@@ -13,13 +13,24 @@ const isCoord = (c: unknown): c is [number, number] =>
   Array.isArray(c) && c.length >= 2 && typeof c[0] === 'number' && typeof c[1] === 'number' && Math.abs(c[0]) <= 180 && Math.abs(c[1]) <= 90;
 const isRing = (r: unknown): r is [number, number][] => Array.isArray(r) && r.length > 0 && r.every(isCoord);
 
+// osmium names areas a<n>: an odd n is the relation (n-1)/2, an even n is the way n/2.
+function objectId(raw: string): string | null {
+  if (ID.test(raw)) return raw;
+  const m = /^a(\d+)$/.exec(raw);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return n % 2 === 1 ? `r${(n - 1) / 2}` : `w${n / 2}`;
+}
+
 function parseFeature(line: string): { id: string; tags: Record<string, string>; geometry: Json } | null {
   let f: unknown;
   try { f = JSON.parse(line.replace(/^\u001e/, '')); } catch { return null; }
-  if (!isObject(f) || typeof f['id'] !== 'string' || !ID.test(f['id']) || !isObject(f['properties']) || !isObject(f['geometry'])) return null;
+  if (!isObject(f) || typeof f['id'] !== 'string' || !isObject(f['properties']) || !isObject(f['geometry'])) return null;
+  const id = objectId(f['id']);
+  if (id === null) return null;
   const tags: Record<string, string> = {};
   for (const [k, v] of Object.entries(f['properties'])) if (typeof v === 'string') tags[k] = v;
-  return { id: f['id'], tags, geometry: f['geometry'] };
+  return { id, tags, geometry: f['geometry'] };
 }
 
 // Rings of a Polygon or MultiPolygon, as [lon, lat]; null when the geometry is none of these or is broken.

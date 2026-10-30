@@ -64,3 +64,10 @@ test('parseBoundaryLine: rings stay lon/lat, tags are kept, points and junk give
   expect(parseBoundaryLine(point('n1', { admin_level: '2' }))).toBeNull();
   expect(parseBoundaryLine('{ nope')).toBeNull();
 });
+
+test('parseGeoJsonLine: osmium names areas a<n>; odd n is relation (n-1)/2, even n is way n/2', () => {
+  const area = (id: string): string => JSON.stringify({ type: 'Feature', id, properties: { tourism: 'camp_site' }, geometry: { type: 'MultiPolygon', coordinates: [[[[8, 49], [9, 49], [9, 50], [8, 49]]]] } });
+  expect(parseGeoJsonLine(area('a815827'))!.id).toBe('r407913');
+  expect(parseGeoJsonLine(area('a1000'))!.id).toBe('w500');
+  expect(parseBoundaryLine(area('a815827'))!.id).toBe('r407913');
+});

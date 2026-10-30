@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { BoundaryIndex } from '../../../pipeline/boundaries.ts';
 import type { BoundaryFeature, Ring } from '../../../pipeline/boundaries.ts';
 import { COUNTRY_JOBS, SETTINGS } from '../../../pipeline/config.ts';
-import { checkSentinels, makeZoneOf } from '../../../pipeline/zones.ts';
+import { checkSentinels, describeBoundaries, makeZoneOf } from '../../../pipeline/zones.ts';
 import { COUNTRY_CODES } from '../../../src/core/places/countries.ts';
 
 const square = (x0: number, y0: number, x1: number, y1: number): Ring => [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]];
@@ -89,4 +89,12 @@ test('[PIPE-ZONE-02] a neighbour state that overlaps the border does not become 
   const withAustria = [feature('at', [square(10, 49, 11, 49.5)], { admin_level: '4', 'ISO3166-2': 'AT-7' }), ...de];
   const zoneOf = makeZoneOf(COUNTRY_JOBS.DE, 'DE', new BoundaryIndex(withAustria, 0.25));
   expect(zoneOf(49.2, 10.5)).toMatchObject({ subdivision: 'DE-BY', holidayZone: 'DE-BY' });
+});
+
+test('describeBoundaries lists level, ISO code, name and ring count of each feature, at most 40', () => {
+  const fs = Array.from({ length: 50 }, (_, i) => feature(`r${i}`, [square(0, 0, 1, 1)], { admin_level: '2', 'ISO3166-1': 'LU', name: `N${i}` }));
+  const lines = describeBoundaries(fs);
+  expect(lines).toHaveLength(41);
+  expect(lines[0]).toBe('r0 level=2 iso1=LU iso2=- name=N0 rings=1');
+  expect(lines[40]).toMatch(/10 more/);
 });

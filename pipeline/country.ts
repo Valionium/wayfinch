@@ -11,7 +11,7 @@ import { COUNTRY_JOBS, SETTINGS } from './config.ts';
 import { writeCountryOutput } from './country-output.ts';
 import { boundaryFilterArgs, boundaryLevelArgs, placeFilterArgs } from './filters.ts';
 import { readBoundaries, readObjects } from './read-geojson.ts';
-import { checkSentinels, makeZoneOf } from './zones.ts';
+import { checkSentinels, describeBoundaries, makeZoneOf } from './zones.ts';
 import { COUNTRY_CODES } from '../src/core/places/countries.ts';
 import type { CountryCode } from '../src/core/places/countries.ts';
 
@@ -76,11 +76,18 @@ async function main(): Promise<number> {
   stamp('filter and export', t);
 
   t = Date.now();
-  const index = new BoundaryIndex(await readBoundaries(createReadStream(f('bounds.geojsonseq'))), BOUNDARY_CELL_DEG);
+  const features = await readBoundaries(createReadStream(f('bounds.geojsonseq')));
+  const index = new BoundaryIndex(features, BOUNDARY_CELL_DEG);
   const zoneOf = makeZoneOf(job, cc, index);
   const problems = checkSentinels(job, zoneOf);
   if (problems.length > 0) {
-    console.error(`${cc}: boundary check failed:\n  ${problems.join('\n  ')}`);
+    // What the boundary file really holds.
+    for (const type of ['Point', 'LineString', 'Polygon', 'MultiPolygon']) {
+      console.error(type, await sh('grep', ['-c', '-F', `"geometry":{"type":"${type}"`, f('bounds.geojsonseq')]).catch(() => '0'));
+    }
+    console.error(await sh('grep', ['-m', '3', '-o', '-E', '^.{0,100}"MultiPolygon"', f('bounds.geojsonseq')]).catch(() => 'none'));
+    console.error(await sh("grep", ["-m", "3", "-o", "-E", "\]\]\]\]\},\"properties\":.{0,250}", f("bounds.geojsonseq")]).catch(() => "none"));
+    console.error(`${cc}: boundary check failed:\n  ${problems.join('\n  ')}\nboundaries in the extract:\n  ${describeBoundaries(features).join('\n  ')}`);
     return 2;
   }
   const out = await classifyCountry(readObjects(createReadStream(f('places.geojsonseq'))), zoneOf, cc, sourceDate, { builtOn, drinkPlaces: SETTINGS.drinkPlaces, settlementAltNames: SETTINGS.settlementAltNames });
