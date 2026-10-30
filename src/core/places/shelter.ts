@@ -1,3 +1,4 @@
+import type { OsmObject } from './types.ts';
 // Rain shelters of spec section 6.0 and section 5a step 7.
 
 const SPELLINGS: Record<string, string> = {
@@ -26,4 +27,37 @@ export function isNeverCover(tags: Record<string, string>): boolean {
   if (type === null || !COVER_TYPES.includes(type)) return true;
   const access = v(tags, 'access');
   return access === 'private' || access === 'no' || v(tags, 'disused') === 'yes' || v(tags, 'abandoned') === 'yes';
+}
+
+const byId = (a: OsmObject, b: OsmObject): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+// Even-odd test over every ring, so holes count as outside. Points are [lat, lon].
+function inside(ring: [number, number][][], lat: number, lon: number): boolean {
+  let odd = false;
+  for (const r of ring) {
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const [yi, xi] = r[i]!;
+      const [yj, xj] = r[j]!;
+      if (yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) odd = !odd;
+    }
+  }
+  return odd;
+}
+
+/**
+ * A shelter drawn both as an outline and as a node is kept once, as the outline, with the node's
+ * tags added where the outline has none (section 5a step 7). The result is sorted by id.
+ */
+export function mergeOutlinesAndNodes(shelters: OsmObject[]): OsmObject[] {
+  const outlines = shelters.filter((o) => o.polygon !== null).sort(byId);
+  const nodes = shelters.filter((o) => o.polygon === null).sort(byId);
+  const merged = new Map(outlines.map((o) => [o.id, { ...o, tags: { ...o.tags } }]));
+  const kept: OsmObject[] = [];
+  for (const n of nodes) {
+    const home = outlines.find((o) => inside(o.polygon!, n.lat, n.lon));
+    if (!home) { kept.push(n); continue; }
+    const target = merged.get(home.id)!;
+    for (const [k, value] of Object.entries(n.tags)) if (!(k in target.tags)) target.tags[k] = value;
+  }
+  return [...merged.values(), ...kept].sort(byId);
 }

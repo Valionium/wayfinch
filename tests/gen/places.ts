@@ -89,3 +89,30 @@ export const osmTags = (): fc.Arbitrary<Record<string, string>> =>
     ),
     { maxKeys: 12 },
   );
+
+const SHELTER_TYPES = ['lean_to', 'basic_hut', 'weather_shelter', 'Wetterpilz', 'wetterpilz', 'picnic shelter', 'public_transport', 'field_shelter', 'sun_shelter',
+  'pergola', 'gazebo', 'pavilion', 'rock_shelter', 'shopping_cart', 'smoking', '', 'LEAN-TO'];
+
+/** Tags of shelters and look-alikes, with wrong values, odd spellings, private access and hunting stands. */
+export const shelterTags = (): fc.Arbitrary<Record<string, string>> =>
+  fc.record({
+    amenity: fc.constantFrom('shelter', 'shelter', 'shelter', 'hunting_stand', 'bench'),
+    shelter_type: fc.option(fc.constantFrom(...SHELTER_TYPES), { nil: undefined }),
+    access: fc.option(fc.constantFrom('yes', 'private', 'no', 'customers'), { nil: undefined }),
+    disused: fc.option(fc.constantFrom('yes', 'no'), { nil: undefined }),
+    abandoned: fc.option(fc.constantFrom('yes', 'no'), { nil: undefined }),
+    bench: fc.option(fc.constantFrom('yes', 'no'), { nil: undefined }),
+  }).map((r) => Object.fromEntries(Object.entries(r).filter(([, v]) => v !== undefined)) as Record<string, string>);
+
+/** Bus stops that all have a roof, close together, under one of three names: the cases of the 30 m merge rule. */
+export const stopCluster = (): fc.Arbitrary<import('../../src/core/places/types.ts').OsmObject[]> =>
+  fc.array(
+    fc.record({ dy: fc.integer({ min: 0, max: 120 }), name: fc.constantFrom('Markt', 'Dorf', 'Bahnhof'), kind: fc.constantFrom('highway', 'platform') }),
+    { minLength: 1, maxLength: 8 },
+  ).map((items) => items.map((s, i) => {
+    const lat = Math.round((49.4 + s.dy / 111195) * 1e5) / 1e5;
+    const tags: Record<string, string> = s.kind === 'highway'
+      ? { highway: 'bus_stop', shelter: 'yes', name: s.name }
+      : { public_transport: 'platform', bus: 'yes', shelter: 'yes', name: s.name };
+    return { id: `n${i + 1}`, lat, lon: 8.7, tags, points: [[lat, 8.7]] as [number, number][], polygon: null };
+  }));

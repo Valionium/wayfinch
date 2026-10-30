@@ -8,6 +8,6 @@ export const latLng = (): fc.Arbitrary<LatLng> =>
     lon: fc.double({ min: -180, max: 180, noNaN: true }),
   });
 
-export { coordinate, osmTags, place, zoneOf, GEN_DATA_DATE } from './places.ts';
+export { coordinate, osmTags, place, shelterTags, stopCluster, zoneOf, GEN_DATA_DATE } from './places.ts';
 export { hoursValue } from './hours.ts';
 export { metaManifest, packEntry, packManifest, rescuePoint, roof, sha256Hex, tileBytes, tileContent, tileFileFor } from './packs.ts';
