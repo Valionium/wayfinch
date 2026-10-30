@@ -44,3 +44,11 @@ export function checkSentinels(job: CountryJob, zoneOf: (lat: number, lon: numbe
   }
   return problems;
 }
+
+// A short look at what the extract really holds, printed when a sentinel fails.
+export function describeBoundaries(features: BoundaryFeature[]): string[] {
+  const shown = features.slice(0, 40).map((f) =>
+    `${f.id} level=${f.tags['admin_level'] ?? '-'} iso1=${f.tags['ISO3166-1'] ?? '-'} iso2=${f.tags['ISO3166-2'] ?? '-'} name=${f.tags['name'] ?? '-'} rings=${f.rings.length}`);
+  if (features.length > 40) shown.push(`... and ${features.length - 40} more`);
+  return shown;
+}
