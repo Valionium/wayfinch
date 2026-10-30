@@ -1,0 +1,103 @@
+{
+  "v": 1,
+  "buildId": "20261028-1",
+  "builtAt": "2026-10-28T00:00:00Z",
+  "licence": {
+    "name": "ODbL-1.0",
+    "url": "https://opendatacommons.org/licenses/odbl/1-0/",
+    "attribution": "© OpenStreetMap contributors",
+    "buildCode": "https://github.com/Valionium/wayfinch"
+  },
+  "countries": {
+    "DE": {
+      "status": "fresh",
+      "builtOn": "2026-10-28",
+      "sourceDate": "2026-10-26",
+      "places": 1280
+    },
+    "FR": {
+      "status": "fresh",
+      "builtOn": "2026-10-28",
+      "sourceDate": "2026-10-26",
+      "places": 39
+    }
+  },
+  "kinds": [
+    "water",
+    "shop",
+    "cafe",
+    "restaurant",
+    "fuel_shop",
+    "campsite",
+    "shelter",
+    "hut",
+    "lodging",
+    "bike_shop",
+    "repair_station",
+    "air",
+    "pharmacy",
+    "hospital",
+    "station",
+    "toilets",
+    "settlement",
+    "drink",
+    "ice_cream"
+  ],
+  "tiles": [
+    {
+      "z": 9,
+      "x": 267,
+      "y": 394,
+      "sha256": "bfbe0decf9e07a8c3d4b70bf7c5a63cd91536e302136372f66b340dc4d7c709b",
+      "bytes": 98305,
+      "gzipBytes": 12121,
+      "places": 502,
+      "roofs": 23,
+      "rescuePoints": 6
+    },
+    {
+      "z": 9,
+      "x": 267,
+      "y": 395,
+      "sha256": "9101703fc7d633bb8a6d48b9671e36df888f0f3c008f765e3cced0ba9cbdba77",
+      "bytes": 88913,
+      "gzipBytes": 10948,
+      "places": 459,
+      "roofs": 22,
+      "rescuePoints": 5
+    },
+    {
+      "z": 9,
+      "x": 267,
+      "y": 396,
+      "sha256": "d3351c386e4c90ff967ed03603e799e30b485cf4875707d0e5e1f4a8f00bc5de",
+      "bytes": 18054,
+      "gzipBytes": 2958,
+      "places": 88,
+      "roofs": 10,
+      "rescuePoints": 2
+    },
+    {
+      "z": 9,
+      "x": 268,
+      "y": 395,
+      "sha256": "3aab86bedad83f45aa22dff245f69365fea3c4dafb09f1f7a0a2fe9df3716f2c",
+      "bytes": 6794,
+      "gzipBytes": 1591,
+      "places": 35,
+      "roofs": 2,
+      "rescuePoints": 1
+    },
+    {
+      "z": 9,
+      "x": 268,
+      "y": 396,
+      "sha256": "f370a526d318283994b47f8f5d3e2605e26b0de181cb2be4d45da73cfd3c2a97",
+      "bytes": 47274,
+      "gzipBytes": 6268,
+      "places": 235,
+      "roofs": 9,
+      "rescuePoints": 2
+    }
+  ]
+}
