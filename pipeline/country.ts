@@ -81,6 +81,8 @@ async function main(): Promise<number> {
   const zoneOf = makeZoneOf(job, cc, index);
   const problems = checkSentinels(job, zoneOf);
   if (problems.length > 0) {
+    for (const name of ['bounds', 'places']) console.error(`first lines of ${name}.geojsonseq:
+${await sh('head', ['-c', '500', f(`${name}.geojsonseq`)])}`);
     console.error(`${cc}: boundary check failed:\n  ${problems.join('\n  ')}\nboundaries in the extract:\n  ${describeBoundaries(features).join('\n  ')}`);
     return 2;
   }
