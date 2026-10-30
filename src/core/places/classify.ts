@@ -1,13 +1,17 @@
 // Kinds of spec section 6.0: one kind per object, first match wins.
 import { readPhones, readWebsite } from './contact.ts';
 import type { CountryCode } from './countries.ts';
+import { NearIndex as NearIndexClass } from './near.ts';
+import type { NearIndex } from './near.ts';
 import { isNeverCover } from './shelter.ts';
+import { stopFlags } from './stop-flags.ts';
 import type { OsmObject, Place, PlaceKind } from './types.ts';
 import { keepTags, limitedText, MAX_HOURS, MAX_NAME } from './whitelist.ts';
 import { waterClass } from './water.ts';
 
 export type Zone = { country: CountryCode; subdivision: string | null; hoursRegionKey: string | null; holidayZone: string; timeZone: string };
-export type PlaceContext = { zone: Zone; inCemetery: boolean; onCampsite: boolean; sourceDate: string };
+// bikeParking is the index of the bike parking around, for the stop flags; without it no place has parking near.
+export type PlaceContext = { zone: Zone; inCemetery: boolean; onCampsite: boolean; sourceDate: string; bikeParking?: NearIndex<OsmObject> };
 export type ClassifyOptions = { drinkPlaces: boolean; settlementAltNames: boolean };
 
 const v = (tags: Record<string, string>, key: string): string | undefined => tags[key]?.trim().toLowerCase();
@@ -29,7 +33,8 @@ export function kindOf(tags: Record<string, string>, opts: ClassifyOptions): Pla
   if (tourism === 'wilderness_hut' || tourism === 'alpine_hut') return 'hut';
   if (isOneOf(tourism, ['hostel', 'guest_house', 'hotel', 'motel'])) return 'lodging';
   if (amenity === 'shelter') return isNeverCover(tags) ? null : 'shelter';
-  if (amenity === 'fuel' && shop !== undefined && shop !== 'no' && v(tags, 'automated') !== 'yes') return 'fuel_shop';
+  // A fuel station is a place only with a shop, and never an automated one; it is no other kind either.
+  if (amenity === 'fuel') return shop !== undefined && shop !== 'no' && v(tags, 'automated') !== 'yes' ? 'fuel_shop' : null;
   if (shop === 'bicycle') return 'bike_shop';
   if (amenity === 'bicycle_repair_station') return 'repair_station';
   if (amenity === 'compressed_air') return 'air';
@@ -46,6 +51,8 @@ export function kindOf(tags: Record<string, string>, opts: ClassifyOptions): Pla
 }
 
 const CONTACT_KINDS: PlaceKind[] = ['campsite', 'lodging', 'bike_shop'];
+const STOP_KINDS: PlaceKind[] = ['shop', 'cafe', 'restaurant', 'drink', 'ice_cream', 'fuel_shop'];
+const EMPTY_INDEX = new NearIndexClass<OsmObject>([], () => [0, 0], 50);
 const round5 = (n: number): number => Math.round(n * 1e5) / 1e5;
 
 /** A place for the pack, or null when the object is none (section 6.0, 5a steps 5-7 and 12). */
@@ -82,6 +89,7 @@ export function classifyObject(o: OsmObject, ctx: PlaceContext, opts: ClassifyOp
     holidayZone: ctx.zone.holidayZone, timeZone: ctx.zone.timeZone,
     tags: keepTags(kind, tags, { settlementAltNames: opts.settlementAltNames, inCemetery: ctx.inCemetery }),
     source: 'pack', dataDate: ctx.sourceDate,
-    stop: null, platformRoof: null, contact,
+    stop: STOP_KINDS.includes(kind) ? stopFlags(tags, ctx.bikeParking ?? EMPTY_INDEX, [o.lat, o.lon]) : null,
+    platformRoof: null, contact,
   };
 }
