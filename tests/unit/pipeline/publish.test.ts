@@ -1,5 +1,5 @@
 import fc from 'fast-check';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, expect, test as plain } from 'vitest';
@@ -89,6 +89,23 @@ plain('a problem means no deployment folder is offered', async () => {
   const r = await prepareDeployment({ builds: [{ buildId: '20261028-1', builtAt: '2026-10-28T00:00:00Z', dir: FIXTURE_BUILD }], newest: '20261028-1', outDir: tmp(), limits: { maxFiles: 3, maxFileBytes: 26214400 } });
   expect(r.dir).toBeNull();
   expect(r.problems.join()).toMatch(/files/);
+});
+
+plain('a build folder without a readable manifest is refused before any entry point is written', async () => {
+  const r = await prepareDeployment({ builds: [{ buildId: '20261028-1', builtAt: '2026-10-28T00:00:00Z', dir: tmp() }], newest: '20261028-1', outDir: tmp(), limits });
+  expect(r.dir).toBeNull();
+  expect(r.problems.join()).toMatch(/manifest/);
+});
+
+plain('a manifest that lists a tile the folder lacks is refused', async () => {
+  const copy = tmp();
+  cpSync(FIXTURE_BUILD, copy, { recursive: true });
+  const manifest = JSON.parse(readFileSync(path.join(copy, 'manifest.json'), 'utf8')) as { tiles: { z: number; x: number; y: number }[] };
+  const t = manifest.tiles[0]!;
+  rmSync(path.join(copy, 't', String(t.z), String(t.x), `${t.y}.json`));
+  const r = await prepareDeployment({ builds: [{ buildId: '20261028-1', builtAt: '2026-10-28T00:00:00Z', dir: copy }], newest: '20261028-1', outDir: tmp(), limits });
+  expect(r.dir).toBeNull();
+  expect(r.problems.join()).toMatch(/tile/);
 });
 
 plain('the newest build must be among the builds', async () => {

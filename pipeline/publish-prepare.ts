@@ -1,7 +1,7 @@
 // The folder that is deployed to the data host: the kept builds, the entry point, headers, a real 404 page and a licence page.
-import { cpSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { readEntry } from '../src/data/packs/reader.ts';
+import { readEntry, readManifest } from '../src/data/packs/reader.ts';
 
 export type BuildRecord = { buildId: string; builtAt: string; replacedAt: string | null };
 export type Limits = { maxFiles: number; maxFileBytes: number };
@@ -46,6 +46,16 @@ const INDEX = `<!doctype html>
 `;
 const NOT_FOUND = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Not found</title></head><body><p>Not found.</p></body></html>\n';
 
+// The newest build must read as a whole: its manifest, and every tile the manifest lists.
+function newestProblems(dir: string, buildId: string): string[] {
+  const manifestFile = path.join(dir, 'manifest.json');
+  if (!existsSync(manifestFile)) return [`the manifest of build ${buildId} is missing`];
+  let manifest;
+  try { manifest = readManifest(readFileSync(manifestFile, 'utf8'), JSON.parse(readFileSync(manifestFile, 'utf8')).buildId); }
+  catch (e) { return [`the manifest of build ${buildId} does not read: ${e instanceof Error ? e.message : String(e)}`]; }
+  return manifest.tiles.filter((t) => !existsSync(path.join(dir, 't', String(t.z), String(t.x), `${t.y}.json`))).map((t) => `tile ${t.z}/${t.x}/${t.y} of build ${buildId} is missing`);
+}
+
 export type DeploymentOptions = {
   builds: { buildId: string; builtAt: string; dir: string }[];
   newest: string;
@@ -57,6 +67,8 @@ export type DeploymentOptions = {
 export async function prepareDeployment(opts: DeploymentOptions): Promise<{ dir: string | null; problems: string[] }> {
   const newest = opts.builds.find((b) => b.buildId === opts.newest);
   if (!newest) throw new Error(`the newest build ${opts.newest} is not among the builds`);
+  const intact = newestProblems(newest.dir, newest.buildId);
+  if (intact.length > 0) return { dir: null, problems: intact };
   rmSync(opts.outDir, { recursive: true, force: true });
   mkdirSync(path.join(opts.outDir, 'packs'), { recursive: true });
   for (const b of opts.builds) cpSync(b.dir, path.join(opts.outDir, 'packs', b.buildId), { recursive: true });

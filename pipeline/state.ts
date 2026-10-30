@@ -18,7 +18,7 @@ const nameOf = (cc: string): string => `country-${cc}-last-good`;
 async function listAssets(gh: GhRunner): Promise<{ id: number; name: string }[]> {
   let text: string;
   try {
-    text = await gh(['api', `repos/${repo()}/releases/tags/${RELEASE}`, '--jq', '.assets[] | "\\(.id) \\(.name)"']);
+    text = await gh(['api', `repos/${repo()}/releases/tags/${RELEASE}`, '--jq', '.assets[] | select(.state == "uploaded") | "\\(.id) \\(.name)"']);
   } catch (e) {
     if (/404|Not Found/i.test(String(e instanceof Error ? e.message : e))) return [];     // the release is not made yet
     throw e;
@@ -35,26 +35,43 @@ async function ensureRelease(gh: GhRunner): Promise<void> {
   }
 }
 
-/** The local path of the country's last good file, or null when there is none. A `.new` copy counts. */
+type Asset = { id: number; name: string };
+const leftovers = (assets: Asset[], cc: string): Asset[] =>
+  assets.filter((a) => a.name.startsWith(`${nameOf(cc)}.new-`)).sort((a, b) => b.id - a.id);
+const rename = (gh: GhRunner, a: Asset, to: string): Promise<string> =>
+  gh(['api', '-X', 'PATCH', `repos/${repo()}/releases/assets/${a.id}`, '-f', `name=${to}`]);
+
+/** The local path of the country's last good file, or null when there is none. A leftover copy from a crashed run counts. */
 export async function downloadLastGood(cc: string, dir: string, gh: GhRunner = realGh): Promise<string | null> {
   const assets = await listAssets(gh);
-  const name = [nameOf(cc), `${nameOf(cc)}.new`].find((n) => assets.some((a) => a.name === n));
+  const name = assets.find((a) => a.name === nameOf(cc))?.name ?? leftovers(assets, cc)[0]?.name;
   if (!name) return null;
   mkdirSync(dir, { recursive: true });
   await gh(['release', 'download', RELEASE, '-R', repo(), '-p', name, '-D', dir, '--clobber']);
   return path.join(dir, name);
 }
 
+/**
+ * Upload under a fresh name, delete the old copy, rename the new one. A crash in between leaves a copy under
+ * one name or the other, and the next call puts a leftover back first, so the last good output is never overwritten.
+ */
 export async function replaceLastGood(cc: string, file: string, gh: GhRunner = realGh): Promise<void> {
   await ensureRelease(gh);
   const name = nameOf(cc);
-  const staging = mkdtempSync(path.join(tmpdir(), 'pack-state-'));
-  const staged = path.join(staging, `${name}.new`);
+  let assets = await listAssets(gh);
+  const left = leftovers(assets, cc);
+  if (!assets.some((a) => a.name === name) && left[0]) {
+    await rename(gh, left[0], name);
+    assets = await listAssets(gh);
+  }
+  const fresh = `${name}.new-${process.env['GITHUB_RUN_ID'] ?? Date.now()}`;
+  const staged = path.join(mkdtempSync(path.join(tmpdir(), 'pack-state-')), fresh);
   copyFileSync(file, staged);
   await gh(['release', 'upload', RELEASE, staged, '-R', repo(), '--clobber']);
-  const before = await listAssets(gh);
-  if (before.some((a) => a.name === name)) await gh(['release', 'delete-asset', RELEASE, name, '-R', repo(), '--yes']);
-  const fresh = (await listAssets(gh)).find((a) => a.name === `${name}.new`);
-  if (!fresh) throw new Error(`the uploaded copy of ${cc} is not on the release`);
-  await gh(['api', '-X', 'PATCH', `repos/${repo()}/releases/assets/${fresh.id}`, '-f', `name=${name}`]);
+  assets = await listAssets(gh);
+  const uploaded = assets.find((a) => a.name === fresh);
+  if (!uploaded) throw new Error(`the uploaded copy of ${cc} is not on the release`);
+  if (assets.some((a) => a.name === name)) await gh(['release', 'delete-asset', RELEASE, name, '-R', repo(), '--yes']);
+  await rename(gh, uploaded, name);
+  for (const old of leftovers(assets, cc)) if (old.id !== uploaded.id) await gh(['release', 'delete-asset', RELEASE, old.name, '-R', repo(), '--yes']);
 }

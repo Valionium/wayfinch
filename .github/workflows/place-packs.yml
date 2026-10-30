@@ -12,6 +12,11 @@ on:
 permissions:
   contents: read
 
+# Runs never overlap: two merges would meddle with the same stored files.
+concurrency:
+  group: place-packs
+  cancel-in-progress: false
+
 jobs:
   setup:
     runs-on: ubuntu-24.04

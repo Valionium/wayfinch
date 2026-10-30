@@ -1,9 +1,9 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, expect, test } from 'vitest';
 import type { CountryOutput } from '../../../pipeline/classify-country.ts';
-import { chooseCountryInputs, mergeBuild } from '../../../pipeline/merge.ts';
+import { chooseCountryInputs, mergeBuild, readOutputOrNull } from '../../../pipeline/merge.ts';
 import { readManifest, readTile } from '../../../src/data/packs/reader.ts';
 import { COUNTRY_CODES } from '../../../src/core/places/countries.ts';
 import type { CountryCode } from '../../../src/core/places/countries.ts';
@@ -117,11 +117,19 @@ test('the same inputs give the same bytes', async () => {
   expect(readFileSync(path.join(a.dir, 'manifest.json'), 'utf8')).toBe(readFileSync(path.join(b.dir, 'manifest.json'), 'utf8'));
 });
 
-test('places piled on one spot beyond the limit are a problem, not a crash', async () => {
+test('a crowded spot is reported as a warning, not a problem that blocks the build', async () => {
   const de = output('DE', 0);
   de.places = Array.from({ length: 60 }, (_, i) => placeAt('shop', 49.4, 8.69, { id: `n${i}` }));
-  const { problems } = await mergeBuild(chooseCountryInputs(fresh(de), new Map(), 0.2), { ...opts(), outDir: tmp() });
-  expect(problems.join()).toMatch(/60/);
+  const r = await mergeBuild(chooseCountryInputs(fresh(de), new Map(), 0.2), { ...opts(), outDir: tmp() });
+  expect(r.problems).toEqual([]);
+  expect(r.warnings.join()).toMatch(/60/);
+});
+
+test('a damaged country file counts as no file instead of stopping the build', async () => {
+  const bad = path.join(tmp(), 'bad.json.gz');
+  writeFileSync(bad, 'this is not gzip');
+  expect(await readOutputOrNull(bad)).toEqual({ output: null, error: expect.any(String) });
+  expect(await readOutputOrNull(path.join(tmp(), 'missing.json.gz'))).toEqual({ output: null, error: expect.any(String) });
 });
 
 test('with write off nothing is written, but the manifest is the same', async () => {

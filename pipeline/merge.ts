@@ -50,11 +50,12 @@ const sha256 = (text: string): string => createHash('sha256').update(text).diges
 const tileKey = (t: TileId): string => `${t.z}/${t.x}/${t.y}`;
 const DROPPED_WITHOUT_DRINKS = ['drink', 'ice_cream'];
 
-export async function mergeBuild(inputs: Map<CountryCode, CountryInput>, opts: MergeOptions): Promise<{ dir: string; manifest: PackManifest; problems: string[]; shares: Map<string, Record<string, number>> }> {
+export async function mergeBuild(inputs: Map<CountryCode, CountryInput>, opts: MergeOptions): Promise<{ dir: string; manifest: PackManifest; problems: string[]; warnings: string[]; shares: Map<string, Record<string, number>> }> {
   const write = opts.write ?? true;
   const dir = opts.outDir ?? mkdtempSync(path.join(tmpdir(), 'pack-build-'));
   const shares = new Map<string, Record<string, number>>();
   const problems: string[] = [];
+  const warnings: string[] = [];
   const places: Place[] = []; const roofs: Roof[] = []; const rescuePoints: PackRescuePoint[] = [];
   const seenPlaces = new Set<string>(); const seenRoofs = new Set<string>(); const seenRescue = new Set<string>();
   const countries: PackManifest['countries'] = {};
@@ -86,7 +87,7 @@ export async function mergeBuild(inputs: Map<CountryCode, CountryInput>, opts: M
   const entries: ManifestTile[] = [];
   const ordered = [...tiles.values()].sort((a, b) => a.id.z - b.id.z || a.id.x - b.id.x || a.id.y - b.id.y);
   for (const t of ordered) {
-    if (t.places.length > opts.maxPerTile) problems.push(`tile ${tileKey(t.id)} holds ${t.places.length} places, over the limit of ${opts.maxPerTile}, at the deepest level ${DEEPEST_LEVEL}`);
+    if (t.places.length > opts.maxPerTile) warnings.push(`tile ${tileKey(t.id)} holds ${t.places.length} places, over the limit of ${opts.maxPerTile}, at the deepest level ${DEEPEST_LEVEL}`);
     const text = encodeTile({ places: t.places, roofs: t.roofs, rescuePoints: t.rescuePoints }, t.id);
     const bytes = Buffer.byteLength(text);
     if (bytes > SETTINGS.maxFileBytes) problems.push(`tile ${tileKey(t.id)} is ${bytes} bytes, over the host limit of ${SETTINGS.maxFileBytes}`);
@@ -113,7 +114,16 @@ export async function mergeBuild(inputs: Map<CountryCode, CountryInput>, opts: M
     mkdirSync(dir, { recursive: true });
     writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(manifest));
   }
-  return { dir, manifest, problems, shares };
+  return { dir, manifest, problems, warnings, shares };
+}
+
+/** A damaged or missing country file counts as no file, with the reason, instead of stopping the whole build. */
+export async function readOutputOrNull(file: string): Promise<{ output: CountryOutput | null; error: string | null }> {
+  try {
+    return { output: await readCountryOutput(file), error: null };
+  } catch (e) {
+    return { output: null, error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 // ---------- command line ----------
@@ -177,21 +187,28 @@ async function main(): Promise<number> {
   const fresh = new Map<CountryCode, CountryOutput>();
   for (const cc of COUNTRY_CODES) {
     const file = [path.join(inDir, `country-${cc}`, `country-${cc}.json.gz`), path.join(inDir, `country-${cc}.json.gz`)].find((f) => existsSync(f));
-    if (file) { files.set(cc, file); fresh.set(cc, await readCountryOutput(file)); }
+    if (file) {
+      const r = await readOutputOrNull(file);
+      if (r.output) { files.set(cc, file); fresh.set(cc, r.output); } else console.error(`${cc}: the new output could not be read (${r.error}); the last good one is used`);
+    }
   }
   const lastGood = new Map<CountryCode, CountryOutput>();
   if (useState) {
     for (const cc of COUNTRY_CODES) {
       const file = await downloadLastGood(cc, path.join(tmpdir(), 'pack-last-good'));
-      if (file) lastGood.set(cc, await readCountryOutput(file));
+      if (file) {
+        const r = await readOutputOrNull(file);
+        if (r.output) lastGood.set(cc, r.output); else console.error(`${cc}: the last good output could not be read (${r.error}); it is treated as missing`);
+      }
     }
   }
   const inputs = chooseCountryInputs(fresh, lastGood, SETTINGS.countDropLimit);
   mkdirSync(outDir, { recursive: true });
-  const { manifest, problems, dir } = await mergeBuild(inputs, { buildId, builtAt, maxPerTile: SETTINGS.maxPlacesPerTile, drinkPlaces: SETTINGS.drinkPlaces, outDir: path.join(outDir, buildId) });
+  const { manifest, problems, warnings, dir } = await mergeBuild(inputs, { buildId, builtAt, maxPerTile: SETTINGS.maxPlacesPerTile, drinkPlaces: SETTINGS.drinkPlaces, outDir: path.join(outDir, buildId) });
   const text = summary(manifest, inputs) + (process.argv.includes('--size-report') ? await sizeSection(inputs, builtAt) : '');
   console.log(text);
   if (process.env['GITHUB_STEP_SUMMARY']) appendFileSync(process.env['GITHUB_STEP_SUMMARY'], text);
+  if (warnings.length > 0) console.error(`merge warnings:\n  ${warnings.join('\n  ')}`);
   if (problems.length > 0) { console.error(`merge problems:\n  ${problems.join('\n  ')}`); return 1; }
   if (useState) for (const [cc, input] of inputs) if (input.status === 'fresh') await replaceLastGood(cc, files.get(cc)!);
   console.log(`build written to ${dir}`);
