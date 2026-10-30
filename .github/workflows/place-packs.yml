@@ -54,3 +54,36 @@ jobs:
           path: pipeline/out/country-*.json.gz
           retention-days: 7
           if-no-files-found: error
+
+  merge:
+    needs: country
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: country-*
+          path: pipeline/in
+      - name: Merge the countries into one build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --max-old-space-size=12000 pipeline/merge.ts \
+            --build-id "$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}" \
+            --built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: place-pack-build
+          path: pipeline/build
+          retention-days: 7
+          if-no-files-found: error
