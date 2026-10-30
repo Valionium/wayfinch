@@ -85,7 +85,8 @@ async function main(): Promise<number> {
     for (const type of ['Point', 'LineString', 'Polygon', 'MultiPolygon']) {
       console.error(type, await sh('grep', ['-c', '-F', `"geometry":{"type":"${type}"`, f('bounds.geojsonseq')]).catch(() => '0'));
     }
-    console.error(await sh('osmium', ['fileinfo', '-e', f('bounds.pbf')]).catch((e: unknown) => String(e)));
+    console.error(await sh('grep', ['-m', '3', '-o', '-E', '^.{0,100}"MultiPolygon"', f('bounds.geojsonseq')]).catch(() => 'none'));
+    console.error(await sh("grep", ["-m", "3", "-o", "-E", "\]\]\]\]\},\"properties\":.{0,250}", f("bounds.geojsonseq")]).catch(() => "none"));
     console.error(`${cc}: boundary check failed:\n  ${problems.join('\n  ')}\nboundaries in the extract:\n  ${describeBoundaries(features).join('\n  ')}`);
     return 2;
   }
