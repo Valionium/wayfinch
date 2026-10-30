@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, expect, test } from 'vitest';
@@ -122,4 +122,21 @@ test('places piled on one spot beyond the limit are a problem, not a crash', asy
   de.places = Array.from({ length: 60 }, (_, i) => placeAt('shop', 49.4, 8.69, { id: `n${i}` }));
   const { problems } = await mergeBuild(chooseCountryInputs(fresh(de), new Map(), 0.2), { ...opts(), outDir: tmp() });
   expect(problems.join()).toMatch(/60/);
+});
+
+test('with write off nothing is written, but the manifest is the same', async () => {
+  const make = () => chooseCountryInputs(fresh(output('DE', 120)), new Map(), 0.2);
+  const written = await mergeBuild(make(), { ...opts(), outDir: tmp() });
+  const dir = tmp();
+  const dry = await mergeBuild(make(), { ...opts(), outDir: dir, write: false });
+  expect(JSON.stringify(dry.manifest)).toBe(JSON.stringify(written.manifest));
+  expect(readdirSync(dir)).toEqual([]);
+});
+
+test('the build reports, per tile, how many places each country holds', async () => {
+  const { shares, manifest } = await mergeBuild(chooseCountryInputs(fresh(output('DE', 3), output('FR', 2)), new Map(), 0.2), { ...opts(), outDir: tmp() });
+  const total: Record<string, number> = {};
+  for (const s of shares.values()) for (const [cc, n] of Object.entries(s)) total[cc] = (total[cc] ?? 0) + n;
+  expect(total).toEqual({ DE: 3, FR: 2 });
+  expect(shares.size).toBe(manifest.tiles.length);
 });

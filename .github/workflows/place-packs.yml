@@ -80,7 +80,8 @@ jobs:
         run: |
           node --max-old-space-size=12000 pipeline/merge.ts \
             --build-id "$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}" \
-            --built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            --built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --size-report
       - uses: actions/upload-artifact@v7
         with:
           name: place-pack-build
