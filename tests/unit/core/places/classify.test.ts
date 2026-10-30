@@ -27,7 +27,8 @@ plain('[PIPE-KIND-01] an object has one kind, in the fixed order', () => {
 plain('[PIPE-KIND-03] heritage and subway stations are not stations', () => {
   expect(kindOf({ railway: 'station' }, opts())).toBe('station');
   expect(kindOf({ railway: 'halt' }, opts())).toBe('station');
-  for (const t of [{ railway: 'station', station: 'subway' }, { railway: 'station', usage: 'tourism' }, { railway: 'station', 'railway:preserved': 'yes' }])
+  const excluded: Record<string, string>[] = [{ railway: 'station', station: 'subway' }, { railway: 'station', usage: 'tourism' }, { railway: 'station', 'railway:preserved': 'yes' }];
+  for (const t of excluded)
     expect(kindOf(t, opts())).toBeNull();
 });
 
@@ -75,7 +76,8 @@ plain('[PIPE-KIND-04] 120 and 255 character limits; control characters removed',
 plain('[CA-KIND] a café with a phone has no contact; a campsite, hostel, alpine hut and bike shop have', () => {
   const phone = { phone: '+49 7221 123456', website: 'www.x.de' };
   expect(classifyObject(obj({ amenity: 'cafe', ...phone }), ctx(), opts())!.contact).toBeNull();
-  for (const t of [{ tourism: 'camp_site' }, { tourism: 'hostel' }, { tourism: 'alpine_hut' }, { shop: 'bicycle' }]) {
+  const kinds: Record<string, string>[] = [{ tourism: 'camp_site' }, { tourism: 'hostel' }, { tourism: 'alpine_hut' }, { shop: 'bicycle' }];
+  for (const t of kinds) {
     expect(classifyObject(obj({ ...t, ...phone }), ctx(), opts())!.contact).toEqual({ phones: ['+49 7221 123456'], website: 'http://www.x.de' });
   }
   expect(classifyObject(obj({ tourism: 'camp_site' }), ctx(), opts())!.contact).toBeNull();
