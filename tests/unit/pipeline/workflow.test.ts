@@ -30,3 +30,16 @@ test('[PIPE-WF-01] user input reaches a script only through an environment varia
   expect(uses.length).toBeGreaterThan(0);
   for (const l of uses) expect(l, l).toMatch(/^\s+[A-Z_]+: \$\{\{\s*inputs\./);
 });
+
+test('[PIPE-WF-01] the merge job waits for the countries, runs even if some fail, and may write releases and issues', () => {
+  const merge = yaml.slice(yaml.indexOf('\n  merge:'));
+  expect(merge).toMatch(/needs: country/);
+  expect(merge).toMatch(/if: \$\{\{ !cancelled\(\) \}\}/);
+  expect(merge).toMatch(/timeout-minutes: 60/);
+  expect(merge).toMatch(/contents: write/);
+  expect(merge).toMatch(/issues: write/);
+  expect(merge).toMatch(/runs-on: ubuntu-24\.04/);
+  expect(merge).toMatch(/pipeline\/merge\.ts/);
+  expect(merge).toMatch(/GH_TOKEN: \$\{\{ github\.token \}\}/);
+  expect(merge).not.toMatch(/secrets\./);
+});
