@@ -1,0 +1,64 @@
+{
+  "v": 1,
+  "buildId": "20261028-1",
+  "builtAt": "2026-10-28T00:00:00Z",
+  "licence": {
+    "name": "ODbL-1.0",
+    "url": "https://opendatacommons.org/licenses/odbl/1-0/",
+    "attribution": "© OpenStreetMap contributors",
+    "buildCode": "https://github.com/Valionium/wayfinch"
+  },
+  "countries": {
+    "DE": {
+      "status": "fresh",
+      "builtOn": "2026-10-28",
+      "sourceDate": "2026-10-26",
+      "places": 798
+    }
+  },
+  "kinds": [
+    "water",
+    "shop",
+    "cafe",
+    "restaurant",
+    "fuel_shop",
+    "campsite",
+    "shelter",
+    "hut",
+    "lodging",
+    "bike_shop",
+    "repair_station",
+    "air",
+    "pharmacy",
+    "hospital",
+    "station",
+    "toilets",
+    "settlement",
+    "drink",
+    "ice_cream"
+  ],
+  "tiles": [
+    {
+      "z": 9,
+      "x": 269,
+      "y": 395,
+      "sha256": "0ea0fafe48fdf6efc64b9a803ac3e93bb74c460988c0851d0b69838e804aef19",
+      "bytes": 150702,
+      "gzipBytes": 18043,
+      "places": 796,
+      "roofs": 40,
+      "rescuePoints": 10
+    },
+    {
+      "z": 9,
+      "x": 269,
+      "y": 396,
+      "sha256": "2b8f62c9f83c92cd6f369424bb2e884833a942428149715a3aaa02888079f766",
+      "bytes": 407,
+      "gzipBytes": 253,
+      "places": 2,
+      "roofs": 0,
+      "rescuePoints": 0
+    }
+  ]
+}

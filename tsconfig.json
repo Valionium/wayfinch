@@ -7,7 +7,9 @@
     "moduleResolution": "bundler",
     "target": "es2022",
     "types": ["node"],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true
   },
-  "include": ["src", "tests", "tools", "vitest.config.ts"]
+  "include": ["src", "tests", "tools", "pipeline", "contracts", "vitest.config.ts"]
 }

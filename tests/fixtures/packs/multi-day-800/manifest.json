@@ -1,0 +1,307 @@
+{
+  "v": 1,
+  "buildId": "20261028-1",
+  "builtAt": "2026-10-28T00:00:00Z",
+  "licence": {
+    "name": "ODbL-1.0",
+    "url": "https://opendatacommons.org/licenses/odbl/1-0/",
+    "attribution": "© OpenStreetMap contributors",
+    "buildCode": "https://github.com/Valionium/wayfinch"
+  },
+  "countries": {
+    "AT": {
+      "status": "fresh",
+      "builtOn": "2026-10-28",
+      "sourceDate": "2026-10-26",
+      "places": 2081
+    },
+    "CH": {
+      "status": "fresh",
+      "builtOn": "2026-10-28",
+      "sourceDate": "2026-10-26",
+      "places": 1346
+    },
+    "DE": {
+      "status": "fresh",
+      "builtOn": "2026-10-28",
+      "sourceDate": "2026-10-26",
+      "places": 571
+    }
+  },
+  "kinds": [
+    "water",
+    "shop",
+    "cafe",
+    "restaurant",
+    "fuel_shop",
+    "campsite",
+    "shelter",
+    "hut",
+    "lodging",
+    "bike_shop",
+    "repair_station",
+    "air",
+    "pharmacy",
+    "hospital",
+    "station",
+    "toilets",
+    "settlement",
+    "drink",
+    "ice_cream"
+  ],
+  "tiles": [
+    {
+      "z": 9,
+      "x": 266,
+      "y": 391,
+      "sha256": "c08e5884263eec480b1e4676fa0f681882c5e7ff9b9b7f4160678fdf72752550",
+      "bytes": 51551,
+      "gzipBytes": 6950,
+      "places": 249,
+      "roofs": 26,
+      "rescuePoints": 5
+    },
+    {
+      "z": 9,
+      "x": 266,
+      "y": 392,
+      "sha256": "85cc6dc6ea1f85c5a82ad19c044aa02c470a78b5a10ac85529f2830ba11e46d7",
+      "bytes": 2620,
+      "gzipBytes": 716,
+      "places": 10,
+      "roofs": 1,
+      "rescuePoints": 0
+    },
+    {
+      "z": 9,
+      "x": 267,
+      "y": 390,
+      "sha256": "3abf5d974bd1ab81b55fbcf921a98225c76d27294d1d80183953110cded4df2d",
+      "bytes": 33290,
+      "gzipBytes": 4994,
+      "places": 168,
+      "roofs": 18,
+      "rescuePoints": 4
+    },
+    {
+      "z": 9,
+      "x": 267,
+      "y": 391,
+      "sha256": "f60885547fc1b3774c09e7abca33d26751025f0509b5bd8a28dca7cafbf82404",
+      "bytes": 33915,
+      "gzipBytes": 5016,
+      "places": 171,
+      "roofs": 15,
+      "rescuePoints": 3
+    },
+    {
+      "z": 9,
+      "x": 267,
+      "y": 392,
+      "sha256": "b0743b8a36c2731db3aaa634a8801ab150352a23ffcfede93c75922796073773",
+      "bytes": 25379,
+      "gzipBytes": 3854,
+      "places": 124,
+      "roofs": 9,
+      "rescuePoints": 3
+    },
+    {
+      "z": 9,
+      "x": 268,
+      "y": 389,
+      "sha256": "a6c27ccd1386b2f870f60e13b58888ac415e854d05dc5ef5acec92a70360c6eb",
+      "bytes": 9923,
+      "gzipBytes": 2027,
+      "places": 52,
+      "roofs": 3,
+      "rescuePoints": 1
+    },
+    {
+      "z": 9,
+      "x": 268,
+      "y": 390,
+      "sha256": "d2fcca5d18492ce1f063e26a96555d7236bbc070709f0e8f5a4fd056e1bf47ec",
+      "bytes": 62484,
+      "gzipBytes": 8707,
+      "places": 330,
+      "roofs": 26,
+      "rescuePoints": 7
+    },
+    {
+      "z": 9,
+      "x": 269,
+      "y": 389,
+      "sha256": "052fe9f3422f5ab252ffb34ddddd151065d6decdd62cda05b82fe46f24dfd83c",
+      "bytes": 82386,
+      "gzipBytes": 10752,
+      "places": 416,
+      "roofs": 38,
+      "rescuePoints": 8
+    },
+    {
+      "z": 9,
+      "x": 269,
+      "y": 390,
+      "sha256": "46f8a40381c23b880100cf64c7344620adbfc553b34f3e5147136b525c2c0be9",
+      "bytes": 50905,
+      "gzipBytes": 7000,
+      "places": 256,
+      "roofs": 18,
+      "rescuePoints": 5
+    },
+    {
+      "z": 9,
+      "x": 269,
+      "y": 391,
+      "sha256": "2758c4b2badd1325508c69a070c16cc5dd43bedbc7b481f61c8f220af4893b89",
+      "bytes": 17491,
+      "gzipBytes": 3056,
+      "places": 89,
+      "roofs": 5,
+      "rescuePoints": 2
+    },
+    {
+      "z": 9,
+      "x": 270,
+      "y": 390,
+      "sha256": "6d77f2e1b7262d9f928dae197d1703f0f7763da3861846f202277a675408fa80",
+      "bytes": 52245,
+      "gzipBytes": 7006,
+      "places": 257,
+      "roofs": 24,
+      "rescuePoints": 5
+    },
+    {
+      "z": 9,
+      "x": 270,
+      "y": 391,
+      "sha256": "68600dea01642a6aa0baa322c85e4dc05eda285015bc12ac6374d5f87d7f1380",
+      "bytes": 15401,
+      "gzipBytes": 2766,
+      "places": 78,
+      "roofs": 4,
+      "rescuePoints": 1
+    },
+    {
+      "z": 9,
+      "x": 271,
+      "y": 390,
+      "sha256": "24f9cadc129a054cd526d504fe3b2ba945bcc07925d922c1642b909dffc1350f",
+      "bytes": 62708,
+      "gzipBytes": 8414,
+      "places": 325,
+      "roofs": 25,
+      "rescuePoints": 7
+    },
+    {
+      "z": 9,
+      "x": 272,
+      "y": 390,
+      "sha256": "e4d0d2707e348e975d8d334e9e2f07672d2bf431a79733a0f70c8f9f30f88c91",
+      "bytes": 70981,
+      "gzipBytes": 9322,
+      "places": 359,
+      "roofs": 29,
+      "rescuePoints": 7
+    },
+    {
+      "z": 9,
+      "x": 272,
+      "y": 391,
+      "sha256": "a0632f1e1fc4bc92d74e8724cef3709ad19ddb92e5bd5c29298d77b42b0c2403",
+      "bytes": 406,
+      "gzipBytes": 255,
+      "places": 2,
+      "roofs": 0,
+      "rescuePoints": 0
+    },
+    {
+      "z": 9,
+      "x": 273,
+      "y": 390,
+      "sha256": "b7a0cea9536591a7049d016663e483410ac8ffa617afd6500a606cea70e37763",
+      "bytes": 2617,
+      "gzipBytes": 859,
+      "places": 13,
+      "roofs": 1,
+      "rescuePoints": 0
+    },
+    {
+      "z": 9,
+      "x": 273,
+      "y": 391,
+      "sha256": "2fbfd1f847aadeb0128dd0a92956ac229ccbad68e906ebb6af12fcc28c2df16e",
+      "bytes": 69133,
+      "gzipBytes": 8909,
+      "places": 336,
+      "roofs": 31,
+      "rescuePoints": 7
+    },
+    {
+      "z": 9,
+      "x": 274,
+      "y": 391,
+      "sha256": "2cd13cfcb349044512328bd773ebf8072aad6502216acc87a7f8d6791ededac6",
+      "bytes": 40489,
+      "gzipBytes": 5791,
+      "places": 201,
+      "roofs": 11,
+      "rescuePoints": 4
+    },
+    {
+      "z": 9,
+      "x": 274,
+      "y": 392,
+      "sha256": "832036f6889de52722acb6544f51803c6fd00c309feaac6d82ae4a544eac7e1f",
+      "bytes": 54222,
+      "gzipBytes": 7341,
+      "places": 272,
+      "roofs": 16,
+      "rescuePoints": 5
+    },
+    {
+      "z": 9,
+      "x": 274,
+      "y": 393,
+      "sha256": "0bd05a07f6f4e33a1ab559e78f9ae8ce3b5d05e3c1a3e59589adcf09fe257350",
+      "bytes": 34277,
+      "gzipBytes": 5027,
+      "places": 169,
+      "roofs": 13,
+      "rescuePoints": 4
+    },
+    {
+      "z": 9,
+      "x": 274,
+      "y": 394,
+      "sha256": "dc4f75979ac09b32e346f0f29ece20d8ae275b259b0b2d99f0e40d8212b76784",
+      "bytes": 278,
+      "gzipBytes": 201,
+      "places": 1,
+      "roofs": 0,
+      "rescuePoints": 0
+    },
+    {
+      "z": 9,
+      "x": 275,
+      "y": 393,
+      "sha256": "98d47ad3d0e28e7a400ee8931a1f4aaca76564a9f4d9eba1eaccbae54be6266b",
+      "bytes": 16895,
+      "gzipBytes": 2869,
+      "places": 82,
+      "roofs": 5,
+      "rescuePoints": 1
+    },
+    {
+      "z": 9,
+      "x": 275,
+      "y": 394,
+      "sha256": "4d876747eca3be115d0274b052a3c8a1d5cd733475efd7e629c215d34667e955",
+      "bytes": 7494,
+      "gzipBytes": 1661,
+      "places": 38,
+      "roofs": 2,
+      "rescuePoints": 1
+    }
+  ]
+}
