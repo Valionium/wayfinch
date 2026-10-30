@@ -1,0 +1,26 @@
+{
+  "name": "wayfinch",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24.15.0 <25"
+  },
+  "scripts": {
+    "types": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "unit": "vitest run",
+    "test": "npm run types && npm run lint && npm run unit",
+    "fast": "node tools/fast.mjs"
+  },
+  "devDependencies": {
+    "@fast-check/vitest": "0.5.0",
+    "@types/node": "24.19.2",
+    "eslint": "10.14.0",
+    "fast-check": "4.10.2",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vitest": "5.0.5"
+  }
+}
