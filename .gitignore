@@ -4,3 +4,4 @@ coverage/
 .env*
 *.pem
 *.key
+pipeline/out/
