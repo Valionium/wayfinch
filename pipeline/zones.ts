@@ -5,12 +5,12 @@ import type { Zone } from '../src/core/places/classify.ts';
 import type { BoundaryFeature, BoundaryIndex } from './boundaries.ts';
 import type { BoundaryPick, CountryJob } from './config.ts';
 
-function matches(pick: BoundaryPick, f: BoundaryFeature): boolean {
+function matches(pick: BoundaryPick, f: BoundaryFeature, cc: CountryCode): boolean {
   const t = f.tags;
   if (t['admin_level'] !== String(pick.level)) return false;
   if (pick.iso1 !== undefined && t['ISO3166-1'] !== pick.iso1) return false;
   if (pick.name !== undefined && t['name'] !== pick.name) return false;
-  if (pick.needsIso2 && !t['ISO3166-2']) return false;
+  if (pick.needsIso2 && !t['ISO3166-2']?.startsWith(`${cc}-`)) return false;   // a neighbour's region is never ours
   if (pick.iso2In && !pick.iso2In.includes(t['ISO3166-2'] ?? '')) return false;
   return true;
 }
@@ -19,8 +19,8 @@ export function makeZoneOf(job: CountryJob, cc: CountryCode, idx: BoundaryIndex)
   const timeZone = COUNTRIES[cc].timeZone;
   return (lat, lon) => {
     const found = idx.lookup(lat, lon);
-    if (!found.some((f) => matches(job.national, f))) return null;
-    const sub = job.subdivision ? found.find((f) => matches(job.subdivision!, f)) : undefined;
+    if (!found.some((f) => matches(job.national, f, cc))) return null;
+    const sub = job.subdivision ? found.find((f) => matches(job.subdivision!, f, cc)) : undefined;
     const subdivision = sub?.tags['ISO3166-2'] ?? null;
     const hoursRegionKey = job.regionalHolidays ? subdivision : null;
     let holidayZone = hoursRegionKey ?? cc;

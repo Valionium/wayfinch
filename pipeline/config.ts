@@ -47,7 +47,7 @@ export const COUNTRY_JOBS: Record<CountryCode, CountryJob> = {
     localZones: [{ level: 6, name: 'Augsburg', inSubdivision: 'DE-BY', zone: 'DE-BY-Augsburg' }],
     sentinels: {
       inside: [['Berlin', 52.52, 13.405, 'DE-BE'], ['München', 48.137, 11.575, 'DE-BY'], ['Augsburg Rathaus', 48.369, 10.898, 'DE-BY-Augsburg'],
-        ['Nürnberg', 49.4521, 11.0767, 'DE-BY'], ['Kehl', 48.5726, 7.8156, 'DE-BW'], ['Büsingen', 47.697, 8.69, null]],
+        ['Nürnberg', 49.4521, 11.0767, 'DE-BY'], ['Kehl', 48.5726, 7.8156, 'DE-BW'], ['Büsingen', 47.697, 8.69, 'DE-BW']],
       outside: [['Strasbourg', 48.5734, 7.7521], ['Zürich', 47.3769, 8.5417]],
     },
   },

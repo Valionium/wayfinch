@@ -84,3 +84,9 @@ test('the country table is complete and the settings are the plan values', () =>
   expect(COUNTRY_JOBS.CZ.geofabrik).toBe('europe/czech-republic');
   for (const cc of COUNTRY_CODES) expect(COUNTRY_JOBS[cc].sentinels.inside.length).toBeGreaterThan(0);
 });
+
+test('[PIPE-ZONE-02] a neighbour state that overlaps the border does not become the subdivision', () => {
+  const withAustria = [feature('at', [square(10, 49, 11, 49.5)], { admin_level: '4', 'ISO3166-2': 'AT-7' }), ...de];
+  const zoneOf = makeZoneOf(COUNTRY_JOBS.DE, 'DE', new BoundaryIndex(withAustria, 0.25));
+  expect(zoneOf(49.2, 10.5)).toMatchObject({ subdivision: 'DE-BY', holidayZone: 'DE-BY' });
+});

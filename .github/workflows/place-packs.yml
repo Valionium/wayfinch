@@ -42,7 +42,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: sudo apt-get install -y osmium-tool
+      - run: sudo apt-get update && sudo apt-get install -y osmium-tool
       - run: osmium --version
       - run: df -h /
       - run: node --max-old-space-size=12000 pipeline/country.ts ${{ matrix.cc }} --built-on "$(date -u +%F)"

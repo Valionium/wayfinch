@@ -86,3 +86,20 @@ test('country output files round-trip, sorted, one record per line', async () =>
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+const platformLine = (extra: Partial<OsmObject> = {}): OsmObject =>
+  ({ id: 'w19', lat: 49.4, lon: 8.7, tags: { amenity: 'bicycle_parking', covered: 'yes' }, points: [[49.4, 8.7], [49.4, 8.701]], polygon: null, ...extra });
+async function* of(...objects: OsmObject[]): AsyncGenerator<OsmObject> { yield* objects; }
+
+test('an object exported twice under one id (line and polygon) counts once, and the polygon wins', async () => {
+  const polygon = platformLine({ polygon: [[[49.4, 8.7], [49.4, 8.701], [49.4001, 8.701], [49.4, 8.7]]] });
+  const out = await run(of(platformLine(), polygon));
+  expect(out.roofs).toHaveLength(1);
+});
+
+test('an object whose centre lies outside the country but whose outline reaches in is kept', async () => {
+  const camp: OsmObject = { id: 'w50', lat: 49.5, lon: 9.6, tags: { tourism: 'camp_site', name: 'Grenzcamping' },
+    points: [[49.5, 9.4], [49.5, 9.8]], polygon: [[[49.49, 9.4], [49.49, 9.8], [49.51, 9.8], [49.51, 9.4], [49.49, 9.4]]] };
+  const out = await run(of(camp));
+  expect(out.places.map((p) => p.id)).toEqual(['w50']);
+});

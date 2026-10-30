@@ -44,6 +44,11 @@ class AreaIndex {
   }
 }
 
+function firstZone(o: OsmObject, zoneOf: (lat: number, lon: number) => Zone | null): Zone | null {
+  for (const [lat, lon] of o.points) { const z = zoneOf(lat, lon); if (z) return z; }
+  return null;
+}
+
 export async function classifyCountry(
   objects: AsyncIterable<OsmObject>,
   zoneOf: (lat: number, lon: number) => Zone | null,
@@ -51,8 +56,13 @@ export async function classifyCountry(
   sourceDate: string,
   opts: CountryOptions,
 ): Promise<CountryOutput> {
-  const all: OsmObject[] = [];
-  for await (const o of objects) all.push(o);
+  // osmium may export a closed way twice (line and polygon) under one id: keep one, the polygon.
+  const byObjectId = new Map<string, OsmObject>();
+  for await (const o of objects) {
+    const seen = byObjectId.get(o.id);
+    if (!seen || (seen.polygon === null && o.polygon !== null)) byObjectId.set(o.id, o);
+  }
+  const all = [...byObjectId.values()];
 
   // Supports: stops, shelters, platforms, bike parking, cemeteries, campsites, shops that may belong to a fuel station.
   const shelters = all.filter((o) => v(o, 'amenity') === 'shelter');
@@ -77,7 +87,8 @@ export async function classifyCountry(
 
   const places: Place[] = [];
   for (const o of [...candidates.values()].sort(byId)) {
-    const zone = zoneOf(o.lat, o.lon);
+    // The centre of an outline may fall outside the country while the object reaches in.
+    const zone = zoneOf(o.lat, o.lon) ?? firstZone(o, zoneOf);
     if (zone === null) continue;
     const maybeWater = waterClass(o.tags, { inCemetery: false }) !== null;
     const place = classifyObject(o, {
