@@ -116,7 +116,8 @@ plain('settlements need a name, not a population', () => {
 plain('a place carries its zone, data date, hours and check date', () => {
   const p = classifyObject(obj({ shop: 'bakery', name: 'B', opening_hours: 'Mo-Sa 07:00-12:00', seasonal: 'no', 'check_date:opening_hours': '2026-09-01', check_date: '2020-01-01' }, { id: 'w77' }), ctx(), opts())!;
   expect(p).toMatchObject({ id: 'w77', lat: 49.40123, lon: 8.69456, country: 'DE', subdivision: 'DE-BW', hoursRegionKey: 'DE-BW', holidayZone: 'DE-BW',
-    timeZone: 'Europe/Berlin', source: 'pack', dataDate: '2026-10-26', openingHours: 'Mo-Sa 07:00-12:00', seasonal: 'no', checkDate: '2026-09-01', stop: null });
+    timeZone: 'Europe/Berlin', source: 'pack', dataDate: '2026-10-26', openingHours: 'Mo-Sa 07:00-12:00', seasonal: 'no', checkDate: '2026-09-01' });
+  expect(p.stop).toEqual({ indoorSeating: null, outdoorSeating: null, toilets: null, takeaway: null, kitchenHours: null, bikeParking50m: false });
   expect(classifyObject(obj({ shop: 'bakery', check_date: '2020-01-01' }), ctx(), opts())!.checkDate).toBe('2020-01-01');
 });
 
