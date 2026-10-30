@@ -1,0 +1,34 @@
+{"type":"Feature","id":"n1","properties":{"man_made":"water_tap","drinking_water":"yes"},"geometry":{"type":"Point","coordinates":[8.69,49.4]}}
+{"type":"Feature","id":"n2","properties":{"shop":"supermarket","name":"Mini Markt","opening_hours":"Mo-Sa 08:00-20:00","phone":"+49 6221 123456"},"geometry":{"type":"Point","coordinates":[8.69,49.403]}}
+{"type":"Feature","id":"n3","properties":{"amenity":"cafe","name":"Mini Cafe"},"geometry":{"type":"Point","coordinates":[8.69,49.406]}}
+{"type":"Feature","id":"n4","properties":{"amenity":"bicycle_parking","covered":"yes"},"geometry":{"type":"Point","coordinates":[8.69,49.4062]}}
+{"type":"Feature","id":"n5","properties":{"highway":"bus_stop","name":"Haltestelle Eins","shelter":"yes"},"geometry":{"type":"Point","coordinates":[8.69,49.409]}}
+{"type":"Feature","id":"n6","properties":{"highway":"bus_stop","name":"Haltestelle Zwei"},"geometry":{"type":"Point","coordinates":[8.69,49.412]}}
+{"type":"Feature","id":"n7","properties":{"amenity":"shelter","shelter_type":"public_transport","bench":"yes"},"geometry":{"type":"Point","coordinates":[8.69,49.412259999999996]}}
+{"type":"Feature","id":"n8","properties":{"amenity":"restaurant","name":"Mini Gasthaus"},"geometry":{"type":"Point","coordinates":[8.69,49.415]}}
+{"type":"Feature","id":"n9","properties":{"amenity":"hospital","name":"Mini Klinik"},"geometry":{"type":"Point","coordinates":[8.69,49.418]}}
+{"type":"Feature","id":"n10","properties":{"amenity":"pharmacy","name":"Mini Apotheke"},"geometry":{"type":"Point","coordinates":[8.69,49.421]}}
+{ this is not json
+{"type":"Feature","id":"n11","properties":{"tourism":"hotel","name":"Mini Hotel"},"geometry":{"type":"Point","coordinates":[8.69,49.424]}}
+{"type":"Feature","id":"w12","properties":{"tourism":"camp_site","name":"Mini Camping"},"geometry":{"type":"Polygon","coordinates":[[[8.69,49.427],[8.690999999999999,49.427],[8.690999999999999,49.428],[8.69,49.428],[8.69,49.427]]]}}
+{"type":"Feature","id":"n13","properties":{"amenity":"drinking_water"},"geometry":{"type":"Point","coordinates":[8.6905,49.4275]}}
+{"type":"Feature","id":"w14","properties":{"landuse":"cemetery"},"geometry":{"type":"Polygon","coordinates":[[[8.69,49.43],[8.690999999999999,49.43],[8.690999999999999,49.431],[8.69,49.431],[8.69,49.43]]]}}
+{"type":"Feature","id":"n15","properties":{"man_made":"water_tap"},"geometry":{"type":"Point","coordinates":[8.6905,49.4305]}}
+{"type":"Feature","id":"w16","properties":{"amenity":"shelter","shelter_type":"lean_to","name":"Mini Huette"},"geometry":{"type":"Polygon","coordinates":[[[8.69,49.433],[8.6904,49.433],[8.6904,49.4334],[8.69,49.4334],[8.69,49.433]]]}}
+{"type":"Feature","id":"n17","properties":{"amenity":"shelter","shelter_type":"lean_to"},"geometry":{"type":"Point","coordinates":[8.690199999999999,49.4332]}}
+{"type":"Feature","id":"n18","properties":{"railway":"station","name":"Mini Bahnhof"},"geometry":{"type":"Point","coordinates":[8.69,49.436]}}
+{"type":"Feature","id":"w19","properties":{"railway":"platform","shelter":"yes"},"geometry":{"type":"LineString","coordinates":[[8.69,49.4365],[8.6904,49.4365]]}}
+{"type":"Feature","id":"n99","properties":{"shop":"bakery"},"geometry":null}
+{"type":"Feature","id":"n20","properties":{"railway":"halt","name":"Mini Halt"},"geometry":{"type":"Point","coordinates":[8.74,49.439]}}
+{"type":"Feature","id":"n21","properties":{"amenity":"fuel","name":"Mini Tank"},"geometry":{"type":"Point","coordinates":[8.69,49.442]}}
+{"type":"Feature","id":"n22","properties":{"shop":"convenience","opening_hours":"24/7"},"geometry":{"type":"Point","coordinates":[8.69,49.4422]}}
+{"type":"Feature","id":"n23","properties":{"place":"village","name":"Minidorf","population":"900"},"geometry":{"type":"Point","coordinates":[8.69,49.445]}}
+{"type":"Feature","id":"n24","properties":{"highway":"emergency_access_point","ref":"KA-145"},"geometry":{"type":"Point","coordinates":[8.69,49.448]}}
+{"type":"Feature","id":"n25","properties":{"amenity":"ice_cream","name":"Mini Eis"},"geometry":{"type":"Point","coordinates":[8.69,49.451]}}
+{"type":"Feature","id":"n26","properties":{"amenity":"pub","name":"Mini Kneipe"},"geometry":{"type":"Point","coordinates":[8.69,49.454]}}
+{"type":"Feature","id":"n27","properties":{"shop":"bicycle","name":"Mini Rad"},"geometry":{"type":"Point","coordinates":[8.69,49.457]}}
+{"type":"Feature","id":"n28","properties":{"amenity":"bicycle_repair_station"},"geometry":{"type":"Point","coordinates":[8.69,49.46]}}
+{"type":"Feature","id":"n29","properties":{"amenity":"compressed_air"},"geometry":{"type":"Point","coordinates":[8.69,49.463]}}
+{"type":"Feature","id":"n30","properties":{"amenity":"toilets"},"geometry":{"type":"Point","coordinates":[8.69,49.466]}}
+{"type":"Feature","id":"n31","properties":{"tourism":"alpine_hut","name":"Mini Huette Alm"},"geometry":{"type":"Point","coordinates":[8.69,49.469]}}
+{"type":"Feature","id":"n32","properties":{"shop":"bakery","name":"Zu weit nördlich"},"geometry":{"type":"Point","coordinates":[8.69,55]}}

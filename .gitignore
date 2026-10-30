@@ -5,3 +5,4 @@ coverage/
 *.pem
 *.key
 pipeline/out/
+pipeline/work/

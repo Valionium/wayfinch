@@ -1,0 +1,56 @@
+name: Place packs
+
+# Started by hand for now: no schedule, no secrets, no publish.
+on:
+  workflow_dispatch:
+    inputs:
+      countries:
+        description: Country codes, separated by commas
+        type: string
+        default: DE,DK,PL,CZ,AT,CH,FR,LU,BE,NL
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - id: matrix
+        env:
+          COUNTRIES: ${{ inputs.countries }}
+        run: |
+          list=$(echo "$COUNTRIES" | tr -d ' ' | tr ',' '\n' | grep -E '^(DE|DK|PL|CZ|AT|CH|FR|LU|BE|NL)$' | sort -u | jq -R . | jq -sc '{cc: .}')
+          if [ "$list" = '{"cc":[]}' ]; then echo "No known country code in the input"; exit 1; fi
+          echo "matrix=$list" >> "$GITHUB_OUTPUT"
+
+  country:
+    needs: setup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: sudo apt-get install -y osmium-tool
+      - run: osmium --version
+      - run: df -h /
+      - run: node --max-old-space-size=12000 pipeline/country.ts ${{ matrix.cc }} --built-on "$(date -u +%F)"
+      - run: df -h /
+        if: ${{ !cancelled() }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: country-${{ matrix.cc }}
+          path: pipeline/out/country-*.json.gz
+          retention-days: 7
+          if-no-files-found: error
