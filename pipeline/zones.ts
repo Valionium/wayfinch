@@ -19,8 +19,9 @@ export function makeZoneOf(job: CountryJob, cc: CountryCode, idx: BoundaryIndex)
   const timeZone = COUNTRIES[cc].timeZone;
   return (lat, lon) => {
     const found = idx.lookup(lat, lon);
-    if (!found.some((f) => matches(job.national, f, cc))) return null;
     const sub = job.subdivision ? found.find((f) => matches(job.subdivision!, f, cc)) : undefined;
+    const inside = job.nationalFromSubdivisions ? sub !== undefined : found.some((f) => matches(job.national, f, cc));
+    if (!inside) return null;
     const subdivision = sub?.tags['ISO3166-2'] ?? null;
     const hoursRegionKey = job.regionalHolidays ? subdivision : null;
     let holidayZone = hoursRegionKey ?? cc;

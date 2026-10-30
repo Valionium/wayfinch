@@ -52,14 +52,16 @@ async function main(): Promise<number> {
   const stamp = (label: string, since: number): void => console.log(`${cc} ${label}: ${Math.round((Date.now() - since) / 1000)} s`);
 
   const url = `https://download.geofabrik.de/${job.geofabrik}-latest.osm.pbf`;
-  // The checksum file is fetched first and retried (Geofabrik can answer 404 while it replaces a file). If file and
-  // checksum disagree, the file may have been replaced between the two requests, so the pair is tried once more.
+  // "-latest" is a redirect (for Germany to a mirror that has no checksum under the "latest" name), so the real address is
+  // looked up first and the file and its checksum both come from it. If they still disagree, the pair is tried once more.
   const curl = ['--fail', '--location', '--retry', '5', '--retry-delay', '30', '--retry-all-errors', '--user-agent', USER_AGENT, '--silent', '--show-error'];
   let t = Date.now();
+  const real = await sh('curl', ['--head', '--location', '--silent', '--show-error', '--fail', '--user-agent', USER_AGENT, '-o', '/dev/null', '-w', '%{url_effective}', url]);
+  if (!/^https:\/\/\S+\.osm\.pbf$/.test(real)) { console.error(`${cc}: unexpected download address ${real}`); return 1; }
   let expected = ''; let actual = '';
   for (let attempt = 1; attempt <= 2; attempt++) {
-    await sh('curl', [...curl, '-o', f('in.pbf.md5'), `${url}.md5`]);
-    await sh('curl', [...curl, '-o', f('in.pbf'), url]);
+    await sh('curl', [...curl, '-o', f('in.pbf.md5'), `${real}.md5`]);
+    await sh('curl', [...curl, '-o', f('in.pbf'), real]);
     expected = readFileSync(f('in.pbf.md5'), 'utf8').trim().split(/\s+/)[0] ?? '';
     actual = await md5(f('in.pbf'));
     if (expected === actual) break;

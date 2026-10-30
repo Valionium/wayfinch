@@ -22,6 +22,7 @@ export type CountryJob = {
   geofabrik: string;
   national: BoundaryPick;
   subdivision: BoundaryPick | null;
+  nationalFromSubdivisions?: boolean;   // the country relation is not built in the extract, so any subdivision of the country counts as inside it
   regionalHolidays: boolean;      // the subdivision is also the hours region key
   localZones: LocalZone[];
   sentinels: Sentinels;
@@ -66,8 +67,9 @@ export const COUNTRY_JOBS: Record<CountryCode, CountryJob> = {
     sentinels: { inside: [['Strasbourg', 48.5734, 7.7521, 'FR-67'], ['Metz', 49.1193, 6.1757, 'FR-57'], ['Paris', 48.8566, 2.3522, 'FR']], outside: [['Kehl', 48.5726, 7.8156], ['Genève Suisse', 46.2044, 6.1432]] },
   },
   NL: {
-    // Level 2 is the whole Kingdom, so the country is level 3 "Nederland".
-    geofabrik: 'europe/netherlands', national: { level: 3, name: 'Nederland' }, subdivision: { level: 4, needsIso2: true }, regionalHolidays: false, localZones: [],
+    // Level 2 is the whole Kingdom and the level 3 relation "Nederland" is not built in the extract (found in the first real run),
+    // so any province counts as the country.
+    geofabrik: 'europe/netherlands', national: { level: 3, name: 'Nederland' }, subdivision: { level: 4, needsIso2: true }, nationalFromSubdivisions: true, regionalHolidays: false, localZones: [],
     sentinels: { inside: [['Amsterdam', 52.3676, 4.9041, 'NL'], ['Maastricht', 50.8514, 5.691, 'NL']], outside: [['Aachen', 50.7753, 6.0839]] },
   },
   DK: {

@@ -98,3 +98,16 @@ test('describeBoundaries lists level, ISO code, name and ring count of each feat
   expect(lines[0]).toBe('r0 level=2 iso1=LU iso2=- name=N0 rings=1');
   expect(lines[40]).toMatch(/10 more/);
 });
+
+test('[PIPE-ZONE-01] the Netherlands: no country relation is built in the extract, so any province is the country', () => {
+  const nl = [
+    feature('nh', [square(4, 52, 5.5, 53)], { admin_level: '4', 'ISO3166-2': 'NL-NH', name: 'Noord-Holland' }),
+    feature('li', [square(5.5, 50.7, 6.2, 51.5)], { admin_level: '4', 'ISO3166-2': 'NL-LI', name: 'Limburg' }),
+    feature('baarle', [square(4.9, 51.4, 5.0, 51.5)], { admin_level: '8', name: 'Baarle-Hertog' }),
+  ];
+  const zoneOf = makeZoneOf(COUNTRY_JOBS.NL, 'NL', new BoundaryIndex(nl, 0.25));
+  expect(zoneOf(52.37, 4.9)).toEqual({ country: 'NL', subdivision: 'NL-NH', hoursRegionKey: null, holidayZone: 'NL', timeZone: 'Europe/Amsterdam' });
+  expect(zoneOf(50.85, 5.69)).toMatchObject({ subdivision: 'NL-LI' });
+  expect(zoneOf(51.45, 4.95)).toBeNull();                // Belgian Baarle-Hertog is not a province
+  expect(zoneOf(48, 2)).toBeNull();
+});
