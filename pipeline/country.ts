@@ -52,12 +52,19 @@ async function main(): Promise<number> {
   const stamp = (label: string, since: number): void => console.log(`${cc} ${label}: ${Math.round((Date.now() - since) / 1000)} s`);
 
   const url = `https://download.geofabrik.de/${job.geofabrik}-latest.osm.pbf`;
-  const curl = ['--fail', '--location', '--retry', '3', '--user-agent', USER_AGENT, '--silent', '--show-error'];
+  // The checksum file is fetched first and retried (Geofabrik can answer 404 while it replaces a file). If file and
+  // checksum disagree, the file may have been replaced between the two requests, so the pair is tried once more.
+  const curl = ['--fail', '--location', '--retry', '5', '--retry-delay', '30', '--retry-all-errors', '--user-agent', USER_AGENT, '--silent', '--show-error'];
   let t = Date.now();
-  await sh('curl', [...curl, '-o', f('in.pbf'), url]);
-  await sh('curl', [...curl, '-o', f('in.pbf.md5'), `${url}.md5`]);
-  const expected = readFileSync(f('in.pbf.md5'), 'utf8').trim().split(/\s+/)[0];
-  const actual = await md5(f('in.pbf'));
+  let expected = ''; let actual = '';
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    await sh('curl', [...curl, '-o', f('in.pbf.md5'), `${url}.md5`]);
+    await sh('curl', [...curl, '-o', f('in.pbf'), url]);
+    expected = readFileSync(f('in.pbf.md5'), 'utf8').trim().split(/\s+/)[0] ?? '';
+    actual = await md5(f('in.pbf'));
+    if (expected === actual) break;
+    console.error(`${cc}: attempt ${attempt}: checksum ${actual}, expected ${expected}`);
+  }
   if (expected !== actual) { console.error(`${cc}: the download is damaged (checksum ${actual}, expected ${expected})`); return 1; }
   stamp('download', t);
 
