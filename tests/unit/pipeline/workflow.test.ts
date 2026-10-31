@@ -47,3 +47,25 @@ test('[PIPE-WF-01] the merge job waits for the countries, runs even if some fail
   expect(merge).toMatch(/GH_TOKEN: \$\{\{ github\.token \}\}/);
   expect(merge).not.toMatch(/secrets\./);
 });
+
+test('[PIPE-WF-01] the publish job waits for a good merge, runs only when asked, and only its deploy step has the secrets', () => {
+  expect(yaml).toMatch(/publish:\s*\n\s+description:[^\n]*\n\s+type: boolean\s*\n\s+default: false/);
+  const start = yaml.indexOf('\n  publish:\n    needs: merge');
+  expect(start).toBeGreaterThan(0);
+  const job = yaml.slice(start, yaml.indexOf('\n  merge:'));
+  expect(job).toContain("if: ${{ !cancelled() && needs.merge.result == 'success' && (github.event_name == 'schedule' || inputs.publish) }}");
+  expect(job).toMatch(/timeout-minutes: 60/);
+  expect(job).toMatch(/contents: write/);
+  expect(job).toMatch(/issues: write/);
+  expect(yaml.indexOf('secrets.CLOUDFLARE_ACCOUNT_ID')).toBe(yaml.lastIndexOf('secrets.CLOUDFLARE_ACCOUNT_ID'));
+  const withSecrets = job.split(/\n\s+- /).filter((s) => s.includes('secrets.'));
+  expect(withSecrets).toHaveLength(1);
+  expect(withSecrets[0]).toContain('wrangler pages deploy pipeline/out/deploy --project-name=wayfinch-data --branch=main');
+  expect(job.indexOf('publish-prepare.ts')).toBeLessThan(job.indexOf('wrangler pages deploy'));
+  expect(job.indexOf('wrangler pages deploy')).toBeLessThan(job.indexOf('check-live.ts'));
+});
+
+test('[PIPE-WF-01] wrangler is pinned to one exact version', () => {
+  const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as { devDependencies: Record<string, string> };
+  expect(pkg.devDependencies['wrangler']).toMatch(/^4\.\d+\.\d+$/);
+});

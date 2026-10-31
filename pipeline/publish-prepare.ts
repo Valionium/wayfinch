@@ -1,7 +1,12 @@
 // The folder that is deployed to the data host: the kept builds, the entry point, headers, a real 404 page and a licence page.
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { readEntry, readManifest } from '../src/data/packs/reader.ts';
+import { SETTINGS } from './config.ts';
+import { listAssets, realGh, RELEASE, repo } from './state.ts';
 
 export type BuildRecord = { buildId: string; builtAt: string; replacedAt: string | null };
 export type Limits = { maxFiles: number; maxFileBytes: number };
@@ -80,4 +85,68 @@ export async function prepareDeployment(opts: DeploymentOptions): Promise<{ dir:
   writeFileSync(path.join(opts.outDir, 'index.html'), INDEX);
   const problems = fileCountProblems(opts.outDir, opts.limits);
   return { dir: problems.length === 0 ? opts.outDir : null, problems };
+}
+
+/** The history with the new build as the current one. Running it again for the same build changes nothing. */
+export function nextHistory(history: BuildRecord[], build: { buildId: string; builtAt: string }, now: string): BuildRecord[] {
+  if (history.some((r) => r.buildId === build.buildId)) return history;
+  return [...history.map((r) => (r.replacedAt === null ? { ...r, replacedAt: now } : r)), { ...build, replacedAt: null }];
+}
+
+/** Only build archives, never the last good files or the history on the same release. */
+export function archivesToDelete(assetNames: string[], keptIds: string[]): string[] {
+  return assetNames.filter((n) => /^build-.+\.tar\.gz$/.test(n) && !keptIds.some((id) => n === `build-${id}.tar.gz`));
+}
+
+const HISTORY = 'builds.json';
+const tar = promisify(execFile);
+
+async function main(): Promise<number> {
+  const root = path.resolve('pipeline/build');
+  const [buildId, ...others] = readdirSync(root);
+  if (!buildId || others.length > 0) { console.error(`expected one build in ${root}, found ${readdirSync(root).length}`); return 1; }
+  const buildDir = path.join(root, buildId);
+  const { builtAt } = readManifest(readFileSync(path.join(buildDir, 'manifest.json'), 'utf8'), buildId);
+  const now = new Date().toISOString();
+  const work = mkdtempSync(path.join(tmpdir(), 'pack-publish-'));
+  const assets = (await listAssets(realGh)).map((a) => a.name);
+  const fetchAsset = (name: string): Promise<string> => realGh(['release', 'download', RELEASE, '-R', repo(), '-p', name, '-D', work, '--clobber']);
+
+  let history: BuildRecord[] = [];
+  if (assets.includes(HISTORY)) {
+    await fetchAsset(HISTORY);
+    history = JSON.parse(readFileSync(path.join(work, HISTORY), 'utf8')) as BuildRecord[];
+  }
+  const keep = buildsToKeep(nextHistory(history, { buildId, builtAt }, now), now);
+
+  const builds = [{ buildId, builtAt, dir: buildDir }];
+  for (const r of keep.filter((k) => k.buildId !== buildId)) {
+    const name = `build-${r.buildId}.tar.gz`;
+    if (!assets.includes(name)) { console.error(`the archive of kept build ${r.buildId} is missing; nothing was published`); return 1; }
+    await fetchAsset(name);
+    const dir = path.join(work, r.buildId);
+    mkdirSync(dir);
+    await tar('tar', ['-xzf', path.join(work, name), '-C', dir]);
+    builds.push({ buildId: r.buildId, builtAt: r.builtAt, dir });
+  }
+
+  const { dir, problems } = await prepareDeployment({ builds, newest: buildId, outDir: path.resolve('pipeline/out/deploy'), limits: { maxFiles: SETTINGS.maxFiles, maxFileBytes: SETTINGS.maxFileBytes } });
+  if (!dir) { console.error(`nothing was published:\n  ${problems.join('\n  ')}`); return 1; }
+
+  // Stored before the deploy: an archive stored too early does no harm, a deployment with no archive could not be rebuilt.
+  const archive = path.join(work, `build-${buildId}.tar.gz`);
+  await tar('tar', ['-czf', archive, '-C', buildDir, '.']);
+  await realGh(['release', 'upload', RELEASE, archive, '-R', repo(), '--clobber']);
+  const historyFile = path.join(work, HISTORY);
+  writeFileSync(historyFile, JSON.stringify(keep, null, 1));
+  await realGh(['release', 'upload', RELEASE, historyFile, '-R', repo(), '--clobber']);
+  for (const name of archivesToDelete(assets, keep.map((k) => k.buildId))) await realGh(['release', 'delete-asset', RELEASE, name, '-R', repo(), '--yes']);
+
+  if (process.env['GITHUB_OUTPUT']) appendFileSync(process.env['GITHUB_OUTPUT'], `build_id=${buildId}\n`);
+  console.log(`build ${buildId} is ready to deploy, with ${builds.length - 1} earlier build(s) kept`);
+  return 0;
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
+  process.exitCode = await main().catch((e: unknown) => { console.error(e instanceof Error ? e.message : String(e)); return 1; });
 }

@@ -8,14 +8,14 @@ import { promisify } from 'node:util';
 
 export type GhRunner = (args: string[]) => Promise<string>;
 const run = promisify(execFile);
-const RELEASE = 'pack-state';
-const repo = (): string => process.env['GITHUB_REPOSITORY'] ?? 'Valionium/wayfinch';
+export const RELEASE = 'pack-state';
+export const repo = (): string => process.env['GITHUB_REPOSITORY'] ?? 'Valionium/wayfinch';
 
 export const realGh: GhRunner = async (args) => (await run('gh', args, { maxBuffer: 16 * 1024 * 1024 })).stdout;
 
 const nameOf = (cc: string): string => `country-${cc}-last-good`;
 
-async function listAssets(gh: GhRunner): Promise<{ id: number; name: string }[]> {
+export async function listAssets(gh: GhRunner): Promise<{ id: number; name: string }[]> {
   let text: string;
   try {
     text = await gh(['api', `repos/${repo()}/releases/tags/${RELEASE}`, '--jq', '.assets[] | select(.state == "uploaded") | "\\(.id) \\(.name)"']);
