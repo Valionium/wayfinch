@@ -31,6 +31,10 @@ test('[PIPE-WF-01] user input reaches a script only through an environment varia
   for (const l of uses) expect(l, l).toMatch(/^\s+[A-Z_]+: \$\{\{\s*inputs\./);
 });
 
+test('[PIPE-WF-01] runs never overlap, so two merges cannot meddle with the same stored files', () => {
+  expect(yaml).toMatch(/^concurrency:\s*\n\s+group: place-packs\s*\n\s+cancel-in-progress: false/m);
+});
+
 test('[PIPE-WF-01] the merge job waits for the countries, runs even if some fail, and may write releases and issues', () => {
   const merge = yaml.slice(yaml.indexOf('\n  merge:'));
   expect(merge).toMatch(/needs: country/);

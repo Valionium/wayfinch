@@ -19,8 +19,9 @@ export function makeZoneOf(job: CountryJob, cc: CountryCode, idx: BoundaryIndex)
   const timeZone = COUNTRIES[cc].timeZone;
   return (lat, lon) => {
     const found = idx.lookup(lat, lon);
-    if (!found.some((f) => matches(job.national, f, cc))) return null;
     const sub = job.subdivision ? found.find((f) => matches(job.subdivision!, f, cc)) : undefined;
+    const inside = job.nationalFromSubdivisions ? sub !== undefined : found.some((f) => matches(job.national, f, cc));
+    if (!inside) return null;
     const subdivision = sub?.tags['ISO3166-2'] ?? null;
     const hoursRegionKey = job.regionalHolidays ? subdivision : null;
     let holidayZone = hoursRegionKey ?? cc;
@@ -47,7 +48,9 @@ export function checkSentinels(job: CountryJob, zoneOf: (lat: number, lon: numbe
 
 // A short look at what the extract really holds, printed when a sentinel fails.
 export function describeBoundaries(features: BoundaryFeature[]): string[] {
-  const shown = features.slice(0, 40).map((f) =>
+  // Relations first, the most important levels first: ways and small areas come last.
+  const rank = (f: BoundaryFeature): number => (f.id.startsWith('r') ? 0 : 100) + Number(f.tags['admin_level'] ?? 99);
+  const shown = [...features].sort((x, y) => rank(x) - rank(y)).slice(0, 40).map((f) =>
     `${f.id} level=${f.tags['admin_level'] ?? '-'} iso1=${f.tags['ISO3166-1'] ?? '-'} iso2=${f.tags['ISO3166-2'] ?? '-'} name=${f.tags['name'] ?? '-'} rings=${f.rings.length}`);
   if (features.length > 40) shown.push(`... and ${features.length - 40} more`);
   return shown;

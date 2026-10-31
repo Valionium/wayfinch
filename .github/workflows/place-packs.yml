@@ -12,6 +12,11 @@ on:
 permissions:
   contents: read
 
+# Runs never overlap: two merges would meddle with the same stored files.
+concurrency:
+  group: place-packs
+  cancel-in-progress: false
+
 jobs:
   setup:
     runs-on: ubuntu-24.04
@@ -80,7 +85,8 @@ jobs:
         run: |
           node --max-old-space-size=12000 pipeline/merge.ts \
             --build-id "$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}" \
-            --built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            --built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --size-report
       - uses: actions/upload-artifact@v7
         with:
           name: place-pack-build
