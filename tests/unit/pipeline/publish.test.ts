@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, expect, test as plain } from 'vitest';
 import { test } from '@fast-check/vitest';
-import { buildsToKeep, fileCountProblems, headersFile, prepareDeployment } from '../../../pipeline/publish-prepare.ts';
+import { archivesToDelete, buildsToKeep, fileCountProblems, headersFile, nextHistory, prepareDeployment } from '../../../pipeline/publish-prepare.ts';
 import type { BuildRecord } from '../../../pipeline/publish-prepare.ts';
 import { readEntry } from '../../../src/data/packs/reader.ts';
 
@@ -110,4 +110,17 @@ plain('a manifest that lists a tile the folder lacks is refused', async () => {
 
 plain('the newest build must be among the builds', async () => {
   await expect(prepareDeployment({ builds: [], newest: '20261028-1', outDir: tmp(), limits })).rejects.toThrow(/newest/);
+});
+
+plain('[PIPE-PUB-01] a new build replaces the current one in the history; running twice changes nothing', () => {
+  const now = '2026-11-10T04:00:00Z';
+  const once = nextHistory([rec('A', '2026-11-03T00:00:00Z', null)], { buildId: 'B', builtAt: '2026-11-10T03:00:00Z' }, now);
+  expect(once).toEqual([rec('A', '2026-11-03T00:00:00Z', now), rec('B', '2026-11-10T03:00:00Z', null)]);
+  expect(nextHistory(once, { buildId: 'B', builtAt: '2026-11-10T03:00:00Z' }, '2026-11-10T05:00:00Z')).toEqual(once);
+  expect(nextHistory([], { buildId: 'A', builtAt: now }, now)).toEqual([rec('A', now, null)]);
+});
+
+plain('[PIPE-PUB-01] only archives of builds no longer kept are deleted, and nothing else on the release', () => {
+  const names = ['build-A.tar.gz', 'build-B.tar.gz', 'builds.json', 'country-DE-last-good'];
+  expect(archivesToDelete(names, ['B'])).toEqual(['build-A.tar.gz']);
 });
