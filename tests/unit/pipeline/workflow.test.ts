@@ -12,9 +12,8 @@ test('[PIPE-WF-01] workflow rules', () => {
   expect(yaml.indexOf('secrets.CLOUDFLARE_API_TOKEN')).toBe(yaml.lastIndexOf('secrets.CLOUDFLARE_API_TOKEN'));
 });
 
-test('[PIPE-WF-01] the workflow is started by hand only, reads the repository and nothing else', () => {
-  expect(yaml).toMatch(/^on:\s*\n\s+workflow_dispatch:/m);
-  expect(yaml).not.toMatch(/^\s*schedule:/m);
+test('[PIPE-WF-01] the workflow runs weekly or by hand, and reads the repository by default', () => {
+  expect(yaml).toMatch(/^on:\s*\n\s+schedule:[\s\S]*?workflow_dispatch:/m);
   expect(yaml).toMatch(/permissions:\s*\n\s+contents: read/);
 });
 
@@ -68,4 +67,38 @@ test('[PIPE-WF-01] the publish job waits for a good merge, runs only when asked,
 test('[PIPE-WF-01] wrangler is pinned to one exact version', () => {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as { devDependencies: Record<string, string> };
   expect(pkg.devDependencies['wrangler']).toMatch(/^4\.\d+\.\d+$/);
+});
+
+const keepAlive = readFileSync('.github/workflows/keep-alive.yml', 'utf8');
+
+test('[PIPE-WF-01] the schedule and keep-alive rules', () => {
+  expect(yaml).toContain("cron: '17 3 * * 2'");
+  expect(yaml).toMatch(/keep-alive:[\s\S]*actions: write/);
+  expect(yaml).toContain('keep-alive.yml/enable');
+  expect(keepAlive).toContain("cron: '41 4 1,15 * *'");
+  expect(keepAlive).toMatch(/for f in place-packs\.yml; do[\s\S]*workflows\/\$f\/enable/);
+  expect(keepAlive).toMatch(/workflow_dispatch:/);
+  expect(keepAlive).toMatch(/actions: write/);
+  for (const f of [yaml, keepAlive]) expect(f).not.toMatch(/git (commit|push)/);
+  for (const f of [yaml, keepAlive]) expect(f).not.toMatch(/deploy-pause/);
+});
+
+test('[PIPE-WF-01] the keep-alive job has no needs, so a failing country cannot stop it', () => {
+  const job = yaml.slice(yaml.indexOf('\n  keep-alive:'), yaml.indexOf('\n  setup:'));
+  expect(job.length).toBeGreaterThan(0);
+  expect(job).not.toMatch(/needs:/);
+});
+
+test('[PIPE-WF-01] the report job runs after everything, needs only its own token, and has no secrets', () => {
+  const job = yaml.slice(yaml.indexOf('\n  report:'));
+  expect(job).toMatch(/needs: \[country, merge, publish\]/);
+  expect(job).toContain('if: ${{ !cancelled() }}');
+  expect(job).toMatch(/issues: write/);
+  expect(job).not.toMatch(/secrets\./);
+  expect(job).toContain('pipeline/report.ts');
+});
+
+test('[PIPE-WF-01] the test-only force_fail input names a country and stops that job at once', () => {
+  expect(yaml).toMatch(/force_fail:\s*\n\s+description:[^\n]*\n\s+type: string\s*\n\s+default: ''/);
+  expect(yaml).toMatch(/FORCE_FAIL: \$\{\{ inputs\.force_fail \}\}/);
 });
