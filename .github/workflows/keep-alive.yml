@@ -1,0 +1,22 @@
+name: Keep alive
+
+# Twice a month, re-enables the scheduled workflows below. Makes no commit.
+on:
+  schedule:
+    - cron: '41 4 1,15 * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  enable:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for f in place-packs.yml; do
+            gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/$f/enable"
+          done

@@ -19,6 +19,8 @@ tests/
 tools/         project scripts
 ```
 
+`pipeline/` is the weekly place-pack build; its guide for the owner is `pipeline/README.md` (commands are listed there). Commits under `pipeline/` must never trigger an app deploy.
+
 Planned, in spec section 4.2: `src/core/` engines, `src/data/`, `src/store/`, `src/ui/`, `src/tools/tyre/`, `public/`, `pipeline/`, `contracts/`, `tests/e2e/`, `tests/fixtures/`, `tests/sim/`.
 
 ## Commands
