@@ -5,7 +5,7 @@ import { bannedHits } from '../../fixtures/banned.ts';
 // Every key starts with the area it belongs to. Weather and stop strings get the stricter list of banned words.
 const AREAS = [
   'water', 'weather', 'rain', 'shelter', 'stop', 'wait', 'food', 'daylight', 'climb', 'sleep', 'help', 'emergency',
-  'share', 'call', 'leaveby', 'time', 'route', 'bike', 'ask', 'ready', 'demo', 'about', 'honesty', 'app',
+  'share', 'call', 'leaveby', 'time', 'route', 'bike', 'ask', 'ready', 'demo', 'about', 'honesty', 'app', 'tyre',
 ];
 const STRICT_AREAS = ['weather', 'rain', 'shelter', 'stop', 'wait'];
 const areaOf = (key: string): string | undefined =>
@@ -13,6 +13,23 @@ const areaOf = (key: string): string | undefined =>
 
 // Test values for each template function. A new template without an entry here fails the test below.
 const TEMPLATE_ARGS: Record<string, unknown[][]> = {
+  tyreDidYouMean: [['65']],
+  tyreLimitTooHighBar: [['65']],
+  tyreLimitTooHighPsi: [['165']],
+  tyreRefuseNumber: [['Rider weight']],
+  tyreRefuseWidth: [['Front','17.9']],
+  tyreRefuseCaliper: [['Front']],
+  tyreRefuseRim: [['65']],
+  tyreRefuseLimit: [['The tyre maximum']],
+  tyreWarnBelowEtrto: [['Tyre width','29']],
+  tyreWarnBelowSidewallMin: [['Front']],
+  tyreWarnBelowOneBar: [['Front']],
+  tyreWarnNoStep: [['Front']],
+  tyreDecidedEstimate: [['Front','40.1','30.4','5.18']],
+  tyreDecidedCap: [['Front','your tyre']],
+  tyreDecidedFloor: [['Front','the minimum']],
+  tyreLimitHooklessWidth: [['45']],
+  tyreFloorIso: [['3.0']],
   routePositionKm: [['80','165']],
   routePositionNear: [['Rheinstetten']],
   routePositionOff: [['1.5']],

@@ -818,6 +818,29 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - in the rail layout, Ahead opens with the picker open and no position request; Update position says "On a computer, this is usually approximate." [WIDE-COMPUTER-POS]
 - desktop Firefox at 1280 × 720 passes these [WIDE-FIREFOX]
 
+## Tool: Tyre pressure
+
+- the twenty research cases, every input stated: Berto and Bicycle Quarterly within 10 percent, Schwalbe 12, ENVE, Vittoria and SILCA 15, limit cases exact to 0.01 bar [TY-CASES]
+- 120 kg on a 28 mm tubeless tyre, 25 mm hookless rim, 5.0 bar maximum: exactly 5.00 bar at both ends, capped, below the ETRTO minimum width (29 mm) [TY-HOOKLESS]
+- a printed 30 mm tubeless tyre on a 19 mm hookless rim is capped at exactly 4.50 bar, with and without a calipered 29.5 mm [TY-PRINTED]
+- a butyl tube never goes below the sidewall minimum (Marathon: front exactly 3.50 bar); tubeless computes 3.07, shows 3.05, warns only [TY-FLOOR]
+- values round down to 0.05 bar and 1 psi, up to a tube floor if that is lower; the shown value lies inside the floor and cap in each unit; the window is 90 to 100 percent [TY-ROUND]
+- the split is measured, else the lever rule, else the default (0.45 drop, 0.40 other), and says why; a backpack counts as rider; effective width is computed [TY-SPLIT]
+- hookless needs tubeless-rated tyres; a width below the ETRTO minimum is flagged; a floor above the cap is incompatible, in words [TY-WARN]
+- a bar value above 10 asks "Did you mean 65 psi?"; a maximum above 11 bar after that, or below the minimum, is rejected; each limit is compared in its own unit [TY-PSI-QUERY]
+- over generated inputs the result never exceeds a limit in the unit it was entered in, never goes below a tube floor, is never NaN, and widths or rims outside the tables are refused or said so [TY-PROP-LIMITS]
+- the 50 mm, 70 kg Vittoria case is informational: it stays inside the limits and its deviation is printed [TY-VITTORIA]
+- the sidewall maximum is the only required field; without it the screen says so and shows no figure [TY-UI-REQUIRED]
+- handlebar, wheel and widths start from the bike labelled "from your bike"; weights from the load summary with its age; rider weight from You; the plan bike is preselected; changes stay in the tyre tool [TY-UI-FROM-BIKE]
+- details are stored per bike id or under a default key, are in the export, and #/tools/tyre opens the tool [TY-UI-STORE]
+- using the tool changes no loadcheck key, byte for byte [TY-UI-NOWRITE]
+- the Tools tab shows the last tyre result and the bag plan line [TY-UI-LAST]
+- every warning and the factor or limit that decided are in words; the split is always shown [TY-UI-WARNINGS]
+- the tool works in flight mode and sends nothing [TY-UI-OFFLINE]
+- heat and altitude headroom: the pump-to maximum from the cap, the temperatures and the two air pressures; without a trip it asks or skips with a note [TY-HEAT]
+- measured wheel loads replace the split; a calipered width replaces the effective width in steps 3 and 4 only [TY-MEASURED]
+- the cross-check with SRAM is a link and a list of what to type; nothing is prefilled or sent; calculators differ by 10 to 30 percent [TY-SRAM]
+
 ## App: Budgets and flight mode
 
 - fresh context: load, GPX, Get ready (stub network), reload offline: Ahead with six cards; each answer states basis and age; /tools/bags/ page (or its placeholder until sub-project 6) offline [FLOW-FLIGHT]
