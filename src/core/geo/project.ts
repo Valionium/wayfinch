@@ -56,7 +56,7 @@ export function pointAtRouteKm(route: Route, km: Km): LatLng {
   const pts = route.points;
   const first = pts[0];
   if (!first) return { lat: 0, lon: 0 };
-  if (km <= first.km) return { lat: first.lat, lon: first.lon };
+  if (!(km > first.km)) return { lat: first.lat, lon: first.lon };
   let lo = 0;
   let hi = pts.length - 1;
   if (km >= pts[hi]!.km) return { lat: pts[hi]!.lat, lon: pts[hi]!.lon };

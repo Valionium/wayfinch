@@ -879,6 +879,7 @@ describe('the reach rule over generated moments', () => {
       { ...f, waterLeft: { litres: bad, at: f.now, confirmed: true } },
       { ...f, profile: { ...f.profile, k: bad } },
       { ...f, trip: { ...f.trip, flatKph: bad } },
+      { ...f, trip: { ...f.trip, flatKph: 1000 } },
       { ...f, trip: { ...f.trip, campWaterL: bad } },
     ];
     for (const b of broken) expect(waterAnswer(b).status).not.toBe('fine');

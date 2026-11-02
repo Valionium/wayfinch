@@ -28,6 +28,14 @@ function effortOf(route: Route): Effort {
   return e;
 }
 
+/** The flat speeds the You page offers (spec section 3.3). The core does not rely on the page having checked. */
+export const MIN_FLAT_KPH = 15;
+export const MAX_FLAT_KPH = 40;
+/** Whether a flat speed can give a time. Written so that NaN fails. */
+export const usableFlatKph = (flatKph: number): boolean => flatKph >= MIN_FLAT_KPH && flatKph <= MAX_FLAT_KPH;
+/** Riding minutes per effort-kilometre; NaN for an unusable speed, so every time made from it is no time, not a good one. */
+const minutesPerKm = (flatKph: number): number => (usableFlatKph(flatKph) ? 60 / (flatKph * LOAD_PENALTY) : Number.NaN);
+
 /** Distance plus climbing from the route start to `km`, linear between samples and held to the route's ends. */
 function effortAt(route: Route, km: Km): number {
   const { kms, efforts: es } = effortOf(route);
@@ -47,7 +55,7 @@ function effortAt(route: Route, km: Km): number {
 
 /** Minutes in the saddle between two route kilometres, without breaks. A ride back takes as long as the ride out. */
 export function ridingMin(route: Route, fromKm: Km, toKm: Km, flatKph: number, r = 1): number {
-  return ((Math.abs(effortAt(route, toKm) - effortAt(route, fromKm)) / (flatKph * LOAD_PENALTY)) * 60) * r;
+  return Math.abs(effortAt(route, toKm) - effortAt(route, fromKm)) * minutesPerKm(flatKph) * r;
 }
 
 /** Riding time with breaks: 15% of it, spread evenly. */
@@ -57,10 +65,10 @@ export function clockMin(route: Route, fromKm: Km, toKm: Km, flatKph: number, r 
 
 /** A rejoin leg or detour: ridden like a flat stretch of route, breaks included. */
 export function flatLegClockMin(km: number, flatKph: number, r = 1): number {
-  return ((km / (flatKph * LOAD_PENALTY)) * 60) * BREAKS * r;
+  return km * minutesPerKm(flatKph) * BREAKS * r;
 }
 /** A leg without breaks: what water use and the daylight margin read. */
-export const flatLegRidingMin = (km: number, flatKph: number, r = 1): number => ((km / (flatKph * LOAD_PENALTY)) * 60) * r;
+export const flatLegRidingMin = (km: number, flatKph: number, r = 1): number => km * minutesPerKm(flatKph) * r;
 
 /**
  * From kilometre `k`: the end of the stage `k` lies in, or of the next stage when `k` is more than halfway through its
@@ -91,7 +99,7 @@ export function correction(checkIns: Position[], dayStartKm: Km, route: Route, f
   if (!first || !latest || latest.km - first.km < STRETCH_MIN_KM) return 1;
   const measuredMin = (latest.at.getTime() - first.at.getTime()) / MS_PER_MIN;
   const modelMin = clockMin(route, first.km, latest.km, flatKph);
-  if (measuredMin <= 0 || modelMin <= 0) return 1;
+  if (!(measuredMin > 0) || !(modelMin > 0)) return 1;
   return Math.min(R_MAX, Math.max(R_MIN, measuredMin / modelMin));
 }
 
@@ -132,12 +140,13 @@ export function buildSchedule(trip: Trip, ride: RideStart, r: number, zone: Zone
   const startZone = zone(0).timeZone;
   const days: RideOfKm[] = [{ date: ride.date, startKm: ride.startKm, stopKm: ride.dayStopKm, departure: ride.departure, r }];
 
-  const added = (fromKm: Km, toKm: Km): number =>
-    stopsAt.reduce((sum, m) => (m.km > fromKm && m.km < toKm ? sum + 2 * flatLegClockMin(rejoinKm(m.offRouteM), flat) : sum), 0);
+  // A stop at the very start of the first ride counts. On a later day that kilometre is the previous ride's stop, so it does not.
+  const added = (fromKm: Km, toKm: Km, first: boolean): number =>
+    stopsAt.reduce((sum, m) => ((first ? m.km >= fromKm : m.km > fromKm) && m.km < toKm ? sum + 2 * flatLegClockMin(rejoinKm(m.offRouteM), flat) : sum), 0);
 
   /** Minutes from a ride's departure to a kilometre of it. */
   const minutesOn = (day: RideOfKm, km: Km, leg: number): number =>
-    (flatLegClockMin(leg, flat) + clockMin(route, day.startKm, km, flat) + added(day.startKm, km)) * day.r;
+    (flatLegClockMin(leg, flat) + clockMin(route, day.startKm, km, flat) + added(day.startKm, km, day === days[0])) * day.r;
 
   const arrivalOn = (i: number, km: Km): Date => {
     const day = days[i]!;

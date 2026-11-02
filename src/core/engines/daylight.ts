@@ -24,7 +24,7 @@ export const solarElevationDeg = (at: Date, lat: number, lon: number): number =>
 
 /** Sunset minus the larger of 30 minutes and 15% of the riding time. Null on a day without a sunset. */
 export function fineLimit(sun: SunTimes, ridingMin: number): Date | null {
-  if (!sun.sunset) return null;
+  if (!sun.sunset || !Number.isFinite(ridingMin)) return null;
   return new Date(sun.sunset.getTime() - Math.max(MARGIN_MIN, MARGIN_SHARE * ridingMin) * MIN);
 }
 
@@ -33,6 +33,7 @@ export function fineLimit(sun: SunTimes, ridingMin: number): Date | null {
  * times belong to. A day the sun never rises has no fine limit: dark from dusk, or all day without a dusk.
  */
 export function arrivalStatus(arrival: Date, sun: SunTimes, ridingMin: number, tz: string): { status: Status; line: string | null } {
+  if (!Number.isFinite(arrival.getTime()) || !Number.isFinite(ridingMin)) return { status: 'unknown', line: null };
   if (sun.lightAllNight) return { status: 'fine', line: W.daylightAllNight };
   const dark = sun.dusk ? arrival.getTime() >= sun.dusk.getTime() : false;
   if (dark) return { status: 'warning', line: W.daylightDarkFrom(formatHm(sun.dusk!, tz)) };
@@ -50,6 +51,7 @@ const span = (ms: number): string => {
 
 /** Daylight left today, in every phase. Whole minutes, rounded down, so it never overstates. */
 export function daylightLeft(now: Date, sun: SunTimes, sunTomorrow: SunTimes, tz: string): string {
+  if (!Number.isFinite(now.getTime())) return W.daylightUnknown;
   if (sun.lightAllNight) return W.daylightAllNight;
   if (!sun.sunset) return W.daylightDarkAllDay;
   const t = now.getTime();

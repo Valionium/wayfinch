@@ -35,6 +35,7 @@ export function buildSegmentIndex(route: Route): SegmentIndex {
 
 /** The segments that may lie within `radiusKm` of `p`, in route order, each once. A superset: callers measure. */
 export function segmentsNear(idx: SegmentIndex, p: LatLng, radiusKm: number): number[] {
+  if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon) || !Number.isFinite(radiusKm)) return [];
   const dLat = radiusKm / KM_PER_DEG_LAT;
   const dLon = radiusKm / (KM_PER_DEG_LAT * Math.max(0.01, Math.cos(((Math.abs(p.lat) + dLat) * Math.PI) / 180)));
   const [r0, c0] = cellOf(p.lat - dLat, p.lon - dLon);

@@ -78,6 +78,7 @@ fcTest.prop([
   }
   expect(r.startOffRouteM).toBeGreaterThanOrEqual(0);
   expect(r.stopKm).toBeLessThanOrEqual(300);
+  expect(r.behindFromKm).toBeLessThanOrEqual(300);
   expect(r.startKm).toBeLessThanOrEqual(r.stopKm);
   expect(r.departure.getTime()).toBeGreaterThanOrEqual(r.phase === 'route-end' || r.phase === 'riding' || r.noRide ? now.getTime() : now.getTime() - 86_400_000);
   const s = schedule(r, { trip });
