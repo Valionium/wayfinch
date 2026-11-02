@@ -1679,6 +1679,10 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <button class="linky" id="draftNew">Start a new plan</button>
     <button class="linky hidden" id="draftKeep">Keep this plan</button>
   </div>
+  <div class="draftbar hidden" id="updateBar" role="status">
+    <button class="kitact" id="updateApply" type="button">Update ready — apply now</button>
+    <span id="updateNote"></span>
+  </div>
   <div class="draftbar hidden" id="tabBar" role="status">
     <span id="tabText"></span>
     <button class="linky hidden" id="tabLoad">Load the newer plan</button>
@@ -11201,9 +11205,67 @@ async function prepareOfflinePacking(){
       ?error.message:'Offline setup could not finish. Connect and try again; you can print or save a PDF.';
   }finally{OFFLINE_PACKING.busy=false;renderOfflinePackingStatus();}
 }
-function initialiseOfflinePacking(){inspectOfflinePacking();}
+function initialiseOfflinePacking(){inspectOfflinePacking();initialiseUpdatePrompt();}
 window.addEventListener('online',()=>{OFFLINE_PACKING.error='';if(!OFFLINE_PACKING.busy)inspectOfflinePacking();});
 window.addEventListener('offline',()=>{OFFLINE_PACKING.error='';if(!OFFLINE_PACKING.busy)inspectOfflinePacking();renderOfflinePackingStatus();});
+
+// The update prompt. A new version applies only at this tap, or by the browser's own rule once every
+// window has closed. Only the tapped window reloads: another window may hold something being typed.
+const UPDATE_CHECK_MS=3600000,UPDATE_APPLY_WAIT_MS=10000;
+const UPDATE_STATE={registration:null,lastCheck:null,applying:false,note:'',settle:null};
+function showUpdateReady(){
+  const ready=!!UPDATE_STATE.registration?.waiting;
+  $('updateBar').classList.toggle('hidden',!ready);
+  $('updateNote').textContent=ready?UPDATE_STATE.note:'';
+}
+// A worker taking over at once passes through "installed" for a moment: only one still waiting counts.
+function queueShowUpdateReady(){clearTimeout(UPDATE_STATE.settle);UPDATE_STATE.settle=setTimeout(showUpdateReady,250);}
+function watchUpdateWorker(worker){if(worker)worker.addEventListener('statechange',queueShowUpdateReady);}
+function watchUpdateRegistration(registration){
+  if(UPDATE_STATE.registration===registration)return;
+  UPDATE_STATE.registration=registration;
+  registration.addEventListener('updatefound',()=>watchUpdateWorker(registration.installing));
+  watchUpdateWorker(registration.installing);watchUpdateWorker(registration.waiting);
+}
+async function checkForUpdate(){
+  if(window.isSecureContext!==true || !('serviceWorker' in navigator))return;
+  const now=Date.now();
+  if(UPDATE_STATE.lastCheck!==null && now-UPDATE_STATE.lastCheck<UPDATE_CHECK_MS)return;
+  UPDATE_STATE.lastCheck=now;
+  try{
+    const registration=await navigator.serviceWorker.getRegistration(new URL('/',location.href).href);
+    if(!registration)return;
+    watchUpdateRegistration(registration);
+    showUpdateReady();
+    await registration.update();
+  }catch(error){}
+}
+async function applyUpdate(){
+  if(UPDATE_STATE.applying || !UPDATE_STATE.registration?.waiting){showUpdateReady();return;}
+  UPDATE_STATE.applying=true;UPDATE_STATE.note='';showUpdateReady();
+  const finish=note=>{UPDATE_STATE.applying=false;UPDATE_STATE.note=note;showUpdateReady();};
+  let saved=false;
+  try{await flushDraft();saved=offlineCurrentPlanSaved();}catch(error){}
+  if(!saved)return finish('Your plan could not be saved on this device, so the update was not applied. Export your plan, then try again.');
+  const waiting=UPDATE_STATE.registration.waiting;
+  if(!waiting)return finish('');
+  const workers=navigator.serviceWorker;
+  const reload=()=>{clearTimeout(timer);window.location.reload();};
+  const timer=setTimeout(()=>{
+    workers.removeEventListener('controllerchange',reload);
+    finish('The update has not applied yet. It will once every window of the app has closed.');
+  },UPDATE_APPLY_WAIT_MS);
+  workers.addEventListener('controllerchange',reload,{once:true});
+  try{waiting.postMessage({type:'LOADCHECK_ACTIVATE'});}
+  catch(error){clearTimeout(timer);workers.removeEventListener('controllerchange',reload);finish('The update could not be applied. Try again.');}
+}
+function initialiseUpdatePrompt(){
+  $('updateApply').onclick=applyUpdate;
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkForUpdate();});
+  checkForUpdate();
+  // A rider who saves the app offline during this visit gets the prompt too, without waiting for the next look.
+  if(window.isSecureContext===true && 'serviceWorker' in navigator)navigator.serviceWorker.ready.then(registration=>{watchUpdateRegistration(registration);showUpdateReady();},()=>{});
+}
 
 /* ==== 90-inspector.js ==== */
 /* ---- Tapping a bag on the finished plan ---- */

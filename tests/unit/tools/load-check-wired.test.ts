@@ -9,9 +9,9 @@ const PAGE = `${REPO}public/tools/bags/index.html`;
 const HELPERS = ['app-vm.cjs', 'plan-kit.cjs', 'run-all.cjs', 'paths.cjs']; // the plan's three helpers, and the path file this task adds
 
 // The page is never printed here: only its hash is compared.
-test('[LC-PAGE-LIVE] the page's hash is the one recorded', () => {
-  // The tag load-check-zip-2026-10-30 holds the page as it was live (aa086001…). Since then: the top-tube wording.
-  const recorded = 'da9f30adf8729435a1d3918e9eeb3b23b35aefd326667cdedc0f987acedfb011';
+test("[LC-PAGE-LIVE] the page's hash is the one recorded", () => {
+  // The tag load-check-zip-2026-10-30 holds the page as it was live (aa086001…). Since then: the top-tube wording and the update prompt.
+  const recorded = '2f31b7568915da63625abb19b97c5850c2b37a192b19ee34bf564d5d3f1d5366';
   expect(createHash('sha256').update(readFileSync(PAGE)).digest('hex')).toBe(recorded);
 });
 
