@@ -44,6 +44,21 @@ export function formatHm(t: Date, tz: string): string {
   return `${String(w.hour).padStart(2, '0')}:${String(w.minute).padStart(2, '0')}`;
 }
 
+/** The instant of wall-clock time `hm` ("HH:MM") on ISO date `date` in zone `tz`. Zone data decide, not the device. */
+export function instantAt(date: string, hm: string, tz: string): Date {
+  const [y, mo, d] = date.split('-').map(Number) as [number, number, number];
+  const [h, mi] = hm.split(':').map(Number) as [number, number];
+  const wall = Date.UTC(y, mo - 1, d, h, mi);
+  const first = wall - zoneOffsetMin(new Date(wall), tz) * MIN;
+  return new Date(wall - zoneOffsetMin(new Date(first), tz) * MIN);
+}
+
+/** The ISO date `n` days after `date`. */
+export function addDaysIso(date: string, n: number): string {
+  const [y, mo, d] = date.split('-').map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, mo - 1, d + n)).toISOString().slice(0, 10);
+}
+
 type Rounding = 'nearest' | 'down' | 'up';
 
 /** Rounds `t` to a multiple of `stepMin` minutes of the zone's own clock, also where its offset is not a whole hour. */
