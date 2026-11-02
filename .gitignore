@@ -8,3 +8,4 @@ pipeline/out/
 pipeline/work/
 pipeline/in/
 pipeline/build/
+.vitest/json/output.json

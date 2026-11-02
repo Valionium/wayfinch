@@ -7,6 +7,12 @@ const MAX_SPACING_KM = 15;
 
 const to3 = (km: Km): Km => Math.round(km * 1000) / 1000;
 
+/**
+ * Grid kilometres are rounded to 0.001 km, while stage ends and the route length stay exact: a grid point and the stop it
+ * was made for can differ by this much. Never compare the two for equality or order without it.
+ */
+export const GRID_KM_ROUNDING = 0.0005 + 1e-9;
+
 export function sampleGrid(route: Route, climbs: Climb[], stages: Stage[]): Km[] {
   const length = Math.max(0, route.lengthKm);
   const grid = new Set<Km>();

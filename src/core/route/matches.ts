@@ -1,8 +1,8 @@
 // Places matched to the route (spec sections 4.5 and 6.0): one route kilometre per pass within the place's category
 // radius; passes closer than twice the radius are one pass.
-import { segmentsNear, type SegmentIndex } from '../geo/index.ts';
+import { buildSegmentIndex, segmentsNear, type SegmentIndex } from '../geo/index.ts';
 import { passesOf, projectOnSegment, type Projection } from '../geo/project.ts';
-import type { Place, PlaceKind, Route, RouteMatch } from '../types.ts';
+import type { Place, PlaceKind, Roof, Route, RouteMatch } from '../types.ts';
 
 /**
  * Section 6.0's radii in kilometres. Shelters take Sleep's 3 km (lean-tos and basic huts) and Emergency's 3 km
@@ -31,6 +31,35 @@ function merged(passes: Projection[], mergeKm: number): Projection[] {
     previousKm = q.km;
   }
   return out;
+}
+
+const ROOF_SEARCH_KM = 0.31; // a little over the 300 m of section 6.0: coverAt holds the limit, on the rounded distance
+const roofIndexes = new WeakMap<Route, SegmentIndex>();
+const roofMatches = new WeakMap<Roof[], { route: Route; list: RoofMatch[] }>();
+
+export type RoofMatch = { roof: Roof; km: number; offRouteM: number };
+
+/** Roofs have no id and come as a layer: one route kilometre per pass, kept for each list of roofs and route. */
+export function matchRoofs(roofs: Roof[], route: Route): RoofMatch[] {
+  const kept = roofMatches.get(roofs);
+  if (kept?.route === route) return kept.list;
+  let idx = roofIndexes.get(route);
+  if (!idx) {
+    idx = buildSegmentIndex(route);
+    roofIndexes.set(route, idx);
+  }
+  const list: RoofMatch[] = [];
+  for (const roof of roofs) {
+    if (!(Math.abs(roof.lat) <= 90 && Math.abs(roof.lon) <= 180)) continue; // written so that NaN fails
+    const within = segmentsNear(idx, roof, ROOF_SEARCH_KM)
+      .map((s) => projectOnSegment(roof, route, s))
+      .filter((q) => q.offKm <= ROOF_SEARCH_KM);
+    for (const q of merged(passesOf(within, roof, route, ROOF_SEARCH_KM), 2 * ROOF_SEARCH_KM)) {
+      list.push({ roof, km: q.km, offRouteM: Math.round(q.offKm * 1e6) / 1e3 });
+    }
+  }
+  roofMatches.set(roofs, { route, list });
+  return list;
 }
 
 export function matchPlaces(places: Place[], route: Route, idx: SegmentIndex): RouteMatch[] {
