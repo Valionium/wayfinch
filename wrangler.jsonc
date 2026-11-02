@@ -1,0 +1,13 @@
+// The site: a Worker that serves dist/ and nothing else.
+// Checked on 2 November: live /index.html answers 307 to /, and a missing file answers 404. These settings keep both.
+{
+  "name": "load-check",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none"
+  }
+}
