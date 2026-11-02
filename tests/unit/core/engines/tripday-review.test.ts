@@ -156,7 +156,7 @@ test('[LOC-MATCH] a place or point with a bad value finds no segment, and does n
   expect(matchPlaces([{ ...tap().atKm(30), lon: Number.NaN }], route, idx)).toEqual([]);
 });
 
-test('[LOC-INFINITY] a latitude of Infinity neither hangs locate nor the index', () => {
+test('[LOC-PROJECT] a latitude of Infinity neither hangs locate nor the index', () => {
   const route = flatRoute(100);
   const idx = buildSegmentIndex(route);
   expect(locate({ ...goodFix, lat: Infinity }, route, idx, null)).toEqual({ kind: 'no-position' });
