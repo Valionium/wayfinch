@@ -227,6 +227,12 @@ test('[DAY-END3] within 3 km of the stop after sunset the ride has ended; the ex
   expect(r.tonightKm).toBe(147.5);
 });
 
+test('[DAY-END3] within 3 km of a stop with no stage after it, also: an approximate fix short of the route end', () => {
+  const r = day([nightAt(230), pos({ km: 298, acc: 1100, at: `${MON} 18:50` })], `${MON} 18:50`);
+  expect(r.phase).toBe('after-ride');
+  expect(r.tonightKm).toBe(298);
+});
+
 test('[DAY-END3] after sunset a rider who has not moved has ended the day; before sunset not', () => {
   expect(day([nightAt(50)], `${SUN} 18:42`).phase).toBe('before-ride');
   expect(day([nightAt(50)], `${SUN} 18:42:01`).phase).toBe('after-ride');

@@ -148,6 +148,12 @@ test('[PACE-LATER] when a late ride reaches the stop after that time, the next d
   msWithin1s(s.rideOf(350).departure.getTime(), arrival);
 });
 
+test("[PACE-LATER] a ride's date is the riding date of its departure, also when the arrival skips a date", () => {
+  const trip = testTrip({ route: flatRoute(900, { stageEnds: [800] }) });
+  const s = sched({ dayStopKm: 800, departure: at('2026-10-17 20:00') }, 1, trip); // km 800 on Monday, about 16:50
+  expect(s.rideOf(850).date).toBe('2026-10-19');
+});
+
 test('[PACE-LATER] riding on past the stop that evening has no night in it', () => {
   const s = sched({ startKm: 50, dayStopKm: 78, departure: at('2026-10-17 16:00') });
   msWithin1s(s.ridingOnAt(100).getTime() - s.departure.getTime(), 50 * CLOCK_PER_KM * MIN);
