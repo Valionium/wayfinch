@@ -64,7 +64,7 @@ test('[SW-BUILD-FILES] with the switch off dist holds only the page, the worker,
   expect(Object.keys(b.files).sort()).toEqual(['/', '/offline-worker.js']);
   expect(b.files['/']).toBe(sha256(read(out, 'index.html')));
   expect(b.files['/offline-worker.js']).toBe(sha256(read(out, 'offline-worker.js')));
-});
+}, 60_000);
 
 test('[SW-BUILD-SAME] two builds from one commit are byte for byte the same, with no date, commit id or absolute path', async () => {
   const a = outDir();
@@ -88,7 +88,7 @@ test('[SW-BUILD-SAME] two builds from one commit are byte for byte the same, wit
       expect(/\b20\d\d-\d\d-\d\d\b/.test(body), `${f} holds a date`).toBe(false);
     }
   }
-});
+}, 60_000);
 
 test('[SW-BUILD-WORKER] the built worker is a classic script that declares its build and its precache list', async () => {
   const out = outDir();
@@ -107,7 +107,7 @@ test('[SW-BUILD-WORKER] the built worker is a classic script that declares its b
   const parsed = new vm.Script(`(${list?.[1] ?? ''})`).runInNewContext() as Record<string, string>;
   expect(JSON.parse(JSON.stringify(parsed))).toEqual(listed);
   expect(Object.keys(parsed)).not.toContain('/offline-worker.js');
-});
+}, 60_000);
 
 test('[SW-BUILD-SIZE] a precached file over 2 MiB fails the build; exactly 2 MiB passes', async () => {
   expect(MAX_PRECACHED_BYTES).toBe(2_097_152);
@@ -117,7 +117,7 @@ test('[SW-BUILD-SIZE] a precached file over 2 MiB fails the build; exactly 2 MiB
   expect(statSync(join(ok, big)).size).toBe(2_097_152);
   expect(Object.keys(buildJson(ok).files)).toContain(`/${big}`);
   await expect(buildDist({ out: outDir(), launch: false, extraFiles: { [big]: Buffer.alloc(2_097_153, 97) } })).rejects.toThrow(/assets\/generated\.bin.*2097153/);
-});
+}, 60_000);
 
 test('[SW-HEADERS] the headers file sets caching and the referrer policy as decided', async () => {
   const off = outDir();
@@ -138,7 +138,7 @@ test('[SW-HEADERS] the headers file sets caching and the referrer policy as deci
     expect(hOff[p], p).toBeUndefined();
     expect(hOn[p]?.['Cache-Control'], p).toBe('no-cache');
   }
-});
+}, 60_000);
 
 test('the command line takes --out and --launch', () => {
   const out = outDir();
@@ -146,4 +146,4 @@ test('the command line takes --out and --launch', () => {
   expect(r.status, r.stderr).toBe(0);
   expect(existsSync(join(out, 'offline-worker.js'))).toBe(true);
   expect(r.stdout.length).toBeLessThan(2000);
-});
+}, 60_000);

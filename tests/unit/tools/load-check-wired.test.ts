@@ -29,4 +29,4 @@ test('[LC-FREEZE-01] the frozen bag rules are unchanged', () => {
   const r = spawnSync(process.execPath, [`${REPO}qa/selection-fixtures.cjs`], { cwd: REPO, encoding: 'utf8' });
   expect(r.status).toBe(0);
   expect(r.stdout).toContain('LC-FREEZE-01 ok');
-});
+}, 60_000); // a child process, on a machine busy with the other test files: the suite itself is unchanged

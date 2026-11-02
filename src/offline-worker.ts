@@ -67,7 +67,7 @@ async function fetchChecked(path: string, sha256: string): Promise<Response> {
   } finally {
     clearTimeout(timer);
   }
-  if (path.endsWith('/') && !(response.headers.get('content-type') ?? '').toLowerCase().includes('text/html')) {
+  if ((path.endsWith('/') || path.endsWith('.html')) && !(response.headers.get('content-type') ?? '').toLowerCase().includes('text/html')) {
     throw new Error(`${path} is not a page.`);
   }
   const actual = hexOf(await crypto.subtle.digest('SHA-256', await copy.clone().arrayBuffer()));

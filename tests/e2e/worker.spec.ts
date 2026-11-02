@@ -184,6 +184,15 @@ test('[SW-VERIFY] a page answered as something other than HTML fails the install
   expect(await activeWorkerKind(page)).toBe('legacy');
 });
 
+test('[SW-VERIFY] another listed .html file answered as something else fails the install too', async ({ page }) => {
+  await onLegacy(page);
+  const next = await buildSite({ extraFiles: { 'legal/notice.html': '<!doctype html><title>Notice</title>' } });
+  appendFileSync(join(next.dir, '_headers'), '/legal/notice.html\n  Content-Type: text/plain\n');
+  server.swap(next.dir);
+  expect(await updateAndSettle(page)).toBe('redundant');
+  expect(await activeWorkerKind(page)).toBe('legacy');
+});
+
 test('[SW-NO-REDIRECT] /index.html online and offline returns the page plainly; no stored entry is redirected', async ({ page }) => {
   const site = await buildSite();
   await start(site.dir, page);
