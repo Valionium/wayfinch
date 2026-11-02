@@ -1,4 +1,4 @@
-// npm run fast: types, lint and the tests touched by this change, with 25 runs per property.
+// npm run fast: types, lint, the tests touched by this change (25 runs per property) and the rule check.
 // A script rather than a package.json line, so that it works in PowerShell and on Linux.
 import { execSync } from 'node:child_process';
 
@@ -8,3 +8,4 @@ const run = (command, env = {}) =>
 run('npm run types');
 run('npm run lint');
 run('npx vitest run --changed --passWithNoTests', { FC_RUNS: '25' });
+run('npm run rules');

@@ -25,6 +25,7 @@ jobs:
       - run: npm ci
       - run: npm run types
       - run: npm run lint
+      - run: npm run rules
 
   unit-property:
     runs-on: ubuntu-latest

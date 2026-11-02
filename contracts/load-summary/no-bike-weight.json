@@ -1,0 +1,78 @@
+{
+  "app": "load-check",
+  "kind": "load-summary",
+  "v": 1,
+  "at": "ISO time",
+  "planUpdatedAt": "ISO time",
+  "nights": 2,
+  "month": 6,
+  "departureDate": null,
+  "mode": "comfort",
+  "foodDays": 2,
+  "bikeId": "bike_m2k9x1_4f7a2c9d",
+  "bags": {
+    "count": 3,
+    "positions": [
+      "frame",
+      "rack",
+      "rack"
+    ],
+    "items": [
+      {
+        "pos": "frame",
+        "L": 3,
+        "shape": 2,
+        "fill": 0.8
+      },
+      {
+        "pos": "rack",
+        "L": 15,
+        "pair": true,
+        "fill": [
+          0.6,
+          0.5
+        ]
+      }
+    ]
+  },
+  "decks": {
+    "bar": null,
+    "rack": "loaded"
+  },
+  "water": {
+    "bottles": [
+      {
+        "slot": "st",
+        "L": 0.5
+      },
+      {
+        "slot": "dt",
+        "L": 0.75
+      }
+    ],
+    "cageL": 1.25,
+    "extraL": 0,
+    "totalL": 1.25
+  },
+  "weight": {
+    "kitKg": 8.95,
+    "cageWaterKg": 1.25,
+    "carriedKg": 10.2,
+    "bikeKg": null,
+    "emptyLuggageKg": null,
+    "byPositionKg": {
+      "fork": 0,
+      "bar": 0,
+      "top": 0,
+      "frame": 1.6,
+      "bottle": 1.25,
+      "seat": 0,
+      "rack": 7.35,
+      "pack": 0
+    },
+    "unplacedKg": 0
+  },
+  "kit": {
+    "waterFilter": false
+  }
+}
