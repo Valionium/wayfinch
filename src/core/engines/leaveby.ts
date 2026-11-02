@@ -1,6 +1,7 @@
 // Leave-by (spec section 6.12): the latest departure that still meets the day's limits. Arrivals move one-for-one with the
 // departure, so each limit is a set of departures, worked out from the places' open stretches and never by trying minutes.
 // The ride is a parameter, so tomorrow's ride and Trip's chosen day need no change here.
+import { compareFinal } from '../answers/index.ts';
 import { addDaysIso, instantAt, isKnownZone, formatHm } from '../answers/time.ts';
 import { pointAtRouteKm } from '../geo/project.ts';
 import { isPublicHoliday, openOnArrival, openOver, openRuns, stateAt } from '../hours/check.ts';
@@ -278,6 +279,8 @@ function planOf(f: LeaveFacts, ride: DayRide): Plan {
       if (runs.length > 0) food.push({ ...x, runs, arrivals: intersect(foodArrivals(runs), [[-Infinity, to]]) });
     }
   }
+  // Route order, then the final tie-break: places that tie on their latest departure come out the same however the list came.
+  food.sort((a, b) => a.match.km - b.match.km || compareFinal(a.place, b.place));
   return { ...base, water, food, foodId, notCounted: unknown.size, closure };
 }
 

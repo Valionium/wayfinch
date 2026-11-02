@@ -160,6 +160,12 @@ export function buildSchedule(trip: Trip, ride: RideStart, r: number, zone: Zone
     while (km > days[i]!.stopKm && days[i]!.stopKm < route.lengthKm) {
       if (i + 1 === days.length) {
         const day = days[i]!;
+        // No departure, and no date to count from: the later rides have no times either.
+        if (!Number.isFinite(day.departure.getTime())) {
+          days.push({ date: day.date, startKm: day.stopKm, stopKm: stopRule(route.stages, day.stopKm, route.lengthKm), departure: day.departure, r: 1 });
+          i++;
+          continue;
+        }
         const startAt = instantAt(addDaysIso(day.date, 1), trip.startTime, zone(day.stopKm).timeZone);
         const arrival = arrivalOn(i, day.stopKm);
         const departure = arrival.getTime() > startAt.getTime() ? arrival : startAt;

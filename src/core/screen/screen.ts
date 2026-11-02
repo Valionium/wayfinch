@@ -146,16 +146,14 @@ const inStormReach = (km: Km, windows: RainWindow[]): boolean =>
   windows.some((w) => w.kind === 'thunder' && km >= w.fromKm - COVER_BEFORE_KM && km <= w.toKm);
 
 /**
- * Cover icons: each plan's first cover, which the Weather card lists, always (INV-10). With rain at the start the list
- * stands in the plan's place, and its first cover is drawn unless it is a plain roof at a thunderstorm.
+ * Cover icons: each plan's first cover, which the Weather card lists, or with rain at the start the first of the list that
+ * stands in its place. Owner's ruling, 2 Nov 2026: the storm rule wins over "first cover is always drawn". In a thunderstorm
+ * band and up to 5 km before it only open buildings are drawn, so a plain roof is not, though the card still names it.
  */
 function coverIcons(plans: RainPlan[], windows: RainWindow[]): Km[] {
-  const first = (p: RainPlan): Cover | undefined => p.covers[0];
   return plans.flatMap((p) => {
-    const cover = first(p);
-    if (cover) return [cover.km];
-    const listed = p.listInstead?.[0];
-    return listed && (listed.coverClass <= 2 || !inStormReach(listed.km, windows)) ? [listed.km] : [];
+    const cover: Cover | undefined = p.covers[0] ?? p.listInstead?.[0];
+    return cover && (cover.coverClass <= 2 || !inStormReach(cover.km, windows)) ? [cover.km] : [];
   });
 }
 
@@ -174,7 +172,7 @@ function stripOf(i: ScreenInputs, ride: DayRide, schedule: Schedule, windows: Ra
   const ideaKms = ideas ? [ideas.title?.km ?? null, ...ideas.timeline.map((x) => x.km)] : [];
   for (const km of [...ideaKms, ...foodNamed].flatMap((k) => (k === null ? [] : [k])).filter(onStrip).slice(0, FOOD_ICONS)) add('food', km, 'food');
   for (const km of cards.sleep.items.flatMap((x) => (typeof x.stamp?.km === 'number' ? [x.stamp.km] : [])).filter(onStrip).sort((a, b) => a - b).slice(0, ICONS_PER_KIND)) add('sleep', km, 'sleep');
-  for (const km of coverIcons(plans, windows)) add('cover', km, 'weather');
+  for (const km of coverIcons(plans, onTheRide(windows, ride))) add('cover', km, 'weather');
   icons.sort((a, b) => a.km - b.km || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
   return {
     label: labelOf(ride), startKm: ride.startKm, endKm: ride.stopKm, endText: endTextOf(i, ride, schedule), icons,
@@ -216,7 +214,13 @@ const describe = (e: unknown): string => {
   }
 };
 
-export function buildScreen(raw: ScreenInputs): { screen: Screen; faults: string[] } {
+/** What the screen was assembled from, for the simulator's checks: they judge a screen against the very values it was built on. */
+export type ScreenParts = {
+  schedule: Schedule; position: Position | null; forecast: StoredForecast | null; stop: StopFacts; water: WaterFacts; leave: LeaveFacts; weather: WeatherFacts; food: StopFacts & Pick<ScreenInputs, 'holidays'>;
+  windows: RainWindow[]; plans: RainPlan[]; lb: LeaveBy | null; wg: WaitOrGo | null; targets: ReturnType<typeof findS1S2> | null; ideas: Ideas | null;
+};
+
+export function buildScreen(raw: ScreenInputs): { screen: Screen; faults: string[]; parts: ScreenParts } {
   const faults: string[] = [];
   const part = <T>(name: string, build: () => T, otherwise: () => T): T => {
     try {
@@ -291,7 +295,7 @@ export function buildScreen(raw: ScreenInputs): { screen: Screen; faults: string
     cards, chips, shareText: share(false), shareMapText: share(true), phase: ride.phase, ride,
     notes: part('notes', () => notesOf(i, ride, position), () => []),
   };
-  return { screen, faults };
+  return { screen, faults, parts: { schedule, position, forecast, stop, water, leave, weather, food, windows, plans, lb, wg, targets, ideas } };
 }
 
 export const screen = (inputs: ScreenInputs): Screen => buildScreen(inputs).screen;

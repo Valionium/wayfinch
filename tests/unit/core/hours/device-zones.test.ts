@@ -222,3 +222,40 @@ function skippedOnDevice(start: number, end: number): [number, number][] {
   }
   return out;
 }
+
+// The library finds "yesterday" of a time over midnight as 24 hours back. The night after the phone's own spring change that
+// lands two days back: found by the simulator's INV-26.
+describe('[H-DEVICE-ZONE] the hour after midnight, the night after the phone skips an hour', () => {
+  const wraps = 'Mo-Fr off; Mo-Sa 03:30-20:30,18:45-03:15';
+  const read = (zone: string, tag: string, when: string): string => withDeviceZone(zone, () => {
+    const date = when.slice(0, 10);
+    return stateAt(hoursOf(tag, placeIn('DE-BW'), other, addDaysIso(date, -2), addDaysIso(date, 1)), instantAt(date, when.slice(11), BERLIN)).state;
+  });
+
+  test('a time over midnight from Saturday does not read open on Monday morning', () => {
+    expect(read('UTC', wraps, '2026-03-30 00:30')).toBe('closed');
+    expect(read('Europe/Berlin', wraps, '2026-03-30 00:30')).toBe('closed');
+    expect(read('America/New_York', wraps, '2026-03-09 00:30')).toBe('closed');
+  });
+  test('a time over midnight from Sunday does not read closed', () => {
+    expect(read('UTC', 'Su 20:00-02:00', '2026-03-30 00:30')).toBe('open');
+    expect(read('Europe/Berlin', 'Su 20:00-02:00', '2026-03-30 00:30')).toBe('open');
+  });
+  test.each(['Su[1] 20:00-02:00', 'Su[-1] 20:00-02:00', 'week 13 Su 20:00-02:00', 'week 14 Su 20:00-02:00', 'Sa[-1] +1 days 20:00-02:00', 'Mar Su 20:00-02:00', 'Apr Su 20:00-02:00', '2026 Su 20:00-02:00', 'Mar 29 20:00-02:00', 'Apr 05 20:00-02:00', 'easter 20:00-02:00', 'SH Su 20:00-02:00', 'Su 20:00-02:00 "by appointment"'])('%s is not read a week later', (tag) => {
+    expect(read('Europe/Berlin', tag, '2026-03-30 00:30')).toBe('unknown');
+  });
+  test('a tagged shop on a local holiday stays unknown in the hour the phone skips', () => {
+    const shopRule = { kind: 'food-shop', nearStation: false } as const;
+    const inHour = withDeviceZone('Europe/Lisbon', () => stateAt(hoursOf('Su[-1] 00:00-05:00', placeIn('DE-BW'), shopRule, '2026-03-28', '2026-03-30', { 'DE-BW': ['2026-03-29'] }), instantAt('2026-03-29', '01:30', BERLIN)).state);
+    expect(inHour).toBe('unknown');
+  });
+  test('a tag that looks at the calendar reads unknown then', () => {
+    expect(read('Europe/Berlin', 'Sa,Su 10:30-04:00,16:15-18:00; Su,PH 07:45-14:30', '2026-03-30 00:30')).toBe('unknown');
+    expect(read('UTC', 'Sa,Su 10:30-04:00,16:15-18:00; Su,PH 07:45-14:30', '2026-03-30 00:30')).toBe('open');
+  });
+  test('the hour after it and a tag with no time over midnight read as on any phone', () => {
+    expect(read('Europe/Berlin', wraps, '2026-03-30 01:30')).toBe('closed');
+    expect(read('Europe/Berlin', 'Mo-Su 00:00-23:00', '2026-03-30 00:30')).toBe('open');
+    expect(read('Europe/Berlin', 'Mo 06:00-12:00', '2026-03-30 00:30')).toBe('closed');
+  });
+});

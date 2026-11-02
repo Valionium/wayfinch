@@ -9,7 +9,8 @@ import { openWaterWindow, stateAt } from '../hours/check.ts';
 import type { Answer, AnswerItem, DayRide, Km, Missing, Place, PlaceHours, RouteMatch, ScreenInputs, SunSource, Trip } from '../types.ts';
 import { showKm, W } from '../wording/en.ts';
 import { LOAD_PENALTY } from '../route/stages.ts';
-import { rejoinKm } from './locate.ts';
+import { newestMapDate } from './covers.ts';
+import { isFarOff, latestPosition, positionOrder, rejoinKm } from './locate.ts';
 import { flatLegClockMin, flatLegRidingMin, usableFlatKph, type Schedule } from './pace.ts';
 import { nowSchedule, ridingDate, zoneLookupOf } from './tripday.ts';
 import { uncertainty } from './water-learning.ts';
@@ -121,6 +122,8 @@ export const hasFuelShop = (place: Place): boolean => {
   return shop !== undefined && shop !== 'no' && place.tags['automated'] !== 'yes';
 };
 const SHOP_KINDS = new Set<Place['kind']>(['shop', 'cafe', 'fuel_shop']);
+/** The shops of section 6.0. Any other shop tag is nothing Food would count, so Water can't count it either (INV-03). */
+const FOOD_SHOP_TAGS: ReadonlySet<string> = new Set(['supermarket', 'convenience', 'bakery', 'kiosk']);
 const filterCarried = (f: WaterFacts): boolean => f.loadSummary !== null && !('empty' in f.loadSummary) && f.loadSummary.kit.waterFilter === true;
 
 /** Whether this place is a reliable source at this arrival, or why not. The class decides, not the kind. */
@@ -134,6 +137,7 @@ export function sourceAt(place: Place, match: RouteMatch, arrival: Date, f: Wate
   }
   if (place.kind === 'fuel_shop' && !hasFuelShop(place)) return uncertain(W.waterNoShop);
   if (place.waterClass === 'A') return place.indoorOrLimited ? byHours(place, arrival, f) : outdoorA(place, match, arrival, f);
+  if (place.kind === 'shop' && !FOOD_SHOP_TAGS.has(place.tags['shop'] ?? '')) return uncertain(W.waterNotASource);
   return SHOP_KINDS.has(place.kind) ? byHours(place, arrival, f) : uncertain(W.waterNotASource);
 }
 
@@ -401,15 +405,16 @@ export const capacityOf = (f: WaterFacts): number | null => capacityFrom(f.profi
 
 const DEFAULT_FOR_MS = 3 * HOUR;
 
-const positionsOf = (f: WaterFacts): WaterFacts['positions'] => f.positions.filter((p) => Number.isFinite(p.km) && validDate(p.at));
+/** Fixes that say where on the route the rider was. One over 5 km off, at home for instance, says nothing of that. */
+const positionsOf = (f: WaterFacts): WaterFacts['positions'] => f.positions.filter((p) => Number.isFinite(p.km) && validDate(p.at) && !isFarOff(p));
 
 /** The last position at or before a moment. */
 const positionAt = (f: WaterFacts, t: Date): WaterFacts['positions'][number] | null =>
-  positionsOf(f).filter((p) => p.at.getTime() <= t.getTime()).sort((a, b) => b.at.getTime() - a.at.getTime())[0] ?? null;
+  latestPosition(positionsOf(f).filter((p) => p.at.getTime() <= t.getTime()));
 
 /** Whether the rider has passed a reliable source since. With no position from before then, any source behind may be it. */
 function passedSource(f: WaterFacts, since: Date): boolean {
-  const later = positionsOf(f).filter((p) => p.at.getTime() > since.getTime()).sort((a, b) => a.at.getTime() - b.at.getTime());
+  const later = positionsOf(f).filter((p) => p.at.getTime() > since.getTime()).sort(positionOrder);
   if (later.length === 0) return false;
   const from = positionAt(f, since)?.km ?? -Infinity;
   const reach = later.reduce((max, p) => Math.max(max, p.km), from);
@@ -538,7 +543,7 @@ const STALE_MS = 12 * HOUR;
 
 function freshnessOf(f: WaterFacts): Answer['freshness'] {
   const dataDates: Record<string, string> = {};
-  const newest = f.places.reduce<string | null>((max, p) => (max === null || p.dataDate > max ? p.dataDate : max), null);
+  const newest = newestMapDate(f);
   if (newest !== null) dataDates['places'] = newest;
   if (f.forecast && validDate(f.forecast.fetchedAt)) dataDates['weather'] = f.forecast.fetchedAt.toISOString();
   const stale = f.forecast !== null && !(f.now.getTime() - f.forecast.fetchedAt.getTime() <= STALE_MS);
