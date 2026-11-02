@@ -5,7 +5,7 @@ import { dayRide, scheduleFor } from '../../../../src/core/engines/tripday.ts';
 import { waterAnswer, type WaterFacts } from '../../../../src/core/engines/water.ts';
 import { buildScreen, screen, type Screen } from '../../../../src/core/screen/screen.ts';
 import type { Answer, Position, ScreenInputs, Trip, ZoneSpan } from '../../../../src/core/types.ts';
-import { at, bakery, busStop, cafe, campsite, flatRoute, pos, settlement, shop, sun, supermarket, tap, testTrip } from '../../../fixtures/build.ts';
+import { at, busStop, cafe, campsite, flatRoute, pos, restaurant, settlement, shop, sun, supermarket, tap, testTrip } from '../../../fixtures/build.ts';
 import { preparedHours } from '../engines/leaveby-helpers.ts';
 import { stamps } from '../engines/weather-helpers.ts';
 import { inputsOf } from './screen-helpers.ts';
@@ -118,7 +118,9 @@ describe('the worked screen of section 3.2', () => {
       trip: trip(), now: `${SAT} 14:20`, positions: [pos({ km: 60, at: `${FRI} 19:00` }), pos({ km: 125, at: `${SAT} 14:20` })],
       spells: [{ range: [100, 137], stamps: stamps(SAT, 13, 15), pp: 80, mm: 1 }], opts: { from: `${FRI} 01:00`, extraKms: [125, 131, 137] },
     });
-    return { ...i, places: [lindenhof], matches: [{ placeId: lindenhof.id, km: 131, offRouteM: 0 }], hours: [preparedHours(lindenhof)] };
+    // Strasbourg at the stop: a dinner place open on arrival, so T1 does not fire.
+    const dinner = restaurant('Mo-Su 11:00-23:00', { name: 'Winstub' }).atKm(164.8);
+    return { ...i, places: [lindenhof, dinner], matches: [{ placeId: lindenhof.id, km: 131, offRouteM: 0 }, { placeId: dinner.id, km: 164.8, offRouteM: 0 }], hours: [preparedHours(lindenhof), preparedHours(dinner)] };
   };
 
   test('[HON-EXAMPLE] the strip: a likely band from here to about km 137, a café at km 131, then "40 km · about 16:35"', () => {
@@ -449,8 +451,8 @@ describe('the position line and the notes', () => {
     expect(s.shareMapText).toContain('openstreetmap');
   });
   test('[HON-ONE-SCREEN] T1 reads the same leave-by: Food and Daylight agree on the Sunday closure', () => {
-    const market = supermarket('Mo-Sa 07:00-14:00', { name: 'Markt' });
-    const i = inputsOf({ trip: testTrip({ route: flatRoute(300, { stageEnds: [90, 200, 300] }) }), now: `${FRI} 20:00`, spots: [{ b: market, km: 89.5 }, { b: bakery('Mo-Su 06:00-12:00'), km: 40 }], litres: 3 });
+    const market = supermarket('Mo-Sa 07:00-16:00', { name: 'Markt' });
+    const i = inputsOf({ trip: testTrip({ route: flatRoute(300, { stageEnds: [90, 200, 300] }) }), now: `${FRI} 20:00`, spots: [{ b: market, km: 89.5 }, { b: tap(), km: 30 }, { b: tap(), km: 60, side: 'west' }], litres: 3 });
     const s = screen({ ...i, hours: i.places.map((p) => preparedHours(p)) });
     expect(s.cards.food.title.toLowerCase()).toContain('sunday');
     expect(itemText(s.cards.daylight).toLowerCase()).toContain('sunday');
