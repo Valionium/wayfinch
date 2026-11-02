@@ -25,6 +25,22 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   shelterMappedAs: [['a weather shelter'], ['a bus stop'], ['bike parking']],
   callAsMapped: [['28 Oct'], ['3 Jan']],
   weatherScenariosShowRain: [[7, '14:30'], [3, '09:00']],
+  waterGentleSchedule: [[0.8], [1.42]],
+  waterNotEnough: [['Kehl', '1.2'], ['the route end', '0.5']],
+  waterFillUp: [['Kehl', '40', '1.5']],
+  waterBottlesHold: [['2.75', '1.5', 'Kehl']],
+  waterRefill: [['Kehl', '+3 km · about 14:05', '2.5'], ['Kehl', '0.3 km back', '2.5']],
+  waterAhead: [['3.2']],
+  waterBack: [['0.3']],
+  waterRefreshOrCarry: [['120', '35']],
+  waterEnoughToReach: [['Kehl', 'Bühl']],
+  waterEnoughToComeBack: [['Turn']],
+  waterNoSource: [['42']],
+  waterStillAbout: [['0.6']],
+  waterExpectedPlanned: [['Kehl', '1.8', '2.5']],
+  waterAtKm: [['76.3']],
+  waterUnverifiedSince: [['2021']],
+  waterSeasonal: [['Apr–Oct']],
 };
 
 function everyString(): { key: string; text: string }[] {

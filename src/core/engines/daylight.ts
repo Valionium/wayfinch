@@ -1,6 +1,6 @@
 // Daylight (spec section 6.5): the sun times, the fine limit and the status of an arrival. The card comes with leave-by.
 // This is the only file that imports suncalc. It takes and gives UTC instants, so the device's zone plays no part.
-import { getTimes } from 'suncalc';
+import { getPosition, getTimes } from 'suncalc';
 import { formatHm } from '../answers/time.ts';
 import type { Status, SunSource, SunTimes } from '../types.ts';
 import { W } from '../wording/en.ts';
@@ -18,6 +18,9 @@ export const sunFromSuncalc: SunSource = (lat, lon, ridingDate) => {
   const t = getTimes(new Date(Date.UTC(y, m - 1, d, 12)), lat, lon);
   return { dawn: t.dawn, sunrise: t.sunrise, sunset: t.sunset, dusk: t.dusk, lightAllNight: t.alwaysUp === true };
 };
+
+/** The sun's elevation in degrees (suncalc 2 gives degrees) at an instant and place, for clear-sky radiation (section 6.3). */
+export const solarElevationDeg = (at: Date, lat: number, lon: number): number => getPosition(at, lat, lon).altitude;
 
 /** Sunset minus the larger of 30 minutes and 15% of the riding time. Null on a day without a sunset. */
 export function fineLimit(sun: SunTimes, ridingMin: number): Date | null {

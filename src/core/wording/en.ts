@@ -56,6 +56,63 @@ export const W = {
   daylightSunSet: (sunset: string, firstLight: string | null): string =>
     firstLight ? `The sun set at ${sunset}. First light tomorrow ${firstLight}.` : `The sun set at ${sunset}.`,
 
+  // ---- Water: drinking advice (section 6.3). ----
+  waterDrinkToThirst: 'Drink to thirst.',
+  waterGentleSchedule: (lPerH: number): string => `In this heat, a gentle guide is about ${lPerH.toFixed(1)} L an hour. An estimate, not a target.`,
+  waterSaltyFood: 'On a long hot ride, have some salty food.',
+  waterColdReminder: 'In the cold you may feel less thirsty. Keep sipping.',
+  waterOutsideRange: 'outside the validated range',
+  waterDayFlag: 'This day adds up to more than 11.4 L. Consider shorter or cooler stretches.',
+
+  // ---- Water: the reach rule (section 6.3). `s` names a source or point; litres and kilometres come as shown. ----
+  waterNotEnough: (s: string, litres: string): string => `Not enough water to reach ${s} with a reserve — you need about ${litres} L.`,
+  waterTips: 'To reduce sweat: shade, cooler hours, an easier pace.',
+  waterFillUp: (s: string, km: string, litres: string): string =>
+    `Refill at ${s} and fill up completely — it's the last reliable water for ${km} km. Carry ${litres} L extra.`,
+  waterBottlesHold: (capacity: string, litres: string, s: string): string => `Your bottles hold ${capacity} L. Carry ${litres} L extra from ${s}.`,
+  waterRefill: (s: string, where: string, litres: string): string => `Refill at ${s} (${where}): fill to ${litres} L`,
+  waterAhead: (km: string): string => `+${km} km`,
+  waterBack: (km: string): string => `${km} km back`,
+  waterRefreshOrCarry: (edgeKm: string, km: string): string => `No place data after km ${edgeKm} — refresh this stretch, or carry for ${km} km.`,
+  waterEnoughToReach: (s2: string, s1: string): string => `Enough to reach ${s2} — refilling at ${s1} is optional.`,
+  waterEnoughToComeBack: (s: string): string => `Enough to come back to ${s} — refilling there is optional.`,
+  waterEnoughToEnd: 'Enough to the end.',
+  waterNoSource: (km: string): string => `No mapped reliable water for the next ${km} km`,
+  waterConfirm: 'Confirm your water to check the next stretch',
+  waterStillAbout: (litres: string): string => `Still about ${litres} L?`,
+  waterEnterCapacity: 'Enter the water you can carry (You) to plan refills.',
+  waterSetDate: 'Set your departure date to check this stretch.',
+  waterCantWorkOut: "The water estimate can't be worked out from these settings. Check your speed, weight and camp water in You and Trip.",
+  waterExpectedPlanned: (s: string, expected: string, planned: string): string => `Estimate to ${s}: expected ${expected} L, planned ${planned} L`,
+  waterNotCalibrated: 'Your personal factor is not calibrated yet.',
+  waterPartlyCalibrated: 'Your personal factor is partly calibrated.',
+  waterCalibrated: 'Your personal factor is calibrated from your rides.',
+  waterRouteEnd: 'the route end',
+  waterAtKm: (km: string): string => `km ${km}`,
+
+  // ---- Water: sources (section 6.0). ----
+  waterMappedAsDrinking: 'mapped as drinking water',
+  waterUnverifiedSince: (year: string): string => `unverified since ${year}`,
+  waterFee: 'fee',
+  waterNearYou: 'near you, may be behind',
+  waterSeasonal: (window: string): string => `seasonal: ${window}`,
+  waterMaybeOffForWinter: 'may be switched off for winter',
+  waterClassB: 'water not verified',
+  waterClassC: 'treat or filter first',
+  waterWithFilter: 'usable with your filter',
+  waterClassD: 'not mapped as drinking water',
+  waterNotOpenAllWindow: 'closes or opens within 30 minutes of arrival',
+  waterClosedAtArrival: 'closed at arrival',
+  waterNoShop: 'no shop mapped at this fuel station',
+  waterNoDate: 'no departure date, so hours and seasons at arrival are not known',
+  waterNotASource: 'not a water source',
+
+  // ---- Water: the basis lines. ----
+  waterBasisEstimate: 'WaterNeed v1: an estimate from weather, pace and load',
+  waterBasisSeasonal: 'seasonal estimate',
+  waterBasisAssumedHot: 'no weather data — assumes a hot day',
+  waterBasisOsm: '© OpenStreetMap contributors',
+
   /** "Mapped as a weather shelter, not checked." and the same line for each other roof kind. */
   shelterMappedAs: (what: string): string => `Mapped as ${what}, not checked.`,
   /** Call ahead and rescue points. `date` is the map data's date, such as "28 Oct". */

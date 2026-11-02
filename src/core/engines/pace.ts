@@ -59,7 +59,8 @@ export function clockMin(route: Route, fromKm: Km, toKm: Km, flatKph: number, r 
 export function flatLegClockMin(km: number, flatKph: number, r = 1): number {
   return ((km / (flatKph * LOAD_PENALTY)) * 60) * BREAKS * r;
 }
-const flatLegRidingMin = (km: number, flatKph: number, r = 1): number => ((km / (flatKph * LOAD_PENALTY)) * 60) * r;
+/** A leg without breaks: what water use and the daylight margin read. */
+export const flatLegRidingMin = (km: number, flatKph: number, r = 1): number => ((km / (flatKph * LOAD_PENALTY)) * 60) * r;
 
 /**
  * From kilometre `k`: the end of the stage `k` lies in, or of the next stage when `k` is more than halfway through its

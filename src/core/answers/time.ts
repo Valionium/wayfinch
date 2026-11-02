@@ -16,6 +16,22 @@ function formatterFor(tz: string): Intl.DateTimeFormat {
   return f;
 }
 
+const zonesKnown = new Map<string, boolean>();
+/** Whether the time-zone data know this name. Formatting with an unknown one throws. */
+export function isKnownZone(tz: string): boolean {
+  let known = zonesKnown.get(tz);
+  if (known === undefined) {
+    try {
+      formatterFor(tz);
+      known = true;
+    } catch {
+      known = false;
+    }
+    zonesKnown.set(tz, known);
+  }
+  return known;
+}
+
 export type WallClock = { year: number; month: number; day: number; hour: number; minute: number; second: number };
 
 /** The wall-clock fields of instant `t` in zone `tz`. */
