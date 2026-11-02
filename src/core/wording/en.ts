@@ -564,6 +564,22 @@ export const W = {
   appNoRoute: "Add a route to see what's ahead",
   appStorageBlocked: "This browser is not keeping Wayfinch's data. The app works for this visit only. Export what you need before you close it.",
   appNoSignalNoTrip: "No signal, and this trip is not prepared. Distance, climbing and daylight come from the route. Places and weather need a connection: prepare the trip while you are online.",
+
+  // ---- The store (sub-project 5): why a value or a write was refused ----
+  appStoreFlatKphRange: 'Flat speed goes from 15 to 40 km/h.',
+  appStoreStartTimeRange: 'Daily start time goes from 04:00 to 14:00.',
+  appStoreNightsRange: 'Nights go from 0 to 30.',
+  appStoreCampWaterRange: 'Camp water per night goes from 0 to 5 L.',
+  appStoreWaterRange: 'Water goes from 0 to 20 L.',
+  appStorePaceChoice: 'Pace is steady, sporting or hard.',
+  appStoreStayChoice: 'Stay type is camping, mixed or accommodation.',
+  appStoreThemeChoice: 'Theme is automatic, light or dark.',
+  appStoreUnitsChoice: 'Units are km and °C, or mi and °F.',
+  appStoreOnOrOff: 'This setting is on or off.',
+  appStoreDepartureDate: 'That is not a date.',
+  appStoreRouteNotReadable: 'This route could not be read.',
+  appStoreNotKept: "This browser did not keep that. Check the phone's free storage.",
+  appStoreChangedElsewhere: 'This was changed in another window. Showing the newer data.',
 };
 
 /** "28 Oct" from an ISO date. Anything else is no date. */
