@@ -86,6 +86,14 @@ describe('bike shop chip', () => {
     expect(itemAt(a, 112).detail).toContain('repairs mapped');
     expect(itemAt(a, 105).detail).toContain('repairs not mapped');
   });
+  test('[EM-BIKE] the title names the nearest, not a far repair shop; the repair shop stays first in the list', () => {
+    const a = chip('bike', {
+      moment: riding(100),
+      spots: [{ b: named(bikeShop, 'Sales only'), km: 105 }, { b: named(bikeShop, 'Workshop', { 'service:bicycle:repair': 'yes' }), km: 290 }],
+    });
+    expect(a.title).toBe('Nearest bike shop: Sales only, km 105');
+    expect(a.items.map((i) => i.stamp?.km)).toEqual([290, 105]);
+  });
   test('[EM-BIKE] within 5 km of the route only; 5 km counts', () => {
     const a = chip('bike', {
       moment: riding(100),
@@ -181,7 +189,7 @@ describe('train chip', () => {
       ],
     });
     expect(a.items.map((i) => i.stamp?.km)).toEqual([108, 102, 90]);
-    expect(a.title).toBe('Nearest station: Main, km 108');
+    expect(a.title).toBe('Nearest halt: Halt, km 102');
   });
   test('[EM-TRAIN] distance and arrival next to sunset, with the label', () => {
     const f = facts({ moment: riding(100), spots: [{ b: station({ name: 'Main' }), km: 110, off: 500 }] });
@@ -195,6 +203,11 @@ describe('train chip', () => {
   test('[EM-TRAIN] an arrival after sunset says so', () => {
     const a = chip('train', { moment: riding(100, '18:30'), spots: [{ b: station({ name: 'Main' }), km: 110 }] });
     expect(itemAt(a, 110).detail).toContain('after sunset (18:42)');
+    expect(itemAt(a, 110).status).toBe('warning');
+  });
+  test('[EM-TRAIN] an arrival before sunrise says so, and is not fine', () => {
+    const a = chip('train', { moment: { positions: [pos({ km: 100, at: `${SAT} 01:00` })], now: `${SAT} 01:00` }, spots: [{ b: station({ name: 'Main' }), km: 110 }] });
+    expect(itemAt(a, 110).detail).toContain('before sunrise (07:55)');
     expect(itemAt(a, 110).status).toBe('warning');
   });
   test('[EM-TRAIN] within 10 km of the route only', () => {
@@ -270,6 +283,24 @@ describe('every chip rides there now', () => {
     expect(itemAt(a, 76.3).detail).toMatch(/^near you, may be behind/);
     expect(itemAt(a, 76.3).stamp!.at).toBeUndefined();
     expect(itemAt(a, 76.3).status).toBe('unknown');
+  });
+  test('[EM-NOW] a place inside the radius counts for the title: alone, it is no "none mapped"', () => {
+    const a = chip('pharmacy', { moment: riding(76, '12:00', { acc: 800 }), spots: [{ b: pharmacy(null, { name: 'P' }), km: 76.2 }] });
+    expect(a.title).toBe('Nearest pharmacy: P, km 76.2');
+    expect(a.status).toBe('unknown');
+    expect(a.detail).not.toContain('No pharmacy mapped');
+  });
+  test('[EM-NOW] a place inside the radius beats a far one, and "none behind" is not claimed: it may be behind', () => {
+    const a = chip('pharmacy', { moment: riding(76, '12:00', { acc: 800 }), spots: [{ b: pharmacy(null, { name: 'P' }), km: 76.2 }, { b: pharmacy(null, { name: 'Far' }), km: 150 }] });
+    expect(a.title).toBe('Nearest pharmacy: P, km 76.2');
+    expect(a.status).toBe('unknown');
+    expect(a.detail).not.toContain('No pharmacy mapped');
+  });
+  test('[EM-NOW] a position past the route end counts from the route end', () => {
+    const now = at(`${SAT} 12:00`);
+    const a = chip('pharmacy', { moment: riding(500), spots: [{ b: pharmacy(null, { name: 'P' }), km: 290 }] });
+    expect(itemAt(a, 290).detail).toMatch(/^10 km back/);
+    near(itemAt(a, 290).stamp!.at!, new Date(now.getTime() + clockMs(10)));
   });
   test('[EM-NOW] after the day\'s ride it still rides there now, from the position', () => {
     const now = at(`${SAT} 19:00`);

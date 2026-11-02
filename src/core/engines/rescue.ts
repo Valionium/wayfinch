@@ -31,7 +31,7 @@ export const realKm = (km: unknown): km is Km => typeof km === 'number' && km >=
 export function distanceText(m: number): string {
   if (m < SAME_SPOT_M) return W.emergencyUnder50;
   const fifty = Math.round(m / 50) * 50;
-  return fifty < 1000 ? `${fifty} m` : `${(Math.round(m / 100) / 10).toFixed(1)} km`;
+  return fifty < 1000 ? W.emergencyMetres(fifty) : W.emergencyKilometres((Math.round(m / 100) / 10).toFixed(1));
 }
 
 /** "600 m north-east", the way this card reads any place from the position. No direction when it is right there. */

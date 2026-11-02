@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 import { emergencyCard, shareLocationText, type EmergencyCard, type EmergencyFacts } from '../../../../src/core/engines/emergency.ts';
 import { COUNTRY_CODES, emergencyTable } from '../../../../src/core/places/countries.ts';
 import type { Place, Position, RescuePoint } from '../../../../src/core/types.ts';
+import { W } from '../../../../src/core/wording/en.ts';
 import { bannedHits } from '../../../fixtures/banned.ts';
 import { at, settlement, shelter } from '../../../fixtures/build.ts';
 import { destination } from '../../../fixtures/geo.ts';
@@ -40,7 +41,7 @@ describe('the table', () => {
   // Written out on purpose, a second time, so that a slip in the table fails here. Sources and dates are in the table's comment.
   const EXPECTED: Record<string, string[]> = {
     DE: ['112'], FR: ['112'], DK: ['112'], NL: ['112'], LU: ['112'], BE: ['112'],
-    AT: ['112', '140'], CH: ['112', '1414'], CZ: ['112', '+420 1210'], PL: ['112', '985', '+48 601 100 300'],
+    AT: ['112', '140'], CH: ['112', '1414'], CZ: ['112', '+420 1210'], PL: ['112', '+48 601 100 300', '985'],
   };
   test.each(Object.entries(EXPECTED))('[EM-NUMBERS] %s shows exactly its numbers', (country, numbers) => {
     expect(card({ country }).numbers).toEqual(numbers);
@@ -66,6 +67,27 @@ describe('the table', () => {
     expect(emergencyTable('CZ')!.mountain!.source).toContain('horskasluzba.cz');
     expect(emergencyTable('PL')!.mountain!.source).toContain('gopr.pl');
   });
+  test('[EM-NUMBERS] the 112 sources are current pages that open: Czechia and Denmark', () => {
+    expect(emergencyTable('CZ')!.source).toBe('https://hzscr.gov.cz/tisnova-komunikace-v-ceske-republice-2');
+    expect(emergencyTable('DK')!.source).toBe('https://lifeindenmark.borger.dk/healthcare/Emergencies');
+  });
+  test('[EM-NUMBERS] names and notes are the wording file\'s', () => {
+    expect(emergencyTable('AT')!.mountain!.name).toBe(W.emergencyMountainAustria);
+    expect(emergencyTable('AT')!.mountain!.note).toBe(W.emergencyNoteVorarlberg);
+    expect(emergencyTable('CH')!.mountain!.name).toBe(W.emergencyMountainSwitzerland);
+    expect(emergencyTable('CH')!.mountain!.note).toBe(W.emergencyNoteValais);
+    expect(emergencyTable('CZ')!.mountain!.name).toBe(W.emergencyMountainCzechia);
+    expect(emergencyTable('PL')!.mountain!.name).toBe(W.emergencyMountainPoland);
+  });
+  test('[EM-NUMBERS] the basis gives the year, and the 112 source beside the mountain source', () => {
+    const cz = card({ country: 'CZ' }).basis.join(' ');
+    expect(cz).toContain('checked 2 Nov 2026');
+    expect(cz).toContain(emergencyTable('CZ')!.source);
+    expect(cz).toContain(emergencyTable('CZ')!.mountain!.source);
+    const at_ = card({ country: 'AT' }).basis.join(' ');
+    expect(at_.split(emergencyTable('AT')!.source).length).toBe(2);
+    expect(card({ country: null }).basis.join(' ')).toContain('checked 2 Nov 2026');
+  });
   test('[EM-NUMBERS] the table\'s country follows the position', () => {
     expect(card({ country: 'AT' }).numbers).toContain('140');
     expect(card({ country: 'CH' }).numbers).toContain('1414');
@@ -79,7 +101,8 @@ describe('the table', () => {
     expect(card({ country: 'CH' }).items[1]!.detail).toContain('In Valais, call 144.');
     expect(card({ country: 'DE' }).items[0]!.detail).toBe('All emergencies');
     const pl = card({ country: 'PL' });
-    expect(pl.items.map((i) => i.label).slice(0, 3)).toEqual(['112', '985', '+48 601 100 300']);
+    expect(pl.items.map((i) => i.label).slice(0, 3)).toEqual(['112', '+48 601 100 300', '985']);
+    expect(JSON.stringify(emergencyTable('PL'))).not.toMatch(/network/i);
   });
   test('[EM-NUMBERS] the basis names where the numbers come from and when they were checked', () => {
     expect(card({ country: 'AT' }).basis.join(' ')).toContain('oesterreich.gv.at');
@@ -149,7 +172,7 @@ describe('no position', () => {
   });
   test.each<[string, Partial<Position>]>([
     ['NaN latitude', { lat: NaN }], ['NaN longitude', { lon: NaN }], ['infinite', { lat: Infinity }], ['latitude over 90', { lat: 91 }],
-    ['longitude over 180', { lon: 181 }], ['the empty 0, 0', { lat: 0, lon: 0 }],
+    ['longitude over 180', { lon: 181 }], ['the empty 0, 0', { lat: 0, lon: 0 }], ['0, 0 with noise', { lat: 1e-7, lon: -1e-7 }],
     ['a text latitude', { lat: '49' as unknown as number }], ['missing coordinates', { lat: undefined as unknown as number, lon: undefined as unknown as number }],
   ])('[EM-NO-POSITION] %s is no position: nothing invented', (_n, bad) => {
     const c = card({ position: gps(bad), country: null });
@@ -159,6 +182,8 @@ describe('no position', () => {
   test('[EM-NO-POSITION] a real point on the equator or the meridian is a position', () => {
     expect(card({ position: gps({ lat: 0, lon: 8.4 }) }).coords).toBe('0.00000, 8.40000');
     expect(card({ position: gps({ lat: 49, lon: 0 }) }).coords).toBe('49.00000, 0.00000');
+    expect(card({ position: gps({ lat: -1e-7, lon: 8.4 }) }).coords).toBe('0.00000, 8.40000');
+    expect(card({ position: gps({ lat: -1e-7, lon: 8.4 }) }).share).toContain('geo:0.00000,8.40000');
   });
 });
 
@@ -451,7 +476,7 @@ describe('nothing else failing may stop it', () => {
   ])('[EM-NO-POSITION] in any state: numbers and the line, and coordinates only when real', (position, country, now, thunderNear, rescuePoints) => {
     const c = emergencyCard({ position, country, now, thunderNear, rescuePoints, settlements: [], shelters: [], dataDate: '2026-10-28' });
     hasTheBasics(c);
-    const real = position !== null && Math.abs(position.lat) <= 90 && Math.abs(position.lon) <= 180 && !(position.lat === 0 && position.lon === 0);
+    const real = position !== null && Math.abs(position.lat) <= 90 && Math.abs(position.lon) <= 180 && !(Math.abs(position.lat) < 5e-6 && Math.abs(position.lon) < 5e-6);
     expect(c.coords !== null).toBe(real);
     expect(c.share !== null).toBe(real);
     const t = text(c) + (c.share ?? '');

@@ -42,8 +42,10 @@ const SHELTER_WORDS = new Map<string, string>([
 
 const listOf = <T>(list: T[]): T[] => (Array.isArray(list) ? list : []);
 
-/** Whether the position is one at all. Exactly 0, 0 is what a phone gives for no fix, so it invents no coordinates. */
-const usable = (p: Position | null | undefined): p is Position => realCoordinates(p) && !(p.lat === 0 && p.lon === 0);
+/** What reads 0.00000 once shown. */
+const ZERO_AT_5_DECIMALS = 5e-6;
+/** Whether the position is one at all. 0, 0 is what a phone gives for no fix, so it invents no coordinates. */
+const usable = (p: Position | null | undefined): p is Position => realCoordinates(p) && !(Math.abs(p.lat) < ZERO_AT_5_DECIMALS && Math.abs(p.lon) < ZERO_AT_5_DECIMALS);
 
 function numberItems(table: EmergencyNumbers | null): { numbers: string[]; items: AnswerItem[] } {
   const items: AnswerItem[] = [{ label: '112', stamp: null, status: 'action', detail: W.emergencyGeneralName }];
@@ -64,8 +66,9 @@ function ageText(ms: number): string {
   return W.emergencyAgeDays(Math.floor(min / (24 * 60)));
 }
 
-const coordsOf = (p: Position): string => `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
-const geoLink = (p: Position): string => `geo:${p.lat.toFixed(5)},${p.lon.toFixed(5)}`;
+const degrees = (n: number): string => (Math.abs(n) < ZERO_AT_5_DECIMALS ? '0.00000' : n.toFixed(5));
+const coordsOf = (p: Position): string => `${degrees(p.lat)}, ${degrees(p.lon)}`;
+const geoLink = (p: Position): string => `geo:${degrees(p.lat)},${degrees(p.lon)}`;
 
 /** The position's time on the place's clock. Where nothing tells the zone it says UTC, rather than pass for local time. */
 function clockOf(at: Date, code: CountryCode | null, zone: unknown): string | null {
@@ -198,7 +201,7 @@ export function emergencyCard(f: EmergencyFacts): EmergencyCard {
   const answer = makeAnswer({
     topic: 'help', status: 'action', title: W.emergencyCall, stamp: null, detail: W.emergencyFallback, items,
     basis: [
-      W.emergencyNumbersBasis(shortMapDate(checked) ?? checked, table?.mountain?.source ?? table?.source ?? EUROPE_112_SOURCE),
+      W.emergencyNumbersBasis(`${shortMapDate(checked) ?? checked} ${checked.slice(0, 4)}`, [...new Set([table?.source ?? EUROPE_112_SOURCE, ...(table?.mountain ? [table.mountain.source] : [])])].join(' ; ')),
       ...(placesShown ? [W.waterBasisOsm] : []),
     ],
     freshness: { dataDates: { emergencyNumbers: checked, ...(mapDate ? { places: dataDate } : {}) }, stale: false },

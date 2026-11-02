@@ -5,7 +5,7 @@ import { pointAtRouteKm } from '../geo/project.ts';
 import type { Status, DayPhase, DayRide, DayNote, DayStart, Km, PlanTomorrow, Position, SunSource, Trip, ZoneLookup, ZoneSpan } from '../types.ts';
 import { W } from '../wording/en.ts';
 import { arrivalStatus, fineLimit } from './daylight.ts';
-import { adjusted, isFarOff, isOffRoute, rejoinKm, usablePosition } from './locate.ts';
+import { adjusted, isFarOff, isOffRoute, latestPosition, rejoinKm, usablePosition } from './locate.ts';
 import { buildSchedule, correction, MIN_FLAT_KPH, stopRule, usableFlatKph, type Schedule } from './pace.ts';
 
 export type DayEnv = { sun: SunSource; routeZones: ZoneSpan[] };
@@ -354,6 +354,25 @@ export function nowSchedule(ride: DayRide, trip: Trip, now: Date, env: DayEnv): 
     behindFromKm: ride.behindFromKm,
   }, ride.r, zone);
 }
+
+/**
+ * Where the chips ride from, in every phase (section 6.2a): the latest usable position, held to the route, with its own
+ * rejoin leg; an approximate one gives its least favourable points (section 6.1). With no position, the ride's start.
+ */
+export function chipStart(ride: DayRide, trip: Trip, positions: Position[]): { aheadKm: Km; behindKm: Km; offM: number; position: Position | null } {
+  const position = latestPosition(positions.filter(usablePosition));
+  if (!position) return { aheadKm: ride.startKm, behindKm: ride.behindFromKm, offM: ride.startOffRouteM, position };
+  const length = trip.route.lengthKm;
+  const a = adjusted(position, length);
+  const held = (km: Km): Km => Math.max(0, Math.min(length, km));
+  return { aheadKm: held(a.aheadFromKm), behindKm: held(a.behindFromKm), offM: isOffRoute(position) ? position.offRouteM : 0, position };
+}
+
+/** The ride a chip rides: the day's, from where `chipStart` says. */
+export const chipRide = (ride: DayRide, trip: Trip, positions: Position[]): DayRide => {
+  const s = chipStart(ride, trip, positions);
+  return { ...ride, startKm: s.aheadKm, behindFromKm: s.behindKm, startOffRouteM: s.offM };
+};
 
 /** The daylight status of the arrival at `km` on a schedule: judged on the sun of the date of the ride it lies on (section 6.2a). */
 export function daylightAt(s: Schedule, km: Km, trip: Trip, env: DayEnv): { status: Status; line: string | null } {

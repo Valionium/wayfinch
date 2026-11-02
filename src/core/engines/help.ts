@@ -5,12 +5,12 @@ import { isKnownZone } from '../answers/time.ts';
 import { pointAtRouteKm } from '../geo/project.ts';
 import { stateAt } from '../hours/check.ts';
 import { radiusKmFor } from '../route/matches.ts';
-import type { Answer, AnswerItem, DayRide, Km, Missing, Place, PlaceKind, Position, RouteMatch, ScreenInputs, Status } from '../types.ts';
+import type { Answer, AnswerItem, DayRide, Km, Missing, Place, PlaceKind, RouteMatch, ScreenInputs, Status } from '../types.ts';
 import { shortMapDate, showKm, W } from '../wording/en.ts';
 import { savedCovers } from './covers.ts';
-import { adjusted, isOffRoute, latestPosition, rejoinKm, usablePosition } from './locate.ts';
+import { rejoinKm } from './locate.ts';
 import { usableFlatKph, type Schedule } from './pace.ts';
-import { nowSchedule, zoneLookupOf } from './tripday.ts';
+import { chipRide, chipStart, nowSchedule, zoneLookupOf } from './tripday.ts';
 
 export type HelpFacts = Pick<ScreenInputs, 'trip' | 'places' | 'matches' | 'hours' | 'savedKm' | 'positions' | 'now' | 'routeZones' | 'sun'> & { ride: DayRide };
 export type HelpKind = 'bike' | 'pharmacy' | 'train' | 'toilets';
@@ -84,14 +84,6 @@ const GROUPS: Record<HelpKind, Group[]> = {
 
 const validDate = (d: Date): boolean => Number.isFinite(d.getTime());
 
-/** Where the chip rides from: the position (an approximate one's least favourable points), or with none the ride's start. */
-function startOf(f: HelpFacts): { aheadKm: Km; behindKm: Km; offM: number; position: Position | null } {
-  const position = latestPosition(f.positions.filter(usablePosition));
-  if (!position) return { aheadKm: f.ride.startKm, behindKm: f.ride.behindFromKm, offM: f.ride.startOffRouteM, position };
-  const a = adjusted(position, f.trip.route.lengthKm);
-  return { aheadKm: a.aheadFromKm, behindKm: a.behindFromKm, offM: isOffRoute(position) ? position.offRouteM : 0, position };
-}
-
 const reach = (s: Pass, from: Km): number => Math.abs(s.match.km - from) + rejoinKm(s.match.offRouteM);
 
 /** The nearest pass on one side, and the nearest of the preferred before it when that is another one. */
@@ -114,9 +106,10 @@ function hoursLine(f: HelpFacts, s: Pass, at: Date, tz: string): { status: Statu
 
 function sunsetLine(f: HelpFacts, schedule: Schedule, km: Km, at: Date, tz: string): { status: Status; line: string[] } {
   const p = pointAtRouteKm(f.trip.route, km);
-  const sunset = f.sun(p.lat, p.lon, schedule.rideOf(km).date).sunset;
+  const { sunset, sunrise } = f.sun(p.lat, p.lon, schedule.rideOf(km).date);
   if (!sunset || !validDate(sunset)) return { status: 'unknown', line: [] };
   const hm = formatHm(sunset, tz);
+  if (sunrise && at.getTime() < sunrise.getTime()) return { status: 'warning', line: [W.helpBeforeSunrise(formatHm(sunrise, tz)), W.helpSunset(hm)] };
   return at.getTime() <= sunset.getTime() ? { status: 'fine', line: [W.helpSunset(hm)] } : { status: 'warning', line: [W.helpAfterSunset(hm)] };
 }
 
@@ -130,12 +123,12 @@ export function helpChip(kind: HelpKind, f: HelpFacts): Answer {
   const basis = [W.waterBasisOsm, ...(date ? [W.stopMapDate(date)] : [])];
   const dataDates: Record<string, string> = newest === null ? {} : { places: newest };
   const freshness = { dataDates, stale: false };
-  const start = startOf(f);
+  const start = chipStart(f.ride, f.trip, f.positions);
   if (!usableFlatKph(f.trip.flatKph) || !validDate(f.now) || !Number.isFinite(start.aheadKm) || !Number.isFinite(start.behindKm)) {
     return makeAnswer({ topic: 'help', status: 'unknown', title: W.helpCantWorkOut, stamp: null, detail: '', items: [], basis, freshness });
   }
   const env = { sun: f.sun, routeZones: f.routeZones };
-  const schedule = nowSchedule({ ...f.ride, startKm: start.aheadKm, behindFromKm: start.behindKm, startOffRouteM: start.offM }, f.trip, f.now, env);
+  const schedule = nowSchedule(chipRide(f.ride, f.trip, f.positions), f.trip, f.now, env);
   const zone = zoneLookupOf(f.routeZones);
   const zoneOf = (s: Pass): string => {
     if (isKnownZone(s.place.timeZone)) return s.place.timeZone;
@@ -160,7 +153,7 @@ export function helpChip(kind: HelpKind, f: HelpFacts): Answer {
     const detail = [...where, ...(sun?.line ?? []), ...(hours ? [hours.line] : []), ...(g.lines?.(s.place) ?? []), ...(isTrain ? [W.helpStationOnly] : [])].join(' · ');
     return {
       item: { label, stamp, status, detail, ...contact }, pass: s, unworked: hours?.unworked ?? false,
-      reach: side === 'behind' ? reach(s, start.behindKm) : reach(s, start.aheadKm),
+      reach: side === 'near' ? rejoinKm(s.match.offRouteM) : reach(s, side === 'behind' ? start.behindKm : start.aheadKm),
     };
   };
 
@@ -183,9 +176,10 @@ export function helpChip(kind: HelpKind, f: HelpFacts): Answer {
     const near = picks(passes.filter(inside), start.aheadKm, g).map((s) => rowOf(s, 'near', g));
     rows.push(...ahead, ...behind, ...near);
     if (index === 0) {
-      if (ahead.length === 0) noneLines.push(W.helpNoneAhead(g.what));
-      if (behind.length === 0) noneLines.push(W.helpNoneBehind(g.what));
-      firsts.push(...ahead, ...behind);
+      // A place inside the radius may lie either way, so neither side can be called empty.
+      if (near.length === 0 && ahead.length === 0) noneLines.push(W.helpNoneAhead(g.what));
+      if (near.length === 0 && behind.length === 0) noneLines.push(W.helpNoneBehind(g.what));
+      firsts.push(...ahead, ...behind, ...near);
     }
   });
 
@@ -193,10 +187,10 @@ export function helpChip(kind: HelpKind, f: HelpFacts): Answer {
   const missing: Missing[] = [...(saved ? [] : ['places' as const]), ...(rows.some((r) => r.unworked) ? ['hours' as const] : [])];
 
   const group = GROUPS[kind][0]!;
-  const preferredRows = group.preferred ? firsts.filter((r) => group.preferred!(r.pass.place)) : firsts;
-  const first = [...(preferredRows.length > 0 ? preferredRows : firsts)].sort((a, b) => a.reach - b.reach || compareFinal(a.pass.place, b.pass.place))[0];
+  // The title says "nearest", so it names the nearest; what is preferred comes first in the list.
+  const first = [...firsts].sort((a, b) => a.reach - b.reach || compareFinal(a.pass.place, b.pass.place))[0];
   const title = first
-    ? W.helpNearest(group.what, nameOf(first.pass.place), showKm(first.pass.match.km))
+    ? W.helpNearest(wordOf(first.pass.place), nameOf(first.pass.place), showKm(first.pass.match.km))
     : !saved && rows.length === 0 ? W.helpNoPlaceData : W.helpNone(group.what);
   const detail = [
     ...(isTrain ? [W.helpStationOnly] : []),

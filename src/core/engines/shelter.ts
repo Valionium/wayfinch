@@ -6,7 +6,7 @@ import { showKm, W } from '../wording/en.ts';
 import { latestPosition, usablePosition } from './locate.ts';
 import { coverLine, coverOfSpot, finalOrder, hoursLookup, hoursNotWorkedOut, insideRadius, isCover, missingFor, newestMapDate, reachKm, shortMapDate, spotsOf, zoneOfSpot, type NotCover, type Spot, type StopFacts } from './covers.ts';
 import { usableFlatKph, type Schedule } from './pace.ts';
-import { nowSchedule } from './tripday.ts';
+import { chipRide, nowSchedule } from './tripday.ts';
 import { hourClass } from './weather-classes.ts';
 import { isStale, weatherWindows } from './weather.ts';
 import { gridOf, hoursTouching, onTheRide, pointNearKm, pointNearPosition, routeForecast, type GridPoint } from './weather-windows.ts';
@@ -125,7 +125,8 @@ export function shelterEntries(f: StopFacts, at: Date, thunder: boolean): Shelte
 }
 
 /** The chip, riding there now. */
-export function shelterChip(f: StopFacts, thunder: boolean): Answer {
+export function shelterChip(facts: StopFacts, thunder: boolean): Answer {
+  const f: StopFacts = { ...facts, ride: chipRide(facts.ride, facts.trip, facts.positions) };
   const newest = newestMapDate(f);
   const date = shortMapDate(newest);
   const forecast = held(f);

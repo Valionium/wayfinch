@@ -1,5 +1,7 @@
 // The ten first-release countries: dial code, trunk rule and the one IANA zone each uses (section 5a), and the emergency
-// numbers of section 6.9. Keep this file free of imports: the pipeline and the Emergency card both read it.
+// numbers of section 6.9. The pipeline imports this file, so its own imports keep their explicit .ts endings.
+import { W } from '../wording/en.ts';
+
 export type CountryCode = 'DE' | 'AT' | 'CH' | 'FR' | 'BE' | 'NL' | 'DK' | 'PL' | 'CZ' | 'LU';
 
 export const COUNTRIES: Record<CountryCode, { dial: string; trunk: 'replace-0' | 'prefix'; timeZone: string }> = {
@@ -30,8 +32,8 @@ export type EmergencyNumbers = {
 //   DE https://verwaltung.bund.de/leistungsverzeichnis/en/rechte-und-pflichten/102837939
 //      mountains, Bavaria only, also 112: https://bergwacht-bayern.de/notruf
 //   FR https://www.service-public.gouv.fr/particuliers/vosdroits/F33953?lang=en
-//   CZ https://mv.gov.cz/clanek/pojmy-tisnove-volani.aspx
-//   DK https://politi.dk/en/about-the-police/contact-the-police/emergency-112
+//   CZ https://hzscr.gov.cz/tisnova-komunikace-v-ceske-republice-2 ; also https://mv.gov.cz/tisnova-volani-pro-cele-uzemi-ceske-republiky
+//   DK https://lifeindenmark.borger.dk/healthcare/Emergencies
 //   NL https://www.government.nl/themes/justice-security-and-defence/emergency-number-112
 //   AT https://www.oesterreich.gv.at/themen/notfaelle_unfaelle_und_kriminalitaet/katastrophenfaelle/1/Seite.29500327.html
 //   LU https://guichet.public.lu/en/citoyens/sante/services-urgence/appel-urgence.html
@@ -46,7 +48,8 @@ export type EmergencyNumbers = {
 //      Valais 144: https://www.rega.ch/en/questions-and-answers ; https://www.vs.ch/de/web/ssp/urgences-et-secours
 //   CZ +420 1210: https://www.horskasluzba.cz/cz/kontakty
 //      with a foreign network: https://www.horskasluzba.cz/cz/aktualni-informace/aktualne/tiskove-zpravy/2903-volani-na-cislo-hs-1210-u-vodafone-zdarma
-//   PL 985 and +48 601 100 300: https://www.gopr.pl/ ; https://topr.pl/
+//   PL +48 601 100 300 and 985: https://www.gopr.pl/ ; https://topr.pl/ . The full number comes first, as it can work from any phone.
+//      No official page was found on whether 985 works from foreign networks, so nothing is claimed about that.
 //      985 also serves sea rescue: https://bip.uke.gov.pl/numeracja/tablice-numerow-kierowania-alarmowego-nka,4,160.html
 // No official page gave a national mountain-rescue number for DE, FR, DK, NL, LU or BE: those show 112.
 const CHECKED = '2026-11-02';
@@ -57,28 +60,28 @@ const EMERGENCY: ReadonlyMap<string, EmergencyNumbers> = new Map<string, Emergen
   ['DE', { general: '112', source: 'https://verwaltung.bund.de/leistungsverzeichnis/en/rechte-und-pflichten/102837939', checked: CHECKED, mountain: null }],
   ['FR', { general: '112', source: 'https://www.service-public.gouv.fr/particuliers/vosdroits/F33953?lang=en', checked: CHECKED, mountain: null }],
   ['CZ', {
-    general: '112', source: 'https://mv.gov.cz/clanek/pojmy-tisnove-volani.aspx', checked: CHECKED,
-    mountain: { number: '+420 1210', name: 'Czech mountain rescue (Horská služba), day and night', source: 'https://www.horskasluzba.cz/cz/kontakty', checked: CHECKED },
+    general: '112', source: 'https://hzscr.gov.cz/tisnova-komunikace-v-ceske-republice-2', checked: CHECKED,
+    mountain: { number: '+420 1210', name: W.emergencyMountainCzechia, source: 'https://www.horskasluzba.cz/cz/kontakty', checked: CHECKED },
   }],
-  ['DK', { general: '112', source: 'https://politi.dk/en/about-the-police/contact-the-police/emergency-112', checked: CHECKED, mountain: null }],
+  ['DK', { general: '112', source: 'https://lifeindenmark.borger.dk/healthcare/Emergencies', checked: CHECKED, mountain: null }],
   ['NL', { general: '112', source: 'https://www.government.nl/themes/justice-security-and-defence/emergency-number-112', checked: CHECKED, mountain: null }],
   ['AT', {
     general: '112', source: 'https://www.oesterreich.gv.at/themen/notfaelle_unfaelle_und_kriminalitaet/katastrophenfaelle/1/Seite.29500327.html', checked: CHECKED,
     mountain: {
-      number: '140', name: 'Austrian mountain rescue (Alpin-Notruf)', note: 'In Vorarlberg, 144 also reaches mountain rescue.',
+      number: '140', name: W.emergencyMountainAustria, note: W.emergencyNoteVorarlberg,
       source: 'https://www.oesterreich.gv.at/themen/notfaelle_unfaelle_und_kriminalitaet/katastrophenfaelle/1/Seite.29500327.html', checked: CHECKED,
     },
   }],
   ['LU', { general: '112', source: 'https://guichet.public.lu/en/citoyens/sante/services-urgence/appel-urgence.html', checked: CHECKED, mountain: null }],
   ['PL', {
     general: '112', source: 'https://www.gov.pl/web/numer-alarmowy-112/numeralarmowy112', checked: CHECKED,
-    mountain: { number: '985', also: '+48 601 100 300', name: 'Polish mountain rescue (GOPR, TOPR in the Tatras)', source: 'https://www.gopr.pl/', checked: CHECKED },
+    mountain: { number: '+48 601 100 300', also: '985', name: W.emergencyMountainPoland, source: 'https://www.gopr.pl/', checked: CHECKED },
   }],
   ['BE', { general: '112', source: 'https://112.be/en/how-call/how-call-112', checked: CHECKED, mountain: null }],
   ['CH', {
     general: '112', source: 'https://www.rega.ch/en/about-us/contact/emergency-numbers', checked: CHECKED,
     mountain: {
-      number: '1414', name: 'Swiss air rescue (Rega)', note: 'In Valais, call 144.',
+      number: '1414', name: W.emergencyMountainSwitzerland, note: W.emergencyNoteValais,
       source: 'https://www.rega.ch/en/about-us/contact/emergency-numbers', checked: CHECKED,
     },
   }],
