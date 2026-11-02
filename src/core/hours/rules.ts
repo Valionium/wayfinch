@@ -4,7 +4,11 @@ import type { HoursSpan } from '../types';
 import { W } from '../wording/en';
 
 export type RuleClass = { kind: 'food-shop' | 'kiosk' | 'bakery' | 'fuel-shop' | 'other-shop' | 'other'; nearStation: boolean };
-export type Seg = { from: number; to: number; state: HoursSpan['state']; reason?: string };
+export type Seg = {
+  from: number; to: number; state: HoursSpan['state']; reason?: string;
+  /** A PH rule of the tag decides this stretch of a holiday. */
+  phRule?: boolean;
+};
 
 const DAY = 86_400_000;
 const isoOf = (n: number): string => new Date(n).toISOString().slice(0, 10);
@@ -57,8 +61,16 @@ function isLocalHoliday(zone: string, date: string): boolean {
   return (key === 'DE-SN' || key === 'DE-TH') && date === corpusChristi(Number(date.slice(0, 4)));
 }
 
-/** An explicit PH rule, not the letters inside a quoted comment. */
-export const hasPhRule = (tag: string): boolean => /\bPH\b/.test(tag.replace(/"[^"]*"/g, ''));
+const withoutComments = (rule: string): string => rule.replace(/"[^"]*"/g, '');
+
+/** Names public holidays, not the letters inside a quoted comment. */
+export const mentionsPh = (tag: string): boolean => /\bPH\b/.test(withoutComments(tag));
+
+/** One rule selects the holiday itself. "PH -1 days" is about the day before, so it does not. */
+export const selectsHoliday = (rule: string): boolean => /\bPH\b(?!\s*[+-]\s*\d)/.test(withoutComments(rule));
+
+/** One rule gives clock times, or says closed or unknown. "Mo-Fr" alone says nothing about when, though the library reads it as open all day. */
+export const saysWhen = (rule: string): boolean => /\d:\d\d|24\/7|\b(?:off|closed|unknown)\s*$/.test(withoutComments(rule).trim());
 
 export type RuleFacts = {
   country: string;
@@ -66,7 +78,6 @@ export type RuleFacts = {
   rule: RuleClass;
   /** The tag was read, so `segs` are its hours. Otherwise the place counts as having no hours. */
   tagged: boolean;
-  phRule: boolean;
   holidays: Set<string>;
   /** Holidays the library can't see, so a PH rule says nothing on them. */
   unseenHolidays: Set<string>;
@@ -89,7 +100,7 @@ function ruleFor(f: RuleFacts, s: Seg, date: string, weekday: number, minute: nu
 
   if (f.tagged) {
     if (!germanRules || !holiday || s.state !== 'open') return null;
-    if (f.phRule && !f.unseenHolidays.has(date)) return null;
+    if (s.phRule && !f.unseenHolidays.has(date)) return null;
     return mayOrClosed(bakeryOrFuel, isLocalHoliday(f.zone, date) ? W.foodLocalHoliday : W.foodHolidayRules);
   }
   if (germanRules && (sunday || holiday)) {

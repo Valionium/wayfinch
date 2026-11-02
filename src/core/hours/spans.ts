@@ -14,7 +14,7 @@ import OpeningHours from 'opening_hours';
 import { wallClock, zoneOffsetMin, type WallClock } from '../answers/time';
 import type { HoursSpan } from '../types';
 import { W } from '../wording/en';
-import { applyRules, hasPhRule, holidayEdits, zoneParts, type RuleClass, type Seg } from './rules';
+import { applyRules, holidayEdits, mentionsPh, saysWhen, selectsHoliday, zoneParts, type RuleClass, type Seg } from './rules';
 
 export type { RuleClass };
 export type WallTime = WallClock;
@@ -73,8 +73,8 @@ function deviceGaps(n0: number, n1: number): [number, number][] {
 
 // ---- The library ----
 
-/** No clock time this wrapper can honour: sun times need a position it does not have, and the library guesses them. */
-const NO_CLOCK = /\b(?:sunrise|sunset|dawn|dusk)\b|^\s*open\s*$/i;
+/** Sun times need a position this wrapper does not have, and the library guesses them. */
+const SUN_TIMES = /\b(?:sunrise|sunset|dawn|dusk)\b/i;
 
 const regionOf = (country: string, key: string | null) => ({
   lat: 0, lon: 0,
@@ -94,13 +94,26 @@ function overlay(segs: Seg[], from: number, to: number, inserted: Seg[]): Seg[] 
   return [...out, ...inserted].sort((a, b) => a.from - b.from);
 }
 
+/** The tag as the library reads it, or null when it rejects it or when any rule gives no time this wrapper can honour. */
+function parseTag(tag: string, region: ReturnType<typeof regionOf>): OpeningHours | null {
+  if (SUN_TIMES.test(tag)) return null;
+  try {
+    const o = new OpeningHours(tag, region);
+    // The library's own form of each rule, so 9-17 and 09.00-17.00 count as the clock times they are.
+    for (let i = 0; ; i++) {
+      const rule = o.prettifyValue({ rule_index: i });
+      if (!rule) return i === 0 ? null : o;
+      if (!saysWhen(rule)) return null;
+    }
+  } catch {
+    return null;
+  }
+}
+
 /** The tag's segments between two naive times, closed included, or null when the library rejects it. */
-function readTag(tag: string, region: ReturnType<typeof regionOf>, n0: number, n1: number): Seg[] | null {
-  if (NO_CLOCK.test(tag)) return null;
-  let o: OpeningHours;
+function readTag(o: OpeningHours, n0: number, n1: number): Seg[] | null {
   let intervals: [Date, Date, boolean, string | undefined][];
   try {
-    o = new OpeningHours(tag, region);
     intervals = o.getOpenIntervals(toDevice(n0), toDevice(n1));
   } catch {
     return null;
@@ -175,8 +188,44 @@ function withoutRemovedHolidays(segs: Seg[], tag: string, place: HoursPlace, zon
       const from = Math.max(Date.parse(`${date}T00:00:00Z`), n0);
       const to = Math.min(Date.parse(`${date}T00:00:00Z`) + DAY, n1);
       if (to <= from) continue;
-      const day = readTag(tag, regionOf(place.country, null), from, to) ?? [{ from, to, state: 'unknown' as const, reason: W.foodHoursUnknown }];
+      const country = parseTag(tag, regionOf(place.country, null));
+      const day = (country && readTag(country, from, to)) ?? [{ from, to, state: 'unknown' as const, reason: W.foodHoursUnknown }];
       out = overlay(out, from, to, day);
+    }
+  }
+  return out;
+}
+
+/** Marks the open stretches of holidays that a PH rule decides. The library says which rule decides each minute. */
+function markPhRules(o: OpeningHours, segs: Seg[], holidays: Set<string>): Seg[] {
+  const selects = new Map<number, boolean>();
+  const decidedByPh = (d: Date): boolean => {
+    const i = o.getMatchingRule(d);
+    if (i === undefined) return false;
+    let yes = selects.get(i);
+    if (yes === undefined) {
+      yes = selectsHoliday(o.prettifyValue({ rule_index: i }));
+      selects.set(i, yes);
+    }
+    return yes;
+  };
+  const out: Seg[] = [];
+  for (const s of segs) {
+    if (s.state !== 'open') { out.push(s); continue; }
+    for (let from = s.from; from < s.to;) {
+      const dayEnd = Math.floor(from / DAY) * DAY + DAY;
+      const to = Math.min(dayEnd, s.to);
+      if (!holidays.has(new Date(from).toISOString().slice(0, 10))) {
+        out.push({ ...s, from, to });
+      } else {
+        for (let n = from; n < to; n += MIN) {
+          const phRule = decidedByPh(toDevice(n));
+          const last = out.at(-1);
+          if (last && last.to === n && last.state === 'open' && last.phRule === phRule) last.to = Math.min(n + MIN, to);
+          else out.push({ from: n, to: Math.min(n + MIN, to), state: 'open', phRule });
+        }
+      }
+      from = to;
     }
   }
   return out;
@@ -243,14 +292,17 @@ export function placeSpans(tag: string | null, place: HoursPlace, rule: RuleClas
   const n0 = naiveOf(windowStart, place.timeZone);
   const n1 = naiveOf(windowEnd, place.timeZone);
   const whole: Seg[] = [{ from: n0, to: n1, state: 'unknown', reason: W.foodHoursUnknown }];
-  const read = tag === null ? null : readTag(tag, regionOf(place.country, place.hoursRegionKey), n0, n1);
-  const phRule = read !== null && hasPhRule(tag!);
-  const segs = phRule ? withoutRemovedHolidays(read, tag!, place, zone, n0, n1) : read ?? whole;
+  const parsed = tag === null ? null : parseTag(tag, regionOf(place.country, place.hoursRegionKey));
+  const read = parsed && readTag(parsed, n0, n1);
+  const ph = read !== null && mentionsPh(tag!);
+  let segs = read && ph ? withoutRemovedHolidays(read, tag!, place, zone, n0, n1) : read ?? whole;
   const needsHolidays = rule.kind !== 'other' && (place.country === 'DE' || place.country === 'AT');
   const years = needsHolidays ? yearsBetween(n0, n1) : [];
+  const holidays = new Set([...years.flatMap((y) => zoneHolidayDates(zone, y)), ...extra]);
+  if (parsed && read && ph && needsHolidays) segs = markPhRules(parsed, segs, holidays);
   const ruled = applyRules(segs, {
-    country: place.country, zone, rule, tagged: read !== null, phRule,
-    holidays: new Set([...years.flatMap((y) => zoneHolidayDates(zone, y)), ...extra]),
+    country: place.country, zone, rule, tagged: read !== null,
+    holidays,
     unseenHolidays: new Set([...years.flatMap((y) => holidayEdits(zone, y).added), ...extra]),
   });
   const spans = toSpans(ruled, t0, t1, place.timeZone);

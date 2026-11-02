@@ -22,5 +22,5 @@ const rule = (): fc.Arbitrary<string> =>
 export const hoursValue = (): fc.Arbitrary<string> =>
   fc.oneof(
     { weight: 6, arbitrary: fc.array(rule(), { minLength: 1, maxLength: 3 }).map((r) => r.join('; ')) },
-    { weight: 1, arbitrary: fc.constantFrom('', 'by appointment', 'Mo-Fr 25:00-26:00', 'sunrise-sunset', 'Mo 9-', 'open', 'Tu-Mo 10:00-12:00;;') },
+    { weight: 1, arbitrary: fc.constantFrom('', 'by appointment', 'Mo-Fr 25:00-26:00', 'sunrise-sunset', 'Mo 9-', 'open', 'Tu-Mo 10:00-12:00;;', 'Mo-Fr', 'Mo-Su', 'Mo-Su open', 'Mar-Oct', 'Apr-Oct open') },
   );

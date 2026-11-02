@@ -26,7 +26,8 @@ function spanAt(spans: HoursSpan[], ms: number): HoursSpan | null {
 export function stateAt(h: PlaceHours | undefined, t: Date): StateNow {
   if (!h) return { state: 'unknown', reason: W.foodHoursUnknown, until: null };
   const ms = t.getTime();
-  if (ms < h.windowStart.getTime() || ms >= h.windowEnd.getTime()) return { ...OUTSIDE };
+  // Written so that an invalid date, whose comparisons are all false, lands outside.
+  if (!(ms >= h.windowStart.getTime() && ms < h.windowEnd.getTime())) return { ...OUTSIDE };
   const s = spanAt(h.spans, ms);
   if (!s) return { ...OUTSIDE };
   const until = s.to.getTime() >= h.windowEnd.getTime() ? null : s.to;
@@ -38,7 +39,8 @@ export function openOver(h: PlaceHours | undefined, from: Date, to: Date): boole
   if (!h) return false;
   const start = from.getTime();
   const end = to.getTime();
-  if (end < start || start < h.windowStart.getTime() || end > h.windowEnd.getTime()) return false;
+  // Written so that an invalid date, whose comparisons are all false, fails.
+  if (!(start <= end && start >= h.windowStart.getTime() && end <= h.windowEnd.getTime())) return false;
   if (start === end) return stateAt(h, from).state === 'open';
   for (let at = start; at < end;) {
     const s = spanAt(h.spans, at);
