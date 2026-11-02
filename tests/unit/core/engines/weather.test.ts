@@ -431,6 +431,23 @@ describe('beyond the forecast', () => {
   });
 });
 
+describe('broken figures', () => {
+  test('[WX-SEASONAL] a baseline point with broken figures is no estimate: "NaN" never reaches the card', () => {
+    const broken: Baseline = { years: 'x', points: [{ ...BASELINE.points[0]!, meanHighC: Number.NaN }] };
+    const a = answerOf(factsOf([], {}, {}, { forecast: null, baseline: broken }));
+    expect(textOf(a)).not.toContain('NaN');
+    expect(a.missing).toContain('weather');
+  });
+  test('[WX-SEASONAL] a position with no coordinates finds no "here"', () => {
+    const f = factsOf([{ range: [120, 137], stamps: [`${SAT} 15:00`], pp: 70 }], riding(125, '14:20'));
+    expect(answerOf({ ...f, position: { ...f.position!, lat: Number.NaN } }).title).not.toContain('here');
+  });
+  test('[WX-TWO-NUMBERS] a thunderstorm window gives its amount too', () => {
+    const a = answerOf(factsOf([{ km: 40, stamps: stamps(SAT, 9, 12), pp: 60, mm: 3, code: 95 }]));
+    expect(a.items[0]!.detail).toContain('3.0 mm/h (one model)');
+  });
+});
+
 describe('honesty', () => {
   const scenes: [string, WeatherFacts][] = [
     ['rain', factsOf([{ range: [40, 60], stamps: stamps(SAT, 9, 13), pp: 80, mm: 1 }])],

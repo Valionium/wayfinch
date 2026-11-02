@@ -90,7 +90,7 @@ function seasonalPoint(baseline: Baseline | null, km: Km, at: Date, tz: string):
   const month = wallClock(at, tz).month;
   let best: Baseline['points'][number] | null = null;
   for (const p of baseline.points) {
-    if (p.month !== month || !Number.isFinite(p.km) || !Number.isFinite(p.p10LowC)) continue;
+    if (p.month !== month || ![p.km, p.p10LowC, p.meanLowC, p.meanHighC, p.rainDays].every(Number.isFinite)) continue;
     if (!best || Math.abs(p.km - km) < Math.abs(best.km - km)) best = p;
   }
   return best;
@@ -268,7 +268,7 @@ function gapTitle(f: WeatherFacts, gap: Km): string {
 // ---- the card ------------------------------------------------------------------------------------------------------
 
 function windowItem(w: RainWindow, f: WeatherFacts, plan: RainPlan | undefined): AnswerItem {
-  const parts = [kmRange(w, f.trip.route.lengthKm), chanceLine(w), w.kind === 'thunder' ? '' : amountLine(w)];
+  const parts = [kmRange(w, f.trip.route.lengthKm), chanceLine(w), amountLine(w)];
   if (w.hail) parts.push(W.weatherHail);
   if (w.kind === 'thunder') parts.push(W.weatherNoLightningProtection);
   if (plan) {

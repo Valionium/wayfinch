@@ -1,9 +1,11 @@
 // What the weather and stop tests share: a forecast on the route's own grid with spells of weather laid over it, and
 // the ride, schedule and day's stops of a moment.
+import type { StopFacts } from '../../../../src/core/engines/covers.ts';
 import { dayRide, scheduleFor, zoneLookupOf } from '../../../../src/core/engines/tripday.ts';
 import { dayStopsOf } from '../../../../src/core/engines/weather-windows.ts';
-import type { GridHour, Km, ModelRun, PlanTomorrow, Position, Route, StoredForecast, Trip } from '../../../../src/core/types.ts';
+import type { GridHour, Km, ModelRun, PlaceHours, PlanTomorrow, Position, Roof, Route, StoredForecast, Trip } from '../../../../src/core/types.ts';
 import { at, pointAtKm, sun, testTrip, zonesOf } from '../../../fixtures/build.ts';
+import { spots, type Spot } from './water-helpers.ts';
 
 export const SAT = '2026-10-17';
 export const SUN = '2026-10-18';
@@ -66,4 +68,26 @@ export function momentOf(c: Moment = {}) {
   const ride = dayRide(trip, positions, c.plan ?? null, null, now, env);
   const schedule = scheduleFor(ride, trip, env);
   return { trip, now, routeZones, env, positions, ride, schedule, zone: zoneLookupOf(routeZones), stops: dayStopsOf(schedule, trip.route.lengthKm) };
+}
+
+export type StopCase = { spots?: Spot[]; roofs?: Roof[]; spells?: Spell[]; moment?: Moment; opts?: ForecastOpts; forecast?: StoredForecast | null; hours?: PlaceHours[] | 'open'; savedKm?: { fromKm: Km; toKm: Km }[] };
+
+/** Prepared hours open all year, or the stretches given by `hoursOf`. */
+export const openAllYear = (id: string): PlaceHours => {
+  const windowStart = at('2026-01-01 00:00');
+  const windowEnd = at('2027-01-01 00:00');
+  return { placeId: id, windowStart, windowEnd, spans: [{ from: windowStart, to: windowEnd, state: 'open' }] };
+};
+
+/** Facts for covers, plans and the chip. Places are open all year unless `hours` says otherwise. */
+export function stopFactsOf(c: StopCase = {}): StopFacts {
+  const m = momentOf(c.moment ?? {});
+  const { places, matches } = spots(c.spots ?? []);
+  return {
+    trip: m.trip, places, matches, roofs: c.roofs ?? [],
+    hours: c.hours === undefined || c.hours === 'open' ? places.map((p) => openAllYear(p.id)) : c.hours,
+    savedKm: c.savedKm ?? [{ fromKm: 0, toKm: m.trip.route.lengthKm }],
+    forecast: c.forecast === undefined ? forecastOf(m.trip.route, c.spells ?? [], c.opts ?? {}) : c.forecast,
+    positions: m.positions, now: m.now, routeZones: m.routeZones, sun: m.env.sun, ride: m.ride, schedule: m.schedule,
+  };
 }
