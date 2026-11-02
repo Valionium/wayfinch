@@ -25,9 +25,9 @@ export default tseslint.config(
     },
   },
   {
-    // Decision 6 of the engines plan: `opening_hours` is a lazy chunk, so only src/core/hours/spans.ts imports it.
+    // Decision 6 of the engines plan: `opening_hours` is a lazy chunk, so only src/core/hours/spans.ts imports it (holidays.ts reaches it through spans.ts, for preparation only).
     // This block replaces the rule above for these folders, so it repeats the layer patterns.
-    files: ['src/core/engines/**', 'src/core/screen/**'],
+    files: ['src/core/engines/**', 'src/core/screen/**', 'src/core/hours/check.ts', 'src/core/hours/rules.ts'],
     rules: {
       'no-restricted-imports': ['error', {
         paths: [{

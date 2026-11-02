@@ -14,14 +14,14 @@ import OpeningHours from 'opening_hours';
 import { wallClock, zoneOffsetMin, type WallClock } from '../answers/time';
 import type { HoursSpan } from '../types';
 import { W } from '../wording/en';
+import { applyRules, hasPhRule, holidayEdits, zoneParts, type RuleClass, type Seg } from './rules';
 
+export type { RuleClass };
 export type WallTime = WallClock;
-export type RuleClass = { kind: 'food-shop' | 'kiosk' | 'bakery' | 'fuel-shop' | 'other-shop' | 'other'; nearStation: boolean };
 export type HolidayOverrides = Record<string, string[]>;
 export type HoursPlace = { timeZone: string; hoursRegionKey: string | null; holidayZone: string | null; country: string };
 
 type State = HoursSpan['state'];
-type Seg = { from: number; to: number; state: State; reason?: string };
 
 const MIN = 60_000;
 const DAY = 86_400_000;
@@ -132,6 +132,56 @@ function readTag(tag: string, region: ReturnType<typeof regionOf>, n0: number, n
   return segs;
 }
 
+// ---- Holidays ----
+
+const yearHolidays = new Map<string, string[]>();
+
+/** The library's public holidays for a region and year. Asked at noon, which no clock change skips. */
+function libraryHolidays(country: string, key: string | null, year: number): string[] {
+  const id = `${country}|${key ?? ''}|${year}`;
+  let dates = yearHolidays.get(id);
+  if (dates) return dates;
+  dates = [];
+  try {
+    const o = new OpeningHours('PH', regionOf(country, key));
+    for (let n = Date.UTC(year, 0, 1, 12); new Date(n).getUTCFullYear() === year; n += DAY) {
+      if (o.getState(toDevice(n))) dates.push(new Date(n).toISOString().slice(0, 10));
+    }
+  } catch {
+    dates = [];   // a country the library has no holidays for
+  }
+  yearHolidays.set(id, dates);
+  return dates;
+}
+
+/** A holiday zone's public holidays for a year, with the overrides of section 6.4. */
+export function zoneHolidayDates(zone: string, year: number): string[] {
+  const { country, key } = zoneParts(zone);
+  const { added, removed } = holidayEdits(zone, year);
+  return [...new Set([...libraryHolidays(country, key, year), ...added])].filter((d) => !removed.includes(d)).sort();
+}
+
+const yearsBetween = (n0: number, n1: number): number[] => {
+  const years: number[] = [];
+  for (let y = new Date(n0).getUTCFullYear(); y <= new Date(n1).getUTCFullYear(); y++) years.push(y);
+  return years;
+};
+
+/** Days the library wrongly calls holidays in this zone are read again as the country alone, where a PH rule can't fire. */
+function withoutRemovedHolidays(segs: Seg[], tag: string, place: HoursPlace, zone: string, n0: number, n1: number): Seg[] {
+  let out = segs;
+  for (const year of yearsBetween(n0, n1)) {
+    for (const date of holidayEdits(zone, year).removed) {
+      const from = Math.max(Date.parse(`${date}T00:00:00Z`), n0);
+      const to = Math.min(Date.parse(`${date}T00:00:00Z`) + DAY, n1);
+      if (to <= from) continue;
+      const day = readTag(tag, regionOf(place.country, null), from, to) ?? [{ from, to, state: 'unknown' as const, reason: W.foodHoursUnknown }];
+      out = overlay(out, from, to, day);
+    }
+  }
+  return out;
+}
+
 // ---- Onto true instants ----
 
 /** The stretches of constant UTC offset of `tz` between two instants. */
@@ -180,9 +230,11 @@ function toSpans(segs: Seg[], t0: number, t1: number, tz: string): HoursSpan[] {
  * rules read (spec section 4.5), and by the window, so a recomputed window is never served an older one.
  */
 export function placeSpans(tag: string | null, place: HoursPlace, rule: RuleClass, windowStart: Date, windowEnd: Date,
-  _extraHolidays: HolidayOverrides, cache?: Map<string, HoursSpan[]>): HoursSpan[] {
+  extraHolidays: HolidayOverrides, cache?: Map<string, HoursSpan[]>): HoursSpan[] {
+  const zone = place.holidayZone ?? place.hoursRegionKey ?? place.country;
+  const extra = extraHolidays[zone] ?? [];
   const key = cache && JSON.stringify([tag, place.holidayZone, place.hoursRegionKey, place.country, place.timeZone, rule.kind, rule.nearStation,
-    windowStart.getTime(), windowEnd.getTime()]);
+    windowStart.getTime(), windowEnd.getTime(), extra]);
   const kept = key === undefined ? undefined : cache?.get(key);
   if (kept) return kept;
 
@@ -191,8 +243,17 @@ export function placeSpans(tag: string | null, place: HoursPlace, rule: RuleClas
   const n0 = naiveOf(windowStart, place.timeZone);
   const n1 = naiveOf(windowEnd, place.timeZone);
   const whole: Seg[] = [{ from: n0, to: n1, state: 'unknown', reason: W.foodHoursUnknown }];
-  const segs = (tag === null ? null : readTag(tag, regionOf(place.country, place.hoursRegionKey), n0, n1)) ?? whole;
-  const spans = toSpans(segs, t0, t1, place.timeZone);
+  const read = tag === null ? null : readTag(tag, regionOf(place.country, place.hoursRegionKey), n0, n1);
+  const phRule = read !== null && hasPhRule(tag!);
+  const segs = phRule ? withoutRemovedHolidays(read, tag!, place, zone, n0, n1) : read ?? whole;
+  const needsHolidays = rule.kind !== 'other' && (place.country === 'DE' || place.country === 'AT');
+  const years = needsHolidays ? yearsBetween(n0, n1) : [];
+  const ruled = applyRules(segs, {
+    country: place.country, zone, rule, tagged: read !== null, phRule,
+    holidays: new Set([...years.flatMap((y) => zoneHolidayDates(zone, y)), ...extra]),
+    unseenHolidays: new Set([...years.flatMap((y) => holidayEdits(zone, y).added), ...extra]),
+  });
+  const spans = toSpans(ruled, t0, t1, place.timeZone);
   if (key !== undefined) cache?.set(key, spans);
   return spans;
 }

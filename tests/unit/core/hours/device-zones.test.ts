@@ -153,6 +153,48 @@ describe('[H-DEVICE-ZONE] against the library run in the place\'s own zone', () 
   }, 120_000);
 });
 
+// Clocks that change at midnight, by half an hour, or on other days than Europe's and New York's. Not among section
+// 11.6's seven, but a rider's phone can be set to anything. A phone with no clock change is the reference.
+describe('[H-DEVICE-GAP] phones whose clocks change in other ways', () => {
+  const tags = ['Mo-Sa 08:00-20:00', 'Mo-Su 00:15-00:45', 'Mo-Su 23:30-00:30', 'Mo-Su 01:30-02:30', 'Mo-Su 02:15-02:45', 'Sa,Su 00:00-24:00', 'Su 00:00-01:00', '24/7', 'PH off; Mo-Su 06:00-22:00'];
+  const place = placeIn('DE-BW');
+  const cases = [
+    ['America/Havana', 300, '2026-03-07', '2026-03-09'],     // midnight, forward
+    ['America/Havana', 300, '2026-10-31', '2026-11-02'],     // back
+    ['Asia/Beirut', -120, '2026-03-28', '2026-03-30'],       // midnight, forward
+    ['America/Santiago', 180, '2026-09-05', '2026-09-07'],   // midnight, forward
+    ['America/Santiago', 180, '2026-04-04', '2026-04-06'],   // midnight, back
+    ['Australia/Lord_Howe', -660, '2026-10-03', '2026-10-05'], // half an hour
+    ['Australia/Lord_Howe', -660, '2026-04-04', '2026-04-06'], // half an hour, back
+  ] as const;
+
+  test.each(cases)('%s (January offset %i) from %s', (zone, janOffset, from, to) => {
+    const before = process.env['TZ'];
+    try {
+      process.env['TZ'] = zone;
+      expect(new Date(2026, 0, 1).getTimezoneOffset()).toBe(janOffset);
+      const start = instantAt(from, '00:00', BERLIN).getTime();
+      const end = instantAt(addDaysIso(to, 1), '00:00', BERLIN).getTime();
+      const gaps = skippedOnDevice(start, end);
+      for (const tag of tags) {
+        process.env['TZ'] = zone;
+        const h = hoursOf(tag, place, other, from, to);
+        process.env['TZ'] = 'UTC';
+        const reference = hoursOf(tag, place, other, from, to);
+        for (let t = start; t < end; t += STEP) {
+          const wall = wallNumber(t, BERLIN);
+          const state = stateAt(h, new Date(t)).state;
+          const label = tag + ' at ' + new Date(t).toISOString();
+          if (gaps.some(([a, b]) => wall >= a && wall < b)) expect(state, label).toBe('unknown');
+          else expect(state, label).toBe(stateAt(reference, new Date(t)).state);
+        }
+      }
+    } finally {
+      if (before === undefined) delete process.env['TZ']; else process.env['TZ'] = before;
+    }
+  });
+});
+
 const wallFormat = new Map<string, Intl.DateTimeFormat>();
 /** The wall clock of `t` in `tz`, as milliseconds with no zone. */
 function wallNumber(t: number, tz: string): number {
