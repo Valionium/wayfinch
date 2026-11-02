@@ -36,6 +36,15 @@ export const W = {
   routeFromStageStart: (km: number): string => `from the stage start at km ${showKm(km)}`,
   routeTonightIsEnd: (km: number): string => `Tonight's stop is the end of your route (km ${showKm(km)})`,
 
+  // ---- Opening hours (section 6.4). ----
+  foodHoursUnknown: 'hours unknown',
+  foodHoursUpdate: 'hours unknown — update',
+  foodUnknownSundayRules: 'hours unknown, probably closed (Sunday rules), an assumption',
+  foodUnknownLocalHoliday: 'hours unknown, possibly closed — local holiday, an assumption',
+  foodHolidayRules: 'probably closed (holiday rules), an assumption',
+  foodLocalHoliday: 'possibly closed — local holiday, an assumption',
+  foodMayBeOpen: 'may be open, an assumption',
+
   // ---- Daylight (section 6.5). Times as "HH:MM", spans as "3 h 30 min". ----
   daylightAllNight: 'light all night',
   daylightDarkAllDay: 'dark all day',

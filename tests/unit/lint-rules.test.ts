@@ -56,8 +56,8 @@ test('the shell may use the browser', async () => {
 });
 
 // Decision 6: only the hours wrapper (src/core/hours/spans.ts) imports the lazy opening_hours library.
-test('engines and the screen may not import opening_hours', async () => {
-  for (const file of ['src/core/engines/x.ts', 'src/core/screen/x.ts']) {
+test('engines, the screen and the one hours check may not import opening_hours', async () => {
+  for (const file of ['src/core/engines/x.ts', 'src/core/screen/x.ts', 'src/core/hours/check.ts', 'src/core/hours/rules.ts']) {
     for (const from of ['opening_hours', 'opening_hours/build/opening_hours.js']) {
       const code = `import x from '${from}'; export default x;`;
       expect(await ruleIds(code, file), `${from} in ${file}`).toContain('no-restricted-imports');
