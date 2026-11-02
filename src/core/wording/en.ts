@@ -263,6 +263,14 @@ export const W = {
   daylightCantWorkOut: "Daylight can't be worked out here. Check your speed in You and the phone's clock.",
 
   // ---- Wait or go (section 6.6). Always an option, never an instruction. ----
+  waitHere: 'here',
+  waitAtCover: (km: string): string => `at the cover at km ${km}`,
+  waitCould: (until: string, saved: string, where: string, arrival: string, instead: string, status: string): string =>
+    `Waiting until ${until} could save about ${saved} min of riding in likely rain, ${where}. Tonight's stop then ${arrival} instead of ${instead}${status ? `, ${status}` : ''}.`,
+  waitLaterThanLeaveBy: (about: string): string => `That is later than your leave-by (${about}).`,
+  waitAfterDark: (line: string): string => `Waiting would mean arriving after dark (${line})`,
+  waitNoHelp: "Waiting up to 3 hours won't help much.",
+  waitCantJudge: "The forecast doesn't reach far enough to say whether waiting could help.",
   waitMissing: (word: string, km: string, until: string): string => `Waiting would mean missing the ${word} at km ${km} (open until ${until})`,
 
   // ---- Cover and rain plans (section 6.11). Every one a suggestion, on what is mapped. ----
