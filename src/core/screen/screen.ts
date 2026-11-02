@@ -4,7 +4,7 @@
 // It never throws: each part is built on its own, and a part that fails answers "can't be worked out" while the rest
 // stands. Emergency depends on nothing else, so its numbers and fallback line show in every state. `buildScreen` also
 // says which parts failed, so the simulator can tell a guarded failure from a good answer.
-import { makeAnswer, formatAbout, formatHm } from '../answers/index.ts';
+import { compareFinal, formatAbout, formatHm, makeAnswer } from '../answers/index.ts';
 import { climbingAnswer } from '../engines/climbing.ts';
 import type { StopFacts } from '../engines/covers.ts';
 import { daylightAnswer } from '../engines/daylight-card.ts';
@@ -44,6 +44,7 @@ const MIN = 60_000;
 const HOUR_MIN = 60;
 const DAY_MIN = 24 * HOUR_MIN;
 const COVER_BEFORE_KM = 5; // a cover icon up to 5 km before a band (section 3.2)
+const KIND_ORDER: StripIcon['kind'][] = ['water', 'food', 'sleep', 'cover'];
 const ICONS_PER_KIND = 2;
 const FOOD_ICONS = 3;
 const SETTLEMENT_COUNTRY_KM = 10; // far off the route: a nearer settlement says which country this is
@@ -174,10 +175,9 @@ function stripOf(i: ScreenInputs, ride: DayRide, schedule: Schedule, windows: Ra
   for (const km of [...ideaKms, ...foodNamed].flatMap((k) => (k === null ? [] : [k])).filter(onStrip).slice(0, FOOD_ICONS)) add('food', km, 'food');
   for (const km of cards.sleep.items.flatMap((x) => (typeof x.stamp?.km === 'number' ? [x.stamp.km] : [])).filter(onStrip).sort((a, b) => a - b).slice(0, ICONS_PER_KIND)) add('sleep', km, 'sleep');
   for (const km of coverIcons(plans, windows)) add('cover', km, 'weather');
-  icons.sort((a, b) => a.km - b.km || a.kind.localeCompare(b.kind));
-  const stopKm = ride.stopKm;
+  icons.sort((a, b) => a.km - b.km || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
   return {
-    label: labelOf(ride), startKm: ride.startKm, endKm: stopKm, endText: endTextOf(i, ride, schedule), icons,
+    label: labelOf(ride), startKm: ride.startKm, endKm: ride.stopKm, endText: endTextOf(i, ride, schedule), icons,
     bands: onTheRide(windows, ride).map(bandOf).sort((a, b) => a.fromKm - b.fromKm),
   };
 }
@@ -195,7 +195,7 @@ function countryAt(i: ScreenInputs, p: Position | null): string | null {
   for (const place of i.places) {
     if (place.kind !== 'settlement') continue;
     const d = haversineKm(p, place);
-    if (d <= SETTLEMENT_COUNTRY_KM && (best === null || d < best.d)) best = { d, place };
+    if (d <= SETTLEMENT_COUNTRY_KM && (best === null || d < best.d || (d === best.d && compareFinal(place, best.place) < 0))) best = { d, place };
   }
   return best?.place.country ?? null;
 }

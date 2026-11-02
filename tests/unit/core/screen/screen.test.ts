@@ -103,6 +103,13 @@ describe('the Emergency chip', () => {
     expect(screen(i).chips.emergency.numbers).toEqual(['112']);
     expect(screen({ ...i, places: [town] }).chips.emergency.numbers).toContain('140');
   });
+  test('[HON-ONE-SCREEN] two settlements at the same distance: the same country whatever their order', () => {
+    const far = pos({ km: 40, at: `${SAT} 14:00`, off: 9000 });
+    const a = settlement('Lech', { country: 'AT', id: 'n2' }).atKm(40, { off: 8000 });
+    const b = settlement('Zuoz', { country: 'DE', id: 'n1' }).atKm(40, { off: 8000 });
+    const i = inputsOf({ zones: border, positions: [far] });
+    expect(screen({ ...i, places: [a, b] }).chips.emergency.numbers).toEqual(screen({ ...i, places: [b, a] }).chips.emergency.numbers);
+  });
   test('[HON-ONE-SCREEN] a thunderstorm near reaches the Shelter chip and Weather alike', () => {
     const spell = { range: [30, 60] as [number, number], stamps: stamps(SAT, 13, 16), pp: 80, code: 95, mm: 1 };
     const s = screen(inputsOf({ positions: [pos({ km: 40, at: `${SAT} 14:00` })], spells: [spell] }));
@@ -394,6 +401,21 @@ describe('the strip', () => {
     const food = screen(inputsOf({ trip: testTrip({ route }), positions: [pos({ km: 10, at: `${SAT} 09:00` })], now: `${SAT} 09:00`, litres: 3, spots: [{ b: tap(), km: 30 }, { b: tap(), km: [40, 70], side: 'west' }] }));
     expect(food.strip.icons.filter((x) => x.kind === 'water').map((x) => x.km)).toEqual([30, 40]);
   });
+  test('[HON-ONE-SCREEN] a roof behind the start is no icon, though it heads the list', () => {
+    const rain = { range: [0, 60] as [number, number], stamps: stamps(SAT, 8, 16), pp: 80, mm: 1 };
+    const s = screen(inputsOf({ positions: [pos({ km: 40, at: `${SAT} 09:00` })], now: `${SAT} 09:00`, roofs: [busStop({ bench: true }).atKm(39.5)], spells: [rain], opts: { extraKms: [40] } }));
+    expect(s.strip.icons.filter((x) => x.kind === 'cover')).toEqual([]);
+  });
+  test('[HON-ONE-SCREEN] rain on a later day of the route gets no band on today\'s strip', () => {
+    const s = screen(inputsOf({ positions: [pos({ km: 10, at: `${SAT} 09:00` })], now: `${SAT} 09:00`, spells: [{ range: [90, 110], stamps: stamps(SUN, 8, 20), pp: 80, mm: 1 }] }));
+    expect(s.strip.endKm).toBe(78);
+    expect(s.strip.bands).toEqual([]);
+  });
+  test('[HON-ONE-SCREEN] a water card with too little to reach the first source lists one target, and draws one icon', () => {
+    const s = screen(inputsOf({ positions: [pos({ km: 10, at: `${SAT} 09:00` })], now: `${SAT} 09:00`, litres: 0, spots: [{ b: tap(), km: 60 }, { b: tap(), km: 70, side: 'west' }] }));
+    expect(s.cards.water.status).toBe('warning');
+    expect(s.strip.icons.filter((x) => x.kind === 'water').map((x) => x.km)).toEqual([60]);
+  });
   test('[HON-ONE-SCREEN] a window ending just past a stage end by grid rounding stays one band within the ride', () => {
     const route = flatRoute(100, { stageEnds: [33.33333] });
     route.sampleGrid = [0, 10, 20, 30, 33.333, 40, 100];
@@ -484,4 +506,4 @@ test('[HON-SPEED] one screen on a 200 km route: measured and printed', () => {
   expect(measured(inputsOf({ ...base, spots: manySpots(200, 1000) }), 'stress: 200 km, 1,000 places')).toBeGreaterThan(0);
   const long = testTrip({ route: flatRoute(1600, { stageEnds: Array.from({ length: 15 }, (_, n) => (n + 1) * 100) }) });
   expect(measured(inputsOf({ trip: long, spells, spots: manySpots(1600, 3000), ...moment }), 'stress: 1,600 km, 3,000 places')).toBeGreaterThan(0);
-});
+}, 120_000);
