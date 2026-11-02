@@ -47,7 +47,7 @@ jobs:
     steps:
       - id: matrix
         env:
-          COUNTRIES: ${{ inputs.countries }}
+          COUNTRIES: ${{ inputs.countries || 'DE,DK,PL,CZ,AT,CH,FR,LU,BE,NL' }}
           FORCE_FAIL: ${{ inputs.force_fail }}
         run: |
           list=$(echo "$COUNTRIES,$FORCE_FAIL" | tr -d ' ' | tr ',' '\n' | grep -E '^(DE|DK|PL|CZ|AT|CH|FR|LU|BE|NL)$' | sort -u | jq -R . | jq -sc '{cc: .}')
@@ -183,4 +183,6 @@ jobs:
           COUNTRY_RESULT: ${{ needs.country.result }}
           MERGE_RESULT: ${{ needs.merge.result }}
           PUBLISH_RESULT: ${{ needs.publish.result }}
+          COUNTRIES: ${{ inputs.countries }}
+          FORCE_FAIL: ${{ inputs.force_fail }}
         run: node pipeline/report.ts
