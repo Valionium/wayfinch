@@ -152,7 +152,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 .tyre-warnings li { margin-bottom: 4px; }
 .tyre-input { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 8px 0; }
 .tyre-label { font-weight: 600; flex: 1 1 100%; }
-.tyre-input input, .tyre-input select { min-height: 44px; min-width: 6rem; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--ground); color: var(--ink); font: inherit; }
+.tyre-input input, .tyre-input select { min-height: 44px; min-width: 6rem; padding: 6px 10px; border: 1px solid var(--muted); border-radius: 8px; background: var(--ground); color: var(--ink); font: inherit; }
 .tyre-input input { width: 8rem; }
 .tyre-input select { max-width: 100%; }
 .tyre-error { color: var(--red); flex: 1 1 100%; }
@@ -167,3 +167,4 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 .tyre-value { font-weight: 600; }
 .tyre-note { border-left: 4px solid var(--amber); padding: 8px 12px; margin: 4px 0 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .tyre-ask { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+html { scroll-padding-bottom: 5rem; }

@@ -278,6 +278,14 @@ export function TyreScreen({ services }: { services: TyreServices }) {
       {!kept ? <Notice>{W.tyreNotSaved}</Notice> : null}
       <p class="muted">{W.tyreSavedHere}</p>
 
+      <Card title={W.tyreSectionLimits}>
+        <p class="muted">{W.tyreLimitHint}</p>
+        <LimitInput id="tyre-max" label={W.tyreLimitMaxLabel} required value={details.tyreMax} min={details.tyreMin} resetKey={key} onCommit={(l) => change({ tyreMax: l ?? undefined })} />
+        <LimitInput id="tyre-min" label={W.tyreLimitMinLabel} required={false} value={details.tyreMin} resetKey={key}
+          onCommit={(l) => change({ tyreMin: l })} />
+        <LimitInput id="tyre-rimmax" label={W.tyreLimitRimLabel} required={false} value={details.rimMax} resetKey={key} onCommit={(l) => change({ rimMax: l })} />
+      </Card>
+
       <section class="card tyre-result" aria-live="polite" aria-labelledby="tyre-result-title">
         <h2 id="tyre-result-title">{W.tyreResultTitle}</h2>
         {!resolved.input ? <p>{W.tyreNeedMax}</p> : null}
@@ -319,13 +327,6 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         {resolved.input ? <p class="muted">{W.tyreEstimateNote}</p> : null}
       </section>
 
-      <Card title={W.tyreSectionLimits}>
-        <p class="muted">{W.tyreLimitHint}</p>
-        <LimitInput id="tyre-max" label={W.tyreLimitMaxLabel} required value={details.tyreMax} min={details.tyreMin} resetKey={key} onCommit={(l) => change({ tyreMax: l ?? undefined })} />
-        <LimitInput id="tyre-min" label={W.tyreLimitMinLabel} required={false} value={details.tyreMin} resetKey={key}
-          onCommit={(l) => change({ tyreMin: l })} />
-        <LimitInput id="tyre-rimmax" label={W.tyreLimitRimLabel} required={false} value={details.rimMax} resetKey={key} onCommit={(l) => change({ rimMax: l })} />
-      </Card>
 
       <Card title={W.tyreSectionRider}>
         <Field id={bikeKey('rider')} label={W.tyreRiderLabel} source={src.riderKg} valueText={`${v.riderKg} kg`}
