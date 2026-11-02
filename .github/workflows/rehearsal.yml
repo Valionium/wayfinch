@@ -1,0 +1,75 @@
+name: rehearsal
+
+# The handover on a throwaway Worker, on the owner's real phones, before riders are touched (plan Task 9).
+# Only the owner runs this. It can't reach the real Worker: the name is asserted before anything uploads.
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: legacy is the site as it is today; step-one the new worker; switch the emergency switch; launch the launch build
+        required: true
+        type: choice
+        options: [legacy, step-one, switch, launch]
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_SEND_METRICS: 'false'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  rehearsal:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    concurrency:
+      group: worker-deploy
+      cancel-in-progress: false
+    env:
+      REHEARSAL_WORKER: load-check-rehearsal
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Fetch the page as it was live
+        if: inputs.stage == 'legacy'
+        run: git fetch --depth=1 origin +refs/tags/load-check-zip-2026-10-30:refs/tags/load-check-zip-2026-10-30
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: npm ci
+      - name: Build this stage
+        env:
+          STAGE: ${{ inputs.stage }}
+        run: |
+          case "$STAGE" in
+            legacy)
+              node --input-type=module -e "import { legacySite } from './tests/e2e/fixtures/legacy-site.mjs'; legacySite('.rehearsal');"
+              rm -rf dist
+              mv .rehearsal/legacy dist
+              ;;
+            step-one) node tools/build.mjs --launch=off ;;
+            switch) node tools/build.mjs --emergency ;;
+            launch) node tools/build.mjs --launch=on ;;
+            *) echo "Unknown stage: $STAGE"; exit 1 ;;
+          esac
+      - name: Check the emergency build
+        if: inputs.stage == 'switch'
+        run: node tools/deploy-check.mjs --check-emergency dist
+      - name: Stop unless the target is the rehearsal Worker
+        run: node tools/deploy-check.mjs --assert-rehearsal "$REHEARSAL_WORKER"
+      - name: Upload to the rehearsal Worker
+        timeout-minutes: 10
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --name "$REHEARSAL_WORKER"
+      - name: Say where it is
+        env:
+          STAGE: ${{ inputs.stage }}
+        run: echo "Stage $STAGE is up at https://$REHEARSAL_WORKER.valentin-hopstein.workers.dev" | tee -a "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,95 @@
+name: emergency
+
+# The owner's two buttons (plan "If something goes wrong"). Only the owner runs this; agents never do.
+# It needs neither the approval environment nor green checks: it must work when everything else is broken.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: rollback goes to the previous version; switch removes the offline worker from every phone (last resort)
+        required: true
+        type: choice
+        options: [rollback, switch]
+      version:
+        description: Rollback only. A version id, to go somewhere other than the previous version. Leave empty otherwise
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  LIVE_ORIGIN: https://load-check.valentin-hopstein.workers.dev
+  WRANGLER_SEND_METRICS: 'false'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  emergency:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+    concurrency:
+      group: worker-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: npm ci
+
+      - id: pick
+        name: Choose the version to go back to
+        if: inputs.action == 'rollback'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          NAMED: ${{ inputs.version }}
+        run: |
+          npx wrangler deployments list --json > rows.json
+          mkdir versions
+          for id in $(node tools/deploy-check.mjs --rollback-candidates rows.json); do
+            npx wrangler versions view "$id" --json > "versions/$id.json" || rm -f "versions/$id.json"
+          done
+          version=$(node tools/deploy-check.mjs --pick-rollback rows.json --named "$NAMED" --versions-dir versions)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - id: rollback
+        name: Roll back
+        if: inputs.action == 'rollback'
+        timeout-minutes: 10
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VERSION: ${{ steps.pick.outputs.version }}
+        run: npx wrangler rollback "$VERSION" --yes --message "Emergency rollback from Run workflow"
+
+      - name: Build the emergency worker
+        if: inputs.action == 'switch'
+        run: node tools/build.mjs --emergency
+      - name: Check the emergency build
+        if: inputs.action == 'switch'
+        run: node tools/deploy-check.mjs --check-emergency dist
+      - id: switch
+        name: Upload the switch
+        if: inputs.action == 'switch'
+        timeout-minutes: 10
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --tag emergency-switch --message "emergency-switch from Run workflow"
+
+      - name: Compare the live site with its own list
+        if: steps.rollback.outcome == 'success' || steps.switch.outcome == 'success'
+        run: node tools/deploy-check.mjs --self --origin "$LIVE_ORIGIN"
+      - name: Say what stays on main, and what riders have now
+        if: always() && (steps.rollback.outcome == 'success' || steps.switch.outcome == 'success')
+        env:
+          ACTION: ${{ inputs.action }}
+        run: node tools/deploy-check.mjs --summary "$ACTION"

@@ -43,6 +43,7 @@ Planned, in spec section 4.2: `src/core/` engines, `src/data/`, `src/store/`, `s
 | `npm run qa` | Load Check's 36 QA suites, one line each; exit 0 only if all pass. `LC_PAGE` and `LC_WORKER` override the page and the old worker |
 | `npm run build` | writes `dist/`: the page, `/offline-worker.js`, `_headers`, `build.json`. `--launch=on|off`, `--out=`, `--emergency` |
 | `npm run e2e` | the browser tests in `tests/e2e` (Chromium, phone and laptop size). The old site in them comes from the tag `load-check-zip-2026-10-30` |
+| `node tools/deploy-check.mjs --build dist/build.json --origin <url>` | does the live site serve this build? Exit 1 if not. Read-only. `--self --origin <url>` compares the site with its own `build.json`; the other modes are for the workflows, listed at the top of the file |
 | `npm test` | types, lint, all unit and property tests, and the cases proving each simulator check can fail |
 | `npm run types`, `npm run lint`, `npm run unit` | one part |
 | `npm run sim -- --seed S --count N` | the simulator: N invented trip moments, each screen checked; a failure saves `tests/regressions/<ID>-<seed>.json` |
@@ -70,6 +71,12 @@ One group of related rules, 1–2 hours of work. Each task lists its rule IDs, s
 2. The smallest code that passes.
 3. `npm run fast`.
 4. A commit.
+
+## Deploys
+
+A merge never deploys. Only the owner approves a deployment, and only the owner runs `emergency`, `preview` and `rehearsal`. Agents never start, approve or re-run any of these, never run `wrangler deploy`, `wrangler rollback` or `wrangler versions upload`, and never call GitHub's approval API.
+
+After green checks on `main`, `deploy.yml`'s `decide` compares the build with the live `build.json`. Only a real difference asks for the owner's click on the `production-approval` environment; `deployEnabled` in `build.config.json` must be true before anything is even compared. `deploy.yml`'s `deploy` job, after that click, is the only ordinary way to `wrangler deploy` to `load-check`. A failed after-deploy check opens one issue labelled `after-deploy`; nothing rolls back by itself. `tools/env-production.json` and `tools/env-approval.json` hold the two environments' settings.
 
 ## Only with the owner
 
