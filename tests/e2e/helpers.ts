@@ -62,10 +62,10 @@ export async function fixedClock(page: Page, iso: string): Promise<void> {
   await page.clock.install({ time: new Date(iso) });
 }
 
-export async function preparedTrip(_page: Page, _id: string): Promise<void> {
-  throw new Error('preparedTrip needs the store (Task 3) and the test hook (Task 17).');
+export async function preparedTrip(page: Page, id: string): Promise<void> {
+  throw new Error(`preparedTrip(${page.url()}, ${id}) needs the store (Task 3) and the test hook (Task 17).`);
 }
 
-export async function atPosition(_page: Page, _km: number, _opts?: { accuracyM?: number; ageMin?: number }): Promise<void> {
-  throw new Error('atPosition needs the store (Task 3) and the test hook (Task 17).');
+export async function atPosition(page: Page, km: number, opts: { accuracyM?: number; ageMin?: number } = {}): Promise<void> {
+  throw new Error(`atPosition(${page.url()}, ${km}, ${JSON.stringify(opts)}) needs the store (Task 3) and the test hook (Task 17).`);
 }
