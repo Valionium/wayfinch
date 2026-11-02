@@ -71,6 +71,40 @@ describe('what it lists', () => {
     expect(t).toBeGreaterThan(at(`${SAT} 19:30`).getTime());
     expect(t).toBeLessThan(at(`${SAT} 21:00`).getTime());
   });
+  // Flat route at 25 km/h flat: 20.5 km/h loaded, clock time x 1.15.
+  const clockMs = (km: number): number => ((km / 20.5) * 60 * 1.15) * 60_000;
+  test('[STOP-CHIP] before the trip it rides there now from the position, not from the route start', () => {
+    const when = '2026-10-16 12:00';
+    const f = stopFactsOf({ moment: { trip: LONG(), positions: [pos({ km: 76, at: when })], now: when }, spots: [{ b: shelter(), km: 86 }, { b: shelter(), km: 70 }] });
+    expect(f.ride.phase).toBe('before-trip');
+    const a = shelterChip(f, false);
+    const ahead = a.items.find((i) => i.stamp!.km === 86)!;
+    expect(ahead.detail).toMatch(/^\+10 km/);
+    expect(Math.abs(ahead.stamp!.at!.getTime() - (at(when).getTime() + clockMs(10)))).toBeLessThanOrEqual(1000);
+    expect(a.items.find((i) => i.stamp!.km === 70)!.detail).toMatch(/^6 km back/);
+  });
+  test('[STOP-CHIP] before the trip the chip adds the position\'s own rejoin leg (INV-19)', () => {
+    const when = '2026-10-16 12:00';
+    const f = stopFactsOf({ moment: { trip: LONG(), positions: [pos({ km: 76, at: when, off: 1000 })], now: when }, spots: [{ b: shelter(), km: 86 }] });
+    const ahead = shelterChip(f, false).items.find((i) => i.stamp!.km === 86)!;
+    expect(Math.abs(ahead.stamp!.at!.getTime() - (at(when).getTime() + clockMs(11.3)))).toBeLessThanOrEqual(1000);
+  });
+  test('[STOP-CHIP] a position past the day\'s stop rides from the position, not the stop', () => {
+    const when = `${SAT} 12:00`;
+    const f = stopFactsOf({ moment: { trip: testTrip(), positions: [pos({ km: 100, at: when })], now: when }, spots: [{ b: shelter(), km: 110 }] });
+    expect(shelterChip(f, false).items.find((i) => i.stamp!.km === 110)!.detail).toMatch(/^\+10 km/);
+  });
+  test('[STOP-CHIP] ±800 m at km 76 before the trip: ahead from km 75.2, behind from km 76.8', () => {
+    const when = '2026-10-16 12:00';
+    const f = stopFactsOf({ moment: { trip: LONG(), positions: [pos({ km: 76, at: when, acc: 800 })], now: when }, spots: [{ b: shelter(), km: 85.2 }, { b: shelter(), km: 66.8 }] });
+    const a = shelterChip(f, false);
+    expect(a.items.find((i) => i.stamp!.km === 85.2)!.detail).toMatch(/^\+10 km/);
+    expect(a.items.find((i) => i.stamp!.km === 66.8)!.detail).toMatch(/^10 km back/);
+  });
+  test('[STOP-CHIP] with no position it still measures from the ride\'s start', () => {
+    const f = stopFactsOf({ moment: { trip: LONG(), now: '2026-10-16 12:00' }, spots: [{ b: shelter(), km: 10 }] });
+    expect(shelterChip(f, false).items[0]!.detail).toMatch(/^\+10 km/);
+  });
   test('[STOP-CHIP] the order of the input decides nothing, and roofs tie after places', () => {
     const s: StopCase['spots'] = [{ b: cafe('x', { name: 'Third' }), km: 101, id: 'n3' }, { b: cafe('x', { name: 'Second' }), km: 101, id: 'n2' }];
     const r = [busStop().atKm(101)];
