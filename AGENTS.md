@@ -40,7 +40,7 @@ Planned, in spec section 4.2: `src/core/` engines, `src/data/`, `src/store/`, `s
 | Command | Runs |
 | --- | --- |
 | `npm run fast` | types, lint, the tests touched by this change with 25 runs per property, 100 simulator scenarios and the rule check |
-| `npm run qa` | Load Check's 35 QA suites, one line each; exit 0 only if all pass. `LC_PAGE` and `LC_WORKER` override the page and the old worker |
+| `npm run qa` | Load Check's 36 QA suites, one line each; exit 0 only if all pass. `LC_PAGE` and `LC_WORKER` override the page and the old worker |
 | `npm test` | types, lint, all unit and property tests, and the cases proving each simulator check can fail |
 | `npm run types`, `npm run lint`, `npm run unit` | one part |
 | `npm run sim -- --seed S --count N` | the simulator: N invented trip moments, each screen checked; a failure saves `tests/regressions/<ID>-<seed>.json` |

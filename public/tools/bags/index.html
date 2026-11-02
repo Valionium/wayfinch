@@ -2850,7 +2850,7 @@ function fitQuickResultText(){
   }
   const where={st:'inside the seat tube',dt:'inside the down tube',un:'under the down tube'},got=['st','dt','un'].filter(k=>fit.cages[k]);
   lines.push(got.length ? `Bottle cages: ${got.length} likely, ${got.map(k=>where[k]).join(' and ')} (estimate)` : 'Bottle cages: none likely (estimate)');
-  lines.push(fit.topMounts.front || fit.topMounts.rear ? 'Top-tube bag: room for one (estimate)' : 'Top-tube bag: probably no room (estimate)');
+  lines.push(fit.topMounts.front || fit.topMounts.rear ? 'Room for a top-tube bag (estimate)' : 'Top-tube bag: probably no room (estimate)');
   return lines.concat([FIT_QUICK_FOOT]).join(FIT_QUICK_SEP);
 }
 const FIT_QUICK_SEP = ' | ';

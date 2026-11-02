@@ -457,7 +457,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 
 ## Load Check in the repository
 
-- The page in git is byte for byte the live page until a task changes it on purpose (§7.1, §12) [LC-PAGE-LIVE]
+- The page in git has the recorded hash, so it changes only on purpose (§7.1, §12) [LC-PAGE-LIVE]
 - The QA runner runs every suite in qa/ except its three helpers (§12) [LC-QA-ALL]
 - The frozen bag rules and their fixtures are unchanged (§7.1, §12) [LC-FREEZE-01]
 
