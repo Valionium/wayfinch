@@ -1,0 +1,136 @@
+/* Colour tokens of spec section 3.6, taken from Load Check. Self-hosted fonts, Latin subsets only (OFL-1.1). */
+@font-face { font-family: 'Barlow'; font-weight: 400; font-style: normal; font-display: swap; src: url('@fontsource/barlow/files/barlow-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-weight: 600; font-style: normal; font-display: swap; src: url('@fontsource/barlow/files/barlow-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-weight: 600; font-style: normal; font-display: swap; src: url('@fontsource/barlow-condensed/files/barlow-condensed-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-weight: 700; font-style: normal; font-display: swap; src: url('@fontsource/barlow-condensed/files/barlow-condensed-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'IBM Plex Mono'; font-weight: 400; font-style: normal; font-display: swap; src: url('@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2') format('woff2'); }
+
+/* Dark is the default; the phone's own setting picks light, and data-theme overrides both. */
+:root {
+  color-scheme: dark;
+  --ground: #1B2018;
+  --panel: #242B20;
+  --ink: #EFEDE0;
+  --muted: #A8B198;
+  --blaze: #FF7950;
+  --sage: #A8C07A;
+  --amber: #E5B145;
+  --red: #F08067;
+  --ice: #8CC9D4;
+  --line: #3E4A36;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-body: 'Barlow', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+    --ground: #F4F2E8;
+    --panel: #FBFAF3;
+    --ink: #22271D;
+    --muted: #57604A;
+    --blaze: #B43A08;
+    --sage: #4C6828;
+    --amber: #84590A;
+    --red: #BC311A;
+    --ice: #156E84;
+    --line: #C7C4B1;
+  }
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --ground: #F4F2E8;
+  --panel: #FBFAF3;
+  --ink: #22271D;
+  --muted: #57604A;
+  --blaze: #B43A08;
+  --sage: #4C6828;
+  --amber: #84590A;
+  --red: #BC311A;
+  --ice: #156E84;
+  --line: #C7C4B1;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ground: #1B2018;
+  --panel: #242B20;
+  --ink: #EFEDE0;
+  --muted: #A8B198;
+  --blaze: #FF7950;
+  --sage: #A8C07A;
+  --amber: #E5B145;
+  --red: #F08067;
+  --ice: #8CC9D4;
+  --line: #3E4A36;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.4;
+}
+h1, h2 { font-family: var(--font-display); font-weight: 700; margin: 0; }
+button, a { font: inherit; }
+:focus-visible { outline: 3px solid var(--blaze); outline-offset: 2px; }
+
+.shell { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+.screen { flex: 1; padding: 16px 16px 24px; max-width: 40rem; width: 100%; margin: 0 auto; }
+.screen h1 { font-size: 1.75rem; margin-bottom: 12px; }
+
+.tabs {
+  display: flex;
+  position: sticky;
+  bottom: 0;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tab {
+  flex: 1;
+  min-height: 56px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  text-decoration: none;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.125rem;
+  border-top: 3px solid transparent;
+}
+.tab[aria-current='page'] { color: var(--ink); border-top-color: var(--blaze); }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin: 0 0 12px; }
+.card h2 { font-size: 1.25rem; margin-bottom: 4px; }
+
+.badge { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.875rem; }
+.badge::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex: none; }
+.badge-fine { color: var(--sage); }
+.badge-action { color: var(--amber); }
+.badge-warning { color: var(--red); }
+.badge-unknown { color: var(--muted); }
+
+.notice { border-left: 4px solid var(--amber); padding: 8px 12px; background: var(--panel); margin: 0 0 12px; }
+
+.btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+}
+.btn-primary { background: var(--blaze); border-color: var(--blaze); color: var(--ground); font-weight: 600; }
+
+.update-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.update-bar p { margin: 0; color: var(--muted); }

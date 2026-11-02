@@ -7,5 +7,6 @@ export interface BuildOptions {
   emergency?: boolean;
   extraFiles?: Record<string, Uint8Array | string>;
   pagePath?: string;
+  vite?: (outDir: string) => Promise<void>;
 }
 export function buildDist(options?: BuildOptions): Promise<{ out: string; build: string; precache: Record<string, string> }>;

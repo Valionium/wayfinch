@@ -2,7 +2,8 @@
 // node tools/build.mjs [--launch=on|off] [--out=dist] [--emergency]
 // Deterministic: no dates, commit ids or absolute paths, so a merge that changes no served file changes nothing here.
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build as esbuild } from 'esbuild';
@@ -10,6 +11,7 @@ import { build as esbuild } from 'esbuild';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PAGE = join(ROOT, 'public', 'tools', 'bags', 'index.html');
 const WORKER_SOURCE = join(ROOT, 'src', 'offline-worker.ts');
+const PUBLIC = join(ROOT, 'public');
 const EMERGENCY_WORKER = join(ROOT, 'tools', 'emergency-worker.js');
 
 export const MAX_PRECACHED_BYTES = 2_097_152; // 2 MiB, §9.1
@@ -41,6 +43,17 @@ function headersFile(launch) {
   ].join('');
 }
 
+/** Vite builds the app's shell into `outDir`. Only a build with the launch switch on ever gets here (Task 1, APP-SWITCH-OFF). */
+async function runVite(outDir) {
+  const { build } = await import('vite');
+  await build({
+    root: ROOT,
+    configFile: join(ROOT, 'vite.config.ts'),
+    logLevel: 'silent',
+    build: { outDir, emptyOutDir: true },
+  });
+}
+
 async function compileWorker(buildId, precache) {
   const result = await esbuild({
     entryPoints: [WORKER_SOURCE],
@@ -61,9 +74,9 @@ async function compileWorker(buildId, precache) {
 /**
  * Builds the site into `out`.
  * `extraFiles` ({ 'assets/x.js': bytes }) are written and precached like any other file; only tests use it so far.
- * `pagePath` lets a test build a site around another page.
+ * `pagePath` lets a test build a site around another page; `vite` lets a test watch for the one step only the launch runs.
  */
-export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = false, extraFiles = {}, pagePath = PAGE } = {}) {
+export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = false, extraFiles = {}, pagePath = PAGE, vite = runVite } = {}) {
   const config = JSON.parse(readFileSync(join(ROOT, 'build.config.json'), 'utf8'));
   const launchOn = launch ?? config.launch === true;
   const target = resolve(out);
@@ -72,9 +85,20 @@ export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = 
   mkdirSync(target, { recursive: true });
 
   // With the switch off the page riders see stays Load Check, at /.
-  writeFileSync(join(target, 'index.html'), readFileSync(pagePath));
   if (launchOn) {
-    // Sub-projects 5 and 6: the co-pilot goes to /, and the bag planner to /tools/bags/.
+    // The co-pilot goes to /, built by Vite; public/ (the manifest, the icons, the bag planner at /tools/bags/) is copied as it is.
+    // Neither happens with the switch off, so that build stays byte for byte what it was.
+    if (existsSync(PUBLIC)) cpSync(PUBLIC, target, { recursive: true });
+    const shell = mkdtempSync(join(tmpdir(), 'wf-vite-'));
+    try {
+      await vite(shell);
+      cpSync(shell, target, { recursive: true });
+    } finally {
+      rmSync(shell, { recursive: true, force: true });
+    }
+  } else {
+    // With the switch off the page riders see stays Load Check, at /.
+    writeFileSync(join(target, 'index.html'), readFileSync(pagePath));
   }
   for (const [path, bytes] of Object.entries(extraFiles)) {
     mkdirSync(dirname(join(target, path)), { recursive: true });

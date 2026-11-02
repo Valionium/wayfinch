@@ -10,6 +10,7 @@ async function ruleIds(code: string, filePath: string): Promise<(string | null)[
 
 const CORE = 'src/core/engines/x.ts';
 const AHEAD = 'src/ui/cards/x.tsx';
+const AHEAD_FOLDER = 'src/ui/ahead/x.tsx';
 const SHELL = 'src/ui/shell/x.tsx';
 
 test('core may not import ui, data or store', async () => {
@@ -75,4 +76,19 @@ test('engines and the screen still may not import ui, data or store', async () =
 test('the hours wrapper may import opening_hours', async () => {
   const code = "import x from 'opening_hours'; export default x;";
   expect(await ruleIds(code, 'src/core/hours/spans.ts')).toEqual([]);
+});
+
+test("[APP-AHEAD-LINT] a file under src/ui/ahead/ that imports src/store or src/data, or calls fetch, fails lint", async () => {
+  for (const from of ['../../store/db', '../../data/packs/reader', '../store/db']) {
+    expect(await ruleIds(`import x from '${from}'; export default x;`, AHEAD_FOLDER)).toContain('no-restricted-imports');
+  }
+  expect(await ruleIds('fetch("/a");', AHEAD_FOLDER)).toContain('no-restricted-globals');
+  for (const code of ['localStorage.getItem("a");', 'indexedDB.open("a");']) {
+    expect(await ruleIds(code, AHEAD_FOLDER)).toContain('no-restricted-globals');
+  }
+  for (const code of ['navigator.geolocation.getCurrentPosition();', 'navigator.share({});', 'navigator.clipboard.writeText("a");']) {
+    expect(await ruleIds(code, AHEAD_FOLDER)).toContain('no-restricted-properties');
+  }
+  // and the shell outside it may
+  expect(await ruleIds('fetch("/a");', 'src/ui/trip/x.tsx')).toEqual([]);
 });
