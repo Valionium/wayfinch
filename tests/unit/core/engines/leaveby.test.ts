@@ -329,7 +329,7 @@ describe('limits met together', () => {
     expect(r.kept).toEqual(['daylight', 'water']);
   });
   test('[LB-DETOUR] two food places meet it at one departure: the one on the route, so no round trip', () => {
-    const r = lb({ sun: SUNSET_17, spots: [{ b: bakery('Mo-Su 06:00-12:00'), km: 12 }, { b: tap(), km: 20 }, { b: supermarket('Mo-Sa 08:00-20:00'), km: 30, off: 400, id: 'n1' }, { b: supermarket('Mo-Sa 08:00-20:00'), km: 30, id: 'n2' }] });
+    const r = lb({ sun: SUNSET_17, spots: [{ b: supermarket('Mo-Sa 08:00-20:00'), km: 30, off: 400, id: 'n1' }, { b: bakery('Mo-Su 06:00-12:00'), km: 12 }, { b: tap(), km: 20 }, { b: supermarket('Mo-Sa 08:00-20:00'), km: 30, id: 'n2' }] });
     expect(near(r.unrounded, `${SAT} 10:49:37`)).toBe(true);
     expect(r.stops).toEqual([]);
   });

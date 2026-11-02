@@ -390,13 +390,14 @@ describe('T6 Rhythm', () => {
   });
 
   test('[H-QUESTIONS] the card\'s list reads "open at arrival, closes 20:00"; a shop closing 10 min after arrival is in the list, and no idea', () => {
-    const arrival = 15 + 40; // leaving at 15:00, a shop 40 km... reached at 15:55
-    const km = 100 + arrival / kmToMin(1);
-    const a = answer({ trip: dayFrom100(), positions: [pos({ km: 60, at: `${FRI} 19:00` }), pos({ km: 100, at: `${SAT} 15:00` })], now: `${SAT} 15:00`, spots: [...NO_GAP(), { b: supermarket('Mo-Su 08:00-16:05'), km, id: 'n1' }, { b: supermarket('Mo-Su 08:00-20:00'), km: km + 1, id: 'n2' }] });
+    // Leaving km 100 at 08:30: reached at 09:25, closing 10 minutes on.
+    const km = 100 + 55 / kmToMin(1);
+    const a = answer({ spots: [...NO_GAP(), { b: supermarket('Mo-Su 08:00-09:35'), km, id: 'n1' }, { b: supermarket('Mo-Su 08:00-20:00'), km: km + 1, id: 'n2' }] });
     const details = a.items.map((i) => `${i.label} ${i.detail ?? ''}`);
-    expect(details.some((d) => d.includes('open at arrival, closes 16:05'))).toBe(true);
+    expect(details.some((d) => d.includes('open at arrival, closes 09:35'))).toBe(true);
     expect(details.some((d) => d.includes('open at arrival, closes 20:00'))).toBe(true);
-    expect(a.items.some((i) => i.label.startsWith('Stop idea') && i.stamp?.km === km)).toBe(false);
+    expect(a.items.some((i) => i.stamp?.km === km && i.label.startsWith('Stop idea'))).toBe(false);
+    expect(a.title).not.toContain('09:25');
   });
 
   test('[H-QUESTIONS] the next place open at arrival is named when T6 finds none', () => {
