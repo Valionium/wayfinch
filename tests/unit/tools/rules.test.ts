@@ -228,3 +228,26 @@ test('the real repository passes', () => {
   // Sub-project 2's IDs are in force; the rest of the engines' IDs are listed.
   expect(Number(m[1])).toBeGreaterThanOrEqual(45);
 });
+
+test('counts an ID named in a Load Check QA suite (qa/*.cjs)', () => {
+  const root = folder({
+    'docs/rules.md': '- one rule (§1) [A-ONE]\n',
+    'tests/rules-in-force.txt': 'A-ONE\n',
+    'qa/suite.cjs': titled('A-ONE'),
+  });
+  const r = run(root);
+  expect(r.code).toBe(0);
+  expect(r.out).toContain('in force 1, later 0');
+});
+
+test('fails for a QA suite naming an undefined ID', () => {
+  const root = folder({
+    'docs/rules.md': '- one rule (§1) [A-ONE]\n',
+    'tests/rules-in-force.txt': 'A-ONE\n',
+    'tests/unit/a.test.ts': TEST_A,
+    'qa/suite.cjs': titled('Z-GHOST'),
+  });
+  const r = run(root);
+  expect(r.code).toBe(1);
+  expect(r.out).toContain('Z-GHOST');
+});

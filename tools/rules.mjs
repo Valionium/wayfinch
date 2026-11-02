@@ -35,10 +35,14 @@ for (const file of registers.filter(existsSync)) {
 }
 if (defined.size === 0) problems.push('no rules are defined: docs/rules.md has no line ending in [ID]');
 
-// Named IDs: a string literal in a test file that starts with [ID].
+// Named IDs: a string literal in a test file (or a QA suite in qa/) that starts with [ID].
 const named = new Map(); // id -> Set of files
 const titleRe = new RegExp(`['"\`]\\[(${ID})\\]`, 'g');
-for (const file of files(join(ROOT, 'tests'), (n) => /\.(ts|tsx|mjs|cjs)$/.test(n))) {
+const testFiles = [
+  ...files(join(ROOT, 'tests'), (n) => /\.(ts|tsx|mjs|cjs)$/.test(n)),
+  ...files(join(ROOT, 'qa'), (n) => n.endsWith('.cjs')), // Load Check's QA suites count too (spec section 12.1)
+];
+for (const file of testFiles) {
   for (const m of readFileSync(file, 'utf8').matchAll(titleRe)) {
     if (!named.has(m[1])) named.set(m[1], new Set());
     named.get(m[1]).add(rel(file));
