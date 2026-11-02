@@ -580,6 +580,13 @@ export const W = {
   appStoreRouteNotReadable: 'This route could not be read.',
   appStoreNotKept: "This browser did not keep that. Check the phone's free storage.",
   appStoreChangedElsewhere: 'This was changed in another window. Showing the newer data.',
+  appStoreImportNotOurs: 'This is not a Wayfinch export file. Nothing was changed.',
+  appStoreImportNewer: 'This file comes from a newer version of Wayfinch. Update the app, then try again. Nothing was changed.',
+  appStoreImportTrip: "The trip in this file can't be read. Nothing was changed.",
+  appStoreImportProfile: "The rider details in this file can't be read. Nothing was changed.",
+  appStoreImportSettings: "The settings in this file can't be read. Nothing was changed.",
+  appStoreImportCalibration: "The water learning in this file can't be read. Nothing was changed.",
+  appStoreImportTyres: "The tyre details in this file can't be read. Nothing was changed.",
 };
 
 /** "28 Oct" from an ISO date. Anything else is no date. */
