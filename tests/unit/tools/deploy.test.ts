@@ -496,7 +496,7 @@ describe('the command, against a real local server', { timeout: 30_000 }, () => 
     await expect(cli(['--build', join(dir, 'missing.json'), '--origin', origin, '--deadline-ms', '0'])).rejects.toMatchObject({ code: 1 });
   });
 
-  test('[DEP-NOT-ARRIVED] the workflow's empty values are read as empty: a skipped upload fails at once, without waiting', async () => {
+  test('[DEP-NOT-ARRIVED] empty values from the workflow are read as empty: a skipped upload fails at once, without waiting', async () => {
     const build = buildOf(FILES);
     const origin = await serve({ '/': 'old page' });
     await expect(cli(['--build', writeJson('build-skip.json', build), '--origin', origin, '--upload-outcome', 'skipped', '--before', '', '--live', ''])).rejects.toMatchObject({ code: 1, stdout: expect.stringContaining('/ has different bytes') });
