@@ -12,6 +12,7 @@ import { resolve } from './model.ts';
 import type { Context, Details, FieldName, Source } from './model.ts';
 import { DEFAULT_KEY, entryOf, readStore, saveEntry } from './storage.ts';
 import type { KeyValueStore, LastResult } from './storage.ts';
+import { SRAM_URL, sramList } from './sram.ts';
 import { WHEELS } from './tables.ts';
 
 export interface TyreServices {
@@ -36,9 +37,9 @@ const ASSUMED_WORDS: Record<FieldName, string> = {
   surface: W.tyreAssumedSurface, carriedKg: '',
 };
 
-const parseNumber = (text: string): number | null => {
+const parseNumber = (text: string, signed = false): number | null => {
   const t = text.trim().replace(',', '.');
-  if (t === '' || !/^\d*\.?\d+$|^\d+\.$/.test(t)) return null;
+  if (t === '' || !(signed ? /^-?(\d*\.?\d+|\d+\.)$/ : /^(\d*\.?\d+|\d+\.)$/).test(t)) return null;
   const n = Number(t);
   return Number.isFinite(n) ? n : null;
 };
@@ -78,12 +79,12 @@ function Field({ label, source, plan, valueText, editor, onReset, id }: {
   );
 }
 
-function NumberInput({ id, label, value, onCommit, unit, placeholder }: { id: string; label: string; value: number | undefined; onCommit: (n: number | undefined) => void; unit?: string; placeholder?: number }) {
+function NumberInput({ id, label, value, onCommit, unit, placeholder, signed = false }: { id: string; label: string; value: number | undefined; onCommit: (n: number | undefined) => void; unit?: string; placeholder?: number; signed?: boolean }) {
   const [text, setText] = useState(value === undefined ? '' : String(value));
   const [bad, setBad] = useState(false);
   useEffect(() => {
     // The value changed from outside (another bike chosen, or reset): follow it, unless it is what was just typed.
-    setText((t) => (parseNumber(t) === (value ?? null) ? t : value === undefined ? '' : String(value)));
+    setText((t) => (parseNumber(t, signed) === (value ?? null) ? t : value === undefined ? '' : String(value)));
     setBad(false);
   }, [value]);
   return (
@@ -96,7 +97,7 @@ function NumberInput({ id, label, value, onCommit, unit, placeholder }: { id: st
         onInput={(e) => {
           const t = (e.currentTarget as HTMLInputElement).value;
           setText(t);
-          const n = parseNumber(t);
+          const n = parseNumber(t, signed);
           setBad(t.trim() !== '' && n === null);
           if (t.trim() === '') onCommit(undefined);
           else if (n !== null) onCommit(n);
@@ -177,6 +178,24 @@ function LimitInput({ id, label, required, value, min, onCommit, resetKey }: {
   );
 }
 
+/** Both weighed wheel loads, or neither: one alone cannot give a split. */
+function MeasuredFields({ value, onCommit }: { value: Details['measured']; onCommit: (m: { frontKg: number; rearKg: number } | undefined) => void }) {
+  const [front, setFront] = useState<number | undefined>(value?.frontKg);
+  const [rear, setRear] = useState<number | undefined>(value?.rearKg);
+  const commit = (f: number | undefined, r: number | undefined): void => {
+    setFront(f);
+    setRear(r);
+    onCommit(f !== undefined && r !== undefined ? { frontKg: f, rearKg: r } : undefined);
+  };
+  return (
+    <>
+      <p class="muted">{W.tyreMeasuredHelp}</p>
+      <NumberInput id="tyre-mfront" label={W.tyreMeasuredFrontLabel} value={front} onCommit={(n) => commit(n, rear)} unit="kg" />
+      <NumberInput id="tyre-mrear" label={W.tyreMeasuredRearLabel} value={rear} onCommit={(n) => commit(front, n)} unit="kg" />
+    </>
+  );
+}
+
 const fmtPct = (share: number): [string, string] => [String(Math.round(share * 100)), String(100 - Math.round(share * 100))];
 
 function WheelFigure({ label, w }: { label: string; w: Wheel }) {
@@ -236,6 +255,11 @@ export function TyreScreen({ services }: { services: TyreServices }) {
   const planDate = host.summary ? (shortMapDate(host.summary.at) ?? '') : '';
   const planNote = W.tyreFromPlan(planDate);
   const bikeKey = (name: string) => `tyre-${name}`;
+  const changeHeat = (patch: NonNullable<Details['heat']>): void => {
+    const heat = { ...details.heat, ...patch };
+    for (const k of Object.keys(heat) as (keyof typeof heat)[]) if (heat[k] === undefined) delete heat[k];
+    change({ heat: Object.keys(heat).length ? heat : undefined });
+  };
   const resetter = (...fields: (keyof Details)[]) => () => change(Object.fromEntries(fields.map((f) => [f, undefined])) as Partial<Details>);
 
   return (
@@ -359,6 +383,34 @@ export function TyreScreen({ services }: { services: TyreServices }) {
           <span>{W.tyreWetLabel}</span>
         </label>
       </Card>
+
+      <Card title={W.tyreSectionHeat}>
+        <p class="muted">{W.tyreHeatIntro}</p>
+        <NumberInput id="tyre-heat-pump" label={W.tyreHeatPumpLabel} signed value={details.heat?.pumpC} onCommit={(n) => changeHeat({ pumpC: n })} unit="°C" />
+        <NumberInput id="tyre-heat-max" label={W.tyreHeatMaxLabel} signed value={details.heat?.maxC} onCommit={(n) => changeHeat({ maxC: n })} unit="°C" />
+        <NumberInput id="tyre-heat-pumph" label={W.tyrePumpHeightLabel} signed value={details.heat?.pumpHeightM} onCommit={(n) => changeHeat({ pumpHeightM: n })} unit="m" />
+        <NumberInput id="tyre-heat-high" label={W.tyreHighestLabel} signed value={details.heat?.highestM} onCommit={(n) => changeHeat({ highestM: n })} unit="m" />
+        {!v.heat ? <p class="notice">{W.tyreHeatSkipped}</p> : null}
+        {v.heat && result && front && rear && !result.incompatible && !front.heat?.advise && !rear.heat?.advise ? <p class="muted">{W.tyreHeatFits}</p> : null}
+      </Card>
+
+      <Card title={W.tyreSectionMeasured}>
+        <MeasuredFields key={`m-${key}`} value={details.measured} onCommit={(m) => change({ measured: m })} />
+        <p class="muted">{W.tyreCaliperHelp}</p>
+        <NumberInput id="tyre-cfront" label={W.tyreCaliperFrontLabel} value={details.caliperFrontMm ?? undefined} onCommit={(n) => change({ caliperFrontMm: n ?? null })} unit="mm" />
+        <NumberInput id="tyre-crear" label={W.tyreCaliperRearLabel} value={details.caliperRearMm ?? undefined} onCommit={(n) => change({ caliperRearMm: n ?? null })} unit="mm" />
+      </Card>
+
+      {resolved.input ? (
+        <Card title={W.tyreSramTitle}>
+          <p>{W.tyreSramIntro}</p>
+          <ul class="tyre-sram">
+            {sramList(v).map((row) => <li key={row.label}><strong>{row.label}:</strong> {row.value}</li>)}
+          </ul>
+          <p><a class="btn btn-primary" href={SRAM_URL} target="_blank" rel="noopener noreferrer">{W.tyreSramLink}</a></p>
+          <p class="muted">{W.tyreSramNothingSent} {W.tyreSramDiffer}</p>
+        </Card>
+      ) : null}
     </div>
   );
 }

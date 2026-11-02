@@ -60,6 +60,16 @@ export function sanitizeDetails(raw: unknown): Details {
     const r = num(raw.measured.rearKg, 1, 300);
     if (f !== undefined && r !== undefined) d.measured = { frontKg: f, rearKg: r };
   }
+  if (isObject(raw.heat)) {
+    const h: NonNullable<Details['heat']> = {};
+    const t = (x: unknown) => num(x, -40, 60);
+    const m = (x: unknown) => num(x, -400, 9000);
+    if (t(raw.heat.pumpC) !== undefined) h.pumpC = t(raw.heat.pumpC);
+    if (t(raw.heat.maxC) !== undefined) h.maxC = t(raw.heat.maxC);
+    if (m(raw.heat.pumpHeightM) !== undefined) h.pumpHeightM = m(raw.heat.pumpHeightM);
+    if (m(raw.heat.highestM) !== undefined) h.highestM = m(raw.heat.highestM);
+    if (Object.keys(h).length) d.heat = h;
+  }
   return d;
 }
 

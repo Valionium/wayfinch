@@ -218,3 +218,41 @@ describe('the tyre screen', () => {
     expect(host.textContent).toContain('outside the 18 to 83 mm this tool covers');
   });
 });
+
+describe('the extras', () => {
+  test('[TY-HEAT] with the temperatures and the highest point the screen says how high to pump; without them it says the check was skipped', async () => {
+    await mount(services(memory()));
+    await type(labelled(W.tyreLimitMaxLabel), '3');
+    expect(host.textContent).toContain(W.tyreHeatSkipped);
+    await type(labelled(W.tyreHeatPumpLabel), '15');
+    await type(labelled(W.tyreHeatMaxLabel), '35');
+    await type(labelled(W.tyreHighestLabel), '2000');
+    expect(host.textContent).not.toContain(W.tyreHeatSkipped);
+    expect(host.textContent).toMatch(/Pump to at most \d\.\d\d bar/);
+  });
+
+  test('[TY-MEASURED] weighed wheel loads and calipered widths are taken, and the screen says so', async () => {
+    await mount(services(memory()));
+    await type(labelled(W.tyreLimitMaxLabel), '6');
+    await type(labelled(W.tyreMeasuredFrontLabel), '40');
+    expect(host.textContent).not.toContain(W.tyreWhyMeasured);
+    await type(labelled(W.tyreMeasuredRearLabel), '60');
+    expect(host.textContent).toContain(W.tyreWhyMeasured);
+    expect(host.textContent).toMatch(/Weight split: 40% front, 60% rear\./);
+    await type(labelled(W.tyreCaliperFrontLabel), '35.5');
+    expect(host.textContent).toContain('effective width 35.5 mm');
+  });
+
+  test('[TY-SRAM] a link and the list of what to type there; nothing prefilled or sent; the calculators differ', async () => {
+    await mount(services(memory()));
+    await type(labelled(W.tyreLimitMaxLabel), '6');
+    const a = host.querySelector('a[href^="https://axs.sram.com/"]') as HTMLAnchorElement;
+    expect(a.getAttribute('href')).toBe('https://axs.sram.com/guides/tire/pressure');
+    expect(a.getAttribute('rel')).toContain('noopener');
+    const items = [...host.querySelectorAll('.tyre-sram li')].map((e) => e.textContent ?? '');
+    expect(items.length).toBe(9);
+    expect(items[0]).toContain('Rider weight');
+    expect(host.textContent).toContain('Calculators differ by 10–30%');
+    expect(host.textContent).toContain(W.tyreSramNothingSent);
+  });
+});

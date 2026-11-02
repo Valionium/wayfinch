@@ -23,6 +23,7 @@ export interface Details {
   bikeKg?: number;
   carriedKg?: number;
   measured?: { frontKg: number; rearKg: number } | null;
+  heat?: { pumpC?: number; maxC?: number; pumpHeightM?: number; highestM?: number };
 }
 
 /** What Load Check's bike record holds, read-only. */
@@ -143,6 +144,10 @@ export function resolve(d: Details, ctx: Context): Resolved {
     rear: { printedMm: rearMm, caliperMm: d.caliperRearMm ?? null },
     casing, setup, rimType, rimInnerMm, wheelBsdMm, surface,
     wet: d.wet ?? false,
+    // Heat and altitude need the temperatures and the highest point; the pump height is sea level unless said.
+    heat: d.heat && d.heat.pumpC !== undefined && d.heat.maxC !== undefined && d.heat.highestM !== undefined
+      ? { pumpC: d.heat.pumpC, maxC: d.heat.maxC, pumpHeightM: d.heat.pumpHeightM ?? 0, highestM: d.heat.highestM }
+      : null,
   };
   if (!d.tyreMax) return { values, input: null, missing: 'tyreMax', sources, assumed };
   const input: TyreInput = { ...values, tyreMax: d.tyreMax, tyreMin: d.tyreMin ?? null, rimMax: d.rimMax ?? null };

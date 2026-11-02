@@ -18,6 +18,9 @@ export interface Limit { value: number; unit: Unit }
 export interface TyreSize { printedMm: number; caliperMm: number | null }
 
 /** Every input, stated. A case never leans on a default from the bike. */
+/** Where and when the rider pumps, and the worst the trip brings: temperatures in Celsius, heights in metres. */
+export interface HeatInput { pumpC: number; maxC: number; pumpHeightM: number; highestM: number }
+
 export interface TyreInput {
   riderKg: number;
   bikeKg: number;
@@ -37,9 +40,20 @@ export interface TyreInput {
   tyreMax: Limit;
   tyreMin: Limit | null;
   rimMax: Limit | null;
+  /** Optional: with it, the heat and altitude headroom is worked out. */
+  heat?: HeatInput | null;
 }
 
 export type LimitKind = 'tyre-max' | 'rim-max' | 'hookless-5' | 'hookless-width' | 'tube-floor' | 'iso-floor';
+
+export interface WheelHeat {
+  /** The most the gauge should read when pumping, so that the warmest, highest moment of the trip stays at or under the cap. */
+  p1MaxBar: number;
+  /** True when that is below the suggestion. */
+  advise: boolean;
+  pumpToBar: number;
+  pumpToPsi: number;
+}
 
 export interface Wheel {
   /** Shown values, rounded inward: bar in 0.05 steps, psi in 1 psi steps. */
@@ -59,6 +73,7 @@ export interface Wheel {
   floorBar: number | null;
   loadKg: number;
   wEffMm: number;
+  heat: WheelHeat | null;
 }
 
 export interface Split { share: number; source: 'measured' | 'lever' | 'default'; why: string }
@@ -81,6 +96,7 @@ export const barToPsi = (bar: number): number => bar * PSI_PER_BAR;
 export const psiToBar = (psi: number): number => psi * BAR_PER_PSI;
 const limitBar = (l: Limit): number => (l.unit === 'bar' ? l.value : psiToBar(l.value));
 const limitIn = (l: Limit, unit: Unit): number => (l.unit === unit ? l.value : unit === 'bar' ? psiToBar(l.value) : barToPsi(l.value));
+const bar2 = (n: number): string => n.toFixed(2);
 const fmt = (n: number, digits = 1): string => String(Number(n.toFixed(digits)));
 
 // ---- rounding inward -----------------------------------------------------------------------------------------------------------
@@ -245,6 +261,14 @@ export function heatedGaugeBar(o: { gaugeBar: number; fromC: number; toC: number
 /** How much the gauge reads more after climbing from one height to another, at the same temperature. */
 export const altitudeShiftBar = (fromM: number, toM: number): number => isaPressureBar(fromM) - isaPressureBar(toM);
 
+/** P1_max = (cap + p_atm2) x T1/T2 - p_atm1, temperatures in kelvin: how high the gauge may read where the rider pumps. */
+export function pumpLimit(o: { capBar: number; pumpC: number; maxC: number; pumpHeightM: number; highestM: number }): { p1MaxBar: number; atm1Bar: number; atm2Bar: number } {
+  const atm1Bar = isaPressureBar(o.pumpHeightM);
+  const atm2Bar = isaPressureBar(o.highestM);
+  const p1MaxBar = ((o.capBar + atm2Bar) * (o.pumpC + KELVIN)) / (o.maxC + KELVIN) - atm1Bar;
+  return { p1MaxBar, atm1Bar, atm2Bar };
+}
+
 // ---- the estimate --------------------------------------------------------------------------------------------------------------
 
 interface Cap { kind: LimitKind; limit: Limit | null; bar: number }
@@ -266,6 +290,15 @@ function validate(i: TyreInput): string[] {
   if (!limitUsable(i.tyreMax)) out.push(W.tyreRefuseLimit(W.tyreWhatMax));
   if (i.tyreMin && !limitUsable(i.tyreMin)) out.push(W.tyreRefuseLimit(W.tyreWhatMin));
   if (i.rimMax && !limitUsable(i.rimMax)) out.push(W.tyreRefuseLimit(W.tyreWhatRimMax));
+  if (i.heat) {
+    const h = i.heat;
+    const temp = (n: number): boolean => Number.isFinite(n) && n >= -40 && n <= 60;
+    const height = (n: number): boolean => Number.isFinite(n) && n >= -400 && n <= 9000;
+    if (!temp(h.pumpC)) out.push(W.tyreRefuseTemp(W.tyreWhatPumpTemp));
+    if (!temp(h.maxC)) out.push(W.tyreRefuseTemp(W.tyreWhatMaxTemp));
+    if (!height(h.pumpHeightM)) out.push(W.tyreRefuseHeight(W.tyreWhatPumpHeight));
+    if (!height(h.highestM)) out.push(W.tyreRefuseHeight(W.tyreWhatHighest));
+  }
   if (out.length === 0 && i.tyreMin && limitBar(i.tyreMin) > limitBar(i.tyreMax)) out.push(W.tyreRefuseMinMax);
   return out;
 }
@@ -337,6 +370,18 @@ export function tyreEstimate(input: TyreInput): TyreResult {
         flag('noStep', W.tyreWarnNoStep(label));
       }
 
+      // Heat and altitude: how high the gauge may read at the pump so that the warmest, highest moment stays at or under the cap.
+      let heat: WheelHeat | null = null;
+      if (input.heat) {
+        const p1MaxBar = pumpLimit({ capBar: capIn('bar'), ...input.heat }).p1MaxBar;
+        const advise = p1MaxBar < bar;
+        const pumpToBar = Math.max(0, stepDown(Math.min(p1MaxBar, bar), 0.05));
+        const pumpToPsi = Math.max(0, stepDown(Math.min(barToPsi(p1MaxBar), psi), 1));
+        heat = { p1MaxBar, advise, pumpToBar, pumpToPsi };
+        if (advise) flag('heatPump', W.tyreWarnHeatPump(label, bar2(pumpToBar), String(pumpToPsi)));
+        if (advise && floorB !== null && pumpToBar < floorB) flag('heatBelowFloor', W.tyreWarnHeatBelowFloor(label));
+      }
+
       const limit: LimitKind | null = capped ? cap.kind : raised ? floorKind : null;
       decided.push(W.tyreDecidedEstimate(label, fmt(loadKg), fmt(wEff), fmt(raw, 2)));
       if (capped) decided.push(W.tyreDecidedCap(label, kindOfCap(cap.kind, tyre.printedMm)));
@@ -355,7 +400,7 @@ export function tyreEstimate(input: TyreInput): TyreResult {
           bar, psi, estimate, raw,
           windowBar: [lo(bar, 'bar', 0.05), bar] as [number, number],
           windowPsi: [lo(psi, 'psi', 1), psi] as [number, number],
-          capped, raised, limit, capBar: capIn('bar'), floorBar, loadKg, wEffMm: wEff,
+          capped, raised, limit, capBar: capIn('bar'), floorBar, loadKg, wEffMm: wEff, heat,
         } satisfies Wheel,
       };
     },
