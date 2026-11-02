@@ -5,7 +5,7 @@ import { startCfLike } from './server/cf-like.mjs';
 import type { CfLike } from './server/cf-like.mjs';
 import { legacySite } from './fixtures/legacy-site.mjs';
 import {
-  activeWorkerKind, blockOutside, buildSite, open, registerAndControl, removeTempDirs, stateOf, tempDir, updateAndSettle, watchNavigations,
+  blockOutside, buildSite, open, registerAndControl, removeTempDirs, stateOf, tempDir, updateAndSettle, waitForWorker, watchNavigations,
 } from './fixtures/sw-helpers.ts';
 
 const PROMPT = 'Update ready — apply now';
@@ -56,7 +56,7 @@ test('[LC-UPDATE-PROMPT] the first takeover from the old worker shows no prompt'
   const next = await buildSite();
   server.swap(next.dir);
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await expect.poll(() => activeWorkerKind(page), { timeout: 20_000 }).toBe('new');
+  await waitForWorker(page, 'new');
   await page.waitForTimeout(500);
   await expect(prompt(page)).toHaveCount(0);
   await expect(page.locator('#updateBar')).toBeHidden();

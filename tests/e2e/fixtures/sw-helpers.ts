@@ -2,6 +2,7 @@
 import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { expect } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
 import { buildDist } from '../../../tools/build.mjs';
 import type { BuildOptions } from '../../../tools/build.mjs';
@@ -116,6 +117,42 @@ export async function activeWorkerKind(page: Page): Promise<string> {
   if (info && typeof info === 'object') return 'version' in info ? 'legacy' : 'new';
   return String(info);
 }
+
+/**
+ * Waits until the handover has settled, then asks once. Don't poll with messages: Chromium can hold back an
+ * activation while the old worker keeps receiving them, which no rider's page does.
+ */
+export async function waitForWorker(page: Page, kind: 'new' | 'legacy', timeout = 20_000): Promise<void> {
+  await expect.poll(async () => {
+    const state = await stateOf(page);
+    if (!state.active || state.waiting || state.installing) return false;
+    const hasLegacyCache = (await cacheNames(page)).includes('loadcheck-offline-v1');
+    return kind === 'new' ? !hasLegacyCache : hasLegacyCache;
+  }, { timeout }).toBe(true);
+  expect(await activeWorkerKind(page)).toBe(kind);
+}
+
+/** Waits until the active worker has finished activating: controllerchange comes well before that. */
+export const waitActivated = (page: Page) => expect.poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistration('/'))?.active?.state), { timeout: 20_000 }).toBe('activated');
+
+/** Tells the waiting worker to apply, as a tap does, and waits for the tab's controller to change. */
+export const applyWaiting = (page: Page) => page.evaluate(() => new Promise<void>((resolve) => {
+  navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true });
+  void navigator.serviceWorker.getRegistration('/').then((r) => r?.waiting?.postMessage({ type: 'LOADCHECK_ACTIVATE' }));
+}));
+
+interface CacheFacts { entries: number; stamp: { first: boolean; order: number; activated: boolean } | null }
+/** Each precache: how many entries it holds, and its stamp. */
+export const cacheStamps = (page: Page): Promise<Record<string, CacheFacts>> => page.evaluate(async () => {
+  const facts: Record<string, CacheFacts> = {};
+  for (const name of await caches.keys()) {
+    if (!name.startsWith('wayfinch-precache-')) continue;
+    const cache = await caches.open(name);
+    const entry = await cache.match('/__complete');
+    facts[name] = { entries: (await cache.keys()).length, stamp: entry ? await entry.json() : null };
+  }
+  return facts;
+});
 
 export const cacheNames = (page: Page) => page.evaluate(() => caches.keys());
 

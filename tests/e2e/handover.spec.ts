@@ -11,7 +11,7 @@ import type { CfLike } from './server/cf-like.mjs';
 import { legacySite } from './fixtures/legacy-site.mjs';
 import {
   activeWorkerKind, blockOutside, buildSite, cacheNames, goOffline, isControlled, isLoadCheckPage, open,
-  registerAndControl, removeTempDirs, stateOf, tempDir, updateAndSettle, watchNavigations,
+  registerAndControl, removeTempDirs, stateOf, tempDir, updateAndSettle, waitForWorker, watchNavigations,
 } from './fixtures/sw-helpers.ts';
 
 let server: CfLike;
@@ -67,7 +67,7 @@ async function handOver(page: Page): Promise<string> {
   const next = await buildSite();
   server.swap(next.dir);
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await expect.poll(() => activeWorkerKind(page), { timeout: 20_000 }).toBe('new');
+  await waitForWorker(page, 'new');
   return next.build;
 }
 
@@ -129,16 +129,17 @@ test('[SW-OPEN-TAB] a tab open throughout, with a change just saved: nothing nav
   server.swap(next.dir);
   const second = await context.newPage();
   await open(second, `${server.origin}/`);
-  await expect.poll(() => activeWorkerKind(second), { timeout: 20_000 }).toBe('new');
+  await waitForWorker(second, 'new');
   await expect.poll(() => isControlled(openTab)).toBe(true);
-  await expect.poll(() => openTab.evaluate(async () => {
+  const kindInOpenTab = await openTab.evaluate(async () => {
     const answer = await new Promise((resolve) => {
       const channel = new MessageChannel();
       channel.port1.onmessage = (event) => resolve(event.data);
       navigator.serviceWorker.controller?.postMessage({ type: 'LOADCHECK_OFFLINE_INFO' }, [channel.port2]);
     });
     return 'version' in (answer as object) ? 'legacy' : 'new';
-  })).toBe('new');
+  });
+  expect(kindInOpenTab).toBe('new');
 
   expect(await navigations()).toEqual({ navigations: 0, mark: true });
   expect(await openTab.evaluate('S.nights')).toBe(5);
@@ -218,6 +219,36 @@ test('[SW-SWITCH] a phone still on the old worker is switched too', async ({ pag
   expect(await savedData(page)).toEqual(before);
 });
 
+test('[SW-SWITCH] after the switch and a later normal deploy a phone has no worker and no offline copy until the rider taps', async ({ page }) => {
+  await legacyPhone(page);
+  await handOver(page);
+  await expect.poll(async () => (await cacheNames(page)).length).toBe(1);
+  server.swap(await emergencySite());
+  await page.evaluate(async () => { await (await navigator.serviceWorker.getRegistration('/'))?.update(); });
+  await expect.poll(() => registrationCount(page), { timeout: 20_000 }).toBe(0);
+
+  // The fix is deployed and the rider opens the site with signal, more than once. The page never registers by itself.
+  const fixed = await buildSite({ extraFiles: { 'assets/fix.txt': 'the fix' } });
+  server.swap(fixed.dir);
+  await page.close();
+  const tab = await page.context().newPage();
+  for (let visit = 0; visit < 2; visit += 1) {
+    const response = await tab.goto(`${server.origin}/`, { waitUntil: 'domcontentloaded' });
+    expect(response?.fromServiceWorker()).toBe(false);
+    await tab.waitForTimeout(1500);
+    expect(await registrationCount(tab)).toBe(0);
+    expect(await cacheNames(tab)).toEqual([]);
+  }
+
+  // Only the tap on Make available offline, here its register call (Decision 10), brings the copy back.
+  await registerAndControl(tab);
+  await waitForWorker(tab, 'new');
+  expect(await cacheNames(tab)).toEqual([`wayfinch-precache-${fixed.build}`]);
+  goOffline(server);
+  await tab.reload({ waitUntil: 'domcontentloaded' });
+  expect(await isLoadCheckPage(tab)).toBe(true);
+});
+
 test('[SW-SWITCH-BUILD] the emergency build passes the same build check: the file exists, is served as JavaScript, is a classic script', async ({ request }) => {
   const dir = await emergencySite();
   server = await startCfLike({ dir });
@@ -249,7 +280,7 @@ test('[SW-DOWNGRADE] the new build active, the server swaps to the old site: aft
   await page.close();
   const fresh = await context.newPage();
   await open(fresh, `${server.origin}/`);
-  await expect.poll(() => activeWorkerKind(fresh), { timeout: 20_000 }).toBe('legacy');
+  await waitForWorker(fresh, 'legacy');
   expect(await stateOf(fresh)).toEqual({ active: true, waiting: false, installing: false });
   expect(await cacheNames(fresh)).toContain('loadcheck-offline-v1');
   expect(await registrationCount(fresh)).toBe(1);
@@ -272,7 +303,7 @@ test('[SW-DOWNGRADE] going forward again later: the new worker returns once wind
   await page.close();
   let tab = await context.newPage();
   await open(tab, `${server.origin}/`);
-  await expect.poll(() => activeWorkerKind(tab), { timeout: 20_000 }).toBe('legacy');
+  await waitForWorker(tab, 'legacy');
 
   const forward = await buildSite({ extraFiles: { 'assets/forward.txt': 'a later build' } });
   server.swap(forward.dir);
@@ -280,7 +311,7 @@ test('[SW-DOWNGRADE] going forward again later: the new worker returns once wind
   await tab.close();
   tab = await context.newPage();
   await open(tab, `${server.origin}/`);
-  await expect.poll(() => activeWorkerKind(tab), { timeout: 20_000 }).toBe('new');
+  await waitForWorker(tab, 'new');
   await expect.poll(async () => (await cacheNames(tab)).includes('loadcheck-offline-v1')).toBe(false);
 
   goOffline(server);

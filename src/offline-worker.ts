@@ -25,8 +25,9 @@ const NEVER_A_PAGE = new Set(['/offline-worker.js', '/build.json']);
 
 /** Kept in the COMPLETE entry, so it survives the browser stopping this worker between its events. */
 interface Stamp {
-  first: boolean; // this cache's install found no finished precache
-  order: number; // activation count: the highest other than ours is the build before this one
+  first: boolean; // this cache's install found no activated precache
+  order: number; // activation count, from 1: the highest other than ours is the build before this one
+  activated: boolean; // this build has been the active one. Until then its cache may belong to a build still on its way
 }
 
 async function readStamp(cache: Cache): Promise<Stamp | null> {
@@ -35,7 +36,7 @@ async function readStamp(cache: Cache): Promise<Stamp | null> {
   try {
     return (await entry.json()) as Stamp;
   } catch {
-    return { first: false, order: 0 };
+    return { first: false, order: 0, activated: false };
   }
 }
 
@@ -77,20 +78,26 @@ async function fetchChecked(path: string, sha256: string): Promise<Response> {
 
 /**
  * Save first, then take over (§9.5 step 2). Any failure rejects, so the browser throws this worker away and the old
- * one keeps serving. A precache only counts as installed once it holds COMPLETE; anything else is deleted here,
- * or a cut-off install would make this phone wait for ever instead of taking over.
+ * one keeps serving. A precache only counts as installed once it holds COMPLETE; a cache without it is deleted here,
+ * or a cut-off install would make this phone wait for ever instead of taking over. Installs run one at a time, so
+ * no other install owns such a cache. Only a build that has been active makes this one "not first".
  */
 async function install(): Promise<void> {
   let first = true;
   for (const name of await ownedCacheNames()) {
-    if (await (await caches.open(name)).match(COMPLETE)) first = false;
-    else await caches.delete(name);
+    const stamp = await readStamp(await caches.open(name));
+    if (!stamp) await caches.delete(name);
+    else if (stamp.activated) first = false;
   }
   const ownWasComplete = await caches.has(CACHE_NAME);
   try {
     const cache = await caches.open(CACHE_NAME);
+    // A release changing only the worker reuses this cache: it keeps its place in the order.
+    const own = await readStamp(cache);
     for (const [path, sha256] of LISTED) await cache.put(path, await fetchChecked(path, sha256));
-    await writeStamp(cache, { first, order: 0 });
+    await writeStamp(cache, { first, order: own?.order ?? 0, activated: own?.activated ?? false });
+    // The handle above keeps working on a deleted cache, so a write succeeding proves nothing.
+    if (!(await caches.has(CACHE_NAME))) throw new Error('The precache was removed during the install.');
   } catch (error) {
     // A cache the same build finished earlier holds only files with these same hashes, so it stays.
     if (!ownWasComplete) await caches.delete(CACHE_NAME).catch(() => false);
@@ -101,40 +108,50 @@ async function install(): Promise<void> {
 
 /**
  * Rule: delete every old-style cache and every precache except this build's and the one before it, which old tabs
- * may still need. Claim open tabs only on the first install. Never navigates or reloads a tab.
+ * may still need. A precache that was never active may belong to a newer build still installing or waiting: it goes
+ * only when nothing is on its way. Claim open tabs only on the first install. Never navigates or reloads a tab.
  */
 async function activate(): Promise<void> {
   const names = await caches.keys();
   await Promise.all(names.filter((name) => name.startsWith(LEGACY_PREFIX)).map((name) => caches.delete(name)));
 
   let previous: string | null = null;
-  let previousOrder = -1;
-  const others = names.filter((name) => name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME);
-  for (const name of others) {
+  let previousOrder = 0;
+  const leftOver: string[] = [];
+  const unused: string[] = [];
+  for (const name of names.filter((n) => n.startsWith(CACHE_PREFIX) && n !== CACHE_NAME)) {
     const stamp = await readStamp(await caches.open(name));
-    if (stamp && stamp.order > previousOrder) {
+    if (!stamp?.activated) {
+      unused.push(name);
+    } else if (stamp.order > previousOrder) {
+      if (previous) leftOver.push(previous);
       previous = name;
       previousOrder = stamp.order;
+    } else {
+      leftOver.push(name);
     }
   }
-  await Promise.all(others.filter((name) => name !== previous).map((name) => caches.delete(name)));
+  // Checked after the list above was read, so anything in that list still on its way shows here.
+  if (!sw.registration.installing && !sw.registration.waiting) leftOver.push(...unused);
+  await Promise.all(leftOver.map((name) => caches.delete(name)));
 
   const cache = await caches.open(CACHE_NAME);
   const stamp = await readStamp(cache);
-  // Storage too full for this small write must not cost the takeover: the order is only a tie-break later.
-  await writeStamp(cache, { first: false, order: previousOrder + 1 }).catch(() => undefined);
-  if (stamp?.first) await sw.clients.claim();
+  if (!stamp) return; // no whole precache here (storage was cleared): never mark an empty cache as finished
+  // Storage too full for this small write must not cost the takeover.
+  await writeStamp(cache, { first: false, order: previousOrder + 1, activated: true }).catch(() => undefined);
+  if (stamp.first) await sw.clients.claim();
 }
 
-/** The finished precache of the build before this one, if there is one. */
+/** The precache of the build before this one, if there is one. */
 async function previousCache(): Promise<Cache | null> {
   let best: Cache | null = null;
-  let bestOrder = -1;
+  let bestOrder = 0;
   for (const name of await ownedCacheNames()) {
     if (name === CACHE_NAME) continue;
     const cache = await caches.open(name);
     const stamp = await readStamp(cache);
-    if (stamp && stamp.order > bestOrder) {
+    if (stamp?.activated && stamp.order > bestOrder) {
       best = cache;
       bestOrder = stamp.order;
     }
@@ -160,7 +177,18 @@ async function answerFromCache(path: string): Promise<Response> {
   }
 }
 
-/** Which cached file answers this request, or null to leave it to the network untouched. */
+/** A file this build doesn't list: an old tab's own file comes from the build before, anything else from the network. */
+async function answerForOldTab(request: Request, path: string): Promise<Response> {
+  try {
+    const hit = await (await previousCache())?.match(path);
+    if (hit) return hit;
+  } catch {
+    // A broken cache must not stop an online visit: fall through to the network.
+  }
+  return fetch(request);
+}
+
+/** Which cached file answers this request, or null if it isn't one of this build's pages or files. */
 function cachedPathFor(url: URL, isNavigation: boolean): string | null {
   const path = CANONICAL.get(url.pathname) ?? url.pathname;
   if (LISTED.has(path)) return path;
@@ -178,8 +206,10 @@ sw.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== sw.location.origin) return;
-  const path = cachedPathFor(url, request.mode === 'navigate');
+  const isNavigation = request.mode === 'navigate';
+  const path = cachedPathFor(url, isNavigation);
   if (path !== null) event.respondWith(answerFromCache(path));
+  else if (!isNavigation && !NEVER_A_PAGE.has(url.pathname) && url.pathname !== COMPLETE) event.respondWith(answerForOldTab(request, url.pathname));
 });
 
 // Rule: old pages keep working (§9.5 step 4). Answers from an installing or waiting worker too.

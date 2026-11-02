@@ -7,8 +7,8 @@ import { startCfLike } from './server/cf-like.mjs';
 import type { CfLike } from './server/cf-like.mjs';
 import { legacySite } from './fixtures/legacy-site.mjs';
 import {
-  activeWorkerKind, ask, blockOutside, buildSite, cacheNames, copyDir, goOffline, isControlled, isLoadCheckPage, loadedPageFacts, open,
-  registerAndControl, removeTempDirs, stateOf, tempDir, updateAndSettle, watchNavigations,
+  activeWorkerKind, applyWaiting, ask, blockOutside, buildSite, cacheNames, cacheStamps, copyDir, goOffline, isControlled, isLoadCheckPage, loadedPageFacts, open,
+  registerAndControl, removeTempDirs, stateOf, tempDir, updateAndSettle, waitActivated, watchNavigations,
 } from './fixtures/sw-helpers.ts';
 
 let server: CfLike;
@@ -142,6 +142,17 @@ test('[SW-PARTIAL] a cache left without its last entry, as a killed browser leav
   expect(await isLoadCheckPage(page)).toBe(true);
 });
 
+test("[SW-VERIFY] a stale copy in the browser's HTTP cache does not fail the install: every file is fetched past it", async ({ context, page }) => {
+  await context.unrouteAll(); // routing would turn the HTTP cache off, and this test needs it
+  const one = await buildSite({ extraFiles: { 'assets/s.txt': 'old bytes' } });
+  const two = await buildSite({ extraFiles: { 'assets/s.txt': 'new bytes' } });
+  await start(one.dir, page); // /assets/* is immutable for a year, so the browser keeps this copy
+  await registerAndControl(page);
+  server.swap(two.dir);
+  expect(await updateAndSettle(page)).toBe('waiting');
+  expect((await cacheStamps(page))[`wayfinch-precache-${two.build}`]?.entries).toBe(3);
+});
+
 test('[SW-QUOTA] storage full during precache: install fails, the old worker stays, offline still served', async ({ page }) => {
   await onLegacy(page);
   const next = await buildSite();
@@ -235,6 +246,44 @@ test('[SW-NO-REDIRECT] a host that redirects / during install: stored as a plain
   expect(await isLoadCheckPage(page)).toBe(true);
 });
 
+test('[SW-NO-REDIRECT] a stored page has no encoding or length headers describing a body it no longer has', async ({ page }) => {
+  const site = await buildSite();
+  await start(site.dir, page);
+  await registerAndControl(page);
+  const stored = await page.evaluate(async (name) => {
+    const entry = await (await caches.open(name)).match('/');
+    return { encoding: entry?.headers.get('content-encoding'), length: entry?.headers.get('content-length'), type: entry?.headers.get('content-type') };
+  }, `wayfinch-precache-${site.build}`);
+  expect(stored).toEqual({ encoding: null, length: null, type: 'text/html; charset=utf-8' });
+  // Otherwise this test proves nothing: the server does compress the page.
+  const onTheWire = await page.request.get(`${server.origin}/`, { headers: { 'Accept-Encoding': 'gzip' } });
+  expect(onTheWire.headers()['content-encoding']).toBe('gzip');
+});
+
+test('[SW-LATER-WAITS] a later activation claims nothing: a tab the worker does not control stays that way', async ({ context, page }) => {
+  const one = await buildSite();
+  const two = await buildSite({ extraFiles: { 'assets/changed.txt': 'changed' } });
+  await start(one.dir, page);
+  await registerAndControl(page);
+
+  const uncontrolled = await context.newPage();
+  await open(uncontrolled, `${server.origin}/`);
+  const session = await context.newCDPSession(uncontrolled);
+  const loaded = uncontrolled.waitForEvent('domcontentloaded');
+  await session.send('Page.reload', { ignoreCache: true }); // a hard reload is never controlled
+  await loaded;
+  expect(await isControlled(uncontrolled)).toBe(false);
+
+  server.swap(two.dir);
+  expect(await updateAndSettle(page)).toBe('waiting');
+  await applyWaiting(page);
+  await waitActivated(page);
+  await expect.poll(async () => (await cacheStamps(page))[`wayfinch-precache-${two.build}`]?.stamp?.activated).toBe(true);
+  await page.waitForTimeout(300);
+  expect(await isControlled(page)).toBe(true);
+  expect(await isControlled(uncontrolled)).toBe(false);
+});
+
 test('[SW-MESSAGES] all three messages to an active, a waiting and an installing worker: two answered exactly, the third activates', async ({ page }) => {
   const one = await buildSite();
   const two = await buildSite({ extraFiles: { 'assets/changed.txt': 'two' } });
@@ -275,7 +324,16 @@ test('[SW-MESSAGES] all three messages to an active, a waiting and an installing
   await expect.poll(async () => (await stateOf(page)).installing).toBe(true);
   expect(await ask(page, 'installing', 'LOADCHECK_OFFLINE_INFO')).toEqual(exact);
   expect(await ask(page, 'installing', 'LOADCHECK_SAVE_APP')).toEqual(exact);
+  // Told to apply while installing: once its files are in, it doesn't wait, though it isn't a first install.
+  await page.evaluate(async () => {
+    (await navigator.serviceWorker.getRegistration('/'))?.installing?.postMessage({ type: 'LOADCHECK_ACTIVATE' });
+  });
+  await page.waitForTimeout(200);
+  expect(await stateOf(page)).toEqual({ active: true, waiting: false, installing: true });
   release();
+  await expect.poll(() => stateOf(page)).toEqual({ active: true, waiting: false, installing: false });
+  await waitActivated(page);
+  await expect.poll(async () => (await cacheStamps(page))[`wayfinch-precache-${four.build}`]?.stamp?.activated).toBe(true);
 });
 
 test('[SW-MESSAGES] a page at another address gets no answer', async ({ page }) => {
@@ -304,19 +362,20 @@ test('[SW-HEAD] HEAD / and /build.json reach the server, and a request to anothe
     const before = server.count('HEAD', '/');
     const beforeJson = server.count('GET', '/build.json');
     const beforeWorker = server.count('GET', '/offline-worker.js');
-    const beforeOther = elsewhere.count('GET', '/build.json');
+    const beforeOther = elsewhere.count('GET', '/');
     const results = await page.evaluate(async (other) => {
       const head = await fetch('/', { method: 'HEAD', cache: 'no-store' });
       const json = await fetch('/build.json', { cache: 'no-store' });
       const worker = await fetch('/offline-worker.js', { cache: 'no-store' });
-      const foreign = await fetch(`${other}/build.json`, { mode: 'no-cors', cache: 'no-store' });
+      // / is listed here, so only the origin check keeps the worker from answering it.
+      const foreign = await fetch(`${other}/`, { mode: 'no-cors', cache: 'no-store' });
       return { head: head.status, json: json.status, worker: worker.status, foreign: foreign.type };
     }, elsewhere.origin);
     expect(results).toEqual({ head: 200, json: 200, worker: 200, foreign: 'opaque' });
     expect(server.count('HEAD', '/')).toBe(before + 1);
     expect(server.count('GET', '/build.json')).toBe(beforeJson + 1);
     expect(server.count('GET', '/offline-worker.js')).toBe(beforeWorker + 1);
-    expect(elsewhere.count('GET', '/build.json')).toBe(beforeOther + 1);
+    expect(elsewhere.count('GET', '/')).toBe(beforeOther + 1);
   } finally {
     await elsewhere.close();
   }
