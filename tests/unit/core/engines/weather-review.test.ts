@@ -71,9 +71,9 @@ describe('the rounded grid and the exact stop', () => {
     expect(statusOf(factsOf([{ km: STOP_UP, stamps: [`${SAT} 13:00`], pp: 40, code: 95 }], close))).toBe('warning');
   });
   test('[WX-WINDOW-STOP] a later day\'s rounded stop still ends its window', () => {
-    const f = factsOf([{ km: [150.124], stamps: stamps(SUN, 8, 18), pp: 80 }, { km: [160], stamps: stamps('2026-10-19', 8, 12), pp: 80 }], { trip: up, now: `${SAT} 08:00` });
+    const f = factsOf([{ km: [150.124], stamps: stamps(SUN, 8, 18), pp: 80 }, { km: [165], stamps: stamps('2026-10-19', 8, 12), pp: 80 }], { trip: up, now: `${SAT} 08:00` });
     const later = weatherWindows(f).filter((w) => w.fromKm > 100);
-    expect(later.map((w) => [w.fromKm, w.toKm])).toEqual([[150.1236, 150.1236], [160, 160]]);
+    expect(later.map((w) => [w.fromKm, w.toKm])).toEqual([[150.1236, 150.1236], [165, 165]]);
   });
   test('[WX-WARN-THUNDER] the route end rounded up is still on the ride', () => {
     const end = roundedTrip([200], 299.9996, LODGING);
