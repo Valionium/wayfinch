@@ -13,6 +13,8 @@ const areaOf = (key: string): string | undefined =>
 
 // Test values for each template function. A new template without an entry here fails the test below.
 const TEMPLATE_ARGS: Record<string, unknown[][]> = {
+  leavebyPlaceCloses: [['bakery at km 5', '19:00']],
+  leavebyLimitLine: [['Leave by about 14:00', 'to reach km 150 before sunset (18:42)']],
   leavebyPlaceAtKm: [['bakery', '12']],
   leavebyManyUnknown: [[3]],
   leavebyNotIncluded: [['3 shops with unknown hours']],

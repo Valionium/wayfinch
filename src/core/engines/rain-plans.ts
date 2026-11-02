@@ -109,8 +109,15 @@ export function rainPlan(w: RainWindow, f: StopFacts): RainPlan {
   const marked = (j: (typeof judged)[number]): j is (typeof judged)[number] & { r: NotCover } =>
     !isCover(j.r) && j.r.listed && (!thunder || hoursDecide(j.spot));
   const scope = reached.filter((j) => inBand.length === 0 || j.lead <= BAND_MAX + SLACK);
+  const listed = new Set<unknown>();
   const notCounted = scope.filter(marked)
     .sort((a, b) => a.spot.match.km - b.spot.match.km || finalOrder(a.spot, b.spot))
+    .filter((j) => {
+      const key = j.spot.place ?? j.spot.roof;
+      if (listed.has(key)) return false;
+      listed.add(key);
+      return true;
+    })
     .slice(0, MAX_COVERS)
     .map((j) => ({ placeId: j.spot.place?.id ?? '', km: j.spot.match.km, reason: j.r.notCover }));
 

@@ -65,6 +65,12 @@ export function placeWord(p: Place): string {
 }
 const namedAt = (p: Place, km: Km): string => W.leavebyPlaceAtKm(placeWord(p), showKm(km));
 
+/** A place has one route match per pass: this tells two passes of one place apart. */
+const passKey = (m: RouteMatch): string => `${m.placeId}|${m.km}`;
+
+/** "Open 24/7" only for a place tagged so. A span that merely reaches the prepared window's end says nothing beyond it. */
+export const open247 = (p: Place): boolean => p.openingHours?.trim() === '24/7';
+
 /** One pass of a place along the route, with readable figures. */
 export type Pass = { place: Place; match: RouteMatch };
 
@@ -84,7 +90,7 @@ export const routeZoneAt = (f: Pick<ScreenInputs, 'routeZones'>, km: Km): string
 export const zoneOfPass = (x: Pass, f: Pick<ScreenInputs, 'routeZones'>): string =>
   (isKnownZone(x.place.timeZone) ? x.place.timeZone : routeZoneAt(f, x.match.km));
 
-const insideRadius = (ride: DayRide, km: Km): boolean => ride.startKm < ride.behindFromKm && km >= ride.startKm && km <= ride.behindFromKm;
+export const insideRadius = (ride: DayRide, km: Km): boolean => ride.startKm < ride.behindFromKm && km >= ride.startKm && km <= ride.behindFromKm;
 
 export const hoursIndex = (f: Pick<ScreenInputs, 'hours'>): ((id: string) => PlaceHours | undefined) => {
   const map = new Map(f.hours.map((h) => [h.placeId, h]));
@@ -147,7 +153,7 @@ function through(p: Plan, stops: RouteMatch[]): Schedule {
   let s = p.s;
   const seen = new Set<string>();
   for (const m of stops) {
-    const key = `${m.placeId}|${m.km}`;
+    const key = passKey(m);
     if (m.km < p.stop && !seen.has(key)) s = s.through(m);
     seen.add(key);
   }
@@ -243,11 +249,11 @@ function planOf(f: LeaveFacts, ride: DayRide): Plan {
   // The water plan: S1 and S2 as the Water card finds them, on tomorrow's ride alone after the day's ride.
   const facts: WaterFacts = { ...f, ride, schedule: s };
   const { s1, s2 } = findS1S2(facts, { tomorrowOnly: ride.phase === 'after-ride' });
-  const seen = new Set<string>();
+  const seen = new Set<string>(); // one per pass: a place passed twice is two sources, each judged at its own arrival
   const water: Source[] = [];
   for (const t of [s1, s2]) {
-    if (t.kind !== 'place' || !(t.km < stop) || (t.place.waterClass === 'A' && !t.place.indoorOrLimited) || seen.has(t.place.id)) continue;
-    seen.add(t.place.id);
+    if (t.kind !== 'place' || !(t.km < stop) || (t.place.waterClass === 'A' && !t.place.indoorOrLimited) || seen.has(passKey(t.match))) continue;
+    seen.add(passKey(t.match));
     const runs = openRunsOf(hoursOf(t.place.id));
     water.push({ place: t.place, match: t.match, runs, arrivals: waterArrivals(runs) });
   }
@@ -260,18 +266,19 @@ function planOf(f: LeaveFacts, ride: DayRide): Plan {
   const nearStop = (x: Pass): boolean => Math.abs(x.match.km - stop) <= AT_STOP_KM;
   const counts = (x: Pass): boolean => onRide(x) && (isFoodShop(x.place) || (foodId === 'food-tonight' && isFoodPlace(x.place) && nearStop(x)));
   const food: Source[] = [];
-  let notCounted = 0;
+  const unknown = new Set<string>();
   if (foodId !== null) {
     for (const x of passesOf(f)) {
       if (!counts(x)) continue;
       const h = hoursOf(x.place.id);
       const runs = openRunsOf(h);
       const state = stateAt(h, arrivalOn(base, s, x.match)).state;
-      if (state === 'unknown' || state === 'possibly-closed') notCounted++;
-      if (runs.length > 0) food.push({ ...x, runs, arrivals: foodArrivals(runs) });
+      if (state === 'unknown' || state === 'possibly-closed') unknown.add(x.place.id);
+      // Food before the closing day, or for tonight, is bought that day: tomorrow morning's opening meets neither.
+      if (runs.length > 0) food.push({ ...x, runs, arrivals: intersect(foodArrivals(runs), [[-Infinity, to]]) });
     }
   }
-  return { ...base, water, food, foodId, notCounted, closure };
+  return { ...base, water, food, foodId, notCounted: unknown.size, closure };
 }
 
 // ---- wording of the limits -----------------------------------------------------------------------------------------
@@ -294,9 +301,10 @@ function noFoodLine(p: Plan): string {
 
 const until = (src: Source, end: number | null, f: LeaveFacts): string | null => (end === null ? null : formatHm(new Date(end), zoneOfPass(src, f)));
 
-/** The stretch a source is latest reached in, on its own: for what can't be reached. */
-function latestEnd(src: Source): number | null {
-  return src.runs.length === 0 ? null : src.runs[src.runs.length - 1]![1];
+/** When it closes on the ride's date: the last open stretch of that day, not of the whole prepared window. */
+function latestEnd(p: Plan, src: Source): number | null {
+  const today = src.runs.filter(([a, b]) => a < p.window[1] && b > p.window[0]);
+  return today[today.length - 1]?.[1] ?? null;
 }
 
 // ---- leaveBy -------------------------------------------------------------------------------------------------------
@@ -326,7 +334,7 @@ function checkOf(p: Plan, id: LimitId, sources: Source[], allOf: boolean, stops:
 }
 
 const waterOpen = (h: (id: string) => PlaceHours | undefined) => (src: Source, t: Date): boolean => openOver(h(src.place.id), new Date(t.getTime() - OPEN_MIN * MIN), new Date(t.getTime() + OPEN_MIN * MIN));
-const foodOpen = (h: (id: string) => PlaceHours | undefined) => (src: Source, t: Date): boolean => openOnArrival(h(src.place.id), t);
+const foodOpen = (h: (id: string) => PlaceHours | undefined, dayEnd: number) => (src: Source, t: Date): boolean => t.getTime() <= dayEnd && openOnArrival(h(src.place.id), t);
 
 /** The best two food places by their own latest departure, a supermarket first. */
 function bestTwo(p: Plan, keep: Keep): { src: Source; latest: number }[] {
@@ -334,7 +342,12 @@ function bestTwo(p: Plan, keep: Keep): { src: Source; latest: number }[] {
     const latest = latestWith(p, { ...keep, food: true }, src);
     return latest === null ? [] : [{ src, latest }];
   }).sort((a, b) => b.latest - a.latest);
-  const two = scored.slice(0, 2);
+  const seen = new Set<string>();
+  const two = scored.filter(({ src }) => {
+    if (seen.has(src.place.id)) return false;
+    seen.add(src.place.id);
+    return true;
+  }).slice(0, 2);
   return two.sort((a, b) => Number(b.src.place.tags['shop'] === 'supermarket') - Number(a.src.place.tags['shop'] === 'supermarket'));
 }
 
@@ -359,7 +372,7 @@ export function leaveBy(f: LeaveFacts, ride: DayRide): LeaveBy {
 
   // Daylight is never set aside: with no departure that meets it, there is no leave-by.
   if (!light && bestWith(p, tries[3]!) === null) {
-    return { ...nothing(p.earliest, p.dataNote), ...common, limits: [{ id: 'daylight', latest: null, place: null, closes: null }], waterSources: p.water.map((w) => w.place.id) };
+    return { ...nothing(p.earliest, p.dataNote), ...common, limits: [{ id: 'daylight', latest: null, place: null, closes: null }], waterSources: [...new Set(p.water.map((w) => w.place.id))] };
   }
 
   let keep = tries[3]!;
@@ -399,7 +412,7 @@ export function leaveBy(f: LeaveFacts, ride: DayRide): LeaveBy {
   if (!light) limits.push({ id: 'daylight', latest: p.limit === null ? null : new Date(p.limit.getTime() - stopOffset(p, planned)), place: null, closes: null });
   for (const w of p.water) {
     const own = latestOf(intersect(intersect([p.window], shifted(w.arrivals, offsetOf(p, planned, w.match))), [[-Infinity, ceiling]]));
-    limits.push({ id: 'water', latest: own === null ? null : new Date(own), place: namedAt(w.place, w.match.km), closes: own === null ? until(w, latestEnd(w), f) : until(w, closesAt(w, closesFor(p, planned, w, own)), f) });
+    limits.push({ id: 'water', latest: own === null ? null : new Date(own), place: namedAt(w.place, w.match.km), closes: own === null ? until(w, latestEnd(p, w), f) : until(w, closesAt(w, closesFor(p, planned, w, own)), f) });
   }
   if (p.foodId !== null) {
     const two = bestTwo(p, { ...keep, water: keep.water });
@@ -427,19 +440,20 @@ export function leaveBy(f: LeaveFacts, ride: DayRide): LeaveBy {
 
   const checks: LimitCheck[] = [];
   if (keep.water) {
-    const w = p.water[0]!;
-    const line = W.waitMissing(placeWord(w.place), showKm(w.match.km), until(w, closesAt(w, closesFor(p, planned, w, found.d)), f) ?? until(w, latestEnd(w), f) ?? '');
-    checks.push(checkOf(p, 'water', p.water, true, p.water.map((x) => x.match), waterOpen(hoursOf), line));
+    for (const w of p.water) {
+      const line = W.waitMissing(placeWord(w.place), showKm(w.match.km), until(w, closesAt(w, closesFor(p, planned, w, found.d)), f) ?? until(w, latestEnd(p, w), f) ?? '');
+      checks.push(checkOf(p, 'water', [w], true, p.water.map((x) => x.match), waterOpen(hoursOf), line));
+    }
   }
   if (keep.food) {
     const src = found.food!;
-    const line = W.waitMissing(placeWord(src.place), showKm(src.match.km), until(src, closesAt(src, closesFor(p, planned, src, found.d)), f) ?? until(src, latestEnd(src), f) ?? '');
-    checks.push(checkOf(p, p.foodId!, p.food, false, keep.water ? p.water.map((x) => x.match) : [], foodOpen(hoursOf), line));
+    const line = W.waitMissing(placeWord(src.place), showKm(src.match.km), until(src, closesAt(src, closesFor(p, planned, src, found.d)), f) ?? until(src, latestEnd(p, src), f) ?? '');
+    checks.push(checkOf(p, p.foodId!, p.food, false, keep.water ? p.water.map((x) => x.match) : [], foodOpen(hoursOf, p.window[1]), line));
   }
 
   return {
     ...common, unrounded, binding, kept, setAside, limits, stops, checks,
-    waterSources: p.water.map((w) => w.place.id),
+    waterSources: [...new Set(p.water.map((w) => w.place.id))],
   };
 }
 
@@ -455,7 +469,7 @@ const isBinding = (id: LimitId, binding: LeaveBy['binding']): boolean =>
 function dedupeStops(list: RouteMatch[]): RouteMatch[] {
   const seen = new Set<string>();
   return list.filter((m) => {
-    const key = `${m.placeId}|${m.km}`;
+    const key = passKey(m);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -477,7 +491,7 @@ function bestAlone(p: Plan): Source {
 }
 
 function cantTogether(p: Plan, src: Source, keep: Keep): string {
-  const end = latestEnd(src);
+  const end = latestEnd(p, src);
   const closes = end === null ? '' : formatHm(new Date(end), zoneOfPass(src, p.f));
   return W.leavebyCantTogether(placeWord(src.place), showKm(src.match.km), closes, keep.water ? W.leavebyTheWaterPlan : W.leavebyDaylightName);
 }
@@ -504,7 +518,7 @@ export function limitFor(id: LimitId, f: LeaveFacts): { meets(d: Date): boolean;
   }
   if (p.foodId !== id || p.food.length === 0) return none;
   const latest = bestWith(p, { daylight: false, water: false, food: true });
-  const check = checkOf(p, id, p.food, false, [], foodOpen(hoursOf), null);
+  const check = checkOf(p, id, p.food, false, [], foodOpen(hoursOf, p.window[1]), null);
   return { meets: (d) => check.meets(d), latest: latest === null ? null : new Date(latest.d) };
 }
 

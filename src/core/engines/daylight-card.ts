@@ -2,14 +2,14 @@
 // day's leave-by and its status is leave-by's. While riding it judges the arrival at the day's stop. At the route end it
 // judges the arrival there on the riding date it was reached, and otherwise gives the daylight left.
 // It lives apart from daylight.ts because the trip day reads daylight.ts, and this card reads the trip day.
-import { formatAbout, makeAnswer } from '../answers/index.ts';
+import { formatAbout, formatLeaveBy, makeAnswer } from '../answers/index.ts';
 import { addDaysIso, formatHm, instantAt, localIsoDate, roundedLeaveBy, wallClock } from '../answers/time.ts';
 import { pointAtRouteKm } from '../geo/project.ts';
 import type { Answer, AnswerItem, DayRide, Km, Missing, Status, SunTimes } from '../types.ts';
 import { showKm, W } from '../wording/en.ts';
 import { newestMapDate, savedCovers, shortMapDate } from './covers.ts';
 import { arrivalStatus, daylightLeft } from './daylight.ts';
-import { bindingPlace, closingDay, closingWord, leaveBy, routeZoneAt, sunReadable, type LeaveBy, type LeaveFacts } from './leaveby.ts';
+import { bindingPlace, closingDay, closingWord, leaveBy, routeZoneAt, stopStamp, sunReadable, type LeaveBy, type LeaveFacts } from './leaveby.ts';
 import { adjusted, latestPosition, usablePosition } from './locate.ts';
 import { usableFlatKph } from './pace.ts';
 import { noteFor, offersPlanTomorrow, ridingDate, zoneLookupOf } from './tripday.ts';
@@ -98,7 +98,7 @@ function titleOf(f: LeaveFacts, ride: DayRide, r: LeaveBy, sun: SunTimes): { tit
   }
 
   const shown = roundedLeaveBy(r.unrounded, startTz);
-  const about = `about ${formatHm(shown, startTz)}`;
+  const about = formatLeaveBy(r.unrounded, startTz);
   if (validDate(f.now) && r.unrounded.getTime() < f.now.getTime()) {
     const needed = r.binding === 'daylight' ? W.leavebyNeeded(about, W.leavebyToReachBare(km)) : W.leavebyNeededAt(about, reasonOf(f, ride, r));
     return { title: `${needed} ${nowAt}`, detail: [] };
@@ -146,15 +146,15 @@ function limitItems(f: LeaveFacts, ride: DayRide, r: LeaveBy): AnswerItem[] {
   const sunset = sunAt(f, ride.stopKm, ride.date).sunset;
   const items: AnswerItem[] = [];
   for (const l of r.limits) {
-    const when = l.latest ? `about ${formatHm(roundedLeaveBy(l.latest, startTz), startTz)}` : null;
+    const when = l.latest ? formatLeaveBy(l.latest, startTz) : null;
     const by = when ? W.leavebyLeaveBy(when) : '';
     if (l.id === 'daylight') {
-      if (when && validDate(sunset)) items.push({ label: `${by} · ${W.leavebyToReach(showKm(ride.stopKm), formatHm(sunset, stopTz))}`, stamp: { km: ride.stopKm }, status: 'fine' });
+      if (when && validDate(sunset)) items.push({ label: W.leavebyLimitLine(by, W.leavebyToReach(showKm(ride.stopKm), formatHm(sunset, stopTz))), stamp: { km: ride.stopKm }, status: 'fine' });
       continue;
     }
     if (l.place === null) continue;
     if (l.id === 'water') items.push({ label: W.leavebyWaterLine(l.place, l.closes ?? ''), stamp: null, status: 'fine', detail: by });
-    else items.push({ label: l.closes ? `${l.place}, closes ${l.closes}` : l.place, stamp: null, status: 'fine', detail: by });
+    else items.push({ label: l.closes ? W.leavebyPlaceCloses(l.place, l.closes) : l.place, stamp: null, status: 'fine', detail: by });
   }
   for (const s of r.setAside) items.push({ label: s.why, stamp: null, status: 'fine' });
   const foodKept = r.kept.includes('food-closure') || r.kept.includes('food-tonight');
@@ -230,13 +230,13 @@ export function daylightAnswer(f: LeaveFacts): Answer {
   const r = leaveBy(f, ride);
   const offers: AnswerItem[] = offersPlanTomorrow(ride) ? [{ label: W.daylightPlanTomorrow, stamp: null, status: 'fine' }]
     : ride.phase === 'after-ride' ? [{ label: W.daylightBackToToday, stamp: null, status: 'fine' }] : [];
-  const notes = [noteFor(ride) ?? '', r.dataNote ?? '', noHeights(f) ? W.leavebyNoHeights : ''];
+  const notes = [stopStamp(ride), noteFor(ride) ?? '', r.dataNote ?? '', noHeights(f) ? W.leavebyNoHeights : ''];
 
   // While riding: the arrival at the day's stop.
   if (ride.phase === 'riding') {
     const arrival = f.schedule.atKm(ride.stopKm);
     const j = arrivalStatus(arrival, stopSun, f.schedule.ridingMinTo(ride.stopKm), zoneAt(f, ride.stopKm));
-    const here: AnswerItem[] = r.unrounded ? [{ label: W.leavebyHereBy(`about ${formatHm(roundedLeaveBy(r.unrounded, zoneAt(f, ride.startKm)), zoneAt(f, ride.startKm))}`), stamp: null, status: 'fine' }] : [];
+    const here: AnswerItem[] = r.unrounded ? [{ label: W.leavebyHereBy(formatLeaveBy(r.unrounded, zoneAt(f, ride.startKm))), stamp: null, status: 'fine' }] : [];
     return makeAnswer({
       topic: 'daylight', status: noHeights(f) ? atLeastAction(j.status) : j.status, title: arrivalTitle(f, ride, arrival, j.line, stopSun), stamp: { km: ride.stopKm, at: arrival },
       detail: notes.filter(Boolean).join(' '), items: [...here, ...limitItems(f, ride, r), usualItem(f, ride), ...sunItems(f, ride), ...offers], basis: basisOf(f, ride, r), freshness: freshnessOf(f), missing: missingOf(f, ride, r),

@@ -6,7 +6,7 @@ import { kitchenHoursId, openAtArrival, openOnArrival, openRuns, stateAt } from 
 import type { Km, Missing, Place, RainPlan, ScreenInputs, Status, StopIdea } from '../types.ts';
 import { showKm, W } from '../wording/en.ts';
 import { isCover, coverOfSpot, savedCovers, seatedKind, seatingLine, spotName, type Spot as CoverSpot, type StopFacts } from './covers.ts';
-import { arrivalRidingOn, closingDay, closingWord, hoursIndex, routeZoneAt, isFoodPlace, passesOf, placeWord, zoneOfPass, type LeaveBy, type LeaveFacts, type Pass } from './leaveby.ts';
+import { arrivalRidingOn, closingDay, closingWord, hoursIndex, routeZoneAt, isFoodPlace, open247, passesOf, placeWord, zoneOfPass, type LeaveBy, type LeaveFacts, type Pass } from './leaveby.ts';
 import { usableFlatKph } from './pace.ts';
 import { planOrder } from './rain-plans.ts';
 import { latestUsable } from './shelter.ts';
@@ -118,7 +118,9 @@ const rhythmKind = (p: Place): number => {
 
 const ahead = (v: Visit, startKm: Km): string => W.waterAhead(showKm(Math.abs(v.match.km - startKm)));
 const toiletsLine = (p: Place): string => (p.stop?.toilets === true ? W.stopToiletsMapped : W.stopToiletsNotMapped);
-const untilLine = (v: Visit): string => (v.until ? W.stopOpenUntil(formatHm(v.until, v.tz)) : W.stopOpen247);
+const noEndLine = (p: Place): string => (open247(p) ? W.stopOpen247 : W.stopOpenOnArrival);
+const untilLine = (v: Visit): string => (v.until ? W.stopOpenUntil(formatHm(v.until, v.tz)) : noEndLine(v.place));
+const samePass = (a: Visit, b: Visit): boolean => a.place.id === b.place.id && a.match.km === b.match.km;
 const about = (v: Visit): string => formatAbout(v.arrival, v.tz);
 const nameOf = (v: Visit): string => spotName({ place: v.place, roof: null, match: v.match });
 const asCoverSpot = (v: Visit): CoverSpot => ({ place: v.place, roof: null, match: v.match });
@@ -155,7 +157,7 @@ function lastChance(r: Ride, lb: LeaveBy): StopIdea | null {
   }
   const near = r.open.filter((v) => last.arrival.getTime() - v.arrival.getTime() <= LOOK_BACK_MIN * MIN + SLACK_MS);
   const best = rankOf(near, { kind: lastChanceKind, target: () => last.arrival.getTime(), wet: r.wet, meal: false }, r.ties)[0]!;
-  const lines = best.place.id === last.place.id ? [] : [W.stopLastOpen(shownAt(last))];
+  const lines = samePass(best, last) ? [] : [W.stopLastOpen(shownAt(last))];
   const where = settledName(best, r);
   const closes = best.until ? formatHm(best.until, best.tz) : null;
   if (!lb.closure) return idea('last-chance', 'action', best, W.stopLastTonight(where, ahead(best, start), about(best), closes), lines);
@@ -180,11 +182,11 @@ function nextOpening(r: Ride, after: Visit): string | null {
   let first: { at: Date; tz: string } | null = null;
   for (const x of passesOf(r.f)) {
     if (!isFoodPlace(x.place) || x.match.km <= r.stop) continue;
-    for (const run of openRuns(r.hoursOf(x.place.id))) {
-      if (run.from.getTime() <= after.arrival.getTime()) continue;
-      if (!first || run.from.getTime() < first.at.getTime()) first = { at: run.from, tz: zoneOfPass(x, r.f) };
-      break;
-    }
+    // Only a stretch the rider would meet it in: its own arrival, on the ride it lies on.
+    const t = r.f.schedule.atPlace(x.match).getTime();
+    const run = openRuns(r.hoursOf(x.place.id)).find((o) => o.from.getTime() <= t && t < o.to.getTime());
+    if (!run || run.from.getTime() <= after.arrival.getTime()) continue;
+    if (!first || run.from.getTime() < first.at.getTime()) first = { at: run.from, tz: zoneOfPass(x, r.f) };
   }
   return first ? `${weekdayOf(first.at, first.tz)} ${formatHm(first.at, first.tz)}` : null;
 }
@@ -203,8 +205,8 @@ function gap(r: Ride): StopIdea | null {
     const near = onRide.filter((v) => v.arrival.getTime() <= last.arrival.getTime() && last.arrival.getTime() - v.arrival.getTime() <= LOOK_BACK_MIN * MIN + SLACK_MS);
     const best = rankOf(near, { kind: lastChanceKind, target: () => last.arrival.getTime(), wet: r.wet, meal: false }, r.ties)[0]!;
     const head = W.stopNoFoodAfter(km, shownAt(last), span);
-    const openWord = best.until ? W.stopClosesAt(formatHm(best.until, best.tz)) : W.stopOpen247;
-    const same = best.place.id === last.place.id;
+    const openWord = best.until ? W.stopClosesAt(formatHm(best.until, best.tz)) : noEndLine(best.place);
+    const same = samePass(best, last);
     const consider = same ? W.stopStockUpThere(ahead(best, r.start), about(best), openWord, toiletsLine(best.place)) : W.stopStockUpAt(shownAt(best), ahead(best, r.start), about(best), openWord, toiletsLine(best.place));
     return idea('gap', 'action', best, `${head} ${consider}`, same ? [] : [W.stopLastOpen(shownAt(last))]);
   }
@@ -221,9 +223,9 @@ function rain(r: Ride, plans: RainPlan[], wg: WaitOrGo | null, startsWet: boolea
     : plans.find((p) => dueIn(p) <= RAIN_WITHIN_MIN) ?? stormPlan ?? null;
   if (!startsWet && !plan) return null;
 
-  const byId = new Map(r.visits.map((v) => [v.place.id, v]));
+  // A cover is one pass of its place: the visit of that pass, with that pass's arrival and hours.
   const fromPlan = (plan?.covers ?? []).flatMap((c) => {
-    const v = c.placeId !== null && c.coverClass <= 2 ? byId.get(c.placeId) : undefined;
+    const v = c.placeId !== null && c.coverClass <= 2 ? r.visits.find((x) => x.place.id === c.placeId && x.match.km === c.km) : undefined;
     return v ? [{ spot: asCoverSpot(v), cover: c, v }] : [];
   });
   const seated = !startsWet ? [] : r.visits.flatMap((v) => {
@@ -234,7 +236,7 @@ function rain(r: Ride, plans: RainPlan[], wg: WaitOrGo | null, startsWet: boolea
   const best = [...seated, ...fromPlan].sort(planOrder)[0];
   if (!best) return idea('rain', 'fine', null, plan?.none ?? plan?.firstCoverLine ?? W.stopNoSeatedNear, [], plan?.m ?? r.start);
   const lines: string[] = [];
-  if (wg?.d && wg.where !== 'here' && wg.where.placeId === best.v.place.id) lines.push(W.stopWaitItOut(formatAbout(wg.d, best.v.tz)));
+  if (wg?.d && wg.where !== 'here' && wg.where.placeId === best.v.place.id && wg.where.km === best.v.match.km) lines.push(W.stopWaitItOut(formatAbout(wg.d, best.v.tz)));
   return idea('rain', 'fine', best.v, shortIdea(best.v), lines);
 }
 
@@ -329,7 +331,8 @@ function hotDay(r: Ride): boolean {
   for (const p of ridePoints(forecast, f.schedule)) {
     if (p.km > r.stop) continue;
     const w = planningWeather(forecast, null, p.km, p.t, { route: f.trip.route, timeZone: r.zone(p.km) });
-    if (w.planT > max) max = w.planT;
+    // Past the forecast the water engine assumes a hot day to be careful with water. That is no hot day.
+    if (w.label !== 'assumed-hot' && w.planT > max) max = w.planT;
   }
   return heatRule(max, f.schedule.ridingMinTo(r.stop));
 }
@@ -371,7 +374,8 @@ export function stopIdeas(f: FoodFacts, plans: RainPlan[], lb: LeaveBy, waterTar
   const nearestOpen = nearest ? idea('rhythm', 'fine', nearest, W.stopNearestOpen(fullLine(nearest, r.start))) : null;
 
   const others = found.filter((x) => x !== first);
-  if (nearestOpen && nearestOpen.placeId !== first.placeId && !others.some((x) => x.placeId === nearestOpen.placeId)) others.push(nearestOpen);
+  const isNearest = (x: StopIdea): boolean => x.placeId === nearestOpen?.placeId && x.km === nearestOpen?.km;
+  if (nearestOpen && !isNearest(first) && !others.some(isNearest)) others.push(nearestOpen);
   const timeline = others.sort((a, b) => (a.km ?? Infinity) - (b.km ?? Infinity));
 
   const title: StopIdea = { ...first, lines: [...first.lines] };
@@ -389,7 +393,7 @@ export function stopIdeas(f: FoodFacts, plans: RainPlan[], lb: LeaveBy, waterTar
 function nextOpenTitle(r: Ride): StopIdea {
   const next = r.visits.find((v) => v.atArrival && isFoodPlace(v.place) && v.match.km <= r.stop + AT_STOP_KM);
   if (!next) return idea('rhythm', 'fine', null, W.stopNoneAtArrival);
-  const closes = next.until ? W.stopOpenAtArrivalCloses(formatHm(next.until, next.tz)) : W.stopOpen247;
+  const closes = next.until ? W.stopOpenAtArrivalCloses(formatHm(next.until, next.tz)) : noEndLine(next.place);
   return { ...idea('rhythm', 'fine', null, W.stopNextOpen(nameOf(next), ahead(next, r.start), about(next), closes), [], next.match.km), arrival: next.arrival };
 }
 

@@ -216,6 +216,8 @@ export const W = {
   leavebyNoPlaceData: 'No place data here',
   leavebyStamp: (km: string, distance: string): string => `km ${km} · ${distance} km`,
   leavebyNeedsDate: 'Leave-by needs a departure date (Trip settings).',
+  leavebyPlaceCloses: (place: string, closes: string): string => `${place}, closes ${closes}`,
+  leavebyLimitLine: (by: string, why: string): string => `${by} · ${why}`,
   leavebyLeaveBy: (about: string): string => `Leave by ${about}`,
   leavebyLeaveByLower: (about: string): string => `leave by ${about}`,
   leavebyDayOne: (day: string): string => `Day 1, ${day}`,

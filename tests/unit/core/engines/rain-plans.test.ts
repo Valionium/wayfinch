@@ -515,6 +515,32 @@ describe('the property', () => {
   });
 });
 
+describe('a place passed twice', () => {
+  const wet = rain(200);
+  const trip = (): ReturnType<typeof testTrip> => testTrip({ route: flatRoute(300, { stageEnds: [250, 300] }) });
+  test('[STOP-BAND] the cover is the pass in the band, with that pass\'s arrival and hours', () => {
+    const b = cafe('x');
+    const p = b.atKm(180, { id: 'n1' });
+    const f = stopFactsOf({ moment: { trip: trip(), now: `${SAT} 08:00` }, spells: [wet], spots: [{ b, km: [60, 180], id: 'n1' }], hours: [hoursOf(p, [{ from: '06:00', to: '20:00' }])] });
+    const plan = rainPlan(firstLikely(f), f);
+    expect(plan.covers.map((c) => c.km)).toEqual([180]);
+    expect(plan.covers[0]!.arrival.getTime()).toBe(f.schedule.atPlace({ placeId: 'n1', km: 180, offRouteM: 0 }).getTime());
+  });
+  test('[STOP-ORDER] both passes in the band: one cover, the latest', () => {
+    const f = stopFactsOf({ moment: { trip: trip(), now: `${SAT} 08:00` }, spells: [wet], spots: [{ b: cafe('x'), km: [185, 190], id: 'n1' }] });
+    expect(rainPlan(firstLikely(f), f).covers.map((c) => c.km)).toEqual([190]);
+  });
+  test('[STOP-NOT-COVER] listed after the covers once, not once per pass', () => {
+    const f = stopFactsOf({ moment: { trip: trip(), now: `${SAT} 08:00` }, spells: [wet], spots: [{ b: cafe(null), km: [185, 190], id: 'n1' }], hours: [] });
+    expect(rainPlan(firstLikely(f), f).notCounted.map((n) => n.placeId)).toEqual(['n1']);
+  });
+  test('[STOP-NO-COVER] behind: the nearest pass', () => {
+    const f = stopFactsOf({ moment: { trip: trip(), positions: [pos({ km: 195, at: `${SAT} 09:00` })], now: `${SAT} 09:00` }, spells: [wet], spots: [{ b: cafe('x'), km: [100, 150], id: 'n1' }] });
+    const plan = rainPlan(firstLikely(f), f);
+    expect(plan.behind).toContain('km 150');
+  });
+});
+
 describe('forecasts with holes', () => {
   test('[STOP-RULE5] windows from an empty forecast give no plans and no throw', () => {
     const c = momentOf();

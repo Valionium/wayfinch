@@ -119,6 +119,10 @@ describe('wording', () => {
     expect(stopStamp(f.ride)).toBe('km 150 · 74 km');
   });
 
+  test('[LB-WORDING] the card carries the stamp', () => {
+    expect(card(FROM_76('07:00')).detail).toContain('km 150 · 74 km');
+  });
+
   test('[LB-WORDING] day 1, before the trip', () => {
     expect(card({ trip: testTrip({ stay: 'accommodation' }), spots: TAPS }).title).toBe('Day 1, Sat 17 Oct: leave by about 13:45 · to reach km 78 before sunset (18:42).');
   });

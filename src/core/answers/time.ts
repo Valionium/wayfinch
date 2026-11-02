@@ -90,6 +90,8 @@ const about = (t: Date, tz: string): string => `about ${formatHm(t, tz)}`;
 
 /** "about 14:40": the nearest 5 minutes, half up. */
 export const formatAbout = (t: Date, tz: string): string => about(roundLocal(t, tz, 5, 'nearest'), tz);
+/** The same nearest 5 minutes, as plain "14:40". */
+export const formatNearestHm = (t: Date, tz: string): string => formatHm(roundLocal(t, tz, 5, 'nearest'), tz);
 /** Leave-by is rounded down to 5 minutes, so the shown time is never later than the real limit. */
 export const formatLeaveBy = (t: Date, tz: string): string => about(roundLocal(t, tz, 5, 'down'), tz);
 /** The instant leave-by shows: rounded down to 5 minutes of the zone's own clock. */

@@ -2,6 +2,7 @@ import { fc, test as fcTest } from '@fast-check/vitest';
 import { describe, expect, test } from 'vitest';
 import { kitchenHoursId, openOnArrival, openOver } from '../../../../src/core/hours/check.ts';
 import { leaveBy, type LeaveBy, type LeaveFacts } from '../../../../src/core/engines/leaveby.ts';
+import { formatHm } from '../../../../src/core/answers/time.ts';
 import { foodAnswer } from '../../../../src/core/engines/food.ts';
 import { rainPlans } from '../../../../src/core/engines/rain-plans.ts';
 import { stopIdeas, type FoodFacts, type Ideas } from '../../../../src/core/engines/stop-ideas.ts';
@@ -455,6 +456,75 @@ describe('ranking', () => {
   });
 });
 
+describe('a place passed twice', () => {
+  const RAIN = { range: [150, 170] as [number, number], stamps: stamps(SAT, 8, 22), pp: 80, mm: 1 };
+  test('[STOP-OPEN-ALL] the idea is the plan\'s cover, on its own pass: km 140, 10:44, open until 12:00', () => {
+    const b = cafe('Mo-Su 08:00-12:00');
+    const r = ideas({ spells: [RAIN], spots: [...NO_GAP(), { b, km: [140, 190], id: 'n1' }] });
+    expect(r.title?.trigger).toBe('rain');
+    expect(r.title?.km).toBe(140);
+    expect(formatHm(r.title!.arrival!, 'Europe/Berlin')).toBe('10:44');
+    expect(r.title?.reason).toContain('open until 12:00');
+  });
+  test('[STOP-LINES] "wait it out there" only on the pass wait or go waits at', () => {
+    const x = setup({ spells: [RAIN], spots: [...NO_GAP(), { b: cafe(OPEN), km: [140, 190], id: 'n1' }] });
+    const cover = x.plans[0]!.covers[0]!;
+    const atOther = { where: { ...cover, km: 190 }, d: at(`${SAT} 12:00`), savedMin: 40, arrivalNow: at(`${SAT} 12:00`), arrivalWait: null, lines: [] };
+    expect(stopIdeas(x.f, x.plans, x.lb, null, atOther).title?.lines.join(' ')).not.toContain('wait it out');
+    expect(stopIdeas(x.f, x.plans, x.lb, null, { ...atOther, where: cover }).title?.lines.join(' ')).toContain('wait it out');
+  });
+  test('[STOP-T6] the nearest open place stays, when the title is another pass of it', () => {
+    const when: Case = { trip: dayFrom100(), positions: [pos({ km: 60, at: `${FRI} 19:00` }), pos({ km: 140, at: `${SAT} 12:00` })], now: `${SAT} 15:00`, spots: [{ b: restaurant(OPEN), km: 199.5, id: 'n500' }, { b: kiosk(OPEN), km: 140 + 70 / kmToMin(1), id: 'n504' }, { b: bakery(OPEN), km: [145, 140 + 120 / kmToMin(1)], id: 'n1' }] };
+    const r = ideas(when);
+    expect(r.title?.placeId).toBe('n1');
+    expect(r.nearestOpen?.km).toBe(145);
+    expect(r.timeline.some((i) => i.placeId === 'n1' && i.km === 145)).toBe(true);
+  });
+  test('[STOP-T2] the last open place and the idea are two passes of one place: not "there"', () => {
+    const r = ideas({ trip: testTrip({ route: flatRoute(500, { stageEnds: [40, 130, 320] }), departureDate: FRI, stay: 'accommodation' }), positions: [pos({ km: 40, at: `${FRI} 19:00` })], spots: [{ b: restaurant(OPEN), km: 129.8, id: 'n500' }, { b: kiosk(OPEN), km: 123, id: 'n2' }, { b: supermarket(OPEN), km: [72, 81], id: 'n1' }] });
+    expect(r.title?.trigger).toBe('gap');
+    expect(r.title?.km).toBe(81);
+  });
+  test('[H-QUESTIONS] the list names a place once: its next pass', () => {
+    const a = answer({ spots: [...NO_GAP(), { b: bakery(OPEN), km: [101, 102], id: 'n1' }] });
+    const stamps2 = a.items.filter((i) => i.detail?.includes('open at arrival')).map((i) => i.stamp?.km);
+    expect(stamps2.filter((k) => k === 102)).toEqual([]);
+    expect(stamps2).toContain(101);
+  });
+});
+
+describe('fixes from the review', () => {
+  test('[H-QUESTIONS] +-800 m at km 130, a café at km 129.6: "near you, may be behind", no arrival', () => {
+    const a = answer({ trip: dayFrom100(), positions: [pos({ km: 60, at: `${FRI} 19:00` }), pos({ km: 130, at: `${SAT} 09:30`, acc: 800 })], now: `${SAT} 09:30`, spots: [...NO_GAP(), { b: cafe(OPEN), km: 129.6, id: 'n1' }] });
+    const item = a.items.find((i) => i.stamp?.km === 129.6)!;
+    expect(item.detail).toBe('near you, may be behind');
+    expect(item.stamp?.at).toBeUndefined();
+    expect(item.status).toBe('unknown');
+  });
+  test('[STOP-T1] "until" names only what the rider would find open: not a bakery days on', () => {
+    const c: Case = {
+      trip: testTrip({ route: flatRoute(500, { stageEnds: [78, 150, 222] }), departureDate: REAL_SAT, stay: 'accommodation' }), now: `${REAL_SAT} 17:10`,
+      positions: [pos({ km: 55, at: `${REAL_SAT} 17:00` }), pos({ km: 60, at: `${REAL_SAT} 17:10` })], opts: { fetchedAt: `${REAL_SAT} 07:10`, from: `${REAL_FRI} 01:00` },
+      spots: [{ b: supermarket('Mo-Sa 08:00-20:00'), km: 69 }, { b: bakery('Su 07:00-12:00'), km: 380 }],
+    };
+    expect(ideas(c).title?.reason).toContain('Nothing mapped as open after it; consider');
+  });
+  test('[STOP-T2] "open 24/7" only for a place tagged so; a span reaching the window\'s end is not', () => {
+    const base: Case = { trip: testTrip({ route: flatRoute(500, { stageEnds: [40, 130, 320] }), departureDate: FRI, stay: 'accommodation' }), positions: [pos({ km: 40, at: `${FRI} 19:00` })] };
+    const spotsFor = (b: Spot['b']): Spot[] => [{ b: restaurant(OPEN), km: 129.8, id: 'n500' }, { b, km: 81, id: 'n1' }, { b: kiosk(OPEN), km: 123 }, { b: kiosk(OPEN), km: 60 }];
+    const x = setup({ ...base, spots: spotsFor(fuelShop('Mo-Su 06:00-20:00')) });
+    const windowEnd = x.f.hours[0]!.windowEnd;
+    const hours = x.f.hours.map((h) => (h.placeId === 'n1' ? { ...h, spans: [{ from: h.windowStart, to: windowEnd, state: 'open' as const }] } : h));
+    const r = stopIdeas({ ...x.f, hours }, x.plans, x.lb, null, null);
+    expect(r.title?.reason).not.toContain('24/7');
+    expect(ideas({ ...base, spots: spotsFor(fuelShop('24/7')) }).title?.reason).toContain('open 24/7');
+  });
+  test('[STOP-LINES] a forecast ending mid-ride at 12 °C is no hot day', () => {
+    const a = answer({ spots: NO_GAP(), opts: { until: `${SAT} 10:00` } });
+    expect(a.detail).not.toContain('salty');
+  });
+});
+
 describe('the Food card', () => {
   test('[STOP-FOOD-UNKNOWN] no data on the ride: unknown, missing places', () => {
     const a = answer({ savedKm: [], spots: NO_GAP() });
@@ -537,15 +607,15 @@ describe('the Food card', () => {
 
   const genStops = fc.record({
     start: fc.integer({ min: 100, max: 150 }), time: fc.integer({ min: 7, max: 16 }),
-    places: fc.array(fc.record({ km: fc.double({ min: 100, max: 201, noNaN: true }), off: fc.constantFrom(0, 0, 200, 600), tag: hoursValue(), kind: fc.integer({ min: 0, max: 6 }) }), { maxLength: 6 }),
+    places: fc.array(fc.record({ km: fc.double({ min: 100, max: 201, noNaN: true }), again: fc.option(fc.double({ min: 100, max: 201, noNaN: true }), { nil: null }), off: fc.constantFrom(0, 0, 200, 600), tag: hoursValue(), kind: fc.integer({ min: 0, max: 6 }) }), { maxLength: 6 }),
     rain: fc.constantFrom(0, 1, 2), hot: fc.boolean(),
   });
   const BUILD = [supermarket, kiosk, bakery, cafe, restaurant, fuelShop, fastFood];
-  type G = { start: number; time: number; places: { km: number; off: number; tag: string; kind: number }[]; rain: number; hot: boolean };
+  type G = { start: number; time: number; places: { km: number; again: number | null; off: number; tag: string; kind: number }[]; rain: number; hot: boolean };
   const fromGen = (g: G): Case => ({
     trip: dayFrom100(), now: `${SAT} ${String(g.time).padStart(2, '0')}:00`,
     positions: [pos({ km: 60, at: `${FRI} 19:00` }), pos({ km: g.start, at: `${SAT} ${String(g.time).padStart(2, '0')}:00` })],
-    spots: g.places.map((p, i) => ({ b: BUILD[p.kind]!(p.tag), km: p.km, off: p.off, id: `n${i + 1}` })),
+    spots: g.places.map((p, i) => ({ b: BUILD[p.kind]!(p.tag), km: p.again === null ? p.km : [p.km, p.again], off: p.off, id: `n${i + 1}` })),
     spells: [
       ...(g.rain === 1 ? [{ range: [100, 200] as [number, number], stamps: stamps(SAT, 8, 23), pp: 80, mm: 1 }] : []),
       ...(g.rain === 2 ? [{ range: [100, 200] as [number, number], stamps: stamps(SAT, 12, 18), pp: 50, code: 95 }] : []),
@@ -556,6 +626,13 @@ describe('the Food card', () => {
   fcTest.prop([genStops])('[STOP-FOOD-STATUS] never warning, and only T1 or T2 make it action', (g) => {
     const a = answer(fromGen(g));
     expect(a.status).not.toBe('warning');
+  }, 60_000);
+
+  fcTest.prop([fc.record({ first: fc.double({ min: 125, max: 160, noNaN: true }), again: fc.double({ min: 172, max: 199, noNaN: true }), closes: fc.integer({ min: 10, max: 15 }) })])('[STOP-OPEN-ALL] a cover passed twice: the idea is open at its own arrival, whichever pass it is', (g) => {
+    const x = setup({ spells: [{ range: [165, 170], stamps: stamps(SAT, 8, 22), pp: 80, mm: 1 }], spots: [...NO_GAP(), { b: cafe(`Mo-Su 06:00-${g.closes}:00`), km: [g.first, g.again], id: 'n1' }] });
+    const r = stopIdeas(x.f, x.plans, x.lb, null, x.wg);
+    const h = x.f.hours.find((o) => o.placeId === r.title?.placeId);
+    if (r.title?.arrival && h) expect(openOnArrival(h, r.title.arrival)).toBe(true);
   }, 60_000);
 
   fcTest.prop([genStops])('[STOP-OPEN-ALL] every idea is open from arrival to +30 min (+45 for meals); T5 and T6 at least 45 min away (T6 90); weather shelters never', (g) => {

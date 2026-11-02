@@ -323,6 +323,65 @@ describe('a clock change', () => {
   });
 });
 
+describe('a place passed twice (out-and-back and loop routes: one match per pass)', () => {
+  const twice = (hours: string): Spot => ({ b: cafe(hours), km: [10, 60] });
+  test('[LB-WATER] S1 and S2 are two passes of one café: each pass is judged, as with two cafés', () => {
+    const one = lb({ sun: SUNSET_17, spots: [twice('Mo-Su 08:00-14:00')] });
+    expect(near(one.unrounded, `${SAT} 10:08:03`)).toBe(true);
+    expect(one.binding).toBe('water');
+    expect(one.limits.filter((l) => l.id === 'water').map((l) => l.place)).toEqual(['café at km 10', 'café at km 60']);
+    const two = lb({ sun: SUNSET_17, spots: [{ b: cafe('Mo-Su 08:00-14:00'), km: 10 }, { b: cafe('Mo-Su 08:00-14:00'), km: 60 }] });
+    expect(one.unrounded!.getTime()).toBe(two.unrounded!.getTime());
+  });
+  test('[LB-WATER] wait or go is told which pass it would miss', () => {
+    const r = lb({ sun: SUNSET_17, spots: [twice('Mo-Su 08:00-14:00')] });
+    const noon = at(`${SAT} 11:00`);
+    expect(r.checks.filter((c) => c.id === 'water' && !c.meets(noon)).map((c) => c.missLine)).toEqual(['Waiting would mean missing the café at km 60 (open until 14:00)']);
+  });
+  test('[LB-WATER] off the route on both passes: the first pass adds its round trip to the second', () => {
+    const r = lb({ sun: SUNSET_17, spots: [{ b: cafe('Mo-Su 08:00-14:00'), km: [10, 60], off: 400 }] });
+    const expected = at(`${SAT} 13:30`).getTime() - ((60 / 20.5) * 60 * 1.15 + 1.75 + 3.5) * 60_000;
+    expect(Math.abs(r.unrounded!.getTime() - expected)).toBeLessThanOrEqual(1000);
+    expect(r.stops.map((m) => m.km)).toEqual([10, 60]);
+  });
+  test('[LB-CLOSURE] a shop passed twice: one pass is enough, and it is one shop in the list', () => {
+    const r = lb(daylightCase([{ b: supermarket('Mo-Sa 08:00-12:00'), km: [10, 30] }, { b: bakery('Mo-Sa 08:00-12:00'), km: 5 }]));
+    expect(near(r.unrounded, `${SAT} 11:13:10`)).toBe(true);
+    expect(r.limits.filter((l) => l.id === 'food-closure').map((l) => l.place)).toEqual(['supermarket at km 10', 'bakery at km 5']);
+  });
+  test('[LB-UNKNOWN] one shop without hours on two passes is one shop', () => {
+    const r = lb({ ...daylightCase([{ b: supermarket(null), km: [30, 40] }]), now: `${SAT} 07:00` });
+    expect(r.notCounted).toBe(1);
+  });
+  test('[LB-NIGHT] the next day\'s ride: a second pass open there lifts the closure; closed on it, the closure holds', () => {
+    expect(lb(daylightCase([{ b: supermarket('Mo-Su 08:00-20:00'), km: [30, 120] }])).closure).toBe(false);
+    expect(lb(daylightCase([{ b: supermarket('Mo-Sa 08:00-20:00'), km: [30, 120] }])).closure).toBe(true);
+  });
+});
+
+describe('what a place is open until', () => {
+  test('[LB-CLASH] the ride\'s own date, not the longest day in the prepared window', () => {
+    const r = lb({ sun: SUNSET_17, spots: [{ b: bakery('Mo-Fr 07:00-18:00; Sa 07:00-11:00'), km: 80 }, { b: cafe('Mo-Su 08:00-18:00'), km: 10 }, { b: tap(), km: 50 }] });
+    expect(r.setAside[0]!.why).toBe("The bakery at km 80, open until 11:00, can't be reached on a departure that suits the water plan");
+  });
+  test('[LB-CLASH] a lunch break: the last stretch of that date', () => {
+    const r = lb({ sun: SUNSET_17, spots: [{ b: bakery('Sa 07:00-09:00,10:00-11:00; Su 07:00-20:00'), km: 80 }, { b: cafe('Mo-Su 08:00-18:00'), km: 10 }, { b: tap(), km: 50 }] });
+    expect(r.setAside[0]!.why).toContain('open until 11:00');
+  });
+});
+
+describe('food before the closing day is before it', () => {
+  test('[LB-CLOSURE] light all night: Sunday morning\'s opening does not meet a limit about the day before', () => {
+    const c: LeaveCase = { trip: dayTo(150), sun: { lightAllNight: true, sunset: null, dusk: null }, spots: [...TAPS, { b: supermarket('Mo-Su 07:00-20:00'), km: 140 }] };
+    const r = lb(c);
+    const expected = at(`${SAT} 19:30`).getTime() - ((140 / 20.5) * 60 * 1.15) * 60_000;
+    expect(Math.abs(r.unrounded!.getTime() - expected)).toBeLessThanOrEqual(1000);
+    expect(r.binding).toBe('food');
+    const f = leaveFacts(c);
+    expect(limitFor('food-closure', f).meets(at(`${SAT} 23:30`))).toBe(false);
+  });
+});
+
 describe('limits met together', () => {
   test('[LB-CLASH] water asks for 30 minutes before the arrival too: 07:56 from a café opening 08:00, past a bakery that needs 07:45', () => {
     const r = lb({ sun: SUNSET_17, spots: [{ b: bakery('Mo-Su 07:00-12:44'), km: 80 }, { b: cafe('Mo-Su 08:00-18:00'), km: 10 }, { b: tap(), km: 50 }] });
@@ -420,15 +479,15 @@ function oracle(f: LeaveFacts, r: LeaveBy) {
 
 const genCase = fc.record({
   stop: fc.integer({ min: 20, max: 180 }), sunset: fc.integer({ min: 15, max: 20 }),
-  shops: fc.array(fc.record({ km: fc.double({ min: 1, max: 200, noNaN: true }), off: fc.constantFrom(0, 0, 200, 400, 900), tag: hoursValue(), kind: fc.constantFrom('super', 'bakery', 'fuel', 'cafe') }), { maxLength: 5 }),
+  shops: fc.array(fc.record({ km: fc.double({ min: 1, max: 200, noNaN: true }), again: fc.option(fc.double({ min: 1, max: 200, noNaN: true }), { nil: null }), off: fc.constantFrom(0, 0, 200, 400, 900), tag: hoursValue(), kind: fc.constantFrom('super', 'bakery', 'fuel', 'cafe') }), { maxLength: 5 }),
   stay: fc.constantFrom('camping', 'mixed', 'accommodation'),
   phase: fc.constantFrom('before-trip', 'before-ride', 'after-ride', 'riding'),
 });
-type Gen = { stop: number; sunset: number; shops: { km: number; off: number; tag: string; kind: string }[]; stay: string; phase: string };
+type Gen = { stop: number; sunset: number; shops: { km: number; again: number | null; off: number; tag: string; kind: string }[]; stay: string; phase: string };
 
 function factsFromGen(g: Gen): LeaveFacts {
   const builders = new Map([['super', supermarket], ['bakery', bakery], ['fuel', fuelShop], ['cafe', cafe]]);
-  const spots: Spot[] = g.shops.map((s, i) => ({ b: builders.get(s.kind)!(s.tag), km: s.km, off: s.off, id: `n${i + 1}` }));
+  const spots: Spot[] = g.shops.map((s, i) => ({ b: builders.get(s.kind)!(s.tag), km: s.again === null ? s.km : [s.km, s.again], off: s.off, id: `n${i + 1}` }));
   const trip = testTrip({ route: flatRoute(600, { stageEnds: [g.stop, g.stop + 120, g.stop + 240] }), stay: g.stay as 'camping', departureDate: g.phase === 'before-trip' ? SAT : FRI });
   const sunset = { sunset: `${g.sunset}:00`, dusk: `${g.sunset}:35` };
   if (g.phase === 'before-trip') return leaveFacts({ trip, spots, sun: sunset, now: `${FRI} 20:00` });
@@ -501,6 +560,7 @@ describe('properties', () => {
     const { s1, s2 } = f.ride.phase === 'after-ride' ? findS1S2(f, { tomorrowOnly: true }) : findS1S2(f);
     const allowed = [s1, s2].flatMap((t) => (t.kind === 'place' && t.km < f.ride.stopKm && !(t.place.waterClass === 'A' && !t.place.indoorOrLimited) ? [t.place.id] : []));
     expect([...r.waterSources].sort()).toEqual([...new Set(allowed)].sort());
+    if (r.unrounded !== null) expect(r.limits.filter((l) => l.id === 'water')).toHaveLength(new Set([s1, s2].flatMap((t) => (t.kind === 'place' && t.km < f.ride.stopKm && !(t.place.waterClass === 'A' && !t.place.indoorOrLimited) ? [t.km] : []))).size);
   }, 60_000);
 
   test('[LB-PROP-S1S2] after the ride, tonight\'s water adds no limit: S1 and S2 are tomorrow\'s alone', () => {

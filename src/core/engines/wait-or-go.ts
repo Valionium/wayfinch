@@ -2,7 +2,7 @@
 // at most seven departures. Always an option, never an instruction. What the forecast can't tell is said, never read as
 // "it won't help".
 import { formatAbout, formatHm, formatLeaveBy } from '../answers/index.ts';
-import { isKnownZone, zoneOffsetMin } from '../answers/time.ts';
+import { formatNearestHm, isKnownZone, zoneOffsetMin } from '../answers/time.ts';
 import { pointAtRouteKm } from '../geo/project.ts';
 import type { Cover, Km, RainPlan, RainWindow, RouteMatch, ScreenInputs, StoredForecast } from '../types.ts';
 import { showKm, W } from '../wording/en.ts';
@@ -86,7 +86,6 @@ const zoneAt = (f: WaitFacts, km: Km): string => {
   const tz = zoneLookupOf(f.routeZones)(km).timeZone;
   return isKnownZone(tz) ? tz : 'UTC';
 };
-const usual = (t: Date, tz: string): string => formatAbout(t, tz).replace('about ', '');
 
 /** How one departure is ridden: leaving here at d, or leaving the cover at d. */
 type Ride = { atKm(km: Km): number; exposure: number; stopAt: Date };
@@ -207,7 +206,7 @@ export function waitOrGo(f: WaitFacts, windows: RainWindow[], plans: RainPlan[],
   };
   const now = statusOf(arrivalNow);
   const wait = statusOf(arrivalWait);
-  const instead = now.fine ? usual(arrivalNow, stopTz) : `${usual(arrivalNow, stopTz)} (${now.text})`;
+  const instead = now.fine ? formatNearestHm(arrivalNow, stopTz) : `${formatNearestHm(arrivalNow, stopTz)} (${now.text})`;
   const whereWord = cover ? W.waitAtCover(showKm(cover.match.km)) : W.waitHere;
   const lines = [W.waitCould(formatAbout(d, startTz), String(Math.round(saved / 5) * 5), whereWord, formatAbout(arrivalWait, stopTz), instead, wait.text)];
   if (lb.unrounded && d.getTime() > lb.unrounded.getTime()) lines.push(W.waitLaterThanLeaveBy(formatLeaveBy(lb.unrounded, startTz)));

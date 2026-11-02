@@ -228,3 +228,18 @@ describe('an approximate position', () => {
     expect(a.items.find((i) => i.stamp!.km === 95)!.detail).toMatch(/^7 km back/);
   });
 });
+
+describe('a place passed twice', () => {
+  const twoPasses = (): ReturnType<typeof stopFactsOf> => stopFactsOf({ moment: { trip: testTrip({ route: flatRoute(300, { stageEnds: [250, 300] }) }), positions: [pos({ km: 120, at: `${SAT} 09:00` })], now: `${SAT} 09:00` }, spots: [{ b: cafe('x'), km: [130, 190], id: 'n1' }] });
+  test('[STOP-CHIP] ahead: the nearer pass, once, with its own arrival', () => {
+    const f = twoPasses();
+    const a = shelterChip(f, false);
+    const kms = a.items.map((i) => i.stamp?.km);
+    expect(kms).toEqual([130]);
+    expect(a.items[0]!.stamp?.at?.getTime()).toBe(f.schedule.atPlace({ placeId: 'n1', km: 130, offRouteM: 0 }).getTime());
+  });
+  test('[STOP-CHIP] one pass ahead and one behind: each on its own side', () => {
+    const f = stopFactsOf({ moment: { trip: testTrip({ route: flatRoute(300, { stageEnds: [250, 300] }) }), positions: [pos({ km: 150, at: `${SAT} 09:00` })], now: `${SAT} 09:00` }, spots: [{ b: cafe('x'), km: [130, 190], id: 'n1' }] });
+    expect(shelterChip(f, false).items.map((i) => i.stamp?.km).sort()).toEqual([130, 190]);
+  });
+});
