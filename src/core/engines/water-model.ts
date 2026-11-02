@@ -66,6 +66,12 @@ export function masses(profile: Profile, summary: LoadSummary | null): { riderKg
   return { riderKg, loadKg: Number.isFinite(carriedKg) && carriedKg >= 0 ? carriedKg + luggage : 10, bikeKg: usable(bikeKg) ? bikeKg : 15 };
 }
 
+/** Capacity C: the summary total when it is a positive number, else "Water you can carry", else none. */
+export function capacityFrom(profile: Profile, summary: LoadSummary | null): number | null {
+  if (isFull(summary) && usable(summary.water.totalL)) return summary.water.totalL;
+  return usable(profile.capacityL) ? profile.capacityL : null;
+}
+
 const MARGIN_C = 1;
 const LAPSE_PER_M = 0.65 / 100;
 const HOUR = 3_600_000;
