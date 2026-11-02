@@ -109,3 +109,7 @@ test('[PIPE-WF-01] the country step has its own limit below the job limit, so a 
   expect(Number(m![1])).toBeLessThan(120);
   expect(Number(m![1])).toBeGreaterThanOrEqual(60);
 });
+
+test('[PIPE-WF-01] a scheduled run has no inputs, so the country list falls back to all ten', () => {
+  expect(yaml).toMatch(/COUNTRIES: \$\{\{ inputs\.countries \|\| 'DE,DK,PL,CZ,AT,CH,FR,LU,BE,NL' \}\}/);
+});
