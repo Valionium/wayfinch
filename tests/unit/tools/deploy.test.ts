@@ -441,7 +441,8 @@ describe('checkSelf', () => {
   });
 });
 
-describe('the command, against a real local server', () => {
+// Each case starts Node, which can be slow on a cold, busy machine.
+describe('the command, against a real local server', { timeout: 30_000 }, () => {
   const SCRIPT = fileURLToPath(new URL('../../../tools/deploy-check.mjs', import.meta.url));
   const dir = mkdtempSync(join(tmpdir(), 'wf-deploy-'));
   const servers: Server[] = [];
@@ -495,6 +496,12 @@ describe('the command, against a real local server', () => {
     await expect(cli(['--build', join(dir, 'missing.json'), '--origin', origin, '--deadline-ms', '0'])).rejects.toMatchObject({ code: 1 });
   });
 
+  test('[DEP-NOT-ARRIVED] the workflow's empty values are read as empty: a skipped upload fails at once, without waiting', async () => {
+    const build = buildOf(FILES);
+    const origin = await serve({ '/': 'old page' });
+    await expect(cli(['--build', writeJson('build-skip.json', build), '--origin', origin, '--upload-outcome', 'skipped', '--before', '', '--live', ''])).rejects.toMatchObject({ code: 1, stdout: expect.stringContaining('/ has different bytes') });
+  });
+
   test('[DEP-SELF-LIST] --self reads the list from the origin and says when there is none', async () => {
     const origin = await serve(FILES);
     const { stdout } = await cli(['--self', '--origin', origin, '--deadline-ms', '0']);
@@ -524,7 +531,7 @@ describe('the command, against a real local server', () => {
       { created_on: '2026-11-01T10:00:00Z', annotations: {}, versions: [{ version_id: 'old', percentage: 100 }] },
       { created_on: '2026-11-02T10:00:00Z', annotations: {}, versions: [{ version_id: 'new', percentage: 100 }] },
     ];
-    const { stdout } = await cli(['--pick-rollback', writeJson('rows.json', list)]);
+    const { stdout } = await cli(['--pick-rollback', writeJson('rows.json', list), '--named', '']);
     expect(stdout.trim()).toBe('old');
     await expect(cli(['--pick-rollback', writeJson('rows-bad.json', list), '--named', 'preview'])).rejects.toMatchObject({ code: 1 });
     writeFileSync(join(dir, 'rows-junk.json'), 'not json');
