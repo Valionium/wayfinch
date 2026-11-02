@@ -83,7 +83,22 @@ export type DayRide = {
   departure: Date; stopKm: Km; // its departure and the day's stop
   tonightKm: Km | null; // null before the trip
   tomorrowKm: Km | null; // null at the route end, or when tomorrow is no trip day
+  // The plan's additions (Task 7), so engines need not recompute them:
+  dayStartKm: Km; // where today's ride began (section 6.2a); the store keeps it for later days
+  nightKm: Km | null; // where the rider spent the last night or stops tonight; null without a position
+  r: number; // today's correction (section 6.2); scheduleFor applies 1 to tomorrow's ride
+  behindFromKm: Km; // where places behind are measured from: the far edge of an approximate position
+  noRide: boolean; // after the day's ride with tonight's stop at the route end: the cards answer as at the route end
+  routeEndReachedOn: string | null; // the riding date to store (section 4.4); null until a day position reaches the end
+  note: DayNote | null; // the start note the cards show; noteFor gives its text
 };
+/** Why the day's ride does not simply start at the rider (section 6.2a). */
+export type DayNote =
+  | { kind: 'day1-route-start' } // the position is elsewhere, and day 1 starts at the route start
+  | { kind: 'past-stop'; stopKm: Km; tomorrow: boolean } // the position lies past the day's stop
+  | { kind: 'no-position'; km: Km } // after the ride with no position: from tonight's stop
+  | { kind: 'stage-start'; km: Km } // no night kilometre: from the plan's stage start
+  | { kind: 'tonight-route-end'; km: Km }; // tonight's stop is the route end, not reached by any position
 
 // The ask box (section 6.10) is not in the first version; its types are kept so engines can take a ride as an argument.
 export type QuestionTypeId = string; // catalogue id, e.g. 'WA-02'

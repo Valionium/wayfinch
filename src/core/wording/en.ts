@@ -6,6 +6,9 @@
 // words ("live", "dry"), so a string belongs under the area that describes it.
 // `tests/unit/core/wording.test.ts` checks the keys, the fixed sentences and the banned words.
 
+/** A route kilometre as shown: to 0.1 km, without a trailing zero. */
+export const showKm = (km: number): string => String(Math.round(km * 10) / 10);
+
 export const W = {
   // ---- Fixed sentences of section 8: change none of them without the owner. ----
   waterOverDrinkCaution:
@@ -24,6 +27,25 @@ export const W = {
   routeGpxTooManySections: 'This GPX has more than 500 separate sections. Export fewer sections and try again.',
   routeGpxUnreadable: 'That did not read as a GPX track or route with valid coordinates.',
   routeTrackTooLong: 'The track distance could not be processed. Try a shorter or simplified GPX.',
+
+  // ---- The start of the day's ride (section 6.2a). ----
+  routeDayOneAtStart: 'Day 1 starts at the route start (km 0)',
+  routePastStop: (which: 'today' | 'tomorrow', km: number): string =>
+    `Your position lies past ${which === 'today' ? "today's" : "tomorrow's"} stop at km ${showKm(km)}. Times assume you rejoin the route there.`,
+  routeFromTonightNoPosition: (km: number): string => `from tonight's stop at km ${showKm(km)}; no position`,
+  routeFromStageStart: (km: number): string => `from the stage start at km ${showKm(km)}`,
+  routeTonightIsEnd: (km: number): string => `Tonight's stop is the end of your route (km ${showKm(km)})`,
+
+  // ---- Daylight (section 6.5). Times as "HH:MM", spans as "3 h 30 min". ----
+  daylightAllNight: 'light all night',
+  daylightDarkAllDay: 'dark all day',
+  daylightLightsOnAllDay: 'lights on all day',
+  daylightLightsOnFrom: (time: string): string => `lights on from ${time}`,
+  daylightDarkFrom: (time: string): string => `dark from ${time}`,
+  daylightLeft: (span: string): string => `${span} of daylight left`,
+  daylightFromSunrise: (span: string, sunrise: string): string => `${span} of daylight from sunrise at ${sunrise}`,
+  daylightSunSet: (sunset: string, firstLight: string | null): string =>
+    firstLight ? `The sun set at ${sunset}. First light tomorrow ${firstLight}.` : `The sun set at ${sunset}.`,
 
   /** "Mapped as a weather shelter, not checked." and the same line for each other roof kind. */
   shelterMappedAs: (what: string): string => `Mapped as ${what}, not checked.`,

@@ -31,13 +31,15 @@ const MAX_RIDING_DAYS = 31;
 /** The climbing of a stage as shown: to 10 m. */
 export const shownAscentM = (m: number): number => Math.round(m / 10) * 10;
 
-type Sample = { kmExact: number; elev: number | null; upExact: number | null; effortExact: number };
+export type Sample = { kmExact: number; elev: number | null; upExact: number | null; effortExact: number };
 
-export function planStages(route: Route, o: { flatKph: number; pace: Pace; nights: number }): StagePlan {
+/**
+ * The route's effort profile: distance plus climbing, by kilometre. Stages split it evenly, and the pace function
+ * (engines/pace.ts) reads riding time from it, so a stage's hours and the time to ride it are one figure.
+ */
+export function effortProfile(route: Route): { samples: Sample[]; effective: number; fallback: StageFallback | null; localClimbing: boolean; ascent: number | null } {
   const distance = Math.max(0, route.lengthKm);
   const ascent = route.ascentM !== null && Number.isFinite(route.ascentM) ? Math.max(0, route.ascentM) : null;
-  const loadedKph = o.flatKph * LOAD_PENALTY;
-  const perDay = PACE_HOURS[o.pace] * loadedKph;
 
   // The profile is the route thinned to 2,000 points, as in Load Check.
   const profile = simplifyProfile(route.points.map((p) => ({ ...p })));
@@ -72,6 +74,13 @@ export function planStages(route: Route, o: { flatKph: number; pace: Pace; night
       : base.length > 1 ? (i / (base.length - 1)) * equivalent : 0;
     return { kmExact: p.kmExact, elev: p.ele, upExact, effortExact: p.kmExact + climbKm };
   });
+  return { samples, effective, fallback, localClimbing, ascent };
+}
+
+export function planStages(route: Route, o: { flatKph: number; pace: Pace; nights: number }): StagePlan {
+  const loadedKph = o.flatKph * LOAD_PENALTY;
+  const perDay = PACE_HOURS[o.pace] * loadedKph;
+  const { samples, effective, fallback, localClimbing, ascent } = effortProfile(route);
 
   // The stage ends at equal effort (stageBoundary). A boundary is found between two samples by linear interpolation.
   const boundary = (target: number): { kmExact: number; upExact: number | null; effortExact: number } => {

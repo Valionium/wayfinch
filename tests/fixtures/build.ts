@@ -5,7 +5,7 @@
 // place "400 m off the route at km 30" is exactly that far east of the route's point at km 30.
 import { zoneOffsetMin } from '../../src/core/answers/time.ts';
 import type { PackRescuePoint, Place, PlaceKind, Roof, StopFlags } from '../../src/core/places/types.ts';
-import type { Km, Position, Route, Stage, SunSource, SunTimes, Trip } from '../../src/core/types.ts';
+import type { Km, Position, Route, Stage, SunSource, SunTimes, Trip, ZoneLookup, ZoneSpan } from '../../src/core/types.ts';
 import { placeAt, roofAt } from './places.ts';
 
 const EARTH_RADIUS_KM = 6371; // the radius src/core/geo/haversine.ts uses, so kilometres match its running totals
@@ -98,6 +98,10 @@ export function testTrip(over: Partial<Trip> = {}): Trip {
     flatKph: 25, stay: 'camping', campWaterL: 2, ...over,
   };
 }
+
+/** The whole route in one time zone, as `routeZones` and `ZoneLookup` want it. */
+export const zonesOf = (lengthKm: Km, timeZone: string = BERLIN): ZoneSpan[] => [{ fromKm: 0, toKm: lengthKm, timeZone, holidayZone: null, country: 'DE' }];
+export const zoneAt = (lengthKm: Km, timeZone: string = BERLIN): ZoneLookup => () => zonesOf(lengthKm, timeZone)[0]!;
 
 // ---- places, roofs, rescue points ---------------------------------------------------------------------------------
 
