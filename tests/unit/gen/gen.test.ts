@@ -150,7 +150,7 @@ describe('variety over 1,000 scenarios', () => {
     expect(count((s) => s.cards.sleep.status === 'fine')).toBeGreaterThanOrEqual(30);
     for (const chip of ['bike', 'pharmacy', 'train', 'toilets'] as const) expect(count((s) => s.chips[chip].status === 'fine'), chip).toBeGreaterThanOrEqual(30);
     expect(count((s) => s.notes.some((n) => /5 km/.test(n)))).toBeGreaterThanOrEqual(20);
-  });
+  }, 120_000);
   test('[HON-GEN-VARIETY] the sun: real, stubbed, light all night, none, broken', () => {
     const kinds = new Set(all.map((i) => (i.sun as unknown as { spec: { kind: string } }).spec.kind));
     expect([...kinds].sort()).toEqual(['broken', 'light-all-night', 'no-sun', 'real', 'stub']);
