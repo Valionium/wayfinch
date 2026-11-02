@@ -257,6 +257,7 @@ describe('what never counts, and bad data', () => {
     expect(r.unrounded).toBeNull();
     expect(r.binding).toBeNull();
     expect(r.kept).toEqual([]);
+    expect(r.earliestArrival).toBeNull();
   });
 
   test('[LB-DAYLIGHT] a flat speed outside 15-40 gives no leave-by', () => {
@@ -323,6 +324,32 @@ describe('a clock change', () => {
 });
 
 describe('limits met together', () => {
+  test('[LB-CLASH] water asks for 30 minutes before the arrival too: 07:56 from a café opening 08:00, past a bakery that needs 07:45', () => {
+    const r = lb({ sun: SUNSET_17, spots: [{ b: bakery('Mo-Su 07:00-12:44'), km: 80 }, { b: cafe('Mo-Su 08:00-18:00'), km: 10 }, { b: tap(), km: 50 }] });
+    expect(r.kept).toEqual(['daylight', 'water']);
+  });
+  test('[LB-DETOUR] two food places meet it at one departure: the one on the route, so no round trip', () => {
+    const r = lb({ sun: SUNSET_17, spots: [{ b: bakery('Mo-Su 06:00-12:00'), km: 12 }, { b: tap(), km: 20 }, { b: supermarket('Mo-Sa 08:00-20:00'), km: 30, off: 400, id: 'n1' }, { b: supermarket('Mo-Sa 08:00-20:00'), km: 30, id: 'n2' }] });
+    expect(near(r.unrounded, `${SAT} 10:49:37`)).toBe(true);
+    expect(r.stops).toEqual([]);
+  });
+  test('[LB-WATER] a source\'s own latest is no later than daylight allows: its afternoon opening does not read as the limit', () => {
+    const r = lb({ sun: SUNSET_17, spots: [{ b: bakery('Mo-Su 06:00-12:00,15:00-20:00'), km: 12 }, { b: tap(), km: 50 }] });
+    expect(near(r.limits.find((l) => l.id === 'water')!.latest, `${SAT} 10:49:37`)).toBe(true);
+  });
+  test('[LB-UNKNOWN] a shop open only outside 04:00-24:00 is "no food shop mapped as open", not a clash', () => {
+    const r = lb(daylightCase([{ b: supermarket('Sa 00:30-01:30'), km: 3 }]));
+    expect(r.setAside[0]!.why).toBe('No food shop on day 1\'s ride is mapped as open before Sunday');
+  });
+  test('[LB-CLOSURE] the expanded view lists the best two, a supermarket first', () => {
+    const r = lb(daylightCase([{ b: bakery('Mo-Sa 08:00-20:00'), km: 60 }, { b: supermarket('Mo-Sa 08:00-20:00'), km: 30 }, { b: kiosk('Mo-Sa 08:00-13:00'), km: 40 }]));
+    expect(r.limits.filter((l) => l.id === 'food-closure').map((l) => l.place)).toEqual(['supermarket at km 30', 'bakery at km 60']);
+  });
+  test('[LB-SINGLE-DAY-RIDE] at the route end there is no leave-by, also when asked directly', () => {
+    const f = leaveFacts({ trip: testTrip(), now: '2026-10-19 15:00', positions: [pos({ km: 298, at: '2026-10-19 15:00' })] });
+    expect(f.ride.phase).toBe('route-end');
+    expect(leaveBy(f, f.ride).unrounded).toBeNull();
+  });
   test('[LB-WATER] a food place past a water source off the route: its arrival adds the source\'s round trip', () => {
     const r = lb({ sun: SUNSET_17, spots: [{ b: cafe('Mo-Su 06:00-18:00'), km: 10, off: 400 }, { b: tap(), km: 12 }, { b: supermarket('Mo-Sa 08:00-12:00'), km: 30 }] });
     const expected = at(`${SAT} 11:30`).getTime() - ((30 / 20.5) * 60 * 1.15 + 3.5) * 60_000;

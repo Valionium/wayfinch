@@ -161,7 +161,9 @@ describe('T2 Gap', () => {
   test('[STOP-T2-BOUND] a gap of exactly 2 h of riding fires', () => {
     expect(ideas(base([{ b: kiosk(OPEN), km: 50 }, { b: kiosk(OPEN), km: 50 + twoHoursKm }, { b: kiosk(OPEN), km: 110 }])).title?.trigger).toBe('gap');
   });
-  test('[STOP-T2-BOUND] 1 h 59 min does not', () => {
+  test('[STOP-T2-BOUND] 1 h 59 min does not; nor does 119.9 min', () => {
+    const just = 119.9 / kmToMin(1);
+    expect(ideas(base([{ b: kiosk(OPEN), km: 50 }, { b: kiosk(OPEN), km: 50 + just }, { b: kiosk(OPEN), km: 110 }])).title?.trigger).not.toBe('gap');
     const km = 119 / kmToMin(1);
     expect(ideas(base([{ b: kiosk(OPEN), km: 50 }, { b: kiosk(OPEN), km: 50 + km }, { b: kiosk(OPEN), km: 110 }])).title?.trigger).not.toBe('gap');
   });
@@ -268,9 +270,14 @@ describe('T4 Heat', () => {
   test('[STOP-T4] 29.9 °C does not', () => {
     expect(ideas(c(hot(29.9), [{ b: restaurant(OPEN), km: at13 - 10, id: 'n1' }])).title?.trigger).not.toBe('heat');
   });
-  test('[STOP-T4] 30.0 °C at 15:30 does not', () => {
-    const km = 100 + (7 * 60) / kmToMin(1);
-    expect(ideas(c(hot(30, [`${SAT} 15:00`, `${SAT} 16:00`], km), [{ b: restaurant(OPEN), km: km - 10, id: 'n1' }])).title?.trigger).not.toBe('heat');
+  test('[STOP-T4] 30.0 °C at 15:30 does not; at 14:30 it does', () => {
+    const hotAt = (minutes: number): Ideas => {
+      const km = 100 + minutes / kmToMin(1);
+      const stampsNear = minutes === 210 ? [`${SAT} 15:00`, `${SAT} 16:00`] : [`${SAT} 14:00`, `${SAT} 15:00`];
+      return ideas({ now: `${SAT} 12:00`, opts: { extraKms: [km] }, spells: [{ km: [km], stamps: stampsNear, t: 30 }], spots: [...NO_GAP(), { b: restaurant(OPEN), km: km - 20, id: 'n1' }] });
+    };
+    expect(hotAt(210).title?.trigger).not.toBe('heat');
+    expect(hotAt(150).title?.trigger).toBe('heat');
   });
   test('[STOP-T4] a temperature that is no number never fires', () => {
     expect(ideas(c(hot(Number.NaN), [{ b: restaurant(OPEN), km: at13 - 10, id: 'n1' }])).title?.trigger).not.toBe('heat');
@@ -332,6 +339,11 @@ describe('T5 Meal', () => {
     const seen = (d: string): boolean => stopIdeas(reachedAt(d), [], x.lb, null, null).title?.placeId === 'n1';
     expect(seen(`${SAT} 09:30`)).toBe(true); // 12:30, kitchen open for 45 minutes
     expect(seen(`${SAT} 10:20`)).toBe(false); // 13:20: the kitchen closes 40 minutes on
+  });
+
+  test('[STOP-T5] beyond 3 h of riding it does not fire', () => {
+    const r = ideas({ now: `${SAT} 08:30`, spots: [...seatedStop, { b: restaurant(OPEN), km: 100 + 240 / kmToMin(1), id: 'n1' }] });
+    expect(r.title?.trigger).not.toBe('meal');
   });
 
   test('[STOP-T5] kitchen hours mapped but not prepared: never open for a meal', () => {
@@ -413,7 +425,7 @@ describe('ranking', () => {
     expect(pick(list, null, { spells: [{ range: [198, 200], stamps: stamps(SAT, 12, 23), pp: 80, mm: 1 }] })).toBe('n2');
   });
   test('[STOP-RANK] then the shorter detour', () => {
-    expect(pick([{ b: bakery(OPEN), km: km(120), off: 500, id: 'n2' }, { b: bakery(OPEN), km: km(121), off: 100, id: 'n1' }])).toBe('n1');
+    expect(pick([{ b: bakery(OPEN), km: km(120), off: 500, id: 'n1' }, { b: bakery(OPEN), km: km(121), off: 100, id: 'n2' }])).toBe('n2');
   });
   test('[STOP-RANK] then Water\'s refill target', () => {
     expect(pick([{ b: bakery(OPEN), km: km(120), id: 'n1' }, { b: bakery(OPEN), km: km(121), id: 'n2' }], 'n2')).toBe('n2');

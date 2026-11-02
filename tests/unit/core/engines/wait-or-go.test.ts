@@ -80,6 +80,11 @@ describe('exposure', () => {
     expect(exposureMin(x.f.forecast!, x.f.schedule, 165)).toBe(0);
   });
 
+  test('[WX-WG-THRESHOLD] possible hours are not likely hours', () => {
+    const x = facts({ spells: [{ range: [100, 145], stamps: stamps(SAT, 15, 15), pp: 30, mm: 0.2 }] });
+    expect(exposureMin(x.f.forecast!, x.f.schedule, 165)).toBe(0);
+  });
+
   test('[WX-WG-THRESHOLD] an hour that is not known gives no figure, never a calm 0', () => {
     const x = facts({ spells: [{ range: [100, 200], stamps: stamps(SAT, 15, 15), pp: Number.NaN }] });
     expect(exposureMin(x.f.forecast!, x.f.schedule, 165)).toBeNaN();
@@ -157,7 +162,7 @@ describe('the other cases of section 11', () => {
     const before = facts({ trip, positions: [], now: `${SAT} 14:20`, spells: [UNTIL_15] });
     expect(before.f.ride.phase).toBe('before-trip');
     expect(waitOrGo(before.f, before.windows, before.plans, before.lb)).toBeNull();
-    const end = facts({ trip: toStop(), km: 399, positions: [pos({ km: 399, at: `${SAT} 14:20` })], spells: [UNTIL_15] });
+    const end = facts({ trip: toStop(), km: 399, positions: [pos({ km: 399, at: `${SAT} 14:20` })], spells: [{ range: [385, 400], stamps: stamps(SAT, 14, 16), pp: 80, mm: 1 }] });
     expect(end.f.ride.phase).toBe('route-end');
     expect(waitOrGo(end.f, end.windows, end.plans, end.lb)).toBeNull();
   });
@@ -258,6 +263,13 @@ describe('waiting at a cover', () => {
     // Leaving now: 34.8 min in the rain. Leaving the cover at 15:00: the same ride there, 17.4 min, so it saves 17.4: too little.
     expect(r.where).not.toBe('here');
     expect(r.d).toBeNull();
+  });
+
+  test('[WX-WG-COVER] a departure before the arrival there is dropped, even where it would have saved the most', () => {
+    // Cover at km 150, reached 15:44. Rain 16:00-17:00: the 14:30 try would beat it, but the rider is not there yet.
+    const r = wg({ trip: toStop(170), spots: [{ b: cafe('Mo-Su 08:00-22:00'), km: 150 }], spells: [{ range: [155, 200], stamps: stamps(SAT, 17, 17), pp: 80, mm: 1 }] })!;
+    expect(r.where).not.toBe('here');
+    expect(hm(r.d)).toBe('16:30');
   });
 
   test('[WX-WG-COVER] departures after the cover closes are dropped', () => {

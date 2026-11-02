@@ -99,6 +99,13 @@ describe('the Daylight card: leave-by in the title', () => {
     expect(a.status).toBe('action');
   });
 
+  test('[LB-FIRST-LIGHT] after the usual start and hours away, before first light alone is action', () => {
+    const a = card({ trip: dayTo(90, { startTime: '05:00' }), sun: { ...SUNSET_17, dawn: '07:58' }, spots: [...TAPS, { b: bakery('Mo-Sa 05:00-09:01'), km: 30 }] });
+    expect(a.status).toBe('action');
+    const light = card({ trip: dayTo(90, { startTime: '05:00' }), sun: { ...SUNSET_17, dawn: '06:00' }, spots: [...TAPS, { b: bakery('Mo-Sa 05:00-09:01'), km: 30 }] });
+    expect(light.status).toBe('fine');
+  });
+
   test('[LB-FIRST-LIGHT] no dawn that day adds nothing, and a broken dawn does not throw', () => {
     const a = card({ sun: { ...SUNSET_17, dawn: null }, spots: TAPS });
     expect(a.title).not.toContain('first light');
