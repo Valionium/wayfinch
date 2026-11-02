@@ -72,10 +72,11 @@ describe('what it lists', () => {
     expect(t).toBeLessThan(at(`${SAT} 21:00`).getTime());
   });
   test('[STOP-CHIP] the order of the input decides nothing, and roofs tie after places', () => {
-    const s: StopCase['spots'] = [{ b: shelter(), km: 101, id: 'n3' }, { b: shelter(), km: 101, id: 'n2' }];
+    const s: StopCase['spots'] = [{ b: cafe('x', { name: 'Third' }), km: 101, id: 'n3' }, { b: cafe('x', { name: 'Second' }), km: 101, id: 'n2' }];
     const r = [busStop().atKm(101)];
     expect(labels(chip({ moment: m, spots: s, roofs: r }))).toEqual(labels(chip({ moment: m, spots: [...s].reverse(), roofs: r })));
     expect(chip({ moment: m, spots: s, roofs: r }).items.map((i) => i.detail)).toHaveLength(3);
+    expect(labels(chip({ moment: m, spots: s, roofs: r }))[0]).toContain('Second');
     expect(labels(chip({ moment: m, spots: s, roofs: r }))[2]).toContain('a bus shelter');
   });
   test('[STOP-CHIP] one place on two passes is listed once', () => {
@@ -120,6 +121,7 @@ describe('what it lists', () => {
   test('[STOP-CHIP] no usable speed or clock: an honest unknown, no throw', () => {
     const noSpeed = chip({ moment: riding(100, '12:00', { trip: testTrip({ flatKph: Number.NaN }) }), spots: [{ b: shelter(), km: 101 }] });
     expect(noSpeed.status).toBe('unknown');
+    expect(noSpeed.title).toContain("can't be worked out");
     const noClock = chip({ moment: { now: new Date(Number.NaN) }, spots: [{ b: shelter(), km: 10 }] });
     expect(noClock.status).toBe('unknown');
   });
@@ -176,12 +178,15 @@ describe('thunderstorm near', () => {
   });
 
   const near = (spell: { km: number; stamps: string[]; pp: number; code: number }, moment: Moment = m): boolean => thunderNear(stopFactsOf({ moment, spells: [spell] }));
-  test('[STOP-CHIP-THUNDER] thunderNear: an hour within 1 h of now at the nearest point', () => {
-    expect(near({ km: 100, stamps: [`${SAT} 13:00`], pp: 10, code: 96 })).toBe(true);
-    expect(near({ km: 100, stamps: [`${SAT} 12:00`], pp: 10, code: 96 })).toBe(true);
-    expect(near({ km: 100, stamps: [`${SAT} 14:00`], pp: 10, code: 96 })).toBe(true); // 13:00-14:00, from 13:00 is exactly 1 h
-    expect(near({ km: 100, stamps: [`${SAT} 15:00`], pp: 10, code: 96 })).toBe(false);
-    expect(near({ km: 100, stamps: [`${SAT} 10:00`], pp: 10, code: 96 })).toBe(false);
+  test('[STOP-CHIP-THUNDER] thunderNear: an hour within 1 h of now at the nearest point, also after the ride', () => {
+    const after: Moment = { positions: [pos({ km: 100, at: `${SAT} 20:00` })], now: `${SAT} 20:00`, plan: { date: SAT, backToTodayAt: null } };
+    expect(near({ km: 100, stamps: [`${SAT} 21:00`], pp: 10, code: 96 }, after)).toBe(true);
+    expect(near({ km: 100, stamps: [`${SAT} 20:00`], pp: 10, code: 96 }, after)).toBe(true);
+    expect(near({ km: 100, stamps: [`${SAT} 22:00`], pp: 10, code: 96 }, after)).toBe(true); // 21:00-22:00: exactly 1 h from now
+    expect(near({ km: 100, stamps: [`${SAT} 19:00`], pp: 10, code: 96 }, after)).toBe(true); // 18:00-19:00: exactly 1 h ago
+    expect(near({ km: 100, stamps: [`${SAT} 23:00`], pp: 10, code: 96 }, after)).toBe(false);
+    expect(near({ km: 100, stamps: [`${SAT} 18:00`], pp: 10, code: 96 }, after)).toBe(false);
+    expect(near({ km: 150, stamps: [`${SAT} 21:00`], pp: 10, code: 96 }, after)).toBe(false);
   });
   test('[STOP-CHIP-THUNDER] thunderNear: or a thunderstorm window on the day\'s ride', () => {
     const f = { km: 150, stamps: stamps(SAT, 14, 17), pp: 30, code: 95 };

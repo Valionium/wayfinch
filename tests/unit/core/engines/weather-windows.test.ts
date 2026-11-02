@@ -312,6 +312,13 @@ describe('rain here now and rain at the start', () => {
     expect(rainAtStart(atHome, c.ride, home)).toBe(false);
     expect(rainAtStart(atStart, c.ride, home)).toBe(true);
   });
+  test('[WX-HERE-START] a first grid point with no kilometre is not the nearest to anything', () => {
+    const c = momentOf({ now: `${SAT} 08:00` });
+    const f = forecastOf(c.trip.route, []);
+    const wet = forecastOf(c.trip.route, [{ km: 0, stamps: [`${SAT} 09:00`], pp: 90 }]).grid[0]!.hours;
+    f.grid.unshift({ km: Number.NaN, lat: 49, lon: 8.4, hours: wet });
+    expect(rainAtStart(f, c.ride)).toBe(false);
+  });
   test('[WX-HERE-START] a broken hour, or none, is not rain at the start', () => {
     const c = momentOf({ now: `${SAT} 08:00` });
     expect(rainAtStart(null, c.ride)).toBe(false);
@@ -335,6 +342,31 @@ describe('the start of the ride between grid points', () => {
 
 describe('forecasts with holes', () => {
   const m = riding(60, '14:00');
+  test('[WX-CLASS] a grid point with no kilometre makes no window, even with rain in it', () => {
+    const c = momentOf(m);
+    const f = forecastOf(c.trip.route, []);
+    const hours = forecastOf(c.trip.route, [{ km: 70, stamps: stamps(SAT, 10, 20), pp: 90 }]).grid.find((g) => g.km === 70)!.hours;
+    f.grid.splice(3, 0, { km: Number.NaN, lat: 49, lon: 8.4, hours });
+    expect(rainWindows(f, c.schedule, c.stops, c.zone)).toEqual([]);
+  });
+  test('[WX-HERE-START] a broken hour in the middle of the list hides nothing and answers nothing', () => {
+    const route = flatRoute(300);
+    const f = forecastOf(route, [{ km: 120, stamps: [`${SAT} 15:00`], pp: 80 }]);
+    const point = f.grid.find((g) => g.km === 120)!;
+    const kept = point.hours.find((h) => h.at.getTime() === at(`${SAT} 15:00`).getTime())!;
+    const broken = { ...kept, at: new Date(Number.NaN), pp: 100, code: 95 };
+    point.hours = [broken, kept, broken, broken, broken];
+    expect(rainHereNow(f, pos({ km: 120, at: `${SAT} 14:20` }), at(`${SAT} 14:20`))!.pp).toBe(80);
+  });
+  test('[WX-ONSET-15] at a KNMI point not even a step from before the fetch counts', () => {
+    const c = momentOf(riding(60, '14:30', { country: 'NL' }));
+    const f = forecastOf(c.trip.route, [{ km: 70, stamps: [`${SAT} 15:00`], pp: 80 }], { fetchedAt: `${SAT} 16:00`, has15: true, rain15: [{ km: 70, at: `${SAT} 14:55`, mm: 0.2 }] });
+    expect(rainWindows(f, c.schedule, c.stops, c.zone)[0]!.onset).toEqual(at(`${SAT} 14:00`));
+  });
+  test('[WX-POSSIBLE] a point met by a likely hour is not a possible point too', () => {
+    const { windows } = windowsOf([{ km: 70, stamps: [`${SAT} 14:00`], pp: 80 }, { km: 70, stamps: [`${SAT} 15:00`], pp: 30 }], riding(60, '14:00'));
+    expect(windows.map((w) => w.cls)).toEqual(['likely']);
+  });
   test('[WX-CLASS] an empty forecast gives no window and does not throw', () => {
     const c = momentOf(m);
     expect(rainWindows({ fetchedAt: at(`${SAT} 07:00`), runs: [], grid: [], has15: false }, c.schedule, c.stops, c.zone)).toEqual([]);

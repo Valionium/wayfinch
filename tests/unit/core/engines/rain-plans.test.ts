@@ -31,6 +31,10 @@ describe('the band', () => {
     expect(p.covers).toHaveLength(1);
     expect(p.covers[0]!.km).toBeCloseTo(kmBefore(lead), 6);
   });
+  test('[STOP-BAND] exactly 60 minutes is in the band: it stands beside one nearer, not as a fallback', () => {
+    const p = planOf({ moment: BAND, spells: [rain(100)], spots: [{ b: cafe('x'), km: kmBefore(60), id: 'n1' }, { b: cafe('x'), km: kmBefore(30), id: 'n2' }] });
+    expect(p.covers.map((c) => c.placeId)).toEqual(['n2', 'n1']);
+  });
   test('[STOP-BAND] 14 minutes: out, and it is too late even as the fallback', () => {
     expect(planOf({ moment: BAND, spells: [rain(100)], spots: [{ b: cafe('x'), km: kmBefore(14) }] }).covers).toEqual([]);
   });
@@ -77,7 +81,12 @@ describe('the order', () => {
     expect(go([{ b: cafe('x'), km: 86, id: 'n1' }, { b: cafe('x'), km: 90, id: 'n2' }])).toEqual(['n2', 'n1']);
   });
   test('[STOP-ORDER] then the shorter detour', () => {
-    expect(go([{ b: cafe('x'), km: 90, off: 100, id: 'n1' }, { b: cafe('x'), km: 90.13, off: 0, id: 'n2' }])).toEqual(['n2', 'n1']);
+    const a = { b: cafe('x'), km: 90, off: 1000, id: 'n1' };
+    const b = { b: cafe('x'), km: 91.3, off: 0, id: 'n2' };
+    const f = stopFactsOf({ moment: m, spells: [rain(100)], spots: [a, b] });
+    const [ma, mb] = f.matches;
+    expect(Math.abs(f.schedule.atPlace(ma!).getTime() - f.schedule.atPlace(mb!).getTime())).toBeLessThan(1000);
+    expect(go([a, b])).toEqual(['n2', 'n1']);
   });
   test('[STOP-ORDER] then the final tie-break', () => {
     expect(go([{ b: cafe('x'), km: 90, id: 'n9' }, { b: cafe('x'), km: 90, id: 'n1' }])).toEqual(['n1', 'n9']);
@@ -271,6 +280,15 @@ describe('no cover', () => {
     expect(planOf({ moment: m, spells, opts, savedKm: [] }).missing).toContain('places');
     expect(planOf({ moment: m, spells, opts, savedKm: [{ fromKm: Number.NaN, toKm: Number.NaN }] }).missing).toContain('places');
   });
+  test('[STOP-NO-COVER] a small range inside a large one takes nothing away', () => {
+    expect(planOf({ moment: m, spells, opts, savedKm: [{ fromKm: 0, toKm: 200 }, { fromKm: 10, toKm: 20 }] }).missing).not.toContain('places');
+  });
+  test('[STOP-NO-COVER] what the plans are missing, the Weather card names', () => {
+    const f = stopFactsOf({ moment: m, spells, opts, savedKm: [{ fromKm: 0, toKm: 88 }] });
+    const windows = weatherWindows(f);
+    const a = weatherAnswer({ ...f, baseline: null, position: f.positions[0]! }, windows, rainPlans(windows, f), null);
+    expect(a.missing).toContain('places');
+  });
   test('[STOP-NO-COVER] saved ranges that join count as one', () => {
     expect(planOf({ moment: m, spells, opts, savedKm: [{ fromKm: 90, toKm: 300 }, { fromKm: 0, toKm: 90 }] }).missing).not.toContain('places');
   });
@@ -290,13 +308,13 @@ describe('rule 5: rain at the start', () => {
   test('[STOP-RULE5] a later met point with a thunderstorm hour: a thunderstorm plan after the list, with m there', () => {
     const f = stopFactsOf({
       moment: m, spells: [...atStart, { km: 80, stamps: [`${SAT} 15:00`, `${SAT} 16:00`], pp: 40, code: 95 }],
-      spots: [{ b: cafe('x'), km: 75, id: 'nC' }, { b: shelter(), km: 76, id: 'nS' }, { b: cafe('x'), km: 62, id: 'nN' }],
+      spots: [{ b: cafe('x'), km: 75, id: 'nC' }, { b: shelter(), km: 72, id: 'nS' }, { b: cafe('x'), km: 62, id: 'nN' }],
     });
     const w = firstLikely(f);
     expect(w.metKms).toEqual([60, 70, 80]);
     const p = rainPlan(w, f);
     expect(p.m).toBe(80);
-    expect(p.covers.map((c) => c.placeId)).toEqual(['nC']);
+    expect(p.covers.map((c) => c.placeId)).toEqual(['nC']); // the shelter at km 72 is in the band and is no cover here
     expect(p.listInstead).not.toBeNull();
   });
   test('[STOP-RULE5] a thunderstorm at the start itself gets the list, with the chip\'s thunderstorm rule', () => {
@@ -305,9 +323,24 @@ describe('rule 5: rain at the start', () => {
       spots: [{ b: shelter(), km: 61, id: 'nS' }, { b: shelter(), km: 62, id: 'nT' }, { b: shelter(), km: 63, id: 'nU' }, { b: cafe('x', { name: 'Far' }), km: 90, id: 'nC' }],
     });
     expect(p.covers).toEqual([]);
+    expect(p.none).toBeNull();
+    expect(p.m).toBe(60);
     expect(p.listInstead![0]!.placeId).toBe('nC');
     expect(p.listInstead!.filter((c) => c.coverClass > 2).every((c) => c.lightning)).toBe(true);
     expect(p.listLines.some((l) => l.includes('Roofs, shelters and huts give no protection from lightning.'))).toBe(true);
+  });
+  test('[STOP-RULE5] a storm at the start and further on: m is the first later point with a storm', () => {
+    const p = planOf({ moment: m, spells: [{ km: 60, stamps: stamps(SAT, 14, 16), pp: 70, code: 95 }, { km: 70, stamps: stamps(SAT, 14, 16), pp: 70 }, { km: 80, stamps: stamps(SAT, 15, 16), pp: 70, code: 95 }], spots: [{ b: cafe('x'), km: 75 }] });
+    expect(p.m).toBe(80);
+    expect(p.covers).toHaveLength(1);
+    expect(p.listInstead).not.toBeNull();
+  });
+  test('[STOP-RULE5] with rain at the start, a second window further on still has its own plan', () => {
+    const f = stopFactsOf({ moment: m, spells: [rain(60), rain(110)], spots: [{ b: cafe('x'), km: 100, id: 'n1' }] });
+    const [first, second] = rainPlans(weatherWindows(f), f);
+    expect(first!.listInstead).not.toBeNull();
+    expect(second!.listInstead).toBeNull();
+    expect(second!.covers.map((c) => c.placeId)).toEqual(['n1']);
   });
   test('[STOP-RULE5] a window further on, with no rain at the start, has its own plan', () => {
     const p = planOf({ moment: m, spells: [rain(100)], spots: [{ b: cafe('x'), km: 90 }] });
@@ -358,7 +391,7 @@ describe('which windows get a plan', () => {
     expect(rainPlans(weatherWindows(f), f)[0]!.covers).toHaveLength(1);
   });
   test('[WX-WINDOW-STOP] no plan for a later day\'s window', () => {
-    const f = stopFactsOf({ moment: { now: `${SAT} 08:00` }, spells: [{ km: 90, stamps: stamps(SUN, 8, 11), pp: 90, code: 95 }], spots: [{ b: cafe('x'), km: 85 }] });
+    const f = stopFactsOf({ moment: { now: `${SAT} 08:00` }, spells: [{ km: 90, stamps: stamps(SUN, 8, 11), pp: 90, code: 95 }], spots: [{ b: cafe('x'), km: 85 }], opts: { fetchedAt: `${SAT} 07:00` } });
     const windows = weatherWindows(f);
     expect(windows).toHaveLength(1);
     expect(rainPlans(windows, f)).toEqual([]);

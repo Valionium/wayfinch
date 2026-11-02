@@ -18,10 +18,12 @@ type Found = { spot: Spot; cover: Cover };
 
 const validDate = (d: Date): boolean => Number.isFinite(d.getTime());
 
-/** Class, then latest arrival, then shorter detour, then the final tie-break. */
+const toSecond = (d: Date): number => Math.floor(d.getTime() / 1000);
+
+/** Class, then latest arrival (arrivals in one second tie: the rest is rounding), then shorter detour, then the final tie-break. */
 const planOrder = (a: Found, b: Found): number =>
   a.cover.coverClass - b.cover.coverClass
-  || b.cover.arrival.getTime() - a.cover.arrival.getTime()
+  || toSecond(b.cover.arrival) - toSecond(a.cover.arrival)
   || a.cover.offRouteM - b.cover.offRouteM
   || finalOrder(a.spot, b.spot);
 
@@ -64,7 +66,7 @@ export function rainPlan(w: RainWindow, f: StopFacts): RainPlan {
   const firstMet = w.metKms[0] ?? w.fromKm;
   const stormLater = startsHere ? w.thunderKms.find((k) => k > firstMet) : undefined;
 
-  const list = startsHere ? shelterEntries(f, f.ride.departure, stormAroundStart(f, position)) : null;
+  const list = startsHere ? shelterEntries(f, f.ride.departure, stormAroundStart(f)) : null;
   const listInstead = list ? list.filter((e) => e.cover !== null).map((e) => e.cover!) : null;
   const listLines = list ? list.map((e) => e.text) : [];
   const empty = { window: w, covers: [], firstCoverLine: null, none: null, behind: null, listInstead, listLines, notCounted: [] };
@@ -73,7 +75,7 @@ export function rainPlan(w: RainWindow, f: StopFacts): RainPlan {
   }
 
   const m: Km = stormLater ?? firstMet;
-  const thunder = stormLater !== undefined || w.kind === 'thunder';
+  const thunder = w.kind === 'thunder';
   const tm = f.schedule.atKm(m);
   const hoursOf = hoursLookup(f);
   const spots = spotsOf(f);

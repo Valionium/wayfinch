@@ -432,6 +432,45 @@ describe('beyond the forecast', () => {
 });
 
 describe('broken figures', () => {
+  const INDOOR = { trip: testTrip({ stay: 'accommodation' as const }) };
+  test('[WX-SEASONAL] a hole in the middle of the grid is not calm, also for an indoor stay', () => {
+    expect(statusOf(factsOf([], INDOOR, { onlyKms: [0, 10, 50, 60, 70, 78] }))).toBe('unknown');
+    expect(statusOf(factsOf([], INDOOR, { onlyKms: [0, 10, 20, 30, 40, 50, 60, 70, 78] }))).toBe('fine');
+  });
+  test('[WX-SEASONAL] grid points that stop short of the day\'s stop are not calm, also for an indoor stay', () => {
+    expect(statusOf(factsOf([], INDOOR, { onlyKms: [0, 10, 20] }))).toBe('unknown');
+  });
+  test("[WX-ACTION] a broken temperature in the night means the night isn't known", () => {
+    const f = factsOf([{ km: 78, stamps: [`${SUN} 03:00`], t: Number.NaN }]);
+    expect(nightLow(f, f.ride, f.baseline).known).toBe(false);
+    expect(statusOf(f)).toBe('unknown');
+  });
+  test("[WX-ACTION] a partly seen night: the seen low stands beside the baseline's, the colder of the two", () => {
+    const f = factsOf([{ km: 78, stamps: [`${SAT} 22:00`], t: -1 }], {}, { until: `${SAT} 23:00` }, { baseline: BASELINE });
+    const n = nightLow(f, f.ride, f.baseline);
+    expect(n.known).toBe(false);
+    expect(n.seasonal).toBe(true);
+    expect(n.lowC).toBe(-1);
+  });
+  test('[WX-BASIS] runs in any order: the latest of each model', () => {
+    const run = (t: string): ModelRun => ({ model: 'ICON-D2', run: at(t), availableAt: at(t) });
+    const b = answerOf(factsOf([], riding(60, '12:00'), { fetchedAt: `${SAT} 11:20`, runs: [run(`${SAT} 10:00`), run(`${SAT} 07:00`)] })).basis;
+    expect(b).toContain('Open-Meteo forecast fetched 11:20 · model run 10:00');
+  });
+  test('[WX-HONEST] gusts beyond 48 h name the day, not the time; within 48 h, about a time', () => {
+    const far = factsOf([allDay({ km: 40, gustKmh: 70 })], { now: '2026-10-14 08:00' }, { from: '2026-10-14 01:00', fetchedAt: '2026-10-14 07:00' });
+    expect(answerOf(far).title).toBe('Gusts up to 70 km/h near km 40, Saturday');
+    expect(answerOf(factsOf([allDay({ km: 40, gustKmh: 70 })])).title).toMatch(/^Gusts up to 70 km\/h near km 40, about \d\d:\d[05]$/);
+  });
+  test('[WX-HONEST] when it eases beyond 48 h, the title does not say when', () => {
+    const f = factsOf([{ range: [120, 137], stamps: [`${SAT} 15:00`], pp: 70 }], riding(125, '14:20'), { fetchedAt: '2026-10-15 14:30' });
+    expect(answerOf(f).title).toBe('Rain likely here');
+  });
+  test('[WX-TITLE-ORDER] the next window comes before what lies beyond the forecast', () => {
+    const f = factsOf([{ km: 10, stamps: [`${SAT} 09:00`], pp: 70 }], {}, { until: `${SAT} 10:00` });
+    expect(answerOf(f).title).toMatch(/^Rain likely/);
+    expect(answerOf(f).status).toBe('unknown');
+  });
   test('[WX-SEASONAL] a baseline point with broken figures is no estimate: "NaN" never reaches the card', () => {
     const broken: Baseline = { years: 'x', points: [{ ...BASELINE.points[0]!, meanHighC: Number.NaN }] };
     const a = answerOf(factsOf([], {}, {}, { forecast: null, baseline: broken }));

@@ -3,7 +3,7 @@
 import { formatAbout, makeAnswer } from '../answers/index.ts';
 import type { Answer, AnswerItem, Cover, Position, StoredForecast } from '../types.ts';
 import { showKm, W } from '../wording/en.ts';
-import { adjusted, isFarOff, latestPosition, usablePosition } from './locate.ts';
+import { latestPosition, usablePosition } from './locate.ts';
 import { coverLine, coverOfSpot, finalOrder, hoursLookup, hoursNotWorkedOut, insideRadius, isCover, missingFor, newestMapDate, reachKm, shortMapDate, spotsOf, zoneOfSpot, type NotCover, type Spot, type StopFacts } from './covers.ts';
 import { usableFlatKph, type Schedule } from './pace.ts';
 import { nowSchedule } from './tripday.ts';
@@ -37,12 +37,9 @@ export function thunderNear(f: StopFacts): boolean {
 }
 
 /** The chip's thunderstorm rule, as it would be at the ride's start at its departure. */
-export function stormAroundStart(f: StopFacts, position: Position | null): boolean {
+export function stormAroundStart(f: StopFacts): boolean {
   const forecast = held(f);
-  if (!forecast) return false;
-  const here = position && !isFarOff(position) && adjusted(position).aheadFromKm === f.ride.startKm;
-  const g = here ? pointNearPosition(forecast, position) : pointNearKm(forecast, f.ride.startKm);
-  return stormAt(g, f.ride.departure) || stormWindowOnRide(f);
+  return forecast !== null && (stormAt(pointNearKm(forecast, f.ride.startKm), f.ride.departure) || stormWindowOnRide(f));
 }
 
 /** One line of the list. `cover` is null for what is listed and not counted. */
