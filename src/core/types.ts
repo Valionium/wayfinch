@@ -90,6 +90,9 @@ export type RainPlan = {
 export type StopIdea = {
   trigger: 'last-chance' | 'gap' | 'rain' | 'heat' | 'meal' | 'rhythm';
   placeId: string | null; arrival: Date | null; status: Status; reason: string;
+  // The plan's additions, so the card and the timeline need not recompute them:
+  km: Km | null; // its route kilometre; null for a gap with no place
+  lines: string[]; // what follows the reason on the card
 };
 
 /** Riding date (ISO) and the kilometre its ride began at (section 6.2a). */
@@ -112,6 +115,8 @@ export type DayRide = {
   note: DayNote | null; // the start note the cards show; noteFor gives its text
   keepDayStart: DayStart | null; // what the store keeps in `dayStarts` (section 4.4); null while the start is provisional
 };
+/** The limits of leave-by (section 6.12). */
+export type LimitId = 'daylight' | 'water' | 'food-closure' | 'food-tonight';
 /** Why the day's ride does not simply start at the rider (section 6.2a). */
 export type DayNote =
   | { kind: 'day1-route-start' } // the position is elsewhere, and day 1 starts at the route start
@@ -178,6 +183,7 @@ export type Stay = 'camping' | 'mixed' | 'accommodation';
 
 export type Trip = {
   route: Route; departureDate: string | null; startTime: string /* HH:MM */; flatKph: number; stay: Stay; campWaterL: number;
+  pace?: 'steady' | 'sporting' | 'hard'; // only the basis line names it (section 6.12)
 };
 
 export type Profile = {

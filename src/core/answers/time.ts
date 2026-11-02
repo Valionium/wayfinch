@@ -92,6 +92,8 @@ const about = (t: Date, tz: string): string => `about ${formatHm(t, tz)}`;
 export const formatAbout = (t: Date, tz: string): string => about(roundLocal(t, tz, 5, 'nearest'), tz);
 /** Leave-by is rounded down to 5 minutes, so the shown time is never later than the real limit. */
 export const formatLeaveBy = (t: Date, tz: string): string => about(roundLocal(t, tz, 5, 'down'), tz);
+/** The instant leave-by shows: rounded down to 5 minutes of the zone's own clock. */
+export const roundedLeaveBy = (t: Date, tz: string): Date => roundLocal(t, tz, 5, 'down');
 /** A rain onset is rounded down to :00 or :30. */
 export const formatRainOnset = (t: Date, tz: string): string => about(roundLocal(t, tz, 30, 'down'), tz);
 /** A rain end is rounded up to :00 or :30. */
