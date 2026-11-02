@@ -8,7 +8,7 @@ import { fineLimit } from '../../src/core/engines/daylight.ts';
 import { arrivalRidingOn, closingDay, hoursIndex, insideRadius, isFoodPlace, isFoodShop, passesOf, routeZoneAt, stopStamp, sunReadable, zoneOfPass } from '../../src/core/engines/leaveby.ts';
 import { adjusted, isFarOff, isOffRoute, rejoinKm } from '../../src/core/engines/locate.ts';
 import type { Schedule } from '../../src/core/engines/pace.ts';
-import { ridingDate, chipRide, nowSchedule, zoneLookupOf } from '../../src/core/engines/tripday.ts';
+import { ridingDate, nowSchedule, zoneLookupOf } from '../../src/core/engines/tripday.ts';
 import { buffer, camp, findS1S2, reserve, use, waterNow, type Target } from '../../src/core/engines/water.ts';
 import { hourClass } from '../../src/core/engines/weather-classes.ts';
 import { gridOf, hourAt, hoursTouching, onTheRide, rainAtStart, rainHereNow, ridePoints } from '../../src/core/engines/weather-windows.ts';
@@ -620,8 +620,15 @@ const rideLegKm = (ride: Ride): number => rejoinKm(ride.startOffRouteM);
 const homeAway = (s: Screen, p: Position | null, i: ScreenInputs): boolean =>
   p !== null && isFarOff(p) && i.trip.departureDate !== null && (s.ride.phase === 'before-trip' || (s.ride.phase === 'before-ride' && s.ride.date === i.trip.departureDate));
 
-/** Riding there now, as a chip does: from the position, with its own leg. */
-const chipSchedule = (i: ScreenInputs, s: Screen): Schedule => nowSchedule(chipRide(s.ride, i.trip, i.positions), i.trip, i.now, { sun: i.sun, routeZones: i.routeZones });
+/** Riding there now, as a chip does, worked out apart from it: from the position, least favourably when approximate, with its own leg. */
+function chipSchedule(i: ScreenInputs, s: Screen): Schedule {
+  const p = latestUsablePosition(world(i));
+  const length = i.trip.route.lengthKm;
+  const held = (km: Km): Km => Math.max(0, Math.min(length, km));
+  const accKm = p?.approximate ? p.accuracyM / 1000 : 0;
+  const ride: Ride = p ? { ...s.ride, startKm: held(p.km - accKm), behindFromKm: held(p.km + accKm), startOffRouteM: isOffRoute(p) ? p.offRouteM : 0 } : s.ride;
+  return nowSchedule(ride, i.trip, i.now, { sun: i.sun, routeZones: i.routeZones });
+}
 
 const INV19: Check = {
   id: 'INV-19',
