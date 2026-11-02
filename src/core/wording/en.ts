@@ -355,6 +355,84 @@ export const W = {
   shelterThunderTitle: 'Thunderstorm near: open buildings first',
   shelterCantWorkOut: "Cover can't be worked out from these settings. Check your speed in You.",
 
+  // ---- The help chips (section 6.9). ----
+  helpNearest: (what: string, name: string, km: string): string => `Nearest ${what}: ${name}, km ${km}`,
+  helpNone: (what: string): string => `No ${what} mapped near your route`,
+  helpNoneAhead: (what: string): string => `No ${what} mapped ahead.`,
+  helpNoneBehind: (what: string): string => `No ${what} mapped behind.`,
+  helpWordBikeShop: 'bike shop',
+  helpWordRepairStation: 'repair station',
+  helpWordPump: 'public pump',
+  helpWordPharmacy: 'pharmacy',
+  helpWordHospital: 'hospital',
+  helpWordStation: 'station',
+  helpWordHalt: 'halt',
+  helpWordToilets: 'toilets',
+  helpToiletsAt: (name: string): string => `toilets at ${name}`,
+  helpRepairsMapped: 'repairs mapped',
+  helpRepairsNotMapped: 'repairs not mapped',
+  helpNoRepairs: 'mapped as no repairs',
+  helpValves: (valves: string): string => `valves: ${valves}`,
+  helpValvesNotMapped: 'valve types not mapped',
+  helpOpenOnArrival: 'open on arrival',
+  helpOpenUntil: (hm: string): string => `open until ${hm}`,
+  helpEmergencyDepartment: 'emergency department mapped',
+  helpEmergencyUnknown: 'emergency department not known',
+  helpStationOnly: 'Station only — train times and bike carriage not checked',
+  helpSunset: (hm: string): string => `sunset ${hm}`,
+  helpAfterSunset: (hm: string): string => `after sunset (${hm})`,
+  helpAccess: (value: string): string => `access: ${value}`,
+  helpAccessNotMapped: 'access not mapped',
+  helpFee: 'fee',
+  helpFeeAmount: (value: string): string => `fee: ${value}`,
+  helpFree: 'free',
+  helpFeeNotMapped: 'fee not mapped',
+  helpCantWorkOut: "Help can't be worked out from these settings. Check your speed in You.",
+  helpNoPlaceData: 'No place data for this stretch. Refresh it.',
+  helpFromNoPosition: (km: string): string => `No position yet: measured from km ${km}.`,
+
+  // ---- The Emergency card and Share my location (section 6.9). Share lines are in the sender's words, with no relative time. ----
+  emergencyCall: 'Call 112',
+  emergencyFallback: '112 — works across Europe and on many mobile networks; check the local number',
+  emergencyGeneralName: 'All emergencies',
+  emergencyNumbersBasis: (date: string, source: string): string => `Numbers from the app's own table, checked ${date}: ${source}`,
+  emergencyPositionAt: (hm: string, age: string): string => `Last position at ${hm} (${age})`,
+  emergencyOldPosition: (hm: string, age: string): string => `From your position at ${hm} (${age})`,
+  emergencyPositionAtNoAge: (hm: string): string => `From your position at ${hm}`,
+  emergencyPositionNoTime: 'Last position: time not known',
+  emergencyAgeNow: 'just now',
+  emergencyAgeMin: (n: number): string => `${n} min ago`,
+  emergencyAgeHours: (h: number, m: number): string => `${h} h ${m} min ago`,
+  emergencyAgeDays: (d: number): string => `${d} days ago`,
+  emergencyTimeUtc: (hm: string): string => `${hm} UTC`,
+  emergencyUpdatePosition: 'Update position',
+  emergencyRouteKm: (km: string): string => `Route km ${km}`,
+  emergencySettlement: (name: string, where: string): string => `Nearest settlement: ${name}, ${where}`,
+  emergencySettlementsFar: 'Settlements far from your route are not stored; a nearer one may exist.',
+  emergencyApproximateSign: (m: string): string => `Your position is approximate (±${m} m); look for the sign nearby.`,
+  emergencyApproximate: (m: string): string => `Your position is approximate (±${m} m).`,
+  emergencyAccuracyUnknown: 'The accuracy of this position is not known.',
+  emergencyManual: (km: string): string => `From km ${km} (set by hand).`,
+  emergencyManualNoKm: 'Set by hand.',
+  emergencyNoMapData: 'No map data saved here: no settlement, rescue point or shelter can be shown.',
+  emergencyUnder50: 'under 50 m',
+  emergencyRescuePoint: (ref: string): string => `Rescue point ${ref}`,
+  emergencyRescueGerman: 'In German: Rettungspunkt.',
+  emergencyRescueOnRoute: (km: string): string => `on your route at km ${km}`,
+  emergencyRescueBack: (km: string, gap: string): string => `on your route at km ${km}, ${gap} back`,
+  emergencyRescueAhead: (km: string, gap: string): string => `on your route at km ${km}, ${gap} ahead`,
+  emergencyRescueNotStored: 'Signs more than 3 km from your route are not stored; a nearer one may exist.',
+  emergencyMappedNoDate: 'As mapped in OpenStreetMap, not checked.',
+  sharePositionAt: (when: string): string => `Position at ${when}`,
+  sharePositionAtAccurate: (when: string, m: string): string => `Position at ${when}, accurate to ${m} m`,
+  sharePositionNoTime: 'Position, time not known',
+  sharePositionNoTimeAccurate: (m: string): string => `Position, time not known, accurate to ${m} m`,
+  shareRescue: (ref: string, where: string): string => `Nearest rescue point: ${ref}, ${where} of that position`,
+  shareRescueUnder50: (ref: string, where: string): string => `Nearest rescue point: ${ref}, ${where} from that position`,
+  shareLastFix: 'This was my last position fix; I may have moved since.',
+  shareApproximate: 'This position is approximate.',
+  shareManual: 'This position was set by hand on my route, not from GPS.',
+
   /** "Mapped as a weather shelter, not checked." and the same line for each other roof kind. */
   shelterMappedAs: (what: string): string => `Mapped as ${what}, not checked.`,
   /** Call ahead and rescue points. `date` is the map data's date, such as "28 Oct". */
@@ -362,3 +440,11 @@ export const W = {
   /** `n` of 10 forecast scenarios, `time` as "HH:MM". */
   weatherScenariosShowRain: (n: number, time: string): string => `${n} in 10 forecast scenarios show rain here around ${time}.`,
 };
+
+/** "28 Oct" from an ISO date. Anything else is no date. */
+export function shortMapDate(iso: string | null | undefined): string | null {
+  const m = /^\d{4}-(\d{2})-(\d{2})/.exec(typeof iso === 'string' ? iso : '');
+  const month = m ? W.timeMonth(Number(m[1]) - 1) : '';
+  const day = m ? Number(m[2]) : 0;
+  return month && day >= 1 && day <= 31 ? W.timeDayMonth(day, month) : null;
+}

@@ -2,7 +2,8 @@
 // radius; passes closer than twice the radius are one pass.
 import { buildSegmentIndex, segmentsNear, type SegmentIndex } from '../geo/index.ts';
 import { passesOf, projectOnSegment, type Projection } from '../geo/project.ts';
-import type { Place, PlaceKind, Roof, Route, RouteMatch } from '../types.ts';
+import type { PackRescuePoint } from '../places/types.ts';
+import type { Place, PlaceKind, RescuePoint, Roof, Route, RouteMatch } from '../types.ts';
 
 /**
  * Section 6.0's radii in kilometres. Shelters take Sleep's 3 km (lean-tos and basic huts) and Emergency's 3 km
@@ -74,4 +75,21 @@ export function matchPlaces(places: Place[], route: Route, idx: SegmentIndex): R
     }
   }
   return out;
+}
+
+const RESCUE_ROUTE_KM = 0.3;
+
+/**
+ * Adds a rescue point's route kilometres: one per pass within 300 m (section 6.9), for preparation. Points stored further
+ * off (up to 3 km) stay in the list with no kilometre.
+ */
+export function matchRescuePoints(points: PackRescuePoint[], route: Route): RescuePoint[] {
+  const idx = buildSegmentIndex(route);
+  return points.map((p) => {
+    if (!(Math.abs(p.lat) <= 90 && Math.abs(p.lon) <= 180)) return { ...p, kms: [] }; // written so that NaN fails
+    const within = segmentsNear(idx, p, RESCUE_ROUTE_KM)
+      .map((s) => projectOnSegment(p, route, s))
+      .filter((q) => q.offKm <= RESCUE_ROUTE_KM);
+    return { ...p, kms: merged(passesOf(within, p, route, RESCUE_ROUTE_KM), 2 * RESCUE_ROUTE_KM).map((q) => q.km) };
+  });
 }

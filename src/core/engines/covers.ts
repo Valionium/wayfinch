@@ -5,7 +5,7 @@ import { formatHm, isKnownZone } from '../answers/time.ts';
 import { openOver, stateAt } from '../hours/check.ts';
 import { matchRoofs } from '../route/matches.ts';
 import type { Cover, DayRide, Km, Missing, Place, PlaceHours, PlaceKind, Roof, RouteMatch, ScreenInputs } from '../types.ts';
-import { showKm, W } from '../wording/en.ts';
+import { shortMapDate, showKm, W } from '../wording/en.ts';
 import { rejoinKm } from './locate.ts';
 import type { Schedule } from './pace.ts';
 import { zoneLookupOf } from './tripday.ts';
@@ -213,13 +213,7 @@ function detailsMapped(s: Spot): string[] {
   return out;
 }
 
-/** "28 Oct" from an ISO date. Anything else is no date. */
-export function shortMapDate(iso: string | null | undefined): string | null {
-  const m = /^\d{4}-(\d{2})-(\d{2})/.exec(iso ?? '');
-  const month = m ? W.timeMonth(Number(m[1]) - 1) : '';
-  const day = m ? Number(m[2]) : 0;
-  return month && day >= 1 && day <= 31 ? W.timeDayMonth(day, month) : null;
-}
+export { shortMapDate };
 
 /** The newest date of the map data, for a roof: roofs carry none of their own. */
 export const newestMapDate = (f: Pick<StopFacts, 'places'>): string | null =>
