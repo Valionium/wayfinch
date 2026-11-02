@@ -244,7 +244,7 @@ describe('[H-DEVICE-ZONE] the hour after midnight, the night after the phone ski
   test.each(['Su[1] 20:00-02:00', 'Su[-1] 20:00-02:00', 'week 13 Su 20:00-02:00', 'week 14 Su 20:00-02:00', 'Sa[-1] +1 days 20:00-02:00', 'Mar Su 20:00-02:00', 'Apr Su 20:00-02:00', '2026 Su 20:00-02:00', 'Mar 29 20:00-02:00', 'Apr 05 20:00-02:00', 'easter 20:00-02:00', 'SH Su 20:00-02:00', 'Su 20:00-02:00 "by appointment"'])('%s is not read a week later', (tag) => {
     expect(read('Europe/Berlin', tag, '2026-03-30 00:30')).toBe('unknown');
   });
-  test('a shop on a local holiday reads unknown in the hour the phone skips, not what the holiday rule makes of it', () => {
+  test('a tagged shop on a local holiday stays unknown in the hour the phone skips', () => {
     const shopRule = { kind: 'food-shop', nearStation: false } as const;
     const inHour = withDeviceZone('Europe/Lisbon', () => stateAt(hoursOf('Su[-1] 00:00-05:00', placeIn('DE-BW'), shopRule, '2026-03-28', '2026-03-30', { 'DE-BW': ['2026-03-29'] }), instantAt('2026-03-29', '01:30', BERLIN)).state);
     expect(inHour).toBe('unknown');

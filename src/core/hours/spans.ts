@@ -179,24 +179,6 @@ function readTag(o: OpeningHours, n0: number, n1: number): Seg[] | null {
   return segs;
 }
 
-/** What this phone can't read stays unknown, whatever a place's rules make of an unknown stretch. */
-function stillUnknown(segs: Seg[], o: OpeningHours, n0: number, n1: number): Seg[] {
-  const pretty = o.prettifyValue();
-  const nightToo = runsOverMidnight(pretty) && !WEEKDAYS_AND_TIMES.test(pretty);
-  let out = segs;
-  const blank = (from: number, to: number): void => {
-    const a = Math.max(from, n0);
-    const b = Math.min(to, n1);
-    if (b > a) out = overlay(out, a, b, [{ from: a, to: b, state: 'unknown', reason: W.foodHoursUnknown }]);
-  };
-  for (const [gapFrom, gapTo] of deviceGaps(n0, n1)) {
-    blank(gapFrom, gapTo);
-    const midnight = Math.floor(gapFrom / DAY) * DAY + DAY;
-    if (nightToo) blank(midnight, midnight + (gapTo - gapFrom));
-  }
-  return out;
-}
-
 // ---- Holidays ----
 
 const yearHolidays = new Map<string, string[]>();
@@ -357,7 +339,7 @@ export function placeSpans(tag: string | null, place: HoursPlace, rule: RuleClas
     holidays,
     unseenHolidays: new Set([...years.flatMap((y) => holidayEdits(zone, y).added), ...extra]),
   });
-  const spans = toSpans(parsed && read ? stillUnknown(ruled, parsed, n0, n1) : ruled, t0, t1, place.timeZone);
+  const spans = toSpans(ruled, t0, t1, place.timeZone);
   if (key !== undefined) cache?.set(key, spans);
   return spans;
 }

@@ -148,7 +148,8 @@ function firstFoodGap(i: ScreenInputs, s: Screen, w: ScreenParts): { from: numbe
 
 const INV03: Check = {
   id: 'INV-03',
-  appliesTo: (i, s) => usableRide(i, s) && targetsOf(world(i)).some((t) => SHOPLIKE.has(t.place.kind)),
+  // Every ride: T2 is compared with the gap worked out by hand whether or not a shop is the water target today.
+  appliesTo: usableRide,
   check(i, s) {
     const w = world(i);
     for (const t of targetsOf(w)) {
