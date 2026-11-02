@@ -1,0 +1,392 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "load-summary.v1.schema.json",
+  "title": "Load summary v1, bag planner to co-pilot (Contract 1)",
+  "definitions": {
+    "envelope": {
+      "type": "object",
+      "required": [
+        "app",
+        "kind",
+        "v",
+        "at"
+      ],
+      "properties": {
+        "app": {
+          "const": "load-check"
+        },
+        "kind": {
+          "const": "load-summary"
+        },
+        "v": {
+          "const": 1
+        },
+        "at": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "nonNegative": {
+      "type": "number",
+      "minimum": 0
+    },
+    "fraction": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "deck": {
+      "enum": [
+        null,
+        "empty",
+        "loaded"
+      ]
+    },
+    "bagItem": {
+      "type": "object",
+      "required": [
+        "pos",
+        "L",
+        "fill"
+      ],
+      "properties": {
+        "pos": {
+          "type": "string",
+          "minLength": 1
+        },
+        "L": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "shape": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "slot": {
+          "enum": [
+            "front",
+            "rear"
+          ]
+        },
+        "pair": {
+          "type": "boolean"
+        },
+        "fill": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/fraction"
+            },
+            {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "$ref": "#/definitions/fraction"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "bottle": {
+      "type": "object",
+      "required": [
+        "slot",
+        "L"
+      ],
+      "properties": {
+        "slot": {
+          "enum": [
+            "st",
+            "dt",
+            "un"
+          ]
+        },
+        "L": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "full": {
+      "type": "object",
+      "required": [
+        "planUpdatedAt",
+        "nights",
+        "month",
+        "departureDate",
+        "mode",
+        "foodDays",
+        "bikeId",
+        "bags",
+        "decks",
+        "water",
+        "weight",
+        "kit"
+      ],
+      "properties": {
+        "planUpdatedAt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nights": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "month": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        },
+        "departureDate": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            }
+          ]
+        },
+        "mode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "foodDays": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bikeId": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "bags": {
+          "type": "object",
+          "required": [
+            "count",
+            "positions",
+            "items"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "positions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/bagItem"
+              }
+            }
+          }
+        },
+        "decks": {
+          "type": "object",
+          "required": [
+            "bar",
+            "rack"
+          ],
+          "properties": {
+            "bar": {
+              "$ref": "#/definitions/deck"
+            },
+            "rack": {
+              "$ref": "#/definitions/deck"
+            }
+          }
+        },
+        "water": {
+          "type": "object",
+          "required": [
+            "bottles",
+            "cageL",
+            "extraL",
+            "totalL"
+          ],
+          "properties": {
+            "bottles": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/bottle"
+              }
+            },
+            "cageL": {
+              "$ref": "#/definitions/nonNegative"
+            },
+            "extraL": {
+              "$ref": "#/definitions/nonNegative"
+            },
+            "totalL": {
+              "$ref": "#/definitions/nonNegative"
+            }
+          }
+        },
+        "weight": {
+          "type": "object",
+          "required": [
+            "kitKg",
+            "cageWaterKg",
+            "carriedKg",
+            "bikeKg",
+            "emptyLuggageKg",
+            "byPositionKg",
+            "unplacedKg"
+          ],
+          "properties": {
+            "kitKg": {
+              "$ref": "#/definitions/nonNegative"
+            },
+            "cageWaterKg": {
+              "$ref": "#/definitions/nonNegative"
+            },
+            "carriedKg": {
+              "$ref": "#/definitions/nonNegative"
+            },
+            "bikeKg": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/definitions/nonNegative"
+                }
+              ]
+            },
+            "emptyLuggageKg": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/definitions/nonNegative"
+                }
+              ]
+            },
+            "byPositionKg": {
+              "type": "object",
+              "required": [
+                "fork",
+                "bar",
+                "top",
+                "frame",
+                "bottle",
+                "seat",
+                "rack",
+                "pack"
+              ],
+              "properties": {
+                "fork": {
+                  "$ref": "#/definitions/nonNegative"
+                },
+                "bar": {
+                  "$ref": "#/definitions/nonNegative"
+                },
+                "top": {
+                  "$ref": "#/definitions/nonNegative"
+                },
+                "frame": {
+                  "$ref": "#/definitions/nonNegative"
+                },
+                "bottle": {
+                  "$ref": "#/definitions/nonNegative"
+                },
+                "seat": {
+                  "$ref": "#/definitions/nonNegative"
+                },
+                "rack": {
+                  "$ref": "#/definitions/nonNegative"
+                },
+                "pack": {
+                  "$ref": "#/definitions/nonNegative"
+                }
+              }
+            },
+            "unplacedKg": {
+              "$ref": "#/definitions/nonNegative"
+            }
+          }
+        },
+        "kit": {
+          "type": "object",
+          "required": [
+            "waterFilter"
+          ],
+          "properties": {
+            "waterFilter": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "emptyPlan": {
+      "type": "object",
+      "required": [
+        "empty"
+      ],
+      "properties": {
+        "empty": {
+          "const": true
+        }
+      }
+    }
+  },
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/definitions/envelope"
+    }
+  ],
+  "oneOf": [
+    {
+      "allOf": [
+        {
+          "$ref": "#/definitions/full"
+        },
+        {
+          "not": {
+            "required": [
+              "empty"
+            ],
+            "properties": {
+              "empty": {}
+            }
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "$ref": "#/definitions/emptyPlan"
+        },
+        {
+          "not": {
+            "required": [
+              "planUpdatedAt"
+            ],
+            "properties": {
+              "planUpdatedAt": {}
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -54,3 +54,25 @@ test("Ahead's components use no browser services", async () => {
 test('the shell may use the browser', async () => {
   expect(await ruleIds('fetch("/a");', SHELL)).toEqual([]);
 });
+
+// Decision 6: only the hours wrapper (src/core/hours/spans.ts) imports the lazy opening_hours library.
+test('engines and the screen may not import opening_hours', async () => {
+  for (const file of ['src/core/engines/x.ts', 'src/core/screen/x.ts']) {
+    for (const from of ['opening_hours', 'opening_hours/build/opening_hours.js']) {
+      const code = `import x from '${from}'; export default x;`;
+      expect(await ruleIds(code, file), `${from} in ${file}`).toContain('no-restricted-imports');
+    }
+  }
+});
+
+test('engines and the screen still may not import ui, data or store', async () => {
+  for (const file of ['src/core/engines/x.ts', 'src/core/screen/x.ts']) {
+    const code = "import x from '../../ui/a'; export default x;";
+    expect(await ruleIds(code, file), file).toContain('no-restricted-imports');
+  }
+});
+
+test('the hours wrapper may import opening_hours', async () => {
+  const code = "import x from 'opening_hours'; export default x;";
+  expect(await ruleIds(code, 'src/core/hours/spans.ts')).toEqual([]);
+});
