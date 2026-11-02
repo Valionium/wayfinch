@@ -403,7 +403,7 @@ export const capacityOf = (f: WaterFacts): number | null => capacityFrom(f.profi
 
 // ---- Water now (section 3.2) ---------------------------------------------------------------------------------------
 
-const DEFAULT_FOR_MS = 3 * HOUR;
+export const DEFAULT_FOR_MS = 3 * HOUR;
 
 /** Fixes that say where on the route the rider was. One over 5 km off, at home for instance, says nothing of that. */
 const positionsOf = (f: WaterFacts): WaterFacts['positions'] => f.positions.filter((p) => Number.isFinite(p.km) && validDate(p.at) && !isFarOff(p));
