@@ -36,8 +36,19 @@ const TAGS: [PlaceKind, Record<string, string>[]][] = [
   ['settlement', [{ place: 'village' }, { place: 'town' }]],
 ];
 const TAGS_OF = new Map(TAGS);
-/** Water from a shop or a café is class B or C; the water engine selects on the class, not the kind. */
-const WATER_OF = new Map<PlaceKind, Place['waterClass']>([['water', 'A'], ['shop', 'B'], ['fuel_shop', 'B'], ['cafe', 'C'], ['restaurant', 'C'], ['toilets', 'C']]);
+/**
+ * The classes real packs hold (src/core/places/water.ts). A shop, café or fuel-station shop has no water class: section 6.0
+ * makes it a source by its hours. Only a refill venue among them is class B. Toilets are class A with drinking_water=yes,
+ * and such a point inside a building or with limited access counts by its hours.
+ */
+function waterOf(kind: PlaceKind, n: number): Pick<Place, 'waterClass' | 'indoorOrLimited'> {
+  switch (kind) {
+    case 'water': return { waterClass: 'A', indoorOrLimited: n % 5 === 0 };
+    case 'toilets': return n % 2 === 0 ? { waterClass: 'A', indoorOrLimited: true } : { waterClass: null, indoorOrLimited: false };
+    case 'shop': case 'cafe': case 'fuel_shop': return n % 10 === 0 ? { waterClass: 'B', indoorOrLimited: true } : { waterClass: null, indoorOrLimited: false };
+    default: return { waterClass: null, indoorOrLimited: false };
+  }
+}
 
 const ODD_VALUES = ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf'] as const;
 const ODD_HOURS = ['Mo-Fr', 'Mo-Su open', 'PH', 'PH off', 'Su,PH off; Mo-Sa 08:00-20:00', 'Mar-Oct', 'constructor', '__proto__', 'sunrise-sunset', 'open', 'Mo-Fr 08:00-12:00; Sa', ''] as const;
@@ -84,7 +95,7 @@ function placeOf(route: Route, c: PlaceChoice, index: number): Place {
   const name = odd ? c.oddValue : c.kind === 'settlement' ? `Town ${c.n % 400}` : c.base.name;
   return {
     ...c.base, id: `n${index}${c.n}`, kind: c.kind, lat, lon, name, tags: odd ? oddTags(c.kind, c.oddValue) : { ...tagList[c.tagAt % tagList.length]! },
-    waterClass: WATER_OF.get(c.kind) ?? null, indoorOrLimited: c.kind === 'water' ? false : c.base.indoorOrLimited,
+    ...waterOf(c.kind, c.n),
     openingHours: c.odd === 1 ? c.oddHours : c.base.openingHours, seasonal: odd ? c.oddValue : c.kind === 'water' ? c.base.seasonal : null,
     stop: ['shop', 'cafe', 'restaurant', 'drink', 'ice_cream', 'fuel_shop'].includes(c.kind) ? (c.base.stop ?? { indoorSeating: null, outdoorSeating: null, toilets: null, takeaway: null, kitchenHours: null, bikeParking50m: false }) : null,
     contact: ['campsite', 'lodging', 'hut', 'bike_shop'].includes(c.kind) ? c.base.contact : null,

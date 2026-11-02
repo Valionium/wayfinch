@@ -83,11 +83,14 @@ function edgeInstant(edge: Edge, date: string, c: ClockFacts): Date | null {
 export function clock(c: ClockFacts): fc.Arbitrary<Moment> {
   const dayRange = fc.oneof(
     { weight: 1, arbitrary: fc.constantFrom(-1, -1, -3) },
-    { weight: 6, arbitrary: fc.integer({ min: 0, max: Math.max(0, c.days - 1) }) },
+    { weight: 10, arbitrary: fc.integer({ min: 0, max: Math.max(0, c.days - 1) }) },
     { weight: 1, arbitrary: fc.constantFrom(c.days, c.days + 1) },
   );
   const base = c.departureDate ?? ANY_DATE;
-  return fc.tuple(dayRange, fc.oneof({ weight: 3, arbitrary: fc.oneof({ weight: 4, arbitrary: fc.integer({ min: 7 * 60, max: 20 * 60 }) }, { weight: 1, arbitrary: fc.integer({ min: 0, max: 1439 }) }).map((n): number | Edge => n) }, { weight: 1, arbitrary: fc.constantFrom<number | Edge>(...EDGES) })).map(([day, when]): Moment => {
+  // Riding is the main use: a good share of moments fall inside the day's ride.
+  const start = minutesOf(c.startTime);
+  const onTheRide = fc.integer({ min: 15, max: Math.max(16, Math.round(c.halfwayMin * 1.9)) }).map((n) => Math.min(23 * 60 + 59, start + n));
+  return fc.tuple(dayRange, fc.oneof({ weight: 3, arbitrary: fc.oneof({ weight: 4, arbitrary: onTheRide }, { weight: 3, arbitrary: fc.integer({ min: 7 * 60, max: 20 * 60 }) }, { weight: 1, arbitrary: fc.integer({ min: 0, max: 1439 }) }).map((n): number | Edge => n) }, { weight: 1, arbitrary: fc.constantFrom<number | Edge>(...EDGES) })).map(([day, when]): Moment => {
     const date = addDaysIso(base, day);
     if (typeof when === 'number') return { now: instantAt(date, hm(when), c.tz), onThreshold: false };
     const edge = edgeInstant(when, date, c);

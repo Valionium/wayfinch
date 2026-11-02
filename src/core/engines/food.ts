@@ -1,6 +1,6 @@
 // The Food card (spec sections 6.4 and 6.11): the stop idea, the other ideas in route order, then the next places open at
 // arrival. It asks less of those than of an idea: open at the arrival itself, not for the 30 minutes after.
-import { formatAbout, formatHm, makeAnswer } from '../answers/index.ts';
+import { compareFinal, formatAbout, formatHm, makeAnswer } from '../answers/index.ts';
 import { openAtArrival, stateAt } from '../hours/check.ts';
 import type { Answer, AnswerItem, StopIdea } from '../types.ts';
 import { showKm, W } from '../wording/en.ts';
@@ -25,7 +25,7 @@ function nextOpenItems(f: FoodFacts): AnswerItem[] {
   const { startKm, stopKm } = f.ride;
   const onRide = passesOf(f).filter((x) => isFoodPlace(x.place) && x.match.km >= startKm && x.match.km <= stopKm + AT_STOP_KM);
   // Inside an approximate position's radius it may already be behind: no distance, no arrival (section 8).
-  const near: AnswerItem[] = onRide.filter((x) => insideRadius(f.ride, x.match.km)).map((x) => ({
+  const near: AnswerItem[] = onRide.filter((x) => insideRadius(f.ride, x.match.km)).sort((a, b) => a.match.km - b.match.km || compareFinal(a.place, b.place)).map((x) => ({
     label: spotName({ place: x.place, roof: null, match: x.match }), stamp: { km: x.match.km }, status: 'unknown', detail: W.waterNearYou,
   }));
   const named = new Set<string>();

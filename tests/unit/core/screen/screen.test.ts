@@ -10,6 +10,7 @@ import { preparedHours } from '../engines/leaveby-helpers.ts';
 import { stamps } from '../engines/weather-helpers.ts';
 import type { Spot } from '../engines/water-helpers.ts';
 import { inputsOf } from './screen-helpers.ts';
+import { scenario } from '../../../gen/scenario.ts';
 
 const FRI = '2026-10-16';
 const SAT = '2026-10-17';
@@ -506,4 +507,35 @@ test('[HON-SPEED] one screen on a 200 km route: measured and printed', () => {
   expect(measured(inputsOf({ ...base, spots: manySpots(200, 1000) }), 'stress: 200 km, 1,000 places')).toBeGreaterThan(0);
   const long = testTrip({ route: flatRoute(1600, { stageEnds: Array.from({ length: 15 }, (_, n) => (n + 1) * 100) }) });
   expect(measured(inputsOf({ trip: long, spells, spots: manySpots(1600, 3000), ...moment }), 'stress: 1,600 km, 3,000 places')).toBeGreaterThan(0);
+}, 120_000);
+
+test('[HON-BUDGET] one screen on a 200 km generated route: median under 150 ms, twice the 75 ms of section 11.1', () => {
+  const near = fc.sample(scenario(), { seed: 20261030, numRuns: 400 }).filter((i) => i.trip.route.lengthKm >= 150 && i.trip.route.lengthKm <= 260 && !i.routeZones.some((z) => z.timeZone === 'constructor')).slice(0, 25);
+  expect(near.length).toBeGreaterThanOrEqual(10);
+  const times = near.map((i) => {
+    const t0 = performance.now();
+    screen(i);
+    return performance.now() - t0;
+  }).sort((a, b) => a - b);
+  const median = times[Math.floor(times.length / 2)]!;
+  console.log(`[HON-BUDGET] ${times.length} generated moments on about 200 km: median ${median.toFixed(1)} ms, 95th ${times[Math.floor(times.length * 0.95)]!.toFixed(1)} ms`);
+  expect(median).toBeLessThan(150);
+}, 120_000);
+
+test('[HON-BUDGET] measured and printed for 200, 800 and 1,600 km', () => {
+  const spells = [{ range: [20, 60] as [number, number], stamps: stamps(SAT, 8, 18), pp: 80, mm: 1 }];
+  const moment = { positions: [pos({ km: 15, at: `${SAT} 09:00` })], now: `${SAT} 09:00` };
+  for (const km of [200, 800, 1600]) {
+    const trip = testTrip({ route: flatRoute(km, { stageEnds: Array.from({ length: Math.floor(km / 100) }, (_, n) => (n + 1) * 100) }) });
+    const i = inputsOf({ trip, spells, spots: manySpots(km, km), ...moment });
+    const times: number[] = [];
+    for (let n = 0; n < 20; n++) {
+      const t0 = performance.now();
+      screen(i);
+      times.push(performance.now() - t0);
+    }
+    times.sort((a, b) => a - b);
+    console.log(`[HON-BUDGET] ${km} km, ${km} places: median ${times[10]!.toFixed(1)} ms, 95th ${times[18]!.toFixed(1)} ms`);
+    expect(times[10]).toBeGreaterThan(0);
+  }
 }, 120_000);

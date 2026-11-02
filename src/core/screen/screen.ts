@@ -216,7 +216,13 @@ const describe = (e: unknown): string => {
   }
 };
 
-export function buildScreen(raw: ScreenInputs): { screen: Screen; faults: string[] } {
+/** What the screen was assembled from, for the simulator's checks: they judge a screen against the very values it was built on. */
+export type ScreenParts = {
+  schedule: Schedule; position: Position | null; forecast: StoredForecast | null; stop: StopFacts; water: WaterFacts; leave: LeaveFacts; weather: WeatherFacts; food: StopFacts & Pick<ScreenInputs, 'holidays'>;
+  windows: RainWindow[]; plans: RainPlan[]; lb: LeaveBy | null; wg: WaitOrGo | null; targets: ReturnType<typeof findS1S2> | null; ideas: Ideas | null;
+};
+
+export function buildScreen(raw: ScreenInputs): { screen: Screen; faults: string[]; parts: ScreenParts } {
   const faults: string[] = [];
   const part = <T>(name: string, build: () => T, otherwise: () => T): T => {
     try {
@@ -291,7 +297,7 @@ export function buildScreen(raw: ScreenInputs): { screen: Screen; faults: string
     cards, chips, shareText: share(false), shareMapText: share(true), phase: ride.phase, ride,
     notes: part('notes', () => notesOf(i, ride, position), () => []),
   };
-  return { screen, faults };
+  return { screen, faults, parts: { schedule, position, forecast, stop, water, leave, weather, food, windows, plans, lb, wg, targets, ideas } };
 }
 
 export const screen = (inputs: ScreenInputs): Screen => buildScreen(inputs).screen;

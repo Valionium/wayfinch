@@ -43,7 +43,7 @@ function zonesFor(form: ZoneForm, route: Route): ZoneSpan[] {
 
 // ---- hours ---------------------------------------------------------------------------------------------------------
 
-function ruleOf(p: Place): RuleClass {
+export function ruleOf(p: Place): RuleClass {
   const shop = p.tags['shop'];
   if (p.kind === 'fuel_shop') return { kind: 'fuel-shop', nearStation: false };
   if (p.kind !== 'shop') return { kind: 'other', nearStation: false };

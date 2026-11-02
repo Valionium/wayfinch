@@ -222,3 +222,32 @@ function skippedOnDevice(start: number, end: number): [number, number][] {
   }
   return out;
 }
+
+// The library finds "yesterday" of a time over midnight as 24 hours back. The night after the phone's own spring change that
+// lands two days back: found by the simulator's INV-26.
+describe('[H-DEVICE-ZONE] the hour after midnight, the night after the phone skips an hour', () => {
+  const wraps = 'Mo-Fr off; Mo-Sa 03:30-20:30,18:45-03:15';
+  const read = (zone: string, tag: string, when: string): string => withDeviceZone(zone, () => {
+    const date = when.slice(0, 10);
+    return stateAt(hoursOf(tag, placeIn('DE-BW'), other, addDaysIso(date, -2), addDaysIso(date, 1)), instantAt(date, when.slice(11), BERLIN)).state;
+  });
+
+  test('a time over midnight from Saturday does not read open on Monday morning', () => {
+    expect(read('UTC', wraps, '2026-03-30 00:30')).toBe('closed');
+    expect(read('Europe/Berlin', wraps, '2026-03-30 00:30')).toBe('closed');
+    expect(read('America/New_York', wraps, '2026-03-09 00:30')).toBe('closed');
+  });
+  test('a time over midnight from Sunday does not read closed', () => {
+    expect(read('UTC', 'Su 20:00-02:00', '2026-03-30 00:30')).toBe('open');
+    expect(read('Europe/Berlin', 'Su 20:00-02:00', '2026-03-30 00:30')).toBe('open');
+  });
+  test('a tag that looks at the calendar reads unknown then', () => {
+    expect(read('Europe/Berlin', 'Sa,Su 10:30-04:00,16:15-18:00; Su,PH 07:45-14:30', '2026-03-30 00:30')).toBe('unknown');
+    expect(read('UTC', 'Sa,Su 10:30-04:00,16:15-18:00; Su,PH 07:45-14:30', '2026-03-30 00:30')).toBe('open');
+  });
+  test('the hour after it and a tag with no time over midnight read as on any phone', () => {
+    expect(read('Europe/Berlin', wraps, '2026-03-30 01:30')).toBe('closed');
+    expect(read('Europe/Berlin', 'Mo-Su 00:00-23:00', '2026-03-30 00:30')).toBe('open');
+    expect(read('Europe/Berlin', 'Mo 06:00-12:00', '2026-03-30 00:30')).toBe('closed');
+  });
+});

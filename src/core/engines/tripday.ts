@@ -5,7 +5,7 @@ import { pointAtRouteKm } from '../geo/project.ts';
 import type { Status, DayPhase, DayRide, DayNote, DayStart, Km, PlanTomorrow, Position, SunSource, Trip, ZoneLookup, ZoneSpan } from '../types.ts';
 import { W } from '../wording/en.ts';
 import { arrivalStatus, fineLimit } from './daylight.ts';
-import { adjusted, isFarOff, isOffRoute, latestPosition, rejoinKm, usablePosition } from './locate.ts';
+import { adjusted, isFarOff, isOffRoute, latestPosition, positionOrder, rejoinKm, usablePosition } from './locate.ts';
 import { buildSchedule, correction, MIN_FLAT_KPH, stopRule, usableFlatKph, type Schedule } from './pace.ts';
 
 export type DayEnv = { sun: SunSource; routeZones: ZoneSpan[] };
@@ -56,8 +56,7 @@ function readDay(tripAsSet: Trip, positions: Position[], now: Date, env: DayEnv,
   // age 0, in the order of its own stamp, so the input's order decides nothing.
   const everything = positions
     .filter(usablePosition)
-    .sort((a, b) => a.at.getTime() - b.at.getTime() || Number(a.source === 'manual') - Number(b.source === 'manual')
-      || a.km - b.km || a.lat - b.lat || a.lon - b.lon)
+    .sort(positionOrder)
     .map((p) => (p.at.getTime() > now.getTime() ? { ...p, at: now } : p));
 
   const departureDate = trip.departureDate;

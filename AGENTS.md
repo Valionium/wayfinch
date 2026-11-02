@@ -23,8 +23,8 @@ src/core/      pure TypeScript, no DOM, fully unit-tested
 tests/
   unit/        Vitest
   gen/         shared generators; extend these instead of writing your own
-  sim/         the simulator: harness, checks (tests/sim/checks.ts), its run
-  regressions/ saved simulator failures, replayed on every run (added only with the owner)
+  sim/         the simulator: harness, the 32 checks (checks.ts), what they read (world.ts), the cases proving each can fail (inv-*.test.ts)
+  regressions/ saved simulator failures, replayed on every run; a plain case for each is in tests/unit/core/screen/sim-found.test.ts
   fixtures/    one-line builders (build.ts, route.ts), banned words, device zones
 tools/         project scripts
 ```
@@ -38,7 +38,7 @@ Planned, in spec section 4.2: `src/core/` engines, `src/data/`, `src/store/`, `s
 | Command | Runs |
 | --- | --- |
 | `npm run fast` | types, lint, the tests touched by this change with 25 runs per property, 100 simulator scenarios and the rule check |
-| `npm test` | types, lint and all unit and property tests |
+| `npm test` | types, lint, all unit and property tests, and the cases proving each simulator check can fail |
 | `npm run types`, `npm run lint`, `npm run unit` | one part |
 | `npm run sim -- --seed S --count N` | the simulator: N invented trip moments, each screen checked; a failure saves `tests/regressions/<ID>-<seed>.json` |
 | `npm run sim:replay -- <file>` | one saved simulator case; exits with an error while it still fails |
