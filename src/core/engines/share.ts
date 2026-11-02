@@ -32,12 +32,12 @@ function plainName(raw: unknown): string | null {
   return cleaned;
 }
 
-/** The nearest settlement within 5 km of a route kilometre, counted along the route and out to the place. */
-function townNear(f: ShareFacts, km: Km): string | null {
+/** The nearest settlement within 5 km of a route kilometre, counted along the route and out to the place. One place for Share and the position line. */
+export function townNear(places: Place[], matches: RouteMatch[], km: Km): string | null {
   if (!Number.isFinite(km)) return null;
-  const byId = new Map(f.settlements.map((p) => [p.id, p]));
+  const byId = new Map(places.filter((p) => p.kind === 'settlement').map((p) => [p.id, p]));
   let best: { name: string; d: number; place: Place } | null = null;
-  for (const m of f.matches) {
+  for (const m of matches) {
     const place = byId.get(m.placeId);
     if (!place || place.kind !== 'settlement' || !Number.isFinite(m.km) || !(m.offRouteM >= 0) || m.offRouteM === Infinity) continue;
     const name = plainName(place.name);
@@ -88,7 +88,7 @@ export function progressText(f: ShareFacts): string | null {
   const stamp = W.timeDayAt(W.timeShortDay(weekdayOf(stampAt, tz), w.day, W.timeMonth(w.month - 1)), formatHm(stampAt, tz));
 
   const stopWhere = (km: Km): string => {
-    const town = townNear(f, km);
+    const town = townNear(f.settlements, f.matches, km);
     return town === null ? W.shareProgressStopAt(kmText(km)) : W.shareProgressStopNear(town, kmText(km));
   };
   const planStop = (km: Km): string => {
@@ -115,21 +115,21 @@ export function progressText(f: ShareFacts): string | null {
   const namedKm = (km: Km): { lat: number; lon: number } => pointAtRouteKm(route, held(km));
 
   if (ride.phase === 'route-end') {
-    body = W.shareProgressReachedEnd(townNear(f, length), lengthText);
+    body = W.shareProgressReachedEnd(townNear(f.settlements, f.matches, length), lengthText);
     named ??= namedKm(length);
   } else if (atEnd) {
-    body = W.shareProgressStoppedAtEnd(townNear(f, length), lengthText);
+    body = W.shareProgressStoppedAtEnd(townNear(f.settlements, f.matches, length), lengthText);
     named ??= namedKm(length);
   } else if (ride.phase === 'riding') {
     const q = qualityOf(position!);
-    body = [W.shareProgressWhere(sentenceKm(position!.km, q), townNear(f, position!.km)), planStop(ride.stopKm)].join(' ');
+    body = [W.shareProgressWhere(sentenceKm(position!.km, q), townNear(f.settlements, f.matches, position!.km)), planStop(ride.stopKm)].join(' ');
   } else if (ride.phase === 'after-ride') {
     const q = qualityOf(position!);
     const today = ridingDate(f.now, routeZoneAt(f, 0));
     const plan = f.planTomorrow;
     const chosen = !!plan && plan.date === today && !plan.backToTodayAt;
     const claimed = chosen || route.stages.some((s) => Math.abs(s.endKm - position!.km) <= CLAIM_KM + EPS);
-    const town = townNear(f, position!.km);
+    const town = townNear(f.settlements, f.matches, position!.km);
     const first = claimed
       ? W.shareProgressStopped(town === null ? sentenceKm(position!.km, q) : W.shareProgressNearTown(town, innerKm(position!.km, q)))
       : W.shareProgressWhere(sentenceKm(position!.km, q), town);
@@ -141,10 +141,10 @@ export function progressText(f: ShareFacts): string | null {
     let from: string;
     if (atPosition) {
       const q = qualityOf(position!);
-      const town = townNear(f, position!.km);
+      const town = townNear(f.settlements, f.matches, position!.km);
       from = town === null ? fromKm(position!.km, q) : W.shareProgressNearTown(town, innerKm(position!.km, q));
     } else {
-      const town = townNear(f, held(ride.startKm));
+      const town = townNear(f.settlements, f.matches, held(ride.startKm));
       from = town === null ? plainKm(ride.startKm) : W.shareProgressNearTown(town, plainKm(ride.startKm));
       named = namedKm(ride.startKm);
     }
