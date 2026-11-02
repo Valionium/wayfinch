@@ -18,6 +18,13 @@ export const W = {
   leavebyExclusions: 'Wind, weather and extra stops are not included.',
   demoBasis: 'Demo, recorded data',
 
+  // ---- Route files (GPX) ----
+  routeGpxTooLarge: 'Choose a GPX file of 20 MB or less.',
+  routeGpxTooManyPoints: 'This GPX has more than 200,000 points. Export a simplified track and try again.',
+  routeGpxTooManySections: 'This GPX has more than 500 separate sections. Export fewer sections and try again.',
+  routeGpxUnreadable: 'That did not read as a GPX track or route with valid coordinates.',
+  routeTrackTooLong: 'The track distance could not be processed. Try a shorter or simplified GPX.',
+
   /** "Mapped as a weather shelter, not checked." and the same line for each other roof kind. */
   shelterMappedAs: (what: string): string => `Mapped as ${what}, not checked.`,
   /** Call ahead and rescue points. `date` is the map data's date, such as "28 Oct". */

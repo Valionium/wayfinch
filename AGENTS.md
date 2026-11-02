@@ -14,9 +14,13 @@ Exist so far:
 src/core/      pure TypeScript, no DOM, fully unit-tested
   geo/         distances
   places/      place types, pack format, classification
+  answers/     makeAnswer, the final comparator, the one time formatter
+  wording/     every user-facing string (en.ts)
+  route/       rounded form, GPX reading, stages, climbs, sample grid, hash
 tests/
   unit/        Vitest
   gen/         shared generators; extend these instead of writing your own
+  fixtures/    one-line builders (build.ts, route.ts), banned words, device zones
 tools/         project scripts
 ```
 
