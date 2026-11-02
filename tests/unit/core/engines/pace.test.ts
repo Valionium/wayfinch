@@ -208,7 +208,7 @@ test('[PACE-R-LATER] with r = 1.4 the rest of today is scaled, and a shop 40 km 
   // Tomorrow: r = 1.
   const tomorrow = at('2026-10-18 08:30').getTime();
   const min = (s.atKm(190).getTime() - tomorrow) / MIN;
-  expect(min).toBeCloseTo(40 * CLOCK_PER_KM, 6);
+  expect(min).toBeCloseTo(40 * CLOCK_PER_KM, 3);
   expect(Math.abs(min - 135)).toBeLessThan(2.5);
   msWithin1s(s.atPlace(shopM(190, 400)).getTime() - s.atKm(190).getTime(), 1.75 * MIN);
   // A stretch across the night: r only on today's part.

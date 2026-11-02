@@ -13,6 +13,11 @@ const areaOf = (key: string): string | undefined =>
 
 // Test values for each template function. A new template without an entry here fails the test below.
 const TEMPLATE_ARGS: Record<string, unknown[][]> = {
+  daylightLightsOnFrom: [['18:42']],
+  daylightDarkFrom: [['19:17']],
+  daylightLeft: [['3 h 30 min']],
+  daylightFromSunrise: [['10 h 47 min', '07:55']],
+  daylightSunSet: [['18:42', '07:20'], ['18:42', null]],
   shelterMappedAs: [['a weather shelter'], ['a bus stop'], ['bike parking']],
   callAsMapped: [['28 Oct'], ['3 Jan']],
   weatherScenariosShowRain: [[7, '14:30'], [3, '09:00']],

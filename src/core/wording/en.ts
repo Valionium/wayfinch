@@ -25,6 +25,17 @@ export const W = {
   routeGpxUnreadable: 'That did not read as a GPX track or route with valid coordinates.',
   routeTrackTooLong: 'The track distance could not be processed. Try a shorter or simplified GPX.',
 
+  // ---- Daylight (section 6.5). Times as "HH:MM", spans as "3 h 30 min". ----
+  daylightAllNight: 'light all night',
+  daylightDarkAllDay: 'dark all day',
+  daylightLightsOnAllDay: 'lights on all day',
+  daylightLightsOnFrom: (time: string): string => `lights on from ${time}`,
+  daylightDarkFrom: (time: string): string => `dark from ${time}`,
+  daylightLeft: (span: string): string => `${span} of daylight left`,
+  daylightFromSunrise: (span: string, sunrise: string): string => `${span} of daylight from sunrise at ${sunrise}`,
+  daylightSunSet: (sunset: string, firstLight: string | null): string =>
+    firstLight ? `The sun set at ${sunset}. First light tomorrow ${firstLight}.` : `The sun set at ${sunset}.`,
+
   /** "Mapped as a weather shelter, not checked." and the same line for each other roof kind. */
   shelterMappedAs: (what: string): string => `Mapped as ${what}, not checked.`,
   /** Call ahead and rescue points. `date` is the map data's date, such as "28 Oct". */
