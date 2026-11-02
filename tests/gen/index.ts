@@ -11,3 +11,12 @@ export const latLng = (): fc.Arbitrary<LatLng> =>
 export { coordinate, osmTags, place, shelterTags, stopCluster, zoneOf, GEN_DATA_DATE } from './places.ts';
 export { hoursValue } from './hours.ts';
 export { metaManifest, packEntry, packManifest, rescuePoint, roof, sha256Hex, tileBytes, tileContent, tileFileFor } from './packs.ts';
+export { placesAlong } from './along.ts';
+export { clock, departureDate, startTime, sunOf, sunSpec } from './clocks.ts';
+export { baselineOf, forecastChoice, forecastOf } from './forecasts.ts';
+export { plannedKm, positions } from './positions.ts';
+export { loadSummary, profile, waterLeft } from './profiles.ts';
+export { route } from './routes.ts';
+export { scenario } from './scenario.ts';
+export { stageChoice, stagesOf, withStages } from './stages.ts';
+export { ageH, chancePct, distanceM, edgeMin, gustKmh, onThreshold, rainMm, tempC } from './thresholds.ts';

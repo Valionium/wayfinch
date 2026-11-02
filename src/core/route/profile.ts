@@ -17,7 +17,8 @@ import { roundPoint } from './round.ts';
 /** Load Check refuses a track longer than this. */
 const MAX_TRACK_KM = 100_000;
 
-export async function buildRoute(raw: RawPoint[], name: string, source: 'gpx' | 'planned'): Promise<Route> {
+/** Everything but the hash, which alone needs an async digest. */
+export function assembleRoute(raw: RawPoint[], name: string, source: 'gpx' | 'planned'): Route {
   const points: RoutePoint[] = [];
   let distance = 0;
   raw.forEach((p, i) => {
@@ -41,11 +42,13 @@ export async function buildRoute(raw: RawPoint[], name: string, source: 'gpx' | 
     ascentM = Math.round(total / 10) * 10;
   }
 
-  const hash = await routeHash(points);
-  const route: Route = {
-    id: `route-${hash.slice(0, 12)}`, name, points, lengthKm: distance, ascentM,
-    stages: [], climbs: [], source, sampleGrid: [], hash,
-  };
+  const route: Route = { id: '', name, points, lengthKm: distance, ascentM, stages: [], climbs: [], source, sampleGrid: [], hash: '' };
   route.climbs = findClimbs(route);
   return route;
+}
+
+export async function buildRoute(raw: RawPoint[], name: string, source: 'gpx' | 'planned'): Promise<Route> {
+  const route = assembleRoute(raw, name, source);
+  const hash = await routeHash(route.points);
+  return { ...route, id: `route-${hash.slice(0, 12)}`, hash };
 }

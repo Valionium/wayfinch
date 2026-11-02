@@ -15,11 +15,16 @@ src/core/      pure TypeScript, no DOM, fully unit-tested
   geo/         distances
   places/      place types, pack format, classification
   answers/     makeAnswer, the final comparator, the one time formatter
+  engines/     the answer engines: one pace, one trip day, one hours check
+  hours/       prepared opening hours; only spans.ts reaches the library
+  screen/      screen(inputs): the whole stop screen, never throws
   wording/     every user-facing string (en.ts)
   route/       rounded form, GPX reading, stages, climbs, sample grid, hash
 tests/
   unit/        Vitest
   gen/         shared generators; extend these instead of writing your own
+  sim/         the simulator: harness, checks (tests/sim/checks.ts), its run
+  regressions/ saved simulator failures, replayed on every run (added only with the owner)
   fixtures/    one-line builders (build.ts, route.ts), banned words, device zones
 tools/         project scripts
 ```
@@ -32,9 +37,11 @@ Planned, in spec section 4.2: `src/core/` engines, `src/data/`, `src/store/`, `s
 
 | Command | Runs |
 | --- | --- |
-| `npm run fast` | types, lint and the tests touched by this change, with 25 runs per property |
+| `npm run fast` | types, lint, the tests touched by this change with 25 runs per property, 100 simulator scenarios and the rule check |
 | `npm test` | types, lint and all unit and property tests |
 | `npm run types`, `npm run lint`, `npm run unit` | one part |
+| `npm run sim -- --seed S --count N` | the simulator: N invented trip moments, each screen checked; a failure saves `tests/regressions/<ID>-<seed>.json` |
+| `npm run sim:replay -- <file>` | one saved simulator case; exits with an error while it still fails |
 | `npm run rules` | the rule check: every rule ID in force has a test, every ID a test names is defined |
 | `npm run rules -- show <PREFIX>` | the rules of one area (for example `W`) and the tests naming them |
 | `npm run rules -- --final` | as `rules`, and fails while any `later:` line remains |

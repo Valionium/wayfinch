@@ -13,6 +13,20 @@ const areaOf = (key: string): string | undefined =>
 
 // Test values for each template function. A new template without an entry here fails the test below.
 const TEMPLATE_ARGS: Record<string, unknown[][]> = {
+  routePositionKm: [['80','165']],
+  routePositionNear: [['Rheinstetten']],
+  routePositionOff: [['1.5']],
+  routeAccuracyM: [['12']],
+  routeAccuracyKm: [['1.2']],
+  routeAccuracyApproximate: [['±800 m']],
+  routeAsOf: [['14:20','40 min ago']],
+  routeAgeMin: [['40']],
+  routeAgeHours: [['3']],
+  routeAgeDays: [['3']],
+  routeRejoinNote: [['1.3']],
+  routeStripTomorrow: [['Sun 18 Oct'],['']],
+  routeStripKm: [['40']],
+  routeStripEndText: [['40 km','about 16:35']],
   helpNearest: [['bike shop','Velo','78']],
   helpNone: [['pharmacy']],
   helpNoneAhead: [['station']],

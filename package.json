@@ -13,7 +13,9 @@
     "unit": "vitest run",
     "test": "npm run types && npm run lint && npm run unit",
     "fast": "node tools/fast.mjs",
-    "rules": "node tools/rules.mjs"
+    "rules": "node tools/rules.mjs",
+    "sim": "node tools/sim.mjs",
+    "sim:replay": "node tools/sim-replay.mjs"
   },
   "devDependencies": {
     "@fast-check/vitest": "0.5.0",
