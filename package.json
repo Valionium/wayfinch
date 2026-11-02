@@ -13,6 +13,7 @@
     "unit": "vitest run",
     "test": "npm run types && npm run lint && npm run unit",
     "fast": "node tools/fast.mjs",
+    "qa": "node qa/run-all.cjs",
     "rules": "node tools/rules.mjs",
     "sim": "node tools/sim.mjs",
     "sim:replay": "node tools/sim-replay.mjs"

@@ -2,7 +2,7 @@ import tseslint from 'typescript-eslint';
 
 // Spec section 12.4: rules that keep hidden inputs out of src/core and browser services out of Ahead.
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'coverage/**'] },
+  { ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'qa/**', 'public/**'] },
   ...tseslint.configs.recommended,
   {
     files: ['src/core/**'],

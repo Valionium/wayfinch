@@ -1,0 +1,110 @@
+'use strict';
+// Bike details dialog (spec 3.7, 7.1, 7.4): sections, openers, validation sentences, comparison, wording, decimal commas.
+const assert=require('node:assert/strict');
+const {appVM}=require('./app-vm.cjs');
+const app=appVM(),originalGet=app.context.document.getElementById;
+const get=id=>{
+  const node=originalGet(id);
+  if(!node.uiMock){
+    node.uiMock=true;const classes=new Set(id==='bikeDetailsBox'||id==='bikeRemovePrompt'?['hidden']:[]);
+    node.classList={add(...n){n.forEach(x=>classes.add(x));},remove(...n){n.forEach(x=>classes.delete(x));},
+      contains(n){return classes.has(n);},toggle(n,f){const on=f??!classes.has(n);on?classes.add(n):classes.delete(n);return on;}};
+    node.focus=()=>{app.context.document.activeElement=node;};
+  }
+  return node;
+};
+app.context.document.getElementById=get;app.context.document.removeEventListener=()=>{};
+app.run('renderKit=()=>{};drawRig=()=>{};renderResult=()=>{};queueDraftSave=()=>{};renderBikeProfiles=()=>{};renderPressureHelper=()=>{};closeBagPop=()=>{};');
+let checks=0;const check=(v,m)=>{assert.ok(v,m);checks++;};
+const html=app.html;
+const field=(id,value)=>{get(id).value=value;};
+const issue=()=>app.run('fitFieldsIssue()');
+const reset=()=>{['fitSizeNumber','fitTriTop','fitTriSeat','fitTriDown','fitSeatGap','fitBarWidth','fitMaxWeight'].forEach(id=>field(id,''));
+  field('fitMaxUnit','kg');field('fitMaxIncludes','');field('fitSizeLetter','');field('fitSizeUnit','cm');
+  ['fitBoltSt','fitBoltDt','fitBoltUn','fitTopTube'].forEach(id=>field(id,'unknown'));app.run("$('fitStyleChoices').dataset.value='unknown'");};
+reset();
+
+// [BK-UI-01] the sections
+{
+  const a=html.indexOf('id="bikeDetailsBox"'),b=html.indexOf('id="pressureToolBox"');
+  const dlg=html.slice(a,b);
+  check(a>0 && a<b && dlg.includes('id="bikeFrameSection"') && dlg.includes('id="bikeMaxWeightSection"') && /Today's details/.test(dlg),'BK-UI-01 Frame, Maximum weight and Today\'s details');
+  check(!/<h3[^>]*>\s*(Look|Geometry)\b/i.test(dlg) && !/id="bike(Look|Geometry)/i.test(dlg),'BK-UI-01 no Look or Geometry section');
+  check(html.indexOf('id="bikeProfilePanel"')>a && html.indexOf('id="bikeProfilePanel"')<b,'BK-UI-01 the editor moved out of the tyre tool into the dialog');
+}
+// [BK-UI-02] openers, and focus returns to the opener
+{
+  for(const id of ['rigBikeDetails','bikeDetailsOpen','pressureEditBike','bikeToolEdit']){
+    const m=html.match(new RegExp('<button[^>]*id="'+id+'"[^>]*>'));
+    check(m && /bikeDetailsBox/.test(html.slice(html.indexOf('id="'+id+'"')-200,html.indexOf('id="'+id+'"')+400)) || id==='pressureEditBike','BK-UI-02 opener '+id+' is in the page');
+  }
+  check(/\$\('rigBikeDetails'\)\.onclick=\(\)=>openBikeDetails/.test(app.script) && /\$\('bikeDetailsOpen'\)\.onclick=\(\)=>openBikeDetails/.test(app.script) && /\$\('pressureEditBike'\)\.onclick=\(\)=>openBikeDetails/.test(app.script),'BK-UI-02 each opener calls openBikeDetails');
+  app.run(`document.getElementById('legalBox').classList.add('hidden');document.getElementById('walkthroughBox').classList.add('hidden');`);
+  const opener=get('rigBikeDetails');opener.isConnected=true;
+  let error=null;
+  try{app.run("openBikeDetails(document.getElementById('rigBikeDetails'))");
+    check(!get('bikeDetailsBox').classList.contains('hidden'),'BK-UI-02 the dialog opens');
+    app.run('closeBikeDetails()');
+    check(get('bikeDetailsBox').classList.contains('hidden'),'BK-UI-02 the dialog closes');
+    check(app.context.document.activeElement===opener,'BK-UI-02 focus returns to the opener');
+  }catch(e){error=e;}
+  if(error)throw error;
+}
+// [BK-UI-03] the dialog rejects what the normaliser would drop, with the spec's sentences
+{
+  field('fitTriTop','20');field('fitTriSeat','30');field('fitTriDown','60');
+  check(issue()==="These lengths don't make a triangle. Measure inside the frame, tube to tube.",'BK-UI-03 the triangle sentence');
+  field('fitTriTop','200');check(/15 to 90 cm/.test(issue()),'BK-UI-03 a named range for a 200 cm side');
+  field('fitTriTop','51,1');field('fitTriSeat','35');field('fitTriDown','65');check(issue()==='','BK-UI-03 a valid triangle with a decimal comma passes');
+  field('fitTriDown','');check(/all three/.test(issue()),'BK-UI-03 two lengths are not enough');
+  ['fitTriTop','fitTriSeat','fitTriDown'].forEach(id=>field(id,''));
+  field('fitSeatGap','2');check(/3 to 60 cm/.test(issue()),'BK-UI-03 seat gap range');field('fitSeatGap','');
+  field('fitBarWidth','90');check(/10 to 80 cm/.test(issue()),'BK-UI-03 bar width range');field('fitBarWidth','');
+  field('fitMaxWeight','300');field('fitMaxIncludes','bike');
+  check(issue()==='Did you mean 300 lb (136 kg)?','BK-UI-03 the pounds query');
+  field('fitMaxWeight','500');check(/20 to 400 kg/.test(issue()),'BK-UI-03 500 kg is rejected');
+  field('fitMaxWeight','10');check(/20 to 400 kg/.test(issue()),'BK-UI-03 10 kg is rejected');
+  field('fitMaxWeight','300');field('fitMaxUnit','lb');check(issue()==='','BK-UI-03 300 lb passes');
+  field('fitMaxIncludes','');check(/includes the bike/.test(issue()),'BK-UI-03 the question about the bike must be answered');
+  reset();
+  field('fitSizeNumber','29');field('fitSizeUnit','in');check(issue()==='That looks like a wheel size, not a frame size.','BK-UI-03 a wheel size is not a frame size');
+  reset();
+  // what the dialog reads is exactly what the normaliser keeps
+  field('fitSizeNumber','54');field('fitMaxWeight','120');field('fitMaxIncludes','no-bike');
+  const read=JSON.parse(app.run('JSON.stringify(readBikeProfileEditor())'));
+  check(read.fit.size.kind==='cm' && read.fit.size.value===54 && read.maxWeight.v===120 && read.maxWeightAsked===true,'BK-UI-03 the editor hands the normaliser what was typed');
+  reset();
+}
+// [BK-UI-04] the setup comparison
+{
+  const rows=JSON.parse(app.run(`(()=>{
+    const mk=(fit,mw)=>normaliseSetup({...captureDraft(),id:'s_'+Math.random().toString(36).slice(2),name:'S',saved:'2026-10-30',predicted:{mounted:35,kit:31,spare:4,spilled:0,kg:14},bikeProfile:{id:'c',name:'C',fit,maxWeight:mw}});
+    try{return JSON.stringify(setupComparisonRows(mk({style:'compact',size:{kind:'letter',value:'M'}},{v:120,u:'kg',includes:'bike'}),mk({style:'trapeze',size:{kind:'letter',value:'L'}},{v:130,u:'kg',includes:'bike'})));}catch(e){return JSON.stringify({error:String(e)});}
+  })()`));
+  if(rows.error)throw new Error(rows.error);
+  const row=n=>rows.find(r=>r.name===n);
+  check(row('Bike · frame style').left==='Compact' && row('Bike · frame style').right==='Trapeze','BK-UI-04 frame style');
+  check(row('Bike · frame size').left==='M' && row('Bike · frame size').right==='L','BK-UI-04 frame size');
+  check(/120 kg/.test(row('Bike · maximum weight').left) && /130 kg/.test(row('Bike · maximum weight').right),'BK-UI-04 maximum weight');
+}
+// [BK-UI-05] no gender question, no banned word
+{
+  const a=html.indexOf('id="bikeDetailsBox"'),b=html.indexOf('id="pressureToolBox"');
+  const dlg=html.slice(a,b).replace(/<[^>]+>/g,' ');
+  check(!/\b(gender|male|female|woman|women|man|men|boy|girl|ladies)\b/i.test(dlg),'BK-UI-05 no gender question');
+  const words=JSON.parse(app.run('JSON.stringify(Object.values(BIKE_WORDING))'));
+  const banned=/\bsafe\b|\bOK\b|okay|approv|certif|guarant/i;
+  check(words.every(w=>!banned.test(w.text)),'BK-UI-05 no banned word in the bike wording table');
+  check(words.filter(w=>w.limit).every(w=>/you entered/.test(w.text)),'BK-UI-05 every limit sentence says "you entered"');
+  check(!banned.test(dlg),'BK-UI-05 no banned word in the dialog');
+}
+// [BK-UI-06] decimal commas
+{
+  reset();
+  field('fitSeatGap','21,5');field('fitBarWidth','38,5');field('fitMaxWeight','120,5');field('fitMaxIncludes','bike');field('fitTriTop','51,1');field('fitTriSeat','35,0');field('fitTriDown','65,0');
+  const p=JSON.parse(app.run('JSON.stringify(readBikeProfileEditor())'));
+  check(p.fit.seatGapCm===21.5 && p.fit.barWidthCm===38.5 && p.maxWeight.v===120.5 && p.fit.triangleCm.top===51.1,'BK-UI-06 "12,5" means 12.5 in every number field');
+  field('fitSeatGap','1.234,5');check(/3 to 60 cm/.test(issue()),'BK-UI-06 a number that is not plain is rejected with its range, not read as 1 or 234');
+  reset();
+}
+console.log(JSON.stringify({suite:'bike-details-ui',checks}));
