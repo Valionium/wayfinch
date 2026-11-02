@@ -203,6 +203,7 @@ function windowOf(run: Run, cls: 'likely' | 'possible', f: StoredForecast, zoneA
     heavy: inBand.some((h) => hourClass(h).heavy),
     detail: detail === 'seasonal' ? 'trend' : detail,
     metKms: met.map((m) => m.km), thunderKms, onAndOff: run.bridged, hoursFrom: new Date(hoursFrom), hoursTo: new Date(hoursTo),
+    hail: rain.some((h) => h.code === 96 || h.code === 99),
   };
 }
 
@@ -284,7 +285,7 @@ export function windowWhen(w: RainWindow, tz: string): string {
   if (w.kind !== 'rain') return `${W.rainHours(formatHm(w.hoursFrom, tz), formatHm(w.hoursTo, tz))}${area}`;
   const parts = [W.rainFrom(formatRainOnset(w.onset!, tz))];
   if (w.onAndOff) parts.push(W.rainOnAndOff);
-  if (w.end) parts.push(W.rainDryAgain(formatRainEnd(w.end, tz)));
+  if (w.end && w.cls === 'likely') parts.push(W.rainDryAgain(formatRainEnd(w.end, tz)));
   return parts.join(', ');
 }
 

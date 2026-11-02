@@ -69,10 +69,23 @@ export type RainWindow = {
   thunderKms: Km[]; // those with a thunderstorm hour in their band
   onAndOff: boolean; // an unmet point was bridged
   hoursFrom: Date; hoursTo: Date; // the rain periods on whole hours, for an area's wording
+  hail: boolean; // a code that includes hail (96, 99) among its hours
 };
 export type Cover = {
   placeId: string | null; roof: Roof | null; km: Km; offRouteM: number; arrival: Date;
   coverClass: 1 | 2 | 3 | 4 | 5; openUntil: Date | null; lightning: boolean;
+};
+/** One likely window's plan (section 6.11). Lines are composed by the plan, which knows the places. */
+export type RainPlan = {
+  window: RainWindow; m: Km;
+  covers: Cover[]; // at most three, best first
+  firstCoverLine: string | null; // what the Weather card shows for the first cover
+  none: string | null; // 'No mapped cover before km 95 (about 14:40)'
+  behind: string | null; // the nearest cover behind, or that there is none; never part of the plan's covers
+  listInstead: Cover[] | null; // rain at the start: the Shelter chip's list in the plan's place
+  listLines: string[]; // that list's lines
+  notCounted: { placeId: string; km: Km; reason: string }[]; // listed after the covers, marked, never counted
+  missing: Missing[]; // the data whose absence this plan's answer rests on
 };
 export type StopIdea = {
   trigger: 'last-chance' | 'gap' | 'rain' | 'heat' | 'meal' | 'rhythm';
