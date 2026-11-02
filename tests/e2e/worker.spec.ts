@@ -125,6 +125,15 @@ test('[SW-PARTIAL] a cache left without its last entry, as a killed browser leav
     }
   }, [`wayfinch-precache-${next.build}`, 'wayfinch-precache-000000000000']);
 
+  // Gone by the next attempt, even one that fails too.
+  server.failNext('/');
+  expect(await updateAndSettle(page)).toBe('redundant');
+  expect(await cacheNames(page)).toEqual(['loadcheck-offline-v1']);
+  expect(await activeWorkerKind(page)).toBe('legacy');
+
+  await page.evaluate(async (name) => {
+    await (await caches.open(name)).put('/', new Response('half-saved', { headers: { 'content-type': 'text/html' } }));
+  }, `wayfinch-precache-${next.build}`);
   expect(await updateAndSettle(page)).toBe('activated');
   expect(await activeWorkerKind(page)).toBe('new');
   expect(await cacheNames(page)).toEqual([`wayfinch-precache-${next.build}`]);
