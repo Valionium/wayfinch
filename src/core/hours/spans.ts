@@ -10,6 +10,9 @@
 // - The device's own skipped hour can't be put to the library at all. It reads unknown (Decision 8). A time inside it
 //   also comes back from the library one hour late, so the same length after it is read minute by minute with
 //   getState, which goes by the fields of the Date and is not moved (found by trying it: see device-zones.test.ts).
+// - The library finds the day a time over midnight began on by going 24 hours back. On the night after the device's skipped
+//   hour that lands two days back, for as long as the gap: found by the simulator. A tag of weekdays and times alone reads
+//   the same a week later, where the library is right. Any other tag with a time over midnight reads unknown then.
 import OpeningHours from 'opening_hours';
 import { wallClock, zoneOffsetMin, type WallClock } from '../answers/time';
 import type { HoursSpan } from '../types';
@@ -25,6 +28,7 @@ type State = HoursSpan['state'];
 
 const MIN = 60_000;
 const DAY = 86_400_000;
+const WEEK = 7 * DAY;
 
 const naiveOf = (t: Date, tz: string): number => t.getTime() + zoneOffsetMin(t, tz) * MIN;
 const offsetMs = (ms: number, tz: string): number => zoneOffsetMin(new Date(ms), tz) * MIN;
@@ -110,6 +114,23 @@ function parseTag(tag: string, region: ReturnType<typeof regionOf>): OpeningHour
   }
 }
 
+const minutesOf = (hours: string, minutes: string): number => Number(hours) * 60 + Number(minutes);
+
+/** Whether any rule holds a time over midnight: an end at or before its start, past 24:00, or an open end. */
+function runsOverMidnight(text: string): boolean {
+  if (/\d\+/.test(text)) return true;
+  return [...text.matchAll(/(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})/g)].some(([, h0, m0, h1, m1]) => {
+    const end = minutesOf(h1!, m1!);
+    return end > 24 * 60 || end <= minutesOf(h0!, m0!);
+  });
+}
+
+/**
+ * Rules of plain weekdays and times, which read the same a week later. Listed this way round, so that any selector not
+ * named here (Su[1], week 13, Mar, PH, easter, +1 days, a comment) counts as looking at the calendar.
+ */
+const WEEKDAYS_AND_TIMES = /^(?:\b(?:Mo|Tu|We|Th|Fr|Sa|Su|off|closed|open)\b|\d{1,2}:\d{2}\+?|24\/7|[-,;\s]|\|\|)*$/;
+
 /** The tag's segments between two naive times, closed included, or null when the library rejects it. */
 function readTag(o: OpeningHours, n0: number, n1: number): Seg[] | null {
   let intervals: [Date, Date, boolean, string | undefined][];
@@ -129,6 +150,9 @@ function readTag(o: OpeningHours, n0: number, n1: number): Seg[] | null {
   }
   if (at < n1) segs.push({ from: at, to: n1, state: 'closed' });
 
+  const pretty = o.prettifyValue();
+  const overMidnight = runsOverMidnight(pretty);
+  const calendar = !WEEKDAYS_AND_TIMES.test(pretty);
   for (const [gapFrom, gapTo] of deviceGaps(n0, n1)) {
     const after = gapTo + (gapTo - gapFrom);
     const reread: Seg[] = [];
@@ -141,6 +165,16 @@ function readTag(o: OpeningHours, n0: number, n1: number): Seg[] | null {
     const a = Math.max(gapFrom, n0);
     const b = Math.min(gapTo, n1);
     if (b > a) segs = overlay(segs, a, b, [{ from: a, to: b, state: 'unknown', reason: W.foodHoursUnknown }]);
+    if (!overMidnight) continue;
+    const midnight = Math.floor(gapFrom / DAY) * DAY + DAY;
+    const nextNight: Seg[] = [];
+    for (let n = Math.max(midnight, n0); n < Math.min(midnight + (gapTo - gapFrom), n1); n += MIN) {
+      const state: State = calendar ? 'unknown' : stateOf(o, toDevice(n + WEEK));
+      const last = nextNight.at(-1);
+      if (last?.state === state) last.to = n + MIN;
+      else nextNight.push({ from: n, to: n + MIN, state, ...(state === 'unknown' ? { reason: W.foodHoursUnknown } : {}) });
+    }
+    if (nextNight.length) segs = overlay(segs, nextNight[0]!.from, nextNight.at(-1)!.to, nextNight);
   }
   return segs;
 }

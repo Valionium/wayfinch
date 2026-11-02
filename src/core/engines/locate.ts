@@ -109,13 +109,17 @@ export function manualPosition(route: Route, km: Km, at: Date): Position | null 
   return { ...pointAtRouteKm(route, held), accuracyM: 0, at, km: held, offRouteM: 0, source: 'manual', approximate: false };
 }
 
-/** The latest position by time. Of two from the same moment, the manual one: it always overrides GPS. */
+/**
+ * Which of two positions came later: by time; of two from the same moment the manual one, which always overrides GPS; then
+ * a fixed order, the more accurate last, so that the list's order decides nothing and every engine reads the same one.
+ */
+export const positionOrder = (a: Position, b: Position): number =>
+  a.at.getTime() - b.at.getTime() || Number(a.source === 'manual') - Number(b.source === 'manual')
+  || a.km - b.km || a.lat - b.lat || a.lon - b.lon || b.accuracyM - a.accuracyM || b.offRouteM - a.offRouteM;
+
+/** The latest position, as `positionOrder` says. */
 export function latestPosition(positions: Position[]): Position | null {
   let best: Position | null = null;
-  for (const p of positions) {
-    if (!best) { best = p; continue; }
-    const d = p.at.getTime() - best.at.getTime();
-    if (d > 0 || (d === 0 && p.source === 'manual' && best.source !== 'manual')) best = p;
-  }
+  for (const p of positions) if (!best || positionOrder(p, best) > 0) best = p;
   return best;
 }

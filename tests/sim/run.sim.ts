@@ -2,7 +2,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { CHECKS } from './checks.ts';
+import { CHECKS, INV10_REACH, INV26_GATE, INV26_REACH } from './checks.ts';
 import { decodeCase, GATE, replayCase, reportFailure, runSim, SELF_TEST_CHECK, type SavedCase } from './harness.ts';
 
 const REGRESSIONS = resolve(process.env.SIM_REGRESSIONS ?? 'tests/regressions');
@@ -32,7 +32,10 @@ if (replay) {
     console.log(`[sim] seed ${seed}, ${count} scenarios, ${report.msPerScreen.toFixed(1)} ms per screen`);
     for (const [id, n] of Object.entries(report.applied)) console.log(`[sim] ${id}: applied to ${n}`);
     for (const [part, n] of Object.entries(report.faults)) console.log(`[sim] guarded failure in ${part}: ${n}`);
+    console.log(`[sim] INV-26 allowances reached: skipped hour ${INV26_REACH.skippedHour}, the night after ${INV26_REACH.nightAfter}`);
     expect(report.failures.map((c) => `${c.id}: ${c.message}`)).toEqual([]);
+    console.log(`[sim] INV-10 plain roofs left undrawn by the storm rule: ${INV10_REACH.roofsUndrawn}`);
+    if (count >= 1000) expect(Math.min(INV26_REACH.skippedHour, INV26_REACH.nightAfter, INV10_REACH.roofsUndrawn)).toBeGreaterThanOrEqual(INV26_GATE);
     expect(report.gateFailures).toEqual([]);
   });
 

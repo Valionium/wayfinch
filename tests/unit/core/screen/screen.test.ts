@@ -10,6 +10,7 @@ import { preparedHours } from '../engines/leaveby-helpers.ts';
 import { stamps } from '../engines/weather-helpers.ts';
 import type { Spot } from '../engines/water-helpers.ts';
 import { inputsOf } from './screen-helpers.ts';
+import { scenario } from '../../../gen/scenario.ts';
 
 const FRI = '2026-10-16';
 const SAT = '2026-10-17';
@@ -370,6 +371,46 @@ describe('the strip', () => {
     }));
     expect(possible.strip.icons.filter((x) => x.kind === 'cover')).toEqual([]);
   });
+  describe('a plain roof as a rain plan\'s first cover, by the owner\'s ruling of 2 Nov 2026', () => {
+    const trip = testTrip({ route: flatRoute(300, { stageEnds: [150, 300] }) });
+    const morning = { trip, positions: [pos({ km: 0.1, at: `${SAT} 07:50` })], now: `${SAT} 08:00` };
+    const storm = (range: [number, number]) => ({ range, stamps: stamps(SAT, 9, 14), pp: 80, mm: 1, code: 95 });
+    const rain = { range: [90, 100] as [number, number], stamps: stamps(SAT, 11, 16), pp: 80, mm: 1 };
+    const icons = (s: Screen): number[] => s.strip.icons.filter((x) => x.kind === 'cover').map((x) => x.km);
+    const firstCover = (i: ScreenInputs): number | undefined => buildScreen(i).parts.plans.find((p) => p.window.kind !== 'thunder')?.covers[0]?.km;
+
+    test('[INV-10] not drawn inside a thunderstorm band', () => {
+      const i = inputsOf({ ...morning, roofs: [busStop().atKm(55)], spells: [storm([50, 60]), rain] });
+      expect(firstCover(i)).toBe(55);
+      expect(icons(screen(i))).toEqual([]);
+    });
+    test('[INV-10] not drawn up to 5 km before it', () => {
+      const i = inputsOf({ ...morning, roofs: [busStop().atKm(45)], spells: [storm([50, 60]), rain] });
+      expect(firstCover(i)).toBe(45);
+      expect(icons(screen(i))).toEqual([]);
+    });
+    test('[INV-10] drawn further before it, and with no storm about', () => {
+      const before = inputsOf({ ...morning, roofs: [busStop().atKm(44)], spells: [storm([50, 60]), rain] });
+      expect(firstCover(before)).toBe(44);
+      expect(icons(screen(before))).toEqual([44]);
+      const calm = inputsOf({ ...morning, roofs: [busStop().atKm(85)], spells: [rain] });
+      expect(firstCover(calm)).toBe(85);
+      expect(icons(screen(calm))).toEqual([85]);
+    });
+    test('[INV-10] drawn when the storm is on a later ride: that is no band on this strip', () => {
+      const later = { range: [150.4, 150.4] as [number, number], stamps: stamps('2026-10-18', 7, 12), pp: 80, mm: 1, code: 95 };
+      const late = { range: [150, 150] as [number, number], stamps: stamps(SAT, 15, 18), pp: 80, mm: 1 };
+      const i = inputsOf({ ...morning, roofs: [busStop().atKm(145.4)], spells: [late, later], opts: { extraKms: [150.4], from: '2026-10-16 01:00' } });
+      expect(firstCover(i)).toBeCloseTo(145.4, 6);
+      expect(screen(i).strip.bands.some((b) => b.kind === 'thunder')).toBe(false);
+      expect(icons(screen(i)).length).toBe(1);
+    });
+    test('[INV-10] an open building as first cover is drawn inside the band all the same', () => {
+      const i = inputsOf({ ...morning, spots: [{ b: cafe('Mo-Su 06:00-22:00'), km: 55 }], spells: [storm([50, 60]), rain] });
+      expect(icons(screen(i))).toContain(55);
+    });
+  });
+
   test('[HON-ONE-SCREEN] with rain at the start, the list\'s first cover is drawn, and a plain roof is not drawn in a thunderstorm', () => {
     const rain = { range: [0, 60] as [number, number], stamps: stamps(SAT, 8, 16), pp: 80, mm: 1 };
     const roof = busStop({ bench: true }).atKm(42);
@@ -506,4 +547,35 @@ test('[HON-SPEED] one screen on a 200 km route: measured and printed', () => {
   expect(measured(inputsOf({ ...base, spots: manySpots(200, 1000) }), 'stress: 200 km, 1,000 places')).toBeGreaterThan(0);
   const long = testTrip({ route: flatRoute(1600, { stageEnds: Array.from({ length: 15 }, (_, n) => (n + 1) * 100) }) });
   expect(measured(inputsOf({ trip: long, spells, spots: manySpots(1600, 3000), ...moment }), 'stress: 1,600 km, 3,000 places')).toBeGreaterThan(0);
+}, 120_000);
+
+test('[HON-BUDGET] one screen on a 200 km generated route: median under 150 ms, twice the 75 ms of section 11.1', () => {
+  const near = fc.sample(scenario(), { seed: 20261030, numRuns: 400 }).filter((i) => i.trip.route.lengthKm >= 150 && i.trip.route.lengthKm <= 260 && !i.routeZones.some((z) => z.timeZone === 'constructor')).slice(0, 25);
+  expect(near.length).toBeGreaterThanOrEqual(10);
+  const times = near.map((i) => {
+    const t0 = performance.now();
+    screen(i);
+    return performance.now() - t0;
+  }).sort((a, b) => a - b);
+  const median = times[Math.floor(times.length / 2)]!;
+  console.log(`[HON-BUDGET] ${times.length} generated moments on about 200 km: median ${median.toFixed(1)} ms, 95th ${times[Math.floor(times.length * 0.95)]!.toFixed(1)} ms`);
+  expect(median).toBeLessThan(150);
+}, 120_000);
+
+test('[HON-BUDGET] measured and printed for 200, 800 and 1,600 km', () => {
+  const spells = [{ range: [20, 60] as [number, number], stamps: stamps(SAT, 8, 18), pp: 80, mm: 1 }];
+  const moment = { positions: [pos({ km: 15, at: `${SAT} 09:00` })], now: `${SAT} 09:00` };
+  for (const km of [200, 800, 1600]) {
+    const trip = testTrip({ route: flatRoute(km, { stageEnds: Array.from({ length: Math.floor(km / 100) }, (_, n) => (n + 1) * 100) }) });
+    const i = inputsOf({ trip, spells, spots: manySpots(km, km), ...moment });
+    const times: number[] = [];
+    for (let n = 0; n < 20; n++) {
+      const t0 = performance.now();
+      screen(i);
+      times.push(performance.now() - t0);
+    }
+    times.sort((a, b) => a - b);
+    console.log(`[HON-BUDGET] ${km} km, ${km} places: median ${times[10]!.toFixed(1)} ms, 95th ${times[18]!.toFixed(1)} ms`);
+    expect(times[10]).toBeGreaterThan(0);
+  }
 }, 120_000);
