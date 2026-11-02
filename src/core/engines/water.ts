@@ -43,7 +43,7 @@ const monthOf = (word: string): number | null => {
 };
 
 /** A seasonal tag's window: 'year-round' for "no"; months and how to show them; null when it gives no window. */
-function seasonalWindow(value: string | null): 'year-round' | { months: Set<number>; label: string } | null {
+export function seasonalWindow(value: string | null): 'year-round' | { months: Set<number>; label: string } | null {
   const text = value?.trim();
   if (!text) return null;
   if (text.toLowerCase() === 'no') return 'year-round';
