@@ -6,14 +6,15 @@ import type { PackManifest } from '../src/core/places/types.ts';
 
 export const ISSUE_TITLE = 'Weekly place packs need a look';
 
-export type RunInput = { manifest: PackManifest | null; problems: string[]; publishFailed: boolean };
+/** `attempted`: the countries this run was asked to build; a last-good country outside it is normal in a partial run. Omitted means all. */
+export type RunInput = { manifest: PackManifest | null; problems: string[]; publishFailed: boolean; attempted?: string[] };
 
 export function problemsOfRun(input: RunInput): { title: string; body: string } | null {
   const lines: string[] = [];
   if (input.manifest === null) lines.push('- The weekly build could not be put together at all, so nothing new was made this week.');
   else {
     for (const [cc, c] of Object.entries(input.manifest.countries)) {
-      if (c.status === 'last-good') lines.push(`- ${cc}: this week's data was not used. The last good data from ${c.builtOn ?? 'an unknown date'} stays in place.`);
+      if (c.status === 'last-good' && (input.attempted === undefined || input.attempted.includes(cc))) lines.push(`- ${cc}: this week's data was not used. The last good data from ${c.builtOn ?? 'an unknown date'} stays in place.`);
       if (c.status === 'missing') lines.push(`- ${cc}: there is no data at all for this country, neither new nor from an earlier week.`);
     }
   }
@@ -29,6 +30,12 @@ export function problemsOfRun(input: RunInput): { title: string; body: string } 
     "If the same country shows up three weeks in a row, ask a helper or tool to read the failed job's log. The steps are in `pipeline/README.md`.",
   ].join('\n').replace(/\n{3,}/g, '\n\n');
   return { title: ISSUE_TITLE, body };
+}
+
+/** The countries the run was asked to build, cleaned up like the setup job does. Undefined means all (a scheduled run). */
+export function attemptedCountries(countries: string, forceFail: string): string[] | undefined {
+  const list = `${countries},${forceFail}`.split(',').map((c) => c.trim().toUpperCase()).filter((c) => /^[A-Z]{2}$/.test(c));
+  return countries.trim() === '' ? undefined : [...new Set(list)];
 }
 
 function readManifest(dir: string): PackManifest | null {
@@ -49,7 +56,8 @@ function main(): number {
   if (country !== 'success') problems.push(`country jobs: ${country}`);
   if (merge !== 'success') problems.push(`merge job: ${merge}`);
   const manifest = merge === 'success' ? readManifest(process.env['BUILD_DIR'] ?? 'pipeline/build') : null;
-  const found = problemsOfRun({ manifest, problems, publishFailed: process.env['PUBLISH_RESULT'] === 'failure' });
+  const attempted = attemptedCountries(process.env['COUNTRIES'] ?? '', process.env['FORCE_FAIL'] ?? '');
+  const found = problemsOfRun({ manifest, problems, publishFailed: process.env['PUBLISH_RESULT'] === 'failure', ...(attempted ? { attempted } : {}) });
   if (found === null) { console.log('No problems, no issue.'); return 0; }
   const open = JSON.parse(gh('issue', 'list', '--state', 'open', '--search', `"${ISSUE_TITLE}" in:title`, '--json', 'number,title')) as { number: number; title: string }[];
   const existing = open.find((i) => i.title === ISSUE_TITLE);

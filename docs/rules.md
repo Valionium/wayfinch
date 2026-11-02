@@ -60,6 +60,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - An unknown path gives a real 404 (place packs) [PIPE-PUB-04]
 - The workflow follows the safety rules (place packs) [PIPE-WF-01]
 - Every download has time limits and a retry (place packs) [PIPE-DL-01]
+- A cut-off download continues where it stopped, starts again if the server cannot resume, and ends in an error after the allowed attempts (place packs) [PIPE-DL-02]
 
 ## Shared
 
