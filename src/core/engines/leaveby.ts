@@ -78,9 +78,11 @@ export function passesOf(f: Pick<ScreenInputs, 'places' | 'matches'>): Pass[] {
   return out;
 }
 
-export const zoneOfPass = (x: Pass, f: Pick<ScreenInputs, 'routeZones'>): string =>
-  (isKnownZone(x.place.timeZone) ? x.place.timeZone : knownZone(zoneLookupOf(f.routeZones)(x.match.km).timeZone));
 const knownZone = (tz: string): string => (isKnownZone(tz) ? tz : 'UTC');
+/** The route's zone at a kilometre, or UTC when its name is one the phone doesn't know. */
+export const routeZoneAt = (f: Pick<ScreenInputs, 'routeZones'>, km: Km): string => knownZone(zoneLookupOf(f.routeZones)(km).timeZone);
+export const zoneOfPass = (x: Pass, f: Pick<ScreenInputs, 'routeZones'>): string =>
+  (isKnownZone(x.place.timeZone) ? x.place.timeZone : routeZoneAt(f, x.match.km));
 
 const insideRadius = (ride: DayRide, km: Km): boolean => ride.startKm < ride.behindFromKm && km >= ride.startKm && km <= ride.behindFromKm;
 
@@ -214,7 +216,6 @@ function sunOfStop(f: LeaveFacts, ride: DayRide): SunTimes {
 export const sunReadable = (sun: SunTimes): boolean =>
   sun.lightAllNight || ([sun.sunset, sun.dusk].every((t) => t === null || validDate(t)));
 
-const startZoneOf = (f: LeaveFacts, ride: DayRide): string => knownZone(zoneLookupOf(f.routeZones)(ride.startKm).timeZone);
 
 function dataNoteOf(f: LeaveFacts, ride: DayRide): string | null {
   const nothingSaved = f.savedKm.length === 0 || (f.places.length > 0 && f.hours.length === 0);
@@ -226,7 +227,7 @@ function planOf(f: LeaveFacts, ride: DayRide): Plan {
   const s = scheduleOf(f, ride);
   const stop = ride.stopKm;
   const sun = sunOfStop(f, ride);
-  const tz = startZoneOf(f, ride);
+  const tz = routeZoneAt(f, ride.startKm);
   const from = instantAt(ride.date, LATEST_START, tz).getTime();
   const to = instantAt(addDaysIso(ride.date, 1), '00:00', tz).getTime();
   const today = validDate(f.now) && ridingDate(f.now, zoneLookupOf(f.routeZones)(0).timeZone) === ride.date;
@@ -433,7 +434,7 @@ export function leaveBy(f: LeaveFacts, ride: DayRide): LeaveBy {
   if (keep.food) {
     const src = found.food!;
     const line = W.waitMissing(placeWord(src.place), showKm(src.match.km), until(src, closesAt(src, closesFor(p, planned, src, found.d)), f) ?? until(src, latestEnd(src), f) ?? '');
-    checks.push(checkOf(p, p.foodId!, p.food, false, [], foodOpen(hoursOf), line));
+    checks.push(checkOf(p, p.foodId!, p.food, false, keep.water ? p.water.map((x) => x.match) : [], foodOpen(hoursOf), line));
   }
 
   return {

@@ -308,6 +308,34 @@ describe('what never counts, and bad data', () => {
   });
 });
 
+describe('a clock change', () => {
+  test('[LB-DAYLIGHT] the ride on Sunday 25 October, when clocks go back at 03:00: 04:00 onward is on the new clock', () => {
+    const sun25 = '2026-10-25';
+    const r = lb({ trip: dayTo(90, { departureDate: sun25 }), now: '2026-10-24 20:00', sun: SUNSET_17, spots: TAPS });
+    expect(near(r.unrounded, `${sun25} 11:17:34`)).toBe(true);
+    expect(near(r.earliest, `${sun25} 04:00`)).toBe(true);
+  });
+  test('[LB-CLOSURE] closing hours across it read on the place\'s clock', () => {
+    const sat24 = '2026-10-24';
+    const r = lb({ trip: dayTo(90, { departureDate: sat24 }), now: '2026-10-23 20:00', sun: SUNSET_17, spots: [...TAPS, SHOP_30] });
+    expect(near(r.unrounded, `${sat24} 09:49:01`)).toBe(true);
+  });
+});
+
+describe('limits met together', () => {
+  test('[LB-WATER] a food place past a water source off the route: its arrival adds the source\'s round trip', () => {
+    const r = lb({ sun: SUNSET_17, spots: [{ b: cafe('Mo-Su 06:00-18:00'), km: 10, off: 400 }, { b: tap(), km: 12 }, { b: supermarket('Mo-Sa 08:00-12:00'), km: 30 }] });
+    const expected = at(`${SAT} 11:30`).getTime() - ((30 / 20.5) * 60 * 1.15 + 3.5) * 60_000;
+    expect(Math.abs(r.unrounded!.getTime() - expected)).toBeLessThanOrEqual(1000);
+    expect(r.kept).toEqual(['daylight', 'water', 'food-closure']);
+  });
+  test('[LB-WATER] one place that is both S1 and the food limit adds its round trip once', () => {
+    const r = lb({ sun: SUNSET_17, spots: [{ b: bakery('Mo-Sa 06:00-20:00'), km: 30, off: 400 }, { b: tap(), km: 35 }] });
+    const moved = at(`${SAT} 11:17:34`).getTime() - 3.5 * 60_000;
+    expect(Math.abs(r.unrounded!.getTime() - moved)).toBeLessThanOrEqual(1000);
+  });
+});
+
 describe('limitFor', () => {
   test('[LB-CLOSURE] limitFor reads the same limit: meets up to its latest departure and not after', () => {
     const f = leaveFacts(daylightCase([SHOP_30]));

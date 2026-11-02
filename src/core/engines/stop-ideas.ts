@@ -3,10 +3,10 @@
 import { compareFinal, formatAbout, formatHm } from '../answers/index.ts';
 import { instantAt, localIsoDate, wallClock } from '../answers/time.ts';
 import { kitchenHoursId, openAtArrival, openOnArrival, openRuns, stateAt } from '../hours/check.ts';
-import type { Km, Missing, Place, RainPlan, RouteMatch, ScreenInputs, Status, StopIdea } from '../types.ts';
+import type { Km, Missing, Place, RainPlan, ScreenInputs, Status, StopIdea } from '../types.ts';
 import { showKm, W } from '../wording/en.ts';
 import { isCover, coverOfSpot, savedCovers, seatedKind, seatingLine, spotName, type Spot as CoverSpot, type StopFacts } from './covers.ts';
-import { arrivalRidingOn, closingDay, closingWord, hoursIndex, isFoodPlace, isFoodShop, passesOf, placeWord, zoneOfPass, type LeaveBy, type LeaveFacts, type Pass } from './leaveby.ts';
+import { arrivalRidingOn, closingDay, closingWord, hoursIndex, routeZoneAt, isFoodPlace, passesOf, placeWord, zoneOfPass, type LeaveBy, type LeaveFacts, type Pass } from './leaveby.ts';
 import { usableFlatKph } from './pace.ts';
 import { planOrder } from './rain-plans.ts';
 import { latestUsable } from './shelter.ts';
@@ -214,9 +214,9 @@ function gap(r: Ride): StopIdea | null {
 const shortIdea = (v: Visit): string => W.stopIdeaShort(nameOf(v), untilLine(v));
 
 function rain(r: Ride, plans: RainPlan[], wg: WaitOrGo | null, startsWet: boolean): StopIdea | null {
-  const { f, dep } = r;
+  const { dep } = r;
   const dueIn = (p: RainPlan): number => (p.window.reachAt.getTime() - dep.getTime()) / MIN;
-  const stormPlan = plans.find((p) => p.window.kind === 'thunder' && p.covers.length + (p.none ? 1 : 0) > 0);
+  const stormPlan = plans.find((p) => p.window.kind === 'thunder');
   const plan = startsWet ? plans.find((p) => p.window.thunderKms.length > 0 && p.covers.length > 0) ?? null
     : plans.find((p) => dueIn(p) <= RAIN_WITHIN_MIN) ?? stormPlan ?? null;
   if (!startsWet && !plan) return null;
@@ -235,7 +235,6 @@ function rain(r: Ride, plans: RainPlan[], wg: WaitOrGo | null, startsWet: boolea
   if (!best) return idea('rain', 'fine', null, plan?.none ?? plan?.firstCoverLine ?? W.stopNoSeatedNear, [], plan?.m ?? r.start);
   const lines: string[] = [];
   if (wg?.d && wg.where !== 'here' && wg.where.placeId === best.v.place.id) lines.push(W.stopWaitItOut(formatAbout(wg.d, best.v.tz)));
-  void f;
   return idea('rain', 'fine', best.v, shortIdea(best.v), lines);
 }
 
@@ -355,7 +354,7 @@ export function stopIdeas(f: FoodFacts, plans: RainPlan[], lb: LeaveBy, waterTar
 
   const position = latestUsable(f);
   const startsWet = f.forecast !== null && rainAtStart(f.forecast, ride, position, f.trip.route);
-  const zone = (km: Km): string => zoneOfPass({ place: { timeZone: '' } as Place, match: { placeId: '', km, offRouteM: 0 } as RouteMatch }, f);
+  const zone = (km: Km): string => routeZoneAt(f, km);
   const stopAt = f.schedule.atKm(ride.stopKm);
   const open = visits.filter((v) => v.open && isFoodPlace(v.place));
   const settlements = passesOf(f).filter((x) => x.place.kind === 'settlement');
@@ -394,4 +393,3 @@ function nextOpenTitle(r: Ride): StopIdea {
   return { ...idea('rhythm', 'fine', null, W.stopNextOpen(nameOf(next), ahead(next, r.start), about(next), closes), [], next.match.km), arrival: next.arrival };
 }
 
-export { isFoodShop };

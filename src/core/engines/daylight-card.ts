@@ -3,13 +3,13 @@
 // judges the arrival there on the riding date it was reached, and otherwise gives the daylight left.
 // It lives apart from daylight.ts because the trip day reads daylight.ts, and this card reads the trip day.
 import { formatAbout, makeAnswer } from '../answers/index.ts';
-import { addDaysIso, formatHm, instantAt, isKnownZone, localIsoDate, roundedLeaveBy, wallClock } from '../answers/time.ts';
+import { addDaysIso, formatHm, instantAt, localIsoDate, roundedLeaveBy, wallClock } from '../answers/time.ts';
 import { pointAtRouteKm } from '../geo/project.ts';
 import type { Answer, AnswerItem, DayRide, Km, Missing, Status, SunTimes } from '../types.ts';
 import { showKm, W } from '../wording/en.ts';
 import { newestMapDate, savedCovers, shortMapDate } from './covers.ts';
 import { arrivalStatus, daylightLeft } from './daylight.ts';
-import { bindingPlace, closingDay, closingWord, leaveBy, sunReadable, type LeaveBy, type LeaveFacts } from './leaveby.ts';
+import { bindingPlace, closingDay, closingWord, leaveBy, routeZoneAt, sunReadable, type LeaveBy, type LeaveFacts } from './leaveby.ts';
 import { adjusted, latestPosition, usablePosition } from './locate.ts';
 import { usableFlatKph } from './pace.ts';
 import { noteFor, offersPlanTomorrow, ridingDate, zoneLookupOf } from './tripday.ts';
@@ -19,10 +19,7 @@ const MIN = 60_000;
 const SOON_MIN = 30;
 const validDate = (d: Date | null): d is Date => d !== null && Number.isFinite(d.getTime());
 
-const zoneAt = (f: LeaveFacts, km: Km): string => {
-  const tz = zoneLookupOf(f.routeZones)(km).timeZone;
-  return isKnownZone(tz) ? tz : 'UTC';
-};
+const zoneAt = routeZoneAt;
 
 const sunAt = (f: LeaveFacts, km: Km, date: string): SunTimes => {
   const { lat, lon } = pointAtRouteKm(f.trip.route, km);
@@ -88,7 +85,7 @@ function titleOf(f: LeaveFacts, ride: DayRide, r: LeaveBy, sun: SunTimes): { tit
   const stopTz = zoneAt(f, ride.stopKm);
   const startTz = zoneAt(f, ride.startKm);
   const km = showKm(ride.stopKm);
-  const judged = r.earliestArrival ? arrivalStatus(r.earliestArrival, sun, ridingTo(f, ride), stopTz) : null;
+  const judged = r.earliestArrival ? arrivalStatus(r.earliestArrival, sun, f.schedule.ridingMinTo(ride.stopKm), stopTz) : null;
   const leavingNow = validDate(r.earliest) && validDate(f.now) && r.earliest.getTime() === f.now.getTime();
   const nowAt = r.earliestArrival && judged ? W.leavebyLeavingNow(formatAbout(r.earliestArrival, stopTz), judged.line ?? '') : '';
 
@@ -110,10 +107,8 @@ function titleOf(f: LeaveFacts, ride: DayRide, r: LeaveBy, sun: SunTimes): { tit
   const usual = usualStart(f, ride);
   const early = r.unrounded.getTime() < usual.getTime();
   const parts: string[] = [];
-  if (validDate(sun.dawn ?? null)) {
-    const dawn = dawnAt(f, ride);
-    if (validDate(dawn) && r.unrounded.getTime() < dawn.getTime()) parts.push(W.leavebyBeforeFirstLight(formatHm(dawn, startTz)));
-  }
+  const dawn = dawnAt(f, ride);
+  if (validDate(dawn) && r.unrounded.getTime() < dawn.getTime()) parts.push(W.leavebyBeforeFirstLight(formatHm(dawn, startTz)));
   if (early) parts.push(W.leavebyMinBeforeUsual(Math.round((usual.getTime() - shown.getTime()) / MIN)));
   if (ride.phase === 'after-ride' && !early) {
     parts.push(W.leavebyUsualStart(formatHm(usual, startTz)));
@@ -126,14 +121,12 @@ function titleOf(f: LeaveFacts, ride: DayRide, r: LeaveBy, sun: SunTimes): { tit
   return { title: `${[lead, ...parts].join(' · ')}.`, detail: [] };
 }
 
-const ridingTo = (f: LeaveFacts, ride: DayRide): number => (ride === f.ride ? f.schedule.ridingMinTo(ride.stopKm) : Number.NaN);
-
 /** Civil dawn at the start point on the ride's date. */
 const dawnAt = (f: LeaveFacts, ride: DayRide): Date | null => sunAt(f, ride.startKm, ride.date).dawn;
 
 /** Section 6.12's status. Every "fine" is reached by a positive test, so a time that is no time is never calm. */
 function statusOf(f: LeaveFacts, ride: DayRide, r: LeaveBy, sun: SunTimes): Status {
-  const judged = r.earliestArrival ? arrivalStatus(r.earliestArrival, sun, ridingTo(f, ride), zoneAt(f, ride.stopKm)) : null;
+  const judged = r.earliestArrival ? arrivalStatus(r.earliestArrival, sun, f.schedule.ridingMinTo(ride.stopKm), zoneAt(f, ride.stopKm)) : null;
   if (judged?.status === 'warning' && !r.lightAllNight) return 'warning';
   if (noHeights(f)) return 'action';
   if (r.unrounded === null) return r.lightAllNight ? 'fine' : 'action';

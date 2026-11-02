@@ -159,7 +159,7 @@ export function waitOrGo(f: WaitFacts, windows: RainWindow[], plans: RainPlan[],
 
   let chosen: { d: Date; ride: Ride; saved: number } | null = null;
   let notKnown = !Number.isFinite(base.exposure);
-  const ruledOut = { dark: false, storm: false, limit: null as string | null, limitHit: false };
+  const ruledOut = { dark: false, darkLine: null as string | null, storm: false, limit: null as string | null, limitHit: false };
   for (const d of waitTries(dep, startTz).slice(1)) {
     if (cover && d.getTime() < cover.at) continue;
     if (cover?.until && d.getTime() > cover.until.getTime()) continue;
@@ -178,6 +178,7 @@ export function waitOrGo(f: WaitFacts, windows: RainWindow[], plans: RainPlan[],
       break;
     }
     ruledOut.dark ||= dark;
+    if (dark) ruledOut.darkLine ??= judged.line;
     ruledOut.storm ||= storm;
     if (broken) {
       ruledOut.limitHit = true;
@@ -189,7 +190,7 @@ export function waitOrGo(f: WaitFacts, windows: RainWindow[], plans: RainPlan[],
   if (!chosen) {
     let line: string | null;
     if (ruledOut.dark && !ruledOut.storm && !ruledOut.limitHit) {
-      line = W.waitAfterDark(arrivalStatus(new Date(sun.dusk?.getTime() ?? Infinity), sun, ridingMin, stopTz).line ?? W.daylightDarkAllDay);
+      line = W.waitAfterDark(ruledOut.darkLine ?? W.daylightDarkAllDay);
     } else if (ruledOut.limitHit && !ruledOut.dark && !ruledOut.storm) line = ruledOut.limit;
     else if (notKnown) line = W.waitCantJudge;
     else line = stormsAtDep.size > 0 ? null : W.waitNoHelp;
