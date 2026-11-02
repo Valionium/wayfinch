@@ -4,7 +4,7 @@ import type { StopFacts } from '../../../../src/core/engines/covers.ts';
 import { rainPlan, rainPlans } from '../../../../src/core/engines/rain-plans.ts';
 import { thunderNear } from '../../../../src/core/engines/shelter.ts';
 import { weatherAnswer, weatherStatus, weatherWindows } from '../../../../src/core/engines/weather.ts';
-import type { Place, RainPlan, RainWindow } from '../../../../src/core/types.ts';
+import type { Place, RainPlan, RainWindow, StoredForecast } from '../../../../src/core/types.ts';
 import { at, bakery, busStop, cafe, flatRoute, fuelShop, kiosk, pos, restaurant, shelter, station, supermarket, testTrip } from '../../../fixtures/build.ts';
 import { forecastOf, momentOf, openAllYear, SAT, stamps, stopFactsOf, SUN, type Moment, type Spell, type StopCase } from './weather-helpers.ts';
 import { hoursOf } from './water-helpers.ts';
@@ -448,8 +448,10 @@ describe('the property', () => {
       closes: fc.option(fc.integer({ min: 9, max: 22 }), { nil: null }),
     }), { maxLength: 12 }),
   });
+  // Built once: the route, and one forecast per rain case. Each is the same for every sample that shares it.
+  const trip = testTrip({ route: flatRoute(300, { stageEnds: [200, 300] }) });
+  const forecasts = new Map<string, StoredForecast>();
   const build = (s: Spec): StopFacts => {
-    const trip = testTrip({ route: flatRoute(300, { stageEnds: [200, 300] }) });
     const spots: StopCase['spots'] = [];
     const hours: StopFacts['hours'] = [];
     const roofs: NonNullable<StopCase['roofs']> = [];
@@ -464,7 +466,10 @@ describe('the property', () => {
     });
     const spell: Spell = s.thunder ? { km: s.rainKm, stamps: stamps(SAT, 6, 23), pp: 30, code: 95 } : { km: s.rainKm, stamps: stamps(SAT, 6, 23), pp: 80 };
     const positions = s.riderKm === 0 ? [] : [pos({ km: s.riderKm, at: `${SAT} 09:00` })];
-    return stopFactsOf({ moment: { trip, positions, now: `${SAT} 09:00` }, spells: [spell], spots, roofs, hours });
+    const key = `${s.rainKm}|${s.thunder}`;
+    const forecast = forecasts.get(key) ?? forecastOf(trip.route, [spell]);
+    forecasts.set(key, forecast);
+    return stopFactsOf({ moment: { trip, positions, now: `${SAT} 09:00` }, forecast, spots, roofs, hours });
   };
 
   fcTest.prop([spec], { numRuns: 100 })('[STOP-PROPERTY] plan covers obey the band, the hours and the roof rules; nothing unknown is suggested', (s) => {
