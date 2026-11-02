@@ -2,11 +2,11 @@
 // phase is derived from the positions, the clock, the Plan tomorrow choice and the stored route-end date, never stored.
 import { addDaysIso, instantAt, localIsoDate } from '../answers/time.ts';
 import { pointAtRouteKm } from '../geo/project.ts';
-import type { DayPhase, DayRide, DayNote, Km, PlanTomorrow, Position, SunSource, Trip, ZoneLookup, ZoneSpan } from '../types.ts';
+import type { Status, DayPhase, DayRide, DayNote, DayStart, Km, PlanTomorrow, Position, SunSource, Trip, ZoneLookup, ZoneSpan } from '../types.ts';
 import { W } from '../wording/en.ts';
-import { fineLimit } from './daylight.ts';
-import { adjusted, isFarOff, isOffRoute, rejoinKm } from './locate.ts';
-import { buildSchedule, correction, stopRule, type Schedule } from './pace.ts';
+import { arrivalStatus, fineLimit } from './daylight.ts';
+import { adjusted, isFarOff, isOffRoute, rejoinKm, usablePosition } from './locate.ts';
+import { buildSchedule, correction, MIN_FLAT_KPH, stopRule, usableFlatKph, type Schedule } from './pace.ts';
 
 export type DayEnv = { sun: SunSource; routeZones: ZoneSpan[] };
 
@@ -40,19 +40,25 @@ type Day = {
   everything: Position[]; // accepted positions, any age: day 1's start reads them
   latest: Position | null; // the latest on a trip day, at most 48 hours old, wherever it lies
   dayPositions: Position[]; todayPositions: Position[]; farPositions: Position[];
-  fromStage: boolean; dayStartKm: Km; nightKm: Km | null;
+  fromStage: boolean; dayStartKm: Km; nightKm: Km | null; keepDayStart: DayStart | null;
 };
 
-function readDay(trip: Trip, positions: Position[], now: Date, env: DayEnv): Day {
+function readDay(tripAsSet: Trip, positions: Position[], now: Date, env: DayEnv, dayStarts: DayStart[]): Day {
+  // An unusable flat speed gives no times on the cards (scheduleFor). The phase must still be judged, so it is judged at
+  // the slowest speed, on which a ride ends soonest.
+  const trip = usableFlatKph(tripAsSet.flatKph) ? tripAsSet : { ...tripAsSet, flatKph: MIN_FLAT_KPH };
   const zone = zoneLookupOf(env.routeZones);
   const startZone = zone(0).timeZone;
   const today = ridingDate(now, startZone);
   const dateOf = (p: Position): string => ridingDate(p.at, startZone);
 
-  // A position stamped after now (the phone's clock moved back) counts, with age 0.
+  // A bad value from the phone is no position. A position stamped after now (the phone's clock moved back) counts, with
+  // age 0, in the order of its own stamp, so the input's order decides nothing.
   const everything = positions
-    .map((p) => (p.at.getTime() > now.getTime() ? { ...p, at: now } : p))
-    .sort((a, b) => a.at.getTime() - b.at.getTime() || Number(a.source === 'manual') - Number(b.source === 'manual'));
+    .filter(usablePosition)
+    .sort((a, b) => a.at.getTime() - b.at.getTime() || Number(a.source === 'manual') - Number(b.source === 'manual')
+      || a.km - b.km || a.lat - b.lat || a.lon - b.lon)
+    .map((p) => (p.at.getTime() > now.getTime() ? { ...p, at: now } : p));
 
   const departureDate = trip.departureDate;
   const onTrip = departureDate === null ? [] : everything.filter((p) => dateOf(p) >= departureDate && now.getTime() - p.at.getTime() <= MS_48H);
@@ -70,7 +76,11 @@ function readDay(trip: Trip, positions: Position[], now: Date, env: DayEnv): Day
   let fromStage = false;
   const isDayOne = departureDate === null || today <= departureDate;
   const before = last(dayPositions.filter((p) => dateOf(p) < today)) ?? last(farPositions.filter((p) => dateOf(p) < today));
-  const base: Km | null = isDayOne ? 0 : before?.km ?? null;
+  // The day start is kept (sections 4.4 and 6.2a): the position it came from may expire during the day, and a fresher one
+  // far off the route must not replace it. A first position before the daily start can still move it.
+  const kept = dayStarts.find((s) => s.day === today && Number.isFinite(s.km))?.km;
+  const base: Km | null = isDayOne ? 0 : kept ?? before?.km ?? null;
+  const settled = base !== null || first !== null;
   if (base !== null) {
     const nightFurther = first !== null && beyondMoved(first, base) && first.at.getTime() < instantAt(today, trip.startTime, zone(first.km).timeZone).getTime();
     dayStartKm = nightFurther ? first.km : base;
@@ -85,7 +95,7 @@ function readDay(trip: Trip, positions: Position[], now: Date, env: DayEnv): Day
     }
   }
 
-  return { trip, env, zone, now, today, startZone, everything, latest: last(onTrip), dayPositions, todayPositions, farPositions, fromStage, dayStartKm, nightKm };
+  return { trip, env, zone, now, today, startZone, everything, latest: last(onTrip), dayPositions, todayPositions, farPositions, fromStage, dayStartKm, nightKm, keepDayStart: settled ? { day: today, km: dayStartKm } : null };
 }
 
 const movedBy = (d: Day, t: Date): boolean => d.todayPositions.some((p) => p.at.getTime() <= t.getTime() && beyondMoved(p, d.dayStartKm));
@@ -160,7 +170,7 @@ function endsAt(d: Day, t: Date, at: Position | null): boolean {
 /** Whether the ride has ended today: Plan tomorrow, or an end judged along today's positions and now. */
 function rideEnded(d: Day, plan: PlanTomorrow | null): boolean {
   if (plan && plan.date === d.today && !plan.backToTodayAt) return true;
-  const tap = plan?.backToTodayAt && ridingDate(plan.backToTodayAt, d.startZone) === d.today && plan.backToTodayAt.getTime() <= d.now.getTime() ? plan.backToTodayAt : null;
+  const tap = plan?.backToTodayAt && Number.isFinite(plan.backToTodayAt.getTime()) && ridingDate(plan.backToTodayAt, d.startZone) === d.today && plan.backToTodayAt.getTime() <= d.now.getTime() ? plan.backToTodayAt : null;
 
   let heldKm: Km | null = null; // the last day position at which end 2 or 3 held
   let asideStopKm: Km | null = null; // ends set aside by Back to today, until a position near this stop
@@ -203,8 +213,8 @@ function routeEndDateOf(d: Day, stored: string | null): string | null {
 }
 
 /** Where a position starts the ride: never beyond its stop, so a ride never runs backwards. */
-function startFrom(p: Position, stopKm: Km): { startKm: Km; startOffRouteM: number; behindFromKm: Km; past: boolean } {
-  const a = adjusted(p);
+function startFrom(p: Position, stopKm: Km, lengthKm: Km): { startKm: Km; startOffRouteM: number; behindFromKm: Km; past: boolean } {
+  const a = adjusted(p, lengthKm);
   const past = a.aheadFromKm >= stopKm;
   return {
     startKm: past ? stopKm : a.aheadFromKm, startOffRouteM: isOffRoute(p) ? p.offRouteM : 0,
@@ -216,7 +226,7 @@ function startFrom(p: Position, stopKm: Km): { startKm: Km; startOffRouteM: numb
 function dayOneStart(d: Day, stopKm: Km): { startKm: Km; startOffRouteM: number; behindFromKm: Km; note: DayNote | null } {
   const p = last(d.everything);
   if (p && !isFarOff(p) && Math.abs(p.km - d.dayStartKm) <= MOVED_KM) {
-    const s = startFrom(p, stopKm);
+    const s = startFrom(p, stopKm, d.trip.route.lengthKm);
     return { startKm: s.startKm, startOffRouteM: s.startOffRouteM, behindFromKm: s.behindFromKm, note: null };
   }
   return { startKm: d.dayStartKm, startOffRouteM: 0, behindFromKm: d.dayStartKm, note: p ? { kind: 'day1-route-start' } : null };
@@ -224,10 +234,23 @@ function dayOneStart(d: Day, stopKm: Km): { startKm: Km; startOffRouteM: number;
 
 const later = (a: Date, b: Date): Date => (a.getTime() > b.getTime() ? a : b);
 
-export function dayRide(trip: Trip, positions: Position[], planTomorrow: PlanTomorrow | null, routeEndDate: string | null, now: Date, env: DayEnv): DayRide {
-  const d = readDay(trip, positions, now, env);
+/**
+ * `dayStarts` are the day starts the store kept from earlier results' `keepDayStart` (section 4.4); `screen()` passes its
+ * input of that name. Without a clock (`now` is no date) no position can be judged: day 1 is planned from the route start.
+ */
+export function dayRide(trip: Trip, positions: Position[], planTomorrow: PlanTomorrow | null, routeEndDate: string | null, now: Date, env: DayEnv, dayStarts: DayStart[] = []): DayRide {
   const { route, departureDate, startTime } = trip;
   const length = route.lengthKm;
+  if (!Number.isFinite(now.getTime())) {
+    const stopKm = stopRule(route.stages, 0, length);
+    return {
+      phase: 'before-trip', date: departureDate ?? '', startKm: 0, startOffRouteM: 0,
+      departure: departureDate === null ? now : instantAt(departureDate, startTime, zoneLookupOf(env.routeZones)(0).timeZone),
+      stopKm, tonightKm: null, tomorrowKm: null, dayStartKm: 0, nightKm: null, r: 1, behindFromKm: 0, noRide: false,
+      routeEndReachedOn: null, note: null, keepDayStart: null,
+    };
+  }
+  const d = readDay(trip, positions, now, env, dayStarts);
   const dailyStart = (date: string, km: Km): Date => instantAt(date, startTime, d.zone(km).timeZone);
   const stopAfter = (km: Km): Km => stopRule(route.stages, km, length);
 
@@ -240,20 +263,20 @@ export function dayRide(trip: Trip, positions: Position[], planTomorrow: PlanTom
       phase: 'before-trip', date, ...dayOne,
       departure: departureDate === null ? now : dailyStart(date, dayOne.startKm), stopKm,
       tonightKm: null, tomorrowKm: addDaysIso(d.today, 1) === departureDate ? stopKm : null,
-      dayStartKm: 0, nightKm: null, r: 1, noRide: false, routeEndReachedOn: null,
+      dayStartKm: 0, nightKm: null, r: 1, noRide: false, routeEndReachedOn: null, keepDayStart: null,
     };
   }
 
-  const common = { dayStartKm: d.dayStartKm, nightKm: d.nightKm, r: rAt(d, now) };
+  const common = { dayStartKm: d.dayStartKm, nightKm: d.nightKm, r: rAt(d, now), keepDayStart: d.keepDayStart };
   const reachedOn = routeEndDateOf(d, routeEndDate);
 
   // Route end reached.
   if (reachedOn !== null && d.today >= reachedOn) {
-    const s = d.latest ? startFrom(d.latest, length) : null;
+    const s = d.latest ? startFrom(d.latest, length, length) : null;
     return {
       phase: 'route-end', date: d.today, startKm: s?.startKm ?? length, startOffRouteM: s?.startOffRouteM ?? 0,
       departure: now, stopKm: length, tonightKm: d.nightKm ?? length, tomorrowKm: null,
-      ...common, behindFromKm: s ? Math.min(s.behindFromKm, length) : length, noRide: false, routeEndReachedOn: reachedOn, note: null,
+      ...common, behindFromKm: s?.behindFromKm ?? length, noRide: false, routeEndReachedOn: reachedOn, note: null,
     };
   }
 
@@ -270,7 +293,7 @@ export function dayRide(trip: Trip, positions: Position[], planTomorrow: PlanTom
       };
     }
     const stopKm = stopAfter(tonightKm);
-    const s = d.latest ? startFrom(d.latest, stopKm) : null;
+    const s = d.latest ? startFrom(d.latest, stopKm, length) : null;
     const date = addDaysIso(d.today, 1);
     const startKm = s?.startKm ?? tonightKm;
     const note: DayNote | null = s === null ? { kind: 'no-position', km: tonightKm } : s.past ? { kind: 'past-stop', stopKm, tomorrow: true } : null;
@@ -292,7 +315,7 @@ export function dayRide(trip: Trip, positions: Position[], planTomorrow: PlanTom
     return { ...base, ...dayOne, departure: later(dailyStart(d.today, dayOne.startKm), now) };
   }
   if (d.latest) {
-    const s = startFrom(d.latest, stop);
+    const s = startFrom(d.latest, stop, length);
     return {
       ...base, startKm: s.startKm, startOffRouteM: s.startOffRouteM, behindFromKm: s.behindFromKm,
       departure: moved ? now : later(dailyStart(d.today, s.startKm), now),
@@ -317,9 +340,26 @@ export function scheduleFor(ride: DayRide, trip: Trip, env: DayEnv): Schedule {
   return scheduleWith(ride, trip, today ? ride.r : 1, env, ride.departure);
 }
 
-/** Riding there now from the ride's start point, at today's correction: the chips, and Sleep after the day's ride. */
+/**
+ * Riding there now from the ride's start point, at today's correction: the chips, and Sleep after the day's ride. Its one
+ * ride runs to the route end with no night in it, so atKm and atPlace mean tonight, at any kilometre, and rideOf gives
+ * today's date for the sun. Places behind go through `behind`. The start is the ride's, so a position past the day's stop
+ * counts from that stop.
+ */
 export function nowSchedule(ride: DayRide, trip: Trip, now: Date, env: DayEnv): Schedule {
-  return scheduleWith(ride, trip, ride.r, env, now);
+  const zone = zoneLookupOf(env.routeZones);
+  const date = Number.isFinite(now.getTime()) ? ridingDate(now, zone(0).timeZone) : ride.date;
+  return buildSchedule(trip, {
+    startKm: ride.startKm, startLegKm: rejoinKm(ride.startOffRouteM), departure: now, dayStopKm: trip.route.lengthKm, date,
+    behindFromKm: ride.behindFromKm,
+  }, ride.r, zone);
+}
+
+/** The daylight status of the arrival at `km` on a schedule: judged on the sun of the date of the ride it lies on (section 6.2a). */
+export function daylightAt(s: Schedule, km: Km, trip: Trip, env: DayEnv): { status: Status; line: string | null } {
+  const p = pointAtRouteKm(trip.route, km);
+  const sun = env.sun(p.lat, p.lon, s.rideOf(km).date);
+  return arrivalStatus(s.atKm(km), sun, s.ridingMinTo(km), zoneLookupOf(env.routeZones)(km).timeZone);
 }
 
 /**

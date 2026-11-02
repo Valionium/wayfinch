@@ -47,6 +47,7 @@ export const W = {
 
   // ---- Daylight (section 6.5). Times as "HH:MM", spans as "3 h 30 min". ----
   daylightAllNight: 'light all night',
+  daylightUnknown: 'daylight not known',
   daylightDarkAllDay: 'dark all day',
   daylightLightsOnAllDay: 'lights on all day',
   daylightLightsOnFrom: (time: string): string => `lights on from ${time}`,

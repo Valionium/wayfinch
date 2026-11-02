@@ -48,8 +48,17 @@ const positionFrom = (p: Fix, km: Km, offKm: number): Position => ({
   source: 'gps', approximate: p.accuracyM > APPROXIMATE_OVER_M,
 });
 
+const validDate = (d: Date): boolean => Number.isFinite(d.getTime());
+const usableFix = (p: Fix): boolean =>
+  Math.abs(p.lat) <= 90 && Math.abs(p.lon) <= 180 && p.accuracyM >= 0 && p.accuracyM < Infinity && validDate(p.at);
+
+/** Whether a stored position can be read at all. A bad value from the phone is no position. Written so that NaN fails. */
+export const usablePosition = (p: Position): boolean =>
+  usableFix(p) && Number.isFinite(p.km) && p.offRouteM >= 0 && p.offRouteM < Infinity;
+
 export function locate(p: Fix, route: Route, idx: SegmentIndex, recent: Position | null):
-  { kind: 'position'; position: Position } | { kind: 'ask'; options: [Km, Km] } {
+  { kind: 'position'; position: Position } | { kind: 'ask'; options: [Km, Km] } | { kind: 'no-position' } {
+  if (!usableFix(p)) return { kind: 'no-position' };
   const list = candidates(p, route, idx);
   const only = list[0];
   if (!only) {
@@ -81,20 +90,21 @@ export const isOffRoute = (pos: Position): boolean => pos.offRouteM > Math.max(O
 /** Beyond 5 km off: the banner says the answers are approximate, and the position sets no phase. */
 export const isFarOff = (pos: Position): boolean => pos.offRouteM > FAR_OFF_M;
 
-/** Where answers measure from. An approximate position starts from the least favourable point of its radius. */
-export function adjusted(pos: Position): { aheadFromKm: Km; behindFromKm: Km; radius: [Km, Km] | null } {
+/** Where answers measure from. An approximate position starts from the least favourable point of its radius, held to the route. */
+export function adjusted(pos: Position, lengthKm: Km = Infinity): { aheadFromKm: Km; behindFromKm: Km; radius: [Km, Km] | null } {
   if (!pos.approximate) return { aheadFromKm: pos.km, behindFromKm: pos.km, radius: null };
   const accKm = pos.accuracyM / 1000;
   const ahead = Math.max(0, pos.km - accKm);
-  const behind = pos.km + accKm;
+  const behind = Math.min(lengthKm, pos.km + accKm);
   return { aheadFromKm: ahead, behindFromKm: behind, radius: [ahead, behind] };
 }
 
 /** The rejoin leg in kilometres of a position `offRouteM` metres off: 1.3 times it. */
 export const rejoinKm = (offRouteM: number): number => (REJOIN_FACTOR * offRouteM) / 1000;
 
-/** A kilometre or town picked by hand: on the route, exact. */
-export function manualPosition(route: Route, km: Km, at: Date): Position {
+/** A kilometre or town picked by hand: on the route, exact. Null when the kilometre or the time is no value. */
+export function manualPosition(route: Route, km: Km, at: Date): Position | null {
+  if (!Number.isFinite(km) || !validDate(at)) return null;
   const held = Math.max(0, Math.min(route.lengthKm, km));
   return { ...pointAtRouteKm(route, held), accuracyM: 0, at, km: held, offRouteM: 0, source: 'manual', approximate: false };
 }

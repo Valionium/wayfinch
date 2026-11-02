@@ -10,7 +10,7 @@ import type { Answer, AnswerItem, DayRide, Km, Missing, Place, PlaceHours, Route
 import { showKm, W } from '../wording/en.ts';
 import { LOAD_PENALTY } from '../route/stages.ts';
 import { rejoinKm } from './locate.ts';
-import { flatLegClockMin, flatLegRidingMin, type Schedule } from './pace.ts';
+import { flatLegClockMin, flatLegRidingMin, usableFlatKph, type Schedule } from './pace.ts';
 import { nowSchedule, ridingDate, zoneLookupOf } from './tripday.ts';
 import { uncertainty } from './water-learning.ts';
 import { capacityFrom, lapse, masses, outsideRange, planningWeather, riderPower, routeHeight, stopRate, sweatRate, type PlanningWeather, type Section } from './water-model.ts';
@@ -566,7 +566,7 @@ function cantWorkOut(f: WaterFacts): Answer {
 
 /** What the engine needs before any figure can mean something. Written so that non-finite values fail. */
 const inputsUsable = (f: WaterFacts): boolean =>
-  f.trip.flatKph > 0 && f.trip.flatKph < Infinity
+  usableFlatKph(f.trip.flatKph)
   && f.profile.k > 0 && f.profile.k < Infinity
   && f.trip.campWaterL >= 0 && f.trip.campWaterL < Infinity
   && f.trip.route.lengthKm >= 0 && f.trip.route.lengthKm < Infinity

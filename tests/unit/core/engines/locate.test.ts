@@ -161,7 +161,7 @@ test('[LOC-APPROX] the near edge never lies before the route start', () => {
 
 test('[LOC-MANUAL] a manual position lies on the route, is exact, and always wins over GPS', () => {
   const route = flatRoute(100);
-  const m = manualPosition(route, 42.5, AT);
+  const m = manualPosition(route, 42.5, AT)!;
   expect(m).toMatchObject({ km: 42.5, offRouteM: 0, source: 'manual', approximate: false });
   const here = pointAtKm(42.5);
   expect(m.lat).toBeCloseTo(here.lat, 6);
@@ -175,14 +175,14 @@ test('[LOC-MANUAL] a manual position lies on the route, is exact, and always win
   expect(latestPosition([gpsEarlier, m])).toBe(m);
   // It settles an ambiguous fix like any position.
   const oab = outAndBack();
-  const r = locate(fix(32), oab, buildSegmentIndex(oab), manualPosition(oab, 115, at('2026-10-17 11:00')));
+  const r = locate(fix(32), oab, buildSegmentIndex(oab), manualPosition(oab, 115, at('2026-10-17 11:00'))!);
   expect(r.kind === 'position' ? r.position.km : -1).toBeCloseTo(118, 6);
 });
 
 test('[LOC-MANUAL] a manual kilometre beyond the route is held to the route', () => {
   const route = flatRoute(100);
-  expect(manualPosition(route, 130, AT).km).toBe(100);
-  expect(manualPosition(route, -3, AT).km).toBe(0);
+  expect(manualPosition(route, 130, AT)!.km).toBe(100);
+  expect(manualPosition(route, -3, AT)!.km).toBe(0);
 });
 
 test('[LOC-PROJECT] a route kilometre gives its point between two route points', () => {

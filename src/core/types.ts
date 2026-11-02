@@ -91,6 +91,7 @@ export type DayRide = {
   noRide: boolean; // after the day's ride with tonight's stop at the route end: the cards answer as at the route end
   routeEndReachedOn: string | null; // the riding date to store (section 4.4); null until a day position reaches the end
   note: DayNote | null; // the start note the cards show; noteFor gives its text
+  keepDayStart: DayStart | null; // what the store keeps in `dayStarts` (section 4.4); null while the start is provisional
 };
 /** Why the day's ride does not simply start at the rider (section 6.2a). */
 export type DayNote =
