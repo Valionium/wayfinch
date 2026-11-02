@@ -37,13 +37,18 @@ const TAGS: [PlaceKind, Record<string, string>[]][] = [
 ];
 const TAGS_OF = new Map(TAGS);
 /**
- * The classes real packs hold (src/core/places/water.ts). A shop, café or fuel-station shop has no water class: section 6.0
+ * The classes real packs hold (src/core/places/water.ts): class D never reaches a pack (pack-format.ts refuses it). A shop, café or fuel-station shop has no water class: section 6.0
  * makes it a source by its hours. Only a refill venue among them is class B. Toilets are class A with drinking_water=yes,
  * and such a point inside a building or with limited access counts by its hours.
  */
 function waterOf(kind: PlaceKind, n: number): Pick<Place, 'waterClass' | 'indoorOrLimited'> {
   switch (kind) {
-    case 'water': return { waterClass: 'A', indoorOrLimited: n % 5 === 0 };
+    case 'water': {
+      const pick = n % 10;
+      if (pick === 8) return { waterClass: 'B', indoorOrLimited: false }; // a spring with a drinking tag, a tap with none
+      if (pick === 9) return { waterClass: 'C', indoorOrLimited: false }; // a spring with no tag, a cemetery tap
+      return { waterClass: 'A', indoorOrLimited: pick < 2 };
+    }
     case 'toilets': return n % 2 === 0 ? { waterClass: 'A', indoorOrLimited: true } : { waterClass: null, indoorOrLimited: false };
     case 'shop': case 'cafe': case 'fuel_shop': return n % 10 === 0 ? { waterClass: 'B', indoorOrLimited: true } : { waterClass: null, indoorOrLimited: false };
     default: return { waterClass: null, indoorOrLimited: false };

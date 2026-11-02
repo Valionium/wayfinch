@@ -79,8 +79,10 @@ describe('statuses and distances', () => {
     failsOnScreen('INV-22', moment, (s) => { s.cards.climbing.basis = []; }, /no basis/);
     failsOnScreen('INV-22', moment, (s) => { s.cards.weather.basis = ['x']; }, /without the Open-Meteo attribution/);
     failsOnScreen('INV-22', moment, (s) => { delete s.cards.weather.freshness.dataDates['weather']; }, /without its forecast's age/);
-    failsOnScreen('INV-22', moment, (s) => { s.cards.food.basis = ['x']; }, /without the OpenStreetMap attribution/);
-    failsOnScreen('INV-22', moment, (s) => { s.cards.food.freshness.dataDates = {}; }, /without their data's date/);
+    failsOnScreen('INV-22', moment, (s) => { s.cards.sleep.basis = ['x']; }, /without the OpenStreetMap attribution/);
+    failsOnScreen('INV-22', moment, (s) => { s.chips.shelter.basis = ['x']; }, /Shelter reads the forecast without the Open-Meteo attribution/);
+    failsOnScreen('INV-22', moment, (s) => { s.cards.food.basis = ['x']; }, /Food reads the forecast without the Open-Meteo attribution/);
+    failsOnScreen('INV-22', moment, (s) => { s.cards.sleep.freshness.dataDates = {}; }, /without their data's date/);
     failsOnScreen('INV-22', moment, (s) => { s.cards.water.freshness.dataDates['places'] = 'not a date'; }, /a data date that is no date/);
     failsOnPart('INV-22', moment, (w) => ({ ...w, windows: w.windows.map((x) => ({ ...x, detail: '30min' as const, reachAt: new Date(x.reachAt.getTime() + 5 * 86_400_000) })) }), /half-hour rain time beyond 48 hours/);
     failsOnPart('INV-22', moment, (w) => ({ ...w, windows: w.windows.map((x) => ({ ...x, detail: 'daypart' as const })) }), /a rain time to the half hour beyond 48 hours/);
@@ -106,6 +108,7 @@ describe('statuses and distances', () => {
     failsOnScreen('INV-24', share, (x) => { x.chips.emergency.share += '\n10 minutes ago'; }, /relative time/);
     failsOnScreen('INV-24', share, (x) => { x.chips.emergency.updatePosition = true; }, /old position/);
     failsOnScreen('INV-24', share, (x) => { x.chips.emergency.share += '\nThis position was set by hand on my route, not from GPS.'; }, /manual position/);
+    failsOnScreen('INV-24', share, (x) => { x.chips.emergency.share += '\nThis position is approximate.'; }, /approximate position/);
     for (const bad of ['I have 2 L of water left.', 'Sent by Wayfinch.', 'At 49.12345, 8.40000.']) failsOnScreen('INV-24', share, (x) => { x.shareText = `${x.shareText} ${bad}`; }, /Share progress holds/);
     failsOnScreen('INV-24', share, (x) => { x.shareMapText = `At 49.12345\n${x.shareMapText}`; }, /outside the map link/);
   });

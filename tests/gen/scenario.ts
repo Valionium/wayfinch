@@ -92,7 +92,7 @@ const hoursChoice = (): fc.Arbitrary<HoursChoice> => fc.record({
   states: fc.array(fc.nat(11), { minLength: 8, maxLength: 8 }),
 });
 
-const SKIPS_HOURS: ReadonlySet<string> = new Set(['water', 'settlement', 'shelter', 'air', 'repair_station']);
+const SKIPS_HOURS: ReadonlySet<string> = new Set(['settlement', 'shelter', 'air', 'repair_station']);
 const REAL_TAGS_PER_SCENARIO = 3;
 
 /** Hour spans of the moment: daily hours, stretches closing or opening right at the rider's arrival, and real tags worked out. */

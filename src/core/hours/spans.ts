@@ -125,8 +125,11 @@ function runsOverMidnight(text: string): boolean {
   });
 }
 
-/** Whether a rule looks at the calendar beyond the weekday, so that a week later may read otherwise. */
-const CALENDAR = /\b(?:PH|SH|easter|week|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{4})\b/i;
+/**
+ * Rules of plain weekdays and times, which read the same a week later. Listed this way round, so that any selector not
+ * named here (Su[1], week 13, Mar, PH, easter, +1 days, a comment) counts as looking at the calendar.
+ */
+const WEEKDAYS_AND_TIMES = /^(?:\b(?:Mo|Tu|We|Th|Fr|Sa|Su|off|closed|open)\b|\d{1,2}:\d{2}\+?|24\/7|[-,;\s]|\|\|)*$/;
 
 /** The tag's segments between two naive times, closed included, or null when the library rejects it. */
 function readTag(o: OpeningHours, n0: number, n1: number): Seg[] | null {
@@ -149,7 +152,7 @@ function readTag(o: OpeningHours, n0: number, n1: number): Seg[] | null {
 
   const pretty = o.prettifyValue();
   const overMidnight = runsOverMidnight(pretty);
-  const calendar = CALENDAR.test(pretty);
+  const calendar = !WEEKDAYS_AND_TIMES.test(pretty);
   for (const [gapFrom, gapTo] of deviceGaps(n0, n1)) {
     const after = gapTo + (gapTo - gapFrom);
     const reread: Seg[] = [];
@@ -174,6 +177,24 @@ function readTag(o: OpeningHours, n0: number, n1: number): Seg[] | null {
     if (nextNight.length) segs = overlay(segs, nextNight[0]!.from, nextNight.at(-1)!.to, nextNight);
   }
   return segs;
+}
+
+/** What this phone can't read stays unknown, whatever a place's rules make of an unknown stretch. */
+function stillUnknown(segs: Seg[], o: OpeningHours, n0: number, n1: number): Seg[] {
+  const pretty = o.prettifyValue();
+  const nightToo = runsOverMidnight(pretty) && !WEEKDAYS_AND_TIMES.test(pretty);
+  let out = segs;
+  const blank = (from: number, to: number): void => {
+    const a = Math.max(from, n0);
+    const b = Math.min(to, n1);
+    if (b > a) out = overlay(out, a, b, [{ from: a, to: b, state: 'unknown', reason: W.foodHoursUnknown }]);
+  };
+  for (const [gapFrom, gapTo] of deviceGaps(n0, n1)) {
+    blank(gapFrom, gapTo);
+    const midnight = Math.floor(gapFrom / DAY) * DAY + DAY;
+    if (nightToo) blank(midnight, midnight + (gapTo - gapFrom));
+  }
+  return out;
 }
 
 // ---- Holidays ----
@@ -336,7 +357,7 @@ export function placeSpans(tag: string | null, place: HoursPlace, rule: RuleClas
     holidays,
     unseenHolidays: new Set([...years.flatMap((y) => holidayEdits(zone, y).added), ...extra]),
   });
-  const spans = toSpans(ruled, t0, t1, place.timeZone);
+  const spans = toSpans(parsed && read ? stillUnknown(ruled, parsed, n0, n1) : ruled, t0, t1, place.timeZone);
   if (key !== undefined) cache?.set(key, spans);
   return spans;
 }

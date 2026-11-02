@@ -1,17 +1,19 @@
 // The invariants the simulator runs after each scenario (spec section 11.2), in my own words beside each. They judge the
 // screen against the values it was built on, and work out again by hand what can be worked out apart from the engines.
 // INV-27, INV-28 and INV-35 wait for later sub-projects, and so do the ask-box clauses of the others (the plan's Decision 1).
-import { addDaysIso, formatAbout, formatLeaveBy, formatNearestHm, instantAt, localIsoDate, roundedLeaveBy } from '../../src/core/answers/time.ts';
+import { addDaysIso, formatAbout, formatLeaveBy, formatNearestHm, instantAt, isKnownZone, localIsoDate, roundedLeaveBy, wallClock } from '../../src/core/answers/time.ts';
 
 import { spotsOf, coverOfSpot, isCover, hoursLookup } from '../../src/core/engines/covers.ts';
 import { fineLimit } from '../../src/core/engines/daylight.ts';
 import { arrivalRidingOn, closingDay, hoursIndex, insideRadius, isFoodPlace, isFoodShop, passesOf, routeZoneAt, stopStamp, sunReadable, zoneOfPass } from '../../src/core/engines/leaveby.ts';
 import { adjusted, isFarOff, isOffRoute, rejoinKm } from '../../src/core/engines/locate.ts';
+import { distanceText } from '../../src/core/engines/rescue.ts';
 import type { Schedule } from '../../src/core/engines/pace.ts';
 import { ridingDate, nowSchedule, zoneLookupOf } from '../../src/core/engines/tripday.ts';
-import { buffer, camp, findS1S2, reserve, use, waterNow, type Target } from '../../src/core/engines/water.ts';
+import { buffer, camp, findS1S2, seasonalWindow, use, waterNow, type Target } from '../../src/core/engines/water.ts';
 import { hourClass } from '../../src/core/engines/weather-classes.ts';
 import { gridOf, hourAt, hoursTouching, onTheRide, rainAtStart, rainHereNow, ridePoints } from '../../src/core/engines/weather-windows.ts';
+import { haversineKm } from '../../src/core/geo/haversine.ts';
 import { pointAtRouteKm } from '../../src/core/geo/project.ts';
 import { openOnArrival, openOver, stateAt } from '../../src/core/hours/check.ts';
 import { placeSpans } from '../../src/core/hours/spans.ts';
@@ -122,6 +124,28 @@ const INV02: Check = {
 
 const SHOPLIKE: ReadonlySet<Place['kind']> = new Set(['shop', 'cafe', 'fuel_shop']);
 
+const FOOD_SHOP_TAGS: ReadonlySet<string> = new Set(['supermarket', 'convenience', 'bakery', 'kiosk']);
+/** Food places by section 6.0's table, worked out apart from the engines. */
+const countsAsFood = (p: Place): boolean => (p.kind === 'shop' && FOOD_SHOP_TAGS.has(p.tags['shop'] ?? ''))
+  || (p.kind === 'fuel_shop' && p.tags['shop'] !== undefined && p.tags['shop'] !== 'no' && p.tags['automated'] !== 'yes')
+  || p.kind === 'cafe' || p.kind === 'restaurant' || p.kind === 'ice_cream';
+
+/** The first stretch of 2 hours or more on the day's ride with no food place open on arrival: T2, by hand. */
+function firstFoodGap(i: ScreenInputs, s: Screen, w: ScreenParts): { from: number; to: number } | null {
+  const { ride } = s;
+  const open = passesOf(i)
+    .filter((x) => countsAsFood(x.place) && x.match.km >= ride.startKm && x.match.km <= ride.stopKm && !insideRadius(ride, x.match.km))
+    .map((x) => ({ km: x.match.km, t: w.schedule.atPlace(x.match), place: x.place }))
+    .filter((x) => openOnArrival(hoursOf(i, x.place.id), x.t))
+    .sort((a, b) => a.t.getTime() - b.t.getTime())
+    .map((x) => ({ km: x.km, t: x.t.getTime() }));
+  const anchors = [{ km: ride.startKm, t: ride.departure.getTime() }, ...open, { km: ride.stopKm, t: w.schedule.atKm(ride.stopKm).getTime() }];
+  for (let n = 0; n + 1 < anchors.length; n++) {
+    if (anchors[n + 1]!.t - anchors[n]!.t >= 120 * MIN - 2) return { from: anchors[n]!.t, to: anchors[n + 1]!.t };
+  }
+  return null;
+}
+
 const INV03: Check = {
   id: 'INV-03',
   appliesTo: (i, s) => usableRide(i, s) && targetsOf(world(i)).some((t) => SHOPLIKE.has(t.place.kind)),
@@ -132,17 +156,58 @@ const INV03: Check = {
       must(openOnArrival(hoursOf(i, t.place.id), t.arrival), `Water uses ${t.place.id} at km ${t.km}, not open on arrival for Food at ${t.arrival.toISOString()}`);
       if (t.tonight || t.km > s.ride.stopKm) continue;
       // Food's own arrival, the same one, makes it an anchor of the gaps: no T2 gap can hold it.
-      must(isFoodPlace(t.place), `Water uses ${t.place.id} (shop=${t.place.tags['shop']}), which Food doesn't count, so a T2 gap could contain it`);
+      must(countsAsFood(t.place), `Water uses ${t.place.id} (shop=${t.place.tags['shop']}), which Food doesn't count, so a T2 gap could contain it`);
       must(within1s(arrivalRidingOn(w.schedule, s.ride.stopKm, i.trip.flatKph, t.match), t.arrival), `Water and Food reach ${t.place.id} at different times`);
+    }
+    if (!w.ideas?.title) return; // Food had no ride to judge
+    const gap = firstFoodGap(i, s, w);
+    const said = ideasOf(w).find((x) => x.trigger === 'gap');
+    must((said !== undefined) === (gap !== null), `T2 says ${said ? `"${said.reason.slice(0, 70)}"` : 'no gap'}; by hand the first gap is ${JSON.stringify(gap)}`);
+    if (gap) for (const t of targetsOf(w)) {
+      if (SHOPLIKE.has(t.place.kind) && !t.tonight && t.km <= s.ride.stopKm) must(!(t.arrival.getTime() > gap.from && t.arrival.getTime() < gap.to), `a T2 gap contains the water source at km ${t.km}, reached ${t.arrival.toISOString()}`);
     }
   },
 };
 
+const RIDING_GAP_MIN = 120;
+
+/** R0 by hand: 1 L over any stretch of more than 2 hours of riding without a town; at the least 0.5 L. Heat can only add. */
+function reserveAtLeast(i: ScreenInputs, s: Screen, w: ScreenParts, toKm: Km): number {
+  const from = s.ride.startKm;
+  const towns = passesOf(i).filter((x) => x.place.kind === 'settlement' && x.match.km > from && x.match.km < toKm).map((x) => x.match.km).sort((a, b) => a - b);
+  let previous = from;
+  for (const km of [...towns, toKm]) {
+    if (w.schedule.ridingMinBetween(previous, km) > RIDING_GAP_MIN + 1e-6) return 1;
+    previous = km;
+  }
+  return 0.5;
+}
+
+/** Camp water by hand: each night at a stop before the target, and tonight's, unless the target is tonight's own water. */
+function campByHand(i: ScreenInputs, s: Screen, w: ScreenParts, target: Target): number {
+  if (i.trip.stay === 'accommodation') return 0;
+  let nights = s.ride.phase === 'after-ride' && !s.ride.noRide && !(target.kind === 'place' && target.tonight) ? 1 : 0;
+  const length = i.trip.route.lengthKm;
+  const from = s.ride.startKm;
+  for (let x = from, guard = 0; x <= target.km && guard < 1000; guard++) {
+    const stop = w.schedule.rideOf(x).stopKm;
+    if (stop >= from && stop < target.km && stop < length) nights++;
+    if (!(stop >= x) || stop >= length) break;
+    x = stop + 1e-6;
+  }
+  return i.trip.campWaterL * nights;
+}
+
 const INV04: Check = {
   id: 'INV-04',
-  appliesTo: (i, s) => s.cards.water.status === 'fine',
-  check(i) {
+  appliesTo: (i, s) => s.cards.water.status === 'fine' || targetsOf(world(i)).length > 0,
+  check(i, s) {
     const w = world(i);
+    // Section 6.0: class B and C are never the target, and only shops, cafés and fuel-station shops count without a class.
+    for (const t of targetsOf(w)) {
+      must(t.place.waterClass === 'A' || (t.place.waterClass === null && SHOPLIKE.has(t.place.kind)), `Water targets ${t.place.id} (${t.place.kind}, class ${t.place.waterClass}), no reliable source`);
+    }
+    if (s.cards.water.status !== 'fine') return;
     const targets = w.targets;
     must(targets !== null, 'Water is fine with no targets');
     const { s1, s2 } = targets!;
@@ -151,8 +216,9 @@ const INV04: Check = {
     must(now.confirmed, 'Water is fine while the amount is unconfirmed');
     if (!now.confirmed) return;
     const left = now.litres - use(w.water, 'now', s2, 'plan');
-    const aside = buffer(w.water, 'now', s2) + reserve(w.water, 'now', s2) + camp(w.water, 'now', s2);
-    must(left >= aside - 1e-9, `Water is fine with ${left.toFixed(3)} L on arrival at S2, ${aside.toFixed(3)} L needed`);
+    const r0 = reserveAtLeast(i, s, w, s2.km);
+    const aside = buffer(w.water, 'now', s2) + r0 + campByHand(i, s, w, s2);
+    must(left >= aside - 1e-9, `Water is fine with ${left.toFixed(3)} L on arrival at S2, ${aside.toFixed(3)} L needed (reserve ${r0})`);
   },
 };
 
@@ -163,13 +229,20 @@ const closedForUnknown = (i: ScreenInputs): ScreenInputs => ({
   ...i, hours: i.hours.map((h) => ({ ...h, spans: h.spans.map((x) => (x.state === 'unknown' || x.state === 'possibly-closed' ? { from: x.from, to: x.to, state: 'closed' as const } : x)) })),
 });
 
+/** An outdoor class A point with no season to go by, between 1 November and 31 March: only its hours can make it count. */
+function reliesOnItsHours(i: ScreenInputs, t: PlaceTarget): boolean {
+  if (seasonalWindow(t.place.seasonal) !== null) return false;
+  const month = wallClock(t.arrival, routeZoneAt(i, t.km)).month;
+  return month >= 11 || month <= 3;
+}
+
 const INV05: Check = {
   id: 'INV-05',
   appliesTo: (i, s) => usable(i, s) && i.trip.departureDate !== null && notKnownSpans(i),
   check(i, s) {
     const w = world(i);
     for (const t of targetsOf(w)) {
-      if (outdoorA(t.place)) continue;
+      if (outdoorA(t.place) && !reliesOnItsHours(i, t)) continue;
       const st = stateAt(hoursOf(i, t.place.id), t.arrival).state;
       must(st === 'open', `water target ${t.place.id} counts while its hours read ${st}`);
     }
@@ -240,6 +313,23 @@ const stormsOnRide = (w: ScreenParts, s: Screen): RainWindow[] => onRideWindows(
 
 const ROOF_LABEL = /^Mapped as /;
 
+/** How many sides, ahead and behind, have an open building for riding there now. */
+function openBuildingSides(i: ScreenInputs, s: Screen): number {
+  const w = world(i);
+  const ride = chipRideByHand(i, s);
+  const sched = chipSchedule(i, s);
+  const of = hoursLookup(w.stop);
+  const inside = (km: Km): boolean => insideRadius(ride, km);
+  const open = (x: ReturnType<typeof spotsOf>[number], arrival: Date): boolean => {
+    const r = coverOfSpot(x, arrival, null, of);
+    return isCover(r) && r.coverClass <= 2;
+  };
+  const spots = spotsOf(w.stop).filter((x) => !inside(x.match.km));
+  const ahead = spots.some((x) => x.match.km >= ride.startKm && open(x, sched.atPlace(x.match)));
+  const behind = spots.some((x) => x.match.km < ride.behindFromKm && open(x, sched.behind(x.match)));
+  return Number(ahead) + Number(behind);
+}
+
 const INV07: Check = {
   id: 'INV-07',
   appliesTo: (i, s) => usableRide(i, s) && stormsOnRide(world(i), s).length > 0,
@@ -274,6 +364,9 @@ const INV07: Check = {
     const rows = shelter.items.filter((x) => x.status === 'fine');
     for (const x of shelter.items) if (ROOF_LABEL.test(x.label) && x.status === 'fine') must(x.detail?.includes(W.weatherNoLightningProtection) === true, `a roof under Shelter lacks the lightning line: ${x.label}`);
     if (rows.some((x) => !ROOF_LABEL.test(x.label))) must(!ROOF_LABEL.test(rows[0]!.label), `a roof heads the Shelter list before the open buildings: ${rows[0]!.label}`);
+    const heads = openBuildingSides(i, s);
+    must(rows.length >= heads, `${heads} sides have an open building, the Shelter list shows ${rows.length} covers`);
+    for (const x of rows.slice(0, heads)) must(!ROOF_LABEL.test(x.label), `an open building on each side should head the Shelter list, and "${x.label}" stands among them`);
     for (const x of s.chips.emergency.items) {
       if (/Mapped as /.test(`${x.label} ${x.detail ?? ''}`)) must(x.detail?.includes(W.weatherNoLightningProtection) === true, `a roof on the Emergency card lacks the lightning line: ${x.label}`);
     }
@@ -620,14 +713,39 @@ const rideLegKm = (ride: Ride): number => rejoinKm(ride.startOffRouteM);
 const homeAway = (s: Screen, p: Position | null, i: ScreenInputs): boolean =>
   p !== null && isFarOff(p) && i.trip.departureDate !== null && (s.ride.phase === 'before-trip' || (s.ride.phase === 'before-ride' && s.ride.date === i.trip.departureDate));
 
-/** Riding there now, as a chip does, worked out apart from it: from the position, least favourably when approximate, with its own leg. */
-function chipSchedule(i: ScreenInputs, s: Screen): Schedule {
+/** The ride a chip rides, worked out apart from it: from the position, least favourably when approximate, with its own leg. */
+function chipRideByHand(i: ScreenInputs, s: Screen): Ride {
   const p = latestUsablePosition(world(i));
+  if (!p) return s.ride;
   const length = i.trip.route.lengthKm;
   const held = (km: Km): Km => Math.max(0, Math.min(length, km));
-  const accKm = p?.approximate ? p.accuracyM / 1000 : 0;
-  const ride: Ride = p ? { ...s.ride, startKm: held(p.km - accKm), behindFromKm: held(p.km + accKm), startOffRouteM: isOffRoute(p) ? p.offRouteM : 0 } : s.ride;
-  return nowSchedule(ride, i.trip, i.now, { sun: i.sun, routeZones: i.routeZones });
+  const accKm = p.approximate ? p.accuracyM / 1000 : 0;
+  return { ...s.ride, startKm: held(p.km - accKm), behindFromKm: held(p.km + accKm), startOffRouteM: isOffRoute(p) ? p.offRouteM : 0 };
+}
+const chipSchedule = (i: ScreenInputs, s: Screen): Schedule => nowSchedule(chipRideByHand(i, s), i.trip, i.now, { sun: i.sun, routeZones: i.routeZones });
+
+const LOADED = 0.82;
+const WITH_BREAKS = 1.15;
+
+/** Emergency measures from the position itself: its distances, worked out from the coordinates. */
+function emergencyDistances(i: ScreenInputs, s: Screen, p: Position): void {
+  const e = s.chips.emergency;
+  const metres = (q: { lat: number; lon: number }): number => haversineKm(p, q) * 1000;
+  if (e.rescue) {
+    const m = metres(e.rescue);
+    must(Math.abs(e.rescue.distanceM - m) <= 1, `Emergency's rescue point is ${e.rescue.distanceM} m away, from the position ${m.toFixed(0)} m`);
+    must(e.rescue.where.startsWith(distanceText(m)), `Emergency says "${e.rescue.where}" for the rescue point, from the position ${distanceText(m)}`);
+  }
+  const towns = i.places.filter((q) => q.kind === 'settlement' && typeof q.name === 'string' && q.name.trim() !== '' && Math.abs(q.lat) <= 90 && Math.abs(q.lon) <= 180);
+  const near = towns.map((q) => ({ q, m: metres(q) })).sort((a, b) => a.m - b.m)[0];
+  if (near) must(e.items.some((x) => x.label.includes(near.q.name!) && x.label.includes(distanceText(near.m))), `Emergency does not say ${near.q.name} is ${distanceText(near.m)} from the position`);
+  for (const q of i.places) {
+    if (q.kind !== 'shelter' || typeof q.name !== 'string' || q.name.trim() === '' || !(Math.abs(q.lat) <= 90) || !(Math.abs(q.lon) <= 180)) continue;
+    const access = q.tags['access'];
+    const m = metres(q);
+    if (access === 'private' || access === 'no' || m > 2990) continue;
+    must(e.items.some((x) => x.label.startsWith(`${q.name} · ${distanceText(m)}`)), `Emergency does not say the shelter ${q.name} is ${distanceText(m)} from the position`);
+  }
 }
 
 const INV19: Check = {
@@ -649,8 +767,16 @@ const INV19: Check = {
       const distance = showKm(ride.stopKm - ride.startKm + leg);
       if (ride.stopKm > ride.startKm || leg > 0) must(s.strip.endText.startsWith(`${distance} km`), `the strip says "${s.strip.endText}", the distance with the rejoin leg is ${distance} km`);
       const atStart = w.schedule.atKm(ride.startKm).getTime() - ride.departure.getTime();
-      if (leg === 0) must(Math.abs(atStart) <= SECOND, `no rejoin leg, yet the start is ${atStart} ms after the departure`);
-      else must(atStart > 0, 'a rejoin leg takes no time');
+      // The leg by hand: 1.3 x the distance off, at the loaded flat speed, with breaks.
+      const legMs = ((1.3 * ride.startOffRouteM) / 1000 / (i.trip.flatKph * LOADED)) * w.schedule.r * WITH_BREAKS * HOUR;
+      must(Math.abs(atStart - legMs) <= SECOND, `the rejoin leg takes ${(atStart / MIN).toFixed(1)} min on the schedule, by hand ${(legMs / MIN).toFixed(1)} min`);
+      // And it costs water: the same ride with no leg uses less on the way to the same target.
+      const target = targetsOf(w).find((t) => !t.tonight);
+      if (leg > 0 && target) {
+        const withLeg = use(w.water, 'now', target, 'plan');
+        const noLeg = use({ ...w.water, ride: { ...ride, startOffRouteM: 0 } }, 'now', target, 'plan');
+        must(withLeg > noLeg, `the water need to km ${target.km} ignores the rejoin leg: ${withLeg} L with it, ${noLeg} L without`);
+      }
     }
     // Home, 40 km off, before the trip or on the morning of day 1: nothing changes.
     if (homeAway(s, p, i)) {
@@ -694,6 +820,7 @@ const INV19: Check = {
     }
     const e = s.chips.emergency;
     must(e.coords !== null && e.coords.includes(p.lat === 0 ? '0.00000' : Math.abs(p.lat).toFixed(5)), `Emergency's coordinates ${e.coords} are not the position's`);
+    emergencyDistances(i, s, p);
   },
 };
 
@@ -742,6 +869,13 @@ const INV20: Check = {
       for (const c of p.covers) {
         const m: RouteMatch = { placeId: c.placeId ?? '', km: c.km, offRouteM: c.offRouteM };
         must(within1s(w.schedule.atPlace(m), c.arrival), `a rain-plan cover at km ${c.km} has its own arrival`);
+      }
+      const first = p.covers[0];
+      if (first && p.window.kind !== 'thunder' && p.firstCoverLine !== null) {
+        const place = i.places.find((x) => x.id === first.placeId);
+        const zone = place && /^[A-Z]/.test(place.timeZone) ? place.timeZone : routeZoneAt(i, first.km);
+        const expected = formatAbout(w.schedule.atPlace({ placeId: first.placeId ?? '', km: first.km, offRouteM: first.offRouteM }), zone);
+        must(p.firstCoverLine.includes(expected), `Weather says "${p.firstCoverLine}" of its first cover, the schedule ${expected}`);
       }
     }
     // The chips ride there now, each from the position, and so agree with each other and with Shelter.
@@ -802,6 +936,8 @@ const INV22: Check = {
       const basis = s.cards.weather.basis.join(' ');
       must(basis.includes(W.weatherAttribution), `Weather without the Open-Meteo attribution: ${basis}`);
       must(s.cards.weather.freshness.dataDates['weather'] === world(i).forecast!.fetchedAt.toISOString(), 'Weather without its forecast\'s age');
+      must(s.chips.shelter.basis.includes(W.weatherAttribution), `Shelter reads the forecast without the Open-Meteo attribution: ${s.chips.shelter.basis.join(' ')}`);
+      must(s.cards.food.basis.includes(W.weatherAttribution), `Food reads the forecast without the Open-Meteo attribution: ${s.cards.food.basis.join(' ')}`);
     }
     for (const a of [s.cards.water, s.cards.food, s.cards.sleep, s.chips.bike, s.chips.pharmacy, s.chips.train, s.chips.toilets, s.chips.shelter]) {
       if (a.items.some((x) => x.stamp?.km !== undefined) && i.places.length > 0) {
@@ -852,6 +988,7 @@ const INV24: Check = {
       must(e.updatePosition === e.share.includes(W.shareLastFix), `an old position and the sender's words disagree: ${e.share}`);
       const p = latestUsablePosition(world(i));
       if (p) must((p.source === 'manual') === e.share.includes(W.shareManual), `a manual position and the sender's words disagree: ${e.share}`);
+      if (p) must((p.source !== 'manual' && (p.approximate || p.accuracyM > 500)) === e.share.includes(W.shareApproximate), `an approximate position and the sender's words disagree: ${e.share}`);
     }
     const names = i.places.filter((p) => p.kind === 'settlement').flatMap((p) => (p.name ? [p.name] : []));
     const masked = (t: string): string => names.reduce((x, n) => x.split(n).join('Town'), t);
@@ -904,18 +1041,63 @@ function hash(text: string): number {
   return h;
 }
 
-/** Whether this wall-clock minute does not exist on the phone's own clock: the one thing Decision 8 lets read otherwise. */
-const skippedOnPhone = (y: number, mo: number, d: number, h: number, mi: number): boolean => {
-  const t = new Date(y, mo - 1, d, h, mi);
-  return t.getHours() !== h || t.getMinutes() !== mi;
-};
+/** How often the two allowances below were reached in a run: a check that never meets them proves nothing about them. */
+export const INV26_REACH = { skippedHour: 0, nightAfter: 0 }; // moments
+export const INV26_GATE = 10;
 
-/** The first hours of the day after the phone skipped an hour: a tag with a calendar in it can't be read there (see spans.ts). */
-const afterSkippedDay = (y: number, mo: number, d: number, h: number): boolean => h < 2 && new Date(y, mo - 1, d).getTime() - new Date(y, mo - 1, d - 1).getTime() < 24 * HOUR;
-const LOOKS_AT_CALENDAR = /\b(?:PH|SH|easter|week|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{4})\b/i;
+/** A rule that is only weekdays and times. Anything else looks at the calendar, and a week later can't stand in for it. */
+const ONLY_WEEKDAYS_AND_TIMES = /^(?:\b(?:Mo|Tu|We|Th|Fr|Sa|Su|off|closed|open)\b|\d{1,2}:\d{2}\+?|24\/7|[-,;\s]|\|\|)*$/;
+const runsOverMidnightByHand = (tag: string): boolean => /\d\+/.test(tag) || [...tag.matchAll(/(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})/g)].some(([, a, b, c, d]) => {
+  const end = Number(c) * 60 + Number(d);
+  return end > 24 * 60 || end <= Number(a) * 60 + Number(b);
+});
+
+/** The phones with a spring clock change, and its date in 2026. */
+const SPRING_CHANGE: { zone: string; date: string }[] = [
+  { zone: 'Europe/Berlin', date: '2026-03-29' }, { zone: 'Europe/Lisbon', date: '2026-03-29' }, { zone: 'Europe/Helsinki', date: '2026-03-29' }, { zone: 'America/New_York', date: '2026-03-08' },
+];
 
 const STEP_15 = 15 * MIN;
-const PREPARED_PER_SCENARIO = 2;
+const PREPARED_PER_SCENARIO = 3;
+
+/**
+ * The same tag prepared on two phones reads the same at every step, with exactly two allowances, each of which must read
+ * exactly unknown and nothing else (the plan's Decision 8 and the ruling in the PR):
+ * - a wall-clock minute the phone skips;
+ * - the first hour of the day after it skips, for a tag with a time over midnight that looks at the calendar.
+ */
+function sameHoursOnBothPhones(p: Place, tag: string, zone: string, from: Date, to: Date, holidays: ScreenInputs['holidays']): void {
+  const spansOf = () => placeSpans(tag, p, ruleOf(p), from, to, holidays);
+  const reference = withDeviceZone('UTC', spansOf);
+  const hoursWith = (spans: PlaceHours['spans']): PlaceHours => ({ placeId: p.id, windowStart: from, windowEnd: to, spans });
+  const asked = !ONLY_WEEKDAYS_AND_TIMES.test(tag) && runsOverMidnightByHand(tag);
+  let sawSkipped = false;
+  let sawNight = false;
+  withDeviceZone(zone, () => {
+    const there = spansOf();
+    for (let t = from.getTime(); t < to.getTime(); t += STEP_15) {
+      const when = new Date(t);
+      const a = stateAt(hoursWith(reference), when).state;
+      const b = stateAt(hoursWith(there), when).state;
+      const c = wallClock(when, p.timeZone);
+      const device = new Date(c.year, c.month - 1, c.day, c.hour, c.minute);
+      const skipped = device.getHours() !== c.hour || device.getMinutes() !== c.minute;
+      const dayMs = new Date(c.year, c.month - 1, c.day).getTime() - new Date(c.year, c.month - 1, c.day - 1).getTime();
+      const nightAfter = asked && dayMs < 24 * HOUR && c.hour * 60 + c.minute < (24 * HOUR - dayMs) / MIN;
+      // A tag the library refuses reads alike everywhere, under the rules of its place: nothing to allow.
+      if (a === b && !nightAfter) continue;
+      if (skipped || nightAfter) {
+        must(b === 'unknown', `${p.id} (${tag}) reads ${b} on a phone set to ${zone} at ${when.toISOString()}, where only unknown is allowed`);
+        if (skipped) sawSkipped = true;
+        else sawNight = true;
+        continue;
+      }
+      must(a === b, `${p.id} (${tag}) reads ${a} on one phone and ${b} on one set to ${zone}, at ${when.toISOString()}`);
+    }
+  });
+  if (sawSkipped) INV26_REACH.skippedHour++;
+  if (sawNight) INV26_REACH.nightAfter++;
+}
 
 const INV26: Check = {
   id: 'INV-26',
@@ -923,41 +1105,24 @@ const INV26: Check = {
   appliesTo: () => true,
   check(i, s, again) {
     const first = JSON.stringify(s);
-    const zone = DEVICE_ZONES[hash(`${i.trip.route.id}|${String(i.now.getTime())}`) % DEVICE_ZONES.length]!.zone;
+    const n = hash(`${i.trip.route.id}|${String(i.now.getTime())}`);
+    const zone = DEVICE_ZONES[n % DEVICE_ZONES.length]!.zone;
     const other = withDeviceZone(zone, () => JSON.stringify(again(i)));
     if (other !== first) {
       let at = 0;
       while (at < first.length && first[at] === other[at]) at++;
       throw new Error(`the screen differs on a phone set to ${zone}: "${first.slice(Math.max(0, at - 60), at + 60)}" against "${other.slice(Math.max(0, at - 60), at + 60)}"`);
     }
-    // Hours are prepared on the phone: the same tags, read on another phone's clock, say the same, but for its skipped hour.
     if (!validDate(i.now)) return;
-    // Whole days on the place's clock, as preparation asks them.
-    const tagged = i.places.filter((p) => typeof p.openingHours === 'string' && /^[A-Z]/.test(p.timeZone)).slice(0, PREPARED_PER_SCENARIO);
-    for (const p of tagged) {
+    // Hours are prepared on the phone. Whole days on the place's clock, around now and around a phone's spring change.
+    const known = i.places.filter((p) => typeof p.openingHours === 'string' && /^[A-Z]/.test(p.timeZone) && isKnownZone(p.timeZone));
+    const chosen = [...known.filter((p) => runsOverMidnightByHand(p.openingHours!) && !ONLY_WEEKDAYS_AND_TIMES.test(p.openingHours!)).slice(0, 1), ...known.slice(0, PREPARED_PER_SCENARIO - 1)];
+    const spring = SPRING_CHANGE[n % SPRING_CHANGE.length]!;
+    for (const p of chosen) {
       const today = localIsoDate(i.now, p.timeZone);
-      const from = instantAt(addDaysIso(today, -1), '00:00', p.timeZone);
-      const to = instantAt(addDaysIso(today, 2), '00:00', p.timeZone);
-      const spansOf = () => placeSpans(p.openingHours, p, ruleOf(p), from, to, i.holidays);
-      const reference = withDeviceZone('UTC', spansOf);
-      const there = withDeviceZone(zone, spansOf);
-      const read = (spans: PlaceHours['spans'], t: Date): string => stateAt({ placeId: p.id, windowStart: from, windowEnd: to, spans }, t).state;
-      for (let t = from.getTime(); t < to.getTime(); t += STEP_15) {
-        const when = new Date(t);
-        const a = read(reference, when);
-        const b = read(there, when);
-        if (a === b) continue;
-        // The wall clock of the place at that instant, as the phone would have to express it.
-        const shift = new Intl.DateTimeFormat('en-CA', { timeZone: p.timeZone, year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(when);
-        const part = (n: string): number => Number(shift.find((x) => x.type === n)!.value);
-        const y = part('year');
-        const mo = part('month');
-        const d = part('day');
-        const h = part('hour');
-        const mi = part('minute');
-        const skipped = withDeviceZone(zone, () => skippedOnPhone(y, mo, d, h, mi) || (b === 'unknown' && LOOKS_AT_CALENDAR.test(p.openingHours!) && afterSkippedDay(y, mo, d, h)));
-        must(skipped, `${p.id} (${p.openingHours}) reads ${a} on one phone and ${b} on one set to ${zone}, at ${when.toISOString()}`);
-      }
+      const day = (date: string, by: number): Date => instantAt(addDaysIso(date, by), '00:00', p.timeZone);
+      sameHoursOnBothPhones(p, p.openingHours!, zone, day(today, -1), day(today, 2), i.holidays);
+      sameHoursOnBothPhones(p, p.openingHours!, spring.zone, day(spring.date, -1), day(spring.date, 3), i.holidays);
     }
   },
 };

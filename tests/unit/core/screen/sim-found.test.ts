@@ -1,7 +1,7 @@
 // What the simulator found that the rule tests had missed. Each saved failure in tests/regressions/ has its plain case here.
 import { describe, expect, test } from 'vitest';
 import { buildScreen, screen } from '../../../../src/core/screen/screen.ts';
-import { at, bakery, cafe, pos, shop, tap } from '../../../fixtures/build.ts';
+import { at, bakery, cafe, pos, shop, tap, testTrip } from '../../../fixtures/build.ts';
 import { inputsOf } from './screen-helpers.ts';
 
 describe('what the simulator found', () => {
@@ -35,6 +35,22 @@ describe('what the simulator found', () => {
     const home = { ...moment, positions: [pos({ km: 30, at: '2026-10-17 07:55', off: 40_000 })] };
     expect(screen(home).cards.water.title).toBe(screen(moment).cards.water.title);
     expect(screen(home).cards.water.status).toBe(screen(moment).cards.water.status);
+  });
+
+  test('[INV-19] two fixes of the moment water was confirmed: the same title, whichever came first', () => {
+    const when = at('2026-10-17 12:00');
+    const a = pos({ km: 39.9, at: '2026-10-17 12:00' });
+    const b = pos({ km: 40.1, at: '2026-10-17 12:00' });
+    const later = pos({ km: 41, at: '2026-10-17 12:20' });
+    const base = inputsOf({ now: '2026-10-17 12:30', spots: [{ b: tap(), km: 40, id: 'n1' }, { b: tap(), km: 60, id: 'n2' }, { b: tap(), km: 80, id: 'n3' }] });
+    const one = { ...base, waterLeft: { litres: 2, at: when, confirmed: true }, positions: [a, b, later] };
+    const two = { ...one, positions: [b, a, later] };
+    expect(screen(two).cards.water.title).toBe(screen(one).cards.water.title);
+  });
+
+  test('[INV-30] no departure date and no clock: every part still stands', () => {
+    const i = inputsOf({ trip: testTrip({ departureDate: null }), spots: [{ b: tap(), km: 100 }] });
+    expect(buildScreen({ ...i, now: new Date(Number.NaN) }).faults).toEqual([]);
   });
 
   test('[INV-29] the places inside an approximate position radius come in one order on the Food card', () => {

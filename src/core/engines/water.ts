@@ -10,7 +10,7 @@ import type { Answer, AnswerItem, DayRide, Km, Missing, Place, PlaceHours, Route
 import { showKm, W } from '../wording/en.ts';
 import { LOAD_PENALTY } from '../route/stages.ts';
 import { newestMapDate } from './covers.ts';
-import { isFarOff, rejoinKm } from './locate.ts';
+import { isFarOff, latestPosition, positionOrder, rejoinKm } from './locate.ts';
 import { flatLegClockMin, flatLegRidingMin, usableFlatKph, type Schedule } from './pace.ts';
 import { nowSchedule, ridingDate, zoneLookupOf } from './tripday.ts';
 import { uncertainty } from './water-learning.ts';
@@ -410,11 +410,11 @@ const positionsOf = (f: WaterFacts): WaterFacts['positions'] => f.positions.filt
 
 /** The last position at or before a moment. */
 const positionAt = (f: WaterFacts, t: Date): WaterFacts['positions'][number] | null =>
-  positionsOf(f).filter((p) => p.at.getTime() <= t.getTime()).sort((a, b) => b.at.getTime() - a.at.getTime())[0] ?? null;
+  latestPosition(positionsOf(f).filter((p) => p.at.getTime() <= t.getTime()));
 
 /** Whether the rider has passed a reliable source since. With no position from before then, any source behind may be it. */
 function passedSource(f: WaterFacts, since: Date): boolean {
-  const later = positionsOf(f).filter((p) => p.at.getTime() > since.getTime()).sort((a, b) => a.at.getTime() - b.at.getTime());
+  const later = positionsOf(f).filter((p) => p.at.getTime() > since.getTime()).sort(positionOrder);
   if (later.length === 0) return false;
   const from = positionAt(f, since)?.km ?? -Infinity;
   const reach = later.reduce((max, p) => Math.max(max, p.km), from);

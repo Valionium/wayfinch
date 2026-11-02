@@ -6,7 +6,7 @@ const time = (): fc.Arbitrary<string> =>
 const span = (): fc.Arbitrary<string> => fc.tuple(time(), time()).map(([a, b]) => `${a}-${b}`);
 const days = (): fc.Arbitrary<string> =>
   fc.oneof(
-    fc.constantFrom('Mo-Su', 'Mo-Fr', 'Sa,Su', 'Mo-Sa', 'PH', 'Su,PH'),
+    fc.constantFrom('Mo-Su', 'Mo-Fr', 'Sa,Su', 'Mo-Sa', 'PH', 'Su,PH', 'Su[1]', 'Su[-1]', 'Sa[2]', 'week 13', 'week 14 Mo-Fr', 'week 10-20 Sa,Su', 'Mar', 'Mar-Oct Mo-Sa', 'Nov-Mar Su'),
     fc.tuple(fc.constantFrom(...DAYS), fc.constantFrom(...DAYS)).map(([a, b]) => `${a}-${b}`),
   );
 const rule = (): fc.Arbitrary<string> =>
@@ -16,6 +16,8 @@ const rule = (): fc.Arbitrary<string> =>
     fc.tuple(days(), span(), span()).map(([d, a, b]) => `${d} ${a},${b}`),
     fc.tuple(days()).map(([d]) => `${d} off`),
     fc.constant('24/7'),
+    // Times over midnight that look at the calendar: what a week later can't stand in for.
+    fc.constantFrom('Su[1] 20:00-02:00', 'Su[-1] 20:00-02:00', 'week 13 Su 22:00-01:30', 'Mar Sa,Su 18:00-03:00', 'PH 23:30-03:30', 'Sa,Su 10:30-04:00; Su,PH 07:45-14:30'),
   );
 
 /** Opening-hours values from the opening_hours syntax, with PH and lunch breaks, plus invalid ones (section 12.2). */
