@@ -12,7 +12,8 @@
     "lint": "eslint . --max-warnings 0",
     "unit": "vitest run",
     "test": "npm run types && npm run lint && npm run unit",
-    "fast": "node tools/fast.mjs"
+    "fast": "node tools/fast.mjs",
+    "rules": "node tools/rules.mjs"
   },
   "devDependencies": {
     "@fast-check/vitest": "0.5.0",

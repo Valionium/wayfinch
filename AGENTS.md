@@ -13,6 +13,7 @@ Exist so far:
 ```
 src/core/      pure TypeScript, no DOM, fully unit-tested
   geo/         distances
+  places/      place types, pack format, classification
 tests/
   unit/        Vitest
   gen/         shared generators; extend these instead of writing your own
@@ -30,11 +31,15 @@ Planned, in spec section 4.2: `src/core/` engines, `src/data/`, `src/store/`, `s
 | `npm run fast` | types, lint and the tests touched by this change, with 25 runs per property |
 | `npm test` | types, lint and all unit and property tests |
 | `npm run types`, `npm run lint`, `npm run unit` | one part |
+| `npm run rules` | the rule check: every rule ID in force has a test, every ID a test names is defined |
+| `npm run rules -- show <PREFIX>` | the rules of one area (for example `W`) and the tests naming them |
+| `npm run rules -- --final` | as `rules`, and fails while any `later:` line remains |
 
 ## Rules
 
 - `core` never imports from `ui`, `data` or `store`.
 - `core` has no hidden inputs: no clock, randomness or device time zone. `now`, zone data and seeds are arguments. Lint enforces this.
+- Rule IDs live in `docs/rules.md`, one line per rule ending in its ID. A test title starts with its ID, for example `test('[W-ZERO] …')`. `tests/rules-in-force.txt` lists IDs in force; a `later: ID` line is listed but has no test yet, and the task that adds the test removes the `later:` mark.
 - Pull requests use fixed seeds.
 - `main` accepts changes only through pull requests with green `types-lint` and `unit-property` checks.
 - Never print or quote lines 20–25 of Load Check's `index.html`.
