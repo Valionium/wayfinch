@@ -2,7 +2,7 @@ import { beforeEach, expect, test } from 'vitest';
 import { freshStore, route, trip } from './helpers.ts';
 import type { Route } from '../../../src/core/types.ts';
 import { openDb, ROUTE_META_PREFIX, ROUTE_STORES } from '../../../src/store/db.ts';
-import { readSettings } from '../../../src/store/settings.ts';
+import { readSettings, writeSettings } from '../../../src/store/settings.ts';
 import { readTrip, replaceRoute, saveTrip } from '../../../src/store/trip.ts';
 
 beforeEach(freshStore);
@@ -123,4 +123,29 @@ test('[ST-REPLACE] final heights on the same line keep the prepared data (the ha
   await fill();
   await saveTrip({ ...t, route: { ...t.route, id: 'route-final', hash: 'final', points: t.route.points.map((p) => ({ ...p, ele: 300 })) } });
   expect(await counts()).toEqual(WITH_OLD);
+});
+
+test('[ST-REPLACE] after replacing the route this window can go on: it may write settings and the trip without reading again', async () => {
+  await writeSettings({ nights: 3 });
+  await saveTrip(trip());
+  await readSettings();
+  await replaceRoute(route({ id: 'route-new', hash: 'new' }, 50));
+  const r = await writeSettings({ theme: 'dark', flatKph: 30 });
+  expect(r).toMatchObject({ ok: true, newer: [] });
+  expect((await readSettings()).nights).toBeNull();
+});
+
+test('[ST-REPLACE] replacing the route does not hide from a window that settings changed elsewhere', async () => {
+  await saveTrip(trip());
+  await readSettings();
+  // Another window's settings write, this window not having read it.
+  localStorage.setItem('copilot:settings', JSON.stringify({ updatedAt: '2030-01-01T00:00:00.000Z', theme: 'light', nights: 2 }));
+  await replaceRoute(route({ id: 'route-new', hash: 'new' }, 50));
+  expect((await writeSettings({ theme: 'dark' })).newer).toEqual(['settings']);
+});
+
+test('[ST-SCHEMA] a connection the browser closed behind our back (a phone waking from the background) is opened again', async () => {
+  await saveTrip(trip());
+  (await openDb()).close();
+  expect((await readTrip())?.route.id).toBe(trip().route.id);
 });

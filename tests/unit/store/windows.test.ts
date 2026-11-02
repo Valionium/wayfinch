@@ -1,6 +1,8 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 import { anotherWindow, freshStore, route, trip } from './helpers.ts';
-import { CHANGED_KEY, flushWrites, NewerDataError, onChanged, tracked } from '../../../src/store/changed.ts';
+import { CHANGED_KEY, flushWrites, holdsCopy, NewerDataError, onChanged, tracked } from '../../../src/store/changed.ts';
+import { openDb } from '../../../src/store/db.ts';
+import { readInputs } from '../../../src/store/inputs.ts';
 import type { Section } from '../../../src/store/changed.ts';
 import { readSettings, writeSettings } from '../../../src/store/settings.ts';
 import { readTrip, replaceRoute, saveTrip } from '../../../src/store/trip.ts';
@@ -130,4 +132,14 @@ test('[APP-UPDATE-PROMPT] saving before an update waits for writes under way, an
   // Refused for newer data is not a failure to save: there is nothing left to save.
   await tracked(Promise.reject(new NewerDataError('trip'))).catch(() => undefined);
   expect(await flushWrites()).toBe(true);
+});
+
+test('[ST-NO-OVERWRITE] reading the inputs does not count as holding a copy: only a read of the section itself does', async () => {
+  await saveTrip(trip());
+  const db = await openDb();
+  await db.put('meta', { thirst: 'more' }, 'profile');
+  await db.put('meta', '2030-01-01T00:00:00.000Z', 'updatedAt:profile');
+  await readInputs(new Date('2026-10-17T10:00:00Z'));
+  expect(holdsCopy('profile', '2030-01-01T00:00:00.000Z')).toBe(false);
+  expect((await readInputs(new Date('2026-10-17T10:00:00Z')))?.profile.thirst).toBe('more');
 });

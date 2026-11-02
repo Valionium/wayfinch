@@ -5,13 +5,13 @@ import { positionOrder } from '../core/engines/locate.ts';
 import { ridingDate, zoneLookupOf } from '../core/engines/tripday.ts';
 import { DEFAULT_FOR_MS } from '../core/engines/water.ts';
 import type { Screen } from '../core/screen/screen.ts';
-import type { Baseline, DayStart, Place, PlaceHours, Position, Profile, RescuePoint, Roof, Route, RouteMatch, ScreenInputs, StoredForecast, Trip, ZoneSpan } from '../core/types.ts';
+import type { Baseline, DayStart, Place, PlaceHours, Position, RescuePoint, Roof, Route, RouteMatch, ScreenInputs, StoredForecast, Trip, ZoneSpan } from '../core/types.ts';
 import { markChanged, tracked } from './changed.ts';
 import { CURRENT, inTx, ROUTE_META_PREFIX, ROUTE_STORES } from './db.ts';
 import type { Tx } from './db.ts';
 import { readLoadSummary } from './loadcheck-read.ts';
 import { keptPositions, readPlanTomorrow, sweepPositions, ZONES_KEY } from './positions.ts';
-import { readProfile } from './profile.ts';
+import { PROFILE_META, usableProfile } from './profile.ts';
 import { usableTrip } from './rules.ts';
 import { readLocalSettings } from './settings-local.ts';
 
@@ -39,12 +39,11 @@ const dayStartsKept = (list: DayStart[], now: Date, zones: ZoneSpan[]): DayStart
  */
 export async function readInputs(now: Date): Promise<ScreenInputs | null> {
   const local = readLocalSettings().settings;
-  const profile: Profile = await readProfile();
   const read = await inTx([...ROUTE_STORES, 'trip', 'meta'], 'readonly', async (tx) => {
     const all = async <T>(name: string): Promise<T[]> => (await tx.objectStore(name).getAll()) as T[];
     const one = async <T>(name: string, key: string): Promise<T | undefined> => (await tx.objectStore(name).get(key)) as T | undefined;
     return {
-      trip: await one<unknown>('trip', CURRENT),
+      trip: await one<unknown>('trip', CURRENT), profile: await one<unknown>('meta', PROFILE_META),
       matches: await all<RouteMatch>('matches'), places: await all<Place>('places'), roofs: await all<Roof>('roofs'),
       hours: await all<PlaceHours>('hours'), rescuePoints: await all<RescuePoint>('rescuePoints'),
       forecast: await one<StoredForecast>('forecast', CURRENT), baseline: await one<Baseline>('baseline', CURRENT),
@@ -71,7 +70,7 @@ export async function readInputs(now: Date): Promise<ScreenInputs | null> {
     trip, matches: read.matches, places: read.places, roofs: read.roofs, hours: read.hours, rescuePoints: read.rescuePoints,
     savedKm: read.savedKm ?? [], forecast: read.forecast ?? null, baseline: read.baseline ?? null,
     positions, dayStarts, routeEndDate: read.routeEndDate ?? null, planTomorrow: readPlanTomorrow(),
-    profile, loadSummary: readLoadSummary(), waterLeft: waterGone ? null : read.waterLeft ?? null,
+    profile: usableProfile(read.profile), loadSummary: readLoadSummary(), waterLeft: waterGone ? null : read.waterLeft ?? null,
     settings: { campWaterL: trip.campWaterL, keepFresh: local.keepFresh },
     now, sun: sunFromSuncalc, routeZones, holidays: read.holidays ?? {}, demo: null,
   };

@@ -85,14 +85,25 @@ export function closeDb(): void {
   void closing?.then((db) => db.close()).catch(() => undefined);
 }
 
+/** A phone can close the connection while the app sleeps, which only shows here: then once more, on a new one. */
+async function begin(stores: string[], mode: 'readonly' | 'readwrite') {
+  const db = await openDb();
+  try {
+    return db.transaction(stores, mode);
+  } catch (e) {
+    if ((e as { name?: string } | null)?.name !== 'InvalidStateError') throw e;
+    forget();
+    return (await openDb()).transaction(stores, mode);
+  }
+}
+
 /**
  * Runs `work` in one transaction. Anything it throws undoes all of it, also what was done before the throw: a value the
  * browser can't store throws at the call, which by itself would not stop the transaction. `work` awaits only this
  * transaction's own requests, or the browser ends it early.
  */
 export async function inTx<T>(stores: string[], mode: 'readonly' | 'readwrite', work: (tx: Tx) => Promise<T>): Promise<T> {
-  const db = await openDb();
-  const tx = db.transaction(stores, mode) as unknown as Tx;
+  const tx = (await begin(stores, mode)) as unknown as Tx;
   try {
     const result = await work(tx);
     await tx.done;

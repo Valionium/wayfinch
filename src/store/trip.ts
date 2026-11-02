@@ -43,6 +43,18 @@ export function forgetPlanTomorrow(): void {
   try { localStorage.removeItem(PLAN_TOMORROW_KEY); } catch { /* storage blocked: nothing was kept */ }
 }
 
+/** What was chosen for the old route alone. This write doesn't count as having seen a settings change from another window. */
+function forgetRouteChoices(): void {
+  forgetPlanTomorrow();
+  const { settings, stamp } = readLocalSettings();
+  if (settings.nights === null) return;
+  const held = holdsCopy('settings', stamp);
+  const written = writeLocalSettings({ nights: null });
+  if (written === null) return;
+  if (held) noteCopy('settings', written);
+  markChanged('settings');
+}
+
 export async function readTrip(): Promise<Trip | null> {
   const { raw, stamp } = await inTx(['trip', 'meta'], 'readonly', async (tx) => ({
     raw: (await tx.objectStore('trip').get(CURRENT)) as unknown,
@@ -72,7 +84,7 @@ async function saving(trip: Trip): Promise<void> {
     return putTrip(tx, trip, stored);
   });
   noteCopy('trip', stamp);
-  if (replaced) forgetPlanTomorrow();
+  if (replaced) forgetRouteChoices();
   markChanged('trip');
 }
 
@@ -108,7 +120,6 @@ async function replacing(route: Route): Promise<void> {
     return putTrip(tx, next, stored);
   });
   noteCopy('trip', stamp);
-  forgetPlanTomorrow();
-  writeLocalSettings({ nights: null });
+  forgetRouteChoices();
   markChanged('trip');
 }

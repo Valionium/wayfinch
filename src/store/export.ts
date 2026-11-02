@@ -182,7 +182,7 @@ async function importing(file: unknown): Promise<ImportResult> {
 // ---- Delete --------------------------------------------------------------------------------------------------------
 
 /**
- * Removes the database and every `copilot:*` key, key by key, and no other: never `localStorage.clear()`, because the bag
+ * Removes the database and every `copilot:*` key, key by key, and no other: never the whole storage at once, because the bag
  * planner's plans live beside them. Other windows let go of the database on its request, and hear of it through the event
  * this fires before its own key goes too.
  */
