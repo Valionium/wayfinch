@@ -71,7 +71,7 @@ export function climbingAnswer(f: ClimbingFacts): Answer {
   }
 
   const toEnd = shownAscentM(between(up, startKm, lengthKm));
-  const toStop = shownAscentM(between(up, startKm, Math.min(stopKm, lengthKm)));
+  const toStop = shownAscentM(between(up, startKm, stopKm));
   const title = stopKm >= lengthKm ? W.climbLeftToEnd(String(toEnd)) : W.climbLeft(String(toStop), showKm(stopKm), String(toEnd));
 
   // The first climb whose top lies ahead; a climb the rider is on still counts.

@@ -80,3 +80,25 @@ export const openWaterWindow = (h: PlaceHours | undefined, t: Date): boolean => 
 /** Whether an ISO date is a public holiday in a holiday zone, from the prepared list. */
 export const isPublicHoliday = (date: string, holidayZone: string | null, holidays: Record<string, string[]>): boolean =>
   holidayZone !== null && Object.hasOwn(holidays, holidayZone) && holidays[holidayZone]!.includes(date);
+
+/**
+ * What a place is over a stretch of time (section 6.8: a night's date). Open if it is open at any moment of the stretch;
+ * otherwise unknown if any part is unknown or possibly closed; otherwise closed. 'outside' when there are no hours, the
+ * prepared window does not cover the whole stretch, or a time is no time: the hours were not worked out for it.
+ */
+export function stateWithin(h: PlaceHours | undefined, from: Date, to: Date): 'open' | 'closed' | 'unknown' | 'outside' {
+  if (!h) return 'outside';
+  const start = from.getTime();
+  const end = to.getTime();
+  // Written so that an invalid date, whose comparisons are all false, lands outside.
+  if (!(start < end && start >= h.windowStart.getTime() && end <= h.windowEnd.getTime())) return 'outside';
+  let unknown = false;
+  let closed = false;
+  for (const s of h.spans) {
+    if (!(s.from.getTime() < end && s.to.getTime() > start)) continue;
+    if (s.state === 'open') return 'open';
+    if (s.state === 'closed') closed = true;
+    else unknown = true;
+  }
+  return unknown ? 'unknown' : closed ? 'closed' : 'outside';
+}

@@ -51,8 +51,10 @@ function townNear(f: ShareFacts, km: Km): string | null {
 
 type Quality = { prefix: 'at' | 'around' | 'near'; tail: string; inner: string };
 function qualityOf(p: Position): Quality {
-  const off = isOffRoute(p);
-  const approximate = p.source !== 'manual' && p.approximate;
+  // A distance or accuracy that is no number cannot show the position is on the route: it reads approximate.
+  const unreadable = !Number.isFinite(p.offRouteM) || !Number.isFinite(p.accuracyM);
+  const off = !unreadable && isOffRoute(p);
+  const approximate = unreadable || (p.source !== 'manual' && p.approximate);
   if (off && approximate) return { prefix: 'near', tail: W.shareProgressTailOffApproximate, inner: W.shareProgressInnerOffApproximate };
   if (off) return { prefix: 'near', tail: W.shareProgressTailOff, inner: W.shareProgressInnerOff };
   if (approximate) return { prefix: 'around', tail: W.shareProgressTailApproximate, inner: W.shareProgressInnerApproximate };
@@ -62,7 +64,7 @@ function qualityOf(p: Position): Quality {
 
 const coordinate = (x: number): string => {
   const v = Math.round(x * 1000) / 1000;
-  return (v === 0 ? 0 : v).toFixed(3);
+  return v.toFixed(3);
 };
 
 export function progressText(f: ShareFacts): string | null {

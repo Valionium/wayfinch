@@ -3,10 +3,12 @@
 // as open. Lean-tos and basic huts are listed with their own label and are never the answer; weather shelters are not
 // sleep places. The card is never a warning.
 import { compareFinal, formatAbout, makeAnswer } from '../answers/index.ts';
+import { stateWithin } from '../hours/check.ts';
 import { addDaysIso, instantAt, localIsoDate } from '../answers/time.ts';
 import { pointAtRouteKm } from '../geo/project.ts';
 import { telLink, websiteLink } from '../places/contact.ts';
 import { COUNTRIES, type CountryCode } from '../places/countries.ts';
+import { GRID_KM_ROUNDING } from '../route/grid.ts';
 import { normaliseShelterType } from '../places/shelter.ts';
 import type { Answer, AnswerItem, DayRide, Km, Missing, Place, PlaceHours, PlaceKind, RouteMatch, ScreenInputs, Status, SunTimes } from '../types.ts';
 import { shortIsoDay, shortMapDate, showKm, W } from '../wording/en.ts';
@@ -112,19 +114,12 @@ function nightOf(place: Place, h: PlaceHours | undefined, date: string, tz: stri
   const dayStart = instantAt(date, '00:00', tz).getTime();
   const dayEnd = instantAt(addDaysIso(date, 1), '00:00', tz).getTime();
   const mapped = typeof place.openingHours === 'string' && place.openingHours.trim() !== '';
-  let verdict: 'open' | 'closed' | 'unknown' | 'unworked';
-  if (!h || !(h.windowStart.getTime() <= dayStart && h.windowEnd.getTime() >= dayEnd)) verdict = 'unworked';
-  else {
-    const overlapping = h.spans.filter((s) => s.from.getTime() < dayEnd && s.to.getTime() > dayStart);
-    if (overlapping.some((s) => s.state === 'open')) verdict = 'open';
-    else if (overlapping.length === 0 || overlapping.some((s) => s.state === 'unknown' || s.state === 'possibly-closed')) verdict = 'unknown';
-    else verdict = 'closed';
-  }
+  const verdict = stateWithin(h, new Date(dayStart), new Date(dayEnd));
   if (verdict === 'open') return { state: 'open', why: null, unworked: false, season: label };
   if (verdict === 'closed') return { state: 'closed', why: 'hours', unworked: false, season: label };
   // Hours not known or not prepared: a season that is in is the only thing left to go on, and only without hours mapped.
   if (seasonIn && !mapped) return { state: 'open', why: 'season', unworked: false, season: label };
-  return { state: 'unknown', why: null, unworked: verdict === 'unworked' && mapped, season: label };
+  return { state: 'unknown', why: null, unworked: verdict === 'outside' && mapped, season: label };
 }
 
 // ---- candidates ----------------------------------------------------------------------------------------------------
@@ -194,9 +189,9 @@ export function sleepAnswer(f: SleepFacts): Answer {
       if (km >= ride.startKm) return { pass: x, side: 'ahead', riding: 'now', arrival: schedule.atPlace(x.match), ridingMinutes: ridingOf('ahead', x.match) };
       return { pass: x, side: 'behind', riding: 'now', arrival: schedule.behind(x.match), ridingMinutes: ridingOf('behind', x.match) };
     }
-    if (km < ride.startKm) return null;
+    if (km < ride.startKm - GRID_KM_ROUNDING) return null;
     if (insideRadius(ride, km)) return { pass: x, side: 'near', riding: 'ride', arrival: null, ridingMinutes: 0 };
-    if (km <= ride.stopKm) return { pass: x, side: 'ahead', riding: 'ride', arrival: schedule.atPlace(x.match), ridingMinutes: ridingOf('ahead', x.match) };
+    if (km <= ride.stopKm + GRID_KM_ROUNDING) return { pass: x, side: 'ahead', riding: 'ride', arrival: schedule.atPlace(x.match), ridingMinutes: ridingOf('ahead', x.match) };
     // Beyond the stop: riding on that evening, kept only if it would be reached fine or action (never a warning).
     const arrival = arrivalRidingOn(schedule, ride.stopKm, flat, x.match);
     const c: Candidate = { pass: x, side: 'ahead', riding: 'beyond', arrival, ridingMinutes: ridingOf('ahead', x.match) };
@@ -307,7 +302,7 @@ export function sleepAnswer(f: SleepFacts): Answer {
   });
 
   const note = noteFor(ride);
-  const detail = [...(note ? [note] : []), ...(!night && offersPlanTomorrow(ride) ? [W.sleepPlanTomorrow] : [])].join(' ');
+  const detail = [...(note ? [note] : []), ...(offersPlanTomorrow(ride) ? [W.sleepPlanTomorrow] : [])].join(' ');
   const best = bestOpen;
   const stamp = best
     ? (best.c.arrival !== null && validDate(best.c.arrival) && best.c.side !== 'near' ? { km: best.c.pass.match.km, at: best.c.arrival } : { km: best.c.pass.match.km })

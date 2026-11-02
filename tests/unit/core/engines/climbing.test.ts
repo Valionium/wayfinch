@@ -183,3 +183,20 @@ describe('[CL-UNKNOWN] no heights', () => {
     expect(a.title).toBe('0 m of climbing to km 150, 0 m to the end');
   });
 });
+
+describe('families of bug that passed the tests before', () => {
+  test('a stop beyond the route end is held to the route end, not counted past it', async () => {
+    const route = await hills();
+    const f = factsOf({ route, positions: [night(76)], now: `${SUN} 07:00` });
+    const a = climbingAnswer({ ...f, ride: { ...f.ride, stopKm: route.lengthKm + 5 } });
+    expect(a.title).toBe('350 m of climbing to the end');
+    expect(a.stamp).toEqual({ km: route.lengthKm });
+  });
+
+  test('a stop before the start (a position past the stop) counts no climbing to the stop', async () => {
+    const route = await hills();
+    const f = factsOf({ route, positions: [night(76)], now: `${SUN} 07:00` });
+    const a = climbingAnswer({ ...f, ride: { ...f.ride, startKm: 120, stopKm: 100 } });
+    expect(a.title).toBe('0 m of climbing to km 100, 150 m to the end');
+  });
+});

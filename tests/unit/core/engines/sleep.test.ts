@@ -2,6 +2,7 @@ import { fc, test as fcTest } from '@fast-check/vitest';
 import { describe, expect, test } from 'vitest';
 import { callAhead, sleepAnswer, type SleepFacts } from '../../../../src/core/engines/sleep.ts';
 import { arrivalRidingOn } from '../../../../src/core/engines/leaveby.ts';
+import { stateWithin } from '../../../../src/core/hours/check.ts';
 import { nowSchedule } from '../../../../src/core/engines/tripday.ts';
 import { ALL_KINDS } from '../../../../src/core/places/types.ts';
 import type { Answer, AnswerItem, Km, Place, PlaceHours } from '../../../../src/core/types.ts';
@@ -238,6 +239,7 @@ describe('[SL-STATUS] the status for the night', () => {
     const f = facts({ spots: [{ b: camp(), km: 60 }] });
     const a = sleepAnswer({ ...f, hours: [dayHours(f.places[0]!, 'open')], ride: { ...f.ride, date: '' } });
     expect(a.status).not.toBe('fine');
+    expect(textOf(a)).not.toMatch(/null|undefined|NaN/);
   });
 
   fcTest.prop([
@@ -557,5 +559,80 @@ describe('[CA-HONEST] as mapped, not checked', () => {
     });
     const d = sleepAnswer(f).items[0]!.detail!;
     expect(d.startsWith('+60 km · about 11:50 · open for tonight (season Apr–Oct) · reservation: recommended (map data) · Call +49 7221 123456 · Website camping-rheinaue.de (online)')).toBe(true);
+  });
+});
+
+describe('the hours of a whole day (section 6.8: the night\'s date)', () => {
+  const day = (from: string, to: string) => [at(`${SAT} ${from}`), at(`${SAT} ${to}`)] as const;
+  const p = placeAt('campsite', 49, 8.4, { id: 'n1' });
+  test('open at any moment of the stretch is open; only unknown or possibly closed is unknown; only closed is closed', () => {
+    const [from, to] = [at(`${SAT} 00:00`), at(`${SUN} 00:00`)];
+    expect(stateWithin(hoursOf(p, [{ from: '08:00', to: '09:00' }]), from, to)).toBe('open');
+    expect(stateWithin(hoursOf(p, [{ from: '08:00', to: '09:00', state: 'unknown' }]), from, to)).toBe('unknown');
+    expect(stateWithin(hoursOf(p, [{ from: '08:00', to: '09:00', state: 'possibly-closed' }]), from, to)).toBe('unknown');
+    expect(stateWithin(hoursOf(p, [{ from: '08:00', to: '09:00', state: 'closed' }]), from, to)).toBe('closed');
+    expect(stateWithin(hoursOf(p, [{ from: '08:00', to: '09:00', state: 'unknown' }, { from: '10:00', to: '11:00' }]), from, to)).toBe('open');
+  });
+  test('a stretch the prepared window does not cover, or no hours, or a date that is no date, is outside', () => {
+    const h = hoursOf(p, [{ from: '08:00', to: '09:00' }]);
+    expect(stateWithin(undefined, ...day('00:00', '23:00'))).toBe('outside');
+    expect(stateWithin(h, at('2025-12-31 00:00'), at(`${SAT} 12:00`))).toBe('outside');
+    expect(stateWithin(h, at(`${SAT} 12:00`), at('2027-01-02 00:00'))).toBe('outside');
+    expect(stateWithin(h, new Date(Number.NaN), at(`${SAT} 12:00`))).toBe('outside');
+    expect(stateWithin(h, at(`${SAT} 12:00`), at(`${SAT} 12:00`))).toBe('outside');
+    expect(stateWithin(h, at(`${SAT} 13:00`), at(`${SAT} 12:00`))).toBe('outside');
+  });
+});
+
+describe('families of bug that passed the tests before', () => {
+  test('a place at the stop, as its rounded kilometre reads, is on the ride even when the ride ends in the dark', () => {
+    // The stage end is km 78 exactly; the place's match is a few metres further, as rounded data is.
+    const a = sleep({ spots: [{ b: camp('At the stop'), km: 78.0004 }], hours: 'open', sun: { sunset: '09:30', dusk: '10:00' } });
+    expect(kms(a)).toEqual([78.0004]);
+    expect(a.items[0]!.detail).not.toContain('riding on');
+  });
+
+  test('a place a few metres behind the start is still on the ride', () => {
+    const a = sleep({
+      spots: [{ b: camp('At the start'), km: 75.9996 }], positions: [pos({ km: 76, at: `${SAT} 07:00` })], now: `${SAT} 07:10`, hours: 'open',
+    });
+    expect(kms(a)).toEqual([75.9996]);
+  });
+
+  test('names that are object keys cannot break a place, its time zone, its lodging kind or the route\'s zone', () => {
+    const f = facts({ spots: [{ b: lodging(named('constructor', { contact: { phones: ['07221 123456'], website: null } })), km: 60 }], hours: 'open' });
+    const place = { ...f.places[0]!, timeZone: 'constructor', country: '__proto__', tags: { tourism: 'constructor', reservation: '__proto__' } };
+    const a = sleepAnswer({ ...f, places: [place], routeZones: [{ fromKm: 0, toKm: 300, timeZone: 'toString', holidayZone: null, country: 'constructor' }] });
+    expect(a.items).toHaveLength(1);
+    expect(a.items[0]!.label).toContain('constructor');
+    expect(textOf(a)).not.toMatch(/NaN|undefined|Invalid/);
+  });
+});
+
+describe('boundaries', () => {
+  const positions = [pos({ km: 76, at: `${SAT} 19:00` }), pos({ km: 151, at: `${SUN} 17:30` })];
+  const after = (spotsIn: Spot[]): Answer => sleep({ spots: spotsIn, positions, now: `${SUN} 17:40`, sun: { sunset: '18:00', dusk: '18:35' }, hours: 'open' });
+
+  test('exactly 3 km from tonight\'s stop is within it; a few metres more is not', () => {
+    expect(kms(after([{ b: camp('Edge ahead'), km: 154 }, { b: camp('Edge behind'), km: 148 }, { b: camp('Inside'), km: 152 }]))).toEqual([148, 152, 154]);
+    expect(kms(after([{ b: camp('Just out'), km: 154.01 }, { b: camp('Just out behind'), km: 147.99 }]))).toEqual([147.99, 154.01]);
+  });
+
+  test('a place ahead of the rider is "+" km ahead, not back', () => {
+    const a = after([{ b: camp('Ahead'), km: 151.2 }]);
+    expect(a.items[0]!.detail).toContain('+0.2 km');
+    expect(a.items[0]!.detail).not.toContain('back');
+  });
+
+  test('hours mapped but not known, in season: unknown, not open', () => {
+    const f = facts({ spots: [{ b: camp('Mapped', { openingHours: 'Mo-Su 08:00-22:00', seasonal: 'Apr-Oct' }), km: 60 }] });
+    const a = sleepAnswer({ ...f, hours: [hoursOf(f.places[0]!, [{ from: '00:00', to: '23:59', state: 'unknown' }])] });
+    expect(a.status).toBe('unknown');
+    expect(itemAt(a, 60).detail).toContain('hours not known for tonight');
+  });
+
+  test('the night of another day is named by its date', () => {
+    const a = sleep({ spots: [{ b: camp(), km: 60 }], hours: 'open', now: `${FRI} 20:00` });
+    expect(a.items[0]!.detail).toContain('open for the night of Sat 17 Oct');
   });
 });

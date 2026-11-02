@@ -184,6 +184,10 @@ describe('[SP-QUALITY] approximate, manual and off route', () => {
   test('manual', () => {
     expect(text({ ...base, positions: [pos({ km: 112.4, at: `${SAT} 14:20`, manual: true })] })).toContain('Sat 17 Oct, 14:20: around km 112 of 165, near Rastatt.');
   });
+  test('manual never reads approximate, whatever its flag says', () => {
+    const manual = { ...pos({ km: 112.4, at: `${SAT} 14:20`, manual: true }), approximate: true };
+    expect(text({ ...base, positions: [manual] })).toContain(': around km 112 of 165, near Rastatt.');
+  });
   test('off route, and approximate and off route', () => {
     expect(text({ ...base, positions: [pos({ km: 112.4, at: `${SAT} 14:20`, off: 400 })] })).toContain('Sat 17 Oct, 14:20: near km 112 of 165, off my route, near Rastatt.');
     expect(text({ ...base, positions: [pos({ km: 112.4, at: `${SAT} 14:20`, off: 1200, acc: 800 })] })).toContain('near km 112 of 165, off my route (position approximate), near Rastatt.');
@@ -295,5 +299,60 @@ describe('[SP-PLAIN] plain characters', () => {
   test('a name with symbols loses only the symbols', () => {
     const t = text({ positions: [pos({ km: 112.4, at: `${SAT} 14:20` })], now: `${SAT} 14:25`, places: [town('Bad · Name → Town', 112)] })!;
     expect(t).toContain('near Bad Name Town.');
+  });
+});
+
+describe('families of bug that passed the tests before', () => {
+  const base = facts({ positions: [pos({ km: 112.4, at: `${SAT} 14:20` })], now: `${SAT} 14:25`, places: [town('Rastatt', 112)] });
+  test('a position whose accuracy or distance from the route is no number reads approximate, never on the route', () => {
+    for (const broken of [{ accuracyM: Number.NaN }, { offRouteM: Number.NaN }, { accuracyM: Infinity }, { offRouteM: -Infinity }]) {
+      const t = progressText({ ...base, position: { ...base.position!, ...broken } })!;
+      expect(t, JSON.stringify(broken)).toContain('around km 112 of 165 (position approximate), near Rastatt.');
+    }
+  });
+
+  test('a time zone named "constructor" falls back, and a settlement id or name that is an object key is only a name', () => {
+    const f = facts({ positions: [pos({ km: 112.4, at: `${SAT} 14:20` })], now: `${SAT} 14:25`, places: [{ b: settlement('constructor'), km: 112, id: 'constructor' }, town('__proto__', 113)] });
+    const t = progressText({ ...f, routeZones: [{ fromKm: 0, toKm: 165, timeZone: 'constructor', holidayZone: null, country: '__proto__' }] })!;
+    expect(t).toMatch(/^Sat 17 Oct, 12:20: at km 112 of 165, near constructor\./);
+  });
+
+  test('a place reached on two passes is found from its nearer pass whichever comes first in the list', () => {
+    const forward = text({ positions: [pos({ km: 112.4, at: `${SAT} 14:20` })], now: `${SAT} 14:25`, places: [{ b: settlement('Loop town'), km: [10, 113] }] })!;
+    const reverse = text({ positions: [pos({ km: 112.4, at: `${SAT} 14:20` })], now: `${SAT} 14:25`, places: [{ b: settlement('Loop town'), km: [113, 10] }] })!;
+    expect(forward).toContain('near Loop town.');
+    expect(reverse).toBe(forward);
+  });
+});
+
+describe('boundaries', () => {
+  const trip = testTrip();
+  test('2.5 km and exactly 3 km from a stage end are a stop', () => {
+    expect(text({ trip, positions: [pos({ km: 147.5, at: `${SAT} 18:50` })], now: `${SAT} 18:50` })).toContain('stopped for the night');
+    expect(text({ trip, positions: [pos({ km: 147, at: `${SAT} 18:50` })], now: `${SAT} 18:50` })).toContain('stopped for the night');
+  });
+
+  test('two settlements the same distance away: the same name whichever is listed first', () => {
+    const a = text({ positions: [pos({ km: 112, at: `${SAT} 14:20` })], now: `${SAT} 14:25`, places: [{ b: settlement('Alpha'), km: 111, id: 'n1' }, { b: settlement('Beta'), km: 113, id: 'n2' }] });
+    const b = text({ positions: [pos({ km: 112, at: `${SAT} 14:20` })], now: `${SAT} 14:25`, places: [{ b: settlement('Beta'), km: 113, id: 'n2' }, { b: settlement('Alpha'), km: 111, id: 'n1' }] });
+    expect(a).toBe(b);
+    expect(a).toContain('near Alpha.');
+  });
+
+  test('before the trip an approximate position at the route start is still not named: the start is', () => {
+    const t = text({ trip: tripOn(FRI), positions: [pos({ km: 0, at: `${THU} 19:10`, acc: 800 })], now: `${THU} 19:10`, places: [town('Heidelberg', 0)] })!;
+    expect(t).toContain('starting on Fri 16 Oct from near Heidelberg (km 0 of 165), leaving');
+    expect(t).not.toContain('approximate');
+  });
+
+  test('a name that is only a number with decimals, or the app\'s name, is not used', () => {
+    const t = text({ positions: [pos({ km: 112.4, at: `${SAT} 14:20` })], now: `${SAT} 14:25`, places: [town('48.8574, 8.2051', 112), town('Wayfinch', 112.2), town('Load Check', 112.3)] })!;
+    expect(t).not.toMatch(/near\s/);
+    expect(t).not.toContain('48.85');
+  });
+
+  test('a stop that is the position\'s own claim needs the position: the rider reads the same with Plan tomorrow chosen but a different date', () => {
+    const t = text({ trip: tripOn(FRI), positions: [pos({ km: 100, at: `${FRI} 19:10` })], now: `${FRI} 19:10`, plan: { date: '2026-10-15', backToTodayAt: null } })!;
+    expect(t).not.toContain('stopped for the night');
   });
 });
