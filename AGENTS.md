@@ -20,7 +20,8 @@ src/core/      pure TypeScript, no DOM, fully unit-tested
   screen/      screen(inputs): the whole stop screen, never throws
   wording/     every user-facing string (en.ts)
   route/       rounded form, GPX reading, stages, climbs, sample grid, hash
-public/        what is served; public/tools/bags/index.html is the Load Check page
+src/ui/        the app's shell in Preact (app, nav, theme.css, update prompt, shared card and status pieces); Ahead's components go in src/ui/ahead/ and may not import store or data
+public/        what is served; public/tools/bags/index.html is the Load Check page; manifest.webmanifest and icons/ ship only with the launch switch on
 qa/            Load Check's QA suites (plain Node scripts), qa/paths.cjs, qa/fixtures/
 tests/
   unit/        Vitest
@@ -33,7 +34,7 @@ tools/         project scripts
 
 `pipeline/` is the weekly place-pack build; its guide for the owner is `pipeline/README.md` (commands are listed there). Commits under `pipeline/` must never trigger an app deploy.
 
-Planned, in spec section 4.2: `src/core/` engines, `src/data/`, `src/store/`, `src/ui/`, `src/tools/tyre/`, `public/`, `pipeline/`, `contracts/`, `tests/e2e/`, `tests/fixtures/`, `tests/sim/`.
+Planned, in spec section 4.2: `src/data/` fetching, `src/store/`, more of `src/ui/`, `src/tools/tyre/`, `public/`, `pipeline/`, `contracts/`, `tests/e2e/`, `tests/fixtures/`, `tests/sim/`.
 
 ## Commands
 
@@ -41,7 +42,7 @@ Planned, in spec section 4.2: `src/core/` engines, `src/data/`, `src/store/`, `s
 | --- | --- |
 | `npm run fast` | types, lint, the tests touched by this change with 25 runs per property, 100 simulator scenarios and the rule check |
 | `npm run qa` | Load Check's 36 QA suites, one line each; exit 0 only if all pass. `LC_PAGE` and `LC_WORKER` override the page and the old worker |
-| `npm run build` | writes `dist/`: the page, `/offline-worker.js`, `_headers`, `build.json`. `--launch=on|off`, `--out=`, `--emergency` |
+| `npm run build` | writes `dist/`: the page, `/offline-worker.js`, `_headers`, `build.json`. `--launch=on|off`, `--out=`, `--emergency`. With `--launch=on` it also runs Vite for the app shell and copies `public/`; with it off, no Vite runs and the output is what it was before the app existed |
 | `npm run e2e` | the browser tests in `tests/e2e` (Chromium, phone and laptop size). The old site in them comes from the tag `load-check-zip-2026-10-30` |
 | `node tools/deploy-check.mjs --build dist/build.json --origin <url>` | does the live site serve this build? Exit 1 if not. Read-only. `--self --origin <url>` compares the site with its own `build.json`; the other modes are for the workflows, listed at the top of the file |
 | `npm test` | types, lint, all unit and property tests, and the cases proving each simulator check can fail |

@@ -5,7 +5,7 @@ import { bannedHits } from '../../fixtures/banned.ts';
 // Every key starts with the area it belongs to. Weather and stop strings get the stricter list of banned words.
 const AREAS = [
   'water', 'weather', 'rain', 'shelter', 'stop', 'wait', 'food', 'daylight', 'climb', 'sleep', 'help', 'emergency',
-  'share', 'call', 'leaveby', 'time', 'route', 'bike', 'ask', 'ready', 'demo', 'about', 'honesty',
+  'share', 'call', 'leaveby', 'time', 'route', 'bike', 'ask', 'ready', 'demo', 'about', 'honesty', 'app',
 ];
 const STRICT_AREAS = ['weather', 'rain', 'shelter', 'stop', 'wait'];
 const areaOf = (key: string): string | undefined =>
@@ -244,6 +244,7 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   shareProgressReachedEnd: [['Strasbourg', '165'], [null, '165']],
   shareProgressStoppedAtEnd: [['Strasbourg', '165'], [null, '165']],
   shareProgressMap: [['48.857', '8.205']],
+  appListMore: [[3]],
 };
 
 function everyString(): { key: string; text: string }[] {
