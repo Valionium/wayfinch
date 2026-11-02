@@ -3,7 +3,9 @@
 import { formatRainEnd, formatRainOnset } from '../answers/index.ts';
 import { formatHm, localIsoDate, wallClock } from '../answers/time.ts';
 import { haversineKm } from '../geo/haversine.ts';
-import type { DayRide, GridHour, Km, Position, RainWindow, StoredForecast, ZoneLookup } from '../types.ts';
+import { pointAtRouteKm } from '../geo/project.ts';
+import { GRID_KM_ROUNDING } from '../route/grid.ts';
+import type { DayRide, GridHour, Km, Position, RainWindow, Route, StoredForecast, ZoneLookup } from '../types.ts';
 import { W } from '../wording/en.ts';
 import { adjusted, isFarOff } from './locate.ts';
 import type { Schedule } from './pace.ts';
@@ -38,6 +40,25 @@ export function gridOf(f: StoredForecast): GridPoint[] {
     grids.set(f, grid);
   }
   return grid;
+}
+
+const GRID_ROUND_DEG = 0.02 + 1e-9; // section 6.6: the request's coordinates are rounded to 0.01-0.02 degrees
+const onRoutes = new WeakMap<StoredForecast, { route: Route; kept: StoredForecast }>();
+
+/**
+ * The forecast without grid points that don't lie on this route: further from the route's point at their kilometre than
+ * the request's rounding allows, or with no coordinates. What they say is about somewhere else, so it is a hole.
+ */
+export function routeForecast(f: StoredForecast, route: Route): StoredForecast {
+  const seen = onRoutes.get(f);
+  if (seen?.route === route) return seen.kept;
+  const grid = f.grid.filter((g) => {
+    const p = pointAtRouteKm(route, g.km);
+    return Math.abs(g.lat - p.lat) <= GRID_ROUND_DEG && Math.abs(g.lon - p.lon) <= GRID_ROUND_DEG; // written so that NaN fails
+  });
+  const kept = grid.length === f.grid.length ? f : { ...f, grid };
+  onRoutes.set(f, { route, kept });
+  return kept;
 }
 
 /** The hour holding instant `t`: the stamp at most an hour after it. Null where the forecast has none. */
@@ -98,7 +119,13 @@ export function ridePoints(f: StoredForecast, schedule: Schedule): RidePoint[] {
   const nearest = nearestByKm(grid, start);
   const out: RidePoint[] = [];
   if (nearest && nearest.km < start) out.push({ km: start, g: nearest, t: schedule.atKm(start) });
-  for (const g of grid) if (g.km >= start) out.push({ km: g.km, g, t: schedule.atKm(g.km) });
+  for (const g of grid) {
+    if (g.km < start) continue;
+    // A point made for a stop belongs to the ride that ends there, also when its rounding took it just past the stop.
+    const stop = schedule.rideOf(g.km - GRID_KM_ROUNDING).stopKm;
+    const km = Math.abs(g.km - stop) <= GRID_KM_ROUNDING && stop >= start ? stop : g.km;
+    out.push({ km, g, t: schedule.atKm(km) });
+  }
   return out;
 }
 
@@ -225,8 +252,8 @@ export function rainWindows(f: StoredForecast, schedule: Schedule, dayStops: Km[
 /** The windows of the day's ride: those whose first met point lies at or before the day's stop. */
 export const onTheRide = (windows: RainWindow[], ride: DayRide): RainWindow[] => windows.filter((w) => w.fromKm <= ride.stopKm);
 
-/** Whether a window's first met point is reached within 48 hours of the forecast: only those get a plan. */
-export const within48h = (w: RainWindow, f: StoredForecast): boolean => w.reachAt.getTime() - f.fetchedAt.getTime() <= 48 * HOUR;
+/** Whether a window's first met point is reached within 48 hours from now. The base is an owner question: see rainPlans. */
+export const within48h = (w: RainWindow, now: Date): boolean => w.reachAt.getTime() - now.getTime() <= 48 * HOUR;
 
 // ---- here and at the start -----------------------------------------------------------------------------------------
 
@@ -234,9 +261,9 @@ export const within48h = (w: RainWindow, f: StoredForecast): boolean => w.reachA
  * The current hour at the stored point nearest the position, whatever its class: read `hourClass` for that. Null when it
  * is not known. It never comes from a request containing the position.
  */
-export function rainHereNow(f: StoredForecast | null, position: Position | null, now: Date): GridHour | null {
+export function rainHereNow(f: StoredForecast | null, position: Position | null, now: Date, route?: Route): GridHour | null {
   if (!f || !position) return null;
-  const g = pointNearPosition(f, position);
+  const g = pointNearPosition(route ? routeForecast(f, route) : f, position);
   return g && hourAt(g.hours, now);
 }
 
@@ -248,9 +275,10 @@ const startsAt = (ride: DayRide, p: Position): boolean => !isFarOff(p) && adjust
  * there reads the same point as rain here now, so the two agree. An unknown hour is no rain at the start; the Weather card
  * says what it doesn't know.
  */
-export function rainAtStart(f: StoredForecast | null, ride: DayRide, position: Position | null = null): boolean {
+export function rainAtStart(f: StoredForecast | null, ride: DayRide, position: Position | null = null, route?: Route): boolean {
   if (!f) return false;
-  const g = position && startsAt(ride, position) ? pointNearPosition(f, position) : pointNearKm(f, ride.startKm);
+  const on = route ? routeForecast(f, route) : f;
+  const g = position && startsAt(ride, position) ? pointNearPosition(on, position) : pointNearKm(on, ride.startKm);
   const hour = g && hourAt(g.hours, ride.departure);
   return hour ? hourClass(hour).cls === 'likely' : false;
 }
@@ -265,9 +293,8 @@ export const shownKm = (w: RainWindow, lengthKm: Km): [Km, Km] => [
   Math.min(lengthKm, Math.ceil(w.toKm / KM_STEP) * KM_STEP),
 ];
 
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 /** The day of the week of an instant, on the zone's clock. */
-export const weekdayOf = (t: Date, tz: string): string => WEEKDAYS[new Date(`${localIsoDate(t, tz)}T00:00:00Z`).getUTCDay()]!;
+export const weekdayOf = (t: Date, tz: string): string => W.timeWeekday(new Date(`${localIsoDate(t, tz)}T00:00:00Z`).getUTCDay());
 
 const dayPartOf = (t: Date, tz: string): string => {
   const { hour } = wallClock(t, tz);
@@ -290,7 +317,11 @@ export function windowWhen(w: RainWindow, tz: string): string {
 }
 
 /** The chance as a reference class, rounded to tens. Empty when no hour gives a chance. */
-export const chanceLine = (w: RainWindow): string => (w.chancePct === null ? '' : W.rainChance(Math.round(w.chancePct / 10)));
+export const chanceLine = (w: RainWindow): string => {
+  if (w.chancePct === null) return '';
+  const n = Math.round(w.chancePct / 10);
+  return n === 0 ? W.rainChanceUnderOne : W.rainChance(n);
+};
 
 /** The largest hourly amount, labelled. */
 export const amountLine = (w: RainWindow): string =>

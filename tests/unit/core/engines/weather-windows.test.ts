@@ -230,14 +230,14 @@ describe('detail in a window', () => {
     expect(windowWhen(windows[0]!, BER)).toBe('Wednesday');
   });
   test('[WX-DETAIL] a window reached within 48 h whose rain runs past it shows no time beyond', () => {
-    const { windows, f } = windowsOf([{ km: 10, stamps: [`${SAT} 10:00`, `${SAT} 11:00`], pp: 80 }], { now: `${SAT} 08:00` }, { fetchedAt: '2026-10-15 09:30' });
-    expect(within48h(windows[0]!, f)).toBe(true);
+    const { windows, c } = windowsOf([{ km: 10, stamps: [`${SAT} 10:00`, `${SAT} 11:00`], pp: 80 }], { now: `${SAT} 08:00` }, { fetchedAt: '2026-10-15 09:30' });
+    expect(within48h(windows[0]!, c.now)).toBe(true);
     expect(windows[0]!.detail).toBe('daypart');
     expect(windowWhen(windows[0]!, BER)).not.toMatch(/\d\d:\d\d/);
   });
   test('[WX-DETAIL] a window beyond 48 h is not within 48 h', () => {
-    const { windows, f } = windowsOf([{ km: 20, stamps: stamps(SAT, 9, 11), pp: 80 }], early, fetched);
-    expect(within48h(windows[0]!, f)).toBe(false);
+    const { windows, c } = windowsOf([{ km: 20, stamps: stamps(SAT, 9, 11), pp: 80 }], early, fetched);
+    expect(within48h(windows[0]!, c.now)).toBe(false);
   });
 });
 

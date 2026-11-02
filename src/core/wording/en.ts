@@ -9,6 +9,9 @@
 /** A route kilometre as shown: to 0.1 km, without a trailing zero. */
 export const showKm = (km: number): string => String(Math.round(km * 10) / 10);
 
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 export const W = {
   // ---- Fixed sentences of section 8: change none of them without the owner. ----
   waterOverDrinkCaution:
@@ -114,6 +117,14 @@ export const W = {
   waterBasisAssumedHot: 'no weather data — assumes a hot day',
   waterBasisOsm: '© OpenStreetMap contributors',
 
+  // ---- Days and dates. Weekdays count from Sunday, months from January, both from 0. ----
+  timeWeekday: (n: number): string => WEEKDAYS[n] ?? '',
+  timeMonth: (n: number): string => MONTHS[n] ?? '',
+  timeShortDay: (weekday: string, day: number, month: string): string => `${weekday.slice(0, 3)} ${day} ${month}`,
+  timeDayMonth: (day: number, month: string): string => `${day} ${month}`,
+  timeDayAt: (day: string, time: string): string => `${day}, ${time}`,
+  timeWeekdayAt: (weekday: string, time: string): string => `${weekday} ${time}`,
+
   // ---- Rain windows (section 6.6). Times come as "about 14:00" or "HH:MM". ----
   rainFrom: (about: string): string => `from ${about}`,
   rainDryAgain: (about: string): string => `likely dry again from ${about}`,
@@ -125,6 +136,8 @@ export const W = {
   rainPartAfternoon: 'afternoon',
   rainPartEvening: 'evening',
   rainChance: (n: number): string => `${n} in 10 forecast scenarios`,
+  rainChanceUnderOne: 'under 1 in 10 forecast scenarios',
+  rainKm: (from: number, to: number): string => (from === to ? `km ${from}` : `km ${from}–${to}`),
   rainUnderAmount: 'under 0.1 mm/h (one model)',
   rainAmount: (mm: string): string => `${mm} mm/h (one model)`,
   rainLikely: (when: string): string => `Rain likely ${when}`,
@@ -162,6 +175,7 @@ export const W = {
   weatherAttribution: 'Weather data by Open-Meteo.com',
   weatherDetailRange: (half: string, parts: string): string => `30-minute detail to ${half}, day parts to ${parts}`,
   weatherStale: 'This forecast is stale: over 12 hours old.',
+  weatherSeasonalBasis: (years: string): string => `seasonal estimate (${years})`,
   weatherNothingSaved: 'No forecast and no seasonal data saved.',
   weatherUnknown: 'Weather unknown: no forecast and no seasonal data saved.',
   weatherCantWorkOut: "The weather along the ride can't be worked out from these settings. Check your speed in You.",
@@ -193,7 +207,7 @@ export const W = {
   stopWordDrink: 'a pub',
   stopWordIceCream: 'an ice-cream parlour',
   stopWordStation: 'a station',
-  stopNoCover: (km: string, about: string): string => `No mapped cover before km ${km} (${about})`,
+  stopNoCover: (km: string, about: string | null): string => `No mapped cover before km ${km}${about ? ` (${about})` : ''}`,
   stopNoPlaceData: (km: string): string => `No place data before km ${km}. Refresh this stretch.`,
   stopNoneBehind: 'None mapped behind either',
   stopNoOpenBehind: 'No open building mapped behind either',

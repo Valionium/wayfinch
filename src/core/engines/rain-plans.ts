@@ -5,14 +5,13 @@ import type { Cover, Km, Missing, RainPlan, RainWindow } from '../types.ts';
 import { showKm, W } from '../wording/en.ts';
 import { coverOfSpot, finalOrder, hoursLookup, hoursNotWorkedOut, insideRadius, isCover, missingFor, reachKm, savedCovers, seatingLine, spotName, spotsOf, zoneOfSpot, hoursDecide, type NotCover, type Spot, type StopFacts } from './covers.ts';
 import { shelterEntries, stormAroundStart, latestUsable } from './shelter.ts';
-import { onTheRide, rainAtStart, within48h } from './weather-windows.ts';
+import { onTheRide, rainAtStart, ridePoints, routeForecast, within48h } from './weather-windows.ts';
 
 const MIN = 60_000;
 const BAND_MIN = 15;
 const BAND_MAX = 60;
 const SLACK = 1e-6; // minutes: "exactly 15" must not fall to rounding
 const MAX_COVERS = 3;
-const GRID_STEP_KM = 15.01;
 
 type Found = { spot: Spot; cover: Cover };
 
@@ -26,6 +25,17 @@ const planOrder = (a: Found, b: Found): number =>
   || toSecond(b.cover.arrival) - toSecond(a.cover.arrival)
   || a.cover.offRouteM - b.cover.offRouteM
   || finalOrder(a.spot, b.spot);
+
+/** One place on two passes of the route is one cover: its best pass. */
+function onePassEach<T extends Found>(list: T[]): T[] {
+  const seen = new Set<unknown>();
+  return list.filter((x) => {
+    const key = x.spot.place ?? x.spot.roof;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 const counts = (thunder: boolean, c: Cover): boolean => !thunder || c.coverClass <= 2;
 
@@ -62,7 +72,9 @@ function behindLine(w: RainWindow, thunder: boolean, spots: Spot[], f: StopFacts
 export function rainPlan(w: RainWindow, f: StopFacts): RainPlan {
   const start = f.ride.startKm;
   const position = latestUsable(f);
-  const startsHere = rainAtStart(f.forecast, f.ride, position) && w.fromKm - start <= GRID_STEP_KM;
+  // The window the ride starts in holds the first point of the ride. A separate window further on keeps its own plan.
+  const forecast = f.forecast && routeForecast(f.forecast, f.trip.route);
+  const startsHere = forecast !== null && rainAtStart(forecast, f.ride, position) && w.fromKm === ridePoints(forecast, f.schedule)[0]?.km;
   const firstMet = w.metKms[0] ?? w.fromKm;
   const stormLater = startsHere ? w.thunderKms.find((k) => k > firstMet) : undefined;
 
@@ -90,7 +102,7 @@ export function rainPlan(w: RainWindow, f: StopFacts): RainPlan {
   const counted = reached.flatMap((j) => (isCover(j.r) && counts(thunder, j.r) ? [{ spot: j.spot, cover: j.r, lead: j.lead }] : []));
   const inBand = counted.filter((c) => c.lead <= BAND_MAX + SLACK);
   const covers: Found[] = inBand.length > 0
-    ? [...inBand].sort(planOrder).slice(0, MAX_COVERS)
+    ? onePassEach([...inBand].sort(planOrder)).slice(0, MAX_COVERS)
     : counted.sort((a, b) => b.cover.arrival.getTime() - a.cover.arrival.getTime() || planOrder(a, b)).slice(0, 1);
 
   // Marked and never counted: what lies in the band, or just before m when the band holds nothing.
@@ -106,7 +118,7 @@ export function rainPlan(w: RainWindow, f: StopFacts): RainPlan {
   const missing: Missing[] = missingFor(f, start, m, unworked);
   const zone = zoneOfSpotKm(f, m);
   const known = savedCovers(f, start, m);
-  const none = covers.length > 0 ? null : known ? W.stopNoCover(showKm(m), validDate(tm) ? formatAbout(tm, zone) : '') : W.stopNoPlaceData(showKm(m));
+  const none = covers.length > 0 ? null : known ? W.stopNoCover(showKm(m), validDate(tm) && w.detail === '30min' ? formatAbout(tm, zone) : null) : W.stopNoPlaceData(showKm(m));
   return {
     ...empty, m, covers: covers.map((c) => c.cover),
     firstCoverLine: covers[0] ? firstCoverLine(covers[0], thunder, f) : null,
@@ -117,9 +129,12 @@ export function rainPlan(w: RainWindow, f: StopFacts): RainPlan {
 
 const zoneOfSpotKm = (f: StopFacts, km: Km): string => zoneOfSpot({ place: null, roof: null, match: { placeId: '', km, offRouteM: 0 } }, f);
 
-/** One plan for each likely window on the day's ride within 48 hours. */
+/**
+ * One plan for each likely window on the day's ride within 48 hours. Section 6.11 does not say 48 hours from what: they are
+ * counted from now, so an old forecast keeps its plans (section 8). A thunderstorm window always gets one, because a warning
+ * promises a plan (INV-07), though section 8's table says "rain beyond 48 h: no plan". An owner question.
+ */
 export function rainPlans(windows: RainWindow[], f: StopFacts): RainPlan[] {
-  const forecast = f.forecast;
-  if (!forecast) return [];
-  return onTheRide(windows, f.ride).filter((w) => w.cls === 'likely' && within48h(w, forecast)).map((w) => rainPlan(w, f));
+  if (!f.forecast) return [];
+  return onTheRide(windows, f.ride).filter((w) => w.cls === 'likely' && (w.kind === 'thunder' || within48h(w, f.now))).map((w) => rainPlan(w, f));
 }

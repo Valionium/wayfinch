@@ -9,7 +9,7 @@ import { usableFlatKph, type Schedule } from './pace.ts';
 import { nowSchedule } from './tripday.ts';
 import { hourClass } from './weather-classes.ts';
 import { isStale, weatherWindows } from './weather.ts';
-import { gridOf, hoursTouching, onTheRide, pointNearKm, pointNearPosition, type GridPoint } from './weather-windows.ts';
+import { gridOf, hoursTouching, onTheRide, pointNearKm, pointNearPosition, routeForecast, type GridPoint } from './weather-windows.ts';
 
 const HOUR = 3_600_000;
 const NEAREST = 3;
@@ -25,7 +25,10 @@ const stormAt = (g: GridPoint | null, t: Date): boolean => {
 const stormWindowOnRide = (f: StopFacts): boolean =>
   onTheRide(weatherWindows(f).filter((w) => w.cls === 'likely'), f.ride).some((w) => w.thunderKms.length > 0);
 
-const held = (f: StopFacts): StoredForecast | null => (f.forecast && gridOf(f.forecast).length > 0 ? f.forecast : null);
+const held = (f: StopFacts): StoredForecast | null => {
+  const forecast = f.forecast && routeForecast(f.forecast, f.trip.route);
+  return forecast && gridOf(forecast).length > 0 ? forecast : null;
+};
 
 /** A thunderstorm hour within 1 hour of now at the nearest grid point, or a thunderstorm window on the day's ride. */
 export function thunderNear(f: StopFacts): boolean {

@@ -10,7 +10,7 @@ import { usablePosition } from './locate.ts';
 import { usableFlatKph, type Schedule } from './pace.ts';
 import { noteFor, zoneLookupOf } from './tripday.ts';
 import { detailFor, hourClass, modelsForRoute } from './weather-classes.ts';
-import { amountLine, chanceLine, dayStopsOf, gridOf, hourAt, hoursTouching, onTheRide, pointNearKm, pointNearPosition, rainWindows, ridePoints, shownKm, weekdayOf, windowWhen, type RidePoint } from './weather-windows.ts';
+import { amountLine, chanceLine, dayStopsOf, gridOf, hourAt, hoursTouching, onTheRide, pointNearKm, pointNearPosition, rainWindows, ridePoints, routeForecast, shownKm, weekdayOf, windowWhen, type RidePoint } from './weather-windows.ts';
 
 export type WeatherFacts = Pick<ScreenInputs, 'forecast' | 'baseline' | 'trip' | 'now' | 'routeZones'> & { ride: DayRide; schedule: Schedule; position: Position | null };
 
@@ -53,12 +53,15 @@ const zoneAt = (f: WeatherFacts, km: Km): string => {
 const dated = (f: WeatherFacts): boolean => f.trip.departureDate !== null;
 const usableInputs = (f: WeatherFacts): boolean => usableFlatKph(f.trip.flatKph) && validDate(f.now) && validDate(f.ride.departure);
 /** A forecast there is something to read in. */
-const held = (f: WeatherFacts): StoredForecast | null => (f.forecast && gridOf(f.forecast).length > 0 ? f.forecast : null);
+const held = (f: WeatherFacts): StoredForecast | null => {
+  const forecast = f.forecast && routeForecast(f.forecast, f.trip.route);
+  return forecast && gridOf(forecast).length > 0 ? forecast : null;
+};
 
 /** Every window along the route, or none when a ride can't be matched to the forecast: no date, no clock, no speed. */
 export function weatherWindows(f: Pick<WeatherFacts, 'forecast' | 'trip' | 'now' | 'routeZones' | 'ride' | 'schedule'> & Partial<WeatherFacts>): RainWindow[] {
   if (!f.forecast || f.trip.departureDate === null || !usableFlatKph(f.trip.flatKph) || !validDate(f.now) || !validDate(f.ride.departure)) return [];
-  return rainWindows(f.forecast, f.schedule, dayStopsOf(f.schedule, f.trip.route.lengthKm), zoneLookupOf(f.routeZones));
+  return rainWindows(routeForecast(f.forecast, f.trip.route), f.schedule, dayStopsOf(f.schedule, f.trip.route.lengthKm), zoneLookupOf(f.routeZones));
 }
 
 const onRide = (f: WeatherFacts): RidePoint[] => {
@@ -67,6 +70,18 @@ const onRide = (f: WeatherFacts): RidePoint[] => {
 };
 
 const gustKnown = (h: GridHour): boolean => h.gustMs >= 0 && h.gustMs < Infinity;
+
+/** Whether the forecast sees the whole band of T plus or minus 1 h. Hours from before it began, and before its fetch, hide nothing ahead. */
+function bandSeen(p: RidePoint, fetchedAt: Date): boolean {
+  const T = p.t.getTime();
+  const began = p.g.hours[0]!.at.getTime() - HOUR;
+  for (const t of [T - HOUR, T, T + HOUR]) {
+    if (t < began && t < fetchedAt.getTime()) continue;
+    const hour = hourAt(p.g.hours, new Date(t));
+    if (!hour || !hourClass(hour).known) return false;
+  }
+  return true;
+}
 
 /** The first kilometre of the day's ride the forecast says nothing about; null when it covers the whole ride. */
 function firstGap(f: WeatherFacts): Km | null {
@@ -77,7 +92,7 @@ function firstGap(f: WeatherFacts): Km | null {
   for (const p of points) {
     if (p.km - previous > GRID_STEP_KM || Math.abs(p.g.km - p.km) > GRID_STEP_KM) return previous;
     const hour = hourAt(p.g.hours, p.t);
-    if (!hour || !hourClass(hour).known || !gustKnown(hour)) return p.km;
+    if (!hour || !gustKnown(hour) || !bandSeen(p, f.forecast!.fetchedAt)) return p.km;
     previous = p.km;
   }
   return f.ride.stopKm - previous > GRID_STEP_KM ? previous : null;
@@ -113,7 +128,8 @@ export function nightLow(f: WeatherFacts, ride: DayRide, baseline: Baseline | nu
   const { km, from, to } = nightSpan(f, ride);
   const none: NightLow = { lowC: null, thunderHours: null, known: false, seasonal: false, km, hail: false };
   const seasonal = validDate(from) ? seasonalPoint(baseline, km, from, zoneAt(f, km)) : null;
-  const g = f.forecast && validDate(from) && validDate(to) ? pointNearKm(f.forecast, km) : null;
+  const forecast = held(f);
+  const g = forecast && validDate(from) && validDate(to) ? pointNearKm(forecast, km) : null;
   if (!g || Math.abs(g.km - km) > GRID_STEP_KM) return seasonal ? { ...none, lowC: seasonal.p10LowC, seasonal: true } : none;
 
   const ms0 = from.getTime();
@@ -173,16 +189,15 @@ export function weatherStatus(f: WeatherFacts, windows: RainWindow[]): { status:
 
 // ---- wording -------------------------------------------------------------------------------------------------------
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const shortDay = (t: Date, tz: string): string => {
   const w = wallClock(t, tz);
-  return `${weekdayOf(t, tz).slice(0, 3)} ${w.day} ${MONTHS[w.month - 1]!}`;
+  return W.timeShortDay(weekdayOf(t, tz), w.day, W.timeMonth(w.month - 1));
 };
 const degrees = (c: number): string => String(Math.round(c) + 0);
 
 const kmRange = (w: RainWindow, lengthKm: Km): string => {
   const [a, b] = shownKm(w, lengthKm);
-  return a === b ? `km ${a}` : `km ${a}–${b}`;
+  return W.rainKm(a, b);
 };
 
 /** A moment on the ride, to the detail the forecast's range allows. */
@@ -242,8 +257,7 @@ function rainHereTitle(f: WeatherFacts): Here | null {
   const tz = zoneAt(f, p.km);
   const until = easesAt(g.hours, hour, forecast.fetchedAt);
   const n = Math.round((hour.pp as number) / 10);
-  const time = formatRainEnd(f.now, tz).replace('about ', '');
-  return { title: until ? W.weatherRainHereUntil(formatRainEnd(until, tz)) : W.weatherRainHere, line: W.weatherScenariosShowRain(n, time) };
+  return { title: until ? W.weatherRainHereUntil(formatRainEnd(until, tz)) : W.weatherRainHere, line: detailFor(f.now, forecast.fetchedAt) === '30min' ? W.weatherScenariosShowRain(n, formatRainEnd(f.now, tz).replace('about ', '')) : null };
 }
 
 function nightStormTitle(f: WeatherFacts, r: WeatherReason & { kind: 'night-thunder' }): string {
@@ -338,13 +352,13 @@ function basisOf(f: WeatherFacts, usesBaseline: boolean): string[] {
     }
     const run = latest.size > 0 ? formatHm(new Date(Math.min(...latest.values())), tz) : null;
     const sameDay = validDate(f.now) && localIsoDate(fetched, tz) === localIsoDate(f.now, tz);
-    basis.push(W.weatherBasis(sameDay ? formatHm(fetched, tz) : `${shortDay(fetched, tz)}, ${formatHm(fetched, tz)}`, run));
+    basis.push(W.weatherBasis(sameDay ? formatHm(fetched, tz) : W.timeDayAt(shortDay(fetched, tz), formatHm(fetched, tz)), run));
     const half = new Date(fetched.getTime() + 48 * HOUR);
     const parts = new Date(fetched.getTime() + 120 * HOUR);
-    basis.push(W.weatherDetailRange(`${weekdayOf(half, tz)} ${formatHm(half, tz)}`, weekdayOf(parts, tz)));
+    basis.push(W.weatherDetailRange(W.timeWeekdayAt(weekdayOf(half, tz), formatHm(half, tz)), weekdayOf(parts, tz)));
     if (isStale(forecast, f.now)) basis.push(W.weatherStale);
   }
-  if (usesBaseline && f.baseline) basis.push(`${W.waterBasisSeasonal} (${f.baseline.years})`);
+  if (usesBaseline && f.baseline) basis.push(W.weatherSeasonalBasis(f.baseline.years));
   if (forecast || usesBaseline) basis.push(W.weatherAttribution);
   else basis.push(W.weatherNothingSaved);
   basis.push(W.weatherNoOfficialWarnings);

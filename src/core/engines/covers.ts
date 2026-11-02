@@ -207,14 +207,12 @@ function detailsMapped(s: Spot): string[] {
   return out;
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 /** "28 Oct" from an ISO date. Anything else is no date. */
 export function shortMapDate(iso: string | null | undefined): string | null {
   const m = /^\d{4}-(\d{2})-(\d{2})/.exec(iso ?? '');
-  const month = m ? MONTHS[Number(m[1]) - 1] : undefined;
+  const month = m ? W.timeMonth(Number(m[1]) - 1) : '';
   const day = m ? Number(m[2]) : 0;
-  return month && day >= 1 && day <= 31 ? `${day} ${month}` : null;
+  return month && day >= 1 && day <= 31 ? W.timeDayMonth(day, month) : null;
 }
 
 /** The newest date of the map data, for a roof: roofs carry none of their own. */
