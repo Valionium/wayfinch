@@ -13,6 +13,17 @@ const areaOf = (key: string): string | undefined =>
 
 // Test values for each template function. A new template without an entry here fails the test below.
 const TEMPLATE_ARGS: Record<string, unknown[][]> = {
+  tyreFrontBackBar: [['5.00']],
+  tyrePsiValue: [['72']],
+  tyreWindow: [['4.50','5.00']],
+  tyreSplit: [['45','55']],
+  tyreAssumedList: [['rider weight 75 kg']],
+  tyreAskYesPsi: [['65']],
+  tyreFromPlan: [['28 Oct']],
+  tyreCardLast: [['2.1','2.4']],
+  tyreBagCardLine: [[3,'10.2'],[1,'2']],
+  tyreBagCardAge: [['28 Oct']],
+  tyreUnitFor: [['Tyre maximum']],
   tyreDidYouMean: [['65']],
   tyreLimitTooHighBar: [['65']],
   tyreLimitTooHighPsi: [['165']],

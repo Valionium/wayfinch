@@ -222,7 +222,8 @@ export function checkLimit(value: number, unit: Unit, o: { keepAsBar?: boolean; 
   return { status: 'ok', limit: { value, unit } };
 }
 
-const limitUsable = (l: Limit): boolean => {
+/** A limit that could be a tyre pressure in its unit (the typing flow, `checkLimit`, asks and rejects with words; this is the plain test). */
+export const limitUsable = (l: Limit): boolean => {
   if (!Number.isFinite(l.value) || l.value <= 0) return false;
   return l.unit === 'bar' ? l.value >= LIMIT_BAR.min && l.value <= LIMIT_BAR.max : l.value >= LIMIT_PSI.min && l.value <= LIMIT_PSI.max;
 };
