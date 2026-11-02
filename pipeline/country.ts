@@ -9,6 +9,7 @@ import { BoundaryIndex } from './boundaries.ts';
 import { classifyCountry } from './classify-country.ts';
 import { COUNTRY_JOBS, SETTINGS } from './config.ts';
 import { writeCountryOutput } from './country-output.ts';
+import { CURL_LIMITS, SMALL_LIMITS, curlArgs } from './download.ts';
 import { boundaryFilterArgs, boundaryLevelArgs, placeFilterArgs } from './filters.ts';
 import { readBoundaries, readObjects } from './read-geojson.ts';
 import { checkSentinels, describeBoundaries, makeZoneOf } from './zones.ts';
@@ -54,14 +55,16 @@ async function main(): Promise<number> {
   const url = `https://download.geofabrik.de/${job.geofabrik}-latest.osm.pbf`;
   // "-latest" is a redirect (for Germany to a mirror that has no checksum under the "latest" name), so the real address is
   // looked up first and the file and its checksum both come from it. If they still disagree, the pair is tried once more.
-  const curl = ['--fail', '--location', '--retry', '5', '--retry-delay', '30', '--retry-all-errors', '--user-agent', USER_AGENT, '--silent', '--show-error'];
+  const big = curlArgs(USER_AGENT);
+  const small = curlArgs(USER_AGENT, SMALL_LIMITS);
   let t = Date.now();
-  const real = await sh('curl', ['--head', '--location', '--silent', '--show-error', '--fail', '--user-agent', USER_AGENT, '-o', '/dev/null', '-w', '%{url_effective}', url]);
+  const real = await sh('curl', [...small, '--head', '-o', '/dev/null', '-w', '%{url_effective}', url]);
   if (!/^https:\/\/\S+\.osm\.pbf$/.test(real)) { console.error(`${cc}: unexpected download address ${real}`); return 1; }
   let expected = ''; let actual = '';
   for (let attempt = 1; attempt <= 2; attempt++) {
-    await sh('curl', [...curl, '-o', f('in.pbf.md5'), `${real}.md5`]);
-    await sh('curl', [...curl, '-o', f('in.pbf'), real]);
+    await sh('curl', [...small, '-o', f('in.pbf.md5'), `${real}.md5`]);
+    console.log(`${cc} downloading ${real} (stall limit ${CURL_LIMITS.stallSeconds} s, ${CURL_LIMITS.attemptSeconds} s per attempt)`);
+    await sh('curl', [...big, '-o', f('in.pbf'), real]);
     expected = readFileSync(f('in.pbf.md5'), 'utf8').trim().split(/\s+/)[0] ?? '';
     actual = await md5(f('in.pbf'));
     if (expected === actual) break;

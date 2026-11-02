@@ -78,6 +78,7 @@ jobs:
       - run: osmium --version
       - run: df -h /
       - run: node --max-old-space-size=12000 pipeline/country.ts ${{ matrix.cc }} --built-on "$(date -u +%F)"
+        timeout-minutes: 100
       - run: df -h /
         if: ${{ !cancelled() }}
       - uses: actions/upload-artifact@v7

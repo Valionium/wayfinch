@@ -102,3 +102,10 @@ test('[PIPE-WF-01] the test-only force_fail input names a country and stops that
   expect(yaml).toMatch(/force_fail:\s*\n\s+description:[^\n]*\n\s+type: string\s*\n\s+default: ''/);
   expect(yaml).toMatch(/FORCE_FAIL: \$\{\{ inputs\.force_fail \}\}/);
 });
+
+test('[PIPE-WF-01] the country step has its own limit below the job limit, so a hang is a failure with a reason, not a cancel', () => {
+  const m = yaml.match(/- run: node --max-old-space-size=12000 pipeline\/country\.ts[^\n]*\n\s+timeout-minutes: (\d+)/);
+  expect(m).not.toBeNull();
+  expect(Number(m![1])).toBeLessThan(120);
+  expect(Number(m![1])).toBeGreaterThanOrEqual(60);
+});
