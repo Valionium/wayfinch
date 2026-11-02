@@ -2,7 +2,7 @@
 import { describe, expect, test } from 'vitest';
 import type { Target } from '../../src/core/engines/water.ts';
 import type { RainPlan, RainWindow, ScreenInputs } from '../../src/core/types.ts';
-import { at, bakery, cafe, campsite, flatRoute, pos, shelter, shop, sun, tap, testTrip } from '../fixtures/build.ts';
+import { at, bakery, busStop, cafe, campsite, flatRoute, pos, shelter, shop, sun, tap, testTrip } from '../fixtures/build.ts';
 import { inputsOf } from '../unit/core/screen/screen-helpers.ts';
 import { stamps } from '../unit/core/engines/weather-helpers.ts';
 import { failsOnInputs, failsOnPart, failsOnScreen, holds } from './breaking.ts';
@@ -146,6 +146,18 @@ describe('rain', () => {
     failsOnScreen('INV-10', rainy, (s) => { s.strip.icons.push({ kind: 'water', km: 33, opens: 'water' }); }, /water icon at km 33/);
     failsOnScreen('INV-10', rainy, (s) => { s.strip.icons.push({ kind: 'cover', km: 33, opens: 'weather' }); }, /cover icon at km 33/);
     failsOnScreen('INV-10', rainy, (s) => { s.strip.bands.push({ fromKm: 33, toKm: 34, kind: 'likely', opens: 'weather' }); }, /band at km 33/);
+  });
+
+  test('[INV-10] the owner\'s ruling: a plain roof as first cover goes undrawn only in or just before a storm band', () => {
+    const trip = testTrip({ route: flatRoute(300, { stageEnds: [150, 300] }) });
+    const stormNear = { range: [50, 60] as [number, number], stamps: stamps(SAT, 9, 14), pp: 80, mm: 1, code: 95 };
+    const later = { range: [90, 100] as [number, number], stamps: stamps(SAT, 11, 16), pp: 80, mm: 1 };
+    const inBand = inputsOf({ trip, ...morning, roofs: [busStop().atKm(45)], spells: [stormNear, later] });
+    holds('INV-10', inBand);
+    failsOnScreen('INV-10', inBand, (s) => { s.strip.icons.push({ kind: 'cover', km: 45, opens: 'weather' }); }, /a plain roof .* is drawn in or just before a thunderstorm band/);
+    const outside = inputsOf({ trip, ...morning, roofs: [busStop().atKm(44)], spells: [stormNear, later] });
+    holds('INV-10', outside);
+    failsOnScreen('INV-10', outside, (s) => { s.strip.icons = []; }, /has no icon/);
   });
 
   const old = inputsOf({ ...morning, spells: [{ range: [0, 30], stamps: stamps(SAT, 7, 12), pp: 80, mm: 1 }], opts: { fetchedAt: '2026-10-16 18:00' } });

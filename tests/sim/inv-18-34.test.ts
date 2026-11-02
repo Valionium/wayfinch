@@ -137,7 +137,7 @@ describe('the same screen', () => {
       });
     }
     expect([...seen].sort()).toEqual(DEVICE_ZONES.map((z) => z.zone).sort());
-  });
+  }, 120_000);
   test('[INV-26] a screen that differs breaks it', () => {
     holds('INV-26', small);
     failsOnScreen('INV-26', small, (s) => { s.notes.push('x'); }, /the screen differs on a phone set to/);

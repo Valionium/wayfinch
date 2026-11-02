@@ -9,7 +9,7 @@ import { pointAtRouteKm } from '../../src/core/geo/project.ts';
 import type { DayStart, HoursSpan, Place, PlaceHours, PlanTomorrow, Position, Route, RouteMatch, ScreenInputs, Stay, Trip, ZoneSpan } from '../../src/core/types.ts';
 import { placesAlong } from './along.ts';
 import { clock, departureDate, startTime, sunOf, sunSpec, type Moment, type SunSpec } from './clocks.ts';
-import { baselineChoice, baselineOf, forecastChoice, forecastOf } from './forecasts.ts';
+import { baselineChoice, baselineOf, forecastChoice, forecastOf, type ForecastChoice } from './forecasts.ts';
 import { plannedKm, positions as positionsGen } from './positions.ts';
 import { loadSummary, profile, waterLeft } from './profiles.ts';
 import { route as routeGen } from './routes.ts';
@@ -215,6 +215,7 @@ export function scenario(): fc.Arbitrary<ScreenInputs> {
       summary: loadSummary(),
       water: waterLeft(now),
       saved: fc.integer({ min: 0, max: 15 }),
+      stormRoof: fc.integer({ min: 0, max: 3 }),
       holiday: fc.integer({ min: 0, max: 9 }),
       plan: fc.integer({ min: 0, max: 15 }),
       dayStart: fc.integer({ min: 0, max: 5 }),
@@ -239,13 +240,20 @@ export function scenario(): fc.Arbitrary<ScreenInputs> {
       });
       const sun = sunOf(b.spec);
       const holidays = holidaysFor(b.trip.departureDate, b.zones, r.holiday);
-      const hours = hoursFor({ trip: b.trip, places, matches, now, holidays }, b.tz, b.zones, sun, r.positions, r.hours, b.trip.departureDate ?? today);
+      // A storm ahead, rain beyond it, and with no other cover worked out, a plain roof in the band as the plan's first cover.
+      const riderKm = plannedKm(b.trip, now, b.tz);
+      const stormAhead = r.stormRoof === 0 && riderKm + 40 < b.route.lengthKm;
+      const hours = hoursFor({ trip: b.trip, places, matches, now, holidays }, b.tz, b.zones, sun, r.positions, stormAhead ? { ...r.hours, form: 'none' } : r.hours, b.trip.departureDate ?? today);
       const dayStarts: DayStart[] = r.dayStart === 0 ? [{ day: today, km: b.trip.route.lengthKm / 3 }] : [];
       const planTomorrow: PlanTomorrow | null = r.plan === 0 ? { date: today, backToTodayAt: null } : r.plan === 1 ? { date: today, backToTodayAt: new Date(now.getTime() - 5 * MIN) } : null;
       const month = Number(today.slice(5, 7));
+      const cellOf = (fromFraction: number, code: number): ForecastChoice['cells'][number] => ({ nearRider: true, fromFraction, kmPerHour: 0, radiusKm: 8, startH: -2, hours: 24, code, pp: 80, mm: 1, gust: 20 });
+      const forecastChosen: ForecastChoice = stormAhead ? { ...r.forecast, form: 'whole', days: 7, rainHere: false, future: false, cells: [cellOf(0.5, 95), cellOf(1.4, 61)] } : r.forecast;
+      const at = stormAhead ? pointAtRouteKm(b.route, Math.min(b.route.lengthKm, riderKm + 34)) : null;
+      const roofs = at ? [{ kind: 'bus_stop' as const, bench: false, lat: at.lat, lon: at.lon }] : r.along.roofs;
       const inputs: ScreenInputs = {
-        trip: b.trip, matches, places, roofs: r.along.roofs, hours, rescuePoints: r.along.rescuePoints,
-        savedKm: savedOf(r.saved, b.route.lengthKm), forecast: forecastOf(b.route, now, r.forecast, plannedKm(b.trip, now, b.tz)), baseline: baselineOf(b.route, month, r.baseline),
+        trip: b.trip, matches, places, roofs, hours, rescuePoints: r.along.rescuePoints,
+        savedKm: savedOf(r.saved, b.route.lengthKm), forecast: forecastOf(b.route, now, forecastChosen, riderKm), baseline: baselineOf(b.route, month, r.baseline),
         positions: r.positions, dayStarts, routeEndDate: r.endDate === 0 && r.plan % 2 === 0 ? today : null, planTomorrow, profile: r.profile, loadSummary: r.summary, waterLeft: r.water,
         settings: { campWaterL: b.trip.campWaterL, keepFresh: false }, now, sun, routeZones: b.zones, holidays, demo: null,
       };

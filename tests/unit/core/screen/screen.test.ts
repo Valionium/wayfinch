@@ -371,6 +371,46 @@ describe('the strip', () => {
     }));
     expect(possible.strip.icons.filter((x) => x.kind === 'cover')).toEqual([]);
   });
+  describe('a plain roof as a rain plan\'s first cover, by the owner\'s ruling of 2 Nov 2026', () => {
+    const trip = testTrip({ route: flatRoute(300, { stageEnds: [150, 300] }) });
+    const morning = { trip, positions: [pos({ km: 0.1, at: `${SAT} 07:50` })], now: `${SAT} 08:00` };
+    const storm = (range: [number, number]) => ({ range, stamps: stamps(SAT, 9, 14), pp: 80, mm: 1, code: 95 });
+    const rain = { range: [90, 100] as [number, number], stamps: stamps(SAT, 11, 16), pp: 80, mm: 1 };
+    const icons = (s: Screen): number[] => s.strip.icons.filter((x) => x.kind === 'cover').map((x) => x.km);
+    const firstCover = (i: ScreenInputs): number | undefined => buildScreen(i).parts.plans.find((p) => p.window.kind !== 'thunder')?.covers[0]?.km;
+
+    test('[INV-10] not drawn inside a thunderstorm band', () => {
+      const i = inputsOf({ ...morning, roofs: [busStop().atKm(55)], spells: [storm([50, 60]), rain] });
+      expect(firstCover(i)).toBe(55);
+      expect(icons(screen(i))).toEqual([]);
+    });
+    test('[INV-10] not drawn up to 5 km before it', () => {
+      const i = inputsOf({ ...morning, roofs: [busStop().atKm(45)], spells: [storm([50, 60]), rain] });
+      expect(firstCover(i)).toBe(45);
+      expect(icons(screen(i))).toEqual([]);
+    });
+    test('[INV-10] drawn further before it, and with no storm about', () => {
+      const before = inputsOf({ ...morning, roofs: [busStop().atKm(44)], spells: [storm([50, 60]), rain] });
+      expect(firstCover(before)).toBe(44);
+      expect(icons(screen(before))).toEqual([44]);
+      const calm = inputsOf({ ...morning, roofs: [busStop().atKm(85)], spells: [rain] });
+      expect(firstCover(calm)).toBe(85);
+      expect(icons(screen(calm))).toEqual([85]);
+    });
+    test('[INV-10] drawn when the storm is on a later ride: that is no band on this strip', () => {
+      const later = { range: [150.4, 150.4] as [number, number], stamps: stamps('2026-10-18', 7, 12), pp: 80, mm: 1, code: 95 };
+      const late = { range: [150, 150] as [number, number], stamps: stamps(SAT, 15, 18), pp: 80, mm: 1 };
+      const i = inputsOf({ ...morning, roofs: [busStop().atKm(145.4)], spells: [late, later], opts: { extraKms: [150.4], from: '2026-10-16 01:00' } });
+      expect(firstCover(i)).toBeCloseTo(145.4, 6);
+      expect(screen(i).strip.bands.some((b) => b.kind === 'thunder')).toBe(false);
+      expect(icons(screen(i)).length).toBe(1);
+    });
+    test('[INV-10] an open building as first cover is drawn inside the band all the same', () => {
+      const i = inputsOf({ ...morning, spots: [{ b: cafe('Mo-Su 06:00-22:00'), km: 55 }], spells: [storm([50, 60]), rain] });
+      expect(icons(screen(i))).toContain(55);
+    });
+  });
+
   test('[HON-ONE-SCREEN] with rain at the start, the list\'s first cover is drawn, and a plain roof is not drawn in a thunderstorm', () => {
     const rain = { range: [0, 60] as [number, number], stamps: stamps(SAT, 8, 16), pp: 80, mm: 1 };
     const roof = busStop({ bench: true }).atKm(42);

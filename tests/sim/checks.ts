@@ -421,6 +421,9 @@ const INV09: Check = {
 const covering = (s: Screen, from: Km, to: Km, cls: 'thunder' | 'likely' | 'possible'): boolean => s.strip.bands.some((b) => b.kind === cls && b.fromKm <= from && b.toKm >= to);
 const listedOn = (a: Answer, km: Km): boolean => a.stamp?.km === km || a.items.some((x) => x.stamp?.km === km);
 
+/** How often a run met the ruling below: a check that never meets it proves nothing about it. */
+export const INV10_REACH = { roofsUndrawn: 0 };
+
 const INV10: Check = {
   id: 'INV-10',
   appliesTo: (i, s) => usable(i, s) && i.trip.departureDate !== null && (onRideWindows(world(i), s).length > 0 || s.strip.icons.length > 0),
@@ -437,7 +440,17 @@ const INV10: Check = {
     }
     for (const p of w.plans) {
       const c = p.covers[0];
-      if (c) must(s.strip.icons.some((x) => x.kind === 'cover' && x.km === c.km), `plan's first cover at km ${c.km} has no icon`);
+      if (!c) continue;
+      const drawn = s.strip.icons.some((x) => x.kind === 'cover' && x.km === c.km);
+      // Owner's ruling, 2 Nov 2026: the storm rule wins over "first cover is always drawn". A plain roof (class 3 to 5) in a
+      // thunderstorm band or up to 5 km before it is not drawn. This is the one first cover that may go without an icon.
+      const stormy = c.coverClass > 2 && s.strip.bands.some((b) => b.kind === 'thunder' && c.km >= b.fromKm - 5 && c.km <= b.toKm);
+      const alsoBuilding = w.plans.some((q) => { const o = q.covers[0] ?? q.listInstead?.[0]; return o !== undefined && o.km === c.km && o.coverClass <= 2; });
+      if (stormy && !alsoBuilding) {
+        INV10_REACH.roofsUndrawn++;
+        must(!drawn, `a plain roof at km ${c.km} is drawn in or just before a thunderstorm band`);
+      }
+      if (!stormy) must(drawn, `plan's first cover at km ${c.km} has no icon`);
     }
     const weather = textOf(s.cards.weather);
     for (const icon of s.strip.icons) {
@@ -725,6 +738,9 @@ function chipRideByHand(i: ScreenInputs, s: Screen): Ride {
 }
 const chipSchedule = (i: ScreenInputs, s: Screen): Schedule => nowSchedule(chipRideByHand(i, s), i.trip, i.now, { sun: i.sun, routeZones: i.routeZones });
 
+/** A body factor that is a number: with none, the card says it can't work water out. */
+const usableWaterFigures = (i: ScreenInputs): boolean => i.profile.k > 0 && i.profile.k < Infinity;
+
 const LOADED = 0.82;
 const WITH_BREAKS = 1.15;
 
@@ -773,7 +789,7 @@ const INV19: Check = {
       must(Math.abs(atStart - legMs) <= SECOND, `the rejoin leg takes ${(atStart / MIN).toFixed(1)} min on the schedule, by hand ${(legMs / MIN).toFixed(1)} min`);
       // And it costs water: the same ride with no leg uses less on the way to the same target.
       const target = targetsOf(w).find((t) => !t.tonight);
-      if (leg > 0 && target) {
+      if (leg > 0 && target && usableWaterFigures(i)) {
         const withLeg = use(w.water, 'now', target, 'plan');
         const noLeg = use({ ...w.water, ride: { ...ride, startOffRouteM: 0 } }, 'now', target, 'plan');
         must(withLeg > noLeg, `the water need to km ${target.km} ignores the rejoin leg: ${withLeg} L with it, ${noLeg} L without`);
@@ -1062,6 +1078,7 @@ const STEP_15 = 15 * MIN;
 const PREPARED_PER_SCENARIO = 3;
 
 /**
+ * Owner's ruling, 2 Nov 2026: these two allowances are approved as they stand. The screen comparison has none.
  * The same tag prepared on two phones reads the same at every step, with exactly two allowances, each of which must read
  * exactly unknown and nothing else (the plan's Decision 8 and the ruling in the PR):
  * - a wall-clock minute the phone skips;
