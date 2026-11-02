@@ -9,7 +9,7 @@ import { BoundaryIndex } from './boundaries.ts';
 import { classifyCountry } from './classify-country.ts';
 import { COUNTRY_JOBS, SETTINGS } from './config.ts';
 import { writeCountryOutput } from './country-output.ts';
-import { CURL_LIMITS, SMALL_LIMITS, curlArgs } from './download.ts';
+import { CURL_LIMITS, SMALL_LIMITS, curlArgs, downloadResumable } from './download.ts';
 import { boundaryFilterArgs, boundaryLevelArgs, placeFilterArgs } from './filters.ts';
 import { readBoundaries, readObjects } from './read-geojson.ts';
 import { checkSentinels, describeBoundaries, makeZoneOf } from './zones.ts';
@@ -55,7 +55,6 @@ async function main(): Promise<number> {
   const url = `https://download.geofabrik.de/${job.geofabrik}-latest.osm.pbf`;
   // "-latest" is a redirect (for Germany to a mirror that has no checksum under the "latest" name), so the real address is
   // looked up first and the file and its checksum both come from it. If they still disagree, the pair is tried once more.
-  const big = curlArgs(USER_AGENT);
   const small = curlArgs(USER_AGENT, SMALL_LIMITS);
   let t = Date.now();
   const real = await sh('curl', [...small, '--head', '-o', '/dev/null', '-w', '%{url_effective}', url]);
@@ -64,11 +63,12 @@ async function main(): Promise<number> {
   for (let attempt = 1; attempt <= 2; attempt++) {
     await sh('curl', [...small, '-o', f('in.pbf.md5'), `${real}.md5`]);
     console.log(`${cc} downloading ${real} (stall limit ${CURL_LIMITS.stallSeconds} s, ${CURL_LIMITS.attemptSeconds} s per attempt)`);
-    await sh('curl', [...big, '-o', f('in.pbf'), real]);
+    await downloadResumable(real, f('in.pbf'), USER_AGENT);   // continues a cut-off download; a damaged file is dropped below
     expected = readFileSync(f('in.pbf.md5'), 'utf8').trim().split(/\s+/)[0] ?? '';
     actual = await md5(f('in.pbf'));
     if (expected === actual) break;
     console.error(`${cc}: attempt ${attempt}: checksum ${actual}, expected ${expected}`);
+    rmSync(f('in.pbf'), { force: true });                     // never resume onto a file that failed its checksum
   }
   if (expected !== actual) { console.error(`${cc}: the download is damaged (checksum ${actual}, expected ${expected})`); return 1; }
   stamp('download', t);

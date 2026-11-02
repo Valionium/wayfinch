@@ -38,3 +38,17 @@ test('a failed publish, or no manifest at all, opens an issue', () => {
   expect(problemsOfRun({ manifest: allFresh.manifest, problems: [], publishFailed: true })?.body).toContain('publish');
   expect(problemsOfRun({ manifest: null, problems: ['merge problems: tile too big'], publishFailed: false })?.body).toContain('tile too big');
 });
+
+test('a partial run does not report the countries it was not asked to build', () => {
+  const lg = { status: 'last-good', builtOn: '2026-10-27', sourceDate: null, places: 9 } as const;
+  const m = manifest({ LU: fresh, FR: lg, DE: lg });
+  expect(problemsOfRun({ manifest: m, problems: [], publishFailed: false, attempted: ['LU'] })).toBeNull();
+  const r = problemsOfRun({ manifest: m, problems: [], publishFailed: false, attempted: ['LU', 'FR'] });
+  expect(r?.body).toContain('FR');
+  expect(r?.body).not.toContain('DE');
+});
+
+test('a missing country is still reported in a partial run', () => {
+  const m = manifest({ LU: fresh, BE: { status: 'missing', builtOn: null, sourceDate: null, places: 0 } });
+  expect(problemsOfRun({ manifest: m, problems: [], publishFailed: false, attempted: ['LU'] })?.body).toContain('BE');
+});
