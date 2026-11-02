@@ -68,6 +68,7 @@ async function main(): Promise<number> {
     actual = await md5(f('in.pbf'));
     if (expected === actual) break;
     console.error(`${cc}: attempt ${attempt}: checksum ${actual}, expected ${expected}`);
+    if (Date.now() - t > 45 * 60_000) break;                  // a second full round would not fit in the step's time limit
     rmSync(f('in.pbf'), { force: true });                     // never resume onto a file that failed its checksum
   }
   if (expected !== actual) { console.error(`${cc}: the download is damaged (checksum ${actual}, expected ${expected})`); return 1; }

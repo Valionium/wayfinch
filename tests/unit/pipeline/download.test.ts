@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -52,6 +52,7 @@ async function resumeServer(body: Buffer, plan: ('ok' | 'cut' | 'ignore-range')[
     const range = req.headers['range'];
     ranges.push(range);
     const mode = plan[Math.min(i, plan.length - 1)];
+    if (range && mode !== 'ignore-range' && Number(/bytes=(\d+)-/.exec(range)?.[1] ?? 0) >= body.length) { res.writeHead(416, { 'content-range': `bytes */${body.length}` }); res.end(); return; }
     const start = range && mode !== 'ignore-range' ? Number(/bytes=(\d+)-/.exec(range)?.[1] ?? 0) : 0;
     const part = body.subarray(start);
     if (start > 0) res.writeHead(206, { 'content-length': String(part.length), 'content-range': `bytes ${start}-${body.length - 1}/${body.length}` });
@@ -98,3 +99,12 @@ test.skipIf(!hasCurl)('[PIPE-DL-02] a server that keeps failing ends in an error
 test('[PIPE-DL-02] the resume attempts together stay within the same worst case as before', () => {
   expect((CURL_LIMITS.retries + 1) * (CURL_LIMITS.attemptSeconds + CURL_LIMITS.retryDelaySeconds)).toBeLessThanOrEqual(100 * 60);
 });
+
+test.skipIf(!hasCurl)('[PIPE-DL-02] a partial file that is already complete is left as it is', async () => {
+  const s = await resumeServer(sample, ['ok']);
+  const dest = path.join(tmp(), 'in.pbf');
+  writeFileSync(dest, sample);
+  await downloadResumable(s.url, dest, 'agent', fast);
+  s.close();
+  expect(readFileSync(dest).equals(sample)).toBe(true);
+}, 40_000);

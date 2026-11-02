@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { problemsOfRun, ISSUE_TITLE } from '../../../pipeline/report.ts';
+import { attemptedCountries, problemsOfRun, ISSUE_TITLE } from '../../../pipeline/report.ts';
 import type { PackManifest } from '../../../src/core/places/types.ts';
 
 const manifest = (countries: PackManifest['countries']): PackManifest => ({
@@ -51,4 +51,9 @@ test('a partial run does not report the countries it was not asked to build', ()
 test('a missing country is still reported in a partial run', () => {
   const m = manifest({ LU: fresh, BE: { status: 'missing', builtOn: null, sourceDate: null, places: 0 } });
   expect(problemsOfRun({ manifest: m, problems: [], publishFailed: false, attempted: ['LU'] })?.body).toContain('BE');
+});
+
+test('the list of countries asked for is cleaned up like the setup job does it', () => {
+  expect(attemptedCountries(' lu, FR ,,x1', ' de')).toEqual(['LU', 'FR', 'DE']);
+  expect(attemptedCountries('', '')).toBeUndefined();
 });

@@ -32,6 +32,12 @@ export function problemsOfRun(input: RunInput): { title: string; body: string } 
   return { title: ISSUE_TITLE, body };
 }
 
+/** The countries the run was asked to build, cleaned up like the setup job does. Undefined means all (a scheduled run). */
+export function attemptedCountries(countries: string, forceFail: string): string[] | undefined {
+  const list = `${countries},${forceFail}`.split(',').map((c) => c.trim().toUpperCase()).filter((c) => /^[A-Z]{2}$/.test(c));
+  return countries.trim() === '' ? undefined : [...new Set(list)];
+}
+
 function readManifest(dir: string): PackManifest | null {
   if (!existsSync(dir)) return null;
   for (const d of readdirSync(dir)) {
@@ -50,8 +56,7 @@ function main(): number {
   if (country !== 'success') problems.push(`country jobs: ${country}`);
   if (merge !== 'success') problems.push(`merge job: ${merge}`);
   const manifest = merge === 'success' ? readManifest(process.env['BUILD_DIR'] ?? 'pipeline/build') : null;
-  const asked = (process.env['COUNTRIES'] ?? '').split(',').map((c) => c.trim()).filter((c) => c !== '');
-  const attempted = asked.length > 0 ? [...asked, ...(process.env['FORCE_FAIL'] ? [process.env['FORCE_FAIL']] : [])] : undefined;
+  const attempted = attemptedCountries(process.env['COUNTRIES'] ?? '', process.env['FORCE_FAIL'] ?? '');
   const found = problemsOfRun({ manifest, problems, publishFailed: process.env['PUBLISH_RESULT'] === 'failure', ...(attempted ? { attempted } : {}) });
   if (found === null) { console.log('No problems, no issue.'); return 0; }
   const open = JSON.parse(gh('issue', 'list', '--state', 'open', '--search', `"${ISSUE_TITLE}" in:title`, '--json', 'number,title')) as { number: number; title: string }[];
