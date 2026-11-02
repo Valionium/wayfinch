@@ -14,14 +14,18 @@
     "test": "npm run types && npm run lint && npm run unit",
     "fast": "node tools/fast.mjs",
     "qa": "node qa/run-all.cjs",
+    "build": "node tools/build.mjs",
+    "e2e": "playwright test",
     "rules": "node tools/rules.mjs",
     "sim": "node tools/sim.mjs",
     "sim:replay": "node tools/sim-replay.mjs"
   },
   "devDependencies": {
     "@fast-check/vitest": "0.5.0",
+    "@playwright/test": "1.64.1",
     "@types/node": "24.19.2",
     "ajv": "8.20.0",
+    "esbuild": "0.28.2",
     "eslint": "10.14.0",
     "fast-check": "4.10.2",
     "jsdom": "30.1.3",

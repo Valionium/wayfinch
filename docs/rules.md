@@ -457,7 +457,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 
 ## Load Check in the repository
 
-- The page in git is byte for byte the live page until a task changes it on purpose (§7.1, §12) [LC-PAGE-LIVE]
+- The page in git has the recorded hash, so it changes only on purpose (§7.1, §12) [LC-PAGE-LIVE]
 - The QA runner runs every suite in qa/ except its three helpers (§12) [LC-QA-ALL]
 - The frozen bag rules and their fixtures are unchanged (§7.1, §12) [LC-FREEZE-01]
 
@@ -476,6 +476,8 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - A file whose bytes differ from its hash fails the install (§9.5) [SW-VERIFY]
 - The worker never stores or answers with a redirected response (§9.1) [SW-NO-REDIRECT]
 - The worker answers the three Load Check messages as decided (§9.1) [SW-MESSAGES]
+- A build's activation leaves a newer build's cache alone, and a build with no whole cache never counts as finished (§9.5) [SW-NEXT-BUILD]
+- A release changing only the worker keeps its cache and its place in the order, even if it fails (§9.5) [SW-WORKER-ONLY]
 - There is exactly one registration, for the site, with the one worker script (§9.1) [SW-NO-STRAY]
 - The worker lets HEAD checks, build.json and other origins through (§9.4) [SW-HEAD]
 - Switching to the new build keeps one registration and takes over after one reload (§9.5) [SW-HAND-TAKEOVER]

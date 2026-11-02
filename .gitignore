@@ -9,3 +9,5 @@ pipeline/work/
 pipeline/in/
 pipeline/build/
 .vitest/json/output.json
+test-results/
+playwright-report/

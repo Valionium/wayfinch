@@ -40,7 +40,9 @@ Planned, in spec section 4.2: `src/core/` engines, `src/data/`, `src/store/`, `s
 | Command | Runs |
 | --- | --- |
 | `npm run fast` | types, lint, the tests touched by this change with 25 runs per property, 100 simulator scenarios and the rule check |
-| `npm run qa` | Load Check's 35 QA suites, one line each; exit 0 only if all pass. `LC_PAGE` and `LC_WORKER` override the page and the old worker |
+| `npm run qa` | Load Check's 36 QA suites, one line each; exit 0 only if all pass. `LC_PAGE` and `LC_WORKER` override the page and the old worker |
+| `npm run build` | writes `dist/`: the page, `/offline-worker.js`, `_headers`, `build.json`. `--launch=on|off`, `--out=`, `--emergency` |
+| `npm run e2e` | the browser tests in `tests/e2e` (Chromium, phone and laptop size). The old site in them comes from the tag `load-check-zip-2026-10-30` |
 | `npm test` | types, lint, all unit and property tests, and the cases proving each simulator check can fail |
 | `npm run types`, `npm run lint`, `npm run unit` | one part |
 | `npm run sim -- --seed S --count N` | the simulator: N invented trip moments, each screen checked; a failure saves `tests/regressions/<ID>-<seed>.json` |
@@ -55,7 +57,7 @@ Planned, in spec section 4.2: `src/core/` engines, `src/data/`, `src/store/`, `s
 - `core` has no hidden inputs: no clock, randomness or device time zone. `now`, zone data and seeds are arguments. Lint enforces this.
 - Rule IDs live in `docs/rules.md`, one line per rule ending in its ID. A test title starts with its ID, for example `test('[W-ZERO] …')`. `tests/rules-in-force.txt` lists IDs in force; a `later: ID` line is listed but has no test yet, and the task that adds the test removes the `later:` mark.
 - Pull requests use fixed seeds.
-- `main` accepts changes only through pull requests with green `types-lint`, `unit-property` and `load-check-qa` checks.
+- `main` accepts changes only through pull requests with green `types-lint`, `unit-property`, `load-check-qa` and `browser` checks.
 - Never print or quote lines 20–25 of Load Check's page (`public/tools/bags/index.html`) in any copy. Read it only from line 26 on (`Read` with `offset` 26, or narrow Grep patterns). `.gitattributes` marks it `-diff`, so `git diff` and `git show` print nothing for it. Never run `gh pr diff` on a pull request that holds the page; review with `git diff -- . ':(exclude)public/tools/bags/index.html'`, and for the page's own edits `git diff --text -U0 -- public/tools/bags/index.html`, whose hunks must not touch lines 20–25.
 - The bag rules are frozen: `qa/selection-fixtures.cjs` and `LC-FREEZE-01` may not change without the owner.
 - Load Check's source is now this repository. The project folder's `index.html` is the archive; don't edit it.

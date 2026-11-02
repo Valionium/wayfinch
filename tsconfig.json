@@ -11,5 +11,5 @@
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true
   },
-  "include": ["src", "tests", "tools", "pipeline", "contracts", "vitest.config.ts", "vitest.sim.config.ts"]
+  "include": ["src", "tests", "tools", "pipeline", "contracts", "vitest.config.ts", "vitest.sim.config.ts", "playwright.config.ts"]
 }

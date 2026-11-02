@@ -51,3 +51,23 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run qa
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      # legacySite() reads the page as it was live from this tag; a shallow checkout doesn't have it.
+      - run: git fetch --depth=1 origin +refs/tags/load-check-zip-2026-10-30:refs/tags/load-check-zip-2026-10-30
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npx playwright test
