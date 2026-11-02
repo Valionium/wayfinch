@@ -8,6 +8,7 @@ import type { Answer, Position, ScreenInputs, Trip, ZoneSpan } from '../../../..
 import { at, busStop, cafe, campsite, flatRoute, pos, restaurant, settlement, shop, sun, supermarket, tap, testTrip } from '../../../fixtures/build.ts';
 import { preparedHours } from '../engines/leaveby-helpers.ts';
 import { stamps } from '../engines/weather-helpers.ts';
+import type { Spot } from '../engines/water-helpers.ts';
 import { inputsOf } from './screen-helpers.ts';
 
 const FRI = '2026-10-16';
@@ -459,11 +460,7 @@ describe('the position line and the notes', () => {
   });
 });
 
-test('[HON-SPEED] one screen on a 200 km route: measured and printed', () => {
-  const trip = testTrip({ route: flatRoute(200, { stageEnds: [70, 140, 200] }) });
-  const spots = Array.from({ length: 200 }, (_, i) => ({ b: i % 3 === 0 ? tap() : i % 3 === 1 ? shop('Mo-Sa 08:00-20:00') : cafe('Mo-Su 09:00-22:00'), km: i + 0.5, off: 50 + (i % 5) * 50 }));
-  const spells = [{ range: [20, 60] as [number, number], stamps: stamps(SAT, 8, 18), pp: 80, mm: 1 }];
-  const i = inputsOf({ trip, spots, spells, positions: [pos({ km: 15, at: `${SAT} 09:00` })], now: `${SAT} 09:00` });
+function measured(i: ScreenInputs, what: string): number {
   const times: number[] = [];
   for (let n = 0; n < 15; n++) {
     const t0 = performance.now();
@@ -471,6 +468,20 @@ test('[HON-SPEED] one screen on a 200 km route: measured and printed', () => {
     times.push(performance.now() - t0);
   }
   times.sort((a, b) => a - b);
-  console.log(`[HON-SPEED] 200 km, ${i.places.length} places: median ${times[7]!.toFixed(1)} ms, worst ${times[14]!.toFixed(1)} ms`);
-  expect(times[7]).toBeGreaterThan(0);
+  console.log(`[HON-SPEED] ${what}: median ${times[7]!.toFixed(1)} ms, worst ${times[14]!.toFixed(1)} ms`);
+  return times[7]!;
+}
+const manySpots = (length: number, count: number): Spot[] => Array.from({ length: count }, (_, i) => ({
+  b: i % 3 === 0 ? tap() : i % 3 === 1 ? shop('Mo-Sa 08:00-20:00') : cafe('Mo-Su 09:00-22:00'), km: ((i + 0.5) * length) / count, off: 50 + (i % 5) * 50,
+}));
+
+test('[HON-SPEED] one screen on a 200 km route: measured and printed', () => {
+  const trip = testTrip({ route: flatRoute(200, { stageEnds: [70, 140, 200] }) });
+  const spells = [{ range: [20, 60] as [number, number], stamps: stamps(SAT, 8, 18), pp: 80, mm: 1 }];
+  const moment = { positions: [pos({ km: 15, at: `${SAT} 09:00` })], now: `${SAT} 09:00` };
+  const base = { trip, spells, ...moment };
+  expect(measured(inputsOf({ ...base, spots: manySpots(200, 200) }), '200 km, 200 places')).toBeGreaterThan(0);
+  expect(measured(inputsOf({ ...base, spots: manySpots(200, 1000) }), 'stress: 200 km, 1,000 places')).toBeGreaterThan(0);
+  const long = testTrip({ route: flatRoute(1600, { stageEnds: Array.from({ length: 15 }, (_, n) => (n + 1) * 100) }) });
+  expect(measured(inputsOf({ trip: long, spells, spots: manySpots(1600, 3000), ...moment }), 'stress: 1,600 km, 3,000 places')).toBeGreaterThan(0);
 });
