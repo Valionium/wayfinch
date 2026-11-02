@@ -102,7 +102,7 @@ test('[SW-BUILD-WORKER] the built worker is a classic script that declares its b
   // The worker's own hash cannot be part of a value written inside the worker.
   const expected = sha256(JSON.stringify(listed)).slice(0, 12);
   expect(src.includes(`BUILD = "${expected}"`)).toBe(true);
-  const list = /PRECACHEw* = (\{[^}]*\})/.exec(src);
+  const list = /PRECACHE\w* = (\{[^}]*\})/.exec(src);
   expect(list).not.toBeNull();
   const parsed = new vm.Script(`(${list?.[1] ?? ''})`).runInNewContext() as Record<string, string>;
   expect(JSON.parse(JSON.stringify(parsed))).toEqual(listed);
