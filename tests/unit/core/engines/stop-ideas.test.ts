@@ -628,8 +628,8 @@ describe('the Food card', () => {
     expect(a.status).not.toBe('warning');
   }, 60_000);
 
-  fcTest.prop([fc.record({ first: fc.double({ min: 125, max: 160, noNaN: true }), again: fc.double({ min: 172, max: 199, noNaN: true }), closes: fc.integer({ min: 10, max: 15 }) })])('[STOP-OPEN-ALL] a cover passed twice: the idea is open at its own arrival, whichever pass it is', (g) => {
-    const x = setup({ spells: [{ range: [165, 170], stamps: stamps(SAT, 8, 22), pp: 80, mm: 1 }], spots: [...NO_GAP(), { b: cafe(`Mo-Su 06:00-${g.closes}:00`), km: [g.first, g.again], id: 'n1' }] });
+  fcTest.prop([fc.record({ first: fc.double({ min: 125, max: 145, noNaN: true }), again: fc.double({ min: 172, max: 199, noNaN: true }), closes: fc.integer({ min: 10, max: 15 }) })])('[STOP-OPEN-ALL] a cover passed twice: the idea is open at its own arrival, whichever pass it is', (g) => {
+    const x = setup({ spells: [{ range: [150, 155], stamps: stamps(SAT, 8, 22), pp: 80, mm: 1 }], spots: [...NO_GAP(), { b: cafe(`Mo-Su 06:00-${g.closes}:00`), km: [g.first, g.again], id: 'n1' }] });
     const r = stopIdeas(x.f, x.plans, x.lb, null, x.wg);
     const h = x.f.hours.find((o) => o.placeId === r.title?.placeId);
     if (r.title?.arrival && h) expect(openOnArrival(h, r.title.arrival)).toBe(true);
