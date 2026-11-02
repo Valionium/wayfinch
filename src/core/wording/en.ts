@@ -448,6 +448,78 @@ export const W = {
   callAsMapped: (date: string): string => `As mapped in OpenStreetMap (${date}), not checked.`,
   /** `n` of 10 forecast scenarios, `time` as "HH:MM". */
   weatherScenariosShowRain: (n: number, time: string): string => `${n} in 10 forecast scenarios show rain here around ${time}.`,
+
+  // ---- Climbing (section 6.7). Heights are shown to 10 m. ----
+  climbUnknown: 'Climbing unknown for this route',
+  climbBasis: "Climbing from the route file's heights",
+  climbBasisNoHeights: 'The route file has no complete heights',
+  climbCantWorkOut: "Climbing can't be worked out from these settings.",
+  climbLeft: (toStop: string, stopKm: string, toEnd: string): string => `${toStop} m of climbing to km ${stopKm}, ${toEnd} m to the end`,
+  climbLeftToEnd: (toEnd: string): string => `${toEnd} m of climbing to the end`,
+  climbNext: (km: string): string => `Next climb: km ${km}`,
+  climbNextDetail: (length: string, gain: string, avg: string, steep: string): string =>
+    `${length} km · +${gain} m · ${avg}% average · steepest 500 m ${steep}%`,
+  climbTop: (when: string): string => `top ${when}`,
+  climbNone: 'No more climbs of 100 m or more ahead',
+
+  // ---- Sleep (section 6.8) and call ahead (section 6.13). ----
+  sleepPlanTomorrow: 'Stopping for the night? Plan tomorrow',
+  sleepShelterNote: 'Shelter — not a campsite; overnight use depends on local rules',
+  sleepCantWorkOut: "Sleep can't be worked out from these settings. Check your speed in You.",
+  sleepWordCampsite: 'Campsite',
+  sleepWordHostel: 'Hostel',
+  sleepWordGuestHouse: 'Guest house',
+  sleepWordHotel: 'Hotel',
+  sleepWordMotel: 'Motel',
+  sleepWordLodging: 'Lodging',
+  sleepWordHut: 'Hut',
+  sleepWordLeanTo: 'Lean-to',
+  sleepWordBasicHut: 'Basic hut',
+  sleepTitleOpen: (name: string, km: string): string => `Open for the night as mapped: ${name}, km ${km}`,
+  sleepTitleUnknown: (name: string, km: string): string => `Hours not known: ${name}, km ${km}`,
+  sleepTitleNone: 'No open sleep place mapped here',
+  sleepTonight: 'tonight',
+  sleepNightOf: (day: string): string => `the night of ${day}`,
+  sleepOpen: (when: string, season: string | null): string => `open for ${when}${season === null ? '' : ` (season ${season})`}`,
+  sleepClosedSeason: (season: string): string => `closed for the season (${season})`,
+  sleepClosedDay: (when: string): string => `closed for ${when}`,
+  sleepHoursUnknown: (when: string): string => `hours not known for ${when}`,
+  sleepRidingOn: "riding on past the day's stop",
+  sleepReservation: (value: string): string => `reservation: ${value} (map data)`,
+  sleepFee: (value: string): string => `fee: ${value} (map data)`,
+  sleepLocked: (value: string): string => `locked: ${value} (map data)`,
+  sleepCallAhead: 'Season and hours not mapped; you could call ahead.',
+  callNoContact: 'No phone or website mapped.',
+  callCall: (number: string): string => `Call ${number}`,
+  callAlso: (number: string): string => `also ${number}`,
+  callText: (number: string): string => `Phone ${number}`,
+  callWebsite: (host: string): string => `Website ${host} (online)`,
+  callLabel: (name: string, number: string): string => `Call ${name}, ${number}`,
+  callTextLabel: (name: string, number: string): string => `Phone ${name}, ${number}`,
+  callWebsiteLabel: (name: string, host: string): string => `Website of ${name}, ${host} (online)`,
+
+  // ---- Share progress (section 6.14): plain characters only, so an SMS stays short. ----
+  shareProgressMessage: (stamp: string, body: string): string => `${stamp}: ${body}`,
+  shareProgressStarting: (on: string | null, from: string, leaving: string | null): string =>
+    `starting${on === null ? '' : ` on ${on}`} from ${from}${leaving === null ? '' : `, leaving ${leaving}`}.`,
+  shareProgressNearTown: (name: string, inner: string): string => `near ${name} (${inner})`,
+  shareProgressKmOfLength: (km: string, length: string): string => `km ${km} of ${length}`,
+  shareProgressAtKm: (prefix: 'at' | 'around' | 'near', km: string, length: string, tail: string): string => `${prefix} km ${km} of ${length}${tail}`,
+  shareProgressTailApproximate: ' (position approximate)',
+  shareProgressTailOff: ', off my route',
+  shareProgressTailOffApproximate: ', off my route (position approximate)',
+  shareProgressInnerApproximate: ', position approximate',
+  shareProgressInnerOff: ', off my route',
+  shareProgressInnerOffApproximate: ', off my route, position approximate',
+  shareProgressWhere: (where: string, town: string | null): string => `${where}${town === null ? '' : `, near ${town}`}.`,
+  shareProgressPlanStop: (where: string, arrival: string | null): string => `Planning to stop ${where}${arrival === null ? '' : ` at ${arrival}`}.`,
+  shareProgressStopNear: (name: string, km: string): string => `near ${name} (km ${km})`,
+  shareProgressStopAt: (km: string): string => `at km ${km}`,
+  shareProgressStopped: (where: string): string => `stopped for the night ${where}.`,
+  shareProgressTomorrow: (where: string): string => `Tomorrow: planning to stop ${where}.`,
+  shareProgressReachedEnd: (town: string | null, km: string): string => `reached the end of my route${town === null ? '' : ` near ${town}`} (km ${km}).`,
+  shareProgressStoppedAtEnd: (town: string | null, km: string): string => `stopped for the night at the end of my route${town === null ? '' : ` near ${town}`} (km ${km}).`,
+  shareProgressMap: (lat: string, lon: string): string => `Map: https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=14/${lat}/${lon}`,
 };
 
 /** "28 Oct" from an ISO date. Anything else is no date. */
@@ -456,4 +528,14 @@ export function shortMapDate(iso: string | null | undefined): string | null {
   const month = m ? W.timeMonth(Number(m[1]) - 1) : '';
   const day = m ? Number(m[2]) : 0;
   return month && day >= 1 && day <= 31 ? W.timeDayMonth(day, month) : null;
+}
+
+/** "Fri 16 Oct" from an ISO date (a calendar date, not an instant). Anything else is no date. */
+export function shortIsoDay(iso: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return null;
+  const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const d = new Date(Date.UTC(year, month - 1, day));
+  if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) return null;
+  return W.timeShortDay(W.timeWeekday(d.getUTCDay()), day, W.timeMonth(month - 1));
 }
