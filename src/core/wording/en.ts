@@ -114,6 +114,20 @@ export const W = {
   waterBasisAssumedHot: 'no weather data — assumes a hot day',
   waterBasisOsm: '© OpenStreetMap contributors',
 
+  // ---- Rain windows (section 6.6). Times come as "about 14:00" or "HH:MM". ----
+  rainFrom: (about: string): string => `from ${about}`,
+  rainDryAgain: (about: string): string => `likely dry again from ${about}`,
+  rainOnAndOff: 'on and off',
+  rainHours: (from: string, to: string): string => `${from}–${to}`,
+  rainDayPart: (weekday: string, part: string): string => `${weekday} ${part}`,
+  rainPartNight: 'night',
+  rainPartMorning: 'morning',
+  rainPartAfternoon: 'afternoon',
+  rainPartEvening: 'evening',
+  rainChance: (n: number): string => `${n} in 10 forecast scenarios`,
+  rainUnderAmount: 'under 0.1 mm/h (one model)',
+  rainAmount: (mm: string): string => `${mm} mm/h (one model)`,
+
   /** "Mapped as a weather shelter, not checked." and the same line for each other roof kind. */
   shelterMappedAs: (what: string): string => `Mapped as ${what}, not checked.`,
   /** Call ahead and rescue points. `date` is the map data's date, such as "28 Oct". */

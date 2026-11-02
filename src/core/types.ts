@@ -58,11 +58,17 @@ export type RescuePoint = PackRescuePoint & { kms: Km[] };
 
 export type ModelRun = { model: string; run: Date; availableAt: Date };
 export type RainWindow = {
-  kind: 'rain' | 'showers' | 'thunder'; cls: 'likely' | 'possible'; fromKm: Km; toKm: Km;
+  kind: 'rain' | 'showers' | 'thunder'; cls: 'likely' | 'possible'; fromKm: Km; toKm: Km; // first and last met point, unrounded
   reachAt: Date; // rider's arrival at the first met point
   onset: Date | null; // null for showers and thunderstorms
-  end: Date | null; // null unless followed by 2 unlikely hours
-  chancePct: number; maxMm: number; heavy: boolean; detail: '30min' | 'daypart' | 'trend';
+  end: Date | null; // null unless followed by 2 unlikely hours; always null for a thunderstorm (no all-clear)
+  chancePct: number | null; // null when no hour of the window gives a chance
+  maxMm: number; heavy: boolean; detail: '30min' | 'daypart' | 'trend';
+  // The plan's additions, so plans and the card need not recompute them:
+  metKms: Km[]; // the met points, in route order
+  thunderKms: Km[]; // those with a thunderstorm hour in their band
+  onAndOff: boolean; // an unmet point was bridged
+  hoursFrom: Date; hoursTo: Date; // the rain periods on whole hours, for an area's wording
 };
 export type Cover = {
   placeId: string | null; roof: Roof | null; km: Km; offRouteM: number; arrival: Date;
