@@ -1,7 +1,7 @@
 // Every user-facing string lives here (spec section 8). Constants and small template functions, nothing else.
 //
 // Every key starts with the area it belongs to (water, weather, rain, shelter, stop, wait, food, daylight, climb,
-// sleep, help, emergency, share, call, leaveby, time, route, bike, ask, ready, demo, about, honesty), followed by a
+// sleep, help, emergency, share, call, leaveby, time, route, bike, ask, ready, demo, about, honesty, app), followed by a
 // capital letter. Keys of the areas weather, rain, shelter, stop and wait are held to the stricter list of banned
 // words ("live", "dry"), so a string belongs under the area that describes it.
 // `tests/unit/core/wording.test.ts` checks the keys, the fixed sentences and the banned words.
@@ -543,6 +543,27 @@ export const W = {
   shareProgressReachedEnd: (town: string | null, km: string): string => `reached the end of my route${town === null ? '' : ` near ${town}`} (km ${km}).`,
   shareProgressStoppedAtEnd: (town: string | null, km: string): string => `stopped for the night at the end of my route${town === null ? '' : ` near ${town}`} (km ${km}).`,
   shareProgressMap: (lat: string, lon: string): string => `Map: https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=14/${lat}/${lon}`,
+
+  // ---- The app's shell (sub-project 5): tabs, the update prompt, status words, shared lists and the degraded situations of section 8. ----
+  appName: 'Wayfinch',
+  appNavLabel: 'Main',
+  appTabAhead: 'Ahead',
+  appTabTrip: 'Trip',
+  appTabTools: 'Tools',
+  appTabYou: 'You',
+  appUpdateReady: 'Update ready — apply now',
+  appUpdateNotSaved: 'Your data could not be saved on this device, so the update was not applied. Export it, then try again.',
+  appUpdateNotYet: 'The update has not applied yet. It will once every window of the app has closed.',
+  appUpdateFailed: 'The update could not be applied. Try again.',
+  appStatusFine: 'Fine',
+  appStatusAction: 'Action needed',
+  appStatusWarning: 'Warning',
+  appStatusUnknown: 'Unknown',
+  appListMore: (n: number): string => `Show ${n} more`,
+  appListFewer: 'Show fewer',
+  appNoRoute: "Add a route to see what's ahead",
+  appStorageBlocked: "This browser is not keeping Wayfinch's data. The app works for this visit only. Export what you need before you close it.",
+  appNoSignalNoTrip: "No signal, and this trip is not prepared. Distance, climbing and daylight come from the route. Places and weather need a connection: prepare the trip while you are online.",
 };
 
 /** "28 Oct" from an ISO date. Anything else is no date. */

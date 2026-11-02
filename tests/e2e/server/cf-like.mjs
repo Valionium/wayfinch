@@ -14,8 +14,13 @@ const TYPES = {
   '.js': 'application/javascript',
   '.json': 'application/json',
   '.txt': 'text/plain; charset=utf-8',
+  // the app's own files (sub-project 5); the host serves each with its proper type
+  '.css': 'text/css; charset=utf-8',
+  '.woff2': 'font/woff2',
+  '.png': 'image/png',
+  '.webmanifest': 'application/manifest+json',
 };
-const COMPRESSED = new Set(['.html', '.js', '.json', '.txt']);
+const COMPRESSED = new Set(['.html', '.js', '.json', '.txt', '.css', '.webmanifest']);
 
 function parseHeaders(dir) {
   const file = join(dir, '_headers');

@@ -48,7 +48,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/ui/strip/**', 'src/ui/cards/**', 'src/ui/ask/**', 'src/ui/demo/**'],
+    files: ['src/ui/ahead/**', 'src/ui/strip/**', 'src/ui/cards/**', 'src/ui/ask/**', 'src/ui/demo/**'],
     rules: {
       'no-restricted-imports': ['error', {
         patterns: [{

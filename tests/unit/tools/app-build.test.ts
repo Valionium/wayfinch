@@ -1,0 +1,117 @@
+import { createHash } from 'node:crypto';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterAll, beforeAll, expect, test, vi } from 'vitest';
+import { buildDist } from '../../../tools/build.mjs';
+import { measure } from '../../../tools/size-budget.mjs';
+
+const REPO = fileURLToPath(new URL('../../../', import.meta.url));
+const sha256 = (b: Buffer | string) => createHash('sha256').update(b).digest('hex');
+const tmpRoot = mkdtempSync(join(tmpdir(), 'wf-app-build-'));
+afterAll(() => rmSync(tmpRoot, { recursive: true, force: true }));
+
+const files = (dir: string): string[] =>
+  readdirSync(dir, { withFileTypes: true, recursive: true })
+    .filter((e) => e.isFile())
+    .map((e) => relative(dir, join(e.parentPath, e.name)).split(sep).join('/'))
+    .sort();
+const text = (dir: string, f: string) => readFileSync(join(dir, f), 'utf8');
+const buildJson = (dir: string) => JSON.parse(text(dir, 'build.json')) as { files: Record<string, string> };
+
+// What the headers file said before the app existed (sub-project 4, group 2). The off build must keep saying exactly this.
+const OFF_HEADERS = [
+  '/offline-worker.js\n  Cache-Control: no-cache\n',
+  '/\n  Cache-Control: no-cache\n',
+  '/build.json\n  Cache-Control: no-cache\n',
+  '/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n',
+  '/vendor/leaflet-1.9.4/*\n  Cache-Control: public, max-age=31536000, immutable\n',
+  '/*\n  Referrer-Policy: strict-origin-when-cross-origin\n',
+].join('');
+
+test('[APP-SWITCH-OFF] with the switch off no Vite step runs, and the build is what it was before the app: the page, the worker, the headers, build.json', async () => {
+  const vite = vi.fn(() => Promise.resolve());
+  const out = join(tmpRoot, 'off');
+  await buildDist({ out, launch: false, vite });
+  expect(vite).not.toHaveBeenCalled();
+  expect(files(out)).toEqual(['_headers', 'build.json', 'index.html', 'offline-worker.js']);
+  // nothing of public/ beyond the page itself: no manifest, no icons, no fonts
+  expect(existsSync(join(out, 'manifest.webmanifest'))).toBe(false);
+  expect(existsSync(join(out, 'icons'))).toBe(false);
+  const page = readFileSync(join(REPO, 'public', 'tools', 'bags', 'index.html'));
+  expect(sha256(readFileSync(join(out, 'index.html')))).toBe(sha256(page));
+  expect(text(out, '_headers')).toBe(OFF_HEADERS);
+  // the precache list holds the page alone, so the build id depends on the page and nothing the app adds
+  const list = buildJson(out).files;
+  expect(Object.keys(list).sort()).toEqual(['/', '/offline-worker.js']);
+  expect(list['/']).toBe(sha256(page));
+  const buildId = sha256(JSON.stringify({ '/': sha256(page) })).slice(0, 12);
+  expect(text(out, 'offline-worker.js')).toContain(buildId);
+}, 60_000);
+
+test('[APP-SWITCH-OFF] the default build (no switch given) reads build.config.json, which says off', async () => {
+  const config = JSON.parse(readFileSync(join(REPO, 'build.config.json'), 'utf8')) as { launch: boolean };
+  expect(config.launch).toBe(false);
+  const vite = vi.fn(() => Promise.resolve());
+  const out = join(tmpRoot, 'default');
+  await buildDist({ out, vite });
+  expect(vite).not.toHaveBeenCalled();
+  expect(files(out)).toEqual(['_headers', 'build.json', 'index.html', 'offline-worker.js']);
+}, 60_000);
+
+let on = '';
+beforeAll(async () => {
+  on = join(tmpRoot, 'on');
+  await buildDist({ out: on, launch: true });
+}, 120_000);
+
+test('[APP-SWITCH-ON] with the switch on, / is the app shell, the bag planner stays at /tools/bags/, and the manifest and icons ship', () => {
+  const html = text(on, 'index.html');
+  expect(html).toContain('<div id="app">');
+  expect(html).toMatch(/<script type="module"[^>]*src="\/assets\/[^"]+\.js"/);
+  expect(html).toContain('rel="manifest" href="/manifest.webmanifest"');
+  expect(html).not.toContain('loadcheck-offline-shell'); // not Load Check's page
+  expect(existsSync(join(on, 'tools', 'bags', 'index.html'))).toBe(true);
+  expect(existsSync(join(on, 'manifest.webmanifest'))).toBe(true);
+  for (const icon of ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png']) expect(existsSync(join(on, 'icons', icon))).toBe(true);
+  // fonts are files the site serves itself, never from outside
+  expect(files(on).filter((f) => f.endsWith('.woff2')).length).toBeGreaterThanOrEqual(4);
+  expect(files(on).some((f) => f.endsWith('.woff'))).toBe(false);
+  expect(html + readdirSync(join(on, 'assets')).filter((f) => f.endsWith('.css')).map((f) => text(on, `assets/${f}`)).join('')).not.toMatch(/https?:\/\//);
+});
+
+test('[APP-SWITCH-ON] /offline-worker.js precaches every emitted file, under the address the host serves', () => {
+  const list = buildJson(on).files;
+  const worker = text(on, 'offline-worker.js');
+  const emitted = files(on).filter((f) => !['offline-worker.js', '_headers', 'build.json'].includes(f));
+  expect(emitted.length).toBeGreaterThan(8);
+  for (const file of emitted) {
+    const address = `/${file}`.replace(/\/index\.html$/, '/');
+    expect(list[address], address).toBe(sha256(readFileSync(join(on, file))));
+    expect(worker, address).toContain(`"${address}"`);
+  }
+  expect(list['/']).toBeDefined();
+  expect(list['/tools/bags/']).toBeDefined();
+  expect(list['/manifest.webmanifest']).toBeDefined();
+});
+
+test('[APP-NO-HOOK] a production build\'s JavaScript contains no __wf', () => {
+  const scripts = files(on).filter((f) => f.endsWith('.js') && !f.startsWith('tools/'));
+  expect(scripts.length).toBeGreaterThan(0);
+  for (const file of scripts) expect(text(on, file).includes('__wf'), file).toBe(false);
+});
+
+test('the first screen\'s JavaScript is measured, and sits far under the 150 KB budget', () => {
+  const figures = measure(on);
+  expect(figures.firstFiles.length).toBeGreaterThan(0);
+  expect(figures.firstJsGzip).toBeGreaterThan(1000);
+  expect(figures.firstJsGzip).toBeLessThan(150 * 1024);
+});
+
+test('the launch-on build is the same twice', async () => {
+  const again = join(tmpRoot, 'on-again');
+  await buildDist({ out: again, launch: true });
+  expect(files(again)).toEqual(files(on));
+  expect(text(again, 'build.json')).toBe(text(on, 'build.json'));
+}, 120_000);

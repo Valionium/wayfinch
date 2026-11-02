@@ -593,3 +593,235 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - A placement for a deleted custom item drops only itself (§12) [LC-STORE-10]
 - A full store on a draft with placements keeps the plan in memory and does not claim it saved (§12) [LC-STORE-11]
 - With no bags the placements are null and a round trip stays null (§12) [LC-STORE-12]
+
+## App budgets
+
+- Prepared 165 km fixture, flight mode: strip and all six cards shown ≤ 2,000 ms after a position fix (criterion 1) (§4.5) [PERF-OFFLINE-2S]
+- screen() ≤ 300 ms in the page on a 200 km route, with rain windows, wait or go, stop ideas, leave-by, rescue point (§4.5) [PERF-SCREEN]
+- Preparation of the 800 km fixture ≤ 20 s of processing, network excluded (§4.5) [PERF-PREP-800]
+- JavaScript before the first screen ≤ 150 KB gzipped, bike drawing included (§4.5) [PERF-JS-FIRST]
+- All lazy chunks together ≤ 200 KB gzipped; bag planner excluded (§4.5) [PERF-JS-LAZY]
+- One bike with bags drawn ≤ 20 ms (§4.5) [PERF-BIKE]
+- Heidelberg → Strasbourg places: ≤ 3 MB and ≤ 30 s on the stand-in's network, on a live pack, on the owner's Run workflow only, because a pull request must not depend on outside data; the fixture's size is checked on every pull request (§4.5) [PERF-PACK]
+- Boundary file ≤ 150 KB gzipped (§4.5) [PERF-BOUNDARY]
+
+## App: Vite, Preact and the switch
+
+- --launch=off runs no Vite step, and dist/ is byte-identical before and after this task's commit (compared with main's build.json) [APP-SWITCH-OFF]
+- --launch=on: / is the shell, opens to Trip with no trip, tabs Ahead, Trip, Tools, You with labels; /offline-worker.js precaches every emitted file [APP-SWITCH-ON]
+- every colour in theme.css is one of §3.6's tokens; :root and [data-theme] give both themes; contrast ≥ 4.5:1 for every text token pair, computed in the test [APP-TOKENS]
+- name and short name "Wayfinch", id and start_url /, scope /, standalone, en; icons 192, 512 and maskable; shortcuts /tools/bags/, /#/tools/tyre; description contains "trip planning, not health advice" [APP-MANIFEST]
+- a file under src/ui/ahead/ importing src/store or calling fetch fails lint (fixture run of ESLint) [APP-AHEAD-LINT]
+- a production build's JS contains no __wf [APP-NO-HOOK]
+- the shell registers /offline-worker.js with { scope: '/', updateViaCache: 'none' } and no module type, once, after its first render; no second registration [APP-REGISTER]
+- a waiting worker shows "Update ready — apply now"; the tap saves first, sends WF_APPLY, and reloads only on controllerchange; update checks at launch and on return to the foreground, at most hourly; the page never reloads by itself [APP-UPDATE-PROMPT]
+
+## App: Shared UI pieces
+
+- each of fine, action, warning, unknown renders its word, not only its colour [APP-STATUS-WORDS]
+- §8's table rows reachable without a trip render their exact text: no route, storage blocked (stubbed), no signal with no trip [APP-DEGRADED]
+
+## App: The database and trip
+
+- every store exists at v1; a generated Trip round-trips with all fields [ST-SCHEMA]
+- a fixture v2 only adds stores, and opening v1 data keeps everything [ST-ADD-ONLY]
+- opening a database at v3 with a v2 build reopens without a version, reads what it knows and doesn't crash (§4.4) [ST-VERSIONERROR]
+- replaceRoute removes matches, places, roofs, rescue points, hours, forecast, baseline, positions, day starts, route-end date, water left, saved tiles, in one transaction; a failure keeps all of the old [ST-REPLACE]
+- flatKph 14.9, 40.1, 0, NaN → rejected with the range named, last good kept; 15 and 40 accepted. screen() never receives a bad speed through the store [ST-SETTINGS-RANGE]
+- ScreenInputs.settings.campWaterL always equals trip.campWaterL; changing stay to accommodation gives 0 by default, an edit afterwards stays [ST-CAMP-ONE]
+- source check: src/store and src/data hold no setItem('loadcheck:, nor localStorage.clear [ST-NO-LOADCHECK]
+
+## App: Positions, day starts, water
+
+- a position older than 48 h at now isn't in readInputs; the latest accepted one under 48 h always is; check-ins of current and previous riding day only [ST-RETENTION]
+- after keepAfterScreen with keepDayStart: { day, km }, readInputs().dayStarts holds it; only current and previous riding days are kept; a provisional result (null) saves nothing; a later screen() gives the same dayStartKm when the position has moved on [ST-KEEP-DAYSTART]
+- route-end date saved once and kept until the trip is replaced [ST-ROUTE-END]
+- confirmed at 14:00; a new position at 14:10 stays confirmed: true; at 14:16 confirmed: false, same litres and at, and the Water card's status then is not fine (property with screen()) [ST-WATER-FLIP]
+- confirmWater with 0 is a real value, not "none"; quick choices and custom 0–20 L accepted [ST-WATER-CONFIRM]
+- set, read, back to today round-trips; a stored date of another riding date has no effect (from the engines' rule) [ST-PLAN-TOMORROW]
+
+## App: Two windows, export, delete groundwork
+
+- Playwright, two pages: a write in one re-reads that section in the other within 1 s, via the storage event [ST-TWO-WINDOWS]
+- a window with older data writing a section leaves the newer data and tells the caller [ST-NO-OVERWRITE]
+- export then import on empty storage is byte-identical in its sections; a bad version or shape writes nothing and says why; no forbidden field in a generated export [ST-EXPORT]
+- delete removes every copilot:* key and the database, and no loadcheck:* key; a loadcheck:* plan stays byte-identical [ST-DELETE]
+
+## App: Pack download
+
+- reads /packs/current.json, then only that build's manifest and tiles; only tile numbers leave the phone (the request list contains no route coordinate) [PREP-ENTRY]
+- a tile with a wrong hash is bad-hash in failed, not saved; the others stay [PREP-VERIFY]
+- current.json changing mid-download changes nothing: the run stays on its build [PREP-SAME-BUILD]
+- a place in two tiles is saved once (by id) [PREP-DEDUP]
+- savedKm covers exactly the kilometres whose corridor tiles were all saved; one failed tile leaves its stretch out, so answers there read "no place data" [PREP-KM]
+
+## App: Saving places
+
+- an abort mid-batch leaves neither its places nor its savedTiles rows [PREP-TRANSACTION]
+
+## App: The bundled boundary file
+
+- the file's source names Natural Earth (public domain) and "© OpenStreetMap contributors" for the local zones, and THIRD_PARTY and the licences page do too [BND-LICENCE]
+- Heidelberg → DE, DE-BW; Strasbourg → FR, FR-67; Augsburg centre → DE-BY-Augsburg; Munich → DE-BY; Metz → FR-57; Paris → FR; Innsbruck → AT; Basel → CH; Warsaw → PL; Copenhagen → DK; every first-release zone is Europe/… and known to Intl [BND-POINTS]
+- all keys in the file exist in pipeline/config.ts's values, and holidaysFor gives dates for each [BND-LOCAL]
+- Heidelberg → Strasbourg fixture has one country change, within 3 km of the Rhine crossing; a route exactly along a border doesn't produce a span under 100 m; property: spans cover the route with no gap or overlap [BND-BORDER]
+- One-off proof, by the agent in this task, from a live pack: 5,000 sampled places, zoneAt against the place's own country: ≥ 99% agree, and every disagreement within 3 km of a border. Reported to the owner; not a pull-request test because it needs live data [BND-AGREE]
+- a point in Italy → null; routeZones gives XX; screen() still shows 112 and the fallback line [BND-OUTSIDE]
+
+## App: Get ready's steps
+
+- order heights → places → hours → weather → baseline → save; with weather failing, places and hours are saved and reported ok, weather's note is named; the trip is marked prepared either way, and Water's missing names what's absent [PREP-STEPS]
+- a route missing heights: the notice is given first, heights looked up, and stages, grid and baseline points fixed only after; failing: stages split by distance, climbing unknown, no climb points; route.hash set when final [PREP-HEIGHTS]
+- spans cover the trip window with no holes, cached per (tag, holidayZone, timeZone, rule class) so one tag on many places runs once (spy); no call of opening_hours from screen() [PREP-HOURS]
+- a place with opening_hours:kitchen has spans under kitchenHoursId(id); Food uses them for a meal stop (via screen()) [PREP-KITCHEN]
+- rescue points carry kms, within 3 km of the route; roofs and places as §4.5, one match per pass [PREP-MATCHES]
+- routeZones and holidays saved; readInputs gives them; the holiday date set covers every zone on the route, for the trip's window [PREP-ZONES]
+- abort after half: rerun fetches only missing tiles, on the same build while its address answers; a build gone (404) restarts on the new one and says so [PREP-RESUME]
+- QuotaExceededError on save: report "Storage full" with what was saved; the session keeps working; no half-written batch reads as complete [PREP-QUOTA]
+- Wake Lock requested when available, released after; no error when missing [PREP-AWAKE]
+- navigator.storage.persist() requested after a successful download; the answer stored [PREP-PERSIST]
+- a trip past the hours window: answers read "hours unknown — update"; spans are recomputed in requestIdleCallback, offline too, after answers show (§4.5) [PREP-IDLE-SPANS]
+
+## App: The requests
+
+- request has exactly the nine hourly variables of §6.6, wind_speed_unit=ms, timeformat=unixtime, timezone=auto, forecast days = min(16, days to the end + 1), coordinates rounded to 0.01–0.02° as sampleGrid fixes them [WXR-GRID]
+- two fetches on a day at different kilometres send byte-identical URLs (criterion 9) [WXR-SAME]
+- with15: false has no minutely_15 and has15 false; with15: true adds 192 steps; weatherMode: 'tap' passes false [WXR-HOURLY-ONLY]
+- stored as the types say: 3.0 mm at 80% stamped 15:00 reads "from about 14:00" through screen() [WXR-STAMPS]
+- five years, stage ends and the high point, rounded; Baseline fields as types.ts [WXR-BASELINE]
+- sends 3 decimals, ≤ 100 per request; a failed batch leaves nulls, not zeros [WXR-ELEVATION]
+- 429, 500 or a bad body: stored forecast kept, its age shown, §8's sentence "The weather service didn't answer. Forecast fetched 07:10." [WXR-REFUSED]
+
+## App: The refresh modes
+
+- mode: 'tap', open and foreground: fetch false and **no metadata request**, counted by a stub; default build.config.json is tap [WXR-TAP-NO-AUTO]
+- in tap, "Keep trip data fresh when online" isn't on Trip or You [WXR-TAP-HIDDEN]
+- auto: fetch when a model that matters has a run ≥ 3 h newer and available ≥ 10 min; 9 min no; 2 h 59 min no; automatic fetches ≥ 3 h apart however many models; a failed check fetches when the forecast is over 3 h old; keepFresh false: nothing [WXR-AUTO-RULES]
+- both modes: a newer run ≥ 10 min available fetches; else says "You have the newest forecast (model run 10:00). Next run expected about 14:30."; failed check with last fetch ≥ 30 min old fetches; no signal: "No signal. Forecast fetched 07:10." [WXR-UPDATE-TAP]
+- whatever triggers it: 29 min 59 s after a fetch, no fetch [WXR-SPACING]
+- basis line "Open-Meteo forecast fetched 11:20 · model run 10:00", in the place's zone, oldest latest run among those that matter [WXR-BASIS]
+- changing only weatherMode in build.config.json turns automatic on: the test builds with each value and checks the bundled constant [WXR-MODE-ONE-LINE]
+
+## App: Refresh this stretch
+
+- nothing is sent before the rider's yes to the notice [RFS-NOTICE]
+- stretch ≤ 50 km, line simplified at 100 m, 4 decimals; one request at a time; a 429 waits ≥ 30 s; server errors back off and halve the stretch; a "runtime error" in a 200 answer is a failure [RFS-LIMITS]
+- classification output equals the pipeline's on the same tags (classify.ts is the one code path) [RFS-SHARED]
+- the stretch and date stored; savedKm grows; hours worked out on the phone [RFS-RECORD]
+
+## App: Add a route and the summary
+
+- the 165 km fixture as a file: distance, climbing, profile, daily stages shown; same figures as planStages [TRIP-GPX]
+- each GpxError reason: its own plain message; the old route stays [TRIP-GPX-BAD]
+- a second route asks first; Cancel keeps everything [TRIP-REPLACE-ASKS]
+- §3.3's example form; heights looked up credited to Copernicus [TRIP-SUMMARY]
+- with no running trip, Trip opens first and the bike is the first thing, ≤ 120 px tall; with a running trip, Ahead (§3.1's rules, month-only counts as running) [TRIP-FIRST]
+- the day before departure: "Day 1 · 78 km · leave by about 13:45"-form, the same time as the Daylight card [TRIP-DAY1-LEAVEBY]
+
+## App: Settings and Get ready
+
+- §3.3's table: defaults (08:30, Sporting, Camping, 2.0 L camp water; 0 for accommodation), ranges refuse with the range named. Month without a date: Ahead says why [TRIP-SETTINGS]
+- progress per step; "1,214 places, weather to Friday, updated 2 h ago", storage used, Update; a failed step shows what's missing and a retry; nothing is hidden or disabled [TRIP-GETREADY]
+- no string on Trip says the trip is ready, safe or complete; "Get ready offline" is the only use of the word (banned list extended for these strings) [TRIP-NOT-READY-WORD]
+- iPhone user agent in a browser tab: before the first download, the ask to add to the home screen and download inside it. Not a block when the page can't tell [TRIP-IPHONE]
+- Android's beforeinstallprompt gives an Install button; none without it [TRIP-INSTALL]
+- Licences reachable; "© OpenStreetMap contributors" with the pack date on Trip's summary [TRIP-ATTRIBUTION]
+
+## App: Plan from A to B
+
+- tries FOSSGIS OSRM bike, Valhalla bicycle, BRouter trekking only, and only the routers Task 21's policy check passes [AB-ROUTERS]
+- no car, foot or synthetic route accepted; source checked [AB-NO-CAR]
+- no thinning; passes through the same buildRoute [AB-FULL-GEOMETRY]
+- only the search text is sent; fallback both ways [AB-SEARCH]
+- no bike router answers: asks for a GPX [AB-NONE]
+
+## App: Position
+
+- no geolocation call without a tap, at start-up or on tab changes (spy in an init script) [AH-NO-AUTO-POS]
+- stops at ≤ 50 m; at 45 s keeps the best; accuracy is always on the position line [AH-ROUTINE]
+- accuracy worse than about 1 km: the explanation of how to allow precise location; > 500 m is marked approximate [AH-APPROX-HELP]
+- denied or failing watchPosition (init script): manual picker by strip, kilometre or town works [AH-MANUAL]
+- only the button and the picker. No answers until a position exists, while screen()'s before-trip answers appear once a day-1 plan applies [AH-FIRST-USE]
+- "Add a route to see what's ahead"; no Try the demo [AH-NO-ROUTE]
+- reopened later: answers from the last position, "as of 14:20, 40 min ago", prominent Update position [AH-RETURN]
+
+## App: Strip, cards, chips, Emergency
+
+- the page shows exactly Screen's strings, in the order of §3.2, on the 165 km rainy fixture; a test walks Screen and finds each in the DOM [AH-TEXTS]
+- bands solid, hatched and red with a mark, not only colour; icons at their km; tapping one opens its card; bike marker at the left, facing travel, ≤ 24 px tall [AH-STRIP]
+- Water, Food, Daylight, Weather, Climbing, Sleep, always; each shows its status in words and its stamp [AH-CARD-ORDER]
+- a tap expands that card's items; Weather's order per §3.2; "Raining anyway? Shelter" opens the chip [AH-EXPAND]
+- "How much water do you have?" with 0, 0.25, 0.5, 0.75, 1, 1.5, 2, 3 L, custom; "Still about 0.6 L?" one tap; unconfirmed reads unknown [AH-WATER-Q]
+- Call → tel:, Website → http(s): only; no network request from showing them (log check); a "No phone or website mapped" row where absent [AH-CALL]
+- Share progress: editable preview of shareText, the map-link choice switches to shareMapText and is kept in copilot:share-progress; no share sheet: SMS and Copy; nothing sent by the app (log) [AH-SHARE]
+- in every state, no position included: 112, the fallback line, coordinates when there are any; opening it sends nothing; reachable offline [AH-EMERGENCY]
+- Update weather runs refreshWeather('tap'); messages as Task 11; offline message [AH-WEATHER-UPDATE]
+- the button appears when offersPlanTomorrow, and Back to today undoes it [AH-PLAN-TOMORROW]
+- a stored flatKph out of range (old data): every affected card reads "can't be worked out", no thrown error, Emergency stands; shell shows the settings link [AH-BAD-SPEED]
+- data 3 days old with a fixed clock: stale label, age true, no wait-or-go, positions gone per ST-RETENTION [APP-OLD-OPEN]
+
+## App: Simulator screens in the browser
+
+- 50 fixed seeds: page text equals Screen's; at 360 and 1280 px no element wider than the screen and each card title fully visible; automated accessibility checks pass [AH-SIM-SCREENS]
+
+## App: The module
+
+- "40-622" → 622/40; "700 × 40C", "700x40c" → 622/40; "650B × 47" → 584/47; "650C × 23" → 571/23; "29 × 2.2" → 622/55.88; "27.5 × 2.4" → 584/60.96; "26 × 1.75" → 559/44.45; else null [BK-TYRES]
+- no bike, no plan: gravel, 700c × 40 mm, diamond sloping, M. Each row of §7.4's table falls through in order, with the right mark [BK-SPEC]
+- the seven rules in order: full suspension → mtb; trapeze → trekking; 90 mm → fat; 55 mm → mtb; 32 mm on 622 → road; panniers → touring; else gravel; defaults table for each [BK-TYPE]
+- every style, size, bag and bottle in the drawing set: anchors exist where the frame takes them, no overlap between tap targets (§14), the backpack off the bike; a step-through has no top tube, a trapeze a low one, a mixte twin tubes, full suspension a shock [BK-ART-ANCHORS]
+- outer wheel diameter = rim + 2 × tyre; nothing outside the viewBox for any generated spec [BK-FIT-BOX]
+- colour only on frame and fork, as stroke="#rrggbb", over a casing 1.5 units wider in muted; bags' fill ramp unaffected by the frame colour; no colour → line [BK-COLOUR-CASING]
+- "Your bike: touring bike, 700 × 40 mm tyres, drop bars, green frame, rear rack." and each part's absence [BK-LABEL]
+- "Drawn from your sloping frame (M), 40-622 tyres and panniers · Make it yours"; with no bike "A typical gravel bike · Add your bike"; "your frame" never for a template; the co-pilot's banned-words test covers captions, and none reads as a fault [BK-CAPTION]
+- 16 with §7.4's hex values and names; contrast with the casing in both themes checked in the test, and changed only with the owner if it fails, since they're "starting values" [BK-SWATCHES]
+- the sample with every field, none, invalid values; invalid drops only itself. DF-02's comparison with the page's own function is in sub-project 6's Task 2 [BK-NORMALISE]
+
+## App: The bike on Trip, Tools, You and the strip
+
+- a change in loadcheck:bikeProfile from another window redraws within one frame; tapping the drawing goes straight to Look; colour eases only with motion allowed [BK-TAP-INSTANT]
+- every screen renders with no bike, no plan, broken bike data; no error, a typical bike, friendly caption [BK-NOTHING-REQUIRED]
+- §3.7's table: Trip top with bags and caption; Tools card with bags and "3 bags · 10.2 kg"; You small drawing, no bags, plan's bike first, marked "in your plan" or "in your plan, not saved"; Ahead marker only [BK-WHERE]
+- marker in the rider's colour, decorative (aria-hidden), the strip carries the label; opens nothing [BK-MARKER]
+- Make it yours and Edit build the exact fragments; back ∈ trip, tools, you, tyre [BK-DEEPLINK]
+- bags drawn only when the summary's bikeId matches the bike, both null counting [BK-MATCH-BAGS]
+- drawing sends nothing (network log) [BK-NO-REQUEST]
+
+## App: You and the legal pages
+
+- weight, flat speed, thirst, e-bike, units saved; empty is allowed everywhere [YOU-RIDER]
+- with a summary, bottle capacity shown beside the field [YOU-CAPACITY]
+- export downloads a file; import shows what arrives; a bad file writes nothing; afterwards Trip asks for Get ready on a new route [YOU-EXPORT-UI]
+- asks first naming what goes; "Also delete bag planner data" stores copilot:delete-request:v1 and opens /tools/bags/#copilot-delete=<id>; until applied, "Bag planner data will be deleted the next time it opens" [YOU-DELETE-UI]
+- the post-ride question; calibration status shown; drinkingAdvice and overDrinking reach the screen [YOU-WATER-LEARN]
+- imprint, privacy and licences within two taps from every tab [PRIV-LEGAL-REACH]
+- all open in flight mode [PRIV-LEGAL-OFFLINE]
+- hash of the imprint's text equals the hash of the page's block; nothing printed [PRIV-IMPRINT-SAME]
+- every outside host in src/data appears in the privacy notice (source scan against the notice's text) [PRIV-RECIPIENTS]
+- every dependencies entry, bundled font and data source is on the Licences page and in THIRD_PARTY; opening_hours with LGPL-3.0-only, its holiday data ODbL, and a link to its exact source at the pinned version; the MIT note; Open-Meteo CC BY 4.0; Copernicus; OSM with links to the packs and build code [PRIV-LICENCES-ALL]
+- network log, one test each: Call and Website shown, writing the message, opening Emergency, wait or go and leave-by. Opening without a prepared trip contacts only the app's own hosting [PRIV-NOTHING-SENT]
+- built HTML, CSS and JS reference no outside code or font [PRIV-NO-OUTSIDE]
+
+## App: The rail, panes, keys and drop
+
+- at 360 × 640, screenshots equal those before this task [WIDE-UNDER-600]
+- 600–839 px one column up to 640 px and the bottom bar; from 840 px a labelled rail and two panes [WIDE-RAIL]
+- §3.8's table: Ahead main position, strip, chips; supporting six cards in order. Trip, Tools, You as listed [WIDE-PANES]
+- DOM order equals visual order in each pane [WIDE-ORDER]
+- at 1280 × 720, position line, strip and Water card show without scrolling [WIDE-FOLD]
+- arrows move along the strip, Enter sets a manual position, Esc collapses a card [WIDE-KEYS]
+- focus always visible; never under the rail or a sticky bar; every drag has a click or key way; mouse-and-keyboard only passes the phone's flows [WIDE-FOCUS]
+- GPX anywhere on Trip, export file on You; pickers stay [WIDE-DROP]
+- a stray drop is cancelled at window level: no navigation or download [WIDE-STRAY]
+- 1280 px at 400% (320 CSS px) works, no horizontal scroll [WIDE-ZOOM]
+- in the rail layout, Ahead opens with the picker open and no position request; Update position says "On a computer, this is usually approximate." [WIDE-COMPUTER-POS]
+- desktop Firefox at 1280 × 720 passes these [WIDE-FIREFOX]
+
+## App: Budgets and flight mode
+
+- fresh context: load, GPX, Get ready (stub network), reload offline: Ahead with six cards; each answer states basis and age; /tools/bags/ page (or its placeholder until sub-project 6) offline [FLOW-FLIGHT]
+- hourly and 15-minute rainy fixtures, 165 and 800 km (criterion 9): covers 15–60 min before m, thunderstorm plans list no roof; two refreshes send byte-identical requests [FLOW-RAIN]
+- standalone display mode: all tabs work offline, Back and links stay in the app [FLOW-INSTALL-OFFLINE]
+- automated checks pass on every screen, both themes [FLOW-AXE]
+- touch targets ≥ 44 px on every control; every control labelled [FLOW-CONTRAST]
+- opening_hours isn't loaded on the first screen; it's precached [FLOW-CHUNKS]
