@@ -52,6 +52,22 @@ export function openOver(h: PlaceHours | undefined, from: Date, to: Date): boole
 
 const after = (t: Date, minutes: number): Date => new Date(t.getTime() + minutes * MIN);
 
+/** The stretches a place is 'open', merged and in order. For limits worked out on whole stretches (section 6.12). */
+export function openRuns(h: PlaceHours | undefined): { from: Date; to: Date }[] {
+  if (!h) return [];
+  const out: { from: Date; to: Date }[] = [];
+  for (const s of h.spans) {
+    if (s.state !== 'open' || !(s.from.getTime() < s.to.getTime())) continue;
+    const last = out[out.length - 1];
+    if (last && last.to.getTime() === s.from.getTime()) last.to = s.to;
+    else out.push({ from: s.from, to: s.to });
+  }
+  return out;
+}
+
+/** Where `opening_hours:kitchen` is mapped, its prepared spans sit in the same list under this id (section 6.11). */
+export const kitchenHoursId = (placeId: string): string => `${placeId}:kitchen`;
+
 /** Section 6.4: open at the arrival itself. */
 export const openAtArrival = (h: PlaceHours | undefined, t: Date): boolean => stateAt(h, t).state === 'open';
 

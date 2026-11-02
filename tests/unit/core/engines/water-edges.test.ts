@@ -7,7 +7,7 @@ import { updateCarrying, updateDrinking, type Ride } from '../../../../src/core/
 import { planningWeather } from '../../../../src/core/engines/water-model.ts';
 import { isPublicHoliday } from '../../../../src/core/hours/check.ts';
 import type { Answer, Baseline, GridHour, Place, Route, StoredForecast } from '../../../../src/core/types.ts';
-import { at, flatRoute, pos, shop, tap, testTrip } from '../../../fixtures/build.ts';
+import { at, cafe, flatRoute, pos, shop, tap, testTrip } from '../../../fixtures/build.ts';
 import { factsOf, hoursOf, SAT, steady, type Case, type Spot } from './water-helpers.ts';
 
 const textOf = (a: Answer): string => [a.title, a.detail, ...a.basis, ...a.items.flatMap((i) => [i.label, i.detail ?? ''])].join(' | ');
@@ -299,4 +299,23 @@ test('[W-WINTER] hours, too, are read at the arrival on the real sun function wi
   const p: Place = shop('x').atKm(30);
   const f = factsOf({ spots: [{ b: shop('x'), km: 30 }], hours: [hoursOf(p, [{ from: '08:00', to: '20:00' }])] });
   expect(waterAnswer({ ...f, sun: sunFromSuncalc }).topic).toBe('water');
+});
+
+describe('a place passed twice', () => {
+  const both = (): ReturnType<typeof factsOf> => factsOf({ trip: testTrip({ route: flatRoute(300, { stageEnds: [150, 300] }) }), spots: [{ b: tap(), km: [10, 60] }] });
+  test('[W-SOURCE-OUTDOOR] S1 and S2 are its two passes, each with its own arrival', () => {
+    const f = both();
+    const { s1, s2 } = findS1S2(f);
+    expect(s1.km).toBe(10);
+    expect(s2.km).toBe(60);
+    if (s1.kind !== 'place' || s2.kind !== 'place') throw new Error('places expected');
+    expect(s1.arrival.getTime()).toBe(f.schedule.atPlace(s1.match).getTime());
+    expect(s2.arrival.getTime()).toBe(f.schedule.atPlace(s2.match).getTime());
+  });
+  test('[W-SOURCE-OUTDOOR] a pass with hours is judged at its own arrival: closed on the first, open on the second', () => {
+    const b = cafe('x');
+    const p = b.atKm(10, { id: 'n1' });
+    const f = factsOf({ trip: testTrip({ route: flatRoute(300, { stageEnds: [150, 300] }) }), spots: [{ b, km: [5, 60], id: 'n1' }], hours: [hoursOf(p, [{ from: '10:00', to: '20:00' }])] });
+    expect(findS1S2(f).s1.km).toBe(60);
+  });
 });

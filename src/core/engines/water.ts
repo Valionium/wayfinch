@@ -116,7 +116,7 @@ function outdoorA(place: Place, match: RouteMatch, arrival: Date, f: WaterFacts)
   return openWaterWindow(hoursOf(place, f), arrival) ? RELIABLE : uncertain(W.waterMaybeOffForWinter);
 }
 
-const hasFuelShop = (place: Place): boolean => {
+export const hasFuelShop = (place: Place): boolean => {
   const shop = place.tags['shop'];
   return shop !== undefined && shop !== 'no' && place.tags['automated'] !== 'yes';
 };

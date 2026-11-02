@@ -109,6 +109,9 @@ export function updateDrinking(rides: Ride[], now: Date): number {
 
 const HEAT_FROM_C = 25;
 const HEAT_OVER_MIN = 90;
+
+/** Section 6.3's heat: any planning temperature at or over 25 °C on a ride over 90 minutes. */
+export const heatRule = (maxPlanT: number, rideMin: number): boolean => maxPlanT >= HEAT_FROM_C && rideMin > HEAT_OVER_MIN;
 const PROMPT_UNCALIBRATED = 1.0;
 const PROMPT_ANYONE = 1.42;
 const DAY_FLAG_L = 11.4;
@@ -121,7 +124,7 @@ const COLD_BELOW_C = 5;
 export function drinkingAdvice(o: { kDrink: number; srModel: number; rideMin: number; maxPlanT: number; calibrated: boolean; ebike: boolean; minPlanT: number }):
   { promptLPerH: number | null; dayFlag: boolean; lines: string[] } {
   const plan = o.kDrink * o.srModel;
-  const heat = o.maxPlanT >= HEAT_FROM_C && o.rideMin > HEAT_OVER_MIN;
+  const heat = heatRule(o.maxPlanT, o.rideMin);
   const scheduled = heat && !o.ebike && Number.isFinite(plan) && plan > 0;
   const promptLPerH = scheduled ? Math.min(plan, o.calibrated ? PROMPT_ANYONE : PROMPT_UNCALIBRATED) : null;
   const dayFlag = !(plan * (o.rideMin / 60) <= DAY_FLAG_L);

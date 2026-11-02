@@ -47,6 +47,12 @@ function indoorKind(p: Place): 'seated' | 'indoor' | 'seat-only' | null {
   }
 }
 
+/** A class-1 kind: a place to sit, whatever its hours. */
+export const seatedKind = (p: Place): boolean => {
+  const kind = indoorKind(p);
+  return kind !== null && !seatsNo(p) && (kind === 'seated' || seatsYes(p));
+};
+
 const SHELTER_CLASS = new Map<string, (p: Place) => 3 | 4 | 5>([
   ['lean_to', () => 3],
   ['basic_hut', () => 3],
@@ -149,7 +155,7 @@ export function hoursNotWorkedOut(s: Spot, arrival: Date, hoursOf: (id: string) 
 }
 
 /** Whether the saved place data covers the stretch from `fromKm` to `toKm`. Broken ranges count for nothing. */
-export function savedCovers(f: StopFacts, fromKm: Km, toKm: Km): boolean {
+export function savedCovers(f: Pick<StopFacts, 'savedKm'>, fromKm: Km, toKm: Km): boolean {
   const ranges = f.savedKm.filter((r) => r.fromKm <= r.toKm).sort((a, b) => a.fromKm - b.fromKm);
   let reached = fromKm;
   let touched = false;
@@ -216,7 +222,7 @@ export function shortMapDate(iso: string | null | undefined): string | null {
 }
 
 /** The newest date of the map data, for a roof: roofs carry none of their own. */
-export const newestMapDate = (f: StopFacts): string | null =>
+export const newestMapDate = (f: Pick<StopFacts, 'places'>): string | null =>
   f.places.reduce<string | null>((max, p) => (shortMapDate(p.dataDate) && (max === null || p.dataDate > max) ? p.dataDate : max), null);
 
 const kmOff = (s: Spot): string => {

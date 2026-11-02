@@ -5,7 +5,8 @@ import { effortProfile, LOAD_PENALTY } from '../route/stages.ts';
 import type { Km, Position, Route, RouteMatch, Stage, Trip, ZoneLookup } from '../types.ts';
 import { rejoinKm } from './locate.ts';
 
-const BREAKS = 1.15;
+/** The share of clock time to riding time: 15% of breaks, spread evenly. */
+export const BREAKS = 1.15;
 const R_MIN = 0.85;
 const R_MAX = 1.5;
 const CHECK_IN_ACCURACY_M = 100;
