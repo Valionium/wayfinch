@@ -20,7 +20,7 @@ const validDate = (d: Date): boolean => Number.isFinite(d.getTime());
 const toSecond = (d: Date): number => Math.floor(d.getTime() / 1000);
 
 /** Class, then latest arrival (arrivals in one second tie: the rest is rounding), then shorter detour, then the final tie-break. */
-const planOrder = (a: Found, b: Found): number =>
+export const planOrder = (a: Found, b: Found): number =>
   a.cover.coverClass - b.cover.coverClass
   || toSecond(b.cover.arrival) - toSecond(a.cover.arrival)
   || a.cover.offRouteM - b.cover.offRouteM

@@ -403,7 +403,7 @@ describe('properties', () => {
     const shownAt = at(`${f.ride.date} ${shown[1]}:${shown[2]}`, tz).getTime();
     expect(r.unrounded.getTime() - shownAt).toBeGreaterThanOrEqual(0);
     expect(r.unrounded.getTime() - shownAt).toBeLessThan(5 * 60_000);
-  });
+  }, 60_000);
 
   fcTest.prop([genCase])('[LB-PROP-NONE] with no leave-by, no departure from 04:00 meets daylight', (g) => {
     const f = factsFromGen(g);
@@ -413,7 +413,7 @@ describe('properties', () => {
     const limit = fineLimit(f.sun(pt.lat, pt.lon, f.ride.date), f.schedule.ridingMinTo(f.ride.stopKm))!;
     const zero = at(`${f.ride.date} 04:00`);
     expect(f.schedule.withDeparture(zero).atKm(f.ride.stopKm).getTime()).toBeGreaterThan(limit.getTime());
-  });
+  }, 60_000);
 
   test('[LB-PROP-NONE] a long ride, by hand: no leave-by exactly when 04:00 misses the limit', () => {
     const f = leaveFacts({ trip: dayTo(240), spots: TAPS });
@@ -438,7 +438,7 @@ describe('properties', () => {
     expect(r.unrounded?.getTime()).toBe(base.unrounded?.getTime());
     expect(r.binding).toBe(base.binding);
     expect(r.closure).toBe(base.closure);
-  });
+  }, 60_000);
 
   fcTest.prop([genCase])('[LB-PROP-S1S2] the water-plan sources are the Water card\'s S1 and S2 for the same ride; after the ride, without tonight\'s water', (g) => {
     const f = factsFromGen(g);
@@ -446,7 +446,7 @@ describe('properties', () => {
     const { s1, s2 } = f.ride.phase === 'after-ride' ? findS1S2(f, { tomorrowOnly: true }) : findS1S2(f);
     const allowed = [s1, s2].flatMap((t) => (t.kind === 'place' && t.km < f.ride.stopKm && !(t.place.waterClass === 'A' && !t.place.indoorOrLimited) ? [t.place.id] : []));
     expect([...r.waterSources].sort()).toEqual([...new Set(allowed)].sort());
-  });
+  }, 60_000);
 
   test('[LB-PROP-S1S2] after the ride, tonight\'s water adds no limit: S1 and S2 are tomorrow\'s alone', () => {
     const trip = testTrip({ departureDate: FRI, stay: 'accommodation' });

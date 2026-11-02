@@ -47,6 +47,12 @@ function indoorKind(p: Place): 'seated' | 'indoor' | 'seat-only' | null {
   }
 }
 
+/** A class-1 kind: a place to sit, whatever its hours. */
+export const seatedKind = (p: Place): boolean => {
+  const kind = indoorKind(p);
+  return kind !== null && !seatsNo(p) && (kind === 'seated' || seatsYes(p));
+};
+
 const SHELTER_CLASS = new Map<string, (p: Place) => 3 | 4 | 5>([
   ['lean_to', () => 3],
   ['basic_hut', () => 3],

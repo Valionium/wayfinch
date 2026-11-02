@@ -154,8 +154,7 @@ function through(p: Plan, stops: RouteMatch[]): Schedule {
 
 /** The arrival at a place on a schedule. One past the day's stop is reached riding on from it, that evening (section 6.2a). */
 function arrivalOn(p: Plan, s: Schedule, m: RouteMatch): Date {
-  if (m.km <= p.stop) return s.atPlace(m);
-  return new Date(s.ridingOnAt(m.km).getTime() + flatLegClockMin(rejoinKm(m.offRouteM), p.f.trip.flatKph, s.r) * MIN);
+  return arrivalRidingOn(s, p.stop, p.f.trip.flatKph, m);
 }
 
 const offsetOf = (p: Plan, s: Schedule, m: RouteMatch): number => arrivalOn(p, s, m).getTime() - p.s.departure.getTime();
@@ -194,6 +193,12 @@ function bestWith(p: Plan, keep: Keep): { d: number; food: Source | null } | nul
 }
 
 const openRunsOf = (h: PlaceHours | undefined): Span[] => openRuns(h).map((r) => [r.from.getTime(), r.to.getTime()]);
+
+/** The arrival at a place on the day's ride, or riding on from its stop: what every card says for that place. */
+export function arrivalRidingOn(s: Schedule, stop: Km, flatKph: number, m: RouteMatch): Date {
+  if (m.km <= stop) return s.atPlace(m);
+  return new Date(s.ridingOnAt(m.km).getTime() + flatLegClockMin(rejoinKm(m.offRouteM), flatKph, s.r) * MIN);
+}
 
 /** The closing of the open stretch holding an arrival, on the place's clock. */
 const closesAt = (src: Source, arrival: number): number | null => src.runs.find(([a, b]) => arrival >= a && arrival < b)?.[1] ?? null;
