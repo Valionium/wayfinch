@@ -348,7 +348,7 @@ export function bufferOfSections(list: Section[], bodyKg: number, factor: number
 }
 
 /** 1.0 L if any section reaches 30 °C planning or the stretch has over 2 h between settlements, else 0.5 L. A broken temperature reads as hot. */
-export const reserveOfSections = (list: Section[], longGap: boolean): 0.5 | 1.0 => (longGap || list.some((s) => !(s.planT < 30)) ? 1.0 : 0.5);
+export const reserveOfSections = (list: Section[], longGap: boolean): 0.5 | 1.0 => (longGap || list.some((s) => !(s.planT < 30)) ? 0.1 : 0.5);
 
 const TWO_HOURS_MIN = 120 + 1e-6; // exactly 2 h stays 0.5 L, whatever floating point makes of the sum
 
