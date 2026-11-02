@@ -65,7 +65,20 @@ export function updateCarrying(prior: { thirst: Profile['thirst'] }, rides: Ride
   const priorLn = Math.log(prior.thirst === 'more' ? 1.2 : 1.0);
   let lnK = priorLn;
   const seen: Seen[] = [];
+  let lastT: number | null = null;
+  /**
+   * As weights fade, a k below the prior closes the same share of its gap as the mean does. A k above the prior stays:
+   * time is no evidence that a rider sweats less, and U already rises. The careful side, where section 6.3 is silent.
+   */
+  const fadeTo = (t: number): void => {
+    if (lastT === null || t <= lastT || lnK >= priorLn) return;
+    const before = meanLn(seen, priorLn, lastT);
+    const moved = meanLn(seen, priorLn, t) - before;
+    if (before < priorLn && moved > 0) lnK += (moved / (priorLn - before)) * (priorLn - lnK);
+    lastT = t;
+  };
   for (const ride of inOrder(rides)) {
+    fadeTo(ride.at.getTime());
     const o = observation(ride, Math.exp(lnK));
     if (!o) continue;
     const t = ride.at.getTime();
@@ -73,7 +86,9 @@ export function updateCarrying(prior: { thirst: Profile['thirst'] }, rides: Ride
     let step = meanLn(seen, priorLn, t) - lnK;
     if (step < 0) step = weighedRatio(ride) === null && ride.feel === 'C' ? 0 : step / 2;
     lnK = clamp(lnK + clamp(step, -MAX_STEP, MAX_STEP), Math.log(K_MIN), Math.log(K_MAX));
+    lastT = t;
   }
+  fadeTo(now.getTime());
   const sumW = seen.reduce((sum, s) => sum + s.w * fade(now.getTime() - s.t), 0);
   return { k: Math.exp(lnK), sumW, U: uncertainty(sumW) };
 }

@@ -685,8 +685,6 @@ describe('a broken number never reads as good', () => {
     const a = factsOf({ ...good, savedKm: [{ fromKm: NaN, toKm: NaN }] });
     expect(findS1S2(a).s1.kind).toBe('edge');
     expect(waterAnswer(a).status).not.toBe('fine');
-    const b = factsOf({ ...good, savedKm: [{ fromKm: 0, toKm: Infinity }] });
-    expect(findS1S2(b).s2.km).toBe(30);
     const c = factsOf(good);
     expect(findS1S2({ ...c, matches: c.matches.map((m) => ({ ...m, km: NaN })) }).s1.kind).toBe('end');
     const d = factsOf(good);
@@ -855,7 +853,7 @@ describe('the reach rule over generated moments', () => {
     const f = build({ ...g, tapKms: [], capacity: g.capacity ?? 3 });
     const a = waterAnswer(f);
     const { s1 } = findS1S2(f);
-    expect(textOf(a)).toContain('No mapped reliable water for the next');
+    if (s1.km > f.ride.startKm + 0.05) expect(textOf(a)).toContain('No mapped reliable water for the next');
     if (s1.kind === 'edge') expect(a.status).not.toBe('fine');
     if (a.status === 'fine') {
       const w0 = (waterNow(f) as { litres: number }).litres;

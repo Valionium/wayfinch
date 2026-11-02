@@ -107,6 +107,7 @@ function clearSky(at: Date, lat: number, lon: number): number {
 
 const goodHour = (h: GridHour): boolean => Number.isFinite(h.t) && Number.isFinite(h.rh) && Number.isFinite(h.ghi);
 
+/** The best of a list. A comparison with NaN never wins, so callers filter out items whose measure is broken. */
 const first = <T>(list: T[], better: (a: T, b: T) => boolean): T | null => {
   let best: T | null = null;
   for (const x of list) if (best === null || better(x, best)) best = x;
@@ -120,12 +121,12 @@ export type PlanningWeather = {
 
 /** What the forecast says for this kilometre and moment, or null beyond its range or where a figure is broken. */
 function fromForecast(forecast: StoredForecast | null, km: Km, at: Date, route: Route): PlanningWeather | null {
-  const point = first(forecast?.grid.filter((g) => g.hours.length > 0) ?? [], (a, b) => Math.abs(a.km - km) < Math.abs(b.km - km));
+  const point = first(forecast?.grid.filter((g) => g.hours.length > 0 && Number.isFinite(g.km)) ?? [], (a, b) => Math.abs(a.km - km) < Math.abs(b.km - km));
   if (!point) return null;
   const t = at.getTime();
-  const hours = point.hours;
+  const hours = point.hours.filter((h) => Number.isFinite(h.at.getTime()));
   // Radiation stamped 15:00 covers 14:00-15:00, so the first stamp at or after the moment covers it.
-  const covering = hours.find((h) => h.at.getTime() >= t);
+  const covering = first(hours.filter((h) => h.at.getTime() >= t), (a, b) => a.at.getTime() < b.at.getTime());
   if (!covering || t < covering.at.getTime() - HOUR) return null;
   const nearest = first(hours, (a, b) => Math.abs(a.at.getTime() - t) < Math.abs(b.at.getTime() - t))!;
   if (!goodHour(covering) || !goodHour(nearest)) return null;
@@ -147,7 +148,7 @@ export function planningWeather(forecast: StoredForecast | null, baseline: Basel
   if (told) return told;
   const { lat, lon } = pointAtRouteKm(where.route, km);
   const month = Number(localIsoDate(at, where.timeZone).slice(5, 7));
-  const points = baseline?.points.filter((p) => p.month === month && Number.isFinite(p.p90HighC)) ?? [];
+  const points = baseline?.points.filter((p) => p.month === month && Number.isFinite(p.p90HighC) && Number.isFinite(p.km)) ?? [];
   const seasonal = first(points, (a, b) => Math.abs(a.km - km) < Math.abs(b.km - km));
   const ghi = clearSky(at, lat, lon);
   if (seasonal) {

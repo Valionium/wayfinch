@@ -63,4 +63,4 @@ export const openWaterWindow = (h: PlaceHours | undefined, t: Date): boolean => 
 
 /** Whether an ISO date is a public holiday in a holiday zone, from the prepared list. */
 export const isPublicHoliday = (date: string, holidayZone: string | null, holidays: Record<string, string[]>): boolean =>
-  holidayZone !== null && (holidays[holidayZone]?.includes(date) ?? false);
+  holidayZone !== null && Object.hasOwn(holidays, holidayZone) && holidays[holidayZone]!.includes(date);

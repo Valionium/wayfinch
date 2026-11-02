@@ -281,7 +281,7 @@ function toSpans(segs: Seg[], t0: number, t1: number, tz: string): HoursSpan[] {
 export function placeSpans(tag: string | null, place: HoursPlace, rule: RuleClass, windowStart: Date, windowEnd: Date,
   extraHolidays: HolidayOverrides, cache?: Map<string, HoursSpan[]>): HoursSpan[] {
   const zone = place.holidayZone ?? place.hoursRegionKey ?? place.country;
-  const extra = extraHolidays[zone] ?? [];
+  const extra = Object.hasOwn(extraHolidays, zone) ? extraHolidays[zone]! : [];
   const key = cache && JSON.stringify([tag, place.holidayZone, place.hoursRegionKey, place.country, place.timeZone, rule.kind, rule.nearStation,
     windowStart.getTime(), windowEnd.getTime(), extra]);
   const kept = key === undefined ? undefined : cache?.get(key);

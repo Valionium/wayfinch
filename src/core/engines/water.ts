@@ -2,7 +2,7 @@
 // margin, so every "good" answer is reached by a positive test: anything non-finite stops at `finite()` or fails a
 // comparison written so that NaN lands on the careful side.
 import { compareFinal, formatAbout, makeAnswer } from '../answers/index.ts';
-import { localIsoDate } from '../answers/time.ts';
+import { isKnownZone, localIsoDate } from '../answers/time.ts';
 import { bearingDeg } from '../geo/bearing.ts';
 import { pointAtRouteKm } from '../geo/project.ts';
 import { openWaterWindow, stateAt } from '../hours/check.ts';
@@ -33,10 +33,13 @@ const validDate = (d: Date): boolean => Number.isFinite(d.getTime());
 // ---- Sources (section 6.0) -----------------------------------------------------------------------------------------
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-const SEASONS: Record<string, number[]> = { spring: [3, 4, 5], summer: [6, 7, 8], autumn: [9, 10, 11], winter: [12, 1, 2] };
+const FULL_MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+// A Map, not an object: these values are tags from strangers, and "constructor" must find nothing.
+const SEASONS = new Map([['spring', [3, 4, 5]], ['summer', [6, 7, 8]], ['autumn', [9, 10, 11]], ['winter', [12, 1, 2]]]);
 const monthOf = (word: string): number | null => {
-  const i = MONTHS.indexOf(word.trim().toLowerCase().slice(0, 3));
-  return i < 0 || !/^[a-z]+$/i.test(word.trim()) ? null : i + 1;
+  const w = word.trim().toLowerCase();
+  const i = Math.max(MONTHS.indexOf(w), FULL_MONTHS.indexOf(w));
+  return i < 0 ? null : i + 1;
 };
 
 /** A seasonal tag's window: 'year-round' for "no"; months and how to show them; null when it gives no window. */
@@ -47,7 +50,7 @@ function seasonalWindow(value: string | null): 'year-round' | { months: Set<numb
   const months = new Set<number>();
   for (const token of text.split(/[;,]/)) {
     const word = token.trim().toLowerCase();
-    const season = SEASONS[word];
+    const season = SEASONS.get(word);
     if (season) { season.forEach((m) => months.add(m)); continue; }
     const [from, to, extra] = word.split('-').map((w) => monthOf(w));
     if (from === null || from === undefined || to === null || extra !== undefined) return null;
@@ -61,17 +64,21 @@ function seasonalWindow(value: string | null): 'year-round' | { months: Set<numb
 }
 
 const monthIn = (t: Date, tz: string): number => Number(localIsoDate(t, tz).slice(5, 7));
+/** The place's zone; one the time-zone data don't know gives way to the route's, so it can't take the card down. */
+const zoneOf = (place: Place, km: Km, f: WaterFacts): string => (isKnownZone(place.timeZone) ? place.timeZone : zoneLookupOf(f.routeZones)(km).timeZone);
 const WINTER_MONTHS = new Set([11, 12, 1, 2, 3]);
 
 /** 1 November-31 March on the place's calendar, or a month whose 10th-percentile low at the route's height is at or below 0 °C. */
 function isWinter(place: Place, match: RouteMatch, arrival: Date, f: WaterFacts): boolean {
-  const month = monthIn(arrival, place.timeZone);
+  const month = monthIn(arrival, zoneOf(place, match.km, f));
   if (WINTER_MONTHS.has(month)) return true;
-  let nearest: NonNullable<WaterFacts['baseline']>['points'][number] | null = null;
-  for (const p of f.baseline?.points ?? []) {
-    if (p.month === month && (!nearest || Math.abs(p.km - match.km) < Math.abs(nearest.km - match.km))) nearest = p;
+  const points = (f.baseline?.points ?? []).filter((p) => p.month === month);
+  let nearest: (typeof points)[number] | null = null;
+  for (const p of points) {
+    if (Number.isFinite(p.km) && (!nearest || Math.abs(p.km - match.km) < Math.abs(nearest.km - match.km))) nearest = p;
   }
-  if (!nearest) return false;
+  // A month the baseline has, but only with broken points: the point needs proof that it is on.
+  if (!nearest) return points.length > 0;
   // Written so that a low that is no number counts as winter: the point then needs proof that it is on.
   return !(nearest.p10LowC + lapse(nearest.eleM, routeHeight(f.trip.route, match.km)) > 0);
 }
@@ -104,7 +111,7 @@ function outdoorA(place: Place, match: RouteMatch, arrival: Date, f: WaterFacts)
   const window = seasonalWindow(place.seasonal);
   if (window === 'year-round') return RELIABLE;
   if (f.trip.departureDate === null) return window ? uncertain(W.waterNoDate) : RELIABLE;
-  if (window) return window.months.has(monthIn(arrival, place.timeZone)) ? RELIABLE : uncertain(W.waterSeasonal(window.label));
+  if (window) return window.months.has(monthIn(arrival, zoneOf(place, match.km, f))) ? RELIABLE : uncertain(W.waterSeasonal(window.label));
   if (!isWinter(place, match, arrival, f)) return RELIABLE;
   return openWaterWindow(hoursOf(place, f), arrival) ? RELIABLE : uncertain(W.waterMaybeOffForWinter);
 }
@@ -135,11 +142,14 @@ const mayGiveWater = (p: Place): boolean => (p.waterClass !== null && p.waterCla
 
 // ---- S1 and S2 -----------------------------------------------------------------------------------------------------
 
+/** The saved stretches that are real numbers. A range without a real end is no data. */
+const savedRanges = (f: WaterFacts): WaterFacts['savedKm'] => f.savedKm.filter((r) => Number.isFinite(r.fromKm) && Number.isFinite(r.toKm) && r.fromKm <= r.toKm);
+
 /** E: the route end, or the first kilometre from `fromKm` without saved place data, whichever comes first. */
 function pointE(f: WaterFacts, fromKm: Km): Target {
   const length = f.trip.route.lengthKm;
   let cursor = fromKm;
-  const ranges = f.savedKm.filter((r) => r.fromKm <= r.toKm).sort((a, b) => a.fromKm - b.fromKm);
+  const ranges = savedRanges(f).sort((a, b) => a.fromKm - b.fromKm);
   for (const r of ranges) if (r.fromKm <= cursor && r.toKm > cursor) cursor = r.toKm;
   const inside = ranges.some((r) => r.fromKm <= fromKm && r.toKm >= fromKm);
   if (!inside) return fromKm >= length ? { kind: 'end', km: length } : { kind: 'edge', km: fromKm };
@@ -166,6 +176,7 @@ function candidatesOf(f: WaterFacts): Candidate[] {
 
 const insideRadius = (ride: DayRide, km: Km): boolean => ride.startKm < ride.behindFromKm && km >= ride.startKm && km <= ride.behindFromKm;
 const afterTheRide = (f: WaterFacts): boolean => f.ride.phase === 'after-ride' && !f.ride.noRide;
+const atRouteEnd = (f: WaterFacts): boolean => f.ride.phase === 'route-end' || f.ride.noRide;
 
 const nowEnv = (f: WaterFacts): Schedule => nowSchedule(f.ride, f.trip, f.now, { sun: f.sun, routeZones: f.routeZones });
 
@@ -219,7 +230,9 @@ function isDay(f: WaterFacts, km: Km, at: Date, tz: string): boolean {
   const { lat, lon } = pointAtRouteKm(f.trip.route, km);
   const s = f.sun(lat, lon, localIsoDate(at, tz));
   if (s.lightAllNight) return true;
-  return s.sunrise !== null && s.sunset !== null && at.getTime() >= s.sunrise.getTime() && at.getTime() < s.sunset.getTime();
+  if (s.sunrise === null || s.sunset === null) return false;
+  // Written so that sun times that are no times read as day: the higher rate.
+  return !(at.getTime() < s.sunrise.getTime()) && !(at.getTime() >= s.sunset.getTime());
 }
 
 function weatherAt(f: WaterFacts, km: Km, at: Date, tz: string): PlanningWeather {
@@ -388,23 +401,44 @@ export const capacityOf = (f: WaterFacts): number | null => capacityFrom(f.profi
 
 const DEFAULT_FOR_MS = 3 * HOUR;
 
+const positionsOf = (f: WaterFacts): WaterFacts['positions'] => f.positions.filter((p) => Number.isFinite(p.km) && validDate(p.at));
+
+/** The last position at or before a moment. */
+const positionAt = (f: WaterFacts, t: Date): WaterFacts['positions'][number] | null =>
+  positionsOf(f).filter((p) => p.at.getTime() <= t.getTime()).sort((a, b) => b.at.getTime() - a.at.getTime())[0] ?? null;
+
+/** Whether the rider has passed a reliable source since. With no position from before then, any source behind may be it. */
 function passedSource(f: WaterFacts, since: Date): boolean {
-  const before = f.positions.filter((p) => p.at.getTime() <= since.getTime()).sort((a, b) => b.at.getTime() - a.at.getTime())[0];
-  if (!before) return false;
-  const later = f.positions.filter((p) => p.at.getTime() > since.getTime()).sort((a, b) => a.at.getTime() - b.at.getTime());
-  const reach = later.reduce((max, p) => Math.max(max, p.km), before.km);
+  const later = positionsOf(f).filter((p) => p.at.getTime() > since.getTime()).sort((a, b) => a.at.getTime() - b.at.getTime());
+  if (later.length === 0) return false;
+  const from = positionAt(f, since)?.km ?? -Infinity;
+  const reach = later.reduce((max, p) => Math.max(max, p.km), from);
   return candidatesOf(f).some((c) => {
-    if (c.match.km <= before.km || c.match.km > reach) return false;
+    if (c.match.km <= from || c.match.km > reach) return false;
     const passedAt = later.find((p) => p.km >= c.match.km)?.at ?? f.now;
     return sourceAt(c.place, c.match, passedAt, f).reliable;
   });
 }
 
-/** The riding rate at the plan factor where the rider is now: what the water since the last confirmation is reckoned at. */
-function planRateNow(f: WaterFacts): number {
+const ROAD_AROUND_KM = 5;
+
+/**
+ * The riding rate at the plan factor that the water since a confirmation is reckoned at, on the real road: the stretch
+ * ridden since, by time; not known to have moved, the worst of the road around the rider. No discount for breaks.
+ */
+function planRateSince(f: WaterFacts, since: Date): number {
   const km = f.ride.startKm;
-  const sec = sectionOf(f, km, km, 1, f.now, f.trip.flatKph * LOAD_PENALTY);
-  return planFactor(f) * sweatRate(sec, bodyOf(f), true);
+  const body = bodyOf(f);
+  const was = positionAt(f, since)?.km;
+  const moved = was !== undefined && was < km;
+  const way: Way = {
+    fromKm: moved ? was : Math.max(0, km - ROAD_AROUND_KM), toKm: moved ? km : Math.min(f.trip.route.lengthKm, km + ROAD_AROUND_KM),
+    startLegKm: 0, endLegKm: 0, schedule: f.schedule, at: () => f.now,
+  };
+  const list = sections(f, way);
+  if (list.length === 0) return planFactor(f) * sweatRate(sectionOf(f, km, km, 1, f.now, f.trip.flatKph * LOAD_PENALTY), body, true);
+  if (!moved) return planFactor(f) * list.reduce((max, s) => Math.max(max, sweatRate(s, body, true)), 0);
+  return (planFactor(f) * list.reduce((sum, s) => sum + s.hours * sweatRate(s, body, true), 0)) / ridingHours(list);
 }
 
 /**
@@ -420,7 +454,7 @@ export function waterNow(f: WaterFacts): { confirmed: true; litres: number } | {
   const startZone = zoneLookupOf(f.routeZones)(0).timeZone;
   const sameDate = ridingDate(left.at, startZone) === ridingDate(f.now, startZone);
   if (!(ageMs <= DEFAULT_FOR_MS) || !sameDate || passedSource(f, left.at)) return gone;
-  const used = ageMs === 0 ? 0 : (ageMs / HOUR) * planRateNow(f);
+  const used = ageMs === 0 ? 0 : (ageMs / HOUR) * planRateSince(f, left.at);
   if (!Number.isFinite(used)) return gone;
   const litres = Math.max(0, left.litres - used);
   return left.confirmed ? { confirmed: true, litres } : { confirmed: false, stillAbout: litres };
@@ -440,11 +474,12 @@ const nameOf = (t: Target): string => {
   return t.place.name ?? W.waterAtKm(showKm(t.km));
 };
 
-const labelsOf = (place: Place, now: Date): string[] => {
+const labelsOf = (place: Place, km: Km, f: WaterFacts): string[] => {
   const out: string[] = [];
   if (place.waterClass === 'A') out.push(W.waterMappedAsDrinking);
-  const threeYearsAgo = `${Number(localIsoDate(now, place.timeZone).slice(0, 4)) - 3}${localIsoDate(now, place.timeZone).slice(4)}`;
-  if (place.checkDate !== null && place.checkDate < threeYearsAgo) out.push(W.waterUnverifiedSince(place.checkDate.slice(0, 4)));
+  const today = localIsoDate(f.now, zoneOf(place, km, f));
+  const threeYearsAgo = `${Number(today.slice(0, 4)) - 3}${today.slice(4)}`;
+  if (place.checkDate !== null && /^\d{4}/.test(place.checkDate) && place.checkDate < threeYearsAgo) out.push(W.waterUnverifiedSince(place.checkDate.slice(0, 4)));
   const fee = place.tags['fee'];
   if (fee !== undefined && fee !== 'no') out.push(W.waterFee);
   return out;
@@ -454,12 +489,12 @@ const dated = (f: WaterFacts): boolean => f.trip.departureDate !== null;
 
 function whereOf(f: WaterFacts, t: Target & { kind: 'place' }): string {
   const distance = t.back ? W.waterBack(showKm(Math.abs(f.ride.behindFromKm - t.km))) : W.waterAhead(showKm(Math.abs(t.km - f.ride.startKm)));
-  return dated(f) && validDate(t.arrival) ? `${distance} · ${formatAbout(t.arrival, t.place.timeZone)}` : distance;
+  return dated(f) && validDate(t.arrival) ? `${distance} · ${formatAbout(t.arrival, zoneOf(t.place, t.km, f))}` : distance;
 }
 
 function itemFor(f: WaterFacts, t: Target & { kind: 'place' }): AnswerItem {
   const stamp = dated(f) ? { km: t.km, at: t.arrival } : { km: t.km };
-  const detail = [whereOf(f, t), ...labelsOf(t.place, f.now)].join(' · ');
+  const detail = [whereOf(f, t), ...labelsOf(t.place, t.km, f)].join(' · ');
   return { label: nameOf(t), stamp, status: 'fine', detail };
 }
 
@@ -476,12 +511,13 @@ function otherItems(f: WaterFacts, toKm: Km, targets: Target[], strict: boolean)
       near.push({ label: c.place.name ?? W.waterAtKm(showKm(c.match.km)), stamp: { km: c.match.km }, status: 'unknown', detail: W.waterNearYou });
       continue;
     }
-    if (c.match.km < f.ride.startKm || (strict ? c.match.km >= toKm : c.match.km > toKm) || unsure.length === UNCERTAIN_SHOWN) continue;
-    const arrival = f.schedule.atPlace(c.match);
+    const backAtEnd = atRouteEnd(f) && c.match.km < f.ride.startKm && c.match.km >= f.ride.startKm - TONIGHT_KM;
+    if ((c.match.km < f.ride.startKm && !backAtEnd) || (strict ? c.match.km >= toKm : c.match.km > toKm) || unsure.length === UNCERTAIN_SHOWN) continue;
+    const arrival = backAtEnd ? arrivalNow(f, c).arrival : f.schedule.atPlace(c.match);
     const v = sourceAt(c.place, c.match, arrival, f);
     if (v.reliable) continue;
     const stamp = dated(f) && validDate(arrival) ? { km: c.match.km, at: arrival } : { km: c.match.km };
-    unsure.push({ label: c.place.name ?? W.waterAtKm(showKm(c.match.km)), stamp, status: 'unknown', detail: [v.reason ?? '', ...labelsOf(c.place, f.now)].filter(Boolean).join(' · ') });
+    unsure.push({ label: c.place.name ?? W.waterAtKm(showKm(c.match.km)), stamp, status: 'unknown', detail: [v.reason ?? '', ...labelsOf(c.place, c.match.km, f)].filter(Boolean).join(' · ') });
   }
   return [...near, ...unsure];
 }
@@ -568,22 +604,31 @@ export function waterAnswer(f: WaterFacts): Answer {
   if (hoursMissing(f, s2.km)) missing.push('hours');
   if (f.trip.route.points.some((p) => p.ele === null)) missing.push('heights');
   if (capacity === null) missing.push('capacity');
-  if (f.forecast === null && f.baseline === null) missing.push('weather');
+  const weatherHeld = (f.forecast?.grid.some((g) => g.hours.length > 0) ?? false) || (f.baseline?.points.length ?? 0) > 0;
+  if (!weatherHeld || (dated(f) && [...listS1, ...listS2].some((s) => s.label === 'assumed-hot'))) missing.push('weather');
 
   const targetItems = [s1, s2].flatMap((t) => (t.kind === 'place' ? [itemFor(f, t)] : []));
+  // At the route end no source is ahead to refill at, but one close by still is one: it is shown, ahead or back.
+  const close = atRouteEnd(f) ? tonightsWater(f, candidatesOf(f)) : null;
+  const closeShown = close?.kind === 'place' && ![s1, s2].some((t) => t.kind === 'place' && t.place.id === close.place.id) ? close : null;
   const stamp = s1.kind === 'place' ? (dated(f) ? { km: s1.km, at: s1.arrival } : { km: s1.km }) : { km: s1.km };
 
   // The lines every card carries.
   const lines: string[] = [];
-  if (s1.kind !== 'place') lines.push(W.waterNoSource(showKm(Math.max(0, s1.km - f.ride.startKm))));
+  if (s1.kind !== 'place' && s1.km - f.ride.startKm >= 0.05) lines.push(W.waterNoSource(showKm(s1.km - f.ride.startKm)));
   lines.push(W.waterExpectedPlanned(nameOf(s1), showNear(expectedS1), showNear(useS1)), calibrationOf(f));
   const rideHours = f.schedule.ridingMinTo(f.ride.stopKm) / 60;
   if (f.profile.ebike || listS2.some((s) => outsideRange({ planT: s.planT, elevM: s.elevM, ridingHours: rideHours }))) lines.push(W.waterOutsideRange);
 
   const card = (status: Answer['status'], title: string, extra: string[], items: AnswerItem[]): Answer => makeAnswer({
-    topic: 'water', status, title, stamp, detail: [...extra, ...lines].join(' '), items, basis: basisOf(listS2.length > 0 ? listS2 : listS1), freshness: freshnessOf(f), missing,
+    topic: 'water', status, title, stamp, detail: [...extra, ...lines].join(' '),
+    // A target is as good as the card it is on: it never reads "fine" on a card that isn't.
+    items: items.map((i) => (i.status === 'fine' ? { ...i, status } : i)), basis: basisOf(listS2.length > 0 ? listS2 : listS1), freshness: freshnessOf(f), missing,
   });
-  const nearby = (strict = false): AnswerItem[] => otherItems(f, s1.km, [s1, s2], strict);
+  const nearby = (strict = false): AnswerItem[] => [
+    ...(closeShown ? [itemFor(f, closeShown)] : []),
+    ...otherItems(f, s1.km, closeShown ? [s1, s2, closeShown] : [s1, s2], strict),
+  ];
 
   if (!now.confirmed) {
     const asks = now.stillAbout === null ? [] : [W.waterStillAbout(showNear(now.stillAbout))];
@@ -614,12 +659,13 @@ export function waterAnswer(f: WaterFacts): Answer {
   }
   if (edge) {
     const at = s1.kind === 'edge' ? s1.km : s2.km;
-    const resumes = f.savedKm.filter((r) => r.fromKm > at && r.fromKm < f.trip.route.lengthKm).reduce((min, r) => Math.min(min, r.fromKm), f.trip.route.lengthKm);
+    const resumes = savedRanges(f).filter((r) => r.fromKm > at && r.fromKm < f.trip.route.lengthKm).reduce((min, r) => Math.min(min, r.fromKm), f.trip.route.lengthKm);
     return card('action', W.waterRefreshOrCarry(showKm(at), showKm(resumes - at)), [], [...targetItems, ...nearby()]);
   }
   // The last row, reached only by a positive test.
   if (!(w0 - useS2 >= asideS2)) return cantWorkOut(f);
   if (!dated(f)) return card('unknown', W.waterSetDate, [], [...targetItems, ...nearby()]);
-  const title = s2.kind === 'place' && s1.kind === 'place' ? W.waterEnoughToReach(nameOf(s2), nameOf(s1)) : W.waterEnoughToEnd;
+  const title = s2.kind !== 'place' || s1.kind !== 'place' ? W.waterEnoughToEnd
+    : s1.place.id === s2.place.id ? W.waterEnoughToComeBack(nameOf(s1)) : W.waterEnoughToReach(nameOf(s2), nameOf(s1));
   return card('fine', title, [], [...targetItems, ...nearby()]);
 }

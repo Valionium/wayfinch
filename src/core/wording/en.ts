@@ -75,6 +75,7 @@ export const W = {
   waterBack: (km: string): string => `${km} km back`,
   waterRefreshOrCarry: (edgeKm: string, km: string): string => `No place data after km ${edgeKm} — refresh this stretch, or carry for ${km} km.`,
   waterEnoughToReach: (s2: string, s1: string): string => `Enough to reach ${s2} — refilling at ${s1} is optional.`,
+  waterEnoughToComeBack: (s: string): string => `Enough to come back to ${s} — refilling there is optional.`,
   waterEnoughToEnd: 'Enough to the end.',
   waterNoSource: (km: string): string => `No mapped reliable water for the next ${km} km`,
   waterConfirm: 'Confirm your water to check the next stretch',

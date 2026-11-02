@@ -34,6 +34,7 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   waterBack: [['0.3']],
   waterRefreshOrCarry: [['120', '35']],
   waterEnoughToReach: [['Kehl', 'Bühl']],
+  waterEnoughToComeBack: [['Turn']],
   waterNoSource: [['42']],
   waterStillAbout: [['0.6']],
   waterExpectedPlanned: [['Kehl', '1.8', '2.5']],
