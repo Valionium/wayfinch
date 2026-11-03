@@ -45,7 +45,12 @@ export type PlaceHours = { placeId: string; windowStart: Date; windowEnd: Date; 
 /** The data whose absence an answer names (section 8 rule 2). Codes, never shown. */
 export type Missing = 'date' | 'places' | 'hours' | 'weather' | 'heights' | 'capacity';
 
-export type AnswerItem = { label: string; stamp: { km?: Km; at?: Date } | null; status: Status; detail?: string; contact?: Contact };
+/**
+ * A Call or Website button of call ahead (section 6.13), worked out by the engine so the UI builds no link: `shown` is the very
+ * text the item's detail carries ("Call +49 7221 123456"), `href` a `tel:` or an http(s) address, `label` names the place.
+ */
+export type ItemLink = { kind: 'tel' | 'web'; shown: string; href: string; label: string; secondary: boolean };
+export type AnswerItem = { label: string; stamp: { km?: Km; at?: Date } | null; status: Status; detail?: string; contact?: Contact; links?: ItemLink[] };
 export type Freshness = { dataDates: Record<string, string>; stale: boolean };
 export type Answer = {
   topic: Topic; status: Status; title: string; stamp: { km?: Km; at?: Date } | null;

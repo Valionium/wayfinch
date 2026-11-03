@@ -10,6 +10,7 @@ import { shortMapDate, showKm, W } from '../wording/en.ts';
 import { savedCovers } from './covers.ts';
 import { rejoinKm } from './locate.ts';
 import { usableFlatKph, type Schedule } from './pace.ts';
+import { callAhead, callPartsOf, hasCallData, linksOf } from './sleep.ts';
 import { chipRide, chipStart, nowSchedule, zoneLookupOf } from './tripday.ts';
 
 export type HelpFacts = Pick<ScreenInputs, 'trip' | 'places' | 'matches' | 'hours' | 'savedKm' | 'positions' | 'now' | 'routeZones' | 'sun'> & { ride: DayRide };
@@ -113,7 +114,7 @@ function sunsetLine(f: HelpFacts, schedule: Schedule, km: Km, at: Date, tz: stri
   return at.getTime() <= sunset.getTime() ? { status: 'fine', line: [W.helpSunset(hm)] } : { status: 'warning', line: [W.helpAfterSunset(hm)] };
 }
 
-type Row = { item: AnswerItem; pass: Pass; unworked: boolean; reach: number };
+type Row = { item: AnswerItem; pass: Pass; unworked: boolean; reach: number; called: boolean };
 
 export function helpChip(kind: HelpKind, f: HelpFacts): Answer {
   const places = new Map(f.places.map((p) => [p.id, p]));
@@ -150,9 +151,14 @@ export function helpChip(kind: HelpKind, f: HelpFacts): Answer {
     const status: Status = side === 'near' ? 'unknown' : hours?.status ?? g.status?.(s.place) ?? (sun && sun.status !== 'unknown' ? sun.status : 'fine');
     const stamp = side === 'near' ? { km: s.match.km } : { km: s.match.km, at: arrival };
     const contact = s.place.contact && (s.place.contact.phones.length > 0 || s.place.contact.website) ? { contact: s.place.contact } : {};
-    const detail = [...where, ...(sun?.line ?? []), ...(hours ? [hours.line] : []), ...(g.lines?.(s.place) ?? []), ...(isTrain ? [W.helpStationOnly] : [])].join(' · ');
+    // Call ahead (section 6.13): a bike shop shows its Call and Website, or says it has none mapped.
+    const calls = callAhead(s.place);
+    const links = linksOf(calls);
+    const detail = [
+      ...where, ...(sun?.line ?? []), ...(hours ? [hours.line] : []), ...(g.lines?.(s.place) ?? []), ...(isTrain ? [W.helpStationOnly] : []), ...callPartsOf(calls),
+    ].join(' · ');
     return {
-      item: { label, stamp, status, detail, ...contact }, pass: s, unworked: hours?.unworked ?? false,
+      item: { label, stamp, status, detail, ...contact, ...(links.length > 0 ? { links } : {}) }, pass: s, unworked: hours?.unworked ?? false, called: hasCallData(calls),
       reach: side === 'near' ? rejoinKm(s.match.offRouteM) : reach(s, side === 'behind' ? start.behindKm : start.aheadKm),
     };
   };
@@ -182,6 +188,11 @@ export function helpChip(kind: HelpKind, f: HelpFacts): Answer {
       firsts.push(...ahead, ...behind, ...near);
     }
   });
+
+  // The source line under the first item with a number or website (section 6.13).
+  const firstCalled = rows.find((r) => r.called);
+  const calledDate = firstCalled ? shortMapDate(firstCalled.pass.place.dataDate) : null;
+  if (firstCalled) firstCalled.item.detail = [firstCalled.item.detail ?? '', calledDate ? W.callAsMapped(calledDate) : W.emergencyMappedNoDate].filter(Boolean).join(' · ');
 
   const saved = savedCovers(f, Math.min(start.aheadKm, start.behindKm), Math.max(start.aheadKm, start.behindKm));
   const missing: Missing[] = [...(saved ? [] : ['places' as const]), ...(rows.some((r) => r.unworked) ? ['hours' as const] : [])];

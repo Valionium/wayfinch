@@ -1,0 +1,75 @@
+/* Ahead (spec section 3.2). Colours are section 3.6's tokens only; a status is a colour and a word, a band a fill and a pattern. */
+.ahead { display: flex; flex-direction: column; gap: 0; }
+.ahead p { margin: 0 0 8px; }
+.ah-position { font-size: 1.125rem; font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.ah-position-controls { margin: 0 0 12px; }
+.ah-position-controls .row { margin: 0 0 8px; }
+.ah-notes { margin: 0 0 12px; padding: 8px 12px 8px 1.75rem; }
+.ah-notes li + li { margin-top: 4px; }
+
+.ah-field { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; font-weight: 600; }
+.ah-field input[type='number'], .ah-field select, .ah-field textarea, .ah-water-custom input {
+  min-height: 44px; width: 100%; max-width: 20rem; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--ground); color: var(--ink); font: inherit; font-weight: 400;
+}
+.ah-field textarea { max-width: none; min-height: 7rem; resize: vertical; }
+.ah-field input[type='range'] { width: 100%; min-height: 44px; accent-color: var(--blaze); }
+.ah-picker { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+.ah-picker > legend { padding: 0 4px; }
+.ah-water-custom label { display: flex; flex-direction: column; gap: 4px; }
+.ah-water-custom { align-items: flex-end; }
+
+/* The strip: the bike at the left, the line, the bands above it and the icons below. */
+.ah-strip { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin: 0 0 12px; }
+.ah-strip-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-family: var(--font-display); font-weight: 600; font-size: 1.125rem; }
+.ah-strip-body { display: flex; align-items: flex-start; gap: 8px; margin-top: 4px; }
+.ah-strip-body .bike-marker { flex: none; height: 44px; align-items: center; }
+.ah-strip-track { position: relative; flex: 1 1 auto; min-width: 0; margin-right: 22px; }
+.ah-strip-line { position: absolute; left: 0; right: 0; top: 21px; height: 2px; background: var(--muted); }
+.ah-strip-bands { position: relative; height: 44px; }
+.ah-band { position: absolute; top: 8px; height: 28px; min-width: 12px; padding: 0; border: 2px solid var(--ice); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ground); }
+.ah-band::after { content: ''; position: absolute; left: 0; right: 0; top: -8px; bottom: -8px; } /* a 44 px tap target */
+.ah-band-likely { background: var(--ice); }
+.ah-band-possible { background: repeating-linear-gradient(135deg, var(--ice) 0 3px, transparent 3px 8px); }
+.ah-band-thunder { background: var(--red); border-color: var(--red); }
+.ah-strip-icons { position: relative; }
+.ah-icon { position: absolute; width: 44px; height: 44px; margin-left: -22px; border-radius: 50%; border: 1px solid var(--line); background: var(--ground); color: var(--ink); display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
+.ah-icon-water { color: var(--ice); }
+.ah-icon-food { color: var(--amber); }
+.ah-icon-sleep { color: var(--sage); }
+.ah-icon-cover { color: var(--blaze); }
+.ah-strip-key { font-size: 0.875rem; margin: 4px 0 0; }
+
+/* The cards. */
+.ah-cards { display: flex; flex-direction: column; }
+.ah-card { border-left-width: 6px; }
+.ah-status-fine { border-left-color: var(--sage); }
+.ah-status-action { border-left-color: var(--amber); }
+.ah-status-warning { border-left-color: var(--red); }
+.ah-status-unknown { border-left-color: var(--muted); }
+.ah-topic { font-family: var(--font-display); font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.875rem; margin: 0 0 2px; }
+.ah-card-title { font-size: 1.25rem; margin: 0 0 4px; overflow-wrap: anywhere; }
+.ah-toggle { display: block; width: 100%; min-height: 44px; padding: 4px 0; text-align: left; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.ah-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.ah-stamp { font-family: var(--font-mono); font-size: 0.9375rem; }
+.ah-card-detail, .ah-detail { overflow-wrap: anywhere; }
+.ah-items { list-style: none; margin: 8px 0; padding: 0; }
+.ah-items li, .ah-chip-panel li { padding: 6px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.ah-item-label { font-weight: 600; }
+.ah-link { margin: 4px 0; color: var(--blaze); font-weight: 600; }
+.ah-link-secondary { font-weight: 400; font-size: 0.9375rem; }
+.ah-basis { list-style: none; margin: 8px 0 0; padding: 0; font-size: 0.875rem; }
+.ah-basis li { border: 0; padding: 2px 0; }
+.ah-weather-update { margin: 8px 0; }
+
+/* The chips, and Emergency in large text. */
+.ah-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+.ah-chip[aria-expanded='true'] { border-color: var(--blaze); }
+.ah-chip-emergency { border-color: var(--red); color: var(--red); font-weight: 600; }
+.ah-chip-panel ul { list-style: none; padding: 0; margin: 8px 0; }
+.ah-large { font-size: 1.25rem; }
+.ah-emergency-title { margin: 0 0 8px; }
+.ah-call { font-size: 1.5rem; font-weight: 700; min-height: 56px; }
+.ah-numbers li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border: 0; }
+.ah-emergency-fallback { font-weight: 600; }
+.ah-sheet { border-color: var(--blaze); }
+.ah-sheet h3 { font-family: var(--font-display); font-size: 1.25rem; margin: 0 0 8px; }

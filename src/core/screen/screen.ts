@@ -5,6 +5,7 @@
 // stands. Emergency depends on nothing else, so its numbers and fallback line show in every state. `buildScreen` also
 // says which parts failed, so the simulator can tell a guarded failure from a good answer.
 import { compareFinal, formatAbout, formatHm, makeAnswer } from '../answers/index.ts';
+import { formatNearestHm } from '../answers/time.ts';
 import { climbingAnswer } from '../engines/climbing.ts';
 import type { StopFacts } from '../engines/covers.ts';
 import { daylightAnswer } from '../engines/daylight-card.ts';
@@ -34,10 +35,14 @@ export type StripBand = { fromKm: Km; toKm: Km; kind: 'likely' | 'possible' | 't
 export type Strip = { label: string; startKm: Km; endKm: Km; endText: string; icons: StripIcon[]; bands: StripBand[] };
 export type CardName = 'water' | 'food' | 'daylight' | 'weather' | 'climbing' | 'sleep';
 export type ChipName = 'bike' | 'pharmacy' | 'train' | 'toilets' | 'shelter';
-/** `shareMapText` is the same message with the map link the rider can add (section 6.14), so the UI computes nothing. */
+/**
+ * `shareMapText` is the same message with the map link the rider can add (section 6.14), and `stamps` each card's and chip's
+ * stamp as the rider reads it ("+6 km · 14:40", "here · 14:20"), so the UI computes nothing.
+ */
 export type Screen = {
   positionLine: string | null; strip: Strip; cards: Record<CardName, Answer>; chips: Record<ChipName, Answer> & { emergency: EmergencyCard };
   shareText: string | null; shareMapText: string | null; phase: DayPhase; ride: DayRide; notes: string[];
+  stamps: Record<CardName | ChipName | 'emergency', string | null>;
 };
 
 const MIN = 60_000;
@@ -180,6 +185,40 @@ function stripOf(i: ScreenInputs, ride: DayRide, schedule: Schedule, windows: Ra
   };
 }
 
+// ---- stamps --------------------------------------------------------------------------------------------------------
+
+/** Under this, a stamp's kilometre is the rider's own: "+0.0 km" would say nothing. */
+const HERE_KM = 0.05;
+
+/**
+ * A card's stamp as the rider reads it (section 3.2): "+6 km · 14:40" from the ride's start, "2.1 km back" for one behind,
+ * "here · 14:20" for a time with no kilometre. A time is shown to the nearest 5 minutes in the place's zone, as arrivals are.
+ */
+function stampTextOf(i: ScreenInputs, ride: DayRide, stamp: Answer['stamp']): string | null {
+  if (!stamp) return null;
+  const at = validDate(stamp.at) ? stamp.at : null;
+  const km = typeof stamp.km === 'number' && Number.isFinite(stamp.km) ? stamp.km : null;
+  const from = Number.isFinite(ride.startKm) ? ride.startKm : 0;
+  if (km === null) return at ? W.weatherStampHere(formatHm(at, routeZoneAt(i, from))) : null;
+  const ahead = km - from;
+  const where = ahead < -HERE_KM ? W.waterBack(showKm(-ahead)) : W.weatherStampAhead(showKm(Math.max(0, ahead)));
+  return at ? `${where} · ${formatNearestHm(at, routeZoneAt(i, km))}` : where;
+}
+
+function stampsOf(i: ScreenInputs, ride: DayRide, cards: Record<CardName, Answer>, chips: Screen['chips']): Screen['stamps'] {
+  const one = (a: Answer): string | null => {
+    try {
+      return stampTextOf(i, ride, a.stamp);
+    } catch {
+      return null;
+    }
+  };
+  return {
+    water: one(cards.water), food: one(cards.food), daylight: one(cards.daylight), weather: one(cards.weather), climbing: one(cards.climbing), sleep: one(cards.sleep),
+    bike: one(chips.bike), pharmacy: one(chips.pharmacy), train: one(chips.train), toilets: one(chips.toilets), shelter: one(chips.shelter), emergency: one(chips.emergency),
+  };
+}
+
 // ---- Emergency -----------------------------------------------------------------------------------------------------
 
 /**
@@ -294,6 +333,7 @@ export function buildScreen(raw: ScreenInputs): { screen: Screen; faults: string
       () => ({ label: labelOf(ride), startKm: ride.startKm, endKm: ride.stopKm, endText: W.routeStripAtEnd, icons: [], bands: [] })),
     cards, chips, shareText: share(false), shareMapText: share(true), phase: ride.phase, ride,
     notes: part('notes', () => notesOf(i, ride, position), () => []),
+    stamps: stampsOf(i, ride, cards, chips),
   };
   return { screen, faults, parts: { schedule, position, forecast, stop, water, leave, weather, food, windows, plans, lb, wg, targets, ideas } };
 }
