@@ -30,7 +30,7 @@ import { noteRoute, noteTripFacts } from './degraded.ts';
 import { isFailure, locateFix, manualAt, onPass, ROUTINE, watchBest } from './position.ts';
 import type { Failure } from './position.ts';
 import { agoText } from './trip/model.ts';
-import { dbExists } from './trip/services.ts';
+import { whileVisible } from './screen-clock.ts';
 
 const APPROXIMATE_HELP_M = 1000; // section 9.2: worse than about 1 km usually means approximate location only
 const SHARE_OLD_MS = 30 * 60_000; // section 6.14
@@ -167,7 +167,8 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     let read: ScreenInputs | null;
     let failed = false;
     try {
-      read = (await dbExists()) ? await readInputs(at) : null;
+      // A read never makes the database: with none (a fresh phone, or just deleted) there is no trip.
+      read = await readInputs(at);
     } catch {
       read = null;
       failed = true;
@@ -359,16 +360,8 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       const stop = onChanged(() => void load());
       // A screen left in front (a phone on the bars, a long stop) is built again each minute from what was read, for the time now:
       // no store read or write, no request. Only while the page is visible.
-      let tick: ReturnType<typeof setInterval> | null = null;
-      const shown = (): boolean => typeof document === 'undefined' || document.visibilityState !== 'hidden';
-      const startTick = (): void => { if (tick === null) tick = setInterval(() => { if (shown()) freshen(); }, TICK_MS); };
-      const stopTick = (): void => { if (tick !== null) clearInterval(tick); tick = null; };
-      if (shown()) startTick();
-      const visible = (): void => {
-        if (!shown()) { stopTick(); return; }
-        void load();
-        startTick();
-      };
+      const stopTick = whileVisible(freshen, TICK_MS);
+      const visible = (): void => { if (typeof document !== 'undefined' && document.visibilityState === 'visible') void load(); };
       if (typeof document !== 'undefined') document.addEventListener('visibilitychange', visible);
       // A bike saved in the bag planner redraws the marker at once.
       const stopBike = effect(() => {

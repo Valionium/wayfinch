@@ -82,3 +82,31 @@ test('[ST-VERSIONERROR] any other failure to open is not swallowed', async () =>
   await expect(openWith(MIGRATIONS)).rejects.toThrow('blocked');
   globalThis.indexedDB = real;
 });
+
+test('[ST-DELETE] a read, or a write that follows one, started while another window deletes everything never brings the database back', async () => {
+  const { readInputs, keepAfterScreen } = await import('../../../src/store/inputs.ts');
+  const { addPosition } = await import('../../../src/store/positions.ts');
+  await readTrip();
+  await saveTrip(trip());
+  const routeId = (await readTrip())!.route.id;
+  // Another window deletes: this window's connection lets go, and these start while the delete is still under way.
+  let blocked = false;
+  const deleting = new Promise<void>((done, fail) => { const r = indexedDB.deleteDatabase(DB_NAME); r.onsuccess = () => done(); r.onerror = () => fail(r.error); r.onblocked = () => { blocked = true; }; });
+  // This window has heard the delete and let go of its connection: what it opens now waits behind the delete.
+  await new Promise((r) => setTimeout(r, 0));
+  expect(blocked).toBe(false);
+  const late = Promise.all([
+    readInputs(new Date()),
+    readTrip(),
+    keepAfterScreen({ keepDayStart: { day: '2026-10-17', km: 3 }, routeEndReachedOn: null } as never, new Date(), routeId).catch(() => 'refused'),
+    addPosition({ lat: 49, lon: 8, accuracyM: 10, at: new Date(), km: 3, offRouteM: 0, source: 'gps', approximate: false }, new Date(), routeId).catch(() => 'refused'),
+  ]);
+  await deleting;
+  const [inputs, tripAfter] = await late;
+  expect(inputs).toBeNull();
+  expect(tripAfter).toBeNull();
+  expect((await indexedDB.databases()).map((d) => d.name)).not.toContain(DB_NAME);
+  // A rider's own write makes it again, as before.
+  await saveTrip(trip());
+  expect((await indexedDB.databases()).map((d) => d.name)).toContain(DB_NAME);
+});

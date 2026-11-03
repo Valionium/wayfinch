@@ -7,7 +7,7 @@ import { DEFAULT_FOR_MS } from '../core/engines/water.ts';
 import type { Screen } from '../core/screen/screen.ts';
 import type { Baseline, DayStart, Place, PlaceHours, Position, RescuePoint, Roof, RouteMatch, ScreenInputs, StoredForecast, Trip, ZoneSpan } from '../core/types.ts';
 import { markChanged, tracked } from './changed.ts';
-import { CURRENT, inTx, ROUTE_META_PREFIX, ROUTE_STORES } from './db.ts';
+import { CURRENT, inExistingTx, inTx, ROUTE_META_PREFIX, ROUTE_STORES } from './db.ts';
 import type { Tx } from './db.ts';
 import { readLoadSummary } from './loadcheck-read.ts';
 import { keptPositions, readPlanTomorrow, sweepPositions, withoutStampedAhead, ZONES_KEY } from './positions.ts';
@@ -82,7 +82,7 @@ export async function readInputs(now: Date): Promise<ScreenInputs | null> {
 async function sweep(now: Date, trip: Trip, zones: ZoneSpan[], positions: boolean, dayStarts: boolean, water: boolean): Promise<void> {
   if (!positions && !dayStarts && !water) return;
   try {
-    await inTx(['positions', 'dayStarts', 'waterLeft'], 'readwrite', async (tx) => {
+    await inExistingTx(['positions', 'dayStarts', 'waterLeft'], async (tx) => {
       if (positions) await sweepPositions(tx, now, trip, zones);
       if (dayStarts) await sweepDayStarts(tx, now, zones);
       if (water) {
@@ -122,7 +122,7 @@ async function keeping(s: Kept, now: Date, routeId: string): Promise<void> {
   const { keepDayStart, routeEndReachedOn } = s.ride;
   if ((keepDayStart === null && routeEndReachedOn === null) || !validDate(now)) return;
   const local = readLocalSettings().settings;
-  const changed = await inTx(['trip', 'dayStarts', 'meta'], 'readwrite', async (tx) => {
+  const changed = await inExistingTx(['trip', 'dayStarts', 'meta'], async (tx) => {
     const trip = usableTrip(await tx.objectStore('trip').get(CURRENT), local);
     if (!trip || trip.route.id !== routeId) return false;
     let wrote = false;

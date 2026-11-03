@@ -20,7 +20,7 @@ import { logRide, readRides, writeProfile } from '../../store/you.ts';
 import type { ProfileField, ProfileWrite } from '../../store/you.ts';
 import { forgetRiderKg, loadRiderKg } from '../rider-kg.ts';
 import { applyTheme } from '../theme-apply.ts';
-import { browserTripServices, dbExists } from '../trip/services.ts';
+import { browserTripServices } from '../trip/services.ts';
 import type { SettingsOutcome } from '../trip/services.ts';
 
 export type YouSnapshot = {
@@ -167,8 +167,7 @@ export function browserYouServices(now: () => Date = () => new Date(), navigate:
     now,
     weatherMode: WEATHER_MODE,
     load: async () => {
-      // Nothing is kept yet, or it was just deleted: reading would make an empty database.
-      if (!(await dbExists())) return { available: true, profile: DEFAULT_PROFILE, settings: readLocalSettings().settings, rides: 0, hillyRides: 0, planBottleL: bottleL() };
+      // Nothing is kept yet, or it was just deleted: the reads below make no database and find nothing.
       try {
         const settings = await readSettings();
         const profile = await readProfile();

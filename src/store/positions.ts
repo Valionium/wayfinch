@@ -5,7 +5,7 @@ import { ridingDate, zoneLookupOf } from '../core/engines/tripday.ts';
 import type { PlanTomorrow, Position, Trip, ZoneSpan } from '../core/types.ts';
 import { W } from '../core/wording/en.ts';
 import { markChanged, tracked } from './changed.ts';
-import { CURRENT, inTx } from './db.ts';
+import { CURRENT, inExistingTx, inTx } from './db.ts';
 import type { Tx } from './db.ts';
 import { goodDate, readablePosition, usableTrip, usableWater, usableZones } from './rules.ts';
 import { readLocalSettings } from './settings-local.ts';
@@ -104,7 +104,7 @@ export function addPosition(p: Position, now: Date, routeId: string): Promise<{ 
 async function adding(p: Position, now: Date, routeId: string): Promise<{ kept: boolean }> {
   if (!readablePosition(p)) return { kept: false };
   const local = readLocalSettings().settings;
-  const outcome = await inTx(['positions', 'waterLeft', 'trip', 'meta'], 'readwrite', async (tx) => {
+  const outcome = await inExistingTx(['positions', 'waterLeft', 'trip', 'meta'], async (tx) => {
     const trip = usableTrip(await tx.objectStore('trip').get(CURRENT), local);
     if (!trip || trip.route.id !== routeId) return null;
     if (p.km < -OUTSIDE_ROUTE_KM || p.km > trip.route.lengthKm + OUTSIDE_ROUTE_KM) return null;

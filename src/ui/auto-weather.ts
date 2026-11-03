@@ -2,6 +2,7 @@
 // foreground, with a prepared trip, signal and "Keep trip data fresh when online" on. It runs only while the app is open: there is
 // no timer and nothing in the background. The rules (model-run check first, 3 hours between automatic fetches, stored across
 // reloads, the stored forecast kept when a request is refused) are refresh.ts's; this file only starts it.
+import { openExisting } from '../store/db.ts';
 import { checkConnectivity } from '../data/connectivity.ts';
 import { refreshWeather } from '../data/refresh.ts';
 import type { RefreshResult, WeatherStore } from '../data/refresh.ts';
@@ -10,7 +11,6 @@ import type { WeatherMode } from '../data/weather-mode.ts';
 import { announceHere } from '../store/changed.ts';
 import { readLocalSettings } from '../store/settings-local.ts';
 import { weatherStore } from '../store/weather.ts';
-import { dbExists } from './trip/services.ts';
 
 const AUTO_SPACING_MS = 3 * 3_600_000;
 
@@ -41,8 +41,8 @@ export async function autoRefresh(trigger: 'open' | 'foreground', deps: AutoDeps
   if (deps.mode !== 'auto' || !deps.keepFresh() || running) return null;
   running = true;
   try {
-    // After Delete co-pilot data there is nothing to refresh, and reading would make an empty database.
-    if (!(await dbExists())) return null;
+    // After Delete co-pilot data there is nothing to refresh. The open makes no database (store/db.ts): none, nothing is read.
+    if (!(await openExisting())) return null;
     const state = await deps.store.read();
     if (!state?.prepared) return null;
     // Nothing is contacted, not even the app's own address, while the last ask is under 3 hours old.

@@ -78,6 +78,52 @@ export function openDb(): Promise<Db> {
   return current;
 }
 
+/**
+ * The database if it is there, else null: this open never makes one. IndexedDB queues it behind a delete another window has
+ * started, and it is undone in the same step if it would create the database, so a read in one window can't bring back what the
+ * rider just deleted in another (ST-DELETE). A database of an older build is opened as usual, to be brought up to date.
+ */
+export async function openExisting(): Promise<Db | null> {
+  if (current) {
+    try {
+      return await current;
+    } catch {
+      // the open that was under way failed: try again below
+    }
+  }
+  let opened: Db | null = null;
+  const hooks = callbacks(() => opened);
+  try {
+    opened = await openDB(DB_NAME, undefined, {
+      upgrade: (_db, oldVersion, _newVersion, tx) => {
+        if (oldVersion !== 0) return;
+        tx.done.catch(() => undefined); // the abort is the answer, not an error
+        tx.abort();
+      },
+      ...hooks,
+    });
+  } catch (e) {
+    if ((e as { name?: string } | null)?.name === 'AbortError') return null;
+    throw e;
+  }
+  if (opened.version < MIGRATIONS.length) {
+    opened.close();
+    return openDb();
+  }
+  if (!current) current = Promise.resolve(opened);
+  else opened.close();
+  return current;
+}
+
+// What a transaction reads with no database at all: every store empty. A write to it is lost, as a write meant to follow a read
+// must be once the rider has deleted everything.
+const emptyStore = {
+  get: async () => undefined, getKey: async () => undefined, getAll: async () => [], getAllKeys: async () => [], count: async () => 0,
+  openCursor: async () => null, put: async () => undefined, add: async () => undefined, delete: async () => undefined, clear: async () => undefined,
+  index: () => emptyStore,
+};
+const emptyTx = { objectStore: () => emptyStore, done: Promise.resolve(), abort: () => undefined, error: null };
+
 /** Lets go of this window's connection; the next use opens a new one. */
 export function closeDb(): void {
   const closing = current;
@@ -85,15 +131,21 @@ export function closeDb(): void {
   void closing?.then((db) => db.close()).catch(() => undefined);
 }
 
-/** A phone can close the connection while the app sleeps, which only shows here: then once more, on a new one. */
-async function begin(stores: string[], mode: 'readonly' | 'readwrite') {
-  const db = await openDb();
+/**
+ * A phone can close the connection while the app sleeps, which only shows here: then once more, on a new one. A read, and a write
+ * that only follows up a read (`existing`), never make the database: with none they see empty stores.
+ */
+async function begin(stores: string[], mode: 'readonly' | 'readwrite', existing: boolean) {
+  const open = (): Promise<Db | null> => (existing ? openExisting() : openDb());
+  const db = await open();
+  if (!db) return emptyTx;
   try {
     return db.transaction(stores, mode);
   } catch (e) {
     if ((e as { name?: string } | null)?.name !== 'InvalidStateError') throw e;
     forget();
-    return (await openDb()).transaction(stores, mode);
+    const again = await open();
+    return again ? again.transaction(stores, mode) : emptyTx;
   }
 }
 
@@ -102,8 +154,8 @@ async function begin(stores: string[], mode: 'readonly' | 'readwrite') {
  * browser can't store throws at the call, which by itself would not stop the transaction. `work` awaits only this
  * transaction's own requests, or the browser ends it early.
  */
-export async function inTx<T>(stores: string[], mode: 'readonly' | 'readwrite', work: (tx: Tx) => Promise<T>): Promise<T> {
-  const tx = (await begin(stores, mode)) as unknown as Tx;
+export async function inTx<T>(stores: string[], mode: 'readonly' | 'readwrite', work: (tx: Tx) => Promise<T>, opts: { existing?: boolean } = {}): Promise<T> {
+  const tx = (await begin(stores, mode, mode === 'readonly' || opts.existing === true)) as unknown as Tx;
   try {
     const result = await work(tx);
     await tx.done;
@@ -115,4 +167,9 @@ export async function inTx<T>(stores: string[], mode: 'readonly' | 'readwrite', 
     if ((e as { name?: string } | null)?.name === 'AbortError' && tx.error) throw tx.error;
     throw e;
   }
+}
+
+/** A write that only follows up a read (a sweep, what a screen keeps, an accepted position): it never makes the database. */
+export function inExistingTx<T>(stores: string[], work: (tx: Tx) => Promise<T>): Promise<T> {
+  return inTx(stores, 'readwrite', work, { existing: true });
 }

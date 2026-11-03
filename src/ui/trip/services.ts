@@ -15,8 +15,7 @@ import { fetchBaseline, fetchElevation, fetchForecast, fetchModelRuns } from '..
 import { WEATHER_MODE } from '../../data/weather-mode.ts';
 import type { WeatherMode } from '../../data/weather-mode.ts';
 import { NewerDataError, RefusedError } from '../../store/changed.ts';
-import { DB_NAME, openDb } from '../../store/db.ts';
-import { readLocalSettings } from '../../store/settings-local.ts';
+import { openExisting } from '../../store/db.ts';
 import { readInputs } from '../../store/inputs.ts';
 import { readPrepared, readStoredZones } from '../../store/prepared.ts';
 import type { PreparedRecord } from '../../store/prepared.ts';
@@ -111,7 +110,9 @@ function heightsLookedUp(route: Route): boolean {
 const weekdayOf = (date: string): number => new Date(`${date}T00:00:00Z`).getUTCDay();
 
 async function counts(): Promise<{ places: number; forecastTo: Date | null; forecastFetchedAt: Date | null; lastPositionAt: Date | null }> {
-  const db = await openDb();
+  // A read: it makes no database (after a delete in another window it finds none).
+  const db = await openExisting();
+  if (!db) return { places: 0, forecastTo: null, forecastFetchedAt: null, lastPositionAt: null };
   const places = await db.count('places');
   const forecast = (await db.get('forecast', 'current')) as { fetchedAt?: unknown; grid?: { hours?: { at: Date }[] }[] } | undefined;
   let forecastTo: Date | null = null;
@@ -125,16 +126,6 @@ async function counts(): Promise<{ places: number; forecastTo: Date | null; fore
   }
   const fetched = forecast?.fetchedAt;
   return { places, forecastTo, forecastFetchedAt: fetched instanceof Date && Number.isFinite(fetched.getTime()) ? fetched : null, lastPositionAt };
-}
-
-/** Whether the database exists: reading it must not make one, or data the rider just deleted would be brought back by an open window. */
-export async function dbExists(): Promise<boolean> {
-  try {
-    if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') return true;
-    return (await indexedDB.databases()).some((d) => d.name === DB_NAME);
-  } catch {
-    return true;
-  }
 }
 
 async function storageMb(): Promise<number | null> {
@@ -182,7 +173,6 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
 
   const load = async (): Promise<TripSnapshot> => {
     const at = now();
-    if (!(await dbExists())) return { ...nothing(at, readLocalSettings().settings, true), storageMb: await storageMb() };
     let settings: Settings;
     let trip: Trip | null;
     try {
