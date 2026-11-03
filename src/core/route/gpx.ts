@@ -52,6 +52,14 @@ function nameFrom(doc: XmlDocLike): string {
   return hit ? (hit.textContent ?? '').trim().slice(0, 60) : '';
 }
 
+/** How many `<trkpt` (or `<rtept`) start tags the text holds, with or without a namespace prefix. */
+function pointTags(text: string, tag: 'trkpt' | 'rtept'): number {
+  let n = 0;
+  const re = tag === 'trkpt' ? /<(?:[A-Za-z_][\w.-]*:)?trkpt[\s/>]/g : /<(?:[A-Za-z_][\w.-]*:)?rtept[\s/>]/g;
+  while (re.exec(text) !== null) if ((n += 1) > GPX_MAX_POINTS) break;
+  return n;
+}
+
 /**
  * Reads GPX text into points. Throws a GpxError for a file that is too big, has too many points or sections, or is no
  * GPX track or route with valid coordinates. A point with bad coordinates is skipped and starts a new section.
@@ -61,6 +69,8 @@ export function parseGpx(
   parseXml: (s: string) => XmlDocLike,
 ): { points: RawPoint[]; segments: number; name: string; hasElev: boolean } {
   if (typeof text !== 'string' || byteLength(text) > GPX_MAX_BYTES) throw new GpxError('too-large', W.routeGpxTooLarge);
+  // Counted in the text first, so a file far over the limit is refused before a document of it is built (a phone's memory).
+  if (pointTags(text, 'trkpt') > GPX_MAX_POINTS || pointTags(text, 'rtept') > GPX_MAX_POINTS) throw new GpxError('too-many-points', W.routeGpxTooManyPoints);
   let doc: XmlDocLike;
   try {
     doc = parseXml(text);
