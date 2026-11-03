@@ -276,13 +276,14 @@ export function TyreScreen({ services }: { services: TyreServices }) {
     }
   }, [shown?.f, shown?.r, key]);
 
-  // When the figures first appear, bring them into view: on a phone the field being typed in is above them.
+  // When an answer first appears (a figure, or the reason for none), bring it to the top: the field just typed in is below or above it.
   const resultRef = useRef<HTMLElement>(null);
-  const had = useRef(false);
+  const had = useRef('');
+  const state = !resolved.input ? 'none' : showFigures ? 'figure' : 'no-figure';
   useEffect(() => {
-    if (showFigures && !had.current) resultRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
-    had.current = showFigures;
-  }, [showFigures]);
+    if (state !== 'none' && had.current !== state && !(had.current === 'figure' && state === 'no-figure')) resultRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    had.current = state;
+  }, [state]);
 
   const src = resolved.sources;
   const v = resolved.values;

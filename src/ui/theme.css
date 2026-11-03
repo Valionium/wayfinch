@@ -170,3 +170,5 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 .tyre-note { border-left: 4px solid var(--amber); padding: 8px 12px; margin: 4px 0 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .tyre-ask { display: inline-flex; gap: 8px; flex-wrap: wrap; }
 html { scroll-padding-bottom: 5rem; }
+
+.tyre-result { scroll-margin-top: 8px; }
