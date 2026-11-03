@@ -1,0 +1,7 @@
+{
+  "wait_timer": 0,
+  "prevent_self_review": false,
+  "can_admins_bypass": false,
+  "reviewers": [{ "type": "User", "id": 186399519 }],
+  "deployment_branch_policy": null
+}

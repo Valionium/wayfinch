@@ -1,0 +1,166 @@
+name: Deploy
+
+# A merge never deploys. After green checks on main, decide compares the build with what is live; only a real
+# difference asks for the owner's click (the reviewer on production-approval), and only that click uploads.
+# Agents never start, approve or re-run this. Plan "Merging and deploying", Decisions 2, 7 and 8.
+on:
+  workflow_run:
+    workflows: [Pull request checks]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  LIVE_ORIGIN: https://load-check.valentin-hopstein.workers.dev
+  GH_REPO: ${{ github.repository }}
+  WRANGLER_SEND_METRICS: 'false'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  decide:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+      actions: read # to read production-approval's reviewer ("Repository permissions for Actions" in GitHub's docs)
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: npm ci
+      - run: npm run build
+      # The latch off (deployEnabled false) means changed=false, check=false, and the live site isn't asked.
+      # A real difference with no required reviewer on production-approval stops here, loudly: no click would be asked.
+      - id: compare
+        name: Compare the build with what is live
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/deploy-check.mjs --decide --build dist/build.json --config build.config.json --origin "$LIVE_ORIGIN"
+      - name: Check the live files, though nothing changed
+        if: steps.compare.outputs.check == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node tools/deploy-check.mjs --build dist/build.json --origin "$LIVE_ORIGIN" --report --live "the same build as commit $HEAD_SHA"
+      - name: Keep the build for the deploy
+        if: steps.compare.outputs.changed == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  # Its own job, holding no concurrency group: a deploy waiting here for a click can't block a rollback.
+  approve:
+    needs: decide
+    if: needs.decide.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    environment: production-approval
+    outputs:
+      attempt: ${{ steps.attempt.outputs.attempt }}
+    steps:
+      # Which try of the run this click belongs to: re-running only deploy keeps this job's old answer.
+      - id: attempt
+        run: |
+          echo "Approved by the owner."
+          echo "attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+
+  # needs: approve, and never always(): a skipped approve skips this job.
+  deploy:
+    needs: approve
+    if: needs.approve.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    concurrency:
+      group: worker-deploy
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      # An old approval after a newer merge, or from an earlier try of this run, deploys nothing.
+      # A failure here leaves stale unset, so nothing below runs.
+      - id: stale
+        name: Stop if a newer merge exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          APPROVED_ATTEMPT: ${{ needs.approve.outputs.attempt }}
+          THIS_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          head=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)
+          stale=$(node tools/deploy-check.mjs --is-stale "$HEAD_SHA" "$head" --approved-attempt "$APPROVED_ATTEMPT" --this-attempt "$THIS_ATTEMPT")
+          echo "stale=$stale" >> "$GITHUB_OUTPUT"
+      - if: steps.stale.outputs.stale == 'false'
+        run: npm ci
+      - if: steps.stale.outputs.stale == 'false'
+        uses: actions/download-artifact@v7
+        with:
+          name: dist
+          path: dist
+      - id: before
+        name: Note what is live, which is what a rollback returns to
+        if: steps.stale.outputs.stale == 'false'
+        timeout-minutes: 2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler deployments list --json > rows-before.json
+          version=$(node tools/deploy-check.mjs --live-version rows-before.json)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Live before this deploy, and what a rollback returns to: ${version:-not known}" >> "$GITHUB_STEP_SUMMARY"
+      - id: upload
+        name: Upload to the live site
+        if: steps.stale.outputs.stale == 'false'
+        timeout-minutes: 10
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: npx wrangler deploy --message "Commit $HEAD_SHA"
+      - id: after
+        name: Note what is live now
+        if: always() && steps.stale.outputs.stale == 'false'
+        continue-on-error: true
+        timeout-minutes: 2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler deployments list --json > rows-after.json
+          echo "version=$(node tools/deploy-check.mjs --live-version rows-after.json)" >> "$GITHUB_OUTPUT"
+      - name: After-deploy check
+        if: always() && steps.stale.outputs.stale == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
+          BEFORE: ${{ steps.before.outputs.version }}
+          AFTER: ${{ steps.after.outputs.version }}
+        run: node tools/deploy-check.mjs --build dist/build.json --origin "$LIVE_ORIGIN" --report --upload-outcome "$UPLOAD_OUTCOME" --before "$BEFORE" --live "$AFTER"

@@ -1,6 +1,7 @@
 {
   "launch": false,
   "deployEnabled": false,
+  "deployWithoutReviewer": false,
   "weatherMode": "tap",
   "dataOrigin": "https://wayfinch-data.pages.dev"
 }
