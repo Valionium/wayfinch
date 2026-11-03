@@ -294,6 +294,8 @@ describe('Export and import (spec sections 3.5 and 4.4)', () => {
     await show();
     await type(field('you-weight'), '82');
     await click(radio('thirst', 'more'));
+    // Both are kept before anything is compared with them.
+    await vi.waitFor(async () => { expect((await readProfile()).thirst).toBe('more'); expect((await readProfile()).weightKg).toBe(82); }, { timeout: 20_000 });
   }
 
   test('[YOU-EXPORT-UI] export hands a file to the browser, with the rider\'s own data and none of the bag planner\'s', async () => {
