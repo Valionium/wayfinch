@@ -37,6 +37,19 @@ function merged(passes: Projection[], mergeKm: number): Projection[] {
 const ROOF_SEARCH_KM = 0.31; // a little over the 300 m of section 6.0: coverAt holds the limit, on the rounded distance
 const roofIndexes = new WeakMap<Route, SegmentIndex>();
 const roofMatches = new WeakMap<Roof[], { route: Route; list: RoofMatch[] }>();
+// The app reads its inputs afresh for each screen, so the same roofs and route come as new objects every time. Their geometry is
+// matched once for what they are (the route's id and each roof's place), and only who is who is redone (PERF-SCREEN).
+type RoofPass = { at: number; km: number; offRouteM: number };
+const roofPassesByContent = new Map<string, RoofPass[]>();
+const ROOF_CONTENT_MAX = 4;
+
+function roofsKey(roofs: Roof[], route: Route): string | null {
+  if (typeof route.id !== 'string' || route.id === '') return null;
+  let h = 0x811c9dc5;
+  const mix = (x: string): void => { for (let i = 0; i < x.length; i++) h = Math.imul(h ^ x.charCodeAt(i), 0x01000193) >>> 0; };
+  for (const r of roofs) mix(`${r.lat},${r.lon};`);
+  return `${route.id}|${route.points.length}|${route.lengthKm}|${roofs.length}|${h}`;
+}
 
 export type RoofMatch = { roof: Roof; km: number; offRouteM: number };
 
@@ -44,22 +57,36 @@ export type RoofMatch = { roof: Roof; km: number; offRouteM: number };
 export function matchRoofs(roofs: Roof[], route: Route): RoofMatch[] {
   const kept = roofMatches.get(roofs);
   if (kept?.route === route) return kept.list;
+  const key = roofsKey(roofs, route);
+  const known = key === null ? undefined : roofPassesByContent.get(key);
+  if (known) {
+    const list = known.map((q) => ({ roof: roofs[q.at]!, km: q.km, offRouteM: q.offRouteM }));
+    roofMatches.set(roofs, { route, list });
+    return list;
+  }
   let idx = roofIndexes.get(route);
   if (!idx) {
     idx = buildSegmentIndex(route);
     roofIndexes.set(route, idx);
   }
   const list: RoofMatch[] = [];
-  for (const roof of roofs) {
-    if (!(Math.abs(roof.lat) <= 90 && Math.abs(roof.lon) <= 180)) continue; // written so that NaN fails
+  const passes: RoofPass[] = [];
+  roofs.forEach((roof, at) => {
+    if (!(Math.abs(roof.lat) <= 90 && Math.abs(roof.lon) <= 180)) return; // written so that NaN fails
     const within = segmentsNear(idx, roof, ROOF_SEARCH_KM)
       .map((s) => projectOnSegment(roof, route, s))
       .filter((q) => q.offKm <= ROOF_SEARCH_KM);
     for (const q of merged(passesOf(within, roof, route, ROOF_SEARCH_KM), 2 * ROOF_SEARCH_KM)) {
-      list.push({ roof, km: q.km, offRouteM: Math.round(q.offKm * 1e6) / 1e3 });
+      const offRouteM = Math.round(q.offKm * 1e6) / 1e3;
+      list.push({ roof, km: q.km, offRouteM });
+      passes.push({ at, km: q.km, offRouteM });
     }
-  }
+  });
   roofMatches.set(roofs, { route, list });
+  if (key !== null) {
+    if (roofPassesByContent.size >= ROOF_CONTENT_MAX) roofPassesByContent.clear();
+    roofPassesByContent.set(key, passes);
+  }
   return list;
 }
 

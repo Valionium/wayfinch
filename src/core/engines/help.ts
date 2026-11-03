@@ -7,7 +7,7 @@ import { stateAt } from '../hours/check.ts';
 import { radiusKmFor } from '../route/matches.ts';
 import type { Answer, AnswerItem, DayRide, Km, Missing, Place, PlaceKind, RouteMatch, ScreenInputs, Status } from '../types.ts';
 import { shortMapDate, showKm, W } from '../wording/en.ts';
-import { savedCovers } from './covers.ts';
+import { newestMapDate, savedCovers } from './covers.ts';
 import { rejoinKm } from './locate.ts';
 import { usableFlatKph, type Schedule } from './pace.ts';
 import { callAhead, callPartsOf, hasCallData, linksOf } from './sleep.ts';
@@ -96,8 +96,20 @@ function picks(list: Pass[], from: Km, g: Group): Pass[] {
   return better && better !== nearest ? [better, nearest] : [nearest];
 }
 
+// A place's prepared hours, the first for its id, as `find` gives it; looked up once per list, not once per row (PERF-SCREEN).
+const FIRST_HOURS = new WeakMap<readonly unknown[], Map<string, HelpFacts['hours'][number]>>();
+function firstHoursOf(f: HelpFacts, id: string): HelpFacts['hours'][number] | undefined {
+  let byId = FIRST_HOURS.get(f.hours);
+  if (!byId) {
+    byId = new Map();
+    for (const h of f.hours) if (!byId.has(h.placeId)) byId.set(h.placeId, h);
+    FIRST_HOURS.set(f.hours, byId);
+  }
+  return byId.get(id);
+}
+
 function hoursLine(f: HelpFacts, s: Pass, at: Date, tz: string): { status: Status; line: string; unworked: boolean } {
-  const h = f.hours.find((x) => x.placeId === s.place.id);
+  const h = firstHoursOf(f, s.place.id);
   const st = stateAt(h, at);
   const unworked = !h || !(at.getTime() >= h.windowStart.getTime() && at.getTime() < h.windowEnd.getTime());
   if (st.state === 'open') return { status: 'fine', line: st.until ? W.helpOpenUntil(formatHm(st.until, tz)) : W.helpOpenOnArrival, unworked };
@@ -118,8 +130,7 @@ type Row = { item: AnswerItem; pass: Pass; unworked: boolean; reach: number; cal
 
 export function helpChip(kind: HelpKind, f: HelpFacts): Answer {
   const places = new Map(f.places.map((p) => [p.id, p]));
-  const dates = f.places.map((p) => p.dataDate).filter((d) => shortMapDate(d) !== null).sort();
-  const newest = dates[dates.length - 1] ?? null;
+  const newest = newestMapDate(f);
   const date = shortMapDate(newest);
   const basis = [W.waterBasisOsm, ...(date ? [W.stopMapDate(date)] : [])];
   const dataDates: Record<string, string> = newest === null ? {} : { places: newest };

@@ -215,9 +215,21 @@ function detailsMapped(s: Spot): string[] {
 
 export { shortMapDate };
 
-/** The newest date of the map data, for a roof: roofs carry none of their own. */
-export const newestMapDate = (f: Pick<StopFacts, 'places'>): string | null =>
-  f.places.reduce<string | null>((max, p) => (shortMapDate(p.dataDate) && (max === null || p.dataDate > max) ? p.dataDate : max), null);
+const NEWEST = new WeakMap<readonly unknown[], string | null>();
+
+/**
+ * The newest date of the map data, for a roof: roofs carry none of their own. Worked out once per list of places: a screen
+ * asks for it on every roof line (PERF-SCREEN).
+ */
+export const newestMapDate = (f: Pick<StopFacts, 'places'>): string | null => {
+  const list = f.places;
+  if (NEWEST.has(list)) return NEWEST.get(list)!;
+  // The newest of the readable dates: ISO dates compare as text, so only the winner needs reading as a date.
+  let out: string | null = null;
+  for (const p of list) if (typeof p.dataDate === 'string' && (out === null || p.dataDate > out) && shortMapDate(p.dataDate)) out = p.dataDate;
+  NEWEST.set(list, out);
+  return out;
+};
 
 const kmOff = (s: Spot): string => {
   const off = Math.round(s.match.offRouteM);
