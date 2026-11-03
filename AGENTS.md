@@ -43,6 +43,10 @@ Planned, in spec section 4.2: `src/data/` fetching, more of `src/ui/`, `src/tool
 
 Group 5 placed the drawing on Trip (`BK-WHERE-TRIP`) and group 6 the marker on the strip (`BK-WHERE-STRIP`); group 8 placed it on You (`BK-WHERE-SCREENS`). Trip, at the top: `<BikeDrawing bike summary back="trip" />` from `src/ui/bike/drawing.tsx`, with `bike`, `summary` and `known` taken from the `bikeSource` signal of `src/ui/bike/live.ts` (it redraws when the bag planner saves in another tab). You: `size="small"` beside each bike of `bikeSource.value.bikes`, the plan's bike first, with `back="you"`; Edit is `bikeDetailsHref(id, 'you')` from `src/ui/bike/link.ts`, without a section. Ahead's strip: `<BikeMarker bike />` from `src/ui/bike/marker.tsx`, decorative, never a link; the strip gets the bike from its actions object, since Ahead's components may not import the store. Never write a `loadcheck:*` key; a tap on a drawing opens the bag planner's Look.
 
+## Contract for C-DELETE (sub-project 6): Also delete bag planner data
+
+You stores `copilot:delete-request:v1` = {app, kind, v: 1, id, createdAt} and opens `/tools/bags/#copilot-delete=<id>`; the bag planner's half does not exist yet. When it is built it must delete only the bag-planner data that was saved **before `createdAt`**, and never anything made or saved later: a rider who taps Also delete bag planner data, then builds a new plan days before the bag planner first applies the request, keeps the new plan. Spec section 7.1, Contract 3, says the request is applied "before it restores its draft" and names the id; it does not name this limit, so this note adds it. Until C-DELETE is merged, the checkbox is on the launch gate list. A request is applied at most once, and never from the fragment alone.
+
 ## Commands
 
 | Command | Runs |

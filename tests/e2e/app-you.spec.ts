@@ -128,8 +128,51 @@ async function ahead(page: Page): Promise<void> {
   await expect(page.locator('[data-ahead="answers"]')).toBeVisible();
 }
 
-test('[PRIV-NOTHING-SENT] with a prepared trip: Call and Website shown, writing the share message, opening Emergency, and opening every card (wait or go, leave-by) send nothing outside', async ({ page }) => {
+const SETTINGS_OFF = JSON.stringify({ updatedAt: '2026-10-01T00:00:00.000Z', keepFresh: false });
+const meteo = (log: string[]): string[] => log.filter((line) => line.includes('open-meteo.com'));
+
+test('[WXR-AUTO-WIRED] in the browser: opening with a prepared trip and "Keep trip data fresh" on checks the five models, asks once for the forecast, and a reload within 3 hours asks nothing', async ({ page }) => {
   await ahead(page);
+  // Get ready offline has just asked for the weather, which counts for the 3 hours; take that ask back, as if it were long ago.
+  await page.evaluate(() => new Promise<void>((done) => {
+    const q = indexedDB.open('copilot');
+    q.onsuccess = () => { const t = q.result.transaction(['meta'], 'readwrite'); t.objectStore('meta').delete('route:weatherAttempt'); t.oncomplete = () => { q.result.close(); done(); }; };
+  }));
+  const log = sent(page);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect.poll(() => meteo(log).length, { timeout: 20_000 }).toBe(6);
+  const calls = meteo(log).map((l) => l.split(' ')[1]!);
+  expect(calls.slice(0, 5).every((u) => u.includes('/static/meta.json'))).toBe(true);
+  expect(calls[5]).toContain('/v1/forecast');
+  // Only Open-Meteo and the app's own address are contacted.
+  expect(outside(log, app!.origin).every((l) => l.includes('open-meteo.com'))).toBe(true);
+  const again = sent(page);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-ahead="answers"]')).toBeVisible();
+  await page.waitForTimeout(1500);
+  expect(meteo(again)).toEqual([]);
+  // Coming back to the foreground within the 3 hours asks nothing either.
+  await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
+  await page.waitForTimeout(500);
+  expect(meteo(again)).toEqual([]);
+});
+
+test('[WXR-AUTO-WIRED] in the browser: with the setting off, opening and coming back to the foreground send nothing outside', async ({ page }) => {
+  await ahead(page);
+  await page.evaluate((v) => localStorage.setItem('copilot:settings', v), SETTINGS_OFF);
+  const log = sent(page);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-ahead="answers"]')).toBeVisible();
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await page.waitForTimeout(1500);
+  expect(outside(log, app!.origin)).toEqual([]);
+});
+
+test('[PRIV-NOTHING-SENT] with a prepared trip and the setting off: Call and Website shown, writing the share message, opening Emergency, and opening every card send nothing outside', async ({ page }) => {
+  await ahead(page);
+  await page.evaluate((v) => localStorage.setItem('copilot:settings', v), SETTINGS_OFF);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-ahead="answers"]')).toBeVisible();
   const log = sent(page);
   const closed = page.locator('.ah-toggle[aria-expanded="false"]');
   while ((await closed.count()) > 0) await closed.first().click();
@@ -142,6 +185,7 @@ test('[PRIV-NOTHING-SENT] with a prepared trip: Call and Website shown, writing 
   await page.locator('[data-share="progress"] textarea').fill('Riding well, about 40 km in.');
   await expect(page.locator('[data-share="progress"] textarea')).toHaveValue('Riding well, about 40 km in.');
   expect(outside(log, app!.origin)).toEqual([]);
-  // The card text that holds wait or go and leave-by was on the page while all this ran.
-  await expect(page.locator('main')).toContainText(/leave|wait|go/i);
+  // The cards that hold wait or go and leave-by were open while all this ran, and said something.
+  await expect(page.locator('[data-card="weather"]')).toBeVisible();
+  await expect(page.locator('[data-card="daylight"]')).toContainText(/leave by/i);
 });

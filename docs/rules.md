@@ -703,6 +703,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - basis line "Open-Meteo forecast fetched 11:20 · model run 10:00", in the place's zone, oldest latest run among those that matter [WXR-BASIS]
 - changing only weatherMode in build.config.json turns automatic on: the test builds with each value and checks the bundled constant; the shipped file says "auto" (owner's ruling A, 3 November, after Open-Meteo's written answer), which also puts 15-minute rain on [WXR-MODE-ONE-LINE]
 - one forecast request per route: at most 10 variables counting the 15-minute rain, at most 16 days; the model-run check comes first; nothing runs in the background [WXR-ONE-CALL]
+- the automatic mode is started at open and at return to the foreground (visibilitychange to visible) with a prepared trip, signal and the setting on; asks nothing, not even the app's own address, within 3 hours of the last ask (stored, so it survives reloads); the setting off or the tap build asks nothing [WXR-AUTO-WIRED]
 
 ## App: Refresh this stretch
 
