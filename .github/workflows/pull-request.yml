@@ -52,9 +52,14 @@ jobs:
       - run: npm ci
       - run: npm run qa
 
-  browser:
+  # The browser tests in two halves side by side (plan Task 23: over 6 minutes in one). The check a merge needs stays `browser`.
+  browser-shard:
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v7
       # legacySite() reads the page as it was live from this tag; a shallow checkout doesn't have it.
@@ -70,4 +75,11 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium firefox
       - run: npm run build
-      - run: npx playwright test
+      - run: npx playwright test --shard=${{ matrix.shard }}/2
+  browser:
+    needs: browser-shard
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: test "${{ needs.browser-shard.result }}" = success

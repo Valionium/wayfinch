@@ -118,11 +118,24 @@ test('[APP-NO-HOOK] only a --test-hooks build has window.__wf, and only with the
 
 // 150 KB read as 150,000 bytes: the coordinator's ruling of 3 November 2026. It tightens the test (it was 150 x 1024) and
 // loosens nothing; the owner may reverse it.
-test("the first screen's JavaScript is measured, and sits under the 150 KB budget (150,000 bytes)", () => {
+test("[PERF-JS-FIRST] the first screen's JavaScript, bike drawing included, sits under the 150 KB budget (150,000 bytes)", () => {
   const figures = measure(on);
   expect(figures.firstFiles.length).toBeGreaterThan(0);
   expect(figures.firstJsGzip).toBeGreaterThan(1000);
+  // The bike module is in it: the drawing is on the first screen.
+  expect(figures.firstFiles.some((f) => text(on, f).includes('bk-casing'))).toBe(true);
+  console.log(`PERF-JS-FIRST: ${figures.firstJsGzip} bytes gzipped`);
   expect(figures.firstJsGzip).toBeLessThanOrEqual(150_000);
+});
+
+// 200 KB read as 200,000 bytes, as the first-screen budget is (the same ruling).
+test('[PERF-JS-LAZY] all lazy chunks together sit under 200 KB gzipped (200,000 bytes); the bag planner is not counted', () => {
+  const figures = measure(on);
+  const lazy = files(on).filter((f) => f.endsWith('.js') && f.startsWith('assets/') && !figures.firstFiles.includes(f));
+  expect(lazy.length).toBeGreaterThan(2); // the tyre tool, You, A to B and the opening-hours library at least
+  expect(figures.lazyJsGzip).toBeGreaterThan(10_000);
+  console.log(`PERF-JS-LAZY: ${figures.lazyJsGzip} bytes gzipped in ${lazy.length} chunks`);
+  expect(figures.lazyJsGzip).toBeLessThanOrEqual(200_000);
 });
 
 test('the launch-on build is the same twice', async () => {
