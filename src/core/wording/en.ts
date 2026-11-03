@@ -205,6 +205,11 @@ export const W = {
   weatherSpaced: (fetched: string | null, again: string): string => (fetched ? `Forecast fetched ${fetched}. It can update again at ${again}.` : `No forecast saved. It can try again at ${again}.`),
   weatherNotKept: (fetched: string | null): string => `This phone didn't keep the new forecast. Check the phone's free storage. ${fetched ? `Forecast fetched ${fetched}.` : 'No forecast saved.'}`,
   weatherKeepFresh: 'Keep trip data fresh when online',
+  weatherIncomplete: (fetched: string | null): string => `The weather service's answer was incomplete. ${fetched ? `Forecast fetched ${fetched}.` : 'No forecast saved.'}`,
+  weatherNotPrepared: 'Get ready offline first. Then Update weather can fetch a forecast.',
+  weatherOtherWindow: 'Another window is updating the forecast.',
+  weatherRouteChanged: 'The route changed, so that forecast was not kept.',
+  weatherNewerSaved: 'A newer forecast is already saved.',
   weatherSeasonalBasis: (years: string): string => `seasonal estimate (${years})`,
   weatherNothingSaved: 'No forecast and no seasonal data saved.',
   weatherUnknown: 'Weather unknown: no forecast and no seasonal data saved.',
@@ -811,6 +816,10 @@ export const W = {
   appStretchPartial: (kms: string, places: number): string => `Only km ${kms} refreshed, with ${places} ${places === 1 ? 'place' : 'places'}. The Overpass service didn't answer for the rest.`,
   appStretchFailed: (from: string, to: string): string => `The Overpass service didn't answer for km ${from}–${to}. Nothing changed. Try again later.`,
   appStretchNotKept: "This phone didn't keep that stretch. Check the phone's free storage.",
+  appStretchKeptPart: (kms: string): string => `This phone kept km ${kms}, but not the rest. Check the phone's free storage.`,
+  appStretchEmpty: (from: string, to: string): string => `The map service returned nothing for km ${from}–${to}. That can be a fault on its side, so nothing was recorded. Try again later.`,
+  appStretchWait: (time: string): string => `The Overpass service asked Wayfinch to wait. Try again after ${time}.`,
+  appStretchBusy: 'Another window is refreshing a stretch. Try again when it has finished.',
   appStoreImportTyres: "The tyre details in this file can't be read. Nothing was changed.",
 };
 

@@ -362,8 +362,10 @@ function basisOf(f: WeatherFacts, usesBaseline: boolean): string[] {
     }
     const run = latest.size > 0 ? formatHm(new Date(Math.min(...latest.values())), tz) : null;
     basis.push(W.weatherBasis(fetchedLabel(fetched, f.now, tz), run));
-    const half = new Date(fetched.getTime() + 48 * HOUR);
-    const parts = new Date(fetched.getTime() + 120 * HOUR);
+    // Never more than the stored hours hold: a short forecast says so.
+    const lastHour = Math.max(...forecast.grid.flatMap((g) => g.hours.map((h) => h.at.getTime()).filter(Number.isFinite)), fetched.getTime());
+    const half = new Date(Math.min(fetched.getTime() + 48 * HOUR, lastHour));
+    const parts = new Date(Math.min(fetched.getTime() + 120 * HOUR, lastHour));
     basis.push(W.weatherDetailRange(W.timeWeekdayAt(weekdayOf(half, tz), formatHm(half, tz)), weekdayOf(parts, tz)));
     if (isStale(forecast, f.now)) basis.push(W.weatherStale);
   }

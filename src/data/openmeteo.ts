@@ -20,6 +20,8 @@ const HOURLY = ['temperature_2m', 'relative_humidity_2m', 'shortwave_radiation',
 const STEPS_15_MIN = 192;
 const MAX_FORECAST_DAYS = 16;
 const DAY = 86_400_000;
+const HOUR_MS = 3_600_000;
+const DETAIL_MS = 48 * HOUR_MS; // the hours the rain answers lean on most
 const FORECAST_TIMEOUT_MS = 30_000;
 const SMALL_TIMEOUT_MS = 12_000;
 const ELEVATION_BATCH = 100;
@@ -36,13 +38,16 @@ export const MODEL_PATHS: Record<string, string> = {
   'DMI HARMONIE-AROME': 'dmi_harmonie_arome_europe',
 };
 
-/** The service refused, failed, or sent something that isn't a whole answer. */
+/** The service refused or failed (`refused`), or answered with less than a whole forecast (`incomplete`). */
 export class WeatherServiceError extends Error {
-  constructor(reason: string) {
+  readonly kind: 'refused' | 'incomplete';
+  constructor(reason: string, kind: 'refused' | 'incomplete' = 'refused') {
     super(reason);
     this.name = 'WeatherServiceError';
+    this.kind = kind;
   }
 }
+const incomplete = (reason: string): WeatherServiceError => new WeatherServiceError(reason, 'incomplete');
 
 const requestInit = (timeoutMs: number): RequestInit => ({
   // A copy from a cache, stamped with the time of this fetch, would be an old forecast shown as new.
@@ -111,12 +116,13 @@ const dayNumber = (iso: string): number => {
  * Forecast days: min(16, days to the end + 1). The end is the plan's, the departure date plus its stages, never a date
  * worked out from how far the rider has come: every request of a day stays the same (spec's privacy table, criterion 9).
  */
-export function forecastDaysFor(route: Route, departureDate: string | null, today: string): number {
+export function forecastDaysFor(route: Route, departureDate: string | null, today: string, finished = false): number {
   if (departureDate === null) return MAX_FORECAST_DAYS;
   const lastDay = route.stages.reduce((most, s) => Math.max(most, s.day), 1);
   const left = dayNumber(addDaysIso(departureDate, lastDay - 1)) - dayNumber(today);
   if (!Number.isFinite(left)) return MAX_FORECAST_DAYS;
-  return Math.max(1, Math.min(MAX_FORECAST_DAYS, left + 1));
+  // A rider still on the trip after the planned last day needs today and tomorrow (the coordinator's ruling on spec 6.6's "end").
+  return Math.min(MAX_FORECAST_DAYS, Math.max(finished ? 1 : 2, left + 1));
 }
 
 const forecastUrl = (grid: GridPoint[], days: number, with15: boolean): string => {
@@ -131,6 +137,7 @@ const forecastUrl = (grid: GridPoint[], days: number, with15: boolean): string =
 const orNaN = (x: unknown): number => (usable(x) ? x : Number.NaN);
 
 function hoursOf(location: unknown, index: number): GridHour[] {
+  // A body that isn't a forecast at all is a refusal; one that is, but short or empty, is incomplete.
   if (!isRecord(location) || !isRecord(location['hourly'])) throw new WeatherServiceError('no hours');
   if ('location_id' in location && location['location_id'] !== index) throw new WeatherServiceError('out of order');
   const h = location['hourly'];
@@ -142,7 +149,7 @@ function hoursOf(location: unknown, index: number): GridHour[] {
     return c;
   };
   const [t, rh, ghi, pp, mm, code, wind, from, gust] = HOURLY.map(column) as [unknown[], unknown[], unknown[], unknown[], unknown[], unknown[], unknown[], unknown[], unknown[]];
-  if (!t.some(usable)) throw new WeatherServiceError('no temperatures');
+  if (!t.some(usable)) throw incomplete('no temperatures');
   return time.map((stamp: number, i) => ({
     at: new Date(stamp * 1000), t: orNaN(t[i]), rh: orNaN(rh[i]), ghi: orNaN(ghi[i]), pp: usable(pp[i]) ? pp[i] : null, mm: orNaN(mm[i]), code: orNaN(code[i]),
     windMs: orNaN(wind[i]), windFrom: orNaN(from[i]), gustMs: orNaN(gust[i]),
@@ -161,11 +168,19 @@ function rain15Of(location: unknown): { at: Date; mm: number }[] {
   return out;
 }
 
-/** An answer that doesn't reach now, or starts after tomorrow, isn't this forecast, whatever the clock of the request says. */
-function checkReach(hours: GridHour[], now: Date): void {
+/**
+ * A whole answer, or none: it reaches now (the last stamp covers the hour before it), starts by tomorrow, holds the days
+ * asked for (a day of a clock change has 23 or 25 hours), and has its rain, code and gusts for most of the next 48 hours.
+ * Anything less would replace a good forecast with a gap.
+ */
+function checkWhole(hours: GridHour[], now: Date, days: number): void {
   const first = hours[0]!.at.getTime();
   const last = hours[hours.length - 1]!.at.getTime();
-  if (last < now.getTime() || first > now.getTime() + DAY) throw new WeatherServiceError('not this forecast');
+  if (last < now.getTime() - HOUR_MS || first > now.getTime() + DAY) throw new WeatherServiceError('not this forecast');
+  if (last - first < (days * 24 - 2) * HOUR_MS) throw incomplete('fewer days than asked for');
+  const soon = hours.filter((x) => x.at.getTime() >= now.getTime() - HOUR_MS && x.at.getTime() <= now.getTime() + DETAIL_MS);
+  const gaps = soon.filter((x) => x.pp === null || !Number.isFinite(x.mm) || !Number.isFinite(x.code) || !Number.isFinite(x.gustMs)).length;
+  if (soon.length === 0 || gaps * 2 > soon.length) throw incomplete('mostly empty');
 }
 
 /**
@@ -176,10 +191,11 @@ export async function fetchForecast(grid: GridPoint[], o: { days: number; with15
   const fetchedAt = (o.now ?? (() => new Date()))();
   const body = await getJson(o.fetch, forecastUrl(grid, o.days, o.with15), FORECAST_TIMEOUT_MS);
   const locations = Array.isArray(body) ? body : [body]; // one location comes back as a bare object
-  if (locations.length !== grid.length) throw new WeatherServiceError('wrong number of points');
+  if (isRecord(body) && body['error'] === true) throw new WeatherServiceError('error answer');
+  if (locations.length !== grid.length) throw incomplete('wrong number of points');
   const stored = grid.map((g, i) => {
     const hours = hoursOf(locations[i], i);
-    checkReach(hours, fetchedAt);
+    checkWhole(hours, fetchedAt, o.days);
     const rain15 = o.with15 ? rain15Of(locations[i]) : [];
     return { km: g.km, lat: g.lat, lon: g.lon, hours, ...(rain15.length > 0 ? { rain15 } : {}) };
   });
@@ -239,6 +255,10 @@ type Tally = { lows: number[]; highs: number[]; rain: number[]; years: Set<numbe
  */
 export async function fetchBaseline(points: GridPoint[], months: number[], f: FetchLike, now: Date = new Date()): Promise<Baseline> {
   const thisYear = now.getUTCFullYear();
+  // The archive takes "elevation ... used for statistical downscaling ... comma separated" for several points, and answers with
+  // the elevation its figures are adapted to (open-meteo.com/en/docs/historical-weather-api): the route's, when all are known.
+  const heights = points.every((p) => p.ele !== null) ? `&elevation=${points.map((p) => Math.round(p.ele!)).join(',')}` : '';
+  const answered: (number | null)[] = points.map(() => null);
   const out: Baseline['points'] = [];
   const sampled = new Set<number>();
   for (const month of months) {
@@ -247,7 +267,7 @@ export async function fetchBaseline(points: GridPoint[], months: number[], f: Fe
       const year = thisYear - back;
       const mm = String(month).padStart(2, '0');
       const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-      const url = `${ARCHIVE_URL}?latitude=${list(points, 'lat', 2)}&longitude=${list(points, 'lon', 2)}&start_date=${year}-${mm}-01&end_date=${year}-${mm}-${lastDay}`
+      const url = `${ARCHIVE_URL}?latitude=${list(points, 'lat', 2)}&longitude=${list(points, 'lon', 2)}${heights}&start_date=${year}-${mm}-01&end_date=${year}-${mm}-${lastDay}`
         + '&daily=temperature_2m_min,temperature_2m_max,precipitation_sum&timezone=auto';
       let body: unknown;
       try {
@@ -263,6 +283,8 @@ export async function fetchBaseline(points: GridPoint[], months: number[], f: Fe
         const [lows, highs, rain] = [numbers(daily['temperature_2m_min']), numbers(daily['temperature_2m_max']), numbers(daily['precipitation_sum'])];
         if (lows.length === 0 || highs.length === 0 || rain.length === 0) return;
         const t = tallies[i]!;
+        const ele = (location as Record<string, unknown>)['elevation'];
+        if (usable(ele)) answered[i] = ele;
         t.lows.push(...lows);
         t.highs.push(...highs);
         t.rain.push(...rain);
@@ -274,7 +296,7 @@ export async function fetchBaseline(points: GridPoint[], months: number[], f: Fe
       if (t.lows.length < MIN_BASELINE_DAYS || t.years.size === 0) return;
       for (const y of t.years) sampled.add(y);
       out.push({
-        km: p.km, eleM: p.ele, month,
+        km: p.km, eleM: answered[i] ?? (heights ? Math.round(p.ele!) : null), month,
         p10LowC: Math.round(percentile(t.lows, 0.1)), meanLowC: Math.round(mean(t.lows)),
         p90HighC: Math.round(percentile(t.highs, 0.9)), meanHighC: Math.round(mean(t.highs)),
         rainDays: Math.round(t.rain.filter((v) => v >= RAIN_DAY_MM).length / t.years.size),

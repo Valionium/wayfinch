@@ -3,7 +3,7 @@
 import type { Route, StoredForecast, ZoneSpan } from '../core/types.ts';
 import { markChanged, tracked } from './changed.ts';
 import { CURRENT, inTx, ROUTE_META_PREFIX } from './db.ts';
-import { ZONES_META } from './inputs.ts';
+import { ROUTE_END_META, ZONES_META } from './inputs.ts';
 import { usableTrip, usableZones } from './rules.ts';
 import { readLocalSettings } from './settings-local.ts';
 
@@ -14,7 +14,14 @@ export const PREPARED_META = `${ROUTE_META_PREFIX}prepared`;
 
 export type WeatherState = {
   route: Route; departureDate: string | null; prepared: boolean; forecast: StoredForecast | null; lastAttemptAt: Date | null; routeZones: ZoneSpan[];
+  /** The route end has been reached: the trip is over. */
+  finished: boolean;
 };
+
+/** A fetch time this far ahead of another can't be compared with it: the clock was wrong when it was stamped (as `isStale`). */
+const AHEAD_MS = 3_600_000;
+
+export type SaveResult = 'saved' | 'gone' | 'older';
 
 const goodDate = (d: unknown): d is Date => d instanceof Date && Number.isFinite(d.getTime());
 const goodForecast = (f: unknown): f is StoredForecast => typeof f === 'object' && f !== null && goodDate((f as StoredForecast).fetchedAt) && Array.isArray((f as StoredForecast).runs);
@@ -28,11 +35,12 @@ export async function readWeatherState(): Promise<WeatherState | null> {
     attempt: (await tx.objectStore('meta').get(WEATHER_ATTEMPT_META)) as unknown,
     prepared: (await tx.objectStore('meta').get(PREPARED_META)) as unknown,
     zones: (await tx.objectStore('meta').get(ZONES_META)) as unknown,
+    end: (await tx.objectStore('meta').get(ROUTE_END_META)) as unknown,
   }));
   const trip = usableTrip(read.trip, local);
   if (!trip) return null;
   return {
-    route: trip.route, departureDate: trip.departureDate, prepared: read.prepared === true, forecast: goodForecast(read.forecast) ? read.forecast : null,
+    route: trip.route, departureDate: trip.departureDate, prepared: read.prepared === trip.route.id, finished: typeof read.end === 'string' && read.end !== '', forecast: goodForecast(read.forecast) ? read.forecast : null,
     lastAttemptAt: goodDate(read.attempt) ? read.attempt : null, routeZones: usableZones(read.zones),
   };
 }
@@ -64,25 +72,33 @@ export function reserveWeatherFetch(routeId: string, now: Date, gapMs: number): 
  * Keeps a forecast. False, with nothing written, when the route it was fetched for has been replaced meanwhile, or a newer
  * forecast is already stored. Throws when storage refuses, and the forecast before it stays.
  */
-export function saveForecast(routeId: string, forecast: StoredForecast): Promise<boolean> {
+export function saveForecast(routeId: string, forecast: StoredForecast): Promise<SaveResult> {
   return tracked(saving(routeId, forecast));
 }
 
-async function saving(routeId: string, forecast: StoredForecast): Promise<boolean> {
-  const saved = await inTx(['trip', 'forecast'], 'readwrite', async (tx) => {
-    if (!(await sameRoute(tx, routeId))) return false;
+async function saving(routeId: string, forecast: StoredForecast): Promise<SaveResult> {
+  const result = await inTx(['trip', 'forecast'], 'readwrite', async (tx): Promise<SaveResult> => {
+    if (!(await sameRoute(tx, routeId))) return 'gone';
     const stored = (await tx.objectStore('forecast').get(CURRENT)) as unknown;
-    if (goodForecast(stored) && stored.fetchedAt.getTime() > forecast.fetchedAt.getTime()) return false;
+    if (goodForecast(stored)) {
+      const ahead = stored.fetchedAt.getTime() - forecast.fetchedAt.getTime();
+      // A newer one stays; one stamped far ahead (a wrong clock) is no newer, or it would hold every later forecast out.
+      if (ahead > 0 && ahead <= AHEAD_MS) return 'older';
+    }
     await tx.objectStore('forecast').put(forecast, CURRENT);
-    return true;
+    return 'saved';
   });
-  if (saved) markChanged('weather');
-  return saved;
+  if (result === 'saved') markChanged('weather');
+  return result;
 }
 
-/** Marks the trip prepared: Get ready's last step (Task 9). Written with the route, so a replaced route starts unprepared. */
-export function markPrepared(): Promise<void> {
-  return tracked(inTx(['meta'], 'readwrite', async (tx) => { await tx.objectStore('meta').put(true, PREPARED_META); }));
+/** Marks the trip prepared: Get ready's last step (Task 9). Only for the route it was prepared for, and it goes with that route. */
+export function markPrepared(routeId: string): Promise<boolean> {
+  return tracked(inTx(['trip', 'meta'], 'readwrite', async (tx) => {
+    if (!(await sameRoute(tx, routeId))) return false;
+    await tx.objectStore('meta').put(routeId, PREPARED_META);
+    return true;
+  }));
 }
 
 export const weatherStore = { read: readWeatherState, reserve: reserveWeatherFetch, save: saveForecast };

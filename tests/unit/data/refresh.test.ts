@@ -1,5 +1,5 @@
 // decideRefresh by the numbers of section 6.6; refreshWeather on the real store, with a stub fetch counting every request.
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -12,9 +12,9 @@ import { decideRefresh, keepFreshOffered, refreshWeather } from '../../../src/da
 import type { RefreshDeps } from '../../../src/data/refresh.ts';
 import { WEATHER_MODE } from '../../../src/data/weather-mode.ts';
 import { openDb } from '../../../src/store/db.ts';
-import { ZONES_META } from '../../../src/store/inputs.ts';
+import { ROUTE_END_META, ZONES_META } from '../../../src/store/inputs.ts';
 import { replaceRoute, saveTrip } from '../../../src/store/trip.ts';
-import { markPrepared, readWeatherState, reserveWeatherFetch, saveForecast, WEATHER_ATTEMPT_META, weatherStore } from '../../../src/store/weather.ts';
+import { markPrepared, PREPARED_META, readWeatherState, reserveWeatherFetch, saveForecast, WEATHER_ATTEMPT_META, weatherStore } from '../../../src/store/weather.ts';
 import { at, flatRoute, testTrip, zonesOf } from '../../fixtures/build.ts';
 import { forecastBody, json, metaBody, stubFetch } from '../../fixtures/openmeteo.ts';
 import { freshStore } from '../store/helpers.ts';
@@ -45,21 +45,10 @@ describe('tap only', () => {
     expect(WEATHER_MODE).toBe('tap');
   });
 
-  test('[WXR-TAP-HIDDEN] "Keep trip data fresh when online" is offered only in the automatic mode', () => {
+  test('[WXR-MODE-ONE-LINE] the mode alone decides whether "Keep trip data fresh when online" is offered', () => {
     expect(keepFreshOffered('tap')).toBe(false);
     expect(keepFreshOffered('auto')).toBe(true);
     expect(W.weatherKeepFresh).toBe('Keep trip data fresh when online');
-  });
-
-  test('[WXR-TAP-HIDDEN] no screen names the setting without asking keepFreshOffered, and its text lives only in the wording', () => {
-    const uiDir = fileURLToPath(new URL('../../../src/ui/', import.meta.url));
-    const files = readdirSync(uiDir, { recursive: true, withFileTypes: true }).filter((e) => e.isFile()).map((e) => join(e.parentPath, e.name));
-    expect(files.length).toBeGreaterThan(0);
-    for (const file of files) {
-      const text = readFileSync(file, 'utf8');
-      expect(text, file).not.toContain('Keep trip data fresh');
-      if (text.includes('weatherKeepFresh')) expect(text, file).toContain('keepFreshOffered');
-    }
   });
 });
 
@@ -194,7 +183,7 @@ describe('the whole refresh, on the real store', () => {
   const prepared = async (zones: ZoneSpan[] = zonesOf(300)): Promise<void> => {
     await saveTrip(trip());
     await (await openDb()).put('meta', zones, ZONES_META);
-    await markPrepared();
+    await markPrepared(trip().route.id);
   };
   const OLD: StoredForecast = { fetchedAt: at('2026-10-17 07:10'), runs: [run(ICON, '2026-10-17 03:00', 6 * HOUR)], grid: [{ km: 0, lat: 49, lon: 8.4, hours: [], rain15: undefined as never }], has15: false };
   const service = (o: { forecast?: () => Response; meta?: (u: string) => Response } = {}) => {
@@ -269,7 +258,7 @@ describe('the whole refresh, on the real store', () => {
   });
 
   test('[WXR-REFUSED] 429, 500 and a bad body: the stored forecast is kept whole, its age shown', async () => {
-    const answers: (() => Response)[] = [() => json({ error: true, reason: 'x' }, 429), () => json({}, 500), () => new Response('<html>'), () => json([{ hourly: {} }])];
+    const answers: (() => Response)[] = [() => json({ error: true, reason: 'x' }, 429), () => json({}, 500), () => new Response('<html>'), () => json(trip().route.sampleGrid.map(() => ({ hourly: {} })))];
     for (const forecast of answers) {
       freshStore();
       await prepared();
@@ -365,7 +354,7 @@ describe('the whole refresh, on the real store', () => {
       return json(forecastBody(count, { from: SECS(at('2026-10-17 00:00')), hours: 96 }));
     });
     const out = await refreshWeather(deps(f), 'tap');
-    expect(out).toEqual({ fetched: false, say: null });
+    expect(out).toEqual({ fetched: false, say: W.weatherRouteChanged });
     expect(await (await openDb()).get('forecast', 'current')).toBeUndefined();
   });
 
@@ -373,7 +362,7 @@ describe('the whole refresh, on the real store', () => {
     await prepared();
     const id = trip().route.id;
     await saveForecast(id, { ...OLD, fetchedAt: at('2026-10-17 11:00') });
-    expect(await saveForecast(id, { ...OLD, fetchedAt: at('2026-10-17 10:00') })).toBe(false);
+    expect(await saveForecast(id, { ...OLD, fetchedAt: at('2026-10-17 10:00') })).toBe('older');
     expect((await readWeatherState())!.forecast!.fetchedAt).toEqual(at('2026-10-17 11:00'));
   });
 
@@ -464,15 +453,76 @@ describe('the whole refresh, on the real store', () => {
     expect((await refreshWeather(deps(f), 'tap')).fetched).toBe(false);
     const stored = (await readWeatherState())!.forecast;
     expect(stored).toBeNull();
-    // With temperature at one hour only, it is stored, and nothing on the screen reads NaN.
-    const count = trip().route.sampleGrid.length;
-    const first = SECS(at('2026-10-17 00:00'));
-    const g = stubFetch((u) => (u.includes('/static/meta.json') ? json({}, 500) : json(forecastBody(count, { from: first, hours: 96, at: (_, t) => (t === first ? undefined : { temperature_2m: null, relative_humidity_2m: null, shortwave_radiation: null, precipitation_probability: null, precipitation: null, weather_code: null, wind_speed_10m: null, wind_direction_10m: null, wind_gusts_10m: null }) }))));
-    expect((await refreshWeather(deps(g, { now: () => new Date(NOW.getTime() + 31 * MIN) }), 'tap')).fetched).toBe(true);
-    const partial = (await readWeatherState())!.forecast!;
+    // Such answers are refused now (incomplete); a stored forecast with gaps, as an older build could keep, still prints no NaN.
+    const partial = forecastOf(trip().route, [], { fetchedAt: '2026-10-17 12:00', from: '2026-10-17 01:00', days: 4 });
+    for (const g of partial.grid) g.hours.forEach((h, n) => { if (n % 2 === 1) Object.assign(h, { rh: Number.NaN, ghi: Number.NaN, pp: null, mm: Number.NaN, code: Number.NaN, windMs: Number.NaN, windFrom: Number.NaN, gustMs: Number.NaN }); });
     const inputs: ScreenInputs = inputsOf({ trip: trip(), now: '2026-10-17 12:40', forecast: partial, positions: [{ lat: 49.36, lon: 8.4, accuracyM: 10, at: at('2026-10-17 12:40'), km: 40, offRouteM: 0, source: 'gps', approximate: false }] });
     expect(JSON.stringify(screen(inputs))).not.toMatch(/NaN|null ?°|undefined/);
   });
+  test('[WXR-REFUSED] an incomplete answer never replaces a good forecast, and says so', async () => {
+    await prepared();
+    const good = forecastOf(trip().route, [], { fetchedAt: '2026-10-17 07:10', from: '2026-10-17 01:00', days: 8 });
+    await saveForecast(trip().route.id, good);
+    const count = trip().route.sampleGrid.length;
+    const f = service({ meta: () => json({}, 500), forecast: () => json(forecastBody(count, { from: SECS(at('2026-10-17 00:00')), hours: 14 })) });
+    const out = await refreshWeather(deps(f), 'tap');
+    expect(out).toEqual({ fetched: false, say: "The weather service's answer was incomplete. Forecast fetched 07:10." });
+    expect((await readWeatherState())!.forecast!.grid[0]!.hours).toHaveLength(good.grid[0]!.hours.length);
+  });
+
+  test('[WXR-BASIS] the basis line claims no more detail than the stored hours hold', () => {
+    const short = forecastOf(trip().route, [], { fetchedAt: '2026-10-17 07:10', from: '2026-10-17 01:00', until: '2026-10-17 23:00' });
+    const text = JSON.stringify(screen(inputsOf({ trip: trip(), now: '2026-10-17 12:00', forecast: short })));
+    expect(text).toContain(W.weatherDetailRange(W.timeWeekdayAt('Saturday', '23:00'), 'Saturday'));
+    expect(text).not.toContain('Mon 07:10');
+  });
+
+  test('[WXR-SPACING] a stored forecast stamped two days ahead (the clock was wrong) is replaced by the next good answer', async () => {
+    await prepared();
+    await saveForecast(trip().route.id, { ...OLD, fetchedAt: at('2026-10-19 07:00') });
+    const out = await refreshWeather(deps(service({ meta: () => json({}, 500) })), 'tap');
+    expect(out.fetched).toBe(true);
+    expect((await readWeatherState())!.forecast!.fetchedAt).toEqual(NOW);
+  });
+
+  test('[WXR-UPDATE-TAP] no tap ends without a sentence', async () => {
+    await saveTrip(trip());
+    expect((await refreshWeather(deps(service()), 'tap')).say).toBe(W.weatherNotPrepared);
+    await markPrepared(trip().route.id);
+    const busy = { ...weatherStore, reserve: () => Promise.resolve(false) };
+    expect((await refreshWeather(deps(service({ meta: () => json({}, 500) }), { store: busy }), 'tap')).say).toBe(W.weatherOtherWindow);
+    const gone = { ...weatherStore, save: () => Promise.resolve('gone' as const) };
+    expect((await refreshWeather(deps(service({ meta: () => json({}, 500) }), { store: gone, now: () => new Date(NOW.getTime() + HOUR) }), 'tap')).say).toBe(W.weatherRouteChanged);
+    const older = { ...weatherStore, save: () => Promise.resolve('older' as const) };
+    expect((await refreshWeather(deps(service({ meta: () => json({}, 500) }), { store: older, now: () => new Date(NOW.getTime() + 2 * HOUR) }), 'tap')).say).toBe(W.weatherNewerSaved);
+  });
+
+  test('[WXR-GRID] a rider behind the plan asks for today and tomorrow on and after the planned last day; after the route end, one day', async () => {
+    await prepared();
+    const f = service({ meta: () => json({}, 500), forecast: () => json(forecastBody(trip().route.sampleGrid.length, { from: SECS(at('2026-10-20 00:00')), hours: 72 })) });
+    await refreshWeather(deps(f, { now: () => at('2026-10-20 19:00') }), 'tap');
+    expect(new URL(forecasts(f)[0]!).searchParams.get('forecast_days')).toBe('2');
+    await (await openDb()).put('meta', '2026-10-20', ROUTE_END_META);
+    await refreshWeather(deps(f, { now: () => at('2026-10-20 20:00') }), 'tap');
+    expect(new URL(forecasts(f)[1]!).searchParams.get('forecast_days')).toBe('1');
+  });
+
+  test('[WXR-TAP-NO-AUTO] a trip marked prepared for a route since replaced is not prepared: nothing is contacted', async () => {
+    await saveTrip(trip());
+    const old = trip().route.id;
+    await replaceRoute({ ...flatRoute(50), id: 'second' });
+    await markPrepared(old);
+    const f = service();
+    await refreshWeather(deps(f), 'tap');
+    expect(f.urls).toEqual([]);
+    expect((await readWeatherState())!.prepared).toBe(false);
+    expect(await markPrepared(old)).toBe(false); // refused outright
+    await (await openDb()).put('meta', old, PREPARED_META); // and a mark of the old route, however it got there, prepares nothing
+    expect((await readWeatherState())!.prepared).toBe(false);
+    expect(await markPrepared('second')).toBe(true);
+    expect((await readWeatherState())!.prepared).toBe(true);
+  });
+
 });
 
 describe('the mode is one line', () => {

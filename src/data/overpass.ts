@@ -1,15 +1,15 @@
 // Refresh this stretch (spec section 5): a live OpenStreetMap query of one stretch, only after the rider's yes to a notice.
 // The public Overpass service is not a backend for an app, so at most 50 km go, as a simplified line, one request at a time,
 // and it is given room when it refuses. Places are classified on the phone by the pipeline's own code (classify-all.ts).
-import { addDaysIso, instantAt, localIsoDate } from '../core/answers/time.ts';
+import { addDaysIso, formatHm, instantAt, localIsoDate } from '../core/answers/time.ts';
 import { zoneLookupOf } from '../core/engines/tripday.ts';
 import { pointAtRouteKm } from '../core/geo/project.ts';
 import { buildSegmentIndex } from '../core/geo/index.ts';
 import { kitchenHoursId } from '../core/hours/check.ts';
-import { holidaysFor } from '../core/hours/holidays.ts';
 import type { RuleClass } from '../core/hours/rules.ts';
 import { classifyAll, keepPolygons, objectOf } from '../core/places/classify-all.ts';
 import type { ClassifyOptions, Zone } from '../core/places/classify.ts';
+import { COUNTRIES } from '../core/places/countries.ts';
 import type { CountryCode } from '../core/places/countries.ts';
 import { PLACE_FILTERS } from '../core/places/filters.ts';
 import { kindOf } from '../core/places/classify.ts';
@@ -31,6 +31,7 @@ const MAX_TOO_MANY = 2;
 const FIRST_BACKOFF_MS = 5_000;
 const MIN_HALVED_KM = 6;
 const MAX_REQUESTS = 10;
+const RUN_LEASE_MS = 30 * 60_000; // longer than any run: a window closed mid-run holds the others up no longer than this
 const NO_DATE_WINDOW_DAYS = 14;
 const M_PER_DEG = 111_320;
 
@@ -99,7 +100,9 @@ export function stretchQuery(line: string[]): string {
     }
   }
   const around = line.join(',');
-  const statements = [...groups.values()].map((g) => `nwr["${g.key}"~"^(${g.values.join('|')})$"](around:${g.km * 1000},${around});`);
+  // A little beyond the radius: the line is simplified at 100 m, so the true route can be that much nearer a place. matchPlaces
+  // then keeps only what is within its radius of the true route.
+  const statements = [...groups.values()].map((g) => `nwr["${g.key}"~"^(${g.values.join('|')})$"](around:${g.km * 1000 + SIMPLIFY_M + 10},${around});`);
   return `[out:json][timeout:${QUERY_TIMEOUT_S}];(${statements.join('')});out geom;`;
 }
 
@@ -197,17 +200,29 @@ const hoursWindow = (state: StretchState, now: Date, tz: string): { from: string
   return { from, to, start: instantAt(from, '00:00', tz), end: instantAt(to, '00:00', tz) };
 };
 
+/**
+ * Outside the first countries no public holidays are known, and the library refuses every tag that names `PH`. So those rules
+ * are taken out: a holiday there reads as any other day, rather than every hour of the place as unknown.
+ */
+export function withoutUnknownHolidays(tag: string | null, country: string): string | null {
+  if (tag === null || Object.hasOwn(COUNTRIES, country) || !/\bPH\b/.test(tag)) return tag;
+  const rules = tag.split(/;|\|\|/).map((r) => r.replace(/(^|,)\s*PH\s*(?=,|\s|$)/g, '$1').replace(/^\s*,/, '').trim())
+    .filter((r) => r !== '' && !/^PH\b/.test(r) && !/^(off|closed)$/i.test(r));
+  return rules.length > 0 ? rules.join('; ') : null;
+}
+
 /** Hour spans for the trip window, worked out on the phone. The library stays a lazy chunk. */
 async function workOutHours(places: Place[], state: StretchState, now: Date, tz: string): Promise<{ hours: PlaceHours[]; holidays: Record<string, string[]> }> {
   const window = hoursWindow(state, now, tz);
   const zones = [...new Set(places.map((p) => p.holidayZone ?? p.hoursRegionKey ?? p.country))];
+  // Both reach the opening-hours library: imported here, it stays a lazy chunk.
+  const [{ holidaysFor }, { placeSpans }] = await Promise.all([import('../core/hours/holidays.ts'), import('../core/hours/spans.ts')]);
   const holidays = holidaysFor(zones, window.from, window.to);
-  const { placeSpans } = await import('../core/hours/spans.ts');
   const cache = new Map<string, ReturnType<typeof placeSpans>>();
   const hours: PlaceHours[] = [];
   for (const p of places) {
     const rule = ruleClassOf(p);
-    const spans = (tag: string | null): ReturnType<typeof placeSpans> => placeSpans(tag, p, rule, instantAt(window.from, '00:00', p.timeZone), instantAt(window.to, '00:00', p.timeZone), holidays, cache);
+    const spans = (tag: string | null): ReturnType<typeof placeSpans> => placeSpans(withoutUnknownHolidays(tag, p.country), p, rule, instantAt(window.from, '00:00', p.timeZone), instantAt(window.to, '00:00', p.timeZone), holidays, cache);
     hours.push({ placeId: p.id, windowStart: instantAt(window.from, '00:00', p.timeZone), windowEnd: instantAt(window.to, '00:00', p.timeZone), spans: spans(p.openingHours) });
     if (p.stop?.kitchenHours) hours.push({ placeId: kitchenHoursId(p.id), windowStart: instantAt(window.from, '00:00', p.timeZone), windowEnd: instantAt(window.to, '00:00', p.timeZone), spans: spans(p.stop.kitchenHours) });
   }
@@ -221,6 +236,9 @@ export type StretchStore = {
   save(routeId: string, batch: {
     fromKm: Km; toKm: Km; date: string; places: Place[]; matches: ReturnType<typeof matchPlaces>; roofs: Roof[]; rescuePoints: ReturnType<typeof matchRescuePoints>; hours: PlaceHours[]; holidays: Record<string, string[]>;
   }): Promise<boolean>;
+  turn(now: Date, leaseMs: number, maxWaitMs: number): Promise<{ ok: true } | { ok: false; why: 'busy' | 'wait'; until: Date }>;
+  hold(notBefore: Date): Promise<void>;
+  release(): Promise<void>;
 };
 
 export type StretchDeps = {
@@ -235,7 +253,7 @@ export type StretchDeps = {
 
 type Range = { fromKm: Km; toKm: Km };
 export type StretchReport = {
-  status: 'declined' | 'busy' | 'nothing' | 'saved' | 'partial' | 'failed' | 'storage';
+  status: 'declined' | 'busy' | 'wait' | 'nothing' | 'saved' | 'partial' | 'failed' | 'storage';
   saved: Range[]; failed: (Range & { reason: string })[]; places: number; say: string | null;
 };
 
@@ -300,10 +318,11 @@ async function batchOf(elements: OverpassElement[], range: Range, state: Stretch
 
 const sayOf = (r: Omit<StretchReport, 'say'>, range: Range): string | null => {
   const span = (x: Range): [string, string] => [showKm(x.fromKm), showKm(x.toKm)];
+  const kept = r.saved.map((s) => span(s).join('–')).join(', ');
   if (r.status === 'saved') return W.appStretchSaved(...span(range), r.places);
-  if (r.status === 'partial') return W.appStretchPartial(r.saved.map((s) => span(s).join('–')).join(', '), r.places);
-  if (r.status === 'failed') return W.appStretchFailed(...span(range));
-  if (r.status === 'storage') return W.appStretchNotKept;
+  if (r.status === 'partial') return W.appStretchPartial(kept, r.places);
+  if (r.status === 'failed') return r.failed.every((f) => f.reason === 'empty answer') ? W.appStretchEmpty(...span(range)) : W.appStretchFailed(...span(range));
+  if (r.status === 'storage') return r.saved.length > 0 ? W.appStretchKeptPart(kept) : W.appStretchNotKept;
   return null;
 };
 
@@ -311,9 +330,10 @@ let running = false;
 
 /** One stretch, at most 50 km of what was asked for: the rider asks for the next one after. Never throws. */
 export async function refreshStretch(fromKm: Km, toKm: Km, deps: StretchDeps): Promise<StretchReport> {
-  const none = (status: StretchReport['status']): StretchReport => ({ status, saved: [], failed: [], places: 0, say: null });
-  if (running) return none('busy');
+  const none = (status: StretchReport['status'], say: string | null = null): StretchReport => ({ status, saved: [], failed: [], places: 0, say });
+  if (running) return none('busy', W.appStretchBusy);
   running = true;
+  let turned = false;
   try {
     let state: StretchState | null;
     try {
@@ -325,6 +345,11 @@ export async function refreshStretch(fromKm: Km, toKm: Km, deps: StretchDeps): P
     const start = Math.max(0, fromKm);
     const end = Math.min(state.route.lengthKm, toKm, start + MAX_STRETCH_KM);
     if (!(end > start)) return none('nothing');
+    // The turn first, so a rider who would only have to wait isn't shown the notice for nothing.
+    const turn = await deps.store.turn(deps.now(), RUN_LEASE_MS, MAX_TOO_MANY_WAIT_MS).catch(() => null);
+    if (!turn) return none('storage', W.appStretchNotKept);
+    if (!turn.ok) return turn.why === 'busy' ? none('busy', W.appStretchBusy) : none('wait', W.appStretchWait(formatHm(turn.until, zoneLookupOf(state.routeZones)(start).timeZone)));
+    turned = true;
     let yes = false;
     try {
       yes = (await deps.askNotice(W.appStretchNotice)) === true;
@@ -332,9 +357,13 @@ export async function refreshStretch(fromKm: Km, toKm: Km, deps: StretchDeps): P
       yes = false;
     }
     if (!yes) return none('declined');
+    // The rider may have replaced the route while the notice was open: then nothing of the old one goes.
+    const again = await deps.store.read().catch(() => null);
+    if (!again || again.route.id !== state.route.id) return none('nothing');
     return await runQueue(state, { fromKm: start, toKm: end }, deps);
   } finally {
     running = false;
+    if (turned) await deps.store.release().catch(() => undefined);
   }
 }
 
@@ -346,6 +375,19 @@ async function runQueue(state: StretchState, range: Range, deps: StretchDeps): P
   let requests = 0;
   let backoffs = 0;
   let storageRefused = false;
+  // A wait the service asked for, or a back-off after its error, holds every request after it: the next try, the next part,
+  // and, through the store, a new tap or another window.
+  let waitMs = 0;
+  const holdFor = async (ms: number): Promise<void> => {
+    waitMs = Math.max(waitMs, ms);
+    await deps.store.hold(new Date(deps.now().getTime() + waitMs)).catch(() => undefined);
+  };
+  const send = async (query: string): Promise<Asked> => {
+    if (waitMs > 0) await deps.sleep(waitMs);
+    waitMs = 0;
+    requests++;
+    return ask(query, deps.fetch);
+  };
   while (queue.length > 0) {
     const part = queue.shift()!;
     if (requests >= MAX_REQUESTS) { failed.push({ ...part, reason: 'too many requests' }); continue; }
@@ -353,24 +395,23 @@ async function runQueue(state: StretchState, range: Range, deps: StretchDeps): P
     let asked: Asked = { kind: 'server', reason: 'not asked' };
     let emptyOnce = false;
     for (let waits = 0; requests < MAX_REQUESTS; waits++) {
-      requests++;
-      asked = await ask(query, deps.fetch);
+      asked = await send(query);
       if (asked.kind === 'empty' && !emptyOnce) { // once more: the next request may reach the other server
         emptyOnce = true;
-        await deps.sleep(FIRST_BACKOFF_MS);
+        await holdFor(FIRST_BACKOFF_MS);
         continue;
       }
       if (asked.kind !== 'too-many') break;
+      await holdFor(asked.waitMs);
       if (waits >= MAX_TOO_MANY) break;
-      await deps.sleep(asked.waitMs);
     }
     if (asked.kind === 'too-many') { failed.push({ ...part, reason: 'too many requests' }); continue; }
     if (asked.kind === 'empty') { failed.push({ ...part, reason: 'empty answer' }); continue; }
     if (asked.kind === 'refused') { failed.push({ ...part, reason: asked.reason }); continue; }
     if (asked.kind === 'server') {
+      await holdFor(FIRST_BACKOFF_MS * 2 ** backoffs++);
       const half = (part.toKm - part.fromKm) / 2;
       if (half < MIN_HALVED_KM) { failed.push({ ...part, reason: asked.reason }); continue; }
-      await deps.sleep(FIRST_BACKOFF_MS * 2 ** backoffs++);
       queue.unshift({ fromKm: part.fromKm, toKm: part.fromKm + half }, { fromKm: part.fromKm + half, toKm: part.toKm });
       continue;
     }
@@ -385,7 +426,7 @@ async function runQueue(state: StretchState, range: Range, deps: StretchDeps): P
       if (!(await deps.store.save(state.route.id, batch))) return { status: 'nothing', saved, failed, places, say: null }; // the route has gone
     } catch {
       storageRefused = true;
-      failed.push({ ...part, reason: 'not kept' });
+      failed.push({ ...part, reason: 'not kept' }, ...queue.splice(0).map((q) => ({ ...q, reason: 'not done' })));
       break;
     }
     saved.push(part);

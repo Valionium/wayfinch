@@ -15,7 +15,7 @@ const SECS = (text: string): number => at(text).getTime() / 1000;
 const FROM = SECS('2026-10-17 00:00');
 const points = (n: number): GridPoint[] => Array.from({ length: n }, (_, i) => ({ km: i * 10, lat: 49 + i / 10, lon: 8.4, ele: 100 + i }));
 const params = (url: string): URLSearchParams => new URL(url).searchParams;
-const answering = (count: number, hours = 48) => stubFetch(() => json(forecastBody(count, { from: FROM, hours })));
+const answering = (count: number, hours = 16 * 24) => stubFetch(() => json(forecastBody(count, { from: FROM, hours })));
 
 describe('the forecast request', () => {
   test("[WXR-GRID] nine hourly variables, m/s, unixtime, zone auto, days, and coordinates at 0.01 degrees with each point's elevation", async () => {
@@ -44,8 +44,8 @@ describe('the forecast request', () => {
   test('[WXR-GRID] forecast days are min(16, days to the planned end + 1), at least 1, and come from the plan alone', () => {
     const trip = testTrip(); // four stages from Sat 17 Oct: planned end Tue 20 Oct
     expect(forecastDaysFor(trip.route, trip.departureDate, '2026-10-17')).toBe(4);
-    expect(forecastDaysFor(trip.route, trip.departureDate, '2026-10-20')).toBe(1);
-    expect(forecastDaysFor(trip.route, trip.departureDate, '2026-10-25')).toBe(1); // past the end
+    expect(forecastDaysFor(trip.route, trip.departureDate, '2026-10-20')).toBe(2); // the last day: today and tomorrow, see below
+    expect(forecastDaysFor(trip.route, trip.departureDate, '2026-10-25')).toBe(2); // past the end, still riding
     expect(forecastDaysFor(trip.route, trip.departureDate, '2026-09-01')).toBe(16);
     expect(forecastDaysFor(trip.route, null, '2026-10-17')).toBe(16); // no date: no end to stop at
   });
@@ -138,7 +138,7 @@ describe('reading the answer', () => {
   });
 
   test('[WXR-STAMPS] a value the service leaves empty stays unknown, and never reads as no rain', async () => {
-    const f = stubFetch(() => json(forecastBody(2, { from: FROM, hours: 12, at: (_, t) => (t === FROM + 3600 ? { precipitation_probability: null, precipitation: null, weather_code: null } : undefined) })));
+    const f = stubFetch(() => json(forecastBody(2, { from: FROM, hours: 24, at: (_, t) => (t === FROM + 3600 ? { precipitation_probability: null, precipitation: null, weather_code: null } : undefined) })));
     const stored = await fetchForecast(points(2), { days: 1, with15: false, fetch: f, now: () => new Date((FROM + 7200) * 1000) });
     const h = stored.grid[0]!.hours[1]!;
     expect(h.pp).toBeNull();
@@ -241,7 +241,8 @@ describe('the seasonal baseline', () => {
     expect(b.years).toBe('2021–2025');
     // Lows 0..29, five times over: mean 14.5; tenth percentile at floor(0.1 * 149) = 14 of the sorted list, which is 2.
     // Highs 10..39: mean 24.5; ninetieth at floor(0.9 * 149) = 134, which is 36.
-    expect(b.points[0]).toEqual({ km: 40, eleM: 100, month: 7, meanLowC: 15, p10LowC: 2, meanHighC: 25, p90HighC: 36, rainDays: 6 });
+    // One point without a height: none is sent, and these built answers name none, so no height is claimed for the figures.
+    expect(b.points[0]).toEqual({ km: 40, eleM: null, month: 7, meanLowC: 15, p10LowC: 2, meanHighC: 25, p90HighC: 36, rainDays: 6 });
     expect(b.points[1]).toMatchObject({ km: 100, eleM: null, month: 7, rainDays: 3 });
   });
 
@@ -307,5 +308,58 @@ describe('heights', () => {
   test('[WXR-ELEVATION] the recorded answer parses', async () => {
     const real = (recorded('elevation-two-points') as { elevation: number[] }).elevation;
     expect(await fetchElevation(pts(2), stubFetch(() => json({ elevation: real })))).toEqual(real);
+  });
+});
+
+describe('review of 3 November: whole answers, days, heights', () => {
+  const inc = async (body: unknown, days: number, now = NOW): Promise<unknown> => fetchForecast(points(2), { days, with15: false, fetch: stubFetch(() => json(body)), now: () => now }).then(() => 'stored', (e: unknown) => e);
+
+  test('[WXR-REFUSED] an answer shorter than the days asked for is incomplete, and never stored', async () => {
+    const short = forecastBody(2, { from: FROM, hours: 14 }); // ends at 13:00 today, 4 days asked for
+    const e = await inc(short, 4);
+    expect(e).toBeInstanceOf(WeatherServiceError);
+    expect((e as WeatherServiceError).kind).toBe('incomplete');
+    expect(await inc(forecastBody(2, { from: FROM, hours: 96 }), 4)).toBe('stored');
+  });
+
+  test('[WXR-REFUSED] mostly empty chance, amount, code or gusts over the next 48 hours is incomplete; a few gaps are not', async () => {
+    const empty = (key: string, every: number) => forecastBody(2, { from: FROM, hours: 96, at: (_, t) => (((t - FROM) / 3600) % every === 0 ? { [key]: null } : undefined) });
+    for (const key of ['precipitation_probability', 'precipitation', 'weather_code', 'wind_gusts_10m']) {
+      expect(((await inc(empty(key, 1), 4)) as WeatherServiceError).kind, key).toBe('incomplete');
+    }
+    expect(await inc(empty('precipitation', 10), 4)).toBe('stored');
+  });
+
+  test('[WXR-REFUSED] fewer points than asked for is an incomplete answer too', async () => {
+    expect(((await fetchForecast(points(3), { days: 2, with15: false, fetch: stubFetch(() => json(forecastBody(2, { from: FROM, hours: 48 }))), now: nowFn }).catch((e: unknown) => e)) as WeatherServiceError).kind).toBe('incomplete');
+  });
+
+  test('[WXR-REFUSED] the last hour stamped 23:00 still covers 22:00 to 23:00: a good one-day answer at 23:30 is taken', async () => {
+    expect(await inc(forecastBody(2, { from: FROM, hours: 24 }), 1, at('2026-10-17 23:30'))).toBe('stored');
+  });
+
+  test('[WXR-GRID] a rider still on the trip after the planned last day gets today and tomorrow; a finished trip, one day', () => {
+    const trip = testTrip(); // planned end Tue 20 Oct
+    expect(forecastDaysFor(trip.route, trip.departureDate, '2026-10-20')).toBe(2);
+    expect(forecastDaysFor(trip.route, trip.departureDate, '2026-10-23')).toBe(2);
+    expect(forecastDaysFor(trip.route, trip.departureDate, '2026-10-20', true)).toBe(1);
+    expect(forecastDaysFor(trip.route, trip.departureDate, '2026-10-17')).toBe(4);
+  });
+
+  test('[WXR-BASELINE] the archive is asked at the route\'s heights, and each figure is stored with the height it stands for', async () => {
+    // https://open-meteo.com/en/docs/historical-weather-api: "elevation: The elevation used for statistical downscaling ... can also be
+    // comma separated"; the returned elevation is the one "statistical downscaling is used to adapt weather conditions for".
+    const days = (elevation: number): unknown => ({ elevation, daily: { time: Array.from({ length: 30 }, (_, i) => `d${i}`), temperature_2m_min: Array(30).fill(1), temperature_2m_max: Array(30).fill(9), precipitation_sum: Array(30).fill(0) } });
+    const known = stubFetch(() => json([days(100), days(1203)]));
+    const b = await fetchBaseline([{ km: 0, lat: 49, lon: 8, ele: 100.4 }, { km: 10, lat: 49.1, lon: 8, ele: 1203.2 }], [7], known, NOW);
+    expect(params(known.urls[0]!).get('elevation')).toBe('100,1203');
+    expect(b.points.map((p) => p.eleM)).toEqual([100, 1203]);
+    const unknown = stubFetch(() => json([days(111), days(150)]));
+    const c = await fetchBaseline([{ km: 0, lat: 49, lon: 8, ele: null }, { km: 10, lat: 49.1, lon: 8, ele: 900 }], [7], unknown, NOW);
+    expect(params(unknown.urls[0]!).has('elevation')).toBe(false);
+    expect(c.points.map((p) => p.eleM)).toEqual([111, 150]); // the service's own height: what the figures are for
+    const recordedHeights = (recorded('archive-two-points') as { elevation: number }[]).map((x) => x.elevation);
+    const r = await fetchBaseline(points(2), [7], stubFetch(() => json(recorded('archive-two-points'))), NOW);
+    expect(r.points.map((p) => p.eleM)).toEqual(recordedHeights);
   });
 });

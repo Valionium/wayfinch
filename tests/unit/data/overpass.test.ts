@@ -1,6 +1,7 @@
 // On a stub fetch; the answer's shape was checked against a real Overpass answer, kept in tests/fixtures/overpass/.
 import { createReadStream, readFileSync } from 'node:fs';
-import { beforeEach, describe, expect, test } from 'vitest';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { BoundaryIndex } from '../../../pipeline/boundaries.ts';
 import type { BoundaryFeature, Ring } from '../../../pipeline/boundaries.ts';
 import { classifyCountry } from '../../../pipeline/classify-country.ts';
@@ -128,7 +129,7 @@ describe('the limits', () => {
         const km = radiusFor(key, value);
         const statement = [...query.matchAll(new RegExp(`nwr\\["${key}"~"\\^\\(([^)]*)\\)\\$"\\]\\(around:(\\d+),`, 'g'))].find((m) => m[1]!.split('|').includes(value));
         expect(statement, `${key}=${value}`).toBeDefined();
-        expect(Number(statement![2])).toBe(km * 1000);
+        expect(Number(statement![2])).toBe(km * 1000 + 110);
         const kind = kindOf({ [key]: value }, { drinkPlaces: true, settlementAltNames: false });
         if (kind) expect(km).toBeGreaterThanOrEqual(radiusKmFor({ kind } as Place));
       }
@@ -223,7 +224,7 @@ describe('the limits', () => {
     expect((await readInputs(NOW))!.savedKm).toEqual([]);
     const answers = [answer([]), answer()];
     const g = stubFetch(() => answers.shift()!);
-    expect((await refreshStretch(50, 70, deps(g))).status).toBe('saved');
+    expect((await refreshStretch(50, 70, deps(g, { now: () => new Date(NOW.getTime() + 60_000) }))).status).toBe('saved'); // after the wait
   });
 
   test('[RFS-LIMITS] a busy page in HTML is a failure too; a 400 is not tried again', async () => {
@@ -231,7 +232,7 @@ describe('the limits', () => {
     const html = stubFetch(() => new Response('<html>busy</html>', { status: 200 }));
     expect((await refreshStretch(50, 60, deps(html))).status).toBe('failed');
     const bad = stubFetch(() => json({}, 400));
-    expect((await refreshStretch(50, 90, deps(bad))).status).toBe('failed');
+    expect((await refreshStretch(50, 90, deps(bad, { now: () => new Date(NOW.getTime() + 60_000) }))).status).toBe('failed');
     expect(bad.urls).toHaveLength(1);
   });
 
@@ -336,7 +337,7 @@ describe('one code path', () => {
     [{ country: 'FR', holidayZone: 'FR-67', timeZone: 'Europe/Paris' }, 'FR-67', 'FR-67', 'FR-67'],
     [{ country: 'PL', holidayZone: 'PL', timeZone: 'Europe/Warsaw' }, null, null, 'PL'],
     [{ country: 'XX', holidayZone: null, timeZone: 'Europe/Rome' }, null, null, 'XX'],
-  ])('[RFS-SHARED] the boundary file\'s zone reads as the pipeline writes it: %j', (z, subdivision, key, holidayZone) => {
+  ])('[RFS-SHARED] the boundary file\'s zone gives the pipeline\'s hours region key and holiday zone; the subdivision only where the zone names it: %j', (z, subdivision, key, holidayZone) => {
     expect(zoneFromBoundary(z)).toEqual({ country: z.country, subdivision, hoursRegionKey: key, holidayZone, timeZone: z.timeZone });
   });
 });
@@ -460,5 +461,146 @@ describe('the record', () => {
 
   test('[RFS-RECORD] ranges that touch become one, the rest stay apart, in order', () => {
     expect(mergeRanges([{ fromKm: 60, toKm: 70 }, { fromKm: 0, toKm: 10 }, { fromKm: 10, toKm: 20 }, { fromKm: 15, toKm: 18 }])).toEqual([{ fromKm: 0, toKm: 20 }, { fromKm: 60, toKm: 70 }]);
+  });
+});
+
+describe('review of 3 November: waits, outlines, sentences', () => {
+  type Ev = string[];
+  const logged = (answers: (() => Response)[], ev: Ev): Stub => stubFetch(() => { ev.push('req'); return answers.shift()!(); });
+  const logDeps = (f: Stub, ev: Ev, over: Partial<StretchDeps> = {}) => deps(f, { sleep: async (ms: number) => { ev.push(`sleep ${ms}`); }, ...over });
+
+  test('[RFS-LIMITS] after a part ends on 429s, the next part waits at least 30 s before it is asked', async () => {
+    await prepared();
+    const ev: Ev = [];
+    const f = logged([() => json({}, 500), () => json({}, 429), () => json({}, 429), () => json({}, 429), () => answer()], ev);
+    await refreshStretch(50, 70, logDeps(f, ev));
+    const last = ev.lastIndexOf('req');
+    expect(ev.slice(last - 1, last)).toEqual(['sleep 30000']); // before the second half
+  });
+
+  test('[RFS-LIMITS] after the smallest part fails on a server error, the next part is not asked at once', async () => {
+    await prepared();
+    const ev: Ev = [];
+    const f = logged([() => json({}, 500), () => json({}, 500), () => answer()], ev); // 50-60 halves to 50-55 and 55-60; 5 km parts are not halved again
+    await refreshStretch(50, 60, logDeps(f, ev));
+    const reqs = ev.map((e, i) => (e === 'req' ? i : -1)).filter((i) => i >= 0);
+    for (let k = 1; k < reqs.length; k++) expect(ev.slice(reqs[k - 1]! + 1, reqs[k]).some((e) => e.startsWith('sleep')), ev.join(' | ')).toBe(true);
+  });
+
+  test('[RFS-LIMITS] a new tap right after a run that ended on 429s sends nothing, and says when it can try', async () => {
+    await prepared();
+    const f = stubFetch(() => json({}, 429));
+    await refreshStretch(50, 70, deps(f));
+    const asked = f.urls.length;
+    const d = deps(f);
+    const out = await refreshStretch(50, 70, d);
+    expect(out.status).toBe('wait');
+    expect(out.say).toBe(W.appStretchWait('18:00'));
+    expect(f.urls).toHaveLength(asked);
+    expect(d.notices).toEqual([]); // not even the notice
+    const later = deps(stubFetch(() => answer()), { now: () => new Date(NOW.getTime() + 60_000) });
+    expect((await refreshStretch(50, 70, later)).status).toBe('saved');
+  });
+
+  test('[RFS-LIMITS] another window waits too, and two windows never ask at the same time', async () => {
+    await prepared();
+    await refreshStretch(50, 70, deps(stubFetch(() => json({}, 429))));
+    vi.resetModules();
+    const other = await import('../../../src/data/overpass.ts');
+    const otherStore = (await import('../../../src/store/stretch.ts')).stretchStore;
+    const f = stubFetch(() => answer());
+    expect((await other.refreshStretch(50, 70, deps(f, { store: otherStore }))).status).toBe('wait');
+    expect(f.urls).toEqual([]);
+    const free = { now: () => new Date(NOW.getTime() + 60_000) };
+    let release: () => void = () => undefined;
+    const slow = stubFetch(() => new Promise<Response>((r) => { release = () => r(answer()); }));
+    const first = refreshStretch(50, 70, deps(slow, free));
+    await new Promise((r) => { setTimeout(r, 20); });
+    const second = await other.refreshStretch(70, 90, deps(f, { store: otherStore, ...free }));
+    expect(second.status).toBe('busy');
+    expect(second.say).toBe(W.appStretchBusy);
+    release();
+    expect((await first).status).toBe('saved');
+    expect(f.urls).toEqual([]);
+  });
+
+  test('[RFS-LIMITS] each tag set is asked a little beyond its radius, so the simplified line loses no place within it', () => {
+    const query = stretchQuery(['49.0000,8.4000', '49.1000,8.4000']);
+    expect(query).toContain(`(around:${1000 + 110},`);
+    expect(query).not.toContain('(around:1000,');
+  });
+
+  test('[RFS-RECORD] a place 950 m from a bent route, further from its simplified line, is asked for and kept', async () => {
+    await prepared();
+    const f = stubFetch(() => answer([{ type: 'node', id: 3, ...pointAtKm(60, 950), tags: { amenity: 'drinking_water' } }]));
+    await refreshStretch(50, 70, deps(f));
+    const radius = Number(/nwr\["amenity"~"\^\([^)]*drinking_water[^)]*\)\$"\]\(around:(\d+),/.exec(queryOf(f.inits[0]!.body))![1]);
+    expect(radius).toBeGreaterThanOrEqual(1000 + 100);
+    expect((await readInputs(NOW))!.places.map((p) => p.id)).toContain('n3');
+  });
+
+  test('[RFS-NOTICE] a route replaced while the notice is open: nothing of the old route is sent', async () => {
+    await prepared();
+    const f = stubFetch(() => answer());
+    const out = await refreshStretch(50, 70, deps(f, { askNotice: async () => { await replaceRoute({ ...flatRoute(100), id: 'second' } as Route); return true; } }));
+    expect(f.urls).toEqual([]);
+    expect(out.status).toBe('nothing');
+  });
+
+  test('[RFS-RECORD] a stretch the map service returns nothing for says so truthfully', async () => {
+    await prepared();
+    const out = await refreshStretch(50, 70, deps(stubFetch(() => answer([]))));
+    expect(out.say).toBe(W.appStretchEmpty('50', '70'));
+    expect(out.say).not.toContain("didn't answer");
+  });
+
+  test('[RFS-RECORD] storage refusing a later part names what was kept, and lists the parts not done', async () => {
+    await prepared();
+    let saves = 0;
+    const store = { ...stretchStore, save: (id: string, b: Parameters<typeof stretchStore.save>[1]) => (++saves === 1 ? stretchStore.save(id, b) : Promise.reject(new DOMException('full', 'QuotaExceededError'))) };
+    const answers = [json({}, 500), answer(), answer([shopAt(2, 75)])];
+    const out = await refreshStretch(50, 90, deps(stubFetch(() => answers.shift()!), { store }));
+    expect(out.status).toBe('storage');
+    expect(out.saved).toEqual([{ fromKm: 50, toKm: 70 }]);
+    expect(out.failed.map((x) => [x.fromKm, x.toKm])).toEqual([[70, 90]]);
+    expect(out.say).toBe(W.appStretchKeptPart('50–70'));
+  });
+
+  test('[RFS-RECORD] storage refusing a part lists every part still to come as not done', async () => {
+    await prepared();
+    let saves = 0;
+    const store = { ...stretchStore, save: (id: string, b: Parameters<typeof stretchStore.save>[1]) => (++saves === 1 ? stretchStore.save(id, b) : Promise.reject(new DOMException('full', 'QuotaExceededError'))) };
+    const answers = [json({}, 500), json({}, 500), answer(), answer([shopAt(2, 65)])];
+    const out = await refreshStretch(50, 90, deps(stubFetch(() => answers.shift()!), { store }));
+    expect(out.saved).toEqual([{ fromKm: 50, toKm: 60 }]);
+    expect(out.failed.map((x) => [x.fromKm, x.toKm, x.reason])).toEqual([[60, 70, 'not kept'], [70, 90, 'not done']]);
+  });
+
+  test('[RFS-RECORD] outside the first countries a tag with PH still gives its hours: holidays there are not known, so they read as other days', async () => {
+    await prepared();
+    const f = stubFetch(() => answer([shopAt(1, 60, { shop: 'bakery', name: 'Forno', opening_hours: 'Mo-Sa 07:00-18:00; PH off' })]));
+    await refreshStretch(50, 70, deps(f, { zoneAt: () => null }));
+    const shop = (await readInputs(NOW))!.hours.find((h) => h.placeId === 'n1')!;
+    expect(shop.spans.some((s) => s.state === 'open' && s.from.getTime() === at('2026-10-17 07:00').getTime())).toBe(true);
+  });
+
+  test('[RFS-RECORD] the opening-hours library stays a lazy chunk: no static import from overpass.ts reaches it', () => {
+    const seen = new Set<string>();
+    const reaches = (file: string): boolean => {
+      if (seen.has(file)) return false;
+      seen.add(file);
+      const text = readFileSync(file, 'utf8');
+      for (const m of text.matchAll(/^import(?!\s+type)[^;]*?from\s+'([^']+)'/gms)) {
+        const spec = m[1]!;
+        if (spec === 'opening_hours') return true;
+        if (!spec.startsWith('.')) continue;
+        const next = new URL(spec.endsWith('.ts') ? spec : `${spec}.ts`, pathToFileURL(file));
+        if (reaches(fileURLToPath(next))) return true;
+      }
+      return false;
+    };
+    expect(reaches(fileURLToPath(new URL('../../../src/core/hours/spans.ts', import.meta.url)))).toBe(true); // the check can see it
+    seen.clear();
+    expect(reaches(fileURLToPath(new URL('../../../src/data/overpass.ts', import.meta.url)))).toBe(false);
   });
 });

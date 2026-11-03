@@ -7,7 +7,7 @@ import { fetchedLabel } from '../core/engines/weather.ts';
 import { modelsForRoute } from '../core/engines/weather-classes.ts';
 import type { Km, ModelRun, RoutePoint, StoredForecast } from '../core/types.ts';
 import { W } from '../core/wording/en.ts';
-import { fetchForecast, fetchModelRuns, forecastDaysFor, gridPoints } from './openmeteo.ts';
+import { fetchForecast, fetchModelRuns, forecastDaysFor, gridPoints, WeatherServiceError } from './openmeteo.ts';
 import type { FetchLike } from './openmeteo.ts';
 import type { WeatherMode } from './weather-mode.ts';
 
@@ -104,10 +104,10 @@ export const keepFreshOffered = (mode: WeatherMode): boolean => mode === 'auto';
 export type WeatherStore = {
   read(): Promise<{
     route: Parameters<typeof gridPoints>[0]; departureDate: string | null; prepared: boolean; forecast: StoredForecast | null; lastAttemptAt: Date | null;
-    routeZones: Parameters<typeof zoneLookupOf>[0];
+    routeZones: Parameters<typeof zoneLookupOf>[0]; finished?: boolean;
   } | null>;
   reserve(routeId: string, now: Date, gapMs: number): Promise<boolean>;
-  save(routeId: string, forecast: StoredForecast): Promise<boolean>;
+  save(routeId: string, forecast: StoredForecast): Promise<'saved' | 'gone' | 'older'>;
 };
 
 export type RefreshDeps = {
@@ -125,15 +125,17 @@ const NOTHING: RefreshResult = { fetched: false, say: null };
  * every failure leaves the stored forecast as it was. Never throws: the rider sees the sentence, and the old forecast.
  */
 export async function refreshWeather(deps: RefreshDeps, trigger: Trigger): Promise<RefreshResult> {
+  const tapped = trigger === 'tap';
+  const told = (say: string): RefreshResult => ({ fetched: false, say: tapped ? say : null });
   let state: Awaited<ReturnType<WeatherStore['read']>>;
   try {
     state = await deps.store.read();
   } catch {
-    return NOTHING;
+    return told(W.appStoreNotKept);
   }
-  if (!state || !state.prepared) return NOTHING; // without a prepared trip, nothing is contacted
+  if (!state) return NOTHING; // no route, no Update weather
   const grid = gridPoints(state.route);
-  if (grid.length === 0) return NOTHING;
+  if (!state.prepared || grid.length === 0) return told(W.weatherNotPrepared); // without a prepared trip, nothing is contacted
 
   const now = deps.now();
   const zone = zoneLookupOf(state.routeZones);
@@ -160,23 +162,24 @@ export async function refreshWeather(deps: RefreshDeps, trigger: Trigger): Promi
   try {
     turn = await deps.store.reserve(state.route.id, now, trigger === 'tap' ? SPACING_MS : AUTO_SPACING_MS);
   } catch {
-    return { fetched: false, say: trigger === 'tap' ? W.weatherNotKept(fetched) : null };
+    return told(W.weatherNotKept(fetched));
   }
-  if (!turn) return NOTHING; // another window has just asked, or the route has gone
+  if (!turn) return told(W.weatherOtherWindow); // another window has just asked, or the route has gone
 
   const today = localIsoDate(now, zone(0).timeZone);
   let forecast: StoredForecast;
   try {
     forecast = await fetchForecast(grid, {
-      days: forecastDaysFor(state.route, state.departureDate, today), with15: deps.mode === 'auto', fetch: deps.fetch, now: () => now, runs: whole ? mattering : [],
+      days: forecastDaysFor(state.route, state.departureDate, today, state.finished === true), with15: deps.mode === 'auto', fetch: deps.fetch, now: () => now, runs: whole ? mattering : [],
     });
-  } catch {
-    return { fetched: false, say: trigger === 'tap' ? W.weatherNoAnswer(fetched) : null };
+  } catch (e) {
+    return told(e instanceof WeatherServiceError && e.kind === 'incomplete' ? W.weatherIncomplete(fetched) : W.weatherNoAnswer(fetched));
   }
   try {
     const saved = await deps.store.save(state.route.id, forecast);
-    return { fetched: saved, say: null };
+    if (saved === 'saved') return { fetched: true, say: null };
+    return told(saved === 'gone' ? W.weatherRouteChanged : W.weatherNewerSaved);
   } catch {
-    return { fetched: false, say: trigger === 'tap' ? W.weatherNotKept(fetched) : null };
+    return told(W.weatherNotKept(fetched));
   }
 }

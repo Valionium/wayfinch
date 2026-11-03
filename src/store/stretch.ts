@@ -96,4 +96,47 @@ async function saving(routeId: string, batch: StretchBatch): Promise<boolean> {
   return saved;
 }
 
-export const stretchStore = { read: readStretchState, known: readKnownPlaces, save: saveStretch };
+/**
+ * The Overpass service's turn, for every window: `notBefore` holds its last "wait", `busyUntil` a run under way. It is about the
+ * service, not the route, so it is no `route:` key and stays when the route is replaced.
+ */
+export const OVERPASS_META = 'overpass';
+type Turn = { notBefore: Date | null; busyUntil: Date | null };
+const goodDate = (d: unknown): d is Date => d instanceof Date && Number.isFinite(d.getTime());
+const readTurn = async (tx: Tx): Promise<Turn> => {
+  const raw = (await tx.objectStore('meta').get(OVERPASS_META)) as Partial<Turn> | undefined;
+  return { notBefore: goodDate(raw?.notBefore) ? raw.notBefore : null, busyUntil: goodDate(raw?.busyUntil) ? raw.busyUntil : null };
+};
+
+/**
+ * Takes the turn to ask Overpass, in one transaction. Refused while another window's run holds it, or while the service's
+ * last wait lasts. A stamp further ahead than `leaseMs` or `maxWaitMs` (the clock moved back) holds nothing up.
+ */
+export function takeOverpassTurn(now: Date, leaseMs: number, maxWaitMs: number): Promise<{ ok: true } | { ok: false; why: 'busy' | 'wait'; until: Date }> {
+  return tracked(inTx(['meta'], 'readwrite', async (tx) => {
+    const turn = await readTurn(tx);
+    const ahead = (d: Date | null, most: number): boolean => d !== null && d.getTime() > now.getTime() && d.getTime() - now.getTime() <= most;
+    if (ahead(turn.busyUntil, leaseMs)) return { ok: false as const, why: 'busy' as const, until: turn.busyUntil! };
+    if (ahead(turn.notBefore, maxWaitMs)) return { ok: false as const, why: 'wait' as const, until: turn.notBefore! };
+    await tx.objectStore('meta').put({ notBefore: null, busyUntil: new Date(now.getTime() + leaseMs) }, OVERPASS_META);
+    return { ok: true as const };
+  }));
+}
+
+/** Records the service's wait, so a new tap or another window keeps it too. */
+export function holdOverpass(notBefore: Date): Promise<void> {
+  return tracked(inTx(['meta'], 'readwrite', async (tx) => {
+    const turn = await readTurn(tx);
+    await tx.objectStore('meta').put({ ...turn, notBefore }, OVERPASS_META);
+  }));
+}
+
+/** Ends this window's run; the wait stays. */
+export function releaseOverpass(): Promise<void> {
+  return tracked(inTx(['meta'], 'readwrite', async (tx) => {
+    const turn = await readTurn(tx);
+    await tx.objectStore('meta').put({ ...turn, busyUntil: null }, OVERPASS_META);
+  }));
+}
+
+export const stretchStore = { read: readStretchState, known: readKnownPlaces, save: saveStretch, turn: takeOverpassTurn, hold: holdOverpass, release: releaseOverpass };
