@@ -32,6 +32,7 @@ test('[WIDE-UNDER-600] at 360 x 640 no rule of the wide layout applies: the scre
   await open(page, 360, 640);
   // Every element's place and every computed style, in one text. A picture of the page would do, but the drawing of the bike
   // is not the same pixel for pixel from one paint to the next; the geometry and the styles are what a picture is made of.
+  const NL = String.fromCharCode(10);
   const look = (): Promise<string> => page.evaluate(() => [...document.querySelectorAll('body *')].map((el) => {
     const r = el.getBoundingClientRect();
     const cs = getComputedStyle(el);
@@ -68,7 +69,15 @@ test('[WIDE-UNDER-600] at 360 x 640 no rule of the wide layout applies: the scre
     });
     expect(removed).toBeGreaterThan(0);
     const without = await stable();
-    expect(without, `${screen} differs`).toBe(withWide);
+    if (without !== withWide) {
+      const a = withWide.split(NL);
+      const b = without.split(NL);
+      const at = a.findIndex((line, i) => line !== b[i]);
+      const [x, y] = [a[at] ?? '', b[at] ?? ''].map((l) => l.split(';'));
+      const [p, q] = [x!, y!];
+      const field = p.findIndex((v, i) => v !== q[i]);
+      throw new Error(`${screen} differs at element ${at}: ${p[0]!.slice(0, 80)} | ${p[field]} vs ${q[field]}`);
+    }
     await page.reload({ waitUntil: 'domcontentloaded' });
   }
 });
