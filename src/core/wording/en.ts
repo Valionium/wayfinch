@@ -593,6 +593,12 @@ export const W = {
   appStoreImportProfile: "The rider details in this file can't be read. Nothing was changed.",
   appStoreImportSettings: "The settings in this file can't be read. Nothing was changed.",
   appStoreImportCalibration: "The water learning in this file can't be read. Nothing was changed.",
+  // Refresh this stretch (sub-project 5, group 4).
+  appStretchNotice: "This sends the outline of this stretch to the Overpass service, a public OpenStreetMap service. Nothing else about you or your ride goes with it.",
+  appStretchSaved: (from: string, to: string, places: number): string => `Km ${from}–${to} refreshed: ${places} ${places === 1 ? 'place' : 'places'} from OpenStreetMap.`,
+  appStretchPartial: (kms: string, places: number): string => `Only km ${kms} refreshed, with ${places} ${places === 1 ? 'place' : 'places'}. The Overpass service didn't answer for the rest.`,
+  appStretchFailed: (from: string, to: string): string => `The Overpass service didn't answer for km ${from}–${to}. Nothing changed. Try again later.`,
+  appStretchNotKept: "This phone didn't keep that stretch. Check the phone's free storage.",
   appStoreImportTyres: "The tyre details in this file can't be read. Nothing was changed.",
 };
 

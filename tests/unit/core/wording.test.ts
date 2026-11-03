@@ -13,6 +13,9 @@ const areaOf = (key: string): string | undefined =>
 
 // Test values for each template function. A new template without an entry here fails the test below.
 const TEMPLATE_ARGS: Record<string, unknown[][]> = {
+  appStretchSaved: [['50', '70', 12], ['50', '70', 1]],
+  appStretchPartial: [['70–90', 12], ['70–90', 1]],
+  appStretchFailed: [['50', '70']],
   weatherNoSignal: [['07:10'], [null]],
   weatherNoAnswer: [['07:10'], [null]],
   weatherNewest: [['10:00', '14:30'], [null, null]],
