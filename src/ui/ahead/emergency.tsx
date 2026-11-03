@@ -29,7 +29,7 @@ export function EmergencyPanel({ card, canShare, actions }: { card: EmergencyCar
       </ul>
       {card.notes.length > 0 ? <ul class="ah-notes">{card.notes.map((n, i) => <li key={i}>{n}</li>)}</ul> : null}
       {card.updatePosition ? <p><button type="button" class="btn" onClick={() => void actions.updatePosition()}>{W.emergencyUpdatePosition}</button></p> : null}
-      {rest.length > 0 ? <ListMore items={rest} render={(x) => <Item item={x} />} /> : <p class="muted">{W.appAheadEmergencyNoPosition}</p>}
+      {rest.length > 0 ? <ListMore items={rest} render={(x) => <Item item={x} plain />} /> : <p class="muted">{W.appAheadEmergencyNoPosition}</p>}
       {card.share ? (
         sharing
           ? <ShareSheet id="location" title={W.appAheadEmergencyShare} text={card.share} canShare={canShare} actions={actions} onClose={() => setSharing(false)} />

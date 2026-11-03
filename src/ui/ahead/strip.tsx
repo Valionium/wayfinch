@@ -2,6 +2,7 @@
 // facing the way of travel, the places at their kilometre and the rain bands. Bands are solid, hatched, or red with a bolt, and
 // say so in words: colour is never the only signal. Tapping an icon or a band opens its card. Where things sit is drawing only:
 // every kilometre and word comes from the screen.
+import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { BikeRecord } from '../../core/bike/normalise.ts';
 import type { CardName, Strip, StripBand, StripIcon } from '../../core/screen/screen.ts';
 import { showKm, W } from '../../core/wording/en.ts';
@@ -46,13 +47,14 @@ const along = (km: number, s: Strip): number => {
 };
 const pct = (x: number): string => `${(x * 100).toFixed(2)}%`;
 
-/** Icons that would cover each other go to a row below: each stays its own tap target. */
-const ROW_GAP = 0.14;
-function rowsOf(icons: StripIcon[], s: Strip): number[] {
+/** Icons that would cover each other go to a row below: each stays its own 44 px tap target. */
+const ICON_PX = 46;
+function rowsOf(icons: StripIcon[], s: Strip, trackPx: number): number[] {
+  const gap = ICON_PX / Math.max(trackPx, ICON_PX);
   const last: number[] = [];
   return icons.map((icon) => {
     const x = along(icon.km, s);
-    let row = last.findIndex((end) => x - end >= ROW_GAP);
+    let row = last.findIndex((end) => x - end >= gap);
     if (row < 0) row = last.length;
     last[row] = x;
     return row;
@@ -60,7 +62,16 @@ function rowsOf(icons: StripIcon[], s: Strip): number[] {
 }
 
 export function RouteStrip({ strip, bike, onOpen }: { strip: Strip; bike: BikeRecord | null; onOpen: (card: CardName) => void }) {
-  const rows = rowsOf(strip.icons, strip);
+  // The track's width decides which icons share a row; before it is measured, a phone's width is assumed.
+  const track = useRef<HTMLDivElement>(null);
+  const [trackPx, setTrackPx] = useState(230);
+  useLayoutEffect(() => {
+    const measure = (): void => { const w = track.current?.clientWidth ?? 0; if (w > 0) setTrackPx(w); };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+  const rows = rowsOf(strip.icons, strip, trackPx);
   const rowCount = Math.max(1, ...rows.map((r) => r + 1));
   return (
     <section class="ah-strip" aria-label={W.appAheadStripLabel(strip.label, showKm(strip.startKm), showKm(strip.endKm))} data-strip>
@@ -70,7 +81,7 @@ export function RouteStrip({ strip, bike, onOpen }: { strip: Strip; bike: BikeRe
       </div>
       <div class="ah-strip-body">
         <BikeMarker bike={bike} />
-        <div class="ah-strip-track">
+        <div class="ah-strip-track" ref={track}>
           <div class="ah-strip-line" />
           <div class="ah-strip-bands">
             {strip.bands.map((b, i) => (

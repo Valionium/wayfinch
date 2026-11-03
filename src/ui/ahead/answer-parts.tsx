@@ -30,12 +30,13 @@ export function Detail({ text, links, describedBy }: { text: string; links?: Ite
   return <span class="ah-detail">{out}</span>;
 }
 
-export function Item({ item, children }: { item: AnswerItem; children?: ComponentChildren }) {
+/** `plain`: no status word, for the Emergency card, whose lines are facts, not judgements. */
+export function Item({ item, children, plain = false }: { item: AnswerItem; children?: ComponentChildren; plain?: boolean }) {
   const id = useId();
   return (
     <>
       <span class="ah-item-label" id={id}>{item.label}</span>
-      {item.status !== 'fine' ? <> <StatusBadge status={item.status} /></> : null}
+      {item.status !== 'fine' && !plain ? <> <StatusBadge status={item.status} /></> : null}
       {item.detail ? <> <Detail text={item.detail} links={item.links} describedBy={id} /></> : null}
       {children}
     </>

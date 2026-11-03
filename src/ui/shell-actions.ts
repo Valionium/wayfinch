@@ -26,7 +26,7 @@ import { readMapLink, writeMapLink } from '../store/share-choice.ts';
 import { weatherStore } from '../store/weather.ts';
 import type { AheadActions, AheadTrip, AheadView, PositionState, Town } from './ahead/actions.ts';
 import { bikeSource } from './bike/live.ts';
-import { noteTripFacts } from './degraded.ts';
+import { noteRoute, noteTripFacts } from './degraded.ts';
 import { isFailure, locateFix, manualAt, onPass, ROUTINE, watchBest } from './position.ts';
 import type { Failure } from './position.ts';
 import { agoText } from './trip/model.ts';
@@ -127,6 +127,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       shareOld, mapLink: readMapLink(), canShare: deps.share !== null, position, weatherSay, weatherBusy,
     };
     view.value = next;
+    noteRoute(true);
   };
 
   const noRoute = (at: Date): void => {

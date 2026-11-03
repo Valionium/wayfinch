@@ -212,6 +212,11 @@ describe('no route', () => {
     expect(host.textContent).not.toMatch(/demo/i);
     await click(buttonNamed('Emergency'));
     expect(host.querySelector('#chip-emergency a[href="tel:112"]')).not.toBeNull();
+    // Once a route's answers show, the notice goes.
+    await seed(rainyStop());
+    window.dispatchEvent(new StorageEvent('storage', { key: 'copilot:changed', newValue: JSON.stringify({ at: Date.now() + 1, section: 'trip' }) }));
+    await until(() => host.querySelector('.ahead[data-ahead="answers"], .ahead[data-ahead="first-use"]') !== null, 'the route on Ahead');
+    expect(host.textContent).not.toContain("Add a route to see what's ahead");
   });
 });
 

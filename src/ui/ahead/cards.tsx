@@ -53,6 +53,10 @@ function TopicCard({ name, answer, stamp, open, onToggle, v, actions, onShelter 
         {stamp ? <span class="ah-stamp">{stamp}</span> : null}
       </p>
       {answer.detail ? <p class="ah-card-detail"><Detail text={answer.detail} /></p> : null}
+      {/* "Stopping for the night? Plan tomorrow" asks for the very tap the Daylight card offers. */}
+      {name === 'sleep' && answer.detail.includes(W.sleepPlanTomorrow) ? (
+        <p><button type="button" class="btn" onClick={() => void actions.planTomorrow(v.screen.ride.date)}>{W.daylightPlanTomorrow}</button></p>
+      ) : null}
       {asksWater && !open ? <WaterQuestion stillAboutL={v.stillAboutL} actions={actions} /> : null}
       <div id={body} hidden={!open}>
         {open ? (

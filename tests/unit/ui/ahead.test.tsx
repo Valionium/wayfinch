@@ -119,6 +119,10 @@ describe('cards', () => {
     await click(buttonNamed(W.daylightPlanTomorrow));
     expect(calls).toContainEqual(['planTomorrow', riding.screen.ride.date]);
     expect(riding.screen.ride.date).toBe(SAT);
+    // Sleep's "Stopping for the night? Plan tomorrow" gives the same tap.
+    expect(riding.screen.cards.sleep.detail).toContain(W.sleepPlanTomorrow);
+    await click(buttonNamed(W.daylightPlanTomorrow, host.querySelector('[data-card="sleep"]')!));
+    expect(calls.filter((c) => c[0] === 'planTomorrow')).toEqual([['planTomorrow', SAT], ['planTomorrow', SAT]]);
 
     const after = trip(viewOf(rainyStop({ plan: { date: SAT, backToTodayAt: null } })));
     expect(after.screen.phase).toBe('after-ride');
@@ -174,6 +178,10 @@ describe('the strip', () => {
       expect(Number(icons[n]!.dataset.km)).toBe(icon.km);
       expect(parseFloat(icons[n]!.style.left)).toBeCloseTo(((icon.km - s.startKm) / (s.endKm - s.startKm)) * 100, 1);
     });
+    // Icons sharing a row never cover each other: each keeps its own 44 px target on a phone-wide track.
+    const byRow = new Map<string, number[]>();
+    for (const b of icons) byRow.set(b.style.top, [...(byRow.get(b.style.top) ?? []), parseFloat(b.style.left)]);
+    for (const xs of byRow.values()) xs.sort((a, b) => a - b).forEach((x, n) => { if (n > 0) expect(x - xs[n - 1]!).toBeGreaterThanOrEqual((46 / 230) * 100 - 0.01); });
     const food = icons.find((b) => b.classList.contains('ah-icon-food'))!;
     await click(food);
     expect(host.querySelector('[data-card="food"] .ah-toggle')!.getAttribute('aria-expanded')).toBe('true');
@@ -269,6 +277,8 @@ describe('Emergency', () => {
     expect(card.textContent).toContain(W.emergencyFallback);
     expect(card.textContent).toContain(v.screen.chips.emergency.coords!);
     expect(() => buttonNamed('Share my location', card)).not.toThrow();
+    // Its lines are facts: no "Unknown" beside the route kilometre or the settlement.
+    expect(card.querySelectorAll('.badge')).toHaveLength(0);
   });
   test('[AH-EMERGENCY] in every state: no route, first use, no position; 112 and the fallback line stand', async () => {
     const states = [
