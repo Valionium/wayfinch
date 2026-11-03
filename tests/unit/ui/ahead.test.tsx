@@ -8,7 +8,7 @@ import { AheadScreen } from '../../../src/ui/ahead/ahead.tsx';
 import { railSignal } from '../../../src/ui/wide/wide.ts';
 import { buildScreen, type Screen } from '../../../src/core/screen/screen.ts';
 import type { Answer } from '../../../src/core/types.ts';
-import { W } from '../../../src/core/wording/en.ts';
+import { showKm, W } from '../../../src/core/wording/en.ts';
 import type { AheadTrip } from '../../../src/ui/ahead/actions.ts';
 import { flatRoute, pos, testTrip } from '../../fixtures/build.ts';
 import { bannedHits } from '../../fixtures/banned.ts';
@@ -187,6 +187,17 @@ describe('cards', () => {
     railSignal.value = false;
   });
 
+  test('[AH-EMERGENCY] Update position inside Emergency says what it is doing there: finding, or why it could not', async () => {
+    const { actions } = fakeActions();
+    const base = trip(viewOf(rainyStop()));
+    for (const [position, words] of [[{ kind: 'watching' as const }, W.appAheadFinding], [{ kind: 'said' as const, text: W.appAheadDenied }, W.appAheadDenied]] as const) {
+      await show({ ...base, position }, actions);
+      await click(buttonNamed('Emergency', host.querySelector('.ah-chips')!));
+      const panel = host.querySelector('#chip-emergency')!;
+      expect(panel.querySelector('[role="status"]')?.textContent, words).toContain(words);
+    }
+  });
+
   test('[AH-WATER-Q] with water confirmed, a refill is one tap on the closed card: the quick choices stay, "Still about" does not', async () => {
     const i = rainyStop();
     const v = trip(viewOf({ ...i, waterLeft: { litres: 1.2, at: new Date(i.now.getTime() - 5 * 60_000), confirmed: true } }));
@@ -233,11 +244,17 @@ describe('the strip', () => {
     const bands = [...host.querySelectorAll<HTMLButtonElement>('.ah-band')];
     expect(bands.map((b) => b.dataset.kind)).toEqual(kinds);
     for (const b of bands) {
-      expect(b.getAttribute('aria-label')).toMatch(/^(Rain likely|Rain possible|Thunderstorm), km [\d.]+–[\d.]+$/);
+      expect(b.getAttribute('aria-label')).toMatch(/^(Rain likely|Rain possible|Thunderstorm)( at your stop)?, km [\d.]+(–[\d.]+)?$/);
+      expect(b.getAttribute('aria-label')).not.toMatch(/km ([\d.]+)–$/);
       expect(b.classList.contains(`ah-band-${b.dataset.kind}`)).toBe(true);
       expect(b.querySelector('svg.ah-bolt') !== null).toBe(b.dataset.kind === 'thunder');
     }
     expect(text()).toContain(W.appAheadStripKey);
+    // A band of no length, at the day's stop: it says so, never "km 82.2–82.2".
+    const atStop = { ...v, screen: { ...v.screen, strip: { ...v.screen.strip, bands: [{ fromKm: v.screen.strip.endKm, toKm: v.screen.strip.endKm, kind: 'thunder' as const, opens: 'weather' as const }] } } };
+    await show(atStop, fakeActions().actions);
+    expect(host.querySelector('.ah-band')!.getAttribute('aria-label')).toBe(`Thunderstorm at your stop, km ${showKm(v.screen.strip.endKm)}`);
+    await show(v, fakeActions().actions);
     const s = v.screen.strip;
     expectIconsPlaced(s);
     const food = [...host.querySelectorAll<HTMLButtonElement>('.ah-icon')].find((b) => b.classList.contains('ah-icon-food'))

@@ -270,11 +270,19 @@ function rainHereTitle(f: WeatherFacts): Here | null {
   return { title: until ? W.weatherRainHereUntil(formatRainEnd(until, tz)) : W.weatherRainHere, line: detailFor(f.now, forecast.fetchedAt) === '30min' ? W.weatherScenariosShowRain(n, formatRainEnd(f.now, tz).replace('about ', '')) : null };
 }
 
+/** When a storm at the night's stop comes, in words: "now" while it is on, "later today" before the evening, else "tonight". */
+function stormWhen(f: WeatherFacts, from: Date, to: Date, tz: string): string {
+  if (f.ride.phase === 'before-trip') return W.weatherOnTheNightOf(shortDay(from, tz));
+  if (validDate(f.now) && from.getTime() <= f.now.getTime() && f.now.getTime() < to.getTime()) return W.weatherStormNow;
+  if (validDate(f.now) && from.getTime() > f.now.getTime() && localIsoDate(from, tz) === localIsoDate(f.now, tz) && wallClock(from, tz).hour < EVENING_HOUR) return W.weatherLaterToday;
+  return W.weatherTonight;
+}
+const EVENING_HOUR = 18;
+
 function nightStormTitle(f: WeatherFacts, r: WeatherReason & { kind: 'night-thunder' }): string {
   const tz = zoneAt(f, r.km);
   const hours = f.forecast && detailFor(r.to, f.forecast.fetchedAt) === '30min' ? W.rainHours(formatHm(r.from, tz), formatHm(r.to, tz)) : null;
-  const when = f.ride.phase === 'before-trip' ? W.weatherOnTheNightOf(shortDay(r.from, tz)) : W.weatherTonight;
-  return W.weatherThunderNight(showKm(r.km), when, hours);
+  return W.weatherThunderNight(showKm(r.km), stormWhen(f, r.from, r.to, tz), hours);
 }
 
 function seasonalLine(f: WeatherFacts, gap: Km): string | null {
@@ -339,7 +347,7 @@ function nightItem(f: WeatherFacts, night: NightLow): AnswerItem {
   if (outdoorStay(f) && night.thunderHours) {
     const tz = zoneAt(f, night.km);
     const within = f.forecast && detailFor(night.thunderHours.to, f.forecast.fetchedAt) === '30min';
-    parts.push(W.weatherThunderNight(showKm(night.km), f.ride.phase === 'before-trip' ? W.weatherOnTheNightOf(shortDay(night.thunderHours.from, tz)) : W.weatherTonight, within ? W.rainHours(formatHm(night.thunderHours.from, tz), formatHm(night.thunderHours.to, tz)) : null));
+    parts.push(W.weatherThunderNight(showKm(night.km), stormWhen(f, night.thunderHours.from, night.thunderHours.to, tz), within ? W.rainHours(formatHm(night.thunderHours.from, tz), formatHm(night.thunderHours.to, tz)) : null));
     if (night.hail) parts.push(W.weatherHail);
   }
   const status: Status = outdoorStay(f) && night.thunderHours ? 'warning' : outdoorStay(f) && night.lowC !== null && night.lowC <= 0 ? 'action' : 'fine';

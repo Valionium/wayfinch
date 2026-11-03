@@ -5,14 +5,14 @@ import { useState } from 'preact/hooks';
 import type { EmergencyCard } from '../../core/engines/emergency.ts';
 import { W } from '../../core/wording/en.ts';
 import { ListMore } from '../card.tsx';
-import type { AheadActions } from './actions.ts';
+import type { AheadActions, PositionState } from './actions.ts';
 import { Basis, Item } from './answer-parts.tsx';
 import { ShareSheet } from './share-sheet.tsx';
 
 /** Only digits and a leading +: what a dialler takes. The numbers come from the app's own dated table. */
 const telOf = (n: string): string => `tel:${n.replace(/[^\d+]/g, '')}`;
 
-export function EmergencyPanel({ card, canShare, actions }: { card: EmergencyCard; canShare: boolean; actions: AheadActions }) {
+export function EmergencyPanel({ card, canShare, actions, position }: { card: EmergencyCard; canShare: boolean; actions: AheadActions; position?: PositionState }) {
   const [sharing, setSharing] = useState(false);
   const numbers = card.items.filter((x) => card.numbers.includes(x.label));
   const rest = card.items.filter((x) => !card.numbers.includes(x.label));
@@ -28,7 +28,14 @@ export function EmergencyPanel({ card, canShare, actions }: { card: EmergencyCar
         ))}
       </ul>
       {card.notes.length > 0 ? <ul class="ah-notes">{card.notes.map((n, i) => <li key={i}>{n}</li>)}</ul> : null}
-      {card.updatePosition ? <p><button type="button" class="btn" onClick={() => void actions.updatePosition()}>{W.emergencyUpdatePosition}</button></p> : null}
+      {card.updatePosition ? <p><button type="button" class="btn" onClick={() => void actions.updatePosition()} aria-busy={position?.kind === 'watching' ? 'true' : undefined}>{W.emergencyUpdatePosition}</button></p> : null}
+      {/* The same words as at the top of Ahead, here where the tap was: the rider may not see the top from here. */}
+      {position ? (
+        <div role="status" aria-live="polite">
+          {position.kind === 'watching' ? <p>{W.appAheadFinding}</p> : null}
+          {position.kind === 'said' ? <p class="notice">{position.text}</p> : null}
+        </div>
+      ) : null}
       {rest.length > 0 ? <ListMore items={rest} render={(x) => <Item item={x} plain />} /> : <p class="muted">{W.appAheadEmergencyNoPosition}</p>}
       {card.share ? (
         sharing

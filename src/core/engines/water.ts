@@ -473,6 +473,8 @@ const trim = (x: number): string => String(Math.round(x * 100) / 100);
 const upToTenth = (x: number): number => Math.ceil(x * 10 - 1e-9) / 10;
 const showUp = (x: number): string => trim(upToTenth(x));
 const showNear = (x: number): string => trim(Math.round(x * 10) / 10);
+/** A need in words: a small one that rounds to 0 reads "under 0.1", never 0, which would say none is needed. */
+const showNeed = (x: number): string => (x > 0 && x < 0.05 ? W.waterUnderTenth : showNear(x));
 
 const nameOf = (t: Target): string => {
   if (t.kind === 'end') return W.waterRouteEnd;
@@ -642,7 +644,7 @@ export function waterAnswer(f: WaterFacts): Answer {
   // The lines every card carries.
   const lines: string[] = [];
   if (s1.kind !== 'place' && s1.km - f.ride.startKm >= 0.05) lines.push(W.waterNoSource(showKm(s1.km - f.ride.startKm)));
-  lines.push(W.waterExpectedPlanned(nameOf(s1), showNear(expectedS1), showNear(useS1)), calibrationOf(f));
+  lines.push(W.waterExpectedPlanned(nameOf(s1), showNeed(expectedS1), showNeed(useS1)), calibrationOf(f));
   const rideHours = f.schedule.ridingMinTo(f.ride.stopKm) / 60;
   if (f.profile.ebike || listS2.some((s) => outsideRange({ planT: s.planT, elevM: s.elevM, ridingHours: rideHours }))) lines.push(W.waterOutsideRange);
 
@@ -658,7 +660,8 @@ export function waterAnswer(f: WaterFacts): Answer {
 
   if (!now.confirmed) {
     const asks = now.stillAbout === null ? [] : [W.waterStillAbout(showNear(now.stillAbout))];
-    return card('unknown', W.waterConfirm, asks, [...targetItems, ...nearby()]);
+    // At the route end there is no next stretch to check: only tonight's water.
+    return card('unknown', atRouteEnd(f) ? W.waterConfirmAtEnd : W.waterConfirm, asks, [...targetItems, ...nearby()]);
   }
 
   const w0 = now.litres;

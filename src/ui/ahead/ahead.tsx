@@ -87,7 +87,7 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
       {v.answers ? <TopicCards screen={s} open={open} onToggle={toggle} v={v} actions={actions} onShelter={() => openChip('shelter')} /> : null}
       <div class="ah-below">
         <ChipRow shown={v.answers ? CHIP_ORDER : ['emergency']} open={chip} onOpen={openChip} />
-        {chip ? <ChipPanel chip={chip} screen={s} canShare={v.canShare} actions={actions} onClose={() => setChip(null)} /> : null}
+        {chip ? <ChipPanel chip={chip} screen={s} canShare={v.canShare} actions={actions} onClose={() => setChip(null)} position={v.position} /> : null}
       </div>
     </div>
   );

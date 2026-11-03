@@ -41,7 +41,7 @@ function ItemControl({ name, label, v, actions, onShelter }: { name: CardName; l
 
 function TopicCard({ name, answer, stamp, open, onToggle, v, actions, onShelter }: CardProps) {
   const body = `card-${name}-body`;
-  const asksWater = name === 'water' && answer.title === W.waterConfirm;
+  const asksWater = name === 'water' && (answer.title === W.waterConfirm || answer.title === W.waterConfirmAtEnd);
   return (
     <section class={`card ah-card ah-status-${answer.status}`} id={`card-${name}`} data-card={name}>
       <p class="ah-topic">{TOPIC[name]}</p>

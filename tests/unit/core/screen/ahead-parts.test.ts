@@ -107,6 +107,22 @@ describe('inside the radius of an approximate fix', () => {
   });
 });
 
+describe('the water estimate in words', () => {
+  test('[AH-WATER-Q] a short leg’s small need reads "under 0.1 L", never "expected 0 L, planned 0 L"', () => {
+    const spots = [...RAINY_SPOTS, { b: tap(), km: 125.3 }];
+    const s = screen(rainyStop({ spots }));
+    expect(s.cards.water.detail).not.toMatch(/expected 0 L, planned 0 L/);
+    expect(s.cards.water.detail).toMatch(/expected under 0\.1 L, planned under 0\.1 L\./);
+  });
+  test('[AH-WATER-Q] at the route end the water question asks for no "next stretch"', () => {
+    const i = rainyStop({ routeEndDate: SAT, positions: [pos({ km: 165, at: `${SAT} 14:20` })] });
+    const s = screen({ ...i, waterLeft: { litres: 1, at: new Date(i.now.getTime() - 60 * 60_000), confirmed: false } });
+    expect(s.phase).toBe('route-end');
+    expect(s.cards.water.title).not.toMatch(/next stretch/);
+    expect(s.cards.water.title).toBe(W.waterConfirmAtEnd);
+  });
+});
+
 describe('basis words with their age', () => {
   test('[INV-22] the Water card says its age in words, as Food and Weather do: the map data date and the forecast fetch time', () => {
     const s = screen(rainyStop());

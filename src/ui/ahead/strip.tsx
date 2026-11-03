@@ -14,6 +14,19 @@ const ICON_WORD: Record<StripIcon['kind'], (km: string) => string> = {
 const BAND_WORD: Record<StripBand['kind'], (from: string, to: string) => string> = {
   likely: W.appAheadBandLikely, possible: W.appAheadBandPossible, thunder: W.appAheadBandThunder,
 };
+/** A band's words: "km 140–146"; one of no length at the day's stop is "at your stop"; one of no length elsewhere names its km. */
+function bandWords(b: StripBand, stopKm: number): string {
+  const [from, to] = [showKm(b.fromKm), showKm(b.toKm)];
+  if (from !== to) return BAND_WORD[b.kind](from, to);
+  return to === showKm(stopKm) ? BAND_AT_STOP[b.kind](to) : BAND_AT_KM[b.kind](to);
+}
+const BAND_AT_KM: Record<StripBand['kind'], (km: string) => string> = {
+  likely: W.appAheadBandLikelyAtKm, possible: W.appAheadBandPossibleAtKm, thunder: W.appAheadBandThunderAtKm,
+};
+/** A band of no length lies where the day's ride stops (the rider is planned to be there when it comes). */
+const BAND_AT_STOP: Record<StripBand['kind'], (km: string) => string> = {
+  likely: W.appAheadBandLikelyAtStop, possible: W.appAheadBandPossibleAtStop, thunder: W.appAheadBandThunderAtStop,
+};
 
 /** Simple shapes, so an icon is told by its form as well as its place: a drop, a cup, a tent, a roof. */
 const ICON_PATH: Record<StripIcon['kind'], string> = {
@@ -149,7 +162,7 @@ export function RouteStrip({ strip, bike, onOpen, onSetPosition }: {
               <button
                 key={`b${i}`} type="button" class={`ah-band ah-band-${b.kind}`} data-kind={b.kind}
                 style={{ left: pct(along(b.fromKm, strip)), width: pct(Math.max(0, along(b.toKm, strip) - along(b.fromKm, strip))) }}
-                aria-label={BAND_WORD[b.kind](showKm(b.fromKm), showKm(b.toKm))} onClick={() => onOpen(b.opens)}
+                aria-label={bandWords(b, strip.endKm)} onClick={() => onOpen(b.opens)}
               >
                 {b.kind === 'thunder' ? <Bolt /> : null}
               </button>
