@@ -23,7 +23,7 @@ function jobsOf(text: string): Record<string, string> {
 /** A job's lines before `steps:`. */
 const headOf = (job: string) => job.slice(0, job.indexOf('\n    steps:\n'));
 /** A job's steps, each as its own text. */
-const stepsOf = (job: string) => job.slice(job.indexOf('\n    steps:\n') + '\n    steps:\n'.length).split(/^ {6}- /m).filter((step) => step.trim());
+const stepsOf = (job: string) => job.slice(job.indexOf('\n    steps:\n') + '\n    steps:\n'.length).split(/^ {6}- /m).filter((step) => step.split('\n').some((line) => line.trim() && !line.trim().startsWith('#')));
 const ifOf = (step: string) => /^\s*if: (.*)$/m.exec(step)?.[1] ?? '';
 const runOf = (step: string) => {
   const at = step.search(/^\s*run: /m);
@@ -46,10 +46,8 @@ describe('deploy.yml: who may start it, and what a merge does', () => {
     expect(text).toMatch(/workflow_run:\n\s+workflows: \[Pull request checks\]\n\s+types: \[completed\]\n\s+branches: \[main\]/);
     expect(workflow('pull-request.yml')).toMatch(/^name: Pull request checks$/m);
     const head = headOf(job('deploy.yml', 'decide'));
-    expect(head).toContain("github.event.workflow_run.conclusion == 'success'");
-    expect(head).toContain("github.event.workflow_run.event == 'push'");
-    expect(head).toContain("github.event.workflow_run.head_branch == 'main'");
-    expect(head).toContain('github.event.workflow_run.head_repository.full_name == github.repository');
+    const gate = /if: >-\n((?: {6}.*\n)+)/.exec(`${head}\n`)?.[1]?.trim().replace(/\s*\n\s*/g, ' ');
+    expect(gate).toBe("github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository");
     for (const name of ['decide', 'deploy']) {
       expect(job('deploy.yml', name)).toContain('ref: ${{ github.event.workflow_run.head_sha }}');
     }
@@ -62,6 +60,7 @@ describe('deploy.yml: who may start it, and what a merge does', () => {
     expect(headOf(approve)).toContain('environment: production-approval');
     expect(stepsOf(approve)).toHaveLength(1);
     expect(stepsOf(approve)[0]).toContain('echo');
+    expect(headOf(approve)).not.toContain('timeout-minutes');
     expect(approve).not.toContain('secrets.');
 
     const head = headOf(job('deploy.yml', 'deploy'));
@@ -89,6 +88,15 @@ describe('deploy.yml: who may start it, and what a merge does', () => {
     expect(ifOf(artifact)).toBe("steps.compare.outputs.changed == 'true'");
   });
 
+  test('[DEP-LATCH] decide may read the approval environment, and deployWithoutReviewer is off', () => {
+    const decideJob = job('deploy.yml', 'decide');
+    expect(headOf(decideJob)).toMatch(/permissions:\n\s+contents: read\n\s+issues: write\n\s+actions: read/);
+    const compare = stepsOf(decideJob).find((step) => step.includes('id: compare')) ?? '';
+    expect(compare).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(workflow('deploy.yml')).toContain('GH_REPO: ${{ github.repository }}');
+    expect(JSON.parse(read('build.config.json'))).toMatchObject({ deployWithoutReviewer: false });
+  });
+
   test('[DEP-UNCHANGED] the unchanged build\'s check runs in decide, and reports; decide can\'t upload', () => {
     const steps = stepsOf(job('deploy.yml', 'decide'));
     const check = steps.find((step) => step.includes('--report')) ?? '';
@@ -104,9 +112,18 @@ describe('deploy.yml: who may start it, and what a merge does', () => {
     expect(steps.slice(0, at).every((step) => /actions\/(checkout|setup-node)@/.test(step))).toBe(true);
     const guard = steps[at] ?? '';
     expect(guard).toContain('HEAD_SHA: ${{ github.event.workflow_run.head_sha }}');
-    expect(runOf(guard)).toContain('branches/main');
-    expect(runOf(guard)).toContain('--is-stale "$HEAD_SHA" "$head"');
-    expect(runOf(guard)).toContain('A newer merge exists; nothing deployed.');
+    expect(runOf(guard)).toContain('head=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)');
+    expect(runOf(guard)).toContain('--is-stale "$HEAD_SHA" "$head" --approved-attempt "$APPROVED_ATTEMPT" --this-attempt "$THIS_ATTEMPT"');
+    expect(guard).toContain('THIS_ATTEMPT: ${{ github.run_attempt }}');
+    expect(guard).toContain('APPROVED_ATTEMPT: ${{ needs.approve.outputs.attempt }}');
+  });
+
+  test('[DEP-STALE] approve records the try it was clicked on, so re-running deploy alone can\'t reuse it', () => {
+    const approve = job('deploy.yml', 'approve');
+    expect(headOf(approve)).toMatch(/outputs:\n\s+attempt: \$\{\{ steps\.attempt\.outputs\.attempt \}\}/);
+    const step = stepsOf(approve)[0] ?? '';
+    expect(step).toContain('id: attempt');
+    expect(runOf(step)).toContain('echo "attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"');
   });
 
   test('[DEP-STALE] after a stale exit nothing runs: no upload, no check, no issue, even from always()', () => {
@@ -140,6 +157,19 @@ describe('deploy.yml: who may start it, and what a merge does', () => {
     expect(workflow('deploy.yml')).toContain('GH_REPO: ${{ github.repository }}');
   });
 
+  test('[DEP-TRIGGERS] the bytes approved are the bytes uploaded: deploy downloads the artifact and never builds', () => {
+    const deploy = job('deploy.yml', 'deploy');
+    expect(deploy).toMatch(/download-artifact@v7[\s\S]*name: dist\n\s+path: dist/);
+    expect(deploy).not.toMatch(/build\.mjs|npm run build/);
+  });
+
+  test('[DEP-ONE-AT-A-TIME] a hung list can\'t hold the group: every list step has a short timeout', () => {
+    for (const id of ['before', 'after']) {
+      const step = stepsOf(job('deploy.yml', 'deploy')).find((s) => s.includes(`id: ${id}`)) ?? '';
+      expect(step, id).toContain('timeout-minutes: 2');
+    }
+  });
+
   test('[DEP-ROLL-ID] the version a rollback returns to is noted in the summary before the upload', () => {
     const steps = stepsOf(job('deploy.yml', 'deploy'));
     const before = steps.findIndex((step) => step.includes('id: before'));
@@ -151,12 +181,17 @@ describe('deploy.yml: who may start it, and what a merge does', () => {
 describe('who may reach the real Worker', () => {
   const wranglerLines = (text: string) => text.split('\n').filter((line) => /\bwrangler\s/.test(line) && !line.trim().startsWith('#'));
 
-  test('[DEP-TRIGGERS] of all workflows, only deploy\'s deploy job, emergency and rehearsal run wrangler deploy', () => {
+  // Any spelling that makes riders see something: npx wrangler@4 deploy, wrangler versions deploy, wrangler rollback.
+  const REACHES_RIDERS = /\bwrangler(@\S+)?\s+(deploy|rollback|versions\s+deploy)\b/;
+
+  test('[DEP-TRIGGERS] of all workflows, only deploy\'s deploy job, emergency and rehearsal run anything that reaches riders', () => {
     const files = readdirSync(join(REPO, '.github/workflows'));
-    const running = files.filter((file) => wranglerLines(workflow(file)).some((line) => /wrangler deploy\b/.test(line))).sort();
+    const running = files.filter((file) => REACHES_RIDERS.test(workflow(file))).sort();
     expect(running).toEqual(['deploy.yml', 'emergency.yml', 'rehearsal.yml']);
+    expect(wranglerLines(workflow('deploy.yml')).filter((line) => REACHES_RIDERS.test(line))).toHaveLength(1);
+    expect(workflow('rehearsal.yml')).not.toMatch(/wrangler(@\S+)?\s+(rollback|versions\s+deploy)/);
     const jobs = jobsOf(workflow('deploy.yml'));
-    expect(Object.keys(jobs).filter((name) => /wrangler deploy\b/.test(jobs[name] ?? ''))).toEqual(['deploy']);
+    expect(Object.keys(jobs).filter((name) => REACHES_RIDERS.test(jobs[name] ?? ''))).toEqual(['deploy']);
     expect(headOf(job('deploy.yml', 'deploy'))).toMatch(/needs: approve/);
   });
 
@@ -188,7 +223,7 @@ describe('who may reach the real Worker', () => {
     const lines = wranglerLines(workflow('preview.yml'));
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatch(/wrangler versions upload/);
-    expect(workflow('preview.yml')).not.toMatch(/wrangler (deploy|rollback|versions deploy)/);
+    expect(workflow('preview.yml')).not.toMatch(REACHES_RIDERS);
     expect(workflow('preview.yml')).toContain('--launch=on');
     expect(workflow('preview.yml')).toContain('Version Preview URL');
   });
@@ -245,41 +280,120 @@ describe('who may reach the real Worker', () => {
 describe('emergency.yml', () => {
   const steps = () => stepsOf(job('emergency.yml', 'emergency'));
   const find = (needle: string) => steps().find((step) => step.includes(needle)) ?? '';
+  const ROLLBACK_DONE = "steps.rollback.outcome == 'success'";
+  const SWITCH_DONE = "steps.switch.outcome == 'success'";
 
   test('[DEP-ROLL-ID] rollback goes through pickRollback, and only then wrangler rollback, with the marked message', () => {
     const pick = find('id: pick');
-    expect(ifOf(pick)).toBe("inputs.action == 'rollback'");
+    expect(ifOf(pick)).toBe("inputs.action == 'rollback' || inputs.action == 'check'");
     expect(pick).toContain('NAMED: ${{ inputs.version }}');
     expect(runOf(pick)).toContain('wrangler deployments list --json > rows.json');
     expect(runOf(pick)).toContain('--pick-rollback rows.json --named "$NAMED" --versions-dir versions');
     const rollback = find('id: rollback');
+    expect(ifOf(rollback)).toBe("inputs.action == 'rollback'");
     expect(rollback).toContain('VERSION: ${{ steps.pick.outputs.version }}');
     expect(runOf(rollback)).toContain(`wrangler rollback "$VERSION" --yes --message "${ROLLBACK_MESSAGE}`);
     expect(steps().indexOf(pick)).toBeLessThan(steps().indexOf(rollback));
   });
 
-  test('[DEP-SELF-LIST] both actions end with deploy-check --self', () => {
+  test('[DEP-TRIGGERS] the check action reads, says where a rollback would go, and stops: its branch holds no writing command', () => {
+    expect(workflow('emergency.yml')).toMatch(/options: \[check, rollback, switch\]/);
+    const WRITES = /\bwrangler(@\S+)?\s+(deploy|rollback|versions\s+(upload|deploy|secret)|delete|secret|triggers|tail)\b/;
+    const reachable = steps().filter((step) => {
+      const condition = ifOf(step);
+      return condition === '' || condition.includes("'check'");
+    });
+    expect(reachable.length).toBeGreaterThan(3);
+    for (const step of reachable) expect(runOf(step)).not.toMatch(WRITES);
+    // Everything else needs an action that isn't check, or a write that already happened.
+    for (const step of steps().filter((s) => WRITES.test(runOf(s)))) {
+      expect(["inputs.action == 'rollback'", "inputs.action == 'switch'"]).toContain(ifOf(step));
+    }
+    const say = find('A rollback would go to');
+    expect(ifOf(say)).toBe("inputs.action == 'check'");
+    expect(runOf(say)).toContain('A rollback would go to $VERSION');
+    expect(steps().indexOf(find('id: pick'))).toBeLessThan(steps().indexOf(say));
+  });
+
+  test('[DEP-SELF-LIST] a rollback isn\'t passed by the old site: the list is saved before, must change, and the version must be the one picked', () => {
+    const save = find('--save-live-list');
+    expect(ifOf(save)).toBe("inputs.action == 'rollback'");
+    expect(steps().indexOf(save)).toBeLessThan(steps().indexOf(find('id: rollback')));
     const self = find('--self');
-    expect(ifOf(self)).toBe("steps.rollback.outcome == 'success' || steps.switch.outcome == 'success'");
-    expect(runOf(self)).toContain('--self --origin "$LIVE_ORIGIN"');
+    expect(ifOf(self)).toBe(ROLLBACK_DONE);
+    expect(runOf(self)).toContain('--self --origin "$LIVE_ORIGIN" --changed-from before-list.txt');
+    const confirm = find('id: confirm');
+    expect(ifOf(confirm)).toBe(ROLLBACK_DONE);
+    expect(confirm).toContain('timeout-minutes: 2');
+    expect(runOf(confirm)).toContain('--live-version rows-after.json');
+    expect(runOf(confirm)).toContain('"$VERSION"');
   });
 
-  test('[DEP-ROLL-WARN] the summary of what stays on main ends the run, whatever the check found', () => {
-    const summary = steps().at(-1) ?? '';
+  test('[DEP-SELF-LIST] a switch is compared with its own build, not with its own list', () => {
+    const check = find('Compare the live site with the switch');
+    expect(ifOf(check)).toBe(SWITCH_DONE);
+    expect(runOf(check)).toContain('--build "$BUILD_DIR/dist/build.json" --origin "$LIVE_ORIGIN"');
+    expect(runOf(check)).not.toContain('--self');
+  });
+
+  test('[DEP-ROLL-WARN] the summary of what stays on main ends the run, whatever the check found, and names what is live', () => {
+    const summary = find('--summary "$ACTION"');
     expect(summary).toContain('ACTION: ${{ inputs.action }}');
-    expect(runOf(summary)).toContain('--summary "$ACTION"');
-    expect(ifOf(summary)).toBe("always() && (steps.rollback.outcome == 'success' || steps.switch.outcome == 'success')");
+    expect(summary).toContain('VERSION: ${{ steps.pick.outputs.version }}');
+    expect(ifOf(summary)).toBe(`always() && (${ROLLBACK_DONE} || ${SWITCH_DONE})`);
+    expect(runOf(summary)).toContain('--version "$VERSION"');
   });
 
-  test('[SW-SWITCH] switch builds the emergency worker, passes its check, marks the version, then says what riders lose', () => {
+  test('[DEP-ROLL-WARN] when the emergency itself fails, the owner is told in words what did and didn\'t happen', () => {
+    const last = steps().at(-1) ?? '';
+    expect(ifOf(last)).toBe('failure()');
+    expect(last).toContain(`ACTED: \${{ ${ROLLBACK_DONE} || ${SWITCH_DONE} }}`);
+    expect(runOf(last)).toContain('--failure-summary "$ACTION" --acted "$ACTED"');
+  });
+
+  test('[SW-SWITCH] switch builds from the commit that is live, read from the live version, in its own folder', () => {
+    const source = find('id: source');
+    expect(ifOf(source)).toBe("inputs.action == 'switch'");
+    expect(source).toContain('timeout-minutes: 3');
+    expect(runOf(source)).toContain('wrangler deployments list --json > rows.json');
+    expect(runOf(source)).toContain('wrangler versions view');
+    expect(runOf(source)).toContain('--commit-of live-version.json');
+    const live = find('path: live-commit');
+    expect(live).toContain('ref: ${{ steps.source.outputs.commit }}');
+    expect(live).toContain('persist-credentials: false');
+    expect(ifOf(live)).toBe("inputs.action == 'switch' && steps.source.outputs.commit != ''");
+    const build = find('--emergency');
+    expect(build).toContain('working-directory: ${{ steps.source.outputs.dir }}');
+    const upload = find('id: switch');
+    expect(upload).toContain('working-directory: ${{ steps.source.outputs.dir }}');
+    expect(steps().indexOf(source)).toBeLessThan(steps().indexOf(live));
+    expect(steps().indexOf(live)).toBeLessThan(steps().indexOf(build));
+    // What deploy.yml writes is what the switch reads.
+    expect(runOf(stepsOf(job('deploy.yml', 'deploy')).find((s) => s.includes('id: upload')) ?? '')).toContain('--message "Commit $HEAD_SHA"');
+  });
+
+  test('[SW-SWITCH] with no commit known, a step before the upload names what main would also release', () => {
+    expect(workflow('emergency.yml')).toMatch(/also_release_main:\n(?:\s+.*\n)*?\s+type: boolean\n\s+default: false/);
+    const guard = find('--switch-guard');
+    expect(ifOf(guard)).toBe("inputs.action == 'switch' && steps.source.outputs.commit == ''");
+    expect(guard).toContain('ALSO_RELEASE_MAIN: ${{ inputs.also_release_main }}');
+    expect(runOf(guard)).toContain('--also-release-main "$ALSO_RELEASE_MAIN"');
+    expect(steps().indexOf(find('--emergency'))).toBeLessThan(steps().indexOf(guard));
+    expect(steps().indexOf(guard)).toBeLessThan(steps().indexOf(find('id: switch')));
+  });
+
+  test('[SW-SWITCH] switch passes its build check, marks the version with its commit, then says what riders lose', () => {
     const build = find('--emergency');
     const check = find('--check-emergency');
     const upload = find('id: switch');
     for (const step of [build, check, upload]) expect(ifOf(step)).toBe("inputs.action == 'switch'");
     expect(steps().indexOf(build)).toBeLessThan(steps().indexOf(check));
     expect(steps().indexOf(check)).toBeLessThan(steps().indexOf(upload));
-    expect(runOf(upload)).toContain(`wrangler deploy --tag ${SWITCH_TAG}`);
-    expect(runOf(steps().at(-1) ?? '')).toContain('--summary "$ACTION"');
+    expect(runOf(upload)).toContain(`wrangler deploy --tag ${SWITCH_TAG} --message "${SWITCH_TAG} from Run workflow, commit $BUILT_FROM"`);
+    expect(upload).toContain("BUILT_FROM: ${{ steps.source.outputs.commit || github.sha }}");
+    const summary = find('--summary "$ACTION"');
+    expect(runOf(summary)).toContain('--built-from "$BUILT_FROM" --built-kind "$BUILT_KIND"');
+    expect(summary).toContain("BUILT_KIND: ${{ steps.guard.outputs.kind || 'live' }}");
   });
 });
 
@@ -288,7 +402,8 @@ describe('every deploying workflow', () => {
     const holders: Array<[string, string]> = [['deploy.yml', 'deploy'], ['emergency.yml', 'emergency'], ['preview.yml', 'preview'], ['rehearsal.yml', 'rehearsal']];
     for (const [file, name] of holders) {
       const head = headOf(job(file, name));
-      expect(head, file).toMatch(/concurrency:\n\s+group: worker-deploy\n\s+cancel-in-progress: false/);
+      // queue: max, or a later job in the group would cancel one still pending: a rollback, say.
+      expect(head, file).toMatch(/concurrency:\n\s+group: worker-deploy\n\s+cancel-in-progress: false\n\s+queue: max\b/);
     }
     for (const file of DEPLOYING) expect(workflow(file)).not.toContain('cancel-in-progress: true');
   });
@@ -297,6 +412,28 @@ describe('every deploying workflow', () => {
     expect(headOf(job('deploy.yml', 'approve'))).not.toContain('concurrency');
     expect(headOf(job('deploy.yml', 'decide'))).not.toContain('concurrency');
     expect(workflow('deploy.yml').slice(0, workflow('deploy.yml').indexOf('\njobs:\n'))).not.toContain('concurrency');
+  });
+
+  test('[DEP-TRIGGERS] nothing runs past a guard: continue-on-error only on id: after; always() only on after, the check and the emergency summary', () => {
+    const notes: string[] = [];
+    for (const file of DEPLOYING) {
+      for (const [name, body] of Object.entries(jobsOf(workflow(file)))) {
+        expect(headOf(body), name).not.toContain('continue-on-error');
+        for (const step of stepsOf(body)) {
+          const label = /name: (.*)/.exec(step)?.[1] ?? step.split('\n')[0];
+          if (/^\s*continue-on-error:/m.test(step)) notes.push(`continue-on-error ${file} ${label}`);
+          if (ifOf(step).includes('always()')) notes.push(`always ${file} ${label}`);
+          // No conditional spelling may get past the implicit success().
+          expect(ifOf(step)).not.toMatch(/\bcancelled\(\)/);
+        }
+      }
+    }
+    expect(notes.sort()).toEqual([
+      'always deploy.yml After-deploy check',
+      'always deploy.yml Note what is live now',
+      'always emergency.yml Say what stays on main, and what riders have now',
+      'continue-on-error deploy.yml Note what is live now',
+    ]);
   });
 
   test('[DEP-ONE-AT-A-TIME] every step runs with pipefail, so a failed upload can\'t look green through tee', () => {
@@ -319,7 +456,7 @@ describe('the environments', () => {
     const reviewers = env.reviewers as Array<{ type: string; id: number }>;
     expect(reviewers).toHaveLength(1);
     expect(reviewers[0]?.type).toBe('User');
-    expect(Number.isInteger(reviewers[0]?.id)).toBe(true);
+    expect(reviewers[0]?.id).toBe(186399519);
     expect(env.prevent_self_review).toBe(false);
     expect(env.can_admins_bypass).toBe(false);
   });

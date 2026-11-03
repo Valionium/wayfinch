@@ -30,6 +30,7 @@ jobs:
     concurrency:
       group: worker-deploy
       cancel-in-progress: false
+      queue: max
     env:
       REHEARSAL_WORKER: load-check-rehearsal
     steps:

@@ -33,6 +33,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      actions: read # to read production-approval's reviewer ("Repository permissions for Actions" in GitHub's docs)
     outputs:
       changed: ${{ steps.compare.outputs.changed }}
     steps:
@@ -46,8 +47,11 @@ jobs:
       - run: npm ci
       - run: npm run build
       # The latch off (deployEnabled false) means changed=false, check=false, and the live site isn't asked.
+      # A real difference with no required reviewer on production-approval stops here, loudly: no click would be asked.
       - id: compare
         name: Compare the build with what is live
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: node tools/deploy-check.mjs --decide --build dist/build.json --config build.config.json --origin "$LIVE_ORIGIN"
       - name: Check the live files, though nothing changed
         if: steps.compare.outputs.check == 'true'
@@ -68,10 +72,15 @@ jobs:
     needs: decide
     if: needs.decide.outputs.changed == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     environment: production-approval
+    outputs:
+      attempt: ${{ steps.attempt.outputs.attempt }}
     steps:
-      - run: echo "Approved by the owner."
+      # Which try of the run this click belongs to: re-running only deploy keeps this job's old answer.
+      - id: attempt
+        run: |
+          echo "Approved by the owner."
+          echo "attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
 
   # needs: approve, and never always(): a skipped approve skips this job.
   deploy:
@@ -83,6 +92,7 @@ jobs:
     concurrency:
       group: worker-deploy
       cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
       issues: write
@@ -94,19 +104,19 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      # An old approval after a newer merge deploys nothing. A failure here leaves stale unset, so nothing below runs.
+      # An old approval after a newer merge, or from an earlier try of this run, deploys nothing.
+      # A failure here leaves stale unset, so nothing below runs.
       - id: stale
         name: Stop if a newer merge exists
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          APPROVED_ATTEMPT: ${{ needs.approve.outputs.attempt }}
+          THIS_ATTEMPT: ${{ github.run_attempt }}
         run: |
           head=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)
-          stale=$(node tools/deploy-check.mjs --is-stale "$HEAD_SHA" "$head")
+          stale=$(node tools/deploy-check.mjs --is-stale "$HEAD_SHA" "$head" --approved-attempt "$APPROVED_ATTEMPT" --this-attempt "$THIS_ATTEMPT")
           echo "stale=$stale" >> "$GITHUB_OUTPUT"
-          if [ "$stale" = true ]; then
-            echo "A newer merge exists; nothing deployed." | tee -a "$GITHUB_STEP_SUMMARY"
-          fi
       - if: steps.stale.outputs.stale == 'false'
         run: npm ci
       - if: steps.stale.outputs.stale == 'false'
@@ -117,6 +127,7 @@ jobs:
       - id: before
         name: Note what is live, which is what a rollback returns to
         if: steps.stale.outputs.stale == 'false'
+        timeout-minutes: 2
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -138,6 +149,7 @@ jobs:
         name: Note what is live now
         if: always() && steps.stale.outputs.stale == 'false'
         continue-on-error: true
+        timeout-minutes: 2
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

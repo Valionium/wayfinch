@@ -79,6 +79,8 @@ A merge never deploys. Only the owner approves a deployment, and only the owner 
 
 After green checks on `main`, `deploy.yml`'s `decide` compares the build with the live `build.json`. Only a real difference asks for the owner's click on the `production-approval` environment; `deployEnabled` in `build.config.json` must be true before anything is even compared. `deploy.yml`'s `deploy` job, after that click, is the only ordinary way to `wrangler deploy` to `load-check`. A failed after-deploy check opens one issue labelled `after-deploy`; nothing rolls back by itself. `tools/env-production.json` and `tools/env-approval.json` hold the two environments' settings.
 
+`decide` refuses to ask for a click, and fails, when `production-approval` has no required reviewer or can't be read, unless `deployWithoutReviewer` in `build.config.json` is true. Setting that to true is the owner's decision. `emergency`'s `check` action changes nothing and says where a rollback would go; `switch` builds from the commit that is live, and only with `also_release_main` from `main`.
+
 ## Only with the owner
 
 - Changing a golden file, a regression case, a committed schema or a threshold.

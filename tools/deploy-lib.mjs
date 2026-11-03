@@ -8,16 +8,36 @@ export const SWITCH_TAG = 'emergency-switch';
 export const ROLLBACK_MESSAGE = 'Emergency rollback';
 export const REHEARSAL_WORKER = 'load-check-rehearsal';
 
-export const ROLLBACK_SUMMARY = [
-  '**What stays on `main`:** the commit you rolled back is still on `main`, so the next approved deploy brings it back unless a revert merges first.',
-  'Saved plans, setups and bikes were not touched: they are in the browser\'s own storage.',
-].join('\n\n');
+export function rollbackSummary(version) {
+  return [
+    `**Version now live:** ${version || 'not known'}.`,
+    '**What stays on `main`:** the commit you rolled back is still on `main`, so the next approved deploy brings it back unless a revert merges first.',
+    'Saved plans, setups and bikes were not touched: they are in the browser\'s own storage.',
+  ].join('\n\n');
+}
 
-export const SWITCH_SUMMARY = [
-  '**The emergency switch is live.** The offline worker removes itself and its caches, and the site loads from the network.',
-  'Riders keep their saved plans, setups and bikes. They have no offline copy until they tap **Make available offline** again, even after a later good deploy: opening the site with signal doesn\'t bring it back, and nothing tells them.',
-  '**What stays on `main`:** every commit, including the one that caused this. The next approved deploy replaces the switch, so merge a fix or a revert first.',
-].join('\n\n');
+const BUILT_FROM = {
+  live: (commit) => `It was built from commit ${commit}, the commit that was live, so riders get no other change.`,
+  'main-same': (commit) => `It was built from \`main\` at ${commit}, because no live commit could be read. \`main\` serves the same files as the live site, so riders get no other change.`,
+  'main-released': (commit) => `It was built from \`main\` at ${commit}, because no live commit could be read, and you chose to go on: what \`main\` holds was also released to riders. The list is above.`,
+};
+
+export function switchSummary({ kind, commit }) {
+  return [
+    '**The emergency switch is live.** The offline worker removes itself and its caches, and the site loads from the network.',
+    (BUILT_FROM[kind] ?? BUILT_FROM['main-released'])(commit || 'not known'),
+    'Riders keep their saved plans, setups and bikes. They have no offline copy until they tap **Make available offline** again, even after a later good deploy: opening the site with signal doesn\'t bring it back, and nothing tells them.',
+    '**What stays on `main`:** every commit, including the one that caused this. The next approved deploy replaces the switch, so merge a fix or a revert first.',
+  ].join('\n\n');
+}
+
+/** What the owner reads when an emergency run fails. `acted`: the write itself went through. */
+export function emergencyFailureSummary(action, acted) {
+  if (action === 'check') return 'The check failed. Nothing was changed. Tell the agent what it says above: the emergency buttons may not work until this is fixed.';
+  if (acted) return `The ${action} was sent to Cloudflare, but the live site could not be confirmed (see above). Look at the site on a phone before pressing again, and tell the agent.`;
+  if (action === 'rollback') return 'The rollback did NOT happen. Riders still have what they had. Try again, or tell the agent. If offline is broken, use switch.';
+  return 'The switch did NOT happen. Riders still have what they had. Try again, or tell the agent.';
+}
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -25,6 +45,16 @@ const REQUEST_TIMEOUT_MS = 30_000;
 /** Is this approval older than `main`? No answer counts as stale: a deploy needs a positive yes. */
 export function isStale(sha, head) {
   return !sha || !head || sha !== head;
+}
+
+/**
+ * Why this run may not upload, or ''. Re-running only the deploy job keeps the old approval, so the approval's try
+ * must be this try. Stated with the same words as the workflow's summary.
+ */
+export function staleReason({ sha, head, approvedAttempt, thisAttempt }) {
+  if (isStale(sha, head)) return 'A newer merge exists; nothing deployed.';
+  if (!approvedAttempt || String(approvedAttempt) !== String(thisAttempt)) return 'This approval belongs to an earlier try; re-run all jobs. Nothing deployed.';
+  return '';
 }
 
 export function compareBuild(local, live) {
@@ -61,14 +91,28 @@ async function look(origin, path, fetchFn) {
   }
 }
 
+async function liveListAnswer(origin, fetchFn) {
+  const answer = await look(origin, '/build.json', fetchFn);
+  if (answer.status === 404) return { build: null, raw: '' };
+  if (answer.problem) throw new Error(answer.problem);
+  const raw = answer.bytes.toString('utf8');
+  try {
+    const build = JSON.parse(raw);
+    return { build: build && build.v === 1 && build.files && typeof build.files === 'object' ? build : null, raw };
+  } catch {
+    return { build: null, raw };
+  }
+}
+
 /** The live /build.json, or null when there's none (404, or a 200 that isn't a build list). Anything else throws. */
 export async function fetchLiveBuild(origin, { fetch: fetchFn }) {
-  const answer = await look(origin, '/build.json', fetchFn);
-  if (answer.status === 404) return null;
-  if (answer.problem) throw new Error(answer.problem);
+  return (await liveListAnswer(origin, fetchFn)).build;
+}
+
+/** The live list's bytes, to tell later that it changed: '' for a 404, null when it can't be told. Never throws: it must not stop a rollback. */
+export async function readLiveList(origin, { fetch: fetchFn }) {
   try {
-    const build = JSON.parse(answer.bytes.toString('utf8'));
-    return build && build.v === 1 && build.files && typeof build.files === 'object' ? build : null;
+    return (await liveListAnswer(origin, fetchFn)).raw;
   } catch {
     return null;
   }
@@ -114,16 +158,19 @@ export async function checkLive(buildJson, origin, { fetch: fetchFn, ...timing }
 /**
  * Does the live site match its own list? For after a rollback or a switch, when what should be live isn't known here.
  * A version from before this plan has no list: then only / and the worker must load, and the note says so.
- * It can't tell a rollback that hasn't arrived yet from one that has: both sites match their own lists.
+ * A site that hasn't changed yet also matches its own list, so `changedFrom`, the list's bytes from before the change,
+ * must be gone first. A 404 counts as changed.
  */
-export async function checkSelf(origin, { fetch: fetchFn, ...timing }) {
+export async function checkSelf(origin, { fetch: fetchFn, changedFrom, ...timing }) {
   return untilGood(async () => {
     let list;
+    let raw;
     try {
-      list = await fetchLiveBuild(origin, { fetch: fetchFn });
+      ({ build: list, raw } = await liveListAnswer(origin, fetchFn));
     } catch (error) {
       return { problems: [error.message] };
     }
+    if (list && changedFrom && raw === changedFrom) return { problems: ['/build.json has not changed since before the rollback, so it has not arrived (or the version has identical files)'] };
     if (list) return { problems: await compareFiles(list, origin, fetchFn) };
     const answers = await Promise.all(['/', '/offline-worker.js'].map((path) => look(origin, path, fetchFn)));
     return {
@@ -135,20 +182,65 @@ export async function checkSelf(origin, { fetch: fetchFn, ...timing }) {
 
 const WHAT_THEY_ARE = { '/': 'the page', '/offline-worker.js': 'the offline worker', 'wrangler.jsonc': 'the site\'s settings' };
 
+/** Does this environment answer (`GET …/environments/<name>`) have a required reviewer? */
+export function hasRequiredReviewer(environment) {
+  const rules = environment?.protection_rules;
+  return Array.isArray(rules) && rules.some((rule) => Array.isArray(rule.reviewers) && rule.reviewers.length > 0);
+}
+
+/**
+ * A job naming an environment that lacks a reviewer just runs, so a merge would reach riders with no click.
+ * Throws unless the environment proves the click exists, or the config says automatic on purpose.
+ */
+async function requireTheClick(config, readApprovalEnv) {
+  if (config.deployWithoutReviewer === true) return;
+  let environment;
+  try {
+    environment = await readApprovalEnv();
+  } catch (error) {
+    throw new Error(`No click asked for, and this run stops: the production-approval environment could not be read (${error.message}), so the owner's click can't be proved.`);
+  }
+  if (!hasRequiredReviewer(environment)) throw new Error('No click asked for, and this run stops: production-approval has no required reviewer, so a merge would reach riders with no click. Add the reviewer, or set deployWithoutReviewer to true in build.config.json on purpose.');
+}
+
 /**
  * Is a click needed, and does the check run? With the latch off, neither, and the live site isn't asked:
  * it has no build.json yet, so a check would only fail and open an issue.
  */
-export async function decide(local, config, origin, { fetch: fetchFn }) {
+export async function decide(local, config, origin, { fetch: fetchFn, readApprovalEnv }) {
   if (config?.deployEnabled !== true) {
     return { changed: false, check: false, summary: 'The deploy latch is off (`deployEnabled` is false in `build.config.json`), so nothing is compared and no click is needed.' };
   }
   const live = await fetchLiveBuild(origin, { fetch: fetchFn });
   const { same, changed } = compareBuild(local, live);
   if (same) return { changed: false, check: true, summary: 'The build is the same as what is live: no click is needed. The live files are checked anyway.' };
+  await requireTheClick(config, readApprovalEnv);
   const lines = changed.map((path) => `- ${path}${WHAT_THEY_ARE[path] ? ` (${WHAT_THEY_ARE[path]})` : ''}`);
   const intro = live ? 'This release would change these files for riders:' : 'The live site has no `build.json` yet, so everything counts as changed:';
-  return { changed: true, check: false, summary: [intro, '', ...lines, '', 'Nothing reaches riders until you approve it.'].join('\n') };
+  const ending = config.deployWithoutReviewer === true ? 'deployWithoutReviewer is true: this goes out with no click.' : 'Nothing reaches riders until you approve it.';
+  return { changed: true, check: false, summary: [intro, '', ...lines, '', ending].join('\n') };
+}
+
+/** The commit a version was built from, from the message deploy.yml and the switch write. '' if it has none. */
+export function commitOfVersion(details) {
+  const message = details?.annotations?.['workers/message'];
+  return /^(?:Commit |emergency-switch from Run workflow, commit )([0-9a-f]{40})$/.exec(String(message ?? ''))?.[1] ?? '';
+}
+
+/**
+ * With no live commit known, the switch can only build from main, which may hold what nobody approved.
+ * Everything but the worker must then match the live list, or the owner must say so: `alsoRelease`.
+ */
+export function switchGuard(local, live, { alsoRelease }) {
+  const paths = compareBuild(local, live).changed.filter((path) => path !== '/offline-worker.js');
+  if (live && paths.length === 0) return { go: true, kind: 'main-same', summary: 'No commit could be read from the live version, but `main` serves the same files as the live site.' };
+  const lines = paths.map((path) => `- ${path}${WHAT_THEY_ARE[path] ? ` (${WHAT_THEY_ARE[path]})` : ''}`);
+  const intro = live
+    ? 'No commit could be read from the live version, and `main` differs from the live site in these files:'
+    : 'No commit could be read from the live version, and the live site has no `build.json` to compare with. These files might change for riders:';
+  const list = [intro, '', ...lines, ''];
+  if (alsoRelease) return { go: true, kind: 'main-released', summary: [...list, 'You set also_release_main, so these go out with the switch.'].join('\n') };
+  return { go: false, summary: [...list, 'The switch stopped, so nothing changed. To send these to riders along with the switch, run it again with also_release_main ticked.'].join('\n') };
 }
 
 /** Can the upload be said to have never arrived? Only when it didn't run, or the same version is still live after it failed. */
@@ -156,6 +248,16 @@ export function uploadNeverArrived({ outcome, before, after }) {
   if (outcome === 'success') return false;
   if (outcome === 'skipped') return true;
   return Boolean(before) && before === after;
+}
+
+/** What the deploy job runs: is the build live, and if asked, report it. An upload that never arrived has nothing to wait for. */
+export async function afterDeployCheck({ build, origin, uploadOutcome = 'success', before = '', live = '', report = false, gh, runUrl, fetch: fetchFn, ...timing }) {
+  const notArrived = uploadNeverArrived({ outcome: uploadOutcome, before, after: live });
+  const result = build
+    ? await checkLive(build, origin, { fetch: fetchFn, ...timing, ...(notArrived ? { deadlineMs: 0 } : {}) })
+    : { ok: false, problems: ['the build list could not be read'] };
+  if (report) await reportIssue(result, { gh, liveVersion: live, lastDeployActive: notArrived, runUrl });
+  return result;
 }
 
 /** Opens one issue, comments on a later failure, closes on a pass. It only ever talks; it never rolls back. */
@@ -213,8 +315,8 @@ export function pickRollback(deployments, { named, versions } = {}) {
   if (named) {
     if (named === liveId) return { refuse: `Version ${named} is already live.` };
     const row = rows.find((candidate) => candidate.versions?.some((version) => version.version_id === named));
-    if (!row) return { refuse: `Version ${named} is not among the deployments Cloudflare still lists. It may be a preview, which never served riders, or past Cloudflare's 100 versions.` };
-    if (wholeVersion(row) !== named) return { refuse: `Version ${named} only ever served part of the traffic.` };
+    if (!row) return { refuse: `Version ${named} is not among the last ten deployments. It may be a preview, which never served riders, or too old to pick here.` };
+    if (!rows.some((candidate) => wholeVersion(candidate) === named)) return { refuse: `Version ${named} only ever served part of the traffic.` };
     return { versionId: named };
   }
 
@@ -228,6 +330,18 @@ export function pickRollback(deployments, { named, versions } = {}) {
   if (carriesSwitchMark(before.annotations) || carriesSwitchMark(versions?.[beforeId]?.annotations)) return { refuse: 'The deployment before the live one is the emergency switch. Name a version.' };
   if (beforeId === liveId) return { refuse: 'The deployment before the live one is the same version. Name a version.' };
   return { versionId: beforeId };
+}
+
+/** The deployments as a table, newest first, for a refusal that asks the owner to name a version. */
+export function formatRows(deployments, versions = {}) {
+  if (!Array.isArray(deployments) || deployments.length === 0) return 'Cloudflare gave no list of deployments.';
+  const cell = (text) => String(text ?? '').replace(/[|\n]/g, ' ');
+  const lines = newestFirst(deployments).map((row) => {
+    const id = wholeVersion(row) ?? row.versions?.map((version) => `${version.version_id} (${version.percentage}%)`).join(', ') ?? '';
+    const message = row.annotations?.['workers/message'] ?? versions[id]?.annotations?.['workers/message'] ?? row.annotations?.['workers/triggered_by'];
+    return `| ${cell(row.created_on).slice(0, 16)} | ${cell(id)} | ${cell(message)} |`;
+  });
+  return ['The last deployments, newest first. The one on top is live:', '', '| Date | Version id | Message |', '| --- | --- | --- |', ...lines].join('\n');
 }
 
 /** §9.5 step 1 for the emergency build: the worker exists, is a classic script, and is the one `build.json` lists. */

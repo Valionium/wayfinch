@@ -11,19 +11,28 @@ import { promisify } from 'node:util';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
+  afterDeployCheck,
   checkEmergencyWorker,
   checkLive,
   checkSelf,
+  commitOfVersion,
   compareBuild,
   decide,
+  emergencyFailureSummary,
   fetchLiveBuild,
+  formatRows,
+  hasRequiredReviewer,
   ISSUE_LABEL,
   isStale,
   liveVersionOf,
   pickRollback,
+  readLiveList,
   reportIssue,
-  ROLLBACK_SUMMARY,
-  SWITCH_SUMMARY,
+  rollbackSummary,
+  ROLLBACK_MESSAGE,
+  staleReason,
+  switchGuard,
+  switchSummary,
   SWITCH_TAG,
   uploadNeverArrived,
   type BuildJson,
@@ -171,9 +180,12 @@ describe('checkLive', () => {
 describe('decide', () => {
   const noFetch: FetchLike = async () => { throw new Error('the live site was asked'); };
   const local = buildOf(FILES);
+  const REVIEWED = { protection_rules: [{ type: 'required_reviewers', reviewers: [{ type: 'User', reviewer: { id: 186399519 } }] }] };
+  const readApprovalEnv = async () => REVIEWED;
+  const noRead = async () => { throw new Error('the environment was read'); };
 
   test('[DEP-LATCH] deployEnabled false: no click and no live check, whatever is live; the live site is never asked', async () => {
-    await expect(decide(local, { deployEnabled: false }, ORIGIN, { fetch: noFetch })).resolves.toMatchObject({ changed: false, check: false });
+    await expect(decide(local, { deployEnabled: false }, ORIGIN, { fetch: noFetch, readApprovalEnv: noRead })).resolves.toMatchObject({ changed: false, check: false });
     await expect(decide(local, {}, ORIGIN, { fetch: noFetch })).resolves.toMatchObject({ changed: false, check: false });
   });
 
@@ -182,16 +194,16 @@ describe('decide', () => {
   });
 
   test('[DEP-UNCHANGED] compareBuild same: nothing to upload, and the check still runs', async () => {
-    await expect(decide(local, { deployEnabled: true }, ORIGIN, liveSite(FILES))).resolves.toMatchObject({ changed: false, check: true });
+    await expect(decide(local, { deployEnabled: true }, ORIGIN, { ...liveSite(FILES), readApprovalEnv: noRead })).resolves.toMatchObject({ changed: false, check: true });
   });
 
   test('[DEP-MATCH] enabled with no live build.json: a click is asked for and no check runs', async () => {
     const { fetch } = stubFetch(() => ({ status: 404 }));
-    await expect(decide(local, { deployEnabled: true }, ORIGIN, { fetch })).resolves.toMatchObject({ changed: true, check: false });
+    await expect(decide(local, { deployEnabled: true }, ORIGIN, { fetch, readApprovalEnv })).resolves.toMatchObject({ changed: true, check: false });
   });
 
   test('a real difference asks for a click and the summary lists the changed paths in plain words', async () => {
-    const result = await decide(buildOf({ ...FILES, '/': 'new page' }), { deployEnabled: true }, ORIGIN, liveSite(FILES));
+    const result = await decide(buildOf({ ...FILES, '/': 'new page' }), { deployEnabled: true }, ORIGIN, { ...liveSite(FILES), readApprovalEnv });
     expect(result).toMatchObject({ changed: true, check: false });
     expect(result.summary).toContain('/ (the page)');
     expect(result.summary).not.toContain('/offline-worker.js');
@@ -200,6 +212,32 @@ describe('decide', () => {
   test('a live site that answers 503 stops decide: it is no reason to ask for a click', async () => {
     const { fetch } = stubFetch(() => ({ status: 503 }));
     await expect(decide(local, { deployEnabled: true }, ORIGIN, { fetch })).rejects.toThrow('503');
+  });
+
+  test('[DEP-LATCH] no required reviewer: a real difference fails loudly and never says changed', async () => {
+    const differs = () => ({ ...liveSite({ '/': 'other' }) });
+    for (const env of [{ protection_rules: [] }, {}, null, { protection_rules: [{ type: 'wait_timer', wait_timer: 5 }] }, { protection_rules: [{ type: 'required_reviewers', reviewers: [] }] }]) {
+      await expect(decide(local, { deployEnabled: true }, ORIGIN, { ...differs(), readApprovalEnv: async () => env })).rejects.toThrow('no required reviewer');
+    }
+  });
+
+  test('[DEP-LATCH] the reviewer can\'t be read: the same refusal', async () => {
+    await expect(decide(local, { deployEnabled: true }, ORIGIN, { ...liveSite({ '/': 'other' }), readApprovalEnv: noRead })).rejects.toThrow('could not be read');
+    await expect(decide(local, { deployEnabled: true }, ORIGIN, liveSite({ '/': 'other' }))).rejects.toThrow('could not be read');
+  });
+
+  test('[DEP-LATCH] only deployWithoutReviewer exactly true goes on without one, and says so', async () => {
+    const result = await decide(local, { deployEnabled: true, deployWithoutReviewer: true }, ORIGIN, { ...liveSite({ '/': 'other' }), readApprovalEnv: noRead });
+    expect(result).toMatchObject({ changed: true, check: false });
+    expect(result.summary).toContain('no click');
+    for (const value of [false, 'true', 1, undefined]) {
+      await expect(decide(local, { deployEnabled: true, deployWithoutReviewer: value }, ORIGIN, { ...liveSite({ '/': 'other' }), readApprovalEnv: async () => ({ protection_rules: [] }) })).rejects.toThrow('no required reviewer');
+    }
+  });
+
+  test('[DEP-LATCH] hasRequiredReviewer reads the shape of GitHub\'s answer', () => {
+    expect(hasRequiredReviewer(REVIEWED)).toBe(true);
+    expect(hasRequiredReviewer({ protection_rules: [{ type: 'branch_policy' }] })).toBe(false);
   });
 
   test('fetchLiveBuild: a 200 that isn\'t a build list counts as no list', async () => {
@@ -291,6 +329,7 @@ describe('reportIssue', () => {
     expect(uploadNeverArrived({ outcome: 'cancelled', before: 'a', after: 'a' })).toBe(true);
     expect(uploadNeverArrived({ outcome: 'failure', before: 'a', after: 'b' })).toBe(false);
     expect(uploadNeverArrived({ outcome: 'failure', before: 'a', after: '' })).toBe(false);
+    expect(uploadNeverArrived({ outcome: 'failure', before: '', after: '' })).toBe(false);
   });
 });
 
@@ -339,14 +378,15 @@ describe('pickRollback', () => {
     expect(pickRollback(rows(['v1']), {})).toHaveProperty('refuse');
   });
 
-  test('[DEP-ROLL-REFUSE] past Cloudflare\'s 100 versions: a named id the list doesn\'t hold', () => {
+  test('[DEP-ROLL-REFUSE] past what Cloudflare still lists (and so past its 100 versions): a named id the list doesn\'t hold', () => {
     const result = pickRollback(rows(['v1'], ['v2']), { named: 'gone-long-ago' });
     expect(result).toHaveProperty('refuse');
-    expect(JSON.stringify(result)).toContain('100');
+    expect(JSON.stringify(result)).toContain('last ten deployments');
   });
 
-  test('[DEP-ROLL-REFUSE] unless named: a rollback live', () => {
+  test('[DEP-ROLL-REFUSE] unless named: a rollback live, known from Cloudflare\'s trigger or only from our own message', () => {
     expect(pickRollback(rows(['v1'], ['v2'], ['v1', 'rollback']), {})).toHaveProperty('refuse');
+    expect(pickRollback(rows(['v1'], ['v2'], ['v1', 'upload', `${ROLLBACK_MESSAGE} from Run workflow`]), {})).toHaveProperty('refuse');
   });
 
   test('[DEP-ROLL-REFUSE] unless named: the switch before the live one, known from the row or from its version', () => {
@@ -374,20 +414,101 @@ describe('pickRollback', () => {
     (split[1] as DeploymentRow).versions = [{ version_id: 'v2', percentage: 50 }, { version_id: 'v1', percentage: 50 }];
     expect(pickRollback(split, {})).toHaveProperty('refuse');
     expect(pickRollback(split, { named: 'v2' })).toHaveProperty('refuse');
+    // A version that also served all traffic in another row may be named.
+    expect(pickRollback([...rows(['v2']), ...split.slice(1)], { named: 'v2' })).toEqual({ versionId: 'v2' });
   });
 });
 
 describe('summaries and small helpers', () => {
   test('[DEP-ROLL-WARN] the job summary text says what stays on main', () => {
-    expect(ROLLBACK_SUMMARY).toContain('`main`');
-    expect(ROLLBACK_SUMMARY).toContain('the next approved deploy brings it back unless a revert merges first');
+    const text = rollbackSummary('version-abc');
+    expect(text).toContain('`main`');
+    expect(text).toContain('the next approved deploy brings it back unless a revert merges first');
+    expect(text).toContain('version-abc');
   });
 
   test('[SW-SWITCH] the summary tells the truth: riders keep plans, and no offline copy until they tap, even after a later good deploy', () => {
-    expect(SWITCH_SUMMARY).toContain('keep their saved plans');
-    expect(SWITCH_SUMMARY).toContain('no offline copy until they tap **Make available offline** again');
-    expect(SWITCH_SUMMARY).toContain('even after a later good deploy');
-    expect(SWITCH_SUMMARY).toContain('`main`');
+    for (const kind of ['live', 'main-same', 'main-released']) {
+      const text = switchSummary({ kind, commit: 'abc123' });
+      expect(text).toContain('keep their saved plans');
+      expect(text).toContain('no offline copy until they tap **Make available offline** again');
+      expect(text).toContain('even after a later good deploy');
+      expect(text).toContain('`main`');
+    }
+  });
+
+  test('[SW-SWITCH] the summary says which commit it built from, and whether main went out with it', () => {
+    const live = switchSummary({ kind: 'live', commit: 'abc123' });
+    expect(live).toContain('abc123');
+    expect(live).toContain('the commit that was live');
+    expect(live).not.toContain('released');
+    expect(switchSummary({ kind: 'main-same', commit: 'abc123' })).toContain('the same files');
+    const released = switchSummary({ kind: 'main-released', commit: 'abc123' });
+    expect(released).toContain('abc123');
+    expect(released).toContain('also released');
+  });
+
+  test('[DEP-STALE] an approval from an earlier try of the run counts as stale, and says what to do', () => {
+    expect(staleReason({ sha: 'a', head: 'a', approvedAttempt: '2', thisAttempt: '2' })).toBe('');
+    expect(staleReason({ sha: 'a', head: 'b', approvedAttempt: '1', thisAttempt: '1' })).toBe('A newer merge exists; nothing deployed.');
+    const old = 'This approval belongs to an earlier try; re-run all jobs. Nothing deployed.';
+    expect(staleReason({ sha: 'a', head: 'a', approvedAttempt: '1', thisAttempt: '2' })).toBe(old);
+    expect(staleReason({ sha: 'a', head: 'a', approvedAttempt: '', thisAttempt: '2' })).toBe(old);
+    expect(staleReason({ sha: 'a', head: 'a', approvedAttempt: '', thisAttempt: '' })).toBe(old);
+  });
+
+  test('[SW-SWITCH] commitOfVersion reads what deploy.yml and the switch write, and nothing looser', () => {
+    const sha = 'a'.repeat(40);
+    const of = (message?: string) => commitOfVersion({ annotations: message === undefined ? {} : { 'workers/message': message } });
+    expect(of(`Commit ${sha}`)).toBe(sha);
+    expect(of(`emergency-switch from Run workflow, commit ${sha}`)).toBe(sha);
+    expect(of()).toBe('');
+    expect(of('Commit abc')).toBe('');
+    expect(of(`Commit ${sha}; rm -rf`)).toBe('');
+    expect(commitOfVersion(null)).toBe('');
+  });
+
+  test('[SW-SWITCH] switchGuard: with no commit known, main\'s differences stop the switch, named in plain words', () => {
+    const live = buildOf({ '/': 'old page', '/offline-worker.js': 'old worker' });
+    const main = buildOf({ '/': 'new page', '/offline-worker.js': 'emergency', '/assets/a.js': 'a' });
+    const stop = switchGuard(main, live, { alsoRelease: false });
+    expect(stop.go).toBe(false);
+    expect(stop.summary).toContain('/ (the page)');
+    expect(stop.summary).toContain('/assets/a.js');
+    expect(stop.summary).not.toContain('/offline-worker.js');
+    expect(stop.summary).toContain('also_release_main');
+    expect(switchGuard(main, live, { alsoRelease: true })).toMatchObject({ go: true, kind: 'main-released' });
+  });
+
+  test('[SW-SWITCH] switchGuard: only the worker differing is no difference; no live list can\'t be proved the same', () => {
+    const live = buildOf({ '/': 'page', '/offline-worker.js': 'old worker' });
+    const main = buildOf({ '/': 'page', '/offline-worker.js': 'emergency' });
+    expect(switchGuard(main, live, { alsoRelease: false })).toMatchObject({ go: true, kind: 'main-same' });
+    expect(switchGuard(main, null, { alsoRelease: false }).go).toBe(false);
+    expect(switchGuard(main, null, { alsoRelease: true })).toMatchObject({ go: true, kind: 'main-released' });
+    expect(switchGuard(buildOf({ '/': 'page', '/offline-worker.js': 'emergency' }, 'other'), live, { alsoRelease: false }).go).toBe(false);
+  });
+
+  test('emergencyFailureSummary says what did and didn\'t happen', () => {
+    expect(emergencyFailureSummary('rollback', false)).toContain('The rollback did NOT happen. Riders still have what they had.');
+    expect(emergencyFailureSummary('rollback', false)).toContain('use switch');
+    expect(emergencyFailureSummary('switch', false)).toContain('The switch did NOT happen.');
+    expect(emergencyFailureSummary('rollback', true)).toContain('was sent to Cloudflare');
+    expect(emergencyFailureSummary('rollback', true)).not.toContain('did NOT');
+    expect(emergencyFailureSummary('check', false)).toContain('Nothing was changed');
+  });
+
+  test('formatRows lists date, version and message, newest first, so a refusal shows where a version id comes from', () => {
+    const text = formatRows([
+      { created_on: '2026-11-01T10:00:00Z', annotations: {}, versions: [{ version_id: 'old', percentage: 100 }] },
+      { created_on: '2026-11-02T10:00:00Z', annotations: { 'workers/message': 'row message' }, versions: [{ version_id: 'new', percentage: 100 }] },
+    ], { old: { annotations: { 'workers/message': 'version message' } } });
+    const lines = text.split('\n');
+    expect(lines.findIndex((l) => l.includes('new'))).toBeLessThan(lines.findIndex((l) => l.includes('old')));
+    expect(text).toContain('2026-11-02');
+    expect(text).toContain('row message');
+    expect(text).toContain('version message');
+    expect(formatRows(null)).toContain('no list');
   });
 
   test('[DEP-STALE] isStale: only the exact head of main is fresh, and no answer counts as stale', () => {
@@ -442,6 +563,75 @@ describe('checkSelf', () => {
 });
 
 // Each case starts Node, which can be slow on a cold, busy machine.
+describe('afterDeployCheck: what the deploy job actually runs', () => {
+  const stubGh = () => {
+    const calls: string[][] = [];
+    return { calls, gh: async (args: string[]) => { calls.push(args); return args[1] === 'list' ? '[]' : ''; } };
+  };
+  const bodyOf = (calls: string[][]) => { const c = calls.at(-1) ?? []; return String(c[c.indexOf('--body') + 1]); };
+
+  test('[DEP-NOT-ARRIVED] a failed upload with the same version live: at once, and the issue says never arrived', async () => {
+    const stub = stubGh();
+    const clock = fakeClock();
+    const result = await afterDeployCheck({ build: buildOf(FILES), origin: ORIGIN, uploadOutcome: 'failure', before: 'v1', live: 'v1', report: true, gh: stub.gh, ...liveSite({ '/': 'old' }), ...clock });
+    expect(result.ok).toBe(false);
+    expect(clock.now()).toBe(0);
+    expect(bodyOf(stub.calls)).toContain('The upload never arrived');
+  });
+
+  test('[DEP-ISSUE-ONE] a good upload with wrong files: waits the five minutes, and the issue suggests the rollback', async () => {
+    const stub = stubGh();
+    const clock = fakeClock();
+    await afterDeployCheck({ build: buildOf(FILES), origin: ORIGIN, uploadOutcome: 'success', before: 'v1', live: 'v2', report: true, gh: stub.gh, ...liveSite({ '/': 'old' }), ...clock });
+    expect(clock.now()).toBe(300_000);
+    expect(bodyOf(stub.calls)).toContain('found wrong files');
+    expect(bodyOf(stub.calls)).toContain('v2');
+  });
+
+  test('[DEP-ISSUE-CLOSE] without report it touches no issue; with an unreadable build it still fails and reports', async () => {
+    const stub = stubGh();
+    await afterDeployCheck({ build: buildOf(FILES), origin: ORIGIN, report: false, gh: stub.gh, ...liveSite(FILES), ...fakeClock() });
+    expect(stub.calls).toEqual([]);
+    const missing = await afterDeployCheck({ build: null, origin: ORIGIN, report: true, gh: stub.gh, ...liveSite(FILES), ...fakeClock() });
+    expect(missing.ok).toBe(false);
+    expect(stub.calls.length).toBeGreaterThan(0);
+  });
+});
+
+describe('checkSelf with the list from before a rollback', () => {
+  const OLD = buildOf(FILES);
+  const NEW = buildOf({ ...FILES, '/': 'older page' });
+
+  test('[DEP-SELF-LIST] the old site matching its own list is no proof: it fails until the list changes', async () => {
+    const before = JSON.stringify(OLD);
+    const stuck = await checkSelf(ORIGIN, { ...liveSite(FILES, OLD), ...fakeClock(), changedFrom: before });
+    expect(stuck.ok).toBe(false);
+    expect(stuck.problems.join()).toContain('has not changed');
+
+    const clock = fakeClock();
+    const { fetch } = stubFetch((path) => {
+      const arrived = clock.now() >= 60_000;
+      if (path === '/build.json') return { body: JSON.stringify(arrived ? NEW : OLD) };
+      return { body: arrived ? ({ '/': 'older page', '/offline-worker.js': FILES['/offline-worker.js'] })[path] : FILES[path as keyof typeof FILES] };
+    });
+    await expect(checkSelf(ORIGIN, { fetch, ...clock, changedFrom: before })).resolves.toMatchObject({ ok: true });
+    expect(clock.now()).toBeGreaterThanOrEqual(60_000);
+  });
+
+  test('[DEP-SELF-LIST] a 404 counts as changed: the version rolled back to is from before this plan', async () => {
+    const old = stubFetch((path) => (path === '/' || path === '/offline-worker.js' ? { body: 'x' } : { status: 404 }));
+    await expect(checkSelf(ORIGIN, { ...old, ...fakeClock(), changedFrom: JSON.stringify(OLD) })).resolves.toMatchObject({ ok: true });
+    await expect(checkSelf(ORIGIN, { ...old, ...fakeClock(), changedFrom: '' })).resolves.toMatchObject({ ok: true });
+  });
+
+  test('[DEP-SELF-LIST] readLiveList gives the bytes, empty for a 404, null when it can\'t tell', async () => {
+    await expect(readLiveList(ORIGIN, liveSite(FILES, OLD))).resolves.toBe(JSON.stringify(OLD));
+    await expect(readLiveList(ORIGIN, stubFetch(() => ({ status: 404 })))).resolves.toBe('');
+    await expect(readLiveList(ORIGIN, stubFetch(() => ({ status: 500 })))).resolves.toBeNull();
+    await expect(readLiveList(ORIGIN, stubFetch(() => ({ throws: 'down' })))).resolves.toBeNull();
+  });
+});
+
 describe('the command, against a real local server', { timeout: 30_000 }, () => {
   const SCRIPT = fileURLToPath(new URL('../../../tools/deploy-check.mjs', import.meta.url));
   const dir = mkdtempSync(join(tmpdir(), 'wf-deploy-'));
@@ -522,8 +712,78 @@ describe('the command, against a real local server', { timeout: 30_000 }, () => 
     const origin = await serve(FILES);
     const output = join(dir, 'output-on.txt');
     writeFileSync(output, '');
-    await cli(['--decide', '--build', writeJson('b2.json', buildOf(FILES)), '--config', writeJson('c2.json', { deployEnabled: true }), '--origin', origin], { GITHUB_OUTPUT: output });
+    await cli(['--decide', '--build', writeJson('b2.json', buildOf(FILES)), '--config', writeJson('c2.json', { deployEnabled: true, deployWithoutReviewer: true }), '--origin', origin], { GITHUB_OUTPUT: output });
     expect(readFileSync(output, 'utf8')).toBe('changed=true\ncheck=false\n');
+  });
+
+  test('[DEP-LATCH] --decide when gh can\'t read the environment: exit 1, the summary says why, and no changed=true', async () => {
+    const origin = await serve(FILES);
+    const output = join(dir, 'output-refused.txt');
+    const summary = join(dir, 'summary-refused.txt');
+    writeFileSync(output, '');
+    writeFileSync(summary, '');
+    await expect(cli(['--decide', '--build', writeJson('b3.json', buildOf(FILES)), '--config', writeJson('c3.json', { deployEnabled: true }), '--origin', origin], { GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary, PATH: '' })).rejects.toMatchObject({ code: 1 });
+    expect(readFileSync(output, 'utf8')).not.toContain('changed=true');
+    expect(readFileSync(summary, 'utf8')).toContain('could not be read');
+  });
+
+  test('[DEP-SELF-LIST] a failing --self exits 1 and names the path, so a bad emergency goes red', async () => {
+    const build = buildOf(FILES);
+    const origin = await serve({ '/': 'other', '/offline-worker.js': FILES['/offline-worker.js'], '/build.json': JSON.stringify(build) });
+    await expect(cli(['--self', '--origin', origin, '--deadline-ms', '0'])).rejects.toMatchObject({ code: 1, stdout: expect.stringContaining('/ has different bytes') });
+  });
+
+  test('[DEP-SELF-LIST] --self --changed-from fails while the list is the one saved before', async () => {
+    const build = buildOf(FILES);
+    const body = JSON.stringify(build);
+    const origin = await serve({ ...FILES, '/build.json': body });
+    const saved = join(dir, 'before-list.txt');
+    await cli(['--save-live-list', saved, '--origin', origin]);
+    expect(readFileSync(saved, 'utf8')).toBe(body);
+    await expect(cli(['--self', '--origin', origin, '--changed-from', saved, '--deadline-ms', '0'])).rejects.toMatchObject({ code: 1, stdout: expect.stringContaining('has not changed') });
+    await cli(['--self', '--origin', origin, '--changed-from', join(dir, 'never-saved.txt'), '--deadline-ms', '0']);
+  });
+
+  test('[SW-SWITCH] --switch-guard stops with the paths in the summary, or goes on with also_release_main', async () => {
+    const origin = await serve({ '/build.json': JSON.stringify(buildOf({ '/': 'live page', '/offline-worker.js': 'w' })) });
+    const main = writeJson('main-build.json', buildOf({ '/': 'main page', '/offline-worker.js': 'e' }));
+    const summary = join(dir, 'summary-guard.txt');
+    const output = join(dir, 'output-guard.txt');
+    writeFileSync(summary, '');
+    writeFileSync(output, '');
+    await expect(cli(['--switch-guard', '--build', main, '--origin', origin, '--also-release-main', 'false'], { GITHUB_STEP_SUMMARY: summary })).rejects.toMatchObject({ code: 1 });
+    expect(readFileSync(summary, 'utf8')).toContain('/ (the page)');
+    await cli(['--switch-guard', '--build', main, '--origin', origin, '--also-release-main', 'true'], { GITHUB_OUTPUT: output });
+    expect(readFileSync(output, 'utf8')).toBe('kind=main-released\n');
+  });
+
+  test('[SW-SWITCH] --commit-of prints the commit, or nothing, from a file that may be missing', async () => {
+    const sha = 'b'.repeat(40);
+    const { stdout } = await cli(['--commit-of', writeJson('v-commit.json', { annotations: { 'workers/message': `Commit ${sha}` } })]);
+    expect(stdout.trim()).toBe(sha);
+    expect((await cli(['--commit-of', join(dir, 'no-such.json')])).stdout.trim()).toBe('');
+  });
+
+  test('[DEP-STALE] --is-stale prints the answer and says why, with an empty or an older attempt', async () => {
+    const summary = join(dir, 'summary-stale.txt');
+    writeFileSync(summary, '');
+    const yes = await cli(['--is-stale', 'a', 'a', '--approved-attempt', '1', '--this-attempt', '2'], { GITHUB_STEP_SUMMARY: summary });
+    expect(yes.stdout.trim()).toBe('true');
+    expect(readFileSync(summary, 'utf8')).toContain('earlier try');
+    expect((await cli(['--is-stale', 'a', 'a', '--approved-attempt', '2', '--this-attempt', '2'])).stdout.trim()).toBe('false');
+    expect((await cli(['--is-stale', 'a', 'b', '--approved-attempt', '2', '--this-attempt', '2'])).stdout.trim()).toBe('true');
+  });
+
+  test('[DEP-ROLL-REFUSE] a refusal prints the ten rows in the summary, so the owner can name a version', async () => {
+    const list = [
+      { created_on: '2026-11-01T10:00:00Z', annotations: {}, versions: [{ version_id: 'older-id', percentage: 100 }] },
+      { created_on: '2026-11-02T10:00:00Z', annotations: { 'workers/triggered_by': 'rollback' }, versions: [{ version_id: 'live-id', percentage: 100 }] },
+    ];
+    const summary = join(dir, 'summary-refuse.txt');
+    writeFileSync(summary, '');
+    await expect(cli(['--pick-rollback', writeJson('rows-refuse.json', list)], { GITHUB_STEP_SUMMARY: summary })).rejects.toMatchObject({ code: 1 });
+    expect(readFileSync(summary, 'utf8')).toContain('older-id');
+    expect(readFileSync(summary, 'utf8')).toContain('Rollback refused');
   });
 
   test('[DEP-ROLL-REFUSE] --pick-rollback prints the id, or says why not and exits 1', async () => {
