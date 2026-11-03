@@ -226,6 +226,21 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     expect((await readTrip())!.stay).toBe('camping');
   });
 
+  test('[TRIP-SETTINGS] a refused value goes back at once, beside its message, even while reading the trip again is slow (a busy phone)', async () => {
+    const real = services();
+    let slow = false;
+    const svc: TripServices = { ...real, load: async () => { if (slow) await new Promise((r) => setTimeout(r, 1500)); return real.load(); } };
+    await show(svc);
+    await pick(await fixtureGpx('heidelberg-strasbourg'));
+    await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
+    slow = true;
+    const input = host.querySelector<HTMLInputElement>('#trip-start')!;
+    await act(async () => { input.value = '03:00'; input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); });
+    await until(() => text().includes(W.appStoreStartTimeRange), 'the start range', 1000);
+    await settle(30);
+    expect(host.querySelector<HTMLInputElement>('#trip-start')!.value).toBe('08:30');
+  }, 20_000);
+
   test('[TRIP-SETTINGS] a value out of range is refused with the range named, the last good value stays, and nothing is saved', async () => {
     await withRoute();
     const set = async (id: string, value: string) => {
