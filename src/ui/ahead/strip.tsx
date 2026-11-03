@@ -69,7 +69,60 @@ function slotsOf(icons: StripIcon[], s: Strip, trackPx: number): Slot[] {
   });
 }
 
-export function RouteStrip({ strip, bike, onOpen }: { strip: Strip; bike: BikeRecord | null; onOpen: (card: CardName) => void }) {
+const tenth = (km: number): number => Math.round(km * 10) / 10;
+
+/**
+ * On a computer: a ruler along the strip's own kilometres. The arrow keys move a point along it, Enter (or the button, for a mouse)
+ * sets the position there; hovering shows the kilometre under the pointer. It is the same kilometre axis as the bands and icons.
+ */
+function Ruler({ strip, onSet }: { strip: Strip; onSet: (km: number) => void }) {
+  const [picked, setPicked] = useState<number | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
+  const first = Number.isFinite(strip.startKm) ? strip.startKm : 0;
+  const last = Number.isFinite(strip.endKm) ? Math.max(first, strip.endKm) : first;
+  const km = picked ?? first;
+  const clamp = (x: number): number => tenth(Math.max(first, Math.min(last, x)));
+  const move = (to: number): void => setPicked(clamp(to));
+  const onKeyDown = (e: KeyboardEvent): void => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const big = e.shiftKey ? 10 : 1;
+    const to = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? km + big
+      : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? km - big
+        : e.key === 'PageUp' ? km + 10 : e.key === 'PageDown' ? km - 10
+          : e.key === 'Home' ? first : e.key === 'End' ? last : null;
+    if (to !== null) { e.preventDefault(); move(to); return; }
+    if (e.key === 'Enter') { e.preventDefault(); onSet(km); }
+  };
+  const at = (e: MouseEvent): number => {
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return clamp(first + (box.width > 0 ? Math.max(0, Math.min(1, (e.clientX - box.left) / box.width)) : 0) * (last - first));
+  };
+  const shown = hover ?? km;
+  return (
+    <div class="ah-ruler">
+      <div
+        class="ah-ruler-bar" role="slider" tabIndex={0} aria-label={W.appWideStripSlider} aria-describedby="ah-ruler-hint"
+        aria-valuemin={first} aria-valuemax={last} aria-valuenow={km} aria-valuetext={W.appWideStripSliderValue(showKm(km), showKm(last))}
+        onKeyDown={onKeyDown} onClick={(e) => move(at(e))} onMouseMove={(e) => setHover(at(e))} onMouseLeave={() => setHover(null)}
+        data-ruler-km={String(km)}
+      >
+        <span class="ah-ruler-tick" style={{ left: pct(along(km, strip)) }} />
+        {hover !== null ? <span class="ah-ruler-hover" style={{ left: pct(along(hover, strip)) }} /> : null}
+      </div>
+      <p class="ah-ruler-read">
+        <span data-ruler-text>{W.appWideStripAt(showKm(shown))}</span>
+        <button type="button" class="btn" onClick={() => onSet(km)}>{W.appWideStripSet(showKm(km))}</button>
+      </p>
+      <p class="visually-hidden" id="ah-ruler-hint">{W.appWideStripSliderHint}</p>
+    </div>
+  );
+}
+
+export function RouteStrip({ strip, bike, onOpen, onSetPosition }: {
+  strip: Strip; bike: BikeRecord | null; onOpen: (card: CardName) => void;
+  /** Given only on a computer: the ruler, with the keys along the strip (spec 3.8). */
+  onSetPosition?: (km: number) => void;
+}) {
   // The track's width decides which icons share a row; before it is measured, a phone's width is assumed.
   const track = useRef<HTMLDivElement>(null);
   const [trackPx, setTrackPx] = useState(230);
@@ -124,6 +177,7 @@ export function RouteStrip({ strip, bike, onOpen }: { strip: Strip; bike: BikeRe
               );
             })}
           </div>
+          {onSetPosition ? <Ruler strip={strip} onSet={onSetPosition} /> : null}
         </div>
       </div>
       {strip.bands.length > 0 ? <p class="muted ah-strip-key">{W.appAheadStripKey}</p> : null}

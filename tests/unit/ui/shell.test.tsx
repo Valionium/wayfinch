@@ -10,9 +10,11 @@ import type { UpdaterEnv } from '../../../src/ui/update.ts';
 
 const host = document.createElement('div');
 document.body.append(host);
-afterEach(() => {
+afterEach(async () => {
   render(null, host);
   vi.useRealTimers();
+  // Preact runs effects after the next paint; let those run while the window still exists.
+  await new Promise((done) => setTimeout(done, 40));
 });
 
 /** A registration and a container that behave as far as the shell looks. */

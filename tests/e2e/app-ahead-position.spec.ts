@@ -67,7 +67,8 @@ test('[AH-MANUAL] with watchPosition denied, the manual picker sets the position
   await picker.getByRole('button', { name: 'Use this position' }).click();
   await expect(page.locator('[data-position-line]')).toContainText(/km 40 of [\d.]+/);
   await expect(page.locator('[data-position-line]')).toContainText('set by hand');
-  await page.getByRole('button', { name: 'Set position by hand' }).click();
+  // On a computer the picker stays open once a position is set (spec 9.2); on a phone it closed.
+  if (!(await picker.isVisible())) await page.getByRole('button', { name: 'Set position by hand' }).click();
   const towns = page.locator('#ah-picker select');
   const options = await towns.locator('option').allTextContents();
   expect(options.length).toBeGreaterThan(1);

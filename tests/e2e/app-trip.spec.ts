@@ -39,13 +39,13 @@ test('[TRIP-FIRST] with no trip the app opens on Trip, and the bike is the first
   const problems = watch(page);
   app = await loadApp(page);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Trip');
-  const first = page.locator('.trip').locator('> *').first();
+  const first = page.locator('.trip-main').locator('> *').first();
   await expect(first).toHaveClass(/trip-bike/);
   await expect(first.locator('svg.bk')).toBeVisible();
   const box = (await first.boundingBox())!;
   expect(box.height).toBeLessThanOrEqual(120);
   const top = (await page.locator('.trip-bike').boundingBox())!.y;
-  for (const card of await page.locator('.trip .card').all()) expect((await card.boundingBox())!.y).toBeGreaterThan(top);
+  for (const card of await page.locator('.trip-main .card').all()) expect((await card.boundingBox())!.y).toBeGreaterThan(top);
   expect(problems).toEqual([]);
 });
 

@@ -13,6 +13,7 @@ import type { ChipKey } from './chips.tsx';
 import { PositionControls, PositionLine } from './position-line.tsx';
 import { ShareSheet } from './share-sheet.tsx';
 import { RouteStrip } from './strip.tsx';
+import { railSignal } from '../wide/wide.ts';
 import './ahead.css';
 
 function focusLater(id: string): void {
@@ -29,9 +30,11 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
   const [open, setOpen] = useState<ReadonlySet<CardName>>(new Set());
   const [chip, setChip] = useState<ChipKey | null>(null);
   const [sharing, setSharing] = useState(false);
-  const [pickerOpen, setPicker] = useState(!v.answers);
-  // First use opens the picker; a position closes it again once answers show.
-  useEffect(() => { if (v.answers) setPicker(false); }, [v.answers, s.positionLine]);
+  // On a computer (the rail layout) the picker is open from the start, with no position asked for (spec 9.2).
+  const rail = railSignal.value;
+  const [pickerOpen, setPicker] = useState(!v.answers || rail);
+  // First use opens the picker; on a phone a position closes it again once answers show.
+  useEffect(() => { if (v.answers && !railSignal.peek()) setPicker(false); }, [v.answers, s.positionLine]);
 
   const toggle = (name: CardName): void => setOpen((was) => {
     const next = new Set(was);
@@ -48,27 +51,42 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
     if (c) focusLater(`chip-${c}`);
   };
 
+  // Esc collapses the card the focus is in, and puts the focus on its title (spec 3.8).
+  const onKeyDown = (e: KeyboardEvent): void => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    const card = (e.target as HTMLElement | null)?.closest?.('[data-card]');
+    const name = card?.getAttribute('data-card') as CardName | null | undefined;
+    if (!card || !name || !open.has(name)) return;
+    e.preventDefault();
+    toggle(name);
+    (card.querySelector('.ah-toggle') as HTMLElement | null)?.focus();
+  };
+
   return (
-    <div class="ahead" data-ahead={v.answers ? 'answers' : 'first-use'}>
-      {v.notice ? <p class="notice" role="status">{v.notice}</p> : null}
-      {v.answers ? <PositionLine v={v} onShare={() => setSharing(true)} /> : <p>{W.appAheadFirstUse}</p>}
-      {sharing && s.shareText !== null ? (
-        <ShareSheet
-          id="progress" title={W.appAheadShare} text={s.shareText} mapText={s.shareMapText} mapLink={v.mapLink} old={v.shareOld}
-          canShare={v.canShare} actions={actions} onClose={() => setSharing(false)}
-        />
-      ) : null}
-      <PositionControls v={v} actions={actions} pickerOpen={pickerOpen} onPicker={setPicker} />
-      {v.answers ? (
-        <>
-          {s.notes.length > 0 ? <ul class="ah-notes notice">{s.notes.map((n, i) => <li key={i}>{n}</li>)}</ul> : null}
-          {v.badSpeed ? <p class="notice"><a href="#/trip">{W.appAheadSpeedLink}</a></p> : null}
-          <RouteStrip strip={s.strip} bike={v.bike} onOpen={openCard} />
-          <TopicCards screen={s} open={open} onToggle={toggle} v={v} actions={actions} onShelter={() => openChip('shelter')} />
-        </>
-      ) : null}
-      <ChipRow shown={v.answers ? CHIP_ORDER : ['emergency']} open={chip} onOpen={openChip} />
-      {chip ? <ChipPanel chip={chip} screen={s} canShare={v.canShare} actions={actions} onClose={() => setChip(null)} /> : null}
+    <div class="ahead" data-ahead={v.answers ? 'answers' : 'first-use'} onKeyDown={onKeyDown}>
+      <div class="ah-main">
+        {v.notice ? <p class="notice" role="status">{v.notice}</p> : null}
+        {v.answers ? <PositionLine v={v} onShare={() => setSharing(true)} /> : <p>{W.appAheadFirstUse}</p>}
+        {sharing && s.shareText !== null ? (
+          <ShareSheet
+            id="progress" title={W.appAheadShare} text={s.shareText} mapText={s.shareMapText} mapLink={v.mapLink} old={v.shareOld}
+            canShare={v.canShare} actions={actions} onClose={() => setSharing(false)}
+          />
+        ) : null}
+        <PositionControls v={v} actions={actions} pickerOpen={pickerOpen} onPicker={setPicker} rail={rail} />
+        {v.answers ? (
+          <>
+            {s.notes.length > 0 ? <ul class="ah-notes notice">{s.notes.map((n, i) => <li key={i}>{n}</li>)}</ul> : null}
+            {v.badSpeed ? <p class="notice"><a href="#/trip">{W.appAheadSpeedLink}</a></p> : null}
+            <RouteStrip strip={s.strip} bike={v.bike} onOpen={openCard} onSetPosition={rail ? (km) => void actions.setManual(km) : undefined} />
+          </>
+        ) : null}
+      </div>
+      {v.answers ? <TopicCards screen={s} open={open} onToggle={toggle} v={v} actions={actions} onShelter={() => openChip('shelter')} /> : null}
+      <div class="ah-below">
+        <ChipRow shown={v.answers ? CHIP_ORDER : ['emergency']} open={chip} onOpen={openChip} />
+        {chip ? <ChipPanel chip={chip} screen={s} canShare={v.canShare} actions={actions} onClose={() => setChip(null)} /> : null}
+      </div>
     </div>
   );
 }
