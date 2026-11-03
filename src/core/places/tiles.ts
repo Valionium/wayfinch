@@ -76,6 +76,9 @@ export const CORRIDOR_KM = 20;
 
 export const tileKey = (t: TileId): string => `${t.z}/${t.x}/${t.y}`;
 
+/** Whether a tile lies within `radiusKm` of a point. */
+export const tileHolds = (t: TileId, p: LatLng, radiusKm: number): boolean => distanceToBoxKm(p, tileBounds(t)) <= radiusKm;
+
 /** How finely `savedKmRanges` walks the route: an edge of a range is true to this. */
 const SAVED_STEP_KM = 0.25;
 
@@ -85,9 +88,9 @@ const SAVED_STEP_KM = 0.25;
  * the careful side: the stretch between a kilometre with data and one without counts as without.
  */
 export function savedKmRanges(route: { points: (LatLng & { km: number })[]; lengthKm: number }, tiles: ManifestTile[], saved: ReadonlySet<string>,
-  covered: (km: number) => boolean, radiusKm: number = CORRIDOR_KM): { fromKm: number; toKm: number }[] {
+  covered: (km: number, p: LatLng) => boolean, radiusKm: number = CORRIDOR_KM): { fromKm: number; toKm: number }[] {
   const missing = tiles.filter((t) => !saved.has(tileKey(t))).map(tileBounds);
-  const good = (p: LatLng, km: number): boolean => covered(km) && !missing.some((b) => distanceToBoxKm(p, b) <= radiusKm);
+  const good = (p: LatLng, km: number): boolean => covered(km, p) && !missing.some((b) => distanceToBoxKm(p, b) <= radiusKm);
   const out: { fromKm: number; toKm: number }[] = [];
   let open: { fromKm: number; toKm: number } | null = null;
   const visit = (p: LatLng, km: number): void => {

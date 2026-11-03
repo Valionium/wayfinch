@@ -587,6 +587,23 @@ export const W = {
   appStoreImportSettings: "The settings in this file can't be read. Nothing was changed.",
   appStoreImportCalibration: "The water learning in this file can't be read. Nothing was changed.",
   appStoreImportTyres: "The tyre details in this file can't be read. Nothing was changed.",
+
+  // ---- Get ready offline (sub-project 5): each step's note ----
+  prepHeightsNotice: 'To work out the climbing, sampled points of this route go to the Open-Meteo elevation service, rounded to about 100 m.',
+  prepHeightsFailed: "Heights couldn't be looked up, so climbing reads unknown and stages split by distance.",
+  prepNoConnection: 'No connection, so this was not updated.',
+  prepPacksNoAnswer: "The map data service didn't answer, so no places were saved.",
+  prepPacksRestarted: 'The map data was updated while this was unfinished, so it started again on the new data.',
+  prepTilesFailed: (n: number): string => `Map data for ${n === 1 ? 'one part' : `${n} parts`} of the route wasn't saved. Get ready offline picks up where it stopped.`,
+  prepStorageFull: (saved: number, total: number): string => `Storage full. ${saved} of ${total} parts of the map data were saved. Free some space, then Get ready offline picks up where it stopped.`,
+  prepStorageFullStep: 'Storage full, so this was not saved.',
+  prepPlacesNotMatched: "The places couldn't be matched to the route.",
+  prepZonesMissing: "The country borders couldn't be read, so this route's time zones and holidays are unknown.",
+  prepHoursFailed: "Opening hours couldn't be worked out.",
+  prepWeatherFailed: "The weather service didn't answer, so no forecast was saved.",
+  prepBaselineFailed: "The seasonal estimate couldn't be fetched.",
+  prepSaveFailed: "This couldn't be saved on this device.",
+  prepRouteReplaced: 'The route was replaced, so this stopped.',
 };
 
 /** "28 Oct" from an ISO date. Anything else is no date. */

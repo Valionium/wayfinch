@@ -93,3 +93,13 @@ export function matchRescuePoints(points: PackRescuePoint[], route: Route): Resc
     return { ...p, kms: merged(passesOf(within, p, route, RESCUE_ROUTE_KM), 2 * RESCUE_ROUTE_KM).map((q) => q.km) };
   });
 }
+
+/** How far off the route a rescue point is still kept (section 6.9). */
+const RESCUE_KEEP_KM = 3;
+
+/** The rescue points worth storing for a route: those within 3 km of it, with their route kilometres. */
+export function rescuePointsNear(points: PackRescuePoint[], route: Route): RescuePoint[] {
+  const idx = buildSegmentIndex(route);
+  const near = points.filter((p) => segmentsNear(idx, p, RESCUE_KEEP_KM).some((s) => projectOnSegment(p, route, s).offKm <= RESCUE_KEEP_KM));
+  return matchRescuePoints(near, route);
+}

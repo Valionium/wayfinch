@@ -147,12 +147,18 @@ export async function readPackRun(): Promise<PackRun | null> {
   return usableRun(await inTx(['meta'], 'readonly', (tx) => tx.objectStore('meta').get(PACK_RUN_META)));
 }
 
+/** Refuses when there's no trip, or when it isn't the route this write was meant for. */
+async function holdsRoute(tx: Tx, routeId: string | undefined): Promise<void> {
+  const trip = (await tx.objectStore('trip').get(CURRENT)) as Trip | undefined;
+  if (trip === undefined || (routeId !== undefined && trip.route?.id !== routeId)) throw new RouteGoneError();
+}
+
 const TILE_STORES = ['places', 'roofs', 'rescuePoints', 'savedTiles', 'matches', 'hours', 'meta', 'trip'];
 
 /** Begins a run. What an earlier run of an older build left goes in the same transaction: builds never mix. */
-export function startPackRun(run: PackRun): Promise<void> {
+export function startPackRun(run: PackRun, routeId?: string): Promise<void> {
   return tracked(inTx(TILE_STORES, 'readwrite', async (tx) => {
-    if ((await tx.objectStore('trip').get(CURRENT)) === undefined) throw new RouteGoneError();
+    await holdsRoute(tx, routeId);
     await Promise.all(['places', 'roofs', 'rescuePoints', 'savedTiles', 'matches', 'hours'].map((name) => tx.objectStore(name).clear()));
     await tx.objectStore('meta').delete(SAVED_KM_KEY);
     await tx.objectStore('meta').put(run, PACK_RUN_META);
@@ -168,8 +174,9 @@ export async function savedTileKeys(): Promise<Set<string>> {
  * One batch of verified tiles, all in one transaction, so a killed tab leaves whole batches and no tile reads as saved
  * without its content. Refused when the run isn't the stored one: the route was replaced meanwhile.
  */
-export function saveTiles(content: TileContent[], report: TileReport): Promise<void> {
-  return tracked(inTx(['places', 'roofs', 'rescuePoints', 'savedTiles', 'meta'], 'readwrite', async (tx) => {
+export function saveTiles(content: TileContent[], report: TileReport, routeId?: string): Promise<void> {
+  return tracked(inTx(['places', 'roofs', 'rescuePoints', 'savedTiles', 'meta', 'trip'], 'readwrite', async (tx) => {
+    await holdsRoute(tx, routeId);
     const run = (await tx.objectStore('meta').get(PACK_RUN_META)) as { buildId?: unknown } | undefined;
     if (run?.buildId !== report.buildId) throw new RouteGoneError();
     // Each is awaited: a value the browser can't store throws at its call, and the requests before it would then be left

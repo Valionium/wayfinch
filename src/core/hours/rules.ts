@@ -4,6 +4,18 @@ import type { HoursSpan } from '../types';
 import { W } from '../wording/en';
 
 export type RuleClass = { kind: 'food-shop' | 'kiosk' | 'bakery' | 'fuel-shop' | 'other-shop' | 'other'; nearStation: boolean };
+/** What a place is to the rules of section 6.4: its kind, and whether a station lies within 100 m. */
+export function ruleClassOf(place: { kind: string; tags: Record<string, string> }, nearStation: boolean): RuleClass {
+  const shop = place.tags['shop'];
+  if (place.kind === 'fuel_shop') return { kind: 'fuel-shop', nearStation };
+  if (place.kind === 'shop') {
+    if (shop === 'bakery') return { kind: 'bakery', nearStation };
+    if (shop === 'kiosk') return { kind: 'kiosk', nearStation };
+    return { kind: 'food-shop', nearStation };
+  }
+  return { kind: shop === undefined ? 'other' : 'other-shop', nearStation };
+}
+
 export type Seg = {
   from: number; to: number; state: HoursSpan['state']; reason?: string;
   /** A PH rule of the tag decides this stretch of a holiday. */

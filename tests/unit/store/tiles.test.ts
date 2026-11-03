@@ -53,6 +53,19 @@ describe('a batch of tiles', () => {
     expect(await counts()).toEqual([0, 0, 0, 0]);
   });
 
+  test('[PREP-TRANSACTION] a run of the same build for a route since replaced is refused too', async () => {
+    await readTrip();
+    await saveTrip(trip());
+    const old = (await readTrip())!.route.id;
+    await replaceRoute(route({ id: 'route-new' }, 80));
+    await startPackRun({ buildId: manifest.buildId, manifest }, 'route-new');
+    await expect(saveTiles(content([placeAt('water', 49, 8, { id: 'n1' })]), report, old)).rejects.toBeInstanceOf(RouteGoneError);
+    await expect(startPackRun({ buildId: manifest.buildId, manifest }, old)).rejects.toBeInstanceOf(RouteGoneError);
+    expect(await counts()).toEqual([0, 0, 0, 0]);
+    await saveTiles(content([placeAt('water', 49, 8, { id: 'n1' })]), report, 'route-new');
+    expect(await counts()).toEqual([1, 1, 1, 1]);
+  });
+
   test('[PREP-TRANSACTION] a new run removes what an older build left, in one go', async () => {
     await started();
     await saveTiles(content([placeAt('water', 49, 8, { id: 'n1' })]), report);
