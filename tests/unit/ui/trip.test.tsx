@@ -696,3 +696,25 @@ describe('Trip and the database', () => {
     expect((await indexedDB.databases()).map((d) => d.name)).toContain('copilot');
   });
 });
+
+describe('Messages that must not be lost', () => {
+  test('[TRIP-SETTINGS] a setting that was kept but whose days could not be updated shows that sentence, though the write was accepted', async () => {
+    await withRoute();
+    const real = services();
+    const svc = { ...real, writeSettings: () => Promise.resolve({ ok: true, reasons: {}, note: W.appTripReplanFailed }) };
+    await show(svc);
+    await click(host.querySelector<HTMLInputElement>('input[name=pace][value=hard]')!);
+    await until(() => text().includes(W.appTripReplanFailed), 'the sentence');
+  });
+
+  test('[TRIP-REPLACE-ASKS] a route that was replaced whose date was not saved says so, and does not say the route is unchanged', async () => {
+    const real = await withRoute('loop');
+    const svc = { ...real, addRoute: (found: Parameters<TripServices['addRoute']>[0], id: string | null) => real.addRoute(found, id).then((o) => ({ ...o, dateNotSaved: true as const })) };
+    await show(svc);
+    await pick(await fixtureGpx('alpine-pass'));
+    await until(() => host.querySelector('[data-replace]') !== null, 'the question');
+    await click(button(W.appTripReplaceYes));
+    await until(() => text().includes(W.appTripReplacedNoDate('Fixture: Altdorf over the Gotthard to Bellinzona')), 'the sentence');
+    expect(text()).not.toContain(W.appTripUnchanged);
+  });
+});

@@ -881,6 +881,7 @@ export const W = {
   appTripReplaceBody: (oldName: string, newName: string, km: string): string => `“${newName}” (${km} km) would replace “${oldName}”. The places, forecast, positions, departure date and nights saved for the old route are removed. The departure date goes back to today and the nights to the stage model's suggestion; pace, speed, start time, stay and camp water stay.`,
   appTripReplaceYes: 'Replace route',
   appTripReplaceCancel: 'Cancel',
+  appTripReplacedNoDate: (name: string): string => `Replaced with “${name}”, but its departure date was not saved. Set the date in Trip settings.`,
   appTripSameRoute: 'That is the route you already have. Nothing was changed.',
   appTripAdded: (name: string): string => `Added “${name}”.`,
   appTripReplaced: (name: string): string => `Replaced with “${name}”.`,

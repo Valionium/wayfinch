@@ -65,7 +65,8 @@ export function TripSettings({ services, snap, reload }: { services: TripService
   const save: Save = async (field, value) => {
     const result = await services.writeSettings({ [field]: value });
     // A refusal stays beside its field only until the next change that is accepted.
-    setProblems((p) => (result.ok ? {} : { ...p, [field]: result.reasons[field] ?? result.note ?? '' }));
+    // An accepted change clears the old refusals, but a note about it (its days could not be updated) is always shown.
+    setProblems((p) => (result.ok ? (result.note ? { [field]: result.note } : {}) : { ...p, [field]: result.reasons[field] ?? result.note ?? '' }));
     await reload();
     return result.ok;
   };

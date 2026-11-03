@@ -49,7 +49,8 @@ export type TripSnapshot = {
   running: boolean;
 };
 
-export type AddOutcome = { kind: 'added' | 'replaced' | 'same'; name: string };
+/** `dateNotSaved`: the route was replaced, but the write of its departure date was refused. */
+export type AddOutcome = { kind: 'added' | 'replaced' | 'same'; name: string; dateNotSaved?: true };
 export type SettingsOutcome = { ok: boolean; reasons: Partial<Record<keyof Settings, string>>; note: string | null };
 
 export type TripEnv = {
@@ -235,8 +236,14 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
     const today = localIsoDate(now(), deviceZone());
     if (before) {
       await replaceRoute(withDays);
-      const stored = await readTrip();
-      if (stored) await saveTrip({ ...stored, departureDate: today });
+      // The route is replaced from here on. If only the date is refused, that is said as it is.
+      try {
+        const stored = await readTrip();
+        if (stored) await saveTrip({ ...stored, departureDate: today });
+      } catch {
+        noteHeights(withDays, hadHeights);
+        return { kind: 'replaced', name: route.name, dateNotSaved: true };
+      }
     } else {
       await saveTrip({ route: withDays, departureDate: today, startTime: settings.startTime, flatKph, stay: settings.stay, campWaterL: settings.campWaterL, pace });
     }

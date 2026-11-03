@@ -40,7 +40,7 @@ function AddRoute({ services, snap, reload }: { services: TripServices; snap: Tr
     try {
       const out = await services.addRoute(found, old?.route.id ?? null);
       setRound((n) => n + 1);
-      setSaid(out.kind === 'same' ? W.appTripSameRoute : out.kind === 'added' ? W.appTripAdded(out.name) : W.appTripReplaced(out.name));
+      setSaid(out.kind === 'same' ? W.appTripSameRoute : out.kind === 'added' ? W.appTripAdded(out.name) : out.dateNotSaved ? W.appTripReplacedNoDate(out.name) : W.appTripReplaced(out.name));
       await reload();
     } catch (e) {
       refused(reasonOf(e));
