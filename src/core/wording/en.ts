@@ -835,6 +835,7 @@ export const W = {
   prepZonesMissing: "The country borders couldn't be read, so this route's time zones and holidays are unknown.",
   prepHoursFailed: "Opening hours couldn't be worked out.",
   prepWeatherFailed: "The weather service didn't answer, so no forecast was saved.",
+  prepWeatherRecent: 'The forecast was fetched less than 30 minutes ago, so it was kept.',
   prepBaselineFailed: "The seasonal estimate couldn't be fetched.",
   prepSaveFailed: "This couldn't be saved on this device.",
   prepRouteReplaced: 'The route was replaced, so this stopped.',

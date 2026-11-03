@@ -32,7 +32,9 @@ test('[PREP-STEPS] Get ready offline on the real site: places and hours are save
     const s = __store.screen(i);
     return { zones: i.routeZones.map((z) => z.holidayZone), savedKm: i.savedKm, missing: s.cards.water.missing, numbers: s.chips.emergency.numbers };
   });
-  expect(seen.zones).toEqual(['DE-BW', 'FR-67']);
+  // The fixture runs through Rhineland-Palatinate by Speyer, as the unsimplified OpenStreetMap borders say too.
+  expect([...new Set(seen.zones)].sort()).toEqual(['DE-BW', 'DE-RP', 'FR-67']);
+  expect([seen.zones[0], seen.zones.at(-1)]).toEqual(['DE-BW', 'FR-67']);
   expect(seen.savedKm).toEqual([{ fromKm: 0, toKm: trip.route.lengthKm }]);
   expect(seen.missing).toContain('weather');
   expect(seen.missing).not.toContain('places');

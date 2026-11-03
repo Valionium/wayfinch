@@ -1,10 +1,13 @@
 // Get ready offline (spec section 5): heights, places, hours, weather, baseline, save. Each step is reported on its own, and a
-// failed step never discards the others. Weather's requests come in as arguments, so this file knows nothing of the service.
+// failed step never discards the others. Weather's requests come in as arguments; the grid, days and points are openmeteo.ts's
+// own, so a forecast asked for here is the very request Update weather sends.
 import { addDaysIso, localIsoDate } from '../core/answers/time.ts';
+import { modelsForRoute } from '../core/engines/weather-classes.ts';
+import { zoneLookupOf } from '../core/engines/tripday.ts';
+import { hoursWindowDates, ridingDaysOf } from '../core/hours/window.ts';
 import { haversineKm } from '../core/geo/haversine.ts';
 import type { LatLng } from '../core/geo/haversine.ts';
 import { buildSegmentIndex } from '../core/geo/index.ts';
-import { pointAtRouteKm } from '../core/geo/project.ts';
 import { kitchenHoursId } from '../core/hours/check.ts';
 import { ruleClassOf } from '../core/hours/rules.ts';
 import { CORRIDOR_KM, savedKmRanges, tileHolds, tileKey } from '../core/places/tiles.ts';
@@ -26,14 +29,14 @@ import { loadBoundaries } from './boundaries.ts';
 import { checkConnectivity } from './connectivity.ts';
 import { downloadTiles, isStorageFull, STORAGE_FULL } from './packs/download.ts';
 import type { TileReport, TileStore } from './packs/download.ts';
+import { baselinePoints, forecastDaysFor, gridPoints } from './openmeteo.ts';
+import type { FetchLike, GridPoint } from './openmeteo.ts';
+import { withoutUnknownHolidays } from './overpass.ts';
+import { WEATHER_MODE } from './weather-mode.ts';
 
 export type StepName = 'heights' | 'places' | 'hours' | 'weather' | 'baseline' | 'save';
 export type StepReport = { step: StepName; ok: boolean; note: string | null };
 
-/** A point of the forecast's grid. */
-export type GridPoint = { km: Km; lat: number; lon: number };
-/** A stage end or the high point, for the seasonal baseline. */
-export type BaselinePoint = { km: Km; lat: number; lon: number; ele: number | null };
 
 type WakeLockLike = { request(type: 'screen'): Promise<{ release(): Promise<void> }> };
 /** The parts of `navigator` used here; each may be missing on a phone. */
@@ -41,17 +44,18 @@ export type PrepareNavigator = { wakeLock?: WakeLockLike; storage?: { persist?: 
 
 type Fetch = typeof globalThis.fetch;
 
+/** As openmeteo.ts's own functions take them. */
 export type PrepareDeps = {
   fetch: Fetch;
-  fetchForecast: (grid: GridPoint[], o: { days: number; with15: boolean; fetch: Fetch }) => Promise<StoredForecast>;
-  fetchBaseline: (points: BaselinePoint[], months: number[], fetch: Fetch) => Promise<Baseline>;
-  fetchElevation: (points: LatLng[], fetch: Fetch) => Promise<(number | null)[]>;
+  fetchForecast: (grid: GridPoint[], o: { days: number; with15: boolean; fetch: FetchLike; now?: () => Date; runs?: ModelRun[] }) => Promise<StoredForecast>;
+  fetchBaseline: (points: GridPoint[], months: number[], fetch: FetchLike) => Promise<Baseline>;
+  fetchElevation: (points: LatLng[], fetch: FetchLike) => Promise<(number | null)[]>;
   /** The model-run check before the forecast (section 5, step 3). Its failure stops nothing. */
-  fetchModelRuns?: (fetch: Fetch) => Promise<ModelRun[]>;
+  fetchModelRuns?: (fetch: FetchLike) => Promise<ModelRun[]>;
   now: () => Date;
   /** Said before any heights are sent. */
   onNotice?: (text: string) => void;
-  /** 15-minute rain: only in the automatic weather mode (Decision 3). */
+  /** 15-minute rain: only in the automatic weather mode (Decision 3), as Update weather asks. */
   with15?: boolean;
   nav?: PrepareNavigator;
   store?: PreparedStore;
@@ -60,7 +64,8 @@ export type PrepareDeps = {
 
 const DAY_MS = 86_400_000;
 const HOURS_BATCH = 200;
-const MAX_FORECAST_DAYS = 16;
+/** As Update weather's tap (refresh.ts): no second request within 30 minutes, whatever asks. */
+const WEATHER_GAP_MS = 30 * 60_000;
 /** Heights asked for no closer than this along the route; those between are interpolated (section 5). */
 const HEIGHT_STEP_KM = 0.2;
 const SHELTER_KINDS: readonly Place['kind'][] = ['settlement', 'shelter'];
@@ -260,15 +265,8 @@ async function placesStep(deps: PrepareDeps, store: PreparedStore, online: boole
 
 const startZoneOf = (zones: ZoneSpan[]): string => zones[0]?.timeZone ?? 'UTC';
 
-/** The trip's dates: from its first day to its planned end + 3 days, whole (section 6.4). A rider already under way gets the days left. */
-function windowDates(trip: Trip, today: string): { from: string; toExclusive: string; plannedEnd: string } {
-  const days = Math.max(1, trip.route.stages.length);
-  const from = trip.departureDate ?? today;
-  const plannedEnd = addDaysIso(from, days - 1);
-  const latest = addDaysIso(today, days - 1);
-  const end = latest > plannedEnd ? latest : plannedEnd;
-  return { from, toExclusive: addDaysIso(end, 4), plannedEnd };
-}
+const windowDates = (trip: Trip, today: string): ReturnType<typeof hoursWindowDates> =>
+  hoursWindowDates({ departureDate: trip.departureDate, ridingDays: ridingDaysOf(trip.route.stages), today });
 
 function nearStations(places: Place[]): (p: Place) => boolean {
   const stations = places.filter((p) => p.kind === 'station');
@@ -296,11 +294,13 @@ async function workOutHours(store: Pick<PreparedStore, 'saveHours'>, routeId: st
     const windowStart = midnight(from, place.timeZone);
     const windowEnd = midnight(toExclusive, place.timeZone);
     const rule = ruleClassOf(place, near(place));
-    batch.push({ placeId: place.id, windowStart, windowEnd, spans: placeSpans(place.openingHours, place, rule, windowStart, windowEnd, {}, cache) });
+    // Outside the first countries no holidays are known: their PH rules go, as for a refreshed stretch.
+    const tag = (raw: string | null): string | null => withoutUnknownHolidays(raw, place.country);
+    batch.push({ placeId: place.id, windowStart, windowEnd, spans: placeSpans(tag(place.openingHours), place, rule, windowStart, windowEnd, {}, cache) });
     // "Mapped but not prepared never counts for a meal": the kitchen's hours are a record of their own.
     const kitchen = place.stop?.kitchenHours;
     if (kitchen) {
-      batch.push({ placeId: kitchenHoursId(place.id), windowStart, windowEnd, spans: placeSpans(kitchen, place, { kind: 'other', nearStation: false }, windowStart, windowEnd, {}, cache) });
+      batch.push({ placeId: kitchenHoursId(place.id), windowStart, windowEnd, spans: placeSpans(tag(kitchen), place, { kind: 'other', nearStation: false }, windowStart, windowEnd, {}, cache) });
     }
     if (batch.length >= HOURS_BATCH) await flush();
   }
@@ -333,43 +333,40 @@ async function hoursStep(store: PreparedStore, trip: Trip, zones: ZoneSpan[], no
 
 // ---- weather -----------------------------------------------------------------------------------------------------------
 
-const daysBetween = (from: string, to: string): number => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
+/** The model-run check, of the models that matter for this route; one read for only some of them counts as none. */
+async function runsFor(deps: PrepareDeps, route: Route, zones: ZoneSpan[]): Promise<ModelRun[]> {
+  try {
+    const zone = zoneLookupOf(zones);
+    const models = modelsForRoute(route.points, (p) => zone((p as Route['points'][number]).km).country);
+    const read = (await deps.fetchModelRuns?.(deps.fetch)) ?? [];
+    const mattering = read.filter((r) => models.includes(r.model));
+    return models.length > 0 && models.every((m) => mattering.some((r) => r.model === m)) ? mattering : [];
+  } catch {
+    return [];
+  }
+}
 
 async function weatherStep(deps: PrepareDeps, store: PreparedStore, online: boolean, trip: Trip, zones: ZoneSpan[], now: Date): Promise<StepReport> {
   if (!online) return { step: 'weather', ok: false, note: W.prepNoConnection };
   const { route } = trip;
   try {
-    const today = localIsoDate(now, startZoneOf(zones));
-    const end = addDaysIso(trip.departureDate ?? today, Math.max(1, route.stages.length) - 1);
-    const days = Math.max(1, Math.min(MAX_FORECAST_DAYS, daysBetween(today, end) + 1));
-    let runs: ModelRun[] | null = null;
-    try {
-      runs = (await deps.fetchModelRuns?.(deps.fetch)) ?? null;
-    } catch {
-      runs = null;
+    const grid = gridPoints(route);
+    if (grid.length === 0) return { step: 'weather', ok: false, note: W.prepWeatherFailed };
+    // The turn to ask, held with Update weather's: a forecast fetched minutes ago stays, and no second request is sent.
+    if (!(await store.reserveWeather(route.id, now, WEATHER_GAP_MS))) {
+      return (await readForecastDate()) ? { step: 'weather', ok: true, note: W.prepWeatherRecent } : { step: 'weather', ok: false, note: W.prepWeatherFailed };
     }
-    const grid = route.sampleGrid.map((km) => ({ km, ...pointAtRouteKm(route, km) }));
-    const forecast = await deps.fetchForecast(grid, { days, with15: deps.with15 ?? false, fetch: deps.fetch });
-    await store.saveForecast(route.id, runs ? { ...forecast, runs } : forecast);
+    const runs = await runsFor(deps, route, zones);
+    const today = localIsoDate(now, startZoneOf(zones));
+    const forecast = await deps.fetchForecast(grid, {
+      days: forecastDaysFor(route, trip.departureDate, today), with15: deps.with15 ?? WEATHER_MODE === 'auto', fetch: deps.fetch, now: () => now, runs,
+    });
+    await store.saveForecast(route.id, runs.length > 0 && forecast.runs.length === 0 ? { ...forecast, runs } : forecast, now);
     return { step: 'weather', ok: true, note: null };
   } catch (e) {
     if (routeGone(e)) throw e;
     return { step: 'weather', ok: false, note: noteFor(e, W.prepWeatherFailed) };
   }
-}
-
-function baselinePoints(route: Route): BaselinePoint[] {
-  const kms = new Set(route.stages.map((s) => s.endKm));
-  if (route.ascentM !== null && route.points.length > 0) {
-    let high = route.points[0]!;
-    for (const p of route.points) if ((p.ele ?? -Infinity) > (high.ele ?? -Infinity)) high = p;
-    kms.add(high.km);
-  }
-  return [...kms].sort((a, b) => a - b).map((km) => {
-    const at = pointAtRouteKm(route, km);
-    const nearest = route.points.reduce((best, p) => (Math.abs(p.km - km) < Math.abs(best.km - km) ? p : best));
-    return { km, ...at, ele: nearest.ele };
-  });
 }
 
 async function baselineStep(deps: PrepareDeps, store: PreparedStore, online: boolean, trip: Trip, zones: ZoneSpan[], now: Date): Promise<StepReport> {
@@ -505,11 +502,10 @@ export async function catchUpHours(now: Date, o: { requestIdle?: IdleRequest; st
 
   const zones = await readStoredZones();
   const today = localIsoDate(now, startZoneOf(zones));
-  const { toExclusive } = windowDates({ ...trip, departureDate: today }, today);
+  const { from, toExclusive } = windowDates(trip, today);
   const { places } = await readTileData();
   const matched = new Set(await readMatchedIds());
   const store = o.store ?? preparedStore;
-  const from = addDaysIso(today, -1);
   await workOutHours(store, trip.route.id, places, matched, from, toExclusive);
   const { holidaysFor } = await import('../core/hours/holidays.ts');
   const named = zonesNamed(zones, places);

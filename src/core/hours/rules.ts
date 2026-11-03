@@ -8,12 +8,12 @@ export type RuleClass = { kind: 'food-shop' | 'kiosk' | 'bakery' | 'fuel-shop' |
 export function ruleClassOf(place: { kind: string; tags: Record<string, string> }, nearStation: boolean): RuleClass {
   const shop = place.tags['shop'];
   if (place.kind === 'fuel_shop') return { kind: 'fuel-shop', nearStation };
-  if (place.kind === 'shop') {
-    if (shop === 'bakery') return { kind: 'bakery', nearStation };
-    if (shop === 'kiosk') return { kind: 'kiosk', nearStation };
-    return { kind: 'food-shop', nearStation };
-  }
-  return { kind: shop === undefined ? 'other' : 'other-shop', nearStation };
+  if (shop === 'bakery') return { kind: 'bakery', nearStation };
+  if (shop === 'kiosk') return { kind: 'kiosk', nearStation };
+  if (place.kind === 'shop') return { kind: 'food-shop', nearStation };
+  // A bike shop or pharmacy is a shop to the holiday rules; so is anything else tagged shop=*.
+  if (place.kind === 'bike_shop' || place.kind === 'pharmacy' || shop !== undefined) return { kind: 'other-shop', nearStation };
+  return { kind: 'other', nearStation };
 }
 
 export type Seg = {

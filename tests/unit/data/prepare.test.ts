@@ -14,6 +14,7 @@ import { catchUpHours, prepareTrip } from '../../../src/data/prepare.ts';
 import type { PrepareDeps, StepReport } from '../../../src/data/prepare.ts';
 import { openDb } from '../../../src/store/db.ts';
 import { readInputs } from '../../../src/store/inputs.ts';
+import { readWeatherState } from '../../../src/store/weather.ts';
 import { preparedStore, PERSIST_META, readPrepared } from '../../../src/store/prepared.ts';
 import { readPackRun, readTrip, replaceRoute, saveTrip } from '../../../src/store/trip.ts';
 import { placeAt, rescueAt, roofAt } from '../../fixtures/places.ts';
@@ -173,6 +174,27 @@ describe('the steps', () => {
   });
 });
 
+describe('with Update weather', () => {
+  test('[PREP-STEPS] the steps ending mark the trip prepared for Update weather, and its turn to ask is shared', async () => {
+    const t = await onTrip();
+    expect((await readWeatherState())!.prepared).toBe(false);
+    let asked = 0;
+    const server = new PackServer(fixtureBuild('heidelberg-strasbourg'));
+    const deps = depsFor(server, { fetchForecast: async () => { asked++; return forecast(); } });
+    await prepareTrip(deps, () => undefined);
+    expect((await readWeatherState())!.prepared).toBe(true);
+    expect(asked).toBe(1);
+    // Minutes later, Get ready again: the forecast just fetched stays, and nothing is sent.
+    const again = await prepareTrip(deps, () => undefined);
+    expect(asked).toBe(1);
+    expect(step(again, 'weather')).toMatchObject({ ok: true, note: W.prepWeatherRecent });
+    // A route replaced: the mark goes with it.
+    await replaceRoute(flatRoute(40, { stageEnds: [40] }));
+    expect((await readWeatherState())!.prepared).toBe(false);
+    expect(t.route.id).not.toBe((await readTrip())!.route.id);
+  });
+});
+
 describe('heights', () => {
   async function noHeights(): Promise<Trip> {
     const base = await fixtureTrip('heidelberg-strasbourg');
@@ -319,6 +341,13 @@ describe('hours', () => {
     // In Switzerland a shop at a station may be open on a Sunday, and one away from it probably is not.
     expect(stateAt(hours.get('n5'), sunday).state).toBe('unknown');
     expect(stateAt(hours.get('n6'), sunday).state).toBe('possibly-closed');
+  });
+
+  test('[PREP-HOURS] a place outside the first countries loses its PH rules, as a refreshed one does, rather than reading unknown', async () => {
+    const { build } = await packTrip([shopAt('n1', 'Mo-Sa 08:00-20:00; PH off', { country: 'LI', holidayZone: null, hoursRegionKey: null, subdivision: null, timeZone: 'Europe/Vaduz' })]);
+    await prepareTrip(depsFor(new PackServer(build)), () => undefined);
+    const h = (await stored<PlaceHours>('hours')).find((x) => x.placeId === 'n1')!;
+    expect(stateAt(h, new Date('2026-10-17T10:00:00Z')).state).toBe('open');
   });
 
   test('[PREP-KITCHEN] a place with opening_hours:kitchen has spans under kitchenHoursId(id); Food uses them for a meal stop', async () => {

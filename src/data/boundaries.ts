@@ -1,5 +1,6 @@
 // The bundled boundary file: served by the site, precached with the launch, fetched at preparation only.
-import type { BoundaryFile } from '../core/route/zones.ts';
+import { zoneAt } from '../core/route/zones.ts';
+import type { BoundaryFile, Zone } from '../core/route/zones.ts';
 
 export const BOUNDARY_PATH = '/data/boundaries.v1.json';
 
@@ -20,6 +21,12 @@ function usableFile(raw: unknown): raw is BoundaryFile {
   return typeof f === 'object' && f !== null && f.v === 1 && typeof f.source === 'string' && Array.isArray(f.areas) && f.areas.length > 0
     && f.areas.every((a) => typeof a.country === 'string' && typeof a.holidayZone === 'string' && knownZone(a.timeZone)
       && Array.isArray(a.rings) && a.rings.every((r) => Array.isArray(r) && r.every(isCoord)));
+}
+
+/** Refresh this stretch's `deps.zoneAt`: the zone of a point from the bundled file, null outside the first countries. */
+export async function loadZoneAt(fetcher: typeof fetch): Promise<(lat: number, lon: number) => Zone | null> {
+  const file = await loadBoundaries(fetcher);
+  return (lat, lon) => zoneAt(lat, lon, file);
 }
 
 export async function loadBoundaries(fetcher: typeof fetch): Promise<BoundaryFile> {

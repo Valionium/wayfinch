@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { holidaysFor } from '../../../src/core/hours/holidays.ts';
 import type { BoundaryFile } from '../../../src/core/route/zones.ts';
-import { loadBoundaries } from '../../../src/data/boundaries.ts';
+import { loadBoundaries, loadZoneAt } from '../../../src/data/boundaries.ts';
 import { buildDist } from '../../../tools/build.mjs';
 import { boundaryGzip, BOUNDARY_BUDGET } from '../../../tools/size-budget.mjs';
 import { COUNTRY_JOBS } from '../../../pipeline/config.ts';
@@ -140,6 +140,11 @@ describe('reading it', () => {
     const got = await loadBoundaries(async (u) => { asked.push(String(u)); return new Response(text); });
     expect(asked).toEqual(['/data/boundaries.v1.json']);
     expect(got.areas.length).toBe(file.areas.length);
+  });
+  test('[BND-LOCAL] Refresh this stretch gets its zoneAt from the same file', async () => {
+    const zoneOf = await loadZoneAt(async () => new Response(text));
+    expect(zoneOf(48.5734, 7.7521)).toEqual({ country: 'FR', holidayZone: 'FR-67', timeZone: 'Europe/Paris' });
+    expect(zoneOf(45.4642, 9.19)).toBeNull();
   });
   test('[BND-LOCAL] a damaged file or a failed answer is no file', async () => {
     await expect(loadBoundaries(answer('nonsense'))).rejects.toThrow();

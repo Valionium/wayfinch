@@ -1,12 +1,14 @@
 // Refresh this stretch (spec section 5): a live OpenStreetMap query of one stretch, only after the rider's yes to a notice.
 // The public Overpass service is not a backend for an app, so at most 50 km go, as a simplified line, one request at a time,
 // and it is given room when it refuses. Places are classified on the phone by the pipeline's own code (classify-all.ts).
-import { addDaysIso, formatHm, instantAt, localIsoDate } from '../core/answers/time.ts';
+import { formatHm, instantAt, localIsoDate } from '../core/answers/time.ts';
 import { zoneLookupOf } from '../core/engines/tripday.ts';
 import { pointAtRouteKm } from '../core/geo/project.ts';
 import { buildSegmentIndex } from '../core/geo/index.ts';
 import { kitchenHoursId } from '../core/hours/check.ts';
+import { ruleClassOf as placeRuleClass } from '../core/hours/rules.ts';
 import type { RuleClass } from '../core/hours/rules.ts';
+import { hoursWindowDates, ridingDaysOf } from '../core/hours/window.ts';
 import { classifyAll, keepPolygons, objectOf } from '../core/places/classify-all.ts';
 import type { ClassifyOptions, Zone } from '../core/places/classify.ts';
 import { COUNTRIES } from '../core/places/countries.ts';
@@ -34,7 +36,6 @@ const MAX_REQUESTS = 10;
 const RUN_LEASE_MS = 3 * 60_000; // renewed before each request and each minute of a wait: a killed window holds the others up only this long
 const RENEW_EVERY_MS = 60_000;
 const MAX_SERVER_ERRORS_IN_A_ROW = 3;
-const NO_DATE_WINDOW_DAYS = 14;
 const M_PER_DEG = 111_320;
 
 type LineStop = { lat: number; lon: number };
@@ -185,20 +186,11 @@ const withPackZones = (p: Place, pack: Place | undefined): Place => {
 };
 
 /** What the hours rules read of a place's kind. */
-export function ruleClassOf(p: Place): RuleClass {
-  const shop = p.tags['shop'];
-  const kind: RuleClass['kind'] = p.kind === 'fuel_shop' ? 'fuel-shop' : shop === 'bakery' ? 'bakery' : shop === 'kiosk' ? 'kiosk'
-    : p.kind === 'shop' ? 'food-shop' : p.kind === 'bike_shop' || p.kind === 'pharmacy' ? 'other-shop' : 'other';
-  return { kind, nearStation: false };
-}
+export const ruleClassOf = (p: Place): RuleClass => placeRuleClass(p, false);
 
+/** The trip window of section 6.4, the same as Get ready's (core/hours/window.ts). */
 const hoursWindow = (state: StretchState, now: Date, tz: string): { from: string; to: string; start: Date; end: Date } => {
-  const today = localIsoDate(now, tz);
-  const departure = state.departureDate;
-  const from = departure !== null && departure > today ? departure : today;
-  const lastDay = state.route.stages.reduce((most, s) => Math.max(most, s.day), 1);
-  const planned = departure === null ? addDaysIso(today, NO_DATE_WINDOW_DAYS) : addDaysIso(departure, lastDay);
-  const to = planned > from ? planned : addDaysIso(from, 1);
+  const { from, toExclusive: to } = hoursWindowDates({ departureDate: state.departureDate, ridingDays: ridingDaysOf(state.route.stages), today: localIsoDate(now, tz) });
   return { from, to, start: instantAt(from, '00:00', tz), end: instantAt(to, '00:00', tz) };
 };
 

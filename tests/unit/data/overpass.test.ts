@@ -364,7 +364,8 @@ describe('the record', () => {
     const inputs = (await readInputs(NOW))!;
     const shop = inputs.hours.find((h) => h.placeId === 'n1')!;
     expect(shop.windowStart).toEqual(at('2026-10-17 00:00')); // the departure, as the trip has not begun
-    expect(shop.windowEnd).toEqual(at('2026-10-21 00:00')); // the day after the plan's last, Tue 20 Oct
+    // The plan's last day, Tue 20 Oct, and 3 days more (section 6.4): the same window as Get ready's.
+    expect(shop.windowEnd).toEqual(at('2026-10-24 00:00'));
     expect(shop.spans[0]!.from).toEqual(shop.windowStart);
     expect(shop.spans[shop.spans.length - 1]!.to).toEqual(shop.windowEnd);
     expect(shop.spans.some((s) => s.state === 'open' && s.from.getTime() === at('2026-10-17 07:00').getTime())).toBe(true);

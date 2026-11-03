@@ -8,8 +8,10 @@ import type { Tx } from './db.ts';
 import { HOLIDAYS_META, SAVED_KM_META, ZONES_META } from './inputs.ts';
 import { usableHolidays, usableZones } from './rules.ts';
 import { readPackRun, readTrip, RouteGoneError, saveTiles, savedTileKeys, saveTrip, startPackRun } from './trip.ts';
+import { PREPARED_META, reserveWeatherFetch, saveForecast as keepForecast } from './weather.ts';
 
-export const PREPARED_META = `${ROUTE_META_PREFIX}prepared`;
+/** The steps' record. That the trip is prepared at all is weather.ts's mark (PREPARED_META), set in the same transaction. */
+export const PREPARED_STEPS_META = `${ROUTE_META_PREFIX}preparedSteps`;
 /** The browser's answer to the request for persistent storage: of this device, so it stays when the route goes. */
 export const PERSIST_META = 'storagePersist';
 
@@ -64,19 +66,28 @@ export const saveHolidays = (routeId: string, holidays: Record<string, string[]>
 export const saveHours = (routeId: string, batch: PlaceHours[]): Promise<void> =>
   guarded(routeId, ['hours'], async (tx) => { for (const h of batch) await tx.objectStore('hours').put(h); });
 
-export const saveForecast = (routeId: string, forecast: StoredForecast): Promise<void> =>
-  guarded(routeId, ['forecast'], async (tx) => { await tx.objectStore('forecast').put(forecast, CURRENT); });
+/** Through Update weather's own write: never over a newer forecast, never over another route. */
+export async function saveForecast(routeId: string, forecast: StoredForecast, now: Date): Promise<void> {
+  if ((await keepForecast(routeId, forecast, now)) === 'gone') throw new RouteGoneError();
+}
+
+/** The turn to ask the weather service, shared with Update weather. */
+export const reserveWeather = (routeId: string, now: Date, gapMs: number): Promise<boolean> => reserveWeatherFetch(routeId, now, gapMs);
 
 export const saveBaseline = (routeId: string, baseline: Baseline): Promise<void> =>
   guarded(routeId, ['baseline'], async (tx) => { await tx.objectStore('baseline').put(baseline, CURRENT); });
 
 export async function savePrepared(routeId: string, record: PreparedRecord): Promise<void> {
-  await guarded(routeId, ['meta'], async (tx) => { await tx.objectStore('meta').put(record, PREPARED_META); });
+  await guarded(routeId, ['meta'], async (tx) => {
+    await tx.objectStore('meta').put(record, PREPARED_STEPS_META);
+    // As weather.ts's markPrepared: from now on Update weather may send.
+    await tx.objectStore('meta').put(routeId, PREPARED_META);
+  });
   markChanged('day');
 }
 
 export async function readPrepared(): Promise<PreparedRecord | null> {
-  const raw = (await inTx(['meta'], 'readonly', (tx) => tx.objectStore('meta').get(PREPARED_META))) as PreparedRecord | undefined;
+  const raw = (await inTx(['meta'], 'readonly', (tx) => tx.objectStore('meta').get(PREPARED_STEPS_META))) as PreparedRecord | undefined;
   return raw && Array.isArray(raw.steps) ? raw : null;
 }
 
@@ -108,6 +119,6 @@ export const readHours = (): Promise<PlaceHours[]> =>
 /** The store as preparation sees it. Tests put a full disk in its place. */
 export const preparedStore = {
   readTrip, saveTrip, readRun: readPackRun, startRun: startPackRun, savedTileKeys, saveTiles, readTileData, saveMatched,
-  saveZones, saveHolidays, saveHours, saveForecast, saveBaseline, savePrepared, savePersist,
+  saveZones, saveHolidays, saveHours, saveForecast, reserveWeather, saveBaseline, savePrepared, savePersist,
 };
 export type PreparedStore = typeof preparedStore;
