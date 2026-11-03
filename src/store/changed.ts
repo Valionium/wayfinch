@@ -2,8 +2,8 @@
 // `copilot:changed`, and the others re-read that section on the storage event. A window remembers which version of each
 // section it last read or wrote, and never writes over a version it hasn't seen.
 
-export type Section = 'trip' | 'settings' | 'profile' | 'calibration' | 'tyres' | 'positions' | 'water' | 'day' | 'plan-tomorrow' | 'all';
-const SECTIONS: readonly string[] = ['trip', 'settings', 'profile', 'calibration', 'tyres', 'positions', 'water', 'day', 'plan-tomorrow', 'all'];
+export type Section = 'trip' | 'settings' | 'profile' | 'calibration' | 'tyres' | 'positions' | 'water' | 'day' | 'plan-tomorrow' | 'weather' | 'all';
+const SECTIONS: readonly string[] = ['trip', 'settings', 'profile', 'calibration', 'tyres', 'positions', 'water', 'day', 'plan-tomorrow', 'weather', 'all'];
 
 export const CHANGED_KEY = 'copilot:changed';
 

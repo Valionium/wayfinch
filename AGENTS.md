@@ -13,7 +13,7 @@ Exist so far:
 ```
 src/core/      pure TypeScript, no DOM, fully unit-tested
   geo/         distances
-  places/      place types, pack format, classification
+  places/      place types, pack format, classification (classify-all.ts is the one code path of the pipeline and Refresh this stretch)
   answers/     makeAnswer, the final comparator, the one time formatter
   engines/     the answer engines: one pace, one trip day, one hours check
   hours/       prepared opening hours; only spans.ts reaches the library
@@ -22,6 +22,7 @@ src/core/      pure TypeScript, no DOM, fully unit-tested
   route/       rounded form, GPX reading, stages, climbs, sample grid, hash
 src/ui/        the app's shell in Preact (app, nav, theme.css, update prompt, shared card and status pieces); Ahead's components go in src/ui/ahead/ and may not import store or data
 src/store/     the rider's data: IndexedDB (add-only migrations) and copilot:* keys; readInputs is the one place screen()'s inputs are put together; a window writes only over the version it read, so Tasks 12 and 13 must call `readTrip` again before `saveTrip` after any `writeSettings`, and `readSettings` before `writeSettings`, or the write is refused as newer
+src/data/      what comes from outside. openmeteo.ts checks each answer whole before handing it on; refresh.ts decides when to ask, with no request of any kind without a prepared trip, a signal and a reason; weather-mode.ts reads build.config.json; overpass.ts is Refresh this stretch
 public/        what is served; public/tools/bags/index.html is the Load Check page; manifest.webmanifest and icons/ ship only with the launch switch on
 qa/            Load Check's QA suites (plain Node scripts), qa/paths.cjs, qa/fixtures/
 tests/

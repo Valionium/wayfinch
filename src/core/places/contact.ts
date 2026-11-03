@@ -17,7 +17,9 @@ export function callableForm(value: string, country: CountryCode): string | null
   if (s.startsWith('+')) {
     international = s;
   } else if (/^\d+$/.test(s)) {
-    const { dial, trunk } = COUNTRIES[country];
+    const known = COUNTRIES[country] as (typeof COUNTRIES)[CountryCode] | undefined; // a refreshed stretch can lie outside the table
+    if (!known) return null;
+    const { dial, trunk } = known;
     if (trunk === 'replace-0') {
       if (!s.startsWith('0')) return null;
       international = `+${dial}${s.slice(1)}`;
