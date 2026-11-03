@@ -1,7 +1,7 @@
 // The trip and its route (spec section 4.4). One trip at a time. Replacing the route removes everything stored for the old
 // one in a single transaction, so a failure keeps all of the old and nothing of the old ever mixes into the new.
 import type { Route, Trip } from '../core/types.ts';
-import { holdsCopy, markChanged, NewerDataError, nextStamp, noteCopy, tracked } from './changed.ts';
+import { holdsCopy, markChanged, NewerDataError, nextStamp, noteCopy, RefusedError, tracked } from './changed.ts';
 import { CURRENT, inTx, ROUTE_META_PREFIX, ROUTE_STORES } from './db.ts';
 import type { Tx } from './db.ts';
 import { routeProblem, tripProblem, usableTrip } from './rules.ts';
@@ -13,15 +13,23 @@ export const stampKey = (section: string): string => `updatedAt:${section}`;
 export const PLAN_TOMORROW_KEY = 'copilot:plan-tomorrow';
 
 /** A trip or route the store won't keep; `message` says why, in the rider's words. */
-export class InvalidTripError extends Error {
+export class InvalidTripError extends RefusedError {
   constructor(reason: string) {
     super(reason);
     this.name = 'InvalidTripError';
   }
 }
 
-export const readStamp = async (tx: Tx, section: string): Promise<string | null> =>
-  ((await tx.objectStore('meta').get(stampKey(section))) as string | undefined) ?? null;
+export const readStamp = async (tx: Tx, section: string): Promise<string | null> => {
+  const stamp: unknown = await tx.objectStore('meta').get(stampKey(section));
+  return typeof stamp === 'string' ? stamp : null;
+};
+
+/** After this window's own write of the whole trip it knows every field of it. */
+const noteTrip = (stamp: string): void => {
+  noteCopy('trip', stamp);
+  noteCopy('trip-settings', stamp);
+};
 
 /** Removes everything stored for the route. Inside the caller's transaction, which needs ROUTE_TX. */
 export async function clearRouteData(tx: Tx): Promise<void> {
@@ -44,7 +52,7 @@ export function forgetPlanTomorrow(): void {
 }
 
 /** What was chosen for the old route alone. This write doesn't count as having seen a settings change from another window. */
-function forgetRouteChoices(): void {
+export function forgetRouteChoices(): void {
   forgetPlanTomorrow();
   const { settings, stamp } = readLocalSettings();
   if (settings.nights === null) return;
@@ -77,13 +85,14 @@ async function saving(trip: Trip): Promise<void> {
     const stored = await readStamp(tx, 'trip');
     if (!holdsCopy('trip', stored)) throw new NewerDataError('trip');
     const before = (await tx.objectStore('trip').get(CURRENT)) as Trip | undefined;
-    if (before && !sameLine(before.route, trip.route)) {
+    // With no trip above it, whatever is stored belongs to no route the new one could use.
+    if (!before || !sameLine(before.route, trip.route)) {
       await clearRouteData(tx);
-      replaced = true;
+      replaced = Boolean(before);
     }
     return putTrip(tx, trip, stored);
   });
-  noteCopy('trip', stamp);
+  noteTrip(stamp);
   if (replaced) forgetRouteChoices();
   markChanged('trip');
 }
@@ -119,7 +128,7 @@ async function replacing(route: Route): Promise<void> {
     };
     return putTrip(tx, next, stored);
   });
-  noteCopy('trip', stamp);
+  noteTrip(stamp);
   forgetRouteChoices();
   markChanged('trip');
 }

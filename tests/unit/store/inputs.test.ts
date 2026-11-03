@@ -85,12 +85,14 @@ describe('positions kept', () => {
     const todayCheckIn = pos({ km: 110, at: '2026-10-19 09:00' });
     const todayRough = pos({ km: 111, at: '2026-10-19 09:30', acc: 800 });
     const todayManual = pos({ km: 112, at: '2026-10-19 10:00', manual: true });
-    const todayFarRough = pos({ km: 113, at: '2026-10-19 10:30', off: 8_000, acc: 200 });
+    const todayFirstFar = pos({ km: 113, at: '2026-10-19 10:15', off: 8_000, acc: 200 }); // the day start's fallback
+    const todayFarRough = pos({ km: 113.5, at: '2026-10-19 10:30', off: 8_000, acc: 200 });
     const latest = pos({ km: 114, at: '2026-10-19 11:00' });
     const kept = keptPositions(
-      [twoDaysAgoCheckIn, yesterdayCheckIn, yesterdayRough, yesterdayManual, todayCheckIn, todayRough, todayManual, todayFarRough, latest],
+      [twoDaysAgoCheckIn, yesterdayCheckIn, yesterdayRough, yesterdayManual, todayCheckIn, todayRough, todayManual, todayFirstFar, todayFarRough, latest],
       now, testTrip(), zonesOf(300));
-    expect(kms(kept)).toEqual([60, 110, 111, 112, 114]);
+    // 62 is the last day position before today: the day start reads it. 61 and 113.5 serve nothing.
+    expect(kms(kept)).toEqual([60, 62, 110, 111, 112, 113, 114]);
   });
 
   test('[ST-RETENTION] the latest day position stays for the night kilometre, also once the check-ins of its day are dropped', () => {
@@ -139,14 +141,14 @@ describe('positions kept', () => {
   test('[ST-RETENTION] adding a position sweeps too, so old ones go even if the screen is never read', async () => {
     await onTrip();
     await put(pos({ km: 10, at: '2026-10-17 10:00' }));
-    await addPosition(pos({ km: 90, at: '2026-10-20 10:00' }), at('2026-10-20 10:00'));
+    await addPosition(pos({ km: 90, at: '2026-10-20 10:00' }), at('2026-10-20 10:00'), 'test-route');
     expect(kms(await stored())).toEqual([90]);
   });
 
   test('[ST-RETENTION] a position that makes no sense is not kept', async () => {
     await onTrip();
-    await addPosition({ ...pos({ km: 10, at: '2026-10-17 10:00' }), km: Number.NaN }, at('2026-10-17 10:00'));
-    await addPosition({ ...pos({ km: 10, at: '2026-10-17 10:00' }), at: new Date(Number.NaN) }, at('2026-10-17 10:00'));
+    await addPosition({ ...pos({ km: 10, at: '2026-10-17 10:00' }), km: Number.NaN }, at('2026-10-17 10:00'), 'test-route');
+    await addPosition({ ...pos({ km: 10, at: '2026-10-17 10:00' }), at: new Date(Number.NaN) }, at('2026-10-17 10:00'), 'test-route');
     expect(await stored()).toEqual([]);
   });
 
@@ -164,7 +166,7 @@ describe('the day start and the route end', () => {
   test('[ST-KEEP-DAYSTART] after a screen the day start is kept and read back', async () => {
     await onTrip();
     const now = at(NOW);
-    await keepAfterScreen(rideOf({ ride: { keepDayStart: { day: '2026-10-18', km: 76.5 }, routeEndReachedOn: null } }), now);
+    await keepAfterScreen(rideOf({ ride: { keepDayStart: { day: '2026-10-18', km: 76.5 }, routeEndReachedOn: null } }), now, 'test-route');
     expect((await withInputs(now)).dayStarts).toEqual([{ day: '2026-10-18', km: 76.5 }]);
   });
 
@@ -173,7 +175,7 @@ describe('the day start and the route end', () => {
     const db = await openDb();
     await db.put('dayStarts', { day: '2026-10-16', km: 1 });
     await db.put('dayStarts', { day: '2026-10-17', km: 2 });
-    await keepAfterScreen(rideOf({ ride: { keepDayStart: { day: '2026-10-18', km: 3 }, routeEndReachedOn: null } }), at(NOW));
+    await keepAfterScreen(rideOf({ ride: { keepDayStart: { day: '2026-10-18', km: 3 }, routeEndReachedOn: null } }), at(NOW), 'test-route');
     expect((await db.getAll('dayStarts')).map((d: { day: string }) => d.day)).toEqual(['2026-10-17', '2026-10-18']);
 
     const later = await withInputs(at('2026-10-20 09:00'));
@@ -183,7 +185,7 @@ describe('the day start and the route end', () => {
 
   test('[ST-KEEP-DAYSTART] a provisional result saves nothing', async () => {
     await onTrip();
-    await keepAfterScreen(rideOf({ ride: { keepDayStart: null, routeEndReachedOn: null } }), at(NOW));
+    await keepAfterScreen(rideOf({ ride: { keepDayStart: null, routeEndReachedOn: null } }), at(NOW), 'test-route');
     expect(await (await openDb()).count('dayStarts')).toBe(0);
   });
 
@@ -194,10 +196,10 @@ describe('the day start and the route end', () => {
     const first = await withInputs(at('2026-10-19 07:30'));
     const before = screen({ ...first, sun: sun() });
     expect(before.ride.dayStartKm).toBe(50);
-    await keepAfterScreen(before, at('2026-10-19 07:30'));
+    await keepAfterScreen(before, at('2026-10-19 07:30'), 'test-route');
 
     // An hour on, that position is over 48 hours old, and the rider is further along.
-    await addPosition(pos({ km: 70, at: '2026-10-19 08:40' }), at('2026-10-19 08:40'));
+    await addPosition(pos({ km: 70, at: '2026-10-19 08:40' }), at('2026-10-19 08:40'), 'test-route');
     const next = await withInputs(at('2026-10-19 08:45'));
     expect(next.positions.map((p) => p.km)).toEqual([70]);
     expect(screen({ ...next, sun: sun() }).ride.dayStartKm).toBe(50);
@@ -210,7 +212,7 @@ describe('the day start and the route end', () => {
     await readInputs(at(NOW));
     await readTrip();
     await replaceRoute(route({ id: 'route-new', hash: 'new' }, 50));
-    await keepAfterScreen(rideOf({ ride: { keepDayStart: { day: '2026-10-18', km: 76.5 }, routeEndReachedOn: '2026-10-18' } }), at(NOW));
+    await keepAfterScreen(rideOf({ ride: { keepDayStart: { day: '2026-10-18', km: 76.5 }, routeEndReachedOn: '2026-10-18' } }), at(NOW), 'test-route');
     const i = await withInputs(at(NOW));
     expect(i.dayStarts).toEqual([]);
     expect(i.routeEndDate).toBeNull();
@@ -221,12 +223,12 @@ describe('the day start and the route end', () => {
     const now = at(NOW);
     await readInputs(now);
     const end = (day: string | null) => rideOf({ ride: { keepDayStart: null, routeEndReachedOn: day } });
-    await keepAfterScreen(end(null), now);
+    await keepAfterScreen(end(null), now, 'test-route');
     expect((await withInputs(now)).routeEndDate).toBeNull();
-    await keepAfterScreen(end('2026-10-18'), now);
+    await keepAfterScreen(end('2026-10-18'), now, 'test-route');
     expect((await withInputs(now)).routeEndDate).toBe('2026-10-18');
-    await keepAfterScreen(end('2026-10-19'), at('2026-10-19 09:00'));
-    await keepAfterScreen(end(null), at('2026-10-20 09:00'));
+    await keepAfterScreen(end('2026-10-19'), at('2026-10-19 09:00'), 'test-route');
+    await keepAfterScreen(end(null), at('2026-10-20 09:00'), 'test-route');
     expect((await withInputs(at('2026-10-25 09:00'))).routeEndDate).toBe('2026-10-18');
 
     await readTrip();
@@ -240,7 +242,7 @@ describe('the day start and the route end', () => {
     await (await openDb()).put('meta', '2026-10-18', ROUTE_END_META);
     const now = at('2026-11-03 09:00');
     await readInputs(now);
-    await keepAfterScreen(rideOf({ ride: { keepDayStart: null, routeEndReachedOn: '2026-11-03' } }), now);
+    await keepAfterScreen(rideOf({ ride: { keepDayStart: null, routeEndReachedOn: '2026-11-03' } }), now, 'test-route');
     expect((await withInputs(now)).routeEndDate).toBe('2026-11-03');
   });
 });
@@ -253,18 +255,18 @@ describe('water', () => {
   test('[ST-WATER-FLIP] confirmed at 14:00: a position at 14:10 leaves it confirmed; one at 14:16 does not, with the same litres and time', async () => {
     await onTrip();
     await confirmWater(1.5, T1400);
-    await addPosition(position(minutes(10)), minutes(10));
+    await addPosition(position(minutes(10)), minutes(10), 'test-route');
     expect((await withInputs(minutes(10))).waterLeft).toEqual({ litres: 1.5, at: T1400, confirmed: true });
-    await addPosition(position(minutes(16)), minutes(16));
+    await addPosition(position(minutes(16)), minutes(16), 'test-route');
     expect((await withInputs(minutes(16))).waterLeft).toEqual({ litres: 1.5, at: T1400, confirmed: false });
   });
 
   test('[ST-WATER-FLIP] exactly 15 minutes stays confirmed; a confirmation after the flip is confirmed again', async () => {
     await onTrip();
     await confirmWater(1, T1400);
-    await addPosition(position(minutes(15)), minutes(15));
+    await addPosition(position(minutes(15)), minutes(15), 'test-route');
     expect((await withInputs(minutes(15))).waterLeft?.confirmed).toBe(true);
-    await addPosition(position(minutes(15.01)), minutes(15.01));
+    await addPosition(position(minutes(15.01)), minutes(15.01), 'test-route');
     expect((await withInputs(minutes(16))).waterLeft?.confirmed).toBe(false);
     await confirmWater(0.5, minutes(20));
     expect((await withInputs(minutes(20))).waterLeft).toEqual({ litres: 0.5, at: minutes(20), confirmed: true });
@@ -274,14 +276,14 @@ describe('water', () => {
     await onTrip();
     await confirmWater(1, T1400);
     expect((await withInputs(minutes(30))).waterLeft?.confirmed).toBe(true);
-    await addPosition({ ...position(minutes(30)), km: Number.NaN }, minutes(30));
+    await addPosition({ ...position(minutes(30)), km: Number.NaN }, minutes(30), 'test-route');
     expect((await withInputs(minutes(30))).waterLeft?.confirmed).toBe(true);
   });
 
   test("[ST-WATER-FLIP] through the store and screen(), the flipped amount's Water card is not fine, and offers the amount back", async () => {
     await onTrip();
     await confirmWater(1.5, T1400);
-    await addPosition(position(minutes(16)), minutes(16));
+    await addPosition(position(minutes(16)), minutes(16), 'test-route');
     const s = screen({ ...(await withInputs(minutes(16))), sun: sun() });
     expect(s.cards.water.status).not.toBe('fine');
     expect(s.cards.water.status).toBe('unknown');
@@ -347,7 +349,7 @@ describe('Plan tomorrow', () => {
     await onTrip();
     const now = at('2026-10-18 11:00');
     await put(pos({ km: 78, at: '2026-10-17 18:00' }));
-    await addPosition(pos({ km: 90, at: '2026-10-18 10:50' }), now);
+    await addPosition(pos({ km: 90, at: '2026-10-18 10:50' }), now, 'test-route');
     expect(screen({ ...(await withInputs(now)), sun: sun() }).phase).toBe('riding');
     setPlanTomorrow('2026-10-18');
     expect(screen({ ...(await withInputs(now)), sun: sun() }).phase).toBe('after-ride');
@@ -359,7 +361,7 @@ describe('Plan tomorrow', () => {
     await onTrip();
     const now = at('2026-10-18 11:00');
     await put(pos({ km: 78, at: '2026-10-17 18:00' }));
-    await addPosition(pos({ km: 90, at: '2026-10-18 10:50' }), now);
+    await addPosition(pos({ km: 90, at: '2026-10-18 10:50' }), now, 'test-route');
     setPlanTomorrow('2026-10-17');
     expect(screen({ ...(await withInputs(now)), sun: sun() }).phase).toBe('riding');
     setPlanTomorrow('2026-10-19');

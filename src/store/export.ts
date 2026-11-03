@@ -7,13 +7,17 @@ import type { Ride } from '../core/engines/water-learning.ts';
 import { W } from '../core/wording/en.ts';
 import { clearCopies, flushWrites, markChanged, noteCopy, tracked } from './changed.ts';
 import { closeDb, CURRENT, DB_NAME, inTx } from './db.ts';
-import { PROFILE_META, usableProfile } from './profile.ts';
+import type { Tx } from './db.ts';
+import { DEFAULT_PROFILE, PROFILE_META, usableProfile } from './profile.ts';
 import { DEFAULT_SETTINGS, settingProblem, tripProblem, usableTrip } from './rules.ts';
 import type { Settings } from './rules.ts';
 import { readLocalSettings, SETTINGS_KEY } from './settings-local.ts';
-import { clearRouteData, forgetPlanTomorrow, readStamp, ROUTE_TX, sameLine, stampKey } from './trip.ts';
+import { clearRouteData, forgetPlanTomorrow, forgetRouteChoices, readStamp, ROUTE_TX, sameLine, stampKey } from './trip.ts';
 
 export const TYRES_META = 'tyres';
+
+/** A pending request to delete the bag planner's data outlives Delete co-pilot data (Contract 3). */
+const DELETE_REQUEST_KEY = 'copilot:delete-request:v1';
 
 type Stamped = { updatedAt: string | null };
 export type JsonRide = Omit<Ride, 'at'> & { at: string };
@@ -61,15 +65,16 @@ export function exportAll(): Promise<ExportFile> {
   const local = readLocalSettings();
   return inTx(['trip', 'calibration', 'meta'], 'readonly', async (tx) => {
     const trip = usableTrip(await tx.objectStore('trip').get(CURRENT), local.settings);
-    const rides = (await tx.objectStore('calibration').getAll()) as Ride[];
-    const tyres = (await tx.objectStore('meta').get(TYRES_META)) as { byBike?: Record<string, unknown> } | undefined;
+    const rides = (await tx.objectStore('calibration').getAll()) as unknown[];
+    const tyres: unknown = await tx.objectStore('meta').get(TYRES_META);
+    const stamp = async (section: string): Promise<string | null> => cleanStamp(await readStamp(tx, section));
     return {
       app: 'copilot' as const, kind: 'export' as const, v: 1 as const,
-      profile: { updatedAt: await readStamp(tx, PROFILE_META), ...profileOf(usableProfile(await tx.objectStore('meta').get(PROFILE_META))) },
-      trip: trip && { updatedAt: await readStamp(tx, 'trip'), ...tripOf(trip) },
-      settings: { updatedAt: local.stamp, ...settingsOf(local.settings) },
-      calibration: { updatedAt: await readStamp(tx, 'calibration'), rides: rides.map((r) => rideOf({ ...r, at: r.at.toISOString() })) },
-      tyres: { updatedAt: await readStamp(tx, TYRES_META), byBike: tyres?.byBike ?? {} },
+      profile: { updatedAt: await stamp(PROFILE_META), ...profileOf(usableProfile(await tx.objectStore('meta').get(PROFILE_META))) },
+      trip: trip && { updatedAt: await stamp('trip'), ...tripOf(trip) },
+      settings: { updatedAt: cleanStamp(local.stamp), ...settingsOf(local.settings) },
+      calibration: { updatedAt: await stamp('calibration'), rides: rides.flatMap(jsonRide) },
+      tyres: { updatedAt: await stamp(TYRES_META), byBike: isObject(tyres) && isObject(tyres.byBike) ? tyres.byBike : {} },
     };
   });
 }
@@ -77,6 +82,7 @@ export function exportAll(): Promise<ExportFile> {
 // ---- Reading a file: everything is checked before anything is written -----------------------------------------------
 
 const goodStamp = (x: unknown): boolean => x === null || (typeof x === 'string' && Number.isFinite(Date.parse(x)));
+const cleanStamp = (x: string | null): string | null => (goodStamp(x) ? x : null);
 
 const profileReads = (p: unknown): boolean => {
   if (!isObject(p) || !goodStamp(p.updatedAt)) return false;
@@ -93,7 +99,13 @@ const rideReads = (r: unknown): boolean => isObject(r) && typeof r.at === 'strin
   && (r.intakeL === null || (typeof r.intakeL === 'number' && Number.isFinite(r.intakeL)))
   && (r.feel === null || r.feel === 'A' || r.feel === 'B' || r.feel === 'C')
   && finiteOrMissing(r.massLossKg) && finiteOrMissing(r.toiletStops);
-const calibrationReads = (c: unknown): boolean => isObject(c) && goodStamp(c.updatedAt) && Array.isArray(c.rides) && c.rides.every(rideReads);
+/** A ride that can't be read stays out of the file, and out of the phone: one bad ride never costs a rider the backup. */
+const jsonRide = (r: unknown): JsonRide[] => {
+  if (!isObject(r) || !(r.at instanceof Date) || !Number.isFinite(r.at.getTime())) return [];
+  const ride = { ...r, at: r.at.toISOString() };
+  return rideReads(ride) ? [rideOf(ride as unknown as JsonRide)] : [];
+};
+const calibrationReads = (c: unknown): boolean => isObject(c) && goodStamp(c.updatedAt) && Array.isArray(c.rides);
 const tyresRead = (t: unknown): boolean => isObject(t) && goodStamp(t.updatedAt) && isObject(t.byBike);
 
 function fileProblem(file: unknown): string | null {
@@ -109,13 +121,18 @@ function fileProblem(file: unknown): string | null {
 }
 
 /**
- * Takes a file's sections in, in one go: a bad file writes nothing. A section the file never had (no `updatedAt`) leaves
- * what's here. Another route brings the same as replacing it: nothing of the old route stays. Reading a file is the
+ * Takes a file's sections in, in one go: a bad file writes nothing. A section that's empty and unstamped leaves what's here;
+ * what a section holds decides, not its stamp, so data that never got a stamp still comes back. Another route brings the same as replacing it: nothing of the old route stays. Reading a file is the
  * rider's own step, so it may be older than what's here, and other windows must then read again before they write.
  */
 export function importAll(file: unknown): Promise<ImportResult> {
   return tracked(importing(file));
 }
+
+const putStamp = async (tx: Tx, section: string, stamp: string | null): Promise<void> => {
+  const meta = tx.objectStore('meta');
+  await (stamp === null ? meta.delete(stampKey(section)) : meta.put(stamp, stampKey(section)));
+};
 
 async function importing(file: unknown): Promise<ImportResult> {
   const problem = fileProblem(file);
@@ -127,7 +144,12 @@ async function importing(file: unknown): Promise<ImportResult> {
   // Settings go first: this is the step the browser can refuse outright, and it can be put back.
   const settingsBefore = localStorage.getItem(SETTINGS_KEY);
   const settingsStamp = f.settings.updatedAt;
-  if (settingsStamp !== null) {
+  const bringSettings = settingsStamp !== null || JSON.stringify(settingsOf(f.settings)) !== JSON.stringify(settingsOf(DEFAULT_SETTINGS));
+  const bringProfile = f.profile.updatedAt !== null || JSON.stringify(profileOf(usableProfile(f.profile))) !== JSON.stringify(profileOf(DEFAULT_PROFILE));
+  const rides = (f.calibration.rides as unknown[]).filter(rideReads) as JsonRide[];
+  const bringRides = f.calibration.updatedAt !== null || rides.length > 0;
+  const bringTyres = f.tyres.updatedAt !== null || Object.keys(f.tyres.byBike).length > 0;
+  if (bringSettings) {
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify({ updatedAt: settingsStamp, ...settingsOf(f.settings) }));
     } catch {
@@ -136,29 +158,31 @@ async function importing(file: unknown): Promise<ImportResult> {
   }
 
   let routeChanged = false;
+  let hadTrip = false;
   try {
     await inTx([...ROUTE_TX, 'calibration'], 'readwrite', async (tx) => {
       const meta = tx.objectStore('meta');
       if (trip) {
         const before = (await tx.objectStore('trip').get(CURRENT)) as Trip | undefined;
+        hadTrip = Boolean(before);
         routeChanged = !sameLine(before?.route, trip.route);
-        if (before && routeChanged) await clearRouteData(tx);
+        if (routeChanged) await clearRouteData(tx);
         await tx.objectStore('trip').put(trip, CURRENT);
-        await meta.put(tripStamp, stampKey('trip'));
+        await putStamp(tx, 'trip', tripStamp as string | null);
       }
-      if (f.profile.updatedAt !== null) {
+      if (bringProfile) {
         await meta.put(profileOf(usableProfile(f.profile)), PROFILE_META);
-        await meta.put(f.profile.updatedAt, stampKey(PROFILE_META));
+        await putStamp(tx, PROFILE_META, f.profile.updatedAt);
       }
-      if (f.calibration.updatedAt !== null) {
+      if (bringRides) {
         const store = tx.objectStore('calibration');
         await store.clear();
-        for (const r of f.calibration.rides) await store.add(rideOf({ ...r, at: new Date(r.at) }));
-        await meta.put(f.calibration.updatedAt, stampKey('calibration'));
+        for (const r of rides) await store.add(rideOf({ ...r, at: new Date(r.at) }));
+        await putStamp(tx, 'calibration', f.calibration.updatedAt);
       }
-      if (f.tyres.updatedAt !== null) {
+      if (bringTyres) {
         await meta.put({ byBike: f.tyres.byBike }, TYRES_META);
-        await meta.put(f.tyres.updatedAt, stampKey(TYRES_META));
+        await putStamp(tx, TYRES_META, f.tyres.updatedAt);
       }
     });
   } catch {
@@ -169,12 +193,19 @@ async function importing(file: unknown): Promise<ImportResult> {
     return { ok: false, reason: W.appStoreNotKept, routeChanged: false };
   }
 
-  if (trip) noteCopy('trip', tripStamp as string | null);
-  if (settingsStamp !== null) noteCopy('settings', settingsStamp);
-  if (f.profile.updatedAt !== null) noteCopy('profile', f.profile.updatedAt);
-  if (f.calibration.updatedAt !== null) noteCopy('calibration', f.calibration.updatedAt);
-  if (f.tyres.updatedAt !== null) noteCopy('tyres', f.tyres.updatedAt);
-  if (routeChanged) forgetPlanTomorrow();
+  if (trip) {
+    noteCopy('trip', tripStamp as string | null);
+    noteCopy('trip-settings', tripStamp as string | null);
+  }
+  if (bringSettings) noteCopy('settings', settingsStamp);
+  if (bringProfile) noteCopy('profile', f.profile.updatedAt);
+  if (bringRides) noteCopy('calibration', f.calibration.updatedAt);
+  if (bringTyres) noteCopy('tyres', f.tyres.updatedAt);
+  // The old route's nights go with it, unless the file brought its own.
+  if (routeChanged && hadTrip) {
+    if (bringSettings) forgetPlanTomorrow();
+    else forgetRouteChoices();
+  }
   markChanged('all');
   return { ok: true, reason: null, routeChanged };
 }
@@ -182,7 +213,7 @@ async function importing(file: unknown): Promise<ImportResult> {
 // ---- Delete --------------------------------------------------------------------------------------------------------
 
 /**
- * Removes the database and every `copilot:*` key, key by key, and no other: never the whole storage at once, because the bag
+ * Removes the database and every `copilot:*` key but a pending request to delete the bag planner's data, key by key, and no other: never the whole storage at once, because the bag
  * planner's plans live beside them. Other windows let go of the database on its request, and hear of it through the event
  * this fires before its own key goes too.
  */
@@ -195,7 +226,7 @@ export async function deleteCopilotData(): Promise<void> {
   const keys: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key !== null && key.startsWith('copilot:')) keys.push(key);
+    if (key !== null && key.startsWith('copilot:') && key !== DELETE_REQUEST_KEY) keys.push(key);
   }
   for (const key of keys) localStorage.removeItem(key);
 }

@@ -110,6 +110,6 @@ export async function atPosition(page: Page, km: number, opts: { accuracyM?: num
     await __store.addPosition({
       lat: point.lat, lon: point.lon, accuracyM, at: new Date(now.getTime() - ageMin * 60_000), km: at, offRouteM: 0,
       source: 'gps', approximate: accuracyM > 500,
-    }, now);
+    }, now, trip.route.id);
   }, { km, accuracyM: opts.accuracyM ?? 10, ageMin: opts.ageMin ?? 0 });
 }

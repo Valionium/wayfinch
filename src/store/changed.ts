@@ -43,8 +43,11 @@ export function onChanged(callback: (section: Section) => void): () => void {
 
 // ---- This window's copies ------------------------------------------------------------------------------------------
 
+/** A write the store chose not to make: nothing went wrong with saving, and the caller is told why. */
+export class RefusedError extends Error {}
+
 /** A write was refused: another window changed this section since this window read it. */
-export class NewerDataError extends Error {
+export class NewerDataError extends RefusedError {
   readonly section: Section;
   constructor(section: Section) {
     super(`${section} was changed in another window`);
@@ -53,16 +56,21 @@ export class NewerDataError extends Error {
   }
 }
 
-const copies = new Map<Section, string | null>();
+/**
+ * What this window has read. `trip-settings` is the trip's fields as the settings panel last read them: reading those says
+ * nothing about the whole trip a caller may hold from `readTrip`, so they count apart.
+ */
+export type Copy = Section | 'trip-settings';
+const copies = new Map<Copy, string | null>();
 
 /** The version of a section this window now holds; null when there was nothing stored. */
-export const noteCopy = (section: Section, stamp: string | null): void => { copies.set(section, stamp); };
+export const noteCopy = (section: Copy, stamp: string | null): void => { copies.set(section, stamp); };
 
 /**
  * Whether this window may write over the stored version. Only over the very version it holds: also an older stored one
  * (an import can bring one) or none (another window deleted it) means this window's copy is out of date.
  */
-export const holdsCopy = (section: Section, stored: string | null): boolean => (copies.get(section) ?? null) === stored;
+export const holdsCopy = (section: Copy, stored: string | null): boolean => (copies.get(section) ?? null) === stored;
 
 export const clearCopies = (): void => { copies.clear(); };
 
@@ -77,9 +85,9 @@ export function nextStamp(stored: string | null): string {
 const pending = new Set<Promise<unknown>>();
 let failedSinceFlush = false;
 
-/** Counts a write for `flushWrites`, and hands its result on. A write refused for newer data is no failure to save. */
+/** Counts a write for `flushWrites`, and hands its result on. A write the store refused is no failure to save. */
 export function tracked<T>(write: Promise<T>): Promise<T> {
-  const watched = write.catch((e: unknown) => { if (!(e instanceof NewerDataError)) failedSinceFlush = true; });
+  const watched = write.catch((e: unknown) => { if (!(e instanceof RefusedError)) failedSinceFlush = true; });
   pending.add(watched);
   void watched.finally(() => pending.delete(watched));
   return write;

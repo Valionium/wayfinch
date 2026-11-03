@@ -1,7 +1,8 @@
 // What the store accepts (spec section 3.3's settings table), in one place. A bad flat speed or start time must never reach
 // `screen()`: the time formatters throw on an Invalid Date, and an unusable speed reads as unknown.
+import { usablePosition } from '../core/engines/locate.ts';
 import { usableFlatKph } from '../core/engines/pace.ts';
-import type { Route, Stay, Trip } from '../core/types.ts';
+import type { DayStart, Position, Route, ScreenInputs, Stay, Trip, ZoneSpan } from '../core/types.ts';
 import { W } from '../core/wording/en.ts';
 
 export type Pace = NonNullable<Trip['pace']>;
@@ -107,3 +108,47 @@ export function usableTrip(raw: unknown, last: Settings): Trip | null {
   if (t.pace !== undefined && !isIn(t.pace, PACES)) delete out.pace;
   return out;
 }
+
+// ---- Stored records as they may be used. One damaged record never blocks a read: it counts as none, and the others stand. --
+
+const isRecord = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
+const goodInstant = (x: unknown): x is Date => x instanceof Date && Number.isFinite(x.getTime());
+
+export const readablePosition = (x: unknown): x is Position => isRecord(x) && goodInstant(x.at) && usablePosition(x as unknown as Position);
+
+export function usableWater(raw: unknown): NonNullable<ScreenInputs['waterLeft']> | null {
+  if (!isRecord(raw) || !goodInstant(raw.at) || !finite(raw.litres) || raw.litres < 0 || typeof raw.confirmed !== 'boolean') return null;
+  return { litres: raw.litres, at: raw.at, confirmed: raw.confirmed };
+}
+
+const knownZones = new Map<string, boolean>();
+function knownZone(name: unknown): name is string {
+  if (typeof name !== 'string') return false;
+  let known = knownZones.get(name);
+  if (known === undefined) {
+    try {
+      new Intl.DateTimeFormat('en', { timeZone: name });
+      known = true;
+    } catch {
+      known = false;
+    }
+    knownZones.set(name, known);
+  }
+  return known;
+}
+
+export const usableZones = (raw: unknown): ZoneSpan[] => (Array.isArray(raw)
+  ? raw.filter((z): z is ZoneSpan => isRecord(z) && finite(z.fromKm) && finite(z.toKm) && knownZone(z.timeZone) && typeof z.country === 'string' && (z.holidayZone === null || typeof z.holidayZone === 'string'))
+  : []);
+
+export const usableSavedKm = (raw: unknown): ScreenInputs['savedKm'] => (Array.isArray(raw)
+  ? raw.filter((s): s is ScreenInputs['savedKm'][number] => isRecord(s) && finite(s.fromKm) && finite(s.toKm))
+  : []);
+
+export function usableHolidays(raw: unknown): ScreenInputs['holidays'] {
+  if (!isRecord(raw)) return {};
+  const good = Object.entries(raw).filter((e): e is [string, string[]] => Array.isArray(e[1]) && e[1].every((d) => typeof d === 'string'));
+  return Object.fromEntries(good);
+}
+
+export const goodDayStart = (x: unknown): x is DayStart => isRecord(x) && goodDate(x.day) && finite(x.km);

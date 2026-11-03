@@ -29,7 +29,7 @@ async function fullPhone(): Promise<void> {
   await db.put('meta', '2026-10-02T11:00:00.000Z', 'updatedAt:calibration');
   await db.put('meta', { byBike: { bike_a: { front: 2.1, rear: 2.4 } } }, 'tyres');
   await db.put('meta', '2026-10-03T00:00:00.000Z', 'updatedAt:tyres');
-  await addPosition(pos({ km: 10, at: '2026-10-17 11:00' }), NOW);
+  await addPosition(pos({ km: 10, at: '2026-10-17 11:00' }), NOW, 'test-route');
   await confirmWater(1.5, NOW);
   await db.put('dayStarts', { day: '2026-10-17', km: 3 });
   await db.put('meta', '2026-10-17', `${ROUTE_META_PREFIX}routeEnd`);
@@ -133,7 +133,6 @@ test('[ST-EXPORT] a bad version or shape writes nothing and says why', async () 
     ['bad stamp', { ...good, settings: { ...good.settings, updatedAt: 7 } }],
     ['bad profile', { ...good, profile: { ...good.profile, k: 'x' } }],
     ['bad rides', { ...good, calibration: { ...good.calibration, rides: 'x' } }],
-    ['bad ride date', { ...good, calibration: { updatedAt: 'x', rides: [{ at: 'never', predictedL: 1, intakeL: 1, feel: null }] } }],
     ['bad tyres', { ...good, tyres: { updatedAt: good.tyres.updatedAt, byBike: 3 } }],
     ['section missing', { ...good, tyres: undefined }],
   ];
@@ -186,6 +185,8 @@ test('[ST-DELETE] delete removes every copilot key and the database, and no load
   await fullPhone();
   localStorage.setItem('copilot:share-progress', 'yes');
   localStorage.setItem('copilot:handoff:v1', '{}');
+  const request = JSON.stringify({ app: 'copilot', kind: 'delete-request', v: 1 });
+  localStorage.setItem('copilot:delete-request:v1', request);
   const plan = JSON.stringify({ bags: [1, 2, 3], 'ünï': 'ß' });
   localStorage.setItem('loadcheck:draft', plan);
   localStorage.setItem('loadcheck:summary:v1', '{"v":1}');
@@ -195,7 +196,9 @@ test('[ST-DELETE] delete removes every copilot key and the database, and no load
 
   const keys: string[] = [];
   for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i)!);
-  expect(keys.sort()).toEqual(['loadcheck:draft', 'loadcheck:summary:v1', 'someone-else']);
+  // A pending request to delete the bag planner's data stays (Contract 3), or the plans the rider asked to erase would stay.
+  expect(keys.sort()).toEqual(['copilot:delete-request:v1', 'loadcheck:draft', 'loadcheck:summary:v1', 'someone-else']);
+  expect(localStorage.getItem('copilot:delete-request:v1')).toBe(request);
   expect(localStorage.getItem('loadcheck:draft')).toBe(plan);
   expect((await indexedDB.databases()).map((d) => d.name)).not.toContain(DB_NAME);
 });
