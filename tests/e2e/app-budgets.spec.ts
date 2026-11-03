@@ -18,7 +18,8 @@ test.setTimeout(600_000);
 // One at a time: two budgets timed side by side would each be timed on half a machine.
 test.describe.configure({ mode: 'serial' });
 
-const today = (): string => new Date().toISOString().slice(0, 10);
+// The departure is the morning's own date, in the same zone as the morning (Berlin): a UTC date was yesterday's from 23:00 UTC.
+const today = (): string => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(thisMorning());
 const median = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
 const report = (id: string, xs: number[], unit = 'ms'): void => {
   const text = `${xs.map((x) => x.toFixed(0)).join(', ')} ${unit}, median ${median(xs).toFixed(0)} ${unit}`;
@@ -119,6 +120,7 @@ test('[PERF-SCREEN] screen() in the page on the 165 km fixture, rainy, with its 
   console.log(`PERF-SCREEN parts: ${JSON.stringify({ ...out, times: undefined })}`);
   expect(out.windows).toBeGreaterThan(0);
   expect(out.plans).toBeGreaterThan(0);
+  expect(out.waitOrGo).toBe(true);
   expect(out.ideas).toBe(true);
   expect(out.leaveBy).toBe(true);
   expect(out.rescue).toBeGreaterThan(0);

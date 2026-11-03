@@ -72,6 +72,9 @@ const SCREENS = [
   { hash: '#/tools/tyre', h1: 'Tools' }, { hash: '#/you', h1: 'You' },
 ] as const;
 
+/** A text only the opening_hours library holds (its parser's message for an unknown token): how its chunk is recognised. */
+const HOURS_MARK = 'Unexpected token in month range';
+
 async function open(page: Page, hash: string, h1: string): Promise<void> {
   await page.goto(`${app!.origin}/${hash}`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(h1);
@@ -98,14 +101,19 @@ test('[FLOW-FLIGHT] load, GPX, Get ready on a stub network, reload offline: Ahea
     card: c.getAttribute('data-card'), lines: [...c.querySelectorAll('.ah-basis li')].map((li) => li.textContent ?? ''),
   })));
   expect(bases).toHaveLength(6);
-  for (const b of bases) expect(b.lines.filter((l) => l.trim() !== '').length, `${b.card} has a basis`).toBeGreaterThan(0);
-  const all = bases.flatMap((b) => b.lines).join('\n');
-  // Ages: the forecast's fetch time and the map data's date.
-  expect(all).toMatch(/forecast fetched/);
-  expect(all).toMatch(/[Mm]ap data (of|from) \d{1,2} [A-Z][a-z]{2}/);
+  // Each answer its basis and the age of what it rests on: the map data's date, the forecast's fetch time. Climbing rests on the
+  // route file alone, which has no age to give; it names that file.
+  const MAP = /[Mm]ap data (of|from) \d{1,2} [A-Z][a-z]{2}/;
+  const FETCHED = /forecast fetched \d\d:\d\d/;
+  const ages: Record<string, RegExp[]> = { water: [MAP, FETCHED], food: [MAP], daylight: [MAP], weather: [FETCHED], climbing: [/route file/], sleep: [MAP] };
+  for (const b of bases) {
+    const text = b.lines.join(' | ');
+    expect(b.lines.filter((l) => l.trim() !== '').length, `${b.card} has a basis`).toBeGreaterThan(0);
+    for (const age of ages[b.card!]!) expect(text, `${b.card}: ${age}`).toMatch(age);
+  }
+  // The bag planner, offline: its own page from the worker's copy, not an error page.
   await page.goto(`${app!.origin}/tools/bags/`, { waitUntil: 'domcontentloaded' });
-  expect(await page.title()).not.toBe('');
-  await expect(page.locator('body')).not.toBeEmpty();
+  expect(await page.title()).toBe('Load Check — Bikepacking Load Planner');
   expect(problems.filter((p) => !/Failed to load resource/.test(p))).toEqual([]);
 });
 
@@ -204,20 +212,25 @@ test('[FLOW-CONTRAST] every screen, with a trip and with none: every control at 
 
 test('[FLOW-CHUNKS] opening_hours is not loaded on the first screen, with no trip or with one; it is precached', async ({ page }) => {
   const scripts = () => page.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name).filter((n) => n.endsWith('.js')));
+  // The library's chunks, found by what they hold, not by their names: the opening_hours parser's own error text.
+  const libraryOf = async (): Promise<string[]> => {
+    const built = JSON.parse(await page.evaluate(async () => (await fetch('/build.json')).text())) as { files: Record<string, string> };
+    const chunks = Object.keys(built.files).filter((f) => /^\/assets\/.+\.js$/.test(f));
+    const out: string[] = [];
+    for (const c of chunks) if ((await page.evaluate(async (u) => (await fetch(u)).text(), c)).includes(HOURS_MARK)) out.push(c);
+    return out;
+  };
   // No trip: the first screen of a new rider.
   app = await loadApp(page);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Trip');
   await page.waitForTimeout(500);
   const first = await scripts();
-  expect(first.some((u) => /\/assets\/spans-/.test(u)), first.join(' ')).toBe(false);
+  const atFirst = await libraryOf();
+  expect(atFirst.length).toBeGreaterThan(0);
+  for (const l of atFirst) expect(first.some((u) => u.endsWith(l)), `the first screen loads ${l}`).toBe(false);
   await app.close();
   await riderPrepares(page);
-  const built = JSON.parse(await page.evaluate(async () => (await fetch('/build.json')).text())) as { files: Record<string, string> };
-  // The library's chunk: the one holding its source, by its own name in the build's list of files.
-  const chunks = Object.keys(built.files).filter((f) => /^\/assets\/.+\.js$/.test(f));
-  const holding: string[] = [];
-  for (const c of chunks) if ((await page.evaluate(async (u) => (await fetch(u)).text(), c)).includes('opening_hours')) holding.push(c);
-  const library = holding.filter((c) => !/\/index-/.test(c));
+  const library = await libraryOf();
   expect(library.length).toBeGreaterThan(0);
   // Get ready itself loaded it: each screen is now opened as a fresh page, as when the app is opened again.
   for (const hash of ['#/ahead', '#/trip']) {

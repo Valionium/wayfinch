@@ -78,9 +78,13 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium firefox
       - run: npm run build
+      # A part that ran no test at all fails: an empty shard once went green.
       - run: |
-          if [ "${{ matrix.part }}" = budgets ]; then npx playwright test --project=app-budgets
-          else npx playwright test --shard=${{ matrix.part }} --grep-invert '\[PERF-'; fi
+          if [ "${{ matrix.part }}" = budgets ]; then npx playwright test --project=app-budgets --reporter=list,json
+          else npx playwright test --shard=${{ matrix.part }} --grep-invert '\[PERF-' --reporter=list,json; fi
+          node -e "const s = require('./pw.json').stats; if (!(s.expected + s.unexpected + s.flaky > 0)) { console.error('This part ran no test.'); process.exit(1); }"
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: pw.json
   browser:
     needs: browser-shard
     if: always()
