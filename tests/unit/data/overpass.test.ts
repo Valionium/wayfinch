@@ -16,7 +16,7 @@ import { radiusKmFor } from '../../../src/core/route/matches.ts';
 import { screen } from '../../../src/core/screen/screen.ts';
 import type { Route } from '../../../src/core/types.ts';
 import { W } from '../../../src/core/wording/en.ts';
-import { classifyElements, MAX_STRETCH_KM, objectFromElement, OVERPASS_URL, radiusFor, refreshStretch, simplifyLine, stretchLine, stretchQuery, zoneFromBoundary } from '../../../src/data/overpass.ts';
+import { classifyElements, MAX_STRETCH_KM, objectFromElement, OVERPASS_URL, radiusFor, refreshStretch, simplifyLine, stretchLine, stretchQuery, withoutUnknownHolidays, zoneFromBoundary } from '../../../src/data/overpass.ts';
 import type { OverpassElement, StretchDeps } from '../../../src/data/overpass.ts';
 import { openDb } from '../../../src/store/db.ts';
 import { readInputs, SAVED_KM_META, ZONES_META } from '../../../src/store/inputs.ts';
@@ -602,5 +602,105 @@ describe('review of 3 November: waits, outlines, sentences', () => {
     expect(reaches(fileURLToPath(new URL('../../../src/core/hours/spans.ts', import.meta.url)))).toBe(true); // the check can see it
     seen.clear();
     expect(reaches(fileURLToPath(new URL('../../../src/data/overpass.ts', import.meta.url)))).toBe(false);
+  });
+});
+
+describe('re-check of 3 November', () => {
+  test.each([
+    ['Mo-Sa 08:00-20:00; PH 10:00-12:00', 'Mo-Sa 08:00-20:00'],
+    ['Mo-Fr 08:00-12:00,13:00-17:00; PH off "closed on holidays"', 'Mo-Fr 08:00-12:00,13:00-17:00'],
+    ['Mo-Su,PH 10:00-22:00', 'Mo-Su 10:00-22:00'],
+    ['Sa,PH 09:00-13:00', 'Sa 09:00-13:00'],
+    ['PH,Sa 09:00-13:00', 'Sa 09:00-13:00'],
+    ['PH off; Mo-Sa 07:00-18:00', 'Mo-Sa 07:00-18:00'],
+    ['Mo-Fr 09:00-17:00 || "by appointment"', 'Mo-Fr 09:00-17:00 || "by appointment"'],
+    ['Mo-Fr 09:00-17:00; PH off || "by appointment"', 'Mo-Fr 09:00-17:00 || "by appointment"'],
+    ['Mo-Fr 09:00-17:00; PHOTO 1', 'Mo-Fr 09:00-17:00; PHOTO 1'],
+    ['PH off', null],
+  ])('[RFS-RECORD] outside the first countries %j reads as %j', (tag, expected) => {
+    expect(withoutUnknownHolidays(tag, 'XX')).toBe(expected);
+    expect(withoutUnknownHolidays(tag, 'DE')).toBe(tag); // the first countries know their holidays
+  });
+
+  test('[RFS-RECORD] abroad, a rule for holidays only never opens a place on an ordinary Sunday, and an off with a comment never closes it throughout', async () => {
+    const { placeSpans } = await import('../../../src/core/hours/spans.ts');
+    const place = { timeZone: 'Europe/Berlin', hoursRegionKey: null, holidayZone: null, country: 'XX' };
+    const rule = { kind: 'food-shop' as const, nearStation: false };
+    const stateAt = (tag: string, when: string): string => placeSpans(withoutUnknownHolidays(tag, 'XX'), place, rule, at('2026-10-17 00:00'), at('2026-10-21 00:00'), {})
+      .find((s) => s.from.getTime() <= at(when).getTime() && s.to.getTime() > at(when).getTime())!.state;
+    expect(stateAt('Mo-Sa 08:00-20:00; PH 10:00-12:00', '2026-10-18 11:00')).toBe('closed');
+    expect(stateAt('Mo-Fr 08:00-12:00,13:00-17:00; PH off "closed on holidays"', '2026-10-19 09:00')).toBe('open');
+    expect(stateAt('Sa,PH 09:00-13:00', '2026-10-17 10:00')).toBe('open');
+  });
+
+  test('[RFS-LIMITS] a service that keeps failing: each wait at most 5 minutes, and the run stops after 3 server errors in a row, saying so', async () => {
+    await prepared();
+    const f = stubFetch(() => json({}, 503));
+    const d = deps(f);
+    const out = await refreshStretch(50, 100, d);
+    expect(f.urls).toHaveLength(3);
+    expect(Math.max(...d.sleeps)).toBeLessThanOrEqual(300_000);
+    expect(out.status).toBe('failed');
+    expect(out.say).toBe(W.appStretchFailed('50', '100'));
+    expect(out.failed.map((x) => [x.fromKm, x.toKm])).toEqual(expect.arrayContaining([[75, 100]])); // the rest is reported, not dropped
+  });
+
+  test('[RFS-LIMITS] a long wait is kept: a new tap after a run that ended on server errors waits too', async () => {
+    await prepared();
+    const err = stubFetch(() => json({}, 503));
+    await refreshStretch(50, 100, deps(err));
+    const f = stubFetch(() => answer());
+    expect((await refreshStretch(50, 70, deps(f))).status).toBe('wait');
+    expect(f.urls).toEqual([]);
+  });
+
+  test('[RFS-LIMITS] the turn is renewed while a run lasts, so no other window can take it mid-run, even in a 5-minute wait', async () => {
+    await prepared();
+    let t = NOW.getTime();
+    const seen: string[] = [];
+    const tryOther = async (): Promise<void> => {
+      const other = await stretchStore.turn(new Date(t), 180_000, 300_000, 'other-window', false);
+      seen.push(other.ok ? 'free' : other.why);
+    };
+    let n = 0;
+    const f = stubFetch(async () => {
+      await tryOther();
+      return ++n === 1 ? new Response('{}', { status: 429, headers: { 'retry-after': '300' } }) : answer();
+    });
+    const out = await refreshStretch(50, 70, deps(f, { now: () => new Date(t), sleep: async (ms: number) => { t += ms; await tryOther(); } }));
+    expect(out.status).toBe('saved');
+    expect(seen.length).toBeGreaterThan(3);
+    expect(seen).not.toContain('free');
+  });
+
+  test('[RFS-LIMITS] a window whose turn ran out cannot take it back from the window that has it now', async () => {
+    await prepared();
+    expect((await stretchStore.turn(NOW, 180_000, 300_000, 'a')).ok).toBe(true);
+    const later = new Date(NOW.getTime() + 4 * 60_000);
+    expect((await stretchStore.turn(later, 180_000, 300_000, 'b')).ok).toBe(true);
+    expect(await stretchStore.renew(later, 180_000, 'a')).toBe(false);
+    expect(await stretchStore.renew(later, 180_000, 'b')).toBe(true);
+  });
+
+  test('[RFS-LIMITS] a window killed mid-run holds the others up only minutes, not half an hour', async () => {
+    await prepared();
+    void refreshStretch(50, 70, deps(stubFetch(() => new Promise<Response>(() => undefined)))); // its request never comes back: the tab was killed
+    await new Promise((r) => { setTimeout(r, 150); });
+    vi.resetModules();
+    const other = await import('../../../src/data/overpass.ts');
+    const otherStore = (await import('../../../src/store/stretch.ts')).stretchStore;
+    const at = (min: number) => ({ store: otherStore, now: () => new Date(NOW.getTime() + min * 60_000) });
+    expect((await other.refreshStretch(50, 70, deps(stubFetch(() => answer()), at(1)))).status).toBe('busy');
+    expect((await other.refreshStretch(50, 70, deps(stubFetch(() => answer()), at(4)))).status).toBe('saved');
+  });
+
+  test('[RFS-NOTICE] a notice left open holds no turn: another window can refresh meanwhile', async () => {
+    await prepared();
+    void refreshStretch(50, 70, deps(stubFetch(() => answer()), { askNotice: () => new Promise<boolean>(() => undefined) }));
+    await new Promise((r) => { setTimeout(r, 150); });
+    vi.resetModules();
+    const other = await import('../../../src/data/overpass.ts');
+    const otherStore = (await import('../../../src/store/stretch.ts')).stretchStore;
+    expect((await other.refreshStretch(70, 90, deps(stubFetch(() => answer()), { store: otherStore }))).status).toBe('saved');
   });
 });

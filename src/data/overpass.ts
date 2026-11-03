@@ -31,7 +31,9 @@ const MAX_TOO_MANY = 2;
 const FIRST_BACKOFF_MS = 5_000;
 const MIN_HALVED_KM = 6;
 const MAX_REQUESTS = 10;
-const RUN_LEASE_MS = 30 * 60_000; // longer than any run: a window closed mid-run holds the others up no longer than this
+const RUN_LEASE_MS = 3 * 60_000; // renewed before each request and each minute of a wait: a killed window holds the others up only this long
+const RENEW_EVERY_MS = 60_000;
+const MAX_SERVER_ERRORS_IN_A_ROW = 3;
 const NO_DATE_WINDOW_DAYS = 14;
 const M_PER_DEG = 111_320;
 
@@ -206,9 +208,25 @@ const hoursWindow = (state: StretchState, now: Date, tz: string): { from: string
  */
 export function withoutUnknownHolidays(tag: string | null, country: string): string | null {
   if (tag === null || Object.hasOwn(COUNTRIES, country) || !/\bPH\b/.test(tag)) return tag;
-  const rules = tag.split(/;|\|\|/).map((r) => r.replace(/(^|,)\s*PH\s*(?=,|\s|$)/g, '$1').replace(/^\s*,/, '').trim())
-    .filter((r) => r !== '' && !/^PH\b/.test(r) && !/^(off|closed)$/i.test(r));
-  return rules.length > 0 ? rules.join('; ') : null;
+  // Rules with the separators between them, `;` and `||` kept as written. Comments in quotes may hold either: kept whole.
+  const parts = tag.match(/(?:"[^"]*"|[^;|"]|\|(?!\|))+|;|\|\|/g) ?? [];
+  const out: string[] = [];
+  for (const part of parts) {
+    if (part === ';' || part === '||') { out.push(part); continue; }
+    const rule = part.trim();
+    if (/^PH\b/.test(rule) && !/^PH\s*,/.test(rule)) { out.push(''); continue; } // a rule for holidays alone, judged as written
+    // `PH` inside a day list goes with its comma: `Mo-Su,PH` is `Mo-Su`, `PH,Sa` is `Sa`.
+    out.push(rule.replace(/^PH\s*,\s*/, '').replace(/\s*,\s*PH\b/g, ''));
+  }
+  // Separators left without a rule on one side go with it.
+  const kept: string[] = [];
+  for (let i = 0; i < out.length; i += 2) {
+    const rule = out[i] ?? '';
+    if (rule === '') continue;
+    if (kept.length > 0) kept.push(out[i - 1] === '||' ? ' || ' : '; ');
+    kept.push(rule);
+  }
+  return kept.length > 0 ? kept.join('') : null;
 }
 
 /** Hour spans for the trip window, worked out on the phone. The library stays a lazy chunk. */
@@ -236,9 +254,10 @@ export type StretchStore = {
   save(routeId: string, batch: {
     fromKm: Km; toKm: Km; date: string; places: Place[]; matches: ReturnType<typeof matchPlaces>; roofs: Roof[]; rescuePoints: ReturnType<typeof matchRescuePoints>; hours: PlaceHours[]; holidays: Record<string, string[]>;
   }): Promise<boolean>;
-  turn(now: Date, leaseMs: number, maxWaitMs: number): Promise<{ ok: true } | { ok: false; why: 'busy' | 'wait'; until: Date }>;
+  turn(now: Date, leaseMs: number, maxWaitMs: number, owner: string, take?: boolean): Promise<{ ok: true } | { ok: false; why: 'busy' | 'wait'; until: Date }>;
+  renew(now: Date, leaseMs: number, owner: string): Promise<boolean>;
   hold(notBefore: Date): Promise<void>;
-  release(): Promise<void>;
+  release(owner: string): Promise<void>;
 };
 
 export type StretchDeps = {
@@ -334,6 +353,9 @@ export async function refreshStretch(fromKm: Km, toKm: Km, deps: StretchDeps): P
   if (running) return none('busy', W.appStretchBusy);
   running = true;
   let turned = false;
+  const owner = globalThis.crypto.randomUUID();
+  const refusedTurn = (turn: { ok: false; why: 'busy' | 'wait'; until: Date }, state: StretchState, km: Km): StretchReport => (turn.why === 'busy'
+    ? none('busy', W.appStretchBusy) : none('wait', W.appStretchWait(formatHm(turn.until, zoneLookupOf(state.routeZones)(km).timeZone))));
   try {
     let state: StretchState | null;
     try {
@@ -345,11 +367,11 @@ export async function refreshStretch(fromKm: Km, toKm: Km, deps: StretchDeps): P
     const start = Math.max(0, fromKm);
     const end = Math.min(state.route.lengthKm, toKm, start + MAX_STRETCH_KM);
     if (!(end > start)) return none('nothing');
-    // The turn first, so a rider who would only have to wait isn't shown the notice for nothing.
-    const turn = await deps.store.turn(deps.now(), RUN_LEASE_MS, MAX_TOO_MANY_WAIT_MS).catch(() => null);
-    if (!turn) return none('storage', W.appStretchNotKept);
-    if (!turn.ok) return turn.why === 'busy' ? none('busy', W.appStretchBusy) : none('wait', W.appStretchWait(formatHm(turn.until, zoneLookupOf(state.routeZones)(start).timeZone)));
-    turned = true;
+    // A look at the turn first, so a rider who would only have to wait isn't shown the notice for nothing. It is taken only
+    // after the yes: a notice left open holds nothing up.
+    const peek = await deps.store.turn(deps.now(), RUN_LEASE_MS, MAX_TOO_MANY_WAIT_MS, owner, false).catch(() => null);
+    if (!peek) return none('storage', W.appStretchNotKept);
+    if (!peek.ok) return refusedTurn(peek, state, start);
     let yes = false;
     try {
       yes = (await deps.askNotice(W.appStretchNotice)) === true;
@@ -360,14 +382,18 @@ export async function refreshStretch(fromKm: Km, toKm: Km, deps: StretchDeps): P
     // The rider may have replaced the route while the notice was open: then nothing of the old one goes.
     const again = await deps.store.read().catch(() => null);
     if (!again || again.route.id !== state.route.id) return none('nothing');
-    return await runQueue(state, { fromKm: start, toKm: end }, deps);
+    const turn = await deps.store.turn(deps.now(), RUN_LEASE_MS, MAX_TOO_MANY_WAIT_MS, owner).catch(() => null);
+    if (!turn) return none('storage', W.appStretchNotKept);
+    if (!turn.ok) return refusedTurn(turn, state, start);
+    turned = true;
+    return await runQueue(state, { fromKm: start, toKm: end }, deps, owner);
   } finally {
     running = false;
-    if (turned) await deps.store.release().catch(() => undefined);
+    if (turned) await deps.store.release(owner).catch(() => undefined);
   }
 }
 
-async function runQueue(state: StretchState, range: Range, deps: StretchDeps): Promise<StretchReport> {
+async function runQueue(state: StretchState, range: Range, deps: StretchDeps, owner: string): Promise<StretchReport> {
   const queue: Range[] = [range];
   const saved: Range[] = [];
   const failed: StretchReport['failed'] = [];
@@ -378,24 +404,41 @@ async function runQueue(state: StretchState, range: Range, deps: StretchDeps): P
   // A wait the service asked for, or a back-off after its error, holds every request after it: the next try, the next part,
   // and, through the store, a new tap or another window.
   let waitMs = 0;
+  let errorsInARow = 0;
+  let lost = false;
   const holdFor = async (ms: number): Promise<void> => {
-    waitMs = Math.max(waitMs, ms);
+    waitMs = Math.min(MAX_TOO_MANY_WAIT_MS, Math.max(waitMs, ms));
     await deps.store.hold(new Date(deps.now().getTime() + waitMs)).catch(() => undefined);
   };
-  const send = async (query: string): Promise<Asked> => {
-    if (waitMs > 0) await deps.sleep(waitMs);
+  const keepTurn = async (): Promise<boolean> => {
+    lost = lost || !(await deps.store.renew(deps.now(), RUN_LEASE_MS, owner).catch(() => false));
+    return !lost;
+  };
+  // Waits in steps of a minute, renewing the turn, so it never runs out while this window waits.
+  const sleepKeepingTurn = async (ms: number): Promise<void> => {
+    for (let left = ms; left > 0 && (await keepTurn()); left -= RENEW_EVERY_MS) await deps.sleep(Math.min(RENEW_EVERY_MS, left));
+  };
+  const send = async (query: string): Promise<Asked | null> => {
+    if (waitMs > 0) await sleepKeepingTurn(waitMs);
     waitMs = 0;
+    if (!(await keepTurn())) return null;
     requests++;
     return ask(query, deps.fetch);
   };
   while (queue.length > 0) {
     const part = queue.shift()!;
+    if (lost || errorsInARow >= MAX_SERVER_ERRORS_IN_A_ROW) {
+      failed.push({ ...part, reason: lost ? 'not done' : 'service failing' }, ...queue.splice(0).map((q) => ({ ...q, reason: lost ? 'not done' : 'service failing' })));
+      break;
+    }
     if (requests >= MAX_REQUESTS) { failed.push({ ...part, reason: 'too many requests' }); continue; }
     const query = stretchQuery(stretchLine(state.route, part.fromKm, part.toKm));
     let asked: Asked = { kind: 'server', reason: 'not asked' };
     let emptyOnce = false;
     for (let waits = 0; requests < MAX_REQUESTS; waits++) {
-      asked = await send(query);
+      const answer = await send(query);
+      if (answer === null) break;
+      asked = answer;
       if (asked.kind === 'empty' && !emptyOnce) { // once more: the next request may reach the other server
         emptyOnce = true;
         await holdFor(FIRST_BACKOFF_MS);
@@ -405,6 +448,8 @@ async function runQueue(state: StretchState, range: Range, deps: StretchDeps): P
       await holdFor(asked.waitMs);
       if (waits >= MAX_TOO_MANY) break;
     }
+    if (lost) { failed.push({ ...part, reason: 'not done' }); continue; }
+    errorsInARow = asked.kind === 'server' ? errorsInARow + 1 : 0;
     if (asked.kind === 'too-many') { failed.push({ ...part, reason: 'too many requests' }); continue; }
     if (asked.kind === 'empty') { failed.push({ ...part, reason: 'empty answer' }); continue; }
     if (asked.kind === 'refused') { failed.push({ ...part, reason: asked.reason }); continue; }

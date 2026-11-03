@@ -116,13 +116,14 @@ const dayNumber = (iso: string): number => {
  * Forecast days: min(16, days to the end + 1). The end is the plan's, the departure date plus its stages, never a date
  * worked out from how far the rider has come: every request of a day stays the same (spec's privacy table, criterion 9).
  */
-export function forecastDaysFor(route: Route, departureDate: string | null, today: string, finished = false): number {
+export function forecastDaysFor(route: Route, departureDate: string | null, today: string): number {
   if (departureDate === null) return MAX_FORECAST_DAYS;
   const lastDay = route.stages.reduce((most, s) => Math.max(most, s.day), 1);
   const left = dayNumber(addDaysIso(departureDate, lastDay - 1)) - dayNumber(today);
   if (!Number.isFinite(left)) return MAX_FORECAST_DAYS;
-  // A rider still on the trip after the planned last day needs today and tomorrow (the coordinator's ruling on spec 6.6's "end").
-  return Math.min(MAX_FORECAST_DAYS, Math.max(finished ? 1 : 2, left + 1));
+  // On and after the planned last day: today and tomorrow, so a rider behind the plan still has tomorrow (the coordinator's
+  // ruling on spec 6.6's "end"). Never from reaching the route end, or the day's request would change mid-day and tell.
+  return Math.min(MAX_FORECAST_DAYS, Math.max(2, left + 1));
 }
 
 const forecastUrl = (grid: GridPoint[], days: number, with15: boolean): string => {

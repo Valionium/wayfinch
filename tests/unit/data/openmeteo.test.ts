@@ -338,12 +338,12 @@ describe('review of 3 November: whole answers, days, heights', () => {
     expect(await inc(forecastBody(2, { from: FROM, hours: 24 }), 1, at('2026-10-17 23:30'))).toBe('stored');
   });
 
-  test('[WXR-GRID] a rider still on the trip after the planned last day gets today and tomorrow; a finished trip, one day', () => {
+  test('[WXR-GRID] on and after the planned last day: today and tomorrow, from the plan and the date alone', () => {
     const trip = testTrip(); // planned end Tue 20 Oct
     expect(forecastDaysFor(trip.route, trip.departureDate, '2026-10-20')).toBe(2);
     expect(forecastDaysFor(trip.route, trip.departureDate, '2026-10-23')).toBe(2);
-    expect(forecastDaysFor(trip.route, trip.departureDate, '2026-10-20', true)).toBe(1);
     expect(forecastDaysFor(trip.route, trip.departureDate, '2026-10-17')).toBe(4);
+    expect(forecastDaysFor.length).toBe(3); // nothing but the plan and the date goes in
   });
 
   test('[WXR-BASELINE] the archive is asked at the route\'s heights, and each figure is stored with the height it stands for', async () => {

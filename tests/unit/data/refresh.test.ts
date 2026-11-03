@@ -358,6 +358,14 @@ describe('the whole refresh, on the real store', () => {
     expect(await (await openDb()).get('forecast', 'current')).toBeUndefined();
   });
 
+  test('[WXR-SPACING] a forecast older than the stored one never overwrites it, also when it is hours older', async () => {
+    await prepared();
+    const id = trip().route.id;
+    await saveForecast(id, { ...OLD, fetchedAt: at('2026-10-17 10:00') }, at('2026-10-17 10:05'));
+    expect(await saveForecast(id, { ...OLD, fetchedAt: at('2026-10-17 08:30') }, at('2026-10-17 10:05'))).toBe('older');
+    expect((await readWeatherState())!.forecast!.fetchedAt).toEqual(at('2026-10-17 10:00'));
+  });
+
   test('[WXR-SPACING] a slower window never writes its older forecast over a newer one', async () => {
     await prepared();
     const id = trip().route.id;
@@ -497,14 +505,14 @@ describe('the whole refresh, on the real store', () => {
     expect((await refreshWeather(deps(service({ meta: () => json({}, 500) }), { store: older, now: () => new Date(NOW.getTime() + 2 * HOUR) }), 'tap')).say).toBe(W.weatherNewerSaved);
   });
 
-  test('[WXR-GRID] a rider behind the plan asks for today and tomorrow on and after the planned last day; after the route end, one day', async () => {
+  test('[WXR-GRID] a rider behind the plan asks for today and tomorrow on and after the planned last day, and reaching the route end changes no request of the day', async () => {
     await prepared();
     const f = service({ meta: () => json({}, 500), forecast: () => json(forecastBody(trip().route.sampleGrid.length, { from: SECS(at('2026-10-20 00:00')), hours: 72 })) });
     await refreshWeather(deps(f, { now: () => at('2026-10-20 19:00') }), 'tap');
     expect(new URL(forecasts(f)[0]!).searchParams.get('forecast_days')).toBe('2');
     await (await openDb()).put('meta', '2026-10-20', ROUTE_END_META);
     await refreshWeather(deps(f, { now: () => at('2026-10-20 20:00') }), 'tap');
-    expect(new URL(forecasts(f)[1]!).searchParams.get('forecast_days')).toBe('1');
+    expect(forecasts(f)[1]).toBe(forecasts(f)[0]);
   });
 
   test('[WXR-TAP-NO-AUTO] a trip marked prepared for a route since replaced is not prepared: nothing is contacted', async () => {

@@ -104,10 +104,10 @@ export const keepFreshOffered = (mode: WeatherMode): boolean => mode === 'auto';
 export type WeatherStore = {
   read(): Promise<{
     route: Parameters<typeof gridPoints>[0]; departureDate: string | null; prepared: boolean; forecast: StoredForecast | null; lastAttemptAt: Date | null;
-    routeZones: Parameters<typeof zoneLookupOf>[0]; finished?: boolean;
+    routeZones: Parameters<typeof zoneLookupOf>[0];
   } | null>;
   reserve(routeId: string, now: Date, gapMs: number): Promise<boolean>;
-  save(routeId: string, forecast: StoredForecast): Promise<'saved' | 'gone' | 'older'>;
+  save(routeId: string, forecast: StoredForecast, now: Date): Promise<'saved' | 'gone' | 'older'>;
 };
 
 export type RefreshDeps = {
@@ -170,13 +170,13 @@ export async function refreshWeather(deps: RefreshDeps, trigger: Trigger): Promi
   let forecast: StoredForecast;
   try {
     forecast = await fetchForecast(grid, {
-      days: forecastDaysFor(state.route, state.departureDate, today, state.finished === true), with15: deps.mode === 'auto', fetch: deps.fetch, now: () => now, runs: whole ? mattering : [],
+      days: forecastDaysFor(state.route, state.departureDate, today), with15: deps.mode === 'auto', fetch: deps.fetch, now: () => now, runs: whole ? mattering : [],
     });
   } catch (e) {
     return told(e instanceof WeatherServiceError && e.kind === 'incomplete' ? W.weatherIncomplete(fetched) : W.weatherNoAnswer(fetched));
   }
   try {
-    const saved = await deps.store.save(state.route.id, forecast);
+    const saved = await deps.store.save(state.route.id, forecast, now);
     if (saved === 'saved') return { fetched: true, say: null };
     return told(saved === 'gone' ? W.weatherRouteChanged : W.weatherNewerSaved);
   } catch {

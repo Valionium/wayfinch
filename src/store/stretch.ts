@@ -101,25 +101,36 @@ async function saving(routeId: string, batch: StretchBatch): Promise<boolean> {
  * service, not the route, so it is no `route:` key and stays when the route is replaced.
  */
 export const OVERPASS_META = 'overpass';
-type Turn = { notBefore: Date | null; busyUntil: Date | null };
+type Turn = { notBefore: Date | null; busyUntil: Date | null; owner: string | null };
 const goodDate = (d: unknown): d is Date => d instanceof Date && Number.isFinite(d.getTime());
 const readTurn = async (tx: Tx): Promise<Turn> => {
   const raw = (await tx.objectStore('meta').get(OVERPASS_META)) as Partial<Turn> | undefined;
-  return { notBefore: goodDate(raw?.notBefore) ? raw.notBefore : null, busyUntil: goodDate(raw?.busyUntil) ? raw.busyUntil : null };
+  return { notBefore: goodDate(raw?.notBefore) ? raw.notBefore : null, busyUntil: goodDate(raw?.busyUntil) ? raw.busyUntil : null, owner: typeof raw?.owner === 'string' ? raw.owner : null };
 };
 
 /**
  * Takes the turn to ask Overpass, in one transaction. Refused while another window's run holds it, or while the service's
  * last wait lasts. A stamp further ahead than `leaseMs` or `maxWaitMs` (the clock moved back) holds nothing up.
  */
-export function takeOverpassTurn(now: Date, leaseMs: number, maxWaitMs: number): Promise<{ ok: true } | { ok: false; why: 'busy' | 'wait'; until: Date }> {
+export function takeOverpassTurn(now: Date, leaseMs: number, maxWaitMs: number, owner: string, take = true): Promise<{ ok: true } | { ok: false; why: 'busy' | 'wait'; until: Date }> {
   return tracked(inTx(['meta'], 'readwrite', async (tx) => {
     const turn = await readTurn(tx);
     const ahead = (d: Date | null, most: number): boolean => d !== null && d.getTime() > now.getTime() && d.getTime() - now.getTime() <= most;
-    if (ahead(turn.busyUntil, leaseMs)) return { ok: false as const, why: 'busy' as const, until: turn.busyUntil! };
+    if (turn.owner !== owner && ahead(turn.busyUntil, leaseMs)) return { ok: false as const, why: 'busy' as const, until: turn.busyUntil! };
     if (ahead(turn.notBefore, maxWaitMs)) return { ok: false as const, why: 'wait' as const, until: turn.notBefore! };
-    await tx.objectStore('meta').put({ notBefore: null, busyUntil: new Date(now.getTime() + leaseMs) }, OVERPASS_META);
+    if (take) await tx.objectStore('meta').put({ notBefore: turn.notBefore, busyUntil: new Date(now.getTime() + leaseMs), owner }, OVERPASS_META);
     return { ok: true as const };
+  }));
+}
+
+/** Keeps the turn a little longer. False when it has run out and another window has it: then this run must stop. */
+export function renewOverpassTurn(now: Date, leaseMs: number, owner: string): Promise<boolean> {
+  return tracked(inTx(['meta'], 'readwrite', async (tx) => {
+    const turn = await readTurn(tx);
+    const othersHold = turn.owner !== owner && turn.busyUntil !== null && turn.busyUntil.getTime() > now.getTime();
+    if (othersHold) return false;
+    await tx.objectStore('meta').put({ ...turn, busyUntil: new Date(now.getTime() + leaseMs), owner }, OVERPASS_META);
+    return true;
   }));
 }
 
@@ -131,12 +142,12 @@ export function holdOverpass(notBefore: Date): Promise<void> {
   }));
 }
 
-/** Ends this window's run; the wait stays. */
-export function releaseOverpass(): Promise<void> {
+/** Ends this window's run, if the turn is still its own; the wait stays. */
+export function releaseOverpass(owner: string): Promise<void> {
   return tracked(inTx(['meta'], 'readwrite', async (tx) => {
     const turn = await readTurn(tx);
-    await tx.objectStore('meta').put({ ...turn, busyUntil: null }, OVERPASS_META);
+    if (turn.owner === owner) await tx.objectStore('meta').put({ ...turn, busyUntil: null, owner: null }, OVERPASS_META);
   }));
 }
 
-export const stretchStore = { read: readStretchState, known: readKnownPlaces, save: saveStretch, turn: takeOverpassTurn, hold: holdOverpass, release: releaseOverpass };
+export const stretchStore = { read: readStretchState, known: readKnownPlaces, save: saveStretch, turn: takeOverpassTurn, renew: renewOverpassTurn, hold: holdOverpass, release: releaseOverpass };
