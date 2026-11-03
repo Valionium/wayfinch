@@ -407,6 +407,15 @@ describe('pickRollback', () => {
     expect(pickRollback(list, { versions: {}, named: 'v2' })).toEqual({ versionId: 'v2' });
   });
 
+  test('[DEP-ROLL-REFUSE] requireDetails: missing details are the answer, before any other refusal and even with a name', () => {
+    const list = rows(['v1'], ['v2'], ['v3']);
+    const full = { v2: plain, v3: plain };
+    expect(pickRollback(list, { versions: full, requireDetails: true })).toEqual({ versionId: 'v2' });
+    expect(JSON.stringify(pickRollback(list, { versions: { v3: plain }, requireDetails: true, named: 'v1' }))).toContain('no details');
+    expect(JSON.stringify(pickRollback(rows(['v1'], ['v2'], ['v3', 'rollback']), { versions: {}, requireDetails: true }))).toContain('no details');
+    expect(JSON.stringify(pickRollback(null, { versions: {}, requireDetails: true }))).toContain('no list');
+  });
+
   test('[DEP-ROLL-REFUSE] the version already live, a split deployment, or a previous row with the live version', () => {
     expect(pickRollback(rows(['v1'], ['v2']), { named: 'v2' })).toHaveProperty('refuse');
     expect(pickRollback(rows(['v1'], ['v1']), {})).toHaveProperty('refuse');
@@ -511,7 +520,11 @@ describe('summaries and small helpers', () => {
     expect(emergencyFailureSummary('rollback', true)).not.toContain('saw the rollback fail');
     const check = emergencyFailureSummary('check', false);
     expect(check).toContain('nothing was changed');
-    expect(check).toContain('refused');
+    expect(check).toContain('refuse');
+    // The one click meant to prove the buttons must never vouch for them.
+    expect(check).not.toContain('buttons work');
+    expect(check).toContain('no list or no details');
+    expect(check).toContain('tell the agent');
   });
 
   test('formatRows lists date, version and message, newest first, so a refusal shows where a version id comes from', () => {
@@ -844,6 +857,20 @@ describe('the command, against a real local server', { timeout: 30_000 }, () => 
     await expect(cli(['--pick-rollback', writeJson('rows-bad.json', list), '--named', 'preview'])).rejects.toMatchObject({ code: 1 });
     writeFileSync(join(dir, 'rows-junk.json'), 'not json');
     await expect(cli(['--pick-rollback', join(dir, 'rows-junk.json')])).rejects.toMatchObject({ code: 1 });
+  });
+
+  test('[DEP-ROLL-REFUSE] --check-only true goes red and says no details, where a named rollback would go on', async () => {
+    const list = [
+      { created_on: '2026-11-01T10:00:00Z', annotations: {}, versions: [{ version_id: 'n11-old', percentage: 100 }] },
+      { created_on: '2026-11-02T10:00:00Z', annotations: {}, versions: [{ version_id: 'n11-new', percentage: 100 }] },
+    ];
+    const rowsFile = writeJson('rows-n11.json', list);
+    const summary = join(dir, 'summary-n11.txt');
+    writeFileSync(summary, '');
+    const named = ['--pick-rollback', rowsFile, '--named', 'n11-old', '--versions-dir', dir];
+    await expect(cli([...named, '--check-only', 'true'], { GITHUB_STEP_SUMMARY: summary })).rejects.toMatchObject({ code: 1 });
+    expect(readFileSync(summary, 'utf8')).toContain('no details');
+    expect((await cli([...named, '--check-only', 'false'])).stdout.trim()).toBe('n11-old');
   });
 
   test('--pick-rollback reads version details from a folder and stops on the switch', async () => {

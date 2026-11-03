@@ -48,6 +48,7 @@ const { values: args, positionals } = parseArgs({
     'deadline-ms': { type: 'string' },
     'pick-rollback': { type: 'string' },
     named: { type: 'string', default: '' },
+    'check-only': { type: 'string', default: 'false' },
     'versions-dir': { type: 'string' },
     'rollback-candidates': { type: 'string' },
     'live-version': { type: 'string' },
@@ -149,7 +150,7 @@ async function main() {
         if (details) versions[id] = details;
       }
     }
-    const pick = pickRollback(rows, { named: args.named || undefined, versions });
+    const pick = pickRollback(rows, { named: args.named || undefined, versions, requireDetails: args['check-only'] === 'true' });
     if ('refuse' in pick) fail(`Rollback refused, nothing changed: ${pick.refuse}`);
     else console.log(pick.versionId);
     const table = formatRows(rows, versions);

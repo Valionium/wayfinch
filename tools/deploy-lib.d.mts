@@ -40,5 +40,5 @@ export function uploadNeverArrived(options: { outcome: string; before: string; a
 export function reportIssue(result: CheckResult, options: { gh: Gh; liveVersion: string; lastDeployActive: boolean; runUrl?: string }): Promise<void>;
 export function liveVersionOf(deployments: unknown): string;
 export function rollbackCandidates(deployments: unknown): string[];
-export function pickRollback(deployments: unknown, options?: { named?: string; versions?: Record<string, { annotations?: Record<string, string> }> }): { versionId: string } | { refuse: string };
+export function pickRollback(deployments: unknown, options?: { named?: string; versions?: Record<string, { annotations?: Record<string, string> }>; requireDetails?: boolean }): { versionId: string } | { refuse: string };
 export function checkEmergencyWorker(source: string | null | undefined, buildJson: BuildJson): string[];

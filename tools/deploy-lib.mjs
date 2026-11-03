@@ -34,7 +34,7 @@ export function switchSummary({ kind, commit }) {
 
 /** What the owner reads when an emergency run fails. `acted`: the write itself went through. */
 export function emergencyFailureSummary(action, acted) {
-  if (action === 'check') return 'The check failed, and nothing was changed. If the lines above say a rollback would be refused, that is the answer, and the buttons work. Otherwise tell the agent what it says above.';
+  if (action === 'check') return 'The check failed, and nothing was changed. If the lines above refuse because of what is live (a rollback or the switch live, only one deployment), that is the answer. If they say Cloudflare gave no list or no details, or anything else, tell the agent: the buttons may not work.';
   if (acted) return `The ${action} was sent to Cloudflare, but the live site could not be confirmed (see above). Look at the site on a phone before pressing again, and tell the agent.`;
   if (action === 'rollback') return 'GitHub saw the rollback fail. Riders most likely still have what they had: look at the site. Try again, or tell the agent. If offline is broken, use switch.';
   return 'GitHub saw the switch fail. Riders most likely still have what they had: look at the site. If the list above names files, read it before going on. If it failed building the live commit, run it again with also_release_main ticked: that also sends what `main` holds. Otherwise try again, or tell the agent.';
@@ -313,8 +313,10 @@ const carriesSwitchMark = (annotations) => annotations?.['workers/tag'] === SWIT
  * Which version may a rollback go to? Always a version that once served all traffic, so never a preview.
  * `versions` ({ id: `wrangler versions view --json` }), when given, must cover the live one and the one before it.
  */
-export function pickRollback(deployments, { named, versions } = {}) {
+export function pickRollback(deployments, { named, versions, requireDetails = false } = {}) {
   if (!Array.isArray(deployments) || deployments.length === 0) return { refuse: 'Cloudflare gave no list of deployments, so nothing is safe to pick.' };
+  // The check action exists to find this fault, so it comes before any other answer, and a name doesn't excuse it.
+  if (requireDetails && !rollbackCandidates(deployments).every((id) => versions?.[id])) return { refuse: 'Cloudflare gave no details for the live version or the one before it.' };
   const rows = newestFirst(deployments);
   const live = rows[0];
   const liveId = wholeVersion(live);

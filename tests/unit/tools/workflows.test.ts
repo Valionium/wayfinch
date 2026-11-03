@@ -288,7 +288,8 @@ describe('emergency.yml', () => {
     expect(ifOf(pick)).toBe("inputs.action == 'rollback' || inputs.action == 'check'");
     expect(pick).toContain('NAMED: ${{ inputs.version }}');
     expect(runOf(pick)).toContain('wrangler deployments list --json > rows.json');
-    expect(runOf(pick)).toContain('--pick-rollback rows.json --named "$NAMED" --versions-dir versions');
+    expect(runOf(pick)).toContain('--pick-rollback rows.json --named "$NAMED" --versions-dir versions --check-only "$CHECK_ONLY"');
+    expect(pick).toContain("CHECK_ONLY: ${{ inputs.action == 'check' }}");
     const rollback = find('id: rollback');
     expect(ifOf(rollback)).toBe("inputs.action == 'rollback'");
     expect(rollback).toContain('VERSION: ${{ steps.pick.outputs.version }}');

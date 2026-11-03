@@ -59,13 +59,14 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           NAMED: ${{ inputs.version }}
+          CHECK_ONLY: ${{ inputs.action == 'check' }}
         run: |
           npx wrangler deployments list --json > rows.json
           mkdir versions
           for id in $(node tools/deploy-check.mjs --rollback-candidates rows.json); do
             npx wrangler versions view "$id" --json > "versions/$id.json" || rm -f "versions/$id.json"
           done
-          version=$(node tools/deploy-check.mjs --pick-rollback rows.json --named "$NAMED" --versions-dir versions)
+          version=$(node tools/deploy-check.mjs --pick-rollback rows.json --named "$NAMED" --versions-dir versions --check-only "$CHECK_ONLY")
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Say where a rollback would go, and stop
         if: inputs.action == 'check'
