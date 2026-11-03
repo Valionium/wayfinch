@@ -16,6 +16,8 @@ const CHECK_IN_ACCURACY_M = 100; // section 6.2
 /** Decision 4 of the plan: a confirmed amount stops being "confirmed" on a position more than this after it. */
 const WATER_CONFIRMED_MS = 15 * 60_000;
 const MAX_WATER_L = 20;
+/** Fixes this close can arrive out of order. Further apart, the one kept first with the later stamp had a clock running ahead. */
+const OUT_OF_ORDER_MS = 5 * 60_000;
 /** A kilometre this far outside the route was not measured on it. */
 const OUTSIDE_ROUTE_KM = 1;
 
@@ -59,6 +61,25 @@ export function keptPositions(all: Position[], now: Date, trip: Trip | null, zon
 }
 
 /**
+ * Leaves out a row stamped ahead: one kept before a true fix, yet stamped later than it. Sorted by stamp it would count as the
+ * latest until real time passed it, and no new fix would change the answers. `rows` come in the order they were kept, which
+ * tells what came first where the stamps can't. Only a fix under 48 hours old and not after now counts as true, so a fix from
+ * a clock far behind hides nothing once the clock is right. Stamps aren't rewritten, as the clock may be wrong at this moment.
+ */
+export function withoutStampedAhead(rows: Position[], now: Date): Position[] {
+  let earliestLater = Infinity;
+  const shown: Position[] = [];
+  for (const p of [...rows].reverse()) {
+    if (!readablePosition(p)) continue;
+    const t = p.at.getTime();
+    if (t - earliestLater > OUT_OF_ORDER_MS) continue;
+    shown.unshift(p);
+    if (t <= now.getTime() && now.getTime() - t <= MS_48H) earliestLater = Math.min(earliestLater, t);
+  }
+  return shown;
+}
+
+/**
  * Deletes what's past its time, and what can't be read, inside the caller's transaction. A position stamped after now stays
  * on the phone whatever the screen is shown: the clock may be what's wrong, and a delete can't be taken back.
  */
@@ -66,7 +87,7 @@ export async function sweepPositions(tx: Tx, now: Date, trip: Trip | null, zones
   const store = tx.objectStore('positions');
   const keys = await store.getAllKeys();
   const rows = (await store.getAll()) as Position[];
-  const kept = new Set(keptPositions(rows, now, trip, zones));
+  const kept = new Set(keptPositions(withoutStampedAhead(rows, now), now, trip, zones));
   const afterNow = (p: Position): boolean => readablePosition(p) && p.at.getTime() > now.getTime();
   await Promise.all(rows.map((p, i) => (kept.has(p) || afterNow(p) ? undefined : store.delete(keys[i]!))));
 }

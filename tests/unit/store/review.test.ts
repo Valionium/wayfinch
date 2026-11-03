@@ -110,7 +110,7 @@ describe('finding 2: damaged records', () => {
     }
   });
 
-  test('[ST-RETENTION] damaged zones read as none; of a list, only the bad entry goes', async () => {
+  test('[ST-RETENTION] damaged zones read as none; one bad span drops the list, as wrong zones are worse than none', async () => {
     const span = zonesOf(300)[0]!;
     for (const bad of ['text', 7, { a: 1 }, [null], [{ ...span, timeZone: 'Not/AZone' }], [{ ...span, fromKm: 'x' }], [{ ...span, timeZone: 7 }]]) {
       freshStore();
@@ -124,7 +124,7 @@ describe('finding 2: damaged records', () => {
     freshStore();
     await onTrip();
     await (await openDb()).put('meta', [span, { ...span, timeZone: 'Not/AZone' }], ZONES_META);
-    expect((await works()).routeZones).toEqual([span]);
+    expect((await works()).routeZones).toEqual([]);
   });
 
   test('[ST-KEEP-DAYSTART] the other damaged small records read as none; the good ones stay', async () => {
@@ -494,5 +494,110 @@ describe("finding 16: a stay's round trip keeps the rider's camp water", () => {
     await other.trip.saveTrip({ ...(await other.trip.readTrip())!, stay: 'mixed', campWaterL: 4 });
     expect((await writeSettings({ stay: 'accommodation' })).ok).toBe(false);
     expect(localStorage.getItem('copilot:camp-water-before')).toBeNull();
+  });
+});
+
+describe('re-check R1: a file whose rides are all unreadable', () => {
+  const ride1 = { at: new Date('2026-10-01T10:00:00Z'), predictedL: 2, intakeL: 2.5, feel: 'B' };
+
+  test('[ST-EXPORT] writes nothing and says why, and the rides on the phone stay', async () => {
+    await saveTrip(trip({ campWaterL: 1 }));
+    const file = JSON.parse(JSON.stringify(await exportAll())) as ExportFile;
+    const db = await openDb();
+    await db.add('calibration', ride1);
+    const damaged = { ...file, trip: { ...file.trip!, campWaterL: 4 }, calibration: { updatedAt: '2026-10-02T00:00:00.000Z', rides: [{ at: 'x' }, { junk: 1 }] } };
+    const r = await importAll(damaged);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/water learning/);
+    expect(await db.count('calibration')).toBe(1);
+    expect((await readTrip())?.campWaterL).toBe(1);
+  });
+
+  test('[ST-EXPORT] an unstamped section of unreadable rides is refused too; a stamped empty list is the rider having none', async () => {
+    await saveTrip(trip());
+    const file = JSON.parse(JSON.stringify(await exportAll())) as ExportFile;
+    const db = await openDb();
+    await db.add('calibration', ride1);
+    expect((await importAll({ ...file, calibration: { updatedAt: null, rides: ['junk'] } })).ok).toBe(false);
+    expect(await db.count('calibration')).toBe(1);
+    expect((await importAll({ ...file, calibration: { updatedAt: '2026-10-02T00:00:00.000Z', rides: [] } })).ok).toBe(true);
+    expect(await db.count('calibration')).toBe(0);
+  });
+
+  test('[ST-EXPORT] when only some are unreadable, the result says how many were left out', async () => {
+    await saveTrip(trip());
+    await (await openDb()).add('calibration', ride1);
+    const file = JSON.parse(JSON.stringify(await exportAll())) as ExportFile;
+    expect((await importAll(file)).ridesLeftOut).toBe(0);
+    const r = await importAll({ ...file, calibration: { ...file.calibration, rides: [...file.calibration.rides, { at: 'x' }, { junk: 1 }] } });
+    expect(r).toMatchObject({ ok: true, ridesLeftOut: 2 });
+  });
+});
+
+describe('re-check R2: zones', () => {
+  const NOW = at('2026-10-18 10:00');
+  const span = zonesOf(300)[0]!;
+
+  test('[ST-RETENTION] a last span open to the end of the route is a good span; not a number is not', async () => {
+    await onTrip();
+    const db = await openDb();
+    await db.put('meta', [{ ...span, toKm: Infinity }], ZONES_META);
+    expect((await readInputs(NOW))!.routeZones).toEqual([{ ...span, toKm: Infinity }]);
+    await db.put('meta', [{ ...span, toKm: Number.NaN }], ZONES_META);
+    expect((await readInputs(NOW))!.routeZones).toEqual([]);
+    await db.put('meta', [{ ...span, fromKm: -Infinity }], ZONES_META);
+    expect((await readInputs(NOW))!.routeZones).toEqual([]);
+  });
+
+  test('[ST-RETENTION] a damaged start span never moves the start zone to the next span', async () => {
+    await onTrip();
+    const tokyo = { fromKm: 100, toKm: 300, timeZone: 'Asia/Tokyo', holidayZone: null, country: 'JP' };
+    await (await openDb()).put('meta', [{ ...span, toKm: 100, timeZone: 'Not/AZone' }, tokyo], ZONES_META);
+    expect((await readInputs(NOW))!.routeZones).toEqual([]);
+  });
+});
+
+describe('re-check R5: a position stamped ahead must not hide later true fixes', () => {
+  const NOW = at('2026-10-18 10:00');
+  const ahead = pos({ km: 20, at: '2026-10-19 10:00' }); // the clock ran a day ahead for this one fix
+
+  test('[ST-RETENTION] a later true fix is what the screen starts from, and the row stamped ahead stays stored', async () => {
+    await onTrip();
+    await addPosition(pos({ km: 15, at: '2026-10-18 09:00' }), at('2026-10-18 09:00'), ID);
+    await addPosition(ahead, NOW, ID);
+    await addPosition(pos({ km: 60, at: '2026-10-18 09:59' }), NOW, ID);
+    const i = (await readInputs(NOW))!;
+    expect(i.positions.map((p) => p.km)).toEqual([15, 60]);
+    expect(screen({ ...i, sun: sun() }).ride.startKm).toBe(60);
+    expect(await rows()).toContainEqual(ahead);
+  });
+
+  test('[ST-RETENTION] once real time has passed its stamp, it stays hidden and goes', async () => {
+    await onTrip();
+    await addPosition(ahead, NOW, ID);
+    await addPosition(pos({ km: 60, at: '2026-10-18 09:59' }), NOW, ID);
+    const later = at('2026-10-19 11:00');
+    const i = (await readInputs(later))!;
+    expect(i.positions.map((p) => p.km)).toEqual([60]);
+    expect((await rows() as Position[]).map((p) => p.km)).toEqual([60]);
+  });
+
+  test('[ST-RETENTION] with no later fix it still counts as the latest; fixes a little out of order hide nothing', async () => {
+    await onTrip();
+    await addPosition(ahead, NOW, ID);
+    expect((await readInputs(NOW))!.positions.map((p) => p.km)).toEqual([20]);
+    freshStore();
+    await onTrip();
+    await addPosition(pos({ km: 30, at: '2026-10-18 09:59' }), NOW, ID);
+    await addPosition(pos({ km: 29, at: '2026-10-18 09:58' }), NOW, ID);
+    expect((await readInputs(NOW))!.positions.map((p) => p.km)).toEqual([29, 30]);
+  });
+
+  test('[ST-RETENTION] a fix from a clock far behind hides nothing once the clock is right: it is old, the others are true', async () => {
+    await onTrip();
+    const today = pos({ km: 90, at: '2026-10-18 09:00' });
+    await addPosition(today, at('2026-10-18 09:00'), ID);
+    await addPosition(pos({ km: 60, at: '2020-01-01 11:59' }), at('2020-01-01 12:00'), ID);
+    expect((await readInputs(NOW))!.positions.map((p) => p.km)).toEqual([90]);
   });
 });

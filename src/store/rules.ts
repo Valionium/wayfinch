@@ -137,9 +137,11 @@ function knownZone(name: unknown): name is string {
   return known;
 }
 
-export const usableZones = (raw: unknown): ZoneSpan[] => (Array.isArray(raw)
-  ? raw.filter((z): z is ZoneSpan => isRecord(z) && finite(z.fromKm) && finite(z.toKm) && knownZone(z.timeZone) && typeof z.country === 'string' && (z.holidayZone === null || typeof z.holidayZone === 'string'))
-  : []);
+const goodZone = (z: unknown): z is ZoneSpan => isRecord(z) && finite(z.fromKm) && (finite(z.toKm) || z.toKm === Infinity) && knownZone(z.timeZone)
+  && typeof z.country === 'string' && (z.holidayZone === null || typeof z.holidayZone === 'string');
+
+/** All or none: without one span the next would quietly become the zone of that stretch, or of the riding date. The route then reads as not prepared. */
+export const usableZones = (raw: unknown): ZoneSpan[] => (Array.isArray(raw) && raw.every(goodZone) ? raw : []);
 
 export const usableSavedKm = (raw: unknown): ScreenInputs['savedKm'] => (Array.isArray(raw)
   ? raw.filter((s): s is ScreenInputs['savedKm'][number] => isRecord(s) && finite(s.fromKm) && finite(s.toKm))

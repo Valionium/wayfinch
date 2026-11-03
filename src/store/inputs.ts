@@ -10,7 +10,7 @@ import { markChanged, tracked } from './changed.ts';
 import { CURRENT, inTx, ROUTE_META_PREFIX, ROUTE_STORES } from './db.ts';
 import type { Tx } from './db.ts';
 import { readLoadSummary } from './loadcheck-read.ts';
-import { keptPositions, readPlanTomorrow, sweepPositions, ZONES_KEY } from './positions.ts';
+import { keptPositions, readPlanTomorrow, sweepPositions, withoutStampedAhead, ZONES_KEY } from './positions.ts';
 import { PROFILE_META, usableProfile } from './profile.ts';
 import { goodDate, goodDayStart, usableHolidays, usableSavedKm, usableTrip, usableWater, usableZones } from './rules.ts';
 import { readLocalSettings } from './settings-local.ts';
@@ -62,7 +62,7 @@ export async function readInputs(now: Date): Promise<ScreenInputs | null> {
   const water = usableWater(read.waterLeft);
   // Without a clock nothing can be judged, so nothing is deleted, and the engines plan from the route start.
   const clock = validDate(now);
-  const positions = clock ? keptPositions(read.positions, now, trip, routeZones).sort(positionOrder) : [];
+  const positions = clock ? keptPositions(withoutStampedAhead(read.positions, now), now, trip, routeZones).sort(positionOrder) : [];
   const dayStarts = clock ? dayStartsKept(read.dayStarts, now, routeZones) : read.dayStarts.filter(goodDayStart);
   const waterOver = water !== null && clock && now.getTime() - water.at.getTime() > DEFAULT_FOR_MS;
   const waterBad = read.waterLeft !== undefined && water === null;

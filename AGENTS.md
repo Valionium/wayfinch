@@ -21,7 +21,7 @@ src/core/      pure TypeScript, no DOM, fully unit-tested
   wording/     every user-facing string (en.ts)
   route/       rounded form, GPX reading, stages, climbs, sample grid, hash
 src/ui/        the app's shell in Preact (app, nav, theme.css, update prompt, shared card and status pieces); Ahead's components go in src/ui/ahead/ and may not import store or data
-src/store/     the rider's data: IndexedDB (add-only migrations) and copilot:* keys; readInputs is the one place screen()'s inputs are put together; a window writes only over the version it read
+src/store/     the rider's data: IndexedDB (add-only migrations) and copilot:* keys; readInputs is the one place screen()'s inputs are put together; a window writes only over the version it read, so Tasks 12 and 13 must call `readTrip` again before `saveTrip` after any `writeSettings`, and `readSettings` before `writeSettings`, or the write is refused as newer
 public/        what is served; public/tools/bags/index.html is the Load Check page; manifest.webmanifest and icons/ ship only with the launch switch on
 qa/            Load Check's QA suites (plain Node scripts), qa/paths.cjs, qa/fixtures/
 tests/

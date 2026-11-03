@@ -155,7 +155,7 @@ describe('positions kept', () => {
   test('[ST-RETENTION] in the inputs, positions come in time order whatever order they were saved in', async () => {
     await onTrip();
     const now = at('2026-10-18 12:00');
-    await put(pos({ km: 30, at: '2026-10-18 11:00' }), pos({ km: 20, at: '2026-10-18 10:00' }));
+    await put(pos({ km: 30, at: '2026-10-18 11:00' }), pos({ km: 20, at: '2026-10-18 10:58' }));
     expect((await withInputs(now)).positions.map((p) => p.km)).toEqual([20, 30]);
   });
 });

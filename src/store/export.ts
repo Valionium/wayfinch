@@ -29,7 +29,8 @@ export type ExportFile = {
   calibration: Stamped & { rides: JsonRide[] };
   tyres: Stamped & { byBike: Record<string, unknown> };
 };
-export type ImportResult = { ok: boolean; reason: string | null; routeChanged: boolean };
+/** `ridesLeftOut`: rides of the file that couldn't be read, when others could. */
+export type ImportResult = { ok: boolean; reason: string | null; routeChanged: boolean; ridesLeftOut: number };
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
@@ -105,7 +106,8 @@ const jsonRide = (r: unknown): JsonRide[] => {
   const ride = { ...r, at: r.at.toISOString() };
   return rideReads(ride) ? [rideOf(ride as unknown as JsonRide)] : [];
 };
-const calibrationReads = (c: unknown): boolean => isObject(c) && goodStamp(c.updatedAt) && Array.isArray(c.rides);
+/** One bad ride is left out, but a list with none readable is a damaged file: taking it would wipe the rides on this phone. */
+const calibrationReads = (c: unknown): boolean => isObject(c) && goodStamp(c.updatedAt) && Array.isArray(c.rides) && (c.rides.length === 0 || c.rides.some(rideReads));
 const tyresRead = (t: unknown): boolean => isObject(t) && goodStamp(t.updatedAt) && isObject(t.byBike);
 
 function fileProblem(file: unknown): string | null {
@@ -136,7 +138,7 @@ const putStamp = async (tx: Tx, section: string, stamp: string | null): Promise<
 
 async function importing(file: unknown): Promise<ImportResult> {
   const problem = fileProblem(file);
-  if (problem) return { ok: false, reason: problem, routeChanged: false };
+  if (problem) return { ok: false, reason: problem, routeChanged: false, ridesLeftOut: 0 };
   const f = file as ExportFile;
   const { updatedAt: tripStamp = null, ...tripFields } = f.trip ?? {};
   const trip = f.trip ? tripOf(tripFields as Trip) : null;
@@ -153,7 +155,7 @@ async function importing(file: unknown): Promise<ImportResult> {
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify({ updatedAt: settingsStamp, ...settingsOf(f.settings) }));
     } catch {
-      return { ok: false, reason: W.appStoreNotKept, routeChanged: false };
+      return { ok: false, reason: W.appStoreNotKept, routeChanged: false, ridesLeftOut: 0 };
     }
   }
 
@@ -190,7 +192,7 @@ async function importing(file: unknown): Promise<ImportResult> {
       if (settingsBefore === null) localStorage.removeItem(SETTINGS_KEY);
       else localStorage.setItem(SETTINGS_KEY, settingsBefore);
     } catch { /* it was just written, so this is not expected */ }
-    return { ok: false, reason: W.appStoreNotKept, routeChanged: false };
+    return { ok: false, reason: W.appStoreNotKept, routeChanged: false, ridesLeftOut: 0 };
   }
 
   if (trip) {
@@ -207,7 +209,7 @@ async function importing(file: unknown): Promise<ImportResult> {
     else forgetRouteChoices();
   }
   markChanged('all');
-  return { ok: true, reason: null, routeChanged };
+  return { ok: true, reason: null, routeChanged, ridesLeftOut: f.calibration.rides.length - rides.length };
 }
 
 // ---- Delete --------------------------------------------------------------------------------------------------------
