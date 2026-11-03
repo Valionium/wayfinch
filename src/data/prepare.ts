@@ -74,7 +74,7 @@ const STATION_NEAR_KM = 0.1;
 /** Ends the whole run: the route it was for isn't the stored one any more. */
 const routeGone = (e: unknown): boolean => e instanceof RouteGoneError;
 
-const noteFor = (e: unknown, otherwise: string): string => (isStorageFull(e) ? W.prepStorageFullStep : otherwise);
+const noteFor = (e: unknown, otherwise: string): string => (isStorageFull(e) ? W.appPrepStorageFullStep : otherwise);
 
 // ---- heights -----------------------------------------------------------------------------------------------------------
 
@@ -132,9 +132,9 @@ async function heightsStep(deps: PrepareDeps, store: PreparedStore, online: bool
   let route = trip.route;
   let report: StepReport = { step: 'heights', ok: true, note: null };
   if (missing) {
-    if (!online) report = { step: 'heights', ok: false, note: W.prepNoConnection };
+    if (!online) report = { step: 'heights', ok: false, note: W.appPrepNoConnection };
     else {
-      deps.onNotice?.(W.prepHeightsNotice);
+      deps.onNotice?.(W.appPrepHeightsNotice);
       let heights: (number | null)[] | null = null;
       try {
         heights = await lookedUpHeights(route, deps);
@@ -142,7 +142,7 @@ async function heightsStep(deps: PrepareDeps, store: PreparedStore, online: bool
         heights = null;
       }
       if (heights) route = await buildRoute(rawOf(route, (i) => heights[i] ?? null), route.name, route.source);
-      else report = { step: 'heights', ok: false, note: W.prepHeightsFailed };
+      else report = { step: 'heights', ok: false, note: W.appPrepHeightsFailed };
     }
   }
   // Stages and the grid are fixed only now, with the heights final.
@@ -154,7 +154,7 @@ async function heightsStep(deps: PrepareDeps, store: PreparedStore, online: bool
     await store.saveTrip({ ...current, route: next.route });
   } catch (e) {
     // Another window changed the trip, or there's no room: the next steps go on with the route that is stored.
-    return { report: { step: 'heights', ok: false, note: noteFor(e, W.prepSaveFailed) }, trip: current };
+    return { report: { step: 'heights', ok: false, note: noteFor(e, W.appPrepSaveFailed) }, trip: current };
   }
   return { report, trip: { ...current, route: next.route } };
 }
@@ -219,7 +219,7 @@ async function placesStep(deps: PrepareDeps, store: PreparedStore, online: boole
       });
     } catch (e) {
       if (routeGone(e)) throw e;
-      note = isStorageFull(e) ? W.prepStorageFullStep : W.prepPacksNoAnswer;
+      note = isStorageFull(e) ? W.appPrepStorageFullStep : W.appPrepPacksNoAnswer;
     }
   } else {
     const run = await store.readRun();
@@ -231,10 +231,10 @@ async function placesStep(deps: PrepareDeps, store: PreparedStore, online: boole
         failed: notSaved.map((tile) => ({ tile, reason: 'no-connection' })),
       };
     }
-    if (!tiles || tiles.failed.length > 0) note = W.prepNoConnection;
+    if (!tiles || tiles.failed.length > 0) note = W.appPrepNoConnection;
   }
 
-  if (!tiles) return { report: { step: 'places', ok: false, note: note ?? (zones ? W.prepPacksNoAnswer : W.prepZonesMissing) }, tiles: null };
+  if (!tiles) return { report: { step: 'places', ok: false, note: note ?? (zones ? W.appPrepPacksNoAnswer : W.appPrepZonesMissing) }, tiles: null };
 
   if (tiles.saved.length > 0) {
     // A wish to the browser, which may say no. Its absence is no error.
@@ -251,14 +251,14 @@ async function placesStep(deps: PrepareDeps, store: PreparedStore, online: boole
     await matchAll(store, route, tiles, zones);
   } catch (e) {
     if (routeGone(e)) throw e;
-    if (!isStorageFull(e)) return { report: { step: 'places', ok: false, note: W.prepPlacesNotMatched }, tiles };
-    return { report: { step: 'places', ok: false, note: W.prepStorageFull(tiles.saved.length, tiles.manifest.tiles.length) }, tiles };
+    if (!isStorageFull(e)) return { report: { step: 'places', ok: false, note: W.appPrepPlacesNotMatched }, tiles };
+    return { report: { step: 'places', ok: false, note: W.appPrepStorageFull(tiles.saved.length, tiles.manifest.tiles.length) }, tiles };
   }
-  if (full) note = W.prepStorageFull(tiles.saved.length, tiles.manifest.tiles.length);
-  else if (note === null && tiles.failed.length > 0) note = W.prepTilesFailed(tiles.failed.length);
-  else if (note === null && zones === null) note = W.prepZonesMissing;
+  if (full) note = W.appPrepStorageFull(tiles.saved.length, tiles.manifest.tiles.length);
+  else if (note === null && tiles.failed.length > 0) note = W.appPrepTilesFailed(tiles.failed.length);
+  else if (note === null && zones === null) note = W.appPrepZonesMissing;
   if (note !== null) return { report: { step: 'places', ok: false, note }, tiles };
-  return { report: { step: 'places', ok: true, note: tiles.restartedFrom ? W.prepPacksRestarted : null }, tiles };
+  return { report: { step: 'places', ok: true, note: tiles.restartedFrom ? W.appPrepPacksRestarted : null }, tiles };
 }
 
 // ---- hours -------------------------------------------------------------------------------------------------------------
@@ -327,7 +327,7 @@ async function hoursStep(store: PreparedStore, trip: Trip, zones: ZoneSpan[], no
     return { step: 'hours', ok: true, note: null };
   } catch (e) {
     if (routeGone(e)) throw e;
-    return { step: 'hours', ok: false, note: noteFor(e, W.prepHoursFailed) };
+    return { step: 'hours', ok: false, note: noteFor(e, W.appPrepHoursFailed) };
   }
 }
 
@@ -347,14 +347,14 @@ async function runsFor(deps: PrepareDeps, route: Route, zones: ZoneSpan[]): Prom
 }
 
 async function weatherStep(deps: PrepareDeps, store: PreparedStore, online: boolean, trip: Trip, zones: ZoneSpan[], now: Date): Promise<StepReport> {
-  if (!online) return { step: 'weather', ok: false, note: W.prepNoConnection };
+  if (!online) return { step: 'weather', ok: false, note: W.appPrepNoConnection };
   const { route } = trip;
   try {
     const grid = gridPoints(route);
-    if (grid.length === 0) return { step: 'weather', ok: false, note: W.prepWeatherFailed };
+    if (grid.length === 0) return { step: 'weather', ok: false, note: W.appPrepWeatherFailed };
     // The turn to ask, held with Update weather's: a forecast fetched minutes ago stays, and no second request is sent.
     if (!(await store.reserveWeather(route.id, now, WEATHER_GAP_MS))) {
-      return (await readForecastDate()) ? { step: 'weather', ok: true, note: W.prepWeatherRecent } : { step: 'weather', ok: false, note: W.prepWeatherFailed };
+      return (await readForecastDate()) ? { step: 'weather', ok: true, note: W.appPrepWeatherRecent } : { step: 'weather', ok: false, note: W.appPrepWeatherFailed };
     }
     const runs = await runsFor(deps, route, zones);
     const today = localIsoDate(now, startZoneOf(zones));
@@ -365,12 +365,12 @@ async function weatherStep(deps: PrepareDeps, store: PreparedStore, online: bool
     return { step: 'weather', ok: true, note: null };
   } catch (e) {
     if (routeGone(e)) throw e;
-    return { step: 'weather', ok: false, note: noteFor(e, W.prepWeatherFailed) };
+    return { step: 'weather', ok: false, note: noteFor(e, W.appPrepWeatherFailed) };
   }
 }
 
 async function baselineStep(deps: PrepareDeps, store: PreparedStore, online: boolean, trip: Trip, zones: ZoneSpan[], now: Date): Promise<StepReport> {
-  if (!online) return { step: 'baseline', ok: false, note: W.prepNoConnection };
+  if (!online) return { step: 'baseline', ok: false, note: W.appPrepNoConnection };
   try {
     const { from, plannedEnd } = windowDates(trip, localIsoDate(now, startZoneOf(zones)));
     const months = new Set<number>();
@@ -379,7 +379,7 @@ async function baselineStep(deps: PrepareDeps, store: PreparedStore, online: boo
     return { step: 'baseline', ok: true, note: null };
   } catch (e) {
     if (routeGone(e)) throw e;
-    return { step: 'baseline', ok: false, note: noteFor(e, W.prepBaselineFailed) };
+    return { step: 'baseline', ok: false, note: noteFor(e, W.appPrepBaselineFailed) };
   }
 }
 
@@ -419,7 +419,7 @@ export async function prepareTrip(deps: PrepareDeps, onProgress: (step: StepName
   /** A step that blows up in a way of its own is that step's failure; the next ones still run. */
   const failed = (name: StepName, e: unknown): StepReport => {
     if (routeGone(e)) throw e;
-    return { step: name, ok: false, note: noteFor(e, W.prepSaveFailed) };
+    return { step: name, ok: false, note: noteFor(e, W.appPrepSaveFailed) };
   };
   try {
     const { online } = await checkConnectivity(deps.fetch);
@@ -466,12 +466,12 @@ export async function prepareTrip(deps: PrepareDeps, onProgress: (step: StepName
       reports.push({ step: 'save', ok: true, note: null });
     } catch (e) {
       if (routeGone(e)) throw e;
-      reports.push({ step: 'save', ok: false, note: noteFor(e, W.prepSaveFailed) });
+      reports.push({ step: 'save', ok: false, note: noteFor(e, W.appPrepSaveFailed) });
     }
     return reports;
   } catch (e) {
-    if (routeGone(e)) return [...reports, { step, ok: false, note: W.prepRouteReplaced }];
-    return [...reports, { step, ok: false, note: noteFor(e, W.prepSaveFailed) }];
+    if (routeGone(e)) return [...reports, { step, ok: false, note: W.appPrepRouteReplaced }];
+    return [...reports, { step, ok: false, note: noteFor(e, W.appPrepSaveFailed) }];
   } finally {
     await release();
   }

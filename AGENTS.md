@@ -19,10 +19,10 @@ src/core/      pure TypeScript, no DOM, fully unit-tested
   hours/       prepared opening hours; only spans.ts reaches the library
   screen/      screen(inputs): the whole stop screen, never throws
   wording/     every user-facing string (en.ts)
-  route/       rounded form, GPX reading, stages, climbs, sample grid, hash
+  route/       rounded form, GPX reading, stages, climbs, sample grid, hash, zones.ts (routeZones and zoneAt over the bundled boundary file)
 src/ui/        the app's shell in Preact (app, nav, theme.css, update prompt, shared card and status pieces); Ahead's components go in src/ui/ahead/ and may not import store or data
 src/store/     the rider's data: IndexedDB (add-only migrations) and copilot:* keys; readInputs is the one place screen()'s inputs are put together; a window writes only over the version it read, so Tasks 12 and 13 must call `readTrip` again before `saveTrip` after any `writeSettings`, and `readSettings` before `writeSettings`, or the write is refused as newer
-src/data/      what comes from outside. openmeteo.ts checks each answer whole before handing it on; refresh.ts decides when to ask, with no request of any kind without a prepared trip, a signal and a reason; weather-mode.ts reads build.config.json; overpass.ts is Refresh this stretch
+src/data/      what comes from outside. openmeteo.ts checks each answer whole before handing it on; refresh.ts decides when to ask, with no request of any kind without a prepared trip, a signal and a reason; weather-mode.ts reads build.config.json; overpass.ts is Refresh this stretch; prepare.ts is Get ready offline (it sets the prepared mark weather.ts reads, and takes the forecast through Update weather's turn and write); packs/download.ts gets tiles, resumable, one build per run; boundaries.ts reads public/data/boundaries.v1.json, which tools/build-boundaries.mjs makes once from OpenStreetMap and tools/prove-boundaries.mjs checks on a live pack (tools/boundaries-proof.json; rebuild the file and the proof goes stale)
 public/        what is served; public/tools/bags/index.html is the Load Check page; manifest.webmanifest and icons/ ship only with the launch switch on
 qa/            Load Check's QA suites (plain Node scripts), qa/paths.cjs, qa/fixtures/
 tests/

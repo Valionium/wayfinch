@@ -90,7 +90,7 @@ describe('the steps', () => {
     const reports = await prepareTrip(deps, () => undefined);
     expect(step(reports, 'places').ok).toBe(true);
     expect(step(reports, 'hours').ok).toBe(true);
-    expect(step(reports, 'weather')).toMatchObject({ ok: false, note: W.prepWeatherFailed });
+    expect(step(reports, 'weather')).toMatchObject({ ok: false, note: W.appPrepWeatherFailed });
     expect(step(reports, 'baseline').ok).toBe(true);
     expect(step(reports, 'save').ok).toBe(true);
     expect((await stored('places')).length).toBeGreaterThan(0);
@@ -147,8 +147,8 @@ describe('the steps', () => {
     expect(log).toBeGreaterThan(0);
     expect(step(reports, 'hours').ok).toBe(true);
     expect(step(reports, 'places').ok).toBe(true); // all was saved
-    expect(step(reports, 'weather')).toMatchObject({ ok: false, note: W.prepNoConnection });
-    expect(step(reports, 'baseline')).toMatchObject({ ok: false, note: W.prepNoConnection });
+    expect(step(reports, 'weather')).toMatchObject({ ok: false, note: W.appPrepNoConnection });
+    expect(step(reports, 'baseline')).toMatchObject({ ok: false, note: W.appPrepNoConnection });
   });
 
   test('[PREP-STEPS] a route replaced during preparation gets nothing of the old one', async () => {
@@ -165,7 +165,7 @@ describe('the steps', () => {
     const reports = await prepareTrip(depsFor(server), () => undefined);
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(replaced).toBe(true);
-    expect(reports.some((r) => r.note === W.prepRouteReplaced)).toBe(true);
+    expect(reports.some((r) => r.note === W.appPrepRouteReplaced)).toBe(true);
     for (const name of ['places', 'matches', 'hours', 'roofs', 'rescuePoints', 'savedTiles', 'forecast', 'baseline']) expect(await stored(name), name).toEqual([]);
     expect(await readPrepared()).toBeNull();
     const i = await inputs();
@@ -187,7 +187,7 @@ describe('with Update weather', () => {
     // Minutes later, Get ready again: the forecast just fetched stays, and nothing is sent.
     const again = await prepareTrip(deps, () => undefined);
     expect(asked).toBe(1);
-    expect(step(again, 'weather')).toMatchObject({ ok: true, note: W.prepWeatherRecent });
+    expect(step(again, 'weather')).toMatchObject({ ok: true, note: W.appPrepWeatherRecent });
     // A route replaced: the mark goes with it.
     await replaceRoute(flatRoute(40, { stageEnds: [40] }));
     expect((await readWeatherState())!.prepared).toBe(false);
@@ -223,7 +223,7 @@ describe('heights', () => {
       fetchBaseline: async (points) => { order.push(`baseline:${points.length}`); return baseline(); },
     }), () => undefined);
     expect(step(reports, 'heights').ok).toBe(true);
-    expect(order[0]).toBe(`notice:${W.prepHeightsNotice}`);
+    expect(order[0]).toBe(`notice:${W.appPrepHeightsNotice}`);
     expect(order[1]).toBe('elevation');
     const after = (await readTrip())!;
     expect(after.route.ascentM).not.toBeNull();
@@ -246,7 +246,7 @@ describe('heights', () => {
       fetchElevation: async (points) => { asked++; return points.map((_, i) => (i === 3 ? null : 200)); },
     }), () => undefined);
     expect(asked).toBe(1);
-    expect(step(reports, 'heights')).toMatchObject({ ok: false, note: W.prepHeightsFailed });
+    expect(step(reports, 'heights')).toMatchObject({ ok: false, note: W.appPrepHeightsFailed });
     expect(step(reports, 'places').ok).toBe(true);
     const after = (await readTrip())!;
     expect(after.route.ascentM).toBeNull();
@@ -483,7 +483,7 @@ describe('zones and holidays', () => {
     const server = new PackServer(fixtureBuild('heidelberg-strasbourg'));
     const deps = depsFor(server);
     const reports = await prepareTrip({ ...deps, fetch: async (u, o) => (String(u) === '/data/boundaries.v1.json' ? new Response('gone', { status: 500 }) : deps.fetch(u, o)) }, () => undefined);
-    expect(step(reports, 'places')).toMatchObject({ ok: false, note: W.prepZonesMissing });
+    expect(step(reports, 'places')).toMatchObject({ ok: false, note: W.appPrepZonesMissing });
     const i = await inputs();
     expect(i.routeZones).toEqual([]);
     expect(i.savedKm.length).toBeGreaterThan(0);
@@ -575,7 +575,7 @@ describe('a download cut off', () => {
     server.current = next.manifest.buildId;
     server.intercept = () => null;
     const reports = await prepareTrip(depsFor(server), () => undefined);
-    expect(step(reports, 'places')).toMatchObject({ ok: true, note: W.prepPacksRestarted });
+    expect(step(reports, 'places')).toMatchObject({ ok: true, note: W.appPrepPacksRestarted });
     expect((await readPackRun())!.buildId).toBe('20261110-1');
     expect((await stored<Place>('places')).map((p) => p.id)).toEqual(['n777']);
     expect((await (await openDb()).getAllKeys('savedTiles')).map(String)).toEqual(next.manifest.tiles.map(tileKey));
@@ -610,7 +610,7 @@ describe('storage full', () => {
     expect(places.ok).toBe(false);
     const saved = (await (await openDb()).getAllKeys('savedTiles')).length;
     expect(saved).toBe(6);
-    expect(places.note).toBe(W.prepStorageFull(saved, build.manifest.tiles.length));
+    expect(places.note).toBe(W.appPrepStorageFull(saved, build.manifest.tiles.length));
     // It stopped asking once there was no room for more.
     expect(server.tileRequests().length).toBe(12);
     expect(reports.map((r) => r.step)).toEqual(['heights', 'places', 'hours', 'weather', 'baseline', 'save']);
@@ -633,8 +633,8 @@ describe('storage full', () => {
       },
     }), () => undefined);
     expect(step(reports, 'places').ok).toBe(true);
-    expect(step(reports, 'hours')).toMatchObject({ ok: false, note: W.prepStorageFullStep });
-    expect(step(reports, 'weather')).toMatchObject({ ok: false, note: W.prepStorageFullStep });
+    expect(step(reports, 'hours')).toMatchObject({ ok: false, note: W.appPrepStorageFullStep });
+    expect(step(reports, 'weather')).toMatchObject({ ok: false, note: W.appPrepStorageFullStep });
     expect(step(reports, 'baseline').ok).toBe(true);
     expect(await readPrepared()).not.toBeNull();
     expect(screen(await inputs()).cards.water.missing).toContain('hours');
