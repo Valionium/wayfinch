@@ -108,7 +108,11 @@ test('[APP-NO-HOOK] only a --test-hooks build has window.__wf, and only with the
   const scripts = files(hooked).filter((f) => f.endsWith('.js') && !f.startsWith('tools/'));
   expect(scripts.some((f) => text(hooked, f).includes('__wf'))).toBe(true);
   // The production build has none of the hook's code, not even as a chunk nobody loads.
-  expect(files(on).filter((f) => f.endsWith('.js') && !f.startsWith('tools/')).length).toBe(scripts.length - 1);
+  expect(scripts.some((f) => text(hooked, f).includes('loadCase'))).toBe(true);
+  for (const f of files(on).filter((x) => x.endsWith('.js'))) {
+    expect(f).not.toMatch(/test-hooks/);
+    expect(text(on, f).includes('loadCase'), f).toBe(false);
+  }
   await expect(buildDist({ out: join(tmpRoot, 'hooks-off'), launch: false, testHooks: true })).rejects.toThrow(/--launch=on/);
 }, 120_000);
 

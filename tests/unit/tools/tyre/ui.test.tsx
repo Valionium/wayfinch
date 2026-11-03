@@ -164,6 +164,8 @@ describe('the tyre screen', () => {
 
   test('[TY-UI-STORE] #/tools/tyre opens the tool inside Tools', async () => {
     await act(() => { go('tools/tyre'); render(<App />, host); });
+    // The tool's screen is a lazy chunk: it comes in a moment later.
+    for (let n = 0; n < 200 && !host.textContent?.includes(W.tyreTitle); n++) await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
     expect(host.textContent).toContain(W.tyreTitle);
     expect(host.querySelector('.tabs [aria-current="page"]')?.textContent).toBe('Tools');
   });

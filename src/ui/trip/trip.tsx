@@ -13,7 +13,7 @@ import { noteTripFacts } from '../degraded.ts';
 import { installOffer, promptInstall } from '../install.ts';
 import { GetReady } from './getready.tsx';
 import { lineKey, routeFromGpx } from './model.ts';
-import { PlanAB } from './plan.tsx';
+import { lazy } from '../lazy.tsx';
 import { reasonOf } from './services.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
 import { TripSettings } from './settings.tsx';
@@ -21,6 +21,9 @@ import { RouteSummary } from './summary.tsx';
 import './trip.css';
 
 type Found = { route: Route; hadHeights: boolean };
+
+// Plan from A to B is its own chunk: Trip's first look is the bike, the route and Get ready.
+const PlanAB = lazy(() => import('./plan.tsx').then((m) => m.PlanAB));
 
 function AddRoute({ services, snap, reload }: { services: TripServices; snap: TripSnapshot | null; reload: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);

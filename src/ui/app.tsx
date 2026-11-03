@@ -4,7 +4,8 @@ import { useEffect } from 'preact/hooks';
 import { W } from '../core/wording/en.ts';
 import { AheadScreen } from './ahead/ahead.tsx';
 import { browserAhead } from './shell-actions.ts';
-import { TyreScreen, browserServices } from '../tools/tyre/ui.tsx';
+import { browserServices } from '../tools/tyre/services.ts';
+import { lazy } from './lazy.tsx';
 import { Degraded } from './card.tsx';
 import { degradedSignal } from './degraded.ts';
 import { screenSignal, tabOf } from './nav.ts';
@@ -16,6 +17,8 @@ import { TripScreen } from './trip/trip.tsx';
 
 // The tyre tool reads Load Check's records and its own storage; rider weight from You joins when the store does.
 const tyreServices = browserServices();
+// The tyre tool's screen is its own chunk: it is not a first screen.
+const TyreScreen = lazy(() => import('../tools/tyre/ui.tsx').then((m) => m.TyreScreen));
 const tripServices = browserTripServices();
 export const aheadShell = browserAhead();
 

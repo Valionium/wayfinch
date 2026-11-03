@@ -573,6 +573,8 @@ export const W = {
   appStatusUnknown: 'Unknown',
   appListMore: (n: number): string => `Show ${n} more`,
   appListFewer: 'Show fewer',
+  appLazyLoading: 'Opening…',
+  appLazyFailed: "This part of the app couldn't be opened. Reload to try again.",
   appNoRoute: "Add a route to see what's ahead",
   appStorageBlocked: "This browser is not keeping Wayfinch's data. The app works for this visit only. Export what you need before you close it.",
   appNoSignalNoTrip: "No signal, and this trip is not prepared. Distance, climbing and daylight come from the route. Places and weather need a connection: prepare the trip while you are online.",
