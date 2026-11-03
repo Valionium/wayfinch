@@ -2,7 +2,8 @@
 // weight from You. It never writes a `loadcheck:*` key. Unknown major versions read as none; unknown fields are ignored.
 import type { Bars, Casing, RimType, Setup } from './core.ts';
 import type { BikeInfo, SummaryInfo } from './model.ts';
-import { WHEELS } from './tables.ts';
+import { parseTyre } from '../../core/bike/tyres.ts';
+import { WHEELS, WIDTH_MAX_MM, WIDTH_MIN_MM } from './tables.ts';
 import type { Pos } from './tables.ts';
 
 export const SUMMARY_KEY = 'loadcheck:summary:v1';
@@ -58,33 +59,16 @@ export function parseSummary(raw: unknown): SummaryInfo | null {
 }
 
 const WHEEL_WORDS: Record<string, number> = { '700c': 622, '650b': 584, '650c': 571, '29': 622, '27.5': 584, '26': 559 };
-const INCH_BSD: Record<string, number> = { '29': 622, '28': 622, '27.5': 584, '26': 559, '24': 507, '20': 406 };
 
-/** A tyre size as people write it: "40-622", "700x40c", "29 x 2.2". Null when it does not parse. */
+/**
+ * A tyre size as people write it: "40-622", "700x40c", "29 x 2.2". Null when it does not parse. The drawing's reader (one reader for
+ * both, so they never disagree), rounded to whole millimetres and held to this tool's table: unsure is null, never a guess.
+ */
 export function parseTyreSize(text: unknown): { widthMm: number; bsdMm: number } | null {
-  if (typeof text !== 'string') return null;
-  // A fraction of an inch ("28 x 1 1/2") is an old size this does not read: unsure is null, never a guess.
-  if (/\d\s*\/\s*\d/.test(text) || /[\u00bc-\u00be\u2150-\u215e]/.test(text)) return null;
-  const etrto = /(?<![\d.])(\d{2,3})\s*[-–]\s*(\d{3})\b/.exec(text);
-  if (etrto) {
-    const widthMm = Number(etrto[1]);
-    const bsdMm = Number(etrto[2]);
-    return WHEELS.some((w) => w.bsdMm === bsdMm) && widthMm >= 18 && widthMm <= 83 ? { widthMm, bsdMm } : null;
-  }
-  const french = /\b(700|650)\s*([bc])?\s*[x×]\s*(\d{2})\s*(?:mm|c)?(?![\w.,/x×])(?!\s*[x×]\s*\d)/i.exec(text);
-  if (french) {
-    const widthMm = Number(french[3]);
-    const letter = (french[2] ?? '').toLowerCase();
-    const bsdMm = french[1] === '700' ? (letter === 'b' ? undefined : 622) : letter === 'b' ? 584 : letter === 'c' ? 571 : undefined;
-    return bsdMm !== undefined && widthMm >= 18 && widthMm <= 83 ? { widthMm, bsdMm } : null;
-  }
-  const inch = /(?<![\w.])(\d{2}(?:\.5)?)\s*[x×]\s*(\d(?:[.,]\d{1,2})?)\s*(?:"|in|inch)?(?![\w.,/x×])(?!\s*[x×]\s*\d)/i.exec(text);
-  if (inch) {
-    const bsdMm = INCH_BSD[inch[1]!];
-    const widthMm = Math.round(Number(inch[2]!.replace(',', '.')) * 25.4);
-    return bsdMm !== undefined && widthMm >= 18 && widthMm <= 83 ? { widthMm, bsdMm } : null;
-  }
-  return null;
+  const size = parseTyre(text);
+  if (!size || !WHEELS.some((w) => w.bsdMm === size.rimMm)) return null;
+  const widthMm = Math.round(size.widthMm);
+  return widthMm >= WIDTH_MIN_MM && widthMm <= WIDTH_MAX_MM ? { widthMm, bsdMm: size.rimMm } : null;
 }
 
 /** One of Load Check's bike records. Fields it does not hold stay unset: nothing is guessed. */
