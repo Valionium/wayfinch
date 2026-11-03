@@ -25,3 +25,4 @@ th { background: var(--panel); }
 .lg-note { color: var(--muted); }
 code { font-family: ui-monospace, Consolas, monospace; font-size: 0.9em; }
 .lg-licence { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel); border: 1px solid var(--line); padding: 8px 12px; font: 0.8125rem/1.4 ui-monospace, Consolas, monospace; }
+.lg-pkg th:nth-child(2), .lg-pkg th:nth-child(3), .lg-pkg td:nth-child(2), .lg-pkg td:nth-child(3) { white-space: nowrap; }
