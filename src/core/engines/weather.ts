@@ -40,7 +40,11 @@ const validDate = (d: Date): boolean => Number.isFinite(d.getTime());
 const later = (a: Date, b: Date): Date => (a.getTime() > b.getTime() ? a : b);
 
 /** Over 12 hours old. No fetch time or no clock can't read as fresh. */
-export const isStale = (f: StoredForecast, now: Date): boolean => !(now.getTime() - f.fetchedAt.getTime() <= STALE_MS);
+const AHEAD_MS = 3_600_000; // a fetch time this far past the clock: one of the two is wrong, and the age is not known
+export const isStale = (f: StoredForecast, now: Date): boolean => {
+  const age = now.getTime() - f.fetchedAt.getTime();
+  return !(age <= STALE_MS && age >= -AHEAD_MS);
+};
 
 /** The headwind component; negative means a tailwind. */
 export const headwind = (speed: number, fromDeg: number, routeBearingDeg: number): number =>
@@ -188,6 +192,12 @@ export function weatherStatus(f: WeatherFacts, windows: RainWindow[]): { status:
 }
 
 // ---- wording -------------------------------------------------------------------------------------------------------
+
+/** A fetch time: its clock time today, with its day on any other day, so that yesterday's 07:10 can't read as this morning's. */
+export function fetchedLabel(fetched: Date, now: Date, tz: string): string {
+  const sameDay = validDate(now) && localIsoDate(fetched, tz) === localIsoDate(now, tz);
+  return sameDay ? formatHm(fetched, tz) : W.timeDayAt(shortDay(fetched, tz), formatHm(fetched, tz));
+}
 
 const shortDay = (t: Date, tz: string): string => {
   const w = wallClock(t, tz);
@@ -351,8 +361,7 @@ function basisOf(f: WeatherFacts, usesBaseline: boolean): string[] {
       latest.set(r.model, Math.max(latest.get(r.model) ?? -Infinity, r.run.getTime()));
     }
     const run = latest.size > 0 ? formatHm(new Date(Math.min(...latest.values())), tz) : null;
-    const sameDay = validDate(f.now) && localIsoDate(fetched, tz) === localIsoDate(f.now, tz);
-    basis.push(W.weatherBasis(sameDay ? formatHm(fetched, tz) : W.timeDayAt(shortDay(fetched, tz), formatHm(fetched, tz)), run));
+    basis.push(W.weatherBasis(fetchedLabel(fetched, f.now, tz), run));
     const half = new Date(fetched.getTime() + 48 * HOUR);
     const parts = new Date(fetched.getTime() + 120 * HOUR);
     basis.push(W.weatherDetailRange(W.timeWeekdayAt(weekdayOf(half, tz), formatHm(half, tz)), weekdayOf(parts, tz)));

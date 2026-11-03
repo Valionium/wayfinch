@@ -1,0 +1,286 @@
+// The requests to Open-Meteo (spec sections 5 and 6.6). Each request is the same for every moment of a day: nothing here
+// knows where the rider is, only the route's fixed points. An answer is checked whole before anything is handed on, so a
+// refused or partial one can't take the place of a good forecast. The answer's shape was checked against the service's
+// real answers, kept in tests/fixtures/openmeteo/.
+import { addDaysIso } from '../core/answers/time.ts';
+import { pointAtRouteKm } from '../core/geo/project.ts';
+import type { Baseline, GridHour, Km, ModelRun, Route, StoredForecast } from '../core/types.ts';
+
+export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
+
+/** One point to ask about: rounded coordinates, and the route's height there. */
+export type GridPoint = { km: Km; lat: number; lon: number; ele: number | null };
+
+const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
+const ELEVATION_URL = 'https://api.open-meteo.com/v1/elevation';
+const ARCHIVE_URL = 'https://archive-api.open-meteo.com/v1/archive';
+const META_URL = (path: string): string => `https://api.open-meteo.com/data/${path}/static/meta.json`;
+
+const HOURLY = ['temperature_2m', 'relative_humidity_2m', 'shortwave_radiation', 'precipitation_probability', 'precipitation', 'weather_code', 'wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'] as const;
+const STEPS_15_MIN = 192;
+const MAX_FORECAST_DAYS = 16;
+const DAY = 86_400_000;
+const FORECAST_TIMEOUT_MS = 30_000;
+const SMALL_TIMEOUT_MS = 12_000;
+const ELEVATION_BATCH = 100;
+const BASELINE_YEARS = 5;
+const MIN_BASELINE_DAYS = 20;
+const RAIN_DAY_MM = 1;
+
+/** The fixed list of five models, by the names of `weather-classes.ts`'s table, with Open-Meteo's path for each. */
+export const MODEL_PATHS: Record<string, string> = {
+  'ICON-D2': 'dwd_icon_d2',
+  'AROME France HD': 'meteofrance_arome_france_hd',
+  'KNMI HARMONIE-AROME': 'knmi_harmonie_arome_europe',
+  'MET Nordic': 'metno_nordic_pp',
+  'DMI HARMONIE-AROME': 'dmi_harmonie_arome_europe',
+};
+
+/** The service refused, failed, or sent something that isn't a whole answer. */
+export class WeatherServiceError extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = 'WeatherServiceError';
+  }
+}
+
+const requestInit = (timeoutMs: number): RequestInit => ({
+  // A copy from a cache, stamped with the time of this fetch, would be an old forecast shown as new.
+  cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(timeoutMs),
+});
+
+async function getJson(f: FetchLike, url: string, timeoutMs: number): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await f(url, requestInit(timeoutMs));
+  } catch {
+    throw new WeatherServiceError('no answer');
+  }
+  if (!response.ok) throw new WeatherServiceError(`HTTP ${response.status}`);
+  try {
+    return await response.json();
+  } catch {
+    throw new WeatherServiceError('not JSON');
+  }
+}
+
+const isRecord = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
+const round2 = (n: number): number => Math.round(n * 100) / 100;
+const list = (points: { lat: number; lon: number }[], key: 'lat' | 'lon', decimals: number): string => points.map((p) => p[key].toFixed(decimals)).join(',');
+const usable = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
+
+function heightAt(route: Route, km: Km): number | null {
+  const pts = route.points;
+  let i = 1;
+  while (i < pts.length - 1 && pts[i]!.km < km) i++;
+  const a = pts[i - 1];
+  const b = pts[i];
+  if (!a) return null;
+  if (!b) return a.ele;
+  if (a.ele === null || b.ele === null) return null;
+  const span = b.km - a.km;
+  return span > 0 ? a.ele + ((b.ele - a.ele) * (km - a.km)) / span : a.ele;
+}
+
+const roundedPoint = (route: Route, km: Km): GridPoint | null => {
+  const p = pointAtRouteKm(route, km);
+  return Number.isFinite(p.lat) && Number.isFinite(p.lon) ? { km, lat: round2(p.lat), lon: round2(p.lon), ele: heightAt(route, km) } : null;
+};
+
+/** The route's fixed sample grid as points to ask about. Nothing about the rider goes in, so nothing about the rider comes out. */
+export const gridPoints = (route: Route): GridPoint[] => route.sampleGrid.map((km) => roundedPoint(route, km)).filter((p) => p !== null);
+
+/** The stage ends and the route's high point, rounded (section 5 step 4). */
+export function baselinePoints(route: Route): GridPoint[] {
+  const kms = new Set<Km>(route.stages.map((s) => s.endKm));
+  const known = route.points.filter((p) => p.ele !== null);
+  if (known.length === route.points.length && known.length > 0) {
+    let high = known[0]!;
+    for (const p of known) if (p.ele! > high.ele!) high = p;
+    kms.add(high.km);
+  }
+  return [...kms].sort((a, b) => a - b).map((km) => roundedPoint(route, km)).filter((p) => p !== null);
+}
+
+const dayNumber = (iso: string): number => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / DAY : Number.NaN;
+};
+
+/**
+ * Forecast days: min(16, days to the end + 1). The end is the plan's, the departure date plus its stages, never a date
+ * worked out from how far the rider has come: every request of a day stays the same (spec's privacy table, criterion 9).
+ */
+export function forecastDaysFor(route: Route, departureDate: string | null, today: string): number {
+  if (departureDate === null) return MAX_FORECAST_DAYS;
+  const lastDay = route.stages.reduce((most, s) => Math.max(most, s.day), 1);
+  const left = dayNumber(addDaysIso(departureDate, lastDay - 1)) - dayNumber(today);
+  if (!Number.isFinite(left)) return MAX_FORECAST_DAYS;
+  return Math.max(1, Math.min(MAX_FORECAST_DAYS, left + 1));
+}
+
+const forecastUrl = (grid: GridPoint[], days: number, with15: boolean): string => {
+  // All or none: the service takes one height per point, and "nan" for one would turn its height correction off there.
+  const heights = grid.every((g) => g.ele !== null) ? `&elevation=${grid.map((g) => Math.round(g.ele!)).join(',')}` : '';
+  const rain = with15 ? `&minutely_15=precipitation&forecast_minutely_15=${STEPS_15_MIN}` : '';
+  return `${FORECAST_URL}?latitude=${list(grid, 'lat', 2)}&longitude=${list(grid, 'lon', 2)}${heights}&hourly=${HOURLY.join(',')}${rain}`
+    + `&wind_speed_unit=ms&timeformat=unixtime&timezone=auto&forecast_days=${days}`;
+};
+
+/** An empty value stays unknown: NaN fails every comparison, where null would pass `>= 0` and read as dry. */
+const orNaN = (x: unknown): number => (usable(x) ? x : Number.NaN);
+
+function hoursOf(location: unknown, index: number): GridHour[] {
+  if (!isRecord(location) || !isRecord(location['hourly'])) throw new WeatherServiceError('no hours');
+  if ('location_id' in location && location['location_id'] !== index) throw new WeatherServiceError('out of order');
+  const h = location['hourly'];
+  const time = h['time'];
+  if (!Array.isArray(time) || time.length === 0 || !time.every(usable)) throw new WeatherServiceError('no hour stamps');
+  const column = (name: (typeof HOURLY)[number]): unknown[] => {
+    const c = h[name];
+    if (!Array.isArray(c) || c.length !== time.length) throw new WeatherServiceError(`no ${name}`);
+    return c;
+  };
+  const [t, rh, ghi, pp, mm, code, wind, from, gust] = HOURLY.map(column) as [unknown[], unknown[], unknown[], unknown[], unknown[], unknown[], unknown[], unknown[], unknown[]];
+  if (!t.some(usable)) throw new WeatherServiceError('no temperatures');
+  return time.map((stamp: number, i) => ({
+    at: new Date(stamp * 1000), t: orNaN(t[i]), rh: orNaN(rh[i]), ghi: orNaN(ghi[i]), pp: usable(pp[i]) ? pp[i] : null, mm: orNaN(mm[i]), code: orNaN(code[i]),
+    windMs: orNaN(wind[i]), windFrom: orNaN(from[i]), gustMs: orNaN(gust[i]),
+  }));
+}
+
+function rain15Of(location: unknown): { at: Date; mm: number }[] {
+  const m = isRecord(location) ? location['minutely_15'] : null;
+  if (!isRecord(m) || !Array.isArray(m['time']) || !Array.isArray(m['precipitation'])) return [];
+  const mm = m['precipitation'] as unknown[];
+  const out: { at: Date; mm: number }[] = [];
+  (m['time'] as unknown[]).forEach((stamp, i) => { // a step with no value is no step: it must not read as dry
+    const value = mm[i];
+    if (usable(stamp) && usable(value)) out.push({ at: new Date(stamp * 1000), mm: value });
+  });
+  return out;
+}
+
+/** An answer that doesn't reach now, or starts after tomorrow, isn't this forecast, whatever the clock of the request says. */
+function checkReach(hours: GridHour[], now: Date): void {
+  const first = hours[0]!.at.getTime();
+  const last = hours[hours.length - 1]!.at.getTime();
+  if (last < now.getTime() || first > now.getTime() + DAY) throw new WeatherServiceError('not this forecast');
+}
+
+/**
+ * One request for the whole grid. Throws `WeatherServiceError` on anything but a whole answer for every point. `fetchedAt`
+ * is when the request set out, so it never reads newer than it is. `runs` are the model runs read just before.
+ */
+export async function fetchForecast(grid: GridPoint[], o: { days: number; with15: boolean; fetch: FetchLike; now?: () => Date; runs?: ModelRun[] }): Promise<StoredForecast> {
+  const fetchedAt = (o.now ?? (() => new Date()))();
+  const body = await getJson(o.fetch, forecastUrl(grid, o.days, o.with15), FORECAST_TIMEOUT_MS);
+  const locations = Array.isArray(body) ? body : [body]; // one location comes back as a bare object
+  if (locations.length !== grid.length) throw new WeatherServiceError('wrong number of points');
+  const stored = grid.map((g, i) => {
+    const hours = hoursOf(locations[i], i);
+    checkReach(hours, fetchedAt);
+    const rain15 = o.with15 ? rain15Of(locations[i]) : [];
+    return { km: g.km, lat: g.lat, lon: g.lon, hours, ...(rain15.length > 0 ? { rain15 } : {}) };
+  });
+  return { fetchedAt, runs: o.runs ?? [], grid: stored, has15: stored.some((g) => g.rain15 !== undefined) };
+}
+
+async function runOf(f: FetchLike, model: string, path: string): Promise<ModelRun | null> {
+  try {
+    const m = await getJson(f, META_URL(path), SMALL_TIMEOUT_MS);
+    if (!isRecord(m) || !usable(m['last_run_initialisation_time']) || !usable(m['last_run_availability_time'])) return null;
+    const interval = m['update_interval_seconds'];
+    return {
+      model, run: new Date(m['last_run_initialisation_time'] * 1000), availableAt: new Date(m['last_run_availability_time'] * 1000),
+      ...(usable(interval) && interval > 0 ? { intervalS: interval } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** The model-run check: always the same five, no coordinates. A model that doesn't answer is left out. */
+export async function fetchModelRuns(f: FetchLike): Promise<ModelRun[]> {
+  const runs = await Promise.all(Object.entries(MODEL_PATHS).map(([model, path]) => runOf(f, model, path)));
+  return runs.filter((r) => r !== null);
+}
+
+/** Heights, 3 decimals, at most 100 per request, one request at a time. A failed batch leaves nulls, never zeros. */
+export async function fetchElevation(points: { lat: number; lon: number }[], f: FetchLike): Promise<(number | null)[]> {
+  const out: (number | null)[] = new Array<number | null>(points.length).fill(null);
+  for (let start = 0; start < points.length; start += ELEVATION_BATCH) {
+    const batch = points.slice(start, start + ELEVATION_BATCH);
+    try {
+      const body = await getJson(f, `${ELEVATION_URL}?latitude=${list(batch, 'lat', 3)}&longitude=${list(batch, 'lon', 3)}`, SMALL_TIMEOUT_MS);
+      const heights = isRecord(body) ? body['elevation'] : null;
+      if (!Array.isArray(heights) || heights.length !== batch.length) continue;
+      heights.forEach((h: unknown, i) => { if (usable(h)) out[start + i] = h; });
+    } catch {
+      // This batch stays unknown.
+    }
+  }
+  return out;
+}
+
+const percentile = (values: number[], q: number): number => {
+  const s = [...values].sort((a, b) => a - b);
+  return s[Math.max(0, Math.min(s.length - 1, Math.floor(q * (s.length - 1))))]!;
+};
+const mean = (values: number[]): number => values.reduce((x, y) => x + y, 0) / values.length;
+const numbers = (x: unknown): number[] => (Array.isArray(x) ? x.filter(usable) : []);
+
+type Tally = { lows: number[]; highs: number[]; rain: number[]; years: Set<number> };
+
+/**
+ * Load Check's five-year archive method (`fetchNormals`): the five years before this one, measured figures only. One request
+ * per year and month for all points, one at a time. A year that fails is left out of the years named; a point with too few
+ * days has no baseline. `months` are 1 to 12, as the engines compare them. Throws when nothing at all came.
+ */
+export async function fetchBaseline(points: GridPoint[], months: number[], f: FetchLike, now: Date = new Date()): Promise<Baseline> {
+  const thisYear = now.getUTCFullYear();
+  const out: Baseline['points'] = [];
+  const sampled = new Set<number>();
+  for (const month of months) {
+    const tallies: Tally[] = points.map(() => ({ lows: [], highs: [], rain: [], years: new Set() }));
+    for (let back = 1; back <= BASELINE_YEARS; back++) {
+      const year = thisYear - back;
+      const mm = String(month).padStart(2, '0');
+      const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      const url = `${ARCHIVE_URL}?latitude=${list(points, 'lat', 2)}&longitude=${list(points, 'lon', 2)}&start_date=${year}-${mm}-01&end_date=${year}-${mm}-${lastDay}`
+        + '&daily=temperature_2m_min,temperature_2m_max,precipitation_sum&timezone=auto';
+      let body: unknown;
+      try {
+        body = await getJson(f, url, SMALL_TIMEOUT_MS);
+      } catch {
+        continue;
+      }
+      const locations = Array.isArray(body) ? body : [body];
+      if (locations.length !== points.length) continue;
+      locations.forEach((location: unknown, i) => {
+        const daily = isRecord(location) ? location['daily'] : null;
+        if (!isRecord(daily)) return;
+        const [lows, highs, rain] = [numbers(daily['temperature_2m_min']), numbers(daily['temperature_2m_max']), numbers(daily['precipitation_sum'])];
+        if (lows.length === 0 || highs.length === 0 || rain.length === 0) return;
+        const t = tallies[i]!;
+        t.lows.push(...lows);
+        t.highs.push(...highs);
+        t.rain.push(...rain);
+        t.years.add(year);
+      });
+    }
+    points.forEach((p, i) => {
+      const t = tallies[i]!;
+      if (t.lows.length < MIN_BASELINE_DAYS || t.years.size === 0) return;
+      for (const y of t.years) sampled.add(y);
+      out.push({
+        km: p.km, eleM: p.ele, month,
+        p10LowC: Math.round(percentile(t.lows, 0.1)), meanLowC: Math.round(mean(t.lows)),
+        p90HighC: Math.round(percentile(t.highs, 0.9)), meanHighC: Math.round(mean(t.highs)),
+        rainDays: Math.round(t.rain.filter((v) => v >= RAIN_DAY_MM).length / t.years.size),
+      });
+    });
+  }
+  if (out.length === 0) throw new WeatherServiceError('no baseline');
+  return { years: `${Math.min(...sampled)}–${Math.max(...sampled)}`, points: out };
+}

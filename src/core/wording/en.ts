@@ -198,6 +198,13 @@ export const W = {
   weatherAttribution: 'Weather data by Open-Meteo.com',
   weatherDetailRange: (half: string, parts: string): string => `30-minute detail to ${half}, day parts to ${parts}`,
   weatherStale: 'This forecast is stale: over 12 hours old.',
+  // Update weather and the refresh (sub-project 5, group 4). `fetched` is null with no forecast stored.
+  weatherNoSignal: (fetched: string | null): string => `No signal. ${fetched ? `Forecast fetched ${fetched}.` : 'No forecast saved.'}`,
+  weatherNoAnswer: (fetched: string | null): string => `The weather service didn't answer. ${fetched ? `Forecast fetched ${fetched}.` : 'No forecast saved.'}`,
+  weatherNewest: (run: string | null, next: string | null): string => `You have the newest forecast${run ? ` (model run ${run})` : ''}.${next ? ` Next run expected about ${next}.` : ''}`,
+  weatherSpaced: (fetched: string | null, again: string): string => (fetched ? `Forecast fetched ${fetched}. It can update again at ${again}.` : `No forecast saved. It can try again at ${again}.`),
+  weatherNotKept: (fetched: string | null): string => `This phone didn't keep the new forecast. Check the phone's free storage. ${fetched ? `Forecast fetched ${fetched}.` : 'No forecast saved.'}`,
+  weatherKeepFresh: 'Keep trip data fresh when online',
   weatherSeasonalBasis: (years: string): string => `seasonal estimate (${years})`,
   weatherNothingSaved: 'No forecast and no seasonal data saved.',
   weatherUnknown: 'Weather unknown: no forecast and no seasonal data saved.',

@@ -56,7 +56,8 @@ export type Answer = {
 /** A rescue point as the engines use it: the pack's record plus one route kilometre per pass within 300 m. */
 export type RescuePoint = PackRescuePoint & { kms: Km[] };
 
-export type ModelRun = { model: string; run: Date; availableAt: Date };
+/** `intervalS` is the model's usual time between runs, from the same metadata, for "Next run expected". */
+export type ModelRun = { model: string; run: Date; availableAt: Date; intervalS?: number };
 export type RainWindow = {
   kind: 'rain' | 'showers' | 'thunder'; cls: 'likely' | 'possible'; fromKm: Km; toKm: Km; // first and last met point, unrounded
   reachAt: Date; // rider's arrival at the first met point
