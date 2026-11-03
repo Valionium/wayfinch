@@ -49,6 +49,20 @@ describe('stamps agree with their items', () => {
     expect(whereOf(a, 135)).toBe(W.waterNearYou);
     expect(s.stamps.pharmacy).toBe(W.waterNearYou);
   });
+  test('[AH-CARD-ORDER] with an approximate fix, a rain window that starts at the rider keeps its time: "here · 14:20"', () => {
+    const s = screen(rainyStop({ positions: [pos({ km: 141, at: `${SAT} 14:20`, acc: 3000 })] }));
+    expect(s.cards.weather.stamp?.km).toBe(138); // the near edge, where answers ahead measure from
+    expect(s.stamps.weather).toBe('here · 14:20');
+  });
+  test('[AH-CARD-ORDER] a timed stamp inside the radius keeps its time beside "near you, may be behind"; an untimed one stays as its item', () => {
+    const s = screen(rainyStop({ positions: [pos({ km: 136, at: `${SAT} 14:20`, acc: 3000 })] }));
+    for (const [name, text] of Object.entries(s.stamps)) {
+      if (text === null || !text.startsWith(W.waterNearYou)) continue;
+      const a = name === 'emergency' ? s.chips.emergency : (s.cards as Record<string, { stamp: { at?: Date } | null }>)[name] ?? (s.chips as Record<string, { stamp: { at?: Date } | null }>)[name];
+      if (a!.stamp?.at) expect(text, name).toMatch(/^near you, may be behind · \d\d:\d\d$/);
+      else expect(text, name).toBe(W.waterNearYou);
+    }
+  });
   test("[AH-CARD-ORDER] a stamp at the rider's own kilometre reads \"here\", never \"+0 km\"", () => {
     const s = screen(rainyStop({ positions: [pos({ km: 141, at: `${SAT} 14:20`, acc: 3000 })] }));
     for (const text of Object.values(s.stamps)) expect(text ?? '').not.toMatch(/^\+0 km/);
