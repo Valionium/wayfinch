@@ -640,6 +640,7 @@ export const W = {
   tyreFrontBackBar: (value: string): string => `${value} bar`,
   tyrePsiValue: (value: string): string => `${value} psi`,
   tyreWindow: (lo: string, hi: string): string => `Aim for ${lo} to ${hi} bar. The lower end is the careful end.`,
+  tyreWindowOne: (value: string): string => `Aim for ${value} bar. Lower is the careful side.`,
   tyreSplit: (front: string, rear: string): string => `Weight split: ${front}% front, ${rear}% rear.`,
   tyreSplitSensitivity: 'Five points of split move the front pressure by about 10%.',
   tyreEstimateNote: 'An estimate, not a measurement. Other calculators differ from this one by 10 to 30%.',
@@ -769,6 +770,29 @@ export const W = {
   tyreSramGravel: 'Gravel',
   tyreSramWetWord: 'Wet',
   tyreSramDryWord: 'Dry',
+
+  // ---- The store (sub-project 5): why a value or a write was refused ----
+  appStoreFlatKphRange: 'Flat speed goes from 15 to 40 km/h.',
+  appStoreStartTimeRange: 'Daily start time goes from 04:00 to 14:00.',
+  appStoreNightsRange: 'Nights go from 0 to 30.',
+  appStoreCampWaterRange: 'Camp water per night goes from 0 to 5 L.',
+  appStoreWaterRange: 'Water goes from 0 to 20 L.',
+  appStorePaceChoice: 'Pace is steady, sporting or hard.',
+  appStoreStayChoice: 'Stay type is camping, mixed or accommodation.',
+  appStoreThemeChoice: 'Theme is automatic, light or dark.',
+  appStoreUnitsChoice: 'Units are km and °C, or mi and °F.',
+  appStoreOnOrOff: 'This setting is on or off.',
+  appStoreDepartureDate: 'That is not a date.',
+  appStoreRouteNotReadable: 'This route could not be read.',
+  appStoreNotKept: "This browser did not keep that. Check the phone's free storage.",
+  appStoreChangedElsewhere: 'This was changed in another window. Showing the newer data.',
+  appStoreImportNotOurs: 'This is not a Wayfinch export file. Nothing was changed.',
+  appStoreImportNewer: 'This file comes from a newer version of Wayfinch. Update the app, then try again. Nothing was changed.',
+  appStoreImportTrip: "The trip in this file can't be read. Nothing was changed.",
+  appStoreImportProfile: "The rider details in this file can't be read. Nothing was changed.",
+  appStoreImportSettings: "The settings in this file can't be read. Nothing was changed.",
+  appStoreImportCalibration: "The water learning in this file can't be read. Nothing was changed.",
+  appStoreImportTyres: "The tyre details in this file can't be read. Nothing was changed.",
 };
 
 /** "28 Oct" from an ISO date. Anything else is no date. */

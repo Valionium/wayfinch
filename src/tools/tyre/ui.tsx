@@ -206,13 +206,16 @@ function MeasuredFields({ value, onCommit }: { value: Details['measured']; onCom
 const fmtPct = (share: number): [string, string] => [String(Math.round(share * 100)), String(100 - Math.round(share * 100))];
 
 function WheelFigure({ label, w }: { label: string; w: Wheel }) {
+  const hiN = w.heat?.advise ? Math.min(w.windowBar[1], w.heat.pumpToBar) : w.windowBar[1];
+  const lo = bar2(Math.min(w.windowBar[0], hiN));
+  const hi = bar2(hiN);
   return (
     <div class="tyre-wheel">
       <h3>{label}</h3>
       <p class="tyre-big">{W.tyreFrontBackBar(bar2(w.bar))}</p>
       <p class="tyre-psi">{W.tyrePsiValue(String(w.psi))}</p>
       {w.heat?.advise ? <p class="tyre-heat"><strong>{W.tyreHeatPumpLine(bar2(w.heat.pumpToBar), String(w.heat.pumpToPsi))}</strong></p> : null}
-      <p class="muted">{W.tyreWindow(bar2(Math.min(w.windowBar[0], w.heat?.advise ? w.heat.pumpToBar : w.windowBar[0])), bar2(w.heat?.advise ? Math.min(w.windowBar[1], w.heat.pumpToBar) : w.windowBar[1]))}</p>
+      <p class="muted">{lo === hi ? W.tyreWindowOne(hi) : W.tyreWindow(lo, hi)}</p>
     </div>
   );
 }

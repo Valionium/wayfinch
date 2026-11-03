@@ -1,12 +1,20 @@
 // Shared steps for the app's browser tests (plan Task 2). Nothing here prints a page.
-// `preparedTrip` and `atPosition` need the store and the test-only hook (`window.__wf`, Task 17), which come later: they say so
-// instead of pretending, and the task that builds them replaces the bodies.
+// `preparedTrip` holds the trip and route the store can hold today; Tasks 9 and 17 add its places, hours and weather.
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { build } from 'esbuild';
 import { test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { buildDist } from '../../tools/build.mjs';
+import { buildRoute } from '../../src/core/route/profile.ts';
+import { sampleGrid } from '../../src/core/route/grid.ts';
+import { planStages } from '../../src/core/route/stages.ts';
+import type { Trip } from '../../src/core/types.ts';
+import { loadFixtureRoute } from '../fixtures/packs/index.ts';
+import type { FixtureRouteId } from '../fixtures/packs/index.ts';
+import type { StoreInPage } from './fixtures/store-page.ts';
 import { startCfLike } from './server/cf-like.mjs';
 import type { CfLike } from './server/cf-like.mjs';
 
@@ -62,10 +70,46 @@ export async function fixedClock(page: Page, iso: string): Promise<void> {
   await page.clock.install({ time: new Date(iso) });
 }
 
-export async function preparedTrip(page: Page, id: string): Promise<void> {
-  throw new Error(`preparedTrip(${page.url()}, ${id}) needs the store (Task 3) and the test hook (Task 17).`);
+declare const __store: StoreInPage;
+
+let storeBundle: Promise<string> | null = null;
+
+/** Puts the real store into this page, on the real site's origin. Only tests have this: no build contains it. */
+export async function withStore(page: Page): Promise<void> {
+  storeBundle ??= build({
+    entryPoints: [fileURLToPath(new URL('./fixtures/store-page.ts', import.meta.url))],
+    bundle: true, write: false, format: 'iife', target: 'es2022', platform: 'browser',
+  }).then((out) => out.outputFiles[0]!.text);
+  await page.evaluate(await storeBundle);
 }
 
+/** A trip on a fixture route, saved through the store. */
+export async function preparedTrip(page: Page, id: string, opts: { departureDate?: string | null } = {}): Promise<Trip> {
+  await withStore(page);
+  const fixture = await loadFixtureRoute(id as FixtureRouteId);
+  const built = await buildRoute(fixture.points, fixture.name, 'gpx');
+  const stages = [...planStages(built, { flatKph: 25, pace: 'sporting', nights: 0 })];
+  const withStages = { ...built, stages };
+  const trip: Trip = {
+    route: { ...withStages, sampleGrid: sampleGrid(withStages, withStages.climbs, stages) },
+    departureDate: opts.departureDate ?? null, startTime: '08:30', flatKph: 25, stay: 'camping', campWaterL: 2, pace: 'sporting',
+  };
+  await page.evaluate(async (t) => {
+    await __store.readTrip();
+    await __store.saveTrip(t);
+  }, trip);
+  return trip;
+}
+
+/** An accepted position at a route kilometre, through the store. */
 export async function atPosition(page: Page, km: number, opts: { accuracyM?: number; ageMin?: number } = {}): Promise<void> {
-  throw new Error(`atPosition(${page.url()}, ${km}, ${JSON.stringify(opts)}) needs the store (Task 3) and the test hook (Task 17).`);
+  await page.evaluate(async ({ km: at, accuracyM, ageMin }) => {
+    const trip = (await __store.readTrip())!;
+    const point = trip.route.points.reduce((best, p) => (Math.abs(p.km - at) < Math.abs(best.km - at) ? p : best));
+    const now = new Date();
+    await __store.addPosition({
+      lat: point.lat, lon: point.lon, accuracyM, at: new Date(now.getTime() - ageMin * 60_000), km: at, offRouteM: 0,
+      source: 'gps', approximate: accuracyM > 500,
+    }, now, trip.route.id);
+  }, { km, accuracyM: opts.accuracyM ?? 10, ageMin: opts.ageMin ?? 0 });
 }
