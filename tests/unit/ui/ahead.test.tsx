@@ -92,7 +92,7 @@ describe('cards', () => {
     await click(weather.querySelector('.ah-toggle'));
     expect(weather.querySelector('.ah-toggle')!.getAttribute('aria-expanded')).toBe('true');
     expect(host.querySelector('[data-card="food"] .ah-items')).toBeNull();
-    const lines = [...weather.querySelectorAll('.ah-items > li')].map((li) => li.textContent);
+    const lines = [...weather.querySelectorAll('.ah-items li')].map((li) => li.textContent);
     expect(lines.map((l) => l!.slice(0, 20))).toEqual(v.screen.cards.weather.items.map((x) => x.label.slice(0, 20)));
     expect(v.screen.cards.weather.items[0]!.label).toMatch(/^Waiting until about 15:00/); // wait or go first (section 3.2)
     const update = buttonNamed('Update weather', weather);
@@ -209,7 +209,9 @@ describe('call ahead', () => {
     const site = links[2]!;
     expect(site.getAttribute('rel')).toBe('noopener noreferrer');
     expect(site.getAttribute('target')).toBe('_blank');
-    expect(links[0]!.getAttribute('aria-label')).toBe('Call Camping Rheinaue, +49 7221 123456');
+    // Each button names its place: its own words, described by the item's label.
+    expect(links[0]!.textContent).toBe('Call +49 7221 123456');
+    expect(document.getElementById(links[0]!.getAttribute('aria-describedby')!)!.textContent).toMatch(/^Camping Rheinaue/);
     await click(buttonNamed('Bike shop', host.querySelector('.ah-chips')!));
     const panel = host.querySelector('#chip-bike')!;
     expect(panel.querySelector<HTMLAnchorElement>('a.ah-link')!.getAttribute('href')).toBe('tel:+49785112345');

@@ -1,37 +1,42 @@
 // The parts every answer on Ahead shows the same way: an item with its status word where it isn't fine, and its detail with the
 // Call and Website buttons in the very place their words stand; and the basis lines. Text is the screen's, unchanged.
 import type { ComponentChildren } from 'preact';
+import { useId } from 'preact/hooks';
 import type { AnswerItem, ItemLink } from '../../core/types.ts';
 import { StatusBadge } from '../status.tsx';
 
 const SEPARATOR = ' · ';
 
-function LinkButton({ link }: { link: ItemLink }) {
-  // A tel: link hands the number to the dialler; a website opens in the browser with no referrer. Nothing is sent before the tap.
+/**
+ * A tel: link hands the number to the dialler; a website opens in the browser with no referrer. Nothing is sent before the tap.
+ * The button's name is its own words ("Call +49 7221 123456"), and it is described by the item's label, which names the place.
+ */
+function LinkButton({ link, describedBy }: { link: ItemLink; describedBy?: string | undefined }) {
   return link.kind === 'tel'
-    ? <a class={`btn ah-link${link.secondary ? ' ah-link-secondary' : ''}`} href={link.href} aria-label={link.label}>{link.shown}</a>
-    : <a class="btn ah-link" href={link.href} target="_blank" rel="noopener noreferrer" aria-label={link.label}>{link.shown}</a>;
+    ? <a class={`btn ah-link${link.secondary ? ' ah-link-secondary' : ''}`} href={link.href} aria-describedby={describedBy}>{link.shown}</a>
+    : <a class="btn ah-link" href={link.href} target="_blank" rel="noopener noreferrer" aria-describedby={describedBy}>{link.shown}</a>;
 }
 
 /** The detail as the engine wrote it; a part that is a button's own words becomes that button. */
-export function Detail({ text, links }: { text: string; links?: ItemLink[] | undefined }) {
+export function Detail({ text, links, describedBy }: { text: string; links?: ItemLink[] | undefined; describedBy?: string | undefined }) {
   if (!links || links.length === 0) return <span class="ah-detail">{text}</span>;
   const parts = text.split(SEPARATOR);
   const out: ComponentChildren[] = [];
   parts.forEach((part, i) => {
     if (i > 0) out.push(SEPARATOR);
     const link = links.find((l) => l.shown === part);
-    out.push(link ? <LinkButton key={i} link={link} /> : part);
+    out.push(link ? <LinkButton key={i} link={link} describedBy={describedBy} /> : part);
   });
   return <span class="ah-detail">{out}</span>;
 }
 
 export function Item({ item, children }: { item: AnswerItem; children?: ComponentChildren }) {
+  const id = useId();
   return (
     <>
-      <span class="ah-item-label">{item.label}</span>
+      <span class="ah-item-label" id={id}>{item.label}</span>
       {item.status !== 'fine' ? <> <StatusBadge status={item.status} /></> : null}
-      {item.detail ? <> <Detail text={item.detail} links={item.links} /></> : null}
+      {item.detail ? <> <Detail text={item.detail} links={item.links} describedBy={id} /></> : null}
       {children}
     </>
   );

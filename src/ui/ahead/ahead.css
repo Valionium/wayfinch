@@ -52,7 +52,7 @@
 .ah-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .ah-stamp { font-family: var(--font-mono); font-size: 0.9375rem; }
 .ah-card-detail, .ah-detail { overflow-wrap: anywhere; }
-.ah-items { list-style: none; margin: 8px 0; padding: 0; }
+.ah-items ul { list-style: none; margin: 8px 0; padding: 0; }
 .ah-items li, .ah-chip-panel li { padding: 6px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
 .ah-item-label { font-weight: 600; }
 .ah-link { margin: 4px 0; color: var(--blaze); font-weight: 600; }

@@ -4,6 +4,7 @@
 import type { CardName, Screen } from '../../core/screen/screen.ts';
 import type { Answer } from '../../core/types.ts';
 import { W } from '../../core/wording/en.ts';
+import { ListMore } from '../card.tsx';
 import { StatusBadge } from '../status.tsx';
 import type { AheadActions, AheadTrip } from './actions.ts';
 import { Basis, Detail, Item } from './answer-parts.tsx';
@@ -19,6 +20,11 @@ type CardProps = {
   name: CardName; answer: Answer; stamp: string | null; open: boolean; onToggle: () => void;
   v: AheadTrip; actions: AheadActions; onShelter: () => void;
 };
+
+const FOLD_AFTER = 5;
+
+const hasControl = (name: CardName, label: string): boolean =>
+  (name === 'daylight' && (label === W.daylightPlanTomorrow || label === W.daylightBackToToday)) || (name === 'weather' && label === W.weatherRainingAnyway);
 
 function ItemControl({ name, label, v, actions, onShelter }: { name: CardName; label: string; v: AheadTrip; actions: AheadActions; onShelter: () => void }) {
   if (name === 'daylight' && label === W.daylightPlanTomorrow) {
@@ -52,14 +58,16 @@ function TopicCard({ name, answer, stamp, open, onToggle, v, actions, onShelter 
         {open ? (
           <>
             {answer.items.length > 0 ? (
-              <ul class="ah-items">
-                {answer.items.map((item, i) => {
-                  const control = <ItemControl name={name} label={item.label} v={v} actions={actions} onShelter={onShelter} />;
-                  const hasControl = (name === 'daylight' && (item.label === W.daylightPlanTomorrow || item.label === W.daylightBackToToday))
-                    || (name === 'weather' && item.label === W.weatherRainingAnyway);
-                  return <li key={i}>{hasControl ? control : <Item item={item} />}</li>;
-                })}
-              </ul>
+              // Long lists fold after five, and nothing is removed (Decision 6). Weather and Daylight keep their order whole: their
+              // last items are controls.
+              <div class="ah-items">
+                <ListMore
+                  items={answer.items} limit={name === 'weather' || name === 'daylight' ? answer.items.length : FOLD_AFTER}
+                  render={(item) => hasControl(name, item.label)
+                    ? <ItemControl name={name} label={item.label} v={v} actions={actions} onShelter={onShelter} />
+                    : <Item item={item} />}
+                />
+              </div>
             ) : null}
             {name === 'water' ? <WaterQuestion stillAboutL={v.stillAboutL} actions={actions} /> : null}
             {name === 'weather' ? (
