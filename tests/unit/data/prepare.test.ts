@@ -38,6 +38,9 @@ vi.mock('opening_hours', async (original) => {
   return { ...real, default: Counted };
 });
 
+// Whole preparations of an 800 km fixture: under a full parallel run they take longer than the default 5 s.
+vi.setConfig({ testTimeout: 30_000 });
+
 beforeEach(() => {
   freshStore();
   openingHours.tags.length = 0;
