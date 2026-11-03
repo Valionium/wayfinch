@@ -3,7 +3,7 @@ export interface BuildJson { v: number; configHash: string; files: Record<string
 export interface FetchAnswer { status: number; ok: boolean; redirected: boolean; arrayBuffer(): Promise<ArrayBuffer> }
 export type FetchLike = (url: string, init?: RequestInit) => Promise<FetchAnswer>;
 export interface Timing { sleep: (ms: number) => Promise<void>; now?: () => number; deadlineMs?: number; intervalMs?: number }
-export interface CheckResult { ok: boolean; problems: string[]; note?: string }
+export interface CheckResult { ok: boolean; problems: string[]; note?: string; reportError?: string }
 export interface DeploymentRow {
   id?: string;
   source?: string;

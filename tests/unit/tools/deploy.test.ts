@@ -424,7 +424,9 @@ describe('summaries and small helpers', () => {
     const text = rollbackSummary('version-abc');
     expect(text).toContain('`main`');
     expect(text).toContain('the next approved deploy brings it back unless a revert merges first');
-    expect(text).toContain('version-abc');
+    expect(text).toContain('**Rolled back to:** version-abc');
+    expect(text).not.toContain('now live');
+    expect(text).toContain('If a deploy was waiting in the queue, cancel it.');
   });
 
   test('[SW-SWITCH] the summary tells the truth: riders keep plans, and no offline copy until they tap, even after a later good deploy', () => {
@@ -442,10 +444,13 @@ describe('summaries and small helpers', () => {
     expect(live).toContain('abc123');
     expect(live).toContain('the commit that was live');
     expect(live).not.toContain('released');
-    expect(switchSummary({ kind: 'main-same', commit: 'abc123' })).toContain('the same files');
+    const same = switchSummary({ kind: 'main-same', commit: 'abc123' });
+    expect(same).toContain('the same files');
+    expect(same).not.toContain('could be read');
     const released = switchSummary({ kind: 'main-released', commit: 'abc123' });
     expect(released).toContain('abc123');
     expect(released).toContain('also released');
+    expect(released).not.toContain('could be read');
   });
 
   test('[DEP-STALE] an approval from an earlier try of the run counts as stale, and says what to do', () => {
@@ -477,6 +482,7 @@ describe('summaries and small helpers', () => {
     expect(stop.summary).toContain('/assets/a.js');
     expect(stop.summary).not.toContain('/offline-worker.js');
     expect(stop.summary).toContain('also_release_main');
+    expect(stop.summary).not.toContain('No commit could be read');
     expect(switchGuard(main, live, { alsoRelease: true })).toMatchObject({ go: true, kind: 'main-released' });
   });
 
@@ -484,18 +490,28 @@ describe('summaries and small helpers', () => {
     const live = buildOf({ '/': 'page', '/offline-worker.js': 'old worker' });
     const main = buildOf({ '/': 'page', '/offline-worker.js': 'emergency' });
     expect(switchGuard(main, live, { alsoRelease: false })).toMatchObject({ go: true, kind: 'main-same' });
-    expect(switchGuard(main, null, { alsoRelease: false }).go).toBe(false);
+    const noList = switchGuard(main, null, { alsoRelease: false });
+    expect(noList.go).toBe(false);
+    expect(noList.summary).toContain('could not be read');
+    expect(noList.summary).toContain('or the site is down');
     expect(switchGuard(main, null, { alsoRelease: true })).toMatchObject({ go: true, kind: 'main-released' });
     expect(switchGuard(buildOf({ '/': 'page', '/offline-worker.js': 'emergency' }, 'other'), live, { alsoRelease: false }).go).toBe(false);
   });
 
   test('emergencyFailureSummary says what did and didn\'t happen', () => {
-    expect(emergencyFailureSummary('rollback', false)).toContain('The rollback did NOT happen. Riders still have what they had.');
-    expect(emergencyFailureSummary('rollback', false)).toContain('use switch');
-    expect(emergencyFailureSummary('switch', false)).toContain('The switch did NOT happen.');
+    const rollback = emergencyFailureSummary('rollback', false);
+    expect(rollback).toContain('GitHub saw the rollback fail');
+    expect(rollback).toContain('look at the site');
+    expect(rollback).toContain('use switch');
+    const theSwitch = emergencyFailureSummary('switch', false);
+    expect(theSwitch).toContain('GitHub saw the switch fail');
+    expect(theSwitch).toContain('If it failed building the live commit, run it again with also_release_main ticked: that also sends what `main` holds.');
+    expect(theSwitch).toContain('If the list above names files');
     expect(emergencyFailureSummary('rollback', true)).toContain('was sent to Cloudflare');
-    expect(emergencyFailureSummary('rollback', true)).not.toContain('did NOT');
-    expect(emergencyFailureSummary('check', false)).toContain('Nothing was changed');
+    expect(emergencyFailureSummary('rollback', true)).not.toContain('saw the rollback fail');
+    const check = emergencyFailureSummary('check', false);
+    expect(check).toContain('nothing was changed');
+    expect(check).toContain('refused');
   });
 
   test('formatRows lists date, version and message, newest first, so a refusal shows where a version id comes from', () => {
@@ -586,6 +602,17 @@ describe('afterDeployCheck: what the deploy job actually runs', () => {
     expect(clock.now()).toBe(300_000);
     expect(bodyOf(stub.calls)).toContain('found wrong files');
     expect(bodyOf(stub.calls)).toContain('v2');
+  });
+
+  test('[DEP-ISSUE-ONE] a gh that fails hides nothing: the result comes back, with the reason beside it', async () => {
+    const gh = async () => { throw new Error('spawn gh ENOENT'); };
+    const failed = await afterDeployCheck({ build: buildOf(FILES), origin: ORIGIN, report: true, gh, ...liveSite({ '/': 'old' }), ...fakeClock(), deadlineMs: 0 });
+    expect(failed.ok).toBe(false);
+    expect(failed.problems.join()).toContain('/ has different bytes');
+    expect(failed.reportError).toContain('ENOENT');
+    const passed = await afterDeployCheck({ build: buildOf(FILES), origin: ORIGIN, report: true, gh, ...liveSite(FILES), ...fakeClock() });
+    expect(passed.ok).toBe(true);
+    expect(passed.reportError).toContain('ENOENT');
   });
 
   test('[DEP-ISSUE-CLOSE] without report it touches no issue; with an unreadable build it still fails and reports', async () => {
@@ -725,6 +752,27 @@ describe('the command, against a real local server', { timeout: 30_000 }, () => 
     await expect(cli(['--decide', '--build', writeJson('b3.json', buildOf(FILES)), '--config', writeJson('c3.json', { deployEnabled: true }), '--origin', origin], { GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary, PATH: '' })).rejects.toMatchObject({ code: 1 });
     expect(readFileSync(output, 'utf8')).not.toContain('changed=true');
     expect(readFileSync(summary, 'utf8')).toContain('could not be read');
+  });
+
+  test('[DEP-ISSUE-ONE] with no gh, the command still names the wrong file, says the issue failed, and exits 1', async () => {
+    const build = buildOf(FILES);
+    const origin = await serve({ '/': 'other', '/offline-worker.js': FILES['/offline-worker.js'], '/build.json': JSON.stringify(build) });
+    const summary = join(dir, 'summary-nogh.txt');
+    writeFileSync(summary, '');
+    await expect(cli(['--build', writeJson('build-nogh.json', build), '--origin', origin, '--deadline-ms', '0', '--report'], { PATH: '', GITHUB_STEP_SUMMARY: summary })).rejects.toMatchObject({ code: 1, stdout: expect.stringContaining('/ has different bytes') });
+    const text = readFileSync(summary, 'utf8');
+    expect(text).toContain('The after-deploy check failed');
+    expect(text).toContain('/ has different bytes');
+    expect(text).toContain('The issue could not be updated');
+  });
+
+  test('[DEP-ISSUE-CLOSE] with no gh, a passing check still says the site is fine, and exits 1 for the issue alone', async () => {
+    const build = buildOf(FILES);
+    const origin = await serve({ ...FILES, '/build.json': JSON.stringify(build) });
+    const summary = join(dir, 'summary-nogh-ok.txt');
+    writeFileSync(summary, '');
+    await expect(cli(['--build', writeJson('build-nogh-ok.json', build), '--origin', origin, '--deadline-ms', '0', '--report'], { PATH: '', GITHUB_STEP_SUMMARY: summary })).rejects.toMatchObject({ code: 1, stdout: expect.stringContaining('The live site matches.') });
+    expect(readFileSync(summary, 'utf8')).toContain('The issue could not be updated');
   });
 
   test('[DEP-SELF-LIST] a failing --self exits 1 and names the path, so a bad emergency goes red', async () => {

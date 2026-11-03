@@ -10,16 +10,17 @@ export const REHEARSAL_WORKER = 'load-check-rehearsal';
 
 export function rollbackSummary(version) {
   return [
-    `**Version now live:** ${version || 'not known'}.`,
+    `**Rolled back to:** ${version || 'not known'}.`,
     '**What stays on `main`:** the commit you rolled back is still on `main`, so the next approved deploy brings it back unless a revert merges first.',
+    'If a deploy was waiting in the queue, cancel it.',
     'Saved plans, setups and bikes were not touched: they are in the browser\'s own storage.',
   ].join('\n\n');
 }
 
 const BUILT_FROM = {
   live: (commit) => `It was built from commit ${commit}, the commit that was live, so riders get no other change.`,
-  'main-same': (commit) => `It was built from \`main\` at ${commit}, because no live commit could be read. \`main\` serves the same files as the live site, so riders get no other change.`,
-  'main-released': (commit) => `It was built from \`main\` at ${commit}, because no live commit could be read, and you chose to go on: what \`main\` holds was also released to riders. The list is above.`,
+  'main-same': (commit) => `It was built from \`main\` at ${commit}, not from a live commit. \`main\` serves the same files as the live site, so riders get no other change.`,
+  'main-released': (commit) => `It was built from \`main\` at ${commit}, not from a live commit, and you chose to go on: what \`main\` holds was also released to riders. The list is above.`,
 };
 
 export function switchSummary({ kind, commit }) {
@@ -33,10 +34,10 @@ export function switchSummary({ kind, commit }) {
 
 /** What the owner reads when an emergency run fails. `acted`: the write itself went through. */
 export function emergencyFailureSummary(action, acted) {
-  if (action === 'check') return 'The check failed. Nothing was changed. Tell the agent what it says above: the emergency buttons may not work until this is fixed.';
+  if (action === 'check') return 'The check failed, and nothing was changed. If the lines above say a rollback would be refused, that is the answer, and the buttons work. Otherwise tell the agent what it says above.';
   if (acted) return `The ${action} was sent to Cloudflare, but the live site could not be confirmed (see above). Look at the site on a phone before pressing again, and tell the agent.`;
-  if (action === 'rollback') return 'The rollback did NOT happen. Riders still have what they had. Try again, or tell the agent. If offline is broken, use switch.';
-  return 'The switch did NOT happen. Riders still have what they had. Try again, or tell the agent.';
+  if (action === 'rollback') return 'GitHub saw the rollback fail. Riders most likely still have what they had: look at the site. Try again, or tell the agent. If offline is broken, use switch.';
+  return 'GitHub saw the switch fail. Riders most likely still have what they had: look at the site. If the list above names files, read it before going on. If it failed building the live commit, run it again with also_release_main ticked: that also sends what `main` holds. Otherwise try again, or tell the agent.';
 }
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -233,11 +234,11 @@ export function commitOfVersion(details) {
  */
 export function switchGuard(local, live, { alsoRelease }) {
   const paths = compareBuild(local, live).changed.filter((path) => path !== '/offline-worker.js');
-  if (live && paths.length === 0) return { go: true, kind: 'main-same', summary: 'No commit could be read from the live version, but `main` serves the same files as the live site.' };
+  if (live && paths.length === 0) return { go: true, kind: 'main-same', summary: 'The switch is building from `main`, not from a live commit, and `main` serves the same files as the live site.' };
   const lines = paths.map((path) => `- ${path}${WHAT_THEY_ARE[path] ? ` (${WHAT_THEY_ARE[path]})` : ''}`);
   const intro = live
-    ? 'No commit could be read from the live version, and `main` differs from the live site in these files:'
-    : 'No commit could be read from the live version, and the live site has no `build.json` to compare with. These files might change for riders:';
+    ? 'The switch is building from `main`, not from a live commit, and `main` differs from the live site in these files:'
+    : 'The switch is building from `main`, not from a live commit, and the live `build.json` could not be read (it has none, or the site is down). These files might change for riders:';
   const list = [intro, '', ...lines, ''];
   if (alsoRelease) return { go: true, kind: 'main-released', summary: [...list, 'You set also_release_main, so these go out with the switch.'].join('\n') };
   return { go: false, summary: [...list, 'The switch stopped, so nothing changed. To send these to riders along with the switch, run it again with also_release_main ticked.'].join('\n') };
@@ -256,7 +257,13 @@ export async function afterDeployCheck({ build, origin, uploadOutcome = 'success
   const result = build
     ? await checkLive(build, origin, { fetch: fetchFn, ...timing, ...(notArrived ? { deadlineMs: 0 } : {}) })
     : { ok: false, problems: ['the build list could not be read'] };
-  if (report) await reportIssue(result, { gh, liveVersion: live, lastDeployActive: notArrived, runUrl });
+  if (!report) return result;
+  // A failing gh must not hide the result: the command prints it first, then this.
+  try {
+    await reportIssue(result, { gh, liveVersion: live, lastDeployActive: notArrived, runUrl });
+  } catch (error) {
+    return { ...result, reportError: error.message };
+  }
   return result;
 }
 

@@ -16,7 +16,7 @@ on:
         type: string
         default: ''
       also_release_main:
-        description: Switch only. Tick only if the switch stopped and listed what main would also send to riders, and you want that
+        description: Switch only. Tick only if the switch stopped, or the live commit won't build, and you want what main holds sent to riders too
         required: false
         type: boolean
         default: false
@@ -71,7 +71,11 @@ jobs:
         if: inputs.action == 'check'
         env:
           VERSION: ${{ steps.pick.outputs.version }}
-        run: echo "A rollback would go to $VERSION. Nothing was changed." | tee -a "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "A rollback would go to $VERSION. Nothing was changed." | tee -a "$GITHUB_STEP_SUMMARY"
+          live=$(node tools/deploy-check.mjs --live-version rows.json)
+          commit=$(node tools/deploy-check.mjs --commit-of "versions/$live.json")
+          if [ -n "$commit" ]; then echo "A switch would build from commit $commit."; else echo 'No commit known, so a switch would build from `main`.'; fi | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Keep the live list, to see it change
         if: inputs.action == 'rollback'
@@ -85,9 +89,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           VERSION: ${{ steps.pick.outputs.version }}
         run: npx wrangler rollback "$VERSION" --yes --message "Emergency rollback from Run workflow"
-      - name: Compare the live site with its own new list
-        if: steps.rollback.outcome == 'success'
-        run: node tools/deploy-check.mjs --self --origin "$LIVE_ORIGIN" --changed-from before-list.txt
       - id: confirm
         name: Confirm Cloudflare has the version that was picked
         if: steps.rollback.outcome == 'success'
@@ -103,6 +104,9 @@ jobs:
             echo "Cloudflare says $now is live, not the picked version." | tee -a "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
+      - name: Compare the live site with its own new list
+        if: steps.rollback.outcome == 'success'
+        run: node tools/deploy-check.mjs --self --origin "$LIVE_ORIGIN" --changed-from before-list.txt
 
       # The switch changes only the worker: its page is the commit that is live, not whatever main holds now.
       - id: source
@@ -112,6 +116,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ALSO_RELEASE_MAIN: ${{ inputs.also_release_main }}
         run: |
           npx wrangler deployments list --json > rows.json || true
           live=$(node tools/deploy-check.mjs --live-version rows.json)
@@ -119,6 +124,8 @@ jobs:
             npx wrangler versions view "$live" --json > live-version.json || rm -f live-version.json
           fi
           commit=$(node tools/deploy-check.mjs --commit-of live-version.json)
+          # The way out when the live commit won't build: main, through the guard's list.
+          if [ "$ALSO_RELEASE_MAIN" = true ]; then commit=""; fi
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
           if [ -n "$commit" ]; then echo "dir=live-commit" >> "$GITHUB_OUTPUT"; else echo "dir=." >> "$GITHUB_OUTPUT"; fi
       - name: Check out the commit that is live

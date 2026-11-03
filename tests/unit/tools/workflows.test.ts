@@ -313,6 +313,11 @@ describe('emergency.yml', () => {
     expect(ifOf(say)).toBe("inputs.action == 'check'");
     expect(runOf(say)).toContain('A rollback would go to $VERSION');
     expect(steps().indexOf(find('id: pick'))).toBeLessThan(steps().indexOf(say));
+    // One click also proves the switch's route: which commit it would read.
+    expect(runOf(say)).toContain('--live-version rows.json');
+    expect(runOf(say)).toContain('--commit-of "versions/$live.json"');
+    expect(runOf(say)).toContain('A switch would build from commit $commit');
+    expect(runOf(say)).toContain('No commit known, so a switch would build from `main`');
   });
 
   test('[DEP-SELF-LIST] a rollback isn\'t passed by the old site: the list is saved before, must change, and the version must be the one picked', () => {
@@ -326,7 +331,9 @@ describe('emergency.yml', () => {
     expect(ifOf(confirm)).toBe(ROLLBACK_DONE);
     expect(confirm).toContain('timeout-minutes: 2');
     expect(runOf(confirm)).toContain('--live-version rows-after.json');
-    expect(runOf(confirm)).toContain('"$VERSION"');
+    expect(runOf(confirm)).toContain('if [ "$now" != "$VERSION" ]; then');
+    // Cloudflare's answer is most wanted when the site looks wrong, so it comes first: a failed compare can't skip it.
+    expect(steps().indexOf(confirm)).toBeLessThan(steps().indexOf(self));
   });
 
   test('[DEP-SELF-LIST] a switch is compared with its own build, not with its own list', () => {
@@ -358,6 +365,15 @@ describe('emergency.yml', () => {
     expect(runOf(source)).toContain('wrangler deployments list --json > rows.json');
     expect(runOf(source)).toContain('wrangler versions view');
     expect(runOf(source)).toContain('--commit-of live-version.json');
+    // The heart of it: the folder written is the folder that was checked out.
+    expect(runOf(source)).toContain('if [ -n "$commit" ]; then echo "dir=live-commit" >> "$GITHUB_OUTPUT"; else echo "dir=." >> "$GITHUB_OUTPUT"; fi');
+    const install = find('Install what that commit needs');
+    expect(ifOf(install)).toBe("inputs.action == 'switch' && steps.source.outputs.commit != ''");
+    expect(install).toContain('working-directory: live-commit');
+    expect(runOf(install)).toContain('npm ci');
+    expect(steps().indexOf(install)).toBeLessThan(steps().indexOf(find('--emergency')));
+    expect(runOf(find('--check-emergency'))).toContain('--check-emergency "$BUILD_DIR/dist"');
+    expect(find('--check-emergency')).toContain('BUILD_DIR: ${{ steps.source.outputs.dir }}');
     const live = find('path: live-commit');
     expect(live).toContain('ref: ${{ steps.source.outputs.commit }}');
     expect(live).toContain('persist-credentials: false');
@@ -370,6 +386,18 @@ describe('emergency.yml', () => {
     expect(steps().indexOf(live)).toBeLessThan(steps().indexOf(build));
     // What deploy.yml writes is what the switch reads.
     expect(runOf(stepsOf(job('deploy.yml', 'deploy')).find((s) => s.includes('id: upload')) ?? '')).toContain('--message "Commit $HEAD_SHA"');
+  });
+
+  test('[SW-SWITCH] a live commit that won\'t build can\'t leave the switch stuck: the tick builds from main, through the guard', () => {
+    const source = find('id: source');
+    expect(source).toContain('ALSO_RELEASE_MAIN: ${{ inputs.also_release_main }}');
+    const run = runOf(source);
+    const unknown = 'if [ "$ALSO_RELEASE_MAIN" = true ]; then commit=""; fi';
+    expect(run).toContain(unknown);
+    // After the read, before anything uses it.
+    expect(run.indexOf('--commit-of live-version.json')).toBeLessThan(run.indexOf(unknown));
+    expect(run.indexOf(unknown)).toBeLessThan(run.indexOf('echo "commit=$commit"'));
+    expect(workflow('emergency.yml')).toMatch(/also_release_main:\n\s+description: .*won't build.*\n/);
   });
 
   test('[SW-SWITCH] with no commit known, a step before the upload names what main would also release', () => {

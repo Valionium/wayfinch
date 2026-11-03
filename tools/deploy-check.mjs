@@ -218,6 +218,7 @@ async function main() {
   });
   printResult(result);
   if (!result.ok) process.exitCode = 1;
+  if (result.reportError) fail(`The issue could not be updated: ${result.reportError}`);
 }
 
 main().catch((error) => fail(error.message));
