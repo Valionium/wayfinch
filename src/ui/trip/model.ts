@@ -1,0 +1,119 @@
+// What Trip shows of a route, as plain data (spec sections 3.1 and 3.3). Nothing here works out an answer: the days are the stage
+// model's, the leave-by time comes from the engines through the services, and the words are the wording file's.
+import { addDaysIso } from '../../core/answers/time.ts';
+import { parseGpx } from '../../core/route/gpx.ts';
+import type { RawPoint, XmlDocLike } from '../../core/route/gpx.ts';
+import { sampleGrid } from '../../core/route/grid.ts';
+import { buildRoute } from '../../core/route/profile.ts';
+import { planStages, shownAscentM } from '../../core/route/stages.ts';
+import type { Pace } from '../../core/route/stages.ts';
+import type { Route, Trip } from '../../core/types.ts';
+import { showKm, W } from '../../core/wording/en.ts';
+
+/** 1214 as "1,214". */
+export const thousands = (n: number): string => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+const stem = (fileName: string): string => fileName.replace(/^.*[\\/]/, '').replace(/\.[^.]*$/, '').trim().slice(0, 60);
+
+/**
+ * A GPX file as a route with no days yet. Throws GpxError with the reason's own plain message for a file that can't be used.
+ * `hadHeights` is whether every point came with a height; if not, Get ready offline looks them up.
+ */
+export async function routeFromGpx(text: string, fileName: string, parseXml: (s: string) => XmlDocLike): Promise<{ route: Route; hadHeights: boolean }> {
+  const parsed = parseGpx(text, parseXml);
+  const raw: RawPoint[] = parsed.points;
+  const route = await buildRoute(raw, parsed.name || stem(fileName) || W.appTripUnnamed, 'gpx');
+  return { route, hadHeights: route.points.every((p) => p.ele !== null) };
+}
+
+export type PlanSettings = { flatKph: number; pace: Pace; nights: number | null };
+
+/** The route with its days and forecast grid, as Get ready offline makes them. Nights not chosen: the stage model's suggestion. */
+export function planned(route: Route, o: PlanSettings): Route {
+  const nights = o.nights ?? planStages(route, { flatKph: o.flatKph, pace: o.pace, nights: 0 }).suggestedNights;
+  const stages = [...planStages(route, { flatKph: o.flatKph, pace: o.pace, nights })];
+  return { ...route, stages, sampleGrid: sampleGrid(route, route.climbs, stages) };
+}
+
+export type Profile = { path: string; minM: number; maxM: number };
+const PROFILE_W = 300;
+const PROFILE_H = 72;
+const PROFILE_POINTS = 120;
+
+/** The heights along the route as a line in a 300 x 72 box; null while any height is unknown. */
+export function profileOf(route: Route): Profile | null {
+  const pts = route.points;
+  if (pts.length < 2 || route.lengthKm <= 0 || pts.some((p) => p.ele === null)) return null;
+  const heights = pts.map((p) => p.ele!);
+  const lo = Math.min(...heights);
+  const hi = Math.max(...heights);
+  const span = Math.max(hi - lo, 20);
+  const step = Math.max(1, Math.ceil(pts.length / PROFILE_POINTS));
+  const picked = pts.filter((_, i) => i % step === 0 || i === pts.length - 1);
+  const path = picked
+    .map((p, i) => `${i === 0 ? 'M' : 'L'}${((p.km / route.lengthKm) * PROFILE_W).toFixed(1)},${(PROFILE_H - ((p.ele! - lo) / span) * (PROFILE_H - 4) - 2).toFixed(1)}`)
+    .join('');
+  return { path, minM: Math.round(lo), maxM: Math.round(hi) };
+}
+
+export const PROFILE_BOX = { w: PROFILE_W, h: PROFILE_H };
+
+export type Summary = {
+  name: string; distance: string; climbing: string; profile: Profile | null;
+  stages: { text: string; detail: string }[]; note: string | null;
+};
+
+const hoursText = (h: number): string => (Math.round(h * 10) / 10).toFixed(1);
+
+/** The summary of §3.3: the stage model's days with the trip's own speed, pace and nights. */
+export function summaryOf(trip: Trip, o: { nights: number | null; day1LeaveBy: string | null }): Summary {
+  const { route } = trip;
+  const plan = planStages(route, {
+    flatKph: trip.flatKph, pace: trip.pace ?? 'sporting',
+    nights: o.nights ?? planStages(route, { flatKph: trip.flatKph, pace: trip.pace ?? 'sporting', nights: 0 }).suggestedNights,
+  });
+  const unknown = route.ascentM === null;
+  return {
+    name: route.name,
+    distance: W.appTripDistance(showKm(route.lengthKm)),
+    climbing: unknown ? W.appTripClimbingUnknown : W.appTripClimbing(thousands(route.ascentM!)),
+    profile: profileOf(route),
+    stages: plan.map((s) => {
+      const lead = W.appTripDayRow(s.day, showKm(s.endKm - s.startKm));
+      return {
+        text: s.day === 1 && o.day1LeaveBy ? `${lead} · ${W.appTripDayLeaveBy(o.day1LeaveBy)}` : lead,
+        detail: W.appTripDayDetail(hoursText(s.ridingHours), s.ascentM === null ? null : thousands(shownAscentM(s.ascentM))),
+      };
+    }),
+    note: unknown ? W.appTripByDistance : null,
+  };
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Whether the trip runs (section 3.1): it is prepared and either today lies between the departure date and the day after the
+ * planned end, or a position was accepted in the last 24 hours. A prepared trip with only a month counts as running.
+ * `today` is the date in the time zone of the route's start.
+ */
+export function tripRuns(f: { prepared: boolean; departureDate: string | null; days: number; today: string; lastPositionAt: Date | null; now: Date }): boolean {
+  if (!f.prepared) return false;
+  if (f.departureDate === null) return true;
+  const lastDay = addDaysIso(f.departureDate, Math.max(0, f.days - 1));
+  if (f.today >= f.departureDate && f.today <= addDaysIso(lastDay, 1)) return true;
+  const age = f.lastPositionAt === null ? Infinity : f.now.getTime() - f.lastPositionAt.getTime();
+  return Number.isFinite(age) && age >= 0 && age <= DAY_MS;
+}
+
+/** The nights the stage model suggests for this trip's speed and pace. */
+export const suggestedNights = (trip: Trip): number =>
+  planStages(trip.route, { flatKph: trip.flatKph, pace: trip.pace ?? 'sporting', nights: 0 }).suggestedNights;
+
+/** "just now", "12 min ago", "2 h ago", "3 days ago": how long since `at`. A time ahead of now reads as now. */
+export function agoText(at: Date, now: Date): string {
+  const minutes = Math.floor((now.getTime() - at.getTime()) / 60_000);
+  if (!Number.isFinite(minutes) || minutes < 1) return W.appTripJustNow;
+  if (minutes < 60) return W.routeAgeMin(String(minutes));
+  if (minutes < 48 * 60) return W.routeAgeHours(String(Math.floor(minutes / 60)));
+  return W.routeAgeDays(String(Math.floor(minutes / 1440)));
+}

@@ -1,0 +1,437 @@
+// @vitest-environment jsdom
+// The Trip screen on the real store (fake IndexedDB), with a fixed clock and a stand-in for the network.
+import 'fake-indexeddb/auto';
+import { IDBFactory } from 'fake-indexeddb';
+import { render } from 'preact';
+import { act } from 'preact/test-utils';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { buildScreen } from '../../../src/core/screen/screen.ts';
+import { planStages } from '../../../src/core/route/stages.ts';
+import { W } from '../../../src/core/wording/en.ts';
+import type { StepName, StepReport } from '../../../src/data/prepare.ts';
+import { clearCopies } from '../../../src/store/changed.ts';
+import { closeDb, openDb } from '../../../src/store/db.ts';
+import { readInputs } from '../../../src/store/inputs.ts';
+import { savePrepared } from '../../../src/store/prepared.ts';
+import { readTrip } from '../../../src/store/trip.ts';
+import { askForHomeScreen, installOffer } from '../../../src/ui/install.ts';
+import { refreshBikeSource } from '../../../src/ui/bike/live.ts';
+import { TripScreen } from '../../../src/ui/trip/trip.tsx';
+import { browserTripServices } from '../../../src/ui/trip/services.ts';
+import type { TripServices } from '../../../src/ui/trip/services.ts';
+import { fixtureGpx } from '../../fixtures/gpx.ts';
+import { bannedHits } from '../../fixtures/banned.ts';
+
+const host = document.createElement('div');
+document.body.append(host);
+
+const NOW = new Date('2026-10-10T09:00:00Z');
+
+beforeEach(async () => {
+  render(null, host);
+  closeDb();
+  clearCopies();
+  globalThis.indexedDB = new IDBFactory();
+  localStorage.clear();
+  refreshBikeSource();
+  installOffer.value = null;
+});
+afterEach(() => { act(() => render(null, host)); });
+
+const settle = async (ms = 0) => { await act(async () => { await new Promise((r) => setTimeout(r, ms)); }); };
+async function until(check: () => boolean, what: string, ms = 8000): Promise<void> {
+  const end = Date.now() + ms;
+  while (!check()) {
+    if (Date.now() > end) throw new Error(`waited for ${what}`);
+    await settle(10);
+  }
+}
+const text = () => host.textContent ?? '';
+
+function services(over: Partial<TripServices> = {}): TripServices {
+  return { ...browserTripServices(() => NOW), ...over };
+}
+
+async function show(svc: TripServices = services()): Promise<TripServices> {
+  act(() => render(null, host));
+  await act(async () => { render(<TripScreen services={svc} />, host); });
+  await until(() => host.querySelector('[data-trip-loaded]') !== null, 'Trip to load');
+  return svc;
+}
+
+async function pick(content: string, name = 'ride.gpx'): Promise<void> {
+  const input = host.querySelector<HTMLInputElement>('input[type=file]')!;
+  Object.defineProperty(input, 'files', { value: [new File([content], name, { type: 'application/gpx+xml' })], configurable: true });
+  await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); });
+}
+
+const button = (name: string | RegExp): HTMLButtonElement => {
+  const found = [...host.querySelectorAll('button')].find((b) => (typeof name === 'string' ? b.textContent?.trim() === name : name.test(b.textContent ?? '')));
+  if (!found) throw new Error(`no button ${String(name)}`);
+  return found;
+};
+const click = async (el: Element) => { await act(async () => { (el as HTMLElement).click(); }); };
+
+async function withRoute(id: 'heidelberg-strasbourg' | 'loop' | 'alpine-pass' = 'heidelberg-strasbourg'): Promise<TripServices> {
+  const svc = await show();
+  await pick(await fixtureGpx(id));
+  await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
+  return svc;
+}
+
+describe('Add a route and the summary (spec section 3.3)', () => {
+  test('[TRIP-GPX] a GPX file becomes the route: the summary shows distance, climbing, profile and the stage model\'s days', async () => {
+    await withRoute();
+    const trip = (await readTrip())!;
+    const summary = host.querySelector('[data-summary]')!;
+    expect(summary.textContent).toContain(`${Math.round(trip.route.lengthKm * 10) / 10} km`);
+    expect(summary.textContent).toMatch(/[\d,]+ m climbing/);
+    expect(summary.querySelector('svg[role=img]')).not.toBeNull();
+    const expected = planStages(trip.route, { flatKph: 25, pace: 'sporting', nights: planStages(trip.route, { flatKph: 25, pace: 'sporting', nights: 0 }).suggestedNights });
+    expect(summary.querySelectorAll('ol li')).toHaveLength(expected.length);
+    expect(trip.route.stages).toEqual([...expected]);
+    expect(trip.departureDate).toBeNull();
+  });
+
+  test('[TRIP-GPX-BAD] a bad file says its own plain reason, and the old route stays', async () => {
+    await withRoute('loop');
+    const before = (await readTrip())!.route.id;
+    await pick('this is not a GPX file');
+    await until(() => text().includes(W.routeGpxUnreadable), 'the refusal');
+    expect(text()).toContain(W.appTripUnchanged);
+    await pick('x'.repeat(21 * 1024 * 1024));
+    await until(() => text().includes(W.routeGpxTooLarge), 'the size refusal');
+    expect(text()).not.toContain(W.routeGpxUnreadable);
+    expect((await readTrip())!.route.id).toBe(before);
+    expect(host.querySelector('[data-replace]')).toBeNull();
+  });
+
+  test('[TRIP-GPX-BAD] a file that cannot be read at all is told in words, with nothing thrown at the rider', async () => {
+    await show();
+    const input = host.querySelector<HTMLInputElement>('input[type=file]')!;
+    const broken = { name: 'a.gpx', size: 10, text: () => Promise.reject(new Error('boom')) };
+    Object.defineProperty(input, 'files', { value: [broken], configurable: true });
+    await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); });
+    await until(() => text().includes(W.appTripFileFailed), 'the refusal');
+    expect(await readTrip()).toBeNull();
+  });
+
+  test('[TRIP-REPLACE-ASKS] a second route asks first; Cancel keeps everything, Replace changes the route and drops the old date', async () => {
+    const svc = await withRoute('loop');
+    await svc.setDeparture('2026-10-17');
+    await settle(20);
+    const first = (await readTrip())!;
+    await pick(await fixtureGpx('alpine-pass'));
+    await until(() => host.querySelector('[data-replace]') !== null, 'the question');
+    expect(host.querySelector('[data-replace]')!.textContent).toContain(first.route.name);
+    expect((await readTrip())!.route.id).toBe(first.route.id);
+    await click(button(W.appTripReplaceCancel));
+    expect(host.querySelector('[data-replace]')).toBeNull();
+    const kept = (await readTrip())!;
+    expect(kept.route.id).toBe(first.route.id);
+    expect(kept.departureDate).toBe('2026-10-17');
+
+    await pick(await fixtureGpx('alpine-pass'));
+    await until(() => host.querySelector('[data-replace]') !== null, 'the question again');
+    await click(button(W.appTripReplaceYes));
+    await until(() => text().includes('Altdorf'), 'the new route');
+    const replaced = (await readTrip())!;
+    expect(replaced.route.id).not.toBe(first.route.id);
+    expect(replaced.departureDate).toBeNull();
+  });
+
+  test('[TRIP-REPLACE-ASKS] the same file again is no new route: nothing asks and nothing changes', async () => {
+    await withRoute('loop');
+    const before = (await readTrip())!;
+    await pick(await fixtureGpx('loop'));
+    await until(() => text().includes(W.appTripSameRoute), 'the note');
+    expect(host.querySelector('[data-replace]')).toBeNull();
+    expect((await readTrip())!.route.id).toBe(before.route.id);
+  });
+
+  test('[TRIP-SUMMARY] a route without heights says climbing is unknown and that Get ready offline looks them up; once looked up, Copernicus is credited', async () => {
+    await show();
+    await pick(await fixtureGpx('loop', { heights: false }));
+    await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
+    expect(text()).toContain(W.appTripClimbingUnknown);
+    expect(text()).toContain(W.appTripHeightsPending);
+    expect(text()).not.toContain(W.appTripHeightsCredit);
+    // What Get ready offline's heights step does: the same line with heights in it.
+    const trip = (await readTrip())!;
+    const withHeights = { ...trip, route: { ...trip.route, ascentM: 120, points: trip.route.points.map((p) => ({ ...p, ele: 150 })) } };
+    const { saveTrip } = await import('../../../src/store/trip.ts');
+    await readTrip();
+    await saveTrip(withHeights);
+    await show(services());
+    expect(text()).toContain(W.appTripHeightsCredit);
+    expect(text()).not.toContain(W.appTripHeightsPending);
+  });
+
+  test('[TRIP-DAY1-LEAVEBY] the day before departure, Day 1 reads "Day 1 · N km · leave by about HH:MM", the very time of the Daylight card', async () => {
+    const svc = await withRoute();
+    await svc.setDeparture('2026-10-11');
+    await show(svc);
+    const row = host.querySelector('[data-summary] ol li')!.textContent!;
+    expect(row).toMatch(/^Day 1 · [\d.]+ km · leave by about \d\d:\d\d/);
+    const inputs = (await readInputs(NOW))!;
+    const card = buildScreen(inputs).screen.cards.daylight.title;
+    const cardTime = /leave by (about \d\d:\d\d)/.exec(card)?.[1];
+    expect(cardTime).toBeDefined();
+    expect(row).toContain(`leave by ${cardTime}`);
+  });
+
+  test('[TRIP-DAY1-LEAVEBY] on any other day Day 1 shows no leave-by time', async () => {
+    const svc = await withRoute();
+    await svc.setDeparture('2026-10-13');
+    await show(svc);
+    expect(host.querySelector('[data-summary] ol li')!.textContent).not.toContain('leave by');
+  });
+});
+
+const stepNames: StepName[] = ['heights', 'places', 'hours', 'weather', 'baseline', 'save'];
+
+/** A Get ready offline that ends as told, and leaves in the store what the real one would have. */
+function preparing(reports: (routeId: string) => StepReport[], o: { places?: number; weatherTo?: Date | null; at?: Date; seen?: string[]; notice?: string } = {}): Partial<TripServices> {
+  return {
+    prepare: async (onProgress, onNotice) => {
+      const trip = (await readTrip())!;
+      if (o.notice) { onNotice(o.notice); await settle(); o.seen?.push(text()); }
+      for (const step of stepNames) { onProgress(step, 1, 2); await settle(); o.seen?.push(text()); }
+      const db = await openDb();
+      for (let i = 0; i < (o.places ?? 0); i++) await db.put('places', { id: `node/${i}`, kind: 'water' });
+      if (o.weatherTo) await db.put('forecast', { fetchedAt: NOW, runs: [], grid: [{ km: 0, lat: 49, lon: 8, hours: [{ at: o.weatherTo }] }], has15: false }, 'current');
+      const steps = reports(trip.route.id);
+      await savePrepared(trip.route.id, { at: o.at ?? NOW, steps, build: { id: 'b', builtAt: '2026-10-28', countries: {} }, forecastFetchedAt: null, baselineYears: null });
+      return steps;
+    },
+  };
+}
+const allOk = (): StepReport[] => stepNames.map((step) => ({ step, ok: true, note: null }));
+
+describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
+  test('[TRIP-SETTINGS] the defaults of the table show: 08:30, Sporting, Camping, 2.0 L; accommodation makes camp water 0 and camping gives 2 back', async () => {
+    await withRoute();
+    expect(host.querySelector<HTMLInputElement>('#trip-start')!.value).toBe('08:30');
+    expect(host.querySelector<HTMLInputElement>('input[name=pace]:checked')!.value).toBe('sporting');
+    expect(host.querySelector<HTMLInputElement>('input[name=stay]:checked')!.value).toBe('camping');
+    expect(host.querySelector<HTMLInputElement>('#trip-camp')!.value).toBe('2');
+    expect(host.querySelector<HTMLInputElement>('#trip-kph')!.value).toBe('25');
+    const accommodation = host.querySelector<HTMLInputElement>('input[name=stay][value=accommodation]')!;
+    await click(accommodation);
+    await until(() => host.querySelector<HTMLInputElement>('#trip-camp')!.value === '0', 'camp water 0');
+    await click(host.querySelector<HTMLInputElement>('input[name=stay][value=camping]')!);
+    await until(() => host.querySelector<HTMLInputElement>('#trip-camp')!.value === '2', 'camp water back');
+    expect((await readTrip())!.stay).toBe('camping');
+  });
+
+  test('[TRIP-SETTINGS] a value out of range is refused with the range named, the last good value stays, and nothing is saved', async () => {
+    await withRoute();
+    const set = async (id: string, value: string) => {
+      const input = host.querySelector<HTMLInputElement>(`#${id}`)!;
+      await act(async () => { input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); });
+    };
+    await set('trip-kph', '60');
+    await until(() => text().includes(W.appStoreFlatKphRange), 'the speed range');
+    await settle(30);
+    expect(host.querySelector<HTMLInputElement>('#trip-kph')!.value).toBe('25');
+    await set('trip-start', '03:00');
+    await until(() => text().includes(W.appStoreStartTimeRange), 'the start range');
+    await settle(30);
+    expect(host.querySelector<HTMLInputElement>('#trip-start')!.value).toBe('08:30');
+    await set('trip-camp', '9');
+    await until(() => text().includes(W.appStoreCampWaterRange), 'the camp water range');
+    await set('trip-nights', '31');
+    await until(() => text().includes(W.appStoreNightsRange), 'the nights range');
+    const trip = (await readTrip())!;
+    expect([trip.flatKph, trip.startTime, trip.campWaterL]).toEqual([25, '08:30', 2]);
+    await set('trip-kph', '30');
+    await until(() => !text().includes(W.appStoreFlatKphRange), 'the message to go');
+    expect((await readTrip())!.flatKph).toBe(30);
+  });
+
+  test('[TRIP-SETTINGS] pace, speed and nights change the days on screen and in the store together', async () => {
+    await withRoute();
+    const days = () => host.querySelectorAll('[data-summary] ol li').length;
+    const before = days();
+    const nights = host.querySelector<HTMLInputElement>('#trip-nights')!;
+    await act(async () => { nights.value = String(before + 2); nights.dispatchEvent(new Event('input', { bubbles: true })); nights.dispatchEvent(new Event('change', { bubbles: true })); });
+    await until(() => days() === before + 3, 'more days');
+    const trip = (await readTrip())!;
+    expect(trip.route.stages).toHaveLength(before + 3);
+    expect(trip.route.sampleGrid.length).toBeGreaterThan(5);
+    await click(button(W.appTripNightsUseSuggested));
+    await until(() => days() === before, 'the suggested days');
+    expect((await readTrip())!.route.stages).toHaveLength(before);
+  });
+
+  test('[TRIP-SETTINGS] a departure date can be set to today, typed, and cleared; without one Trip says what is lost', async () => {
+    await withRoute();
+    expect(text()).toContain(W.appTripDepartureNone);
+    await click(button(W.appTripDepartureToday));
+    await until(() => host.querySelector<HTMLInputElement>('#trip-date')!.value === '2026-10-10', 'today');
+    expect((await readTrip())!.departureDate).toBe('2026-10-10');
+    expect(text()).not.toContain(W.appTripDepartureNone);
+    const date = host.querySelector<HTMLInputElement>('#trip-date')!;
+    await act(async () => { date.value = '2026-10-17'; date.dispatchEvent(new Event('change', { bubbles: true })); });
+    await settle(30);
+    expect((await readTrip())!.departureDate).toBe('2026-10-17');
+    await click(button(W.appTripDepartureClear));
+    await until(() => text().includes(W.appTripDepartureNone), 'the note again');
+    expect((await readTrip())!.departureDate).toBeNull();
+  });
+
+  test('[WXR-TAP-HIDDEN] in the tap-only weather mode "Keep trip data fresh when online" is not on Trip; in the automatic mode it is, and it saves', async () => {
+    const tap = services();
+    expect(tap.env.weatherMode).toBe('tap');
+    await show(tap);
+    expect(text()).not.toContain(W.weatherKeepFresh);
+    render(null, host);
+    const auto = services({ env: { ...tap.env, weatherMode: 'auto' } });
+    await show(auto);
+    expect(text()).toContain(W.weatherKeepFresh);
+    const box = host.querySelector<HTMLInputElement>('input[type=checkbox]')!;
+    expect(box.checked).toBe(true);
+    await click(box);
+    await settle(30);
+    expect(JSON.parse(localStorage.getItem('copilot:settings')!).keepFresh).toBe(false);
+  });
+
+  test('[TRIP-GETREADY] the steps show their progress, and the result reads "1,214 places, weather to Friday, updated 2 h ago" with the storage used and Update', async () => {
+    const seen: string[] = [];
+    const svc = services(preparing(allOk, { places: 1214, weatherTo: new Date('2026-10-16T12:00:00Z'), at: new Date(NOW.getTime() - 2 * 3_600_000), seen, notice: W.appPrepHeightsNotice }));
+    await show(svc);
+    await pick(await fixtureGpx('loop'));
+    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    expect(text()).toContain(W.appTripNothingSaved);
+    expect(text()).toContain(W.appTripFlightMode);
+    await click(button(W.appTripGetReadyButton));
+    await until(() => text().includes('1,214 places'), 'the result');
+    expect(seen.some((t) => t.includes(W.appTripProgress(2, 6, W.appTripStepPlaces)))).toBe(true);
+    expect(seen.some((t) => t.includes(W.appPrepHeightsNotice))).toBe(true);
+    expect(text()).toContain('1,214 places, weather to Friday, updated 2 h ago');
+    expect(button(W.appTripUpdateButton)).toBeDefined();
+    expect(text()).toContain(W.appTripFlightMode);
+  });
+
+  test('[TRIP-GETREADY] a failed step shows what is not saved, a retry, and nothing is hidden or disabled', async () => {
+    const fake = preparing((id) => {
+      void id;
+      return allOk().map((r) => (r.step === 'weather' ? { ...r, ok: false, note: W.appPrepWeatherFailed } : r.step === 'places' ? { ...r, ok: false, note: W.appPrepStorageFull(6, 14) } : r));
+    }, { places: 0 });
+    await show(services(fake));
+    await pick(await fixtureGpx('loop'));
+    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    await click(button(W.appTripGetReadyButton));
+    await until(() => text().includes(W.appPrepWeatherFailed), 'the failed step');
+    expect(text()).toContain(W.appPrepStorageFull(6, 14));
+    expect(text()).toContain(W.appTripMissingHeading);
+    expect(text()).toContain(W.appTripPartial);
+    expect(text()).toContain(W.appTripNoPlaces);
+    const retry = button(W.appTripRetryButton);
+    expect(retry.disabled).toBe(false);
+    for (const b of host.querySelectorAll('button')) expect(b.disabled, b.textContent ?? '').toBe(false);
+    expect(host.querySelector('[hidden]')).toBeNull();
+  });
+
+  test('[TRIP-GETREADY] a Get ready offline that throws is told as "this could not be saved", and the screen keeps working', async () => {
+    await show(services({ prepare: () => Promise.reject(new Error('boom')) }));
+    await pick(await fixtureGpx('loop'));
+    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    await click(button(W.appTripGetReadyButton));
+    await until(() => text().includes(W.appPrepSaveFailed), 'the sentence');
+    expect(button(W.appTripGetReadyButton).disabled).toBe(false);
+  });
+
+  test('[TRIP-NOT-READY-WORD] no string on Trip calls the trip ready, safe or complete; "Get ready offline" is the only use of "ready"', async () => {
+    const trip = Object.entries(W).filter(([k]) => k.startsWith('appTrip') || k.startsWith('appAb'));
+    expect(trip.length).toBeGreaterThan(40);
+    const samples = (v: unknown): string[] => {
+      if (typeof v === 'string') return [v];
+      if (typeof v !== 'function') return [];
+      const f = v as (...a: never[]) => unknown;
+      const args: unknown[][] = [['a'], ['a', 'b'], ['a', 'b', 'c'], [1], [1, 2], [1, 2, 'c'], [null], ['1'], ['1', null]];
+      const out: string[] = [];
+      for (const a of args) {
+        try {
+          const s = f(...(a as never[]));
+          if (typeof s === 'string') out.push(s);
+        } catch {
+          // wrong shape of arguments for this template
+        }
+      }
+      return out;
+    };
+    for (const [key, value] of trip) {
+      for (const s of samples(value)) {
+        expect(bannedHits(s), `${key}: ${s}`).toEqual([]);
+        expect(/\b(ready|safe|complete|completed|done|finished)\b/i.test(s.replace(/Get ready offline/gi, '')), `${key}: ${s}`).toBe(false);
+        expect(/\bprepared\b/i.test(s), `${key}: ${s}`).toBe(false);
+      }
+    }
+    // And on the screen, in each state it can be in.
+    await show();
+    await pick(await fixtureGpx('loop'));
+    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    expect(text().replace(/Get ready offline/gi, '')).not.toMatch(/\b(ready|safe|complete)\b/i);
+  });
+
+  test('[TRIP-IPHONE] on an iPhone in a browser tab, before the first download, Trip asks to add the app to the home screen; in the installed app, or where the page can\'t tell, it does not', async () => {
+    const tab = { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148', maxTouchPoints: 5, platform: 'iPhone', standalone: false };
+    expect(askForHomeScreen(tab)).toBe(true);
+    expect(askForHomeScreen({ ...tab, standalone: true })).toBe(false);
+    expect(askForHomeScreen({ ...tab, standalone: null })).toBe(false);
+    expect(askForHomeScreen({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', maxTouchPoints: 5, platform: 'MacIntel', standalone: false })).toBe(true);
+    expect(askForHomeScreen({ userAgent: 'Mozilla/5.0 (Linux; Android 14)', maxTouchPoints: 5, platform: 'Linux armv8l', standalone: false })).toBe(false);
+
+    const base = services();
+    const iphone = services({ env: { ...base.env, ...tab } });
+    await show(iphone);
+    await pick(await fixtureGpx('loop'));
+    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    expect(text()).toContain(W.appTripIphoneAsk);
+    expect(button(W.appTripGetReadyButton).disabled).toBe(false);
+    // Once something is saved the ask is not repeated.
+    render(null, host);
+    await show(services({ env: { ...base.env, ...tab }, ...preparing(allOk, { places: 3 }) }));
+    await click(button(W.appTripGetReadyButton));
+    await until(() => text().includes('3 places'), 'the result');
+    expect(text()).not.toContain(W.appTripIphoneAsk);
+    render(null, host);
+    await show(services({ env: { ...base.env, ...tab, standalone: true } }));
+    expect(text()).not.toContain(W.appTripIphoneAsk);
+  });
+
+  test('[TRIP-INSTALL] Android\'s install offer gives an Install button that asks the browser; without an offer there is none', async () => {
+    await show();
+    expect(text()).not.toContain(W.appTripInstall);
+    let asked = 0;
+    const offer = Object.assign(new Event('beforeinstallprompt'), { prompt: () => { asked += 1; return Promise.resolve({ outcome: 'accepted' }); } });
+    await act(async () => { installOffer.value = offer; });
+    expect(button(W.appTripInstall)).toBeDefined();
+    await click(button(W.appTripInstall));
+    expect(asked).toBe(1);
+    expect(text()).not.toContain(W.appTripInstall);
+  });
+
+  test('[TRIP-ATTRIBUTION] the summary names OpenStreetMap with the pack date once places are saved, and Licences is one tap away', async () => {
+    await show(services(preparing(allOk, { places: 2 })));
+    await pick(await fixtureGpx('loop'));
+    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    expect(text()).not.toContain('© OpenStreetMap contributors');
+    await click(button(W.appTripGetReadyButton));
+    await until(() => text().includes('© OpenStreetMap contributors'), 'the credit');
+    expect(host.querySelector('[data-summary]')!.textContent).toContain(W.appTripOsm('28 Oct'));
+    const licences = [...host.querySelectorAll('a')].find((a) => a.textContent === W.appTripLicences)!;
+    expect(licences.getAttribute('href')).toBe('#/you/legal');
+  });
+});
+
+describe('The bike on Trip (spec section 3.7)', () => {
+  test('[BK-WHERE-TRIP] the bike is the first thing on Trip, drawn with its bags and its caption', async () => {
+    await show();
+    const first = host.querySelector('[data-trip-loaded]')!.firstElementChild!;
+    expect(first.querySelector('svg.bk')).not.toBeNull();
+    expect(first.querySelector('figcaption')).not.toBeNull();
+    expect(first.querySelector('a[href^="/tools/bags/#bike-details="][href*="back=trip"]')).not.toBeNull();
+  });
+});

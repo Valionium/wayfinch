@@ -8,9 +8,12 @@ import { screenSignal, tabOf } from './nav.ts';
 import type { ScreenName, TabName } from './nav.ts';
 import type { Updater } from './update.ts';
 import { ToolsScreen } from './tools/tools.tsx';
+import { browserTripServices } from './trip/services.ts';
+import { TripScreen } from './trip/trip.tsx';
 
 // The tyre tool reads Load Check's records and its own storage; rider weight from You joins when the store does.
 const tyreServices = browserServices();
+const tripServices = browserTripServices();
 
 const TABS: { name: TabName; label: string }[] = [
   { name: 'ahead', label: W.appTabAhead },
@@ -32,6 +35,7 @@ function Screen({ name }: { name: ScreenName }) {
     <main class="screen" id="main" data-screen={name}>
       <h1>{TITLES[tab]}</h1>
       {degradedSignal.value.map((kind) => <Degraded key={kind} kind={kind} />)}
+      {name === 'trip' ? <TripScreen services={tripServices} /> : null}
       {name === 'tools' ? <ToolsScreen services={tyreServices} /> : null}
       {name === 'tools/tyre' ? <TyreScreen services={tyreServices} /> : null}
     </main>
