@@ -1,0 +1,32 @@
+// The smoke set (plan Decision 1, spec section 11.7): a few whole paths that every browser must walk. WebKit runs only these, in
+// its own CI job that never blocks a merge; Chromium runs them with the rest. Nothing here needs Chromium's own tools.
+import { expect, test } from '@playwright/test';
+import { goOffline, loadApp, preparedTrip, removeBuilds } from './helpers.ts';
+import type { LoadedApp } from './helpers.ts';
+
+let app: LoadedApp | undefined;
+test.afterEach(async () => { await app?.close(); app = undefined; });
+test.afterAll(() => removeBuilds());
+test.setTimeout(180_000);
+
+test('[APP-SWITCH-ON] smoke: the shell opens on Trip with its four tabs, and each tab opens', async ({ page }) => {
+  app = await loadApp(page);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Trip');
+  for (const tab of ['Ahead', 'Tools', 'You', 'Trip']) {
+    await page.locator('nav.tabs').getByRole('link', { name: tab }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(tab);
+  }
+});
+
+test('[FLOW-FLIGHT] smoke: a prepared trip opens offline on Ahead, with its six cards and Emergency', async ({ page }) => {
+  app = await loadApp(page);
+  await preparedTrip(page, 'heidelberg-strasbourg', { departureDate: new Date().toISOString().slice(0, 10), places: true });
+  await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+  await goOffline(page);
+  await page.goto(`${app.origin}/#/ahead`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.ahead[data-ahead]')).toBeVisible();
+  await page.locator('.ah-chips').getByRole('button', { name: 'Emergency', exact: true }).click();
+  await expect(page.locator('#chip-emergency').getByRole('link', { name: 'Call 112' })).toHaveAttribute('href', 'tel:112');
+});

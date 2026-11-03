@@ -38,9 +38,9 @@ export default defineConfig({
     // In CI the budgets have a job of their own (WAYFINCH_SHARDED): a dependency on every other project would also put every test
     // into one shard.
     { name: 'app-budgets', testMatch: APP_SPECS, testIgnore: WIDE, grep: BUDGETS, dependencies: process.env.WAYFINCH_SHARDED ? [] : FUNCTIONAL, metadata: { cpuThrottle: 4 }, use: { viewport: { width: 360, height: 640 }, colorScheme: 'dark' } },
-    // WebKit's smoke test is for when its browser is installed (the browser job installs Chromium only); it never blocks.
+    // WebKit runs the smoke set only, when its browser is installed: CI's webkit-smoke job, which never blocks a merge.
     ...(process.env.WAYFINCH_WEBKIT
-      ? [{ name: 'app-webkit-smoke', testMatch: APP_SPECS, use: { browserName: 'webkit' as const, viewport: { width: 390, height: 844 } } }]
+      ? [{ name: 'app-webkit-smoke', testMatch: /app-smoke\.spec\.ts/, use: { browserName: 'webkit' as const, viewport: { width: 390, height: 844 } } }]
       : []),
   ],
 });

@@ -85,6 +85,22 @@ jobs:
           node -e "const s = require('./pw.json').stats; if (!(s.expected + s.unexpected + s.flaky > 0)) { console.error('This part ran no test.'); process.exit(1); }"
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: pw.json
+  # WebKit's smoke set (plan Decision 1): it runs on every pull request, is not a required check, and `browser` does not wait for it.
+  webkit-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps webkit
+      - run: npx playwright test --project=app-webkit-smoke
+        env:
+          WAYFINCH_WEBKIT: '1'
   browser:
     needs: browser-shard
     if: always()
