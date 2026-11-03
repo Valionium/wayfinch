@@ -1,6 +1,6 @@
 // Size measures of a built site (spec section 4.5). The budgets themselves are tests (plan, "Budgets as tests"); this is what they measure with.
 // node tools/size-budget.mjs [dist]   prints the figures. Gzip level 9, so a figure doesn't depend on a build machine.
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
@@ -36,6 +36,10 @@ function firstScripts(dist) {
   return [...wanted];
 }
 
+/** Decision 5 of the plan: the bundled boundary file, gzipped, in bytes. Not counted as JavaScript. */
+export const BOUNDARY_BUDGET = 150_000;
+export const boundaryGzip = (path) => gzipBytes(readFileSync(path));
+
 /** JavaScript before the first screen, and every other script, in gzipped bytes; the service worker is neither. */
 export function measure(distDir) {
   const dist = resolve(distDir);
@@ -56,4 +60,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const figures = measure(dist);
   console.log(`First-screen JavaScript: ${figures.firstJsGzip} bytes gzipped in ${figures.firstFiles.length} file(s).`);
   console.log(`Lazy JavaScript: ${figures.lazyJsGzip} bytes gzipped.`);
+  const boundaries = join(dist, 'data', 'boundaries.v1.json');
+  if (existsSync(boundaries)) console.log(`Boundary file: ${boundaryGzip(boundaries)} bytes gzipped (budget ${BOUNDARY_BUDGET}).`);
 }

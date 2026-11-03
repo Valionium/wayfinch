@@ -1,6 +1,6 @@
 // Shared steps for the app's browser tests (plan Task 2). Nothing here prints a page.
-// `preparedTrip` holds the trip and route the store can hold today; Tasks 9 and 17 add its places, hours and weather.
-import { mkdtempSync, rmSync } from 'node:fs';
+// `preparedTrip` holds the trip and route, and with `places` runs the real Get ready offline on the fixture pack; Task 17 adds weather.
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -83,8 +83,40 @@ export async function withStore(page: Page): Promise<void> {
   await page.evaluate(await storeBundle);
 }
 
-/** A trip on a fixture route, saved through the store. */
-export async function preparedTrip(page: Page, id: string, opts: { departureDate?: string | null } = {}): Promise<Trip> {
+const DATA_ORIGIN = (JSON.parse(readFileSync(fileURLToPath(new URL('../../build.config.json', import.meta.url)), 'utf8')) as { dataOrigin: string }).dataOrigin;
+
+export type PackServing = { requests: string[]; manifest: { buildId: string; tiles: { z: number; x: number; y: number; places: number }[] } };
+
+/**
+ * Serves a fixture pack as the data project does, and records what's asked of it. `hold` may answer a request itself: 'abort'
+ * cuts it off, a Promise keeps it waiting.
+ */
+export async function servePack(page: Page, id: string, hold: (url: string) => 'abort' | Promise<void> | void = () => undefined): Promise<PackServing> {
+  const dir = new URL(`../fixtures/packs/${id}/`, import.meta.url);
+  const manifestText = readFileSync(new URL('manifest.json', dir), 'utf8');
+  const manifest = JSON.parse(manifestText) as PackServing['manifest'] & { builtAt: string };
+  const requests: string[] = [];
+  const cors = { 'access-control-allow-origin': '*' };
+  await page.context().route(`${DATA_ORIGIN}/packs/**`, async (route) => {
+    const url = route.request().url();
+    const path = url.slice(DATA_ORIGIN.length);
+    requests.push(path);
+    const answer = hold(path);
+    if (answer === 'abort') return route.abort();
+    if (answer) await answer;
+    if (path === '/packs/current.json') {
+      return route.fulfill({ headers: cors, json: { v: 1, buildId: manifest.buildId, builtAt: manifest.builtAt, manifest: `/packs/${manifest.buildId}/manifest.json` } });
+    }
+    const prefix = `/packs/${manifest.buildId}/`;
+    if (!path.startsWith(prefix)) return route.fulfill({ status: 404, headers: cors, body: 'gone' });
+    if (path === `${prefix}manifest.json`) return route.fulfill({ headers: cors, body: manifestText });
+    return route.fulfill({ headers: cors, body: readFileSync(new URL(path.slice(prefix.length), dir)) });
+  });
+  return { requests, manifest };
+}
+
+/** A trip on a fixture route, saved through the store. With `places`, also Get ready offline's places and hours, on the fixture pack. */
+export async function preparedTrip(page: Page, id: string, opts: { departureDate?: string | null; places?: boolean } = {}): Promise<Trip> {
   await withStore(page);
   const fixture = await loadFixtureRoute(id as FixtureRouteId);
   const built = await buildRoute(fixture.points, fixture.name, 'gpx');
@@ -98,7 +130,10 @@ export async function preparedTrip(page: Page, id: string, opts: { departureDate
     await __store.readTrip();
     await __store.saveTrip(t);
   }, trip);
-  return trip;
+  if (!opts.places) return trip;
+  await servePack(page, id);
+  await page.evaluate(() => __store.prepare());
+  return page.evaluate(async () => (await __store.readTrip())!);
 }
 
 /** An accepted position at a route kilometre, through the store. */

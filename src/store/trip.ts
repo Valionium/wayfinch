@@ -12,6 +12,7 @@ export const stampKey = (section: string): string => `updatedAt:${section}`;
 
 export const PLAN_TOMORROW_KEY = 'copilot:plan-tomorrow';
 
+
 /** A trip or route the store won't keep; `message` says why, in the rider's words. */
 export class InvalidTripError extends RefusedError {
   constructor(reason: string) {
@@ -111,6 +112,19 @@ async function putTrip(tx: Tx, trip: Trip, stored: string | null): Promise<strin
  */
 export function replaceRoute(route: Route): Promise<void> {
   return tracked(replacing(route));
+}
+
+// ---- The pack tiles of the route (spec sections 5 and 5a) ---------------------------------------------------------------
+
+/** The run the saved tiles belong to. Under the route's prefix, so it goes with the route. */
+export const PACK_RUN_META = `${ROUTE_META_PREFIX}packRun`;
+
+/** The route was replaced, here or in another window, while its data was on the way: that data is of no use any more. */
+export class RouteGoneError extends RefusedError {
+  constructor() {
+    super('the route has been replaced');
+    this.name = 'RouteGoneError';
+  }
 }
 
 async function replacing(route: Route): Promise<void> {
