@@ -3,7 +3,7 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { fixtureGpx } from '../fixtures/gpx.ts';
-import { atPosition, loadApp, preparedTrip, removeBuilds } from './helpers.ts';
+import { atPosition, fixedClock, loadApp, preparedTrip, removeBuilds } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
 
 let app: LoadedApp | undefined;
@@ -13,8 +13,9 @@ test.afterAll(() => removeBuilds());
 const today = (): string => new Date().toISOString().slice(0, 10);
 
 /** A window of this size, the app loaded with a prepared trip and a position at km 40, on `screen`. */
-async function open(page: Page, width: number, height: number, screen = 'ahead', opts: { position?: boolean; trip?: boolean } = {}): Promise<void> {
+async function open(page: Page, width: number, height: number, screen = 'ahead', opts: { position?: boolean; trip?: boolean; clock?: string } = {}): Promise<void> {
   await page.setViewportSize({ width, height });
+  if (opts.clock) await fixedClock(page, opts.clock);
   app = await loadApp(page);
   if (opts.trip !== false) {
     await preparedTrip(page, 'heidelberg-strasbourg', { departureDate: today(), places: true });
@@ -296,7 +297,9 @@ test('[WIDE-COMPUTER-POS] in the rail layout Ahead opens with the picker open, a
     const geo = { watchPosition() { w.__geo.push('watch'); return 1; }, getCurrentPosition() { w.__geo.push('get'); }, clearWatch() { /* none */ } };
     Object.defineProperty(navigator, 'geolocation', { configurable: true, get: () => geo });
   });
-  await open(page, 1280, 720, 'ahead', { position: false });
+  // With no position at all the day-1 answers show only on departure day before the ride (spec 3.2: first use is the button and the
+  // picker alone), so the clock is fixed at dawn of the departure day instead of following the real time of day.
+  await open(page, 1280, 720, 'ahead', { position: false, clock: `${today()}T05:00:00Z` });
   await expect(page.locator('#ah-picker')).toBeVisible();
   await expect(page.getByText('On a computer, this is usually approximate.')).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __geo: string[] }).__geo)).toEqual([]);

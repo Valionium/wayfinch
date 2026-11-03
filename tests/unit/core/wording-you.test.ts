@@ -7,6 +7,7 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   youCapacityPlan: [['1.25']],
   youLearnRides: [[1], [3]],
   youLearnWeighed: [[1], [2]],
+  youLearnHilly: [[1], [3]],
   youRideEstimate: [['1.3']],
   youExported: [['wayfinch-data-2026-10-10.json']],
   youImportTrip: [['Heidelberg to Strasbourg', '165.2']],

@@ -106,6 +106,8 @@ const rideReads = (r: unknown): boolean => isObject(r) && typeof r.at === 'strin
 /** A ride that can't be read stays out of the file, and out of the phone: one bad ride never costs a rider the backup. */
 const jsonRide = (r: unknown): JsonRide[] => {
   if (!isObject(r) || !(r.at instanceof Date) || !Number.isFinite(r.at.getTime())) return [];
+  // A hilly report stays on the phone: the file's format has no place for it, and a flat reading of it would mislead.
+  if (r.hilly === true) return [];
   const ride = { ...r, at: r.at.toISOString() };
   return rideReads(ride) ? [rideOf(ride as unknown as JsonRide)] : [];
 };
@@ -181,7 +183,12 @@ async function importing(file: unknown): Promise<ImportResult> {
       }
       if (bringRides) {
         const store = tx.objectStore('calibration');
-        await store.clear();
+        // The flat rides are replaced; the hilly reports, which the file cannot hold, stay.
+        let cursor = await store.openCursor();
+        while (cursor) {
+          if ((cursor.value as { hilly?: unknown }).hilly !== true) await cursor.delete();
+          cursor = await cursor.continue();
+        }
         for (const r of rides) await store.add(rideOf({ ...r, at: new Date(r.at) }));
         await putStamp(tx, 'calibration', f.calibration.updatedAt);
       }

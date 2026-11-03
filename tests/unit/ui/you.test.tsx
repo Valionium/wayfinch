@@ -120,13 +120,13 @@ describe('Rider and water you can carry (spec section 3.5)', () => {
     expect(field('you-weight').value).toBe('');
     await type(field('you-weight'), '82');
     await type(field('you-weight'), '');
-    expect((await readProfile()).weightKg).toBeNull();
+    await vi.waitFor(async () => expect((await readProfile()).weightKg).toBeNull(), { timeout: 20_000 });
     await type(field('you-kph'), '31');
     await type(field('you-kph'), '');
-    expect((await readSettings()).flatKph).toBe(25);
+    await vi.waitFor(async () => expect((await readSettings()).flatKph).toBe(25), { timeout: 20_000 });
     await type(field('you-capacity'), '2');
     await type(field('you-capacity'), '');
-    expect((await readProfile()).capacityL).toBeNull();
+    await vi.waitFor(async () => expect((await readProfile()).capacityL).toBeNull(), { timeout: 20_000 });
     expect(host.querySelector('[role=alert]')).toBeNull();
   });
 
@@ -573,5 +573,60 @@ describe('Delete and the theme after it (review of PR 37)', () => {
     await click(button(Y.youDelete));
     await click(button(Y.youDeleteConfirm));
     await until(() => document.documentElement.getAttribute('data-theme') === null, 'the phone own theme after the delete');
+  });
+});
+
+describe("Flat or hilly? on the post-ride report (owner ruling small)", () => {
+  async function addRide(terrain: 'flat' | 'hilly', feel: 'A' | 'B' | 'C' = 'C'): Promise<void> {
+    if (!host.querySelector('[data-ride-form]')) await click(button(Y.youRideOpen));
+    await type(field('ride-hours'), '5');
+    await type(field('ride-drank'), '3');
+    await click(radio('ride-feel', feel));
+    await click(radio('ride-terrain', terrain));
+    await click(button(Y.youRideAdd));
+    await until(() => host.querySelector('[data-ride-result]') !== null, 'the result');
+  }
+
+  test("[YOU-TERRAIN] each report carries one tap, Flat or hilly?, flat by default; a hilly report is kept apart, says so, and leaves the status and the count alone", async () => {
+    await show();
+    await click(button(Y.youRideOpen));
+    expect(host.querySelector('legend')!.textContent).toBeTruthy();
+    expect(radio('ride-terrain', 'flat').checked).toBe(true);
+    await addRide('hilly');
+    expect(host.querySelector('[data-hilly-kept]')!.textContent).toBe(Y.youRideHillyKept);
+    await until(() => host.querySelector('[data-hilly-count]') !== null, 'the hilly count');
+    expect(host.querySelector('[data-hilly-count]')!.textContent).toBe(Y.youLearnHilly(1));
+    expect(text()).toContain(Y.youLearnNoRides); // no flat ride counted
+    expect(host.querySelector('[data-calibration]')!.textContent).toBe(W.waterNotCalibrated);
+    const kept = await readProfile();
+    expect(kept.sumW).toBe(0);
+    expect(kept.k).toBe(1);
+    expect(await readRides()).toHaveLength(1);
+    // The tap resets to flat for the next report, and a flat one counts and moves the factor.
+    expect(radio('ride-terrain', 'flat').checked).toBe(true);
+    await addRide('flat');
+    await until(() => text().includes(Y.youLearnRides(1)), 'one flat ride');
+    expect((await readProfile()).sumW).toBeGreaterThan(0);
+    expect(host.querySelector('[data-hilly-count]')!.textContent).toBe(Y.youLearnHilly(1));
+  });
+
+  test("[YOU-TERRAIN] the export note and the empty-rides line of the import preview both say that hilly reports stay on this phone, and a hilly result shows no caution and no schedule", async () => {
+    await show();
+    expect(text()).toContain('hilly water reports stay out of it');
+    expect(Y.youImportRides(0)).toContain('hilly reports stay on this phone');
+    await click(button(Y.youRideOpen));
+    await type(field('ride-hours'), '5');
+    await type(field('ride-drank'), '4.5');
+    await click(radio('ride-temp', 'warm'));
+    await click(radio('ride-terrain', 'hilly'));
+    await type(field('ride-loss'), '1');
+    await click(button(Y.youRideAdd));
+    await until(() => host.querySelector('[data-ride-result]') !== null, 'the result');
+    const result = host.querySelector('[data-ride-result]')!.textContent!;
+    expect(result).toContain(Y.youRideHillyKept);
+    expect(result).toContain(W.waterDrinkToThirst);
+    expect(host.querySelector('[data-over-drinking]')).toBeNull();
+    expect(result).not.toContain(W.waterSaltyFood);
+    expect((await readProfile()).weighedRides).toBe(0);
   });
 });

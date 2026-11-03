@@ -77,4 +77,34 @@ describe('the post-ride report (spec sections 3.5 and 6.3)', () => {
     expect(over({ hours: 2, intakeL: 1, massLossKg: -0.5 })).toBe(true);
     expect(over({ hours: 2, intakeL: 1, massLossKg: 0.5 })).toBe(false);
   });
+
+  test('[YOU-TERRAIN] the terrain tap goes onto the logged ride: hilly is marked, flat and untouched carry no mark', () => {
+    const logged = (o: Partial<RideReport>) => {
+      const r = reportRide({ ...base, ...o }, profile, 25);
+      if (!r.ok) throw new Error('refused');
+      return r.ride;
+    };
+    expect(logged({ hilly: true }).hilly).toBe(true);
+    expect('hilly' in logged({ hilly: false })).toBe(false);
+    expect('hilly' in logged({})).toBe(false);
+  });
+
+  test('[YOU-TERRAIN] a hilly report is not judged against the flat estimate: drink to thirst only, no schedule, no over-drinking caution, not counted as calibrated', () => {
+    // The reviewer's probe: a warm 5 h hilly ride, 0.9 L/h, weighed 1.0 kg lighter (the real loss was far above the flat figure).
+    const probe: RideReport = { at, hours: 5, intakeL: 4.5, feel: null, temp: 'warm', massLossKg: 1.0 };
+    const hilly = reportRide({ ...probe, hilly: true }, profile, 25);
+    if (!hilly.ok) throw new Error('refused');
+    expect(hilly.advice.lines).toEqual([W.waterDrinkToThirst]);
+    expect(hilly.advice.promptLPerH).toBeNull();
+    expect(hilly.advice.dayFlag).toBe(false);
+    expect(hilly.over).toBe(false);
+    // The same words on flat ground are judged as before (the over-drinking check and the schedule remain for flat rides).
+    const flat = reportRide(probe, profile, 25);
+    if (!flat.ok) throw new Error('refused');
+    expect(flat.over).toBe(true);
+    // A weighed gain on a hilly day gives no caution either.
+    const gain = reportRide({ ...probe, massLossKg: -0.5, hilly: true }, profile, 25);
+    if (!gain.ok) throw new Error('refused');
+    expect(gain.over).toBe(false);
+  });
 });

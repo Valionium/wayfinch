@@ -40,7 +40,9 @@ export async function ridesOf(tx: Tx): Promise<Ride[]> {
 const weighedCount = (rides: Ride[]): number => rides.filter((r) => finite(r.massLossKg) && r.intakeL !== null).length;
 
 /** The factors the rides give, with the prior the thirst answer sets. */
-function factorsOf(profile: Profile, rides: Ride[], now: Date): Pick<Profile, 'k' | 'sumW' | 'kDrink' | 'weighedRides'> {
+function factorsOf(profile: Profile, all: Ride[], now: Date): Pick<Profile, 'k' | 'sumW' | 'kDrink' | 'weighedRides'> {
+  // Hilly reports are kept but stand outside every factor and every count: the estimate they were set against is for flat ground.
+  const rides = all.filter((r) => r.hilly !== true);
   const carrying = updateCarrying({ thirst: profile.thirst }, rides, now);
   return { k: carrying.k, sumW: carrying.sumW, kDrink: updateDrinking(rides, now), weighedRides: weighedCount(rides) };
 }

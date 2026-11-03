@@ -29,6 +29,8 @@ export type YouSnapshot = {
   profile: Profile;
   settings: Settings;
   rides: number;
+  /** Hilly reports: kept on the phone, outside every factor and the count above. */
+  hillyRides: number;
   /** The bag plan's bottle capacity, when there is a plan with water in it. */
   planBottleL: number | null;
 };
@@ -166,14 +168,15 @@ export function browserYouServices(now: () => Date = () => new Date(), navigate:
     weatherMode: WEATHER_MODE,
     load: async () => {
       // Nothing is kept yet, or it was just deleted: reading would make an empty database.
-      if (!(await dbExists())) return { available: true, profile: DEFAULT_PROFILE, settings: readLocalSettings().settings, rides: 0, planBottleL: bottleL() };
+      if (!(await dbExists())) return { available: true, profile: DEFAULT_PROFILE, settings: readLocalSettings().settings, rides: 0, hillyRides: 0, planBottleL: bottleL() };
       try {
         const settings = await readSettings();
         const profile = await readProfile();
-        const rides = (await readRides()).length;
-        return { available: true, profile, settings, rides, planBottleL: bottleL() };
+        const all = await readRides();
+        const hillyRides = all.filter((r) => r.hilly === true).length;
+        return { available: true, profile, settings, rides: all.length - hillyRides, hillyRides, planBottleL: bottleL() };
       } catch {
-        return { available: false, profile: DEFAULT_PROFILE, settings: DEFAULT_SETTINGS, rides: 0, planBottleL: bottleL() };
+        return { available: false, profile: DEFAULT_PROFILE, settings: DEFAULT_SETTINGS, rides: 0, hillyRides: 0, planBottleL: bottleL() };
       }
     },
     writeProfile: async (partial) => {
