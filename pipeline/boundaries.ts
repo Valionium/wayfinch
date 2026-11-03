@@ -1,19 +1,12 @@
 // Boundaries as polygons, and a grid index that answers "which boundaries hold this point" in constant time.
-export type Ring = [number, number][];                       // [lon, lat], closed or not
+import { pointInRings } from '../src/core/places/rings.ts';
+import type { Ring } from '../src/core/places/rings.ts';
+
+export { pointInRings };
+export type { Ring };
 export type BoundaryFeature = { id: string; tags: Record<string, string>; rings: Ring[] };   // even-odd over all rings: holes and exclaves
 
 // Even-odd ray casting over all rings of one feature.
-export function pointInRings(rings: Ring[], lon: number, lat: number): boolean {
-  let inside = false;
-  for (const ring of rings) {
-    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-      const [ax, ay] = ring[i]!;
-      const [bx, by] = ring[j]!;
-      if ((ay > lat) !== (by > lat) && lon < ax + ((lat - ay) * (bx - ax)) / (by - ay)) inside = !inside;
-    }
-  }
-  return inside;
-}
 
 type Edges = { ax: Float64Array; ay: Float64Array; bx: Float64Array; by: Float64Array };
 // A cell is fully inside, fully outside, or holds the edges that may cross it, with the parity at the middle of its left side.
