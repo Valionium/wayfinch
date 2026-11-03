@@ -34,4 +34,7 @@ test('[TRIP-FIRST] what the first read finds also settles which notices the shel
   expect(degradedSignal.value).not.toContain('noRoute');
   await openOnFirstScreen({ load: () => Promise.resolve(snap()) }, false);
   expect(degradedSignal.value).toContain('noRoute');
+  // a read that failed found out nothing: it is not "no route", and Ahead says it couldn't read the trip
+  await openOnFirstScreen({ load: () => Promise.resolve(snap({ available: false })) }, false);
+  expect(degradedSignal.value).not.toContain('noRoute');
 });

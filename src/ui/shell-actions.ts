@@ -134,6 +134,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
   const emergencyAlone = (at: Date) => emergencyCard({ position: null, now: at, country: null, settlements: [], shelters: [], rescuePoints: [], thunderNear: false, dataDate: '' });
   const unreadable = (at: Date): void => {
     view.value = { kind: 'unreadable', canShare: deps.share !== null, emergency: emergencyAlone(at) };
+    noteRoute(null);
   };
 
   const noRoute = (at: Date): void => {

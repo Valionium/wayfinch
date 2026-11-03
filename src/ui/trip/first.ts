@@ -7,7 +7,9 @@ import type { TripSnapshot } from './services.ts';
 export async function openOnFirstScreen(services: { load: () => Promise<TripSnapshot> }, hasAddress: boolean): Promise<void> {
   const shown = screenSignal.value;
   const snap = await services.load();
-  noteTripFacts(snap.trip !== null, snap.prepared !== null);
+  // A read that failed (`available` false) found out nothing about the route.
+  if (snap.available) noteTripFacts(snap.trip !== null, snap.prepared !== null);
+  else noteTripFacts(null, null);
   if (hasAddress || screenSignal.value !== shown) return;
   // No history entry: the app opened here, and Back should leave it.
   screenSignal.value = defaultScreen(snap.running);

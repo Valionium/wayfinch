@@ -1,13 +1,15 @@
 // Section 8's degraded situations that can happen with no trip: which of them apply right now.
-// The store (Task 3) will feed `hasRoute` and `hasPreparedTrip`; until it exists there is no route and no trip.
+// Trip and Ahead feed `hasRoute` and `hasPreparedTrip` from what the store read; null until a read has succeeded.
 import { signal } from '@preact/signals';
 import type { DegradedKind } from './card.tsx';
+import type { TabName } from './nav.ts';
 
-export const degradedSignal = signal<DegradedKind[]>(['noRoute']);
+export const degradedSignal = signal<DegradedKind[]>([]);
 
 export interface DegradedFacts {
-  hasRoute: boolean;
-  hasPreparedTrip: boolean;
+  /** null: not read yet, or the read failed. Nothing is said about a route the app hasn't read. */
+  hasRoute: boolean | null;
+  hasPreparedTrip: boolean | null;
   online: boolean;
   storageBlocked: boolean;
 }
@@ -16,9 +18,15 @@ export interface DegradedFacts {
 export function degradedKinds(facts: DegradedFacts): DegradedKind[] {
   const kinds: DegradedKind[] = [];
   if (facts.storageBlocked) kinds.push('storageBlocked');
-  if (!facts.hasRoute) kinds.push('noRoute');
-  if (!facts.online && !facts.hasPreparedTrip) kinds.push('noSignalNoTrip');
+  if (facts.hasRoute === false) kinds.push('noRoute');
+  // "this trip is not prepared … come from the route": only for a route that is there
+  if (!facts.online && facts.hasRoute === true && facts.hasPreparedTrip === false) kinds.push('noSignalNoTrip');
   return kinds;
+}
+
+/** Spec section 8: "No route | Trip and Ahead". The route and trip notices belong where the route is used; blocked storage everywhere. */
+export function kindsOnScreen(kinds: readonly DegradedKind[], tab: TabName): DegradedKind[] {
+  return tab === 'trip' || tab === 'ahead' ? [...kinds] : kinds.filter((k) => k === 'storageBlocked');
 }
 
 /** True when the browser will not open a database for this site (a private window, or a setting that blocks it). */
@@ -40,17 +48,23 @@ export function isStorageBlocked(factory: IDBFactory | undefined): Promise<boole
   });
 }
 
-let known: DegradedFacts = { hasRoute: false, hasPreparedTrip: false, online: true, storageBlocked: false };
+let known: DegradedFacts = { hasRoute: null, hasPreparedTrip: null, online: true, storageBlocked: false };
 const publish = (): void => { degradedSignal.value = degradedKinds(known); };
 
-/** Trip tells the shell whether a route is stored and whether Get ready offline has ended for it, so the notices fit. */
-export function noteTripFacts(hasRoute: boolean, hasPreparedTrip: boolean): void {
+/**
+ * Trip tells the shell whether a route is stored and whether Get ready offline has ended for it, so the notices fit. null for
+ * both when the read failed.
+ */
+export function noteTripFacts(hasRoute: boolean | null, hasPreparedTrip: boolean | null): void {
   known = { ...known, hasRoute, hasPreparedTrip };
   publish();
 }
 
-/** Ahead tells the shell a route is there when it shows one, so "Add a route" never stands above a route's answers. */
-export function noteRoute(hasRoute: boolean): void {
+/**
+ * Ahead tells the shell a route is there when it shows one, so "Add a route" never stands above a route's answers; and null
+ * when it couldn't read the trip, so "Add a route" never stands above "couldn't be read".
+ */
+export function noteRoute(hasRoute: boolean | null): void {
   known = { ...known, hasRoute };
   publish();
 }

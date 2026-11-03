@@ -9,7 +9,7 @@ import { sameLine } from '../../store/trip.ts';
 import { BikeDrawing } from '../bike/drawing.tsx';
 import { bikeSource } from '../bike/live.ts';
 import { Card } from '../card.tsx';
-import { noteTripFacts } from '../degraded.ts';
+import { degradedSignal, noteTripFacts } from '../degraded.ts';
 import { installOffer, promptInstall } from '../install.ts';
 import { GetReady } from './getready.tsx';
 import { lineKey, routeFromGpx } from './model.ts';
@@ -114,7 +114,8 @@ export function TripScreen({ services }: { services: TripServices }) {
     const next = await services.load();
     if (!alive.current || mine !== latest.current) return;
     setSnap(next);
-    noteTripFacts(next.trip !== null, next.prepared !== null);
+    if (next.available) noteTripFacts(next.trip !== null, next.prepared !== null);
+    else noteTripFacts(null, null);
   }, [services]);
   useEffect(() => {
     alive.current = true;
@@ -132,7 +133,8 @@ export function TripScreen({ services }: { services: TripServices }) {
         <div class="trip-bike">
           <BikeDrawing bike={bike.bike} summary={bike.summary} known={bike.known} back="trip" />
         </div>
-        {snap && !snap.available ? <p class="notice" role="status">{W.appStorageBlocked}</p> : null}
+        {/* The shell says it already when the browser refuses storage outright; once is enough. */}
+        {snap && !snap.available && !degradedSignal.value.includes('storageBlocked') ? <p class="notice" role="status">{W.appStorageBlocked}</p> : null}
         <AddRoute services={services} snap={snap} reload={reload} />
         {snap ? <RouteSummary snap={snap} /> : null}
       </div>

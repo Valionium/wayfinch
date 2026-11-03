@@ -3,6 +3,7 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterAll, afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { App } from '../../../src/ui/app.tsx';
+import { noteTripFacts } from '../../../src/ui/degraded.ts';
 import { go, screenFromHash, screenSignal } from '../../../src/ui/nav.ts';
 import { resetRegistration, startOfflineWorker } from '../../../src/ui/register.ts';
 import { UPDATE_CHECK_MS, createUpdater } from '../../../src/ui/update.ts';
@@ -175,6 +176,21 @@ test('the shell opens on Trip with no trip, shows four labelled tabs, and follow
   expect(screenFromHash('#/nonsense', 'trip')).toBe('trip');
   expect(screenFromHash('', 'trip')).toBe('trip');
   expect(screenSignal.value).toBe('tools/tyre');
+});
+
+test('[APP-DEGRADED] the shell shows "Add a route" on Trip and Ahead, never on Tools or You', async () => {
+  noteTripFacts(false, false);
+  go('tools');
+  render(<App />, host);
+  const notices = () => [...host.querySelectorAll('main > .notice')].map((n) => n.textContent);
+  expect(notices()).not.toContain("Add a route to see what's ahead");
+  await act(async () => { go('you'); });
+  expect(notices()).not.toContain("Add a route to see what's ahead");
+  await act(async () => { go('trip'); });
+  expect(notices()).toContain("Add a route to see what's ahead");
+  // a failed read says nothing about the route
+  await act(async () => { noteTripFacts(null, null); });
+  expect(notices()).not.toContain("Add a route to see what's ahead");
 });
 
 // The teardown race of 3 November ("requestAnimationFrame is not defined"): a tree left mounted after the last test re-renders when
