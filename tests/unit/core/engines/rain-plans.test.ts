@@ -49,6 +49,13 @@ describe('the band', () => {
     // With nothing close either, the spec's own words.
     expect(planOf({ moment: BAND, spells: [rain(100)], spots: [] }).none).toMatch(/^No mapped cover before km 100/);
   });
+  test('[STOP-BAND] a roof 10 minutes ahead in rain with no thunderstorm is named as mapped, never "open" (section 8 rule 6)', () => {
+    const p = planOf({ moment: BAND, spells: [rain(100)], spots: [{ b: shelter(), km: kmBefore(10) }] });
+    expect(p.covers).toEqual([]);
+    expect(p.none).toMatch(/^No mapped cover 15–60 min of riding before km 100/);
+    expect(p.none).toMatch(/Mapped as .+, not checked/);
+    expect(p.none).not.toMatch(/open/i);
+  });
   test('[STOP-BAND] 61 minutes alone: not in the band, so the fallback names it', () => {
     const p = planOf({ moment: BAND, spells: [rain(100)], spots: [{ b: cafe('x'), km: kmBefore(61) }] });
     expect(p.covers).toHaveLength(1);

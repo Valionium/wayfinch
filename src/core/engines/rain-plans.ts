@@ -3,7 +3,7 @@
 import { formatAbout, formatHm } from '../answers/index.ts';
 import type { Cover, Km, Missing, RainPlan, RainWindow } from '../types.ts';
 import { showKm, W } from '../wording/en.ts';
-import { coverOfSpot, finalOrder, hoursLookup, hoursNotWorkedOut, insideRadius, isCover, missingFor, reachKm, savedCovers, seatingLine, spotName, spotsOf, zoneOfSpot, hoursDecide, type NotCover, type Spot, type StopFacts } from './covers.ts';
+import { coverLine, coverOfSpot, finalOrder, hoursLookup, hoursNotWorkedOut, insideRadius, isCover, missingFor, reachKm, savedCovers, seatingLine, spotName, spotsOf, zoneOfSpot, hoursDecide, type NotCover, type Spot, type StopFacts } from './covers.ts';
 import { shelterEntries, stormAroundStart, latestUsable } from './shelter.ts';
 import { onTheRide, rainAtStart, ridePoints, routeForecast, within48h } from './weather-windows.ts';
 
@@ -133,7 +133,10 @@ export function rainPlan(w: RainWindow, f: StopFacts): RainPlan {
     .sort((a, b) => a.arrival.getTime() - b.arrival.getTime() || finalOrder(a.spot, b.spot))[0];
   const none = covers.length > 0 ? null
     : !known ? W.stopNoPlaceData(showKm(m))
-    : close ? `${W.stopNoCoverInBand(showKm(m), about)} · ${W.stopCoverClose(spotName(close.spot), showKm(close.spot.match.km), formatAbout(close.arrival, zoneOfSpot(close.spot, f)))}`
+    // "Open" only for an open building (class 1 or 2, open at arrival); a roof or shelter is named as mapped (section 8 rule 6).
+    : close ? `${W.stopNoCoverInBand(showKm(m), about)} · ${(close.r as Cover).coverClass <= 2
+      ? W.stopCoverClose(spotName(close.spot), showKm(close.spot.match.km), formatAbout(close.arrival, zoneOfSpot(close.spot, f)))
+      : W.stopCoverCloseMapped(coverLine(close.spot, close.r, f))}`
     : W.stopNoCover(showKm(m), about);
   return {
     ...empty, m, covers: covers.map((c) => c.cover),

@@ -341,6 +341,7 @@ export const W = {
   // Section 6.11's band holds none, but an open cover lies closer than the band counts (review of 3 Nov 2026).
   stopNoCoverInBand: (km: string, about: string | null): string => `No mapped cover 15–60 min of riding before km ${km}${about ? ` (${about})` : ''}`,
   stopCoverClose: (name: string, km: string, about: string): string => `Close by and open: ${name}, km ${km}, ${about}, under 15 min before the rain`,
+  stopCoverCloseMapped: (line: string): string => `Close by, under 15 min before the rain: ${line}`,
   stopNoPlaceData: (km: string): string => `No place data before km ${km}. Refresh this stretch.`,
   stopNoneBehind: 'None mapped behind either',
   stopNoOpenBehind: 'No open building mapped behind either',
