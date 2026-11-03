@@ -340,6 +340,9 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     expect(text()).toContain('1,214 places (map data of 25 Oct), weather to Friday (fetched 2 h ago)');
     expect(button(W.appTripUpdateButton)).toBeDefined();
     expect(text()).toContain(W.appTripFlightMode);
+    // The steps that went through name the data saved, the same right after the run as after a reload: "Saving" is not one.
+    const ok = [...host.querySelectorAll('p.muted')].find((p) => p.textContent?.startsWith(W.appTripStepsOk))!.textContent!;
+    expect(ok).not.toContain(W.appTripStepSave);
   });
 
   test('[TRIP-GETREADY] a failed step shows what is not saved, a retry, and nothing is hidden or disabled', async () => {

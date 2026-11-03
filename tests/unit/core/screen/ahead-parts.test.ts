@@ -123,6 +123,16 @@ describe('the water estimate in words', () => {
   });
 });
 
+describe('water times of another day', () => {
+  test('[AH-WATER-Q] after the day’s ride, tomorrow’s water says "tomorrow", so two days’ times never stand side by side as one', () => {
+    const s = screen(rainyStop({ plan: { date: SAT, backToTodayAt: null } }));
+    const tomorrow = s.cards.water.items.find((x) => x.label === 'Café Lindenhof')!;
+    expect(tomorrow.detail).toMatch(/· tomorrow about \d\d:\d\d/);
+    // Today's stay as they were.
+    expect(screen(rainyStop()).cards.water.items.map((x) => x.detail ?? '').join(' ')).not.toMatch(/tomorrow/);
+  });
+});
+
 describe('basis words with their age', () => {
   test('[INV-22] the Water card says its age in words, as Food and Weather do: the map data date and the forecast fetch time', () => {
     const s = screen(rainyStop());

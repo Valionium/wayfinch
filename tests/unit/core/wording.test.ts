@@ -267,6 +267,8 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   stopKmOff: [['96', '120']],
   stopNoCover: [['95', 'about 14:40'], ['95', null]],
   stopNoCoverInBand: [['95', 'about 14:40'], ['95', null]],
+  waterTomorrowAbout: [['about 08:45']],
+  waterDayAbout: [['Mon 19 Oct', 'about 08:45']],
   stopCoverClose: [['Café Lindenhof', '93.2', 'about 14:30']],
   stopCoverCloseMapped: [['Mapped as a weather shelter, not checked · km 93.2.']],
   stopNoPlaceData: [['95']],

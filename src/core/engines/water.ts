@@ -2,7 +2,7 @@
 // margin, so every "good" answer is reached by a positive test: anything non-finite stops at `finite()` or fails a
 // comparison written so that NaN lands on the careful side.
 import { compareFinal, formatAbout, makeAnswer } from '../answers/index.ts';
-import { isKnownZone, localIsoDate } from '../answers/time.ts';
+import { addDaysIso, isKnownZone, localIsoDate } from '../answers/time.ts';
 import { bearingDeg } from '../geo/bearing.ts';
 import { pointAtRouteKm } from '../geo/project.ts';
 import { openWaterWindow, stateAt } from '../hours/check.ts';
@@ -495,9 +495,21 @@ const labelsOf = (place: Place, km: Km, f: WaterFacts): string[] => {
 
 const dated = (f: WaterFacts): boolean => f.trip.departureDate !== null;
 
+/** "about 08:45", with its day when it is not today's: tomorrow's water beside today's must not read as the same day. */
+function aboutOn(arrival: Date, tz: string, now: Date): string {
+  const about = formatAbout(arrival, tz);
+  if (!validDate(now)) return about;
+  const [day, today] = [localIsoDate(arrival, tz), localIsoDate(now, tz)];
+  if (day === today) return about;
+  if (day === addDaysIso(today, 1)) return W.waterTomorrowAbout(about);
+  const [y, m, d] = day.split('-').map(Number) as [number, number, number];
+  const weekday = W.timeWeekday(new Date(Date.UTC(y, m - 1, d)).getUTCDay());
+  return W.waterDayAbout(W.timeShortDay(weekday, d, W.timeMonth(m - 1)), about);
+}
+
 function whereOf(f: WaterFacts, t: Target & { kind: 'place' }): string {
   const distance = t.back ? W.waterBack(showKm(Math.abs(f.ride.behindFromKm - t.km))) : W.waterAhead(showKm(Math.abs(t.km - f.ride.startKm)));
-  return dated(f) && validDate(t.arrival) ? `${distance} · ${formatAbout(t.arrival, zoneOf(t.place, t.km, f))}` : distance;
+  return dated(f) && validDate(t.arrival) ? `${distance} · ${aboutOn(t.arrival, zoneOf(t.place, t.km, f), f.now)}` : distance;
 }
 
 /**

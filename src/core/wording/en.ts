@@ -110,6 +110,8 @@ export const W = {
   waterConfirm: 'Confirm your water to check the next stretch',
   waterConfirmAtEnd: 'Confirm your water to check it for tonight',
   waterUnderTenth: 'under 0.1',
+  waterTomorrowAbout: (about: string): string => `tomorrow ${about}`,
+  waterDayAbout: (day: string, about: string): string => `${day}, ${about}`,
   waterStillAbout: (litres: string): string => `Still about ${litres} L?`,
   waterEnterCapacity: 'Enter the water you can carry (You) to plan refills.',
   waterSetDate: 'Set your departure date to check this stretch.',
