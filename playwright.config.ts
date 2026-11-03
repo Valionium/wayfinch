@@ -35,7 +35,9 @@ export default defineConfig({
     // Desktop at 1280 x 720 (the short window of spec section 3.8), in Chromium and in Firefox. Both block a pull request.
     { name: 'app-wide', testMatch: WIDE, use: { viewport: { width: 1280, height: 720 }, colorScheme: 'dark' } },
     { name: 'app-wide-firefox', testMatch: WIDE, use: { browserName: 'firefox' as const, viewport: { width: 1280, height: 720 }, colorScheme: 'dark' } },
-    { name: 'app-budgets', testMatch: APP_SPECS, testIgnore: WIDE, grep: BUDGETS, dependencies: FUNCTIONAL, metadata: { cpuThrottle: 4 }, use: { viewport: { width: 360, height: 640 }, colorScheme: 'dark' } },
+    // In CI the budgets have a job of their own (WAYFINCH_SHARDED): a dependency on every other project would also put every test
+    // into one shard.
+    { name: 'app-budgets', testMatch: APP_SPECS, testIgnore: WIDE, grep: BUDGETS, dependencies: process.env.WAYFINCH_SHARDED ? [] : FUNCTIONAL, metadata: { cpuThrottle: 4 }, use: { viewport: { width: 360, height: 640 }, colorScheme: 'dark' } },
     // WebKit's smoke test is for when its browser is installed (the browser job installs Chromium only); it never blocks.
     ...(process.env.WAYFINCH_WEBKIT
       ? [{ name: 'app-webkit-smoke', testMatch: APP_SPECS, use: { browserName: 'webkit' as const, viewport: { width: 390, height: 844 } } }]
