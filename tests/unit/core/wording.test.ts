@@ -53,6 +53,7 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   appAheadWaterYes: [['0.6']],
   appAheadShareOld: [['14:20', '40 min ago']],
   appWideStripAt: [['42.5']],
+  appWideStripSet: [['42.5']],
   appWideStripSliderValue: [['42.5', '165']],
   appStretchSaved: [['50', '70', 12], ['50', '70', 1]],
   appPrepTilesFailed: [[1], [4]],

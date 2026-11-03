@@ -111,7 +111,7 @@ function Ruler({ strip, onSet }: { strip: Strip; onSet: (km: number) => void }) 
       </div>
       <p class="ah-ruler-read">
         <span data-ruler-text>{W.appWideStripAt(showKm(shown))}</span>
-        <button type="button" class="btn" onClick={() => onSet(km)}>{W.appAheadManualSet}</button>
+        <button type="button" class="btn" onClick={() => onSet(km)}>{W.appWideStripSet(showKm(km))}</button>
       </p>
       <p class="visually-hidden" id="ah-ruler-hint">{W.appWideStripSliderHint}</p>
     </div>

@@ -184,6 +184,11 @@ test('[WIDE-KEYS] arrows move along the strip, Enter sets a manual position, Esc
   await page.keyboard.press('Shift+ArrowRight');
   const at = Number(await ruler.getAttribute('aria-valuenow'));
   expect(at).toBeCloseTo(before + 12, 5);
+  // One action by that name: the ruler's button says what it sets, and the text is in the app's own font, not monospace.
+  await expect(page.getByRole('button', { name: 'Use this position' })).toHaveCount(1);
+  const read = page.locator('.ah-ruler-read');
+  await expect(read.getByRole('button', { name: `Set position at km ${at}` })).toBeVisible();
+  expect(await read.evaluate((el) => getComputedStyle(el).fontFamily + getComputedStyle(el.querySelector('button')!).fontFamily)).not.toMatch(/mono/i);
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-position-line]')).toContainText(`km ${at} of`);
   await expect(page.locator('[data-position-line]')).toContainText('set by hand');

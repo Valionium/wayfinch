@@ -38,7 +38,7 @@
   .ah-ruler-bar::before { content: ''; position: absolute; left: 0; right: 0; top: 21px; height: 2px; background: var(--line); }
   .ah-ruler-tick { position: absolute; top: 8px; width: 4px; height: 28px; margin-left: -2px; border-radius: 2px; background: var(--blaze); }
   .ah-ruler-hover { position: absolute; top: 14px; width: 2px; height: 16px; margin-left: -1px; background: var(--ink); }
-  .ah-ruler-read { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0; font-family: var(--font-mono); }
+  .ah-ruler-read { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0; }
 
   /* Trip: the bike, the route and its days; then the settings and Get ready. */
   .trip { display: grid; grid-template-columns: minmax(0, 7fr) minmax(16rem, 3fr); column-gap: 24px; align-items: start; }

@@ -1049,6 +1049,7 @@ export const W = {
   // Wide screens (plan Task 22, spec section 3.8): the keys along the strip, and what a computer's position is worth.
   appWideComputerApprox: 'On a computer, this is usually approximate.',
   appWideStripSlider: 'Choose a point along the strip',
+  appWideStripSet: (km: string): string => `Set position at km ${km}`,
   appWideStripSliderHint: 'Arrow keys move along the strip, Enter sets your position there.',
   appWideStripAt: (km: string): string => `km ${km}`,
   appWideStripSliderValue: (km: string, of: string): string => `km ${km} of ${of}`,
