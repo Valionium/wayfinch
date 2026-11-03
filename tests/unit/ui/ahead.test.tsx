@@ -167,6 +167,23 @@ describe('cards', () => {
     await click(buttonNamed('Set', card));
     expect(calls.filter((c) => c[0] === 'confirmWater')).toEqual([['confirmWater', v.stillAboutL], ['confirmWater', 0], ['confirmWater', 1.8]]);
   });
+
+  test('[AH-WATER-Q] with water confirmed, a refill is one tap on the closed card: the quick choices stay, "Still about" does not', async () => {
+    const i = rainyStop();
+    const v = trip(viewOf({ ...i, waterLeft: { litres: 1.2, at: new Date(i.now.getTime() - 5 * 60_000), confirmed: true } }));
+    expect(v.screen.cards.water.title).not.toBe(W.waterConfirm);
+    const { actions, calls } = fakeActions();
+    await show(v, actions);
+    const card = host.querySelector('[data-card="water"]')!;
+    expect(card.querySelector('.ah-toggle')!.getAttribute('aria-expanded')).toBe('false');
+    expect(card.textContent).not.toContain('Yes, about');
+    await click(buttonNamed('2 L', card));
+    expect(calls.filter((c) => c[0] === 'confirmWater')).toEqual([['confirmWater', 2]]);
+    // opened, the card holds the whole question once, with another amount
+    await click(card.querySelector('.ah-toggle'));
+    expect(card.querySelectorAll('[data-water-question]')).toHaveLength(1);
+    expect(card.querySelector('input[type=number]')).not.toBeNull();
+  });
 });
 
 

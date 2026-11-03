@@ -59,7 +59,8 @@ function TopicCard({ name, answer, stamp, open, onToggle, v, actions, onShelter 
       {name === 'sleep' && answer.detail.includes(W.sleepPlanTomorrow) ? (
         <p><button type="button" class="btn" onClick={() => void actions.planTomorrow(v.screen.ride.date)}>{W.daylightPlanTomorrow}</button></p>
       ) : null}
-      {asksWater && !open ? <WaterQuestion stillAboutL={v.stillAboutL} actions={actions} /> : null}
+      {/* Unconfirmed, the closed card asks in full; confirmed, a refill is still one tap (M7 of the group 6 review). */}
+      {name === 'water' && !open ? <WaterQuestion stillAboutL={v.stillAboutL} actions={actions} quick={!asksWater} /> : null}
       <div id={body} hidden={!open}>
         {open ? (
           <>
