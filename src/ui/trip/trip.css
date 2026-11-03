@@ -1,10 +1,16 @@
 /* Trip (spec section 3.3). The bike comes first and stays at most 120 px tall with its caption (section 3.3). */
 .trip-bike { margin: 0 0 12px; }
-.trip-bike .bike { display: flex; align-items: center; gap: 12px; margin: 0; max-height: 120px; overflow: hidden; }
+/* No clipping: a long caption once lost its first and last lines at 360 px. It fits the 120 px by its size instead (below). */
+.trip-bike .bike { display: flex; align-items: center; gap: 12px; margin: 0; }
 .trip-bike .bike-tap { flex: 0 0 auto; }
 .trip-bike .bike-art { width: auto; max-width: none; margin: 0; }
 .trip-bike .bike-art .bk { width: auto; height: 84px; max-width: 52vw; }
 .trip-bike .bike-caption { flex: 1 1 auto; margin: 0; min-width: 0; }
+@media (max-width: 420px) {
+  .trip-bike .bike-art .bk { height: 64px; }
+  .trip-bike .bike-caption { font-size: 0.875rem; line-height: 1.3; }
+  .trip-bike .bike-caption a { min-height: 44px; }
+}
 
 .field { margin: 0 0 12px; border: 0; padding: 0; min-width: 0; }
 .field > label, .field > legend { display: block; font-weight: 600; margin-bottom: 4px; padding: 0; }
