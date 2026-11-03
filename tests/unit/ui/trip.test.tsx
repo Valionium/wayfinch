@@ -686,3 +686,13 @@ describe('What the review of group 5 found', () => {
     expect(text()).not.toContain(W.appAbNone);
   });
 });
+
+describe('Trip and the database', () => {
+  test('[ST-DELETE] opening Trip with no data stored creates no database: a window that is open while the rider deletes its data does not bring it back', async () => {
+    await show();
+    expect((await indexedDB.databases()).map((d) => d.name)).not.toContain('copilot');
+    await pick(await fixtureGpx('loop'));
+    await until(() => host.querySelector('[data-summary]') !== null, 'the route');
+    expect((await indexedDB.databases()).map((d) => d.name)).toContain('copilot');
+  });
+});

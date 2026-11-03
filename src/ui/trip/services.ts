@@ -15,7 +15,8 @@ import { fetchBaseline, fetchElevation, fetchForecast, fetchModelRuns } from '..
 import { WEATHER_MODE } from '../../data/weather-mode.ts';
 import type { WeatherMode } from '../../data/weather-mode.ts';
 import { NewerDataError, RefusedError } from '../../store/changed.ts';
-import { openDb } from '../../store/db.ts';
+import { DB_NAME, openDb } from '../../store/db.ts';
+import { readLocalSettings } from '../../store/settings-local.ts';
 import { readInputs } from '../../store/inputs.ts';
 import { readPrepared, readStoredZones } from '../../store/prepared.ts';
 import type { PreparedRecord } from '../../store/prepared.ts';
@@ -124,6 +125,16 @@ async function counts(): Promise<{ places: number; forecastTo: Date | null; fore
   return { places, forecastTo, forecastFetchedAt: fetched instanceof Date && Number.isFinite(fetched.getTime()) ? fetched : null, lastPositionAt };
 }
 
+/** Whether the database exists: reading it must not make one, or data the rider just deleted would be brought back by an open window. */
+async function dbExists(): Promise<boolean> {
+  try {
+    if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') return true;
+    return (await indexedDB.databases()).some((d) => d.name === DB_NAME);
+  } catch {
+    return true;
+  }
+}
+
 async function storageMb(): Promise<number | null> {
   try {
     const usage = (await navigator.storage?.estimate?.())?.usage;
@@ -169,6 +180,7 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
 
   const load = async (): Promise<TripSnapshot> => {
     const at = now();
+    if (!(await dbExists())) return { ...nothing(at, readLocalSettings().settings, true), storageMb: await storageMb() };
     let settings: Settings;
     let trip: Trip | null;
     try {
