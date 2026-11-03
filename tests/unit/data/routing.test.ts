@@ -200,7 +200,7 @@ describe('Place search (spec section 7.1)', () => {
     const { fetch: f, seen } = fakeFetch({ [METEO]: meteoHits });
     const hits = await searchPlace('Heidelberg', f);
     expect(hits.map((h) => h.name)).toEqual(['Heidelberg']);
-    expect(hits[0]).toMatchObject({ lat: 49.4, lon: 8.69 });
+    expect(hits[0]).toMatchObject({ lat: 49.4, lon: 8.69, source: 'geonames' });
     expect(seen).toHaveLength(1);
     const url = new URL(seen[0]!.url);
     expect(url.origin + url.pathname).toBe(METEO);
@@ -212,7 +212,7 @@ describe('Place search (spec section 7.1)', () => {
 
   test('[AB-SEARCH] a natural feature asks Photon first, with its fixed filters and the text; each is the fallback of the other', async () => {
     const photonFirst = fakeFetch({ [PHOTON]: photonHits });
-    expect((await searchPlace('Bodensee', photonFirst.fetch)).map((h) => h.name)).toEqual(['Bodensee']);
+    expect((await searchPlace('Bodensee', photonFirst.fetch)).map((h) => [h.name, h.source])).toEqual([['Bodensee', 'osm']]);
     expect(photonFirst.seen).toHaveLength(1);
     const url = new URL(photonFirst.seen[0]!.url);
     expect(url.origin + url.pathname).toBe(PHOTON);

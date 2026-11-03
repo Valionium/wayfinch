@@ -15,8 +15,7 @@ import { fetchBaseline, fetchElevation, fetchForecast, fetchModelRuns } from '..
 import { WEATHER_MODE } from '../../data/weather-mode.ts';
 import type { WeatherMode } from '../../data/weather-mode.ts';
 import { NewerDataError, RefusedError } from '../../store/changed.ts';
-import { DB_NAME, openDb } from '../../store/db.ts';
-import { readLocalSettings } from '../../store/settings-local.ts';
+import { openExisting } from '../../store/db.ts';
 import { readInputs } from '../../store/inputs.ts';
 import { readPrepared, readStoredZones } from '../../store/prepared.ts';
 import type { PreparedRecord } from '../../store/prepared.ts';
@@ -69,7 +68,8 @@ export type TripServices = {
   parseXml: (text: string) => XmlDocLike;
   load: () => Promise<TripSnapshot>;
   /** Puts a route in: the first one, or in place of the old (the caller has asked the rider already, naming `expectedOldRouteId`). */
-  addRoute: (found: { route: Route; hadHeights: boolean }, expectedOldRouteId: string | null) => Promise<AddOutcome>;
+  /** `expectedOld`: the route the rider's question named (null: none). Compared by its line, so new heights are the same route. */
+  addRoute: (found: { route: Route; hadHeights: boolean }, expectedOld: Route | null) => Promise<AddOutcome>;
   /** The store Get ready writes through: its stage writes take their turn and use the settings as they are then. */
   prepareStore: (base: PreparedStore) => PreparedStore;
   writeSettings: (partial: Partial<Record<keyof Settings, unknown>>) => Promise<SettingsOutcome>;
@@ -110,7 +110,9 @@ function heightsLookedUp(route: Route): boolean {
 const weekdayOf = (date: string): number => new Date(`${date}T00:00:00Z`).getUTCDay();
 
 async function counts(): Promise<{ places: number; forecastTo: Date | null; forecastFetchedAt: Date | null; lastPositionAt: Date | null }> {
-  const db = await openDb();
+  // A read: it makes no database (after a delete in another window it finds none).
+  const db = await openExisting();
+  if (!db) return { places: 0, forecastTo: null, forecastFetchedAt: null, lastPositionAt: null };
   const places = await db.count('places');
   const forecast = (await db.get('forecast', 'current')) as { fetchedAt?: unknown; grid?: { hours?: { at: Date }[] }[] } | undefined;
   let forecastTo: Date | null = null;
@@ -124,16 +126,6 @@ async function counts(): Promise<{ places: number; forecastTo: Date | null; fore
   }
   const fetched = forecast?.fetchedAt;
   return { places, forecastTo, forecastFetchedAt: fetched instanceof Date && Number.isFinite(fetched.getTime()) ? fetched : null, lastPositionAt };
-}
-
-/** Whether the database exists: reading it must not make one, or data the rider just deleted would be brought back by an open window. */
-export async function dbExists(): Promise<boolean> {
-  try {
-    if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') return true;
-    return (await indexedDB.databases()).some((d) => d.name === DB_NAME);
-  } catch {
-    return true;
-  }
 }
 
 async function storageMb(): Promise<number | null> {
@@ -181,7 +173,6 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
 
   const load = async (): Promise<TripSnapshot> => {
     const at = now();
-    if (!(await dbExists())) return { ...nothing(at, readLocalSettings().settings, true), storageMb: await storageMb() };
     let settings: Settings;
     let trip: Trip | null;
     try {
@@ -222,11 +213,13 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
     await saveTrip({ ...trip, route });
   };
 
-  const addRoute = async ({ route, hadHeights }: { route: Route; hadHeights: boolean }, expected: string | null): Promise<AddOutcome> => {
+  const addRoute = async ({ route, hadHeights }: { route: Route; hadHeights: boolean }, expected: Route | null): Promise<AddOutcome> => {
     const settings = await readSettings();
     const before = await readTrip();
     // The question the rider answered named a route; if another window has put in a different one since, nothing is replaced.
-    if ((before?.route.id ?? null) !== expected) throw new RefusedError(W.appStoreChangedElsewhere);
+    // By the line, not the id: Get ready's heights step gives the same line a new id in this very window.
+    const asExpected = before === null ? expected === null : expected !== null && sameLine(before.route, expected);
+    if (!asExpected) throw new RefusedError(W.appStoreChangedElsewhere);
     // The same line is the same route, whatever heights it has now.
     if (before && sameLine(before.route, route)) return { kind: 'same', name: before.route.name };
     const flatKph = before?.flatKph ?? settings.flatKph;

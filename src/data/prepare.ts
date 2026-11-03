@@ -470,6 +470,11 @@ export async function prepareTrip(deps: PrepareDeps, onProgress: (step: StepName
       reports.push(failed('places', e));
     }
     const zones = await readStoredZones();
+    // The rider may have changed the date, speed, pace or nights while places downloaded: the later steps go by the trip as it is
+    // stored now (the same route; a replaced one stops the run).
+    const current = await store.readTrip();
+    if (!current || current.route.id !== trip.route.id) throw new RouteGoneError();
+    trip = current;
 
     begin('hours');
     reports.push(await hoursStep(store, trip, zones, deps.now(), (done, total) => onProgress('hours', done, total)));

@@ -47,6 +47,8 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
     focusLater(`card-${name}`);
   };
   const openChip = (c: ChipKey | null): void => {
+    // Emergency's "Last position at … (… ago)" is read at the time it is opened.
+    if (c !== null) actions.freshen();
     setChip(c);
     if (c) focusLater(`chip-${c}`);
   };
@@ -66,7 +68,7 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
     <div class="ahead" data-ahead={v.answers ? 'answers' : 'first-use'} onKeyDown={onKeyDown}>
       <div class="ah-main">
         {v.notice ? <p class="notice" role="status">{v.notice}</p> : null}
-        {v.answers ? <PositionLine v={v} onShare={() => setSharing(true)} /> : <p>{W.appAheadFirstUse}</p>}
+        {v.answers ? <PositionLine v={v} onShare={() => { actions.freshen(); setSharing(true); }} /> : <p>{W.appAheadFirstUse}</p>}
         {sharing && s.shareText !== null ? (
           <ShareSheet
             id="progress" title={W.appAheadShare} text={s.shareText} mapText={s.shareMapText} mapLink={v.mapLink} old={v.shareOld}
@@ -85,7 +87,7 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
       {v.answers ? <TopicCards screen={s} open={open} onToggle={toggle} v={v} actions={actions} onShelter={() => openChip('shelter')} /> : null}
       <div class="ah-below">
         <ChipRow shown={v.answers ? CHIP_ORDER : ['emergency']} open={chip} onOpen={openChip} />
-        {chip ? <ChipPanel chip={chip} screen={s} canShare={v.canShare} actions={actions} onClose={() => setChip(null)} /> : null}
+        {chip ? <ChipPanel chip={chip} screen={s} canShare={v.canShare} actions={actions} onClose={() => setChip(null)} position={v.position} /> : null}
       </div>
     </div>
   );

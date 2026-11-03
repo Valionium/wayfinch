@@ -8,7 +8,7 @@ import { browserServices } from '../tools/tyre/services.ts';
 import { lazy } from './lazy.tsx';
 import { riderKg } from './rider-kg.ts';
 import { Degraded } from './card.tsx';
-import { degradedSignal } from './degraded.ts';
+import { degradedSignal, kindsOnScreen } from './degraded.ts';
 import { screenSignal, tabOf } from './nav.ts';
 import type { ScreenName, TabName } from './nav.ts';
 import type { Updater } from './update.ts';
@@ -60,7 +60,7 @@ function Screen({ name }: { name: ScreenName }) {
   return (
     <main class="screen" id="main" data-screen={name}>
       <h1>{TITLES[tab]}</h1>
-      {degradedSignal.value.map((kind) => <Degraded key={kind} kind={kind} />)}
+      {kindsOnScreen(degradedSignal.value, tab).map((kind) => <Degraded key={kind} kind={kind} />)}
       {name === 'ahead' ? <AheadHost /> : null}
       {name === 'trip' ? <TripScreen services={tripServices} /> : null}
       {name === 'tools' ? <ToolsScreen services={tyreServices} /> : null}

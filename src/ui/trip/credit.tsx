@@ -11,3 +11,14 @@ export function OsmCredit({ lead, date }: { lead: string; date?: { date: string;
     </p>
   );
 }
+
+export const GEONAMES = 'https://www.geonames.org/';
+
+/** The credit for place names from Open-Meteo's geocoding, which come from GeoNames under CC BY 4.0. */
+export function GeoNamesCredit() {
+  return (
+    <p class="muted">
+      {W.appTripOsmSearch}<a href={GEONAMES} target="_blank" rel="noopener noreferrer">{W.appTripGeoNamesLink}</a>{W.appTripGeoNamesLicence}.
+    </p>
+  );
+}

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { test as fcTest, fc } from '@fast-check/vitest';
 import { describe, expect, test } from 'vitest';
 import { bikeArt, markerArt } from '../../../../src/core/bike/art.ts';
+import { CASINGS, casingFor, contrastRatio, SWATCHES } from '../../../../src/core/bike/colour.ts';
 import type { Anchors, Box } from '../../../../src/core/bike/art.ts';
 import { normaliseBike } from '../../../../src/core/bike/normalise.ts';
 import { resolveBikeSpec } from '../../../../src/core/bike/spec.ts';
@@ -122,6 +123,39 @@ describe('bikeArt (spec section 7.4)', () => {
   });
 });
 
+describe('bags where they ride (the look of 3 November)', () => {
+  test('[BK-ART-ANCHORS] the handlebar bag hangs in front of the bars, not above them, and clear of the front tyre', () => {
+    for (const e of drawingSet()) {
+      const a = bikeArt(resolveBikeSpec(e.bike, e.bags), e.bags).anchors;
+      const clamp = a.points.bar;
+      // centred ahead of the stem's clamp, its top at the bar, its middle below it: it hangs from the bars
+      expect(a.bar.x + a.bar.w / 2, `${e.name}: ahead`).toBeGreaterThan(clamp[0] + 4);
+      expect(a.bar.y, `${e.name}: top`).toBeGreaterThan(clamp[1] - 8);
+      expect(a.bar.y + a.bar.h / 2, `${e.name}: hangs`).toBeGreaterThan(clamp[1]);
+      const tyreTop = a.wheels.front.cy - a.wheels.front.r;
+      expect(a.bar.y + a.bar.h, `${e.name}: tyre`).toBeLessThanOrEqual(tyreTop);
+    }
+  }, 60_000);
+
+  test('[BK-ART-ANCHORS] bottles inside the frame triangle are drawn behind the frame bag; one under the down tube stays in front', () => {
+    const order = (bags: BagView, bike: Parameters<typeof resolveBikeSpec>[0] = setBike('diamond-level', 'M', 'drop', false)) => {
+      const els = elements(bikeArt(resolveBikeSpec(bike, bags), bags).svg);
+      const frameBag = els.findIndex((x) => x.tag === 'polygon' && x.attrs.class === 'bk-shell');
+      const bottles = els.map((x, i) => (x.attrs.class === 'bk-bottle' ? i : -1)).filter((i) => i >= 0);
+      return { frameBag, bottles };
+    };
+    for (const name of ['frame-three-quarter', 'frame-half', 'wedge', 'touring'] as const) {
+      const { frameBag, bottles } = order(BAG_SETS[name]!);
+      expect(frameBag, name).toBeGreaterThan(0);
+      expect(bottles.length, name).toBeGreaterThan(0);
+      for (const b of bottles) expect(b, name).toBeLessThan(frameBag);
+    }
+    const under: BagView = { items: [{ pos: 'frame', L: 3, shape: 2, fill: 1 }], decks: { bar: null, rack: null }, bottles: [{ slot: 'un', L: 0.75 }] };
+    const u = order(under, null); // a typical bike has the bolts under the down tube
+    expect(u.bottles[0]).toBeGreaterThan(u.frameBag);
+  });
+});
+
 describe('scale and fit (spec section 7.4)', () => {
   test('[BK-FIT-BOX] the outer wheel diameter is the rim plus twice the tyre, at 0.11 units per mm unless the bike shrinks to fit', () => {
     for (const e of tyreSet()) {
@@ -207,6 +241,50 @@ describe('colour and casing (spec sections 3.6 and 7.4)', () => {
     const b = bikeArt(spec(null), BAG_SETS.everything!, { idPrefix: 'two' }).svg;
     const ids = (s: string) => [...s.matchAll(/id="([^"]+)"/g)].map((m) => m[1]);
     expect(ids(a).some((id) => ids(b).includes(id))).toBe(false);
+  });
+});
+
+describe("the casing, owner's ruling A of 3 November 2026", () => {
+  const themeCss = readFileSync('src/ui/theme.css', 'utf8');
+  const tokenOf = (selector: string, name: string): string => {
+    const at = themeCss.indexOf(selector);
+    const body = themeCss.slice(themeCss.indexOf('{', at) + 1, themeCss.indexOf('}', at));
+    return new RegExp(`--${name}:\\s*(#[0-9A-Fa-f]{6})`).exec(body)![1]!.toUpperCase();
+  };
+
+  test('[BK-COLOUR-CASING] only Brown (light), Silver and Sand (dark) leave muted, and they stand out from their casing at 3:1 or more; the swatches are as the spec fixes them', () => {
+    expect(SWATCHES.map((s) => `${s.name} ${s.hex}`).join(', ')).toBe('Black #1d1d1f, Graphite #4b4f54, Silver #b9bdc1, White #f4f4f2, Sand #cbb68e, Brown #7b5434, Red #c62f2a, Orange #e46b1f, Yellow #f1c232, Olive #6d7a37, Green #2f7d4f, Teal #1f7f80, Blue #2563b8, Navy #1f2f55, Purple #6b3fa0, Pink #d6619b');
+    const ruled: Record<'light' | 'dark', string[]> = { light: ['Brown'], dark: ['Silver', 'Sand'] };
+    for (const theme of ['light', 'dark'] as const) {
+      for (const s of SWATCHES) {
+        const tone = casingFor(s.hex, theme);
+        if (ruled[theme].includes(s.name)) {
+          expect(tone, `${s.name} in ${theme}`).not.toBe('muted');
+          expect(contrastRatio(s.hex, (CASINGS[theme] as Record<string, string>)[tone]!), `${s.name} in ${theme} on ${tone}`).toBeGreaterThanOrEqual(3);
+        } else {
+          // Section 3.6: the casing is muted; the owner moved only the three above.
+          expect(tone, `${s.name} in ${theme}`).toBe('muted');
+        }
+      }
+    }
+    // A colour of the picker or a photo keeps muted as well.
+    expect(casingFor('#7c5535', 'light')).toBe('muted');
+  });
+
+  test('[BK-COLOUR-CASING] the casing tones are the theme’s own tokens, as theme.css has them, and the drawing and marker carry the tone', () => {
+    for (const [theme, selector] of [['light', ":root[data-theme='light']"], ['dark', ":root[data-theme='dark']"]] as const) {
+      for (const [tone, hex] of Object.entries(CASINGS[theme])) expect(hex.toUpperCase(), `${theme} ${tone}`).toBe(tokenOf(selector, tone));
+    }
+    const css = readFileSync('src/ui/bike/bike.css', 'utf8').replace(/\s+/g, '');
+    for (const tone of ['ink', 'panel', 'ground']) expect(css).toContain(`.bk-casing-${tone}{stroke:var(--${tone})`);
+    const brown = resolveBikeSpec(normaliseBike({ id: 'b', look: { colour: '#7b5434' } }), null);
+    const tone = casingFor('#7b5434', 'light');
+    expect(elements(bikeArt(brown, null, { theme: 'light' }).svg).filter((e) => (e.attrs.class ?? '').startsWith('bk-casing')).every((e) => e.attrs.class === `bk-casing bk-casing-${tone}`)).toBe(true);
+    const black = resolveBikeSpec(normaliseBike({ id: 'k', look: { colour: '#1d1d1f' } }), null);
+    const plain = elements(bikeArt(black, null, { theme: 'dark' }).svg).filter((e) => (e.attrs.class ?? '').startsWith('bk-casing'));
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.every((e) => e.attrs.class === 'bk-casing')).toBe(true);
+    expect(markerArt(brown, 'light')).toContain(`class="bk-casing bk-casing-${tone}"`);
   });
 });
 

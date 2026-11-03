@@ -52,9 +52,17 @@ jobs:
       - run: npm ci
       - run: npm run qa
 
-  browser:
+  # The browser tests in two halves side by side (plan Task 23: over 6 minutes in one), and the budgets alone in a third, so
+  # nothing else runs on the machine while they are timed. The check a merge needs stays `browser`.
+  browser-shard:
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ['1/2', '2/2', 'budgets']
+    env:
+      WAYFINCH_SHARDED: '1'
     steps:
       - uses: actions/checkout@v7
       # legacySite() reads the page as it was live from this tag; a shallow checkout doesn't have it.
@@ -70,4 +78,33 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium firefox
       - run: npm run build
-      - run: npx playwright test
+      # A part that ran no test at all fails: an empty shard once went green.
+      - run: |
+          if [ "${{ matrix.part }}" = budgets ]; then npx playwright test --project=app-budgets --reporter=list,json
+          else npx playwright test --shard=${{ matrix.part }} --grep-invert '\[PERF-' --reporter=list,json; fi
+          node -e "const s = require('./pw.json').stats; if (!(s.expected + s.unexpected + s.flaky > 0)) { console.error('This part ran no test.'); process.exit(1); }"
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: pw.json
+  # WebKit's smoke set (plan Decision 1): it runs on every pull request, is not a required check, and `browser` does not wait for it.
+  webkit-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps webkit
+      - run: npx playwright test --project=app-webkit-smoke
+        env:
+          WAYFINCH_WEBKIT: '1'
+  browser:
+    needs: browser-shard
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: test "${{ needs.browser-shard.result }}" = success

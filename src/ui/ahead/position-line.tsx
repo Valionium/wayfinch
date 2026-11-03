@@ -41,7 +41,8 @@ export function PositionControls({ v, actions, pickerOpen, onPicker, rail = fals
         </div>
       ) : null}
       {v.approximateHelp ? <p class="notice">{W.appAheadApproxHelp}</p> : null}
-      {pickerOpen ? <ManualPicker lengthKm={v.lengthKm} towns={v.towns} actions={actions} start={v.screen.ride.startKm} /> : null}
+      {/* Keyed by where the ride starts: a picker left open on a computer starts again from the new position, not the old one. */}
+      {pickerOpen ? <ManualPicker key={v.screen.ride.startKm} lengthKm={v.lengthKm} towns={v.towns} actions={actions} start={v.screen.ride.startKm} /> : null}
     </div>
   );
 }

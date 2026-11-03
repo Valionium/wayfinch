@@ -603,7 +603,8 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - JavaScript before the first screen ≤ 150 KB gzipped, bike drawing included; 150 KB is 150,000 bytes (coordinator's ruling, 3 Nov 2026: it tightens the test and loosens nothing; the owner may reverse it) (§4.5) [PERF-JS-FIRST]
 - All lazy chunks together ≤ 200 KB gzipped; bag planner excluded (§4.5) [PERF-JS-LAZY]
 - One bike with bags drawn ≤ 20 ms (§4.5) [PERF-BIKE]
-- Heidelberg → Strasbourg places: ≤ 3 MB and ≤ 30 s on the stand-in's network, on a live pack, on the owner's Run workflow only, because a pull request must not depend on outside data; the fixture's size is checked on every pull request (§4.5) [PERF-PACK]
+- Heidelberg → Strasbourg places: the fixture pack's size, ≤ 3 MB, is checked on every pull request (§4.5) [PERF-PACK]
+- Heidelberg → Strasbourg places on a live pack: ≤ 3 MB and ≤ 30 s on the stand-in's network, on the owner's Run workflow only, because a pull request must not depend on outside data; no test or workflow step exists yet (§4.5) [PERF-PACK-LIVE]
 - Boundary file ≤ 150 KB gzipped (§4.5) [PERF-BOUNDARY]
 
 ## App: Vite, Preact and the switch

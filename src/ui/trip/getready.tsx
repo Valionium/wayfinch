@@ -64,7 +64,8 @@ export function GetReady({ services, snap, reload }: { services: TripServices; s
 
   const steps = reports ?? snap.prepared?.steps ?? null;
   const failed = steps?.filter((s) => !s.ok) ?? [];
-  const saved = steps?.filter((s) => s.ok) ?? [];
+  // "Saving" is how the run ends, not data it saved; the stored record never holds it, so it isn't listed right after a run either.
+  const saved = steps?.filter((s) => s.ok && s.step !== 'save') ?? [];
   const line = savedLine(snap);
   const ask = askForHomeScreen({ userAgent: services.env.userAgent, maxTouchPoints: services.env.maxTouchPoints, platform: services.env.platform, standalone: services.env.standalone })
     && snap.prepared === null && snap.places === 0;

@@ -75,14 +75,24 @@ export const open247 = (p: Place): boolean => p.openingHours?.trim() === '24/7';
 /** One pass of a place along the route, with readable figures. */
 export type Pass = { place: Place; match: RouteMatch };
 
-export function passesOf(f: Pick<ScreenInputs, 'places' | 'matches'>): Pass[] {
+// Every engine of one screen asks for the same passes and hours (PERF-SCREEN): worked out once per pair of lists, frozen, so no
+// caller can change what the next one reads.
+const PASSES = new WeakMap<readonly unknown[], WeakMap<readonly unknown[], readonly Pass[]>>();
+
+export function passesOf(f: Pick<ScreenInputs, 'places' | 'matches'>): readonly Pass[] {
+  const kept = PASSES.get(f.places)?.get(f.matches);
+  if (kept) return kept;
   const byId = new Map(f.places.map((p) => [p.id, p]));
   const out: Pass[] = [];
   for (const match of f.matches) {
     const place = byId.get(match.placeId);
     if (place && Number.isFinite(match.km) && match.offRouteM >= 0 && match.offRouteM < Infinity) out.push({ place, match });
   }
-  return out;
+  const frozen = Object.freeze(out);
+  let inner = PASSES.get(f.places);
+  if (!inner) PASSES.set(f.places, (inner = new WeakMap()));
+  inner.set(f.matches, frozen);
+  return frozen;
 }
 
 const knownZone = (tz: string): string => (isKnownZone(tz) ? tz : 'UTC');
@@ -93,9 +103,15 @@ export const zoneOfPass = (x: Pass, f: Pick<ScreenInputs, 'routeZones'>): string
 
 export const insideRadius = (ride: DayRide, km: Km): boolean => ride.startKm < ride.behindFromKm && km >= ride.startKm && km <= ride.behindFromKm;
 
+const HOURS = new WeakMap<readonly unknown[], (id: string) => PlaceHours | undefined>();
+
 export const hoursIndex = (f: Pick<ScreenInputs, 'hours'>): ((id: string) => PlaceHours | undefined) => {
+  const kept = HOURS.get(f.hours);
+  if (kept) return kept;
   const map = new Map(f.hours.map((h) => [h.placeId, h]));
-  return (id) => map.get(id);
+  const look = (id: string): PlaceHours | undefined => map.get(id);
+  HOURS.set(f.hours, look);
+  return look;
 };
 
 /** The schedule of a ride. The ride the facts already plan keeps its own, so a place has one arrival on every card. */

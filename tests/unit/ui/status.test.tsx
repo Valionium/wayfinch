@@ -2,7 +2,7 @@
 import { render } from 'preact';
 import { afterEach, expect, test } from 'vitest';
 import { Degraded, ListMore } from '../../../src/ui/card.tsx';
-import { degradedKinds, isStorageBlocked } from '../../../src/ui/degraded.ts';
+import { degradedKinds, isStorageBlocked, kindsOnScreen } from '../../../src/ui/degraded.ts';
 import { StatusBadge } from '../../../src/ui/status.tsx';
 import { W } from '../../../src/core/wording/en.ts';
 import type { Status } from '../../../src/core/types.ts';
@@ -40,8 +40,24 @@ test('[APP-DEGRADED] with no trip, section 8 names the missing route, blocked st
 
   // and which of them show with nothing yet: no route; blocked storage first; no signal only while no trip is prepared
   expect(degradedKinds({ hasRoute: false, hasPreparedTrip: false, online: true, storageBlocked: false })).toEqual(['noRoute']);
-  expect(degradedKinds({ hasRoute: false, hasPreparedTrip: false, online: false, storageBlocked: true })).toEqual(['storageBlocked', 'noRoute', 'noSignalNoTrip']);
+  expect(degradedKinds({ hasRoute: false, hasPreparedTrip: false, online: false, storageBlocked: true })).toEqual(['storageBlocked', 'noRoute']);
+  expect(degradedKinds({ hasRoute: true, hasPreparedTrip: false, online: false, storageBlocked: true })).toEqual(['storageBlocked', 'noSignalNoTrip']);
   expect(degradedKinds({ hasRoute: true, hasPreparedTrip: true, online: false, storageBlocked: false })).toEqual([]);
+});
+
+test('[APP-DEGRADED] "Add a route" only once a read found no route, and only on Trip and Ahead; "No signal" only for a route that is not prepared', () => {
+  const facts = { hasRoute: null, hasPreparedTrip: null, online: true, storageBlocked: false };
+  // not read yet, or the read failed: nothing is claimed about the route (Ahead says "couldn't be read" itself)
+  expect(degradedKinds(facts)).toEqual([]);
+  expect(degradedKinds({ ...facts, online: false })).toEqual([]);
+  // no route at all: "this trip is not prepared … come from the route" would talk about a route that isn't there
+  expect(degradedKinds({ ...facts, hasRoute: false, hasPreparedTrip: false, online: false })).toEqual(['noRoute']);
+  expect(degradedKinds({ ...facts, hasRoute: true, hasPreparedTrip: false, online: false })).toEqual(['noSignalNoTrip']);
+  // spec section 8: "No route | Trip and Ahead". You and Tools work without a route; blocked storage matters everywhere.
+  const all = ['storageBlocked', 'noRoute', 'noSignalNoTrip'] as const;
+  expect(kindsOnScreen(all, 'trip')).toEqual(all);
+  expect(kindsOnScreen(all, 'ahead')).toEqual(all);
+  for (const tab of ['you', 'tools'] as const) expect(kindsOnScreen(all, tab)).toEqual(['storageBlocked']);
 });
 
 test('a list folds after five and shows all on a tap, removing nothing', () => {

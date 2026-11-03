@@ -198,8 +198,8 @@ type From = { aheadKm: Km; behindKm: Km };
 /**
  * A stamp as the rider reads it (section 3.2), in the very terms its item uses: "+6 km · 14:40" ahead, measured from the near
  * edge of an approximate position; "9 km back · 14:50" behind, from its far edge; "near you, may be behind" inside the radius,
- * with no time, as the item has none; "here" at the rider's own kilometre; "here · 14:20" for a time alone. A time is shown to
- * the nearest 5 minutes in the place's zone, as arrivals are.
+ * with no time when the item has none, and with its time when it has one; "here" at the rider's own kilometre; "here · 14:20"
+ * for a time alone. A time is shown to the nearest 5 minutes in the place's zone, as arrivals are.
  */
 function stampTextOf(i: ScreenInputs, from: From, stamp: Answer['stamp']): string | null {
   if (!stamp) return null;
@@ -208,7 +208,13 @@ function stampTextOf(i: ScreenInputs, from: From, stamp: Answer['stamp']): strin
   const near = Number.isFinite(from.aheadKm) ? from.aheadKm : 0;
   const far = Number.isFinite(from.behindKm) ? Math.max(from.behindKm, near) : near;
   if (km === null) return at ? W.weatherStampHere(formatHm(at, routeZoneAt(i, near))) : null;
-  if (far > near && km >= near && km <= far) return W.waterNearYou;
+  if (far > near && km >= near && km <= far) {
+    // A place inside the radius has no time, as its item has none. A timed stamp keeps its time: at the near edge, where answers
+    // ahead measure from, it is "here · 14:20" (a rain window that starts at the rider); further in, "near you, may be behind · 14:20".
+    if (!at) return W.waterNearYou;
+    const where = km - near < HERE_KM ? W.routeStampHere : W.waterNearYou;
+    return `${where} · ${formatNearestHm(at, routeZoneAt(i, km))}`;
+  }
   let where: string;
   if (km < near) {
     const back = far - km;

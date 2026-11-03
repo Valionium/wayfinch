@@ -3,7 +3,7 @@
 import { formatAbout, formatHm } from '../answers/index.ts';
 import type { Cover, Km, Missing, RainPlan, RainWindow } from '../types.ts';
 import { showKm, W } from '../wording/en.ts';
-import { coverOfSpot, finalOrder, hoursLookup, hoursNotWorkedOut, insideRadius, isCover, missingFor, reachKm, savedCovers, seatingLine, spotName, spotsOf, zoneOfSpot, hoursDecide, type NotCover, type Spot, type StopFacts } from './covers.ts';
+import { coverLine, coverOfSpot, finalOrder, hoursLookup, hoursNotWorkedOut, insideRadius, isCover, missingFor, reachKm, savedCovers, seatingLine, spotName, spotsOf, zoneOfSpot, hoursDecide, type NotCover, type Spot, type StopFacts } from './covers.ts';
 import { shelterEntries, stormAroundStart, latestUsable } from './shelter.ts';
 import { onTheRide, rainAtStart, ridePoints, routeForecast, within48h } from './weather-windows.ts';
 
@@ -125,7 +125,19 @@ export function rainPlan(w: RainWindow, f: StopFacts): RainPlan {
   const missing: Missing[] = missingFor(f, start, m, unworked);
   const zone = zoneOfSpotKm(f, m);
   const known = savedCovers(f, start, m);
-  const none = covers.length > 0 ? null : known ? W.stopNoCover(showKm(m), validDate(tm) && w.detail === '30min' ? formatAbout(tm, zone) : null) : W.stopNoPlaceData(showKm(m));
+  const about = validDate(tm) && w.detail === '30min' ? formatAbout(tm, zone) : null;
+  // A cover the rule doesn't count because it is reached under 15 minutes before m is still there: the words say so, rather than
+  // that none is mapped (the rider would be sent back past an open building 600 m on).
+  const close = judged
+    .filter((j) => j.lead < BAND_MIN - SLACK && j.lead >= 0 && isCover(j.r) && counts(thunder, j.r))
+    .sort((a, b) => a.arrival.getTime() - b.arrival.getTime() || finalOrder(a.spot, b.spot))[0];
+  const none = covers.length > 0 ? null
+    : !known ? W.stopNoPlaceData(showKm(m))
+    // "Open" only for an open building (class 1 or 2, open at arrival); a roof or shelter is named as mapped (section 8 rule 6).
+    : close ? `${W.stopNoCoverInBand(showKm(m), about)} · ${(close.r as Cover).coverClass <= 2
+      ? W.stopCoverClose(spotName(close.spot), showKm(close.spot.match.km), formatAbout(close.arrival, zoneOfSpot(close.spot, f)))
+      : W.stopCoverCloseMapped(coverLine(close.spot, close.r, f))}`
+    : W.stopNoCover(showKm(m), about);
   return {
     ...empty, m, covers: covers.map((c) => c.cover),
     firstCoverLine: covers[0] ? firstCoverLine(covers[0], thunder, f) : null,

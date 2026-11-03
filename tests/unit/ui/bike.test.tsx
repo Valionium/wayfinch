@@ -80,7 +80,9 @@ describe('nothing is required (the owner\'s rules)', () => {
   test('[BK-NOTHING-REQUIRED] with no bike and no plan: a typical bike and a friendly caption, no error', () => {
     show(<BikeDrawing bike={null} summary={null} back="trip" />);
     expect(svg()!.getAttribute('aria-label')).toBe('Your bike: gravel bike, 700 × 40 mm tyres, drop bars.');
-    expect(host.querySelector('figcaption')!.textContent).toBe('A typical gravel bike · Add your bike');
+    expect(host.querySelector('figcaption')!.textContent!.replace(/ /g, ' ')).toBe('A typical gravel bike · Add your bike');
+    // The "·" holds to the words before it: on a narrow phone only the link moves to the next line, never the dot alone.
+    expect(host.querySelector('figcaption')!.textContent).toContain('bike · ');
   });
 
   test('[BK-NOTHING-REQUIRED] every screen renders with broken bike data, no plan or a broken plan', async () => {

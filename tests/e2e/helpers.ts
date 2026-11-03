@@ -12,6 +12,7 @@ import { buildRoute } from '../../src/core/route/profile.ts';
 import { sampleGrid } from '../../src/core/route/grid.ts';
 import { planStages } from '../../src/core/route/stages.ts';
 import type { Trip } from '../../src/core/types.ts';
+import { forecastBody } from '../fixtures/openmeteo.ts';
 import { loadFixtureRoute } from '../fixtures/packs/index.ts';
 import type { FixtureRouteId } from '../fixtures/packs/index.ts';
 import type { StoreInPage } from './fixtures/store-page.ts';
@@ -70,6 +71,14 @@ export async function fixedClock(page: Page, iso: string): Promise<void> {
   await page.clock.install({ time: new Date(iso) });
 }
 
+/** Today at 09:30 in Berlin, the fixture routes' zone, as an instant: a morning with the day's ride ahead. */
+export function thisMorning(): Date {
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
+  const guess = new Date(`${day}T09:30:00Z`);
+  const offsetH = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Berlin', hour: '2-digit', hour12: false }).format(guess)) - 9;
+  return new Date(guess.getTime() - offsetH * 3_600_000);
+}
+
 declare const __store: StoreInPage;
 
 let storeBundle: Promise<string> | null = null;
@@ -116,7 +125,7 @@ export async function servePack(page: Page, id: string, hold: (url: string) => '
 }
 
 /** A trip on a fixture route, saved through the store. With `places`, also Get ready offline's places and hours, on the fixture pack. */
-export async function preparedTrip(page: Page, id: string, opts: { departureDate?: string | null; places?: boolean } = {}): Promise<Trip> {
+export async function preparedTrip(page: Page, id: string, opts: { departureDate?: string | null; places?: boolean; weather?: boolean; atMs?: number } = {}): Promise<Trip> {
   await withStore(page);
   const fixture = await loadFixtureRoute(id as FixtureRouteId);
   const built = await buildRoute(fixture.points, fixture.name, 'gpx');
@@ -132,8 +141,37 @@ export async function preparedTrip(page: Page, id: string, opts: { departureDate
   }, trip);
   if (!opts.places) return trip;
   await servePack(page, id);
-  await page.evaluate(() => __store.prepare());
+  await page.evaluate(([weather, atMs]) => __store.prepare({ weather, atMs }), [opts.weather ?? false, opts.atMs] as const);
   return page.evaluate(async () => (await __store.readTrip())!);
+}
+
+/**
+ * Open-Meteo's forecast for this page, rainy as of `base` (now by default): rain from one to two hours on, a thunderstorm from
+ * three to four, at every point asked for; hourly, and in 15 minutes when asked. Every request's address is kept.
+ */
+export async function serveRainyWeather(page: Page, base: number = Date.now()): Promise<string[]> {
+  const asked: string[] = [];
+  const cors = { 'access-control-allow-origin': '*' };
+  await page.context().route('https://api.open-meteo.com/**', async (route) => {
+    const url = new URL(route.request().url());
+    asked.push(url.toString());
+    if (!url.pathname.startsWith('/v1/forecast')) return route.fulfill({ status: 500, headers: cors, body: '{}' });
+    const count = url.searchParams.get('latitude')!.split(',').length;
+    const days = Number(url.searchParams.get('forecast_days'));
+    const hour = 3600;
+    const now = Math.floor(base / 1000 / hour) * hour;
+    const from = now - 12 * hour;
+    const rainy = (t: number) => t >= now + hour && t < now + 2 * hour;
+    const stormy = (t: number) => t >= now + 3 * hour && t < now + 4 * hour;
+    const with15 = url.searchParams.has('minutely_15');
+    const body = forecastBody(count, {
+      from, hours: days * 24 + 12,
+      at: (_l, t) => (rainy(t) ? { precipitation_probability: 85, precipitation: 2.2, weather_code: 63 } : stormy(t) ? { precipitation_probability: 75, precipitation: 3.5, weather_code: 95 } : undefined),
+      ...(with15 ? { rain15: () => { const time = Array.from({ length: 192 }, (_, n) => now + n * 900); return { time, precipitation: time.map((t) => (rainy(t) ? 0.6 : stormy(t) ? 0.9 : 0)) }; } } : {}),
+    });
+    return route.fulfill({ headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  });
+  return asked;
 }
 
 /** An accepted position at a route kilometre, through the store. */

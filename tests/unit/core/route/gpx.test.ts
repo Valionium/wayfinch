@@ -36,6 +36,18 @@ describe('[LC-PORT-LIMITS] limits', () => {
     expect(parseGpx('x', () => fakeDoc(200_000, 1)).points).toHaveLength(200_000);
   });
 
+  test('a text with over 200,000 points is refused before it is parsed: a phone never builds that document (TRIP-GPX-BAD ran slow on it)', () => {
+    const pts = (n: number, tag: string) => `<gpx><trk><trkseg>${`<${tag} lat="48" lon="8"/>`.repeat(n)}</trkseg></trk></gpx>`;
+    let parsed = 0;
+    const never = () => { parsed += 1; return fakeDoc(2, 1); };
+    expectRefused(() => parseGpx(pts(200_001, 'trkpt'), never), 'too-many-points');
+    expectRefused(() => parseGpx(pts(200_001, 'gpx:rtept'), never), 'too-many-points');
+    expect(parsed).toBe(0);
+    // At the limit the text is parsed as before, and the document decides.
+    parseGpx(pts(200_000, 'trkpt'), never);
+    expect(parsed).toBe(1);
+  });
+
   test('over 500 sections is refused with the reason, 500 is accepted', () => {
     expectRefused(() => parseGpx('x', () => fakeDoc(1000, 501)), 'too-many-sections');
     expect(parseGpx('x', () => fakeDoc(1000, 500)).segments).toBe(500);

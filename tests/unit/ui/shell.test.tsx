@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { App } from '../../../src/ui/app.tsx';
+import { noteTripFacts } from '../../../src/ui/degraded.ts';
 import { go, screenFromHash, screenSignal } from '../../../src/ui/nav.ts';
 import { resetRegistration, startOfflineWorker } from '../../../src/ui/register.ts';
 import { UPDATE_CHECK_MS, createUpdater } from '../../../src/ui/update.ts';
@@ -13,8 +14,6 @@ document.body.append(host);
 afterEach(async () => {
   render(null, host);
   vi.useRealTimers();
-  // Preact runs effects after the next paint; let those run while the window still exists.
-  await new Promise((done) => setTimeout(done, 40));
 });
 
 /** A registration and a container that behave as far as the shell looks. */
@@ -81,6 +80,8 @@ test('[APP-REGISTER] it registers after the first render, never before, and not 
   await flush();
   expect(world.container.register).toHaveBeenCalledTimes(1);
   expect(sawShellAtRegister).toBe(true);
+  // main.tsx mounted the whole app here: unmount it, or it re-renders after the file's last test, when jsdom is gone.
+  render(null, app);
   app.remove();
 
   // an insecure page registers nothing
@@ -175,4 +176,31 @@ test('the shell opens on Trip with no trip, shows four labelled tabs, and follow
   expect(screenFromHash('#/nonsense', 'trip')).toBe('trip');
   expect(screenFromHash('', 'trip')).toBe('trip');
   expect(screenSignal.value).toBe('tools/tyre');
+});
+
+test('[APP-DEGRADED] the shell shows "Add a route" on Trip and Ahead, never on Tools or You', async () => {
+  noteTripFacts(false, false);
+  go('tools');
+  render(<App />, host);
+  const notices = () => [...host.querySelectorAll('main > .notice')].map((n) => n.textContent);
+  expect(notices()).not.toContain("Add a route to see what's ahead");
+  await act(async () => { go('you'); });
+  expect(notices()).not.toContain("Add a route to see what's ahead");
+  await act(async () => { go('trip'); });
+  expect(notices()).toContain("Add a route to see what's ahead");
+  // a failed read says nothing about the route
+  await act(async () => { noteTripFacts(null, null); });
+  expect(notices()).not.toContain("Add a route to see what's ahead");
+});
+
+// The teardown race of 3 November ("requestAnimationFrame is not defined"): a tree left mounted after the last test re-renders when
+// its store reads settle, and Preact asks for the next frame after jsdom has gone. Every tree here is unmounted, so after the last
+// test nothing renders: a render now would ask for a frame.
+afterAll(async () => {
+  let asked = 0;
+  const real = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = (cb) => { asked += 1; return real(cb); };
+  await new Promise((done) => setTimeout(done, 300));
+  globalThis.requestAnimationFrame = real;
+  expect(asked).toBe(0);
 });

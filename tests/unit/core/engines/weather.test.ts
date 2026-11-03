@@ -57,6 +57,14 @@ describe('warning: thunderstorms at night', () => {
     expect(statusOf(f)).toBe('warning');
     expect(answerOf(f).title).toBe("Thunderstorm possible at km 150 tonight, 22:00–01:00. Exact places and times can't be forecast.");
   });
+  test('[WX-WARN-NIGHT] at the stop, a storm going on now is not "tonight": it says now, and one later today says so', () => {
+    const NOW_STORM: Spell = { km: 150, stamps: [`${SAT} 14:00`, `${SAT} 15:00`], pp: 40, code: 95 };
+    const f = factsOf([NOW_STORM], riding(150, '14:20'));
+    expect(answerOf(f).title).not.toMatch(/tonight/);
+    expect(answerOf(f).title).toMatch(/^Thunderstorm possible at km 150 now/);
+    const LATER: Spell = { km: 150, stamps: [`${SAT} 16:00`, `${SAT} 17:00`], pp: 40, code: 95 };
+    expect(answerOf(factsOf([LATER], riding(150, '14:20'))).title).toMatch(/^Thunderstorm possible at km 150 later today/);
+  });
   test('[WX-WARN-NIGHT] an indoor stay has no such warning, and the hours are not named as its reason', () => {
     const f = factsOf([NIGHT], riding(100, '14:00', { trip: testTrip({ stay: 'accommodation' }) }));
     expect(statusOf(f)).toBe('fine');

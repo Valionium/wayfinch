@@ -30,10 +30,12 @@ import { noteRoute, noteTripFacts } from './degraded.ts';
 import { isFailure, locateFix, manualAt, onPass, ROUTINE, watchBest } from './position.ts';
 import type { Failure } from './position.ts';
 import { agoText } from './trip/model.ts';
-import { dbExists } from './trip/services.ts';
+import { whileVisible } from './screen-clock.ts';
 
 const APPROXIMATE_HELP_M = 1000; // section 9.2: worse than about 1 km usually means approximate location only
 const SHARE_OLD_MS = 30 * 60_000; // section 6.14
+/** While Ahead is in front, the screen is built again for the time now this often: ages, "here" and stamps follow the clock. */
+export const TICK_MS = 60_000;
 
 export type AheadDeps = {
   now: () => Date;
@@ -134,6 +136,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
   const emergencyAlone = (at: Date) => emergencyCard({ position: null, now: at, country: null, settlements: [], shelters: [], rescuePoints: [], thunderNear: false, dataDate: '' });
   const unreadable = (at: Date): void => {
     view.value = { kind: 'unreadable', canShare: deps.share !== null, emergency: emergencyAlone(at) };
+    noteRoute(null);
   };
 
   const noRoute = (at: Date): void => {
@@ -142,6 +145,12 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       emergency: emergencyAlone(at),
     };
     noteTripFacts(false, false);
+  };
+
+  /** The screen again for the time now, from the inputs already read: no store, no network. */
+  const freshen = (): void => {
+    if (hooked || !inputs || view.peek().kind !== 'trip') return;
+    present({ ...inputs, now: deps.now() });
   };
 
   /** The facts that change without a new screen: the position routine, Update weather, the bike, the map-link choice. */
@@ -158,7 +167,8 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     let read: ScreenInputs | null;
     let failed = false;
     try {
-      read = (await dbExists()) ? await readInputs(at) : null;
+      // A read never makes the database: with none (a fresh phone, or just deleted) there is no trip.
+      read = await readInputs(at);
     } catch {
       read = null;
       failed = true;
@@ -340,6 +350,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     },
     // No recipient: the rider picks one in the SMS app. "?&body=" is the form both iPhone and Android open.
     smsHref: (text) => `sms:?&body=${encodeURIComponent(text)}`,
+    freshen,
   };
 
   return {
@@ -347,6 +358,9 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     start() {
       void load();
       const stop = onChanged(() => void load());
+      // A screen left in front (a phone on the bars, a long stop) is built again each minute from what was read, for the time now:
+      // no store read or write, no request. Only while the page is visible.
+      const stopTick = whileVisible(freshen, TICK_MS);
       const visible = (): void => { if (typeof document !== 'undefined' && document.visibilityState === 'visible') void load(); };
       if (typeof document !== 'undefined') document.addEventListener('visibilitychange', visible);
       // A bike saved in the bag planner redraws the marker at once.
@@ -356,6 +370,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       });
       return () => {
         stop();
+        stopTick();
         stopBike();
         if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', visible);
       };

@@ -168,7 +168,8 @@ export async function planRoute(a: LatLon, b: LatLon, fetchIt: Fetch, routers: r
 
 // ---- place search ---------------------------------------------------------------------------------------------------------
 
-export type FoundPlace = { name: string; where: string; lat: number; lon: number };
+/** `source`: whose data the hit is, for its credit: Open-Meteo's geocoding answers from GeoNames (CC BY 4.0), Photon from OpenStreetMap. */
+export type FoundPlace = { name: string; where: string; lat: number; lon: number; source: 'geonames' | 'osm' };
 
 const METEO_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 const PHOTON_URL = 'https://photon.komoot.io/api/';
@@ -184,7 +185,7 @@ function meteoHits(answer: unknown): FoundPlace[] {
   const out: FoundPlace[] = [];
   for (const r of results) {
     if (!isRecord(r) || clean(r.name, 160) === '' || !validLatLon(r.latitude, r.longitude)) continue;
-    out.push({ name: clean(r.name, 160), where: joined([r.admin1, r.country]), lat: r.latitude, lon: r.longitude as number });
+    out.push({ name: clean(r.name, 160), where: joined([r.admin1, r.country]), lat: r.latitude, lon: r.longitude as number, source: 'geonames' });
   }
   return out.slice(0, MAX_HITS);
 }
@@ -199,7 +200,7 @@ function photonHits(answer: unknown): FoundPlace[] {
     const [lon, lat] = f.geometry.coordinates as unknown[];
     const p = f.properties;
     if (clean(p.name, 160) === '' || !validLatLon(lat, lon) || !PHOTON_KEYS.includes(String(p.osm_key))) continue;
-    out.push({ name: clean(p.name, 160), where: joined([p.city, p.state, p.country]), lat, lon: lon as number });
+    out.push({ name: clean(p.name, 160), where: joined([p.city, p.state, p.country]), lat, lon: lon as number, source: 'osm' });
   }
   return out.slice(0, MAX_HITS);
 }

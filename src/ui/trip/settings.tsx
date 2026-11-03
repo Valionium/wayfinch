@@ -67,7 +67,9 @@ export function TripSettings({ services, snap, reload }: { services: TripService
     // A refusal stays beside its field only until the next change that is accepted.
     // An accepted change clears the old refusals, but a note about it (its days could not be updated) is always shown.
     setProblems((p) => (result.ok ? (result.note ? { [field]: result.note } : {}) : { ...p, [field]: result.reasons[field] ?? result.note ?? '' }));
-    await reload();
+    // The caller puts a refused value back at once, as the refusal shows: not only once the trip has been read again (on a busy
+    // phone that took long enough for the refused value to linger beside its message).
+    void reload();
     return result.ok;
   };
   const setDate = async (date: string | null): Promise<void> => {
@@ -99,7 +101,20 @@ export function TripSettings({ services, snap, reload }: { services: TripService
                 void setDate(e.currentTarget.value === '' ? null : e.currentTarget.value);
               }}
             />
-            {trip.departureDate === null ? <p class="muted">{W.appTripDepartureNone}</p> : null}
+            {trip.departureDate !== null ? (
+              <p>
+                <button
+                  type="button" class="btn"
+                  onClick={() => {
+                    // A date still settling from the field goes too: the tap is the last word.
+                    if (dateTimer.current) clearTimeout(dateTimer.current);
+                    dateTimer.current = null;
+                    setDateDraft('');
+                    void setDate(null);
+                  }}
+                >{W.appTripDateClear}</button>
+              </p>
+            ) : <p class="muted">{W.appTripDepartureNone}</p>}
             {problem('date') ? <p class="field-problem" role="alert">{problem('date')}</p> : null}
           </div>
         ) : null}

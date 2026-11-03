@@ -1,4 +1,6 @@
+import { test as fcTest, fc } from '@fast-check/vitest';
 import { describe, expect, test } from 'vitest';
+import { wallClock } from '../../../src/core/answers/time.ts';
 import {
   compareFinal, formatAbout, formatLeaveBy, formatRainEnd, formatRainOnset, makeAnswer,
 } from '../../../src/core/answers/index.ts';
@@ -138,5 +140,26 @@ describe('[HON-TIEBREAK] the final comparator', () => {
     const a = [...items].sort(compareFinal);
     const b = [...items].reverse().sort(compareFinal);
     expect(a).toEqual(b);
+  });
+});
+
+describe('[HON-TIME] the wall clock by arithmetic is the zone formatter\'s, to the second (PERF-SCREEN asks it thousands of times)', () => {
+  const ZONES = ['Europe/Berlin', 'Europe/London', 'Europe/Athens', 'America/St_Johns', 'Asia/Kathmandu', 'Australia/Lord_Howe', 'Pacific/Chatham', 'UTC'];
+  const formatted = (t: Date, tz: string) => {
+    const w: Record<string, number> = {};
+    const f = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    for (const p of f.formatToParts(t)) if (p.type !== 'literal') w[p.type] = Number(p.value);
+    return { year: w['year'], month: w['month'], day: w['day'], hour: w['hour'], minute: w['minute'], second: w['second'] };
+  };
+  fcTest.prop([fc.integer({ min: Date.UTC(2020, 0, 1), max: Date.UTC(2035, 0, 1) }), fc.constantFrom(...ZONES)], { numRuns: 400 })('any instant', (ms, tz) => {
+    const t = new Date(ms);
+    expect(wallClock(t, tz)).toEqual(formatted(t, tz));
+  });
+  test('every second around the spring and autumn changes of 2026, in Berlin, London and Lord Howe (a half-hour change)', () => {
+    const edges: [string, number][] = [['Europe/Berlin', Date.UTC(2026, 2, 29, 1)], ['Europe/Berlin', Date.UTC(2026, 9, 25, 1)], ['Europe/London', Date.UTC(2026, 2, 29, 1)], ['Australia/Lord_Howe', Date.UTC(2026, 3, 4, 15)], ['Australia/Lord_Howe', Date.UTC(2026, 9, 3, 15, 30)]];
+    for (const [tz, edge] of edges) for (let s = -120; s <= 120; s += 1) {
+      const t = new Date(edge + s * 1000 + 250);
+      expect(wallClock(t, tz), `${tz} ${t.toISOString()}`).toEqual(formatted(t, tz));
+    }
   });
 });

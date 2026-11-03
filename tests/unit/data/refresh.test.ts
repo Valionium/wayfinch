@@ -252,6 +252,10 @@ describe('the whole refresh, on the real store', () => {
     }
     expect(src('src/data/refresh.ts')).toMatch(/'open' \| 'foreground' \| 'tap'/);
     expect(src('tools/build.mjs') + src('src/ui/register.ts')).not.toMatch(/periodicsync|backgroundfetch/i);
+    // Ahead's minute clock only calls back while the page is in front: it reaches no network, no store and no weather.
+    const clock = src('src/ui/screen-clock.ts');
+    expect(clock).not.toMatch(/fetch|import |indexedDB|localStorage|refresh/);
+    expect(clock).toMatch(/visibilityState/);
   });
 
   test('[WXR-ONE-CALL] one request for the whole route, whatever the length: 10 variables with the 15-minute rain, no more than 16 days', async () => {
@@ -600,5 +604,7 @@ describe('the mode is one line', () => {
     expect(await bundled('tap')).toBe('tap');
     expect(await bundled('auto')).toBe('auto');
     expect(await bundled('sometimes')).toBe('tap');
-  });
+    // Three real esbuild runs: under a full parallel suite on a busy machine they outlast the default 5 s, as the build tests'
+    // runs do (tests/unit/tools/app-build.test.ts gives those 60 s). The check itself is unchanged.
+  }, 30_000);
 });

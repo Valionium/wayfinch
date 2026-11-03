@@ -4,7 +4,7 @@ import type { ChipName, Screen } from '../../core/screen/screen.ts';
 import { W } from '../../core/wording/en.ts';
 import { ListMore } from '../card.tsx';
 import { StatusBadge } from '../status.tsx';
-import type { AheadActions } from './actions.ts';
+import type { AheadActions, PositionState } from './actions.ts';
 import { Basis, Detail, Item } from './answer-parts.tsx';
 import { EmergencyPanel } from './emergency.tsx';
 
@@ -28,11 +28,11 @@ export function ChipRow({ shown, open, onOpen }: { shown: ChipKey[]; open: ChipK
   );
 }
 
-export function ChipPanel({ chip, screen, canShare, actions, onClose }: { chip: ChipKey; screen: Screen; canShare: boolean; actions: AheadActions; onClose: () => void }) {
+export function ChipPanel({ chip, screen, canShare, actions, onClose, position }: { chip: ChipKey; screen: Screen; canShare: boolean; actions: AheadActions; onClose: () => void; position?: PositionState }) {
   if (chip === 'emergency') {
     return (
       <section class="card ah-chip-panel ah-large" id="chip-emergency" aria-label={CHIP_LABEL.emergency}>
-        <EmergencyPanel card={screen.chips.emergency} canShare={canShare} actions={actions} />
+        <EmergencyPanel card={screen.chips.emergency} canShare={canShare} actions={actions} position={position} />
         <button type="button" class="btn" onClick={onClose}>{W.appAheadClose}</button>
       </section>
     );

@@ -2,17 +2,18 @@
 // margin, so every "good" answer is reached by a positive test: anything non-finite stops at `finite()` or fails a
 // comparison written so that NaN lands on the careful side.
 import { compareFinal, formatAbout, makeAnswer } from '../answers/index.ts';
-import { isKnownZone, localIsoDate } from '../answers/time.ts';
+import { addDaysIso, isKnownZone, localIsoDate } from '../answers/time.ts';
 import { bearingDeg } from '../geo/bearing.ts';
 import { pointAtRouteKm } from '../geo/project.ts';
 import { openWaterWindow, stateAt } from '../hours/check.ts';
 import type { Answer, AnswerItem, DayRide, Km, Missing, Place, PlaceHours, RouteMatch, ScreenInputs, SunSource, Trip } from '../types.ts';
-import { showKm, W } from '../wording/en.ts';
+import { shortMapDate, showKm, W } from '../wording/en.ts';
 import { LOAD_PENALTY } from '../route/stages.ts';
 import { newestMapDate } from './covers.ts';
+import { fetchedLabel } from './weather.ts';
 import { isFarOff, latestPosition, positionOrder, rejoinKm } from './locate.ts';
 import { flatLegClockMin, flatLegRidingMin, usableFlatKph, type Schedule } from './pace.ts';
-import { nowSchedule, ridingDate, zoneLookupOf } from './tripday.ts';
+import { chipStart, nowSchedule, ridingDate, zoneLookupOf } from './tripday.ts';
 import { uncertainty } from './water-learning.ts';
 import { capacityFrom, lapse, masses, outsideRange, planningWeather, riderPower, routeHeight, stopRate, sweatRate, type PlanningWeather, type Section } from './water-model.ts';
 
@@ -472,6 +473,8 @@ const trim = (x: number): string => String(Math.round(x * 100) / 100);
 const upToTenth = (x: number): number => Math.ceil(x * 10 - 1e-9) / 10;
 const showUp = (x: number): string => trim(upToTenth(x));
 const showNear = (x: number): string => trim(Math.round(x * 10) / 10);
+/** A need in words: a small one that rounds to 0 reads "under 0.1", never 0, which would say none is needed. */
+const showNeed = (x: number): string => (x > 0 && x < 0.05 ? W.waterUnderTenth : showNear(x));
 
 const nameOf = (t: Target): string => {
   if (t.kind === 'end') return W.waterRouteEnd;
@@ -492,12 +495,36 @@ const labelsOf = (place: Place, km: Km, f: WaterFacts): string[] => {
 
 const dated = (f: WaterFacts): boolean => f.trip.departureDate !== null;
 
+/** "about 08:45", with its day when it is not today's: tomorrow's water beside today's must not read as the same day. */
+function aboutOn(arrival: Date, tz: string, now: Date): string {
+  const about = formatAbout(arrival, tz);
+  if (!validDate(now)) return about;
+  const [day, today] = [localIsoDate(arrival, tz), localIsoDate(now, tz)];
+  if (day === today) return about;
+  if (day === addDaysIso(today, 1)) return W.waterTomorrowAbout(about);
+  const [y, m, d] = day.split('-').map(Number) as [number, number, number];
+  const weekday = W.timeWeekday(new Date(Date.UTC(y, m - 1, d)).getUTCDay());
+  return W.waterDayAbout(W.timeShortDay(weekday, d, W.timeMonth(m - 1)), about);
+}
+
 function whereOf(f: WaterFacts, t: Target & { kind: 'place' }): string {
   const distance = t.back ? W.waterBack(showKm(Math.abs(f.ride.behindFromKm - t.km))) : W.waterAhead(showKm(Math.abs(t.km - f.ride.startKm)));
-  return dated(f) && validDate(t.arrival) ? `${distance} · ${formatAbout(t.arrival, zoneOf(t.place, t.km, f))}` : distance;
+  return dated(f) && validDate(t.arrival) ? `${distance} · ${aboutOn(t.arrival, zoneOf(t.place, t.km, f), f.now)}` : distance;
+}
+
+/**
+ * Inside the radius of an approximate fix the place may already be behind (section 8). The day's ride carries that radius while
+ * it runs; after the ride (tonight's water) it is the fix's own, as the chips have it.
+ */
+function insideFix(f: WaterFacts, km: Km): boolean {
+  if (insideRadius(f.ride, km)) return true;
+  const s = chipStart(f.ride, f.trip, f.positions);
+  return s.aheadKm < s.behindKm && km >= s.aheadKm && km <= s.behindKm;
 }
 
 function itemFor(f: WaterFacts, t: Target & { kind: 'place' }): AnswerItem {
+  // The litres still go to the least favourable point; the words say where it may be: no distance, no arrival.
+  if (insideFix(f, t.km)) return { label: nameOf(t), stamp: { km: t.km }, status: 'fine', detail: [W.waterNearYou, ...labelsOf(t.place, t.km, f)].join(' · ') };
   const stamp = dated(f) ? { km: t.km, at: t.arrival } : { km: t.km };
   const detail = [whereOf(f, t), ...labelsOf(t.place, t.km, f)].join(' · ');
   return { label: nameOf(t), stamp, status: 'fine', detail };
@@ -550,11 +577,19 @@ function freshnessOf(f: WaterFacts): Answer['freshness'] {
   return { dataDates, stale };
 }
 
-function basisOf(list: Sec[]): string[] {
+function basisOf(list: Sec[], f: WaterFacts): string[] {
   const basis = [W.waterBasisEstimate];
   if (list.some((s) => s.label === 'seasonal')) basis.push(W.waterBasisSeasonal);
   if (list.some((s) => s.label === 'assumed-hot')) basis.push(W.waterBasisAssumedHot);
   basis.push(W.waterBasisOsm);
+  // Its age in words, as Food and Weather give theirs (section 8): the map data's date, the forecast's fetch time.
+  const date = shortMapDate(newestMapDate(f));
+  if (date) basis.push(W.stopMapDate(date));
+  if (f.forecast && validDate(f.forecast.fetchedAt) && validDate(f.now)) {
+    const tz = zoneLookupOf(f.routeZones)(0).timeZone;
+    const zone = isKnownZone(tz) ? tz : 'UTC';
+    basis.push(W.weatherBasis(fetchedLabel(f.forecast.fetchedAt, f.now, zone), null));
+  }
   return basis;
 }
 
@@ -621,14 +656,14 @@ export function waterAnswer(f: WaterFacts): Answer {
   // The lines every card carries.
   const lines: string[] = [];
   if (s1.kind !== 'place' && s1.km - f.ride.startKm >= 0.05) lines.push(W.waterNoSource(showKm(s1.km - f.ride.startKm)));
-  lines.push(W.waterExpectedPlanned(nameOf(s1), showNear(expectedS1), showNear(useS1)), calibrationOf(f));
+  lines.push(W.waterExpectedPlanned(nameOf(s1), showNeed(expectedS1), showNeed(useS1)), calibrationOf(f));
   const rideHours = f.schedule.ridingMinTo(f.ride.stopKm) / 60;
   if (f.profile.ebike || listS2.some((s) => outsideRange({ planT: s.planT, elevM: s.elevM, ridingHours: rideHours }))) lines.push(W.waterOutsideRange);
 
   const card = (status: Answer['status'], title: string, extra: string[], items: AnswerItem[]): Answer => makeAnswer({
     topic: 'water', status, title, stamp, detail: [...extra, ...lines].join(' '),
     // A target is as good as the card it is on: it never reads "fine" on a card that isn't.
-    items: items.map((i) => (i.status === 'fine' ? { ...i, status } : i)), basis: basisOf(listS2.length > 0 ? listS2 : listS1), freshness: freshnessOf(f), missing,
+    items: items.map((i) => (i.status === 'fine' ? { ...i, status } : i)), basis: basisOf(listS2.length > 0 ? listS2 : listS1, f), freshness: freshnessOf(f), missing,
   });
   const nearby = (strict = false): AnswerItem[] => [
     ...(closeShown ? [itemFor(f, closeShown)] : []),
@@ -637,7 +672,8 @@ export function waterAnswer(f: WaterFacts): Answer {
 
   if (!now.confirmed) {
     const asks = now.stillAbout === null ? [] : [W.waterStillAbout(showNear(now.stillAbout))];
-    return card('unknown', W.waterConfirm, asks, [...targetItems, ...nearby()]);
+    // At the route end there is no next stretch to check: only tonight's water.
+    return card('unknown', atRouteEnd(f) ? W.waterConfirmAtEnd : W.waterConfirm, asks, [...targetItems, ...nearby()]);
   }
 
   const w0 = now.litres;
