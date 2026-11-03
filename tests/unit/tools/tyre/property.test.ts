@@ -21,7 +21,7 @@ const inputArb: fc.Arbitrary<TyreInput> = fc
     wheelBsdMm: fc.constantFrom(622, 584, 571, 559, 507, 406),
     casing: fc.constantFrom('supple' as const, 'standard' as const, 'reinforced' as const),
     setup: fc.constantFrom('butyl' as const, 'latex' as const, 'tpu' as const, 'tubeless' as const),
-    rimType: fc.constantFrom('hooked' as const, 'hookless' as const, 'tubular' as const),
+    rimType: fc.constantFrom('hooked' as const, 'hookless' as const, 'tubular' as const, 'unset' as const),
     surface: fc.constantFrom('paved' as const, 'rough' as const, 'unpaved' as const),
     wet: fc.boolean(),
     bars: fc.constantFrom('drop' as const, 'flat' as const, 'other' as const),
@@ -49,7 +49,7 @@ describe('limits hold for every input', () => {
       expect(w.bar).toBeLessThanOrEqual(w.capBar + 1e-9);
       expect(w.estimate).toBeLessThanOrEqual(w.capBar);
       if (w.floorBar !== null && !r.incompatible) expect(w.estimate).toBeGreaterThanOrEqual(w.floorBar);
-      if (input.rimType === 'hookless') expect(w.bar).toBeLessThanOrEqual(5);
+      if (input.rimType === 'hookless' || input.rimType === 'unset') expect(w.bar).toBeLessThanOrEqual(5);
       if (input.setup !== 'tubeless' && input.tyreMin && !r.incompatible) {
         expect(inUnit(input.tyreMin, w)).toBeGreaterThanOrEqual(input.tyreMin.value);
         expect(w.windowBar[0]).toBeGreaterThanOrEqual(barOf(input.tyreMin) - 1e-9);

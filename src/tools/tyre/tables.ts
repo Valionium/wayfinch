@@ -52,4 +52,4 @@ export const FIT_MAX_MM = 37;
 
 /** Limits that can be typed: anything outside is not a tyre pressure. */
 export const LIMIT_BAR = { min: 0.2, max: 11, queryAbove: 10 } as const;
-export const LIMIT_PSI = { min: 3, max: 160 } as const;
+export const LIMIT_PSI = { min: 3, max: 160, queryBelow: 15 } as const;

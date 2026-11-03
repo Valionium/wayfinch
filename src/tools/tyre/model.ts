@@ -71,6 +71,9 @@ export const ASSUMED = {
   surface: 'paved', riderKg: 75, bikeKg: 14,
 } as const;
 
+/** The order of the "assumed" line: what can make a figure too high comes first. */
+const ASSUMED_ORDER: FieldName[] = ['rimType', 'frontMm', 'rearMm', 'wheelBsdMm', 'rimInnerMm', 'setup', 'casing', 'surface', 'bars', 'riderKg', 'bikeKg', 'carriedKg'];
+
 /** Every value the calculation will use, whether or not the required limit is there yet. */
 export type Values = Omit<TyreInput, 'tyreMax' | 'tyreMin' | 'rimMax'>;
 
@@ -107,7 +110,9 @@ export function resolve(d: Details, ctx: Context): Resolved {
   else sources.rearMm = sources.frontMm;
   const casing = pick('casing', d.casing, bike?.casing);
   const setup = pick('setup', d.setup, bike?.setup);
-  const rimType = pick('rimType', d.rimType, bike?.rimType);
+  const rimPicked = d.rimType ?? bike?.rimType;
+  const rimType: RimType | 'unset' = rimPicked === undefined ? 'unset' : rimPicked;
+  sources.rimType = d.rimType !== undefined ? 'entered' : bike?.rimType !== undefined ? 'bike' : 'assumed';
   const rimInnerMm = pick('rimInnerMm', d.rimInnerMm, bike?.rimInnerMm);
   const surface = pick('surface', d.surface, undefined);
 
@@ -135,13 +140,13 @@ export function resolve(d: Details, ctx: Context): Resolved {
     sources.carriedKg = 'assumed';
   }
 
-  const assumed = (Object.keys(sources) as FieldName[]).filter((k) => sources[k] === 'assumed' && k !== 'carriedKg');
+  const assumed = ASSUMED_ORDER.filter((k) => sources[k] === 'assumed');
   const values: Values = {
     riderKg, bikeKg, load,
     measured: d.measured ?? null,
     bars,
-    front: { printedMm: frontMm, caliperMm: d.caliperFrontMm ?? null },
-    rear: { printedMm: rearMm, caliperMm: d.caliperRearMm ?? null },
+    front: { printedMm: frontMm, caliperMm: d.caliperFrontMm ?? null, assumed: sources.frontMm === 'assumed' },
+    rear: { printedMm: rearMm, caliperMm: d.caliperRearMm ?? null, assumed: sources.rearMm === 'assumed' },
     casing, setup, rimType, rimInnerMm, wheelBsdMm, surface,
     wet: d.wet ?? false,
     // Heat and altitude need the temperatures and the highest point; the pump height is sea level unless said.

@@ -63,13 +63,13 @@ const INCH_BSD: Record<string, number> = { '29': 622, '28': 622, '27.5': 584, '2
 /** A tyre size as people write it: "40-622", "700x40c", "29 x 2.2". Null when it does not parse. */
 export function parseTyreSize(text: unknown): { widthMm: number; bsdMm: number } | null {
   if (typeof text !== 'string') return null;
-  const etrto = /(\d{2,3})\s*[-–]\s*(\d{3})\b/.exec(text);
+  const etrto = /(?<![\d.])(\d{2,3})\s*[-–]\s*(\d{3})\b/.exec(text);
   if (etrto) {
     const widthMm = Number(etrto[1]);
     const bsdMm = Number(etrto[2]);
     return WHEELS.some((w) => w.bsdMm === bsdMm) && widthMm >= 18 && widthMm <= 83 ? { widthMm, bsdMm } : null;
   }
-  const french = /\b(700|650b)\s*[x×]\s*(\d{2})\b/i.exec(text);
+  const french = /\b(700|650b)\s*[x×]\s*(\d{2})c?\b/i.exec(text);
   if (french) {
     const widthMm = Number(french[2]);
     return widthMm >= 18 && widthMm <= 83 ? { widthMm, bsdMm: french[1] === '700' ? 622 : 584 } : null;

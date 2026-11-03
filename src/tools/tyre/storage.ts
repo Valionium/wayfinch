@@ -14,7 +14,7 @@ export interface KeyValueStore {
 }
 
 /** The last figures shown for one bike, for the Tools tab. Shown values only (bar), never written anywhere else. */
-export interface LastResult { frontBar: number; rearBar: number; at: string }
+export interface LastResult { frontBar: number; rearBar: number; at: string; bike?: string }
 export interface Entry { details: Details; last: LastResult | null }
 export interface TyreStore { v: 1; updatedAt: string; entries: Record<string, Entry> }
 
@@ -77,7 +77,7 @@ function sanitizeLast(raw: unknown): LastResult | null {
   if (!isObject(raw)) return null;
   const f = num(raw.frontBar, 0.1, 15);
   const r = num(raw.rearBar, 0.1, 15);
-  return f !== undefined && r !== undefined && typeof raw.at === 'string' && raw.at.length <= 40 ? { frontBar: f, rearBar: r, at: raw.at } : null;
+  return f !== undefined && r !== undefined && typeof raw.at === 'string' && raw.at.length <= 40 ? { frontBar: f, rearBar: r, at: raw.at, ...(typeof raw.bike === 'string' && raw.bike.length <= 100 ? { bike: raw.bike } : {}) } : null;
 }
 
 export type ReadOutcome = { ok: true; store: TyreStore } | { ok: false; reason: 'newer' | 'broken' };

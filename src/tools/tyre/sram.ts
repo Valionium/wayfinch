@@ -13,7 +13,7 @@ export function sramList(v: Values): { label: string; value: string }[] {
   const placed = v.load.byPositionKg ?? {};
   const pack = placed.pack ?? 0; // a backpack counts as rider
   const gear = v.bikeKg + v.load.unplacedKg + (v.load.emptyLuggageKg ?? 0) + Object.entries(placed).reduce((a, [k, n]) => a + (k === 'pack' ? 0 : (n ?? 0)), 0);
-  const rim = { hooked: W.tyreRimHooked, hookless: W.tyreRimHookless, tubular: W.tyreRimTubular }[v.rimType];
+  const rim = v.rimType === 'unset' ? W.tyreSramRimUnset : { hooked: W.tyreRimHooked, hookless: W.tyreRimHookless, tubular: W.tyreRimTubular }[v.rimType];
   const casing = { supple: W.tyreSramThin, standard: W.tyreCasingStandard, reinforced: W.tyreCasingReinforced }[v.casing];
   return [
     { label: W.tyreSramRider, value: kg(v.riderKg + pack) },

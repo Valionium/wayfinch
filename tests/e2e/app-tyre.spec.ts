@@ -40,6 +40,8 @@ test('[TY-UI-STORE] #/tools/tyre opens inside Tools, and what was typed is still
   await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Tools' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByText('Enter the maximum pressure printed on your tyre')).toBeVisible();
   await page.getByRole('textbox', { name: /Tyre maximum/ }).fill('5');
+  await expect(page.locator('.tyre-big')).toHaveCount(0); // rim type and width unknown: the lowest limits, which a tube cannot meet
+  await page.getByLabel('Hooked').check();
   await expect(page.locator('.tyre-big')).toHaveCount(2);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('textbox', { name: /Tyre maximum/ })).toHaveValue('5');
@@ -92,6 +94,7 @@ test('[TY-UI-OFFLINE] the tool works in flight mode and sends nothing', async ({
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Tyre pressure', level: 2 })).toBeVisible();
   const settled = requests.length;
+  await page.getByLabel('Hooked').check();
   await page.getByRole('textbox', { name: /Tyre maximum/ }).fill('65');
   await page.getByRole('button', { name: 'Yes, 65 psi' }).click();
   await expect(page.locator('.tyre-big')).toHaveCount(2);
@@ -120,4 +123,24 @@ test('the tyre screen has no accessibility violations, no sideways scroll, 44 px
     if (box) expect(box.height, await control.evaluate((e) => e.outerHTML.slice(0, 80))).toBeGreaterThanOrEqual(43.5);
   }
   expect(problems).toEqual([]);
+});
+
+test('[TY-UI-STORE] switching bike in a real browser never writes one bike\'s details over another\'s', async ({ page }) => {
+  app = await loadApp(page, { launch: true });
+  const second = { ...bike, id: 'bike_b', name: 'Gravel hookless', look: { colour: null, bars: 'drop', ebike: null }, pressure: { wheel: '700c', rim: 'hookless', rimMm: 21 }, frontTyre: '30-622', rearTyre: '30-622' };
+  await page.goto(`${app.origin}/#/tools`);
+  await page.evaluate((entries) => { for (const [k, v] of Object.entries(entries)) localStorage.setItem(k, v); }, { ...SEED, 'loadcheck:bikeProfiles': JSON.stringify([bike, second]) });
+  await page.goto(`${app.origin}/#/tools/tyre`);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.locator('#tyre-bike').selectOption('default');
+  await page.getByRole('textbox', { name: /Tyre maximum/ }).fill('8');
+  await page.getByLabel('Hooked').check();
+  await page.locator('#tyre-bike').selectOption('bike_b');
+  await expect(page.getByRole('textbox', { name: /Tyre maximum/ })).toHaveValue('');
+  await expect(page.getByText('Enter the maximum pressure printed on your tyre')).toBeVisible();
+  const store = await page.evaluate(() => JSON.parse(localStorage.getItem('copilot:tyre:v1') ?? '{}'));
+  expect(store.entries.bike_b).toBeUndefined();
+  expect(store.entries.default.details.tyreMax).toEqual({ value: 8, unit: 'bar' });
+  await page.locator('#tyre-bike').selectOption('default');
+  await expect(page.getByRole('textbox', { name: /Tyre maximum/ })).toHaveValue('8');
 });
