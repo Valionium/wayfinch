@@ -3,7 +3,7 @@
 // The outline and wheels are the theme's `line`; the rider's colour is a stroke="#rrggbb" on frame and fork only, over a casing
 // 1.5 units wider in `muted`. Bags keep the fill ramp, so how full a bag looks never depends on the frame colour.
 import { W } from '../wording/en.ts';
-import { nearestSwatchName } from './colour.ts';
+import { casingFor, nearestSwatchName } from './colour.ts';
 import type { BagItem, BagView, BikeSpec } from './spec.ts';
 import { SIZE_FACTOR, TEMPLATES } from './templates.ts';
 
@@ -704,12 +704,19 @@ export function bikeArt(spec: BikeSpec, bags: BagView | null, options: ArtOption
     RECENT.unshift(hit);
     RECENT.length = Math.min(RECENT.length, 12);
   }
-  const svg = (colour ? hit.svg.split(`stroke="${PAINT}"`).join(`stroke="${colour}"`) : hit.svg).replace(NAME, label);
+  const svg = withCasing((colour ? hit.svg.split(`stroke="${PAINT}"`).join(`stroke="${colour}"`) : hit.svg).replace(NAME, label), colour, options.theme ?? 'dark');
   return { svg, anchors: hit.anchors, label };
 }
 
+/** The casing's tone for this colour and theme (owner's ruling A): muted keeps the plain class, the stylesheet's own. */
+function withCasing(svg: string, colour: string | null, theme: 'dark' | 'light'): string {
+  if (!colour) return svg;
+  const tone = casingFor(colour, theme);
+  return tone === 'muted' ? svg : svg.split('class="bk-casing"').join(`class="bk-casing bk-casing-${tone}"`);
+}
+
 /** The route-strip marker: wheels, frame and fork only, at most 24 px tall. Decorative: the strip carries the position's label. */
-export function markerArt(spec: BikeSpec): string {
+export function markerArt(spec: BikeSpec, theme: 'dark' | 'light' = 'dark'): string {
   const g = geometry(spec);
   const fr = frameOf(g);
   const colour = spec.colour.value;
@@ -728,6 +735,6 @@ export function markerArt(spec: BikeSpec): string {
   const y1 = GROUND + 1;
   const w = x1 - x0;
   const h = y1 - y0;
-  return `<svg class="bk bk-marker" viewBox="${r2(x0)} ${r2(y0)} ${r2(w)} ${r2(h)}" width="${r2((24 * w) / h)}" height="24" aria-hidden="true" focusable="false">`
-    + `${tyre(g.rear, g.rr)}${tyre(g.front, g.rf)}${paint('bk-frame', main, 6.5 * k)}${paint('bk-fork', fork, 6.5 * k)}</svg>`;
+  return withCasing(`<svg class="bk bk-marker" viewBox="${r2(x0)} ${r2(y0)} ${r2(w)} ${r2(h)}" width="${r2((24 * w) / h)}" height="24" aria-hidden="true" focusable="false">`
+    + `${tyre(g.rear, g.rr)}${tyre(g.front, g.rf)}${paint('bk-frame', main, 6.5 * k)}${paint('bk-fork', fork, 6.5 * k)}</svg>`, colour, theme);
 }

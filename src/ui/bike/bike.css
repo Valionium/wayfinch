@@ -9,6 +9,10 @@
 .bk-hub, .bk-bb { fill: var(--line); }
 
 .bk-casing { fill: none; stroke: var(--muted); stroke-linecap: round; stroke-linejoin: round; }
+/* Owner's ruling A: where the rider's colour is too close to muted (under 3:1), the drawing names one of the theme's own tones. */
+.bk-casing-ink { stroke: var(--ink); }
+.bk-casing-panel { stroke: var(--panel); }
+.bk-casing-ground { stroke: var(--ground); }
 .bk-frame:not(.bk-paint), .bk-stays:not(.bk-paint), .bk-fork:not(.bk-paint) { fill: none; stroke: var(--line); stroke-linecap: round; stroke-linejoin: round; }
 .bk-paint { stroke-linecap: round; stroke-linejoin: round; }
 .bk-plain { fill: none; stroke: var(--muted); stroke-linecap: round; stroke-linejoin: round; }

@@ -5,7 +5,10 @@ import { markerArt } from '../../core/bike/art.ts';
 import type { BikeRecord } from '../../core/bike/normalise.ts';
 import { resolveBikeSpec } from '../../core/bike/spec.ts';
 import './bike.css';
+import { useTheme } from './drawing.tsx';
 
 export function BikeMarker({ bike }: { bike: BikeRecord | null }) {
-  return <span class="bike-marker" aria-hidden="true" dangerouslySetInnerHTML={{ __html: markerArt(resolveBikeSpec(bike, null)) }} />;
+  // The theme picks the casing's tone under the rider's colour (owner's ruling A).
+  const theme = useTheme();
+  return <span class="bike-marker" aria-hidden="true" dangerouslySetInnerHTML={{ __html: markerArt(resolveBikeSpec(bike, null), theme) }} />;
 }

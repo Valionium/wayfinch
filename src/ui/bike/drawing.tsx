@@ -19,8 +19,8 @@ function currentTheme(): Theme {
   return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
 
-/** The fill ramp follows the theme, as in the bag planner. */
-function useTheme(): Theme {
+/** The fill ramp follows the theme, as in the bag planner; so does the casing's tone (owner's ruling A). */
+export function useTheme(): Theme {
   const [theme, setTheme] = useState(currentTheme);
   useEffect(() => {
     if (typeof matchMedia !== 'function') return undefined;

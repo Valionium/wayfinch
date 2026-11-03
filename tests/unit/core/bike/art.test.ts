@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { test as fcTest, fc } from '@fast-check/vitest';
 import { describe, expect, test } from 'vitest';
 import { bikeArt, markerArt } from '../../../../src/core/bike/art.ts';
+import { CASINGS, casingFor, contrastRatio, SWATCHES } from '../../../../src/core/bike/colour.ts';
 import type { Anchors, Box } from '../../../../src/core/bike/art.ts';
 import { normaliseBike } from '../../../../src/core/bike/normalise.ts';
 import { resolveBikeSpec } from '../../../../src/core/bike/spec.ts';
@@ -206,7 +207,7 @@ describe('colour and casing (spec sections 3.6 and 7.4)', () => {
       expect(e.attrs.fill).toBe('none');
       expect(e.attrs.class).toMatch(/^bk-paint bk-(frame|stays|fork)$/);
       const casing = els[els.indexOf(e) - 1]!;
-      expect(casing.attrs.class).toBe('bk-casing');
+      expect(casing.attrs.class).toMatch(/^bk-casing( bk-casing-(ink|panel|ground))?$/); // ruling A: a tone where muted is too close
       expect(casing.attrs.d).toBe(e.attrs.d);
       expect(casing.attrs.stroke).toBeUndefined(); // the theme's muted, from the stylesheet
       expect(Number(casing.attrs['stroke-width']) - Number(e.attrs['stroke-width'])).toBeCloseTo(1.5, 6);
@@ -243,13 +244,56 @@ describe('colour and casing (spec sections 3.6 and 7.4)', () => {
   });
 });
 
+describe("the casing, owner's ruling A of 3 November 2026", () => {
+  const themeCss = readFileSync('src/ui/theme.css', 'utf8');
+  const tokenOf = (selector: string, name: string): string => {
+    const at = themeCss.indexOf(selector);
+    const body = themeCss.slice(themeCss.indexOf('{', at) + 1, themeCss.indexOf('}', at));
+    return new RegExp(`--${name}:\\s*(#[0-9A-Fa-f]{6})`).exec(body)![1]!.toUpperCase();
+  };
+
+  test('[BK-COLOUR-CASING] every swatch stands out from its casing at 3:1 or more (WCAG non-text) in both themes; the swatches are as the spec fixes them', () => {
+    expect(SWATCHES.map((s) => `${s.name} ${s.hex}`).join(', ')).toBe('Black #1d1d1f, Graphite #4b4f54, Silver #b9bdc1, White #f4f4f2, Sand #cbb68e, Brown #7b5434, Red #c62f2a, Orange #e46b1f, Yellow #f1c232, Olive #6d7a37, Green #2f7d4f, Teal #1f7f80, Blue #2563b8, Navy #1f2f55, Purple #6b3fa0, Pink #d6619b');
+    for (const theme of ['light', 'dark'] as const) {
+      for (const s of SWATCHES) {
+        const tone = casingFor(s.hex, theme);
+        expect(contrastRatio(s.hex, (CASINGS[theme] as Record<string, string>)[tone]!), `${s.name} in ${theme} on ${tone}`).toBeGreaterThanOrEqual(3);
+      }
+    }
+    // The three the owner named are among those whose casing moved off muted.
+    expect(casingFor('#7b5434', 'light')).not.toBe('muted');
+    expect(casingFor('#b9bdc1', 'dark')).not.toBe('muted');
+    expect(casingFor('#cbb68e', 'dark')).not.toBe('muted');
+    // Muted stays wherever it already stands out (a black frame in the dark theme, a white one in the light).
+    expect(casingFor('#1d1d1f', 'dark')).toBe('muted');
+    expect(casingFor('#f4f4f2', 'light')).toBe('muted');
+  });
+
+  test('[BK-COLOUR-CASING] the casing tones are the theme’s own tokens, as theme.css has them, and the drawing and marker carry the tone', () => {
+    for (const [theme, selector] of [['light', ":root[data-theme='light']"], ['dark', ":root[data-theme='dark']"]] as const) {
+      for (const [tone, hex] of Object.entries(CASINGS[theme])) expect(hex.toUpperCase(), `${theme} ${tone}`).toBe(tokenOf(selector, tone));
+    }
+    const css = readFileSync('src/ui/bike/bike.css', 'utf8').replace(/\s+/g, '');
+    for (const tone of ['ink', 'panel', 'ground']) expect(css).toContain(`.bk-casing-${tone}{stroke:var(--${tone})`);
+    const brown = resolveBikeSpec(normaliseBike({ id: 'b', look: { colour: '#7b5434' } }), null);
+    const tone = casingFor('#7b5434', 'light');
+    expect(elements(bikeArt(brown, null, { theme: 'light' }).svg).filter((e) => (e.attrs.class ?? '').startsWith('bk-casing')).every((e) => e.attrs.class === `bk-casing bk-casing-${tone}`)).toBe(true);
+    const black = resolveBikeSpec(normaliseBike({ id: 'k', look: { colour: '#1d1d1f' } }), null);
+    const plain = elements(bikeArt(black, null, { theme: 'dark' }).svg).filter((e) => (e.attrs.class ?? '').startsWith('bk-casing'));
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.every((e) => e.attrs.class === 'bk-casing')).toBe(true);
+    expect(markerArt(brown, 'light')).toContain(`class="bk-casing bk-casing-${tone}"`);
+  });
+});
+
 describe('the marker on the route strip (spec section 7.4)', () => {
   test('[BK-ART-ANCHORS] the marker is wheels, frame and fork only, at most 24 px tall, decorative, in the rider\'s colour', () => {
     const m = markerArt(resolveBikeSpec(normaliseBike({ id: 'm', look: { colour: '#c62f2a' } }), null));
     const els = elements(m);
     expect(els[0]!.attrs['aria-hidden']).toBe('true');
     expect(Number(els[0]!.attrs.height)).toBeLessThanOrEqual(24);
-    expect(new Set(els.slice(1).map((e) => e.attrs.class))).toEqual(new Set(['bk-tyre', 'bk-casing', 'bk-paint bk-frame', 'bk-paint bk-fork']));
+    // Red is under 3:1 against muted in the dark theme: its casing takes the theme's ink (ruling A).
+    expect(new Set(els.slice(1).map((e) => e.attrs.class))).toEqual(new Set(['bk-tyre', 'bk-casing bk-casing-ink', 'bk-paint bk-frame', 'bk-paint bk-fork']));
     expect(m).toContain('stroke="#c62f2a"');
     expect(m).not.toMatch(/aria-label|role=/);
   });
