@@ -1,0 +1,16 @@
+/* You (spec section 3.5). Colours come from the tokens of theme.css. */
+.you-bikes { list-style: none; margin: 0 0 12px; padding: 0; }
+.you-bike { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.you-bike:first-child { border-top: 0; }
+.you-bike .bike { margin: 0; flex: 0 0 auto; }
+.you-bike .bike-art .bk { width: auto; height: 64px; max-width: 40vw; }
+.you-bike-text { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.you-bike-text strong { overflow-wrap: anywhere; }
+.you-bike-mark { color: var(--sage); font-weight: 600; font-size: 0.875rem; }
+.you-legal { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+[data-learn] form { margin-top: 8px; }
+[data-learn] input[type='number'] { max-width: 10rem; }
+[data-learn] summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 600; }
+[data-delete], [data-bags-pending] { margin-top: 12px; }
+[data-import-preview] { margin: 8px 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; }
+[data-import-preview] ul { margin: 4px 0 8px; padding-left: 1.25rem; }

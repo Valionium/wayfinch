@@ -15,5 +15,8 @@ export default defineConfig({
     cssCodeSplit: false,
     sourcemap: false,
     reportCompressedSize: false,
+    // Everything the first screen needs stays in one file, also when a lazy screen (You) shares modules with it: otherwise
+    // the bundler splits shared wording and the JSX runtime into files of their own, which compress worse and cost requests.
+    rolldownOptions: { output: { codeSplitting: { groups: [{ name: 'shell', tags: ['$initial'] }] } } },
   },
 });

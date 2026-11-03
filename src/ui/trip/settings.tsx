@@ -10,7 +10,7 @@ import type { TripServices, TripSnapshot } from './services.ts';
 
 type Save = (field: keyof Settings, value: unknown) => Promise<boolean>;
 
-function NumberField({ id, label, value, step, min, max, placeholder, onCommit, problem }: {
+export function NumberField({ id, label, value, step, min, max, placeholder, onCommit, problem }: {
   id: string; label: string; value: number | null; step: string; min: number; max: number; placeholder?: string;
   onCommit: (value: number | null) => Promise<boolean>; problem: string | null;
 }) {
@@ -35,7 +35,7 @@ function NumberField({ id, label, value, step, min, max, placeholder, onCommit, 
 }
 
 /** The choice shows at once; if the store refuses it, the last good one comes back. */
-function Choice({ name, legend, value, options, onPick }: { name: string; legend: string; value: string; options: [string, string][]; onPick: (v: string) => Promise<boolean> }) {
+export function Choice({ name, legend, value, options, onPick }: { name: string; legend: string; value: string; options: [string, string][]; onPick: (v: string) => Promise<boolean> }) {
   const [shown, setShown] = useState(value);
   useEffect(() => setShown(value), [value]);
   return (

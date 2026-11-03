@@ -6,6 +6,7 @@ import { AheadScreen } from './ahead/ahead.tsx';
 import { browserAhead } from './shell-actions.ts';
 import { browserServices } from '../tools/tyre/services.ts';
 import { lazy } from './lazy.tsx';
+import { riderKg } from './rider-kg.ts';
 import { Degraded } from './card.tsx';
 import { degradedSignal } from './degraded.ts';
 import { screenSignal, tabOf } from './nav.ts';
@@ -15,10 +16,12 @@ import { ToolsScreen } from './tools/tools.tsx';
 import { browserTripServices } from './trip/services.ts';
 import { TripScreen } from './trip/trip.tsx';
 
-// The tyre tool reads Load Check's records and its own storage; rider weight from You joins when the store does.
-const tyreServices = browserServices();
+// The tyre tool reads Load Check's records, its own storage and the rider's weight from You.
+const tyreServices = browserServices(riderKg);
 // The tyre tool's screen is its own chunk: it is not a first screen.
 const TyreScreen = lazy(() => import('../tools/tyre/ui.tsx').then((m) => m.TyreScreen));
+// You is its own chunk too (spec section 3.5): the first screen does not carry its form, export or import.
+const YouHost = lazy(() => import('./you/host.tsx').then((m) => m.YouHost));
 const tripServices = browserTripServices();
 export const aheadShell = browserAhead();
 
@@ -51,6 +54,7 @@ function Screen({ name }: { name: ScreenName }) {
       {name === 'ahead' ? <AheadHost /> : null}
       {name === 'trip' ? <TripScreen services={tripServices} /> : null}
       {name === 'tools' ? <ToolsScreen services={tyreServices} /> : null}
+      {name === 'you' ? <YouHost /> : null}
       {name === 'tools/tyre' ? <TyreScreen services={tyreServices} /> : null}
     </main>
   );
