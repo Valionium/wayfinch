@@ -6,7 +6,7 @@ import type { Route } from '../../core/types.ts';
 import { W } from '../../core/wording/en.ts';
 import { planRoute, searchPlace } from '../../data/routing.ts';
 import type { FoundPlace } from '../../data/routing.ts';
-import { OsmCredit } from './credit.tsx';
+import { GeoNamesCredit, OsmCredit } from './credit.tsx';
 import { routeFromPoints } from './model.ts';
 import type { TripServices } from './services.ts';
 
@@ -56,7 +56,8 @@ function PlaceChoice({ id, label, services, chosen, onChoose }: {
       {hits && hits.length > 0 ? (
         <>
           <p class="muted">{W.appAbPick}</p>
-          <OsmCredit lead={W.appTripOsmSearch} />
+          {hits.some((h) => h.source === 'osm') ? <OsmCredit lead={W.appTripOsmSearch} /> : null}
+          {hits.some((h) => h.source === 'geonames') ? <GeoNamesCredit /> : null}
           <ul class="hits">
             {hits.map((h, i) => (
               <li key={i}>

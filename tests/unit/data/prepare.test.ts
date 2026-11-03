@@ -140,6 +140,27 @@ describe('the steps', () => {
     expect(seenMonths).toEqual([10]);
   });
 
+  test('[PREP-STEPS] a date or days changed while the run is on reach the later steps: the forecast follows the trip as stored', async () => {
+    await onTrip();
+    const server = new PackServer(fixtureBuild('heidelberg-strasbourg'));
+    let changed = false;
+    server.intercept = (url) => {
+      if (url.includes('/t/') && !changed) {
+        changed = true;
+        // the rider moves the departure a day on in Trip's settings, mid-run, in this window
+        void readTrip().then((t) => saveTrip({ ...t!, departureDate: '2026-10-18' }));
+      }
+      return null;
+    };
+    let seenOptions: { days: number } | null = null;
+    await prepareTrip(depsFor(server, { fetchForecast: async (_grid, o) => { seenOptions = o; return forecast(); } }), () => undefined);
+    expect(changed).toBe(true);
+    const saved = (await readTrip())!;
+    expect(saved.departureDate).toBe('2026-10-18');
+    // from 16 October to the planned end of a trip leaving on the 18th
+    expect(seenOptions).toMatchObject({ days: saved.route.stages.length + 2 });
+  });
+
   test('[PREP-STEPS] with no connection nothing is asked of the outside; what needs none still runs', async () => {
     await onTrip();
     const server = new PackServer(fixtureBuild('heidelberg-strasbourg'));

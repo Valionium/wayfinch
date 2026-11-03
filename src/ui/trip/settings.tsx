@@ -99,7 +99,20 @@ export function TripSettings({ services, snap, reload }: { services: TripService
                 void setDate(e.currentTarget.value === '' ? null : e.currentTarget.value);
               }}
             />
-            {trip.departureDate === null ? <p class="muted">{W.appTripDepartureNone}</p> : null}
+            {trip.departureDate !== null ? (
+              <p>
+                <button
+                  type="button" class="btn"
+                  onClick={() => {
+                    // A date still settling from the field goes too: the tap is the last word.
+                    if (dateTimer.current) clearTimeout(dateTimer.current);
+                    dateTimer.current = null;
+                    setDateDraft('');
+                    void setDate(null);
+                  }}
+                >{W.appTripDateClear}</button>
+              </p>
+            ) : <p class="muted">{W.appTripDepartureNone}</p>}
             {problem('date') ? <p class="field-problem" role="alert">{problem('date')}</p> : null}
           </div>
         ) : null}

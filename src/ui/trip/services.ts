@@ -69,7 +69,8 @@ export type TripServices = {
   parseXml: (text: string) => XmlDocLike;
   load: () => Promise<TripSnapshot>;
   /** Puts a route in: the first one, or in place of the old (the caller has asked the rider already, naming `expectedOldRouteId`). */
-  addRoute: (found: { route: Route; hadHeights: boolean }, expectedOldRouteId: string | null) => Promise<AddOutcome>;
+  /** `expectedOld`: the route the rider's question named (null: none). Compared by its line, so new heights are the same route. */
+  addRoute: (found: { route: Route; hadHeights: boolean }, expectedOld: Route | null) => Promise<AddOutcome>;
   /** The store Get ready writes through: its stage writes take their turn and use the settings as they are then. */
   prepareStore: (base: PreparedStore) => PreparedStore;
   writeSettings: (partial: Partial<Record<keyof Settings, unknown>>) => Promise<SettingsOutcome>;
@@ -222,11 +223,13 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
     await saveTrip({ ...trip, route });
   };
 
-  const addRoute = async ({ route, hadHeights }: { route: Route; hadHeights: boolean }, expected: string | null): Promise<AddOutcome> => {
+  const addRoute = async ({ route, hadHeights }: { route: Route; hadHeights: boolean }, expected: Route | null): Promise<AddOutcome> => {
     const settings = await readSettings();
     const before = await readTrip();
     // The question the rider answered named a route; if another window has put in a different one since, nothing is replaced.
-    if ((before?.route.id ?? null) !== expected) throw new RefusedError(W.appStoreChangedElsewhere);
+    // By the line, not the id: Get ready's heights step gives the same line a new id in this very window.
+    const asExpected = before === null ? expected === null : expected !== null && sameLine(before.route, expected);
+    if (!asExpected) throw new RefusedError(W.appStoreChangedElsewhere);
     // The same line is the same route, whatever heights it has now.
     if (before && sameLine(before.route, route)) return { kind: 'same', name: before.route.name };
     const flatKph = before?.flatKph ?? settings.flatKph;

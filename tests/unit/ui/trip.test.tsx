@@ -270,7 +270,8 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     await withRoute();
     const date = () => host.querySelector<HTMLInputElement>('#trip-date')!;
     expect(date().value).toBe('2026-10-10');
-    expect([...host.querySelectorAll('button')].some((x) => /today|clear the date/i.test(x.textContent ?? ''))).toBe(false);
+    // The date starts as today, so there is no "Set to today"; "Clear the date" is a tap, not only the browser's own field.
+    expect([...host.querySelectorAll('button')].some((x) => /today/i.test(x.textContent ?? ''))).toBe(false);
     expect(text()).not.toContain(W.appTripDepartureNone);
     await act(async () => { date().value = '2026-10-01'; date().dispatchEvent(new Event('change', { bubbles: true })); });
     await act(async () => { date().value = '2026-10-17'; date().dispatchEvent(new Event('change', { bubbles: true })); });
@@ -279,6 +280,18 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     await act(async () => { date().value = ''; date().dispatchEvent(new Event('change', { bubbles: true })); date().dispatchEvent(new Event('blur', { bubbles: true })); });
     await until(() => text().includes(W.appTripDepartureNone), 'the note');
     expect((await readTrip())!.departureDate).toBeNull();
+    expect([...host.querySelectorAll('button')].some((x) => x.textContent === W.appTripDateClear)).toBe(false);
+  });
+
+  test('[TRIP-SETTINGS] "Clear the date" takes the date away in one tap, also over a date still settling, and says what is lost', async () => {
+    await withRoute();
+    const date = () => host.querySelector<HTMLInputElement>('#trip-date')!;
+    await act(async () => { date().value = '2026-10-17'; date().dispatchEvent(new Event('change', { bubbles: true })); });
+    await click(button(W.appTripDateClear));
+    await settle(900);
+    await until(() => text().includes(W.appTripDepartureNone), 'the note');
+    expect((await readTrip())!.departureDate).toBeNull();
+    expect(date().value).toBe('');
   });
 
   test('[WXR-TAP-HIDDEN] the shipped (automatic) build shows "Keep trip data fresh when online" on Trip and it saves; the tap-only build still hides it', async () => {
@@ -607,8 +620,11 @@ describe('What the review of group 5 found', () => {
     await act(async () => { input.value = 'Heidelberg'; input.dispatchEvent(new Event('input', { bubbles: true })); });
     await act(async () => { input.form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
     await until(() => host.querySelector('button.hit') !== null, 'a hit');
-    const link = host.querySelector<HTMLAnchorElement>('[data-plan-ab] a[href="https://www.openstreetmap.org/copyright"]');
-    expect(link?.textContent).toBe('© OpenStreetMap contributors');
+    // Open-Meteo's geocoding answers from GeoNames (CC BY 4.0): that is the credit, not OpenStreetMap's
+    const link = host.querySelector<HTMLAnchorElement>('[data-plan-ab] a[href="https://www.geonames.org/"]');
+    expect(link?.textContent).toBe('GeoNames');
+    expect(link!.parentElement!.textContent).toBe('Place names: GeoNames, CC BY 4.0.');
+    expect(host.querySelector('[data-plan-ab] a[href="https://www.openstreetmap.org/copyright"]')).toBeNull();
     await pick(await fixtureGpx('loop'));
     await until(() => host.querySelector('[data-summary]') !== null, 'the route');
     expect(host.querySelector('[data-summary] a[href="https://www.openstreetmap.org/copyright"]')).toBeNull();
@@ -655,9 +671,20 @@ describe('What the review of group 5 found', () => {
   test('[TRIP-REPLACE-ASKS] a replace is refused if the route stored is not the one the question named', async () => {
     const svc = await withRoute('loop');
     const found = await routeFromGpx(await fixtureGpx('alpine-pass'), 'a.gpx', svc.parseXml);
-    await expect(svc.addRoute(found, 'route-someone-else')).rejects.toThrow(W.appStoreChangedElsewhere);
+    const other = await routeFromGpx(await fixtureGpx('loop'), 'b.gpx', svc.parseXml);
+    await expect(svc.addRoute(found, { ...other.route, points: other.route.points.slice(1) })).rejects.toThrow(W.appStoreChangedElsewhere);
     expect((await readTrip())!.route.name).toContain('Heilbronn');
     await expect(svc.addRoute(found, null)).rejects.toThrow(W.appStoreChangedElsewhere);
+  });
+
+  test('[TRIP-REPLACE-ASKS] the heights step giving the stored route a new id is not "changed in another window": the line is the same', async () => {
+    const svc = await withRoute('loop');
+    const asked = (await readTrip())!.route;
+    const { saveTrip } = await import('../../../src/store/trip.ts');
+    // what Get ready's heights step does in this window: the same line, with heights, under a new id
+    await saveTrip({ ...(await readTrip())!, route: { ...asked, id: 'route-with-heights', points: asked.points.map((p) => ({ ...p, ele: 100 })) } });
+    const found = await routeFromGpx(await fixtureGpx('alpine-pass'), 'a.gpx', svc.parseXml);
+    await expect(svc.addRoute(found, asked)).resolves.toMatchObject({ kind: 'replaced' });
   });
 
   test('[AB-NONE] a planned line the route building will not take says why, not that no router answered', async () => {
@@ -709,7 +736,7 @@ describe('Messages that must not be lost', () => {
 
   test('[TRIP-REPLACE-ASKS] a route that was replaced whose date was not saved says so, and does not say the route is unchanged', async () => {
     const real = await withRoute('loop');
-    const svc = { ...real, addRoute: (found: Parameters<TripServices['addRoute']>[0], id: string | null) => real.addRoute(found, id).then((o) => ({ ...o, dateNotSaved: true as const })) };
+    const svc = { ...real, addRoute: (found: Parameters<TripServices['addRoute']>[0], old: Parameters<TripServices['addRoute']>[1]) => real.addRoute(found, old).then((o) => ({ ...o, dateNotSaved: true as const })) };
     await show(svc);
     await pick(await fixtureGpx('alpine-pass'));
     await until(() => host.querySelector('[data-replace]') !== null, 'the question');
