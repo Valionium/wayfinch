@@ -19,7 +19,7 @@ import { showKm, W } from '../core/wording/en.ts';
 import { checkConnectivity } from '../data/connectivity.ts';
 import { refreshWeather } from '../data/refresh.ts';
 import { WEATHER_MODE } from '../data/weather-mode.ts';
-import { onChanged } from '../store/changed.ts';
+import { announceHere, onChanged } from '../store/changed.ts';
 import { keepAfterScreen, readInputs } from '../store/inputs.ts';
 import { addPosition, backToToday, confirmWater, setPlanTomorrow } from '../store/positions.ts';
 import { readMapLink, writeMapLink } from '../store/share-choice.ts';
@@ -292,6 +292,8 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
           ...(v.kind === 'trip' && Number.isFinite(v.screen.ride.startKm) ? { atKm: v.screen.ride.startKm } : {}),
         }, 'tap');
         weatherSay = result.say ?? (result.fetched ? W.appAheadWeatherUpdated : null);
+        // Trip's summary of the forecast reads again too (this window's own screens hear no storage event).
+        if (result.fetched) announceHere('weather');
       } catch {
         weatherSay = W.appStoreNotKept;
       } finally {

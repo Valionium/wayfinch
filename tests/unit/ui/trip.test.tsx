@@ -281,13 +281,9 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     expect((await readTrip())!.departureDate).toBeNull();
   });
 
-  test('[WXR-TAP-HIDDEN] in the tap-only weather mode "Keep trip data fresh when online" is not on Trip; in the automatic mode it is, and it saves', async () => {
-    const tap = services();
-    expect(tap.env.weatherMode).toBe('tap');
-    await show(tap);
-    expect(text()).not.toContain(W.weatherKeepFresh);
-    render(null, host);
-    const auto = services({ env: { ...tap.env, weatherMode: 'auto' } });
+  test('[WXR-TAP-HIDDEN] the shipped (automatic) build shows "Keep trip data fresh when online" on Trip and it saves; the tap-only build still hides it', async () => {
+    const auto = services();
+    expect(auto.env.weatherMode).toBe('auto');
     await show(auto);
     expect(text()).toContain(W.weatherKeepFresh);
     const box = host.querySelector<HTMLInputElement>('input[type=checkbox]')!;
@@ -295,6 +291,10 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     await click(box);
     await settle(30);
     expect(JSON.parse(localStorage.getItem('copilot:settings')!).keepFresh).toBe(false);
+    render(null, host);
+    const tap = services({ env: { ...auto.env, weatherMode: 'tap' } });
+    await show(tap);
+    expect(text()).not.toContain(W.weatherKeepFresh);
   });
 
   test('[TRIP-GETREADY] the steps show their progress, and the result reads "1,214 places (map data of 25 Oct), weather to Friday (fetched 2 h ago)" with the storage used and Update', async () => {

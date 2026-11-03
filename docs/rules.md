@@ -695,13 +695,15 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 
 ## App: The refresh modes
 
-- mode: 'tap', open and foreground: fetch false and **no metadata request**, counted by a stub; default build.config.json is tap [WXR-TAP-NO-AUTO]
-- in tap, "Keep trip data fresh when online" isn't on Trip or You [WXR-TAP-HIDDEN]
+- mode: 'tap', open and foreground: fetch false and **no metadata request**, counted by a stub; tap stays the fallback, one build setting [WXR-TAP-NO-AUTO]
+- "Keep trip data fresh when online" is on Trip and You in the shipped automatic build, and saves; in the tap build it isn't on Trip or You [WXR-TAP-HIDDEN]
 - auto: fetch when a model that matters has a run ≥ 3 h newer and available ≥ 10 min; 9 min no; 2 h 59 min no; automatic fetches ≥ 3 h apart however many models; a failed check fetches when the forecast is over 3 h old; keepFresh false: nothing [WXR-AUTO-RULES]
 - both modes: a newer run ≥ 10 min available fetches; else says "You have the newest forecast (model run 10:00). Next run expected about 14:30."; failed check with last fetch ≥ 30 min old fetches; no signal: "No signal. Forecast fetched 07:10." [WXR-UPDATE-TAP]
 - whatever triggers it: 29 min 59 s after a fetch, no fetch [WXR-SPACING]
 - basis line "Open-Meteo forecast fetched 11:20 · model run 10:00", in the place's zone, oldest latest run among those that matter [WXR-BASIS]
-- changing only weatherMode in build.config.json turns automatic on: the test builds with each value and checks the bundled constant [WXR-MODE-ONE-LINE]
+- changing only weatherMode in build.config.json turns automatic on: the test builds with each value and checks the bundled constant; the shipped file says "auto" (owner's ruling A, 3 November, after Open-Meteo's written answer), which also puts 15-minute rain on [WXR-MODE-ONE-LINE]
+- one forecast request per route: at most 10 variables counting the 15-minute rain, at most 16 days; the model-run check comes first; nothing runs in the background [WXR-ONE-CALL]
+- the automatic mode is started at open and at return to the foreground (visibilitychange to visible) with a prepared trip, signal and the setting on; asks nothing, not even the app's own address, within 3 hours of the last ask (stored, so it survives reloads); the setting off or the tap build asks nothing [WXR-AUTO-WIRED]
 
 ## App: Refresh this stretch
 
@@ -785,7 +787,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - §3.7's table, Tools row: the Tools card draws the bike with its bags above "3 bags · 10.2 kg", and a tap goes to Look [BK-WHERE]
 - §3.7's table, Trip row: Trip top with bags and caption, at most 120 px tall [BK-WHERE-TRIP]
 - §3.7's table, Ahead row: on the strip only the marker, markerArt(spec) from src/core/bike, at most 24 px tall, at the left end facing travel (group 6) [BK-WHERE-STRIP]
-- §3.7's table, You row: small drawing, no bags, plan's bike first, marked "in your plan" or "in your plan, not saved" (split from the Tools row; Trip is BK-WHERE-TRIP and the strip BK-WHERE-STRIP; You arrives with group 8) [BK-WHERE-SCREENS]
+- §3.7's table, You row: small drawing, no bags, plan's bike first, marked "in your plan" or "in your plan, not saved" (split from the Tools row; Trip is BK-WHERE-TRIP and the strip BK-WHERE-STRIP) [BK-WHERE-SCREENS]
 - marker in the rider's colour, decorative (aria-hidden), the strip carries the label; opens nothing [BK-MARKER]
 - Make it yours and Edit build the exact fragments; back ∈ trip, tools, you, tyre [BK-DEEPLINK]
 - bags drawn only when the summary's bikeId matches the bike, both null counting [BK-MATCH-BAGS]
@@ -797,8 +799,8 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - with a summary, bottle capacity shown beside the field [YOU-CAPACITY]
 - export downloads a file; import shows what arrives; a bad file writes nothing; afterwards Trip asks for Get ready on a new route [YOU-EXPORT-UI]
 - asks first naming what goes; "Also delete bag planner data" stores copilot:delete-request:v1 and opens /tools/bags/#copilot-delete=<id>; until applied, "Bag planner data will be deleted the next time it opens" [YOU-DELETE-UI]
-- the post-ride question; calibration status shown; drinkingAdvice and overDrinking reach the screen [YOU-WATER-LEARN]
-- imprint, privacy and licences within two taps from every tab [PRIV-LEGAL-REACH]
+- the post-ride report (hours, drink, warmth, feel, optional weighing) is logged and moves the factors; calibration status shown; drinkingAdvice and overDrinking reach the screen: ruling of group 8, the loss it is compared with is the sweat-rate model on flat ground at the chosen warmth [YOU-WATER-LEARN]
+- imprint, privacy and licences within two taps from every tab (plain pages at /legal/<name>/, a folder each because the host redirects *.html) [PRIV-LEGAL-REACH]
 - all open in flight mode [PRIV-LEGAL-OFFLINE]
 - hash of the imprint's text equals the hash of the page's block; nothing printed [PRIV-IMPRINT-SAME]
 - every outside host in src/data appears in the privacy notice (source scan against the notice's text) [PRIV-RECIPIENTS]
@@ -835,7 +837,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - the 50 mm, 70 kg Vittoria case is informational: it stays inside the limits and its deviation is printed [TY-VITTORIA]
 - the sidewall maximum is the only required field when the rim is stated hooked; with the rim hookless or not stated, the tyre width is asked for too, and there is no figure (and no saved last figure) until it is given; without the maximum the screen says so and shows no figure; a limit that is asked about or refused shows no figure until answered [TY-UI-REQUIRED]
 - handlebar, wheel and widths start from the bike labelled "from your bike"; weights from the load summary with its age; the plan bike is preselected; changes stay in the tyre tool; one bike's details never reach another's [TY-UI-FROM-BIKE]
-- rider weight starts from You; until You exists the screen says "75 kg assumed; enter yours" (arrives with sub-project 5, group 8) [TY-UI-FROM-YOU]
+- rider weight starts from the weight entered in You, shown "from You"; with none entered the screen says 75 kg is assumed [TY-UI-FROM-YOU]
 - details are stored per bike id or under a default key, and #/tools/tyre opens the tool [TY-UI-STORE]
 - the tyre details are in the export file and an import brings them back (arrives with the store's export.ts) [TY-UI-EXPORT]
 - using the tool changes no loadcheck key, byte for byte [TY-UI-NOWRITE]

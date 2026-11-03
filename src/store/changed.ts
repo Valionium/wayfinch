@@ -29,7 +29,21 @@ export function markChanged(section: Section): void {
   }
 }
 
-/** Calls back with the section another window changed. Returns how to stop listening. */
+const HERE_EVENT = 'copilot:changed-here';
+
+/**
+ * Tells this window's own screens that a section changed under them, as `markChanged` tells the other windows. Only what is written by
+ * code that no screen is waiting on (the automatic weather fetch) says it, so a screen's own writes never call it back.
+ */
+export function announceHere(section: Section): void {
+  try {
+    if (typeof globalThis.dispatchEvent === 'function') globalThis.dispatchEvent(new CustomEvent(HERE_EVENT, { detail: section }));
+  } catch {
+    // No event system here: the other windows and the next read still find it.
+  }
+}
+
+/** Calls back with the section another window changed, or this window announced. Returns how to stop listening. */
 export function onChanged(callback: (section: Section) => void): () => void {
   const listener = (e: Event): void => {
     const { key, newValue } = e as StorageEvent;
@@ -37,8 +51,16 @@ export function onChanged(callback: (section: Section) => void): () => void {
     const change = parseChange(newValue);
     if (change) callback(change.section);
   };
+  const here = (e: Event): void => {
+    const section = (e as CustomEvent<unknown>).detail;
+    if (typeof section === 'string' && SECTIONS.includes(section)) callback(section as Section);
+  };
   globalThis.addEventListener('storage', listener);
-  return () => globalThis.removeEventListener('storage', listener);
+  globalThis.addEventListener(HERE_EVENT, here);
+  return () => {
+    globalThis.removeEventListener('storage', listener);
+    globalThis.removeEventListener(HERE_EVENT, here);
+  };
 }
 
 // ---- This window's copies ------------------------------------------------------------------------------------------

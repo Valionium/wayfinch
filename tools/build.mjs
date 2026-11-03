@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build as esbuild } from 'esbuild';
+import { writeImprint } from './build-legal.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PAGE = join(ROOT, 'public', 'tools', 'bags', 'index.html');
@@ -132,6 +133,9 @@ export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = 
     } finally {
       rmSync(shell, { recursive: true, force: true });
     }
+    // The imprint is the bag planner's own block, taken at build time. If it can't be taken, the launch build fails (a site without its
+    // imprint must not go out); nothing of the block is printed. The off build never gets here.
+    writeImprint(target);
     mkdirSync(join(target, 'tools', 'bags'), { recursive: true });
     writeFileSync(join(target, 'tools', 'bags', 'bike.js'), await compileBikeScript());
   } else {

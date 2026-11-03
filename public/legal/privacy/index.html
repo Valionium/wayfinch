@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy notice · Datenschutz — Wayfinch</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="/legal/legal.css">
+<script src="/legal/theme.js"></script>
+</head>
+<body>
+<header class="lg-top"><a class="lg-back" href="/#/you">&larr; Wayfinch</a></header>
+<main class="lg-main">
+<p class="lg-draft">Drafted by an AI from the project's spec. Not legal advice.</p>
+<nav class="lg-nav" aria-label="Legal pages"><a href="#en">English</a> <a href="#de">Deutsch</a> <a href="/legal/imprint/">Imprint</a> <a href="/legal/licences/">Licences and data</a></nav>
+
+<section id="en" lang="en">
+<h1>Privacy notice</h1>
+<p class="lg-note">The operator is named in the <a href="/legal/imprint/">imprint</a>. This notice covers the Wayfinch app (Trip, Ahead, Tools, You). The bag planner (Load Check) has its own notice in its footer; its requests are listed at the end.</p>
+
+<h2>In short</h2>
+<ul>
+<li>No accounts, no analytics, no advertising, no tracking, no cookies.</li>
+<li>Your profile, body weight, drinking reports, trip and route, position check-ins and bike stay on your device. The app has no server that receives them.</li>
+<li><strong>The app never sends your position on its own.</strong> It leaves your phone only when you share it yourself, through an app you choose.</li>
+<li>Without a prepared trip, opening the app contacts only the app's own hosting.</li>
+<li>All code, fonts and libraries are served by the site itself. No outside code or font is loaded.</li>
+</ul>
+
+<h2>What stays on your device</h2>
+<p>The browser keeps, in IndexedDB and local storage: your rider details (weight, usual speed, thirst, e-bike, water you can carry), logged rides for water learning, the trip and route, settings, tyre details, the place data and forecast you prepared, position check-ins of the current and previous riding day (at most 48 hours), the latest accepted position (until replaced, at most 48 hours), the day start, the water you confirm, and the choice for Share progress. The bag planner keeps its plans, bikes and packing list in its own storage; the app reads them and never changes them itself. The one way it asks for a change is the button Also delete bag planner data, which you tap yourself. Positions, check-ins, day starts and the route-end date are not part of the export file. You can delete everything under You, <em>Delete co-pilot data</em>, with <em>Also delete bag planner data</em> for the bag planner's part (including its preserved tyre fields, and the weights kept there until they are dropped). Under the German TDDDG, storing this is necessary for the function you ask for.</p>
+
+<h2>Where requests go</h2>
+<p>Each row names the recipient (legal entity and country as far as its terms say), what is sent, when, and the legal basis (GDPR Art. 6 (1)(b) for a function you start; Art. 6 (1)(f) for hosting). Every recipient sees your IP address. Where no retention is stated, we do not know it.</p>
+<div class="lg-table-wrap" tabindex="0" role="region" aria-label="Recipients of requests"><table>
+<thead><tr><th>Recipient</th><th>What is sent</th><th>When</th><th>Retention</th></tr></thead>
+<tbody>
+<tr><td>Cloudflare, Inc., USA (hosting of the app; transfer on the EU-US Data Privacy Framework or standard contractual clauses)</td><td>Normal page requests. The connectivity check is a <code>HEAD</code> request for the app's own address with nothing about you.</td><td>Every visit; the check at the start of Get ready offline and of Update weather, and before an automatic weather check</td><td>Technical connection logs at the provider</td></tr>
+<tr><td>Place packs: the app's Cloudflare data project, <code>wayfinch-data.pages.dev</code> (Cloudflare, Inc., USA)</td><td>The tiles covering your route corridor, so an approximate area</td><td>Get ready offline</td><td>Connection logs at the provider</td></tr>
+<tr><td>Open-Meteo: forecast, <code>api.open-meteo.com</code> (OpenMeteo GmbH, Switzerland)</td><td>A coarse, sampled outline of the route (a fixed grid rounded to 0.01–0.02°), the same in every request for a trip on the same day, with 15-minute rain. No account, no position.</td><td>Get ready offline; Update weather; and, because the weather mode is automatic, again after a newer model run while the app is open and Keep trip data fresh when online is on (at most once in 3 hours, counted across restarts; never in the background)</td><td>Web server logs, which may contain the grid's coordinates, are deleted after 90 days</td></tr>
+<tr><td>Open-Meteo: model runs, <code>api.open-meteo.com</code> (static metadata)</td><td>Nothing about you or the trip: the same five model names for everyone, no coordinates</td><td>Get ready offline; Update weather; when the app opens or returns to the foreground with a prepared trip, a signal and the setting on</td><td>90 days (logs)</td></tr>
+<tr><td>Open-Meteo: seasonal baseline, <code>archive-api.open-meteo.com</code></td><td>Stage ends and the high point of the route, rounded</td><td>Get ready offline</td><td>90 days (logs)</td></tr>
+<tr><td>Open-Meteo: elevation, <code>api.open-meteo.com</code> (Copernicus data)</td><td>Sampled route points rounded to 3 decimals, after a notice</td><td>Only when a route has no heights</td><td>90 days (logs)</td></tr>
+<tr><td>Refresh this stretch: OpenStreetMap Overpass, <code>overpass-api.de</code> (operator not named on its pages)</td><td>One stretch's outline, after a notice</td><td>Only on request</td><td>Not stated</td></tr>
+<tr><td>Plan from A to B: FOSSGIS routing, <code>routing.openstreetmap.de</code> and <code>valhalla1.openstreetmap.de</code> (FOSSGIS e.V., Germany); BRouter, <code>brouter.de</code></td><td>The start and end points. Only the first router that answers is asked.</td><td>Planning</td><td>Route requests are saved in the server log (FOSSGIS)</td></tr>
+<tr><td>Place search: Open-Meteo geocoding, <code>geocoding-api.open-meteo.com</code> (OpenMeteo GmbH, Switzerland); Photon, <code>photon.komoot.io</code> (komoot GmbH, Germany)</td><td>The search text you type, after you tap Search</td><td>Planning</td><td>90 days (Open-Meteo logs); not stated (Photon)</td></tr>
+<tr><td>Your device's location service (the browser or the system; on a computer, for example Google Location Services in Chrome)</td><td>Nearby Wi-Fi networks or the IP address, under that service's terms. The app sends nothing itself.</td><td>Only after you tap Update position or open the manual picker</td><td>Under that service's terms</td></tr>
+<tr><td>Call and Website on a place card (the place's own site, or your mobile network for a call)</td><td>Nothing from the app. The browser opens the site, which sees your IP address but no referrer. The dialler places a call you confirm, and the place sees your number unless it is hidden.</td><td>Only when you tap Website or Call</td><td>The place's own terms</td></tr>
+<tr><td>Share progress and Share my location (the app you pick: SMS, a messenger or e-mail)</td><td>The message text. Share progress: time, km, nearest town and plan, with coordinates only in a map link you add. Share my location: the position's time and accuracy, coordinates, a <code>geo:</code> link and the nearest rescue point. Messaging apps may load a link preview.</td><td>Only when you send it from that app. The app stores no message, recipient or call.</td><td>The service you pick</td></tr>
+<tr><td>SRAM tyre pressure calculator, <code>axs.sram.com</code></td><td>Nothing from the app. You open the link and type the values yourself.</td><td>On request</td><td>SRAM's own terms</td></tr>
+<tr><td>Bag planner (Load Check): GPX end names (Nominatim, OpenStreetMap Foundation, United Kingdom); routing (FOSSGIS OSRM bike and foot, Valhalla, BRouter, the OSRM demo car router <code>router.project-osrm.org</code>); elevation and terrain estimate (Open-Meteo, Copernicus data; up to 200 points, rounded to 3 decimals); forecast and climate (Open-Meteo); map tiles (<code>tile.openstreetmap.org</code>, only while its map is open); speech input (your browser's speech service, only when you use the microphone button); feedback (Formspree, Inc., USA, only on Send)</td><td>As described in the bag planner's notice</td><td>When you use that function in the bag planner</td><td>See the bag planner's notice</td></tr>
+</tbody></table></div>
+<p>No progress is revealed by the forecast: every request for a trip asks for the same fixed grid, and every model-run check for the same five models. The IP address still shows a coarse network location. Rain plans, covers and stop ideas are worked out on your phone and send nothing.</p>
+
+<h2>Choosing your bike's colour from a photo</h2>
+<p>Choosing your bike's colour from a photo: the photo is analysed only on your device. It is not uploaded, not sent to us or anyone else, and not saved. Only the colour you confirm is stored with your bike in this browser and deleted with your bike data.</p>
+
+<h2>Bike data</h2>
+<p>Your bike stays on your devices. Bike details, frame measurements, maximum weight, colour and geometry are kept in the bag planner's storage. The weight check of the bag planner never asks for your body weight; only the tyre tool does, and it reads the weight you enter under You.</p>
+
+<h2>Water, weather and pressure</h2>
+<p>Wayfinch is a planning aid, not a medical device. Water, weather and pressure figures are estimates. Pressure is a starting point within the limits you enter.</p>
+
+<h2>Your rights</h2>
+<p>Because the app keeps your data only on your device and has no account, you can see, export and delete it yourself under You. You may also contact the operator named in the imprint, and complain to a data-protection authority (in Baden-Württemberg: Der Landesbeauftragte für Datenschutz und Informationsfreiheit). Last drafted 3 November 2026.</p>
+</section>
+
+<hr>
+
+<section id="de" lang="de">
+<h2>Datenschutzerklärung</h2>
+<p class="lg-note">Wer die Seite betreibt, steht im <a href="/legal/imprint/">Impressum</a>. Diese Erklärung gilt für die Wayfinch-App (Tour, Voraus, Werkzeuge, Du). Der Gepäckplaner (Load Check) hat eine eigene Erklärung in seiner Fußzeile; seine Anfragen sind am Ende der Tabelle genannt.</p>
+
+<h2>Kurzfassung</h2>
+<ul>
+<li>Keine Konten, keine Analyse, keine Werbung, kein Tracking, keine Cookies.</li>
+<li>Dein Profil, dein Körpergewicht, Trinkberichte, Tour und Strecke, Standort-Einträge und dein Fahrrad bleiben auf deinem Gerät. Die App hat keinen Server, der sie empfängt.</li>
+<li><strong>Die App sendet deinen Standort nie von selbst.</strong> Er verlässt dein Gerät nur, wenn du ihn selbst teilst, über eine App deiner Wahl.</li>
+<li>Ohne vorbereitete Tour kontaktiert die App beim Öffnen nur ihr eigenes Hosting.</li>
+<li>Aller Code, alle Schriften und Bibliotheken kommen von der Seite selbst. Es wird kein fremder Code und keine fremde Schrift geladen.</li>
+</ul>
+
+<h2>Was auf deinem Gerät bleibt</h2>
+<p>Der Browser speichert in IndexedDB und im lokalen Speicher: deine Fahrerangaben (Gewicht, übliche Geschwindigkeit, Durst, E-Bike, Wassermenge), eingetragene Fahrten fürs Wasser-Lernen, Tour und Strecke, Einstellungen, Reifenangaben, die vorbereiteten Ortsdaten und die Vorhersage, Standort-Einträge des aktuellen und des vorigen Fahrtags (höchstens 48 Stunden), den zuletzt akzeptierten Standort (bis zum Ersatz, höchstens 48 Stunden), den Tagesstart, das bestätigte Wasser und die Wahl für „Fortschritt teilen“. Der Gepäckplaner speichert Pläne, Fahrräder und Packliste in seinem eigenen Speicher; die App liest sie und ändert sie nie selbst. Die einzige Möglichkeit, eine Änderung anzufordern, ist die Taste „Auch Daten des Gepäckplaners löschen“, die du selbst tippst. Standorte, Einträge, Tagesstarts und das Streckenende-Datum gehören nicht zur Exportdatei. Unter „Du“ kannst du alles löschen („Daten der App löschen“), mit „Auch Daten des Gepäckplaners löschen“ auch dessen Teil (einschließlich der aufbewahrten Reifenfelder und der dort gespeicherten Gewichte, bis sie entfallen). Die Speicherung ist für die von dir gewünschte Funktion erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG).</p>
+
+<h2>Wohin Anfragen gehen</h2>
+<p>Jede Zeile nennt den Empfänger (Rechtsträger und Land, soweit seine Bedingungen sie nennen), was gesendet wird, wann, und die Rechtsgrundlage (Art. 6 Abs. 1 lit. b DSGVO für eine Funktion, die du startest; lit. f für das Hosting). Jeder Empfänger sieht deine IP-Adresse. Wo keine Speicherdauer steht, ist sie uns nicht bekannt.</p>
+<div class="lg-table-wrap" tabindex="0" role="region" aria-label="Empfänger von Anfragen"><table>
+<thead><tr><th>Empfänger</th><th>Was gesendet wird</th><th>Wann</th><th>Speicherdauer</th></tr></thead>
+<tbody>
+<tr><td>Cloudflare, Inc., USA (Hosting der App; Übermittlung auf Grundlage des EU-US Data Privacy Framework bzw. von Standardvertragsklauseln)</td><td>Normale Seitenaufrufe. Die Verbindungsprüfung ist eine <code>HEAD</code>-Anfrage an die eigene Adresse der App ohne Angaben zu dir.</td><td>Bei jedem Besuch; die Prüfung zu Beginn von „Offline vorbereiten“ und von „Wetter aktualisieren“ sowie vor einer automatischen Wetterprüfung</td><td>Technische Verbindungsprotokolle beim Anbieter</td></tr>
+<tr><td>Ortspakete: das Cloudflare-Datenprojekt der App, <code>wayfinch-data.pages.dev</code> (Cloudflare, Inc., USA)</td><td>Die Kacheln, die deinen Streckenkorridor abdecken, also ein ungefährer Bereich</td><td>Offline vorbereiten</td><td>Verbindungsprotokolle beim Anbieter</td></tr>
+<tr><td>Open-Meteo: Vorhersage, <code>api.open-meteo.com</code> (OpenMeteo GmbH, Schweiz)</td><td>Ein grober, abgetasteter Umriss der Strecke (festes Raster, auf 0,01–0,02° gerundet), für eine Tour am selben Tag in jeder Anfrage gleich, mit 15-Minuten-Regen. Kein Konto, kein Standort.</td><td>Offline vorbereiten; Wetter aktualisieren; und, da der Wettermodus automatisch ist, erneut nach einem neueren Modelllauf, solange die App offen ist und „Tourdaten aktuell halten“ an ist (höchstens einmal in 3 Stunden, auch über Neustarts hinweg gezählt; nie im Hintergrund)</td><td>Webserver-Protokolle, die die Koordinaten des Rasters enthalten können, werden nach 90 Tagen gelöscht</td></tr>
+<tr><td>Open-Meteo: Modelläufe, <code>api.open-meteo.com</code> (statische Metadaten)</td><td>Nichts über dich oder die Tour: für alle dieselben fünf Modellnamen, keine Koordinaten</td><td>Offline vorbereiten; Wetter aktualisieren; beim Öffnen oder Zurückkehren in die App mit vorbereiteter Tour, Empfang und eingeschalteter Einstellung</td><td>90 Tage (Protokolle)</td></tr>
+<tr><td>Open-Meteo: saisonale Grundlage, <code>archive-api.open-meteo.com</code></td><td>Etappenenden und der höchste Punkt der Strecke, gerundet</td><td>Offline vorbereiten</td><td>90 Tage (Protokolle)</td></tr>
+<tr><td>Open-Meteo: Höhen, <code>api.open-meteo.com</code> (Copernicus-Daten)</td><td>Abgetastete Streckenpunkte auf 3 Nachkommastellen gerundet, nach einem Hinweis</td><td>Nur, wenn eine Strecke keine Höhen hat</td><td>90 Tage (Protokolle)</td></tr>
+<tr><td>Abschnitt auffrischen: OpenStreetMap Overpass, <code>overpass-api.de</code> (Betreiber auf den Seiten nicht genannt)</td><td>Der Umriss eines Abschnitts, nach einem Hinweis</td><td>Nur auf Wunsch</td><td>Nicht angegeben</td></tr>
+<tr><td>Planen von A nach B: FOSSGIS-Routing, <code>routing.openstreetmap.de</code> und <code>valhalla1.openstreetmap.de</code> (FOSSGIS e.V., Deutschland); BRouter, <code>brouter.de</code></td><td>Start- und Endpunkt. Gefragt wird nur der erste Dienst, der antwortet.</td><td>Planen</td><td>Routenanfragen werden im Serverprotokoll gespeichert (FOSSGIS)</td></tr>
+<tr><td>Ortssuche: Open-Meteo-Geokodierung, <code>geocoding-api.open-meteo.com</code> (OpenMeteo GmbH, Schweiz); Photon, <code>photon.komoot.io</code> (komoot GmbH, Deutschland)</td><td>Der Suchtext, den du eingibst, nachdem du „Suchen“ tippst</td><td>Planen</td><td>90 Tage (Open-Meteo-Protokolle); nicht angegeben (Photon)</td></tr>
+<tr><td>Ortungsdienst deines Geräts (Browser oder System; am Computer zum Beispiel Google Location Services in Chrome)</td><td>WLAN-Netze in der Nähe oder die IP-Adresse, nach den Bedingungen dieses Dienstes. Die App selbst sendet nichts.</td><td>Nur nach „Standort aktualisieren“ oder beim Öffnen der manuellen Auswahl</td><td>Nach den Bedingungen des Dienstes</td></tr>
+<tr><td>Anrufen und Webseite auf einer Ortskarte (die Seite des Ortes selbst bzw. dein Mobilfunknetz bei einem Anruf)</td><td>Nichts von der App. Der Browser öffnet die Seite, die deine IP-Adresse sieht, aber keinen Verweis. Das Telefon startet einen Anruf, den du bestätigst; der Ort sieht deine Nummer, wenn sie nicht unterdrückt ist.</td><td>Nur, wenn du „Webseite“ oder „Anrufen“ tippst</td><td>Bedingungen des Ortes</td></tr>
+<tr><td>Fortschritt teilen und Meinen Standort teilen (die App deiner Wahl: SMS, Messenger oder E-Mail)</td><td>Der Nachrichtentext. Fortschritt: Zeit, km, nächster Ort und Plan, Koordinaten nur in einem Kartenlink, den du hinzufügst. Standort: Zeit und Genauigkeit der Position, Koordinaten, ein <code>geo:</code>-Link und der nächste Rettungspunkt. Messenger können eine Linkvorschau laden.</td><td>Nur, wenn du in dieser App sendest. Die App speichert keine Nachricht, keinen Empfänger und keinen Anruf.</td><td>Der von dir gewählte Dienst</td></tr>
+<tr><td>SRAM-Reifendruckrechner, <code>axs.sram.com</code></td><td>Nichts von der App. Du öffnest den Link und gibst die Werte selbst ein.</td><td>Auf Wunsch</td><td>Bedingungen von SRAM</td></tr>
+<tr><td>Gepäckplaner (Load Check): GPX-Endnamen (Nominatim, OpenStreetMap Foundation, Vereinigtes Königreich); Routing (FOSSGIS OSRM Fahrrad und Fuß, Valhalla, BRouter, der OSRM-Demo-Autorouter <code>router.project-osrm.org</code>); Höhen und Geländeschätzung (Open-Meteo, Copernicus-Daten; bis zu 200 Punkte, auf 3 Nachkommastellen gerundet); Vorhersage und Klima (Open-Meteo); Kartenkacheln (<code>tile.openstreetmap.org</code>, nur bei geöffneter Karte); Spracheingabe (Spracherkennung deines Browsers, nur bei Mikrofon-Taste); Rückmeldung (Formspree, Inc., USA, nur bei „Send“)</td><td>Wie in der Erklärung des Gepäckplaners beschrieben</td><td>Wenn du diese Funktion im Gepäckplaner nutzt</td><td>Siehe Erklärung des Gepäckplaners</td></tr>
+</tbody></table></div>
+<p>Die Vorhersage verrät keinen Fortschritt: Jede Anfrage für eine Tour fragt dasselbe feste Raster ab, jede Prüfung der Modelläufe dieselben fünf Modelle. Die IP-Adresse zeigt weiterhin einen groben Netzstandort. Regenpläne, Unterstände und Stopp-Ideen werden auf deinem Gerät berechnet und senden nichts.</p>
+
+<h2>Fahrradfarbe aus einem Foto</h2>
+<p>Farbe deines Fahrrads aus einem Foto: Das Foto wird nur auf deinem Gerät ausgewertet. Es wird nicht hochgeladen, nicht an uns oder andere gesendet und nicht gespeichert. Nur die Farbe, die du bestätigst, wird mit deinem Fahrrad in diesem Browser gespeichert und mit deinen Fahrraddaten gelöscht.</p>
+
+<h2>Fahrraddaten</h2>
+<p>Dein Fahrrad bleibt auf deinen Geräten. Fahrraddetails, Rahmenmaße, zulässiges Gewicht, Farbe und Geometrie liegen im Speicher des Gepäckplaners. Die Gewichtsprüfung des Gepäckplaners fragt nie nach deinem Körpergewicht; nur der Reifendruck-Rechner tut es, und er liest das Gewicht, das du unter „Du“ einträgst.</p>
+
+<h2>Wasser, Wetter und Reifendruck</h2>
+<p>Wayfinch ist eine Planungshilfe, kein Medizinprodukt. Wasser-, Wetter- und Druckwerte sind Schätzungen. Der Druck ist ein Ausgangswert innerhalb der Grenzen, die du einträgst.</p>
+
+<h2>Deine Rechte</h2>
+<p>Da die App deine Daten nur auf deinem Gerät speichert und kein Konto hat, kannst du sie unter „Du“ selbst einsehen, exportieren und löschen. Du kannst dich außerdem an den im Impressum genannten Betreiber wenden und dich bei einer Datenschutzaufsichtsbehörde beschweren (in Baden-Württemberg: Der Landesbeauftragte für Datenschutz und Informationsfreiheit). Entwurf vom 3. November 2026.</p>
+</section>
+</main>
+</body>
+</html>

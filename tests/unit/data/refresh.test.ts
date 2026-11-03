@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { screen } from '../../../src/core/screen/screen.ts';
 import type { ModelRun, ScreenInputs, StoredForecast, Trip, ZoneSpan } from '../../../src/core/types.ts';
 import { W } from '../../../src/core/wording/en.ts';
+import { forecastDaysFor } from '../../../src/data/openmeteo.ts';
 import { decideRefresh, keepFreshOffered, refreshWeather } from '../../../src/data/refresh.ts';
 import type { RefreshDeps } from '../../../src/data/refresh.ts';
 import { WEATHER_MODE } from '../../../src/data/weather-mode.ts';
@@ -39,10 +40,8 @@ describe('tap only', () => {
     expect(decide({ mode: 'tap', trigger, runs: [run(ICON, '2026-10-17 09:00', HOUR)], held: [run(ICON, '2026-10-16 09:00', 26 * HOUR)], lastFetchAt: ago(30 * HOUR) })).toEqual({ fetch: false, say: null });
   });
 
-  test('[WXR-TAP-NO-AUTO] the default build is tap only', () => {
-    const config = JSON.parse(readFileSync(fileURLToPath(new URL('../../../build.config.json', import.meta.url)), 'utf8')) as { weatherMode: string };
-    expect(config.weatherMode).toBe('tap');
-    expect(WEATHER_MODE).toBe('tap');
+  test('[WXR-TAP-NO-AUTO] the tap build offers no "Keep trip data fresh" setting', () => {
+    expect(keepFreshOffered('tap')).toBe(false);
   });
 
   test('[WXR-MODE-ONE-LINE] the mode alone decides whether "Keep trip data fresh when online" is offered', () => {
@@ -234,6 +233,42 @@ describe('the whole refresh, on the real store', () => {
     expect(metas(f)).toHaveLength(5);
     expect(forecasts(f)).toHaveLength(1);
     expect(forecasts(f)[0]).toContain('minutely_15');
+  });
+
+  test('[WXR-ONE-CALL] automatic: the model-run check comes first, all five models before the forecast request', async () => {
+    await prepared();
+    await saveForecast(trip().route.id, OLD);
+    const f = service();
+    await refreshWeather(deps(f, { mode: 'auto' }), 'open');
+    const firstForecast = f.urls.findIndex((u) => u.includes('/v1/forecast'));
+    expect(firstForecast).toBe(5);
+    expect(f.urls.slice(0, 5).every((u) => u.includes('/static/meta.json'))).toBe(true);
+  });
+
+  test('[WXR-AUTO-RULES] only while the app is open: the only automatic triggers are opening and returning to the app, and nothing in the source runs in the background', () => {
+    const src = (path: string): string => readFileSync(fileURLToPath(new URL(`../../../${path}`, import.meta.url)), 'utf8');
+    for (const path of ['src/data/refresh.ts', 'src/ui/shell-actions.ts', 'src/data/openmeteo.ts', 'src/ui/main.tsx']) {
+      expect(src(path), path).not.toMatch(/periodicSync|PeriodicSync|sync\.register|setInterval\(/);
+    }
+    expect(src('src/data/refresh.ts')).toMatch(/'open' \| 'foreground' \| 'tap'/);
+    expect(src('tools/build.mjs') + src('src/ui/register.ts')).not.toMatch(/periodicsync|backgroundfetch/i);
+  });
+
+  test('[WXR-ONE-CALL] one request for the whole route, whatever the length: 10 variables with the 15-minute rain, no more than 16 days', async () => {
+    await prepared();
+    await saveForecast(trip().route.id, OLD);
+    const f = service();
+    await refreshWeather(deps(f, { mode: 'auto' }), 'open');
+    expect(forecasts(f)).toHaveLength(1);
+    const q = new URL(forecasts(f)[0]!).searchParams;
+    const variables = [...q.get('hourly')!.split(','), ...q.get('minutely_15')!.split(',')];
+    expect(variables).toHaveLength(10);
+    expect(Number(q.get('forecast_days'))).toBeLessThanOrEqual(16);
+    expect(q.get('forecast_minutely_15')).toBe('192');
+    // A trip of a month still asks for 16 days at most.
+    const long = { ...trip().route, stages: Array.from({ length: 30 }, (_, i) => ({ ...trip().route.stages[0]!, day: i + 1 })) };
+    expect(forecastDaysFor(long, '2026-10-17', '2026-10-17')).toBe(16);
+    expect(forecastDaysFor(long, null, '2026-10-17')).toBe(16);
   });
 
   test('[WXR-HOURLY-ONLY] the tap mode passes with15 false', async () => {
@@ -535,6 +570,13 @@ describe('the whole refresh, on the real store', () => {
 
 describe('the mode is one line', () => {
   const REPO = fileURLToPath(new URL('../../../', import.meta.url));
+
+  test('[WXR-MODE-ONE-LINE] the shipped build is automatic with 15-minute rain (ruling A of 3 November, after Open-Meteo written answer)', () => {
+    const config = JSON.parse(readFileSync(join(REPO, 'build.config.json'), 'utf8')) as { weatherMode: string };
+    expect(config.weatherMode).toBe('auto');
+    expect(WEATHER_MODE).toBe('auto');
+    expect(keepFreshOffered(WEATHER_MODE)).toBe(true);
+  });
 
   /** Builds the app's constant from a copy of the repository's own file with only `weatherMode` changed. */
   async function bundled(mode: string): Promise<unknown> {

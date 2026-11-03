@@ -824,6 +824,14 @@ export const W = {
   appStretchEmpty: (from: string, to: string): string => `The map service returned nothing for km ${from}–${to}. That can be a fault on its side, so nothing was recorded. Try again later.`,
   appStretchWait: (time: string): string => `The Overpass service asked Wayfinch to wait. Try again after ${time}.`,
   appStretchBusy: 'Another window is refreshing a stretch. Try again when it has finished.',
+  appStoreWeightRange: 'Weight goes from 20 to 350 kg.',
+  appStoreCapacityRange: 'Water you can carry goes from 0 to 20 L.',
+  appStoreThirstChoice: 'Thirst is less, average or more.',
+  appStoreEbikeChoice: 'E-bike is yes or no.',
+  appStoreRideShort: 'A ride under one hour is too short to learn from.',
+  appStoreRideLong: 'A ride over 16 hours is not taken in. Check the hours.',
+  appStoreRideIntake: 'What you drank goes from 0 to 20 L.',
+  appStoreRideWeighing: 'Check the weighing: weight change within 10 kg, toilet stops from 0 to 30.',
   appStoreImportTyres: "The tyre details in this file can't be read. Nothing was changed.",
 
   // ---- Get ready offline (sub-project 5): each step's note ----

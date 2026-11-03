@@ -210,7 +210,8 @@ async function importing(file: unknown): Promise<ImportResult> {
   if (bringTyres) {
     const mineIn = Object.fromEntries(Object.entries(f.tyres.byBike).filter(([, e]) => isObject(e) && isObject(e.details)));
     const stamp = f.tyres.updatedAt === null ? new Date() : new Date(f.tyres.updatedAt);
-    if (Object.keys(mineIn).length) { try { importTyres(localStorage, { v: 1, entries: mineIn }, stamp); } catch { /* the file is already in */ } }
+    // An empty section replaces too: a phone that kept tyre details for a bike the file does not hold no longer shows them.
+    try { importTyres(localStorage, { v: 1, entries: mineIn }, stamp); } catch { /* the file is already in */ }
   }
   // The old route's nights go with it, unless the file brought its own.
   if (routeChanged && hadTrip) {

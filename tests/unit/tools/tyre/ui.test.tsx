@@ -125,7 +125,7 @@ describe('the tyre screen', () => {
     expect(JSON.stringify(Object.fromEntries(Object.entries(mem.kv.dump()).filter(([k]) => k.startsWith('loadcheck:'))))).toBe(before);
   });
 
-  test('rider weight from You, once a profile reader is connected (arrives with sub-project 5, group 8; TY-UI-FROM-YOU is listed as later)', async () => {
+  test('[TY-UI-FROM-YOU] rider weight from You, read through the function the app connects to its store', async () => {
     await mount(services(memory(LOADCHECK), 82));
     const from = [...host.querySelectorAll('.tyre-from')].map((e) => e.textContent ?? '');
     expect(from.some((t) => t.includes(W.tyreRiderLabel) && t.includes('82 kg') && t.includes('from You'))).toBe(true);

@@ -119,7 +119,7 @@ describe('the steps', () => {
     expect(i.baseline).not.toBeNull();
   });
 
-  test('[PREP-STEPS] the forecast asks for the trip\'s grid, up to its end, hourly only; the baseline for the stage ends and high point in the trip\'s months', async () => {
+  test('[PREP-STEPS] the forecast asks for the trip\'s grid, up to its end, with the 15-minute rain of the shipped automatic build; the baseline for the stage ends and high point in the trip\'s months', async () => {
     const trip = await onTrip();
     let seenGrid: { km: number; lat: number; lon: number }[] = [];
     let seenOptions: { days: number; with15: boolean } | null = null;
@@ -133,7 +133,7 @@ describe('the steps', () => {
     expect(seenGrid.map((g) => g.km)).toEqual(saved.route.sampleGrid);
     expect(saved.route.sampleGrid.length).toBeGreaterThan(5);
     // From 16 October to the planned end of a trip leaving on the 17th.
-    expect(seenOptions).toMatchObject({ days: saved.route.stages.length + 1, with15: false });
+    expect(seenOptions).toMatchObject({ days: saved.route.stages.length + 1, with15: true });
     expect(trip.departureDate).toBe('2026-10-17');
     const ends = saved.route.stages.map((st) => st.endKm);
     for (const e of ends) expect(seenPoints.map((p) => p.km)).toContain(e);
