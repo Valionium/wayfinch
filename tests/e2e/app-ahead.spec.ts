@@ -68,14 +68,19 @@ test('[AH-EMERGENCY] offline after a reload: 112, the fallback line and the coor
   await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
   await goOffline(page);
   await page.reload({ waitUntil: 'domcontentloaded' });
-  const log = sent(page);
+  const asked: Request[] = [];
+  page.on('request', (r) => { asked.push(r); });
   await page.goto(`${app!.origin}/#/ahead`, { waitUntil: 'domcontentloaded' });
   await page.locator('.ah-chips').getByRole('button', { name: 'Emergency', exact: true }).click();
   const card = page.locator('#chip-emergency');
   await expect(card.getByRole('link', { name: 'Call 112' })).toHaveAttribute('href', 'tel:112');
   await expect(card).toContainText('112 — works across Europe and on many mobile networks; check the local number');
   await expect(card).toContainText(/\d+\.\d{5}, \d+\.\d{5}/);
-  expect(log.filter((l) => !l.includes(new URL(app!.origin).origin))).toEqual([]);
+  // Nothing leaves the phone: every request, the app's own fonts included, is the app's own address answered by its worker.
+  for (const r of asked) {
+    expect(new URL(r.url()).origin, r.url()).toBe(new URL(app!.origin).origin);
+    expect((await r.response())?.fromServiceWorker(), r.url()).toBe(true);
+  }
 });
 
 test('Ahead has no automatic accessibility violations with everything open, and every control is at least 44 px', async ({ page }) => {

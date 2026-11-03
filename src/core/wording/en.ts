@@ -53,6 +53,8 @@ export const W = {
   routeRejoinNote: (km: string): string => `Distances and times include about ${km} km back to the route.`,
   routeFarOffNote: 'You are more than 5 km from the route, so these answers are approximate.',
   routeNoDateNote: 'No departure date yet, so the answers give distances only. Set it in Trip.',
+  routeStampHere: 'here',
+  routeNoPositionFromStart: 'No position yet: these answers count from the route start (km 0). Update position for answers from where you are.',
   routeStripDayOne: 'Day 1',
   routeStripToday: 'Today',
   routeStripTomorrow: (day: string): string => (day === '' ? 'Tomorrow' : `Tomorrow, ${day}`),
@@ -213,7 +215,7 @@ export const W = {
   weatherSeasonalBasis: (years: string): string => `seasonal estimate (${years})`,
   weatherNothingSaved: 'No forecast and no seasonal data saved.',
   weatherUnknown: 'Weather unknown: no forecast and no seasonal data saved.',
-  weatherCantWorkOut: "The weather along the ride can't be worked out from these settings. Check your speed in You.",
+  weatherCantWorkOut: "The weather along the ride can't be worked out from these settings. Check the flat speed in Trip settings.",
   weatherSetDate: 'Set your departure date to match the forecast to your ride.',
   weatherNoForecastFrom: (km: string): string => `No forecast from km ${km}`,
   weatherNoForecastFor: (ride: string): string => `No forecast for ${ride}`,
@@ -288,7 +290,7 @@ export const W = {
   leavebySundayAssumed: 'Sunday closing is an assumption.',
   leavebyHolidayAssumed: 'Holiday closing is an assumption.',
   leavebyMapDate: (date: string): string => `Map data from ${date}.`,
-  leavebyCantWorkOut: "Leave-by can't be worked out from these settings. Check your speed in You.",
+  leavebyCantWorkOut: "Leave-by can't be worked out from these settings. Check the flat speed in Trip settings.",
 
   // ---- The Daylight card (sections 6.5 and 6.12). ----
   daylightArrival: (km: string, about: string, line: string): string => `km ${km} ${about} · ${line}`,
@@ -297,7 +299,7 @@ export const W = {
   daylightPlanTomorrow: 'Plan tomorrow',
   daylightBackToToday: 'Back to today',
   daylightBasis: 'Sun times worked out on this phone for the place and the date.',
-  daylightCantWorkOut: "Daylight can't be worked out here. Check your speed in You and the phone's clock.",
+  daylightCantWorkOut: "Daylight can't be worked out here. Check the flat speed in Trip settings and the phone's clock.",
 
   // ---- Wait or go (section 6.6). Always an option, never an instruction. ----
   waitHere: 'here',
@@ -372,7 +374,7 @@ export const W = {
   stopHoursUnknown: (n: number): string => `No stop idea: hours unknown for the next ${n} food ${n === 1 ? 'place' : 'places'}`,
   stopNoPlaceDataHere: 'No place data here',
   stopSetDate: 'Set your departure date to see what is open on arrival.',
-  stopCantWorkOut: "Stop ideas can't be worked out from these settings. Check your speed in You.",
+  stopCantWorkOut: "Stop ideas can't be worked out from these settings. Check the flat speed in Trip settings.",
   stopAtRouteEnd: 'This is the end of your route: no ride ahead to plan stops on.',
 
   // ---- The Shelter chip (section 6.11). ----
@@ -388,7 +390,7 @@ export const W = {
   shelterNearest: (km: string): string => `Nearest mapped cover: km ${km}`,
   shelterNone: 'No mapped cover near here',
   shelterThunderTitle: 'Thunderstorm near: open buildings first',
-  shelterCantWorkOut: "Cover can't be worked out from these settings. Check your speed in You.",
+  shelterCantWorkOut: "Cover can't be worked out from these settings. Check the flat speed in Trip settings.",
 
   // ---- The help chips (section 6.9). ----
   helpNearest: (what: string, name: string, km: string): string => `Nearest ${what}: ${name}, km ${km}`,
@@ -423,7 +425,7 @@ export const W = {
   helpFeeAmount: (value: string): string => `fee: ${value}`,
   helpFree: 'free',
   helpFeeNotMapped: 'fee not mapped',
-  helpCantWorkOut: "Help can't be worked out from these settings. Check your speed in You.",
+  helpCantWorkOut: "Help can't be worked out from these settings. Check the flat speed in Trip settings.",
   helpNoPlaceData: 'No place data for this stretch. Refresh it.',
   helpFromNoPosition: (km: string): string => `No position yet: measured from km ${km}.`,
 
@@ -500,7 +502,7 @@ export const W = {
   // ---- Sleep (section 6.8) and call ahead (section 6.13). ----
   sleepPlanTomorrow: 'Stopping for the night? Plan tomorrow',
   sleepShelterNote: 'Shelter — not a campsite; overnight use depends on local rules',
-  sleepCantWorkOut: "Sleep can't be worked out from these settings. Check your speed in You.",
+  sleepCantWorkOut: "Sleep can't be worked out from these settings. Check the flat speed in Trip settings.",
   sleepWordCampsite: 'Campsite',
   sleepWordHostel: 'Hostel',
   sleepWordGuestHouse: 'Guest house',
@@ -993,6 +995,9 @@ export const W = {
   appAheadManualSet: 'Use this position',
   appAheadManualBadKm: (length: string): string => `Enter a kilometre from 0 to ${length}.`,
   appAheadToTrip: 'Open Trip',
+  appAheadUnreadable: "Your trip couldn't be read on this phone just now. Try again; if it keeps failing, reload the app.",
+  appAheadRetry: 'Try again',
+  appAheadChoiceNotKept: "This browser didn't keep that choice, so the plan is unchanged. Try again.",
   appAheadSpeedLink: 'Change the flat speed in Trip settings',
   appAheadStripKey: 'Solid: rain likely. Hatched: rain possible. Red with a bolt: thunderstorm.',
   appAheadStripLabel: (label: string, from: string, to: string): string => `${label}: route strip from km ${from} to km ${to}`,
@@ -1000,6 +1005,7 @@ export const W = {
   appAheadIconFood: (km: string): string => `Food at km ${km}`,
   appAheadIconSleep: (km: string): string => `Sleep place at km ${km}`,
   appAheadIconCover: (km: string): string => `Cover at km ${km}`,
+  appAheadIconMore: (n: number): string => `+${n}`,
   appAheadBandLikely: (from: string, to: string): string => `Rain likely, km ${from}–${to}`,
   appAheadBandPossible: (from: string, to: string): string => `Rain possible, km ${from}–${to}`,
   appAheadBandThunder: (from: string, to: string): string => `Thunderstorm, km ${from}–${to}`,

@@ -84,6 +84,21 @@ describe('cards', () => {
     }
   });
 
+  test('[AH-CARD-ORDER] collapsed, each card shows its title, status, stamp and detail; a stale forecast is labelled on the card itself', async () => {
+    const v = trip(viewOf(rainyStop({ now: `${SAT} 21:30` })));
+    expect(v.screen.cards.weather.freshness.stale).toBe(true);
+    await show(v, fakeActions().actions);
+    expect(host.querySelectorAll('.ah-toggle[aria-expanded="true"]')).toHaveLength(0);
+    for (const c of CARDS) {
+      const card = host.querySelector(`[data-card="${c}"]`)!;
+      const a = v.screen.cards[c];
+      expect(card.querySelector('.ah-toggle')!.textContent).toBe(a.title);
+      if (a.detail) expect(card.querySelector('.ah-card-detail')!.textContent).toBe(a.detail);
+      expect(card.querySelector('[data-stale]')?.textContent ?? null, c).toBe(a.freshness.stale ? W.weatherStale : null);
+    }
+    expect(host.querySelector('[data-card="weather"] [data-stale]')!.textContent).toBe(W.weatherStale);
+  });
+
   test('[AH-EXPAND] a tap expands that card only; Weather lists its items in order, then Update weather, then the basis', async () => {
     const v = trip(viewOf(rainyStop()));
     await show(v, fakeActions().actions);
@@ -154,6 +169,22 @@ describe('cards', () => {
   });
 });
 
+
+/** Every icon of the strip is on the page, alone at its kilometre or in a "+N" button; two rows at most; none covers another. */
+function expectIconsPlaced(s: Screen['strip']): void {
+  const singles = [...host.querySelectorAll<HTMLButtonElement>('.ah-icon:not(.ah-icon-more)')];
+  const more = [...host.querySelectorAll<HTMLButtonElement>('.ah-icon-more')];
+  const kms = [...singles.map((b) => Number(b.dataset.km)), ...more.flatMap((b) => b.dataset.kms!.split(' ').map(Number))].sort((x, y) => x - y);
+  expect(kms).toEqual(s.icons.map((x) => x.km).sort((x, y) => x - y));
+  for (const b of singles) expect(parseFloat(b.style.left)).toBeLessThanOrEqual(((Number(b.dataset.km) - s.startKm) / (s.endKm - s.startKm)) * 100 + 0.01);
+  const all = [...singles, ...more];
+  expect(new Set(all.map((b) => b.style.top)).size).toBeLessThanOrEqual(2);
+  const byRow = new Map<string, number[]>();
+  for (const b of all) byRow.set(b.style.top, [...(byRow.get(b.style.top) ?? []), parseFloat(b.style.left)]);
+  for (const xs of byRow.values()) xs.sort((x, y) => x - y).forEach((x, n) => { if (n > 0) expect(x - xs[n - 1]!).toBeGreaterThanOrEqual((46 / 230) * 100 - 0.01); });
+  expect(parseFloat(host.querySelector<HTMLElement>('.ah-strip-icons')!.style.height)).toBeLessThanOrEqual(92);
+}
+
 describe('the strip', () => {
   test('[AH-STRIP] bands are solid, hatched or red with a bolt, and say so in words; icons sit at their kilometre and open their card', async () => {
     const thunder = { range: [150, 155] as [number, number], stamps: stamps(SAT, 16, 17), pp: 80, code: 95, mm: 2 };
@@ -172,21 +203,26 @@ describe('the strip', () => {
     }
     expect(text()).toContain(W.appAheadStripKey);
     const s = v.screen.strip;
-    const icons = [...host.querySelectorAll<HTMLButtonElement>('.ah-icon')];
-    expect(icons.length).toBe(s.icons.length);
-    s.icons.forEach((icon, n) => {
-      expect(Number(icons[n]!.dataset.km)).toBe(icon.km);
-      expect(parseFloat(icons[n]!.style.left)).toBeCloseTo(((icon.km - s.startKm) / (s.endKm - s.startKm)) * 100, 1);
-    });
-    // Icons sharing a row never cover each other: each keeps its own 44 px target on a phone-wide track.
-    const byRow = new Map<string, number[]>();
-    for (const b of icons) byRow.set(b.style.top, [...(byRow.get(b.style.top) ?? []), parseFloat(b.style.left)]);
-    for (const xs of byRow.values()) xs.sort((a, b) => a - b).forEach((x, n) => { if (n > 0) expect(x - xs[n - 1]!).toBeGreaterThanOrEqual((46 / 230) * 100 - 0.01); });
-    const food = icons.find((b) => b.classList.contains('ah-icon-food'))!;
+    expectIconsPlaced(s);
+    const food = [...host.querySelectorAll<HTMLButtonElement>('.ah-icon')].find((b) => b.classList.contains('ah-icon-food'))
+      ?? [...host.querySelectorAll<HTMLButtonElement>('.ah-icon-more')].find((b) => /Food/.test(b.getAttribute('aria-label') ?? ''))!;
     await click(food);
     expect(host.querySelector('[data-card="food"] .ah-toggle')!.getAttribute('aria-expanded')).toBe('true');
     await click(bands[0]);
     expect(host.querySelector('[data-card="weather"] .ah-toggle')!.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  test('[AH-STRIP] six places near the start stay in two rows at 360 px; "+N" names them all and opens their cards', async () => {
+    const v = trip(viewOf(rainyStop()));
+    const s = v.screen.strip;
+    const crowded = [126, 126.5, 127, 127.5, 128, 128.5].map((km, n) => ({ kind: (['water', 'food', 'sleep', 'cover', 'water', 'food'] as const)[n]!, km, opens: (['water', 'food', 'sleep', 'weather', 'water', 'food'] as const)[n]! }));
+    await show({ ...v, screen: { ...v.screen, strip: { ...s, icons: crowded } } }, fakeActions().actions);
+    expectIconsPlaced({ ...s, icons: crowded });
+    const more = host.querySelector<HTMLButtonElement>('.ah-icon-more')!;
+    expect(more.textContent).toBe('+5');
+    expect(more.getAttribute('aria-label')).toBe('+5: Food at km 126.5, Sleep place at km 127, Cover at km 127.5, Water at km 128, Food at km 128.5');
+    await click(more);
+    for (const c of ['food', 'sleep', 'weather', 'water']) expect(host.querySelector(`[data-card="${c}"] .ah-toggle`)!.getAttribute('aria-expanded'), c).toBe('true');
   });
 
   test('[BK-WHERE-STRIP] [AH-STRIP] the bike marker sits at the left end, facing the way of travel, at most 24 px tall, decorative', async () => {
@@ -248,6 +284,22 @@ describe('share progress', () => {
     expect(calls).toContainEqual(['copy', 'At the café, all well.']);
     expect(sheet.textContent).toContain(W.appAheadShareNothingSent);
     expect(sheet.textContent).toContain(W.appAheadShareMapNote);
+  });
+
+  test("[AH-SHARE] the map-link choice adds or takes out the link line only: the rider's own words stay", async () => {
+    const v = trip(viewOf(rainyStop()));
+    await show(v, fakeActions().actions);
+    await click(buttonNamed('Share progress'));
+    const sheet = host.querySelector('[data-share="progress"]')!;
+    const box = sheet.querySelector('textarea')!;
+    const mapLine = v.screen.shareMapText!.slice(v.screen.shareText!.length);
+    expect(mapLine).toMatch(/openstreetmap\.org/);
+    await typeInto(box, 'At the café, all well.');
+    await click(sheet.querySelector('input[type=checkbox]'));
+    expect(box.value).toBe(`At the café, all well.${mapLine}`);
+    await typeInto(box, `Dry again. ${box.value}`);
+    await click(sheet.querySelector('input[type=checkbox]'));
+    expect(box.value).toBe('Dry again. At the café, all well.');
   });
 
   test('[AH-SHARE] with a share sheet, Share… hands it the text; the button hides with no position', async () => {
@@ -332,6 +384,15 @@ describe('degraded', () => {
     expect(host.querySelectorAll('[data-card]')).toHaveLength(6);
     const dayOne = trip(viewOf(rainyStop({ now: `${FRI} 07:30`, positions: [] })));
     expect(dayOne.answers).toBe(true);
+  });
+
+  test('[AH-FIRST-USE] on the departure day at 11:35 with no position, the page says its answers count from the route start', async () => {
+    const v = trip(viewOf(rainyStop({ now: `${FRI} 11:35`, positions: [] })));
+    expect(v.answers).toBe(true);
+    await show(v, fakeActions().actions);
+    expect(host.querySelectorAll('[data-card]')).toHaveLength(6);
+    expect(host.querySelector('.ah-notes')!.textContent).toContain(W.routeNoPositionFromStart);
+    expect(host.querySelector('.ah-notes')!.compareDocumentPosition(host.querySelector('[data-strip]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   test('[AH-RETURN] reopened later: the answers of the last position, "as of 14:20, 40 min ago", and Update position first', async () => {

@@ -47,17 +47,25 @@ const along = (km: number, s: Strip): number => {
 };
 const pct = (x: number): string => `${(x * 100).toFixed(2)}%`;
 
-/** Icons that would cover each other go to a row below: each stays its own 44 px tap target. */
+/**
+ * Icons close together share a column at the first one's place, so none covers another and the strip keeps two rows at most:
+ * the first icon on top; below it the second, or, with more, one button for the rest ("+3"), which opens their cards.
+ */
 const ICON_PX = 46;
-function rowsOf(icons: StripIcon[], s: Strip, trackPx: number): number[] {
+type Slot = { x: number; row: 0 | 1; icons: StripIcon[] };
+function slotsOf(icons: StripIcon[], s: Strip, trackPx: number): Slot[] {
   const gap = ICON_PX / Math.max(trackPx, ICON_PX);
-  const last: number[] = [];
-  return icons.map((icon) => {
+  const groups: { x: number; icons: StripIcon[] }[] = [];
+  for (const icon of icons) {
     const x = along(icon.km, s);
-    let row = last.findIndex((end) => x - end >= gap);
-    if (row < 0) row = last.length;
-    last[row] = x;
-    return row;
+    const last = groups[groups.length - 1];
+    if (last && x - last.x < gap) last.icons.push(icon);
+    else groups.push({ x, icons: [icon] });
+  }
+  return groups.flatMap((g): Slot[] => {
+    const [first, ...rest] = g.icons;
+    const top: Slot = { x: g.x, row: 0, icons: [first!] };
+    return rest.length === 0 ? [top] : [top, { x: g.x, row: 1, icons: rest }];
   });
 }
 
@@ -71,8 +79,8 @@ export function RouteStrip({ strip, bike, onOpen }: { strip: Strip; bike: BikeRe
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
   }, []);
-  const rows = rowsOf(strip.icons, strip, trackPx);
-  const rowCount = Math.max(1, ...rows.map((r) => r + 1));
+  const slots = slotsOf(strip.icons, strip, trackPx);
+  const rowCount = slots.some((x) => x.row === 1) ? 2 : 1;
   return (
     <section class="ah-strip" aria-label={W.appAheadStripLabel(strip.label, showKm(strip.startKm), showKm(strip.endKm))} data-strip>
       <div class="ah-strip-head">
@@ -94,16 +102,27 @@ export function RouteStrip({ strip, bike, onOpen }: { strip: Strip; bike: BikeRe
               </button>
             ))}
           </div>
-          <div class="ah-strip-icons" style={{ height: `${rowCount * 46}px` }}>
-            {strip.icons.map((icon, i) => (
-              <button
-                key={`i${i}`} type="button" class={`ah-icon ah-icon-${icon.kind}`} data-km={String(icon.km)}
-                style={{ left: pct(along(icon.km, strip)), top: `${rows[i]! * 46}px` }}
-                aria-label={ICON_WORD[icon.kind](showKm(icon.km))} onClick={() => onOpen(icon.opens as CardName)}
-              >
-                <Glyph kind={icon.kind} />
-              </button>
-            ))}
+          <div class="ah-strip-icons" style={{ height: `${rowCount * ICON_PX}px` }}>
+            {slots.map((slot, i) => {
+              const style = { left: pct(slot.x), top: `${slot.row * ICON_PX}px` };
+              const one = slot.icons.length === 1 ? slot.icons[0]! : null;
+              return one ? (
+                <button
+                  key={`i${i}`} type="button" class={`ah-icon ah-icon-${one.kind}`} data-km={String(one.km)} style={style}
+                  aria-label={ICON_WORD[one.kind](showKm(one.km))} onClick={() => onOpen(one.opens as CardName)}
+                >
+                  <Glyph kind={one.kind} />
+                </button>
+              ) : (
+                <button
+                  key={`i${i}`} type="button" class="ah-icon ah-icon-more" data-kms={slot.icons.map((x) => x.km).join(' ')} style={style}
+                  aria-label={`${W.appAheadIconMore(slot.icons.length)}: ${slot.icons.map((x) => ICON_WORD[x.kind](showKm(x.km))).join(', ')}`}
+                  onClick={() => { for (const name of new Set(slot.icons.map((x) => x.opens as CardName))) onOpen(name); }}
+                >
+                  {W.appAheadIconMore(slot.icons.length)}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

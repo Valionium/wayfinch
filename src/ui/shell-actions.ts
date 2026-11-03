@@ -87,6 +87,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
   let position: PositionState = { kind: 'idle' };
   let weatherSay: string | null = null;
   let weatherBusy = false;
+  let notice: string | null = null;
   let pendingFix: Fix | null = null;
   let hooked = false;
   let reading = 0;
@@ -124,16 +125,21 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       kind: 'trip', screen: s, answers: s.positionLine !== null || dayOne, lengthKm: i.trip.route.lengthKm, towns: townsOf(i),
       bike: bikeSource.peek().bike, stillAboutL, badSpeed: !usableFlatKph(i.trip.flatKph),
       approximateHelp: p !== null && p.source === 'gps' && !(p.accuracyM <= APPROXIMATE_HELP_M),
-      shareOld, mapLink: readMapLink(), canShare: deps.share !== null, position, weatherSay, weatherBusy,
+      shareOld, mapLink: readMapLink(), canShare: deps.share !== null, position, weatherSay, weatherBusy, notice,
     };
     view.value = next;
     noteRoute(true);
   };
 
+  const emergencyAlone = (at: Date) => emergencyCard({ position: null, now: at, country: null, settlements: [], shelters: [], rescuePoints: [], thunderNear: false, dataDate: '' });
+  const unreadable = (at: Date): void => {
+    view.value = { kind: 'unreadable', canShare: deps.share !== null, emergency: emergencyAlone(at) };
+  };
+
   const noRoute = (at: Date): void => {
     view.value = {
       kind: 'no-route', canShare: deps.share !== null,
-      emergency: emergencyCard({ position: null, now: at, country: null, settlements: [], shelters: [], rescuePoints: [], thunderNear: false, dataDate: '' }),
+      emergency: emergencyAlone(at),
     };
     noteTripFacts(false, false);
   };
@@ -142,7 +148,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
   const touch = (): void => {
     const v = view.peek();
     if (v.kind !== 'trip') return;
-    view.value = { ...v, position, weatherSay, weatherBusy, bike: bikeSource.peek().bike, mapLink: readMapLink() };
+    view.value = { ...v, position, weatherSay, weatherBusy, notice, bike: bikeSource.peek().bike, mapLink: readMapLink() };
   };
 
   const load = async (): Promise<void> => {
@@ -150,14 +156,21 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     const mine = (reading += 1);
     const at = deps.now();
     let read: ScreenInputs | null;
+    let failed = false;
     try {
       read = (await dbExists()) ? await readInputs(at) : null;
     } catch {
       read = null;
+      failed = true;
     }
     // Only the newest read is shown: an older one that finishes late would bring back what was just changed.
     if (hooked || mine !== reading) return;
     inputs = read;
+    // A trip that could not be read is not "no route": the rider is told, and can try again.
+    if (failed) {
+      unreadable(at);
+      return;
+    }
     if (!read) {
       noRoute(at);
       return;
@@ -288,14 +301,18 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       touch();
     },
 
+    // The choice lives in this browser's storage; one it refused is said, not passed over.
     async planTomorrow(date) {
-      setPlanTomorrow(date);
+      notice = setPlanTomorrow(date) ? null : W.appAheadChoiceNotKept;
       await load();
+      touch();
     },
     async backToToday() {
-      backToToday(deps.now());
+      notice = backToToday(deps.now()) ? null : W.appAheadChoiceNotKept;
       await load();
+      touch();
     },
+    retry: () => load(),
 
     setMapLink(on) {
       writeMapLink(on);

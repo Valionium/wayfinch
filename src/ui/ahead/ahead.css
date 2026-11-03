@@ -74,3 +74,5 @@
 .ah-sheet { border-color: var(--blaze); }
 .ah-sheet h2 { font-family: var(--font-display); font-size: 1.25rem; margin: 0 0 8px; }
 .ah-strip .bk-tyre { stroke: var(--muted); } /* the wheels read on both grounds; the line token is too faint at 24 px */
+.ah-stale { border-left: 4px solid var(--amber); padding: 2px 8px; font-weight: 600; }
+.ah-icon-more { color: var(--ink); font-weight: 600; font-family: var(--font-display); }

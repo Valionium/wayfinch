@@ -45,6 +45,7 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   appAheadIconFood: [['131']],
   appAheadIconSleep: [['163']],
   appAheadIconCover: [['127']],
+  appAheadIconMore: [[3]],
   appAheadBandLikely: [['125', '137']],
   appAheadBandPossible: [['150', '155']],
   appAheadBandThunder: [['150', '155']],

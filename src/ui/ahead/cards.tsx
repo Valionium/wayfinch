@@ -52,6 +52,8 @@ function TopicCard({ name, answer, stamp, open, onToggle, v, actions, onShelter 
         <StatusBadge status={answer.status} />
         {stamp ? <span class="ah-stamp">{stamp}</span> : null}
       </p>
+      {/* A forecast over 12 hours old is labelled on the card itself, not only in its basis (section 8, rule 3). */}
+      {answer.freshness.stale ? <p class="ah-stale" data-stale>{W.weatherStale}</p> : null}
       {answer.detail ? <p class="ah-card-detail"><Detail text={answer.detail} /></p> : null}
       {/* "Stopping for the night? Plan tomorrow" asks for the very tap the Daylight card offers. */}
       {name === 'sleep' && answer.detail.includes(W.sleepPlanTomorrow) ? (

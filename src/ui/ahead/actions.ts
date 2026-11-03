@@ -40,10 +40,17 @@ export type AheadTrip = {
   /** What the last Update weather said; null before a tap or after a fetch with nothing to say. */
   weatherSay: string | null;
   weatherBusy: boolean;
+  /** A tap the store refused, said once at the top (Plan tomorrow, Back to today). */
+  notice: string | null;
 };
 
 /** With no route there is no screen, but the Emergency card stands: 112 and the fallback line (section 6.9). */
-export type AheadView = { kind: 'loading' } | { kind: 'no-route'; emergency: EmergencyCard; canShare: boolean } | AheadTrip;
+export type AheadView =
+  | { kind: 'loading' }
+  | { kind: 'no-route'; emergency: EmergencyCard; canShare: boolean }
+  /** The trip is there but could not be read: said so, with Try again, never "Add a route". */
+  | { kind: 'unreadable'; emergency: EmergencyCard; canShare: boolean }
+  | AheadTrip;
 
 export type AheadActions = {
   updatePosition(): Promise<void>;
@@ -56,6 +63,8 @@ export type AheadActions = {
   /** `date` is the riding date of the ride that ends: the screen's own `ride.date`. */
   planTomorrow(date: string): Promise<void>;
   backToToday(): Promise<void>;
+  /** Reads the trip again, after a read that failed. */
+  retry(): Promise<void>;
   setMapLink(on: boolean): void;
   /** The system share sheet with the text only. False when there is none or the rider closed it. */
   share(text: string): Promise<boolean>;

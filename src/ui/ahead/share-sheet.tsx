@@ -23,13 +23,22 @@ export function ShareSheet(p: ShareSheetProps) {
   const withMap = p.mapText !== undefined && p.mapText !== null;
   const start = withMap && p.mapLink ? p.mapText! : p.text;
   const [text, setText] = useState(start);
+  const [linked, setLinked] = useState(withMap && p.mapLink === true);
   const [said, setSaid] = useState<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus(); }, []);
-  // The choice switches the message to the other form; what the rider typed gives way, as the preview says.
+  // The choice adds or takes out the map line only: what the rider typed stays. The line is the part the map form adds.
+  const mapLine = withMap && p.mapText!.startsWith(p.text) ? p.mapText!.slice(p.text.length) : null;
   const choose = (on: boolean): void => {
+    setLinked(on);
     p.actions.setMapLink(on);
-    setText(on && withMap ? p.mapText! : p.text);
+    setText((was) => {
+      if (mapLine === null || mapLine.trim() === '') return on && withMap ? p.mapText! : p.text;
+      if (on) return was.includes(mapLine.trim()) ? was : `${was.replace(/\s+$/, '')}${mapLine}`;
+      const at = was.indexOf(mapLine);
+      if (at >= 0) return was.slice(0, at) + was.slice(at + mapLine.length);
+      return was.split('\n').filter((l) => l.trim() !== mapLine.trim()).join('\n');
+    });
   };
   const copy = async (): Promise<void> => setSaid((await p.actions.copy(text)) ? W.appAheadShareCopied : W.appAheadShareCopyFailed);
   return (
@@ -47,7 +56,7 @@ export function ShareSheet(p: ShareSheetProps) {
       </label>
       {withMap ? (
         <label class="choice-option">
-          <input type="checkbox" checked={p.mapLink === true} onChange={(e) => choose(e.currentTarget.checked)} />
+          <input type="checkbox" checked={linked} onChange={(e) => choose(e.currentTarget.checked)} />
           <span>{W.appAheadShareMapLink} <span class="muted">{W.appAheadShareMapNote}</span></span>
         </label>
       ) : null}

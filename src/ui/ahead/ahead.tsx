@@ -50,6 +50,7 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
 
   return (
     <div class="ahead" data-ahead={v.answers ? 'answers' : 'first-use'}>
+      {v.notice ? <p class="notice" role="status">{v.notice}</p> : null}
       {v.answers ? <PositionLine v={v} onShare={() => setSharing(true)} /> : <p>{W.appAheadFirstUse}</p>}
       {sharing && s.shareText !== null ? (
         <ShareSheet
@@ -75,15 +76,20 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
 export function AheadScreen({ view, actions }: { view: AheadView; actions: AheadActions }) {
   if (view.kind === 'loading') return <div class="ahead" aria-busy="true" />;
   // With no route the shell's notice says "Add a route to see what's ahead"; there is no demo in the first version.
-  if (view.kind === 'no-route') return <NoRoute view={view} actions={actions} />;
+  if (view.kind === 'no-route' || view.kind === 'unreadable') return <NoRoute view={view} actions={actions} />;
   return <TripAhead v={view} actions={actions} />;
 }
 
-function NoRoute({ view, actions }: { view: Extract<AheadView, { kind: 'no-route' }>; actions: AheadActions }) {
+function NoRoute({ view, actions }: { view: Extract<AheadView, { kind: 'no-route' | 'unreadable' }>; actions: AheadActions }) {
   const [open, setOpen] = useState(false);
   return (
-    <div class="ahead" data-ahead="no-route">
-      <p><a class="btn btn-primary" href="#/trip">{W.appAheadToTrip}</a></p>
+    <div class="ahead" data-ahead={view.kind}>
+      {view.kind === 'unreadable' ? (
+        <>
+          <p class="notice" role="alert">{W.appAheadUnreadable}</p>
+          <p><button type="button" class="btn btn-primary" onClick={() => void actions.retry()}>{W.appAheadRetry}</button></p>
+        </>
+      ) : <p><a class="btn btn-primary" href="#/trip">{W.appAheadToTrip}</a></p>}
       <ChipRow shown={['emergency']} open={open ? 'emergency' : null} onOpen={(c) => setOpen(c !== null)} />
       {open ? (
         <section class="card ah-chip-panel ah-large" id="chip-emergency" aria-label={W.appAheadChipEmergency}>

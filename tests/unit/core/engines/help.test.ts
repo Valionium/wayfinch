@@ -361,7 +361,7 @@ describe('bad data reads honest', () => {
   test.each([['flat speed 0', 0], ['flat speed NaN', NaN], ['flat speed 100', 100]])('[EM-BIKE] %s reads unknown', (_n, flatKph) => {
     const f = facts({ moment: riding(100), spots: [{ b: named(bikeShop, 'A'), km: 110 }] });
     const a = helpChip('bike', { ...f, trip: { ...f.trip, flatKph } });
-    expect(a.title).toBe("Help can't be worked out from these settings. Check your speed in You.");
+    expect(a.title).toBe("Help can't be worked out from these settings. Check the flat speed in Trip settings.");
     expect(a.status).toBe('unknown');
     expect(a.items).toEqual([]);
   });

@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { ScreenInputs } from '../../../src/core/types.ts';
 import { W } from '../../../src/core/wording/en.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
-import { closeDb } from '../../../src/store/db.ts';
+import { closeDb, DB_NAME } from '../../../src/store/db.ts';
 import { readInputs } from '../../../src/store/inputs.ts';
 import { addPosition } from '../../../src/store/positions.ts';
 import { saveForecast, saveHours, saveMatched, savePrepared, saveZones } from '../../../src/store/prepared.ts';
@@ -267,22 +267,59 @@ describe('Update weather', () => {
 });
 
 describe('opened days later', () => {
-  test('[APP-OLD-OPEN] data 3 days old: the forecast is labelled stale, ages are true, no wait or go, and old positions are gone', async () => {
+  test('[APP-OLD-OPEN] data 3 days old: on the page the forecast is labelled stale on its card, its age is true, no wait or go, old positions gone', async () => {
+    // Prepared and ridden on Saturday 17 October; the next leg leaves Tuesday 20 October, and the phone opens that morning.
     const i = rainyStop();
-    await seed(i);
+    await seed({ ...i, trip: { ...i.trip, departureDate: '2026-10-20' } });
     const later = at('2026-10-20 09:00');
     expect((await readInputs(i.now))!.positions.length).toBeGreaterThan(0);
     const shell = browserAhead(deps({ now: () => later }));
     const stop = shell.start();
-    await until(() => shell.view.value.kind === 'trip', 'the screen');
-    const inputs = (await readInputs(later))!;
-    expect(inputs.positions).toEqual([]); // ST-RETENTION: none is under 48 h old
-    const v = shell.view.value;
-    if (v.kind !== 'trip') throw new Error(v.kind);
-    const weather = v.screen.cards.weather;
-    expect(JSON.stringify(weather)).toContain(W.weatherStale);
-    expect(weather.items.some((x) => /^Waiting until/.test(x.label))).toBe(false);
-    expect(weather.basis.join(' ')).toMatch(/fetched Sat 17 Oct, 07:10/);
+    await act(async () => { render(<Live shell={shell} />, host); });
+    await until(() => host.querySelector('[data-card="weather"]') !== null, () => `the cards: ${host.textContent?.slice(0, 200)}`);
+    expect((await readInputs(later))!.positions).toEqual([]); // ST-RETENTION: none is under 48 h old
+    const weather = host.querySelector('[data-card="weather"]')!;
+    expect(weather.querySelector('[data-stale]')!.textContent).toBe(W.weatherStale); // on the collapsed card
+    await click(weather.querySelector('.ah-toggle'));
+    expect(weather.textContent).toContain('Open-Meteo forecast fetched Sat 17 Oct, 07:10'); // the age, as it is
+    expect(weather.textContent).not.toMatch(/Waiting until/);
+    expect(host.querySelector('[data-position-line]')).toBeNull();
+    expect(host.textContent).toContain(W.routeNoPositionFromStart);
+    stop();
+  });
+});
+
+describe('refusals and failures', () => {
+  test('[AH-PLAN-TOMORROW] a Plan tomorrow the browser would not keep is said on the page, and the plan is unchanged', async () => {
+    const i = rainyStop();
+    await seed(i);
+    const shell = browserAhead(deps({ now: () => i.now }));
+    const stop = shell.start();
+    await act(async () => { render(<Live shell={shell} />, host); });
+    await until(() => host.querySelector('[data-card="daylight"]') !== null, 'the cards');
+    const refuse = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('QuotaExceededError'); });
+    await click(host.querySelector('[data-card="daylight"] .ah-toggle'));
+    await click(buttonNamed(W.daylightPlanTomorrow, host.querySelector('[data-card="daylight"]')!));
+    await until(() => host.textContent?.includes(W.appAheadChoiceNotKept) ?? false, 'the refusal');
+    refuse.mockRestore();
+    expect(shell.view.value.kind === 'trip' && shell.view.value.screen.phase).toBe('riding');
+    stop();
+  });
+  test('[AH-NO-ROUTE] a trip that cannot be read is said so, with Try again, never "Add a route"', async () => {
+    const i = rainyStop();
+    await seed(i);
+    closeDb();
+    const real = globalThis.indexedDB;
+    globalThis.indexedDB = { databases: () => Promise.resolve([{ name: DB_NAME, version: 1 }]), open: () => { throw new Error('blocked'); } } as unknown as IDBFactory;
+    const shell = browserAhead(deps({ now: () => i.now }));
+    const stop = shell.start();
+    await act(async () => { render(<Live shell={shell} />, host); });
+    await until(() => host.querySelector('[data-ahead="unreadable"]') !== null, 'the unreadable view');
+    expect(host.textContent).toContain(W.appAheadUnreadable);
+    expect(host.textContent).not.toContain(W.appAheadToTrip);
+    globalThis.indexedDB = real;
+    await click(buttonNamed(W.appAheadRetry));
+    await until(() => host.querySelector('[data-ahead="answers"]') !== null, 'the answers after Try again');
     stop();
   });
 });

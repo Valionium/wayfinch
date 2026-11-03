@@ -22,6 +22,7 @@ export function fakeActions(o: { share?: boolean; copy?: boolean } = {}): { acti
     updateWeather: rec('updateWeather') as AheadActions['updateWeather'],
     planTomorrow: rec('planTomorrow') as AheadActions['planTomorrow'],
     backToToday: rec('backToToday') as AheadActions['backToToday'],
+    retry: rec('retry') as AheadActions['retry'],
     setMapLink: (on) => { calls.push(['setMapLink', on]); },
     share: (t) => { calls.push(['share', t]); return Promise.resolve(o.share ?? true); },
     copy: (t) => { calls.push(['copy', t]); return Promise.resolve(o.copy ?? true); },

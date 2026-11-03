@@ -20,7 +20,7 @@ import { progressText, townNear } from '../engines/share.ts';
 import { latestUsable, shelterChip, thunderNear } from '../engines/shelter.ts';
 import { sleepAnswer } from '../engines/sleep.ts';
 import { stopIdeas, type Ideas } from '../engines/stop-ideas.ts';
-import { dayRide, noteFor, scheduleFor, zoneLookupOf, type DayEnv } from '../engines/tripday.ts';
+import { chipStart, dayRide, noteFor, scheduleFor, zoneLookupOf, type DayEnv } from '../engines/tripday.ts';
 import { waitOrGo } from '../engines/wait-or-go.ts';
 import { findS1S2, waterAnswer, type WaterFacts } from '../engines/water.ts';
 import { onTheRide, routeForecast } from '../engines/weather-windows.ts';
@@ -122,6 +122,8 @@ function notesOf(i: ScreenInputs, ride: DayRide, p: Position | null): string[] {
   const out: string[] = note ? [note] : [];
   if (!dayOneElsewhere && ride.startOffRouteM > 0) out.push(W.routeRejoinNote(showKm(rejoinKm(ride.startOffRouteM))));
   if (!dayOneElsewhere && p && isFarOff(p)) out.push(W.routeFarOffNote);
+  // With no position the cards plan from the route start: said in words, so no distance passes for one from the rider.
+  if (p === null && ride.note === null && ride.startKm === 0 && ride.phase !== 'route-end' && !ride.noRide) out.push(W.routeNoPositionFromStart);
   if (i.trip.departureDate === null) out.push(W.routeNoDateNote);
   return out;
 }
@@ -190,32 +192,56 @@ function stripOf(i: ScreenInputs, ride: DayRide, schedule: Schedule, windows: Ra
 /** Under this, a stamp's kilometre is the rider's own: "+0.0 km" would say nothing. */
 const HERE_KM = 0.05;
 
+/** Where answers measure from, as the engines do (section 6.1): ahead from the near edge, behind from the far edge. */
+type From = { aheadKm: Km; behindKm: Km };
+
 /**
- * A card's stamp as the rider reads it (section 3.2): "+6 km · 14:40" from the ride's start, "2.1 km back" for one behind,
- * "here · 14:20" for a time with no kilometre. A time is shown to the nearest 5 minutes in the place's zone, as arrivals are.
+ * A stamp as the rider reads it (section 3.2), in the very terms its item uses: "+6 km · 14:40" ahead, measured from the near
+ * edge of an approximate position; "9 km back · 14:50" behind, from its far edge; "near you, may be behind" inside the radius,
+ * with no time, as the item has none; "here" at the rider's own kilometre; "here · 14:20" for a time alone. A time is shown to
+ * the nearest 5 minutes in the place's zone, as arrivals are.
  */
-function stampTextOf(i: ScreenInputs, ride: DayRide, stamp: Answer['stamp']): string | null {
+function stampTextOf(i: ScreenInputs, from: From, stamp: Answer['stamp']): string | null {
   if (!stamp) return null;
   const at = validDate(stamp.at) ? stamp.at : null;
   const km = typeof stamp.km === 'number' && Number.isFinite(stamp.km) ? stamp.km : null;
-  const from = Number.isFinite(ride.startKm) ? ride.startKm : 0;
-  if (km === null) return at ? W.weatherStampHere(formatHm(at, routeZoneAt(i, from))) : null;
-  const ahead = km - from;
-  const where = ahead < -HERE_KM ? W.waterBack(showKm(-ahead)) : W.weatherStampAhead(showKm(Math.max(0, ahead)));
+  const near = Number.isFinite(from.aheadKm) ? from.aheadKm : 0;
+  const far = Number.isFinite(from.behindKm) ? Math.max(from.behindKm, near) : near;
+  if (km === null) return at ? W.weatherStampHere(formatHm(at, routeZoneAt(i, near))) : null;
+  if (far > near && km >= near && km <= far) return W.waterNearYou;
+  let where: string;
+  if (km < near) {
+    const back = far - km;
+    where = back < HERE_KM ? W.routeStampHere : W.waterBack(showKm(back));
+  } else {
+    const ahead = km - near;
+    where = ahead < HERE_KM ? W.routeStampHere : W.weatherStampAhead(showKm(ahead));
+  }
   return at ? `${where} · ${formatNearestHm(at, routeZoneAt(i, km))}` : where;
 }
 
 function stampsOf(i: ScreenInputs, ride: DayRide, cards: Record<CardName, Answer>, chips: Screen['chips']): Screen['stamps'] {
-  const one = (a: Answer): string | null => {
+  // Cards ride the day's ride; the chips ride from the position now, in every phase (section 6.9), as their engines do.
+  const card: From = { aheadKm: ride.startKm, behindKm: ride.behindFromKm };
+  let chip: From = card;
+  try {
+    const s = chipStart(ride, i.trip, i.positions);
+    chip = { aheadKm: s.aheadKm, behindKm: s.behindKm };
+  } catch {
+    chip = card;
+  }
+  const one = (a: Answer, from: From): string | null => {
     try {
-      return stampTextOf(i, ride, a.stamp);
+      return stampTextOf(i, from, a.stamp);
     } catch {
       return null;
     }
   };
   return {
-    water: one(cards.water), food: one(cards.food), daylight: one(cards.daylight), weather: one(cards.weather), climbing: one(cards.climbing), sleep: one(cards.sleep),
-    bike: one(chips.bike), pharmacy: one(chips.pharmacy), train: one(chips.train), toilets: one(chips.toilets), shelter: one(chips.shelter), emergency: one(chips.emergency),
+    water: one(cards.water, card), food: one(cards.food, card), daylight: one(cards.daylight, card), weather: one(cards.weather, card),
+    climbing: one(cards.climbing, card), sleep: one(cards.sleep, card),
+    bike: one(chips.bike, chip), pharmacy: one(chips.pharmacy, chip), train: one(chips.train, chip), toilets: one(chips.toilets, chip),
+    shelter: one(chips.shelter, chip), emergency: one(chips.emergency, chip),
   };
 }
 

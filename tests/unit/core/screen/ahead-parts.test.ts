@@ -4,7 +4,7 @@ import { helpChip } from '../../../../src/core/engines/help.ts';
 import { buildScreen, screen } from '../../../../src/core/screen/screen.ts';
 import { W } from '../../../../src/core/wording/en.ts';
 import { bikeShop, flatRoute, pos, testTrip } from '../../../fixtures/build.ts';
-import { rainyStop, SAT } from '../../ui/ahead-fixture.ts';
+import { FRI, rainyStop, SAT } from '../../ui/ahead-fixture.ts';
 import { inputsOf } from './screen-helpers.ts';
 
 describe('stamps', () => {
@@ -25,6 +25,41 @@ describe('stamps', () => {
       else expect(text, name).toMatch(/^(\+[\d.]+ km|[\d.]+ km back|here)( · \d\d:\d\d)?$/);
     }
     expect(built.faults).toEqual([]);
+  });
+});
+
+describe('stamps agree with their items', () => {
+  /** The first item at the stamp's kilometre, and where its detail says it is. */
+  const whereOf = (a: { items: { stamp: { km?: number } | null; detail?: string }[] }, km: number): string =>
+    (a.items.find((x) => x.stamp?.km === km)?.detail ?? '').split(' · ')[0]!;
+
+  test('[AH-CARD-ORDER] with an approximate fix, a chip stamp behind is measured from the far edge, as its item is', () => {
+    const s = screen(rainyStop({ positions: [pos({ km: 141, at: `${SAT} 14:20`, acc: 3000 })] }));
+    for (const chip of ['pharmacy', 'toilets'] as const) {
+      const a = s.chips[chip];
+      expect(a.stamp?.km, chip).toBeLessThan(138);
+      expect(s.stamps[chip]!.split(' · ')[0], chip).toBe(whereOf(a, a.stamp!.km!));
+      expect(s.stamps[chip], chip).toMatch(/km back/);
+    }
+  });
+  test('[AH-CARD-ORDER] a place inside the radius reads "near you, may be behind" on its stamp, as on its item', () => {
+    const s = screen(rainyStop({ positions: [pos({ km: 136, at: `${SAT} 14:20`, acc: 3000 })] }));
+    const a = s.chips.pharmacy; // at km 135, inside 133 to 139
+    expect(a.stamp?.km).toBe(135);
+    expect(whereOf(a, 135)).toBe(W.waterNearYou);
+    expect(s.stamps.pharmacy).toBe(W.waterNearYou);
+  });
+  test("[AH-CARD-ORDER] a stamp at the rider's own kilometre reads \"here\", never \"+0 km\"", () => {
+    const s = screen(rainyStop({ positions: [pos({ km: 141, at: `${SAT} 14:20`, acc: 3000 })] }));
+    for (const text of Object.values(s.stamps)) expect(text ?? '').not.toMatch(/^\+0 km/);
+  });
+});
+
+describe('no position', () => {
+  test('[AH-FIRST-USE] with no position, the screen says its answers count from the route start, and how to get them from here', () => {
+    expect(screen(rainyStop({ now: `${FRI} 11:35`, positions: [] })).notes).toContain(W.routeNoPositionFromStart);
+    expect(screen(rainyStop({ now: '2026-10-15 18:00', positions: [] })).notes).toContain(W.routeNoPositionFromStart);
+    expect(screen(rainyStop()).notes).not.toContain(W.routeNoPositionFromStart);
   });
 });
 

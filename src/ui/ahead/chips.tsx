@@ -46,6 +46,7 @@ export function ChipPanel({ chip, screen, canShare, actions, onClose }: { chip: 
         <StatusBadge status={a.status} />
         {screen.stamps[chip] ? <span class="ah-stamp">{screen.stamps[chip]}</span> : null}
       </p>
+      {a.freshness.stale ? <p class="ah-stale" data-stale>{W.weatherStale}</p> : null}
       {a.detail ? <p class="ah-card-detail"><Detail text={a.detail} /></p> : null}
       {a.items.length > 0 ? <ListMore items={a.items} render={(x) => <Item item={x} />} /> : null}
       <Basis lines={a.basis} />
