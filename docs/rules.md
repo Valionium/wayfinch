@@ -782,7 +782,9 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 
 - a change in loadcheck:bikeProfile from another window redraws within one frame; tapping the drawing goes straight to Look; colour eases only with motion allowed [BK-TAP-INSTANT]
 - every screen renders with no bike, no plan, broken bike data; no error, a typical bike, friendly caption [BK-NOTHING-REQUIRED]
-- §3.7's table: Trip top with bags and caption; Tools card with bags and "3 bags · 10.2 kg"; You small drawing, no bags, plan's bike first, marked "in your plan" or "in your plan, not saved"; Ahead marker only [BK-WHERE]
+- §3.7's table, Tools row: the Tools card draws the bike with its bags above "3 bags · 10.2 kg", and a tap goes to Look [BK-WHERE]
+- §3.7's table, Trip row: Trip top with bags and caption, at most 120 px tall [BK-WHERE-TRIP]
+- §3.7's table, the other rows: You small drawing, no bags, plan's bike first, marked "in your plan" or "in your plan, not saved"; Ahead marker only (split from the Tools row: these screens arrive with groups 6 and 8) [BK-WHERE-SCREENS]
 - marker in the rider's colour, decorative (aria-hidden), the strip carries the label; opens nothing [BK-MARKER]
 - Make it yours and Edit build the exact fragments; back ∈ trip, tools, you, tyre [BK-DEEPLINK]
 - bags drawn only when the summary's bikeId matches the bike, both null counting [BK-MATCH-BAGS]

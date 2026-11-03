@@ -111,6 +111,8 @@ export async function inTx<T>(stores: string[], mode: 'readonly' | 'readwrite', 
   } catch (e) {
     try { tx.abort(); } catch { /* already ended */ }
     await tx.done.catch(() => undefined);
+    // A full disk can show first as a request aborted: the transaction's own error says why.
+    if ((e as { name?: string } | null)?.name === 'AbortError' && tx.error) throw tx.error;
     throw e;
   }
 }

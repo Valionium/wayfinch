@@ -2,9 +2,9 @@
 import { createInterface } from 'node:readline';
 import type { Readable } from 'node:stream';
 import type { BoundaryFeature, Ring } from './boundaries.ts';
+import { objectOf } from '../src/core/places/classify-all.ts';
 import type { OsmObject } from '../src/core/places/types.ts';
 
-const MAX_POINTS = 300;
 const ID = /^[nwr]\d+$/;
 
 type Json = Record<string, unknown>;
@@ -63,11 +63,7 @@ export function parseGeoJsonLine(line: string): OsmObject | null {
     polygon = rings.map((r) => r.map((c): [number, number] => [c[1], c[0]]));
     vertices = polygon.flat();
   }
-  let south = Infinity, north = -Infinity, west = Infinity, east = -Infinity;
-  for (const [lat, lon] of vertices) { south = Math.min(south, lat); north = Math.max(north, lat); west = Math.min(west, lon); east = Math.max(east, lon); }
-  const step = Math.ceil(vertices.length / MAX_POINTS);
-  const points = step > 1 ? vertices.filter((_, i) => i % step === 0) : vertices;
-  return { id: f.id, lat: (south + north) / 2, lon: (west + east) / 2, tags: f.tags, points, polygon };
+  return objectOf(f.id, f.tags, vertices, polygon);
 }
 
 export function parseBoundaryLine(line: string): BoundaryFeature | null {

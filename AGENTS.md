@@ -13,15 +13,17 @@ Exist so far:
 ```
 src/core/      pure TypeScript, no DOM, fully unit-tested
   geo/         distances
-  places/      place types, pack format, classification
+  places/      place types, pack format, classification (classify-all.ts is the one code path of the pipeline and Refresh this stretch)
   answers/     makeAnswer, the final comparator, the one time formatter
   engines/     the answer engines: one pace, one trip day, one hours check
   hours/       prepared opening hours; only spans.ts reaches the library
   screen/      screen(inputs): the whole stop screen, never throws
   wording/     every user-facing string (en.ts)
-  route/       rounded form, GPX reading, stages, climbs, sample grid, hash
+  route/       rounded form, GPX reading, stages, climbs, sample grid, hash, zones.ts (routeZones and zoneAt over the bundled boundary file)
+  bike/        your bike: tyre sizes (one reader, the tyre tool's too), the bike normaliser, resolveBikeSpec, frame templates, bikeArt and markerArt, swatches and OKLab, the caption
 src/ui/        the app's shell in Preact (app, nav, theme.css, update prompt, shared card and status pieces); Ahead's components go in src/ui/ahead/ and may not import store or data
 src/store/     the rider's data: IndexedDB (add-only migrations) and copilot:* keys; readInputs is the one place screen()'s inputs are put together; a window writes only over the version it read, so Tasks 12 and 13 must call `readTrip` again before `saveTrip` after any `writeSettings`, and `readSettings` before `writeSettings`, or the write is refused as newer
+src/data/      what comes from outside. openmeteo.ts checks each answer whole before handing it on; refresh.ts decides when to ask, with no request of any kind without a prepared trip, a signal and a reason; weather-mode.ts reads build.config.json; overpass.ts is Refresh this stretch; prepare.ts is Get ready offline (it sets the prepared mark weather.ts reads, and takes the forecast through Update weather's turn and write); packs/download.ts gets tiles, resumable, one build per run; boundaries.ts reads public/data/boundaries.v1.json, which tools/build-boundaries.mjs makes once from OpenStreetMap and tools/prove-boundaries.mjs checks on a live pack (tools/boundaries-proof.json; rebuild the file and the proof goes stale)
 public/        what is served; public/tools/bags/index.html is the Load Check page; manifest.webmanifest and icons/ ship only with the launch switch on
 qa/            Load Check's QA suites (plain Node scripts), qa/paths.cjs, qa/fixtures/
 tests/
@@ -36,6 +38,10 @@ tools/         project scripts
 `pipeline/` is the weekly place-pack build; its guide for the owner is `pipeline/README.md` (commands are listed there). Commits under `pipeline/` must never trigger an app deploy.
 
 Planned, in spec section 4.2: `src/data/` fetching, more of `src/ui/`, `src/tools/tyre/`, `public/`, `pipeline/`, `contracts/`, `tests/e2e/`, `tests/fixtures/`, `tests/sim/`.
+
+## The bike on Trip, You and the strip
+
+Groups 5, 6 and 8 place the drawing; `BK-WHERE-SCREENS` waits for them. Trip, at the top: `<BikeDrawing bike summary back="trip" />` from `src/ui/bike/drawing.tsx`, with `bike`, `summary` and `known` taken from the `bikeSource` signal of `src/ui/bike/live.ts` (it redraws when the bag planner saves in another tab). You: `size="small"` beside each bike of `bikeSource.value.bikes`, the plan's bike first, with `back="you"`; Edit is `bikeDetailsHref(id, 'you')` from `src/ui/bike/link.ts`, without a section. Ahead's strip: `<BikeMarker bike />` from `src/ui/bike/marker.tsx`, decorative, never a link; the strip gets the bike from its actions object, since Ahead's components may not import the store. Never write a `loadcheck:*` key; a tap on a drawing opens the bag planner's Look.
 
 ## Commands
 

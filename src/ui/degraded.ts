@@ -40,11 +40,21 @@ export function isStorageBlocked(factory: IDBFactory | undefined): Promise<boole
   });
 }
 
+let known: DegradedFacts = { hasRoute: false, hasPreparedTrip: false, online: true, storageBlocked: false };
+const publish = (): void => { degradedSignal.value = degradedKinds(known); };
+
+/** Trip tells the shell whether a route is stored and whether Get ready offline has ended for it, so the notices fit. */
+export function noteTripFacts(hasRoute: boolean, hasPreparedTrip: boolean): void {
+  known = { ...known, hasRoute, hasPreparedTrip };
+  publish();
+}
+
 /** Looks at this device once, and again when the connection changes. */
 export async function watchDegraded(env: { indexedDB: IDBFactory | undefined; online: () => boolean; addOnlineListener: (cb: () => void) => void }): Promise<void> {
   const blocked = await isStorageBlocked(env.indexedDB);
-  const update = () => {
-    degradedSignal.value = degradedKinds({ hasRoute: false, hasPreparedTrip: false, online: env.online(), storageBlocked: blocked });
+  const update = (): void => {
+    known = { ...known, online: env.online(), storageBlocked: blocked };
+    publish();
   };
   update();
   env.addOnlineListener(update);
