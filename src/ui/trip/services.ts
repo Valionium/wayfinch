@@ -141,6 +141,13 @@ function standaloneNow(): boolean | null {
 }
 
 export function browserTripServices(now: () => Date = () => new Date()): TripServices {
+  // One write at a time: the store refuses a write over a version this window has not read, so taps that follow each other fast must not overlap.
+  let queue: Promise<unknown> = Promise.resolve();
+  const inTurn = <T>(work: () => Promise<T>): Promise<T> => {
+    const run = queue.then(work, work);
+    queue = run.catch(() => undefined);
+    return run;
+  };
   const nav = typeof navigator === 'undefined' ? undefined : navigator;
   const nothing = (at: Date, settings: Settings, available: boolean): TripSnapshot => ({
     now: at, available, trip: null, settings, prepared: null, places: 0, forecastTo: null, zone: 'UTC', storageMb: null, day1LeaveBy: null, heightsLookedUp: false, running: false,
@@ -188,6 +195,46 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
     await saveTrip({ ...trip, route });
   };
 
+  const addRoute = async ({ route, hadHeights }: { route: Route; hadHeights: boolean }): Promise<AddOutcome> => {
+    const settings = await readSettings();
+    const before = await readTrip();
+    if (before && before.route.hash === route.hash) return { kind: 'same', name: before.route.name };
+    const flatKph = before?.flatKph ?? settings.flatKph;
+    const pace = before?.pace ?? settings.pace;
+    // A replaced route starts with the stage model's nights; the first one takes what was set for the next trip.
+    const withDays = planned(route, { flatKph, pace, nights: before ? null : settings.nights });
+    if (before) await replaceRoute(withDays);
+    else {
+      await saveTrip({ route: withDays, departureDate: null, startTime: settings.startTime, flatKph, stay: settings.stay, campWaterL: settings.campWaterL, pace });
+    }
+    noteHeights(withDays, hadHeights);
+    return { kind: before ? 'replaced' : 'added', name: route.name };
+  };
+
+  const changeSettings = async (partial: Partial<Record<keyof Settings, unknown>>): Promise<SettingsOutcome> => {
+    try {
+      await readSettings();
+      const result = await writeSettings(partial);
+      const replans = ['flatKph', 'pace', 'nights'].some((k) => k in partial && !(k in result.reasons));
+      if (result.newer.length === 0 && replans) await replan();
+      return { ok: result.ok, reasons: result.reasons, note: result.newerReason };
+    } catch (e) {
+      return { ok: false, reasons: {}, note: reasonOf(e) };
+    }
+  };
+
+  const changeDeparture = async (date: string | null): Promise<string | null> => {
+    if (date !== null && !goodDate(date)) return W.appStoreDepartureDate;
+    try {
+      const trip = await readTrip();
+      if (!trip) return W.appStoreNotKept;
+      await saveTrip({ ...trip, departureDate: date });
+      return null;
+    } catch (e) {
+      return reasonOf(e);
+    }
+  };
+
   return {
     now,
     env: {
@@ -198,45 +245,9 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
     parseXml: (text) => new DOMParser().parseFromString(text, 'application/xml') as unknown as XmlDocLike,
     load,
 
-    async addRoute({ route, hadHeights }) {
-      const settings = await readSettings();
-      const before = await readTrip();
-      if (before && before.route.hash === route.hash) return { kind: 'same', name: before.route.name };
-      const flatKph = before?.flatKph ?? settings.flatKph;
-      const pace = before?.pace ?? settings.pace;
-      // A replaced route starts with the stage model's nights; the first one takes what was set for the next trip.
-      const withDays = planned(route, { flatKph, pace, nights: before ? null : settings.nights });
-      if (before) await replaceRoute(withDays);
-      else {
-        await saveTrip({ route: withDays, departureDate: null, startTime: settings.startTime, flatKph, stay: settings.stay, campWaterL: settings.campWaterL, pace });
-      }
-      noteHeights(withDays, hadHeights);
-      return { kind: before ? 'replaced' : 'added', name: route.name };
-    },
-
-    async writeSettings(partial) {
-      try {
-        await readSettings();
-        const result = await writeSettings(partial);
-        const replans = ['flatKph', 'pace', 'nights'].some((k) => k in partial && !(k in result.reasons));
-        if (result.newer.length === 0 && replans) await replan();
-        return { ok: result.ok, reasons: result.reasons, note: result.newerReason };
-      } catch (e) {
-        return { ok: false, reasons: {}, note: reasonOf(e) };
-      }
-    },
-
-    async setDeparture(date) {
-      if (date !== null && !goodDate(date)) return W.appStoreDepartureDate;
-      try {
-        const trip = await readTrip();
-        if (!trip) return W.appStoreNotKept;
-        await saveTrip({ ...trip, departureDate: date });
-        return null;
-      } catch (e) {
-        return reasonOf(e);
-      }
-    },
+    addRoute: (found) => inTurn(() => addRoute(found)),
+    writeSettings: (partial) => inTurn(() => changeSettings(partial)),
+    setDeparture: (date) => inTurn(() => changeDeparture(date)),
 
     prepare(onProgress, onNotice) {
       return prepareTrip({

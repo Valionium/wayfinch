@@ -35,13 +35,16 @@ function NumberField({ id, label, value, step, min, max, placeholder, onCommit, 
   );
 }
 
-function Choice({ name, legend, value, options, onPick }: { name: string; legend: string; value: string; options: [string, string][]; onPick: (v: string) => void }) {
+/** The choice shows at once; if the store refuses it, the last good one comes back. */
+function Choice({ name, legend, value, options, onPick }: { name: string; legend: string; value: string; options: [string, string][]; onPick: (v: string) => Promise<boolean> }) {
+  const [shown, setShown] = useState(value);
+  useEffect(() => setShown(value), [value]);
   return (
     <fieldset class="field choice">
       <legend>{legend}</legend>
       {options.map(([v, text]) => (
         <label key={v} class="choice-option">
-          <input type="radio" name={name} value={v} checked={value === v} onChange={() => onPick(v)} />
+          <input type="radio" name={name} value={v} checked={shown === v} onChange={async () => { setShown(v); if (!(await onPick(v))) setShown(value); }} />
           <span>{text}</span>
         </label>
       ))}
@@ -53,11 +56,14 @@ export function TripSettings({ services, snap, reload }: { services: TripService
   const { settings, trip } = snap;
   const [problems, setProblems] = useState<Partial<Record<string, string>>>({});
   const [startDraft, setStartDraft] = useState(settings.startTime);
+  const [fresh, setFresh] = useState(settings.keepFresh);
+  useEffect(() => setFresh(settings.keepFresh), [settings.keepFresh]);
   useEffect(() => setStartDraft(settings.startTime), [settings.startTime]);
 
   const save: Save = async (field, value) => {
     const result = await services.writeSettings({ [field]: value });
-    setProblems((p) => ({ ...p, [field]: result.reasons[field] ?? result.note ?? '' }));
+    // A refusal stays beside its field only until the next change that is accepted.
+    setProblems((p) => (result.ok ? {} : { ...p, [field]: result.reasons[field] ?? result.note ?? '' }));
     await reload();
     return result.ok;
   };
@@ -101,7 +107,7 @@ export function TripSettings({ services, snap, reload }: { services: TripService
         {settings.nights !== null ? <button type="button" class="btn" onClick={() => void save('nights', null)}>{W.appTripNightsUseSuggested}</button> : null}
 
         <Choice
-          name="pace" legend={W.appTripPace} value={settings.pace} onPick={(v) => void save('pace', v)}
+          name="pace" legend={W.appTripPace} value={settings.pace} onPick={(v) => save('pace', v)}
           options={[['steady', W.appTripPaceSteady], ['sporting', W.appTripPaceSporting], ['hard', W.appTripPaceHard]]}
         />
         {problem('pace') ? <p class="field-problem" role="alert">{problem('pace')}</p> : null}
@@ -109,7 +115,7 @@ export function TripSettings({ services, snap, reload }: { services: TripService
         <NumberField id="trip-kph" label={W.appTripFlatKph} value={settings.flatKph} step="0.5" min={15} max={40} onCommit={(v) => save('flatKph', v ?? Number.NaN)} problem={problem('flatKph')} />
 
         <Choice
-          name="stay" legend={W.appTripStay} value={settings.stay} onPick={(v) => void save('stay', v)}
+          name="stay" legend={W.appTripStay} value={settings.stay} onPick={(v) => save('stay', v)}
           options={[['camping', W.appTripStayCamping], ['mixed', W.appTripStayMixed], ['accommodation', W.appTripStayAccommodation]]}
         />
         {problem('stay') ? <p class="field-problem" role="alert">{problem('stay')}</p> : null}
@@ -119,7 +125,7 @@ export function TripSettings({ services, snap, reload }: { services: TripService
         {keepFreshOffered(services.env.weatherMode) ? (
           <div class="field">
             <label class="choice-option">
-              <input type="checkbox" checked={settings.keepFresh} onChange={(e) => void save('keepFresh', e.currentTarget.checked)} />
+              <input type="checkbox" checked={fresh} onChange={async (e) => { const on = e.currentTarget.checked; setFresh(on); if (!(await save('keepFresh', on))) setFresh(settings.keepFresh); }} />
               <span>{W.weatherKeepFresh}</span>
             </label>
             <p class="muted">{W.appTripKeepFreshWhy}</p>

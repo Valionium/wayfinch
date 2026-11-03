@@ -26,6 +26,7 @@ function AddRoute({ services, snap, reload }: { services: TripServices; snap: Tr
   const [error, setError] = useState<string | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const [pending, setPending] = useState<Found | null>(null);
+  const [round, setRound] = useState(0);
   const asking = useRef<HTMLHeadingElement>(null);
   const old = snap?.trip ?? null;
   useEffect(() => { if (pending) asking.current?.focus(); }, [pending]);
@@ -37,6 +38,7 @@ function AddRoute({ services, snap, reload }: { services: TripServices; snap: Tr
     setPending(null);
     try {
       const out = await services.addRoute(found);
+      setRound((n) => n + 1);
       setSaid(out.kind === 'same' ? W.appTripSameRoute : out.kind === 'added' ? W.appTripAdded(out.name) : W.appTripReplaced(out.name));
       await reload();
     } catch (e) {
@@ -91,7 +93,7 @@ function AddRoute({ services, snap, reload }: { services: TripServices; snap: Tr
             </div>
           </div>
         ) : null}
-        <PlanAB services={services} onRoute={async (found) => { if (old) setPending(found); else await commit(found); }} />
+        <PlanAB key={round} services={services} onRoute={async (found) => { if (old) setPending(found); else await commit(found); }} />
       </div>
     </Card>
   );
