@@ -5,6 +5,7 @@ import { deleteDB } from 'idb';
 import type { Climb, Profile, Route, RoutePoint, Stage, Trip } from '../core/types.ts';
 import type { Ride } from '../core/engines/water-learning.ts';
 import { W } from '../core/wording/en.ts';
+import { exportTyres, importTyres } from '../tools/tyre/storage.ts';
 import { clearCopies, flushWrites, markChanged, noteCopy, tracked } from './changed.ts';
 import { closeDb, CURRENT, DB_NAME, inTx } from './db.ts';
 import type { Tx } from './db.ts';
@@ -64,6 +65,7 @@ const rideOf = <T extends Ride | JsonRide>(r: T): Omit<T, never> => ({
 
 export function exportAll(): Promise<ExportFile> {
   const local = readLocalSettings();
+  const mine = exportTyres(localStorage);
   return inTx(['trip', 'calibration', 'meta'], 'readonly', async (tx) => {
     const trip = usableTrip(await tx.objectStore('trip').get(CURRENT), local.settings);
     const rides = (await tx.objectStore('calibration').getAll()) as unknown[];
@@ -75,7 +77,8 @@ export function exportAll(): Promise<ExportFile> {
       trip: trip && { updatedAt: await stamp('trip'), ...tripOf(trip) },
       settings: { updatedAt: cleanStamp(local.stamp), ...settingsOf(local.settings) },
       calibration: { updatedAt: await stamp('calibration'), rides: rides.flatMap(jsonRide) },
-      tyres: { updatedAt: await stamp(TYRES_META), byBike: isObject(tyres) && isObject(tyres.byBike) ? tyres.byBike : {} },
+      // The tyre tool keeps its details in its own key; they travel here. Older data in the database still goes when the tool has none.
+      tyres: { updatedAt: mine?.updatedAt || (await stamp(TYRES_META)), byBike: mine ? mine.entries : isObject(tyres) && isObject(tyres.byBike) ? tyres.byBike : {} },
     };
   });
 }
@@ -203,6 +206,12 @@ async function importing(file: unknown): Promise<ImportResult> {
   if (bringProfile) noteCopy('profile', f.profile.updatedAt);
   if (bringRides) noteCopy('calibration', f.calibration.updatedAt);
   if (bringTyres) noteCopy('tyres', f.tyres.updatedAt);
+  // The tyre tool's own key, read as the tool reads it: a damaged entry is dropped, and none of it can stop the file.
+  if (bringTyres) {
+    const mineIn = Object.fromEntries(Object.entries(f.tyres.byBike).filter(([, e]) => isObject(e) && isObject(e.details)));
+    const stamp = f.tyres.updatedAt === null ? new Date() : new Date(f.tyres.updatedAt);
+    if (Object.keys(mineIn).length) { try { importTyres(localStorage, { v: 1, entries: mineIn }, stamp); } catch { /* the file is already in */ } }
+  }
   // The old route's nights go with it, unless the file brought its own.
   if (routeChanged && hadTrip) {
     if (bringSettings) forgetPlanTomorrow();

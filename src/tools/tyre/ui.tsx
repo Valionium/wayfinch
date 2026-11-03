@@ -1,0 +1,486 @@
+// The tyre screen (spec section 7.2): inputs on top of a figure that is recomputed on every change. It renders what `resolve` and
+// `tyreEstimate` give and computes no pressure itself. It reads Load Check's records and never writes them.
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import type { ComponentChildren } from 'preact';
+import { W, shortMapDate } from '../../core/wording/en.ts';
+import { Card, Notice } from '../../ui/card.tsx';
+import { checkLimit, tyreEstimate } from './core.ts';
+import type { Bars, Casing, Limit, RimType, Setup, Surface, Unit, Wheel } from './core.ts';
+import { readHost } from './host.ts';
+import type { HostData } from './host.ts';
+import { resolve } from './model.ts';
+import type { Context, Details, FieldName, Source } from './model.ts';
+import { DEFAULT_KEY, entryOf, readStore, saveEntry } from './storage.ts';
+import type { KeyValueStore, LastResult } from './storage.ts';
+import { SRAM_URL, sramList } from './sram.ts';
+import { WHEELS } from './tables.ts';
+
+export interface TyreServices {
+  /** Load Check's records and You, read-only. */
+  host: () => HostData;
+  /** The tyre tool's own storage. */
+  storage: KeyValueStore;
+  now: () => Date;
+}
+
+export function browserServices(riderKg: () => number | null = () => null): TyreServices {
+  const kv: KeyValueStore = {
+    getItem: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+    setItem: (k, v) => localStorage.setItem(k, v),
+  };
+  return { host: () => readHost(kv, riderKg), storage: kv, now: () => new Date() };
+}
+
+const ASSUMED_WORDS: Record<FieldName, string> = {
+  riderKg: W.tyreAssumedRider, bikeKg: W.tyreAssumedBike, bars: W.tyreAssumedBars, wheelBsdMm: W.tyreAssumedWheel, frontMm: W.tyreAssumedFront,
+  rearMm: W.tyreAssumedRear, casing: W.tyreAssumedCasing, setup: W.tyreAssumedSetup, rimType: W.tyreAssumedRimType, rimInnerMm: W.tyreAssumedRim,
+  surface: W.tyreAssumedSurface, carriedKg: W.tyreAssumedNoLuggage,
+};
+
+const parseNumber = (text: string, signed = false): number | null => {
+  const t = text.trim().replace(',', '.');
+  if (t === '' || !(signed ? /^-?(\d*\.?\d+|\d+\.)$/ : /^(\d*\.?\d+|\d+\.)$/).test(t)) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+};
+const bar2 = (n: number): string => n.toFixed(2);
+
+// ---- small pieces --------------------------------------------------------------------------------------------------------------
+
+function SourceLine({ source, plan }: { source: Source; plan?: string }) {
+  if (source === 'bike') return <>{W.tyreFromBike}</>;
+  if (source === 'plan') return <>{plan ?? ''}</>;
+  if (source === 'you') return <>{W.tyreFromYou}</>;
+  return null;
+}
+
+/** A field that starts from somewhere else shows its value, where it came from, and Change; once changed it is an ordinary field. */
+function Field({ label, source, plan, valueText, editor, onReset, id, resetLabel }: {
+  label: string; source: Source; plan?: string; valueText: string; editor: ComponentChildren; onReset?: () => void; id: string; resetLabel: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const fromElsewhere = source === 'bike' || source === 'plan' || source === 'you';
+  return (
+    <div class="tyre-field" data-source={source}>
+      {fromElsewhere && !editing ? (
+        <div class="tyre-from">
+          <span class="tyre-label" id={`${id}-label`}>{label}</span>
+          <span class="tyre-value">{valueText}</span>
+          <span class="muted"><SourceLine source={source} plan={plan} /> · </span>
+          <button type="button" class="btn" onClick={() => setEditing(true)} aria-describedby={`${id}-label`}>{W.tyreChange}</button>
+        </div>
+      ) : (
+        <>
+          {editor}
+          {source === 'entered' && onReset ? <button type="button" class="btn" onClick={() => { onReset(); setEditing(false); }}>{resetLabel}</button> : null}
+        </>
+      )}
+    </div>
+  );
+}
+
+function NumberInput({ id, label, value, onCommit, unit, assumed, signed = false }: { id: string; label: string; value: number | undefined; onCommit: (n: number | undefined) => void; unit?: string; assumed?: number; signed?: boolean }) {
+  const [text, setText] = useState(value === undefined ? '' : String(value));
+  const [bad, setBad] = useState(false);
+  useEffect(() => {
+    // The value changed from outside (another bike chosen, or reset): follow it, unless it is what was just typed.
+    setText((t) => (parseNumber(t, signed) === (value ?? null) ? t : value === undefined ? '' : String(value)));
+    setBad(false);
+  }, [value]);
+  return (
+    <label class="tyre-input" for={id}>
+      <span class="tyre-label">{label}</span>
+      <input
+        id={id} type="text" inputMode="decimal" autoComplete="off" value={text}
+        aria-invalid={bad ? 'true' : undefined}
+        aria-describedby={bad ? `${id}-err` : undefined}
+        onInput={(e) => {
+          const t = (e.currentTarget as HTMLInputElement).value;
+          setText(t);
+          const n = parseNumber(t, signed);
+          setBad(t.trim() !== '' && n === null);
+          if (t.trim() === '') onCommit(undefined);
+          else if (n !== null) onCommit(n);
+        }}
+      />
+      {unit ? <span class="muted">{unit}</span> : null}
+      {value === undefined && text.trim() === '' && assumed !== undefined ? <span class="muted">{W.tyreAssumedTag(`${assumed}${unit ? ' ' + unit : ''}`)}</span> : null}
+      {bad ? <span class="tyre-error" id={`${id}-err`} role="alert">{W.tyreNotANumber}</span> : null}
+    </label>
+  );
+}
+
+function Choice<T extends string>({ id, label, value, options, onChange, source }: {
+  id: string; label: string; value: T | undefined; options: readonly { value: T; label: string }[]; onChange: (v: T) => void; source?: Source;
+}) {
+  return (
+    <fieldset class="tyre-choice">
+      <legend class="tyre-label">{label}{source === 'bike' ? <span class="muted"> · {W.tyreFromBike}</span> : null}</legend>
+      <div class="tyre-options">
+        {options.map((o) => (
+          <label key={o.value} class="tyre-option">
+            <input type="radio" name={id} value={o.value} checked={o.value === value} onChange={() => onChange(o.value)} />
+            <span>{o.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+/** A pressure limit: the number, its unit, and the "Did you mean 65 psi?" question. Anything not accepted clears the limit, so no figure shows. */
+function LimitInput({ id, label, required, value, min, onCommit, onPending }: {
+  id: string; label: string; required: boolean; value: Limit | null | undefined; min?: Limit | null; onCommit: (l: Limit | null) => void; onPending: (id: string, label: string | null) => void;
+}) {
+  const [text, setText] = useState(value ? String(value.value) : '');
+  const [unit, setUnit] = useState<Unit>(value?.unit ?? 'bar');
+  const [note, setNote] = useState<{ kind: 'reject' | 'ask'; text: string; alt?: Limit } | null>(null);
+  // While a question stands or a value is refused, the screen shows no figure for it.
+  useEffect(() => {
+    onPending(id, note ? label : null);
+    // A question opened here may have been scrolled out of sight by a figure appearing; bring it back.
+    if (note) document.getElementById(`${id}-note`)?.scrollIntoView?.({ block: 'nearest' });
+    return () => onPending(id, null);
+  }, [note]);
+  const evaluate = (t: string, u: Unit, keepAsBar: boolean, keepAsPsi = false): void => {
+    const n = parseNumber(t);
+    if (t.trim() === '') { setNote(null); onCommit(null); return; }
+    if (n === null) { setNote({ kind: 'reject', text: W.tyreLimitNotNumber }); onCommit(null); return; }
+    const c = checkLimit(n, u, { keepAsBar, keepAsPsi, min });
+    if (c.status === 'ok') { setNote(null); onCommit(c.limit); }
+    else if (c.status === 'ask') { setNote({ kind: 'ask', text: c.question, alt: c.alt }); onCommit(null); }
+    else { setNote({ kind: 'reject', text: c.reason }); onCommit(null); }
+  };
+  return (
+    <div class="tyre-limit">
+      <label class="tyre-input" for={id}>
+        <span class="tyre-label">{label}{required ? ' *' : ''}</span>
+        <input id={id} type="text" inputMode="decimal" autoComplete="off" value={text} aria-describedby={note ? `${id}-note` : undefined}
+          onInput={(e) => { const t = (e.currentTarget as HTMLInputElement).value; setText(t); evaluate(t, unit, false); }} />
+      </label>
+      <div class="tyre-options" role="group" aria-label={W.tyreUnitFor(label)}>
+        {(['bar', 'psi'] as const).map((u) => (
+          <label key={u} class="tyre-option">
+            <input type="radio" name={`${id}-unit`} checked={unit === u} onChange={() => { setUnit(u); evaluate(text, u, false); }} />
+            <span>{u === 'bar' ? W.tyreUnitBar : W.tyreUnitPsi}</span>
+          </label>
+        ))}
+      </div>
+      {note ? (
+        <div class="tyre-note" id={`${id}-note`} role="alert">
+          <span>{note.text}</span>
+          {note.kind === 'ask' && note.alt ? (
+            <span class="tyre-ask">
+              {note.alt.unit === 'psi' ? (
+                <>
+                  <button type="button" class="btn btn-primary" onClick={() => { setUnit('psi'); evaluate(text, 'psi', false, true); }}>{W.tyreAskYesPsi(String(note.alt.value))}</button>
+                  <button type="button" class="btn" onClick={() => evaluate(text, 'bar', true)}>{W.tyreAskNoBar}</button>
+                </>
+              ) : (
+                <>
+                  <button type="button" class="btn btn-primary" onClick={() => { setUnit('bar'); evaluate(text, 'bar', true); }}>{W.tyreAskYesBar(String(note.alt.value))}</button>
+                  <button type="button" class="btn" onClick={() => evaluate(text, 'psi', false, true)}>{W.tyreAskNoPsi}</button>
+                </>
+              )}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Both weighed wheel loads, or neither: one alone cannot give a split. */
+function MeasuredFields({ value, onCommit }: { value: Details['measured']; onCommit: (m: { frontKg: number; rearKg: number } | undefined) => void }) {
+  const [front, setFront] = useState<number | undefined>(value?.frontKg);
+  const [rear, setRear] = useState<number | undefined>(value?.rearKg);
+  const commit = (f: number | undefined, r: number | undefined): void => {
+    setFront(f);
+    setRear(r);
+    onCommit(f !== undefined && r !== undefined ? { frontKg: f, rearKg: r } : undefined);
+  };
+  return (
+    <>
+      <p class="muted">{W.tyreMeasuredHelp}</p>
+      <NumberInput id="tyre-mfront" label={W.tyreMeasuredFrontLabel} value={front} onCommit={(n) => commit(n, rear)} unit="kg" />
+      <NumberInput id="tyre-mrear" label={W.tyreMeasuredRearLabel} value={rear} onCommit={(n) => commit(front, n)} unit="kg" />
+    </>
+  );
+}
+
+const fmtPct = (share: number): [string, string] => [String(Math.round(share * 100)), String(100 - Math.round(share * 100))];
+
+function WheelFigure({ label, w }: { label: string; w: Wheel }) {
+  const hiN = w.heat?.advise ? Math.min(w.windowBar[1], w.heat.pumpToBar) : w.windowBar[1];
+  const lo = bar2(Math.min(w.windowBar[0], hiN));
+  const hi = bar2(hiN);
+  return (
+    <div class="tyre-wheel">
+      <h3>{label}</h3>
+      <p class="tyre-big">{W.tyreFrontBackBar(bar2(w.bar))}</p>
+      <p class="tyre-psi">{W.tyrePsiValue(String(w.psi))}</p>
+      {w.heat?.advise ? <p class="tyre-heat"><strong>{W.tyreHeatPumpLine(bar2(w.heat.pumpToBar), String(w.heat.pumpToPsi))}</strong></p> : null}
+      {w.heat?.advise ? null : <p class="muted">{lo === hi ? W.tyreWindowOne(hi) : W.tyreWindow(lo, hi)}</p>}
+    </div>
+  );
+}
+
+// ---- the screen ----------------------------------------------------------------------------------------------------------------
+
+export function TyreScreen({ services }: { services: TyreServices }) {
+  const host = useMemo(() => services.host(), [services]);
+  const load = (k: string): { key: string; details: Details } => {
+    const r = readStore(services.storage);
+    return { key: k, details: r.ok ? entryOf(r.store, k).details : {} };
+  };
+  // The bike and its details change together, in one step: a render never pairs one bike's key with another's details.
+  const [session, setSession] = useState(() => load(host.planBikeId ?? DEFAULT_KEY));
+  const { key, details } = session;
+  const [kept, setKept] = useState(true);
+  const [pending, setPending] = useState<Record<string, string>>({});
+  const onPending = (id: string, label: string | null): void => {
+    setPending((p) => {
+      if ((p[id] ?? null) === label) return p;
+      const next = { ...p };
+      if (label === null) delete next[id]; else next[id] = label;
+      return next;
+    });
+  };
+  const blockedBy = Object.values(pending)[0] ?? null;
+
+  const bike = host.bikes.find((b) => b.id === key) ?? null;
+  // The plan's load belongs to the plan's bike: another bike has its own weights.
+  const usePlan = host.summary !== null && (key === host.planBikeId || (host.summary.bikeId === null && key === DEFAULT_KEY));
+  const ctx: Context = { riderKg: host.riderKg, summary: usePlan ? host.summary : null, bike };
+  const resolved = resolve(details, ctx);
+  const fallback = resolve({}, ctx).sources;
+  const result = resolved.input ? tyreEstimate(resolved.input) : null;
+
+  const change = (patch: Partial<Details>): void => {
+    const next = { ...details, ...patch };
+    for (const k of Object.keys(next) as (keyof Details)[]) if (next[k] === undefined) delete next[k];
+    setSession({ key, details: next });
+    // The last figures are whatever storage holds now, never a copy read earlier.
+    const now = readStore(services.storage);
+    setKept(saveEntry(services.storage, key, { details: next, last: now.ok ? entryOf(now.store, key).last : null }, services.now()));
+  };
+
+  // The last figures, for the Tools tab: kept while a figure is shown, gone when it is not.
+  const front = result?.front ?? null;
+  const rear = result?.rear ?? null;
+  const showFigures = Boolean(front && rear && !result?.incompatible && blockedBy === null && result?.refused.length === 0);
+  const pumped = (w: Wheel): number => (w.heat?.advise ? Math.min(w.bar, w.heat.pumpToBar) : w.bar);
+  const shown = showFigures && front && rear ? { f: pumped(front), r: pumped(rear) } : null;
+  useEffect(() => {
+    const read = readStore(services.storage);
+    if (!read.ok) return;
+    const entry = entryOf(read.store, key);
+    if (shown) {
+      if (entry.last && entry.last.frontBar === shown.f && entry.last.rearBar === shown.r && entry.last.bike === bike?.name) return;
+      const last: LastResult = { frontBar: shown.f, rearBar: shown.r, at: services.now().toISOString(), ...(bike ? { bike: bike.name } : {}) };
+      saveEntry(services.storage, key, { details: entry.details, last }, services.now());
+    } else if (entry.last) {
+      saveEntry(services.storage, key, { details: entry.details, last: null }, services.now());
+    }
+  }, [shown?.f, shown?.r, key]);
+
+  // When an answer first appears (a figure, or the reason for none), bring it to the top: the field just typed in is below or above it.
+  const resultRef = useRef<HTMLElement>(null);
+  const had = useRef('');
+  const state = !resolved.input ? 'none' : showFigures ? 'figure' : 'no-figure';
+  useEffect(() => {
+    if (state !== 'none' && had.current !== state && !(had.current === 'figure' && state === 'no-figure')) resultRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    had.current = state;
+  }, [state]);
+
+  const src = resolved.sources;
+  const v = resolved.values;
+  const own = (field: FieldName, value: number): number | undefined => (src[field] === 'assumed' ? undefined : value);
+  const planDate = host.summary ? (shortMapDate(host.summary.at) ?? '') : '';
+  const planNote = W.tyreFromPlan(planDate);
+  const bikeKey = (name: string) => `tyre-${name}`;
+  const changeHeat = (patch: NonNullable<Details['heat']>): void => {
+    const heat = { ...details.heat, ...patch };
+    for (const k of Object.keys(heat) as (keyof typeof heat)[]) if (heat[k] === undefined) delete heat[k];
+    change({ heat: Object.keys(heat).length ? heat : undefined });
+  };
+  const resetter = (...fields: (keyof Details)[]) => () => change(Object.fromEntries(fields.map((f) => [f, undefined])) as Partial<Details>);
+
+  const resetFor = (field: FieldName): string => {
+    const f = fallback[field];
+    return f === 'bike' ? W.tyreBackToBike : f === 'plan' ? W.tyreBackToPlan : f === 'you' ? W.tyreBackToYou : W.tyreClear;
+  };
+  const choiceValue = <T extends string>(field: FieldName, value: T | 'unset'): T | undefined => (src[field] === 'assumed' || value === 'unset' ? undefined : value);
+  const notes = result?.warningItems ?? [];
+  const nearFigure = notes.filter((n) => n.code === 'rimUnset' || n.code === 'widthUnset');
+  const listed = notes.filter((n) => !['rimUnset', 'widthUnset', 'heatPump'].includes(n.code));
+
+  return (
+    <div class="tyre">
+      <p><a class="btn" href="#/tools">{W.tyreBack}</a></p>
+      <h2 class="tyre-title">{W.tyreTitle}</h2>
+      <p class="muted">{W.tyreIntro}</p>
+
+      <label class="tyre-input" for="tyre-bike">
+        <span class="tyre-label">{W.tyreBikeLabel}</span>
+        <select id="tyre-bike" value={key} onChange={(e) => { setPending({}); setSession(load((e.currentTarget as HTMLSelectElement).value)); }}>
+          <option value={DEFAULT_KEY}>{W.tyreBikeNone}</option>
+          {host.bikes.map((b) => <option key={b.id} value={b.id}>{b.name}{b.id === host.planBikeId ? W.tyreBikeInPlan : ''}</option>)}
+        </select>
+      </label>
+      {!kept ? <Notice>{W.tyreNotSaved}</Notice> : null}
+      <p class="muted">{W.tyreSavedHere}</p>
+
+      <Card title={W.tyreSectionLimits}>
+        <p class="muted">{W.tyreLimitHint}</p>
+        <LimitInput key={`max-${key}`} id="tyre-max" label={W.tyreLimitMaxLabel} required value={details.tyreMax} min={details.tyreMin} onPending={onPending}
+          onCommit={(l) => change({ tyreMax: l ?? undefined })} />
+        <p class="muted">{W.tyreLimitBothWheels}</p>
+      </Card>
+
+      <section class="card tyre-result" aria-live="polite" aria-labelledby="tyre-result-title" ref={resultRef}>
+        <h2 id="tyre-result-title">{W.tyreResultTitle}</h2>
+        {!resolved.input ? <p>{W.tyreNeedMax}</p> : null}
+        {blockedBy !== null ? <p class="notice">{W.tyrePendingLimit(blockedBy)}</p> : null}
+        {blockedBy === null && result?.needsWidth ? <p class="notice">{resolved.sources.rimType === 'assumed' ? W.tyreNeedTwo : W.tyreNeedWidthOnly}</p> : null}
+        {blockedBy === null && result && result.refused.length ? (
+          <>
+            <h3>{W.tyreRefusedTitle}</h3>
+            <ul>{result.refused.map((t) => <li key={t}>{t}</li>)}</ul>
+          </>
+        ) : null}
+        {blockedBy === null && result && result.incompatible ? <h3>{result.warningCodes.includes('rimUnset') ? W.tyreNeedRimTitle : W.tyreIncompatibleTitle}</h3> : null}
+        {showFigures && front && rear ? (
+          <>
+            <div class="tyre-wheels">
+              <WheelFigure label={W.tyreFront} w={front} />
+              <WheelFigure label={W.tyreRear} w={rear} />
+            </div>
+            <p class="muted">{W.tyreRoundedNote}</p>
+          </>
+        ) : null}
+        {blockedBy === null && nearFigure.map((n) => (
+          <p class="tyre-cap-note" key={n.code}>
+            {n.text}
+            {n.code === 'rimUnset' ? <> <button type="button" class="btn" onClick={() => change({ rimType: 'hooked' })}>{W.tyreMyRimHooked}</button> <span class="muted">{W.tyreRimUnsure}</span></> : null}
+          </p>
+        ))}
+        {blockedBy === null && result?.split ? (
+          <p>
+            {W.tyreSplit(...fmtPct(result.split.share))} {result.split.why}
+            <br /><span class="muted">{W.tyreSplitSensitivity}</span>
+          </p>
+        ) : null}
+        {resolved.input && resolved.assumed.length ? <p class="tyre-assumed">{W.tyreAssumedList(resolved.assumed.map((f) => ASSUMED_WORDS[f]).join(', '))}</p> : null}
+        {blockedBy === null && listed.length ? (
+          <>
+            <h3>{W.tyreHeadingWarnings}</h3>
+            <ul class="tyre-warnings">{listed.map((n) => <li key={n.code + n.text}>{n.text}</li>)}</ul>
+          </>
+        ) : null}
+        {blockedBy === null && result && result.decided.length ? (
+          <>
+            <h3>{W.tyreHeadingWhy}</h3>
+            <ul>{result.decided.map((t) => <li key={t}>{t}</li>)}</ul>
+          </>
+        ) : null}
+        {resolved.input ? <p class="muted">{W.tyreEstimateNote}</p> : null}
+      </section>
+
+      <Card title={W.tyreLimitsMoreTitle}>
+        <LimitInput key={`min-${key}`} id="tyre-min" label={W.tyreLimitMinLabel} required={false} value={details.tyreMin} onPending={onPending}
+          onCommit={(l) => change({ tyreMin: l })} />
+        <LimitInput key={`rim-${key}`} id="tyre-rimmax" label={W.tyreLimitRimLabel} required={false} value={details.rimMax} min={details.tyreMin} onPending={onPending}
+          onCommit={(l) => change({ rimMax: l })} />
+      </Card>
+
+      <Card title={W.tyreSectionRider}>
+        <Field id={bikeKey('rider')} label={W.tyreRiderLabel} source={src.riderKg} valueText={`${v.riderKg} kg`} resetLabel={resetFor('riderKg')}
+          onReset={resetter('riderKg')}
+          editor={<NumberInput key={`rider-${key}`} id="tyre-rider" label={W.tyreRiderLabel} value={own('riderKg', v.riderKg)} assumed={v.riderKg} onCommit={(n) => change({ riderKg: n })} unit="kg" />} />
+        <Field id={bikeKey('bikekg')} label={W.tyreBikeKgLabel} source={src.bikeKg} plan={planNote} valueText={`${v.bikeKg} kg`} resetLabel={resetFor('bikeKg')}
+          onReset={resetter('bikeKg')}
+          editor={<NumberInput key={`bikekg-${key}`} id="tyre-bikekg" label={W.tyreBikeKgLabel} value={own('bikeKg', v.bikeKg)} assumed={v.bikeKg} onCommit={(n) => change({ bikeKg: n })} unit="kg" />} />
+        <Field id={bikeKey('load')} label={W.tyreLoadLabel} source={src.carriedKg} plan={planNote} valueText={`${ctx.summary?.carriedKg ?? 0} kg`} resetLabel={resetFor('carriedKg')}
+          onReset={resetter('carriedKg')}
+          editor={<>
+            <NumberInput key={`load-${key}`} id="tyre-load" label={W.tyreLoadLabel} value={details.carriedKg} onCommit={(n) => change({ carriedKg: n })} unit="kg" />
+            <p class="muted">{src.carriedKg === 'entered' ? W.tyreLoadEnteredNote : W.tyreLoadNone}</p>
+          </>} />
+      </Card>
+
+      <Card title={W.tyreSectionBars}>
+        <Field id={bikeKey('bars')} label={W.tyreBarsLabel} source={src.bars} valueText={({ drop: W.tyreBarsDrop, flat: W.tyreBarsFlat, other: W.tyreBarsOther })[v.bars]} resetLabel={resetFor('bars')}
+          onReset={resetter('bars')}
+          editor={<Choice<Bars> id="tyre-bars" label={W.tyreBarsLabel} value={choiceValue('bars', v.bars)} onChange={(x) => change({ bars: x })}
+            options={[{ value: 'drop', label: W.tyreBarsDrop }, { value: 'flat', label: W.tyreBarsFlat }, { value: 'other', label: W.tyreBarsOther }]} />} />
+      </Card>
+
+      <Card title={W.tyreSectionTyres}>
+        {bike?.unreadFront && src.frontMm === 'assumed' ? <p class="muted">{W.tyreCouldntRead(bike.unreadFront)}</p> : null}
+        {bike?.unreadRear && src.rearMm === 'assumed' ? <p class="muted">{W.tyreCouldntRead(bike.unreadRear)}</p> : null}
+        <Field id={bikeKey('front')} label={W.tyreFrontWidthLabel} source={src.frontMm} valueText={`${v.front.printedMm} mm`} resetLabel={resetFor('frontMm')} onReset={resetter('frontMm')}
+          editor={<NumberInput key={`front-${key}`} id="tyre-front" label={W.tyreFrontWidthLabel} value={own('frontMm', v.front.printedMm)} assumed={v.front.printedMm} onCommit={(n) => change({ frontMm: n })} unit="mm" />} />
+        <Field id={bikeKey('rear')} label={W.tyreRearWidthLabel} source={src.rearMm} valueText={`${v.rear.printedMm} mm`} resetLabel={resetFor('rearMm')} onReset={resetter('rearMm')}
+          editor={<NumberInput key={`rear-${key}`} id="tyre-rear" label={W.tyreRearWidthLabel} value={own('rearMm', v.rear.printedMm)} assumed={v.rear.printedMm} onCommit={(n) => change({ rearMm: n })} unit="mm" />} />
+        {resolved.rearFollowsFront && (v.rimType === 'hookless' || v.rimType === 'unset') ? <p class="muted">{W.tyreRearLabelShort}: {W.tyreSameAsFront}</p> : null}
+        <Choice<Casing> id="tyre-casing" label={W.tyreCasingLabel} source={src.casing} value={choiceValue('casing', v.casing)} onChange={(x) => change({ casing: x })}
+          options={[{ value: 'supple', label: W.tyreCasingSupple }, { value: 'standard', label: W.tyreCasingStandard }, { value: 'reinforced', label: W.tyreCasingReinforced }]} />
+        <Choice<Setup> id="tyre-setup" label={W.tyreSetupLabel} source={src.setup} value={choiceValue('setup', v.setup)} onChange={(x) => change({ setup: x })}
+          options={[{ value: 'butyl', label: W.tyreSetupButyl }, { value: 'latex', label: W.tyreSetupLatex }, { value: 'tpu', label: W.tyreSetupTpu }, { value: 'tubeless', label: W.tyreSetupTubeless }]} />
+      </Card>
+
+      <Card title={W.tyreSectionRim}>
+        <Field id={bikeKey('wheel')} label={W.tyreWheelLabel} source={src.wheelBsdMm} valueText={WHEELS.find((w) => w.bsdMm === (v.wheelBsdMm))?.label ?? ''} resetLabel={resetFor('wheelBsdMm')} onReset={resetter('wheelBsdMm')}
+          editor={
+            <label class="tyre-input" for="tyre-wheel">
+              <span class="tyre-label">{W.tyreWheelLabel}</span>
+              <select id="tyre-wheel" value={String(v.wheelBsdMm)} onChange={(e) => change({ wheelBsdMm: Number((e.currentTarget as HTMLSelectElement).value) })}>
+                {WHEELS.map((w) => <option key={w.bsdMm} value={String(w.bsdMm)}>{w.label}</option>)}
+              </select>
+            </label>} />
+        <Choice<RimType> id="tyre-rimtype" label={W.tyreRimTypeLabel} source={src.rimType} value={choiceValue('rimType', v.rimType)} onChange={(x) => change({ rimType: x })}
+          options={[{ value: 'hooked', label: W.tyreRimHooked }, { value: 'hookless', label: W.tyreRimHookless }, { value: 'tubular', label: W.tyreRimTubular }]} />
+        <Field id={bikeKey('rim')} label={W.tyreRimInnerLabel} source={src.rimInnerMm} valueText={`${v.rimInnerMm} mm`} resetLabel={resetFor('rimInnerMm')} onReset={resetter('rimInnerMm')}
+          editor={<NumberInput key={`rim-${key}`} id="tyre-rim" label={W.tyreRimInnerLabel} value={own('rimInnerMm', v.rimInnerMm)} assumed={v.rimInnerMm} onCommit={(n) => change({ rimInnerMm: n })} unit="mm" />} />
+      </Card>
+
+      <Card title={W.tyreSectionSurface}>
+        <Choice<Surface> id="tyre-surface" label={W.tyreSurfaceLabel} source={src.surface} value={choiceValue('surface', v.surface)} onChange={(x) => change({ surface: x })}
+          options={[{ value: 'paved', label: W.tyreSurfacePaved }, { value: 'rough', label: W.tyreSurfaceRough }, { value: 'unpaved', label: W.tyreSurfaceUnpaved }]} />
+        <label class="tyre-check">
+          <input type="checkbox" checked={details.wet ?? false} onChange={(e) => change({ wet: (e.currentTarget as HTMLInputElement).checked })} />
+          <span>{W.tyreWetLabel}</span>
+        </label>
+      </Card>
+
+      <Card title={W.tyreSectionHeat}>
+        <p class="muted">{W.tyreHeatIntro}</p>
+        <NumberInput key={`hp-${key}`} id="tyre-heat-pump" label={W.tyreHeatPumpLabel} signed value={details.heat?.pumpC} onCommit={(n) => changeHeat({ pumpC: n })} unit="°C" />
+        <NumberInput key={`hm-${key}`} id="tyre-heat-max" label={W.tyreHeatMaxLabel} signed value={details.heat?.maxC} onCommit={(n) => changeHeat({ maxC: n })} unit="°C" />
+        <NumberInput key={`hh-${key}`} id="tyre-heat-pumph" label={W.tyrePumpHeightLabel} signed value={details.heat?.pumpHeightM} onCommit={(n) => changeHeat({ pumpHeightM: n })} unit="m" />
+        <NumberInput key={`hv-${key}`} id="tyre-heat-high" label={W.tyreHighestLabel} signed value={details.heat?.highestM} onCommit={(n) => changeHeat({ highestM: n })} unit="m" />
+        {!v.heat ? <p class="notice">{W.tyreHeatSkipped}</p> : null}
+        {v.heat && showFigures && front && rear && !front.heat?.advise && !rear.heat?.advise ? <p class="muted">{W.tyreHeatFits}</p> : null}
+      </Card>
+
+      <Card title={W.tyreSectionMeasured}>
+        <MeasuredFields key={`m-${key}`} value={details.measured} onCommit={(m) => change({ measured: m })} />
+        <p class="muted">{W.tyreCaliperHelp}</p>
+        <NumberInput key={`cf-${key}`} id="tyre-cfront" label={W.tyreCaliperFrontLabel} value={details.caliperFrontMm ?? undefined} onCommit={(n) => change({ caliperFrontMm: n ?? null })} unit="mm" />
+        <NumberInput key={`cr-${key}`} id="tyre-crear" label={W.tyreCaliperRearLabel} value={details.caliperRearMm ?? undefined} onCommit={(n) => change({ caliperRearMm: n ?? null })} unit="mm" />
+      </Card>
+
+      {resolved.input ? (
+        <Card title={W.tyreSramTitle}>
+          <p>{W.tyreSramIntro}</p>
+          <ul class="tyre-sram">
+            {sramList(v).map((row) => <li key={row.label}><strong>{row.label}:</strong> {row.value}</li>)}
+          </ul>
+          <p><a class="btn btn-primary" href={SRAM_URL} target="_blank" rel="noopener noreferrer">{W.tyreSramLink}</a></p>
+          <p class="muted">{W.tyreSramNothingSent} {W.tyreSramDiffer}</p>
+        </Card>
+      ) : null}
+    </div>
+  );
+}
