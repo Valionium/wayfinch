@@ -1,0 +1,170 @@
+// What the tyre screen knows (its own stored details, the bike, the bag plan, You) turned into one TyreInput, with where each value came from.
+// Pure: the screen renders this and computes nothing itself.
+import type { Bars, Casing, Limit, Pos, RimType, Setup, Surface, TyreInput } from './core.ts';
+
+/** The tyre tool's own details for one bike. Every field is optional: "not set" falls back to the bike, the plan, You, then an assumption. */
+export interface Details {
+  bars?: Bars;
+  wheelBsdMm?: number;
+  frontMm?: number;
+  rearMm?: number;
+  caliperFrontMm?: number | null;
+  caliperRearMm?: number | null;
+  casing?: Casing;
+  setup?: Setup;
+  rimType?: RimType;
+  rimInnerMm?: number;
+  surface?: Surface;
+  wet?: boolean;
+  tyreMax?: Limit;
+  tyreMin?: Limit | null;
+  rimMax?: Limit | null;
+  riderKg?: number;
+  bikeKg?: number;
+  carriedKg?: number;
+  measured?: { frontKg: number; rearKg: number } | null;
+  heat?: { pumpC?: number; maxC?: number; pumpHeightM?: number; highestM?: number };
+}
+
+/** What Load Check's bike record holds, read-only. */
+export interface BikeInfo {
+  id: string;
+  name: string;
+  bars?: Bars;
+  wheelBsdMm?: number;
+  frontMm?: number;
+  rearMm?: number;
+  rimInnerMm?: number;
+  rimType?: RimType;
+  setup?: Setup;
+  casing?: Casing;
+  bikeKg?: number;
+  /** A tyre text on the bike that could not be read with certainty. */
+  unreadTyre?: string;
+  unreadFront?: string;
+  unreadRear?: string;
+}
+
+/** The parts of Contract 1 this tool reads. */
+export interface SummaryInfo {
+  at: string;
+  bikeId: string | null;
+  bagCount: number;
+  carriedKg: number;
+  bikeKg: number | null;
+  emptyLuggageKg: number | null;
+  byPositionKg: Partial<Record<Pos, number>>;
+  unplacedKg: number;
+}
+
+export interface Context {
+  /** From You. */
+  riderKg: number | null;
+  summary: SummaryInfo | null;
+  /** The chosen bike, or null for none. */
+  bike: BikeInfo | null;
+}
+
+export type Source = 'entered' | 'bike' | 'plan' | 'you' | 'assumed';
+export type FieldName =
+  | 'bars' | 'wheelBsdMm' | 'frontMm' | 'rearMm' | 'casing' | 'setup' | 'rimType' | 'rimInnerMm' | 'surface'
+  | 'riderKg' | 'bikeKg' | 'carriedKg';
+
+export const ASSUMED = {
+  bars: 'drop', wheelBsdMm: 622, frontMm: 32, rearMm: 32, casing: 'standard', setup: 'butyl', rimType: 'hooked', rimInnerMm: 19,
+  surface: 'paved', riderKg: 75, bikeKg: 14,
+} as const;
+
+/** The order of the "assumed" line: what can make a figure too high comes first. */
+const ASSUMED_ORDER: FieldName[] = ['rimType', 'frontMm', 'rearMm', 'wheelBsdMm', 'rimInnerMm', 'setup', 'casing', 'surface', 'bars', 'riderKg', 'bikeKg', 'carriedKg'];
+
+/** Every value the calculation will use, whether or not the required limit is there yet. */
+export type Values = Omit<TyreInput, 'tyreMax' | 'tyreMin' | 'rimMax'>;
+
+export interface Resolved {
+  /** The rear width follows the front because nobody gave one. */
+  rearFollowsFront: boolean;
+  values: Values;
+  /** Null while the sidewall maximum is missing: the one required field. */
+  input: TyreInput | null;
+  missing: 'tyreMax' | null;
+  sources: Record<FieldName, Source>;
+  /** Fields that fell back to an assumption, for the notice under the figures. */
+  assumed: FieldName[];
+}
+
+export function resolve(d: Details, ctx: Context): Resolved {
+  const bike = ctx.bike;
+  const sum = ctx.summary;
+  const sources = {} as Record<FieldName, Source>;
+  const pick = <K extends 'bars' | 'wheelBsdMm' | 'frontMm' | 'rearMm' | 'casing' | 'setup' | 'rimType' | 'rimInnerMm' | 'surface'>(
+    name: K,
+    entered: Details[K],
+    fromBike: Details[K],
+  ): NonNullable<Details[K]> => {
+    if (entered !== undefined && entered !== null) { sources[name] = 'entered'; return entered as NonNullable<Details[K]>; }
+    if (fromBike !== undefined && fromBike !== null) { sources[name] = 'bike'; return fromBike as NonNullable<Details[K]>; }
+    sources[name] = 'assumed';
+    return ASSUMED[name] as NonNullable<Details[K]>;
+  };
+  const bars = pick('bars', d.bars, bike?.bars);
+  const wheelBsdMm = pick('wheelBsdMm', d.wheelBsdMm, bike?.wheelBsdMm);
+  const frontMm = pick('frontMm', d.frontMm, bike?.frontMm);
+  // A rear width nobody set follows the front: one tyre size is by far the usual case.
+  let rearMm = frontMm;
+  // A rear tyre text that could not be read is not the front's width: it stays unset.
+  const rearUnread = d.rearMm === undefined && bike?.rearMm === undefined && bike?.unreadRear !== undefined;
+  if ((d.rearMm ?? bike?.rearMm) !== undefined) rearMm = pick('rearMm', d.rearMm, bike?.rearMm);
+  else if (rearUnread) { rearMm = ASSUMED.rearMm; sources.rearMm = 'assumed'; }
+  else sources.rearMm = sources.frontMm;
+  const rearFollowsFront = (d.rearMm ?? bike?.rearMm) === undefined && !rearUnread;
+  const casing = pick('casing', d.casing, bike?.casing);
+  const setup = pick('setup', d.setup, bike?.setup);
+  const rimPicked = d.rimType ?? bike?.rimType;
+  const rimType: RimType | 'unset' = rimPicked === undefined ? 'unset' : rimPicked;
+  sources.rimType = d.rimType !== undefined ? 'entered' : bike?.rimType !== undefined ? 'bike' : 'assumed';
+  const rimInnerMm = pick('rimInnerMm', d.rimInnerMm, bike?.rimInnerMm);
+  const surface = pick('surface', d.surface, undefined);
+
+  let riderKg: number;
+  if (d.riderKg !== undefined) { riderKg = d.riderKg; sources.riderKg = 'entered'; }
+  else if (ctx.riderKg !== null) { riderKg = ctx.riderKg; sources.riderKg = 'you'; }
+  else { riderKg = ASSUMED.riderKg; sources.riderKg = 'assumed'; }
+
+  let bikeKg: number;
+  if (d.bikeKg !== undefined) { bikeKg = d.bikeKg; sources.bikeKg = 'entered'; }
+  else if (sum?.bikeKg != null) { bikeKg = sum.bikeKg; sources.bikeKg = 'plan'; }
+  else if (bike?.bikeKg !== undefined) { bikeKg = bike.bikeKg; sources.bikeKg = 'bike'; }
+  else { bikeKg = ASSUMED.bikeKg; sources.bikeKg = 'assumed'; }
+
+  // The load: the plan's positions when the plan is used as it is; an entered load has no positions, so the default split applies.
+  let load: TyreInput['load'];
+  if (d.carriedKg !== undefined) {
+    load = { byPositionKg: null, unplacedKg: d.carriedKg, emptyLuggageKg: null };
+    sources.carriedKg = 'entered';
+  } else if (sum) {
+    load = { byPositionKg: sum.byPositionKg, unplacedKg: sum.unplacedKg, emptyLuggageKg: sum.emptyLuggageKg };
+    sources.carriedKg = 'plan';
+  } else {
+    load = { byPositionKg: null, unplacedKg: 0, emptyLuggageKg: null };
+    sources.carriedKg = 'assumed';
+  }
+
+  const assumed = ASSUMED_ORDER.filter((k) => sources[k] === 'assumed');
+  const values: Values = {
+    riderKg, bikeKg, load,
+    measured: d.measured ?? null,
+    bars,
+    front: { printedMm: frontMm, caliperMm: d.caliperFrontMm ?? null, assumed: sources.frontMm === 'assumed' },
+    rear: { printedMm: rearMm, caliperMm: d.caliperRearMm ?? null, assumed: sources.rearMm === 'assumed' },
+    casing, setup, rimType, rimInnerMm, wheelBsdMm, surface,
+    wet: d.wet ?? false,
+    // Heat and altitude need the temperatures and the highest point; the pump height is sea level unless said.
+    heat: d.heat && d.heat.pumpC !== undefined && d.heat.maxC !== undefined && d.heat.highestM !== undefined
+      ? { pumpC: d.heat.pumpC, maxC: d.heat.maxC, pumpHeightM: d.heat.pumpHeightM ?? 0, highestM: d.heat.highestM }
+      : null,
+  };
+  if (!d.tyreMax) return { values, input: null, missing: 'tyreMax', sources, assumed, rearFollowsFront };
+  const input: TyreInput = { ...values, tyreMax: d.tyreMax, tyreMin: d.tyreMin ?? null, rimMax: d.rimMax ?? null };
+  return { values, input, missing: null, sources, assumed, rearFollowsFront };
+}

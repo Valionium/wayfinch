@@ -134,3 +134,41 @@ button, a { font: inherit; }
 
 .update-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .update-bar p { margin: 0; color: var(--muted); }
+
+/* Tools tab and the tyre screen */
+.muted { color: var(--muted); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.tool-line { font-size: 1.125rem; margin: 4px 0 8px; }
+.tyre h3 { font-family: var(--font-display); font-size: 1.125rem; margin: 12px 0 4px; }
+.tyre-title { font-size: 1.5rem; margin: 8px 0; }
+.tyre-result { border-color: var(--blaze); }
+.tyre-wheels { display: flex; gap: 12px; flex-wrap: wrap; }
+.tyre-wheel { flex: 1 1 8rem; }
+.tyre-wheel h3 { margin-top: 4px; }
+.tyre-big { font-family: var(--font-display); font-size: 2.25rem; font-weight: 700; margin: 0; line-height: 1.1; }
+.tyre-psi { font-family: var(--font-mono); margin: 0 0 4px; }
+.tyre-cap-note { border-left: 4px solid var(--amber); padding: 4px 12px; margin: 8px 0; font-weight: 600; }
+.tyre-heat { margin: 2px 0; }
+.tyre-assumed { border-left: 4px solid var(--amber); padding: 4px 12px; margin: 8px 0; }
+.tyre-warnings li { margin-bottom: 4px; }
+.tyre-input { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 8px 0; }
+.tyre-label { font-weight: 600; flex: 1 1 100%; }
+.tyre-input input, .tyre-input select { min-height: 44px; min-width: 6rem; padding: 6px 10px; border: 1px solid var(--muted); border-radius: 8px; background: var(--ground); color: var(--ink); font: inherit; }
+.tyre-input input { width: 8rem; }
+.tyre-input select { max-width: 100%; }
+.tyre-error { color: var(--red); flex: 1 1 100%; }
+.tyre-choice { border: 0; padding: 0; margin: 8px 0; min-width: 0; }
+.tyre-choice legend { padding: 0; }
+.tyre-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.tyre-option, .tyre-check { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.tyre-option input, .tyre-check input { width: 20px; height: 20px; accent-color: var(--blaze); }
+.tyre-field { margin: 8px 0; }
+.tyre-from { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.tyre-from .tyre-label { flex: 1 1 100%; }
+.tyre-value { font-weight: 600; }
+.tyre-note { border-left: 4px solid var(--amber); padding: 8px 12px; margin: 4px 0 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tyre-ask { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+html { scroll-padding-bottom: 5rem; }
+
+.tyre-result { scroll-margin-top: 8px; }
