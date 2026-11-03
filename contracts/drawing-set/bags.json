@@ -1,0 +1,33 @@
+{
+  "about": "Bag sets for the drawing set, in Contract 1's shape (bags.items, decks, water.bottles). null is a plan without bags.",
+  "sets": {
+    "none": null,
+    "frame-full": { "items": [{ "pos": "frame", "L": 6, "shape": 0, "fill": 0.8 }], "decks": { "bar": null, "rack": null }, "bottles": [] },
+    "frame-three-quarter": { "items": [{ "pos": "frame", "L": 4.5, "shape": 1, "fill": 0.5 }], "decks": { "bar": null, "rack": null }, "bottles": [{ "slot": "dt", "L": 0.75 }] },
+    "frame-half": { "items": [{ "pos": "frame", "L": 3, "shape": 2, "fill": 1 }], "decks": { "bar": null, "rack": null }, "bottles": [{ "slot": "st", "L": 0.5 }, { "slot": "dt", "L": 0.75 }] },
+    "wedge": { "items": [{ "pos": "frame", "L": 1.5, "shape": 3, "fill": 0.3 }], "decks": { "bar": null, "rack": null }, "bottles": [{ "slot": "dt", "L": 0.75 }] },
+    "bikepacking": {
+      "items": [
+        { "pos": "seat", "L": 14, "fill": 0.9 }, { "pos": "bar", "L": 13, "fill": 0.6 }, { "pos": "frame", "L": 4.5, "shape": 1, "fill": 0.7 },
+        { "pos": "top", "L": 1, "slot": "front", "fill": 0.4 }, { "pos": "top", "L": 0.8, "slot": "rear", "fill": 1 }, { "pos": "fork", "L": 3, "pair": true, "fill": [0.5, 0.2] }
+      ],
+      "decks": { "bar": "loaded", "rack": null },
+      "bottles": [{ "slot": "st", "L": 0.5 }, { "slot": "dt", "L": 0.75 }, { "slot": "un", "L": 0.5 }]
+    },
+    "touring": {
+      "items": [{ "pos": "rack", "L": 20, "pair": true, "fill": [0.8, 0.6] }, { "pos": "bar", "L": 5, "fill": 0.3 }, { "pos": "frame", "L": 3, "shape": 2, "fill": 0 }],
+      "decks": { "bar": null, "rack": "loaded" },
+      "bottles": [{ "slot": "st", "L": 0.75 }, { "slot": "dt", "L": 1 }]
+    },
+    "everything": {
+      "items": [
+        { "pos": "seat", "L": 14, "fill": 1 }, { "pos": "seat", "L": 8, "fill": 0.2 }, { "pos": "bar", "L": 13, "fill": 0.5 }, { "pos": "bar", "L": 5, "fill": 1 },
+        { "pos": "frame", "L": 6, "shape": 0, "fill": 0.6 }, { "pos": "top", "L": 1, "slot": "front", "fill": 0.5 }, { "pos": "top", "L": 1, "slot": "rear", "fill": 0.5 },
+        { "pos": "fork", "L": 3, "pair": true, "fill": [1, 1] }, { "pos": "rack", "L": 20, "pair": true, "fill": [1, 0.4] },
+        { "pos": "pack", "L": 18, "fill": 0.7 }, { "pos": "pack", "L": 10, "fill": 0.1 }
+      ],
+      "decks": { "bar": "empty", "rack": "loaded" },
+      "bottles": [{ "slot": "st", "L": 0.5 }, { "slot": "dt", "L": 0.75 }, { "slot": "un", "L": 0.5 }]
+    }
+  }
+}

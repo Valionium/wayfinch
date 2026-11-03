@@ -54,6 +54,33 @@ async function runVite(outDir) {
   });
 }
 
+/**
+ * The bike module for the bag planner (spec section 7.4): a classic script, `window.WayfinchBike`, so the page draws the same bike as
+ * the app. Only a build with the launch switch on writes it.
+ */
+async function compileBikeScript() {
+  const result = await esbuild({
+    stdin: {
+      contents: "import { bikeArt, nearestSwatchName, normaliseBike, oklabMedian, resolveBikeSpec, SWATCHES } from './src/core/bike/index.ts';\n"
+        + 'window.WayfinchBike = Object.freeze({ bikeArt, resolveBikeSpec, SWATCHES, nearestSwatchName, normaliseBike, oklabMedian });\n',
+      resolveDir: ROOT,
+      sourcefile: 'bike-entry.ts',
+      loader: 'ts',
+    },
+    absWorkingDir: ROOT,
+    bundle: true,
+    write: false,
+    format: 'iife',
+    target: 'es2020',
+    platform: 'browser',
+    charset: 'utf8',
+    legalComments: 'none',
+    minify: true,
+    logLevel: 'silent',
+  });
+  return Buffer.from(result.outputFiles[0].contents);
+}
+
 async function compileWorker(buildId, precache) {
   const result = await esbuild({
     entryPoints: [WORKER_SOURCE],
@@ -96,6 +123,8 @@ export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = 
     } finally {
       rmSync(shell, { recursive: true, force: true });
     }
+    mkdirSync(join(target, 'tools', 'bags'), { recursive: true });
+    writeFileSync(join(target, 'tools', 'bags', 'bike.js'), await compileBikeScript());
   } else {
     // With the switch off the page riders see stays Load Check, at /.
     writeFileSync(join(target, 'index.html'), readFileSync(pagePath));

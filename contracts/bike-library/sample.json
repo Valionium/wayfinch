@@ -1,0 +1,48 @@
+[
+  {
+    "id": "bike_m2k9x1_4f7a2c9d",
+    "name": "Blue tourer",
+    "frontTyre": "40-622",
+    "rearTyre": "42-622",
+    "padType": "Shimano L05A",
+    "chainType": "KMC X10",
+    "hangerType": "Pilo D691",
+    "notes": "Spare spokes taped to the chainstay.",
+    "tyres": "tubeless",
+    "valve": "presta",
+    "brakes": "hydraulic-disc",
+    "drive": "derailleur",
+    "shifting": "cable",
+    "pressure": {
+      "bikeKg": 14.2, "wheel": "700c", "rim": "tubeless-crochet", "rimMm": 23, "frontMm": 40, "rearMm": 42,
+      "frontCasing": "standard", "rearCasing": "reinforced", "frontMinBar": 2.5, "frontMaxBar": 5, "rearMinBar": 2.5, "rearMaxBar": 5
+    },
+    "fit": {
+      "style": "diamond-sloping", "size": { "kind": "letter", "value": "M" },
+      "bolts": { "st": "yes", "dt": "yes", "un": "no" }, "topTubeBag": "yes",
+      "triangleCm": { "top": 51.1, "seat": 35, "down": 65 }, "seatGapCm": 22, "barWidthCm": 38
+    },
+    "maxWeight": { "v": 120, "u": "kg", "includes": "bike" },
+    "maxWeightAsked": true,
+    "look": { "colour": "#2563b8", "bars": "drop", "ebike": false },
+    "geometry": {
+      "at": "2026-10-29T10:00:00Z", "maker": "Example Cycles", "model": "Long Road", "year": 2025, "size": "54", "wheel": "700c",
+      "values": { "stack_mm": { "v": 580, "src": "table" }, "reach_mm": { "v": 385, "src": "table" }, "chainstay_mm": { "v": 435, "src": "measured" } }
+    }
+  },
+  {
+    "id": "bike_plain",
+    "name": "",
+    "frontTyre": "",
+    "rearTyre": "",
+    "padType": "",
+    "chainType": "",
+    "hangerType": "",
+    "notes": "",
+    "tyres": "unknown",
+    "valve": "unknown",
+    "brakes": "unknown",
+    "drive": "unknown",
+    "shifting": "unknown"
+  }
+]

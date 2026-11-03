@@ -1,0 +1,9 @@
+{
+  "about": "The drawing set (spec sections 7.4 and 11): each style x size x handlebar x e-bike, with each bag set of bags.json, and the tyres and colours below. Both pages draw every entry; a bike record is built as { id, fit: { style, size: { kind: 'letter', value } }, look: { bars, ebike, colour }, frontTyre, rearTyre }.",
+  "styles": ["diamond-level", "diamond-sloping", "compact", "trapeze", "mixte", "step-through", "full-suspension"],
+  "sizes": ["XS", "S", "M", "L", "XL"],
+  "bars": ["drop", "flat", "other"],
+  "ebike": [false, true],
+  "tyres": [["28-622", "28-622"], ["40-622", "40-622"], ["47-584", "47-584"], ["29 x 2.4", "29 x 2.4"], ["27.5 x 2.8", "27.5 x 2.8"], ["26 x 4.0", "26 x 4.0"], ["20 x 2.0", "20 x 2.0"], ["", ""]],
+  "colours": [null, "#1d1d1f", "#f4f4f2", "#2f7d4f", "#e46b1f"]
+}
