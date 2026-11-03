@@ -1,0 +1,72 @@
+/* Wide screens (spec section 3.8). Everything here sits inside a min-width query of 600 px or more, so the phone design is
+   untouched; a test (WIDE-UNDER-600) checks that. 600-839 px needs nothing: the screen is already one column of about 640 px and
+   the bottom bar stays. Colours are the tokens only. */
+
+@media (min-width: 840px) {
+  /* The rail: the four labelled tabs down the left, the screen to its right, in two panes. */
+  html { scroll-padding-bottom: 1rem; }
+  .shell { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); grid-template-rows: auto 1fr; align-items: start; }
+  .update-bar { grid-column: 1 / -1; grid-row: 1; }
+  .tabs {
+    grid-column: 1; grid-row: 2; position: sticky; top: 0; flex-direction: column; align-self: start;
+    height: 100vh; height: 100dvh; padding: 16px 0; border-top: 0; border-right: 1px solid var(--line);
+  }
+  .tab { flex: none; justify-content: flex-start; min-height: 48px; padding: 0 16px; border-top: 0; border-left: 4px solid transparent; }
+  .tab[aria-current='page'] { border-top-color: transparent; border-left-color: var(--blaze); }
+  .screen { grid-column: 2; grid-row: 2; align-self: stretch; max-width: 96rem; margin: 0 auto; padding: 20px 32px 32px; min-width: 0; }
+  .screen h1 { font-size: 1.5rem; margin-bottom: 8px; }
+  .screen[data-drop-ready] { outline: 3px dashed var(--blaze); outline-offset: -8px; }
+
+  /* Ahead: the position, strip and chips in the main pane; the six cards in the supporting pane. */
+  .ahead[data-ahead='first-use'], .ahead[data-ahead='no-route'], .ahead[data-ahead='unreadable'] { max-width: 40rem; }
+  .ahead[data-ahead='answers'] {
+    display: grid; column-gap: 0; align-items: start;
+    grid-template-columns: minmax(0, 7fr) minmax(16rem, 3fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: 'main side' 'below side';
+  }
+  .ah-main { grid-area: main; container-type: inline-size; margin-right: 24px; }
+  .ah-below { grid-area: below; margin-right: 24px; }
+  .ah-cards { grid-area: side; container-type: inline-size; }
+  .ah-computer { margin: 0 0 8px; }
+  .ah-position-controls .row { margin-bottom: 4px; }
+  .ah-strip { padding-bottom: 4px; }
+
+  /* The ruler under the strip: arrow keys move a point along it. */
+  .ah-ruler { margin-top: 4px; }
+  .ah-ruler-bar { position: relative; height: 44px; cursor: crosshair; border-radius: 8px; }
+  .ah-ruler-bar::before { content: ''; position: absolute; left: 0; right: 0; top: 21px; height: 2px; background: var(--line); }
+  .ah-ruler-tick { position: absolute; top: 8px; width: 4px; height: 28px; margin-left: -2px; border-radius: 2px; background: var(--blaze); }
+  .ah-ruler-hover { position: absolute; top: 14px; width: 2px; height: 16px; margin-left: -1px; background: var(--ink); }
+  .ah-ruler-read { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0; }
+
+  /* Trip: the bike, the route and its days; then the settings and Get ready. */
+  .trip { display: grid; grid-template-columns: minmax(0, 7fr) minmax(16rem, 3fr); column-gap: 24px; align-items: start; }
+
+  /* Tools: both tool cards side by side. */
+  .screen[data-screen='tools'] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; align-items: start; align-content: start; }
+  .screen[data-screen='tools'] > h1, .screen[data-screen='tools'] > .notice { grid-column: 1 / -1; }
+
+  /* You: a form in two columns, with text lines of at most about 70 characters. */
+  .screen[data-screen='you'] { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); column-gap: 32px; align-items: start; align-content: start; }
+  .screen[data-screen='you'] > h1, .screen[data-screen='you'] > .notice { grid-column: 1 / -1; }
+  .screen[data-screen='you'] p, .screen[data-screen='you'] li { max-width: 70ch; }
+
+  /* Other screens (the tyre calculator, legal pages) keep a readable line. */
+  .screen[data-screen='tools/tyre'], .screen[data-screen='you/legal'] { max-width: 56rem; }
+
+  /* Cards and fields adapt to the pane they sit in, not to the window. */
+  @container (min-width: 32rem) {
+    .ah-picker-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 12px; align-items: end; }
+    .ah-picker-fields .ah-field { max-width: none; }
+    .ah-picker-fields .field-problem, .ah-picker-fields .btn { grid-column: 1 / -1; justify-self: start; }
+  }
+}
+
+@media (min-width: 1200px) {
+  /* A wider strip and cards. The middle column is kept for the map view (spec section 13), collapsed until it exists. */
+  .ahead[data-ahead='answers'] {
+    grid-template-columns: minmax(0, 1fr) 0 minmax(20rem, 26rem);
+    grid-template-areas: 'main map side' 'below map side';
+  }
+}

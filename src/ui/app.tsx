@@ -14,6 +14,9 @@ import type { Updater } from './update.ts';
 import { ToolsScreen } from './tools/tools.tsx';
 import { browserTripServices } from './trip/services.ts';
 import { TripScreen } from './trip/trip.tsx';
+import { installDrop } from './wide/drop.ts';
+import { installFocusClear } from './wide/wide.ts';
+import './wide/wide.css';
 
 // The tyre tool reads Load Check's records and its own storage; rider weight from You joins when the store does.
 const tyreServices = browserServices();
@@ -21,6 +24,13 @@ const tyreServices = browserServices();
 const TyreScreen = lazy(() => import('../tools/tyre/ui.tsx').then((m) => m.TyreScreen));
 const tripServices = browserTripServices();
 export const aheadShell = browserAhead();
+
+// A file dropped on the window never opens or downloads; on Trip and You it goes to the screen's own file input (spec 3.8).
+// Between 600 and 839 px the bottom bar never covers the focused element. Both live as long as the page, so no effect owns them.
+if (typeof window !== 'undefined') {
+  installDrop(window, document, () => screenSignal.value);
+  installFocusClear(window, document);
+}
 
 const TABS: { name: TabName; label: string }[] = [
   { name: 'ahead', label: W.appTabAhead },

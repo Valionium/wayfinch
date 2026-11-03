@@ -127,15 +127,20 @@ export function TripScreen({ services }: { services: TripServices }) {
   const offer = installOffer.value;
   return (
     <div class="trip" data-trip-loaded={snap ? 'true' : undefined}>
-      <div class="trip-bike">
-        <BikeDrawing bike={bike.bike} summary={bike.summary} known={bike.known} back="trip" />
+      {/* Two panes on a wide screen: the bike, the route and its days; then the settings and Get ready (spec 3.8). */}
+      <div class="trip-main">
+        <div class="trip-bike">
+          <BikeDrawing bike={bike.bike} summary={bike.summary} known={bike.known} back="trip" />
+        </div>
+        {snap && !snap.available ? <p class="notice" role="status">{W.appStorageBlocked}</p> : null}
+        <AddRoute services={services} snap={snap} reload={reload} />
+        {snap ? <RouteSummary snap={snap} /> : null}
       </div>
-      {snap && !snap.available ? <p class="notice" role="status">{W.appStorageBlocked}</p> : null}
-      <AddRoute services={services} snap={snap} reload={reload} />
-      {snap ? <RouteSummary snap={snap} /> : null}
-      {snap ? <TripSettings services={services} snap={snap} reload={reload} /> : null}
-      {snap?.trip ? <GetReady key={lineKey(snap.trip.route)} services={services} snap={snap} reload={reload} /> : null}
-      {offer ? <button type="button" class="btn" onClick={() => void promptInstall()}>{W.appTripInstall}</button> : null}
+      <div class="trip-side">
+        {snap ? <TripSettings services={services} snap={snap} reload={reload} /> : null}
+        {snap?.trip ? <GetReady key={lineKey(snap.trip.route)} services={services} snap={snap} reload={reload} /> : null}
+        {offer ? <button type="button" class="btn" onClick={() => void promptInstall()}>{W.appTripInstall}</button> : null}
+      </div>
     </div>
   );
 }
