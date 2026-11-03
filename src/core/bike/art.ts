@@ -266,9 +266,15 @@ const SPOKE_TURNS = [0.1, 0.3].map((turn) => Array.from({ length: 16 }, (_, i) =
   const a = turn + (i * 2 * Math.PI) / 16;
   return [Math.cos(a), Math.sin(a), Math.cos(a + 0.35) * 2, Math.sin(a + 0.35) * 2] as const;
 }));
+const SPOKES = new Map<string, string>();
 function spokes(c: P, rim: number, which: 0 | 1): string {
+  const key = `${which}${c[0]},${c[1]},${rim}`;
+  const known = SPOKES.get(key);
+  if (known !== undefined) return known;
+  if (SPOKES.size > 24) SPOKES.clear();
   let d = '';
   for (const t of SPOKE_TURNS[which]!) d += `${d ? ' ' : ''}M${r2(c[0] + t[2])} ${r2(c[1] + t[3])} L${r2(c[0] + t[0] * rim)} ${r2(c[1] + t[1] * rim)}`;
+  SPOKES.set(key, d);
   return d;
 }
 

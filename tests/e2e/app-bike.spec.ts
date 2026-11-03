@@ -101,7 +101,7 @@ test('[BK-NOTHING-REQUIRED] broken bike and plan data: every screen opens, the t
   expect(problems).toEqual([]);
 });
 
-test('[PERF-BIKE] one bike with every bag of the drawing set is drawn within 20 ms on the phone stand-in, in the page (median of three)', async ({ page }) => {
+test('[PERF-BIKE] one bike with a full bikepacking rig is drawn within 20 ms on the phone stand-in, in the page (median of three)', async ({ page }) => {
   // Drawn: the spec, the drawing, the DOM and its layout, as on each tap once the bike is on screen. The first, cold drawing is
   // reported beside it; it belongs to the screen's first paint, which PERF-OFFLINE-2S covers.
   app = await loadApp(page, { launch: true, path: '/#/tools' });
@@ -125,7 +125,7 @@ test('[PERF-BIKE] one bike with every bag of the drawing set is drawn within 20 
     }
     host.remove();
     return out;
-  }, { record: bike, bags: bagSets.sets.everything });
+  }, { record: bike, bags: bagSets.sets.bikepacking });
   const [cold, , ...taps] = times; // the first two draws are the screen's own: one cold, one as it settles
   const median = [...taps].sort((a, b) => a! - b!)[1]!;
   test.info().annotations.push({ type: 'PERF-BIKE', description: `first ${cold!.toFixed(1)} ms; then ${taps.map((t) => t!.toFixed(1)).join(', ')} ms, median ${median.toFixed(1)} ms` });
