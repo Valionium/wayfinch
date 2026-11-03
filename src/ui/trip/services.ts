@@ -127,7 +127,7 @@ async function counts(): Promise<{ places: number; forecastTo: Date | null; fore
 }
 
 /** Whether the database exists: reading it must not make one, or data the rider just deleted would be brought back by an open window. */
-async function dbExists(): Promise<boolean> {
+export async function dbExists(): Promise<boolean> {
   try {
     if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') return true;
     return (await indexedDB.databases()).some((d) => d.name === DB_NAME);

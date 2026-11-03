@@ -6,30 +6,17 @@ import { W, shortMapDate } from '../../core/wording/en.ts';
 import { Card, Notice } from '../../ui/card.tsx';
 import { checkLimit, tyreEstimate } from './core.ts';
 import type { Bars, Casing, Limit, RimType, Setup, Surface, Unit, Wheel } from './core.ts';
-import { readHost } from './host.ts';
-import type { HostData } from './host.ts';
 import { resolve } from './model.ts';
 import type { Context, Details, FieldName, Source } from './model.ts';
 import { DEFAULT_KEY, entryOf, readStore, saveEntry } from './storage.ts';
-import type { KeyValueStore, LastResult } from './storage.ts';
+import type { LastResult } from './storage.ts';
 import { SRAM_URL, sramList } from './sram.ts';
 import { WHEELS } from './tables.ts';
 
-export interface TyreServices {
-  /** Load Check's records and You, read-only. */
-  host: () => HostData;
-  /** The tyre tool's own storage. */
-  storage: KeyValueStore;
-  now: () => Date;
-}
-
-export function browserServices(riderKg: () => number | null = () => null): TyreServices {
-  const kv: KeyValueStore = {
-    getItem: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
-    setItem: (k, v) => localStorage.setItem(k, v),
-  };
-  return { host: () => readHost(kv, riderKg), storage: kv, now: () => new Date() };
-}
+// The services live in their own module, so the Tools card can read them without loading this screen (a lazy chunk).
+export { browserServices } from './services.ts';
+export type { TyreServices } from './services.ts';
+import type { TyreServices } from './services.ts';
 
 const ASSUMED_WORDS: Record<FieldName, string> = {
   riderKg: W.tyreAssumedRider, bikeKg: W.tyreAssumedBike, bars: W.tyreAssumedBars, wheelBsdMm: W.tyreAssumedWheel, frontMm: W.tyreAssumedFront,

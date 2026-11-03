@@ -7,6 +7,8 @@ export interface BuildOptions {
   emergency?: boolean;
   extraFiles?: Record<string, Uint8Array | string>;
   pagePath?: string;
-  vite?: (outDir: string) => Promise<void>;
+  vite?: (outDir: string, options?: { testHooks?: boolean }) => Promise<void>;
+  /** `window.__wf` for the browser tests; needs the launch switch on. */
+  testHooks?: boolean;
 }
 export function buildDist(options?: BuildOptions): Promise<{ out: string; build: string; precache: Record<string, string> }>;

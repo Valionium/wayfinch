@@ -1,7 +1,11 @@
 // The app's shell: the update bar, the current screen and the four tabs (spec section 3.1).
 // The screens are placeholders until their groups arrive; the shell already opens on Trip when no trip runs.
+import { useEffect } from 'preact/hooks';
 import { W } from '../core/wording/en.ts';
-import { TyreScreen, browserServices } from '../tools/tyre/ui.tsx';
+import { AheadScreen } from './ahead/ahead.tsx';
+import { browserAhead } from './shell-actions.ts';
+import { browserServices } from '../tools/tyre/services.ts';
+import { lazy } from './lazy.tsx';
 import { Degraded } from './card.tsx';
 import { degradedSignal } from './degraded.ts';
 import { screenSignal, tabOf } from './nav.ts';
@@ -13,7 +17,10 @@ import { TripScreen } from './trip/trip.tsx';
 
 // The tyre tool reads Load Check's records and its own storage; rider weight from You joins when the store does.
 const tyreServices = browserServices();
+// The tyre tool's screen is its own chunk: it is not a first screen.
+const TyreScreen = lazy(() => import('../tools/tyre/ui.tsx').then((m) => m.TyreScreen));
 const tripServices = browserTripServices();
+export const aheadShell = browserAhead();
 
 const TABS: { name: TabName; label: string }[] = [
   { name: 'ahead', label: W.appTabAhead },
@@ -29,12 +36,19 @@ const TITLES: Record<TabName, string> = {
   you: W.appTabYou,
 };
 
+/** Ahead reads the store only while it is shown; another window's change re-reads it. */
+function AheadHost() {
+  useEffect(() => aheadShell.start(), []);
+  return <AheadScreen view={aheadShell.view.value} actions={aheadShell.actions} />;
+}
+
 function Screen({ name }: { name: ScreenName }) {
   const tab = tabOf(name);
   return (
     <main class="screen" id="main" data-screen={name}>
       <h1>{TITLES[tab]}</h1>
       {degradedSignal.value.map((kind) => <Degraded key={kind} kind={kind} />)}
+      {name === 'ahead' ? <AheadHost /> : null}
       {name === 'trip' ? <TripScreen services={tripServices} /> : null}
       {name === 'tools' ? <ToolsScreen services={tyreServices} /> : null}
       {name === 'tools/tyre' ? <TyreScreen services={tyreServices} /> : null}

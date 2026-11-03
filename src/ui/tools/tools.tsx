@@ -3,7 +3,7 @@
 import { W, shortMapDate } from '../../core/wording/en.ts';
 import { readStore } from '../../tools/tyre/storage.ts';
 import type { LastResult } from '../../tools/tyre/storage.ts';
-import type { TyreServices } from '../../tools/tyre/ui.tsx';
+import type { TyreServices } from '../../tools/tyre/services.ts';
 import { BikeDrawing } from '../bike/drawing.tsx';
 import { bikeSource } from '../bike/live.ts';
 import { Card } from '../card.tsx';

@@ -102,11 +102,27 @@ test('[APP-NO-HOOK] a production build\'s JavaScript contains no __wf', () => {
   for (const file of scripts) expect(text(on, file).includes('__wf'), file).toBe(false);
 });
 
-test('the first screen\'s JavaScript is measured, and sits far under the 150 KB budget', () => {
+test('[APP-NO-HOOK] only a --test-hooks build has window.__wf, and only with the launch switch on', async () => {
+  const hooked = join(tmpRoot, 'hooks');
+  await buildDist({ out: hooked, launch: true, testHooks: true });
+  const scripts = files(hooked).filter((f) => f.endsWith('.js') && !f.startsWith('tools/'));
+  expect(scripts.some((f) => text(hooked, f).includes('__wf'))).toBe(true);
+  // The production build has none of the hook's code, not even as a chunk nobody loads.
+  expect(scripts.some((f) => text(hooked, f).includes('loadCase'))).toBe(true);
+  for (const f of files(on).filter((x) => x.endsWith('.js'))) {
+    expect(f).not.toMatch(/test-hooks/);
+    expect(text(on, f).includes('loadCase'), f).toBe(false);
+  }
+  await expect(buildDist({ out: join(tmpRoot, 'hooks-off'), launch: false, testHooks: true })).rejects.toThrow(/--launch=on/);
+}, 120_000);
+
+// 150 KB read as 150,000 bytes: the coordinator's ruling of 3 November 2026. It tightens the test (it was 150 x 1024) and
+// loosens nothing; the owner may reverse it.
+test("the first screen's JavaScript is measured, and sits under the 150 KB budget (150,000 bytes)", () => {
   const figures = measure(on);
   expect(figures.firstFiles.length).toBeGreaterThan(0);
   expect(figures.firstJsGzip).toBeGreaterThan(1000);
-  expect(figures.firstJsGzip).toBeLessThan(150 * 1024);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(150_000);
 });
 
 test('the launch-on build is the same twice', async () => {

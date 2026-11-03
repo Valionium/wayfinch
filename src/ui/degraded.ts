@@ -49,6 +49,12 @@ export function noteTripFacts(hasRoute: boolean, hasPreparedTrip: boolean): void
   publish();
 }
 
+/** Ahead tells the shell a route is there when it shows one, so "Add a route" never stands above a route's answers. */
+export function noteRoute(hasRoute: boolean): void {
+  known = { ...known, hasRoute };
+  publish();
+}
+
 /** Looks at this device once, and again when the connection changes. */
 export async function watchDegraded(env: { indexedDB: IDBFactory | undefined; online: () => boolean; addOnlineListener: (cb: () => void) => void }): Promise<void> {
   const blocked = await isStorageBlocked(env.indexedDB);

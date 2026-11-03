@@ -1,0 +1,367 @@
+// Ahead's real actions (plan Task 15): the one file that touches the store and the network for Ahead. It reads the inputs, builds
+// the screen with `screen()`, and hands the components the screen, a few plain facts and the actions. Nothing is sent on its own:
+// the position is asked for only on a tap, the forecast only on Update weather's tap (weatherMode "tap"), and sharing is the
+// rider's own, through the apps they choose.
+//
+// The store's rules hold: positions and day starts take the route id they were measured on, and every write goes through one
+// queue, so two taps in a row never write over each other.
+import { effect, signal, untracked } from '@preact/signals';
+import type { Signal } from '@preact/signals';
+import { formatHm } from '../core/answers/time.ts';
+import { emergencyCard } from '../core/engines/emergency.ts';
+import type { Fix } from '../core/engines/locate.ts';
+import { usableFlatKph } from '../core/engines/pace.ts';
+import { zoneLookupOf } from '../core/engines/tripday.ts';
+import { waterNow } from '../core/engines/water.ts';
+import { buildScreen } from '../core/screen/screen.ts';
+import type { Km, Position, Route, ScreenInputs } from '../core/types.ts';
+import { showKm, W } from '../core/wording/en.ts';
+import { checkConnectivity } from '../data/connectivity.ts';
+import { refreshWeather } from '../data/refresh.ts';
+import { WEATHER_MODE } from '../data/weather-mode.ts';
+import { onChanged } from '../store/changed.ts';
+import { keepAfterScreen, readInputs } from '../store/inputs.ts';
+import { addPosition, backToToday, confirmWater, setPlanTomorrow } from '../store/positions.ts';
+import { readMapLink, writeMapLink } from '../store/share-choice.ts';
+import { weatherStore } from '../store/weather.ts';
+import type { AheadActions, AheadTrip, AheadView, PositionState, Town } from './ahead/actions.ts';
+import { bikeSource } from './bike/live.ts';
+import { noteRoute, noteTripFacts } from './degraded.ts';
+import { isFailure, locateFix, manualAt, onPass, ROUTINE, watchBest } from './position.ts';
+import type { Failure } from './position.ts';
+import { agoText } from './trip/model.ts';
+import { dbExists } from './trip/services.ts';
+
+const APPROXIMATE_HELP_M = 1000; // section 9.2: worse than about 1 km usually means approximate location only
+const SHARE_OLD_MS = 30 * 60_000; // section 6.14
+
+export type AheadDeps = {
+  now: () => Date;
+  geolocation: () => Geolocation | undefined;
+  /** navigator.onLine: only a hint; Update weather checks with one HEAD to the app's own address (section 9.4). */
+  online: () => boolean;
+  fetch: typeof fetch;
+  share: ((data: { text: string }) => Promise<void>) | null;
+  writeClipboard: ((text: string) => Promise<void>) | null;
+};
+
+function browserDeps(): AheadDeps {
+  const nav = typeof navigator === 'undefined' ? undefined : navigator;
+  return {
+    now: () => new Date(),
+    geolocation: () => nav?.geolocation,
+    online: () => nav?.onLine !== false,
+    fetch: (input, init) => fetch(input, init),
+    share: nav && typeof nav.share === 'function' ? (data) => nav.share(data) : null,
+    writeClipboard: nav?.clipboard && typeof nav.clipboard.writeText === 'function' ? (text) => nav.clipboard.writeText(text) : null,
+  };
+}
+
+const FAILURE_TEXT: Record<Failure['kind'], string> = {
+  denied: W.appAheadDenied, unavailable: W.appAheadNoFix, timeout: W.appAheadNoFix, unsupported: W.appAheadNoGeo,
+};
+
+/** The settlements the route passes, in route order: the manual picker's towns. */
+function townsOf(i: ScreenInputs): Town[] {
+  const names = new Map(i.places.filter((p) => p.kind === 'settlement' && typeof p.name === 'string' && p.name.trim() !== '').map((p) => [p.id, p.name!.trim()]));
+  const out: Town[] = [];
+  for (const m of i.matches) {
+    const name = names.get(m.placeId);
+    if (name !== undefined && Number.isFinite(m.km) && m.km >= 0 && m.km <= i.trip.route.lengthKm) out.push({ name, km: m.km });
+  }
+  return out.sort((a, b) => a.km - b.km || (a.name < b.name ? -1 : 1));
+}
+
+export type AheadShell = {
+  view: Signal<AheadView>;
+  actions: AheadActions;
+  /** Reads the store now and whenever another window changes it. Returns how to stop. */
+  start(): () => void;
+  /** Shows the screen of these inputs instead of the store's, and stops reading the store: only test builds call it. */
+  show(inputs: ScreenInputs): void;
+};
+
+export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
+  const view = signal<AheadView>({ kind: 'loading' });
+  let inputs: ScreenInputs | null = null;
+  let position: PositionState = { kind: 'idle' };
+  let weatherSay: string | null = null;
+  let weatherBusy = false;
+  let notice: string | null = null;
+  let pendingFix: Fix | null = null;
+  let hooked = false;
+  let reading = 0;
+
+  // One write at a time, as on Trip: the store refuses a write over a version this window has not read.
+  let queue: Promise<unknown> = Promise.resolve();
+  const inTurn = <T>(work: () => Promise<T>): Promise<T> => {
+    const run = queue.then(work, work);
+    queue = run.catch(() => undefined);
+    return run;
+  };
+
+  const present = (i: ScreenInputs): void => {
+    const now = i.now;
+    const built = buildScreen(i);
+    const s = built.screen;
+    const p = built.parts.position;
+    let stillAboutL: number | null = null;
+    try {
+      const w = waterNow(built.parts.water);
+      if (!w.confirmed && w.stillAbout !== null && Number.isFinite(w.stillAbout)) stillAboutL = Math.round(w.stillAbout * 10) / 10;
+    } catch {
+      stillAboutL = null;
+    }
+    let shareOld: string | null = null;
+    if (p && now.getTime() - p.at.getTime() > SHARE_OLD_MS) {
+      try {
+        shareOld = W.appAheadShareOld(formatHm(p.at, zoneLookupOf(i.routeZones)(p.km).timeZone), agoText(p.at, now));
+      } catch {
+        shareOld = null;
+      }
+    }
+    const dayOne = i.trip.departureDate === null || s.phase === 'before-trip' || (s.ride.date === i.trip.departureDate && s.ride.startKm === 0);
+    const next: AheadTrip = {
+      kind: 'trip', screen: s, answers: s.positionLine !== null || dayOne, lengthKm: i.trip.route.lengthKm, towns: townsOf(i),
+      bike: bikeSource.peek().bike, stillAboutL, badSpeed: !usableFlatKph(i.trip.flatKph),
+      approximateHelp: p !== null && p.source === 'gps' && !(p.accuracyM <= APPROXIMATE_HELP_M),
+      shareOld, mapLink: readMapLink(), canShare: deps.share !== null, position, weatherSay, weatherBusy, notice,
+    };
+    view.value = next;
+    noteRoute(true);
+  };
+
+  const emergencyAlone = (at: Date) => emergencyCard({ position: null, now: at, country: null, settlements: [], shelters: [], rescuePoints: [], thunderNear: false, dataDate: '' });
+  const unreadable = (at: Date): void => {
+    view.value = { kind: 'unreadable', canShare: deps.share !== null, emergency: emergencyAlone(at) };
+  };
+
+  const noRoute = (at: Date): void => {
+    view.value = {
+      kind: 'no-route', canShare: deps.share !== null,
+      emergency: emergencyAlone(at),
+    };
+    noteTripFacts(false, false);
+  };
+
+  /** The facts that change without a new screen: the position routine, Update weather, the bike, the map-link choice. */
+  const touch = (): void => {
+    const v = view.peek();
+    if (v.kind !== 'trip') return;
+    view.value = { ...v, position, weatherSay, weatherBusy, notice, bike: bikeSource.peek().bike, mapLink: readMapLink() };
+  };
+
+  const load = async (): Promise<void> => {
+    if (hooked) return;
+    const mine = (reading += 1);
+    const at = deps.now();
+    let read: ScreenInputs | null;
+    let failed = false;
+    try {
+      read = (await dbExists()) ? await readInputs(at) : null;
+    } catch {
+      read = null;
+      failed = true;
+    }
+    // Only the newest read is shown: an older one that finishes late would bring back what was just changed.
+    if (hooked || mine !== reading) return;
+    inputs = read;
+    // A trip that could not be read is not "no route": the rider is told, and can try again.
+    if (failed) {
+      unreadable(at);
+      return;
+    }
+    if (!read) {
+      noRoute(at);
+      return;
+    }
+    present(read);
+    const shown = view.peek();
+    if (shown.kind === 'trip') {
+      const routeId = read.trip.route.id;
+      void inTurn(() => keepAfterScreen(shown.screen, at, routeId)).catch(() => undefined);
+    }
+  };
+
+  const say = (state: PositionState): void => {
+    position = state;
+    touch();
+  };
+
+  /** Keeps a position, measured on `route`. Refused (the route changed meanwhile, or it lies off the route): the rider is told. */
+  const keep = async (p: Position, route: Route): Promise<void> => {
+    let kept = false;
+    try {
+      kept = (await inTurn(() => addPosition(p, deps.now(), route.id))).kept;
+    } catch {
+      kept = false;
+    }
+    position = kept ? { kind: 'idle' } : { kind: 'said', text: W.appAheadNotKept };
+    await load();
+    touch();
+  };
+
+  const routeNow = async (): Promise<ScreenInputs | null> => {
+    try {
+      return await readInputs(deps.now());
+    } catch {
+      return null;
+    }
+  };
+
+  const actions: AheadActions = {
+    async updatePosition() {
+      if (position.kind === 'watching') return;
+      pendingFix = null;
+      say({ kind: 'watching' });
+      const fix = await watchBest(ROUTINE, deps.geolocation());
+      if (isFailure(fix)) {
+        say({ kind: 'said', text: FAILURE_TEXT[fix.kind] });
+        return;
+      }
+      // Read again: the route may have been replaced while the phone was looking.
+      const now = await routeNow();
+      if (!now) {
+        say({ kind: 'said', text: W.appAheadNotKept });
+        return;
+      }
+      const found = locateFix(fix, now.trip.route, now.positions);
+      if (found.kind === 'no-position') say({ kind: 'said', text: W.appAheadNoPosition });
+      else if (found.kind === 'ask') {
+        pendingFix = fix;
+        const [a, b] = found.options.map((km) => showKm(km)) as [string, string];
+        say({ kind: 'ask', question: W.appAheadAsk(a, b), options: found.options.map((km) => ({ km, text: W.appAheadAskKm(showKm(km)) })) });
+      } else await keep(found.position, now.trip.route);
+    },
+
+    async choosePass(km: Km) {
+      const fix = pendingFix;
+      pendingFix = null;
+      const now = await routeNow();
+      const p = fix && now ? onPass(fix, now.trip.route, km) : null;
+      if (!p || !now) {
+        say({ kind: 'said', text: W.appAheadNotKept });
+        return;
+      }
+      await keep(p, now.trip.route);
+    },
+
+    async setManual(at) {
+      pendingFix = null;
+      const now = await routeNow();
+      if (!now) {
+        say({ kind: 'said', text: W.appAheadNotKept });
+        return;
+      }
+      const km = typeof at === 'number' ? at : at.km;
+      const p = manualAt(now.trip.route, km, deps.now());
+      if (!p || km < 0 || km > now.trip.route.lengthKm) {
+        say({ kind: 'said', text: W.appAheadManualBadKm(showKm(now.trip.route.lengthKm)) });
+        return;
+      }
+      await keep(p, now.trip.route);
+    },
+
+    async confirmWater(litres) {
+      let reason: string | null;
+      try {
+        reason = (await inTurn(() => confirmWater(litres, deps.now()))).reason;
+      } catch {
+        reason = W.appStoreNotKept;
+      }
+      await load();
+      return reason;
+    },
+
+    async updateWeather() {
+      if (weatherBusy) return;
+      weatherBusy = true;
+      weatherSay = null;
+      touch();
+      try {
+        // Any answer from the app's own address means a signal; the hint alone is not trusted to say so (section 9.4).
+        const signalNow = deps.online() ? (await checkConnectivity(deps.fetch)).online : false;
+        const v = view.peek();
+        const result = await refreshWeather({
+          mode: WEATHER_MODE, fetch: deps.fetch, now: deps.now, signal: signalNow, keepFresh: inputs?.settings.keepFresh ?? false,
+          store: {
+            read: weatherStore.read,
+            reserve: (routeId, now, gapMs) => inTurn(() => weatherStore.reserve(routeId, now, gapMs)),
+            save: (routeId, forecast, now) => inTurn(() => weatherStore.save(routeId, forecast, now)),
+          },
+          ...(v.kind === 'trip' && Number.isFinite(v.screen.ride.startKm) ? { atKm: v.screen.ride.startKm } : {}),
+        }, 'tap');
+        weatherSay = result.say ?? (result.fetched ? W.appAheadWeatherUpdated : null);
+      } catch {
+        weatherSay = W.appStoreNotKept;
+      } finally {
+        weatherBusy = false;
+      }
+      await load();
+      touch();
+    },
+
+    // The choice lives in this browser's storage; one it refused is said, not passed over.
+    async planTomorrow(date) {
+      notice = setPlanTomorrow(date) ? null : W.appAheadChoiceNotKept;
+      await load();
+      touch();
+    },
+    async backToToday() {
+      notice = backToToday(deps.now()) ? null : W.appAheadChoiceNotKept;
+      await load();
+      touch();
+    },
+    retry: () => load(),
+
+    setMapLink(on) {
+      writeMapLink(on);
+      touch();
+    },
+    async share(text) {
+      if (!deps.share) return false;
+      try {
+        await deps.share({ text });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    async copy(text) {
+      if (!deps.writeClipboard) return false;
+      try {
+        await deps.writeClipboard(text);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    // No recipient: the rider picks one in the SMS app. "?&body=" is the form both iPhone and Android open.
+    smsHref: (text) => `sms:?&body=${encodeURIComponent(text)}`,
+  };
+
+  return {
+    view, actions,
+    start() {
+      void load();
+      const stop = onChanged(() => void load());
+      const visible = (): void => { if (typeof document !== 'undefined' && document.visibilityState === 'visible') void load(); };
+      if (typeof document !== 'undefined') document.addEventListener('visibilitychange', visible);
+      // A bike saved in the bag planner redraws the marker at once.
+      const stopBike = effect(() => {
+        void bikeSource.value;
+        untracked(touch);
+      });
+      return () => {
+        stop();
+        stopBike();
+        if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', visible);
+      };
+    },
+    show(i) {
+      hooked = true;
+      inputs = i;
+      present(i);
+    },
+  };
+}

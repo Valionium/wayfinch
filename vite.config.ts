@@ -5,7 +5,10 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   base: '/',
   publicDir: false,
-  oxc: { jsx: { runtime: 'automatic', importSource: 'preact' } },
+  // development: false always: a NODE_ENV of "test" would otherwise build the dev JSX, with file paths in it.
+  oxc: { jsx: { runtime: 'automatic', importSource: 'preact', development: false } },
+  // tools/build.mjs sets it true for --test-hooks builds only; false drops the hook's code from the build.
+  define: { __WF_TEST_HOOKS__: 'false' },
   build: {
     target: 'es2022',
     assetsInlineLimit: 0, // fonts stay files, so the worker precaches them

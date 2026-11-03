@@ -5,6 +5,7 @@
 // stands. Emergency depends on nothing else, so its numbers and fallback line show in every state. `buildScreen` also
 // says which parts failed, so the simulator can tell a guarded failure from a good answer.
 import { compareFinal, formatAbout, formatHm, makeAnswer } from '../answers/index.ts';
+import { formatNearestHm } from '../answers/time.ts';
 import { climbingAnswer } from '../engines/climbing.ts';
 import type { StopFacts } from '../engines/covers.ts';
 import { daylightAnswer } from '../engines/daylight-card.ts';
@@ -19,7 +20,7 @@ import { progressText, townNear } from '../engines/share.ts';
 import { latestUsable, shelterChip, thunderNear } from '../engines/shelter.ts';
 import { sleepAnswer } from '../engines/sleep.ts';
 import { stopIdeas, type Ideas } from '../engines/stop-ideas.ts';
-import { dayRide, noteFor, scheduleFor, zoneLookupOf, type DayEnv } from '../engines/tripday.ts';
+import { chipStart, dayRide, noteFor, scheduleFor, zoneLookupOf, type DayEnv } from '../engines/tripday.ts';
 import { waitOrGo } from '../engines/wait-or-go.ts';
 import { findS1S2, waterAnswer, type WaterFacts } from '../engines/water.ts';
 import { onTheRide, routeForecast } from '../engines/weather-windows.ts';
@@ -34,10 +35,14 @@ export type StripBand = { fromKm: Km; toKm: Km; kind: 'likely' | 'possible' | 't
 export type Strip = { label: string; startKm: Km; endKm: Km; endText: string; icons: StripIcon[]; bands: StripBand[] };
 export type CardName = 'water' | 'food' | 'daylight' | 'weather' | 'climbing' | 'sleep';
 export type ChipName = 'bike' | 'pharmacy' | 'train' | 'toilets' | 'shelter';
-/** `shareMapText` is the same message with the map link the rider can add (section 6.14), so the UI computes nothing. */
+/**
+ * `shareMapText` is the same message with the map link the rider can add (section 6.14), and `stamps` each card's and chip's
+ * stamp as the rider reads it ("+6 km · 14:40", "here · 14:20"), so the UI computes nothing.
+ */
 export type Screen = {
   positionLine: string | null; strip: Strip; cards: Record<CardName, Answer>; chips: Record<ChipName, Answer> & { emergency: EmergencyCard };
   shareText: string | null; shareMapText: string | null; phase: DayPhase; ride: DayRide; notes: string[];
+  stamps: Record<CardName | ChipName | 'emergency', string | null>;
 };
 
 const MIN = 60_000;
@@ -117,6 +122,8 @@ function notesOf(i: ScreenInputs, ride: DayRide, p: Position | null): string[] {
   const out: string[] = note ? [note] : [];
   if (!dayOneElsewhere && ride.startOffRouteM > 0) out.push(W.routeRejoinNote(showKm(rejoinKm(ride.startOffRouteM))));
   if (!dayOneElsewhere && p && isFarOff(p)) out.push(W.routeFarOffNote);
+  // With no position the cards plan from the route start: said in words, so no distance passes for one from the rider.
+  if (p === null && ride.note === null && ride.startKm === 0 && ride.phase !== 'route-end' && !ride.noRide) out.push(W.routeNoPositionFromStart);
   if (i.trip.departureDate === null) out.push(W.routeNoDateNote);
   return out;
 }
@@ -177,6 +184,64 @@ function stripOf(i: ScreenInputs, ride: DayRide, schedule: Schedule, windows: Ra
   return {
     label: labelOf(ride), startKm: ride.startKm, endKm: ride.stopKm, endText: endTextOf(i, ride, schedule), icons,
     bands: onTheRide(windows, ride).map(bandOf).sort((a, b) => a.fromKm - b.fromKm),
+  };
+}
+
+// ---- stamps --------------------------------------------------------------------------------------------------------
+
+/** Under this, a stamp's kilometre is the rider's own: "+0.0 km" would say nothing. */
+const HERE_KM = 0.05;
+
+/** Where answers measure from, as the engines do (section 6.1): ahead from the near edge, behind from the far edge. */
+type From = { aheadKm: Km; behindKm: Km };
+
+/**
+ * A stamp as the rider reads it (section 3.2), in the very terms its item uses: "+6 km · 14:40" ahead, measured from the near
+ * edge of an approximate position; "9 km back · 14:50" behind, from its far edge; "near you, may be behind" inside the radius,
+ * with no time, as the item has none; "here" at the rider's own kilometre; "here · 14:20" for a time alone. A time is shown to
+ * the nearest 5 minutes in the place's zone, as arrivals are.
+ */
+function stampTextOf(i: ScreenInputs, from: From, stamp: Answer['stamp']): string | null {
+  if (!stamp) return null;
+  const at = validDate(stamp.at) ? stamp.at : null;
+  const km = typeof stamp.km === 'number' && Number.isFinite(stamp.km) ? stamp.km : null;
+  const near = Number.isFinite(from.aheadKm) ? from.aheadKm : 0;
+  const far = Number.isFinite(from.behindKm) ? Math.max(from.behindKm, near) : near;
+  if (km === null) return at ? W.weatherStampHere(formatHm(at, routeZoneAt(i, near))) : null;
+  if (far > near && km >= near && km <= far) return W.waterNearYou;
+  let where: string;
+  if (km < near) {
+    const back = far - km;
+    where = back < HERE_KM ? W.routeStampHere : W.waterBack(showKm(back));
+  } else {
+    const ahead = km - near;
+    where = ahead < HERE_KM ? W.routeStampHere : W.weatherStampAhead(showKm(ahead));
+  }
+  return at ? `${where} · ${formatNearestHm(at, routeZoneAt(i, km))}` : where;
+}
+
+function stampsOf(i: ScreenInputs, ride: DayRide, cards: Record<CardName, Answer>, chips: Screen['chips']): Screen['stamps'] {
+  // Cards ride the day's ride; the chips ride from the position now, in every phase (section 6.9), as their engines do.
+  const card: From = { aheadKm: ride.startKm, behindKm: ride.behindFromKm };
+  let chip: From = card;
+  try {
+    const s = chipStart(ride, i.trip, i.positions);
+    chip = { aheadKm: s.aheadKm, behindKm: s.behindKm };
+  } catch {
+    chip = card;
+  }
+  const one = (a: Answer, from: From): string | null => {
+    try {
+      return stampTextOf(i, from, a.stamp);
+    } catch {
+      return null;
+    }
+  };
+  return {
+    water: one(cards.water, card), food: one(cards.food, card), daylight: one(cards.daylight, card), weather: one(cards.weather, card),
+    climbing: one(cards.climbing, card), sleep: one(cards.sleep, card),
+    bike: one(chips.bike, chip), pharmacy: one(chips.pharmacy, chip), train: one(chips.train, chip), toilets: one(chips.toilets, chip),
+    shelter: one(chips.shelter, chip), emergency: one(chips.emergency, chip),
   };
 }
 
@@ -294,6 +359,7 @@ export function buildScreen(raw: ScreenInputs): { screen: Screen; faults: string
       () => ({ label: labelOf(ride), startKm: ride.startKm, endKm: ride.stopKm, endText: W.routeStripAtEnd, icons: [], bands: [] })),
     cards, chips, shareText: share(false), shareMapText: share(true), phase: ride.phase, ride,
     notes: part('notes', () => notesOf(i, ride, position), () => []),
+    stamps: stampsOf(i, ride, cards, chips),
   };
   return { screen, faults, parts: { schedule, position, forecast, stop, water, leave, weather, food, windows, plans, lb, wg, targets, ideas } };
 }

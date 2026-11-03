@@ -10,7 +10,7 @@ import { telLink, websiteLink } from '../places/contact.ts';
 import { COUNTRIES, type CountryCode } from '../places/countries.ts';
 import { GRID_KM_ROUNDING } from '../route/grid.ts';
 import { normaliseShelterType } from '../places/shelter.ts';
-import type { Answer, AnswerItem, DayRide, Km, Missing, Place, PlaceHours, PlaceKind, RouteMatch, ScreenInputs, Status, SunTimes } from '../types.ts';
+import type { Answer, AnswerItem, DayRide, ItemLink, Km, Missing, Place, PlaceHours, PlaceKind, RouteMatch, ScreenInputs, Status, SunTimes } from '../types.ts';
 import { shortIsoDay, shortMapDate, showKm, W } from '../wording/en.ts';
 import { newestMapDate, savedCovers } from './covers.ts';
 import { arrivalStatus } from './daylight.ts';
@@ -88,6 +88,32 @@ export function callAhead(place: Place): CallAhead {
     if (host !== '') website = { host, url, label: W.callWebsiteLabel(name, host), shown: W.callWebsite(host) };
   }
   return { eligible: true, calls, website };
+}
+
+/** Whether a place of a call-ahead kind has a number or a website mapped. */
+export const hasCallData = (c: CallAhead): boolean => c.eligible && (c.calls.length > 0 || c.website !== null);
+
+/** The words an item carries for its calls: "Call +49 …", "also …", "Website host (online)", or "No phone or website mapped." */
+export function callPartsOf(c: CallAhead): string[] {
+  if (!c.eligible) return [];
+  if (!hasCallData(c)) return [W.callNoContact];
+  const first = c.calls[0];
+  return [
+    ...(first ? [first.tel === null ? W.callText(first.text) : W.callCall(first.text)] : []),
+    ...c.calls.slice(1).map((x) => W.callAlso(x.text)),
+    ...(c.website ? [c.website.shown] : []),
+  ];
+}
+
+/** The buttons for those words: one for each callable number and the website. A number that can't be called stays text. */
+export function linksOf(c: CallAhead): ItemLink[] {
+  if (!hasCallData(c)) return [];
+  const out: ItemLink[] = [];
+  c.calls.forEach((x, i) => {
+    if (x.tel !== null) out.push({ kind: 'tel', shown: i === 0 ? W.callCall(x.text) : W.callAlso(x.text), href: x.tel, label: x.label, secondary: i > 0 });
+  });
+  if (c.website) out.push({ kind: 'web', shown: c.website.shown, href: c.website.url, label: c.website.label, secondary: false });
+  return out;
 }
 
 // ---- the night -----------------------------------------------------------------------------------------------------
@@ -264,15 +290,8 @@ export function sleepAnswer(f: SleepFacts): Answer {
     const reservation = RESERVATION.get(p.tags['reservation'] ?? '');
     const fee = YES_NO.get(p.tags['fee'] ?? '');
     const locked = YES_NO.get(p.tags['locked'] ?? '');
-    const first = r.calls.calls[0];
-    const hasData = r.calls.eligible && (r.calls.calls.length > 0 || r.calls.website !== null);
-    const callParts = !r.calls.eligible ? []
-      : !hasData ? [W.callNoContact]
-        : [
-          ...(first ? [first.tel === null ? W.callText(first.text) : W.callCall(first.text)] : []),
-          ...r.calls.calls.slice(1).map((x) => W.callAlso(x.text)),
-          ...(r.calls.website ? [r.calls.website.shown] : []),
-        ];
+    const hasData = hasCallData(r.calls);
+    const callParts = callPartsOf(r.calls);
     const lines: string[] = [];
     if (hasData && !sourceShown) {
       sourceShown = true;
@@ -297,7 +316,11 @@ export function sleepAnswer(f: SleepFacts): Answer {
       ...callParts, ...lines,
     ].join(' · ');
     const item: AnswerItem = { label, stamp: timed ? { km: m.km, at: c.arrival! } : { km: m.km }, status: r.status, detail };
-    if (hasData) item.contact = { phones: r.calls.calls.map((x) => x.text), website: r.calls.website?.url ?? null };
+    if (hasData) {
+      item.contact = { phones: r.calls.calls.map((x) => x.text), website: r.calls.website?.url ?? null };
+      const links = linksOf(r.calls);
+      if (links.length > 0) item.links = links;
+    }
     return item;
   });
 
