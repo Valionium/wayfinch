@@ -3,7 +3,7 @@ import { render } from 'preact';
 import './theme.css';
 import { App } from './app.tsx';
 import { watchDegraded } from './degraded.ts';
-import { loadRiderKg } from './rider-kg.ts';
+import { loadRiderKg, reloadRiderKg } from './rider-kg.ts';
 import { onChanged } from '../store/changed.ts';
 import { applyTheme } from './theme-apply.ts';
 import { readLocalSettings } from '../store/settings-local.ts';
@@ -14,7 +14,7 @@ import { browserTripServices } from './trip/services.ts';
 
 applyTheme(readLocalSettings().settings.theme);
 void loadRiderKg();
-onChanged(() => void loadRiderKg());
+onChanged(() => void reloadRiderKg());
 listenForInstall();
 const updater = makeUpdater();
 render(<App updater={updater} />, document.getElementById('app')!);

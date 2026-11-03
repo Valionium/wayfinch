@@ -17,7 +17,7 @@ import { readSettings } from '../../store/settings.ts';
 import { readTrip } from '../../store/trip.ts';
 import { logRide, readRides, writeProfile } from '../../store/you.ts';
 import type { ProfileField, ProfileWrite } from '../../store/you.ts';
-import { loadRiderKg } from '../rider-kg.ts';
+import { forgetRiderKg, loadRiderKg } from '../rider-kg.ts';
 import { browserTripServices } from '../trip/services.ts';
 import type { SettingsOutcome } from '../trip/services.ts';
 
@@ -198,7 +198,7 @@ export function browserYouServices(now: () => Date = () => new Date(), navigate:
     deleteAll: async (alsoBags) => {
       try {
         await deleteCopilotData();
-        await loadRiderKg();
+        forgetRiderKg();
       } catch {
         return { ok: false };
       }

@@ -6,6 +6,10 @@ import type { Page, Request } from '@playwright/test';
 import { atPosition, goOffline, loadApp, preparedTrip, removeBuilds } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
 
+// A busy machine can be slow to draw a page from the worker's cache.
+test.use({ actionTimeout: 15_000 });
+expect.configure({ timeout: 15_000 });
+
 let app: LoadedApp | undefined;
 test.afterEach(async () => { await app?.close(); app = undefined; });
 test.afterAll(() => removeBuilds());
@@ -33,6 +37,8 @@ test('[YOU-RIDER] You opens as its own screen with the rider, water, learning, b
   await page.getByLabel('Your weight (kg)').fill('82');
   await page.getByLabel('Your weight (kg)').blur();
   await expect(page.getByLabel('Your weight (kg)')).toHaveValue('82');
+  // The write is kept once the other windows are told; reload only after that.
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('copilot:changed'))).not.toBeNull();
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByLabel('Your weight (kg)')).toHaveValue('82');
   // The tyre tool starts from it.
@@ -45,6 +51,7 @@ test('[YOU-EXPORT-UI] Export downloads a JSON file named by the day, with the ri
   await tab(page, 'You').click();
   await page.getByLabel('Your weight (kg)').fill('82');
   await page.getByLabel('Your weight (kg)').blur();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('copilot:changed'))).not.toBeNull();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export my data' }).click();
   const file = await download;

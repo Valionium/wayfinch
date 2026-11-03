@@ -400,9 +400,10 @@ describe('Delete (spec section 3.5, Contract 3)', () => {
     expect(localStorage.getItem('copilot:delete-request:v1')).toBeNull();
     expect(went).toEqual([]);
     expect(localStorage.getItem('loadcheck:bikeProfiles')).not.toBeNull();
+    await until(() => field('you-weight').value === '', 'the screen to show the deleted weight');
+    expect(riderKg()).toBeNull();
     expect(await readTrip()).toBeNull();
     expect((await readProfile()).weightKg).toBeNull();
-    await until(() => field('you-weight').value === '', 'the screen to show the deleted weight');
   });
 
   test('[YOU-DELETE-UI] "Also delete bag planner data" stores copilot:delete-request:v1, opens the bag planner with its id, and shows the pending line until it is applied', async () => {
