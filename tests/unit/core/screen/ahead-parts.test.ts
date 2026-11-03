@@ -3,8 +3,8 @@ import { describe, expect, test } from 'vitest';
 import { helpChip } from '../../../../src/core/engines/help.ts';
 import { buildScreen, screen } from '../../../../src/core/screen/screen.ts';
 import { W } from '../../../../src/core/wording/en.ts';
-import { bikeShop, flatRoute, pos, testTrip } from '../../../fixtures/build.ts';
-import { FRI, rainyStop, SAT } from '../../ui/ahead-fixture.ts';
+import { bikeShop, flatRoute, pos, tap, testTrip } from '../../../fixtures/build.ts';
+import { FRI, RAINY_SPOTS, rainyStop, SAT } from '../../ui/ahead-fixture.ts';
 import { inputsOf } from './screen-helpers.ts';
 
 describe('stamps', () => {
@@ -66,6 +66,44 @@ describe('stamps agree with their items', () => {
   test("[AH-CARD-ORDER] a stamp at the rider's own kilometre reads \"here\", never \"+0 km\"", () => {
     const s = screen(rainyStop({ positions: [pos({ km: 141, at: `${SAT} 14:20`, acc: 3000 })] }));
     for (const text of Object.values(s.stamps)) expect(text ?? '').not.toMatch(/^\+0 km/);
+  });
+});
+
+describe('inside the radius of an approximate fix', () => {
+  test('[AH-CARD-ORDER] with a fix of ±900 m, Water says "near you, may be behind" for a place inside the radius, as Food does, never "+0.7 km"', () => {
+    let seen = 0;
+    for (let km = 100; km <= 150; km += 1) {
+      const s = screen(rainyStop({ positions: [pos({ km, at: `${SAT} 14:20`, acc: 900 })] }));
+      const { startKm, behindFromKm } = s.ride;
+      for (const item of s.cards.water.items) {
+        const at = item.stamp?.km;
+        if (typeof at !== 'number' || !(startKm < behindFromKm && at >= startKm && at <= behindFromKm)) continue;
+        seen += 1;
+        expect(item.detail?.split(' · ')[0], `km ${km}: ${item.label}`).toBe(W.waterNearYou);
+        expect(item.stamp?.at, `km ${km}: ${item.label} has no time`).toBeUndefined();
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
+  });
+  test('[AH-CARD-ORDER] after the day’s ride, with ±900 m at the stop: tonight’s water inside the radius reads "near you, may be behind" too', () => {
+    let seen = 0;
+    const plan = { date: SAT, backToTodayAt: null };
+    const stop = screen(rainyStop({ plan })).ride.tonightKm!;
+    // A tap 0.6 km on from tonight's stop: tonight's water, chosen for riding there now.
+    const spots = [...RAINY_SPOTS, { b: tap(), km: stop + 0.6 }];
+    for (let d = -0.25; d <= 1.25; d += 0.25) {
+      const km = stop + d;
+      const s = screen(rainyStop({ plan, spots, positions: [pos({ km: 60, at: `${FRI} 19:00` }), pos({ km, at: `${SAT} 14:20`, acc: 900 })] }));
+      for (const item of s.cards.water.items) {
+        const at = item.stamp?.km;
+        // Inside the fix's own radius, whatever the day's ride is doing.
+        if (typeof at !== 'number' || Math.abs(at - km) > 0.9) continue;
+        seen += 1;
+        expect(item.detail?.split(' · ')[0], `fix at km ${km}: ${item.label} (${s.ride.phase})`).toBe(W.waterNearYou);
+        expect(item.stamp?.at, `fix at km ${km}: ${item.label}`).toBeUndefined();
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
   });
 });
 

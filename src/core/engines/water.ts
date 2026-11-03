@@ -13,7 +13,7 @@ import { newestMapDate } from './covers.ts';
 import { fetchedLabel } from './weather.ts';
 import { isFarOff, latestPosition, positionOrder, rejoinKm } from './locate.ts';
 import { flatLegClockMin, flatLegRidingMin, usableFlatKph, type Schedule } from './pace.ts';
-import { nowSchedule, ridingDate, zoneLookupOf } from './tripday.ts';
+import { chipStart, nowSchedule, ridingDate, zoneLookupOf } from './tripday.ts';
 import { uncertainty } from './water-learning.ts';
 import { capacityFrom, lapse, masses, outsideRange, planningWeather, riderPower, routeHeight, stopRate, sweatRate, type PlanningWeather, type Section } from './water-model.ts';
 
@@ -498,7 +498,19 @@ function whereOf(f: WaterFacts, t: Target & { kind: 'place' }): string {
   return dated(f) && validDate(t.arrival) ? `${distance} · ${formatAbout(t.arrival, zoneOf(t.place, t.km, f))}` : distance;
 }
 
+/**
+ * Inside the radius of an approximate fix the place may already be behind (section 8). The day's ride carries that radius while
+ * it runs; after the ride (tonight's water) it is the fix's own, as the chips have it.
+ */
+function insideFix(f: WaterFacts, km: Km): boolean {
+  if (insideRadius(f.ride, km)) return true;
+  const s = chipStart(f.ride, f.trip, f.positions);
+  return s.aheadKm < s.behindKm && km >= s.aheadKm && km <= s.behindKm;
+}
+
 function itemFor(f: WaterFacts, t: Target & { kind: 'place' }): AnswerItem {
+  // The litres still go to the least favourable point; the words say where it may be: no distance, no arrival.
+  if (insideFix(f, t.km)) return { label: nameOf(t), stamp: { km: t.km }, status: 'fine', detail: [W.waterNearYou, ...labelsOf(t.place, t.km, f)].join(' · ') };
   const stamp = dated(f) ? { km: t.km, at: t.arrival } : { km: t.km };
   const detail = [whereOf(f, t), ...labelsOf(t.place, t.km, f)].join(' · ');
   return { label: nameOf(t), stamp, status: 'fine', detail };
