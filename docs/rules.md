@@ -646,7 +646,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Playwright, two pages: a write in one re-reads that section in the other within 1 s, via the storage event [ST-TWO-WINDOWS]
 - a window with older data writing a section leaves the newer data and tells the caller [ST-NO-OVERWRITE]
 - export then import on empty storage is byte-identical in its sections; a bad version or shape writes nothing and says why; no forbidden field in a generated export [ST-EXPORT]
-- delete removes every copilot:* key and the database, and no loadcheck:* key; a loadcheck:* plan stays byte-identical [ST-DELETE]
+- delete removes every copilot:* key except a pending copilot:delete-request:v1 (Contract 3), and the database, and no loadcheck:* key; a loadcheck:* plan stays byte-identical [ST-DELETE]
 
 ## App: Pack download
 
