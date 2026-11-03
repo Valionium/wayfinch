@@ -40,7 +40,7 @@ describe('tap only', () => {
     expect(decide({ mode: 'tap', trigger, runs: [run(ICON, '2026-10-17 09:00', HOUR)], held: [run(ICON, '2026-10-16 09:00', 26 * HOUR)], lastFetchAt: ago(30 * HOUR) })).toEqual({ fetch: false, say: null });
   });
 
-  test('[WXR-TAP-NO-AUTO] the tap-only fallback is one build setting: the mode "tap" reads as tap, and so does anything that is not "auto"', () => {
+  test('[WXR-TAP-NO-AUTO] the tap build offers no "Keep trip data fresh" setting', () => {
     expect(keepFreshOffered('tap')).toBe(false);
   });
 

@@ -6,6 +6,8 @@ import { Card } from '../card.tsx';
 import { bagDeleteHref } from './services.ts';
 import type { ImportPreview, YouServices } from './services.ts';
 
+const DELETE_WAIT_MS = 15_000;
+
 type Done = { text: string; newRoute: boolean };
 
 function ExportImport({ services, reload }: { services: YouServices; reload: () => Promise<void> }) {
@@ -14,6 +16,7 @@ function ExportImport({ services, reload }: { services: YouServices; reload: () 
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [done, setDone] = useState<Done | null>(null);
+  const [sure, setSure] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
 
   const doExport = async (): Promise<void> => {
@@ -24,7 +27,7 @@ function ExportImport({ services, reload }: { services: YouServices; reload: () 
       setSaid(Y.youExported(file.name));
     } catch {
       setSaid(null);
-      setProblem(Y.youDeleteFailed);
+      setProblem(Y.youExportFailed);
     }
   };
   const pick = async (file: File | undefined): Promise<void> => {
@@ -33,11 +36,13 @@ function ExportImport({ services, reload }: { services: YouServices; reload: () 
     if (!file) return;
     const content = await file.text().catch(() => '');
     setText(content);
-    setPreview(services.preview(content));
+    setSure(false);
+    setPreview(await services.preview(content));
   };
   const cancel = (): void => {
     setText(null);
     setPreview(null);
+    setSure(false);
     setProblem(null);
     if (picker.current) picker.current.value = '';
   };
@@ -73,8 +78,17 @@ function ExportImport({ services, reload }: { services: YouServices; reload: () 
               <p>{Y.youImportArrives}</p>
               <ul>{preview.lines.length ? preview.lines.map((line) => <li key={line}>{line}</li>) : <li>{Y.youImportNothing}</li>}</ul>
               <p class="muted">{Y.youImportReplaces}</p>
+              {preview.warnings.length > 0 ? (
+                <div class="notice" role="alert" data-import-warnings>
+                  <p><strong>{Y.youImportWarnings}</strong></p>
+                  <ul>{preview.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
+                  {sure ? <p>{Y.youImportSure}</p> : null}
+                </div>
+              ) : null}
               <div class="row">
-                <button type="button" class="btn btn-primary" onClick={() => void apply()}>{Y.youImportGo}</button>
+                <button type="button" class="btn btn-primary" onClick={() => { if (preview.warnings.length > 0 && !sure) setSure(true); else void apply(); }}>
+                  {preview.warnings.length > 0 && sure ? Y.youImportReplaceAnyway : Y.youImportGo}
+                </button>
                 <button type="button" class="btn" onClick={cancel}>{Y.youImportCancel}</button>
               </div>
             </>
@@ -101,8 +115,13 @@ function DeleteAll({ services, reload }: { services: YouServices; reload: () => 
   const [asking, setAsking] = useState(false);
   const [alsoBags, setAlsoBags] = useState(false);
   const [state, setState] = useState<'idle' | 'deleted' | 'failed'>('idle');
+  const [busy, setBusy] = useState(false);
   const confirm = async (): Promise<void> => {
-    const result = await services.deleteAll(alsoBags);
+    if (busy) return;
+    setBusy(true);
+    // A window that never lets go of the database must not leave the rider waiting without a word.
+    const result = await Promise.race([services.deleteAll(alsoBags), new Promise<{ ok: boolean }>((r) => setTimeout(() => r({ ok: false }), DELETE_WAIT_MS))]);
+    setBusy(false);
     setAsking(false);
     setAlsoBags(false);
     setState(result.ok ? 'deleted' : 'failed');
@@ -120,8 +139,8 @@ function DeleteAll({ services, reload }: { services: YouServices; reload: () => 
           </label>
           {alsoBags ? <p>{Y.youDeleteBagsGoes}</p> : null}
           <div class="row">
-            <button type="button" class="btn btn-primary" onClick={() => void confirm()}>{Y.youDeleteConfirm}</button>
-            <button type="button" class="btn" onClick={() => { setAsking(false); setAlsoBags(false); }}>{Y.youDeleteCancel}</button>
+            <button type="button" class="btn btn-primary" disabled={busy} onClick={() => void confirm()}>{busy ? Y.youDeleting : Y.youDeleteConfirm}</button>
+            <button type="button" class="btn" disabled={busy} onClick={() => { setAsking(false); setAlsoBags(false); }}>{Y.youDeleteCancel}</button>
           </div>
         </div>
       )}

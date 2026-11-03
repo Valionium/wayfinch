@@ -48,8 +48,19 @@ describe('imprint', () => {
     expect(textOfFile('public/legal/imprint/index.html')).toContain('added by the owner');
   });
 
-  test('[PRIV-IMPRINT-SAME] when the block cannot be taken the step fails with a plain reason, and the build keeps the placeholder', () => {
+  test('[PRIV-IMPRINT-SAME] when the block cannot be taken the step fails with a plain reason, and the launch build fails with it; the off build does not run the step', async () => {
     expect(() => imprintBlock(join(ROOT, 'public', 'manifest.webmanifest'))).toThrow(/imprint:/);
+    const source = read('tools/build.mjs');
+    expect(source).toMatch(/^ {4}writeImprint\(target\);/m);
+    expect(source).not.toMatch(/catch[^}]*writeImprint|writeImprint[^;]*catch/);
+    // The launch-off build holds no legal folder and is not asked for an imprint.
+    const off = mkdtempSync(join(tmpdir(), 'wf-off-'));
+    try {
+      await buildDist({ out: off, launch: false });
+      expect(readdirSync(off).includes('legal')).toBe(false);
+    } finally {
+      rmSync(off, { recursive: true, force: true, maxRetries: 3 });
+    }
   });
 });
 
@@ -68,7 +79,7 @@ describe('the pages are on the site and reachable', () => {
   test('[PRIV-LEGAL-OFFLINE] every legal page and its stylesheet is in the worker list, under the address the host serves', () => {
     const build = JSON.parse(readFileSync(join(site, 'build.json'), 'utf8')) as { files: Record<string, string> };
     const listed = Object.keys(build.files);
-    for (const path of ['/legal/imprint/', '/legal/privacy/', '/legal/licences/', '/legal/legal.css']) expect(listed, path).toContain(path);
+    for (const path of ['/legal/imprint/', '/legal/privacy/', '/legal/licences/', '/legal/legal.css', '/legal/theme.js']) expect(listed, path).toContain(path);
     // The host redirects *.html to the folder address, so a *.html entry would never be asked for.
     expect(listed.some((p) => p.startsWith('/legal/') && p.endsWith('.html'))).toBe(false);
   });

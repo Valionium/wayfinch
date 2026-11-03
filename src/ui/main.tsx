@@ -15,7 +15,7 @@ import { browserTripServices } from './trip/services.ts';
 
 applyTheme(readLocalSettings().settings.theme);
 void loadRiderKg();
-onChanged(() => void reloadRiderKg());
+onChanged(() => { void reloadRiderKg(); applyTheme(readLocalSettings().settings.theme); });
 listenForInstall();
 const updater = makeUpdater();
 render(<App updater={updater} />, document.getElementById('app')!);

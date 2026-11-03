@@ -133,13 +133,9 @@ export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = 
     } finally {
       rmSync(shell, { recursive: true, force: true });
     }
-    // The imprint is the bag planner's own block, taken at build time. If it can't be taken, the placeholder from public/ stays and the
-    // test PRIV-IMPRINT-SAME fails; nothing of the block is printed.
-    try {
-      writeImprint(target);
-    } catch (e) {
-      console.warn(`Imprint not taken from the bag planner (${e instanceof Error ? e.message.split(String.fromCharCode(10))[0] : 'unknown'}); the placeholder stays.`);
-    }
+    // The imprint is the bag planner's own block, taken at build time. If it can't be taken, the launch build fails (a site without its
+    // imprint must not go out); nothing of the block is printed. The off build never gets here.
+    writeImprint(target);
     mkdirSync(join(target, 'tools', 'bags'), { recursive: true });
     writeFileSync(join(target, 'tools', 'bags', 'bike.js'), await compileBikeScript());
   } else {

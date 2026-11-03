@@ -14,7 +14,8 @@ import { closeDb, openDb } from '../../../src/store/db.ts';
 import { readProfile } from '../../../src/store/profile.ts';
 import { readSettings } from '../../../src/store/settings.ts';
 import { readTrip, saveTrip } from '../../../src/store/trip.ts';
-import { readRides } from '../../../src/store/you.ts';
+import { exportAll } from '../../../src/store/export.ts';
+import { logRide, readRides } from '../../../src/store/you.ts';
 import { markPrepared } from '../../../src/store/weather.ts';
 import { browserServices } from '../../../src/tools/tyre/services.ts';
 import { refreshBikeSource } from '../../../src/ui/bike/live.ts';
@@ -429,5 +430,146 @@ describe('Delete (spec section 3.5, Contract 3)', () => {
     await show();
     expect(host.querySelector('[data-bags-pending]')).toBeNull();
     expect(localStorage.getItem('copilot:delete-request:v1')).toBeNull();
+  });
+});
+
+describe('What an import says before it replaces (review of PR 37)', () => {
+  const ride = (day: number) => ({ at: new Date(Date.UTC(2026, 9, day, 18)), predictedL: 2, intakeL: 2.5, feel: 'B' as const });
+  async function logged(days: number[]): Promise<void> {
+    await readProfile();
+    await readRides();
+    for (const d of days) await logRide(ride(d), NOW);
+  }
+  async function pickFile(content: string): Promise<void> {
+    if (host.querySelector('[data-import-preview]')) {
+      await click(button(Y.youImportCancel));
+      await until(() => host.querySelector('[data-import-preview]') === null, 'the old preview to go');
+    }
+    const input = field('you-import');
+    Object.defineProperty(input, 'files', { value: [new File([content], 'x.json')], configurable: true });
+    await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); });
+    await until(() => host.querySelector('[data-import-preview]') !== null, 'the preview');
+  }
+  const exported = async (): Promise<string> => JSON.stringify(await exportAll());
+
+  test('[YOU-EXPORT-UI] an older file over more rides says so plainly and needs a second, explicit confirm; nothing is written before it', async () => {
+    await logged([1]);
+    const older = await exported();
+    await logged([2]);
+    expect(await readRides()).toHaveLength(2);
+    await show();
+    await pickFile(older);
+    const warn = host.querySelector('[data-import-warnings]')!;
+    expect(warn.textContent).toContain(Y.youImportRidesLose(2, 1));
+    expect(warn.textContent).toContain('newer ride will be lost');
+    expect(host.querySelector('[data-import-preview]')!.textContent).not.toContain('Nothing else is touched');
+    await click(button(Y.youImportGo)); // the first tap only asks again
+    expect(host.querySelector('[data-import-warnings]')!.textContent).toContain(Y.youImportSure);
+    expect(await readRides()).toHaveLength(2);
+    await click(button(Y.youImportReplaceAnyway));
+    await until(() => host.querySelector('[data-imported]') !== null, 'the import');
+    expect(await readRides()).toHaveLength(1);
+  });
+
+  test('[YOU-EXPORT-UI] a file with a dated section older than the phone\'s, or none, is called older or undated; the same data needs no confirm', async () => {
+    await show();
+    await type(field('you-weight'), '82');
+    const mine = JSON.parse(await exported()) as { profile: { updatedAt: string | null } };
+    const older = JSON.parse(JSON.stringify(mine)) as typeof mine;
+    older.profile.updatedAt = '2026-06-03T10:00:00.000Z';
+    await pickFile(JSON.stringify(older));
+    expect(host.querySelector('[data-import-warnings]')!.textContent).toContain(Y.youImportOlder(Y.youImportPartRider, '3 Jun'));
+    const undated = JSON.parse(JSON.stringify(mine)) as typeof mine;
+    undated.profile.updatedAt = null;
+    await pickFile(JSON.stringify(undated));
+    expect(host.querySelector('[data-import-warnings]')!.textContent).toContain(Y.youImportUndated(Y.youImportPartRider));
+    await pickFile(JSON.stringify(mine));
+    expect(host.querySelector('[data-import-warnings]')).toBeNull();
+    await click(button(Y.youImportGo));
+    await until(() => host.querySelector('[data-imported]') !== null, 'the import');
+  });
+
+  test('[YOU-EXPORT-UI] another route says its prepared places and forecast go, naming the trip that is replaced', async () => {
+    await saveTrip(testTrip());
+    await show();
+    const file = JSON.parse(await exported()) as { trip: { route: { hash: string; name: string } } };
+    file.trip.route = { ...file.trip.route, hash: 'another', name: 'Another loop' };
+    await pickFile(JSON.stringify(file));
+    const warn = host.querySelector('[data-import-warnings]')!.textContent!;
+    expect(warn).toContain(Y.youImportRouteClears(testTrip().route.name));
+    expect(warn).toContain('prepared places and forecast');
+  });
+
+  test('[YOU-EXPORT-UI] sections without a date and a dated empty list of rides are listed, so the preview never says "nothing" over what it writes', async () => {
+    await show();
+    const file = JSON.parse(await exported()) as Record<string, Record<string, unknown>>;
+    file.profile = { ...file.profile, updatedAt: null, weightKg: 91 };
+    file.calibration = { updatedAt: '2026-10-01T00:00:00.000Z', rides: [] };
+    await pickFile(JSON.stringify(file));
+    const text = host.querySelector('[data-import-preview]')!.textContent!;
+    expect(text).toContain(Y.youImportRider);
+    expect(text).toContain(Y.youImportRides(0));
+    expect(text).not.toContain(Y.youImportNothing);
+  });
+
+  test('[YOU-EXPORT-UI] an import whose tyre section is empty clears the tyre details on the phone', async () => {
+    localStorage.setItem('copilot:tyre:v1', JSON.stringify({ v: 1, updatedAt: '2026-10-01T00:00:00.000Z', entries: { bike_a: { details: { tyreMax: { value: 6, unit: 'bar' } } } } }));
+    await show();
+    const file = JSON.parse(await exported()) as Record<string, Record<string, unknown>>;
+    file.tyres = { updatedAt: '2026-10-02T00:00:00.000Z', byBike: {} };
+    await pickFile(JSON.stringify(file));
+    expect(host.querySelector('[data-import-warnings]')!.textContent).toContain(Y.youImportTyresLose(1, 0));
+    await click(button(Y.youImportGo));
+    await click(button(Y.youImportReplaceAnyway));
+    await until(() => host.querySelector('[data-imported]') !== null, 'the import');
+    expect(Object.keys(JSON.parse(localStorage.getItem('copilot:tyre:v1')!).entries)).toEqual([]);
+  });
+
+  test('[YOU-EXPORT-UI] a failed export says it could not export, not that something could not be deleted', async () => {
+    await show(services({ exportFile: async () => { throw new Error('no'); } }));
+    await click(button(Y.youExport));
+    await until(() => text().includes(Y.youExportFailed), 'the sentence');
+    expect(text()).not.toContain(Y.youDeleteFailed);
+  });
+});
+
+
+describe('Delete and the theme after it (review of PR 37)', () => {
+  test('[YOU-DELETE-UI] after Delete now the screen shows the empty state without making the database again, and a slow delete shows a busy state', async () => {
+    await saveTrip(testTrip());
+    await show();
+    await type(field('you-weight'), '82');
+    await click(button(Y.youDelete));
+    await click(button(Y.youDeleteConfirm));
+    await until(() => text().includes(Y.youDeleted), 'the deletion');
+    await until(() => field('you-weight').value === '', 'the empty screen');
+    await settle(100);
+    expect((await indexedDB.databases()).map((d) => d.name)).not.toContain('copilot');
+    // A delete that takes a long time says so and cannot be tapped twice.
+    let release: () => void = () => undefined;
+    await show(services({ deleteAll: () => new Promise((r) => { release = () => r({ ok: true }); }) }));
+    await click(button(Y.youDelete));
+    await click(button(Y.youDeleteConfirm));
+    expect(button(Y.youDeleting).disabled).toBe(true);
+    release();
+    await until(() => text().includes(Y.youDeleted), 'the end of the wait');
+  });
+
+  test('[YOU-RIDER] the theme is put on the page again after an import and after a delete', async () => {
+    await show();
+    await click(radio('theme', 'dark'));
+    await until(() => document.documentElement.getAttribute('data-theme') === 'dark', 'dark');
+    const file = JSON.parse(JSON.stringify(await exportAll())) as { settings: { theme: string } };
+    file.settings.theme = 'light';
+    const input = field('you-import');
+    Object.defineProperty(input, 'files', { value: [new File([JSON.stringify(file)], 'x.json')], configurable: true });
+    await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); });
+    await until(() => host.querySelector('[data-import-preview]') !== null, 'the preview');
+    await click(button(Y.youImportGo));
+    if (host.querySelector('[data-import-warnings]')) await click(button(Y.youImportReplaceAnyway));
+    await until(() => document.documentElement.getAttribute('data-theme') === 'light', 'light after the import');
+    await click(button(Y.youDelete));
+    await click(button(Y.youDeleteConfirm));
+    await until(() => document.documentElement.getAttribute('data-theme') === null, 'the phone own theme after the delete');
   });
 });

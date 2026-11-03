@@ -3,22 +3,24 @@
 import { reportRide } from '../../core/engines/ride-report.ts';
 import type { RideOutcome, RideReport } from '../../core/engines/ride-report.ts';
 import type { Profile } from '../../core/types.ts';
-import { W } from '../../core/wording/en.ts';
+import { shortMapDate, W } from '../../core/wording/en.ts';
 import { Y } from '../../core/wording/en-you.ts';
 import { WEATHER_MODE } from '../../data/weather-mode.ts';
 import type { WeatherMode } from '../../data/weather-mode.ts';
 import { RefusedError } from '../../store/changed.ts';
 import { deleteCopilotData, exportAll, importAll } from '../../store/export.ts';
-import type { ImportResult } from '../../store/export.ts';
+import type { ExportFile, ImportResult } from '../../store/export.ts';
 import { DEFAULT_PROFILE, readProfile } from '../../store/profile.ts';
 import { DEFAULT_SETTINGS } from '../../store/rules.ts';
 import type { Settings } from '../../store/rules.ts';
 import { readSettings } from '../../store/settings.ts';
+import { readLocalSettings } from '../../store/settings-local.ts';
 import { readTrip } from '../../store/trip.ts';
 import { logRide, readRides, writeProfile } from '../../store/you.ts';
 import type { ProfileField, ProfileWrite } from '../../store/you.ts';
 import { forgetRiderKg, loadRiderKg } from '../rider-kg.ts';
-import { browserTripServices } from '../trip/services.ts';
+import { applyTheme } from '../theme-apply.ts';
+import { browserTripServices, dbExists } from '../trip/services.ts';
 import type { SettingsOutcome } from '../trip/services.ts';
 
 export type YouSnapshot = {
@@ -34,7 +36,7 @@ export type YouSnapshot = {
 export type PendingBagDelete = { id: string };
 
 /** What an export file would bring, worked out without writing anything. */
-export type ImportPreview = { ok: true; lines: string[] } | { ok: false; reason: string };
+export type ImportPreview = { ok: true; lines: string[]; warnings: string[] } | { ok: false; reason: string };
 
 export type YouServices = {
   now: () => Date;
@@ -45,7 +47,7 @@ export type YouServices = {
   report: (report: RideReport, profile: Profile, flatKph: number) => Promise<{ outcome: RideOutcome; refused: string | null }>;
   exportFile: () => Promise<{ name: string; text: string }>;
   save: (name: string, text: string) => void;
-  preview: (text: string) => ImportPreview;
+  preview: (text: string) => Promise<ImportPreview>;
   applyImport: (text: string) => Promise<ImportResult>;
   deleteAll: (alsoBags: boolean) => Promise<{ ok: boolean }>;
   /** A request to delete the bag planner's data that the bag planner has not applied yet. */
@@ -95,8 +97,16 @@ function storeDeleteRequest(now: Date): string | null {
 
 export const bagDeleteHref = (id: string): string => `/tools/bags/#copilot-delete=${id}`;
 
-/** What a file would bring, in the words of the screen. Checks the shape only: the store checks the rest before it writes anything. */
-export function describeImport(text: string): ImportPreview {
+const isStamp = (x: unknown): x is string => typeof x === 'string' && Number.isFinite(Date.parse(x));
+const dayOf = (stamp: string): string => shortMapDate(stamp.slice(0, 10)) ?? stamp.slice(0, 10);
+const sameFields = (a: unknown, b: Record<string, unknown>): boolean => isObject(a) && Object.keys(b).every((k) => JSON.stringify(a[k]) === JSON.stringify(b[k]));
+
+/**
+ * What a file would bring, in the words of the screen, set against what this phone holds (`here`, its own export). `lines` is what
+ * arrives; `warnings` is what would be lost or is newer here, which needs a second, explicit confirm. The shape only: the store
+ * checks the rest before it writes anything. Sections without a date are listed too, when their values differ from the defaults.
+ */
+export function describeImport(text: string, here: ExportFile | null = null): ImportPreview {
   let file: unknown;
   try {
     file = JSON.parse(text);
@@ -106,17 +116,38 @@ export function describeImport(text: string): ImportPreview {
   if (!isObject(file) || file.app !== 'copilot' || file.kind !== 'export') return { ok: false, reason: W.appStoreImportNotOurs };
   if (typeof file.v === 'number' && file.v > 1) return { ok: false, reason: W.appStoreImportNewer };
   const lines: string[] = [];
+  const warnings: string[] = [];
   const trip = file.trip;
   if (isObject(trip) && isObject(trip.route) && typeof trip.route.name === 'string' && typeof trip.route.lengthKm === 'number') {
     lines.push(Y.youImportTrip(trip.route.name.slice(0, 80), String(Math.round(trip.route.lengthKm * 10) / 10)));
+    const mine = here?.trip?.route;
+    if (mine && !(isObject(trip.route) && trip.route.hash === mine.hash)) warnings.push(Y.youImportRouteClears(mine.name.slice(0, 80)));
   }
-  if (isObject(file.profile) && file.profile.updatedAt != null) lines.push(Y.youImportRider);
-  if (isObject(file.settings) && file.settings.updatedAt != null) lines.push(Y.youImportSettings);
-  const rides = isObject(file.calibration) && Array.isArray(file.calibration.rides) ? file.calibration.rides.length : 0;
-  if (rides > 0) lines.push(Y.youImportRides(rides));
-  const bikes = isObject(file.tyres) && isObject(file.tyres.byBike) ? Object.keys(file.tyres.byBike).length : 0;
-  if (bikes > 0) lines.push(Y.youImportTyres(bikes));
-  return { ok: true, lines };
+  const dated = (part: string, mineStamp: string | null | undefined, theirs: unknown): void => {
+    if (!isStamp(mineStamp)) return;
+    if (!isStamp(theirs)) warnings.push(Y.youImportUndated(part));
+    else if (Date.parse(theirs) < Date.parse(mineStamp)) warnings.push(Y.youImportOlder(part, dayOf(theirs)));
+  };
+  const profile = file.profile;
+  if (isObject(profile) && (profile.updatedAt != null || !sameFields(profile, { ...DEFAULT_PROFILE }))) {
+    lines.push(Y.youImportRider);
+    dated(Y.youImportPartRider, here?.profile.updatedAt, profile.updatedAt);
+  }
+  const settings = file.settings;
+  if (isObject(settings) && (settings.updatedAt != null || !sameFields(settings, { ...DEFAULT_SETTINGS }))) {
+    lines.push(Y.youImportSettings);
+    dated(Y.youImportPartSettings, here?.settings.updatedAt, settings.updatedAt);
+  }
+  const cal = file.calibration;
+  const rides = isObject(cal) && Array.isArray(cal.rides) ? cal.rides.length : 0;
+  if (isObject(cal) && (rides > 0 || cal.updatedAt != null)) lines.push(Y.youImportRides(rides));
+  const mineRides = here?.calibration.rides.length ?? 0;
+  if (isObject(cal) && (rides > 0 || cal.updatedAt != null) && mineRides > rides) warnings.push(Y.youImportRidesLose(mineRides, rides));
+  const tyres = isObject(file.tyres) && isObject(file.tyres.byBike) ? Object.keys(file.tyres.byBike).length : 0;
+  const mineTyres = here ? Object.keys(here.tyres.byBike).length : 0;
+  if (tyres > 0) lines.push(Y.youImportTyres(tyres));
+  if (isObject(file.tyres) && (tyres > 0 || file.tyres.updatedAt != null) && mineTyres > tyres) warnings.push(Y.youImportTyresLose(mineTyres, tyres));
+  return { ok: true, lines, warnings };
 }
 
 function bottleL(): number | null {
@@ -134,6 +165,8 @@ export function browserYouServices(now: () => Date = () => new Date(), navigate:
     now,
     weatherMode: WEATHER_MODE,
     load: async () => {
+      // Nothing is kept yet, or it was just deleted: reading would make an empty database.
+      if (!(await dbExists())) return { available: true, profile: DEFAULT_PROFILE, settings: readLocalSettings().settings, rides: 0, planBottleL: bottleL() };
       try {
         const settings = await readSettings();
         const profile = await readProfile();
@@ -178,10 +211,11 @@ export function browserYouServices(now: () => Date = () => new Date(), navigate:
       a.download = name;
       document.body.append(a);
       a.click();
-      a.remove();
+      // Taken away after the click has been handled: some browsers cancel a download whose link is gone at once.
+      setTimeout(() => a.remove(), 1000);
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     },
-    preview: describeImport,
+    preview: async (text) => describeImport(text, await exportAll().catch(() => null)),
     applyImport: async (text) => {
       let file: unknown;
       try {
@@ -193,12 +227,14 @@ export function browserYouServices(now: () => Date = () => new Date(), navigate:
       await Promise.all([readProfile(), readSettings(), readRides(), readTrip()]).catch(() => undefined);
       const result = await importAll(file);
       await loadRiderKg();
+      applyTheme(readLocalSettings().settings.theme);
       return result;
     },
     deleteAll: async (alsoBags) => {
       try {
         await deleteCopilotData();
         forgetRiderKg();
+        applyTheme(readLocalSettings().settings.theme);
       } catch {
         return { ok: false };
       }

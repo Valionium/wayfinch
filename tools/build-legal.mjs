@@ -78,6 +78,7 @@ const page = (block) => `<!doctype html>
 <title>Impressum · Imprint — Wayfinch</title>
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="/legal/legal.css">
+<script src="/legal/theme.js"></script>
 </head>
 <body>
 <header class="lg-top"><a class="lg-back" href="/#/you">&larr; Wayfinch</a></header>

@@ -1,8 +1,11 @@
 /* The legal pages of Wayfinch: plain pages of the site, no script, no outside font. Colours as in the app (section 3.6). */
 :root { color-scheme: light dark; --ground: #F4F2E8; --panel: #FBFAF3; --ink: #22271D; --muted: #57604A; --blaze: #B43A08; --line: #C7C4B1; }
 @media (prefers-color-scheme: dark) {
-  :root { --ground: #1B2018; --panel: #242B20; --ink: #EFEDE0; --muted: #A8B198; --blaze: #FF7950; --line: #3E4A36; }
+  :root:not([data-theme='light']) { color-scheme: dark; --ground: #1B2018; --panel: #242B20; --ink: #EFEDE0; --muted: #A8B198; --blaze: #FF7950; --line: #3E4A36; }
 }
+/* The rider's own choice under You (set by theme.js) wins over the phone's setting. */
+:root[data-theme='light'] { color-scheme: light; --ground: #F4F2E8; --panel: #FBFAF3; --ink: #22271D; --muted: #57604A; --blaze: #B43A08; --line: #C7C4B1; }
+:root[data-theme='dark'] { color-scheme: dark; --ground: #1B2018; --panel: #242B20; --ink: #EFEDE0; --muted: #A8B198; --blaze: #FF7950; --line: #3E4A36; }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--ground); color: var(--ink); font: 1rem/1.5 system-ui, 'Segoe UI', Roboto, sans-serif; }
 .lg-top { padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }

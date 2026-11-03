@@ -13,6 +13,11 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   youImportRides: [[1], [4]],
   youImportTyres: [[1], [3]],
   youImportLeftOut: [[1], [2]],
+  youImportOlder: [['rider details', '3 Jun']],
+  youImportUndated: [['settings']],
+  youImportRidesLose: [[2, 1], [3, 0], [1, 0]],
+  youImportTyresLose: [[2, 1], [1, 0]],
+  youImportRouteClears: [['Heidelberg to Strasbourg']],
 };
 
 function everyString(): { key: string; text: string }[] {
