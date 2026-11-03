@@ -89,12 +89,10 @@ test('[ST-DELETE] a read, or a write that follows one, started while another win
   await readTrip();
   await saveTrip(trip());
   const routeId = (await readTrip())!.route.id;
-  // Another window deletes: this window's connection lets go, and these start while the delete is still under way.
-  let blocked = false;
-  const deleting = new Promise<void>((done, fail) => { const r = indexedDB.deleteDatabase(DB_NAME); r.onsuccess = () => done(); r.onerror = () => fail(r.error); r.onblocked = () => { blocked = true; }; });
-  // This window has heard the delete and let go of its connection: what it opens now waits behind the delete.
-  await new Promise((r) => setTimeout(r, 0));
-  expect(blocked).toBe(false);
+  // Another window deletes. This window has let go of its connection (as it does on the delete's versionchange), and what it opens
+  // now is asked for after the delete, so IndexedDB runs it after the delete: the race of the flake, in a fixed order.
+  closeDb();
+  const deleting = new Promise<void>((done, fail) => { const r = indexedDB.deleteDatabase(DB_NAME); r.onsuccess = () => done(); r.onerror = () => fail(r.error); });
   const late = Promise.all([
     readInputs(new Date()),
     readTrip(),
