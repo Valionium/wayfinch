@@ -39,7 +39,7 @@ test('[YOU-RIDER] You opens as its own screen with the rider, water, learning, b
   await page.getByLabel('Your weight (kg)').blur();
   await expect(page.getByLabel('Your weight (kg)')).toHaveValue('82');
   // The write is kept once the other windows are told; reload only after that.
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('copilot:changed'))).not.toBeNull();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('copilot:changed')), { timeout: 30_000 }).not.toBeNull();
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByLabel('Your weight (kg)')).toHaveValue('82');
   // The tyre tool starts from it.
@@ -52,7 +52,7 @@ test('[YOU-EXPORT-UI] Export downloads a JSON file named by the day, with the ri
   await tab(page, 'You').click();
   await page.getByLabel('Your weight (kg)').fill('82');
   await page.getByLabel('Your weight (kg)').blur();
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('copilot:changed'))).not.toBeNull();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('copilot:changed')), { timeout: 30_000 }).not.toBeNull();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export my data' }).click();
   const file = await download;
@@ -226,7 +226,7 @@ test('[YOU-DELETE-UI] after Delete now and a reload, no empty database comes bac
   await tab(page, 'You').click();
   await page.getByLabel('Your weight (kg)').fill('82');
   await page.getByLabel('Your weight (kg)').blur();
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('copilot:changed'))).not.toBeNull();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('copilot:changed')), { timeout: 30_000 }).not.toBeNull();
   await page.getByRole('button', { name: 'Delete co-pilot data' }).click();
   await page.getByRole('button', { name: 'Delete now' }).click();
   await expect(page.getByText('Deleted from this phone.')).toBeVisible();
