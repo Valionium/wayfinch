@@ -34,7 +34,7 @@ export function ShareSheet(p: ShareSheetProps) {
   const copy = async (): Promise<void> => setSaid((await p.actions.copy(text)) ? W.appAheadShareCopied : W.appAheadShareCopyFailed);
   return (
     <div class="ah-sheet card" role="dialog" aria-labelledby={`${p.id}-title`} data-share={p.id}>
-      <h3 id={`${p.id}-title`} tabIndex={-1} ref={heading}>{p.title}</h3>
+      <h2 id={`${p.id}-title`} tabIndex={-1} ref={heading}>{p.title}</h2>
       {p.old ? (
         <p class="notice">
           {p.old}{' '}

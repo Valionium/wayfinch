@@ -21,14 +21,14 @@ import type { CfLike } from './server/cf-like.mjs';
 const built = new Map<string, Promise<string>>();
 const roots: string[] = [];
 
-/** A real build in a fresh folder, once per worker and switch position. */
-function siteFor(launch: boolean): Promise<string> {
-  const key = String(launch);
+/** A real build in a fresh folder, once per worker, switch position and test hook (`window.__wf`, Task 17). */
+function siteFor(launch: boolean, testHooks = false): Promise<string> {
+  const key = `${launch}:${testHooks}`;
   if (!built.has(key)) {
     const root = mkdtempSync(join(tmpdir(), 'wf-app-e2e-'));
     roots.push(root);
     const dir = join(root, 'site');
-    built.set(key, buildDist({ out: dir, launch }).then(() => dir));
+    built.set(key, buildDist({ out: dir, launch, testHooks }).then(() => dir));
   }
   return built.get(key)!;
 }
@@ -52,8 +52,8 @@ export interface LoadedApp {
 }
 
 /** Serves a build like the host does, blocks every outside address, and opens the app. */
-export async function loadApp(page: Page, options: { launch: boolean; path?: string } = { launch: true }): Promise<LoadedApp> {
-  const server = await startCfLike({ dir: await siteFor(options.launch) });
+export async function loadApp(page: Page, options: { launch: boolean; path?: string; testHooks?: boolean } = { launch: true }): Promise<LoadedApp> {
+  const server = await startCfLike({ dir: await siteFor(options.launch, options.testHooks ?? false) });
   await page.context().route(/^https:\/\//, (route) => route.abort());
   await throttleIfPhone(page);
   await page.goto(`${server.origin}${options.path ?? '/'}`, { waitUntil: 'domcontentloaded' });

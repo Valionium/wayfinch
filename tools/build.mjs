@@ -1,5 +1,5 @@
 // Writes dist/: what the site serves. Spec sections 9.1, 9.5 and 9.7, Decisions 4 and 5 of sub-project 4's plan.
-// node tools/build.mjs [--launch=on|off] [--out=dist] [--emergency]
+// node tools/build.mjs [--launch=on|off] [--out=dist] [--emergency] [--test-hooks]
 // Deterministic: no dates, commit ids or absolute paths, so a merge that changes no served file changes nothing here.
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -43,13 +43,20 @@ function headersFile(launch) {
   ].join('');
 }
 
-/** Vite builds the app's shell into `outDir`. Only a build with the launch switch on ever gets here (Task 1, APP-SWITCH-OFF). */
-async function runVite(outDir) {
+/**
+ * Vite builds the app's shell into `outDir`. Only a build with the launch switch on ever gets here (Task 1, APP-SWITCH-OFF).
+ * `testHooks` adds `window.__wf` for the browser tests (plan Decision 8); without it the hook's code is not in the build at all.
+ */
+async function runVite(outDir, { testHooks = false } = {}) {
   const { build } = await import('vite');
   await build({
     root: ROOT,
     configFile: join(ROOT, 'vite.config.ts'),
     logLevel: 'silent',
+    // Always the production build, whatever NODE_ENV the caller runs with (a test runner sets "test"), so what is measured and
+    // tested is what ships.
+    mode: 'production',
+    define: { __WF_TEST_HOOKS__: JSON.stringify(testHooks === true), 'process.env.NODE_ENV': JSON.stringify('production') },
     build: { outDir, emptyOutDir: true },
   });
 }
@@ -102,10 +109,12 @@ async function compileWorker(buildId, precache) {
  * Builds the site into `out`.
  * `extraFiles` ({ 'assets/x.js': bytes }) are written and precached like any other file; only tests use it so far.
  * `pagePath` lets a test build a site around another page; `vite` lets a test watch for the one step only the launch runs.
+ * `testHooks` (--test-hooks) is for the browser tests only, and only with the launch switch on: the off build is never touched.
  */
-export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = false, extraFiles = {}, pagePath = PAGE, vite = runVite } = {}) {
+export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = false, extraFiles = {}, pagePath = PAGE, vite = runVite, testHooks = false } = {}) {
   const config = JSON.parse(readFileSync(join(ROOT, 'build.config.json'), 'utf8'));
   const launchOn = launch ?? config.launch === true;
+  if (testHooks && !launchOn) throw new Error('--test-hooks needs --launch=on: the build with the switch off stays what it was.');
   const target = resolve(out);
   if (ROOT.startsWith(`${target}${sep}`) || `${target}${sep}` === ROOT) throw new Error('The build would delete the repository: choose another --out.');
   rmSync(target, { recursive: true, force: true });
@@ -118,7 +127,7 @@ export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = 
     if (existsSync(PUBLIC)) cpSync(PUBLIC, target, { recursive: true });
     const shell = mkdtempSync(join(tmpdir(), 'wf-vite-'));
     try {
-      await vite(shell);
+      await vite(shell, { testHooks });
       cpSync(shell, target, { recursive: true });
     } finally {
       rmSync(shell, { recursive: true, force: true });
@@ -163,6 +172,7 @@ async function main(args) {
     out: value('out') ?? join(ROOT, 'dist'),
     launch: launch === undefined ? undefined : launch === 'on',
     emergency: args.includes('--emergency'),
+    testHooks: args.includes('--test-hooks'),
   });
   console.log(`Built ${Object.keys(result.precache).length} precached file(s), build ${result.build}${args.includes('--emergency') ? ', emergency worker' : ''}.`);
 }

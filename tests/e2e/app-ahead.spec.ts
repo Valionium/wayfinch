@@ -29,7 +29,8 @@ async function ahead(page: Page): Promise<void> {
 }
 
 async function openEverything(page: Page): Promise<void> {
-  for (const toggle of await page.locator('.ah-toggle').all()) if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  const closed = page.locator('.ah-toggle[aria-expanded="false"]');
+  while ((await closed.count()) > 0) await closed.first().click();
   for (const chip of ['Bike shop', 'Pharmacy', 'Bail out by train', 'Toilets', 'Shelter', 'Emergency']) {
     await page.locator('.ah-chips').getByRole('button', { name: chip, exact: true }).click();
     await expect(page.locator('.ah-chip-panel')).toBeVisible();

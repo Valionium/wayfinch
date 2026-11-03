@@ -18,7 +18,7 @@ export function EmergencyPanel({ card, canShare, actions }: { card: EmergencyCar
   const rest = card.items.filter((x) => !card.numbers.includes(x.label));
   return (
     <div class="ah-emergency" data-emergency>
-      <h3 class="ah-emergency-title"><a class="btn btn-primary ah-call" href={telOf('112')}>{card.title}</a></h3>
+      <h2 class="ah-emergency-title"><a class="btn btn-primary ah-call" href={telOf('112')}>{card.title}</a></h2>
       <p class="ah-emergency-fallback">{card.detail}</p>
       <ul class="ah-numbers">
         {numbers.map((x, i) => (

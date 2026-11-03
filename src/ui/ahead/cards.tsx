@@ -34,7 +34,7 @@ function ItemControl({ name, label, v, actions, onShelter }: { name: CardName; l
     return <button type="button" class="btn" onClick={() => void actions.backToToday()}>{label}</button>;
   }
   if (name === 'weather' && label === W.weatherRainingAnyway) {
-    return <button type="button" class="btn" onClick={onShelter} aria-controls="chip-shelter">{label}</button>;
+    return <button type="button" class="btn" onClick={onShelter}>{label}</button>;
   }
   return null;
 }

@@ -102,6 +102,16 @@ test('[APP-NO-HOOK] a production build\'s JavaScript contains no __wf', () => {
   for (const file of scripts) expect(text(on, file).includes('__wf'), file).toBe(false);
 });
 
+test('[APP-NO-HOOK] only a --test-hooks build has window.__wf, and only with the launch switch on', async () => {
+  const hooked = join(tmpRoot, 'hooks');
+  await buildDist({ out: hooked, launch: true, testHooks: true });
+  const scripts = files(hooked).filter((f) => f.endsWith('.js') && !f.startsWith('tools/'));
+  expect(scripts.some((f) => text(hooked, f).includes('__wf'))).toBe(true);
+  // The production build has none of the hook's code, not even as a chunk nobody loads.
+  expect(files(on).filter((f) => f.endsWith('.js') && !f.startsWith('tools/')).length).toBe(scripts.length - 1);
+  await expect(buildDist({ out: join(tmpRoot, 'hooks-off'), launch: false, testHooks: true })).rejects.toThrow(/--launch=on/);
+}, 120_000);
+
 test('the first screen\'s JavaScript is measured, and sits far under the 150 KB budget', () => {
   const figures = measure(on);
   expect(figures.firstFiles.length).toBeGreaterThan(0);

@@ -72,4 +72,4 @@
 .ah-numbers li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border: 0; }
 .ah-emergency-fallback { font-weight: 600; }
 .ah-sheet { border-color: var(--blaze); }
-.ah-sheet h3 { font-family: var(--font-display); font-size: 1.25rem; margin: 0 0 8px; }
+.ah-sheet h2 { font-family: var(--font-display); font-size: 1.25rem; margin: 0 0 8px; }

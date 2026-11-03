@@ -23,3 +23,5 @@ void watchDegraded({
   addOnlineListener: (cb) => { window.addEventListener('online', cb); window.addEventListener('offline', cb); },
 });
 void openOnFirstScreen(browserTripServices(), location.hash.replace(/^#\/?/, '') !== '');
+// Only a --test-hooks build has this; in any other the condition is false and the hook is not built in.
+if (__WF_TEST_HOOKS__) void import('./test-hooks.ts');
