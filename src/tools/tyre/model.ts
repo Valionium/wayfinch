@@ -39,6 +39,8 @@ export interface BikeInfo {
   setup?: Setup;
   casing?: Casing;
   bikeKg?: number;
+  /** A tyre text on the bike that could not be read with certainty. */
+  unreadTyre?: string;
 }
 
 /** The parts of Contract 1 this tool reads. */
@@ -78,6 +80,8 @@ const ASSUMED_ORDER: FieldName[] = ['rimType', 'frontMm', 'rearMm', 'wheelBsdMm'
 export type Values = Omit<TyreInput, 'tyreMax' | 'tyreMin' | 'rimMax'>;
 
 export interface Resolved {
+  /** The rear width follows the front because nobody gave one. */
+  rearFollowsFront: boolean;
   values: Values;
   /** Null while the sidewall maximum is missing: the one required field. */
   input: TyreInput | null;
@@ -108,6 +112,7 @@ export function resolve(d: Details, ctx: Context): Resolved {
   let rearMm = frontMm;
   if ((d.rearMm ?? bike?.rearMm) !== undefined) rearMm = pick('rearMm', d.rearMm, bike?.rearMm);
   else sources.rearMm = sources.frontMm;
+  const rearFollowsFront = (d.rearMm ?? bike?.rearMm) === undefined;
   const casing = pick('casing', d.casing, bike?.casing);
   const setup = pick('setup', d.setup, bike?.setup);
   const rimPicked = d.rimType ?? bike?.rimType;
@@ -154,7 +159,7 @@ export function resolve(d: Details, ctx: Context): Resolved {
       ? { pumpC: d.heat.pumpC, maxC: d.heat.maxC, pumpHeightM: d.heat.pumpHeightM ?? 0, highestM: d.heat.highestM }
       : null,
   };
-  if (!d.tyreMax) return { values, input: null, missing: 'tyreMax', sources, assumed };
+  if (!d.tyreMax) return { values, input: null, missing: 'tyreMax', sources, assumed, rearFollowsFront };
   const input: TyreInput = { ...values, tyreMax: d.tyreMax, tyreMin: d.tyreMin ?? null, rimMax: d.rimMax ?? null };
-  return { values, input, missing: null, sources, assumed };
+  return { values, input, missing: null, sources, assumed, rearFollowsFront };
 }

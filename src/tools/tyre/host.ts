@@ -63,16 +63,20 @@ const INCH_BSD: Record<string, number> = { '29': 622, '28': 622, '27.5': 584, '2
 /** A tyre size as people write it: "40-622", "700x40c", "29 x 2.2". Null when it does not parse. */
 export function parseTyreSize(text: unknown): { widthMm: number; bsdMm: number } | null {
   if (typeof text !== 'string') return null;
+  // A fraction of an inch ("28 x 1 1/2") is an old size this does not read: unsure is null, never a guess.
+  if (/\d\s*\/\s*\d/.test(text)) return null;
   const etrto = /(?<![\d.])(\d{2,3})\s*[-–]\s*(\d{3})\b/.exec(text);
   if (etrto) {
     const widthMm = Number(etrto[1]);
     const bsdMm = Number(etrto[2]);
     return WHEELS.some((w) => w.bsdMm === bsdMm) && widthMm >= 18 && widthMm <= 83 ? { widthMm, bsdMm } : null;
   }
-  const french = /\b(700|650b)\s*[x×]\s*(\d{2})c?\b/i.exec(text);
+  const french = /\b(700|650)\s*([bc])?\s*[x×]\s*(\d{2})\s*(?:mm|c)?(?![\w])/i.exec(text);
   if (french) {
-    const widthMm = Number(french[2]);
-    return widthMm >= 18 && widthMm <= 83 ? { widthMm, bsdMm: french[1] === '700' ? 622 : 584 } : null;
+    const widthMm = Number(french[3]);
+    const letter = (french[2] ?? '').toLowerCase();
+    const bsdMm = french[1] === '700' ? (letter === 'b' ? undefined : 622) : letter === 'b' ? 584 : letter === 'c' ? 571 : undefined;
+    return bsdMm !== undefined && widthMm >= 18 && widthMm <= 83 ? { widthMm, bsdMm } : null;
   }
   const inch = /\b(\d{2}(?:\.5)?)\s*[x×]\s*(\d(?:[.,]\d{1,2})?)\b/.exec(text);
   if (inch) {
@@ -93,6 +97,10 @@ export function parseBike(raw: unknown): BikeInfo | null {
   const p = isObject(raw.pressure) ? raw.pressure : {};
   const front = parseTyreSize(raw.frontTyre);
   const rear = parseTyreSize(raw.rearTyre);
+  // Text that is there but not certain is shown to the rider, never used.
+  for (const [text, got, given] of [[raw.frontTyre, front, p.frontMm], [raw.rearTyre, rear, p.rearMm]] as const) {
+    if (typeof text === 'string' && text.trim() !== '' && got === null && num(given, 18, 83) === undefined && bike.unreadTyre === undefined) bike.unreadTyre = text.trim().slice(0, 60);
+  }
   const wheel = typeof p.wheel === 'string' ? WHEEL_WORDS[p.wheel] : undefined;
   const bsd = wheel ?? front?.bsdMm ?? rear?.bsdMm;
   if (bsd !== undefined) bike.wheelBsdMm = bsd;

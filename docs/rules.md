@@ -821,7 +821,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 ## Tool: Tyre pressure
 
 - the twenty research cases, every input stated: Berto and Bicycle Quarterly within 10 percent, Schwalbe 12, ENVE, Vittoria and SILCA 15, limit cases exact to 0.01 bar [TY-CASES]
-- 120 kg on a 28 mm tubeless tyre, 25 mm hookless rim, 5.0 bar maximum: exactly 5.00 bar at both ends, capped, below the ETRTO minimum width (29 mm); a rim type not set counts as hookless for the limits, and a tyre width not set uses the table's lowest cap, both said beside the figure [TY-HOOKLESS]
+- 120 kg on a 28 mm tubeless tyre, 25 mm hookless rim, 5.0 bar maximum: exactly 5.00 bar at both ends, capped, below the ETRTO minimum width (29 mm); a rim type not set counts as hookless for the limits, said beside the figure, and a hookless or unset rim with no tyre width given shows no figure [TY-HOOKLESS]
 - a printed 30 mm tubeless tyre on a 19 mm hookless rim is capped at exactly 4.50 bar, with and without a calipered 29.5 mm [TY-PRINTED]
 - a butyl tube never goes below the sidewall minimum (Marathon: front exactly 3.50 bar); tubeless computes 3.07, shows 3.05, warns only [TY-FLOOR]
 - values round down to 0.05 bar and 1 psi, up to a tube floor if that is lower; the shown value lies inside the floor and cap in each unit; the window is 90 to 100 percent [TY-ROUND]
@@ -830,7 +830,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - a bar value above 10 asks "Did you mean 65 psi?"; a maximum above 11 bar after that, or below the minimum, is rejected; each limit is compared in its own unit [TY-PSI-QUERY]
 - over generated inputs the result never exceeds a limit in the unit it was entered in, never goes below a tube floor, is never NaN, and widths or rims outside the tables are refused or said so [TY-PROP-LIMITS]
 - the 50 mm, 70 kg Vittoria case is informational: it stays inside the limits and its deviation is printed [TY-VITTORIA]
-- the sidewall maximum is the only required field; without it the screen says so and shows no figure; a limit that is asked about or refused shows no figure until answered [TY-UI-REQUIRED]
+- the sidewall maximum is the only required field when the rim is stated hooked; with the rim hookless or not stated, the tyre width is asked for too, and there is no figure (and no saved last figure) until it is given; without the maximum the screen says so and shows no figure; a limit that is asked about or refused shows no figure until answered [TY-UI-REQUIRED]
 - handlebar, wheel and widths start from the bike labelled "from your bike"; weights from the load summary with its age; the plan bike is preselected; changes stay in the tyre tool; one bike's details never reach another's [TY-UI-FROM-BIKE]
 - rider weight starts from You; until You exists the screen says "75 kg assumed; enter yours" (arrives with sub-project 5, group 8) [TY-UI-FROM-YOU]
 - details are stored per bike id or under a default key, and #/tools/tyre opens the tool [TY-UI-STORE]

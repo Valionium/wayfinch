@@ -136,7 +136,12 @@ function LimitInput({ id, label, required, value, min, onCommit, onPending }: {
   const [unit, setUnit] = useState<Unit>(value?.unit ?? 'bar');
   const [note, setNote] = useState<{ kind: 'reject' | 'ask'; text: string; alt?: Limit } | null>(null);
   // While a question stands or a value is refused, the screen shows no figure for it.
-  useEffect(() => { onPending(id, note ? label : null); return () => onPending(id, null); }, [note]);
+  useEffect(() => {
+    onPending(id, note ? label : null);
+    // A question opened here may have been scrolled out of sight by a figure appearing; bring it back.
+    if (note) document.getElementById(`${id}-note`)?.scrollIntoView?.({ block: 'nearest' });
+    return () => onPending(id, null);
+  }, [note]);
   const evaluate = (t: string, u: Unit, keepAsBar: boolean, keepAsPsi = false): void => {
     const n = parseNumber(t);
     if (t.trim() === '') { setNote(null); onCommit(null); return; }
@@ -215,7 +220,7 @@ function WheelFigure({ label, w }: { label: string; w: Wheel }) {
       <p class="tyre-big">{W.tyreFrontBackBar(bar2(w.bar))}</p>
       <p class="tyre-psi">{W.tyrePsiValue(String(w.psi))}</p>
       {w.heat?.advise ? <p class="tyre-heat"><strong>{W.tyreHeatPumpLine(bar2(w.heat.pumpToBar), String(w.heat.pumpToPsi))}</strong></p> : null}
-      <p class="muted">{lo === hi ? W.tyreWindowOne(hi) : W.tyreWindow(lo, hi)}</p>
+      {w.heat?.advise ? null : <p class="muted">{lo === hi ? W.tyreWindowOne(hi) : W.tyreWindow(lo, hi)}</p>}
     </div>
   );
 }
@@ -337,13 +342,14 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         <h2 id="tyre-result-title">{W.tyreResultTitle}</h2>
         {!resolved.input ? <p>{W.tyreNeedMax}</p> : null}
         {blockedBy !== null ? <p class="notice">{W.tyrePendingLimit(blockedBy)}</p> : null}
+        {blockedBy === null && result?.needsWidth ? <p class="notice">{resolved.sources.rimType === 'assumed' ? W.tyreNeedTwo : W.tyreNeedWidthOnly}</p> : null}
         {blockedBy === null && result && result.refused.length ? (
           <>
             <h3>{W.tyreRefusedTitle}</h3>
             <ul>{result.refused.map((t) => <li key={t}>{t}</li>)}</ul>
           </>
         ) : null}
-        {blockedBy === null && result && result.incompatible ? <h3>{W.tyreIncompatibleTitle}</h3> : null}
+        {blockedBy === null && result && result.incompatible ? <h3>{result.warningCodes.includes('rimUnset') ? W.tyreNeedRimTitle : W.tyreIncompatibleTitle}</h3> : null}
         {showFigures && front && rear ? (
           <>
             <div class="tyre-wheels">
@@ -356,7 +362,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         {blockedBy === null && nearFigure.map((n) => (
           <p class="tyre-cap-note" key={n.code}>
             {n.text}
-            {n.code === 'rimUnset' ? <> <button type="button" class="btn" onClick={() => change({ rimType: 'hooked' })}>{W.tyreMyRimHooked}</button></> : null}
+            {n.code === 'rimUnset' ? <> <button type="button" class="btn" onClick={() => change({ rimType: 'hooked' })}>{W.tyreMyRimHooked}</button> <span class="muted">{W.tyreRimUnsure}</span></> : null}
           </p>
         ))}
         {blockedBy === null && result?.split ? (
@@ -411,10 +417,12 @@ export function TyreScreen({ services }: { services: TyreServices }) {
       </Card>
 
       <Card title={W.tyreSectionTyres}>
+        {bike?.unreadTyre && src.frontMm === 'assumed' ? <p class="muted">{W.tyreCouldntRead(bike.unreadTyre)}</p> : null}
         <Field id={bikeKey('front')} label={W.tyreFrontWidthLabel} source={src.frontMm} valueText={`${v.front.printedMm} mm`} resetLabel={resetFor('frontMm')} onReset={resetter('frontMm')}
           editor={<NumberInput key={`front-${key}`} id="tyre-front" label={W.tyreFrontWidthLabel} value={own('frontMm', v.front.printedMm)} assumed={v.front.printedMm} onCommit={(n) => change({ frontMm: n })} unit="mm" />} />
         <Field id={bikeKey('rear')} label={W.tyreRearWidthLabel} source={src.rearMm} valueText={`${v.rear.printedMm} mm`} resetLabel={resetFor('rearMm')} onReset={resetter('rearMm')}
           editor={<NumberInput key={`rear-${key}`} id="tyre-rear" label={W.tyreRearWidthLabel} value={own('rearMm', v.rear.printedMm)} assumed={v.rear.printedMm} onCommit={(n) => change({ rearMm: n })} unit="mm" />} />
+        {resolved.rearFollowsFront && (v.rimType === 'hookless' || v.rimType === 'unset') ? <p class="muted">{W.tyreRearLabelShort}: {W.tyreSameAsFront}</p> : null}
         <Choice<Casing> id="tyre-casing" label={W.tyreCasingLabel} source={src.casing} value={choiceValue('casing', v.casing)} onChange={(x) => change({ casing: x })}
           options={[{ value: 'supple', label: W.tyreCasingSupple }, { value: 'standard', label: W.tyreCasingStandard }, { value: 'reinforced', label: W.tyreCasingReinforced }]} />
         <Choice<Setup> id="tyre-setup" label={W.tyreSetupLabel} source={src.setup} value={choiceValue('setup', v.setup)} onChange={(x) => change({ setup: x })}

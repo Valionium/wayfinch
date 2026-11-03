@@ -46,7 +46,7 @@ export interface TyreInput {
   heat?: HeatInput | null;
 }
 
-export type LimitKind = 'hookless-unknown-width' | 'tyre-max' | 'rim-max' | 'hookless-5' | 'hookless-width' | 'tube-floor' | 'iso-floor';
+export type LimitKind = 'tyre-max' | 'rim-max' | 'hookless-5' | 'hookless-width' | 'tube-floor' | 'iso-floor';
 
 export interface WheelHeat {
   /** The most the gauge should read when pumping, so that the warmest, highest moment of the trip stays at or under the cap. */
@@ -90,6 +90,8 @@ export interface TyreResult {
   warnings: string[];
   warningCodes: string[];
   warningItems: WarningItem[];
+  /** The limits of a hookless rim apply and a tyre width is not given: no figure until it is. */
+  needsWidth: boolean;
   incompatible: boolean;
   /** Why no figure is shown, in words. Empty when there is one. */
   refused: string[];
@@ -314,10 +316,10 @@ function validate(i: TyreInput): string[] {
 }
 
 const refusedResult = (refused: string[]): TyreResult =>
-  ({ front: null, rear: null, split: null, decided: [], warnings: [], warningCodes: [], warningItems: [], incompatible: false, refused });
+  ({ front: null, rear: null, split: null, decided: [], warnings: [], warningCodes: [], warningItems: [], needsWidth: false, incompatible: false, refused });
 
 const kindOfCap = (k: LimitKind, mm: number): string =>
-  k === 'tyre-max' ? W.tyreLimitTyreMax : k === 'rim-max' ? W.tyreLimitRimMax : k === 'hookless-5' ? W.tyreLimitHookless5 : k === 'hookless-unknown-width' ? W.tyreLimitHooklessUnknownWidth : W.tyreLimitHooklessWidth(fmt(mm, 0));
+  k === 'tyre-max' ? W.tyreLimitTyreMax : k === 'rim-max' ? W.tyreLimitRimMax : k === 'hookless-5' ? W.tyreLimitHookless5 : W.tyreLimitHooklessWidth(fmt(mm, 0));
 
 /** The ISO 5775-1 minimums of old, used only when no sidewall minimum was entered. */
 const isoFloorBar = (printedMm: number, surface: Surface): number => (printedMm <= 25 ? 3.0 : surface === 'unpaved' ? 1.5 : 2.0);
@@ -331,6 +333,9 @@ export function tyreEstimate(input: TyreInput): TyreResult {
     if (w === null || !Number.isFinite(w) || w < 10) return refusedResult([W.tyreRefuseWidth(t === input.front ? W.tyreFront : W.tyreRear, fmt(t.printedMm))]);
     wEffs.push(w);
   }
+
+  // A hookless cap depends on the printed width: with the rim hookless or unset and a width nobody gave, there is no figure to give.
+  if ((input.rimType === 'hookless' || input.rimType === 'unset') && (input.front.assumed || input.rear.assumed)) return { ...refusedResult([]), needsWidth: true };
 
   const { frontKg, rearKg, split } = chooseSplit(input);
   const withTube = input.setup !== 'tubeless';
@@ -357,10 +362,8 @@ export function tyreEstimate(input: TyreInput): TyreResult {
       if (input.rimMax) caps.push({ kind: 'rim-max', limit: input.rimMax, bar: limitBar(input.rimMax) });
       if (hooklessLimited) {
         caps.push({ kind: 'hookless-5', limit: { value: HOOKLESS_MAX_BAR, unit: 'bar' }, bar: HOOKLESS_MAX_BAR });
-        // A width nobody gave could be any: the lowest cap of the table holds until it is entered.
-        const unknownWidth = tyre.assumed === true;
-        const table = unknownWidth ? Math.min(...HOOKLESS_CAPS.map((r) => r[2])) : hooklessCapBar(tyre.printedMm);
-        if (table !== null) caps.push({ kind: unknownWidth ? 'hookless-unknown-width' : 'hookless-width', limit: { value: table, unit: 'bar' }, bar: table });
+        const table = hooklessCapBar(tyre.printedMm);
+        if (table !== null) caps.push({ kind: 'hookless-width', limit: { value: table, unit: 'bar' }, bar: table });
       }
       const cap = caps.reduce((a, b) => (b.bar < a.bar ? b : a));
       const floorLimit: Limit | null = withTube ? (input.tyreMin ?? { value: isoFloorBar(tyre.printedMm, input.surface), unit: 'bar' }) : null;
@@ -378,7 +381,9 @@ export function tyreEstimate(input: TyreInput): TyreResult {
       const floorIn = (unit: Unit): number | null => (floorLimit ? limitIn(floorLimit, unit) : null);
       const bar = roundInward(estimate, { step: 0.05, floor: floorIn('bar'), cap: capIn('bar') });
       const psi = roundInward(barToPsi(estimate), { step: 1, floor: floorIn('psi'), cap: capIn('psi') });
-      const lo = (v: number, unit: Unit, step: number): number => Math.min(v, roundInward(v * 0.9, { step, floor: floorIn(unit), cap: v }));
+      // The range never starts below a tube floor, nor below a printed minimum.
+      const winFloor = (unit: Unit): number | null => floorIn(unit) ?? (input.tyreMin ? limitIn(input.tyreMin, unit) : null);
+      const lo = (v: number, unit: Unit, step: number): number => Math.min(v, roundInward(v * 0.9, { step, floor: winFloor(unit), cap: v }));
       const floorB = floorIn('bar');
       const floorP = floorIn('psi');
       const noStep = (floorB !== null && bar < floorB) || (floorP !== null && psi < floorP);
@@ -410,7 +415,7 @@ export function tyreEstimate(input: TyreInput): TyreResult {
       if (!withTube && input.tyreMin) {
         const m = input.tyreMin;
         // The figure as shown, and the low end of the window, not only the estimate.
-        if (estimate < limitBar(m) || bar < limitIn(m, 'bar') || psi < limitIn(m, 'psi') || lo(bar, 'bar', 0.05) < limitIn(m, 'bar') || lo(psi, 'psi', 1) < limitIn(m, 'psi')) {
+        if (estimate < limitBar(m) || bar < limitIn(m, 'bar') || psi < limitIn(m, 'psi')) {
           flag('belowSidewallMin', W.tyreWarnBelowSidewallMin(label));
         }
       }
@@ -435,7 +440,6 @@ export function tyreEstimate(input: TyreInput): TyreResult {
     if (withTube) flag('hooklessNeedsTubeless', W.tyreWarnHooklessTube);
   }
   if (input.rimType === 'unset') flag('rimUnset', W.tyreWarnRimUnset);
-  if (hooklessLimited && (input.front.assumed || input.rear.assumed)) flag('widthUnset', W.tyreWarnWidthUnset);
   if (input.rimType === 'tubular') flag('tubularNoCheck', W.tyreWarnTubular);
   if (input.rimType !== 'tubular') {
     const min = etrtoMinWidth(input.rimInnerMm);
@@ -447,9 +451,10 @@ export function tyreEstimate(input: TyreInput): TyreResult {
     }
   }
   if (wheels.some((w) => w.wEff < FIT_MIN_MM || w.wEff > FIT_MAX_MM)) flag('extrapolated', W.tyreWarnExtrapolated);
-  const unknownRimOrWidth = codeSet.has('rimUnset') || codeSet.has('widthUnset');
+  const unknownRimOrWidth = codeSet.has('rimUnset');
   if (incompatible) flag('incompatible', unknownRimOrWidth ? W.tyreWarnIncompatibleUnknown : W.tyreWarnIncompatible);
-  if ((capBindsSeen || incompatible) && !(incompatible && unknownRimOrWidth)) flag('capBinds', W.tyreWarnCapBinds);
+  // "Fit a wider tyre" only where a real tyre width is what limits: not under the careful rule for an unset rim, and not when a tube's floor is the cause.
+  if (capBindsSeen && !incompatible) flag('capBinds', codeSet.has('rimUnset') ? W.tyreWarnCapRimUnset : W.tyreWarnCapBinds);
   if (!incompatible) for (const [code, text] of heatNotes) flag(code, text);
 
   return {
@@ -460,6 +465,7 @@ export function tyreEstimate(input: TyreInput): TyreResult {
     warnings,
     warningCodes: [...codeSet],
     warningItems: items,
+    needsWidth: false,
     incompatible,
     refused: [],
   };

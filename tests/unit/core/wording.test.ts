@@ -17,6 +17,7 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   tyrePsiValue: [['72']],
   tyreWindow: [['4.50','5.00']],
   tyreWindowOne: [['2.50']],
+  tyreCouldntRead: [['28 x 1 1/2']],
   tyreSplit: [['45','55']],
   tyreAssumedList: [['rider weight 75 kg']],
   tyreAskYesPsi: [['65']],

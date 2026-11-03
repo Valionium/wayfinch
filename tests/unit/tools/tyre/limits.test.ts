@@ -141,7 +141,7 @@ describe('limits and warnings', () => {
     }));
     expect(r.incompatible).toBe(true);
     expect(r.warningCodes).toContain('incompatible');
-    expect(r.warnings.join(' ')).toContain(NO_RANGE);
+    expect(r.warnings.join(' ')).toContain('do not fit together'); // a tube's floor is the cause, so no "fit a wider tyre"
     expect(r.front!.bar).toBeLessThanOrEqual(3.5);
     // The older ISO minimum can do the same: 3.0 bar for a 25 mm tyre against a 2.5 bar maximum.
     const iso = tyreEstimate(tyreInput({

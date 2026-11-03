@@ -17,19 +17,6 @@ describe('review findings, in the calculation', () => {
     expect(hooked.rear!.bar).toBeGreaterThan(5);
   });
 
-  test('[TY-HOOKLESS] C2: with the tyre width not set too, the lowest hookless cap (1.5 bar) applies', () => {
-    const r = tyreEstimate(tyreInput({
-      rimType: 'unset', front: { printedMm: 45, caliperMm: null, assumed: true }, rear: { printedMm: 45, caliperMm: null, assumed: true },
-      tyreMax: { value: 7, unit: 'bar' }, measured: wheelLoads(200, 0.5),
-    }));
-    expect(r.front!.bar).toBeLessThanOrEqual(1.5);
-    expect(r.warningCodes).toContain('widthUnset');
-    const stated = tyreEstimate(tyreInput({ rimType: 'hookless', front: { printedMm: 45, caliperMm: null }, rear: { printedMm: 45, caliperMm: null }, tyreMax: { value: 7, unit: 'bar' }, measured: wheelLoads(200, 0.5) }));
-    expect(stated.front!.bar).toBe(3);
-    const hookedUnknownWidth = tyreEstimate(tyreInput({ rimType: 'hooked', front: { printedMm: 45, caliperMm: null, assumed: true }, rear: { printedMm: 45, caliperMm: null, assumed: true }, tyreMax: { value: 7, unit: 'bar' }, measured: wheelLoads(200, 0.5) }));
-    expect(hookedUnknownWidth.front!.bar).toBeGreaterThan(1.5);
-  });
-
   test('[TY-WARN] C2: when an unset rim or width leaves no figure possible, the words ask for the rim type and width', () => {
     const r = tyreEstimate(tyreInput({ rimType: 'unset', setup: 'butyl', tyreMin: { value: 6, unit: 'bar' }, tyreMax: { value: 7, unit: 'bar' }, measured: wheelLoads(100, 0.5) }));
     expect(r.incompatible).toBe(true);
