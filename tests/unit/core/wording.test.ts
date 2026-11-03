@@ -31,6 +31,7 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   appTripUpdated: [['2 h ago']],
   appTripStorage: [['41.5']],
   appAbName: [['Heidelberg', 'Strasbourg']],
+  appAbChange: [['Start']],
   appStretchSaved: [['50', '70', 12], ['50', '70', 1]],
   appPrepTilesFailed: [[1], [4]],
   appPrepNoPlaceData: [['30–44'], ['0–12, 140–165']],

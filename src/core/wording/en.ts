@@ -957,6 +957,8 @@ export const W = {
   appAbNoResults: 'Nothing found. Try another spelling, or a larger town nearby.',
   appAbSearchFailed: "The search services did not answer. Check your connection and try again.",
   appAbPick: 'Choose the place you mean',
+  appAbSearching: 'Searching…',
+  appAbChange: (label: string): string => `Change ${label.toLowerCase()}`,
   appAbPlanning: 'Planning…',
   appAbNone: 'No bike router answered, so no route was planned. Plan it in another app and add it as a GPX file.',
   appAbName: (a: string, b: string): string => `${a} to ${b}`,

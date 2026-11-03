@@ -91,7 +91,7 @@ function AddRoute({ services, snap, reload }: { services: TripServices; snap: Tr
             </div>
           </div>
         ) : null}
-        <PlanAB services={services} old={old} onRoute={async (found) => { if (old) setPending(found); else await commit(found); }} />
+        <PlanAB services={services} onRoute={async (found) => { if (old) setPending(found); else await commit(found); }} />
       </div>
     </Card>
   );

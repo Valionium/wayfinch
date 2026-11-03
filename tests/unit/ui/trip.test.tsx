@@ -435,3 +435,96 @@ describe('The bike on Trip (spec section 3.7)', () => {
     expect(first.querySelector('a[href^="/tools/bags/#bike-details="][href*="back=trip"]')).not.toBeNull();
   });
 });
+
+describe('Plan from A to B on Trip (spec section 7.1)', () => {
+  const COORDS: Record<string, [number, number]> = { Heidelberg: [49.4, 8.69], Strasbourg: [48.58, 7.75] };
+  const LINE: [number, number][] = Array.from({ length: 400 }, (_, i) => {
+    const t = i / 399;
+    return [8.69 + (7.75 - 8.69) * t + Math.sin(i / 7) * 0.01 * (i === 0 || i === 399 ? 0 : 1), 49.4 + (48.58 - 49.4) * t + Math.cos(i / 9) * 0.01 * (i === 0 || i === 399 ? 0 : 1)];
+  });
+
+  /** Place search and routers as recorded; `routers` false makes every router refuse. */
+  function network(routers: boolean): { fetch: typeof fetch; urls: string[] } {
+    const urls: string[] = [];
+    const fetchStub = ((input: string | URL | Request) => {
+      const url = String(input);
+      urls.push(url);
+      const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+      if (url.startsWith('https://geocoding-api.open-meteo.com/')) {
+        const name = new URL(url).searchParams.get('name') ?? '';
+        const at = COORDS[name];
+        return json({ results: at ? [{ id: 1, name, country: 'Europe', latitude: at[0], longitude: at[1] }] : [] });
+      }
+      if (routers && url.startsWith('https://routing.openstreetmap.de/')) return json({ code: 'Ok', routes: [{ geometry: { coordinates: LINE } }] });
+      return Promise.resolve(new Response('no', { status: 503 }));
+    }) as typeof fetch;
+    return { fetch: fetchStub, urls };
+  }
+
+  async function type(id: string, value: string): Promise<void> {
+    const input = host.querySelector<HTMLInputElement>(`#${id}`)!;
+    await act(async () => { input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); });
+    await act(async () => { input.form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+  }
+  async function choose(id: string, value: string): Promise<void> {
+    await type(id, value);
+    await until(() => [...host.querySelectorAll('button.hit')].some((b) => b.textContent?.startsWith(value)), `a hit for ${value}`);
+    await click([...host.querySelectorAll('button.hit')].find((b) => b.textContent?.startsWith(value))!);
+  }
+
+  test('[AB-SEARCH] two searches find the places, only the typed words leave, and Plan the route makes a planned route with the whole line', async () => {
+    const net = network(true);
+    await show(services({ fetch: net.fetch }));
+    await choose('ab-from', 'Heidelberg');
+    await choose('ab-to', 'Strasbourg');
+    expect(net.urls.every((u) => new URL(u).origin === 'https://geocoding-api.open-meteo.com')).toBe(true);
+    expect(net.urls.map((u) => new URL(u).searchParams.get('name'))).toEqual(['Heidelberg', 'Strasbourg']);
+    expect(net.urls.join(' ')).not.toMatch(/49\.4|8\.69/);
+    await click(button(W.appAbPlan));
+    await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
+    const trip = (await readTrip())!;
+    expect(trip.route.name).toBe(W.appAbName('Heidelberg', 'Strasbourg'));
+    expect(trip.route.source).toBe('planned');
+    expect(trip.route.points).toHaveLength(400);
+    expect(text()).toContain(W.appTripHeightsPending);
+  });
+
+  test('[AB-FULL-GEOMETRY] with a route already stored, a planned one asks before it replaces it', async () => {
+    const net = network(true);
+    await show(services({ fetch: net.fetch }));
+    await pick(await fixtureGpx('loop'));
+    await until(() => host.querySelector('[data-summary]') !== null, 'the first route');
+    const before = (await readTrip())!.route.id;
+    await choose('ab-from', 'Heidelberg');
+    await choose('ab-to', 'Strasbourg');
+    await click(button(W.appAbPlan));
+    await until(() => host.querySelector('[data-replace]') !== null, 'the question');
+    expect((await readTrip())!.route.id).toBe(before);
+    await click(button(W.appTripReplaceCancel));
+    expect((await readTrip())!.route.id).toBe(before);
+  });
+
+  test('[AB-NONE] when no bike router answers, Trip says so and asks for a GPX; nothing is stored and the file picker stays', async () => {
+    const net = network(false);
+    await show(services({ fetch: net.fetch }));
+    await choose('ab-from', 'Heidelberg');
+    await choose('ab-to', 'Strasbourg');
+    await click(button(W.appAbPlan));
+    await until(() => text().includes(W.appAbNone), 'the sentence');
+    expect(await readTrip()).toBeNull();
+    expect(host.querySelector('input[type=file]')).not.toBeNull();
+    expect(net.urls.some((u) => /routed-(foot|car)|project-osrm|profile=(car|foot)/.test(u))).toBe(false);
+  });
+
+  test('[AB-SEARCH] nothing found and a failing search each say so in words, and a failed search is not "nothing found"', async () => {
+    const net = network(true);
+    await show(services({ fetch: net.fetch }));
+    await type('ab-from', 'Nowhereville');
+    await until(() => text().includes(W.appAbNoResults), 'no results');
+    const down = ((): Promise<Response> => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch;
+    await show(services({ fetch: down }));
+    await type('ab-from', 'Heidelberg');
+    await until(() => text().includes(W.appAbSearchFailed), 'the failure');
+    expect(text()).not.toContain(W.appAbNoResults);
+  });
+});

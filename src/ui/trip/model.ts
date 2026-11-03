@@ -26,6 +26,9 @@ export async function routeFromGpx(text: string, fileName: string, parseXml: (s:
   return { route, hadHeights: route.points.every((p) => p.ele !== null) };
 }
 
+/** A router's line as a route: the very building a GPX file goes through, with all its points. */
+export const routeFromPoints = (raw: RawPoint[], name: string): Promise<Route> => buildRoute(raw, name, 'planned');
+
 export type PlanSettings = { flatKph: number; pace: Pace; nights: number | null };
 
 /** The route with its days and forecast grid, as Get ready offline makes them. Nights not chosen: the stage model's suggestion. */
