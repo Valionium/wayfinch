@@ -145,10 +145,33 @@ test('[FLOW-INSTALL-OFFLINE] as an installed app (standalone), offline: every ta
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tools');
 });
 
-test('[FLOW-AXE] [FLOW-CONTRAST] every screen, with a trip and with none: no automatic accessibility violation, every control 44 px and named', async ({ page }) => {
-  const check = async (where: string): Promise<void> => {
+/** Every screen with no trip, then with a prepared trip offline and a position, everything open; `check` on each. */
+async function everyScreen(page: Page, check: (where: string) => Promise<void>): Promise<void> {
+  app = await loadApp(page);
+  for (const s of SCREENS) {
+    await open(page, s.hash, s.h1);
+    await check(`no trip ${s.hash}`);
+  }
+  await app.close();
+  await riderPrepares(page);
+  await goOffline(page);
+  await aheadWithFix(page);
+  for (const s of SCREENS) {
+    await open(page, s.hash, s.h1);
+    if (s.hash === '#/ahead') await openAll(page);
+    await check(`trip ${s.hash}`);
+  }
+}
+
+test('[FLOW-AXE] every screen, with a trip and with none, in this project\'s theme: no automatic accessibility violation', async ({ page }) => {
+  await everyScreen(page, async (where) => {
     const results = await new AxeBuilder({ page }).analyze();
     expect(results.violations.map((v) => `${where} ${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
+  });
+});
+
+test('[FLOW-CONTRAST] every screen, with a trip and with none: every control at least 44 px and named', async ({ page }) => {
+  await everyScreen(page, async (where) => {
     const small = await page.evaluate(() => {
       const out: string[] = [];
       const name = (el: Element): string => {
@@ -176,23 +199,7 @@ test('[FLOW-AXE] [FLOW-CONTRAST] every screen, with a trip and with none: no aut
       return out;
     });
     expect(small.map((s) => `${where} ${s}`)).toEqual([]);
-  };
-  // No trip yet: the screens a new rider sees.
-  app = await loadApp(page);
-  for (const s of SCREENS) {
-    await open(page, s.hash, s.h1);
-    await check(`no trip ${s.hash}`);
-  }
-  await app.close();
-  // A prepared trip, offline, a position, everything open.
-  await riderPrepares(page);
-  await goOffline(page);
-  await aheadWithFix(page);
-  for (const s of SCREENS) {
-    await open(page, s.hash, s.h1);
-    if (s.hash === '#/ahead') await openAll(page);
-    await check(`trip ${s.hash}`);
-  }
+  });
 });
 
 test('[FLOW-CHUNKS] opening_hours is not loaded on the first screen, with no trip or with one; it is precached', async ({ page }) => {
