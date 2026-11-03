@@ -71,4 +71,6 @@ export type AheadActions = {
   copy(text: string): Promise<boolean>;
   /** The `sms:` address with the text as its body and no recipient. */
   smsHref(text: string): string;
+  /** The screen again for the time now, from what was read: when Emergency or the share sheet opens. Nothing is read or sent. */
+  freshen(): void;
 };

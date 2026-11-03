@@ -34,6 +34,8 @@ import { dbExists } from './trip/services.ts';
 
 const APPROXIMATE_HELP_M = 1000; // section 9.2: worse than about 1 km usually means approximate location only
 const SHARE_OLD_MS = 30 * 60_000; // section 6.14
+/** While Ahead is in front, the screen is built again for the time now this often: ages, "here" and stamps follow the clock. */
+export const TICK_MS = 60_000;
 
 export type AheadDeps = {
   now: () => Date;
@@ -143,6 +145,12 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       emergency: emergencyAlone(at),
     };
     noteTripFacts(false, false);
+  };
+
+  /** The screen again for the time now, from the inputs already read: no store, no network. */
+  const freshen = (): void => {
+    if (hooked || !inputs || view.peek().kind !== 'trip') return;
+    present({ ...inputs, now: deps.now() });
   };
 
   /** The facts that change without a new screen: the position routine, Update weather, the bike, the map-link choice. */
@@ -341,6 +349,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     },
     // No recipient: the rider picks one in the SMS app. "?&body=" is the form both iPhone and Android open.
     smsHref: (text) => `sms:?&body=${encodeURIComponent(text)}`,
+    freshen,
   };
 
   return {
@@ -348,7 +357,18 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     start() {
       void load();
       const stop = onChanged(() => void load());
-      const visible = (): void => { if (typeof document !== 'undefined' && document.visibilityState === 'visible') void load(); };
+      // A screen left in front (a phone on the bars, a long stop) is built again each minute from what was read, for the time now:
+      // no store read or write, no request. Only while the page is visible.
+      let tick: ReturnType<typeof setInterval> | null = null;
+      const shown = (): boolean => typeof document === 'undefined' || document.visibilityState !== 'hidden';
+      const startTick = (): void => { if (tick === null) tick = setInterval(() => { if (shown()) freshen(); }, TICK_MS); };
+      const stopTick = (): void => { if (tick !== null) clearInterval(tick); tick = null; };
+      if (shown()) startTick();
+      const visible = (): void => {
+        if (!shown()) { stopTick(); return; }
+        void load();
+        startTick();
+      };
       if (typeof document !== 'undefined') document.addEventListener('visibilitychange', visible);
       // A bike saved in the bag planner redraws the marker at once.
       const stopBike = effect(() => {
@@ -357,6 +377,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       });
       return () => {
         stop();
+        stopTick();
         stopBike();
         if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', visible);
       };

@@ -289,6 +289,44 @@ describe('opened days later', () => {
   });
 });
 
+describe('a screen left open', () => {
+  test('[AH-RETURN] while Ahead stays in front, its ages follow the clock once a minute with no reload, no store write and no request; hidden, it waits', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const i = rainyStop();
+    await seed(i);
+    let clock = new Date(i.now.getTime());
+    let asked = 0;
+    const shell = browserAhead(deps({ now: () => clock, fetch: () => { asked += 1; return Promise.reject(new Error('offline')); } }));
+    const stop = shell.start();
+    await act(async () => { render(<Live shell={shell} />, host); });
+    await until(() => host.querySelector('[data-position-line]') !== null, 'the position line');
+    const line = () => host.querySelector('[data-position-line]')!.textContent ?? '';
+    const first = line();
+    const writes = (await readInputs(clock))!.positions.length;
+    // An hour on, the page still in front: within a minute the line says the fix is an hour old.
+    clock = new Date(clock.getTime() + 61 * 60_000);
+    await act(async () => { vi.advanceTimersByTime(60_000); });
+    await until(() => line() !== first, () => `the line to move on: ${line()}`);
+    expect(line()).toMatch(/1 h/);
+    await click(buttonNamed('Emergency', host.querySelector('.ah-chips')!));
+    expect(host.querySelector('#chip-emergency')!.textContent).toMatch(/position at \d\d:\d\d \(1 h 1 min ago\)/);
+    expect(asked).toBe(0);
+    expect((await readInputs(clock))!.positions.length).toBe(writes);
+    // Hidden: no rebuild until it is shown again.
+    const hidden = line();
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    clock = new Date(clock.getTime() + 90 * 60_000);
+    await act(async () => { vi.advanceTimersByTime(120_000); });
+    await settle(30);
+    expect(line()).toBe(hidden);
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    await until(() => line() !== hidden, () => `the line on return: ${line()}`);
+    stop();
+  }, 20_000);
+});
+
 describe('refusals and failures', () => {
   test('[AH-PLAN-TOMORROW] a Plan tomorrow the browser would not keep is said on the page, and the plan is unchanged', async () => {
     const i = rainyStop();
