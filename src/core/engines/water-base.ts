@@ -1,7 +1,9 @@
 // The parts of water learning that the Water card reads (spec section 6.3): the ride record, the uncertainty factor and the heat rule.
 // The rest (carrying and drinking factors, drinking advice) is in water-factors.ts, which only You loads, so the first screen does
 // not carry it. Everything is re-exported from water-learning.ts.
-export type Ride = { at: Date; predictedL: number; intakeL: number | null; feel: 'A' | 'B' | 'C' | null; massLossKg?: number; toiletStops?: number };
+export type Ride = { at: Date; predictedL: number; intakeL: number | null; feel: 'A' | 'B' | 'C' | null; massLossKg?: number; toiletStops?: number;
+  /** Reported as a hilly ride: kept, but the flat-ground estimate it was compared with does not fit it, so it never moves a factor. */
+  hilly?: true };
 
 /** Evidence below 1 is none yet; a broken sum counts as none, so the rider keeps the largest margin. */
 export const uncertainty = (sumW: number): 1.4 | 1.3 | 1.2 => {

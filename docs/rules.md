@@ -800,6 +800,8 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - export downloads a file; import shows what arrives; a bad file writes nothing; afterwards Trip asks for Get ready on a new route [YOU-EXPORT-UI]
 - asks first naming what goes; "Also delete bag planner data" stores copilot:delete-request:v1 and opens /tools/bags/#copilot-delete=<id>; until applied, "Bag planner data will be deleted the next time it opens" [YOU-DELETE-UI]
 - the post-ride report (hours, drink, warmth, feel, optional weighing) is logged and moves the factors; calibration status shown; drinkingAdvice and overDrinking reach the screen: ruling of group 8, the loss it is compared with is the sweat-rate model on flat ground at the chosen warmth [YOU-WATER-LEARN]
+- each post-ride report carries one tap, "Flat or hilly?" (flat by default); a hilly report is kept on the phone but moves no factor (k, the evidence, k_drink, the weighed count), is shown apart from the flat count, never travels in the export (the file's format is unchanged), and stays on the phone through an import (owner's ruling "small", 3 November) [YOU-TERRAIN]
+- the terrain of a post-ride report is taken from the route the rider rode, the stored route's climb over the ridden stretch, with the tap asked only when the ride had no route; factors per terrain class (the owner's full ruling, not built) [YOU-TERRAIN-ROUTE]
 - imprint, privacy and licences within two taps from every tab (plain pages at /legal/<name>/, a folder each because the host redirects *.html) [PRIV-LEGAL-REACH]
 - all open in flight mode [PRIV-LEGAL-OFFLINE]
 - hash of the imprint's text equals the hash of the page's block; nothing printed [PRIV-IMPRINT-SAME]
