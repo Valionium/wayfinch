@@ -8,7 +8,7 @@ import { buildRoute } from '../../core/route/profile.ts';
 import { planStages, shownAscentM } from '../../core/route/stages.ts';
 import type { Pace } from '../../core/route/stages.ts';
 import type { Route, Trip } from '../../core/types.ts';
-import { showKm, W } from '../../core/wording/en.ts';
+import { shortMapDate, showKm, W } from '../../core/wording/en.ts';
 
 /** 1214 as "1,214". */
 export const thousands = (n: number): string => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -59,6 +59,13 @@ export function profileOf(route: Route): Profile | null {
   return { path, minM: Math.round(lo), maxM: Math.round(hi) };
 }
 
+/** Which line a route follows: it stays the same when looked-up heights change the route's own id. */
+export const lineKey = (route: Route): string => {
+  const first = route.points[0]!;
+  const last = route.points[route.points.length - 1]!;
+  return `${route.points.length}:${first.lat},${first.lon}:${last.lat},${last.lon}`;
+};
+
 export const PROFILE_BOX = { w: PROFILE_W, h: PROFILE_H };
 
 export type Summary = {
@@ -68,13 +75,13 @@ export type Summary = {
 
 const hoursText = (h: number): string => (Math.round(h * 10) / 10).toFixed(1);
 
-/** The summary of §3.3: the stage model's days with the trip's own speed, pace and nights. */
-export function summaryOf(trip: Trip, o: { nights: number | null; day1LeaveBy: string | null }): Summary {
+/**
+ * The summary of §3.3. The days are the stored ones, which are what Ahead, the forecast grid and the leave-by time read: Trip
+ * works out no days of its own. Changing pace, speed or nights makes the engine plan them again and stores them.
+ */
+export function summaryOf(trip: Trip, o: { day1LeaveBy: string | null }): Summary {
   const { route } = trip;
-  const plan = planStages(route, {
-    flatKph: trip.flatKph, pace: trip.pace ?? 'sporting',
-    nights: o.nights ?? planStages(route, { flatKph: trip.flatKph, pace: trip.pace ?? 'sporting', nights: 0 }).suggestedNights,
-  });
+  const plan = route.stages;
   const unknown = route.ascentM === null;
   return {
     name: route.name,
@@ -96,12 +103,13 @@ const DAY_MS = 86_400_000;
 
 /**
  * Whether the trip runs (section 3.1): it is prepared and either today lies between the departure date and the day after the
- * planned end, or a position was accepted in the last 24 hours. A prepared trip with only a month counts as running.
+ * planned end, or a position was accepted in the last 24 hours.
  * `today` is the date in the time zone of the route's start.
  */
 export function tripRuns(f: { prepared: boolean; departureDate: string | null; days: number; today: string; lastPositionAt: Date | null; now: Date }): boolean {
   if (!f.prepared) return false;
-  if (f.departureDate === null) return true;
+  // No date and no month: nothing says the trip is on, so the app opens on Trip.
+  if (f.departureDate === null) return false;
   const lastDay = addDaysIso(f.departureDate, Math.max(0, f.days - 1));
   if (f.today >= f.departureDate && f.today <= addDaysIso(lastDay, 1)) return true;
   const age = f.lastPositionAt === null ? Infinity : f.now.getTime() - f.lastPositionAt.getTime();
@@ -119,4 +127,13 @@ export function agoText(at: Date, now: Date): string {
   if (minutes < 60) return W.routeAgeMin(String(minutes));
   if (minutes < 48 * 60) return W.routeAgeHours(String(Math.floor(minutes / 60)));
   return W.routeAgeDays(String(Math.floor(minutes / 1440)));
+}
+
+/** The date of the map data: the pack's own source date when it gives one, else its build date, and which it is. */
+export function packDate(build: { builtAt: string; countries: Record<string, string | null> } | null | undefined): { date: string; fromSource: boolean } | null {
+  if (!build) return null;
+  const sources = Object.values(build.countries).filter((d): d is string => typeof d === 'string' && d !== '').sort();
+  const newest = sources[sources.length - 1];
+  const shown = shortMapDate(newest ?? build.builtAt);
+  return shown === null ? null : { date: shown, fromSource: newest !== undefined };
 }

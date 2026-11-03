@@ -5,13 +5,14 @@ import { GPX_MAX_BYTES, GpxError } from '../../core/route/gpx.ts';
 import type { Route } from '../../core/types.ts';
 import { showKm, W } from '../../core/wording/en.ts';
 import { onChanged } from '../../store/changed.ts';
+import { sameLine } from '../../store/trip.ts';
 import { BikeDrawing } from '../bike/drawing.tsx';
 import { bikeSource } from '../bike/live.ts';
 import { Card } from '../card.tsx';
 import { noteTripFacts } from '../degraded.ts';
 import { installOffer, promptInstall } from '../install.ts';
 import { GetReady } from './getready.tsx';
-import { routeFromGpx } from './model.ts';
+import { lineKey, routeFromGpx } from './model.ts';
 import { PlanAB } from './plan.tsx';
 import { reasonOf } from './services.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
@@ -37,7 +38,7 @@ function AddRoute({ services, snap, reload }: { services: TripServices; snap: Tr
     setBusy(true);
     setPending(null);
     try {
-      const out = await services.addRoute(found);
+      const out = await services.addRoute(found, old?.route.id ?? null);
       setRound((n) => n + 1);
       setSaid(out.kind === 'same' ? W.appTripSameRoute : out.kind === 'added' ? W.appTripAdded(out.name) : W.appTripReplaced(out.name));
       await reload();
@@ -52,13 +53,14 @@ function AddRoute({ services, snap, reload }: { services: TripServices; snap: Tr
     const file = input.files?.[0];
     setError(null);
     setSaid(null);
-    setPending(null);
     if (!file) return;
     setBusy(true);
     try {
       if (file.size > GPX_MAX_BYTES) throw new GpxError('too-large', W.routeGpxTooLarge);
       const found = await routeFromGpx(await file.text(), file.name, services.parseXml);
-      if (old && old.route.hash === found.route.hash) setSaid(W.appTripSameRoute);
+      // A file that cannot be used leaves an open question as it was; one that can replaces it.
+      setPending(null);
+      if (old && sameLine(old.route, found.route)) setSaid(W.appTripSameRoute);
       else if (old) setPending(found);
       else {
         setBusy(false);
@@ -102,9 +104,12 @@ function AddRoute({ services, snap, reload }: { services: TripServices; snap: Tr
 export function TripScreen({ services }: { services: TripServices }) {
   const [snap, setSnap] = useState<TripSnapshot | null>(null);
   const alive = useRef(true);
+  const latest = useRef(0);
   const reload = useCallback(async (): Promise<void> => {
+    // Only the newest read is shown: an older one that finishes late would put a value back that has just been changed.
+    const mine = (latest.current += 1);
     const next = await services.load();
-    if (!alive.current) return;
+    if (!alive.current || mine !== latest.current) return;
     setSnap(next);
     noteTripFacts(next.trip !== null, next.prepared !== null);
   }, [services]);
@@ -126,7 +131,7 @@ export function TripScreen({ services }: { services: TripServices }) {
       <AddRoute services={services} snap={snap} reload={reload} />
       {snap ? <RouteSummary snap={snap} /> : null}
       {snap ? <TripSettings services={services} snap={snap} reload={reload} /> : null}
-      {snap?.trip ? <GetReady services={services} snap={snap} reload={reload} /> : null}
+      {snap?.trip ? <GetReady key={lineKey(snap.trip.route)} services={services} snap={snap} reload={reload} /> : null}
       {offer ? <button type="button" class="btn" onClick={() => void promptInstall()}>{W.appTripInstall}</button> : null}
     </div>
   );

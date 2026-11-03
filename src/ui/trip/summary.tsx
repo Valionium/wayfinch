@@ -1,15 +1,15 @@
 // The route summary (spec section 3.3): distance, climbing, the elevation profile and the stage model's days. What it says about
 // heights and places is only what was done: looked-up heights are credited, a route without them says so.
-import { shortMapDate, W } from '../../core/wording/en.ts';
+import { W } from '../../core/wording/en.ts';
 import { Card } from '../card.tsx';
-import { PROFILE_BOX, summaryOf } from './model.ts';
+import { OsmCredit } from './credit.tsx';
+import { PROFILE_BOX, packDate, summaryOf } from './model.ts';
 import type { TripSnapshot } from './services.ts';
 
 export function RouteSummary({ snap }: { snap: TripSnapshot }) {
-  const { trip, settings } = snap;
+  const { trip } = snap;
   if (!trip) return null;
-  const s = summaryOf(trip, { nights: settings.nights, day1LeaveBy: snap.day1LeaveBy });
-  const packDate = shortMapDate(snap.prepared?.build?.builtAt ?? null);
+  const s = summaryOf(trip, { day1LeaveBy: snap.day1LeaveBy });
   const missingHeights = trip.route.ascentM === null;
   return (
     <Card title={W.appTripSummaryTitle}>
@@ -31,7 +31,7 @@ export function RouteSummary({ snap }: { snap: TripSnapshot }) {
           ))}
         </ol>
         {missingHeights ? <p class="muted">{W.appTripHeightsPending}</p> : snap.heightsLookedUp ? <p class="muted">{W.appTripHeightsCredit}</p> : null}
-        {snap.prepared?.build ? <p class="muted">{W.appTripOsm(packDate)}</p> : null}
+        {trip.route.source === 'planned' || snap.prepared?.build ? <OsmCredit lead={W.appTripOsmLead} date={packDate(snap.prepared?.build)} /> : null}
         <p class="muted"><a href="#/you/legal">{W.appTripLicences}</a></p>
       </div>
     </Card>

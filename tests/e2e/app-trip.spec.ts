@@ -49,9 +49,9 @@ test('[TRIP-FIRST] with no trip the app opens on Trip, and the bike is the first
   expect(problems).toEqual([]);
 });
 
-test('[TRIP-FIRST] with a running trip (prepared, a month and no date) the app opens on Ahead; an address of its own is kept', async ({ page }) => {
+test('[TRIP-FIRST] with a running trip (prepared, departing today) the app opens on Ahead; an address of its own is kept', async ({ page }) => {
   app = await loadApp(page);
-  await preparedTrip(page, 'heidelberg-strasbourg', { departureDate: null });
+  await preparedTrip(page, 'heidelberg-strasbourg', { departureDate: new Date().toISOString().slice(0, 10) });
   await page.evaluate(async () => {
     const db = await __store.openDb();
     await db.put('meta', { at: new Date(), steps: [], build: null, forecastFetchedAt: null, baselineYears: null }, 'route:preparedSteps');
@@ -119,4 +119,16 @@ test('Trip has no automatic accessibility violations with a route, and every con
     const box = (await el.boundingBox())!;
     expect(box.height, await el.innerText().catch(() => '')).toBeGreaterThanOrEqual(43.5);
   }
+});
+
+test('[TRIP-FIRST] a prepared trip with no date and no month does not count as running: the app opens on Trip, not on an empty Ahead', async ({ page }) => {
+  app = await loadApp(page);
+  await preparedTrip(page, 'heidelberg-strasbourg', { departureDate: null });
+  await page.evaluate(async () => {
+    const db = await __store.openDb();
+    await db.put('meta', { at: new Date(), steps: [], build: null, forecastFetchedAt: null, baselineYears: null }, 'route:preparedSteps');
+  });
+  await page.goto(`${app.origin}/`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Trip');
+  await expect(page.locator('[data-summary]')).toBeVisible();
 });

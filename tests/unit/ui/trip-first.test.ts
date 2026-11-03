@@ -7,7 +7,7 @@ import type { TripSnapshot } from '../../../src/ui/trip/services.ts';
 import { DEFAULT_SETTINGS } from '../../../src/store/rules.ts';
 
 const snap = (over: Partial<TripSnapshot> = {}): TripSnapshot => ({
-  now: new Date(0), available: true, trip: null, settings: DEFAULT_SETTINGS, prepared: null, places: 0, forecastTo: null, zone: 'UTC',
+  now: new Date(0), available: true, trip: null, settings: DEFAULT_SETTINGS, prepared: null, places: 0, forecastTo: null, forecastFetchedAt: null, zone: 'UTC',
   storageMb: null, day1LeaveBy: null, heightsLookedUp: false, running: false, ...over,
 });
 const running = snap({ running: true, trip: {} as TripSnapshot['trip'], prepared: {} as TripSnapshot['prepared'] });

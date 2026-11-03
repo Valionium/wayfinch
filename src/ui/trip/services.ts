@@ -8,7 +8,7 @@ import { zoneLookupOf } from '../../core/engines/tripday.ts';
 import type { XmlDocLike } from '../../core/route/gpx.ts';
 import { buildScreen } from '../../core/screen/screen.ts';
 import type { Route, Trip } from '../../core/types.ts';
-import { W } from '../../core/wording/en.ts';
+import { shortIsoDay, W } from '../../core/wording/en.ts';
 import { prepareTrip } from '../../data/prepare.ts';
 import type { StepName, StepReport } from '../../data/prepare.ts';
 import { fetchBaseline, fetchElevation, fetchForecast, fetchModelRuns } from '../../data/openmeteo.ts';
@@ -22,7 +22,9 @@ import type { PreparedRecord } from '../../store/prepared.ts';
 import { DEFAULT_SETTINGS, goodDate } from '../../store/rules.ts';
 import type { Settings } from '../../store/rules.ts';
 import { readSettings, writeSettings } from '../../store/settings.ts';
-import { readTrip, replaceRoute, saveTrip } from '../../store/trip.ts';
+import { readTrip, replaceRoute, RouteGoneError, sameLine, saveTrip } from '../../store/trip.ts';
+import { preparedStore } from '../../store/prepared.ts';
+import type { PreparedStore } from '../../store/prepared.ts';
 import { planned, tripRuns } from './model.ts';
 
 export type TripSnapshot = {
@@ -35,6 +37,8 @@ export type TripSnapshot = {
   prepared: PreparedRecord | null;
   places: number;
   forecastTo: Date | null;
+  /** When the stored forecast was fetched: its own time, not the time Get ready ended. */
+  forecastFetchedAt: Date | null;
   /** The time zone of the route's start. */
   zone: string;
   storageMb: number | null;
@@ -62,8 +66,10 @@ export type TripServices = {
   fetch: typeof fetch;
   parseXml: (text: string) => XmlDocLike;
   load: () => Promise<TripSnapshot>;
-  /** Puts a route in: the first one, or in place of the old (the caller has asked the rider already). */
-  addRoute: (found: { route: Route; hadHeights: boolean }) => Promise<AddOutcome>;
+  /** Puts a route in: the first one, or in place of the old (the caller has asked the rider already, naming `expectedOldRouteId`). */
+  addRoute: (found: { route: Route; hadHeights: boolean }, expectedOldRouteId: string | null) => Promise<AddOutcome>;
+  /** The store Get ready writes through: its stage writes take their turn and use the settings as they are then. */
+  prepareStore: (base: PreparedStore) => PreparedStore;
   writeSettings: (partial: Partial<Record<keyof Settings, unknown>>) => Promise<SettingsOutcome>;
   setDeparture: (date: string | null) => Promise<string | null>;
   prepare: (onProgress: (step: StepName, done: number, total: number) => void, onNotice: (text: string) => void) => Promise<StepReport[]>;
@@ -101,10 +107,10 @@ function heightsLookedUp(route: Route): boolean {
 
 const weekdayOf = (date: string): number => new Date(`${date}T00:00:00Z`).getUTCDay();
 
-async function counts(): Promise<{ places: number; forecastTo: Date | null; lastPositionAt: Date | null }> {
+async function counts(): Promise<{ places: number; forecastTo: Date | null; forecastFetchedAt: Date | null; lastPositionAt: Date | null }> {
   const db = await openDb();
   const places = await db.count('places');
-  const forecast = (await db.get('forecast', 'current')) as { grid?: { hours?: { at: Date }[] }[] } | undefined;
+  const forecast = (await db.get('forecast', 'current')) as { fetchedAt?: unknown; grid?: { hours?: { at: Date }[] }[] } | undefined;
   let forecastTo: Date | null = null;
   for (const g of forecast?.grid ?? []) {
     const at = g.hours?.[g.hours.length - 1]?.at;
@@ -114,7 +120,8 @@ async function counts(): Promise<{ places: number; forecastTo: Date | null; last
   for (const p of (await db.getAll('positions')) as { at?: unknown }[]) {
     if (p.at instanceof Date && Number.isFinite(p.at.getTime()) && (lastPositionAt === null || p.at > lastPositionAt)) lastPositionAt = p.at;
   }
-  return { places, forecastTo, lastPositionAt };
+  const fetched = forecast?.fetchedAt;
+  return { places, forecastTo, forecastFetchedAt: fetched instanceof Date && Number.isFinite(fetched.getTime()) ? fetched : null, lastPositionAt };
 }
 
 async function storageMb(): Promise<number | null> {
@@ -126,11 +133,18 @@ async function storageMb(): Promise<number | null> {
   }
 }
 
+/** The device's own zone, only to say which day "today" is when a route is added. */
+const deviceZone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
 /** Why the store refused or failed, in the rider's words. */
 export const reasonOf = (e: unknown): string => (e instanceof NewerDataError ? W.appStoreChangedElsewhere : e instanceof RefusedError ? e.message : W.appStoreNotKept);
 
-/** The day name of the forecast's last hour in the route's zone, for "weather to Friday". */
-export const weatherToDay = (forecastTo: Date, zone: string): string => W.timeWeekday(weekdayOf(localIsoDate(forecastTo, zone)));
+/** The forecast's last day in the route's zone: a weekday within a week of now, otherwise the date, so a bare weekday is never ambiguous. */
+export function forecastDay(forecastTo: Date, now: Date, zone: string): string {
+  const date = localIsoDate(forecastTo, zone);
+  const apart = Math.abs(Date.parse(`${date}T00:00:00Z`) - Date.parse(`${localIsoDate(now, zone)}T00:00:00Z`)) / 86_400_000;
+  return apart <= 6 ? W.timeWeekday(weekdayOf(date)) : (shortIsoDay(date) ?? date);
+}
 
 /** Whether the page runs as the installed app; null when the browser can't say (section 9.4: then nothing is asked or blocked). */
 function standaloneNow(): boolean | null {
@@ -150,7 +164,7 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
   };
   const nav = typeof navigator === 'undefined' ? undefined : navigator;
   const nothing = (at: Date, settings: Settings, available: boolean): TripSnapshot => ({
-    now: at, available, trip: null, settings, prepared: null, places: 0, forecastTo: null, zone: 'UTC', storageMb: null, day1LeaveBy: null, heightsLookedUp: false, running: false,
+    now: at, available, trip: null, settings, prepared: null, places: 0, forecastTo: null, forecastFetchedAt: null, zone: 'UTC', storageMb: null, day1LeaveBy: null, heightsLookedUp: false, running: false,
   });
 
   const load = async (): Promise<TripSnapshot> => {
@@ -167,7 +181,7 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
     try {
       const prepared = await readPrepared();
       const zone = zoneLookupOf(await readStoredZones())(0).timeZone;
-      const { places, forecastTo, lastPositionAt } = await counts();
+      const { places, forecastTo, forecastFetchedAt, lastPositionAt } = await counts();
       const today = localIsoDate(at, zone);
       let day1LeaveBy: string | null = null;
       if (trip.departureDate !== null && addDaysIso(today, 1) === trip.departureDate) {
@@ -176,7 +190,7 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
         if (lb && Number.isFinite(lb.getTime())) day1LeaveBy = formatLeaveBy(lb, zone);
       }
       return {
-        now: at, available: true, trip, settings, prepared, places, forecastTo, zone, storageMb: await storageMb(), day1LeaveBy,
+        now: at, available: true, trip, settings, prepared, places, forecastTo, forecastFetchedAt, zone, storageMb: await storageMb(), day1LeaveBy,
         heightsLookedUp: heightsLookedUp(trip.route),
         running: tripRuns({ prepared: prepared !== null, departureDate: trip.departureDate, days: trip.route.stages.length || 1, today, lastPositionAt, now: at }),
       };
@@ -195,17 +209,24 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
     await saveTrip({ ...trip, route });
   };
 
-  const addRoute = async ({ route, hadHeights }: { route: Route; hadHeights: boolean }): Promise<AddOutcome> => {
+  const addRoute = async ({ route, hadHeights }: { route: Route; hadHeights: boolean }, expected: string | null): Promise<AddOutcome> => {
     const settings = await readSettings();
     const before = await readTrip();
-    if (before && before.route.hash === route.hash) return { kind: 'same', name: before.route.name };
+    // The question the rider answered named a route; if another window has put in a different one since, nothing is replaced.
+    if ((before?.route.id ?? null) !== expected) throw new RefusedError(W.appStoreChangedElsewhere);
+    // The same line is the same route, whatever heights it has now.
+    if (before && sameLine(before.route, route)) return { kind: 'same', name: before.route.name };
     const flatKph = before?.flatKph ?? settings.flatKph;
     const pace = before?.pace ?? settings.pace;
     // A replaced route starts with the stage model's nights; the first one takes what was set for the next trip.
     const withDays = planned(route, { flatKph, pace, nights: before ? null : settings.nights });
-    if (before) await replaceRoute(withDays);
-    else {
-      await saveTrip({ route: withDays, departureDate: null, startTime: settings.startTime, flatKph, stay: settings.stay, campWaterL: settings.campWaterL, pace });
+    const today = localIsoDate(now(), deviceZone());
+    if (before) {
+      await replaceRoute(withDays);
+      const stored = await readTrip();
+      if (stored) await saveTrip({ ...stored, departureDate: today });
+    } else {
+      await saveTrip({ route: withDays, departureDate: today, startTime: settings.startTime, flatKph, stay: settings.stay, campWaterL: settings.campWaterL, pace });
     }
     noteHeights(withDays, hadHeights);
     return { kind: before ? 'replaced' : 'added', name: route.name };
@@ -216,8 +237,16 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
       await readSettings();
       const result = await writeSettings(partial);
       const replans = ['flatKph', 'pace', 'nights'].some((k) => k in partial && !(k in result.reasons));
-      if (result.newer.length === 0 && replans) await replan();
-      return { ok: result.ok, reasons: result.reasons, note: result.newerReason };
+      let note = result.newerReason;
+      if (result.newer.length === 0 && replans) {
+        try {
+          await replan();
+        } catch {
+          // The setting is kept; only the days are behind. Said on its own, not as a refusal of the setting.
+          note = W.appTripReplanFailed;
+        }
+      }
+      return { ok: result.ok, reasons: result.reasons, note };
     } catch (e) {
       return { ok: false, reasons: {}, note: reasonOf(e) };
     }
@@ -235,7 +264,7 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
     }
   };
 
-  return {
+  const services: TripServices = {
     now,
     env: {
       weatherMode: WEATHER_MODE, userAgent: nav?.userAgent ?? '', maxTouchPoints: nav?.maxTouchPoints ?? 0, platform: nav?.platform ?? '',
@@ -245,7 +274,18 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
     parseXml: (text) => new DOMParser().parseFromString(text, 'application/xml') as unknown as XmlDocLike,
     load,
 
-    addRoute: (found) => inTurn(() => addRoute(found)),
+    addRoute: (found, expected) => inTurn(() => addRoute(found, expected)),
+    prepareStore: (base) => ({
+      ...base,
+      saveTrip: (trip) => inTurn(async () => {
+        const settings = await readSettings();
+        const current = await readTrip();
+        if (!current || !sameLine(current.route, trip.route)) throw new RouteGoneError();
+        // Planned again with the settings as they are now: the last word is the rider's current pace, speed and nights.
+        const route = planned(trip.route, { flatKph: current.flatKph, pace: current.pace ?? settings.pace, nights: settings.nights });
+        await base.saveTrip({ ...current, route });
+      }),
+    }),
     writeSettings: (partial) => inTurn(() => changeSettings(partial)),
     setDeparture: (date) => inTurn(() => changeDeparture(date)),
 
@@ -253,8 +293,9 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
       return prepareTrip({
         fetch: (input, init) => fetch(input, init),
         fetchForecast, fetchBaseline, fetchElevation, fetchModelRuns,
-        now, onNotice, with15: WEATHER_MODE === 'auto',
+        now, onNotice, with15: WEATHER_MODE === 'auto', store: services.prepareStore(preparedStore),
       }, onProgress);
     },
   };
+  return services;
 }

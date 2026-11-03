@@ -22,7 +22,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     const suggested = planStages(route, { flatKph: 25, pace: 'sporting', nights: 0 }).suggestedNights;
     const expected = planStages(route, { flatKph: 25, pace: 'sporting', nights: suggested });
     expect(withDays.stages).toEqual([...expected]);
-    const s = summaryOf(tripOf(withDays), { nights: null, day1LeaveBy: null });
+    const s = summaryOf(tripOf(withDays), { day1LeaveBy: null });
     expect(s.distance).toBe(`${Math.round(route.lengthKm * 10) / 10} km`);
     expect(s.climbing).toMatch(/^[\d,]+ m climbing$/);
     expect(s.profile).not.toBeNull();
@@ -60,7 +60,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
   test('[TRIP-SUMMARY] the day rows read "Day 1 · 78 km", the day before departure adds "leave by about 13:45", and a route without heights says so', async () => {
     const { route } = await routeFromGpx(await fixtureGpx('multi-day-800'), 'a.gpx', parseXml);
     const withDays = planned(route, { flatKph: 25, pace: 'sporting', nights: 3 });
-    const s = summaryOf(tripOf(withDays), { nights: 3, day1LeaveBy: 'about 13:45' });
+    const s = summaryOf(tripOf(withDays), { day1LeaveBy: 'about 13:45' });
     expect(s.stages).toHaveLength(4);
     expect(s.stages[0]!.text).toMatch(/^Day 1 · [\d.]+ km · leave by about 13:45$/);
     expect(s.stages[1]!.text).toMatch(/^Day 2 · [\d.]+ km$/);
@@ -68,10 +68,18 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     expect(s.note).toBeNull();
 
     const bare = planned(await buildRoute((await loadFixtureRoute('loop')).points.map((p) => ({ lat: p.lat, lon: p.lon, ele: null })), 'Flat', 'gpx'), { flatKph: 25, pace: 'sporting', nights: 1 });
-    const unknown = summaryOf(tripOf(bare), { nights: 1, day1LeaveBy: null });
+    const unknown = summaryOf(tripOf(bare), { day1LeaveBy: null });
     expect(unknown.climbing).toBe(W.appTripClimbingUnknown);
     expect(unknown.profile).toBeNull();
     expect(unknown.note).toBe(W.appTripByDistance);
+  });
+
+  test('[TRIP-SUMMARY] the days shown are the stored ones, never a recomputation: what Ahead reads is what Trip shows', async () => {
+    const { route } = await routeFromGpx(await fixtureGpx('multi-day-800'), 'a.gpx', parseXml);
+    const stored = planned(route, { flatKph: 25, pace: 'steady', nights: 2 });
+    const s = summaryOf(tripOf(stored, { pace: 'hard', flatKph: 40 }), { day1LeaveBy: null });
+    expect(s.stages).toHaveLength(3);
+    expect(s.stages[0]!.text).toBe(`Day 1 · ${Math.round((stored.stages[0]!.endKm - stored.stages[0]!.startKm) * 10) / 10} km`);
   });
 
   test('[TRIP-SUMMARY] the profile is a drawing of the heights with its lowest and highest named', async () => {
@@ -101,8 +109,9 @@ describe('Which screen the app opens on (spec section 3.1)', () => {
     expect(tripRuns({ ...base, today: '2026-10-21' })).toBe(false);
   });
 
-  test('[TRIP-FIRST] a prepared trip with only a month (no date) counts as running', () => {
-    expect(tripRuns({ ...base, departureDate: null })).toBe(true);
+  test('[TRIP-FIRST] a prepared trip with no date and no month never counts as running, so Trip opens', () => {
+    expect(tripRuns({ ...base, departureDate: null })).toBe(false);
+    expect(tripRuns({ ...base, departureDate: null, today: '2027-03-01' })).toBe(false);
   });
 
   test('[TRIP-FIRST] outside the dates, a position accepted in the last 24 hours makes it run; an older one does not', () => {

@@ -13,7 +13,9 @@ import { clearCopies } from '../../../src/store/changed.ts';
 import { closeDb, openDb } from '../../../src/store/db.ts';
 import { readInputs } from '../../../src/store/inputs.ts';
 import { savePrepared } from '../../../src/store/prepared.ts';
+import { preparedStore } from '../../../src/store/prepared.ts';
 import { readTrip } from '../../../src/store/trip.ts';
+import { planned, routeFromGpx } from '../../../src/ui/trip/model.ts';
 import { askForHomeScreen, installOffer } from '../../../src/ui/install.ts';
 import { refreshBikeSource } from '../../../src/ui/bike/live.ts';
 import { TripScreen } from '../../../src/ui/trip/trip.tsx';
@@ -90,7 +92,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     const expected = planStages(trip.route, { flatKph: 25, pace: 'sporting', nights: planStages(trip.route, { flatKph: 25, pace: 'sporting', nights: 0 }).suggestedNights });
     expect(summary.querySelectorAll('ol li')).toHaveLength(expected.length);
     expect(trip.route.stages).toEqual([...expected]);
-    expect(trip.departureDate).toBeNull();
+    expect(trip.departureDate).toBe('2026-10-10');
   });
 
   test('[TRIP-GPX-BAD] a bad file says its own plain reason, and the old route stays', async () => {
@@ -137,7 +139,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     await until(() => text().includes('Altdorf'), 'the new route');
     const replaced = (await readTrip())!;
     expect(replaced.route.id).not.toBe(first.route.id);
-    expect(replaced.departureDate).toBeNull();
+    expect(replaced.departureDate).toBe('2026-10-10');
   });
 
   test('[TRIP-REPLACE-ASKS] the same file again is no new route: nothing asks and nothing changes', async () => {
@@ -191,17 +193,17 @@ describe('Add a route and the summary (spec section 3.3)', () => {
 const stepNames: StepName[] = ['heights', 'places', 'hours', 'weather', 'baseline', 'save'];
 
 /** A Get ready offline that ends as told, and leaves in the store what the real one would have. */
-function preparing(reports: (routeId: string) => StepReport[], o: { places?: number; weatherTo?: Date | null; at?: Date; seen?: string[]; notice?: string } = {}): Partial<TripServices> {
+function preparing(reports: (routeId: string) => StepReport[], o: { places?: number; weatherTo?: Date | null; at?: Date; seen?: string[]; notice?: string; fetchedAt?: Date; sourceDate?: string | null } = {}): Partial<TripServices> {
   return {
     prepare: async (onProgress, onNotice) => {
       const trip = (await readTrip())!;
-      if (o.notice) { onNotice(o.notice); await settle(); o.seen?.push(text()); }
-      for (const step of stepNames) { onProgress(step, 1, 2); await settle(); o.seen?.push(text()); }
+      if (o.notice) { onNotice(o.notice); await settle(25); o.seen?.push(text()); }
+      for (const step of stepNames) { onProgress(step, 1, 2); await settle(25); o.seen?.push(text()); }
       const db = await openDb();
       for (let i = 0; i < (o.places ?? 0); i++) await db.put('places', { id: `node/${i}`, kind: 'water' });
-      if (o.weatherTo) await db.put('forecast', { fetchedAt: NOW, runs: [], grid: [{ km: 0, lat: 49, lon: 8, hours: [{ at: o.weatherTo }] }], has15: false }, 'current');
+      if (o.weatherTo) await db.put('forecast', { fetchedAt: o.fetchedAt ?? NOW, runs: [], grid: [{ km: 0, lat: 49, lon: 8, hours: [{ at: o.weatherTo }] }], has15: false }, 'current');
       const steps = reports(trip.route.id);
-      await savePrepared(trip.route.id, { at: o.at ?? NOW, steps, build: { id: 'b', builtAt: '2026-10-28', countries: {} }, forecastFetchedAt: null, baselineYears: null });
+      await savePrepared(trip.route.id, { at: o.at ?? NOW, steps, build: { id: 'b', builtAt: '2026-10-28', countries: o.sourceDate === undefined ? {} : { DE: o.sourceDate } }, forecastFetchedAt: null, baselineYears: null });
       return steps;
     },
   };
@@ -264,19 +266,18 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     expect((await readTrip())!.route.stages).toHaveLength(before);
   });
 
-  test('[TRIP-SETTINGS] a departure date can be set to today, typed, and cleared; without one Trip says what is lost', async () => {
+  test('[TRIP-SETTINGS] the departure date starts as today, the day the route was added, as a value to change; it saves once typing has settled, and an empty date says what is lost', async () => {
     await withRoute();
-    expect(text()).toContain(W.appTripDepartureNone);
-    await click(button(W.appTripDepartureToday));
-    await until(() => host.querySelector<HTMLInputElement>('#trip-date')!.value === '2026-10-10', 'today');
-    expect((await readTrip())!.departureDate).toBe('2026-10-10');
+    const date = () => host.querySelector<HTMLInputElement>('#trip-date')!;
+    expect(date().value).toBe('2026-10-10');
+    expect([...host.querySelectorAll('button')].some((x) => /today|clear the date/i.test(x.textContent ?? ''))).toBe(false);
     expect(text()).not.toContain(W.appTripDepartureNone);
-    const date = host.querySelector<HTMLInputElement>('#trip-date')!;
-    await act(async () => { date.value = '2026-10-17'; date.dispatchEvent(new Event('change', { bubbles: true })); });
-    await settle(30);
+    await act(async () => { date().value = '2026-10-01'; date().dispatchEvent(new Event('change', { bubbles: true })); });
+    await act(async () => { date().value = '2026-10-17'; date().dispatchEvent(new Event('change', { bubbles: true })); });
+    await settle(900);
     expect((await readTrip())!.departureDate).toBe('2026-10-17');
-    await click(button(W.appTripDepartureClear));
-    await until(() => text().includes(W.appTripDepartureNone), 'the note again');
+    await act(async () => { date().value = ''; date().dispatchEvent(new Event('change', { bubbles: true })); date().dispatchEvent(new Event('blur', { bubbles: true })); });
+    await until(() => text().includes(W.appTripDepartureNone), 'the note');
     expect((await readTrip())!.departureDate).toBeNull();
   });
 
@@ -296,9 +297,9 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     expect(JSON.parse(localStorage.getItem('copilot:settings')!).keepFresh).toBe(false);
   });
 
-  test('[TRIP-GETREADY] the steps show their progress, and the result reads "1,214 places, weather to Friday, updated 2 h ago" with the storage used and Update', async () => {
+  test('[TRIP-GETREADY] the steps show their progress, and the result reads "1,214 places (map data of 25 Oct), weather to Friday (fetched 2 h ago)" with the storage used and Update', async () => {
     const seen: string[] = [];
-    const svc = services(preparing(allOk, { places: 1214, weatherTo: new Date('2026-10-16T12:00:00Z'), at: new Date(NOW.getTime() - 2 * 3_600_000), seen, notice: W.appPrepHeightsNotice }));
+    const svc = services(preparing(allOk, { places: 1214, weatherTo: new Date('2026-10-16T12:00:00Z'), fetchedAt: new Date(NOW.getTime() - 2 * 3_600_000), sourceDate: '2026-10-25', seen, notice: W.appPrepHeightsNotice }));
     await show(svc);
     await pick(await fixtureGpx('loop'));
     await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
@@ -308,7 +309,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     await until(() => text().includes('1,214 places'), 'the result');
     expect(seen.some((t) => t.includes(W.appTripProgress(2, 6, W.appTripStepPlaces)))).toBe(true);
     expect(seen.some((t) => t.includes(W.appPrepHeightsNotice))).toBe(true);
-    expect(text()).toContain('1,214 places, weather to Friday, updated 2 h ago');
+    expect(text()).toContain('1,214 places (map data of 25 Oct), weather to Friday (fetched 2 h ago)');
     expect(button(W.appTripUpdateButton)).toBeDefined();
     expect(text()).toContain(W.appTripFlightMode);
   });
@@ -413,16 +414,22 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     expect(text()).not.toContain(W.appTripInstall);
   });
 
-  test('[TRIP-ATTRIBUTION] the summary names OpenStreetMap with the pack date once places are saved, and Licences is one tap away', async () => {
-    await show(services(preparing(allOk, { places: 2 })));
+  test('[TRIP-ATTRIBUTION] the credit is a link to the OpenStreetMap copyright page with the pack date; with no source date it says the build date honestly; Licences is one tap away', async () => {
+    await show(services(preparing(allOk, { places: 2, sourceDate: '2026-10-25' })));
     await pick(await fixtureGpx('loop'));
     await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
-    expect(text()).not.toContain('© OpenStreetMap contributors');
     await click(button(W.appTripGetReadyButton));
-    await until(() => text().includes('© OpenStreetMap contributors'), 'the credit');
-    expect(host.querySelector('[data-summary]')!.textContent).toContain(W.appTripOsm('28 Oct'));
+    await until(() => text().includes('map data of 25 Oct'), 'the credit');
+    const credit = [...host.querySelectorAll('[data-summary] a')].find((a) => a.textContent === '© OpenStreetMap contributors')!;
+    expect(credit.getAttribute('href')).toBe('https://www.openstreetmap.org/copyright');
+    expect(host.querySelector('[data-summary]')!.textContent).toContain('map data of 25 Oct');
     const licences = [...host.querySelectorAll('a')].find((a) => a.textContent === W.appTripLicences)!;
     expect(licences.getAttribute('href')).toBe('#/you/legal');
+    render(null, host);
+    await show(services(preparing(allOk, { places: 2 })));
+    await click(button(/^(Update|Get ready offline)$/));
+    await until(() => text().includes('map data from 28 Oct'), 'the build date');
+    expect(text()).not.toContain('map data of');
   });
 });
 
@@ -526,5 +533,156 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     await type('ab-from', 'Heidelberg');
     await until(() => text().includes(W.appAbSearchFailed), 'the failure');
     expect(text()).not.toContain(W.appAbNoResults);
+  });
+});
+
+describe('What the review of group 5 found', () => {
+  test('[TRIP-GETREADY] a replaced route shows none of the old route results: no steps list, no retry, the first-time button', async () => {
+    const fake = preparing(() => allOk().map((r) => (r.step === 'weather' ? { ...r, ok: false, note: W.appPrepNoConnection } : r)), { places: 5 });
+    await show(services(fake));
+    await pick(await fixtureGpx('loop'));
+    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    await click(button(W.appTripGetReadyButton));
+    await until(() => text().includes(W.appTripMissingHeading), 'the first run');
+    await pick(await fixtureGpx('alpine-pass'));
+    await until(() => host.querySelector('[data-replace]') !== null, 'the question');
+    await click(button(W.appTripReplaceYes));
+    await until(() => text().includes('Altdorf'), 'the new route');
+    await settle(30);
+    expect(text()).not.toContain(W.appTripStepsOk);
+    expect(text()).not.toContain(W.appTripMissingHeading);
+    expect(text()).toContain(W.appTripNothingSaved);
+    expect(button(W.appTripGetReadyButton)).toBeDefined();
+  });
+
+  test('[TRIP-SUMMARY] a setting changed during Get ready is not overwritten by a heights step that planned with the old pace', async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((r) => { release = r; });
+    const svc = services({
+      prepare: async () => {
+        const trip = (await readTrip())!;
+        const old = planned(trip.route, { flatKph: trip.flatKph, pace: trip.pace ?? 'sporting', nights: null });
+        await held;
+        // What heightsStep does at its end, through the store Trip hands to Get ready.
+        await svc.prepareStore!(preparedStore).saveTrip({ ...(await readTrip())!, route: old });
+        return [];
+      },
+    });
+    await show(svc);
+    await pick(await fixtureGpx('multi-day-800'));
+    await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
+    const run = svc.prepare(() => undefined, () => undefined);
+    await act(async () => { host.querySelector<HTMLInputElement>('input[name=pace][value=steady]')!.click(); });
+    await settle(150);
+    release();
+    await run;
+    await settle(50);
+    const trip = (await readTrip())!;
+    const expected = planStages(trip.route, { flatKph: trip.flatKph, pace: 'steady', nights: planStages(trip.route, { flatKph: trip.flatKph, pace: 'steady', nights: 0 }).suggestedNights });
+    expect(trip.pace).toBe('steady');
+    expect(trip.route.stages.map((s) => Math.round(s.endKm))).toEqual([...expected].map((s) => Math.round(s.endKm)));
+    expect(host.querySelectorAll('[data-summary] ol li')).toHaveLength(expected.length);
+  });
+
+  test('[TRIP-GETREADY] a forecast that has ended is said to have ended, with its own fetch time', async () => {
+    const stale = preparing(allOk, { places: 12, weatherTo: new Date('2026-10-04T12:00:00Z'), fetchedAt: new Date('2026-09-28T08:00:00Z'), at: NOW });
+    await show(services(stale));
+    await pick(await fixtureGpx('loop'));
+    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    await click(button(W.appTripGetReadyButton));
+    await until(() => text().includes('12 places'), 'the line');
+    expect(text()).toContain('forecast ended Sunday');
+    expect(text()).toContain('fetched 12 days ago');
+    expect(text()).not.toContain('weather to Sunday');
+    expect(text()).not.toMatch(/updated just now/);
+  });
+
+  test('[TRIP-ATTRIBUTION] the search results carry the linked credit before anything is saved; a route that came from a file does not', async () => {
+    const f = ((input: string | URL | Request) => {
+      if (String(input).startsWith('https://geocoding-api.open-meteo.com/')) return Promise.resolve(new Response(JSON.stringify({ results: [{ id: 1, name: 'Heidelberg', latitude: 49.4, longitude: 8.69 }] }), { status: 200 }));
+      return Promise.resolve(new Response('no', { status: 503 }));
+    }) as typeof fetch;
+    await show(services({ fetch: f }));
+    const input = host.querySelector<HTMLInputElement>('#ab-from')!;
+    await act(async () => { input.value = 'Heidelberg'; input.dispatchEvent(new Event('input', { bubbles: true })); });
+    await act(async () => { input.form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+    await until(() => host.querySelector('button.hit') !== null, 'a hit');
+    const link = host.querySelector<HTMLAnchorElement>('[data-plan-ab] a[href="https://www.openstreetmap.org/copyright"]');
+    expect(link?.textContent).toBe('© OpenStreetMap contributors');
+    await pick(await fixtureGpx('loop'));
+    await until(() => host.querySelector('[data-summary]') !== null, 'the route');
+    expect(host.querySelector('[data-summary] a[href="https://www.openstreetmap.org/copyright"]')).toBeNull();
+  });
+
+  test('[TRIP-ATTRIBUTION] a route planned from A to B carries the linked credit on its summary', async () => {
+    const trip = await (async () => {
+      await show();
+      await pick(await fixtureGpx('loop'));
+      await until(() => host.querySelector('[data-summary]') !== null, 'the route');
+      return (await readTrip())!;
+    })();
+    const { saveTrip } = await import('../../../src/store/trip.ts');
+    await saveTrip({ ...trip, route: { ...trip.route, source: 'planned' } });
+    await show(services());
+    expect(host.querySelector('[data-summary] a[href="https://www.openstreetmap.org/copyright"]')?.textContent).toBe('© OpenStreetMap contributors');
+  });
+
+  test('[TRIP-REPLACE-ASKS] the same line again, once its heights were looked up, is the route you already have: nothing asks, nothing is wiped', async () => {
+    await show();
+    await pick(await fixtureGpx('loop', { heights: false }));
+    await until(() => host.querySelector('[data-summary]') !== null, 'the route');
+    const trip = (await readTrip())!;
+    const { saveTrip } = await import('../../../src/store/trip.ts');
+    await saveTrip({ ...trip, route: { ...trip.route, hash: 'with-heights', id: 'route-with-heights', ascentM: 10, points: trip.route.points.map((p) => ({ ...p, ele: 100 })) } });
+    await pick(await fixtureGpx('loop', { heights: false }));
+    await until(() => text().includes(W.appTripSameRoute), 'the note');
+    expect(host.querySelector('[data-replace]')).toBeNull();
+  });
+
+  test('[TRIP-REPLACE-ASKS] the question says exactly what is removed and what stays, and a bad file does not drop it', async () => {
+    await withRoute('loop');
+    await pick(await fixtureGpx('alpine-pass'));
+    await until(() => host.querySelector('[data-replace]') !== null, 'the question');
+    const body = host.querySelector('[data-replace]')!.textContent!;
+    expect(body).toContain('departure date');
+    expect(body).toContain('nights');
+    expect(body).toContain('pace, speed, start time, stay and camp water stay');
+    await pick('not a gpx');
+    await until(() => text().includes(W.routeGpxUnreadable), 'the refusal');
+    expect(host.querySelector('[data-replace]')).not.toBeNull();
+  });
+
+  test('[TRIP-REPLACE-ASKS] a replace is refused if the route stored is not the one the question named', async () => {
+    const svc = await withRoute('loop');
+    const found = await routeFromGpx(await fixtureGpx('alpine-pass'), 'a.gpx', svc.parseXml);
+    await expect(svc.addRoute(found, 'route-someone-else')).rejects.toThrow(W.appStoreChangedElsewhere);
+    expect((await readTrip())!.route.name).toContain('Heilbronn');
+    await expect(svc.addRoute(found, null)).rejects.toThrow(W.appStoreChangedElsewhere);
+  });
+
+  test('[AB-NONE] a planned line the route building will not take says why, not that no router answered', async () => {
+    const far: [number, number][] = [[8.69, 49.4]];
+    for (let i = 0; i < 6; i += 1) far.push([-100, -40], [8.7, 49.41]);
+    far.push([7.75, 48.58]);
+    const f = ((input: string | URL | Request) => {
+      const url = String(input);
+      const json = (b: unknown) => Promise.resolve(new Response(JSON.stringify(b), { status: 200 }));
+      if (url.startsWith('https://geocoding-api.open-meteo.com/')) {
+        const name = new URL(url).searchParams.get('name')!;
+        return json({ results: [{ id: 1, name, latitude: name === 'Heidelberg' ? 49.4 : 48.58, longitude: name === 'Heidelberg' ? 8.69 : 7.75 }] });
+      }
+      return json({ code: 'Ok', routes: [{ geometry: { coordinates: far } }] });
+    }) as typeof fetch;
+    await show(services({ fetch: f }));
+    for (const [id, name] of [['ab-from', 'Heidelberg'], ['ab-to', 'Strasbourg']] as const) {
+      const input = host.querySelector<HTMLInputElement>(`#${id}`)!;
+      await act(async () => { input.value = name; input.dispatchEvent(new Event('input', { bubbles: true })); });
+      await act(async () => { input.form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+      await until(() => host.querySelector('button.hit') !== null, 'a hit');
+      await click(host.querySelector('button.hit')!);
+    }
+    await click(button(W.appAbPlan));
+    await until(() => text().includes(W.routeTrackTooLong), 'the reason');
+    expect(text()).not.toContain(W.appAbNone);
   });
 });

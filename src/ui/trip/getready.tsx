@@ -5,8 +5,8 @@ import { W } from '../../core/wording/en.ts';
 import type { StepName, StepReport } from '../../data/prepare.ts';
 import { Card } from '../card.tsx';
 import { askForHomeScreen } from '../install.ts';
-import { agoText, thousands } from './model.ts';
-import { weatherToDay } from './services.ts';
+import { agoText, packDate, thousands } from './model.ts';
+import { forecastDay } from './services.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
 
 const ORDER: StepName[] = ['heights', 'places', 'hours', 'weather', 'baseline', 'save'];
@@ -20,14 +20,18 @@ type Progress = { step: StepName; done: number; total: number };
 
 /** "1,214 places, weather to Friday, updated 2 h ago": only what is stored. */
 function savedLine(snap: TripSnapshot): string | null {
-  const { prepared, places, forecastTo, zone, now } = snap;
+  const { prepared, places, forecastTo, forecastFetchedAt, zone, now } = snap;
   if (!prepared && places === 0 && forecastTo === null) return null;
-  const parts = [
-    places > 0 ? W.appTripPlaces(thousands(places)) : W.appTripNoPlaces,
-    forecastTo ? W.appTripWeatherTo(weatherToDay(forecastTo, zone)) : W.appTripNoWeather,
-    ...(prepared ? [W.appTripUpdated(agoText(prepared.at, now))] : []),
-  ];
-  return parts.join(', ');
+  const pack = packDate(prepared?.build);
+  const placesText = places > 0 ? `${W.appTripPlaces(thousands(places))}${pack ? ` (${W.appTripMapDate(pack.date, pack.fromSource)})` : ''}` : W.appTripNoPlaces;
+  // The forecast is read against now: one that has ended says so, and its time is its own fetch time.
+  let weather = W.appTripNoWeather;
+  if (forecastTo) {
+    const day = forecastDay(forecastTo, now, zone);
+    weather = forecastTo.getTime() > now.getTime() ? W.appTripWeatherTo(day) : W.appTripWeatherEnded(day);
+    if (forecastFetchedAt) weather += ` (${W.appTripFetched(agoText(forecastFetchedAt, now))})`;
+  }
+  return [placesText, weather].join(', ');
 }
 
 export function GetReady({ services, snap, reload }: { services: TripServices; snap: TripSnapshot; reload: () => Promise<void> }) {
@@ -92,7 +96,7 @@ export function GetReady({ services, snap, reload }: { services: TripServices; s
             <p>{W.appTripPartial}</p>
           </>
         ) : null}
-        {!progress && saved.length > 0 ? <p class="muted">{W.appTripStepSaved}: {saved.map((s) => labelOf(s.step)).join(', ')}.</p> : null}
+        {!progress && saved.length > 0 ? <p class="muted">{W.appTripStepsOk}: {saved.map((s) => labelOf(s.step)).join(', ')}.</p> : null}
         <p class="tool-line">{W.appTripFlightMode}</p>
       </div>
     </Card>

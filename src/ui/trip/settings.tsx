@@ -1,7 +1,6 @@
 // Trip settings (spec section 3.3). Every field saves when it is changed; a value outside its range is refused with the range
 // named, and the field goes back to the last good value. Nothing here works out the days: the services re-plan them.
-import { useEffect, useState } from 'preact/hooks';
-import { localIsoDate } from '../../core/answers/time.ts';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { W } from '../../core/wording/en.ts';
 import { keepFreshOffered } from '../../data/refresh.ts';
 import type { Settings } from '../../store/rules.ts';
@@ -56,6 +55,9 @@ export function TripSettings({ services, snap, reload }: { services: TripService
   const { settings, trip } = snap;
   const [problems, setProblems] = useState<Partial<Record<string, string>>>({});
   const [startDraft, setStartDraft] = useState(settings.startTime);
+  const [dateDraft, setDateDraft] = useState(trip?.departureDate ?? '');
+  useEffect(() => setDateDraft(trip?.departureDate ?? ''), [trip?.departureDate]);
+  const dateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [fresh, setFresh] = useState(settings.keepFresh);
   useEffect(() => setFresh(settings.keepFresh), [settings.keepFresh]);
   useEffect(() => setStartDraft(settings.startTime), [settings.startTime]);
@@ -80,11 +82,22 @@ export function TripSettings({ services, snap, reload }: { services: TripService
         {trip ? (
           <div class="field">
             <label for="trip-date">{W.appTripDeparture}</label>
-            <input id="trip-date" type="date" value={trip.departureDate ?? ''} onChange={(e) => void setDate(e.currentTarget.value === '' ? null : e.currentTarget.value)} />
-            <div class="row">
-              <button type="button" class="btn" onClick={() => void setDate(localIsoDate(services.now(), snap.zone))}>{W.appTripDepartureToday}</button>
-              {trip.departureDate !== null ? <button type="button" class="btn" onClick={() => void setDate(null)}>{W.appTripDepartureClear}</button> : null}
-            </div>
+            <input
+              id="trip-date" type="date" value={dateDraft}
+              onChange={(e) => {
+                // A date typed digit by digit passes through other dates: it is saved once it has settled, or when the field is left.
+                const v = e.currentTarget.value;
+                setDateDraft(v);
+                if (dateTimer.current) clearTimeout(dateTimer.current);
+                dateTimer.current = setTimeout(() => { dateTimer.current = null; void setDate(v === '' ? null : v); }, 700);
+              }}
+              onBlur={(e) => {
+                if (!dateTimer.current) return;
+                clearTimeout(dateTimer.current);
+                dateTimer.current = null;
+                void setDate(e.currentTarget.value === '' ? null : e.currentTarget.value);
+              }}
+            />
             {trip.departureDate === null ? <p class="muted">{W.appTripDepartureNone}</p> : null}
             {problem('date') ? <p class="field-problem" role="alert">{problem('date')}</p> : null}
           </div>

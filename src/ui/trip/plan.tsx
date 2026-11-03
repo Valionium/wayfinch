@@ -1,10 +1,12 @@
 // Plan from A to B (spec section 7.1): two place searches, then a bike router. Only the words typed go to a place search and only
 // the two chosen points go to a router (the note below says so). If no bike router answers, it asks for a GPX file instead.
 import { useState } from 'preact/hooks';
+import { GpxError } from '../../core/route/gpx.ts';
 import type { Route } from '../../core/types.ts';
 import { W } from '../../core/wording/en.ts';
 import { planRoute, searchPlace } from '../../data/routing.ts';
 import type { FoundPlace } from '../../data/routing.ts';
+import { OsmCredit } from './credit.tsx';
 import { routeFromPoints } from './model.ts';
 import type { TripServices } from './services.ts';
 
@@ -54,6 +56,7 @@ function PlaceChoice({ id, label, services, chosen, onChoose }: {
       {hits && hits.length > 0 ? (
         <>
           <p class="muted">{W.appAbPick}</p>
+          <OsmCredit lead={W.appTripOsmSearch} />
           <ul class="hits">
             {hits.map((h, i) => (
               <li key={i}>
@@ -71,11 +74,13 @@ export function PlanAB({ services, onRoute }: { services: TripServices; onRoute:
   const [picked, setPicked] = useState<Record<Slot, FoundPlace | null>>({ from: null, to: null });
   const [busy, setBusy] = useState(false);
   const [none, setNone] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
 
   const plan = async (): Promise<void> => {
     const { from, to } = picked;
     if (!from || !to) return;
     setNone(false);
+    setProblem(null);
     setBusy(true);
     try {
       const line = await planRoute(from, to, services.fetch);
@@ -85,9 +90,10 @@ export function PlanAB({ services, onRoute }: { services: TripServices; onRoute:
       }
       const route = await routeFromPoints(line, W.appAbName(from.name, to.name));
       await onRoute({ route, hadHeights: route.points.every((p) => p.ele !== null) });
-    } catch {
-      // A line the route building will not take is no ride either: the rider is asked for a GPX.
-      setNone(true);
+    } catch (e) {
+      // A line the route building will not take is said in its own words; anything else is no answer from a router.
+      if (e instanceof GpxError) setProblem(e.message);
+      else setNone(true);
     } finally {
       setBusy(false);
     }
@@ -102,6 +108,7 @@ export function PlanAB({ services, onRoute }: { services: TripServices; onRoute:
       {picked.from && picked.to ? <button type="button" class="btn btn-primary" onClick={() => void plan()}>{W.appAbPlan}</button> : null}
       {busy ? <p role="status">{W.appAbPlanning}</p> : null}
       {none ? <p class="notice" role="alert">{W.appAbNone}</p> : null}
+      {problem ? <p class="notice" role="alert">{problem}</p> : null}
     </div>
   );
 }
