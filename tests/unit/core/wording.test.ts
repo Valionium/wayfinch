@@ -299,6 +299,21 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   shareProgressStoppedAtEnd: [['Strasbourg', '165'], [null, '165']],
   shareProgressMap: [['48.857', '8.205']],
   appListMore: [[3]],
+  // Your bike (sub-project 5, group 7).
+  bikeLabel: [[['touring bike', '700 × 40 mm tyres', 'drop bars']]],
+  bikeKind: [['touring', false], ['trekking', true]],
+  bikeTyres: [['700', '40']],
+  bikeTyresTwo: [['700', '28', '32']],
+  bikeColourFrame: [['Green']],
+  bikeFrameStyle: [['sloping', 'M'], ['step-through', null]],
+  bikeFrameSize: [['L']],
+  bikeTyresEtrto: [[['40-622']], [['40-622', '45-622']]],
+  bikeTyresWidth: [['45']],
+  bikeWheels: [['650b']],
+  bikeDrawnFrom: [[['sloping frame (M)', '40-622 tyres', 'panniers']], [['size L frame']]],
+  bikeTypical: [['gravel bike']],
+  bikeTypicalWith: [['touring bike', 'panniers']],
+  bikeTapName: [['Your bike: gravel bike.', 'Make it yours']],
 };
 
 function everyString(): { key: string; text: string }[] {

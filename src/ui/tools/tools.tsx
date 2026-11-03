@@ -1,9 +1,11 @@
-// The Tools tab (spec section 3.4): the bag planner and the tyre calculator, each with its last result. It reads Load Check's summary
-// and the tyre tool's own storage, and writes nothing.
+// The Tools tab (spec section 3.4): the bag planner, with the rider's bike and its bags (section 3.7), and the tyre calculator, each
+// with its last result. It reads Load Check's summary and bikes and the tyre tool's own storage, and writes nothing.
 import { W, shortMapDate } from '../../core/wording/en.ts';
 import { readStore } from '../../tools/tyre/storage.ts';
 import type { LastResult } from '../../tools/tyre/storage.ts';
 import type { TyreServices } from '../../tools/tyre/ui.tsx';
+import { BikeDrawing } from '../bike/drawing.tsx';
+import { bikeSource } from '../bike/live.ts';
 import { Card } from '../card.tsx';
 
 const trimBar = (n: number): string => String(Number(n.toFixed(2)));
@@ -17,9 +19,11 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
   const last: LastResult | null = pick?.last ?? null;
   const sum = host.summary;
   const saved = sum ? shortMapDate(sum.at) : null;
+  const bike = bikeSource.value;
   return (
     <>
       <Card title={W.tyreBagCardTitle}>
+        <BikeDrawing bike={bike.bike} summary={bike.summary} known={bike.known} back="tools" caption={false} />
         <p class="tool-line">{sum ? W.tyreBagCardLine(sum.bagCount, String(Number(sum.carriedKg.toFixed(1)))) : W.tyreBagCardNone}</p>
         {saved ? <p class="muted">{W.tyreBagCardAge(saved)}</p> : null}
         <a class="btn btn-primary" href="/tools/bags/">{W.tyreCardOpen}<span class="visually-hidden"> {W.tyreBagCardTitle}</span></a>

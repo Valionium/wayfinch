@@ -1,0 +1,45 @@
+/* The bike drawing (spec sections 3.6 and 7.4): the module's bk-* parts on the theme's tokens, as Load Check's .bg-line and .bg-wheel.
+   Stroke widths come with the drawing. The rider's colour is a stroke attribute on .bk-paint, so no rule here sets a painted part's stroke. */
+.bk { display: block; width: 100%; height: auto; }
+.bk-marker { display: inline-block; width: auto; height: 24px; vertical-align: middle; }
+
+.bk-tyre { fill: none; stroke: var(--line); }
+.bk-rim { fill: none; stroke: var(--line); }
+.bk-spokes { fill: none; stroke: var(--line); opacity: 0.7; }
+.bk-hub, .bk-bb { fill: var(--line); }
+
+.bk-casing { fill: none; stroke: var(--muted); stroke-linecap: round; stroke-linejoin: round; }
+.bk-frame:not(.bk-paint), .bk-stays:not(.bk-paint), .bk-fork:not(.bk-paint) { fill: none; stroke: var(--line); stroke-linecap: round; stroke-linejoin: round; }
+.bk-paint { stroke-linecap: round; stroke-linejoin: round; }
+.bk-plain { fill: none; stroke: var(--muted); stroke-linecap: round; stroke-linejoin: round; }
+@media (prefers-reduced-motion: no-preference) {
+  .bk-paint { transition: stroke 150ms ease; }
+}
+
+.bk-ring, .bk-cog, .bk-hubgear, .bk-rotor { fill: none; stroke: var(--line); }
+.bk-chain, .bk-belt, .bk-mech, .bk-rack { fill: none; stroke: var(--line); stroke-linecap: round; stroke-linejoin: round; }
+.bk-caliper, .bk-crank, .bk-post, .bk-bar, .bk-grip { fill: none; stroke: var(--line); stroke-linecap: round; stroke-linejoin: round; }
+.bk-saddle, .bk-hood, .bk-motor { fill: var(--line); }
+.bk-battery { fill: var(--line); stroke: var(--muted); stroke-width: 0.6; }
+.bk-shock, .bk-seal { fill: none; stroke: var(--muted); stroke-linecap: round; }
+
+/* Bags keep the bag planner's fill ramp; their outline never takes the frame colour. */
+.bk-shell { fill: var(--panel); stroke: var(--muted); stroke-width: 1.3; }
+.bk-fill { opacity: 0.62; }
+.bk-onbody .bk-shell { stroke: var(--amber); }
+.bk-deck .bk-shell { fill: none; stroke: var(--sage); stroke-width: 1.4; }
+.bk-strap { fill: none; stroke: var(--blaze); stroke-width: 1; opacity: 0.7; }
+.bk-deck.bk-empty .bk-shell, .bk-deck.bk-empty .bk-strap { stroke: var(--muted); }
+.bk-cage { fill: none; stroke: var(--amber); stroke-width: 1.6; opacity: 0.85; }
+.bk-water { fill: var(--amber); opacity: 0.4; stroke: var(--amber); stroke-width: 1; }
+.bk-cap { fill: var(--amber); opacity: 0.9; }
+
+/* <BikeDrawing>: the drawing is the invitation; a tap opens Bike details at Look (section 3.7). */
+.bike { margin: 0 0 8px; }
+.bike-tap { display: block; border-radius: 8px; color: inherit; text-decoration: none; }
+.bike-art { display: block; }
+.bike-large .bike-art { max-width: 32rem; margin: 0 auto; }
+.bike-small .bike-art { width: 7.5rem; }
+.bike-caption { margin: 4px 0 0; }
+.bike-caption a { display: inline-flex; align-items: center; min-height: 44px; color: var(--blaze); font-weight: 600; }
+.bike-marker { display: inline-flex; align-items: center; }

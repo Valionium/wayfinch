@@ -73,7 +73,7 @@ test('[TY-UI-LAST] the Tools tab shows the last tyre figures and the bag plan li
   await expect(page.getByText('3 bags · 10.2 kg')).toBeVisible();
   await expect(page.getByText('Not worked out yet')).toBeVisible();
   await page.getByRole('link', { name: /Open Tyre pressure/ }).click();
-  await expect(page.getByLabel('Bike')).toHaveValue(bike.id);
+  await expect(page.locator('#tyre-bike')).toHaveValue(bike.id);
   await page.getByRole('textbox', { name: /Tyre maximum/ }).fill('6');
   await expect(page.locator('.tyre-big')).toHaveCount(2);
   const [front, rear] = (await page.locator('.tyre-big').allTextContents()).map((t) => String(Number(t.replace(' bar', ''))));
