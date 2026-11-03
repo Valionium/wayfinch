@@ -3,6 +3,9 @@
 // each tap does what its words say through the actions object, and nothing else.
 import { afterEach, describe, expect, test } from 'vitest';
 import { render } from 'preact';
+import { act } from 'preact/test-utils';
+import { AheadScreen } from '../../../src/ui/ahead/ahead.tsx';
+import { railSignal } from '../../../src/ui/wide/wide.ts';
 import { buildScreen, type Screen } from '../../../src/core/screen/screen.ts';
 import type { Answer } from '../../../src/core/types.ts';
 import { W } from '../../../src/core/wording/en.ts';
@@ -166,6 +169,22 @@ describe('cards', () => {
     await typeInto(card.querySelector<HTMLInputElement>('input[type=number]')!, '1.8');
     await click(buttonNamed('Set', card));
     expect(calls.filter((c) => c[0] === 'confirmWater')).toEqual([['confirmWater', v.stillAboutL], ['confirmWater', 0], ['confirmWater', 1.8]]);
+  });
+
+  test('[AH-MANUAL] an open picker follows a new position: its kilometre is where the rider now is, not where it was opened', async () => {
+    const { actions } = fakeActions();
+    railSignal.value = true; // a computer: the picker stays open once a position is set (spec 9.2)
+    const before = trip(viewOf(rainyStop({ positions: [pos({ km: 40, at: `${SAT} 14:20` })] })));
+    await show(before, actions);
+    if (!host.querySelector('#ah-picker')) await click(buttonNamed('Set position by hand'));
+    const kmField = () => host.querySelector<HTMLInputElement>('#ah-picker input[type=number]')!;
+    expect(kmField().value).toBe(String(before.screen.ride.startKm));
+    // A computer keeps the picker open; a fix then moves the rider on.
+    const after = trip(viewOf(rainyStop({ positions: [pos({ km: 141, at: `${SAT} 14:20` })] })));
+    expect(after.screen.ride.startKm).not.toBe(before.screen.ride.startKm);
+    await act(async () => { render(<AheadScreen view={after} actions={actions} />, host); }); // the same page, a new screen
+    expect(kmField().value).toBe(String(after.screen.ride.startKm));
+    railSignal.value = false;
   });
 
   test('[AH-WATER-Q] with water confirmed, a refill is one tap on the closed card: the quick choices stay, "Still about" does not', async () => {
