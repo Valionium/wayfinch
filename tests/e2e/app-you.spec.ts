@@ -5,6 +5,7 @@ import { expect, test } from '@playwright/test';
 import type { Page, Request } from '@playwright/test';
 import { atPosition, goOffline, loadApp, preparedTrip, removeBuilds } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
+import { forecastBody, metaBody } from '../fixtures/openmeteo.ts';
 
 // A busy machine can be slow to draw a page from the worker's cache.
 test.use({ actionTimeout: 15_000 });
@@ -188,4 +189,49 @@ test('[PRIV-NOTHING-SENT] with a prepared trip and the setting off: Call and Web
   // The cards that hold wait or go and leave-by were open while all this ran, and said something.
   await expect(page.locator('[data-card="weather"]')).toBeVisible();
   await expect(page.locator('[data-card="daylight"]')).toContainText(/leave by/i);
+});
+
+test('[WXR-AUTO-WIRED] in the browser: the automatic forecast shows on the Weather card at once, without a reload', async ({ page }) => {
+  await ahead(page);
+  await page.evaluate(() => new Promise<void>((done) => {
+    const q = indexedDB.open('copilot');
+    q.onsuccess = () => { const t = q.result.transaction(['meta'], 'readwrite'); t.objectStore('meta').delete('route:weatherAttempt'); t.oncomplete = () => { q.result.close(); done(); }; };
+  }));
+  const trip = await page.evaluate(() => new Promise<{ grid: number }>((res) => {
+    const q = indexedDB.open('copilot');
+    q.onsuccess = () => { const r = q.result.transaction(['trip']).objectStore('trip').get('current'); r.onsuccess = () => res({ grid: r.result.route.sampleGrid.length }); };
+  }));
+  // A fake Open-Meteo: five model runs, and a calm forecast for today and the days after.
+  const cors = { 'access-control-allow-origin': '*' };
+  const dayStart = Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()) / 1000;
+  await page.context().route(/^https:\/\/api\.open-meteo\.com\//, (route) => {
+    const url = route.request().url();
+    if (url.includes('/static/meta.json')) {
+      const now = Date.now() / 1000;
+      return route.fulfill({ headers: cors, json: metaBody({ run: now - 3 * 3600, available: now - 1.5 * 3600 }) });
+    }
+    return route.fulfill({ headers: cors, json: forecastBody(trip.grid, { from: dayStart, hours: 96 }) });
+  });
+  await page.goto(`${app!.origin}/#/ahead`, { waitUntil: 'domcontentloaded' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const card = page.locator('[data-card="weather"]');
+  await expect(card).toBeVisible();
+  // The forecast lands and the card changes by itself.
+  await expect(card).not.toContainText(/unknown/i, { timeout: 20_000 });
+  await expect(card).toContainText(/°C|rain/i);
+});
+
+test('[YOU-DELETE-UI] after Delete now and a reload, no empty database comes back, also with Keep trip data fresh on', async ({ page }) => {
+  app = await loadApp(page);
+  await tab(page, 'You').click();
+  await page.getByLabel('Your weight (kg)').fill('82');
+  await page.getByLabel('Your weight (kg)').blur();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('copilot:changed'))).not.toBeNull();
+  await page.getByRole('button', { name: 'Delete co-pilot data' }).click();
+  await page.getByRole('button', { name: 'Delete now' }).click();
+  await expect(page.getByText('Deleted from this phone.')).toBeVisible();
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-you-loaded]')).toBeVisible();
+  await page.waitForTimeout(1000);
+  expect(await page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name))).not.toContain('copilot');
 });

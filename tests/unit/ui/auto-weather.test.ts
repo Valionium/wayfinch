@@ -2,6 +2,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, test } from 'vitest';
 import type { StoredForecast, ZoneSpan } from '../../../src/core/types.ts';
+import { onChanged } from '../../../src/store/changed.ts';
 import { openDb } from '../../../src/store/db.ts';
 import { ZONES_META } from '../../../src/store/inputs.ts';
 import { saveTrip } from '../../../src/store/trip.ts';
@@ -11,6 +12,10 @@ import type { AutoDeps } from '../../../src/ui/auto-weather.ts';
 import { at, testTrip, zonesOf } from '../../fixtures/build.ts';
 import { forecastBody, json, metaBody, stubFetch } from '../../fixtures/openmeteo.ts';
 import { freshStore } from '../store/helpers.ts';
+
+// Plain Node has no window: the events a window would carry go through one stand-in for it.
+const bus = new EventTarget();
+Object.assign(globalThis, { addEventListener: bus.addEventListener.bind(bus), removeEventListener: bus.removeEventListener.bind(bus), dispatchEvent: bus.dispatchEvent.bind(bus) });
 
 beforeEach(freshStore);
 const NOW = at('2026-10-17 12:00');
@@ -99,5 +104,27 @@ describe('open and foreground', () => {
     const again = service();
     expect(await autoRefresh('open', deps(again, { now: () => new Date(NOW.getTime() + HOUR) }))).toBeNull();
     expect(again.urls).toEqual([]);
+  });
+
+  test('[WXR-AUTO-WIRED] a fetched forecast tells the screens of this window (the storage event reaches only other windows); no fetch tells nobody', async () => {
+    await prepared();
+    await saveForecast(trip.route.id, OLD(5 * HOUR));
+    const heard: string[] = [];
+    const stop = onChanged((section) => heard.push(section));
+    await autoRefresh('open', deps(service()));
+    expect(heard).toEqual(['weather']);
+    await autoRefresh('open', deps(service(), { now: () => new Date(NOW.getTime() + HOUR) }));
+    expect(heard).toEqual(['weather']);
+    stop();
+  });
+
+  test('[WXR-AUTO-WIRED] with no database (after Delete co-pilot data) nothing is read and none is made', async () => {
+    let reads = 0;
+    const counting = { ...weatherStore, read: async () => { reads += 1; return weatherStore.read(); } };
+    const f = service();
+    expect(await autoRefresh('open', deps(f, { store: counting }))).toBeNull();
+    expect(reads).toBe(0);
+    expect(f.urls).toEqual([]);
+    expect((await indexedDB.databases()).map((d) => d.name)).not.toContain('copilot');
   });
 });

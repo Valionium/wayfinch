@@ -7,8 +7,10 @@ import { refreshWeather } from '../data/refresh.ts';
 import type { RefreshResult, WeatherStore } from '../data/refresh.ts';
 import { WEATHER_MODE } from '../data/weather-mode.ts';
 import type { WeatherMode } from '../data/weather-mode.ts';
+import { announceHere } from '../store/changed.ts';
 import { readLocalSettings } from '../store/settings-local.ts';
 import { weatherStore } from '../store/weather.ts';
+import { dbExists } from './trip/services.ts';
 
 const AUTO_SPACING_MS = 3 * 3_600_000;
 
@@ -39,6 +41,8 @@ export async function autoRefresh(trigger: 'open' | 'foreground', deps: AutoDeps
   if (deps.mode !== 'auto' || !deps.keepFresh() || running) return null;
   running = true;
   try {
+    // After Delete co-pilot data there is nothing to refresh, and reading would make an empty database.
+    if (!(await dbExists())) return null;
     const state = await deps.store.read();
     if (!state?.prepared) return null;
     // Nothing is contacted, not even the app's own address, while the last ask is under 3 hours old.
@@ -46,7 +50,10 @@ export async function autoRefresh(trigger: 'open' | 'foreground', deps: AutoDeps
     const since = deps.now().getTime() - last;
     if (last > 0 && since >= 0 && since < AUTO_SPACING_MS) return null;
     const signal = deps.online() ? (await checkConnectivity(deps.fetch)).online : false;
-    return await refreshWeather({ mode: deps.mode, fetch: deps.fetch, now: deps.now, signal, keepFresh: true, store: deps.store }, trigger);
+    const result = await refreshWeather({ mode: deps.mode, fetch: deps.fetch, now: deps.now, signal, keepFresh: true, store: deps.store }, trigger);
+    // The new forecast is stored; the screens of this window read it again (the storage event reaches only the other windows).
+    if (result.fetched) announceHere('weather');
+    return result;
   } catch {
     return null;
   } finally {
