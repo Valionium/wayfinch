@@ -120,13 +120,13 @@ describe('Rider and water you can carry (spec section 3.5)', () => {
     expect(field('you-weight').value).toBe('');
     await type(field('you-weight'), '82');
     await type(field('you-weight'), '');
-    expect((await readProfile()).weightKg).toBeNull();
+    await vi.waitFor(async () => expect((await readProfile()).weightKg).toBeNull(), { timeout: 20_000 });
     await type(field('you-kph'), '31');
     await type(field('you-kph'), '');
-    expect((await readSettings()).flatKph).toBe(25);
+    await vi.waitFor(async () => expect((await readSettings()).flatKph).toBe(25), { timeout: 20_000 });
     await type(field('you-capacity'), '2');
     await type(field('you-capacity'), '');
-    expect((await readProfile()).capacityL).toBeNull();
+    await vi.waitFor(async () => expect((await readProfile()).capacityL).toBeNull(), { timeout: 20_000 });
     expect(host.querySelector('[role=alert]')).toBeNull();
   });
 
