@@ -69,6 +69,15 @@ describe('stamps agree with their items', () => {
   });
 });
 
+describe('basis words with their age', () => {
+  test('[INV-22] the Water card says its age in words, as Food and Weather do: the map data date and the forecast fetch time', () => {
+    const s = screen(rainyStop());
+    const water = s.cards.water.basis.join(' | ');
+    expect(water).toMatch(/[Mm]ap data (of|from) \d{1,2} [A-Z][a-z]{2}/);
+    expect(water).toMatch(/forecast fetched \d\d:\d\d/);
+  });
+});
+
 describe('no position', () => {
   test('[AH-FIRST-USE] with no position, the screen says its answers count from the route start, and how to get them from here', () => {
     expect(screen(rainyStop({ now: `${FRI} 11:35`, positions: [] })).notes).toContain(W.routeNoPositionFromStart);

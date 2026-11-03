@@ -7,9 +7,10 @@ import { bearingDeg } from '../geo/bearing.ts';
 import { pointAtRouteKm } from '../geo/project.ts';
 import { openWaterWindow, stateAt } from '../hours/check.ts';
 import type { Answer, AnswerItem, DayRide, Km, Missing, Place, PlaceHours, RouteMatch, ScreenInputs, SunSource, Trip } from '../types.ts';
-import { showKm, W } from '../wording/en.ts';
+import { shortMapDate, showKm, W } from '../wording/en.ts';
 import { LOAD_PENALTY } from '../route/stages.ts';
 import { newestMapDate } from './covers.ts';
+import { fetchedLabel } from './weather.ts';
 import { isFarOff, latestPosition, positionOrder, rejoinKm } from './locate.ts';
 import { flatLegClockMin, flatLegRidingMin, usableFlatKph, type Schedule } from './pace.ts';
 import { nowSchedule, ridingDate, zoneLookupOf } from './tripday.ts';
@@ -550,11 +551,19 @@ function freshnessOf(f: WaterFacts): Answer['freshness'] {
   return { dataDates, stale };
 }
 
-function basisOf(list: Sec[]): string[] {
+function basisOf(list: Sec[], f: WaterFacts): string[] {
   const basis = [W.waterBasisEstimate];
   if (list.some((s) => s.label === 'seasonal')) basis.push(W.waterBasisSeasonal);
   if (list.some((s) => s.label === 'assumed-hot')) basis.push(W.waterBasisAssumedHot);
   basis.push(W.waterBasisOsm);
+  // Its age in words, as Food and Weather give theirs (section 8): the map data's date, the forecast's fetch time.
+  const date = shortMapDate(newestMapDate(f));
+  if (date) basis.push(W.stopMapDate(date));
+  if (f.forecast && validDate(f.forecast.fetchedAt) && validDate(f.now)) {
+    const tz = zoneLookupOf(f.routeZones)(0).timeZone;
+    const zone = isKnownZone(tz) ? tz : 'UTC';
+    basis.push(W.weatherBasis(fetchedLabel(f.forecast.fetchedAt, f.now, zone), null));
+  }
   return basis;
 }
 
@@ -628,7 +637,7 @@ export function waterAnswer(f: WaterFacts): Answer {
   const card = (status: Answer['status'], title: string, extra: string[], items: AnswerItem[]): Answer => makeAnswer({
     topic: 'water', status, title, stamp, detail: [...extra, ...lines].join(' '),
     // A target is as good as the card it is on: it never reads "fine" on a card that isn't.
-    items: items.map((i) => (i.status === 'fine' ? { ...i, status } : i)), basis: basisOf(listS2.length > 0 ? listS2 : listS1), freshness: freshnessOf(f), missing,
+    items: items.map((i) => (i.status === 'fine' ? { ...i, status } : i)), basis: basisOf(listS2.length > 0 ? listS2 : listS1, f), freshness: freshnessOf(f), missing,
   });
   const nearby = (strict = false): AnswerItem[] => [
     ...(closeShown ? [itemFor(f, closeShown)] : []),
