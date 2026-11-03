@@ -70,3 +70,46 @@ export function corridorTiles(points: LatLng[], manifest: PackManifest, radiusKm
     return pts.some((p) => distanceToBoxKm(p, b) <= radiusKm);
   });
 }
+
+/** The corridor of section 5a: a kilometre has its place data when every tile within this of it is saved. */
+export const CORRIDOR_KM = 20;
+
+export const tileKey = (t: TileId): string => `${t.z}/${t.x}/${t.y}`;
+
+/** How finely `savedKmRanges` walks the route: an edge of a range is true to this. */
+const SAVED_STEP_KM = 0.25;
+
+/**
+ * The kilometres that have saved place data (section 9.10's coverage): those inside the covered countries, with every
+ * listed tile within the corridor saved. A tile the manifest doesn't list holds no places, and is no gap. An edge falls on
+ * the careful side: the stretch between a kilometre with data and one without counts as without.
+ */
+export function savedKmRanges(route: { points: (LatLng & { km: number })[]; lengthKm: number }, tiles: ManifestTile[], saved: ReadonlySet<string>,
+  covered: (km: number) => boolean, radiusKm: number = CORRIDOR_KM): { fromKm: number; toKm: number }[] {
+  const missing = tiles.filter((t) => !saved.has(tileKey(t))).map(tileBounds);
+  const good = (p: LatLng, km: number): boolean => covered(km) && !missing.some((b) => distanceToBoxKm(p, b) <= radiusKm);
+  const out: { fromKm: number; toKm: number }[] = [];
+  let open: { fromKm: number; toKm: number } | null = null;
+  const visit = (p: LatLng, km: number): void => {
+    if (!good(p, km)) {
+      open = null;
+      return;
+    }
+    if (open) open.toKm = km;
+    else {
+      open = { fromKm: km, toKm: km };
+      out.push(open);
+    }
+  };
+  route.points.forEach((p, i) => {
+    visit(p, p.km);
+    const next = route.points[i + 1];
+    if (!next) return;
+    const steps = Math.floor(haversineKm(p, next) / SAVED_STEP_KM);
+    for (let s = 1; s <= steps; s++) {
+      const f = s / (steps + 1);
+      visit({ lat: p.lat + (next.lat - p.lat) * f, lon: p.lon + (next.lon - p.lon) * f }, p.km + (next.km - p.km) * f);
+    }
+  });
+  return out.filter((r) => r.toKm > r.fromKm);
+}

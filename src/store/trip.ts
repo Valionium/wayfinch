@@ -1,6 +1,10 @@
 // The trip and its route (spec section 4.4). One trip at a time. Replacing the route removes everything stored for the old
 // one in a single transaction, so a failure keeps all of the old and nothing of the old ever mixes into the new.
+import { tileKey } from '../core/places/tiles.ts';
+import type { TileContent } from '../core/places/types.ts';
 import type { Route, Trip } from '../core/types.ts';
+import type { PackRun, TileReport, TileStore } from '../data/packs/download.ts';
+import { readManifest } from '../data/packs/reader.ts';
 import { holdsCopy, markChanged, NewerDataError, nextStamp, noteCopy, RefusedError, tracked } from './changed.ts';
 import { CURRENT, inTx, ROUTE_META_PREFIX, ROUTE_STORES } from './db.ts';
 import type { Tx } from './db.ts';
@@ -11,6 +15,9 @@ import { readLocalSettings, writeLocalSettings } from './settings-local.ts';
 export const stampKey = (section: string): string => `updatedAt:${section}`;
 
 export const PLAN_TOMORROW_KEY = 'copilot:plan-tomorrow';
+
+/** Inputs' `SAVED_KM_META`; inputs.ts imports from this file, so the key is stated here. */
+const SAVED_KM_KEY = `${ROUTE_META_PREFIX}savedKm`;
 
 /** A trip or route the store won't keep; `message` says why, in the rider's words. */
 export class InvalidTripError extends RefusedError {
@@ -112,6 +119,72 @@ async function putTrip(tx: Tx, trip: Trip, stored: string | null): Promise<strin
 export function replaceRoute(route: Route): Promise<void> {
   return tracked(replacing(route));
 }
+
+// ---- The pack tiles of the route (spec sections 5 and 5a) ---------------------------------------------------------------
+
+/** The run the saved tiles belong to. Under the route's prefix, so it goes with the route. */
+export const PACK_RUN_META = `${ROUTE_META_PREFIX}packRun`;
+
+/** The route was replaced, here or in another window, while its data was on the way: that data is of no use any more. */
+export class RouteGoneError extends RefusedError {
+  constructor() {
+    super('the route has been replaced');
+    this.name = 'RouteGoneError';
+  }
+}
+
+const usableRun = (raw: unknown): PackRun | null => {
+  const r = raw as Partial<PackRun> | null | undefined;
+  if (typeof r?.buildId !== 'string') return null;
+  try {
+    return { buildId: r.buildId, manifest: readManifest(JSON.stringify(r.manifest), r.buildId) };
+  } catch {
+    return null; // damaged: the next run starts over, which costs only a download
+  }
+};
+
+export async function readPackRun(): Promise<PackRun | null> {
+  return usableRun(await inTx(['meta'], 'readonly', (tx) => tx.objectStore('meta').get(PACK_RUN_META)));
+}
+
+const TILE_STORES = ['places', 'roofs', 'rescuePoints', 'savedTiles', 'matches', 'hours', 'meta', 'trip'];
+
+/** Begins a run. What an earlier run of an older build left goes in the same transaction: builds never mix. */
+export function startPackRun(run: PackRun): Promise<void> {
+  return tracked(inTx(TILE_STORES, 'readwrite', async (tx) => {
+    if ((await tx.objectStore('trip').get(CURRENT)) === undefined) throw new RouteGoneError();
+    await Promise.all(['places', 'roofs', 'rescuePoints', 'savedTiles', 'matches', 'hours'].map((name) => tx.objectStore(name).clear()));
+    await tx.objectStore('meta').delete(SAVED_KM_KEY);
+    await tx.objectStore('meta').put(run, PACK_RUN_META);
+  }));
+}
+
+export async function savedTileKeys(): Promise<Set<string>> {
+  const keys = await inTx(['savedTiles'], 'readonly', (tx) => tx.objectStore('savedTiles').getAllKeys());
+  return new Set(keys.map(String));
+}
+
+/**
+ * One batch of verified tiles, all in one transaction, so a killed tab leaves whole batches and no tile reads as saved
+ * without its content. Refused when the run isn't the stored one: the route was replaced meanwhile.
+ */
+export function saveTiles(content: TileContent[], report: TileReport): Promise<void> {
+  return tracked(inTx(['places', 'roofs', 'rescuePoints', 'savedTiles', 'meta'], 'readwrite', async (tx) => {
+    const run = (await tx.objectStore('meta').get(PACK_RUN_META)) as { buildId?: unknown } | undefined;
+    if (run?.buildId !== report.buildId) throw new RouteGoneError();
+    // Each is awaited: a value the browser can't store throws at its call, and the requests before it would then be left
+    // to fail unheard when the transaction is undone.
+    for (const c of content) {
+      for (const p of c.places) await tx.objectStore('places').put(p);
+      for (const r of c.roofs) await tx.objectStore('roofs').add(r);
+      for (const r of c.rescuePoints) await tx.objectStore('rescuePoints').add({ ...r, kms: [] });
+    }
+    for (const t of report.saved) await tx.objectStore('savedTiles').put({ buildId: report.buildId, z: t.z, x: t.x, y: t.y }, tileKey(t));
+  }));
+}
+
+/** The store as a download sees it. */
+export const tileStore: TileStore = { readRun: readPackRun, startRun: startPackRun, savedTileKeys, saveTiles };
 
 async function replacing(route: Route): Promise<void> {
   const problem = routeProblem(route);
