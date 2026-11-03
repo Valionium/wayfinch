@@ -41,6 +41,8 @@ export interface BikeInfo {
   bikeKg?: number;
   /** A tyre text on the bike that could not be read with certainty. */
   unreadTyre?: string;
+  unreadFront?: string;
+  unreadRear?: string;
 }
 
 /** The parts of Contract 1 this tool reads. */
@@ -110,9 +112,12 @@ export function resolve(d: Details, ctx: Context): Resolved {
   const frontMm = pick('frontMm', d.frontMm, bike?.frontMm);
   // A rear width nobody set follows the front: one tyre size is by far the usual case.
   let rearMm = frontMm;
+  // A rear tyre text that could not be read is not the front's width: it stays unset.
+  const rearUnread = d.rearMm === undefined && bike?.rearMm === undefined && bike?.unreadRear !== undefined;
   if ((d.rearMm ?? bike?.rearMm) !== undefined) rearMm = pick('rearMm', d.rearMm, bike?.rearMm);
+  else if (rearUnread) { rearMm = ASSUMED.rearMm; sources.rearMm = 'assumed'; }
   else sources.rearMm = sources.frontMm;
-  const rearFollowsFront = (d.rearMm ?? bike?.rearMm) === undefined;
+  const rearFollowsFront = (d.rearMm ?? bike?.rearMm) === undefined && !rearUnread;
   const casing = pick('casing', d.casing, bike?.casing);
   const setup = pick('setup', d.setup, bike?.setup);
   const rimPicked = d.rimType ?? bike?.rimType;

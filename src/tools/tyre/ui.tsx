@@ -417,7 +417,8 @@ export function TyreScreen({ services }: { services: TyreServices }) {
       </Card>
 
       <Card title={W.tyreSectionTyres}>
-        {bike?.unreadTyre && src.frontMm === 'assumed' ? <p class="muted">{W.tyreCouldntRead(bike.unreadTyre)}</p> : null}
+        {bike?.unreadFront && src.frontMm === 'assumed' ? <p class="muted">{W.tyreCouldntRead(bike.unreadFront)}</p> : null}
+        {bike?.unreadRear && src.rearMm === 'assumed' ? <p class="muted">{W.tyreCouldntRead(bike.unreadRear)}</p> : null}
         <Field id={bikeKey('front')} label={W.tyreFrontWidthLabel} source={src.frontMm} valueText={`${v.front.printedMm} mm`} resetLabel={resetFor('frontMm')} onReset={resetter('frontMm')}
           editor={<NumberInput key={`front-${key}`} id="tyre-front" label={W.tyreFrontWidthLabel} value={own('frontMm', v.front.printedMm)} assumed={v.front.printedMm} onCommit={(n) => change({ frontMm: n })} unit="mm" />} />
         <Field id={bikeKey('rear')} label={W.tyreRearWidthLabel} source={src.rearMm} valueText={`${v.rear.printedMm} mm`} resetLabel={resetFor('rearMm')} onReset={resetter('rearMm')}

@@ -348,7 +348,8 @@ export function tyreEstimate(input: TyreInput): TyreResult {
   };
   // Heat advice carries pressure numbers: it is only given when there is a figure.
   const heatNotes: [string, string][] = [];
-  let capBindsSeen = false;
+  let capReal = false;
+  let capHookless = false;
   const hooklessLimited = input.rimType === 'hookless' || input.rimType === 'unset';
   const decided: string[] = [];
   let incompatible = false;
@@ -420,7 +421,7 @@ export function tyreEstimate(input: TyreInput): TyreResult {
         }
       }
       if (!withTube && estimate < 1) flag('belowOneBar', W.tyreWarnBelowOneBar(label));
-      if (capped) capBindsSeen = true;
+      if (capped) { if (cap.kind === 'tyre-max' || cap.kind === 'rim-max') capReal = true; else capHookless = true; }
 
       return {
         label, tyre, wEff,
@@ -454,7 +455,10 @@ export function tyreEstimate(input: TyreInput): TyreResult {
   const unknownRimOrWidth = codeSet.has('rimUnset');
   if (incompatible) flag('incompatible', unknownRimOrWidth ? W.tyreWarnIncompatibleUnknown : W.tyreWarnIncompatible);
   // "Fit a wider tyre" only where a real tyre width is what limits: not under the careful rule for an unset rim, and not when a tube's floor is the cause.
-  if (capBindsSeen && !incompatible) flag('capBinds', codeSet.has('rimUnset') ? W.tyreWarnCapRimUnset : W.tyreWarnCapBinds);
+  if (!incompatible) {
+    if (capReal) flag('capBinds', W.tyreWarnCapBinds);
+    if (capHookless) flag(codeSet.has('rimUnset') ? 'capRimUnset' : 'capBinds', codeSet.has('rimUnset') ? W.tyreWarnCapRimUnset : W.tyreWarnCapBinds);
+  }
   if (!incompatible) for (const [code, text] of heatNotes) flag(code, text);
 
   return {
