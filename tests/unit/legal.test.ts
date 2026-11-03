@@ -10,9 +10,11 @@ import { buildDist } from '../../tools/build.mjs';
 import { imprintBlock, sha256, textOf } from '../../tools/build-legal.mjs';
 import { LEGAL_PAGES } from '../../src/ui/legal/links.tsx';
 
+/** jsdom ships no types here (tests/jsdom.d.ts), so the window it returns is typed as a browser window. */
+const docOf = (html: string): Document => (new JSDOM(html) as unknown as { window: { document: Document } }).window.document;
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const read = (path: string): string => readFileSync(join(ROOT, path), 'utf8');
-const textOfFile = (path: string): string => new JSDOM(read(path)).window.document.body.textContent ?? '';
+const textOfFile = (path: string): string => docOf(read(path)).body.textContent ?? '';
 const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true, recursive: true })
   .filter((e) => e.isFile()).map((e) => join(e.parentPath, e.name));
 const deps = (): Record<string, string> => (JSON.parse(read('package.json')) as { dependencies: Record<string, string> }).dependencies;
@@ -28,7 +30,7 @@ afterAll(() => { if (site) rmSync(join(site, '..'), { recursive: true, force: tr
 describe('imprint', () => {
   test('[PRIV-IMPRINT-SAME] the built imprint holds exactly the text of the bag planner block: equal hashes, nothing printed', () => {
     const page = imprintBlock();
-    const built = new JSDOM(readFileSync(join(site, 'legal', 'imprint', 'index.html'), 'utf8')).window.document.querySelector('[data-imprint]');
+    const built = docOf(readFileSync(join(site, 'legal', 'imprint', 'index.html'), 'utf8')).querySelector('[data-imprint]');
     expect(built).not.toBeNull();
     const builtHash = sha256(textOf(built!.innerHTML));
     expect(builtHash === page.hash ? 'same' : `different: ${builtHash} / ${page.hash}`).toBe('same');
@@ -55,7 +57,7 @@ describe('the pages are on the site and reachable', () => {
   test('[PRIV-LEGAL-REACH] imprint, privacy and licences are built under /legal/name/, link to each other and back to the app, and You links to all three', () => {
     expect(LEGAL_PAGES.map((p) => p.href)).toEqual(['/legal/imprint/', '/legal/privacy/', '/legal/licences/']);
     for (const page of LEGAL_PAGES) {
-      const doc = new JSDOM(readFileSync(join(site, page.href.slice(1), 'index.html'), 'utf8')).window.document;
+      const doc = docOf(readFileSync(join(site, page.href.slice(1), 'index.html'), 'utf8'));
       const links = [...doc.querySelectorAll('a')].map((a) => a.getAttribute('href'));
       expect(links, page.href).toContain('/#/you');
       for (const other of LEGAL_PAGES.filter((p) => p.href !== page.href)) expect(links, `${page.href} to ${other.href}`).toContain(other.href);
@@ -73,7 +75,7 @@ describe('the pages are on the site and reachable', () => {
 
   test('every legal text begins with the line that says an AI drafted it', () => {
     for (const page of LEGAL_PAGES) {
-      const body = new JSDOM(readFileSync(join(site, page.href.slice(1), 'index.html'), 'utf8')).window.document.querySelector('main')!.textContent!.trim();
+      const body = docOf(readFileSync(join(site, page.href.slice(1), 'index.html'), 'utf8')).querySelector('main')!.textContent!.trim();
       expect(body.startsWith("Drafted by an AI from the project's spec. Not legal advice."), page.href).toBe(true);
     }
   });
@@ -92,7 +94,7 @@ describe('privacy notice', () => {
       for (const h of hostsIn(code)) if (h !== 'www.w3.org') hosts.add(h);
     }
     expect(hosts.size).toBeGreaterThanOrEqual(9);
-    const doc = new JSDOM(read('public/legal/privacy/index.html')).window.document;
+    const doc = docOf(read('public/legal/privacy/index.html'));
     const en = doc.querySelector('#en')!.textContent!;
     const de = doc.querySelector('#de')!.textContent!;
     for (const h of hosts) {
@@ -102,7 +104,7 @@ describe('privacy notice', () => {
   });
 
   test('[PRIV-RECIPIENTS] the notice says what the spec makes it say, in both languages, and nothing of what is not in the first version', () => {
-    const doc = new JSDOM(read('public/legal/privacy/index.html')).window.document;
+    const doc = docOf(read('public/legal/privacy/index.html'));
     const en = doc.querySelector('#en')!.textContent!.replace(/\s+/g, ' ');
     const de = doc.querySelector('#de')!.textContent!.replace(/\s+/g, ' ');
     expect(en).toContain('The app never sends your position on its own.');
@@ -171,7 +173,7 @@ describe('nothing from outside', () => {
       const body = readFileSync(file, 'utf8');
       const name = file.slice(site.length);
       if (file.endsWith('.html')) {
-        const doc = new JSDOM(body).window.document;
+        const doc = docOf(body);
         for (const el of doc.querySelectorAll('script[src], link[href], img[src], iframe[src], source[src]')) {
           const url = el.getAttribute('src') ?? el.getAttribute('href') ?? '';
           if (el.tagName === 'LINK' && !['stylesheet', 'modulepreload', 'preload', 'icon', 'apple-touch-icon', 'manifest'].includes(el.getAttribute('rel') ?? '')) continue;

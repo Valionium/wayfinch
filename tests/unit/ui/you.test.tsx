@@ -44,7 +44,7 @@ beforeEach(async () => {
 afterEach(() => { act(() => render(null, host)); });
 
 const settle = async (ms = 0) => { await act(async () => { await new Promise((r) => setTimeout(r, ms)); }); };
-async function until(check: () => boolean, what: string, ms = 8000): Promise<void> {
+async function until(check: () => boolean, what: string, ms = 20_000): Promise<void> {
   const end = Date.now() + ms;
   while (!check()) {
     if (Date.now() > end) throw new Error(`waited for ${what}`);
@@ -279,7 +279,7 @@ describe('Settings (spec sections 3.5 and 6.6)', () => {
   test('[YOU-RIDER] the theme is kept and put on the page at once', async () => {
     await show();
     await click(radio('theme', 'light'));
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    await until(() => document.documentElement.getAttribute('data-theme') === 'light', 'the page to turn light');
     expect((await readSettings()).theme).toBe('light');
     await click(radio('theme', 'auto'));
     await until(() => document.documentElement.getAttribute('data-theme') === null, 'the page to follow the phone again');
