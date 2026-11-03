@@ -112,15 +112,17 @@ export function contrastRatio(a: string, b: string): number {
 /** Non-text contrast (WCAG 1.4.11): the frame must stand out from its casing at least this much. */
 export const CASING_MIN_CONTRAST = 3;
 
+/** The owner's ruling A names these swatches, and only these, for a casing other than muted: Brown (light), Silver and Sand (dark). */
+const RULED: Record<'dark' | 'light', readonly string[]> = { light: ['#7b5434'], dark: ['#b9bdc1', '#cbb68e'] };
+
 /**
- * The casing under the rider's colour. The swatches never change (they are the spec's); the casing does: muted where the paint
- * stands out from it at 3:1, else the theme's tone the paint stands out from most. Brown in the light theme, Silver and Sand in
- * the dark were the owner's three; every colour, a picked or photo one too, is held to the same 3:1.
+ * The casing under the rider's colour. Section 3.6 makes it muted; the owner's ruling A moves it for Brown in the light theme and
+ * for Silver and Sand in the dark, to the theme's tone the paint stands out from most. The swatches themselves never change, and
+ * every other colour (a picked or photo one too) keeps muted.
  */
 export function casingFor(paint: string, theme: 'dark' | 'light'): CasingTone {
-  if (!isHex(paint)) return 'muted';
+  if (!isHex(paint) || !RULED[theme].includes(paint.toLowerCase())) return 'muted';
   const tones = CASINGS[theme] as Record<string, string>;
-  if (contrastRatio(paint, tones['muted']!) >= CASING_MIN_CONTRAST) return 'muted';
   let best: CasingTone = 'muted';
   let bestRatio = 0;
   for (const [tone, hex] of Object.entries(tones)) {

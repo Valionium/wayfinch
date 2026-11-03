@@ -207,7 +207,7 @@ describe('colour and casing (spec sections 3.6 and 7.4)', () => {
       expect(e.attrs.fill).toBe('none');
       expect(e.attrs.class).toMatch(/^bk-paint bk-(frame|stays|fork)$/);
       const casing = els[els.indexOf(e) - 1]!;
-      expect(casing.attrs.class).toMatch(/^bk-casing( bk-casing-(ink|panel|ground))?$/); // ruling A: a tone where muted is too close
+      expect(casing.attrs.class).toBe('bk-casing');
       expect(casing.attrs.d).toBe(e.attrs.d);
       expect(casing.attrs.stroke).toBeUndefined(); // the theme's muted, from the stylesheet
       expect(Number(casing.attrs['stroke-width']) - Number(e.attrs['stroke-width'])).toBeCloseTo(1.5, 6);
@@ -252,21 +252,23 @@ describe("the casing, owner's ruling A of 3 November 2026", () => {
     return new RegExp(`--${name}:\\s*(#[0-9A-Fa-f]{6})`).exec(body)![1]!.toUpperCase();
   };
 
-  test('[BK-COLOUR-CASING] every swatch stands out from its casing at 3:1 or more (WCAG non-text) in both themes; the swatches are as the spec fixes them', () => {
+  test('[BK-COLOUR-CASING] only Brown (light), Silver and Sand (dark) leave muted, and they stand out from their casing at 3:1 or more; the swatches are as the spec fixes them', () => {
     expect(SWATCHES.map((s) => `${s.name} ${s.hex}`).join(', ')).toBe('Black #1d1d1f, Graphite #4b4f54, Silver #b9bdc1, White #f4f4f2, Sand #cbb68e, Brown #7b5434, Red #c62f2a, Orange #e46b1f, Yellow #f1c232, Olive #6d7a37, Green #2f7d4f, Teal #1f7f80, Blue #2563b8, Navy #1f2f55, Purple #6b3fa0, Pink #d6619b');
+    const ruled: Record<'light' | 'dark', string[]> = { light: ['Brown'], dark: ['Silver', 'Sand'] };
     for (const theme of ['light', 'dark'] as const) {
       for (const s of SWATCHES) {
         const tone = casingFor(s.hex, theme);
-        expect(contrastRatio(s.hex, (CASINGS[theme] as Record<string, string>)[tone]!), `${s.name} in ${theme} on ${tone}`).toBeGreaterThanOrEqual(3);
+        if (ruled[theme].includes(s.name)) {
+          expect(tone, `${s.name} in ${theme}`).not.toBe('muted');
+          expect(contrastRatio(s.hex, (CASINGS[theme] as Record<string, string>)[tone]!), `${s.name} in ${theme} on ${tone}`).toBeGreaterThanOrEqual(3);
+        } else {
+          // Section 3.6: the casing is muted; the owner moved only the three above.
+          expect(tone, `${s.name} in ${theme}`).toBe('muted');
+        }
       }
     }
-    // The three the owner named are among those whose casing moved off muted.
-    expect(casingFor('#7b5434', 'light')).not.toBe('muted');
-    expect(casingFor('#b9bdc1', 'dark')).not.toBe('muted');
-    expect(casingFor('#cbb68e', 'dark')).not.toBe('muted');
-    // Muted stays wherever it already stands out (a black frame in the dark theme, a white one in the light).
-    expect(casingFor('#1d1d1f', 'dark')).toBe('muted');
-    expect(casingFor('#f4f4f2', 'light')).toBe('muted');
+    // A colour of the picker or a photo keeps muted as well.
+    expect(casingFor('#7c5535', 'light')).toBe('muted');
   });
 
   test('[BK-COLOUR-CASING] the casing tones are the theme’s own tokens, as theme.css has them, and the drawing and marker carry the tone', () => {
@@ -292,8 +294,7 @@ describe('the marker on the route strip (spec section 7.4)', () => {
     const els = elements(m);
     expect(els[0]!.attrs['aria-hidden']).toBe('true');
     expect(Number(els[0]!.attrs.height)).toBeLessThanOrEqual(24);
-    // Red is under 3:1 against muted in the dark theme: its casing takes the theme's ink (ruling A).
-    expect(new Set(els.slice(1).map((e) => e.attrs.class))).toEqual(new Set(['bk-tyre', 'bk-casing bk-casing-ink', 'bk-paint bk-frame', 'bk-paint bk-fork']));
+    expect(new Set(els.slice(1).map((e) => e.attrs.class))).toEqual(new Set(['bk-tyre', 'bk-casing', 'bk-paint bk-frame', 'bk-paint bk-fork']));
     expect(m).toContain('stroke="#c62f2a"');
     expect(m).not.toMatch(/aria-label|role=/);
   });
