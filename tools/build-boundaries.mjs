@@ -20,8 +20,8 @@ const SOURCE = 'Countries, regions and local zones: © OpenStreetMap contributor
   + 'Region codes checked against Natural Earth 1:10m admin-1 (public domain).';
 
 /** Douglas-Peucker tolerance in degrees, for borders between countries and for those inside one. Over budget: raise these. */
-const BORDER_TOLERANCE = Number(process.env.BORDER_TOLERANCE ?? 0.002);
-const INLAND_TOLERANCE = Number(process.env.INLAND_TOLERANCE ?? 0.008);
+const BORDER_TOLERANCE = Number(process.env.BORDER_TOLERANCE ?? 0.0025);
+const INLAND_TOLERANCE = Number(process.env.INLAND_TOLERANCE ?? 0.012);
 /** Rings smaller than this, in square degrees, are left out, unless they're all an area has. */
 const MIN_RING_AREA = Number(process.env.MIN_RING_AREA ?? 0.000002);
 

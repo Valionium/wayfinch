@@ -140,6 +140,44 @@ describe('spans along a route', () => {
     const spans = routeZones(route, file);
     expect(spans.length).toBeGreaterThan(0);
     for (const s of spans) expect(s.toKm - s.fromKm).toBeGreaterThanOrEqual(0.1);
+    spans.forEach((s, i) => { if (i > 0) expect(`${s.country}|${s.holidayZone}`).not.toBe(`${spans[i - 1]!.country}|${spans[i - 1]!.holidayZone}`); });
+  });
+
+  // What lies under the line, looked at every 20 m, in order.
+  function underLine(a: [number, number], b: [number, number]): { country: string; fromKm: number; toKm: number }[] {
+    const route = routeThrough([a, b]);
+    const steps = Math.ceil(route.lengthKm / 0.02);
+    const runs: { country: string; fromKm: number; toKm: number }[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const f = i / steps;
+      const country = zoneAt(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, file)?.country ?? 'XX';
+      const km = route.lengthKm * f;
+      const last = runs.at(-1);
+      if (last?.country === country) last.toKm = km;
+      else runs.push({ country, fromKm: km, toKm: km });
+    }
+    return runs;
+  }
+  const legs: [string, [number, number], [number, number]][] = [
+    ['Weil am Rhein to Konstanz, over the Swiss bends of the Rhine', [47.5947, 7.6208], [47.6633, 9.1753]],
+    ['Frankfurt (Oder) over the Oder to Słubice and on', [52.34, 14.5], [52.36, 14.65]],
+    ['Aachen to Maastricht', [50.7753, 6.0839], [50.8514, 5.691]],
+    ['Saarbrücken to Luxembourg', [49.2402, 6.9969], [49.6116, 6.1319]],
+  ];
+  test.each(legs)('[BND-BORDER] one long leg, %s: the spans follow what lies under it, cut within 60 m', (_name, a, b) => {
+    const truth = underLine(a, b);
+    const spans = routeZones(routeThrough([a, b]), file);
+    const at = (km: number): string => spans.find((s) => km >= s.fromKm && km <= s.toKm)!.country;
+    let looked = 0;
+    // Every stretch of 250 m or more is there, all but its last 60 m at each end; shorter ones may go to a neighbour.
+    for (const run of truth.filter((r) => r.toKm - r.fromKm >= 0.25)) {
+      for (let km = run.fromKm + 0.06; km <= run.toKm - 0.06; km += 0.05) {
+        expect(at(km), `km ${km.toFixed(2)}`).toBe(run.country);
+        looked++;
+      }
+    }
+    expect(looked).toBeGreaterThan(100);
+    expect(new Set(truth.map((r) => r.country)).size).toBeGreaterThan(1);
   });
 
   const box = fc.record({

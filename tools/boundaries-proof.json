@@ -1,0 +1,68 @@
+{
+ "note": "BND-AGREE: places sampled from a live pack, zoneAt against the place's own country. Written by tools/prove-boundaries.mjs.",
+ "fileSha256": "3a4b81753cd8bbef233278196fc7fbbef05ff78b817009a4f8f9f2a936e8b6dd",
+ "buildId": "20261102-17",
+ "sampled": 5000,
+ "agree": 4998,
+ "holidayZoneAgree": 4988,
+ "tilesRead": 127,
+ "perCountry": {
+  "DE": {
+   "sampled": 1586,
+   "agree": 1586
+  },
+  "CH": {
+   "sampled": 419,
+   "agree": 417
+  },
+  "FR": {
+   "sampled": 1415,
+   "agree": 1415
+  },
+  "BE": {
+   "sampled": 175,
+   "agree": 175
+  },
+  "AT": {
+   "sampled": 286,
+   "agree": 286
+  },
+  "CZ": {
+   "sampled": 240,
+   "agree": 240
+  },
+  "PL": {
+   "sampled": 609,
+   "agree": 609
+  },
+  "NL": {
+   "sampled": 190,
+   "agree": 190
+  },
+  "DK": {
+   "sampled": 80,
+   "agree": 80
+  }
+ },
+ "disagreements": [
+  {
+   "id": "n325790184",
+   "name": null,
+   "lat": 47.59385,
+   "lon": 7.64215,
+   "country": "CH",
+   "found": "DE",
+   "km": 0.16
+  },
+  {
+   "id": "w367215509",
+   "name": "Bivacco Colombo Aurora Bijelich",
+   "lat": 46.35874,
+   "lon": 9.83121,
+   "country": "CH",
+   "found": null,
+   "km": 0.1
+  }
+ ],
+ "farDisagreements": []
+}
