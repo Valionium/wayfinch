@@ -34,18 +34,49 @@ export function isKnownZone(tz: string): boolean {
 
 export type WallClock = { year: number; month: number; day: number; hour: number; minute: number; second: number };
 
-/** The wall-clock fields of instant `t` in zone `tz`. */
-export function wallClock(t: Date, tz: string): WallClock {
+/** The zone's own formatter, asked directly: the source of truth for every wall clock below. */
+function formattedWall(t: Date, tz: string): WallClock {
   const w: Record<string, number> = {};
   for (const p of formatterFor(tz).formatToParts(t)) if (p.type !== 'literal') w[p.type] = Number(p.value);
   return { year: w['year']!, month: w['month']!, day: w['day']!, hour: w['hour']!, minute: w['minute']!, second: w['second']! };
 }
 
+// Zones change their offset only on a quarter hour, so every instant of a quarter hour has the offset of its first second. One
+// screen asks for thousands of wall clocks (PERF-SCREEN); the zone's formatter is asked once per quarter hour and zone, the rest is
+// arithmetic. A bounded number of offsets is kept.
+const QUARTER_MS = 15 * 60_000;
+const OFFSETS = new Map<string, number>();
+const OFFSETS_MAX = 8192;
+
+function quarterOffsetMin(ms: number, tz: string): number {
+  const quarter = Math.floor(ms / QUARTER_MS) * QUARTER_MS;
+  const key = `${tz}|${quarter}`;
+  const kept = OFFSETS.get(key);
+  if (kept !== undefined) return kept;
+  const w = formattedWall(new Date(quarter), tz);
+  const out = Math.round((Date.UTC(w.year, w.month - 1, w.day, w.hour, w.minute, w.second) - quarter) / MIN);
+  if (OFFSETS.size >= OFFSETS_MAX) OFFSETS.clear();
+  OFFSETS.set(key, out);
+  return out;
+}
+
+/** The wall-clock fields of instant `t` in zone `tz`. */
+export function wallClock(t: Date, tz: string): WallClock {
+  const ms = t.getTime();
+  // A date that is no date goes to the formatter, which says so as it always has.
+  if (!Number.isFinite(ms)) return formattedWall(t, tz);
+  const d = new Date(Math.floor(ms / 1000) * 1000 + quarterOffsetMin(ms, tz) * MIN);
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate(), hour: d.getUTCHours(), minute: d.getUTCMinutes(), second: d.getUTCSeconds() };
+}
+
 /** The zone's offset from UTC at instant `t`, in minutes, east positive. */
 export function zoneOffsetMin(t: Date, tz: string): number {
-  const w = wallClock(t, tz);
-  const asUtc = Date.UTC(w.year, w.month - 1, w.day, w.hour, w.minute, w.second);
-  return Math.round((asUtc - Math.floor(t.getTime() / 1000) * 1000) / MIN);
+  const ms = t.getTime();
+  if (!Number.isFinite(ms)) {
+    const w = formattedWall(t, tz);
+    return Math.round((Date.UTC(w.year, w.month - 1, w.day, w.hour, w.minute, w.second) - Math.floor(ms / 1000) * 1000) / MIN);
+  }
+  return quarterOffsetMin(ms, tz);
 }
 
 /** The ISO date (YYYY-MM-DD) of instant `t` in zone `tz`. */
