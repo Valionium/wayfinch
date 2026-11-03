@@ -695,13 +695,14 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 
 ## App: The refresh modes
 
-- mode: 'tap', open and foreground: fetch false and **no metadata request**, counted by a stub; default build.config.json is tap [WXR-TAP-NO-AUTO]
-- in tap, "Keep trip data fresh when online" isn't on Trip or You [WXR-TAP-HIDDEN]
+- mode: 'tap', open and foreground: fetch false and **no metadata request**, counted by a stub; tap stays the fallback, one build setting [WXR-TAP-NO-AUTO]
+- "Keep trip data fresh when online" is on Trip and You in the shipped automatic build, and saves; in the tap build it isn't on Trip or You [WXR-TAP-HIDDEN]
 - auto: fetch when a model that matters has a run ≥ 3 h newer and available ≥ 10 min; 9 min no; 2 h 59 min no; automatic fetches ≥ 3 h apart however many models; a failed check fetches when the forecast is over 3 h old; keepFresh false: nothing [WXR-AUTO-RULES]
 - both modes: a newer run ≥ 10 min available fetches; else says "You have the newest forecast (model run 10:00). Next run expected about 14:30."; failed check with last fetch ≥ 30 min old fetches; no signal: "No signal. Forecast fetched 07:10." [WXR-UPDATE-TAP]
 - whatever triggers it: 29 min 59 s after a fetch, no fetch [WXR-SPACING]
 - basis line "Open-Meteo forecast fetched 11:20 · model run 10:00", in the place's zone, oldest latest run among those that matter [WXR-BASIS]
-- changing only weatherMode in build.config.json turns automatic on: the test builds with each value and checks the bundled constant [WXR-MODE-ONE-LINE]
+- changing only weatherMode in build.config.json turns automatic on: the test builds with each value and checks the bundled constant; the shipped file says "auto" (owner's ruling A, 3 November, after Open-Meteo's written answer), which also puts 15-minute rain on [WXR-MODE-ONE-LINE]
+- one forecast request per route: at most 10 variables counting the 15-minute rain, at most 16 days; the model-run check comes first; nothing runs in the background [WXR-ONE-CALL]
 
 ## App: Refresh this stretch
 
