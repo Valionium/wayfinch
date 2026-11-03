@@ -14,6 +14,8 @@ import type { Updater } from './update.ts';
 import { ToolsScreen } from './tools/tools.tsx';
 import { browserTripServices } from './trip/services.ts';
 import { TripScreen } from './trip/trip.tsx';
+import { installDrop } from './wide/drop.ts';
+import './wide/wide.css';
 
 // The tyre tool reads Load Check's records and its own storage; rider weight from You joins when the store does.
 const tyreServices = browserServices();
@@ -69,6 +71,8 @@ function UpdateBar({ updater }: { updater: Updater }) {
 export function App({ updater = null }: { updater?: Updater | null }) {
   const current = screenSignal.value;
   const active = tabOf(current);
+  // A file dropped on the window never opens or downloads; on Trip and You it goes to the screen's own file input (spec 3.8).
+  useEffect(() => installDrop(window, document, () => screenSignal.value), []);
   return (
     <div class="shell">
       {updater ? <UpdateBar updater={updater} /> : null}
