@@ -54,18 +54,26 @@ const RAMPS = {
   dark: [[0, [168, 192, 122]], [0.55, [229, 177, 69]], [1, [224, 68, 40]]],
   light: [[0, [107, 143, 58]], [0.55, [192, 130, 20]], [1, [194, 52, 27]]],
 } as const;
+const FILLS = new Map<string, string>();
 export function fillColour(pct: number, theme: 'dark' | 'light' = 'dark'): string {
   const p = Math.max(0, Math.min(1, Number.isFinite(pct) ? pct : 0));
+  const key = theme + p;
+  const known = FILLS.get(key);
+  if (known) return known;
   const ramp = RAMPS[theme];
+  let out = `rgb(${ramp[ramp.length - 1]![1].join(',')})`;
   for (let i = 1; i < ramp.length; i += 1) {
-    const [p0, c0] = ramp[i - 1]!;
-    const [p1, c1] = ramp[i]!;
-    if (p <= p1) {
-      const t = (p - p0) / (p1 - p0);
-      return `rgb(${c0.map((v, j) => Math.round(v + (c1[j]! - v) * t)).join(',')})`;
+    const lo = ramp[i - 1]!;
+    const hi = ramp[i]!;
+    if (p <= hi[0]) {
+      const t = (p - lo[0]) / (hi[0] - lo[0]);
+      const c = (j: number) => Math.round(lo[1][j]! + (hi[1][j]! - lo[1][j]!) * t);
+      out = `rgb(${c(0)},${c(1)},${c(2)})`;
+      break;
     }
   }
-  return `rgb(${ramp[ramp.length - 1]![1].join(',')})`;
+  FILLS.set(key, out);
+  return out;
 }
 
 /** Sutherland–Hodgman against one half-plane: keeps the points where `side` is at most 0. */
@@ -74,7 +82,8 @@ function clip(poly: P[], side: (p: P) => number): P[] {
   for (let i = 0; i < poly.length; i += 1) {
     const a = poly[i]!;
     const b = poly[(i + 1) % poly.length]!;
-    const [sa, sb] = [side(a), side(b)];
+    const sa = side(a);
+    const sb = side(b);
     if (sa <= 0) out.push(a);
     if ((sa <= 0) !== (sb <= 0)) out.push(lerp(a, b, sa / (sa - sb)));
   }
@@ -103,22 +112,34 @@ function inset(poly: P[], d: number): P[] {
 function clockwise(poly: P[]): P[] {
   let s = 0;
   for (let i = 0; i < poly.length; i += 1) {
-    const [a, b] = [poly[i]!, poly[(i + 1) % poly.length]!];
+    const a = poly[i]!;
+    const b = poly[(i + 1) % poly.length]!;
     s += a[0] * b[1] - b[0] * a[1];
   }
   return s >= 0 ? poly : [...poly].reverse();
 }
 
-const boxOf = (pts: P[]): Box => {
-  const xs = pts.map((p) => p[0]);
-  const ys = pts.map((p) => p[1]);
-  return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
-};
+function boxOf(pts: P[]): Box {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const p of pts) {
+    if (p[0] < x0) x0 = p[0];
+    if (p[0] > x1) x1 = p[0];
+    if (p[1] < y0) y0 = p[1];
+    if (p[1] > y1) y1 = p[1];
+  }
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
 const corners = (b: Placed): P[] => {
-  const [cx, cy] = [b.x + b.w / 2, b.y + b.h / 2];
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
   const a = (b.rot * Math.PI) / 180;
-  return ([[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]] as P[])
-    .map(([x, y]) => [cx + (x - cx) * Math.cos(a) - (y - cy) * Math.sin(a), cy + (x - cx) * Math.sin(a) + (y - cy) * Math.cos(a)] as P);
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  const at = (x: number, y: number): P => [cx + (x - cx) * c - (y - cy) * s, cy + (x - cx) * s + (y - cy) * c];
+  return [at(b.x, b.y), at(b.x + b.w, b.y), at(b.x + b.w, b.y + b.h), at(b.x, b.y + b.h)];
 };
 const pad = (b: Box, d: number): Box => ({ x: b.x - d, y: b.y - d, w: b.w + 2 * d, h: b.h + 2 * d });
 const union = (a: Box, b: Box): Box => boxOf([[a.x, a.y], [a.x + a.w, a.y + a.h], [b.x, b.y], [b.x + b.w, b.y + b.h]]);
@@ -210,7 +231,7 @@ function frameOf(g: Geometry) {
   if (t.step !== undefined) {
     top = null;
     const from = g.headAt(0.55);
-    down = { a: g.bb, b: from, c: [g.bb[0] + (from[0] - g.bb[0]) * 0.62, g.bb[1] - 2] };
+    down = { a: g.bb, b: from, c: [g.bb[0] + (from[0] - g.bb[0]) * 0.45, g.bb[1] + 4] };
   }
   const stayTop = lerp(g.bb, g.seatTop, 0.94);
   let shock: [P, P] | null = null;
@@ -240,14 +261,15 @@ function wheel(c: P, outer: number, rim: number, widthUnits: number): string {
   return circle('bk-tyre', c, outer - sw / 2, sw) + circle('bk-rim', c, rim, 1);
 }
 
-function spokes(c: P, rim: number, n: number, turn: number): string {
+/** 16 spokes from the hub flange to the rim, angles worked out once. */
+const SPOKE_TURNS = [0.1, 0.3].map((turn) => Array.from({ length: 16 }, (_, i) => {
+  const a = turn + (i * 2 * Math.PI) / 16;
+  return [Math.cos(a), Math.sin(a), Math.cos(a + 0.35) * 2, Math.sin(a + 0.35) * 2] as const;
+}));
+function spokes(c: P, rim: number, which: 0 | 1): string {
   let d = '';
-  for (let i = 0; i < n; i += 1) {
-    const a = turn + (i * 2 * Math.PI) / n;
-    const hub = add(c, [Math.cos(a + 0.35) * 2, Math.sin(a + 0.35) * 2]);
-    d += `M${pt(hub)} L${pt(add(c, [Math.cos(a) * rim, Math.sin(a) * rim]))} `;
-  }
-  return d.trim();
+  for (const t of SPOKE_TURNS[which]!) d += `${d ? ' ' : ''}M${r2(c[0] + t[2])} ${r2(c[1] + t[3])} L${r2(c[0] + t[0] * rim)} ${r2(c[1] + t[1] * rim)}`;
+  return d;
 }
 
 // ---- the bike ----
@@ -258,7 +280,7 @@ function bikeParts(spec: BikeSpec, g: Geometry, fr: ReturnType<typeof frameOf>):
   const wr = spec.rearMm.value * g.k;
   const wf = spec.frontMm.value * g.k;
   out.push(wheel(g.rear, g.rr, g.rimR, wr), wheel(g.front, g.rf, g.rimR, wf));
-  out.push(path('bk-spokes', `${spokes(g.rear, g.rimR, 16, 0.1)} ${spokes(g.front, g.rimR, 16, 0.3)}`, 0.45));
+  out.push(path('bk-spokes', `${spokes(g.rear, g.rimR, 0)} ${spokes(g.front, g.rimR, 1)}`, 0.45));
   // Rack, behind the wheel's near side.
   if (spec.rack.value) {
     const y = g.rear[1] - g.rr - 3;
@@ -423,6 +445,8 @@ function anchorsOf(spec: BikeSpec, g: Geometry, fr: ReturnType<typeof frameOf>, 
   const seatAll = stack(seat, counts.seat ?? 1, 2);
   const barAll = stack(bar, counts.bar ?? 1, 2);
   const packAll = { ...pack, h: pack.h + 37 * Math.max(0, (counts.pack ?? 1) - 1) };
+  // Tap targets and tags are the bag planner's: worked out on first use, so a drawing alone never pays for them.
+  const hitsOf = (): Hit[] => {
   const hits: Hit[] = [];
   const rectHit = (key: string, b: Box) => hits.push({ key, kind: 'rect', box: clampBox(b) });
   rectHit('pack', pad(packAll, 5));
@@ -440,6 +464,10 @@ function anchorsOf(spec: BikeSpec, g: Geometry, fr: ReturnType<typeof frameOf>, 
     if (b) hits.push({ key: `bottle:${k}`, kind: 'circle', box: { x: b.cx - 9, y: b.cy - 9, w: 18, h: 18 }, circle: { cx: b.cx, cy: b.cy, r: 9 } });
   }
   separate(hits);
+  return hits;
+  };
+  let hitsMemo: Hit[] | undefined;
+  let tagsMemo: Record<string, P> | undefined;
   const tagAt = (b: Box, dy = -2.5): P => [Math.min(VIEW_W - 12, Math.max(12, b.x + b.w / 2)), Math.min(VIEW_H - 2, Math.max(8, b.y + dy))];
   return {
     scale: g.k,
@@ -448,10 +476,13 @@ function anchorsOf(spec: BikeSpec, g: Geometry, fr: ReturnType<typeof frameOf>, 
     tubes: {
       top: fr.top ? [fr.top.a, fr.top.b] : null, low: fr.low ? [fr.low.a, fr.low.b] : null, twin: fr.twin ? [fr.twin.a, fr.twin.b] : null, shock: fr.shock,
     },
-    seat, bar, top: { front: topFront, rear: topRear }, frame, fork, rack, rackTop, barDeck, pack, bottles, hits,
-    tags: {
-      seat: tagAt(seatAll), bar: tagAt(barAll), pack: tagAt(packAll), rack: tagAt(rack, rack.h + 8), fork: [Math.min(VIEW_W - 12, fork.x + fork.w + 6), fork.y + fork.h / 2],
-      ...(topFront ? { top: tagAt(boxOf(corners(topFront)), -1.5) } : {}), ...(frame ? { frame: tagAt(frame.boxes[0], frame.boxes[0].h + 9) } : {}),
+    seat, bar, top: { front: topFront, rear: topRear }, frame, fork, rack, rackTop, barDeck, pack, bottles,
+    get hits(): Hit[] { return (hitsMemo ??= hitsOf()); },
+    get tags(): Record<string, P> {
+      return (tagsMemo ??= {
+        seat: tagAt(seatAll), bar: tagAt(barAll), pack: tagAt(packAll), rack: tagAt(rack, rack.h + 8), fork: [Math.min(VIEW_W - 12, fork.x + fork.w + 6), fork.y + fork.h / 2],
+        ...(topFront ? { top: tagAt(boxOf(corners(topFront)), -1.5) } : {}), ...(frame ? { frame: tagAt(frame.boxes[0], frame.boxes[0].h + 9) } : {}),
+      });
     },
   };
 }
@@ -470,20 +501,23 @@ function crossSeat(fr: ReturnType<typeof frameOf>, fallback: P): P {
 /** Trims rectangle targets so no two overlap: each pair is split along its shallower overlap; a bottle's circle wins over a rectangle. */
 function separate(hits: Hit[]): void {
   const rects = hits.filter((h) => h.kind === 'rect');
-  for (let round = 0; round < 4; round += 1) {
+  for (let round = 0; round < 2; round += 1) {
     for (let i = 0; i < rects.length; i += 1) for (let j = i + 1; j < rects.length; j += 1) {
-      const [a, b] = [rects[i]!.box, rects[j]!.box];
+      const a = rects[i]!.box;
+      const b = rects[j]!.box;
       const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
       const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
       if (ox <= 0 || oy <= 0) continue;
       if (ox < oy) {
-        const [l, r] = a.x < b.x ? [a, b] : [b, a];
+        const l = a.x < b.x ? a : b;
+        const r = a.x < b.x ? b : a;
         const mid = (Math.max(a.x, b.x) + Math.min(a.x + a.w, b.x + b.w)) / 2;
         l.w = mid - l.x;
         r.w = r.x + r.w - mid;
         r.x = mid;
       } else {
-        const [t, u] = a.y < b.y ? [a, b] : [b, a];
+        const t = a.y < b.y ? a : b;
+        const u = a.y < b.y ? b : a;
         const mid = (Math.max(a.y, b.y) + Math.min(a.y + a.h, b.y + b.h)) / 2;
         t.h = mid - t.y;
         u.h = u.y + u.h - mid;
@@ -493,7 +527,8 @@ function separate(hits: Hit[]): void {
   }
   const circles = hits.filter((h) => h.kind === 'circle');
   for (let i = 0; i < circles.length; i += 1) for (let j = i + 1; j < circles.length; j += 1) {
-    const [a, b] = [circles[i]!.circle!, circles[j]!.circle!];
+    const a = circles[i]!.circle!;
+    const b = circles[j]!.circle!;
     const d = Math.hypot(a.cx - b.cx, a.cy - b.cy);
     if (d < a.r + b.r) a.r = b.r = Math.max(4, d / 2 - 0.05);
   }
@@ -506,15 +541,15 @@ function separate(hits: Hit[]): void {
       const dy = Math.max(b.y - cc.cy, 0, cc.cy - (b.y + b.h));
       if (Math.hypot(dx, dy) >= cc.r) continue;
       // Cut the rectangle back on the side that costs it least.
-      const cuts = [
-        { side: 'left', cost: cc.cx + cc.r - b.x }, { side: 'right', cost: b.x + b.w - (cc.cx - cc.r) },
-        { side: 'top', cost: cc.cy + cc.r - b.y }, { side: 'bottom', cost: b.y + b.h - (cc.cy - cc.r) },
-      ].sort((p, q) => p.cost - q.cost);
-      const cut = cuts[0]!;
-      if (cut.side === 'left') { b.w -= cut.cost; b.x += cut.cost; }
-      else if (cut.side === 'right') b.w -= cut.cost;
-      else if (cut.side === 'top') { b.h -= cut.cost; b.y += cut.cost; }
-      else b.h -= cut.cost;
+      const left = cc.cx + cc.r - b.x;
+      const right = b.x + b.w - (cc.cx - cc.r);
+      const top = cc.cy + cc.r - b.y;
+      const bottom = b.y + b.h - (cc.cy - cc.r);
+      const least = Math.min(left, right, top, bottom);
+      if (least === left) { b.w -= left; b.x += left; }
+      else if (least === right) b.w -= right;
+      else if (least === top) { b.h -= top; b.y += top; }
+      else b.h -= bottom;
     }
   }
 }
@@ -525,12 +560,17 @@ function bagsArt(view: BagView, a: Anchors, theme: 'dark' | 'light', prefix: str
   const art: string[] = [];
   let n = 0;
   const rot = (p: Placed) => (p.rot ? ` transform="rotate(${r2(p.rot)} ${r2(p.x + p.w / 2)} ${r2(p.y + p.h / 2)})"` : '');
+  // A rectangle's fill is a path that keeps the shell's rounded bottom: no clip path, so a drawing full of bags stays light.
   const shellRect = (cls: string, p: Placed, pct: number, rx: number) => {
-    const id = `${prefix}c${n++}`;
     const fh = Math.max(0, p.h * Math.max(0, Math.min(1, pct)));
-    const rect = `${attr('x', p.x)}${attr('y', p.y)}${attr('width', p.w)}${attr('height', p.h)}${attr('rx', rx)}`;
-    defs.push(`<clipPath id="${id}"><rect${rect}/></clipPath>`);
-    art.push(`<g class="${cls}"${rot(p)}><rect class="bk-shell"${rect}/><rect class="bk-fill" fill="${fillColour(pct, theme)}" clip-path="url(#${id})"${attr('x', p.x)}${attr('y', p.y + p.h - fh)}${attr('width', p.w)}${attr('height', fh)}/></g>`);
+    const r = Math.min(rx, p.w / 2, p.h / 2);
+    const x0 = r2(p.x);
+    const x1 = r2(p.x + p.w);
+    const y1 = r2(p.y + p.h);
+    const top = r2(p.y + p.h - fh);
+    const bend = r2(p.y + p.h - Math.min(r, fh));
+    const fill = fh <= 0 ? '' : `<path class="bk-fill" fill="${fillColour(pct, theme)}" d="M${x0} ${top} L${x1} ${top} L${x1} ${bend} Q${x1} ${y1} ${r2(p.x + p.w - r)} ${y1} L${r2(p.x + r)} ${y1} Q${x0} ${y1} ${x0} ${bend} Z"/>`;
+    art.push(`<g class="${cls}"${rot(p)}><rect class="bk-shell"${attr('x', p.x)}${attr('y', p.y)}${attr('width', p.w)}${attr('height', p.h)}${attr('rx', r)}/>${fill}</g>`);
   };
   const shellPoly = (pts: string, box: Box, pct: number) => {
     const id = `${prefix}c${n++}`;
@@ -546,7 +586,9 @@ function bagsArt(view: BagView, a: Anchors, theme: 'dark' | 'light', prefix: str
   const of = (pos: string) => view.items.filter((i) => i.pos === pos);
   const pairs = (pos: string, base: Placed, off: P, rx: number) => {
     for (const item of of(pos)) {
-      const [first, second] = fills(item);
+      const both = fills(item);
+      const first = both[0];
+      const second = both[1];
       if (second !== undefined) shellRect('bk-bag', { ...base, x: base.x + off[0], y: base.y + off[1] }, first!, rx);
       shellRect('bk-bag', base, second ?? first!, rx);
     }
@@ -621,17 +663,35 @@ export function labelOf(spec: BikeSpec): string {
 }
 
 /** The drawing, its anchors and its accessible name. Bags, bottles and decks come only from `bags`. */
+/** The last drawings, without their colour: a tap on a swatch only repaints. */
+const RECENT: { key: string; svg: string; anchors: Anchors }[] = [];
+const PAINT = '#c010ff';
+const NAME = '{{label}}';
+
+/** The drawing, its anchors and its accessible name. Bags, bottles and decks come only from `bags`. The anchors are shared: read them only. */
 export function bikeArt(spec: BikeSpec, bags: BagView | null, options: ArtOptions = {}): { svg: string; anchors: Anchors; label: string } {
-  const g = geometry(spec);
-  const fr = frameOf(g);
-  const counts: Record<string, number> = {};
-  for (const item of bags?.items ?? []) counts[item.pos] = (counts[item.pos] ?? 0) + 1;
-  const anchors = anchorsOf(spec, g, fr, counts);
-  const parts = bikeParts(spec, g, fr);
+  const colour = spec.colour.value;
   const label = labelOf(spec);
-  const b = bags ? bagsArt(bags, anchors, options.theme ?? 'dark', options.idPrefix ?? 'bk') : { defs: [], art: [] };
-  const svg = `<svg class="bk" viewBox="0 0 ${VIEW_W} ${VIEW_H}" role="img" aria-label="${label}">${b.defs.length ? `<defs>${b.defs.join('')}</defs>` : ''}${parts.join('')}${b.art.join('')}</svg>`;
-  return { svg, anchors, label };
+  const m = spec.mounts;
+  // What the drawing is made of, without its colour. The frame points follow from style and size (geometry is empty in this release).
+  const key = `${spec.type.value}|${spec.rimMm.value}|${spec.frontMm.value}|${spec.rearMm.value}|${spec.style.value}|${spec.size.value}|${spec.bars.value}|${spec.fork.value}|${spec.brakes.value}|${spec.drive.value}|${spec.rack.value}|${spec.ebike.value}|${colour ? 1 : 0}|${m.st}${m.dt}${m.un}${m.top}${m.frame}|${options.theme ?? 'dark'}|${options.idPrefix ?? 'bk'}|${bags ? JSON.stringify(bags) : ''}`;
+  let hit = RECENT.find((r) => r.key === key);
+  if (!hit) {
+    const plain: BikeSpec = { ...spec, colour: { value: colour ? PAINT : null, mark: spec.colour.mark } };
+    const g = geometry(plain);
+    const fr = frameOf(g);
+    const counts: Record<string, number> = {};
+    for (const item of bags?.items ?? []) counts[item.pos] = (counts[item.pos] ?? 0) + 1;
+    const anchors = anchorsOf(plain, g, fr, counts);
+    const parts = bikeParts(plain, g, fr);
+    const b = bags ? bagsArt(bags, anchors, options.theme ?? 'dark', options.idPrefix ?? 'bk') : { defs: [], art: [] };
+    const svg = `<svg class="bk" viewBox="0 0 ${VIEW_W} ${VIEW_H}" role="img" aria-label="${NAME}">${b.defs.length ? `<defs>${b.defs.join('')}</defs>` : ''}${parts.join('')}${b.art.join('')}</svg>`;
+    hit = { key, svg, anchors };
+    RECENT.unshift(hit);
+    RECENT.length = Math.min(RECENT.length, 12);
+  }
+  const svg = (colour ? hit.svg.split(`stroke="${PAINT}"`).join(`stroke="${colour}"`) : hit.svg).replace(NAME, label);
+  return { svg, anchors: hit.anchors, label };
 }
 
 /** The route-strip marker: wheels, frame and fork only, at most 24 px tall. Decorative: the strip carries the position's label. */

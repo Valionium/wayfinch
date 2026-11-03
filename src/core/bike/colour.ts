@@ -21,7 +21,9 @@ const toGamma = (c: number): number => (c <= 0.0031308 ? 12.92 * c : 1.055 * c *
 
 /** 0–255 sRGB to OKLab. */
 export function rgbToOklab(r: number, g: number, b: number): Oklab {
-  const [lr, lg, lb] = [r, g, b].map((v) => toLinear(v / 255)) as [number, number, number];
+  const lr = toLinear(r / 255);
+  const lg = toLinear(g / 255);
+  const lb = toLinear(b / 255);
   const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
   const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
   const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
@@ -52,15 +54,19 @@ export function oklabToHex([L, a, b]: Oklab): string {
 const SWATCH_LAB = SWATCHES.map((s) => ({ name: s.name, lab: hexToOklab(s.hex) }));
 
 /** The name of the swatch nearest to a colour in OKLab; null for anything that is not "#rrggbb". */
+const NAMES = new Map<string, string>();
 export function nearestSwatchName(hex: unknown): string | null {
   if (!isHex(hex)) return null;
-  const [L, a, b] = hexToOklab(hex);
+  const known = NAMES.get(hex);
+  if (known) return known;
+  const lab = hexToOklab(hex);
   let best = SWATCH_LAB[0]!;
   let bestD = Infinity;
   for (const s of SWATCH_LAB) {
-    const d = (s.lab[0] - L) ** 2 + (s.lab[1] - a) ** 2 + (s.lab[2] - b) ** 2;
-    if (d < bestD) [best, bestD] = [s, d];
+    const d = (s.lab[0] - lab[0]) ** 2 + (s.lab[1] - lab[1]) ** 2 + (s.lab[2] - lab[2]) ** 2;
+    if (d < bestD) { best = s; bestD = d; }
   }
+  NAMES.set(hex, best.name);
   return best.name;
 }
 

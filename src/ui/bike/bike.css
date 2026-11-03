@@ -33,3 +33,13 @@
 .bk-cage { fill: none; stroke: var(--amber); stroke-width: 1.6; opacity: 0.85; }
 .bk-water { fill: var(--amber); opacity: 0.4; stroke: var(--amber); stroke-width: 1; }
 .bk-cap { fill: var(--amber); opacity: 0.9; }
+
+/* <BikeDrawing>: the drawing is the invitation; a tap opens Bike details at Look (section 3.7). */
+.bike { margin: 0 0 8px; }
+.bike-tap { display: block; border-radius: 8px; color: inherit; text-decoration: none; }
+.bike-art { display: block; }
+.bike-large .bike-art { max-width: 32rem; margin: 0 auto; }
+.bike-small .bike-art { width: 7.5rem; }
+.bike-caption { margin: 4px 0 0; }
+.bike-caption a { display: inline-flex; align-items: center; min-height: 44px; color: var(--blaze); font-weight: 600; }
+.bike-marker { display: inline-flex; align-items: center; }
