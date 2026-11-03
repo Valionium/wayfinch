@@ -8,6 +8,7 @@ import type { Place, RainPlan, RainWindow, StoredForecast } from '../../../../sr
 import { at, bakery, busStop, cafe, flatRoute, fuelShop, kiosk, pos, restaurant, shelter, station, supermarket, testTrip } from '../../../fixtures/build.ts';
 import { forecastOf, momentOf, openAllYear, SAT, stamps, stopFactsOf, SUN, type Moment, type Spell, type StopCase } from './weather-helpers.ts';
 import { hoursOf } from './water-helpers.ts';
+import { showKm } from '../../../../src/core/wording/en.ts';
 
 const KM_PER_MIN = (25 * 0.82) / 1.15 / 60;
 const LONG = (): ReturnType<typeof testTrip> => testTrip({ route: flatRoute(300, { stageEnds: [200, 300] }) });
@@ -37,6 +38,16 @@ describe('the band', () => {
   });
   test('[STOP-BAND] 14 minutes: out, and it is too late even as the fallback', () => {
     expect(planOf({ moment: BAND, spells: [rain(100)], spots: [{ b: cafe('x'), km: kmBefore(14) }] }).covers).toEqual([]);
+  });
+  test('[STOP-BAND] an open cover under 15 minutes before m is not counted, and the plan says so in true words, never "no mapped cover"', () => {
+    const p = planOf({ moment: BAND, spells: [rain(100)], spots: [{ b: cafe('Mo-Su 00:00-24:00'), km: kmBefore(10) }] });
+    expect(p.covers).toEqual([]);
+    expect(p.none).not.toMatch(/^No mapped cover before/);
+    expect(p.none).toMatch(/^No mapped cover 15–60 min of riding before km 100/);
+    expect(p.none).toContain(`, km ${showKm(kmBefore(10))}, about `);
+    expect(p.none).toMatch(/Close by and open: .+, under 15 min before the rain$/);
+    // With nothing close either, the spec's own words.
+    expect(planOf({ moment: BAND, spells: [rain(100)], spots: [] }).none).toMatch(/^No mapped cover before km 100/);
   });
   test('[STOP-BAND] 61 minutes alone: not in the band, so the fallback names it', () => {
     const p = planOf({ moment: BAND, spells: [rain(100)], spots: [{ b: cafe('x'), km: kmBefore(61) }] });

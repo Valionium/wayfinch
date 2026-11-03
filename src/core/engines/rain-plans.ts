@@ -125,7 +125,16 @@ export function rainPlan(w: RainWindow, f: StopFacts): RainPlan {
   const missing: Missing[] = missingFor(f, start, m, unworked);
   const zone = zoneOfSpotKm(f, m);
   const known = savedCovers(f, start, m);
-  const none = covers.length > 0 ? null : known ? W.stopNoCover(showKm(m), validDate(tm) && w.detail === '30min' ? formatAbout(tm, zone) : null) : W.stopNoPlaceData(showKm(m));
+  const about = validDate(tm) && w.detail === '30min' ? formatAbout(tm, zone) : null;
+  // A cover the rule doesn't count because it is reached under 15 minutes before m is still there: the words say so, rather than
+  // that none is mapped (the rider would be sent back past an open building 600 m on).
+  const close = judged
+    .filter((j) => j.lead < BAND_MIN - SLACK && j.lead >= 0 && isCover(j.r) && counts(thunder, j.r))
+    .sort((a, b) => a.arrival.getTime() - b.arrival.getTime() || finalOrder(a.spot, b.spot))[0];
+  const none = covers.length > 0 ? null
+    : !known ? W.stopNoPlaceData(showKm(m))
+    : close ? `${W.stopNoCoverInBand(showKm(m), about)} · ${W.stopCoverClose(spotName(close.spot), showKm(close.spot.match.km), formatAbout(close.arrival, zoneOfSpot(close.spot, f)))}`
+    : W.stopNoCover(showKm(m), about);
   return {
     ...empty, m, covers: covers.map((c) => c.cover),
     firstCoverLine: covers[0] ? firstCoverLine(covers[0], thunder, f) : null,

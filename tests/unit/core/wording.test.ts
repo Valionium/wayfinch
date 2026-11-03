@@ -260,6 +260,8 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   stopKm: [['96']],
   stopKmOff: [['96', '120']],
   stopNoCover: [['95', 'about 14:40'], ['95', null]],
+  stopNoCoverInBand: [['95', 'about 14:40'], ['95', null]],
+  stopCoverClose: [['Café Lindenhof', '93.2', 'about 14:30']],
   stopNoPlaceData: [['95']],
   stopCoverBehind: [['Café', '70', '15', 'about 14:40']],
   stopOpenBehind: [['Café', '70', '15', 'about 14:40']],
