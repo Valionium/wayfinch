@@ -5,6 +5,7 @@ import { decodeTile } from '../core/places/pack-format.ts';
 import { tileKey } from '../core/places/tiles.ts';
 import type { TileId } from '../core/places/types.ts';
 import { matchRoofs } from '../core/route/matches.ts';
+import { kitchenHoursId } from '../core/hours/check.ts';
 import type { Place, RescuePoint, Roof, Route, Trip } from '../core/types.ts';
 import type { PackRun, TileStore } from '../data/packs/download.ts';
 import { tracked } from './changed.ts';
@@ -22,7 +23,11 @@ import { PACK_RUN_META, RouteGoneError } from './trip.ts';
 export const PACK_STAGE_META = `${ROUTE_META_PREFIX}packStage`;
 export const STAGE_PREFIX = 'stage:';
 
-const STORES = ['places', 'roofs', 'rescuePoints', 'savedTiles', 'matches', 'meta', 'trip'];
+const STORES = ['places', 'roofs', 'rescuePoints', 'savedTiles', 'matches', 'hours', 'meta', 'trip'];
+/** prepared.ts's record of the steps: a swap makes it out of date, until the run that swapped writes a new one. */
+const PREPARED_STEPS_KEY = `${ROUTE_META_PREFIX}preparedSteps`;
+/** Runs a newer build may take to come in whole before it is given up, and the old one kept. */
+export const STAGE_TRIES = 3;
 
 async function routeOf(tx: Tx, routeId: string | undefined): Promise<Route> {
   const trip = (await tx.objectStore('trip').get(CURRENT)) as Trip | undefined;
@@ -42,8 +47,15 @@ export async function clearPackData(tx: Tx, route: Route): Promise<void> {
   const stretches = stretchesOf(await meta.get(STRETCHES_META));
   const inStretch = (km: number): boolean => stretches.some((s) => km >= s.fromKm && km <= s.toKm);
 
+  // A place goes with its hours, the kitchen's too: no "open" of the old data outlives it.
   const places = tx.objectStore('places');
-  for (const p of (await places.getAll()) as Place[]) if (p.source !== 'overpass') await places.delete(p.id);
+  const hours = tx.objectStore('hours');
+  for (const p of (await places.getAll()) as Place[]) {
+    if (p.source === 'overpass') continue;
+    await places.delete(p.id);
+    await hours.delete(p.id);
+    await hours.delete(kitchenHoursId(p.id));
+  }
 
   const roofs = tx.objectStore('roofs');
   const roofKeys = await roofs.getAllKeys();
@@ -59,6 +71,25 @@ export async function clearPackData(tx: Tx, route: Route): Promise<void> {
 
   await tx.objectStore('matches').clear();
   await meta.put(mergeRanges(stretches), SAVED_KM_META);
+}
+
+/** Gives up the newer build on its way: its tiles go, the old build stays the one in use. */
+export function dropStage(): Promise<void> {
+  return tracked(inTx(['savedTiles', 'meta'], 'readwrite', async (tx) => {
+    await dropStaged(tx);
+    await tx.objectStore('meta').delete(PACK_STAGE_META);
+  }));
+}
+
+/** Counts one more run that didn't bring the newer build in whole; resolves to how many there have been. */
+export function bumpStage(buildId: string): Promise<number> {
+  return tracked(inTx(['meta'], 'readwrite', async (tx) => {
+    const stage = (await tx.objectStore('meta').get(PACK_STAGE_META)) as (PackRun & { tries?: number }) | undefined;
+    if (stage?.buildId !== buildId) return 0;
+    const tries = (typeof stage.tries === 'number' ? stage.tries : 0) + 1;
+    await tx.objectStore('meta').put({ ...stage, tries }, PACK_STAGE_META);
+    return tries;
+  }));
 }
 
 export async function readStage(): Promise<PackRun | null> {
@@ -130,6 +161,7 @@ export function swapIn(buildId: string, routeId?: string): Promise<void> {
     }
     await meta.put(stage, PACK_RUN_META);
     await meta.delete(PACK_STAGE_META);
+    await meta.delete(PREPARED_STEPS_KEY);
   }));
 }
 
@@ -196,4 +228,4 @@ export function saveTiles(content: TileContent[], report: TileReport, routeId?: 
 
 
 /** The store as a download sees it. */
-export const tileStore: TileStore = { readRun: readPackRun, startRun: startPackRun, savedTileKeys, saveTiles, readStage, startStage, stagedTileKeys, stageTiles, swapIn };
+export const tileStore: TileStore = { readRun: readPackRun, startRun: startPackRun, savedTileKeys, saveTiles, readStage, startStage, stagedTileKeys, stageTiles, swapIn, dropStage, bumpStage };

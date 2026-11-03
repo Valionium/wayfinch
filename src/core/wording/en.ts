@@ -837,6 +837,8 @@ export const W = {
   appPrepWeatherFailed: "The weather service didn't answer, so no forecast was saved.",
   appPrepNoPlaceData: (kms: string): string => `No place data for km ${kms}: outside the covered countries, or not saved. Refresh this stretch can fetch it.`,
   appPrepNewDataUnfinished: 'Newer map data could not all be fetched, so the earlier map data is kept. Get ready offline picks up where it stopped.',
+  appPrepNewDataDropped: 'Newer map data could not be fetched in three tries, so it was given up and the earlier map data is kept.',
+  appPrepNewDataNoRoom: 'Storage is too full for newer map data next to the earlier, so the earlier map data is kept.',
   appPrepNoHours: 'No opening hours were worked out: no places are saved for this route.',
   appPrepWeatherRecent: 'The forecast was fetched less than 30 minutes ago, so it was kept.',
   appPrepBaselineFailed: "The seasonal estimate couldn't be fetched.",

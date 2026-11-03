@@ -17,7 +17,7 @@ import { readInputs } from '../../../src/store/inputs.ts';
 import { readWeatherState } from '../../../src/store/weather.ts';
 import { preparedStore, PERSIST_META, readPrepared } from '../../../src/store/prepared.ts';
 import { readTrip, replaceRoute, saveTrip } from '../../../src/store/trip.ts';
-import { readPackRun } from '../../../src/store/packs.ts';
+import { readPackRun, readStage } from '../../../src/store/packs.ts';
 import { placeAt, rescueAt, roofAt } from '../../fixtures/places.ts';
 import { flatRoute } from '../../fixtures/build.ts';
 import { buildOf, fixtureBuild, fixtureTrip, ORIGIN, PackServer, rebuilt } from './pack-server.ts';
@@ -675,6 +675,110 @@ describe('a download cut off', () => {
     expect((await readPackRun())!.buildId).toBe(build.manifest.buildId);
     expect(server.requests.filter((u) => u.endsWith('current.json'))).toHaveLength(1);
     expect((await (await openDb()).getAllKeys('savedTiles'))).toHaveLength(build.manifest.tiles.length - 1);
+  });
+});
+
+describe('a newer build and its hours', () => {
+  const lat = 49.3;
+  const lon = 8.6;
+  const zone = { country: 'DE', subdivision: 'DE-BW', hoursRegionKey: 'DE-BW', holidayZone: 'DE-BW', timeZone: 'Europe/Berlin' };
+  const shopOf = (id: string, tag: string, more: Partial<Place> = {}): Place => placeAt('shop', lat + 0.002, lon, { id, openingHours: tag, ...zone, tags: { shop: 'convenience' }, ...more });
+  async function onShortTrip(): Promise<void> {
+    const route = await buildRoute(Array.from({ length: 21 }, (_, i) => ({ lat: lat + i * 0.002, lon, ele: 100 })), 'short', 'gpx');
+    await readTrip();
+    await saveTrip({ route, departureDate: '2026-10-17', startTime: '08:30', flatKph: 25, stay: 'camping', campWaterL: 2 });
+  }
+  const stop = { indoorSeating: true, outdoorSeating: null, toilets: null, takeaway: null, bikeParking50m: false, kitchenHours: 'Mo-Su 12:00-14:00' };
+
+  test('[PREP-RESUME] a swapped-in build keeps no hours of the old one: no old "open" survives, also when the hours step then fails', async () => {
+    await onShortTrip();
+    const a = buildOf({ places: [shopOf('n1', 'Mo-Su 08:00-20:00'), shopOf('n2', 'Mo-Su 08:00-20:00', { kind: 'restaurant', stop })], roofs: [], rescuePoints: [] }, '20261028-8', ['shop', 'restaurant']);
+    const server = new PackServer(a);
+    await prepareTrip(depsFor(server), () => undefined);
+    const ids = async (): Promise<string[]> => (await stored<PlaceHours>('hours')).map((h) => h.placeId).sort();
+    expect(await ids()).toEqual(['n1', 'n2', 'n2:kitchen']);
+
+    // Build B: n1 now opens only 10:00-11:00, and n2 is gone. The hours step fails after the swap, as on a killed tab.
+    const b = buildOf({ places: [shopOf('n1', 'Mo-Su 10:00-11:00')], roofs: [], rescuePoints: [] }, '20261110-3', ['shop', 'restaurant']);
+    server.add(b);
+    server.current = b.manifest.buildId;
+    const reports = await prepareTrip(depsFor(server, { store: { ...preparedStore, saveHours: async () => { throw new Error('killed'); } } }), () => undefined);
+    expect((await readPackRun())!.buildId).toBe('20261110-3');
+    expect(step(reports, 'hours').ok).toBe(false);
+    expect(await ids()).toEqual([]);
+    const three = new Date('2026-10-17T13:00:00Z'); // 15:00 in Berlin
+    const i = await inputs(three);
+    expect(stateAt(i.hours.find((h) => h.placeId === 'n1'), three).state).not.toBe('open');
+    // And the run after works out the new build's hours.
+    await prepareTrip(depsFor(server), () => undefined);
+    expect(await ids()).toEqual(['n1']);
+    expect(stateAt((await stored<PlaceHours>('hours'))[0], three).state).toBe('closed');
+  });
+
+  test('[PREP-IDLE-SPANS] hours of places no longer stored keep no catch-up running', async () => {
+    await onShortTrip();
+    const a = buildOf({ places: [shopOf('n1', 'Mo-Su 08:00-20:00'), shopOf('n2', 'Mo-Su 08:00-20:00')], roofs: [], rescuePoints: [] }, '20261028-9', ['shop']);
+    const server = new PackServer(a);
+    await prepareTrip(depsFor(server), () => undefined);
+    const b = buildOf({ places: [shopOf('n1', 'Mo-Su 08:00-20:00')], roofs: [], rescuePoints: [] }, '20261110-4', ['shop']);
+    server.add(b);
+    server.current = b.manifest.buildId;
+    await prepareTrip(depsFor(server), () => undefined);
+    const late = new Date('2026-11-10T09:00:00Z');
+    expect(await catchUpHours(late, { requestIdle: (run) => run() })).toBe(true);
+    expect(await catchUpHours(late, { requestIdle: (run) => run() })).toBe(false);
+  });
+
+  test('[PREP-RESUME] two windows swapping at once: the second says nothing untrue, and the data is the new build alone', async () => {
+    await onShortTrip();
+    const a = buildOf({ places: [shopOf('n1', 'Mo-Su 08:00-20:00')], roofs: [], rescuePoints: [] }, '20261028-10', ['shop']);
+    const server = new PackServer(a);
+    await prepareTrip(depsFor(server), () => undefined);
+    const b = buildOf({ places: [shopOf('n5', 'Mo-Su 08:00-20:00')], roofs: [], rescuePoints: [] }, '20261110-5', ['shop']);
+    server.add(b);
+    server.current = b.manifest.buildId;
+    // The other window swaps the staged build in just before this one does.
+    const reports = await prepareTrip(depsFor(server, {
+      store: { ...preparedStore, swapIn: async (id, routeId) => { await preparedStore.swapIn(id, routeId); await preparedStore.swapIn(id, routeId); } },
+    }), () => undefined);
+    expect(reports.some((r) => r.note === W.appPrepRouteReplaced)).toBe(false);
+    expect(step(reports, 'places')).toMatchObject({ ok: true, note: null });
+    expect((await stored<Place>('places')).map((p) => p.id)).toEqual(['n5']);
+  });
+
+  test('[PREP-RESUME] a newer build that can\'t finish is dropped after three runs, and the old one stays in use', async () => {
+    await onShortTrip();
+    const a = buildOf({ places: [shopOf('n1', 'Mo-Su 08:00-20:00')], roofs: [], rescuePoints: [] }, '20261028-11', ['shop']);
+    const server = new PackServer(a);
+    await prepareTrip(depsFor(server), () => undefined);
+    const b = buildOf({ places: [shopOf('n5', 'Mo-Su 08:00-20:00')], roofs: [], rescuePoints: [] }, '20261110-6', ['shop']);
+    server.add(b);
+    server.current = b.manifest.buildId;
+    server.intercept = (u) => (u.includes('/20261110-6/t/') ? new TypeError('no') : null);
+    const notes: (string | null)[] = [];
+    for (let n = 0; n < 3; n++) notes.push(step(await prepareTrip(depsFor(server), () => undefined), 'places').note);
+    expect(notes).toEqual([W.appPrepNewDataUnfinished, W.appPrepNewDataUnfinished, W.appPrepNewDataDropped]);
+    expect(await readStage()).toBeNull();
+    expect((await readPackRun())!.buildId).toBe('20261028-11');
+    expect((await stored<Place>('places')).map((p) => p.id)).toEqual(['n1']);
+    expect((await (await openDb()).getAllKeys('savedTiles')).map(String).some((k) => k.startsWith('stage:'))).toBe(false);
+  });
+
+  test('[PREP-QUOTA] a newer build that doesn\'t fit is dropped at once, and the old one stays in use', async () => {
+    await onShortTrip();
+    const a = buildOf({ places: [shopOf('n1', 'Mo-Su 08:00-20:00')], roofs: [], rescuePoints: [] }, '20261028-12', ['shop']);
+    const server = new PackServer(a);
+    await prepareTrip(depsFor(server), () => undefined);
+    const b = buildOf({ places: [shopOf('n5', 'Mo-Su 08:00-20:00')], roofs: [], rescuePoints: [] }, '20261110-7', ['shop']);
+    server.add(b);
+    server.current = b.manifest.buildId;
+    const reports = await prepareTrip(depsFor(server, {
+      store: { ...preparedStore, swapIn: async () => { throw new DOMException('full', 'QuotaExceededError'); } },
+    }), () => undefined);
+    expect(step(reports, 'places')).toMatchObject({ ok: false, note: W.appPrepNewDataNoRoom });
+    expect(await readStage()).toBeNull();
+    expect((await readPackRun())!.buildId).toBe('20261028-12');
+    expect((await stored<Place>('places')).map((p) => p.id)).toEqual(['n1']);
   });
 });
 

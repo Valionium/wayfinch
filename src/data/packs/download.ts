@@ -15,7 +15,7 @@ export type TileReport = {
   /** A finished run's build was replaced by a newer one. */
   replacedFrom?: string;
   /** A newer build is on its way but not yet whole: the report is of the old one, which stays until then. */
-  pending?: { buildId: string; staged: number; total: number; full: boolean };
+  pending?: { buildId: string; staged: number; total: number; full: boolean; dropped?: 'tries' | 'room' };
 };
 /** A run in the store: its build, and the manifest it began with, of the tiles of this route's corridor. */
 export type PackRun = { buildId: string; manifest: PackManifest };
@@ -32,6 +32,8 @@ export type TileStore = {
   stagedTileKeys(): Promise<Set<string>>;
   stageTiles(tiles: { tile: TileId; text: string }[], buildId: string): Promise<void>;
   swapIn(buildId: string): Promise<void>;
+  dropStage(): Promise<void>;
+  bumpStage(buildId: string): Promise<number>;
 };
 
 export type DownloadDeps = {
@@ -44,6 +46,8 @@ export type DownloadDeps = {
 export const STORAGE_FULL = 'storage-full';
 
 const AT_A_TIME = 6;
+/** Runs a newer build may take to come in whole (store/packs.ts's STAGE_TRIES). */
+const STAGE_TRIES = 3;
 const TRIES = 3;
 const FIRST_WAIT_MS = 1000;
 const TILE_WAIT_MS = 30_000;
@@ -185,12 +189,26 @@ export async function downloadTiles(route: { points: LatLng[] }, deps: DownloadD
     if (target !== staged) await store.startStage(target);
     const f = await fill(target, await store.stagedTileKeys(), (good, ids) =>
       store.stageTiles(good.map((g, i) => ({ tile: ids[i]!, text: g.text })), target.buildId));
+    let full = f.full;
     if (!f.gone && f.failed.length === 0) {
-      await store.swapIn(target.buildId);
-      return reportOf(target, { saved: f.saved, failed: [] }, flag);
+      try {
+        await store.swapIn(target.buildId);
+        return reportOf(target, { saved: f.saved, failed: [] }, flag);
+      } catch (e) {
+        // Another window swapped the very same build in first: it is in, which is all this run was for.
+        if ((await store.readRun())?.buildId === target.buildId) return reportOf(target, { saved: f.saved, failed: [] }, flag);
+        if (!isStorageFull(e)) throw e;
+        full = true;
+      }
     }
     const before = await asStored(old);
-    return { ...before, failed: before.failed.filter((x) => x.reason !== 'build-gone'), pending: { buildId: target.buildId, staged: f.saved.length, total: target.manifest.tiles.length, full: f.full } };
+    const pending = { buildId: target.buildId, staged: f.saved.length, total: target.manifest.tiles.length, full };
+    // Two builds held at once cost room: no room drops the newer one at once, and so do three runs that couldn't finish it.
+    let dropped: 'tries' | 'room' | undefined;
+    if (full) dropped = 'room';
+    else if ((await store.bumpStage(target.buildId)) >= STAGE_TRIES) dropped = 'tries';
+    if (dropped) await store.dropStage();
+    return { ...before, failed: before.failed.filter((x) => x.reason !== 'build-gone'), pending: { ...pending, ...(dropped ? { dropped } : {}) } };
   };
 
   let run = await store.readRun();

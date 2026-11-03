@@ -8,7 +8,7 @@ import type { Tx } from './db.ts';
 import { HOLIDAYS_META, SAVED_KM_META, ZONES_META } from './inputs.ts';
 import { usableHolidays, usableZones } from './rules.ts';
 import { readTrip, RouteGoneError, saveTrip } from './trip.ts';
-import { readPackRun, readStage, saveTiles, savedTileKeys, stagedTileKeys, stageTiles, startPackRun, startStage, swapIn } from './packs.ts';
+import { bumpStage, dropStage, readPackRun, readStage, saveTiles, savedTileKeys, stagedTileKeys, stageTiles, startPackRun, startStage, swapIn } from './packs.ts';
 import { mergeRanges, STRETCHES_META } from './stretch.ts';
 import { usableSavedKm } from './rules.ts';
 import { PREPARED_META, reserveWeatherFetch, saveForecast as keepForecast } from './weather.ts';
@@ -52,7 +52,14 @@ export type Matched = TileData & { matches: RouteMatch[]; savedKm: { fromKm: num
  * A refreshed stretch's kilometres stay saved. Resolves to the saved kilometres as stored.
  */
 export function saveMatched(routeId: string, m: Matched): Promise<Matched['savedKm']> {
-  return guarded(routeId, ['places', 'roofs', 'rescuePoints', 'matches', 'meta'], async (tx) => {
+  return guarded(routeId, ['places', 'roofs', 'rescuePoints', 'matches', 'hours', 'meta'], async (tx) => {
+    // Hours of a place no longer kept go with it, or their old window would keep the catch-up of hours running.
+    const kept = new Set(m.places.map((p) => p.id));
+    const hours = tx.objectStore('hours');
+    for (const key of await hours.getAllKeys()) {
+      const id = String(key).replace(/:kitchen$/, '');
+      if (!kept.has(id)) await hours.delete(key);
+    }
     for (const name of ['places', 'roofs', 'rescuePoints', 'matches']) await tx.objectStore(name).clear();
     for (const p of m.places) await tx.objectStore('places').put(p);
     for (const r of m.roofs) await tx.objectStore('roofs').add(r);
@@ -127,7 +134,7 @@ export const readHours = (): Promise<PlaceHours[]> =>
 
 /** The store as preparation sees it. Tests put a full disk in its place. */
 export const preparedStore = {
-  readTrip, saveTrip, readRun: readPackRun, startRun: startPackRun, savedTileKeys, saveTiles, readStage, startStage, stagedTileKeys, stageTiles, swapIn, readTileData, saveMatched,
+  readTrip, saveTrip, readRun: readPackRun, startRun: startPackRun, savedTileKeys, saveTiles, readStage, startStage, stagedTileKeys, stageTiles, swapIn, dropStage, bumpStage, readTileData, saveMatched,
   saveZones, saveHolidays, saveHours, saveForecast, reserveWeather, saveBaseline, savePrepared, savePersist,
 };
 export type PreparedStore = typeof preparedStore;

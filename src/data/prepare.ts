@@ -219,7 +219,7 @@ async function placesStep(deps: PrepareDeps, store: PreparedStore, online: boole
     readRun: store.readRun, savedTileKeys: store.savedTileKeys, readStage: store.readStage, stagedTileKeys: store.stagedTileKeys,
     startRun: (run) => store.startRun(run, route.id),
     saveTiles: (content, report) => store.saveTiles(content, report, route.id),
-    startStage: (run) => store.startStage(run, route.id),
+    startStage: (run) => store.startStage(run, route.id), dropStage: store.dropStage, bumpStage: store.bumpStage,
     stageTiles: (list, buildId) => store.stageTiles(list, buildId, route.id),
     swapIn: (buildId) => store.swapIn(buildId, route.id),
   };
@@ -272,7 +272,9 @@ async function placesStep(deps: PrepareDeps, store: PreparedStore, online: boole
     return { report: { step: 'places', ok: false, note: W.appPrepStorageFull(tiles.saved.length, tiles.manifest.tiles.length) }, tiles };
   }
   const gaps = withoutData(route, savedKm);
-  if (full) note = tiles.pending ? W.appPrepStorageFullStep : W.appPrepStorageFull(tiles.saved.length, tiles.manifest.tiles.length);
+  if (tiles.pending?.dropped === 'room') note = W.appPrepNewDataNoRoom;
+  else if (tiles.pending?.dropped === 'tries') note = W.appPrepNewDataDropped;
+  else if (full) note = tiles.pending ? W.appPrepStorageFullStep : W.appPrepStorageFull(tiles.saved.length, tiles.manifest.tiles.length);
   else if (note === null && tiles.pending) note = W.appPrepNewDataUnfinished;
   else if (note === null && tiles.failed.length > 0) note = W.appPrepTilesFailed(tiles.failed.length);
   else if (note === null && zones === null) note = W.appPrepZonesMissing;

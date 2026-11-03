@@ -3,7 +3,8 @@ import type { PackManifest, Place, TileContent } from '../../../src/core/places/
 import type { TileReport } from '../../../src/data/packs/download.ts';
 import { openDb } from '../../../src/store/db.ts';
 import { PACK_RUN_META, readTrip, replaceRoute, RouteGoneError, saveTrip } from '../../../src/store/trip.ts';
-import { readPackRun, saveTiles, startPackRun } from '../../../src/store/packs.ts';
+import { readPackRun, saveTiles, stageTiles, startPackRun, startStage, swapIn } from '../../../src/store/packs.ts';
+import { saveMatched } from '../../../src/store/prepared.ts';
 import { placeAt, rescueAt, roofAt } from '../../fixtures/places.ts';
 import { freshStore, route, trip } from './helpers.ts';
 
@@ -79,5 +80,31 @@ describe('a batch of tiles', () => {
     await started();
     await (await openDb()).put('meta', { buildId: manifest.buildId, manifest: { nonsense: true } }, PACK_RUN_META);
     expect(await readPackRun()).toBeNull();
+  });
+});
+
+describe('hours go with their places', () => {
+  const span = { placeId: 'x', windowStart: new Date('2026-10-17T00:00:00Z'), windowEnd: new Date('2026-10-20T00:00:00Z'), spans: [] };
+  const hoursKeys = async (): Promise<string[]> => (await (await openDb()).getAllKeys('hours')).map(String).sort();
+
+  test('[PREP-TRANSACTION] a swap removes the hours of every place it removes, the kitchen\'s too, and keeps a refreshed place\'s', async () => {
+    await started();
+    await saveTiles(content([placeAt('water', 49, 8, { id: 'n1' })]), report);
+    const db = await openDb();
+    await db.put('places', placeAt('water', 49, 8, { id: 'n7', source: 'overpass' }));
+    for (const id of ['n1', 'n1:kitchen', 'n7', 'n7:kitchen']) await db.put('hours', { ...span, placeId: id });
+    const next = { ...manifest, buildId: '20261110-1' };
+    await startStage({ buildId: next.buildId, manifest: next });
+    await stageTiles([], next.buildId);
+    await swapIn(next.buildId);
+    expect(await hoursKeys()).toEqual(['n7', 'n7:kitchen']);
+  });
+
+  test('[PREP-TRANSACTION] matching keeps no hours of a place it no longer keeps', async () => {
+    await started();
+    const db = await openDb();
+    for (const id of ['n1', 'n1:kitchen', 'n2', 'n2:kitchen']) await db.put('hours', { ...span, placeId: id });
+    await saveMatched((await readTrip())!.route.id, { places: [placeAt('water', 49, 8, { id: 'n1' })], roofs: [], rescuePoints: [], matches: [], savedKm: [] });
+    expect(await hoursKeys()).toEqual(['n1', 'n1:kitchen']);
   });
 });
