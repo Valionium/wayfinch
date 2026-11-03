@@ -609,4 +609,24 @@ describe("Flat or hilly? on the post-ride report (owner ruling small)", () => {
     expect((await readProfile()).sumW).toBeGreaterThan(0);
     expect(host.querySelector('[data-hilly-count]')!.textContent).toBe(Y.youLearnHilly(1));
   });
+
+  test("[YOU-TERRAIN] the export note and the empty-rides line of the import preview both say that hilly reports stay on this phone, and a hilly result shows no caution and no schedule", async () => {
+    await show();
+    expect(text()).toContain('hilly water reports stay out of it');
+    expect(Y.youImportRides(0)).toContain('hilly reports stay on this phone');
+    await click(button(Y.youRideOpen));
+    await type(field('ride-hours'), '5');
+    await type(field('ride-drank'), '4.5');
+    await click(radio('ride-temp', 'warm'));
+    await click(radio('ride-terrain', 'hilly'));
+    await type(field('ride-loss'), '1');
+    await click(button(Y.youRideAdd));
+    await until(() => host.querySelector('[data-ride-result]') !== null, 'the result');
+    const result = host.querySelector('[data-ride-result]')!.textContent!;
+    expect(result).toContain(Y.youRideHillyKept);
+    expect(result).toContain(W.waterDrinkToThirst);
+    expect(host.querySelector('[data-over-drinking]')).toBeNull();
+    expect(result).not.toContain(W.waterSaltyFood);
+    expect((await readProfile()).weighedRides).toBe(0);
+  });
 });

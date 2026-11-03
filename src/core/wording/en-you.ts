@@ -87,7 +87,7 @@ export const Y = {
   // ---- Data ----
   youDataTitle: 'Your data',
   youExport: 'Export my data',
-  youExportNote: 'One file with your rider details, trip, settings, water learning and tyre details. Positions and the bag planner stay out of it.',
+  youExportNote: 'One file with your rider details, trip, settings, water learning and tyre details. Positions, the bag planner and hilly water reports stay out of it: those stay on this phone.',
   youExported: (name: string): string => `Saved as ${name}.`,
   youImport: 'Import from a file',
   youImportFileLabel: 'Choose an export file',
@@ -95,7 +95,7 @@ export const Y = {
   youImportTrip: (name: string, km: string): string => `a trip: ${name}, ${km} km`,
   youImportRider: 'rider details',
   youImportSettings: 'settings',
-  youImportRides: (n: number): string => (n === 0 ? 'no logged rides (your logged rides are cleared)' : n === 1 ? '1 logged ride' : `${n} logged rides`),
+  youImportRides: (n: number): string => (n === 0 ? 'no logged rides (your flat rides are cleared; hilly reports stay on this phone)' : n === 1 ? '1 logged ride' : `${n} logged rides`),
   youImportTyres: (n: number): string => (n === 1 ? 'tyre details for 1 bike' : `tyre details for ${n} bikes`),
   youImportNothing: 'nothing the app keeps',
   youImportReplaces: 'What is in the file replaces the same part on this phone.',

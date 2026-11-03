@@ -3,6 +3,7 @@
 // kept after the day, so the loss the ride is compared with is the sweat-rate model on flat ground at the temperature the
 // rider picks (ruling of group 8; the check-in range and the stored forecast stay for a later refinement).
 import type { Profile } from '../types.ts';
+import { W } from '../wording/en.ts';
 import { LOAD_PENALTY } from '../route/stages.ts';
 import { drinkingAdvice, overDrinking } from './water-factors.ts';
 import type { Ride } from './water-base.ts';
@@ -62,6 +63,10 @@ export function reportRide(report: RideReport, profile: Profile, flatKph: number
     ...(report.toiletStops === undefined ? {} : { toiletStops: report.toiletStops }),
     ...(report.hilly === true ? { hilly: true as const } : {}),
   };
+  // A hilly ride is not judged against the flat estimate: no schedule, no caution, nothing counted as calibrated. Drink to thirst.
+  if (report.hilly === true) {
+    return { ok: true, ride, predictedL, srModel: rate.riding, advice: { promptLPerH: null, dayFlag: false, lines: [W.waterDrinkToThirst] }, over: false };
+  }
   const temp = REPORT_TEMPS[report.temp];
   const planT = temp + PLAN_MARGIN_C;
   const advice = drinkingAdvice({
