@@ -1,0 +1,24 @@
+/* The legal pages of Wayfinch: plain pages of the site, no script, no outside font. Colours as in the app (section 3.6). */
+:root { color-scheme: light dark; --ground: #F4F2E8; --panel: #FBFAF3; --ink: #22271D; --muted: #57604A; --blaze: #B43A08; --line: #C7C4B1; }
+@media (prefers-color-scheme: dark) {
+  :root { --ground: #1B2018; --panel: #242B20; --ink: #EFEDE0; --muted: #A8B198; --blaze: #FF7950; --line: #3E4A36; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 1rem/1.5 system-ui, 'Segoe UI', Roboto, sans-serif; }
+.lg-top { padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.lg-back, .lg-nav a { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 8px; color: var(--ink); font-weight: 600; }
+.lg-main { max-width: 46rem; margin: 0 auto; padding: 16px 16px 48px; overflow-wrap: anywhere; }
+h1 { font-size: 1.75rem; margin: 16px 0 8px; }
+h2 { font-size: 1.35rem; margin: 28px 0 8px; }
+h3 { font-size: 1.1rem; margin: 20px 0 4px; }
+a { color: var(--blaze); text-underline-offset: 2px; }
+:focus-visible { outline: 3px solid var(--blaze); outline-offset: 2px; }
+.lg-draft { border-left: 4px solid var(--blaze); padding: 8px 12px; background: var(--panel); font-weight: 600; }
+.lg-nav { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 8px 0; }
+.lg-table-wrap { overflow-x: auto; margin: 8px 0; }
+table { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: 0.9375rem; }
+th, td { text-align: left; vertical-align: top; border: 1px solid var(--line); padding: 6px 8px; }
+th { background: var(--panel); }
+.lg-note { color: var(--muted); }
+code { font-family: ui-monospace, Consolas, monospace; font-size: 0.9em; }
+.lg-licence { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel); border: 1px solid var(--line); padding: 8px 12px; font: 0.8125rem/1.4 ui-monospace, Consolas, monospace; }

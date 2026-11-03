@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build as esbuild } from 'esbuild';
+import { writeImprint } from './build-legal.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PAGE = join(ROOT, 'public', 'tools', 'bags', 'index.html');
@@ -131,6 +132,13 @@ export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = 
       cpSync(shell, target, { recursive: true });
     } finally {
       rmSync(shell, { recursive: true, force: true });
+    }
+    // The imprint is the bag planner's own block, taken at build time. If it can't be taken, the placeholder from public/ stays and the
+    // test PRIV-IMPRINT-SAME fails; nothing of the block is printed.
+    try {
+      writeImprint(target);
+    } catch (e) {
+      console.warn(`Imprint not taken from the bag planner (${e instanceof Error ? e.message.split(String.fromCharCode(10))[0] : 'unknown'}); the placeholder stays.`);
     }
     mkdirSync(join(target, 'tools', 'bags'), { recursive: true });
     writeFileSync(join(target, 'tools', 'bags', 'bike.js'), await compileBikeScript());

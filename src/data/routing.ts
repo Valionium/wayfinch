@@ -96,7 +96,7 @@ export const ROUTERS: readonly Router[] = [
   },
   {
     id: 'valhalla-bicycle', name: 'FOSSGIS Valhalla, bicycle', profile: 'bicycle',
-    terms: 'https://valhalla1.openstreetmap.de/',
+    terms: 'https://valhalla.openstreetmap.de/',
     note: 'Volunteer-run Valhalla instance; the request carries the bicycle costing. Line without heights.',
     url: (a, b) => `https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(JSON.stringify({
       locations: [{ lat: a.lat, lon: a.lon }, { lat: b.lat, lon: b.lon }],

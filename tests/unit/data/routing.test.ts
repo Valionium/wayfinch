@@ -77,6 +77,14 @@ describe('Plan from A to B (spec section 7.1)', () => {
     }
   });
 
+  test('[AB-ROUTERS] each terms address is the one read on 3 November 2026 (policy check): the OSRM about page, the FOSSGIS Valhalla page (the instance address answers 404) and the BRouter home page', () => {
+    expect(Object.fromEntries(ROUTERS.map((r) => [r.id, r.terms]))).toEqual({
+      'osrm-bike': 'https://routing.openstreetmap.de/about.html',
+      'valhalla-bicycle': 'https://valhalla.openstreetmap.de/',
+      'brouter-trekking': 'https://brouter.de/',
+    });
+  });
+
   test('[AB-ROUTERS] they are tried in turn: the first that answers wins and the rest are never asked', async () => {
     const first = fakeFetch({ [OSRM]: osrmAnswer(exact(40)) });
     const got = await planRoute(A, B, first.fetch);

@@ -4,9 +4,9 @@ import { Y } from '../../core/wording/en-you.ts';
 import { Card } from '../card.tsx';
 
 export const LEGAL_PAGES = [
-  { href: '/legal/imprint.html', label: Y.youImprint },
-  { href: '/legal/privacy.html', label: Y.youPrivacy },
-  { href: '/legal/licences.html', label: Y.youLicences },
+  { href: '/legal/imprint/', label: Y.youImprint },
+  { href: '/legal/privacy/', label: Y.youPrivacy },
+  { href: '/legal/licences/', label: Y.youLicences },
 ] as const;
 
 export function LegalLinks() {

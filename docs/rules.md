@@ -799,7 +799,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - export downloads a file; import shows what arrives; a bad file writes nothing; afterwards Trip asks for Get ready on a new route [YOU-EXPORT-UI]
 - asks first naming what goes; "Also delete bag planner data" stores copilot:delete-request:v1 and opens /tools/bags/#copilot-delete=<id>; until applied, "Bag planner data will be deleted the next time it opens" [YOU-DELETE-UI]
 - the post-ride report (hours, drink, warmth, feel, optional weighing) is logged and moves the factors; calibration status shown; drinkingAdvice and overDrinking reach the screen: ruling of group 8, the loss it is compared with is the sweat-rate model on flat ground at the chosen warmth [YOU-WATER-LEARN]
-- imprint, privacy and licences within two taps from every tab [PRIV-LEGAL-REACH]
+- imprint, privacy and licences within two taps from every tab (plain pages at /legal/<name>/, a folder each because the host redirects *.html) [PRIV-LEGAL-REACH]
 - all open in flight mode [PRIV-LEGAL-OFFLINE]
 - hash of the imprint's text equals the hash of the page's block; nothing printed [PRIV-IMPRINT-SAME]
 - every outside host in src/data appears in the privacy notice (source scan against the notice's text) [PRIV-RECIPIENTS]
