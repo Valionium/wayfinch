@@ -1,6 +1,6 @@
-// PERF-PACK on every pull request (spec section 4.5): the Heidelberg → Strasbourg fixture's places stay within 3 MB, as the live
-// pack must. The live download in 30 s on the stand-in's network is the owner's run only (tests/e2e/app-budgets.spec.ts, with
-// WAYFINCH_LIVE_PACK set), because a pull request must not depend on outside data.
+// PERF-PACK on every pull request (spec section 4.5): the Heidelberg → Strasbourg fixture's places stay within 3 MB. This proves
+// nothing about the live pack: its size and its 30 s on the stand-in's network are PERF-PACK-LIVE, still `later:` (no test or
+// workflow step exists), because a pull request must not depend on outside data.
 import { readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
