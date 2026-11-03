@@ -82,7 +82,8 @@ export function BikeDrawing({ bike, summary, size = 'large', back, caption = tru
       </a>
       {caption ? (
         <figcaption class="bike-caption">
-          {words.text} · <a href={href}>{words.action}</a>
+          {/* A no-break space keeps the "·" with the words: on a narrow phone only the link moves down a line. */}
+          {words.text}{' · '}<a href={href}>{words.action}</a>
         </figcaption>
       ) : null}
     </figure>

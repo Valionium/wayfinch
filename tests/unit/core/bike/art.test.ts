@@ -122,6 +122,39 @@ describe('bikeArt (spec section 7.4)', () => {
   });
 });
 
+describe('bags where they ride (the look of 3 November)', () => {
+  test('[BK-ART-ANCHORS] the handlebar bag hangs in front of the bars, not above them, and clear of the front tyre', () => {
+    for (const e of drawingSet()) {
+      const a = bikeArt(resolveBikeSpec(e.bike, e.bags), e.bags).anchors;
+      const clamp = a.points.bar;
+      // centred ahead of the stem's clamp, its top at the bar, its middle below it: it hangs from the bars
+      expect(a.bar.x + a.bar.w / 2, `${e.name}: ahead`).toBeGreaterThan(clamp[0] + 4);
+      expect(a.bar.y, `${e.name}: top`).toBeGreaterThan(clamp[1] - 8);
+      expect(a.bar.y + a.bar.h / 2, `${e.name}: hangs`).toBeGreaterThan(clamp[1]);
+      const tyreTop = a.wheels.front.cy - a.wheels.front.r;
+      expect(a.bar.y + a.bar.h, `${e.name}: tyre`).toBeLessThanOrEqual(tyreTop);
+    }
+  }, 60_000);
+
+  test('[BK-ART-ANCHORS] bottles inside the frame triangle are drawn behind the frame bag; one under the down tube stays in front', () => {
+    const order = (bags: BagView, bike: Parameters<typeof resolveBikeSpec>[0] = setBike('diamond-level', 'M', 'drop', false)) => {
+      const els = elements(bikeArt(resolveBikeSpec(bike, bags), bags).svg);
+      const frameBag = els.findIndex((x) => x.tag === 'polygon' && x.attrs.class === 'bk-shell');
+      const bottles = els.map((x, i) => (x.attrs.class === 'bk-bottle' ? i : -1)).filter((i) => i >= 0);
+      return { frameBag, bottles };
+    };
+    for (const name of ['frame-three-quarter', 'frame-half', 'wedge', 'touring'] as const) {
+      const { frameBag, bottles } = order(BAG_SETS[name]!);
+      expect(frameBag, name).toBeGreaterThan(0);
+      expect(bottles.length, name).toBeGreaterThan(0);
+      for (const b of bottles) expect(b, name).toBeLessThan(frameBag);
+    }
+    const under: BagView = { items: [{ pos: 'frame', L: 3, shape: 2, fill: 1 }], decks: { bar: null, rack: null }, bottles: [{ slot: 'un', L: 0.75 }] };
+    const u = order(under, null); // a typical bike has the bolts under the down tube
+    expect(u.bottles[0]).toBeGreaterThan(u.frameBag);
+  });
+});
+
 describe('scale and fit (spec section 7.4)', () => {
   test('[BK-FIT-BOX] the outer wheel diameter is the rim plus twice the tyre, at 0.11 units per mm unless the bike shrinks to fit', () => {
     for (const e of tyreSet()) {

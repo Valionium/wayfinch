@@ -375,9 +375,12 @@ function bikeParts(spec: BikeSpec, g: Geometry, fr: ReturnType<typeof frameOf>):
 function anchorsOf(spec: BikeSpec, g: Geometry, fr: ReturnType<typeof frameOf>, counts: Record<string, number>): Anchors {
   const saddleTail = add(g.saddle, [-15.5 * (g.k / MM), 0]);
   const seat = inside({ x: saddleTail[0] + 3, y: g.saddle[1] + 1.2, w: 46, h: 17, rot: 0 });
-  const barTop = Math.min(...g.bar.map((p) => p[1]), g.clamp[1]);
-  const bar = inside({ x: g.clamp[0] - 13, y: barTop - 20, w: 30, h: 18, rot: 0 });
-  const barDeck = inside({ x: bar.x + bar.w + 1, y: bar.y + 1, w: 13, h: 16, rot: 0 });
+  // A handlebar bag is strapped to the bars and hangs in front of them, over the head tube; never down onto the front tyre.
+  const tyreTop = g.front[1] - g.rf;
+  const barH = Math.max(10, Math.min(18, tyreTop - 1 - (g.clamp[1] - 4)));
+  const bar = inside({ x: g.clamp[0] - 4, y: Math.min(g.clamp[1] - 4, tyreTop - 1 - barH), w: 30, h: barH, rot: 0 });
+  // The deck rides beside the bag, in front of it, as before; never down onto the tyre either.
+  const barDeck = inside({ x: bar.x + bar.w + 1, y: Math.min(bar.y + 1, tyreTop - 17), w: 13, h: 16, rot: 0 });
   // The top tube (or the tube that stands in for it) takes two bags at set fractions.
   const topTube: Tube | null = spec.mounts.top ? fr.top ?? fr.low ?? (fr.twin ? { a: lerp(fr.twin.a, fr.twin.b, 0.62), b: fr.twin.a } : null) : null;
   let topFront: Placed | null = null;
@@ -604,9 +607,17 @@ function bagsArt(view: BagView, a: Anchors, theme: 'dark' | 'light', prefix: str
     const step = items.length > 1 ? Math.min(base.h + gap, Math.max(4, (base.y - 1) / (items.length - 1))) : 0;
     items.forEach((item, i) => shellRect(cls, inside({ ...base, y: base.y - i * step }), fills(item)[0]!, rx));
   };
-  // Back to front: panniers and the rack-top deck, the frame bag, top-tube bags, seat pack, bar roll, fork bags, decks, bottles, backpack.
+  // Back to front: panniers and the rack-top deck, the bottles inside the triangle, the frame bag (in front of them, as on the bike),
+  // top-tube bags, seat pack, bar roll, fork bags, decks, the bottle under the down tube, backpack.
   pairs('rack', a.rack, [-7, -7], 2);
   if (view.decks.rack !== null) deck(art, a.rackTop, view.decks.rack);
+  const bottlesOf = (inTriangle: boolean) => {
+    for (const b of view.bottles) {
+      const s = a.bottles[b.slot];
+      if (s && (b.slot !== 'un') === inTriangle) art.push(bottleArt(s, b.L));
+    }
+  };
+  bottlesOf(true);
   const frameItem = of('frame')[0];
   if (frameItem && a.frame) {
     const shape = Math.max(0, Math.min(3, Math.round(frameItem.shape ?? 0)));
@@ -622,10 +633,7 @@ function bagsArt(view: BagView, a: Anchors, theme: 'dark' | 'light', prefix: str
   stacked('bar', a.bar, 2, 3);
   pairs('fork', a.fork, [-5, -5], 2);
   if (view.decks.bar !== null) deck(art, a.barDeck, view.decks.bar);
-  for (const b of view.bottles) {
-    const s = a.bottles[b.slot];
-    if (s) art.push(bottleArt(s, b.L));
-  }
+  bottlesOf(false);
   stacked('pack', { ...a.pack, y: a.pack.y + 37 * Math.max(0, of('pack').length - 1) }, 3, 5, 'bk-bag bk-onbody');
   return { defs, art };
 }
