@@ -7,7 +7,8 @@ import { checkConnectivity } from '../../../src/data/connectivity.ts';
 import { downloadTiles } from '../../../src/data/packs/download.ts';
 import type { TileReport } from '../../../src/data/packs/download.ts';
 import { openDb } from '../../../src/store/db.ts';
-import { readTrip, saveTrip, tileStore } from '../../../src/store/trip.ts';
+import { readTrip, saveTrip } from '../../../src/store/trip.ts';
+import { tileStore } from '../../../src/store/packs.ts';
 import { placeAt } from '../../fixtures/places.ts';
 import { buildOf, fixtureBuild, fixtureTrip, ORIGIN, PackServer, rebuilt } from './pack-server.ts';
 

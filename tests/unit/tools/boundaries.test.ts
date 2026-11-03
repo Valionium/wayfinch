@@ -37,7 +37,7 @@ describe('the file', () => {
   });
 
   test('[BND-LOCAL] every key in the file is one the pipeline writes, and every key the pipeline writes is in the file', () => {
-    const fromFile = new Set(file.areas.map((a) => a.holidayZone));
+    const fromFile = new Set(file.areas.filter((a) => a.country !== 'XX').map((a) => a.holidayZone));
     // The local zones and every sentinel's zone are the pipeline's stated values.
     const stated = new Set<string>();
     for (const [cc, job] of Object.entries(COUNTRY_JOBS)) {
@@ -61,7 +61,7 @@ describe('the file', () => {
   });
 
   test('[BND-LOCAL] holidaysFor gives dates for each key', () => {
-    for (const key of new Set(file.areas.map((a) => a.holidayZone))) {
+    for (const key of new Set(file.areas.filter((a) => a.country !== 'XX').map((a) => a.holidayZone))) {
       const dates = holidaysFor([key], '2026-01-01', '2026-12-31')[key]!;
       expect(dates.length, key).toBeGreaterThan(5);
       expect(dates, key).toContain('2026-12-25');

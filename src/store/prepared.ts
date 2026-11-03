@@ -7,7 +7,10 @@ import { CURRENT, inTx, ROUTE_META_PREFIX } from './db.ts';
 import type { Tx } from './db.ts';
 import { HOLIDAYS_META, SAVED_KM_META, ZONES_META } from './inputs.ts';
 import { usableHolidays, usableZones } from './rules.ts';
-import { readPackRun, readTrip, RouteGoneError, saveTiles, savedTileKeys, saveTrip, startPackRun } from './trip.ts';
+import { readTrip, RouteGoneError, saveTrip } from './trip.ts';
+import { readPackRun, readStage, saveTiles, savedTileKeys, stagedTileKeys, stageTiles, startPackRun, startStage, swapIn } from './packs.ts';
+import { mergeRanges, STRETCHES_META } from './stretch.ts';
+import { usableSavedKm } from './rules.ts';
 import { PREPARED_META, reserveWeatherFetch, saveForecast as keepForecast } from './weather.ts';
 
 /** The steps' record. That the trip is prepared at all is weather.ts's mark (PREPARED_META), set in the same transaction. */
@@ -44,15 +47,21 @@ export function readTileData(): Promise<TileData> {
 
 export type Matched = TileData & { matches: RouteMatch[]; savedKm: { fromKm: number; toKm: number }[] };
 
-/** The route's matches and what stays of the tiles, in one transaction: a place never reads as matched without its record. */
-export function saveMatched(routeId: string, m: Matched): Promise<void> {
+/**
+ * The route's matches and what stays of the tiles, in one transaction: a place never reads as matched without its record.
+ * A refreshed stretch's kilometres stay saved. Resolves to the saved kilometres as stored.
+ */
+export function saveMatched(routeId: string, m: Matched): Promise<Matched['savedKm']> {
   return guarded(routeId, ['places', 'roofs', 'rescuePoints', 'matches', 'meta'], async (tx) => {
     for (const name of ['places', 'roofs', 'rescuePoints', 'matches']) await tx.objectStore(name).clear();
     for (const p of m.places) await tx.objectStore('places').put(p);
     for (const r of m.roofs) await tx.objectStore('roofs').add(r);
     for (const r of m.rescuePoints) await tx.objectStore('rescuePoints').add(r);
     for (const x of m.matches) await tx.objectStore('matches').add(x);
-    await tx.objectStore('meta').put(m.savedKm, SAVED_KM_META);
+    const stretches = usableSavedKm(await tx.objectStore('meta').get(STRETCHES_META));
+    const savedKm = mergeRanges([...m.savedKm, ...stretches]);
+    await tx.objectStore('meta').put(savedKm, SAVED_KM_META);
+    return savedKm;
   });
 }
 
@@ -118,7 +127,7 @@ export const readHours = (): Promise<PlaceHours[]> =>
 
 /** The store as preparation sees it. Tests put a full disk in its place. */
 export const preparedStore = {
-  readTrip, saveTrip, readRun: readPackRun, startRun: startPackRun, savedTileKeys, saveTiles, readTileData, saveMatched,
+  readTrip, saveTrip, readRun: readPackRun, startRun: startPackRun, savedTileKeys, saveTiles, readStage, startStage, stagedTileKeys, stageTiles, swapIn, readTileData, saveMatched,
   saveZones, saveHolidays, saveHours, saveForecast, reserveWeather, saveBaseline, savePrepared, savePersist,
 };
 export type PreparedStore = typeof preparedStore;

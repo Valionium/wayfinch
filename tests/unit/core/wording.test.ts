@@ -15,6 +15,7 @@ const areaOf = (key: string): string | undefined =>
 const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   appStretchSaved: [['50', '70', 12], ['50', '70', 1]],
   appPrepTilesFailed: [[1], [4]],
+  appPrepNoPlaceData: [['30–44'], ['0–12, 140–165']],
   appPrepStorageFull: [[6, 14], [0, 3]],
   appStretchPartial: [['70–90', 12], ['70–90', 1]],
   appStretchFailed: [['50', '70']],

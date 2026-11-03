@@ -19,7 +19,8 @@ import { sampleGrid } from '../core/route/grid.ts';
 import { planStages } from '../core/route/stages.ts';
 import { routeZones } from '../core/route/zones.ts';
 import type { Baseline, Km, ModelRun, Place, PlaceHours, Roof, Route, StoredForecast, Trip, ZoneSpan } from '../core/types.ts';
-import { W } from '../core/wording/en.ts';
+import { showKm, W } from '../core/wording/en.ts';
+import { readPackRun } from '../store/packs.ts';
 import { markChanged } from '../store/changed.ts';
 import { preparedStore, readBaselineYears, readForecastDate, readHeldHolidays, readHours, readMatchedIds, readPrepared, readStoredZones, readTileData } from '../store/prepared.ts';
 import type { PreparedRecord, PreparedStore } from '../store/prepared.ts';
@@ -182,7 +183,7 @@ function coveredBy(report: TileReport, zones: ZoneSpan[] | null, corridor: Manif
 }
 
 /** Matches the route to all that's saved. Run again after more tiles, it gives the same as if they had all come at once. */
-async function matchAll(store: PreparedStore, route: Route, report: TileReport, zones: ZoneSpan[] | null): Promise<void> {
+async function matchAll(store: PreparedStore, route: Route, report: TileReport, zones: ZoneSpan[] | null): Promise<{ fromKm: Km; toKm: Km }[]> {
   const data = await store.readTileData();
   const idx = buildSegmentIndex(route);
   const matches = matchPlaces(data.places, route, idx);
@@ -194,7 +195,19 @@ async function matchAll(store: PreparedStore, route: Route, report: TileReport, 
   const rescuePoints = rescuePointsNear(dedupe(data.rescuePoints, (r) => `${r.ref}|${r.lat}|${r.lon}`), route);
   const saved = new Set(report.saved.map(tileKey));
   const savedKm = savedKmRanges(route, report.manifest.tiles, saved, coveredBy(report, zones, report.manifest.tiles));
-  await store.saveMatched(route.id, { places, roofs: nearRoofs, rescuePoints, matches, savedKm });
+  return store.saveMatched(route.id, { places, roofs: nearRoofs, rescuePoints, matches, savedKm });
+}
+
+/** The kilometres of the route that have no place data, as "a–b, c–d"; null when there are none. Edges within 50 m are none. */
+function withoutData(route: Route, savedKm: { fromKm: Km; toKm: Km }[]): string | null {
+  const gaps: [Km, Km][] = [];
+  let at = 0;
+  for (const r of [...savedKm].sort((a, b) => a.fromKm - b.fromKm)) {
+    if (r.fromKm - at > 0.05) gaps.push([at, r.fromKm]);
+    at = Math.max(at, r.toKm);
+  }
+  if (route.lengthKm - at > 0.05) gaps.push([at, route.lengthKm]);
+  return gaps.length === 0 ? null : gaps.map(([a, b]) => `${showKm(a)}–${showKm(b)}`).join(', ');
 }
 
 async function placesStep(deps: PrepareDeps, store: PreparedStore, online: boolean, trip: Trip, onProgress: (done: number, total: number) => void): Promise<{ report: StepReport; tiles: TileReport | null }> {
@@ -203,9 +216,12 @@ async function placesStep(deps: PrepareDeps, store: PreparedStore, online: boole
   if (zones) await store.saveZones(route.id, zones);
 
   const tileStore: TileStore = {
-    readRun: store.readRun, savedTileKeys: store.savedTileKeys,
+    readRun: store.readRun, savedTileKeys: store.savedTileKeys, readStage: store.readStage, stagedTileKeys: store.stagedTileKeys,
     startRun: (run) => store.startRun(run, route.id),
     saveTiles: (content, report) => store.saveTiles(content, report, route.id),
+    startStage: (run) => store.startStage(run, route.id),
+    stageTiles: (list, buildId) => store.stageTiles(list, buildId, route.id),
+    swapIn: (buildId) => store.swapIn(buildId, route.id),
   };
   let tiles: TileReport | null = null;
   let note: string | null = null;
@@ -246,17 +262,22 @@ async function placesStep(deps: PrepareDeps, store: PreparedStore, online: boole
     }
   }
 
-  const full = tiles.failed.some((f) => f.reason === STORAGE_FULL);
+  const full = tiles.failed.some((f) => f.reason === STORAGE_FULL) || tiles.pending?.full === true;
+  let savedKm: { fromKm: Km; toKm: Km }[];
   try {
-    await matchAll(store, route, tiles, zones);
+    savedKm = await matchAll(store, route, tiles, zones);
   } catch (e) {
     if (routeGone(e)) throw e;
     if (!isStorageFull(e)) return { report: { step: 'places', ok: false, note: W.appPrepPlacesNotMatched }, tiles };
     return { report: { step: 'places', ok: false, note: W.appPrepStorageFull(tiles.saved.length, tiles.manifest.tiles.length) }, tiles };
   }
-  if (full) note = W.appPrepStorageFull(tiles.saved.length, tiles.manifest.tiles.length);
+  const gaps = withoutData(route, savedKm);
+  if (full) note = tiles.pending ? W.appPrepStorageFullStep : W.appPrepStorageFull(tiles.saved.length, tiles.manifest.tiles.length);
+  else if (note === null && tiles.pending) note = W.appPrepNewDataUnfinished;
   else if (note === null && tiles.failed.length > 0) note = W.appPrepTilesFailed(tiles.failed.length);
   else if (note === null && zones === null) note = W.appPrepZonesMissing;
+  // Said plainly whatever else is said: a stretch with no place data, outside the covered countries or not saved.
+  else if (note === null && gaps !== null) note = [...(tiles.restartedFrom ? [W.appPrepPacksRestarted] : []), W.appPrepNoPlaceData(gaps)].join(' ');
   if (note !== null) return { report: { step: 'places', ok: false, note }, tiles };
   return { report: { step: 'places', ok: true, note: tiles.restartedFrom ? W.appPrepPacksRestarted : null }, tiles };
 }
@@ -274,7 +295,8 @@ function nearStations(places: Place[]): (p: Place) => boolean {
 }
 
 /** Hour spans for the matched places, batch by batch, through the lazy chunk that alone reaches the library. */
-async function workOutHours(store: Pick<PreparedStore, 'saveHours'>, routeId: string, places: Place[], matched: ReadonlySet<string>, from: string, toExclusive: string, onProgress: (done: number, total: number) => void = () => undefined): Promise<void> {
+/** Resolves to how many places were worked out. */
+async function workOutHours(store: Pick<PreparedStore, 'saveHours'>, routeId: string, places: Place[], matched: ReadonlySet<string>, from: string, toExclusive: string, onProgress: (done: number, total: number) => void = () => undefined): Promise<number> {
   const { placeSpans, wallToInstant } = await import('../core/hours/spans.ts');
   const cache = new Map<string, PlaceHours['spans']>();
   const near = nearStations(places);
@@ -305,6 +327,7 @@ async function workOutHours(store: Pick<PreparedStore, 'saveHours'>, routeId: st
     if (batch.length >= HOURS_BATCH) await flush();
   }
   await flush();
+  return worked.length;
 }
 
 /** Every holiday zone the route or a place on it lies in. */
@@ -321,10 +344,10 @@ async function hoursStep(store: PreparedStore, trip: Trip, zones: ZoneSpan[], no
     const matched = new Set(await readMatchedIds());
     const today = localIsoDate(now, startZoneOf(zones));
     const { from, toExclusive } = windowDates(trip, today);
-    await workOutHours(store, trip.route.id, places, matched, from, toExclusive, onProgress);
+    const worked = await workOutHours(store, trip.route.id, places, matched, from, toExclusive, onProgress);
     const { holidaysFor } = await import('../core/hours/holidays.ts');
     await store.saveHolidays(trip.route.id, holidaysFor(zonesNamed(zones, places), from, addDaysIso(toExclusive, -1)));
-    return { step: 'hours', ok: true, note: null };
+    return worked === 0 ? { step: 'hours', ok: false, note: W.appPrepNoHours } : { step: 'hours', ok: true, note: null };
   } catch (e) {
     if (routeGone(e)) throw e;
     return { step: 'hours', ok: false, note: noteFor(e, W.appPrepHoursFailed) };
@@ -372,9 +395,11 @@ async function weatherStep(deps: PrepareDeps, store: PreparedStore, online: bool
 async function baselineStep(deps: PrepareDeps, store: PreparedStore, online: boolean, trip: Trip, zones: ZoneSpan[], now: Date): Promise<StepReport> {
   if (!online) return { step: 'baseline', ok: false, note: W.appPrepNoConnection };
   try {
-    const { from, plannedEnd } = windowDates(trip, localIsoDate(now, startZoneOf(zones)));
+    // The window's own end: for a rider behind the plan it reaches past the planned end, so the current month is in.
+    const { from, toExclusive } = windowDates(trip, localIsoDate(now, startZoneOf(zones)));
+    const last = addDaysIso(toExclusive, -4);
     const months = new Set<number>();
-    for (let d = from; d <= plannedEnd; d = addDaysIso(d, 1)) months.add(Number(d.slice(5, 7)));
+    for (let d = from; d <= last; d = addDaysIso(d, 1)) months.add(Number(d.slice(5, 7)));
     await store.saveBaseline(trip.route.id, await deps.fetchBaseline(baselinePoints(trip.route), [...months], deps.fetch));
     return { step: 'baseline', ok: true, note: null };
   } catch (e) {
@@ -453,11 +478,16 @@ export async function prepareTrip(deps: PrepareDeps, onProgress: (step: StepName
 
     begin('save');
     const held = await readPrepared();
+    const run = tiles ? null : await readPackRun();
     const record: PreparedRecord = {
       at: deps.now(), steps: [...reports],
       build: tiles ? {
         id: tiles.buildId, builtAt: tiles.manifest.builtAt,
         countries: Object.fromEntries(Object.entries(tiles.manifest.countries).map(([code, c]) => [code, c.sourceDate])),
+      } : run ? {
+        // The places step broke midway: the record names the build the stored data is of.
+        id: run.buildId, builtAt: run.manifest.builtAt,
+        countries: Object.fromEntries(Object.entries(run.manifest.countries).map(([code, c]) => [code, c.sourceDate])),
       } : held?.build ?? null,
       forecastFetchedAt: await readForecastDate(), baselineYears: await readBaselineYears(),
     };

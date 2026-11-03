@@ -23,7 +23,7 @@ function usableFile(raw: unknown): raw is BoundaryFile {
       && Array.isArray(a.rings) && a.rings.every((r) => Array.isArray(r) && r.every(isCoord)));
 }
 
-/** Refresh this stretch's `deps.zoneAt`: the zone of a point from the bundled file, null outside the first countries. */
+/** Refresh this stretch's `deps.zoneAt`: the zone of a point from the bundled file, null outside the first countries (area XX). */
 export async function loadZoneAt(fetcher: typeof fetch): Promise<(lat: number, lon: number) => Zone | null> {
   const file = await loadBoundaries(fetcher);
   return (lat, lon) => zoneAt(lat, lon, file);

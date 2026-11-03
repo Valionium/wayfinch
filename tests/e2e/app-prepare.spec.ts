@@ -76,7 +76,8 @@ test('[PREP-RESUME] a tab closed mid-download leaves whole batches; the next run
 
   const again = await servePack(next, 'multi-day-800');
   const reports = await next.evaluate(() => __store.prepare());
-  expect(reports.find((r) => r.step === 'places')).toMatchObject({ ok: true, note: null });
+  // Every tile is in; only Liechtenstein, outside the first countries, has no place data.
+  expect(reports.find((r) => r.step === 'places')!.note).toMatch(/^No place data for km/);
   expect(again.requests.filter((r) => r.endsWith('current.json') || r.endsWith('manifest.json'))).toEqual([]);
   const asked = again.requests.map((r) => r.replace(`/packs/${served.manifest.buildId}/t/`, '').replace('.json', '')).sort();
   expect(asked).toEqual([...byKey.keys()].filter((k) => !after.tiles.includes(k)).sort());
@@ -89,7 +90,7 @@ test('[PREP-RESUME] a tab closed mid-download leaves whole batches; the next run
  * read AbortError, and only `tx.error` says QuotaExceededError. The undoing is the browser's own. The cause is set by hand:
  * Storage.overrideQuotaForOrigin had no effect on IndexedDB when tried, so no test here fills a real disk.
  */
-const fillDiskAfter = (page: Page, tiles: number) => page.evaluate((room) => {
+const fillDiskAfter = (page: Page, tiles: number, how: 'commit' | 'throw') => page.evaluate(({ room, how: way }) => {
   const w = window as unknown as { diskFull: boolean; room: number };
   w.diskFull = false;
   w.room = room;
@@ -98,20 +99,22 @@ const fillDiskAfter = (page: Page, tiles: number) => page.evaluate((room) => {
   for (const method of ['put', 'add'] as const) {
     const real = IDBObjectStore.prototype[method];
     IDBObjectStore.prototype[method] = function patched(this: IDBObjectStore, ...args: Parameters<typeof real>) {
-      const request = real.apply(this, args);
       if (this.name === 'savedTiles' && ++seen > w.room) w.diskFull = true;
+      // As a browser may also say it: the store call itself refuses, inside a real transaction the store then undoes.
+      if (w.diskFull && way === 'throw') throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+      const request = real.apply(this, args);
       if (w.diskFull) this.transaction.abort();
       return request;
     };
   }
-}, tiles);
+}, { room: tiles, how });
 
-test('[PREP-QUOTA] the commit refused for lack of room: "Storage full" with what was saved, answers name what is missing, and a rerun with room finishes', async ({ page }) => {
+for (const how of ['commit', 'throw'] as const) test(`[PREP-QUOTA] no room (${how === 'commit' ? 'the commit refused' : 'a store call refused'}): "Storage full" with what was saved, answers name what is missing, and a rerun with room finishes`, async ({ page }) => {
   app = await loadApp(page);
   const trip = await preparedTrip(page, 'multi-day-800', { departureDate: '2026-10-17' });
   const served = await servePack(page, 'multi-day-800');
 
-  await fillDiskAfter(page, 6);
+  await fillDiskAfter(page, 6, how);
   const reports = await page.evaluate(() => __store.prepare());
   const places = reports.find((r) => r.step === 'places')!;
   expect(places.ok).toBe(false);
@@ -144,8 +147,12 @@ test('[PREP-QUOTA] the commit refused for lack of room: "Storage full" with what
   });
   const before = served.requests.length;
   const second = await page.evaluate(() => __store.prepare());
-  expect(second.find((r) => r.step === 'places')).toMatchObject({ ok: true, note: null });
+  // Every tile is in; only Liechtenstein, outside the first countries, has no place data.
+  expect(second.find((r) => r.step === 'places')!.note).toMatch(/^No place data for km/);
   expect(served.requests.length - before).toBe(served.manifest.tiles.length - seen.tiles.length);
-  const whole = await page.evaluate(async () => (await __store.readInputs(new Date('2026-10-16T08:00:00Z')))!.savedKm);
-  expect(whole).toEqual([{ fromKm: 0, toKm: trip.route.lengthKm }]);
+  const whole = await page.evaluate(async () => {
+    const i = (await __store.readInputs(new Date('2026-10-16T08:00:00Z')))!;
+    return { covered: i.savedKm.reduce((s, r) => s + r.toKm - r.fromKm, 0), coverable: i.routeZones.filter((z) => z.country !== 'XX').reduce((s, z) => s + z.toKm - z.fromKm, 0) };
+  });
+  expect(Math.abs(whole.covered - whole.coverable)).toBeLessThan(0.6);
 });

@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import type { PackManifest, Place, TileContent } from '../../../src/core/places/types.ts';
 import type { TileReport } from '../../../src/data/packs/download.ts';
 import { openDb } from '../../../src/store/db.ts';
-import { PACK_RUN_META, readPackRun, readTrip, replaceRoute, RouteGoneError, saveTiles, saveTrip, startPackRun } from '../../../src/store/trip.ts';
+import { PACK_RUN_META, readTrip, replaceRoute, RouteGoneError, saveTrip } from '../../../src/store/trip.ts';
+import { readPackRun, saveTiles, startPackRun } from '../../../src/store/packs.ts';
 import { placeAt, rescueAt, roofAt } from '../../fixtures/places.ts';
 import { freshStore, route, trip } from './helpers.ts';
 

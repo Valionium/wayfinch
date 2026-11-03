@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
 import { haversineKm } from '../../../../src/core/geo/haversine.ts';
+import { pointAtRouteKm } from '../../../../src/core/geo/project.ts';
 import { COUNTRIES } from '../../../../src/core/places/countries.ts';
 import { assembleRoute } from '../../../../src/core/route/profile.ts';
 import { routeZones, zoneAt } from '../../../../src/core/route/zones.ts';
@@ -43,7 +44,8 @@ describe('real places', () => {
 
   test('[BND-POINTS] every first-release zone is Europe/… and known to Intl', () => {
     expect(file.areas.length).toBeGreaterThan(10);
-    for (const a of file.areas) {
+    expect(file.areas.at(-1)!.country).toBe('XX'); // the outside comes last
+    for (const a of file.areas.slice(0, -1)) {
       expect(a.timeZone).toMatch(/^Europe\//);
       expect(() => new Intl.DateTimeFormat('en', { timeZone: a.timeZone })).not.toThrow();
     }
@@ -229,17 +231,85 @@ describe('outside the first-release countries', () => {
     expect(s.chips.emergency.detail).toBe(W.emergencyFallback);
   });
 
-  test('[BND-OUTSIDE] a point in no area joins the nearest span within 5 km of route; further in it is XX', () => {
-    // From Lörrach over the Swiss border, on to Italy far beyond: Switzerland, then a short way into Italy, then XX.
-    const route = routeThrough(line([46.45, 8.75], [45.60, 8.95], 200)); // from Ticino south past the Italian border
-    const spans: ZoneSpan[] = routeZones(route, file);
+  /** The km along a route where the country under it changes, looked at every 10 m. */
+  function crossings(route: Route): { km: number; country: string }[] {
+    const out: { km: number; country: string }[] = [];
+    route.points.forEach((p, i) => {
+      const next = route.points[i + 1];
+      if (!next) return;
+      const steps = Math.max(1, Math.ceil((next.km - p.km) / 0.01));
+      for (let s = 0; s < steps; s++) {
+        const f = s / steps;
+        const country = zoneAt(p.lat + (next.lat - p.lat) * f, p.lon + (next.lon - p.lon) * f, file)?.country ?? 'XX';
+        if (out.at(-1)?.country !== country) out.push({ km: p.km + (next.km - p.km) * f, country });
+      }
+    });
+    return out;
+  }
+  const emergencyAt = (route: Route, spans: ZoneSpan[], km: number) => {
+    const trip = testTrip({ route: { ...route, stages: [{ day: 1, startKm: 0, endKm: route.lengthKm, ridingHours: 6, ascentM: null }] } });
+    const p = pointAtRouteKm(route, km);
+    const position = { lat: p.lat, lon: p.lon, accuracyM: 10, at: new Date('2026-10-17T12:00:00Z'), km, offRouteM: 0, source: 'gps' as const, approximate: false };
+    return screen({
+      trip, matches: [], places: [], roofs: [], hours: [], rescuePoints: [], savedKm: [], forecast: null, baseline: null,
+      positions: [position], dayStarts: [], routeEndDate: null, planTomorrow: null,
+      profile: { weightKg: null, thirst: 'average', ebike: false, capacityL: null, k: 1, sumW: 0, kDrink: 0, weighedRides: 0 },
+      loadSummary: null, waterLeft: null, settings: { campWaterL: 2, keepFresh: false }, now: new Date('2026-10-17T12:00:00Z'), sun: sun(),
+      routeZones: spans, holidays: {}, demo: null,
+    }).chips.emergency;
+  };
+
+  test('[BND-OUTSIDE] over the Brenner: Italy begins where the border lies, never joined to Austria; 3 km in, 112 and the fallback line only', () => {
+    const route = routeThrough([[47.2692, 11.4041], [47.10, 11.46], [47.002, 11.507], [46.95, 11.47], [46.893, 11.43]]);
+    const spans = routeZones(route, file);
+    expect(spans.map((s) => s.country)).toEqual(['AT', 'XX']);
+    const border = crossings(route).find((c) => c.country === 'XX')!.km;
+    expect(Math.abs(spans[1]!.fromKm - border)).toBeLessThan(0.06);
+    const e = emergencyAt(route, spans, border + 3);
+    expect(e.numbers).toEqual(['112']);
+    expect(e.detail).toBe(W.emergencyFallback);
+    const before = emergencyAt(route, spans, border - 3);
+    expect(before.numbers).toContain('140');
+  });
+
+  test('[BND-OUTSIDE] through Liechtenstein: Feldkirch, Vaduz, Sargans: Liechtenstein reads XX, each stretch cut where its border lies', () => {
+    expect(zoneAt(47.141, 9.521, file)).toBeNull(); // Vaduz
+    const route = routeThrough([[47.237, 9.598], [47.20, 9.53], [47.141, 9.521], [47.08, 9.50], [47.04, 9.44]]);
+    const spans = routeZones(route, file);
+    // The line clips Liechtenstein's southern tip again by Balzers: the spans follow what lies under it.
+    const truth = crossings(route);
+    expect(spans.map((s) => s.country)).toEqual(truth.map((c) => c.country));
+    expect(truth.map((c) => c.country).slice(0, 3)).toEqual(['AT', 'XX', 'CH']);
+    spans.forEach((s, i) => { if (i > 0) expect(Math.abs(s.fromKm - truth[i]!.km)).toBeLessThan(0.06); });
+    expect(emergencyAt(route, spans, (spans[1]!.fromKm + spans[1]!.toKm) / 2).numbers).toEqual(['112']);
+  });
+
+  test('[BND-OUTSIDE] from Ticino into Italy: XX from the border on, not 5 km later', () => {
+    const route = routeThrough(line([46.45, 8.75], [45.60, 8.95], 200));
+    const spans = routeZones(route, file);
     expect(spans[0]!.country).toBe('CH');
-    const out = spans.find((s) => s.country === 'XX');
-    expect(out).toBeDefined();
-    // The last Swiss point lies inside; the span runs on for at most 5 km beyond it.
-    const lastInside = route.points.filter((p) => zoneAt(p.lat, p.lon, file) !== null).at(-1)!;
-    expect(out!.fromKm).toBeGreaterThan(lastInside.km);
-    expect(out!.fromKm).toBeLessThanOrEqual(lastInside.km + 5.5);
+    const border = crossings(route).find((c) => c.country === 'XX')!.km;
+    expect(Math.abs(spans.find((s) => s.country === 'XX')!.fromKm - border)).toBeLessThan(0.06);
+  });
+
+  test('[BND-OUTSIDE] a gap in the shapes still joins the nearest zone within 5 km; the outside area never does', () => {
+    // A small file of its own: Germany in two pieces with a 3 km gap, the outside after a 3 km gap on the far side.
+    const sq = (w: number, e: number): number[][] => [[w, 48], [e, 48], [e, 48.1], [w, 48.1]];
+    const de = { country: 'DE', holidayZone: 'DE-BW', timeZone: 'Europe/Berlin' };
+    const own: BoundaryFile = { v: 1, source: 'test', areas: [
+      { ...de, rings: [sq(8, 8.2)] }, { ...de, rings: [sq(8.24, 8.4)] },
+      { country: 'XX', holidayZone: 'XX', timeZone: 'UTC', rings: [sq(8.44, 9)] },
+    ] };
+    const across = routeZones(routeThrough(line([48.05, 8.1], [48.05, 8.35], 100)), own);
+    expect(across.map((s) => s.country)).toEqual(['DE']);
+    const out = routeThrough(line([48.05, 8.3], [48.05, 8.6], 120));
+    const spans = routeZones(out, own);
+    expect(spans.map((s) => s.country)).toEqual(['DE', 'XX']);
+    // The gap before the outside goes to the outside, the careful side, from the middle of the gap or nearer.
+    const gapStart = out.points.find((p) => p.lon > 8.4)!.km;
+    expect(spans[1]!.fromKm).toBeLessThanOrEqual(gapStart + 1.6);
+    expect(zoneAt(48.05, 8.5, own)).toBeNull();
+    expect(spans[1]!.timeZone).toBe('Europe/Berlin');
   });
 
   test('[BND-OUTSIDE] a crossing over water between two zoned shores joins its shores', () => {

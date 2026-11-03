@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { freshStore } from '../store/helpers.ts';
 import { kitchenHoursId, stateAt } from '../../../src/core/hours/check.ts';
-import { tileKey } from '../../../src/core/places/tiles.ts';
+import { tileKey, tileOf } from '../../../src/core/places/tiles.ts';
 import { screen } from '../../../src/core/screen/screen.ts';
 import { assembleRoute, buildRoute } from '../../../src/core/route/profile.ts';
 import { haversineKm } from '../../../src/core/geo/haversine.ts';
@@ -16,10 +16,14 @@ import { openDb } from '../../../src/store/db.ts';
 import { readInputs } from '../../../src/store/inputs.ts';
 import { readWeatherState } from '../../../src/store/weather.ts';
 import { preparedStore, PERSIST_META, readPrepared } from '../../../src/store/prepared.ts';
-import { readPackRun, readTrip, replaceRoute, saveTrip } from '../../../src/store/trip.ts';
+import { readTrip, replaceRoute, saveTrip } from '../../../src/store/trip.ts';
+import { readPackRun } from '../../../src/store/packs.ts';
 import { placeAt, rescueAt, roofAt } from '../../fixtures/places.ts';
 import { flatRoute } from '../../fixtures/build.ts';
 import { buildOf, fixtureBuild, fixtureTrip, ORIGIN, PackServer, rebuilt } from './pack-server.ts';
+import { loadFixturePack } from '../../fixtures/packs/index.ts';
+import { saveStretch } from '../../../src/store/stretch.ts';
+import { showKm } from '../../../src/core/wording/en.ts';
 import type { Build } from './pack-server.ts';
 
 const openingHours = vi.hoisted(() => ({ tags: [] as string[] }));
@@ -449,7 +453,8 @@ describe('what two tiles both hold', () => {
       files: new Map([...first.files, [path, bytes]]),
     });
     const reports = await prepareTrip(depsFor(server), () => undefined);
-    expect(step(reports, 'places').ok).toBe(true);
+    // The pack holds German places only: the French end has none, and says so.
+    expect(step(reports, 'places').note).toMatch(/^No place data for km/);
     expect(await (await openDb()).getAllKeys('savedTiles')).toHaveLength(2);
     expect(await stored<Roof>('roofs')).toHaveLength(1);
     expect(await stored<RescuePoint>('rescuePoints')).toHaveLength(1);
@@ -499,9 +504,10 @@ describe('zones and holidays', () => {
     const zone = { country: 'CH', subdivision: 'CH-TI', hoursRegionKey: 'CH-TI', holidayZone: 'CH-TI', timeZone: 'Europe/Zurich' };
     const build = buildOf({ places: [placeAt('water', 46.3, 8.95, { id: 'n1', ...zone })], roofs: [], rescuePoints: [] }, '20261028-6', ['water']);
     const reports = await prepareTrip(depsFor(new PackServer(build)), () => undefined);
-    expect(step(reports, 'places').ok).toBe(true);
     const i = await inputs();
     const zones = i.routeZones;
+    // Said plainly: the step did not get place data for the whole route.
+    expect(step(reports, 'places')).toMatchObject({ ok: false, note: W.appPrepNoPlaceData(`0–${showKm(i.savedKm[0]!.fromKm)}`) });
     expect(zones[0]!.country).toBe('XX');
     expect(zones.at(-1)!.country).toBe('CH');
     expect(i.savedKm).toHaveLength(1);
@@ -540,32 +546,101 @@ describe('a download cut off', () => {
     server.intercept = () => null;
     server.requests.length = 0;
     const second = await prepareTrip(depsFor(server), () => undefined);
-    expect(step(second, 'places')).toMatchObject({ ok: true, note: null });
+    // Every tile is in; only Liechtenstein, outside the first countries, has no place data.
+    expect(step(second, 'places').note).toMatch(/^No place data for km/);
     expect(server.requests.filter((u) => u.endsWith('current.json'))).toEqual([]);
     const asked = server.tileRequests().map((u) => u.replace(`${ORIGIN}/packs/${build.manifest.buildId}/t/`, '').replace('.json', ''));
     const missing = build.manifest.tiles.map(tileKey).filter((k) => !savedAfterFirst.includes(k));
     expect(asked.sort()).toEqual(missing.sort());
     expect((await readPackRun())!.buildId).toBe(build.manifest.buildId);
     const i = await inputs();
-    expect(i.savedKm).toEqual([{ fromKm: 0, toKm: trip.route.lengthKm }]);
+    // The fixture passes through Liechtenstein: those kilometres have no data, and all the others do.
+    expect(i.routeZones.some((z) => z.country === 'XX')).toBe(true);
+    expect(Math.abs(covered(i) - coverable(i))).toBeLessThan(0.6);
+    expect(trip.route.lengthKm).toBeGreaterThan(covered(i));
   });
 
-  test('[PREP-RESUME] a finished run asks for no tiles when run again', async () => {
+  test('[PREP-RESUME] a finished run run again reads current.json, and with no newer build asks for nothing more', async () => {
     await onTrip();
     const server = new PackServer(fixtureBuild('heidelberg-strasbourg'));
     await prepareTrip(depsFor(server), () => undefined);
     server.requests.length = 0;
-    await prepareTrip(depsFor(server), () => undefined);
-    expect(server.requests).toEqual([]);
+    const again = await prepareTrip(depsFor(server), () => undefined);
+    expect(server.requests).toEqual([`${ORIGIN}/packs/current.json`]);
+    expect(step(again, 'places')).toMatchObject({ ok: true, note: null });
   });
 
-  test('[PREP-RESUME] a build gone (404) restarts on the new one and says so; nothing of the old stays', async () => {
+  test('[PREP-RESUME] a newer build is downloaded whole, verified against its own manifest, then swapped in at once; until then the old stays', async () => {
+    const trip = await onTrip();
+    const old = fixtureBuild('heidelberg-strasbourg');
+    const server = new PackServer(old);
+    await prepareTrip(depsFor(server), () => undefined);
+    const before = { places: (await stored<Place>('places')).length, savedKm: (await inputs()).savedKm };
+
+    // The new build: the same places, and one more at the start, so its tiles differ from the old ones.
+    const start = trip.route.points[0]!;
+    const fresh = fixtureBuild('heidelberg-strasbourg');
+    const pack = await loadFixturePack('heidelberg-strasbourg');
+    // One place is gone from it, so a mix of the two builds would show.
+    const dropped = pack.places[0]!.id;
+    const next = buildOf({ ...pack, places: [...pack.places.slice(1), placeAt('water', start.lat, start.lon, { id: 'n9999' })] }, '20261110-1', fresh.manifest.kinds);
+    // A refreshed stretch's place is the rider's newer data: it stays through the new build.
+    const mine = placeAt('water', start.lat + 0.001, start.lon, { id: 'n8888', source: 'overpass' });
+    expect(await saveStretch((await readTrip())!.route.id, { fromKm: 0, toKm: 1, date: '2026-10-16', places: [mine], matches: [{ placeId: 'n8888', km: 0.1, offRouteM: 50 }], roofs: [], rescuePoints: [], hours: [], holidays: {} })).toBe(true);
+    server.add(next);
+    server.current = next.manifest.buildId;
+    // The connection drops after three of its tiles.
+    let got = 0;
+    server.intercept = (url) => (url.includes('/20261110-1/t/') && ++got > 3 ? new TypeError('network gone') : null);
+    const cut = await prepareTrip(depsFor(server), () => undefined);
+    expect(step(cut, 'places')).toMatchObject({ ok: false, note: W.appPrepNewDataUnfinished });
+    expect((await readPackRun())!.buildId).toBe(old.manifest.buildId);
+    expect((await stored<Place>('places')).length).toBe(before.places + 1);
+    expect((await stored<Place>('places')).some((p) => p.id === 'n9999')).toBe(false);
+    expect((await stored<Place>('places')).some((p) => p.id === dropped)).toBe(true);
+    expect((await inputs()).savedKm).toEqual(before.savedKm);
+    expect((await readPrepared())!.build!.id).toBe(old.manifest.buildId);
+
+    // With the network back, only the new build's missing tiles are asked for; then it's in, whole.
+    server.intercept = () => null;
+    server.requests.length = 0;
+    const done = await prepareTrip(depsFor(server), () => undefined);
+    expect(step(done, 'places')).toMatchObject({ ok: true, note: null });
+    const asked = server.tileRequests();
+    expect(asked.every((u) => u.includes('/20261110-1/t/'))).toBe(true);
+    expect(asked).toHaveLength(next.manifest.tiles.length - 3);
+    expect((await readPackRun())!.buildId).toBe('20261110-1');
+    expect((await stored<Place>('places')).some((p) => p.id === 'n9999')).toBe(true);
+    expect((await stored<Place>('places')).some((p) => p.id === dropped)).toBe(false);
+    expect((await stored<Place>('places')).some((p) => p.id === 'n8888')).toBe(true);
+    expect((await (await openDb()).getAllKeys('savedTiles')).map(String).sort()).toEqual(next.manifest.tiles.map(tileKey).sort());
+    expect((await readPrepared())!.build).toMatchObject({ id: '20261110-1' });
+    expect((await inputs()).savedKm).toEqual([{ fromKm: 0, toKm: trip.route.lengthKm }]);
+  });
+
+  test('[PREP-RESUME] a new build with a tile that fails its hash is never swapped in', async () => {
+    await onTrip();
+    const old = fixtureBuild('heidelberg-strasbourg');
+    const server = new PackServer(old);
+    await prepareTrip(depsFor(server), () => undefined);
+    const next = rebuilt(fixtureBuild('heidelberg-strasbourg'), '20261110-2');
+    next.manifest = { ...next.manifest, tiles: next.manifest.tiles.map((t, i) => (i === 0 ? { ...t, sha256: '0'.repeat(64) } : t)) };
+    server.add(next);
+    server.current = next.manifest.buildId;
+    const reports = await prepareTrip(depsFor(server), () => undefined);
+    expect(step(reports, 'places')).toMatchObject({ ok: false, note: W.appPrepNewDataUnfinished });
+    expect((await readPackRun())!.buildId).toBe(old.manifest.buildId);
+  });
+
+  test('[PREP-RESUME] a build gone (404) restarts on the new one and says so; the old stays until the new is whole, then nothing of it', async () => {
     await onTrip('multi-day-800');
     const build = fixtureBuild('multi-day-800');
     const server = new PackServer(build);
     let tiles = 0;
     server.intercept = (url) => (url.includes('/t/') && ++tiles > 8 ? new TypeError('network gone') : null);
     await prepareTrip(depsFor(server), () => undefined);
+    const partial = (await stored<Place>('places')).length;
+    expect(partial).toBeGreaterThan(0);
 
     const zone = { country: 'DE', subdivision: 'DE-BW', hoursRegionKey: 'DE-BW', holidayZone: 'DE-BW', timeZone: 'Europe/Berlin' };
     const start = (await readTrip())!.route.points[0]!;
@@ -573,9 +648,14 @@ describe('a download cut off', () => {
     server.builds.delete(build.manifest.buildId);
     server.add(next);
     server.current = next.manifest.buildId;
+    // First the new build's only tile fails too: what the old build gave stays.
+    server.intercept = (url) => (url.includes('/20261110-1/t/') ? new TypeError('network gone') : null);
+    const kept = await prepareTrip(depsFor(server), () => undefined);
+    expect(step(kept, 'places')).toMatchObject({ ok: false, note: W.appPrepNewDataUnfinished });
+    expect((await stored<Place>('places')).length).toBe(partial);
     server.intercept = () => null;
     const reports = await prepareTrip(depsFor(server), () => undefined);
-    expect(step(reports, 'places')).toMatchObject({ ok: true, note: W.appPrepPacksRestarted });
+    expect(step(reports, 'places').note).toContain(W.appPrepPacksRestarted);
     expect((await readPackRun())!.buildId).toBe('20261110-1');
     expect((await stored<Place>('places')).map((p) => p.id)).toEqual(['n777']);
     expect((await (await openDb()).getAllKeys('savedTiles')).map(String)).toEqual(next.manifest.tiles.map(tileKey));
@@ -594,6 +674,83 @@ describe('a download cut off', () => {
     expect((await (await openDb()).getAllKeys('savedTiles'))).toHaveLength(build.manifest.tiles.length - 1);
   });
 });
+
+describe('what the reviewer found', () => {
+  test('[PREP-KM] running Get ready again keeps the kilometres a refreshed stretch covers', async () => {
+    await onTrip();
+    const build = fixtureBuild('heidelberg-strasbourg');
+    const server = new PackServer(build);
+    const victim = tileUrlOf(build.manifest.buildId, startTile(build, (await readTrip())!));
+    server.intercept = (u) => (u === victim ? new TypeError('no') : null);
+    await prepareTrip(depsFor(server), () => undefined);
+    const route = (await readTrip())!.route;
+    const gap = (await inputs()).savedKm[0]!.fromKm;
+    expect(gap).toBeGreaterThan(5);
+    expect(await saveStretch(route.id, { fromKm: 0, toKm: gap, date: '2026-10-16', places: [], matches: [], roofs: [], rescuePoints: [], hours: [], holidays: {} })).toBe(true);
+    expect((await inputs()).savedKm[0]!.fromKm).toBe(0);
+    await prepareTrip(depsFor(server), () => undefined);
+    expect((await inputs()).savedKm[0]!.fromKm).toBe(0);
+  });
+
+  test('[PREP-KM] the stretch of a failed tile reads "no place data" on the screen; past it, it doesn\'t', async () => {
+    await onTrip();
+    const build = fixtureBuild('heidelberg-strasbourg');
+    const server = new PackServer(build);
+    const victim = tileUrlOf(build.manifest.buildId, startTile(build, (await readTrip())!));
+    server.intercept = (u) => (u === victim ? new TypeError('no') : null);
+    await prepareTrip(depsFor(server), () => undefined);
+    const i = await inputs();
+    const gapEnd = i.savedKm[0]!.fromKm;
+    const at = (km: number) => {
+      const p = i.trip.route.points.reduce((best, q) => (Math.abs(q.km - km) < Math.abs(best.km - km) ? q : best));
+      const now = new Date('2026-10-17T09:00:00Z');
+      return screen({ ...i, now, positions: [{ lat: p.lat, lon: p.lon, accuracyM: 10, at: now, km: p.km, offRouteM: 0, source: 'gps', approximate: false }] }).cards.water;
+    };
+    expect(at(gapEnd / 2).missing).toContain('places');
+    expect(at(i.trip.route.lengthKm - 2).missing).not.toContain('places');
+  });
+
+  test('[PREP-STEPS] hours report not done when no place could be worked out', async () => {
+    await onTrip();
+    const server = new PackServer(fixtureBuild('heidelberg-strasbourg'));
+    server.intercept = (u) => (u.includes('/t/') ? new TypeError('no') : null);
+    const reports = await prepareTrip(depsFor(server), () => undefined);
+    expect(step(reports, 'hours')).toMatchObject({ ok: false, note: W.appPrepNoHours });
+  });
+
+  test('[PREP-STEPS] the baseline is fetched for a rider behind the plan too, for the current month', async () => {
+    const t = await fixtureTrip('heidelberg-strasbourg');
+    await readTrip();
+    await saveTrip({ ...t, departureDate: '2026-10-28' });
+    let months: number[] = [];
+    const late = new Date('2026-11-02T08:00:00Z');
+    const reports = await prepareTrip(depsFor(new PackServer(fixtureBuild('heidelberg-strasbourg')), {
+      now: () => late, fetchBaseline: async (_p, m) => { months = m; return baseline(); },
+    }), () => undefined);
+    expect(step(reports, 'baseline').ok).toBe(true);
+    expect(months).toContain(11);
+  });
+
+  test('[PREP-STEPS] the prepared record names the build its data came from, also when the places step broke midway', async () => {
+    await onTrip('multi-day-800');
+    let batches = 0;
+    const reports = await prepareTrip(depsFor(new PackServer(fixtureBuild('multi-day-800')), {
+      store: { ...preparedStore, saveTiles: async (c, r, id) => { if (++batches > 1) throw new Error('broke'); await preparedStore.saveTiles(c, r, id); } },
+    }), () => undefined);
+    expect(step(reports, 'places').ok).toBe(false);
+    expect((await readPrepared())!.build).toMatchObject({ id: (await readPackRun())!.buildId });
+  });
+});
+
+const tileUrlOf = (buildId: string, t: { z: number; x: number; y: number }): string => `${ORIGIN}/packs/${buildId}/t/${t.z}/${t.x}/${t.y}.json`;
+/** The tile the route starts in. */
+const startTile = (build: Build, trip: Trip): { z: number; x: number; y: number } => {
+  const p = trip.route.points[0]!;
+  return build.manifest.tiles.find((t) => tileKey(t) === tileKey(tileOf(p.lat, p.lon, t.z)))!;
+};
+/** The kilometres in the first countries: what can have place data at all. */
+const coverable = (i: ScreenInputs): number => i.routeZones.filter((z) => z.country !== 'XX').reduce((s, z) => s + z.toKm - z.fromKm, 0);
+const covered = (i: ScreenInputs): number => i.savedKm.reduce((s, r) => s + r.toKm - r.fromKm, 0);
 
 describe('storage full', () => {
   const quota = (): Error => new DOMException('full', 'QuotaExceededError');

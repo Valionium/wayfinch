@@ -12,6 +12,10 @@ export type TileReport = {
   buildId: string; manifest: PackManifest; saved: TileId[]; failed: TileFailure[];
   /** The build this run had begun on is gone from the host, so it began again on a new one. */
   restartedFrom?: string;
+  /** A finished run's build was replaced by a newer one. */
+  replacedFrom?: string;
+  /** A newer build is on its way but not yet whole: the report is of the old one, which stays until then. */
+  pending?: { buildId: string; staged: number; total: number; full: boolean };
 };
 /** A run in the store: its build, and the manifest it began with, of the tiles of this route's corridor. */
 export type PackRun = { buildId: string; manifest: PackManifest };
@@ -22,6 +26,12 @@ export type TileStore = {
   startRun(run: PackRun): Promise<void>;
   savedTileKeys(): Promise<Set<string>>;
   saveTiles(content: TileContent[], report: TileReport): Promise<void>;
+  /** A newer build on its way, kept beside the old one: its run, its verified tiles, and the swap once it's whole. */
+  readStage(): Promise<PackRun | null>;
+  startStage(run: PackRun): Promise<void>;
+  stagedTileKeys(): Promise<Set<string>>;
+  stageTiles(tiles: { tile: TileId; text: string }[], buildId: string): Promise<void>;
+  swapIn(buildId: string): Promise<void>;
 };
 
 export type DownloadDeps = {
@@ -43,7 +53,7 @@ class NotThere extends Error {}
 
 export const isStorageFull = (e: unknown): boolean => (e as { name?: string } | null)?.name === 'QuotaExceededError';
 
-type Got = { kind: 'ok'; tile: ManifestTile; content: TileContent } | { kind: 'failed'; tile: ManifestTile; reason: string } | { kind: 'absent'; tile: ManifestTile };
+type Got = { kind: 'ok'; tile: ManifestTile; content: TileContent; text: string } | { kind: 'failed'; tile: ManifestTile; reason: string } | { kind: 'absent'; tile: ManifestTile };
 
 const idOf = (t: TileId): TileId => ({ z: t.z, x: t.x, y: t.y });
 
@@ -74,11 +84,11 @@ export async function downloadTiles(route: { points: LatLng[] }, deps: DownloadD
   });
 
   /** A new run, from the entry point. Nothing of an older run is touched until this has worked. */
-  const fresh = async (): Promise<PackRun> => {
-    const entry = readEntry(await textOf(`${origin}/packs/current.json`, { cache: 'no-cache' }));
+  const manifestOf = async (entry: ReturnType<typeof readEntry>): Promise<PackRun> => {
     const manifest = readManifest(await textOf(`${origin}${entry.manifest}`, {}), entry.buildId);
     return { buildId: entry.buildId, manifest: { ...manifest, tiles: corridorTiles(route.points, manifest, CORRIDOR_KM) } };
   };
+  const fresh = async (): Promise<PackRun> => manifestOf(readEntry(await textOf(`${origin}/packs/current.json`, { cache: 'no-cache' })));
 
   const getTile = async (run: PackRun, tile: ManifestTile): Promise<Got> => {
     const url = `${origin}/packs/${run.buildId}/t/${tile.z}/${tile.x}/${tile.y}.json`;
@@ -94,7 +104,7 @@ export async function downloadTiles(route: { points: LatLng[] }, deps: DownloadD
           return new Uint8Array(await r.arrayBuffer());
         });
         if (got === 'absent') return { kind: 'absent', tile };
-        return { kind: 'ok', tile, content: await readTile(got, tile, run.manifest) };
+        return { kind: 'ok', tile, content: await readTile(got, tile, run.manifest), text: new TextDecoder().decode(got) };
       } catch (e) {
         reason = e instanceof PackError ? e.code : e instanceof Error && /^(timeout|http-\d+)$/.test(e.message) ? e.message : 'network';
       }
@@ -112,46 +122,32 @@ export async function downloadTiles(route: { points: LatLng[] }, deps: DownloadD
     }
   };
 
-  let run = await store.readRun();
-  let restartedFrom: string | undefined;
-  if (!run) {
-    run = await fresh();
-    await store.startRun(run);
-  }
+  type Filled = { saved: TileId[]; failed: TileFailure[]; gone: boolean; full: boolean; missing: ManifestTile[] };
 
-  for (;;) {
-    const current: PackRun = run;
-    const had = await store.savedTileKeys();
-    const missing = current.manifest.tiles.filter((t) => !had.has(tileKey(t)));
-    const saved: TileId[] = current.manifest.tiles.filter((t) => had.has(tileKey(t))).map(idOf);
+  /** Fetches what `run` lacks of `have`, batch by batch, handing each verified batch to `keep`. */
+  const fill = async (run: PackRun, have: Set<string>, keep: (got: Extract<Got, { kind: 'ok' }>[], ids: TileId[]) => Promise<void>): Promise<Filled> => {
+    const missing = run.manifest.tiles.filter((t) => !have.has(tileKey(t)));
+    const saved: TileId[] = run.manifest.tiles.filter((t) => have.has(tileKey(t))).map(idOf);
     const failed: TileFailure[] = [];
-    const total = current.manifest.tiles.length;
-    const finish = (extra: TileFailure[] = []): TileReport => ({
-      buildId: current.buildId, manifest: current.manifest, saved, failed: [...failed, ...extra], ...(restartedFrom ? { restartedFrom } : {}),
-    });
+    const total = run.manifest.tiles.length;
     deps.onProgress?.(saved.length, total);
     let full = false;
-    let gone = false;
-
     for (let i = 0; i < missing.length; i += AT_A_TIME) {
       const batch = missing.slice(i, i + AT_A_TIME);
       if (full) {
         failed.push(...batch.map((t) => ({ tile: idOf(t), reason: STORAGE_FULL })));
         continue;
       }
-      const got = await Promise.all(batch.map((t) => getTile(current, t)));
+      const got = await Promise.all(batch.map((t) => getTile(run, t)));
       const absent = got.filter((g) => g.kind === 'absent');
-      if (absent.length > 0 && (await buildIsGone(current))) {
-        gone = true;
-        break;
-      }
+      if (absent.length > 0 && (await buildIsGone(run))) return { saved, failed, gone: true, full, missing };
       failed.push(...absent.map((g) => ({ tile: idOf(g.tile), reason: 'not-found' })));
       for (const g of got) if (g.kind === 'failed') failed.push({ tile: idOf(g.tile), reason: g.reason });
       const good = got.filter((g) => g.kind === 'ok');
       if (good.length > 0) {
         const ids = good.map((g) => idOf(g.tile));
         try {
-          await store.saveTiles(good.map((g) => g.content), { buildId: current.buildId, manifest: current.manifest, saved: ids, failed: [] });
+          await keep(good, ids);
           saved.push(...ids);
         } catch (e) {
           if (!isStorageFull(e)) throw e;
@@ -161,24 +157,78 @@ export async function downloadTiles(route: { points: LatLng[] }, deps: DownloadD
       }
       deps.onProgress?.(saved.length, total);
     }
+    return { saved, failed, gone: false, full, missing };
+  };
 
-    if (!gone) return finish();
+  const saveInto = (run: PackRun) => (good: Extract<Got, { kind: 'ok' }>[], ids: TileId[]): Promise<void> =>
+    store.saveTiles(good.map((g) => g.content), { buildId: run.buildId, manifest: run.manifest, saved: ids, failed: [] });
 
-    // Only once: a host that loses a second build within one run is not answering sensibly.
-    let next: PackRun | null = null;
-    if (restartedFrom === undefined) {
-      try {
-        next = await fresh();
-      } catch {
-        next = null;
-      }
+  const reportOf = (run: PackRun, f: Pick<Filled, 'saved' | 'failed'>, extra: Partial<TileReport> = {}): TileReport =>
+    ({ buildId: run.buildId, manifest: run.manifest, saved: f.saved, failed: f.failed, ...extra });
+
+  /** What a run holds, with no request made. */
+  const asStored = async (run: PackRun): Promise<TileReport> => {
+    const had = await store.savedTileKeys();
+    return reportOf(run, {
+      saved: run.manifest.tiles.filter((t) => had.has(tileKey(t))).map(idOf),
+      failed: run.manifest.tiles.filter((t) => !had.has(tileKey(t))).map((t) => ({ tile: idOf(t), reason: 'build-gone' })),
+    });
+  };
+
+  /**
+   * A newer build, fetched whole beside the old and checked against its own manifest, then put in the old one's place in one
+   * transaction. Until then the old build's data stays as it was, and is what the report is of.
+   */
+  const replaceWith = async (old: PackRun, next: PackRun, flag: Partial<TileReport>): Promise<TileReport> => {
+    const staged = await store.readStage();
+    const target = staged?.buildId === next.buildId ? staged : next;
+    if (target !== staged) await store.startStage(target);
+    const f = await fill(target, await store.stagedTileKeys(), (good, ids) =>
+      store.stageTiles(good.map((g, i) => ({ tile: ids[i]!, text: g.text })), target.buildId));
+    if (!f.gone && f.failed.length === 0) {
+      await store.swapIn(target.buildId);
+      return reportOf(target, { saved: f.saved, failed: [] }, flag);
     }
-    if (!next || next.buildId === current.buildId) {
-      const savedNow = new Set(saved.map(tileKey));
-      return finish(missing.filter((t) => !savedNow.has(tileKey(t))).map((t) => ({ tile: idOf(t), reason: 'build-gone' })));
-    }
-    restartedFrom = current.buildId;
-    await store.startRun(next);
-    run = next;
+    const before = await asStored(old);
+    return { ...before, failed: before.failed.filter((x) => x.reason !== 'build-gone'), pending: { buildId: target.buildId, staged: f.saved.length, total: target.manifest.tiles.length, full: f.full } };
+  };
+
+  let run = await store.readRun();
+  if (!run) {
+    run = await fresh();
+    await store.startRun(run);
+    const f = await fill(run, new Set(), saveInto(run));
+    return reportOf(run, f);
   }
+
+  const had = await store.savedTileKeys();
+  if (run.manifest.tiles.some((t) => !had.has(tileKey(t)))) {
+    // An unfinished run goes on on its own build, while that build's address answers (plan, Review Focus 1).
+    const f = await fill(run, had, saveInto(run));
+    if (!f.gone) return reportOf(run, f);
+    let next: PackRun;
+    try {
+      next = await fresh();
+    } catch {
+      return reportOf(run, { saved: f.saved, failed: [...f.failed, ...f.missing.filter((t) => !f.saved.some((s) => tileKey(s) === tileKey(t))).map((t) => ({ tile: idOf(t), reason: 'build-gone' }))] });
+    }
+    if (next.buildId === run.buildId) return asStored(run);
+    return replaceWith(run, next, { restartedFrom: run.buildId });
+  }
+
+  // A finished run: the entry point says whether there's newer data (section 5a). No answer keeps what is stored.
+  let entry: ReturnType<typeof readEntry>;
+  try {
+    entry = readEntry(await textOf(`${origin}/packs/current.json`, { cache: 'no-cache' }));
+  } catch {
+    return reportOf(run, { saved: run.manifest.tiles.map(idOf), failed: [] });
+  }
+  if (entry.buildId === run.buildId) return reportOf(run, { saved: run.manifest.tiles.map(idOf), failed: [] });
+  let next: PackRun;
+  try {
+    next = await manifestOf(entry);
+  } catch {
+    return reportOf(run, { saved: run.manifest.tiles.map(idOf), failed: [] }, { pending: { buildId: entry.buildId, staged: 0, total: 0, full: false } });
+  }
+  return replaceWith(run, next, { replacedFrom: run.buildId });
 }

@@ -75,10 +75,21 @@ function holds(a: IndexedArea, lat: number, lon: number): boolean {
 
 const zoneOf = (a: BoundaryArea): Zone => ({ country: a.country, holidayZone: a.holidayZone, timeZone: a.timeZone });
 
-export function zoneAt(lat: number, lon: number, file: BoundaryFile): Zone | null {
+/** The country of the file's last area: outside the first countries, known as such. */
+export const OUTSIDE_COUNTRY = 'XX';
+const OUT = 'outside' as const;
+
+/** The zone of a point, `outside` in the outside area, null in no area at all (a gap in the shapes). */
+function placeOf(lat: number, lon: number, file: BoundaryFile): Zone | typeof OUT | null {
   if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) return null; // written so that NaN fails
-  for (const a of indexOf(file)) if (holds(a, lat, lon)) return zoneOf(a.area);
+  for (const a of indexOf(file)) if (holds(a, lat, lon)) return a.area.country === OUTSIDE_COUNTRY ? OUT : zoneOf(a.area);
   return null;
+}
+
+/** The zone of a point; null outside the first countries. */
+export function zoneAt(lat: number, lon: number, file: BoundaryFile): Zone | null {
+  const z = placeOf(lat, lon, file);
+  return z === OUT ? null : z;
 }
 
 /** The time zone of the area with the nearest corner: for a place in none, where only a clock is asked of it. */
@@ -86,6 +97,7 @@ function nearestTimeZone(lat: number, lon: number, file: BoundaryFile): string {
   let best = Infinity;
   let zone = file.areas[0]?.timeZone ?? 'UTC';
   for (const area of file.areas) {
+    if (area.country === OUTSIDE_COUNTRY) continue;
     for (const ring of area.rings) {
       for (const c of ring) {
         const d = haversineKm({ lat, lon }, { lat: c[1]!, lon: c[0]! });
@@ -99,14 +111,15 @@ function nearestTimeZone(lat: number, lon: number, file: BoundaryFile): string {
   return zone;
 }
 
-type Look = { km: number; lat: number; lon: number; zone: Zone | null };
+type Found = Zone | typeof OUT | null;
+type Look = { km: number; lat: number; lon: number; zone: Found };
 
-const sameZone = (a: Zone | null, b: Zone | null): boolean => (a === null || b === null ? a === b : a.holidayZone === b.holidayZone && a.country === b.country && a.timeZone === b.timeZone);
+const sameZone = (a: Found, b: Found): boolean => (a === null || b === null || a === OUT || b === OUT ? a === b : a.holidayZone === b.holidayZone && a.country === b.country && a.timeZone === b.timeZone);
 
 /** The looks along the route: each route point, and steps between far ones, with a border found to within `CUT_KM`. */
 function walk(route: Route, file: BoundaryFile): Look[] {
   const looks: Look[] = [];
-  const look = (lat: number, lon: number, km: number): Look => ({ km, lat, lon, zone: zoneAt(lat, lon, file) });
+  const look = (lat: number, lon: number, km: number): Look => ({ km, lat, lon, zone: placeOf(lat, lon, file) });
   const between = (a: Look, b: Look, out: Look[]): void => {
     if (sameZone(a.zone, b.zone) || b.km - a.km <= CUT_KM) return;
     const mid = look((a.lat + b.lat) / 2, (a.lon + b.lon) / 2, (a.km + b.km) / 2);
@@ -136,8 +149,9 @@ function walk(route: Route, file: BoundaryFile): Look[] {
 }
 
 /**
- * The route's stretches, cut at each change along it, covering it with no gap or overlap. A point in no area joins the nearest
- * zone along the route within 5 km, for the file's coast and rounding; further from any it is `XX`, with the nearest clock.
+ * The route's stretches, cut at each change along it, covering it with no gap or overlap. A point in the outside area is `XX`,
+ * with the nearest clock. A point in no area, a gap in the shapes, joins the nearest look along the route within 5 km, unless
+ * that look is outside; further from any it is `XX` too.
  * No stretch under 100 m stays, unless it's the whole route: a route along a border doesn't flip back and forth.
  */
 export function routeZones(route: Route, file: BoundaryFile): ZoneSpan[] {
@@ -146,6 +160,8 @@ export function routeZones(route: Route, file: BoundaryFile): ZoneSpan[] {
   let nextKnown = 0;
   type Kept = { km: number; zone: Zone | null };
   const settled: Kept[] = looks.map((l) => {
+    // Outside the first countries is known, and never joined to a neighbour: 112 and the fallback line there.
+    if (l.zone === OUT) return { km: l.km, zone: null };
     if (l.zone) return { km: l.km, zone: l.zone };
     while (nextKnown < known.length && known[nextKnown]!.km < l.km) nextKnown++;
     const after = known[nextKnown];
@@ -153,7 +169,8 @@ export function routeZones(route: Route, file: BoundaryFile): ZoneSpan[] {
     const dAfter = after ? after.km - l.km : Infinity;
     const dBefore = before ? l.km - before.km : Infinity;
     const near = dBefore <= dAfter ? before : after;
-    return { km: l.km, zone: near && Math.min(dBefore, dAfter) <= JOIN_KM ? near.zone : null };
+    const joined = near && Math.min(dBefore, dAfter) <= JOIN_KM ? near.zone : null;
+    return { km: l.km, zone: joined === OUT ? null : joined };
   });
 
   // Runs of one zone. A run ends where the next begins, at the middle of the last two looks.

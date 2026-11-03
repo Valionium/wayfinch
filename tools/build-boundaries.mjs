@@ -17,15 +17,19 @@ import { COUNTRY_JOBS } from '../pipeline/config.ts';
 const OUT = fileURLToPath(new URL('../public/data/boundaries.v1.json', import.meta.url));
 
 const SOURCE = 'Countries, regions and local zones: © OpenStreetMap contributors, ODbL 1.0, simplified. '
-  + 'Region codes checked against Natural Earth 1:10m admin-1 (public domain).';
+  + 'Region codes checked against Natural Earth 1:10m admin-1 (public domain). '
+  + 'The last area, XX, is outside the first countries: a box less their outer edge.';
 
 /** Douglas-Peucker tolerance in degrees, for borders between countries and for those inside one. Over budget: raise these. */
-const BORDER_TOLERANCE = Number(process.env.BORDER_TOLERANCE ?? 0.0025);
+const BORDER_TOLERANCE = Number(process.env.BORDER_TOLERANCE ?? 0.003);
 const INLAND_TOLERANCE = Number(process.env.INLAND_TOLERANCE ?? 0.012);
 /** Rings smaller than this, in square degrees, are left out, unless they're all an area has. */
 const MIN_RING_AREA = Number(process.env.MIN_RING_AREA ?? 0.000002);
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
+/** The outside area's country and zone, as zones.ts reads them. */
+const OUTSIDE = 'XX';
+const LOCAL_ZONES = new Set(['FR-57', 'FR-67', 'FR-68', 'DE-BY-Augsburg']);
 const keyOf = (p) => `${p[0]},${p[1]}`;
 
 function clean(ring) {
@@ -238,6 +242,58 @@ function checkAgainstNaturalEarth(path, areas) {
 }
 const ringAreaSum = (rings) => rings.reduce((sum, r) => sum + ringArea(r), 0);
 
+/** Rings of a union: an edge two rings share lies inside and goes; what's left is walked back into rings. */
+function dissolve(rings) {
+  const undirected = (a, b) => (keyOf(a) < keyOf(b) ? `${keyOf(a)}|${keyOf(b)}` : `${keyOf(b)}|${keyOf(a)}`);
+  const count = new Map();
+  for (const ring of rings) for (let i = 0; i < ring.length; i++) {
+    const k = undirected(ring[i], ring[(i + 1) % ring.length]);
+    count.set(k, (count.get(k) ?? 0) + 1);
+  }
+  const next = new Map();
+  const points = new Map();
+  const link = (a, b) => {
+    if (!next.has(keyOf(a))) next.set(keyOf(a), []);
+    next.get(keyOf(a)).push(keyOf(b));
+  };
+  for (const ring of rings) for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    if (count.get(undirected(a, b)) % 2 === 0) continue;
+    points.set(keyOf(a), a);
+    points.set(keyOf(b), b);
+    link(a, b);
+    link(b, a);
+  }
+  const drop = (a, b) => {
+    const list = next.get(a);
+    const i = list.indexOf(b);
+    if (i >= 0) list.splice(i, 1);
+  };
+  const out = [];
+  for (const start of next.keys()) {
+    while (next.get(start).length > 0) {
+      const ring = [start];
+      let at = start;
+      let to = next.get(at)[0];
+      for (;;) {
+        drop(at, to);
+        drop(to, at);
+        if (to === start) break;
+        ring.push(to);
+        at = to;
+        if (next.get(at).length === 0) break;
+        to = next.get(at)[0];
+      }
+      if (ring.length >= 3) out.push(ring.map((k) => points.get(k)));
+    }
+  }
+  return out;
+}
+
+/** Where the outside area ends: well beyond the first countries on every side. */
+const OUTSIDE_BOX = { west: -12, east: 40, south: 34, north: 72 };
+
 function main() {
   const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
   const folder = arg('osm');
@@ -257,6 +313,13 @@ function main() {
     const big = rings.filter((r) => ringArea(r) >= MIN_RING_AREA);
     return { country: a.country, holidayZone: a.zone, timeZone: COUNTRIES[a.country].timeZone, rings: big.length > 0 ? big : rings };
   });
+  // Everything else in the box is outside the first countries: Italy, Liechtenstein, the sea beyond the coastal waters. Its rings
+  // are the box and the first countries' own outer edge, the very vertices of their areas, so no gap opens at a border. It
+  // comes last: a point it holds is in none of the others.
+  const covered = dissolve(areas.filter((a) => !LOCAL_ZONES.has(a.holidayZone)).flatMap((a) => a.rings));
+  const b = OUTSIDE_BOX;
+  const box = [[b.west, b.south], [b.east, b.south], [b.east, b.north], [b.west, b.north]];
+  areas.push({ country: OUTSIDE, holidayZone: OUTSIDE, timeZone: 'UTC', rings: [box, ...covered] });
   const text = JSON.stringify({ v: 1, source: SOURCE, areas });
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, text);
