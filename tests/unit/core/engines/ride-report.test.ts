@@ -77,4 +77,15 @@ describe('the post-ride report (spec sections 3.5 and 6.3)', () => {
     expect(over({ hours: 2, intakeL: 1, massLossKg: -0.5 })).toBe(true);
     expect(over({ hours: 2, intakeL: 1, massLossKg: 0.5 })).toBe(false);
   });
+
+  test('[YOU-TERRAIN] the terrain tap goes onto the logged ride: hilly is marked, flat and untouched carry no mark', () => {
+    const logged = (o: Partial<RideReport>) => {
+      const r = reportRide({ ...base, ...o }, profile, 25);
+      if (!r.ok) throw new Error('refused');
+      return r.ride;
+    };
+    expect(logged({ hilly: true }).hilly).toBe(true);
+    expect('hilly' in logged({ hilly: false })).toBe(false);
+    expect('hilly' in logged({})).toBe(false);
+  });
 });

@@ -1,4 +1,4 @@
-import { beforeEach, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { freshStore } from './helpers.ts';
 import { reportRide } from '../../../src/core/engines/ride-report.ts';
 import { W } from '../../../src/core/wording/en.ts';
@@ -70,4 +70,49 @@ test('[YOU-RIDER] a changed thirst answer moves the starting point of k and keep
   expect((await readProfile()).k).toBeCloseTo(1, 6); // "less" never lowers the prior
   await writeProfile({ thirst: 'average' }, NOW);
   expect((await readProfile()).thirst).toBe('average');
+});
+
+describe('hilly reports (owner ruling "small": one tap, kept apart)', () => {
+  const profile0 = { weightKg: 75, thirst: 'average' as const, ebike: false, capacityL: null, k: 1, sumW: 0, kDrink: 1, weighedRides: 0 };
+  const ride = (o: Partial<Parameters<typeof reportRide>[0]>) => {
+    const r = reportRide({ at: NOW, hours: 5, intakeL: 3, feel: 'C', temp: 'warm', ...o }, profile0, 25);
+    if (!r.ok) throw new Error('refused');
+    return r.ride;
+  };
+
+  test('[YOU-TERRAIN] a hilly report is kept but moves neither k, nor the evidence, nor k_drink, nor the weighed count', async () => {
+    await readProfile();
+    await readRides();
+    const before = await readProfile();
+    const hilly = await logRide(ride({ hilly: true }), NOW);
+    expect(hilly.ok).toBe(true);
+    expect(hilly.profile).toEqual(before);
+    const weighedHilly = await logRide(ride({ hilly: true, massLossKg: 2, at: new Date(NOW.getTime() + 1) }), NOW);
+    expect(weighedHilly.profile).toEqual(before);
+    expect(await readRides()).toHaveLength(2);
+    // A flat report after them moves the factors exactly as it would have alone.
+    const flat = await logRide(ride({ at: new Date(NOW.getTime() + 2) }), NOW);
+    expect(flat.profile.k).toBeGreaterThan(1);
+    const alone = (await import('../../../src/core/engines/water-factors.ts')).updateCarrying({ thirst: 'average' }, [ride({ at: new Date(NOW.getTime() + 2) })], NOW);
+    expect(flat.profile.k).toBeCloseTo(alone.k, 9);
+    expect(flat.profile.sumW).toBeCloseTo(alone.sumW, 9);
+  });
+
+  test('[YOU-TERRAIN] the export format is unchanged: a hilly report never travels, and an import keeps the hilly reports on the phone', async () => {
+    await readProfile();
+    await readRides();
+    await logRide(ride({ hilly: true }), NOW);
+    await logRide(ride({ at: new Date(NOW.getTime() + 1) }), NOW);
+    const file = await exportAll();
+    expect(file.calibration.rides).toHaveLength(1);
+    expect(Object.keys(file.calibration.rides[0]!).sort()).toEqual(['at', 'feel', 'intakeL', 'predictedL']);
+    expect(JSON.stringify(file)).not.toContain('hilly');
+    const { importAll } = await import('../../../src/store/export.ts');
+    await readProfile();
+    await readRides();
+    expect((await importAll(JSON.parse(JSON.stringify(file)))).ok).toBe(true);
+    const rides = await readRides();
+    expect(rides).toHaveLength(2);
+    expect(rides.filter((r) => r.hilly === true)).toHaveLength(1);
+  });
 });

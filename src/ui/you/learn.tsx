@@ -30,6 +30,7 @@ export function LearnCard({ services, snap, reload }: { services: YouServices; s
   const [feel, setFeel] = useState<'A' | 'B' | 'C' | ''>('');
   const [loss, setLoss] = useState('');
   const [stops, setStops] = useState('');
+  const [hilly, setHilly] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [added, setAdded] = useState<Added | null>(null);
   const { profile } = snap;
@@ -46,7 +47,7 @@ export function LearnCard({ services, snap, reload }: { services: YouServices; s
     const s = num(stops);
     const { outcome, refused } = await services.report({
       at: services.now(), hours: h, intakeL: d, feel: feel === '' ? null : feel, temp,
-      ...(l === null ? {} : { massLossKg: l }), ...(s === null ? {} : { toiletStops: s }),
+      ...(l === null ? {} : { massLossKg: l }), ...(s === null ? {} : { toiletStops: s }), hilly,
     }, profile, snap.settings.flatKph);
     if (!outcome.ok) {
       setProblem({ short: W.appStoreRideShort, long: W.appStoreRideLong, intake: W.appStoreRideIntake, weighing: W.appStoreRideWeighing }[outcome.reason]);
@@ -63,6 +64,7 @@ export function LearnCard({ services, snap, reload }: { services: YouServices; s
     setLoss('');
     setStops('');
     setFeel('');
+    setHilly(false);
     await reload();
   };
 
@@ -74,6 +76,7 @@ export function LearnCard({ services, snap, reload }: { services: YouServices; s
           {snap.rides === 0 ? Y.youLearnNoRides : Y.youLearnRides(snap.rides)}
           {profile.weighedRides > 0 ? ` ${Y.youLearnWeighed(profile.weighedRides)}` : ''}
         </p>
+        {snap.hillyRides > 0 ? <p class="muted" data-hilly-count>{Y.youLearnHilly(snap.hillyRides)}</p> : null}
         <p class="muted">{Y.youLearnIntro}</p>
         {!open ? <button type="button" class="btn" onClick={() => setOpen(true)}>{Y.youRideOpen}</button> : (
           <form data-ride-form noValidate onSubmit={(e) => { e.preventDefault(); void submit(); }}>
@@ -85,6 +88,11 @@ export function LearnCard({ services, snap, reload }: { services: YouServices; s
               <label for="ride-drank">{Y.youRideDrank}</label>
               <input id="ride-drank" type="number" inputMode="decimal" step="0.1" min={0} max={20} value={drank} onInput={(e) => setDrank(e.currentTarget.value)} />
             </div>
+            <fieldset class="field choice">
+              <legend>{Y.youTerrainLegend}</legend>
+              <label class="choice-option"><input type="radio" name="ride-terrain" value="flat" checked={!hilly} onChange={() => setHilly(false)} /><span>{Y.youTerrainFlat}</span></label>
+              <label class="choice-option"><input type="radio" name="ride-terrain" value="hilly" checked={hilly} onChange={() => setHilly(true)} /><span>{Y.youTerrainHilly}</span></label>
+            </fieldset>
             <fieldset class="field choice">
               <legend>{Y.youRideTempLegend}</legend>
               {(Object.keys(REPORT_TEMPS) as ReportTemp[]).map((t) => (
@@ -119,6 +127,7 @@ export function LearnCard({ services, snap, reload }: { services: YouServices; s
         {added ? (
           <div data-ride-result role="status">
             <p>{Y.youRideAdded} {Y.youRideEstimate((Math.round(added.predictedL * 10) / 10).toFixed(1))}</p>
+            {added.ride.hilly === true ? <p data-hilly-kept>{Y.youRideHillyKept}</p> : null}
             <h3>{Y.youRideAdviceTitle}</h3>
             <ul>{added.advice.lines.map((line) => <li key={line}>{line}</li>)}</ul>
             {added.over ? <p class="notice" data-over-drinking>{W.waterOverDrinkCaution}</p> : null}

@@ -22,6 +22,8 @@ export type RideReport = {
   at: Date; hours: number; intakeL: number; feel: 'A' | 'B' | 'C' | null; temp: ReportTemp;
   /** Weight lost over the ride, kg (negative: gained); both weighings or none. */
   massLossKg?: number; toiletStops?: number;
+  /** The one tap, "Flat or hilly?": true for hilly. */
+  hilly?: boolean;
 };
 
 export type RideOutcome =
@@ -58,6 +60,7 @@ export function reportRide(report: RideReport, profile: Profile, flatKph: number
     at: report.at, predictedL, intakeL: report.intakeL, feel: report.feel,
     ...(report.massLossKg === undefined ? {} : { massLossKg: report.massLossKg }),
     ...(report.toiletStops === undefined ? {} : { toiletStops: report.toiletStops }),
+    ...(report.hilly === true ? { hilly: true as const } : {}),
   };
   const temp = REPORT_TEMPS[report.temp];
   const planT = temp + PLAN_MARGIN_C;

@@ -575,3 +575,38 @@ describe('Delete and the theme after it (review of PR 37)', () => {
     await until(() => document.documentElement.getAttribute('data-theme') === null, 'the phone own theme after the delete');
   });
 });
+
+describe("Flat or hilly? on the post-ride report (owner ruling small)", () => {
+  async function addRide(terrain: 'flat' | 'hilly', feel: 'A' | 'B' | 'C' = 'C'): Promise<void> {
+    if (!host.querySelector('[data-ride-form]')) await click(button(Y.youRideOpen));
+    await type(field('ride-hours'), '5');
+    await type(field('ride-drank'), '3');
+    await click(radio('ride-feel', feel));
+    await click(radio('ride-terrain', terrain));
+    await click(button(Y.youRideAdd));
+    await until(() => host.querySelector('[data-ride-result]') !== null, 'the result');
+  }
+
+  test("[YOU-TERRAIN] each report carries one tap, Flat or hilly?, flat by default; a hilly report is kept apart, says so, and leaves the status and the count alone", async () => {
+    await show();
+    await click(button(Y.youRideOpen));
+    expect(host.querySelector('legend')!.textContent).toBeTruthy();
+    expect(radio('ride-terrain', 'flat').checked).toBe(true);
+    await addRide('hilly');
+    expect(host.querySelector('[data-hilly-kept]')!.textContent).toBe(Y.youRideHillyKept);
+    await until(() => host.querySelector('[data-hilly-count]') !== null, 'the hilly count');
+    expect(host.querySelector('[data-hilly-count]')!.textContent).toBe(Y.youLearnHilly(1));
+    expect(text()).toContain(Y.youLearnNoRides); // no flat ride counted
+    expect(host.querySelector('[data-calibration]')!.textContent).toBe(W.waterNotCalibrated);
+    const kept = await readProfile();
+    expect(kept.sumW).toBe(0);
+    expect(kept.k).toBe(1);
+    expect(await readRides()).toHaveLength(1);
+    // The tap resets to flat for the next report, and a flat one counts and moves the factor.
+    expect(radio('ride-terrain', 'flat').checked).toBe(true);
+    await addRide('flat');
+    await until(() => text().includes(Y.youLearnRides(1)), 'one flat ride');
+    expect((await readProfile()).sumW).toBeGreaterThan(0);
+    expect(host.querySelector('[data-hilly-count]')!.textContent).toBe(Y.youLearnHilly(1));
+  });
+});
