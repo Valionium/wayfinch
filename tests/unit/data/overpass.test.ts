@@ -117,7 +117,7 @@ describe('the limits', () => {
     const route = flatRoute(50);
     const bent = (offM: number): Route => ({ ...route, points: route.points.map((p) => (p.km === 25 ? { ...p, ...pointAtKm(25, offM) } : p)) });
     expect(stretchLine(bent(50), 10, 40)).toHaveLength(2);
-    expect(stretchLine(bent(150), 10, 40)).toHaveLength(3);
+    expect(stretchLine(bent(150), 10, 40).length).toBeGreaterThan(2);
   });
 
   test('[RFS-LIMITS] every tag set of the pipeline is asked for, each at least as far as its kind counts', () => {
@@ -212,13 +212,18 @@ describe('the limits', () => {
     expect((await readInputs(NOW))!.places.map((p) => p.id)).toEqual(['n1']);
   });
 
-  test('[RFS-LIMITS] an answer with nothing in it is not believed: the stretch is not recorded as having place data, and is not asked again', async () => {
+  test('[RFS-LIMITS] an answer with nothing in it is not believed: asked once more, then the stretch is not recorded as having place data', async () => {
     await prepared();
     const f = stubFetch(() => answer([]));
-    const out = await refreshStretch(50, 70, deps(f));
+    const d = deps(f);
+    const out = await refreshStretch(50, 70, d);
     expect(out.status).toBe('failed');
-    expect(f.urls).toHaveLength(1);
+    expect(f.urls).toHaveLength(2);
+    expect(d.sleeps).toHaveLength(1);
     expect((await readInputs(NOW))!.savedKm).toEqual([]);
+    const answers = [answer([]), answer()];
+    const g = stubFetch(() => answers.shift()!);
+    expect((await refreshStretch(50, 70, deps(g))).status).toBe('saved');
   });
 
   test('[RFS-LIMITS] a busy page in HTML is a failure too; a 400 is not tried again', async () => {

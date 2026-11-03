@@ -239,7 +239,7 @@ export type StretchReport = {
   saved: Range[]; failed: (Range & { reason: string })[]; places: number; say: string | null;
 };
 
-type Asked = { kind: 'ok'; elements: OverpassElement[] } | { kind: 'too-many'; waitMs: number } | { kind: 'server'; reason: string } | { kind: 'refused'; reason: string };
+type Asked = { kind: 'ok'; elements: OverpassElement[] } | { kind: 'empty' } | { kind: 'too-many'; waitMs: number } | { kind: 'server'; reason: string } | { kind: 'refused'; reason: string };
 
 async function ask(query: string, f: FetchLike): Promise<Asked> {
   let response: Response;
@@ -267,8 +267,9 @@ async function ask(query: string, f: FetchLike): Promise<Asked> {
   // A timeout or lack of memory comes back as 200, with what was found so far and a remark: a part of the stretch is no stretch.
   if (typeof b?.remark === 'string' && /error/i.test(b.remark)) return { kind: 'server', reason: 'runtime error' };
   if (!Array.isArray(b?.elements)) return { kind: 'server', reason: 'no elements' };
-  // Nothing at all, not even a village within 5 km, isn't believed (seen from the real service): recorded, it would read as a stretch without water.
-  if (b.elements.length === 0) return { kind: 'refused', reason: 'empty answer' };
+  // Nothing at all, not even a village within 5 km, isn't believed. Measured on 3 November 2026: of the service's two servers, one
+  // answered a good query with 200 and no elements, the other with 148. Recorded, that would read as a stretch without water.
+  if (b.elements.length === 0) return { kind: 'empty' };
   return { kind: 'ok', elements: b.elements as OverpassElement[] };
 }
 
@@ -350,14 +351,21 @@ async function runQueue(state: StretchState, range: Range, deps: StretchDeps): P
     if (requests >= MAX_REQUESTS) { failed.push({ ...part, reason: 'too many requests' }); continue; }
     const query = stretchQuery(stretchLine(state.route, part.fromKm, part.toKm));
     let asked: Asked = { kind: 'server', reason: 'not asked' };
+    let emptyOnce = false;
     for (let waits = 0; requests < MAX_REQUESTS; waits++) {
       requests++;
       asked = await ask(query, deps.fetch);
+      if (asked.kind === 'empty' && !emptyOnce) { // once more: the next request may reach the other server
+        emptyOnce = true;
+        await deps.sleep(FIRST_BACKOFF_MS);
+        continue;
+      }
       if (asked.kind !== 'too-many') break;
       if (waits >= MAX_TOO_MANY) break;
       await deps.sleep(asked.waitMs);
     }
     if (asked.kind === 'too-many') { failed.push({ ...part, reason: 'too many requests' }); continue; }
+    if (asked.kind === 'empty') { failed.push({ ...part, reason: 'empty answer' }); continue; }
     if (asked.kind === 'refused') { failed.push({ ...part, reason: asked.reason }); continue; }
     if (asked.kind === 'server') {
       const half = (part.toKm - part.fromKm) / 2;
