@@ -99,6 +99,8 @@ describe('nothing is required (the owner\'s rules)', () => {
         show(<App />);
         await flush();
         expect(host.querySelector('main')!.dataset.screen).toBe(screen);
+        // You is its own chunk: let it arrive and draw before the next screen, so nothing renders after the test has ended.
+        if (screen === 'you') await vi.waitFor(() => expect(host.querySelector('[data-you-loaded]')).not.toBeNull(), { timeout: 20_000 });
       }
       act(() => go('tools'));
       show(<App />);
