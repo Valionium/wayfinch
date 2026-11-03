@@ -600,5 +600,7 @@ describe('the mode is one line', () => {
     expect(await bundled('tap')).toBe('tap');
     expect(await bundled('auto')).toBe('auto');
     expect(await bundled('sometimes')).toBe('tap');
-  });
+    // Three real esbuild runs: under a full parallel suite on a busy machine they outlast the default 5 s, as the build tests'
+    // runs do (tests/unit/tools/app-build.test.ts gives those 60 s). The check itself is unchanged.
+  }, 30_000);
 });
