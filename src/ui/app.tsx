@@ -1,11 +1,16 @@
 // The app's shell: the update bar, the current screen and the four tabs (spec section 3.1).
 // The screens are placeholders until their groups arrive; the shell already opens on Trip when no trip runs.
 import { W } from '../core/wording/en.ts';
+import { TyreScreen, browserServices } from '../tools/tyre/ui.tsx';
 import { Degraded } from './card.tsx';
 import { degradedSignal } from './degraded.ts';
 import { screenSignal, tabOf } from './nav.ts';
 import type { ScreenName, TabName } from './nav.ts';
 import type { Updater } from './update.ts';
+import { ToolsScreen } from './tools/tools.tsx';
+
+// The tyre tool reads Load Check's records and its own storage; rider weight from You joins when the store does.
+const tyreServices = browserServices();
 
 const TABS: { name: TabName; label: string }[] = [
   { name: 'ahead', label: W.appTabAhead },
@@ -27,6 +32,8 @@ function Screen({ name }: { name: ScreenName }) {
     <main class="screen" id="main" data-screen={name}>
       <h1>{TITLES[tab]}</h1>
       {degradedSignal.value.map((kind) => <Degraded key={kind} kind={kind} />)}
+      {name === 'tools' ? <ToolsScreen services={tyreServices} /> : null}
+      {name === 'tools/tyre' ? <TyreScreen services={tyreServices} /> : null}
     </main>
   );
 }
