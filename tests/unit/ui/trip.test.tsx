@@ -763,3 +763,23 @@ describe('Messages that must not be lost', () => {
     expect(text()).not.toContain(W.appTripUnchanged);
   });
 });
+
+describe('Plan bags for this trip (Contract 2)', () => {
+  test('[C-HANDOFF] with a route, Trip offers to plan bags for it; a tap hands the trip over, and a refusal is said in words', async () => {
+    let calls = 0;
+    let answer: { ok: true; id: string } | { ok: false; reason: string } = { ok: false, reason: W.appHandoffStorageFull };
+    await show(services({ handOff: async () => { calls += 1; return answer; } }));
+    expect(host.querySelector('[data-handoff]')).toBeNull(); // no route, nothing to hand over
+    await pick(await fixtureGpx('loop'));
+    await until(() => host.querySelector('[data-handoff]') !== null, 'the button');
+    expect(text()).toContain(W.appHandoffNote);
+    await click(button(W.appHandoffButton));
+    await until(() => text().includes(W.appHandoffStorageFull), 'the reason');
+    expect(calls).toBe(1);
+    answer = { ok: true, id: 'a'.repeat(32) };
+    await click(button(W.appHandoffButton));
+    await until(() => !text().includes(W.appHandoffStorageFull), 'the reason gone');
+    expect(calls).toBe(2);
+    expect(bannedHits(`${W.appHandoffButton} ${W.appHandoffNote} ${W.appHandoffNoRoute} ${W.appHandoffTooManyPoints} ${W.appHandoffTooLarge} ${W.appHandoffStorageFull} ${W.appHandoffNotKept}`)).toEqual([]);
+  });
+});

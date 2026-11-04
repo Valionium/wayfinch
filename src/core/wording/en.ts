@@ -976,6 +976,14 @@ export const W = {
   appTripFlightMode: 'Try it in flight mode before you leave.',
   appTripIphoneAsk: 'On an iPhone or iPad, first add Wayfinch to your home screen (Share, then Add to Home Screen), open it from there and do Get ready offline in that app. Safari can remove what a browser tab saved after seven days without a visit.',
   appTripInstall: 'Install Wayfinch',
+  // Contract 2: the trip to the bag planner (spec section 7.1). The route and the settings you set go; the bag planner asks first.
+  appHandoffButton: 'Plan bags for this trip',
+  appHandoffNote: 'Opens the bag planner with this route and your trip settings. It asks before it changes anything, and your bags stay as they are.',
+  appHandoffNoRoute: 'Add a route first, then plan bags for it.',
+  appHandoffTooManyPoints: 'This route has more than 200,000 points, more than the bag planner reads. Add a simplified version of it to plan bags.',
+  appHandoffTooLarge: 'This route is over 20 MB as a file, more than the bag planner reads. Add a simplified version of it to plan bags.',
+  appHandoffStorageFull: "This phone's storage is full, so the route could not be passed on. Free some space, then try again.",
+  appHandoffNotKept: 'The route could not be passed on to the bag planner. Try again.',
   // Plan from A to B (spec section 7.1). Only the search text goes to the search services; only the two end points go to a bike router.
   appAbTitle: 'Plan from A to B',
   appAbFrom: 'Start',

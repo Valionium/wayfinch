@@ -1,6 +1,8 @@
 // The bag planner's side of the contracts with the co-pilot, in a real browser, built with the launch switch on (sub-project 6, group 2).
 // qa/contracts.cjs holds the detailed cases on the page's own code; here start-up, the fragment and the address are real.
 // Nothing here prints the page: failures compare booleans, counts and short values.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { loadApp, removeBuilds } from './helpers.ts';
@@ -163,4 +165,42 @@ test('[LC-BACK] in the home-screen app, Back to Wayfinch is always at the top an
   await back.click();
   await page.waitForURL(`${app.origin}/#/you`);
   expect(new URL(page.url()).pathname).toBe('/');
+});
+
+test('[C-HANDOFF] a trip from Wayfinch in a real browser: the bar asks, Apply loads the route and its settings, Undo brings the plan back, Back goes to Trip', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await plannerWithPlan(page);
+  const gpx = readFileSync(join(process.cwd(), 'contracts', 'handoff', 'heidelberg-strasbourg.gpx'), 'utf8');
+  // the co-pilot's database as it makes it (src/store/db.ts), with the handoff the co-pilot wrote
+  await page.evaluate(async ({ gpx, id }) => {
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open('copilot', 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore('handoffs'); };
+      req.onsuccess = () => {
+        const db = req.result;
+        const tx = db.transaction('handoffs', 'readwrite');
+        tx.objectStore('handoffs').put({ id, gpx, createdAt: new Date().toISOString() }, id);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+    localStorage.setItem('copilot:handoff:v1', JSON.stringify({ app: 'copilot', kind: 'handoff', v: 1, id, createdAt: new Date().toISOString() }));
+  }, { gpx, id: ID });
+  const before = await page.evaluate('JSON.stringify(captureDraft())');
+  await openFresh(page, `/tools/bags/#copilot-handoff=${ID}`);
+  await ready(page);
+  await expect(page.locator('#handoffBar')).toBeVisible();
+  await expect(page.locator('#handoffText')).toContainText('A trip from Wayfinch');
+  await page.locator('#handoffApply').click();
+  await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
+  expect(await page.evaluate('[S.nights, S.pace, S.sleep, S.flatKph, S.departureDate, S.place && S.place.name]')).toEqual([2, 'hard', 'mixed', 22, '2026-06-12', 'Heidelberg']);
+  expect(await page.evaluate('S.bags.length')).toBe(3);
+  expect(await page.evaluate(() => location.hash)).toBe('');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:handoff-done')!).outcome)).toBe('applied');
+  await expect(page.locator('#backToWayfinch')).toHaveAttribute('href', '/#/trip');
+  await page.locator('#handoffUndo').click();
+  expect(await page.evaluate('JSON.stringify(captureDraft())')).toBe(before);
+  expect(errors).toEqual([]);
 });

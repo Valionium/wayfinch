@@ -15,7 +15,10 @@ import { fetchBaseline, fetchElevation, fetchForecast, fetchModelRuns } from '..
 import { WEATHER_MODE } from '../../data/weather-mode.ts';
 import type { WeatherMode } from '../../data/weather-mode.ts';
 import { NewerDataError, RefusedError } from '../../store/changed.ts';
-import { openExisting } from '../../store/db.ts';
+import { inExistingTx, inTx, openExisting } from '../../store/db.ts';
+import { cleanupHandoff, HANDOFF_STORE, handOffTrip } from './handoff.ts';
+import type { HandoffOutcome } from './handoff.ts';
+import type { Place } from '../../core/places/types.ts';
 import { readInputs } from '../../store/inputs.ts';
 import { readPrepared, readStoredZones } from '../../store/prepared.ts';
 import type { PreparedRecord } from '../../store/prepared.ts';
@@ -75,6 +78,8 @@ export type TripServices = {
   writeSettings: (partial: Partial<Record<keyof Settings, unknown>>) => Promise<SettingsOutcome>;
   setDeparture: (date: string | null) => Promise<string | null>;
   prepare: (onProgress: (step: StepName, done: number, total: number) => void, onNotice: (text: string) => void) => Promise<StepReport[]>;
+  /** Contract 2: the trip to the bag planner, which then opens. Absent where there is no bag planner to open. */
+  handOff?: () => Promise<HandoffOutcome>;
 };
 
 const HEIGHTS_FLAG = 'copilot:heights-lookup';
@@ -300,6 +305,21 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
     }),
     writeSettings: (partial) => inTurn(() => changeSettings(partial)),
     setDeparture: (date) => inTurn(() => changeDeparture(date)),
+
+    handOff: () => inTurn(async () => {
+      const trip = await readTrip();
+      if (!trip) return { ok: false as const, reason: W.appHandoffNoRoute };
+      const settings = await readSettings();
+      const deps = {
+        now, storage: localStorage, go: (href: string) => window.location.assign(href),
+        randomId: () => [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join(''),
+        places: async (): Promise<Place[]> => { const db = await openExisting(); return db ? ((await db.getAll('places')) as Place[]) : []; },
+        putRecord: (record: { id: string; gpx: string; createdAt: string }) => inTx([HANDOFF_STORE], 'readwrite', async (tx) => { await tx.objectStore(HANDOFF_STORE).put(record, record.id); }),
+        deleteRecord: (id: string) => inExistingTx([HANDOFF_STORE], async (tx) => { await tx.objectStore(HANDOFF_STORE).delete(id); }),
+      };
+      await cleanupHandoff(deps);
+      return handOffTrip(trip, settings, deps);
+    }),
 
     prepare(onProgress, onNotice) {
       return prepareTrip({

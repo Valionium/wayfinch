@@ -68,7 +68,7 @@ test('[C-DELETE] a stored request removes every loadcheck:* key saved before it,
 
 test('[C-DELETE] the code never clears storage, never names a cache, and runs before anything is read at start-up',()=>{
   const html=fs.readFileSync(PAGE,'utf8');
-  const fn=html.slice(html.indexOf('function applyDeleteRequest('),html.indexOf('// Another bag-planner tab applied a request'));
+  const fn=html.slice(html.indexOf('function applyDeleteRequest('),html.indexOf('/* ---- Contract 2: a trip from Wayfinch'));
   assert.ok(fn.length>200);
   // assert.ok on a boolean only: an assertion on the page's text would print the page.
   assert.ok(!/\.clear\(|caches|copilot:/.test(fn),'no clear, no cache, and the only copilot key is the request, read elsewhere');

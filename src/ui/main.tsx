@@ -12,6 +12,7 @@ import { listenForInstall } from './install.ts';
 import { makeUpdater, startOfflineWorker } from './register.ts';
 import { openOnFirstScreen } from './trip/first.ts';
 import { browserTripServices } from './trip/services.ts';
+import { cleanupStoredHandoff } from './trip/handoff.ts';
 
 applyTheme(readLocalSettings().settings.theme);
 void loadRiderKg();
@@ -31,6 +32,7 @@ void watchDegraded({
   addOnlineListener: (cb) => { window.addEventListener('online', cb); window.addEventListener('offline', cb); },
 });
 startAutoWeather();
+void cleanupStoredHandoff();
 void openOnFirstScreen(browserTripServices(), location.hash.replace(/^#\/?/, '') !== '');
 // Only a --test-hooks build has this; in any other the condition is false and the hook is not built in.
 if (__WF_TEST_HOOKS__) void import('./test-hooks.ts');

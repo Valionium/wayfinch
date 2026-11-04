@@ -13,7 +13,7 @@ test("[LC-PAGE-LIVE] the page's hash is the one recorded", () => {
   // The tag load-check-zip-2026-10-30 holds the page as it was live (aa086001…). Since then: the top-tube wording and the update prompt.
   // Sub-project 6 changes the bag planner behind the launch switch (bike.js, the rig, Look); riders keep releases/load-check-root.html
   // (LC-ROOT-FROZEN), so each change here is on purpose and recorded.
-  const recorded = 'f28a9701cdc7e8ec7c6c45ebe1c348041e58a6b6ee7cde5cddebfcbd9fee9c4e';
+  const recorded = '09ad93242b1846cb6021bf2345b7f31ed6516e852886a89ddc1d31c9cca24143';
   expect(createHash('sha256').update(readFileSync(PAGE)).digest('hex')).toBe(recorded);
 });
 
