@@ -26,11 +26,12 @@
 .ah-strip-track { position: relative; flex: 1 1 auto; min-width: 0; margin-right: 22px; }
 .ah-strip-line { position: absolute; left: 0; right: 0; top: 21px; height: 2px; background: var(--muted); }
 .ah-strip-bands { position: relative; height: 44px; }
-.ah-band { position: absolute; top: 8px; height: 28px; min-width: 12px; padding: 0; border: 2px solid var(--ice); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ground); }
-.ah-band::after { content: ''; position: absolute; left: 0; right: 0; top: -8px; bottom: -8px; } /* a 44 px tap target */
-.ah-band-likely { background: var(--ice); }
-.ah-band-possible { background: repeating-linear-gradient(135deg, var(--ice) 0 3px, transparent 3px 8px); }
-.ah-band-thunder { background: var(--red); border-color: var(--red); }
+.ah-band { position: absolute; top: 0; height: 44px; min-width: 12px; padding: 0; border: 0; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ground); } /* the button is the 44 px tap target */
+.ah-band::before { content: ''; position: absolute; left: 0; right: 0; top: 8px; bottom: 8px; border: 2px solid var(--ice); border-radius: 4px; } /* the 28 px bar */
+.ah-band > * { position: relative; }
+.ah-band-likely::before { background: var(--ice); }
+.ah-band-possible::before { background: repeating-linear-gradient(135deg, var(--ice) 0 3px, transparent 3px 8px); }
+.ah-band-thunder::before { background: var(--red); border-color: var(--red); }
 .ah-strip-icons { position: relative; }
 .ah-icon { position: absolute; width: 44px; height: 44px; margin-left: -22px; border-radius: 50%; border: 1px solid var(--line); background: var(--ground); color: var(--ink); display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
 .ah-icon-water { color: var(--ice); }
