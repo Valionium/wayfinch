@@ -373,8 +373,9 @@ function bikeParts(spec: BikeSpec, g: Geometry, fr: ReturnType<typeof frameOf>):
 
 // ---- anchors ----
 function anchorsOf(spec: BikeSpec, g: Geometry, fr: ReturnType<typeof frameOf>, counts: Record<string, number>): Anchors {
+  // The seat pack hangs behind the saddle, over the rear wheel, its front just under the saddle's tail, as in the bag planner today.
   const saddleTail = add(g.saddle, [-15.5 * (g.k / MM), 0]);
-  const seat = inside({ x: saddleTail[0] + 3, y: g.saddle[1] + 1.2, w: 46, h: 17, rot: 0 });
+  const seat = inside({ x: saddleTail[0] + 4 - 46, y: g.saddle[1] + 1.2, w: 46, h: 17, rot: 0 });
   // A handlebar bag is strapped to the bars and hangs in front of them, over the head tube; never down onto the front tyre.
   const tyreTop = g.front[1] - g.rf;
   const barH = Math.max(10, Math.min(18, tyreTop - 1 - (g.clamp[1] - 4)));

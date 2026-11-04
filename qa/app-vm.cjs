@@ -7,14 +7,15 @@ const vm=require('node:vm');
 function sharedStore(){return {values:new Map(),vms:new Set()};}
 function appVM(options={}){
   const store=options.storage||sharedStore();
-  const html=fs.readFileSync(require('./paths.cjs').page,'utf8');
+  const html=fs.readFileSync(options.page||require('./paths.cjs').page,'utf8');
   const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
   const nodes=new Map(),events=new Map(),listeners={};
   const values=store.values;
   const element=id=>({id,innerHTML:'',textContent:'',value:'',dataset:{},style:{},children:[],attributes:[],
     classList:{add(){},remove(){},toggle(){},contains(){return false;}},querySelectorAll(){return [];},querySelector(){return null;},
     addEventListener(){},removeEventListener(){},setAttribute(){},getAttribute(){return null;},removeAttribute(){},
-    hasAttribute(){return false;},contains(){return false;},focus(){},scrollIntoView(){},closest(){return null;}});
+    hasAttribute(){return false;},contains(){return false;},focus(){},scrollIntoView(){},closest(){return null;},
+    insertAdjacentHTML(where,html){this.innerHTML+=html;}});
   const get=id=>{if(!nodes.has(id))nodes.set(id,element(id));return nodes.get(id);};
   const notify=(key,oldValue,newValue)=>{
     store.vms.forEach(other=>{if(other!==self)other.fireStorage(key,oldValue,newValue);});

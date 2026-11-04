@@ -169,8 +169,8 @@ body{
 .bagg.inspectable:hover .bag-shell{stroke:var(--blaze);stroke-width:2.2;filter:drop-shadow(0 0 1.5px var(--blaze))}
 .bagg.inspectable:hover .hit{fill:transparent}
 #rigSvg.focussed .bagg:not(.lifted), #rigSvg.focussed .btl:not(.lifted),
-#rigSvg.focussed .bag-tag, #rigSvg.focussed .bg-line, #rigSvg.focussed .bg-wheel{opacity:.13}
-.bag-tag, .bg-line, .bg-wheel{transition:opacity .3s ease}
+#rigSvg.focussed .bag-tag, #rigSvg.focussed .bg-line, #rigSvg.focussed .bg-wheel, #rigSvg.focussed .bk{opacity:.13}
+.bag-tag, .bg-line, .bg-wheel, #rigSvg .bk{transition:opacity .3s ease}
 .bagg, .btl{transition:opacity .3s ease}
 .bagg.lifted{
   transform-box:view-box;transform-origin:0 0;
@@ -362,6 +362,33 @@ button.go.small{font-size:15px;padding:9px 16px;flex:0 0 auto}
 .rig-foot .fits{color:var(--sage)}
 .bg-line{fill:none;stroke:var(--line);stroke-width:2.4;stroke-linecap:round}
 .bg-wheel{fill:none;stroke:var(--line);stroke-width:2.4}
+/* The bike from bike.js (spec 7.4): its bk-* parts on this page's tokens, as .bg-line and .bg-wheel were. Stroke widths come with
+   the drawing; the rider's colour is a stroke attribute on .bk-paint, over a casing in muted (or the tone the drawing names). */
+.bk{display:block;width:100%;height:auto;overflow:visible}
+.bk-tyre,.bk-rim{fill:none;stroke:var(--line)}
+.bk-spokes{fill:none;stroke:var(--line);opacity:.7}
+.bk-hub,.bk-bb{fill:var(--line)}
+.bk-casing{fill:none;stroke:var(--muted);stroke-linecap:round;stroke-linejoin:round}
+.bk-casing-ink{stroke:var(--ink)}
+.bk-casing-panel{stroke:var(--panel)}
+.bk-casing-ground{stroke:var(--ground)}
+.bk-frame:not(.bk-paint),.bk-stays:not(.bk-paint),.bk-fork:not(.bk-paint){fill:none;stroke:var(--line);stroke-linecap:round;stroke-linejoin:round}
+.bk-paint{stroke-linecap:round;stroke-linejoin:round}
+.bk-ring,.bk-cog,.bk-hubgear,.bk-rotor{fill:none;stroke:var(--line)}
+.bk-chain,.bk-belt,.bk-mech,.bk-rack,.bk-caliper,.bk-crank,.bk-post,.bk-bar,.bk-grip{fill:none;stroke:var(--line);stroke-linecap:round;stroke-linejoin:round}
+.bk-saddle,.bk-hood,.bk-motor{fill:var(--line)}
+.bk-battery{fill:var(--line);stroke:var(--muted);stroke-width:.6}
+.bk-shock,.bk-seal{fill:none;stroke:var(--muted);stroke-linecap:round}
+.bk-shell{fill:var(--panel-hi);stroke:var(--muted-dim);stroke-width:1.3}
+.bk-fill{opacity:.62}
+.bk-onbody .bk-shell{stroke:var(--amber)}
+.bk-deck .bk-shell{fill:none;stroke:var(--sage);stroke-width:1.4}
+.bk-strap{fill:none;stroke:var(--blaze);stroke-width:1;opacity:.7}
+.bk-deck.bk-empty .bk-shell,.bk-deck.bk-empty .bk-strap{stroke:var(--muted)}
+.bk-cage{fill:none;stroke:var(--amber);stroke-width:1.6;opacity:.85}
+.bk-water{fill:var(--amber);opacity:.4;stroke:var(--amber);stroke-width:1}
+.bk-cap{fill:var(--amber);opacity:.9}
+@media (prefers-reduced-motion:no-preference){ .bk-paint{transition:stroke .15s ease} }
 .bag-shell{fill:var(--panel-hi);stroke:var(--muted-dim);stroke-width:1.2}
 .bag-shell.active{stroke:var(--blaze);stroke-width:1.6}
 .bag-fill{opacity:.62}
@@ -1248,7 +1275,8 @@ button.back:hover{color:var(--ink);border-color:var(--muted-dim)}
 :root[data-theme="light"] #rigSvg.focussed .btl:not(.lifted),
 :root[data-theme="light"] #rigSvg.focussed .bag-tag,
 :root[data-theme="light"] #rigSvg.focussed .bg-line,
-:root[data-theme="light"] #rigSvg.focussed .bg-wheel{opacity:.2}
+:root[data-theme="light"] #rigSvg.focussed .bg-wheel,
+:root[data-theme="light"] #rigSvg.focussed .bk{opacity:.2}
 :root[data-theme="light"] .tickbox.on::after{border-color:var(--panel)}
 
 /* ---- the switch itself ---- */
@@ -1691,11 +1719,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
   <div class="rig" id="rigBox">
     <svg id="rigSvg" viewBox="0 0 320 150" role="group" aria-label="Your bike, bags and bottle cages" tabindex="-1">
       <defs id="rigDefs"></defs>
-      <circle class="bg-wheel" cx="95" cy="98" r="40"/>
-      <circle class="bg-wheel" cx="212" cy="98" r="40"/>
-      <path class="bg-line" d="M143,106 L127,52 M143,106 L194,59 M127,52 L189,44 M189,44 L194,59 M194,59 L212,98 M143,106 L95,98 M127,52 L95,98"/>
-      <path class="bg-line" d="M127,52 L123,38 M110,36 h29 M189,44 L197,40 M190,40 h16"/>
-      <circle cx="143" cy="106" r="3.5" fill="var(--line)"/>
+      <g id="rigBike"></g>
       <g id="bagLayer"></g>
       <g id="bottleLayer"></g>
     </svg>
@@ -3734,7 +3758,9 @@ function safeDataThumb(markup){
   const ns = 'http://www.w3.org/2000/svg';
   const tags = new Set(['svg','g','defs','clipPath','rect','polygon','path','line','circle','text']);
   const numeric = new Set(['x','y','x1','y1','x2','y2','cx','cy','r','rx','ry','width','height','opacity','fill-opacity','stroke-opacity','stroke-width']);
-  const drawingClasses = new Set(['bg-wheel','bg-line','bagg','owned','packed','idle','onbody','deck','deck-empty','bag-shell','active','bag-fill','bag-tag','deck-tag','strapline','btl','cage','bottle','bottle-cap','leftbehind','seg','levelline','brimline']);
+  const drawingClasses = new Set(['bk','bk-tyre','bk-rim','bk-spokes','bk-hub','bk-bb','bk-casing','bk-casing-ink','bk-casing-panel','bk-casing-ground',
+    'bk-paint','bk-frame','bk-stays','bk-fork','bk-ring','bk-cog','bk-hubgear','bk-rotor','bk-chain','bk-belt','bk-mech','bk-rack','bk-caliper',
+    'bk-crank','bk-post','bk-bar','bk-grip','bk-saddle','bk-hood','bk-motor','bk-battery','bk-shock','bk-seal','bg-wheel','bg-line','bagg','owned','packed','idle','onbody','deck','deck-empty','bag-shell','active','bag-fill','bag-tag','deck-tag','strapline','btl','cage','bottle','bottle-cap','leftbehind','seg','levelline','brimline']);
   const prefix = 'thumb' + (++thumbRenderId) + '_';
   const idMap = new Map();
   for(const el of doc.querySelectorAll('[id]')){
@@ -7062,67 +7088,113 @@ function fillColour(pct){
   }
   return 'rgb(224,68,40)';
 }
-// Deliberate tap targets, drawn invisibly over each spot. Sized for fingers,
-// checked for non-overlap. The frame is a polygon; bottles are circles that
-// sit on top of it, so a tap near a cage adds a cage and anywhere else in the
-// triangle adds a frame bag.
-const HITBOX = {
-  pack:[2,14,44,54], seat:[58,24,64,36], rack:[58,66,66,44],
-  top:[148,26,36,24], bar:[186,10,42,38], fork:[190,56,30,42],
-};
-const TAGPOS = { top:[156,30], bar:[199,14], frame:[161,121], seat:[91,24], fork:[216,74], rack:[93,120],
-                 strap:[222,48], rackTop:[93,44], pack:[22,18] };
-const TT = x => 52 + (x-127)*(44-52)/(189-127);   // top tube height at x
+// The plan's bags in Contract 1's shape (spec 7.1): what bike.js reads of a plan. Usable bags only, as the plan counts them;
+// fills from the packed slots once the kit is known. It only reads the plan.
+function planBagView(){
+  if(S.step === 1) return null;
+  const stage = S.step, A = stage >= 3 ? currentPlan() : null, items = [], bottles = [];
+  const fillOf = u => {
+    const s = A && A.slots.find(x => x.key === u.key);
+    return s && s.cap > 0 ? +Math.min(1, (s.cap - s.left) / s.cap).toFixed(3) : 0;
+  };
+  S.bags.forEach(b => {
+    if(!bagSpec(b).usable) return;
+    if(isBottle(b.pos)){ if(b.slot) bottles.push({ slot:b.slot, L:+b.L || 0.75 }); return; }
+    const units = physical(b), item = { pos:b.pos, L:+b.L || 0, fill:units.length > 1 ? units.map(fillOf) : fillOf(units[0]) };
+    if(b.pos === 'frame') item.shape = frameShapeIdx(b);
+    if(b.pos === 'top' && b.slot) item.slot = b.slot;
+    if(units.length > 1) item.pair = true;
+    items.push(item);
+  });
+  const deck = which => hasDeck(which) ? (stage >= 3 && (which === 'rack' ? deckClaims().length > 0 : A.slots.some(s => s.pos === 'bar')) ? 'loaded' : 'empty') : null;
+  return { items, decks:{ bar:deck('bar'), rack:deck('rack') }, bottles };
+}
+
+// The rig's bike (spec 7.4, "Bags and anchors"): drawn by bike.js from the plan's bike and bags, without the bags themselves.
+// The page draws the bags, tags and tap targets from the anchors, where the bike says they go. Which mounts exist is bikeFit's,
+// the one frame-fit rule the plan uses, so a spot is offered exactly where a bag can go.
+function rigArt(){
+  const B = bikeModule(); if(!B) return null;
+  const fit = bikeFit(S.bikeProfile), view = planBagView();
+  const spec = { ...B.resolveBikeSpec(B.normaliseBike(S.bikeProfile), view),
+    mounts:{ st:!!fit.cages.st, dt:!!fit.cages.dt, un:!!fit.cages.un, top:!!(fit.topMounts.front || fit.topMounts.rear), frame:!fit.frameBag.none } };
+  return B.bikeArt(spec, null, { theme:bikeTheme(), idPrefix:'rig' });
+}
+function rigAnchors(){ const r = rigArt(); return r ? r.anchors : null; }
+
+const r2 = n => Math.round(n * 100) / 100;
+// A place from the anchors as the page's bag shape: a rectangle, or, when it is turned with its tube, its corners as a polygon,
+// so the fill still rises level from the bottom and the inspector reads it like a frame bag.
+function rigShape(p, rx){
+  if(!p) return null;
+  if(!p.rot) return { kind:'rect', x:r2(p.x), y:r2(p.y), w:r2(p.w), h:r2(p.h), rx };
+  const cx = p.x + p.w / 2, cy = p.y + p.h / 2, a = p.rot * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+  const pts = [[p.x, p.y], [p.x + p.w, p.y], [p.x + p.w, p.y + p.h], [p.x, p.y + p.h]]
+    .map(([x, y]) => [cx + (x - cx) * c - (y - cy) * s, cy + (x - cx) * s + (y - cy) * c]);
+  const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]), x0 = Math.min(...xs), y0 = Math.min(...ys);
+  return { kind:'poly', pts:pts.map(q => r2(q[0]) + ',' + r2(q[1])).join(' '),
+    box:{ x:r2(x0), y:r2(y0), w:r2(Math.max(...xs) - x0), h:r2(Math.max(...ys) - y0) } };
+}
+function shiftShape(L, dx, dy){
+  if(!L || (!dx && !dy)) return L;
+  if(L.kind === 'rect') return { ...L, x:r2(L.x + dx), y:r2(L.y + dy) };
+  return { kind:'poly', box:{ ...L.box, x:r2(L.box.x + dx), y:r2(L.box.y + dy) },
+    pts:L.pts.split(' ').map(q => q.split(',').map(Number)).map(([x, y]) => r2(x + dx) + ',' + r2(y + dy)).join(' ') };
+}
+// Bags stacked on one place climb as far as the view allows, as bike.js stacks them.
+const stackStep = (y, h, gap, n) => n > 1 ? Math.min(h + gap, Math.max(4, (y - 1) / (n - 1))) : 0;
+// The top edge of a polygon at x: where the frame-shape numbers sit, just under the tube all the shapes share.
+function polyTopY(pts, x){
+  const p = pts.split(' ').map(q => q.split(',').map(Number)); let best = null;
+  p.forEach((a, i) => { const b = p[(i + 1) % p.length];
+    if((a[0] - x) * (b[0] - x) > 0 || a[0] === b[0]) return;
+    const y = a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]); if(best === null || y < best) best = y; });
+  return best;
+}
 
 function shellRect(x,y,w,h,pct,rx){
   const id='cl'+(clipN++), fh=Math.max(0,h*pct);
   return { def:`<clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx||2}"/></clipPath>`,
     art:`<rect class="bag-shell active" x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx||2}"/>`+
-        `<rect class="bag-fill" fill="${fillColour(pct)}" clip-path="url(#${id})" x="${x}" y="${y+h-fh}" width="${w}" height="${fh}"/>` };
+        `<rect class="bag-fill" fill="${fillColour(pct)}" clip-path="url(#${id})" x="${x}" y="${r2(y+h-fh)}" width="${w}" height="${r2(fh)}"/>` };
 }
 
 function shellPoly(pts,box,pct){
   const id='cl'+(clipN++), fh=Math.max(0,box.h*pct);
   return { def:`<clipPath id="${id}"><polygon points="${pts}"/></clipPath>`,
     art:`<polygon class="bag-shell active" points="${pts}"/>`+
-        `<rect class="bag-fill" fill="${fillColour(pct)}" clip-path="url(#${id})" x="${box.x}" y="${box.y+box.h-fh}" width="${box.w}" height="${fh}"/>` };
+        `<rect class="bag-fill" fill="${fillColour(pct)}" clip-path="url(#${id})" x="${box.x}" y="${r2(box.y+box.h-fh)}" width="${box.w}" height="${r2(fh)}"/>` };
 }
-// where each bag of a position sits, given how many of them there are
+// where each bag of a position sits, given how many of them there are, from the bike's anchors
 
-function layout(pos, i, n, frameSmall, slot){
+function layout(pos, i, n, frameSmall, slot, a = rigAnchors()){
+  if(!a) return null;
   switch(pos){
-    case 'top': { const t = TOP_SLOTS[slot] || TOP_SLOTS.front;
-      return { kind:'rect', x:t.x, y:TT(t.x+t.w/2)-10, w:t.w, h:10 }; }
-    case 'bar': { const w=30, h=18;
-      return { kind:'rect', x:184, y:20-i*(h+2), w, h, rx:3 }; }
-    case 'frame': { const p = FRAME_PRESETS[frameSmall]; return { kind:'poly', pts:p.pts, box:p.box }; }
-    case 'seat': { const h=17;
-      return { kind:'rect', x:68, y:31-i*(h+2), w:46, h, rx:4 }; }
-    case 'fork': { const w=12, h=22;
-      return { kind:'rect', x:199, y:65, w, h }; }        // pair offset applied by the caller
-    case 'rack': { const h=27;
-      return { kind:'rect', x:70, y:75, w:46, h }; }      // pair offset applied by the caller
-    case 'pack': { const h=34;
-      return { kind:'rect', x:8, y:24-i*(h+3), w:29, h, rx:5 }; }
+    case 'top': return rigShape(a.top[slot] || a.top.front, 2);
+    case 'bar': { const s = stackStep(a.bar.y, a.bar.h, 2, n); return rigShape({ ...a.bar, y:a.bar.y - i * s }, 3); }
+    case 'frame': return a.frame ? { kind:'poly', pts:a.frame.shapes[frameSmall], box:a.frame.boxes[frameSmall] } : null;
+    case 'seat': { const s = stackStep(a.seat.y, a.seat.h, 2, n); return rigShape({ ...a.seat, y:a.seat.y - i * s }, 4); }
+    case 'fork': return rigShape(a.fork, 2);        // pair offset applied by the caller
+    case 'rack': return rigShape(a.rack, 2);        // pair offset applied by the caller
+    case 'pack': { const base = a.pack.y + 37 * Math.max(0, n - 1), s = stackStep(base, a.pack.h, 3, n);
+      return rigShape({ ...a.pack, y:base - i * s }, 5); }
   }
+  return null;
 }
 
-// Bottle cages sit ON a tube, long axis parallel to it, offset clear of the tube.
-// Seat tube leans back, so its bottle rotates anticlockwise (negative in SVG).
-// Down tube rises forward at 37 degrees, so its bottle rotates 53 degrees clockwise.
-// Each cage is its own mount point. Tapping the down-tube cage adds the
-// down-tube cage — not whichever slot happened to be free first.
+// Bottle cages sit ON a tube, long axis parallel to it, offset clear of the tube, at the bolts the bike has (bike.js places
+// them). Each cage is its own mount point. Tapping the down-tube cage adds the down-tube cage — not whichever slot happened
+// to be free first.
 const BOTTLE_SPOTS = {
-  st: { cx:142, cy:81, rot:-16.5, pos:'bottle',  defL:0.5,  name:'seat tube',
+  st: { pos:'bottle',  defL:0.5,  name:'seat tube',
         where:'On the seat tube, the tighter of the two in-frame mounts' },
-  dt: { cx:161, cy:79, rot:47.3,  pos:'bottle',  defL:0.75, name:'down tube',
+  dt: { pos:'bottle',  defL:0.75, name:'down tube',
         where:'On the down tube — the roomiest of the three, so the big bottle goes here' },
-  un: { cx:162, cy:99, rot:47.3,  pos:'bottleU', defL:0.5, maxL:0.5, name:'under the down tube',
+  un: { pos:'bottleU', defL:0.5, maxL:0.5, name:'under the down tube',
         where:'Underneath the down tube — clear of the frame bag entirely, but limited by the front wheel' },
 };
 const BOTTLE_ORDER = ['st','dt','un'];
 // The top tube takes two bags: one behind the stem, one up by the saddle.
-const TOP_SLOTS = { front:{x:155,w:25}, rear:{x:128,w:25} };
 const TOP_ORDER = ['front','rear'];
 
 function bottleArt(spot, ghost, L, addable, act, extraClass){
@@ -7131,26 +7203,44 @@ function bottleArt(spot, ghost, L, addable, act, extraClass){
   const r = (L || 0.75) / 0.75;
   const h = 30   * Math.min(1.16, Math.max(0.78, Math.pow(r, 0.45)));
   const w = 9.6  * Math.min(1.08, Math.max(0.90, Math.pow(r, 0.15)));
-  const x = spot.cx - w/2, y = spot.cy - h/2;
+  const x = r2(spot.cx - w/2), y = r2(spot.cy - h/2), cx = r2(spot.cx), cy = r2(spot.cy);
   const hot = addable || (act||'').includes('data-del');
-  return `<g class="btl${ghost?' ghost':''}${addable?' addable':''}${extraClass?' '+extraClass:''}"${act||''} transform="rotate(${spot.rot} ${spot.cx} ${spot.cy})">
-    ${hot?`<circle class="hit" cx="${spot.cx}" cy="${spot.cy}" r="9"/>`:''}
-    <rect class="cage" x="${x-2.2}" y="${y+h*0.13}" width="${w+4.4}" height="${h*0.70}" rx="2.5"/>
-    <rect class="bottle" x="${x}" y="${y}" width="${w}" height="${h}" rx="3.5"/>
-    <rect class="bottle-cap" x="${x+w*0.28}" y="${y-2.5}" width="${w*0.44}" height="3.5" rx="1"/>
+  return `<g class="btl${ghost?' ghost':''}${addable?' addable':''}${extraClass?' '+extraClass:''}"${act||''} transform="rotate(${r2(spot.rot)} ${cx} ${cy})">
+    ${hot?`<circle class="hit" cx="${cx}" cy="${cy}" r="${r2(spot.r || 9)}"/>`:''}
+    <rect class="cage" x="${r2(x-2.2)}" y="${r2(y+h*0.13)}" width="${r2(w+4.4)}" height="${r2(h*0.70)}" rx="2.5"/>
+    <rect class="bottle" x="${x}" y="${y}" width="${r2(w)}" height="${r2(h)}" rx="3.5"/>
+    <rect class="bottle-cap" x="${r2(x+w*0.28)}" y="${r2(y-2.5)}" width="${r2(w*0.44)}" height="3.5" rx="1"/>
   </g>`;
 }
+// A cage's place and tap circle, from the anchors.
+function bottleSpot(a, sid){
+  const s = a && a.bottles[sid]; if(!s) return null;
+  const h = a.hits.find(x => x.key === 'bottle:' + sid);
+  return { ...s, r:h && h.circle ? h.circle.r : 9 };
+}
 
+// The frame bag's shape beside its controls, drawn from this bike's own triangle.
 function frameShapeGlyph(b){
-  const p = framePreset(b);
-  return `<svg class="sglyph" viewBox="122 40 78 70" aria-hidden="true">
-    <path class="sg-tube" d="M143,106 L127,52 M143,106 L194,59 M127,52 L189,44 M189,44 L194,59"/>
-    <polygon class="sg-bag" points="${p.pts}"/>
+  const a = rigAnchors(); if(!a || !a.frame) return '';
+  const P = a.points, T = a.tubes, box = a.frame.boxes[0], pad = 9, pt = q => r2(q[0]) + ',' + r2(q[1]);
+  const line = (p, q) => `M${pt(p)} L${pt(q)}`;
+  const upper = T.top || T.low || T.twin;
+  const d = [line(P.bb, P.seatTop), line(P.bb, P.headBottom), line(P.headTop, P.headBottom), upper ? line(upper[0], upper[1]) : ''].join(' ');
+  const vb = [box.x - pad, box.y - pad, box.w + pad * 2, box.h + pad * 2].map(r2).join(' ');
+  return `<svg class="sglyph" viewBox="${vb}" aria-hidden="true">
+    <path class="sg-tube" d="${d}"/>
+    <polygon class="sg-bag" points="${a.frame.shapes[frameShapeIdx(b)]}"/>
     ${inTriangleCount() ? BOTTLE_ORDER.slice(0, inTriangleCount()).map(sid => {
-        const s = BOTTLE_SPOTS[sid];
-        return `<rect class="sg-btl" x="${s.cx-4}" y="${s.cy-12}" width="8" height="24" rx="2"
-          transform="rotate(${s.rot} ${s.cx} ${s.cy})"/>`; }).join('') : ''}
+        const s = a.bottles[sid]; if(!s) return '';
+        return `<rect class="sg-btl" x="${r2(s.cx-4)}" y="${r2(s.cy-12)}" width="8" height="24" rx="2"
+          transform="rotate(${r2(s.rot)} ${r2(s.cx)} ${r2(s.cy)})"/>`; }).join('') : ''}
   </svg>`;
+}
+
+// The bike at the back of the rig, redrawn on its own when only the look or the theme changed.
+function paintRigBike(art = rigArt()){
+  const holder = $('rigBike'); if(!holder) return;
+  holder.innerHTML = art ? art.svg : '';
 }
 
 function drawRig(){
@@ -7163,17 +7253,26 @@ function drawRig(){
   const defs = [], art = [], tags = [];
   const fb = S.bags.find(b => b.pos === 'frame');
   const frameSmall = frameShapeIdx(fb);
+  const bike = rigArt(), anchors = bike ? bike.anchors : null;
+  paintRigBike(bike);
 
   const editing = stage === 2;
   const removing = editing && S.editMode === 'remove';
   const inspecting = stage === 4;
   if(inspecting) INSPECT = {};
-  const HITS = { seat:[58,24,64,36], bar:[186,10,42,38], fork:[190,56,30,42],
-                 rack:[58,66,66,44], pack:[2,14,44,54],
-                 'top:front':[154,26,31,24], 'top:rear':[123,28,29,22] };
-  const hitFor = key => HITS[key]
-    ? `<rect class="hit" x="${HITS[key][0]}" y="${HITS[key][1]}" width="${HITS[key][2]}" height="${HITS[key][3]}"/>`
-    : (key === 'frame' ? `<polygon class="hit" points="${FRAME_PRESETS[frameSmall].pts}"/>` : '');
+  // Tap targets come with the anchors: sized for fingers, inside the view, no two overlapping. The frame is a polygon;
+  // bottles are circles that sit on top of it, so a tap near a cage adds a cage and anywhere else in the triangle a frame bag.
+  const HITS = {};
+  (anchors ? anchors.hits : []).forEach(h => { HITS[h.key] = h; });
+  // rounded at both edges, so two targets that only touch never overlap by a rounding
+  const hitRect = b => `<rect class="hit" x="${r2(b.x)}" y="${r2(b.y)}" width="${r2(r2(b.x + b.w) - r2(b.x))}" height="${r2(r2(b.y + b.h) - r2(b.y))}"/>`;
+  const hitFor = key => key === 'frame'
+    ? (anchors && anchors.frame ? `<polygon class="hit" points="${anchors.frame.shapes[frameSmall]}"/>` : '')
+    : (HITS[key] && HITS[key].kind === 'rect' ? hitRect(HITS[key].box) : '');
+  const TAGS = anchors ? anchors.tags : {};
+  const tagAt = (pos, text, active) => { const t = TAGS[pos]; if(!t) return '';
+    return `<text class="bag-tag${active?' active':''}" x="${r2(t[0])}" y="${r2(t[1])}" text-anchor="${pos==='fork'?'start':'middle'}">${text}</text>`; };
+  const shellOf = (L, pct) => L.kind === 'poly' ? shellPoly(L.pts, L.box, pct) : shellRect(L.x, L.y, L.w, L.h, pct, L.rx);
 
   POS_ORDER.filter(p => !isBottle(p)).forEach(pos => {
     const allMine = stage === 1 ? [] : S.bags.filter(b => b.pos === pos);
@@ -7186,16 +7285,15 @@ function drawRig(){
         ? slots_.filter(s => mountOk('top', s) && !allMine.some(b => b.slot === s)).map(s => ({ slot:s, key:pos+':'+s }))
         : (allMine.length || (pos === 'frame' && bikeFit(S.bikeProfile).frameBag.none) ? [] : [{ slot:null, key:pos }]);
       empties.forEach(e => {
-        const L = layout(pos, 0, 1, frameSmall, e.slot); if(!L) return;
-        const sh = L.kind === 'poly' ? shellPoly(L.pts, L.box, 0) : shellRect(L.x, L.y, L.w, L.h, 0, L.rx);
+        const L = layout(pos, 0, 1, frameSmall, e.slot, anchors); if(!L) return;
+        const sh = shellOf(L, 0);
         defs.push(sh.def);
         art.push(`<g class="bagg ghost${editing && !removing ? ' addable' : ''}"${
           editing && !removing ? ` data-add="${e.key}"` : ''}>${sh.art}${
           editing && !removing ? hitFor(e.key) : ''}</g>`);
       });
       if(!mine.length){
-        const t = TAGPOS[pos];
-        if(t) tags.push(`<text class="bag-tag" x="${t[0]}" y="${t[1]}" text-anchor="${pos==='fork'?'start':'middle'}">${POSITIONS[pos].short}</text>`);
+        tags.push(tagAt(pos, POSITIONS[pos].short, false));
         return;
       }
     }
@@ -7204,17 +7302,17 @@ function drawRig(){
     // one of a pair mounted: show where the other would go
     if(editing && !removing && POSITIONS[pos].pairable && mine.length === 1 && !mine[0].pair){
       const PO = { rack:[-7,-7], fork:[-5,-5] }[pos] || [-4,-4];
-      const B = layout(pos, 0, 1, frameSmall, null);
-      if(B && B.kind === 'rect'){
-        const gx = B.x + PO[0], gy = B.y + PO[1];
+      const G = shiftShape(layout(pos, 0, 1, frameSmall, null, anchors), PO[0], PO[1]);
+      if(G){
         // badge on the outer corner — the middle of the ghost is hidden behind
         // the bag in front, which left a stray stub of the old centred plus
-        const bx = gx + 0.5, by = gy + 0.5, a = 2.4;
+        const gb = G.kind === 'rect' ? G : G.box;
+        const bx = r2(gb.x + 0.5), by = r2(gb.y + 0.5), a = 2.4;
         art.push(`<g class="bagg pairghost addable" data-bump="${mine[0].uid}">
-          <rect class="bag-shell" x="${gx}" y="${gy}" width="${B.w}" height="${B.h}" rx="${B.rx||2}"/>
+          ${G.kind === 'rect' ? `<rect class="bag-shell" x="${G.x}" y="${G.y}" width="${G.w}" height="${G.h}" rx="${G.rx||2}"/>` : `<polygon class="bag-shell" points="${G.pts}"/>`}
           <circle class="plusdot" cx="${bx}" cy="${by}" r="4.4"/>
-          <path class="plus" d="M${bx-a},${by} h${a*2} M${bx},${by-a} v${a*2}"/>
-          <rect class="hit" x="${gx-9}" y="${gy-9}" width="${B.w+18}" height="${B.h+18}"/></g>`);
+          <path class="plus" d="M${r2(bx-a)},${by} h${a*2} M${bx},${r2(by-a)} v${a*2}"/>
+          ${hitFor(pos)}</g>`);
       }
     }
     const units = mine.flatMap(physical);
@@ -7224,24 +7322,29 @@ function drawRig(){
     order.forEach((b,i) => {
       const s = slots.find(x => x.key === b.key);
       const pct = showFill && s && s.cap > 0 ? Math.min(1, (s.cap - s.left) / s.cap) : 0;
-      const L = layout(pos, b.idx, units.length, frameSmall, b.slot); if(!L) return;
-      const off = b.idx > 0 && !slots_ ? { dx:PAIR_OFF[0], dy:PAIR_OFF[1] } : { dx:0, dy:0 };
-      if(L.kind === 'rect'){ L.x += off.dx; L.y += off.dy; }
-      const sh = L.kind === 'poly' ? shellPoly(L.pts, L.box, pct) : shellRect(L.x, L.y, L.w, L.h, pct, L.rx);
+      let L = layout(pos, b.idx, units.length, frameSmall, b.slot, anchors); if(!L) return;
+      if(b.idx > 0 && !slots_) L = shiftShape(L, PAIR_OFF[0], PAIR_OFF[1]);
+      const sh = shellOf(L, pct);
       defs.push(sh.def);
       const canBump = !removing && (POSITIONS[pos].pairable && !b.pair || pos === 'frame');
       // 1 / 2 / 3 sit inside even the smallest frame bag, so they never
       // fall outside the shape whichever one is selected
-      const cycleMark = (editing && !removing && pos === 'frame')
+      // A frame that takes one shape only (trapeze, mixte, full suspension) has nothing to choose, so no numbers crowd its triangle.
+      const cycleMark = (editing && !removing && pos === 'frame' && anchors && anchors.frame && bikeFit(S.bikeProfile).frameBag.shapes.length > 1)
         ? `<g class="shapenums">${[0,1,2].map((n,i) => {
              // sit them just under the top tube edge — the one boundary all three
              // shapes share — so they never crowd whatever bag is showing
-             const x = 146 + i*8, y = (57 - (x-132)*7/52) + 4.7;
+             const fbx = anchors.frame.boxes[0], x = r2(fbx.x + fbx.w * (0.27 + 0.155 * i));
+             const top = polyTopY(anchors.frame.shapes[0], x);
+             // and below the top-tube bags' own targets, which reach down over the tube on a small frame
+             const under = anchors.hits.filter(h => h.kind === 'rect' && h.key.startsWith('top') && h.box.x < x + 4 && h.box.x + h.box.w > x - 4)
+               .reduce((m, h) => Math.max(m, h.box.y + h.box.h + 4.55), -Infinity);
+             const y = Math.max((top === null ? fbx.y : top) + 4.7, under);
              const on = frameShapeIdx(b) === n, blocked = n < minShapeIdx();
              return `<g class="snum${on?' on':''}${blocked?' blocked':''}" data-setshape="${b.uid}:${n}">
                <circle cx="${x}" cy="${y.toFixed(1)}" r="3.1"/>
                <text x="${x}" y="${(y+1.5).toFixed(1)}" text-anchor="middle">${n+1}</text>
-               <rect class="hit" x="${x-4}" y="${(y-4.5).toFixed(1)}" width="8" height="9"/></g>`;
+               <rect class="hit" x="${r2(x-4)}" y="${(y-4.5).toFixed(1)}" width="8" height="9"/></g>`;
            }).join('')}</g>` : '';
       const act = removing ? ` data-del="${b.uid}"` : (canBump ? ` data-bump="${b.uid}"` : '');
       const key = slots_ ? pos+':'+b.slot : pos;
@@ -7252,42 +7355,43 @@ function drawRig(){
         // spills into the empty space up and left of the bag in front
         const pad = b.idx > 0 ? 11 : 5;
         INSPECT[s.key] = { label:unitLabel(s), pos, box, geom:L };
-        insp = `<rect class="hit" x="${box.x-pad}" y="${box.y-pad}" width="${box.w+pad*2}" height="${box.h+pad*2}"/>`;
+        insp = hitRect({ x:box.x-pad, y:box.y-pad, w:box.w+pad*2, h:box.h+pad*2 });
       }
       art.push(`<g class="bagg owned${showFill?' packed':''}${POSITIONS[pos].onBody?' onbody':''}${
         showFill && !s ? ' idle' : ''}${removing ? ' removable' : (canBump ? ' bumpable' : '')}${
         inspecting && s ? ' inspectable' : ''}"${act}${inspecting && s ? ` data-inspect="${htmlEsc(s.key)}"` : ''}>${sh.art}${
         editing && (removing || canBump) ? hitFor(key) : ''}${cycleMark}${insp}</g>`);
     });
-    const t = TAGPOS[pos];
-    if(t) tags.push(`<text class="bag-tag active" x="${t[0]}" y="${t[1]}" text-anchor="${pos==='fork'?'start':'middle'}">${POSITIONS[pos].short}${units.length>1?' ×'+units.length:''}</text>`);
+    tags.push(tagAt(pos, POSITIONS[pos].short + (units.length>1?' ×'+units.length:''), true));
   });
 
   // Decks. The bar bungees appear once there is a bar roll to strap them to;
   // the rack deck stands alone, because a rack with nothing on it is still a rack.
   [['bar', hasBarRoll()], ['rack', true]].forEach(([which, offered]) => {
-    if(!offered || stage === 1) return;
+    if(!offered || stage === 1 || !anchors) return;
     const on = hasDeck(which);
     if(!on && stage > 2) return;
-    const D = which === 'bar' ? {x:215, y:22, w:13, h:16} : {x:69, y:52, w:48, h:6};
+    const P = which === 'bar' ? anchors.barDeck : anchors.rackTop, H = HITS[which === 'bar' ? 'barDeck' : 'rackTop'];
+    const D = { x:r2(P.x), y:r2(P.y), w:r2(P.w), h:r2(P.h) };
     const act = editing ? (removing && on ? ` data-deldeck="${which}"` : (!removing ? ` data-deck="${which}"` : '')) : '';
     const deckEmpty=showFill && on && !(which==='rack' && loadedRackDeck);
     const deckIdle=showFill && on && which==='bar' && !slots.some(s=>s.pos==='bar');
     const cls = on ? `deck${deckEmpty?' deck-empty':''}${deckIdle?' idle':''}` : 'deck ghostdeck';
     art.push(`<g class="bagg ${cls}${editing && (removing ? on : true) ? (removing ? ' removable' : ' addable') : ''}"${act}>` +
       `<rect class="bag-shell" x="${D.x}" y="${D.y}" width="${D.w}" height="${D.h}" rx="1.5"/>` +
-      `<path class="strapline" d="M${D.x-2},${D.y+D.h*0.34} h${D.w+4} M${D.x-2},${D.y+D.h*0.72} h${D.w+4}"/>` +
-      (editing ? `<rect class="hit" x="${D.x-5}" y="${D.y-5}" width="${D.w+10}" height="${D.h+10}"/>` : '') + `</g>`);
-    const dt = which === 'bar' ? [222,48] : [66,57];
-    tags.push(`<text class="bag-tag${on?' active':''} deck-tag${deckEmpty?' deck-empty':''}" x="${dt[0]}" y="${dt[1]}" text-anchor="${which==='bar'?'start':'end'}">${which==='bar'?'STRAPS':'DECK'}</text>`);
+      `<path class="strapline" d="M${r2(D.x-2)},${r2(D.y+D.h*0.34)} h${r2(D.w+4)} M${r2(D.x-2)},${r2(D.y+D.h*0.72)} h${r2(D.w+4)}"/>` +
+      (editing && H ? hitRect(H.box) : '') + `</g>`);
+    // the bar's straps are named below their deck, the rack's deck to its left, clear of the bags beside them
+    const dt = which === 'bar' ? [Math.min(296, D.x + 6), Math.min(147, D.y + D.h + 10)] : [Math.max(30, D.x - 3), D.y + D.h - 1];
+    tags.push(`<text class="bag-tag${on?' active':''} deck-tag${deckEmpty?' deck-empty':''}" x="${r2(dt[0])}" y="${r2(dt[1])}" text-anchor="${which==='bar'?'start':'end'}">${which==='bar'?'STRAPS':'DECK'}</text>`);
   });
 
   // bottle cages, one mount point each
   const bart = [];
   BOTTLE_ORDER.forEach(sid => {
-    const spot = BOTTLE_SPOTS[sid];
+    const spot = bottleSpot(anchors, sid);
     const own = stage === 1 ? null : S.bags.find(b => isBottle(b.pos) && b.slot === sid);
-    if(own && !bagSpec(own).usable){
+    if(!spot || own && !bagSpec(own).usable){
       // a cage this bike does not have: the bottle waits in the cupboard, nothing is drawn
     } else if(own){
       bart.push(bottleArt(spot, false, +own.L || 0.75, false,
@@ -11449,6 +11553,7 @@ function applyTheme(t){
   if(b){ b.innerHTML = t === 'light' ? MOON : SUN;
          b.setAttribute('title', t === 'light' ? 'Switch to dark' : 'Switch to light'); }
   if(S.step >= 2) drawRig();          // the fill ramp is read from the stylesheet
+  else paintRigBike();                // the frame's casing follows the theme
 }
 function setTheme(t){ THEME_CHOSEN = true; S.theme = t; applyTheme(t); store.set('loadcheck:theme', t); queueDraftSave(); }
 

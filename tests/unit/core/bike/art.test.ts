@@ -3,7 +3,7 @@ import { test as fcTest, fc } from '@fast-check/vitest';
 import { describe, expect, test } from 'vitest';
 import { bikeArt, markerArt } from '../../../../src/core/bike/art.ts';
 import { CASINGS, casingFor, contrastRatio, SWATCHES } from '../../../../src/core/bike/colour.ts';
-import type { Anchors, Box } from '../../../../src/core/bike/art.ts';
+import type { Anchors, Box, Placed } from '../../../../src/core/bike/art.ts';
 import { normaliseBike } from '../../../../src/core/bike/normalise.ts';
 import { resolveBikeSpec } from '../../../../src/core/bike/spec.ts';
 import type { BagView } from '../../../../src/core/bike/spec.ts';
@@ -72,6 +72,15 @@ function checkAnchors(a: Anchors, name: string, mounts: { st: boolean; dt: boole
   }
   // Each target holds its own place: a target never loses its centre to another.
   for (const h of a.hits) expect(h.box.w * h.box.h, `${name}: ${h.key} size`).toBeGreaterThan(40);
+  const places: [string, Placed | null][] = [['seat', a.seat], ['bar', a.bar], ['pack', a.pack], ['top:front', a.top.front], ['top:rear', a.top.rear]];
+  for (const [key, p] of places) {
+    const h = a.hits.find((x) => x.key === key);
+    if (!p || !h) continue;
+    const [cx, cy] = [p.x + p.w / 2, p.y + p.h / 2];
+    expect(cx >= h.box.x - 0.01 && cx <= h.box.x + h.box.w + 0.01 && cy >= h.box.y - 0.01 && cy <= h.box.y + h.box.h + 0.01, `${name}: ${key} keeps its centre`).toBe(true);
+  }
+  // The seat pack hangs behind the saddle, over the rear wheel.
+  expect(a.seat.x + a.seat.w, `${name}: seat pack behind the saddle`).toBeLessThan(a.points.saddle[0]);
   void circleBox;
 }
 
