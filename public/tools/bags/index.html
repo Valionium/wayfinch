@@ -7217,7 +7217,7 @@ function loadSummary(now = new Date()){
 }
 // The stored summary, unless it says the same as this one; true when written.
 function writeLoadSummary(always = false){
-  if(DELETED_ELSEWHERE || !DRAFT_READY) return false;
+  if(!DRAFT_READY || deletedSinceLoad()) return false;
   let next; try { next = loadSummary(); } catch(e){ return false; }
   const stored = readLocalJson(SUMMARY_KEY), bare = x => JSON.stringify({ ...x, at:null, planUpdatedAt:null });
   if(!always && dataObject(stored) && bare(stored) === bare(next)) return false;
@@ -9685,7 +9685,7 @@ const store = {
     return MEM[k] !== undefined ? MEM[k] : null;
   },
   async set(k, v, detailed=false){
-    if(DELETED_ELSEWHERE && String(k).startsWith('loadcheck:')) return detailed ? {saved:false,kind:'memory'} : false;
+    if(String(k).startsWith('loadcheck:') && deletedSinceLoad()) return detailed ? {saved:false,kind:'memory'} : false;
     if(k === SETUP_KEY && Array.isArray(v)) mergeOtherTabsSetups(v);
     const before=String(k).startsWith('loadcheck:') ? readLocalRaw(k) : null;
     MEM[k] = v;
@@ -9724,6 +9724,26 @@ const DELETE_REQUEST_KEY='copilot:delete-request:v1',DELETE_APPLIED_KEY='loadche
 const SAVED_ITEM_KEYS=['loadcheck:setups','loadcheck:bikeProfiles'];
 const SUMMARY_KEY='loadcheck:summary:v1';
 let DELETED_ELSEWHERE=false;   // another tab applied a delete request: this one never writes its plan back
+const DELETING_KEY='loadcheck:delete-applying';   // written before the first removal, so other tabs stop at once (review M3)
+// What this tab last knew of the deletes; read at load and after its own apply. A tab that was frozen or in the back/forward
+// cache hears no storage event: before any save, and when it shows again, it compares this with what is stored (review I1).
+function deleteMark(){
+  try { return String(window.localStorage.getItem(DELETE_APPLIED_KEY))+'|'+String(window.localStorage.getItem(DELETING_KEY)); } catch(e){ return ''; }
+}
+let DELETE_SEEN=deleteMark();
+// True, and this tab drops everything it holds in memory and starts again from what is stored, when a delete was applied
+// since it last looked. Nothing of it is written back.
+function deletedSinceLoad(){
+  if(DELETED_ELSEWHERE) return true;
+  if(deleteMark() === DELETE_SEEN) return false;
+  dropForDelete();
+  return true;
+}
+function dropForDelete(){
+  if(DELETED_ELSEWHERE) return;
+  DELETED_ELSEWHERE=true; DRAFT_FROZEN=true; DRAFT_READY=false; clearTimeout(DRAFT_TIMER); DRAFT_TIMER=null;
+  window.location.reload();
+}
 function readLocalJson(k){
   try { const raw=window.localStorage.getItem(k); return raw === null ? null : JSON.parse(raw); } catch(e){ return null; }
 }
@@ -9799,8 +9819,12 @@ function applyDeleteRequest(){
   if(!request) return false;
   const applied=readLocalJson(DELETE_APPLIED_KEY);
   if(dataObject(applied) && applied.id === request.id) return false;
-  const cutoff=Date.parse(request.createdAt),ledger=readSavedAt();
-  const later=stamp => typeof stamp === 'string' && Number.isFinite(Date.parse(stamp)) && Date.parse(stamp) >= cutoff;
+  try { window.localStorage.setItem(DELETING_KEY,JSON.stringify({id:request.id})); } catch(e){}
+  const cutoff=Date.parse(request.createdAt),ledger=readSavedAt(),now=Date.now();
+  // "Later" is at or after the request; a time later than now (a clock set back since) is later too, never "before" (review M2)
+  const later=stamp => typeof stamp === 'string' && Number.isFinite(Date.parse(stamp)) && (Date.parse(stamp) >= cutoff || Date.parse(stamp) > now);
+  // a day-only date (an older page's setup) is later only when it is a later day than the request's
+  const laterDay=day => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day) && day > request.createdAt.slice(0,10);
   const remove=k => { try { window.localStorage.removeItem(k); } catch(e){} delete MEM[k]; };
   const keepList=(k,keep) => {
     const list=readLocalJson(k);
@@ -9811,16 +9835,16 @@ function applyDeleteRequest(){
   };
   const kept={keys:{},items:{}};
   for(const k of localKeys()){
-    if(!k.startsWith('loadcheck:') || [DELETE_APPLIED_KEY,SAVED_AT_KEY,DRAFT_BROWSER_META_KEY,BIKE_FORMAT_KEY].includes(k)) continue;
+    if(!k.startsWith('loadcheck:') || [DELETE_APPLIED_KEY,DELETING_KEY,SAVED_AT_KEY,DRAFT_BROWSER_META_KEY,BIKE_FORMAT_KEY].includes(k)) continue;
     if(k === DRAFT_KEY){
       const draft=readLocalJson(k);
       if(dataObject(draft) && later(draft.updatedAt)) kept.keys[k]=true; else { remove(k); remove(DRAFT_BROWSER_META_KEY); }
     } else if(k === SETUP_KEY){
-      if(keepList(k,x => later(ledger.items[k][x.id]) || later(x.updated))) kept.keys[k]=true;
+      if(keepList(k,x => later(ledger.items[k][x.id]) || later(x.updated) || laterDay(x.saved))) kept.keys[k]=true;
     } else if(k === FEEDBACK_KEY){
       if(keepList(k,x => later(x.at))) kept.keys[k]=true;
     } else if(k === BIKE_PROFILE_KEY){
-      if(keepList(k,x => later(ledger.items[k][x.id]))) kept.keys[k]=true;
+      if(keepList(k,x => later(ledger.items[k][x.id]) || later(x.geometry && x.geometry.at))) kept.keys[k]=true;
     } else if(k !== SUMMARY_KEY && later(ledger.keys[k])) kept.keys[k]=true;
     else remove(k);
   }
@@ -9835,6 +9859,8 @@ function applyDeleteRequest(){
     if(Object.keys(left.keys).length) window.localStorage.setItem(SAVED_AT_KEY,JSON.stringify(left)); else remove(SAVED_AT_KEY);
     window.localStorage.setItem(DELETE_APPLIED_KEY,JSON.stringify({app:'load-check',kind:'delete-applied',v:1,id:request.id,at:new Date().toISOString()}));
   } catch(e){}
+  remove(DELETING_KEY);
+  DELETE_SEEN=deleteMark();   // this tab's own delete
   return true;
 }
 /* ---- Contract 2: a trip from Wayfinch (spec 7.1) ----
@@ -9892,6 +9918,7 @@ function handoffTrip(text){
   return out;
 }
 function writeHandoffDone(outcome){
+  if(deletedSinceLoad()) return;
   const before=readLocalRaw(HANDOFF_DONE_KEY),value={app:'load-check',kind:'handoff-done',v:1,id:HANDOFF.id,outcome,at:new Date().toISOString()};
   try { window.localStorage.setItem(HANDOFF_DONE_KEY,JSON.stringify(value)); stampSaved(HANDOFF_DONE_KEY,value,before); } catch(e){}
 }
@@ -9968,11 +9995,8 @@ $('handoffCancel').onclick=cancelHandoff;
 $('handoffUndo').onclick=undoHandoff;
 // Another bag-planner tab applied a request: this tab discards its plan in memory and never writes it back.
 function followDeleteElsewhere(event){
-  if(event.key !== DELETE_APPLIED_KEY || !event.newValue || event.newValue === event.oldValue) return;
-  let applied=null; try { applied=JSON.parse(event.newValue); } catch(e){ return; }
-  if(!dataObject(applied) || applied.kind !== 'delete-applied') return;
-  DELETED_ELSEWHERE=true; DRAFT_FROZEN=true; DRAFT_READY=false; clearTimeout(DRAFT_TIMER); DRAFT_TIMER=null;
-  window.location.reload();
+  if(![DELETE_APPLIED_KEY,DELETING_KEY].includes(event.key) || !event.newValue || event.newValue === event.oldValue) return;
+  dropForDelete();
 }
 
 const DRAFT_KEY = 'loadcheck:draft';
@@ -10462,7 +10486,7 @@ function saveDraftInBrowser(value){
 }
 function persistDraft(serial){
   DRAFT_LATEST_SERIAL=serial;
-  if(DRAFT_FROZEN) return DRAFT_WRITES;
+  if(DRAFT_FROZEN || deletedSinceLoad()) return DRAFT_WRITES;
   // Nothing unsaved: a hidden or closing tab writes nothing, and instead notices a newer draft.
   if(serial === DRAFT_SIGNATURE && DRAFT_SAVE_STATUS.state === 'saved' && !DRAFT_PENDING_SERIAL){
     if(!window.storage){ const other=foreignDraft(); if(other) handleForeignDraft(other); }
@@ -10563,7 +10587,7 @@ function handleForeignDraft(other){
   showTabNotice('This plan was changed in another tab. Your last change here was not saved.',true);
 }
 function checkOtherTabs(){
-  if(!DRAFT_READY) return;
+  if(!DRAFT_READY || deletedSinceLoad()) return;
   if(window.storage){ foreignDraftAccount().then(other => { if(other) handleForeignDraft(other); }); return; }
   const other=foreignDraft(); if(other) handleForeignDraft(other);
 }
@@ -10585,7 +10609,7 @@ function mergeOtherTabsSetups(list){
 }
 function followOtherTabs(event){
   try { if(event.storageArea && event.storageArea !== window.localStorage) return; } catch(e){ return; }
-  if(event.key === DELETE_APPLIED_KEY){ followDeleteElsewhere(event); return; }
+  if(event.key === DELETE_APPLIED_KEY || event.key === DELETING_KEY){ followDeleteElsewhere(event); return; }
   if(DELETED_ELSEWHERE) return;
   const key=event.key,all=key === null;
   if(all || key === DRAFT_KEY) checkOtherTabs();
@@ -11548,7 +11572,7 @@ let WALKTHROUGH_INDEX=0,WALKTHROUGH_SEEN=false;
 try{WALKTHROUGH_SEEN=['dismissed','done'].includes(window.localStorage.getItem(WALKTHROUGH_KEY));}catch(error){}
 function rememberWalkthrough(done=false){
   WALKTHROUGH_SEEN=true;
-  try{const before=readLocalRaw(WALKTHROUGH_KEY),value=done?'done':'dismissed';window.localStorage.setItem(WALKTHROUGH_KEY,value);stampKey(WALKTHROUGH_KEY,value,before);}catch(error){}
+  try{if(deletedSinceLoad())return;const before=readLocalRaw(WALKTHROUGH_KEY),value=done?'done':'dismissed';window.localStorage.setItem(WALKTHROUGH_KEY,value);stampKey(WALKTHROUGH_KEY,value,before);}catch(error){}
   $('walkthroughInvite').classList.add('hidden');
 }
 function renderWalkthrough(){

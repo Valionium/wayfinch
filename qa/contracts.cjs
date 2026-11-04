@@ -181,6 +181,60 @@ test('[C-DELETE-FRAGMENT] #copilot-delete= with no stored valid request deletes 
   assert.ok(!q.log.some(x=>x.startsWith('history:')),'no fragment, nothing to remove');
 });
 
+// ---- Review of PR 43, I1, M3, M1, M2: a delete sticks in every tab, and "before" is read carefully ----
+test('[C-DELETE] a tab kept in the back/forward cache, which never heard of the delete, drops its plan on coming back and writes nothing back',async()=>{
+  const storage=sharedStore();
+  const cached=page({storage});
+  oldData(cached);
+  cached.run('SETUPS=JSON.parse(window.localStorage.getItem(SETUP_KEY)).map(normaliseSetup).filter(Boolean);BIKE_PROFILES=[normaliseBikeProfile({id:"bike_old",name:"Old bike"})];DRAFT_READY=true;');
+  let reloaded=0;cached.context.window.location.reload=()=>{reloaded++;};
+  const self=[...storage.vms].find(v=>v.context===cached.context);
+  storage.vms.delete(self);   // in the cache: no storage events reach it
+  const p=page({storage});
+  p.values.set('copilot:delete-request:v1',request(iso(Date.now()+1000)));
+  assert.equal(p.run('applyDeleteRequest()'),true);
+  storage.vms.add(self);
+  for(const fn of cached.listeners.pageshow||[])fn({persisted:true});
+  assert.equal(reloaded,1,'back from the cache, it starts again from what is stored');
+  assert.equal(await cached.run("store.set(SETUP_KEY,[...SETUPS,{id:'st_new',name:'New'}])"),false);
+  assert.equal(await cached.run('store.set(BIKE_PROFILE_KEY,BIKE_PROFILES)'),false);
+  cached.run('persistDraft(JSON.stringify(captureDraft()))');
+  assert.deepEqual(loadcheckKeys(p),['loadcheck:delete-applied'],'nothing it held comes back');
+});
+
+test('[C-DELETE] a save that would slip in while another tab is deleting is refused: the tab hears of the delete when it starts, not when it ends',async()=>{
+  const storage=sharedStore();
+  const other=page({storage});
+  oldData(other);
+  let reloaded=0;other.context.window.location.reload=()=>{reloaded++;};
+  other.run('SETUPS=JSON.parse(window.localStorage.getItem(SETUP_KEY)).map(normaliseSetup).filter(Boolean);DRAFT_READY=true;');
+  const p=page({storage});
+  p.values.set('copilot:delete-request:v1',request(iso(Date.now()+1000)));
+  // the other tab's 300 ms save fires between the deleting tab's first removal and its last
+  let fired=false;const remove=p.localStorage.removeItem;
+  // the other tab saves its setups (the old ones, rewritten with a fresh stamp) between the deleting tab's first removal and its last
+  p.localStorage.removeItem=k=>{remove(k);if(!fired){fired=true;other.run('store.set(SETUP_KEY,SETUPS)');}};
+  assert.equal(p.run('applyDeleteRequest()'),true);
+  assert.ok(fired && reloaded>=1);
+  await new Promise(r=>setTimeout(r,0));
+  assert.deepEqual(loadcheckKeys(p),['loadcheck:delete-applied'],'the old plan was not written back in the gap');
+});
+
+test('[C-DELETE] a value of an older page that carries its own time keeps it; one with no time goes; a stamp from a clock set back is never "before"',()=>{
+  const p=page();
+  const asked=Date.now()-24*HOUR,day=iso(Date.now()).slice(0,10);
+  p.values.set('loadcheck:setups',JSON.stringify([{id:'st_day_after',name:'Saved the day after',saved:day},{id:'st_day_before',name:'Before',saved:iso(asked-24*HOUR).slice(0,10)},{id:'st_edit',name:'Edited after',saved:'2026-01-01',updated:iso(Date.now())}]));
+  p.values.set('loadcheck:bikeProfiles',JSON.stringify([{id:'bike_measured',name:'Measured after',geometry:{at:iso(Date.now()),values:{}}},{id:'bike_plain',name:'No time'}]));
+  p.values.set('loadcheck:places',JSON.stringify([{name:'x'}]));
+  // the clock was set back after the request: this stamp reads as later than now, so it is kept
+  p.values.set('loadcheck:saved-at:v1',JSON.stringify({app:'load-check',kind:'saved-at',v:1,keys:{'loadcheck:places':iso(Date.now()+48*HOUR)},items:{}}));
+  p.values.set('copilot:delete-request:v1',request(iso(asked)));
+  assert.equal(p.run('applyDeleteRequest()'),true);
+  assert.deepEqual(JSON.parse(p.stored('loadcheck:setups')).map(x=>x.id),['st_day_after','st_edit']);
+  assert.deepEqual(JSON.parse(p.stored('loadcheck:bikeProfiles')).map(x=>x.id),['bike_measured']);
+  assert.ok(p.stored('loadcheck:places'),'a stamp later than now never deletes');
+});
+
 // ---- Contract 1: the load summary (spec 7.1). Its contents are checked against the schema in tests/unit/contracts/load-summary-page.test.ts ----
 test('[C-SUMMARY-WRITE] written once at start-up when the draft is ready; after a save only when it differs; no bags is {app, kind, v, at, empty}',async()=>{
   const p=page();
