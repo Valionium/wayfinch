@@ -20,3 +20,4 @@ export { route } from './routes.ts';
 export { scenario } from './scenario.ts';
 export { stageChoice, stagesOf, withStages } from './stages.ts';
 export { ageH, chancePct, distanceM, edgeMin, gustKmh, onThreshold, rainMm, tempC } from './thresholds.ts';
+export { bikeLibrary, rawBike } from './bikes.ts';

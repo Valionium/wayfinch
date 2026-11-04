@@ -8,6 +8,9 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build as esbuild } from 'esbuild';
 import { writeImprint } from './build-legal.mjs';
+import bikeScript from './bike-script.cjs';
+
+const { bikeScriptOptions } = bikeScript;
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 // Until the launch, / serves this frozen copy of the page that went live with the first release (sub-project 6, Decision 2), so edits
@@ -69,25 +72,7 @@ async function runVite(outDir, { testHooks = false } = {}) {
  * the app. Only a build with the launch switch on writes it.
  */
 async function compileBikeScript() {
-  const result = await esbuild({
-    stdin: {
-      contents: "import { bikeArt, nearestSwatchName, normaliseBike, oklabMedian, resolveBikeSpec, SWATCHES } from './src/core/bike/index.ts';\n"
-        + 'window.WayfinchBike = Object.freeze({ bikeArt, resolveBikeSpec, SWATCHES, nearestSwatchName, normaliseBike, oklabMedian });\n',
-      resolveDir: ROOT,
-      sourcefile: 'bike-entry.ts',
-      loader: 'ts',
-    },
-    absWorkingDir: ROOT,
-    bundle: true,
-    write: false,
-    format: 'iife',
-    target: 'es2020',
-    platform: 'browser',
-    charset: 'utf8',
-    legalComments: 'none',
-    minify: true,
-    logLevel: 'silent',
-  });
+  const result = await esbuild(bikeScriptOptions);
   return Buffer.from(result.outputFiles[0].contents);
 }
 

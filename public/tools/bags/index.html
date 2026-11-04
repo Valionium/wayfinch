@@ -2096,6 +2096,8 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 </div>
 
 <section id="printChecklist" class="print-checklist"></section>
+<!-- The bike drawing (spec 7.4): the same module as the app's, served beside this page and precached with it. -->
+<script src="bike.js"></script>
 <script>
 /* ==== 00-regions.js ==== */
 /* ---- Where and when: regions and the climate model ---- */
@@ -7022,6 +7024,17 @@ function nightsNote(from, to){
 
 /* ==== 60-diagram.js ==== */
 /* ---- The bike drawing: shapes, fills, layout, hit targets ---- */
+
+// The bike itself comes from /tools/bags/bike.js (spec 7.4), the module the app draws with, so both show the same bike.
+// Without it (a page opened on its own) nothing here throws: the rig shows its bags and the lists still work.
+function bikeModule(){ return window.WayfinchBike || null; }
+function bikeTheme(){ return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; }
+// One bike with a plan's bags in Contract 1's shape ({items, decks, bottles}, or null), as the app draws it.
+function bikeDrawing(profile, view, options){
+  const B = bikeModule(); if(!B) return null;
+  const spec = B.resolveBikeSpec(B.normaliseBike(profile), view || null);
+  return B.bikeArt(spec, view || null, options || { theme:bikeTheme() });
+}
 
 function inspectMap(){ return INSPECT; }
 // Room to spare reads green, filling up reads amber, packed to the brim reads red.
