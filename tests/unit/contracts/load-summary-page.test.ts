@@ -84,6 +84,28 @@ describe('[C-SUMMARY-FIXTURES] the page writes what contracts/load-summary holds
   });
 });
 
+describe('[C-SUMMARY-INVARIANT] the decks and one pannier half (review of PR 43, I2 and M6)', () => {
+  test('a bar roll with its straps on, and nothing strapped there, is an empty deck, as the page draws it; the rack deck is loaded only with its tent and mat', () => {
+    const camp = "for(const id of ['tent','pad','bag','stove','pot','jacket']) if(S.kit[id]!==undefined) S.kit[id]=true;";
+    const { page, summary } = summaryOf(`S.bags=[{uid:1,pos:'bar',L:12},{uid:2,pos:'seat',L:14}];S.nextUid=3;S.decks={bar:true,rack:false};${camp}`);
+    expect(summary.decks).toEqual({ bar: 'empty', rack: null });
+    page.run('S.step=4;');
+    expect(JSON.parse(page.run('JSON.stringify(planBagView().decks)') as string)).toEqual(summary.decks); // the page's own drawing agrees
+    expect(summaryOf(`S.bags=[{uid:1,pos:'seat',L:14}];S.nextUid=2;S.decks={bar:false,rack:true};${camp}`).summary.decks).toEqual({ bar: null, rack: 'loaded' });
+    expect(summaryOf(`S.bags=[{uid:1,pos:'seat',L:14}];S.nextUid=2;S.decks={bar:false,rack:true};`).summary.decks).toEqual({ bar: null, rack: 'empty' });
+  });
+  test('a pair of panniers with one half in use is one entry, pair false, one fill, and one position', () => {
+    const { summary } = summaryOf(`S.bags=[{uid:2,pos:'rack',L:15,pair:true}];S.nextUid=3;for(const id of ['tent','pad','bag','stove','pot','jacket']) if(S.kit[id]!==undefined) S.kit[id]=true;
+      const qaPlan=currentPlan; currentPlan=()=>{ const A=qaPlan(); return { ...A, slots:A.slots.filter(s=>s.key!=='2-1') }; };`);
+    expect(summary.bags.items.map((i) => i.pos)).toEqual(['rack']);
+    const rack = summary.bags.items.find((i) => i.pos === 'rack')!;
+    expect(rack.pair).toBe(false);
+    expect(typeof rack.fill).toBe('number');
+    expect(summary.bags.positions.filter((p) => p === 'rack')).toEqual(['rack']);
+    expect(summary.bags.count).toBe(summary.bags.items.length + summary.bags.items.filter((i) => i.pair === true).length);
+  });
+});
+
 describe('[C-SUMMARY-ORPHAN] a summary naming a bike no one has', () => {
   test('reads as none: the plan\'s other bike gets no bags; with no bike, none matches none (spec 7.1, 7.4)', () => {
     const { summary } = summaryOf(FULL);
@@ -161,6 +183,7 @@ describe('[C-SUMMARY-INVARIANT] the summary\'s weights', () => {
       expect(Math.abs(sumOf(w.byPositionKg) + w.unplacedKg - w.carriedKg)).toBeLessThanOrEqual(0.05);
       expect(summary.bags.count).toBe(summary.bags.items.length + summary.bags.items.filter((i) => i.pair === true).length);
       expect(summary.bags.positions.length).toBe(summary.bags.count);
+      expect(summary.decks.bar).not.toBe('loaded'); // the allocation straps nothing to the bar (deckClaims is the rack's)
       for (const i of summary.bags.items) {
         if (i.pair === true) expect(Array.isArray(i.fill) && i.fill.length === 2).toBe(true);
         else expect(typeof i.fill).toBe('number');

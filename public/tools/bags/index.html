@@ -7150,6 +7150,9 @@ function fillColour(pct){
   }
   return 'rgb(224,68,40)';
 }
+// A deck is loaded only with kit strapped there (Contract 1). The plan straps the tent and mat to the rack top (deckClaims) and
+// nothing to the bar's bungees, which the rig draws as an empty deck.
+function deckLoaded(which){ return which === 'rack' && deckClaims().length > 0; }
 // The plan's bags in Contract 1's shape (spec 7.1): what bike.js reads of a plan. Usable bags only, as the plan counts them;
 // fills from the packed slots once the kit is known. It only reads the plan.
 function planBagView(){
@@ -7168,7 +7171,7 @@ function planBagView(){
     if(units.length > 1) item.pair = true;
     items.push(item);
   });
-  const deck = which => hasDeck(which) ? (stage >= 3 && (which === 'rack' ? deckClaims().length > 0 : A.slots.some(s => s.pos === 'bar')) ? 'loaded' : 'empty') : null;
+  const deck = which => hasDeck(which) ? (stage >= 3 && deckLoaded(which) ? 'loaded' : 'empty') : null;
   return { items, decks:{ bar:deck('bar'), rack:deck('rack') }, bottles };
 }
 
@@ -7194,7 +7197,7 @@ function loadSummary(now = new Date()){
     else { if(countOf(b) > 1) item.pair = false; item.fill = fillOf(used[0]); }
     items.push(item); used.forEach(() => positions.push(b.pos));
   }
-  const deck = which => hasDeck(which) ? ((which === 'rack' ? deckClaims().length > 0 : A.slots.some(x => x.pos === 'bar')) ? 'loaded' : 'empty') : null;
+  const deck = which => hasDeck(which) ? (deckLoaded(which) ? 'loaded' : 'empty') : null;
   const bottlesNow = liveBottles().filter(b => ['st','dt','un'].includes(b.slot) && +b.L > 0)
     .map(b => ({ slot:b.slot, L:+b.L }));
   const cageL = waterL(), extraL = r2(activeKit().filter(k => k.id === 'water').reduce((n, k) => n + itemL(k), 0));
