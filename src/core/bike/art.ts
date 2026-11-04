@@ -429,7 +429,9 @@ function anchorsOf(spec: BikeSpec, g: Geometry, fr: ReturnType<typeof frameOf>, 
   const forkU = unit(sub(g.front, g.headBottom));
   const fork = inside({ x: forkMid[0] - 6 + forkU[1] * -1.5, y: forkMid[1] - 11, w: 12, h: 22, rot: deg(Math.atan2(forkU[1], forkU[0])) - 90 });
   const rackY = g.rear[1] - g.rr - 3;
-  const rack = inside({ x: g.rear[0] - 21, y: rackY + 2.2, w: 46, h: 27, rot: 0 });
+  // Panniers hang from the rack beside the wheel, their tops well below the rack-top deck (as in the bag planner today: about 0.4 of
+  // the wheel's radius under its top), so the deck, the bag behind and the bag in front never cover one another.
+  const rack = inside({ x: g.rear[0] - 21, y: rackY + 3 + Math.min(17, 0.42 * g.rr), w: 46, h: 27, rot: 0 });
   const rackTop = inside({ x: g.rear[0] - 22, y: rackY - 6.6, w: 48, h: 6, rot: 0 });
   const pack = { x: 8, y: 24, w: 29, h: 34, rot: 0 };
   // Bottles at the bolts that exist, turned to the tube.

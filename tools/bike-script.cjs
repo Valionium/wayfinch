@@ -22,10 +22,14 @@ const options={
   minify:true,
   logLevel:'silent',
 };
+// The photo colour picker (spec 7.4, "Colour from a photo"): /tools/bags/bike-photo.js, loaded on demand; window.WayfinchBikePhoto.
+const photoOptions={...options,stdin:{...options.stdin,
+  contents:"import { openPicker } from './src/ui/bike-photo/picker.ts';\n"+'window.WayfinchBikePhoto = Object.freeze({ openPicker });\n',
+  sourcefile:'bike-photo-entry.ts'}};
 let cached=null;
 /** The script's text, built once per process (the QA suites build many pages). */
 function bikeScriptSync(){
   if(cached===null)cached=Buffer.from(require('esbuild').buildSync(options).outputFiles[0].contents).toString('utf8');
   return cached;
 }
-module.exports={bikeScriptOptions:options,bikeScriptSync};
+module.exports={bikeScriptOptions:options,photoScriptOptions:photoOptions,bikeScriptSync};

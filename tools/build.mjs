@@ -10,7 +10,7 @@ import { build as esbuild } from 'esbuild';
 import { writeImprint } from './build-legal.mjs';
 import bikeScript from './bike-script.cjs';
 
-const { bikeScriptOptions } = bikeScript;
+const { bikeScriptOptions, photoScriptOptions } = bikeScript;
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 // Until the launch, / serves this frozen copy of the page that went live with the first release (sub-project 6, Decision 2), so edits
@@ -71,8 +71,8 @@ async function runVite(outDir, { testHooks = false } = {}) {
  * The bike module for the bag planner (spec section 7.4): a classic script, `window.WayfinchBike`, so the page draws the same bike as
  * the app. Only a build with the launch switch on writes it.
  */
-async function compileBikeScript() {
-  const result = await esbuild(bikeScriptOptions);
+async function compileBikeScript(options = bikeScriptOptions) {
+  const result = await esbuild(options);
   return Buffer.from(result.outputFiles[0].contents);
 }
 
@@ -125,6 +125,8 @@ export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = 
     writeImprint(target);
     mkdirSync(join(target, 'tools', 'bags'), { recursive: true });
     writeFileSync(join(target, 'tools', 'bags', 'bike.js'), await compileBikeScript());
+    // The photo colour picker, loaded only when a rider taps From a photo; precached like every other file.
+    writeFileSync(join(target, 'tools', 'bags', 'bike-photo.js'), await compileBikeScript(photoScriptOptions));
   } else {
     // With the switch off the page riders see stays Load Check, at /: the frozen copy, never the bag planner being worked on.
     writeFileSync(join(target, 'index.html'), readFileSync(pagePath));

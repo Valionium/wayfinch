@@ -79,6 +79,8 @@ function checkAnchors(a: Anchors, name: string, mounts: { st: boolean; dt: boole
     const [cx, cy] = [p.x + p.w / 2, p.y + p.h / 2];
     expect(cx >= h.box.x - 0.01 && cx <= h.box.x + h.box.w + 0.01 && cy >= h.box.y - 0.01 && cy <= h.box.y + h.box.h + 0.01, `${name}: ${key} keeps its centre`).toBe(true);
   }
+  // Panniers hang below the rack-top deck, the one behind included (it sits 7 up and left of the one in front).
+  expect(a.rack.y - 7, `${name}: panniers under the deck`).toBeGreaterThan(a.rackTop.y + a.rackTop.h);
   // The seat pack hangs behind the saddle, over the rear wheel.
   expect(a.seat.x + a.seat.w, `${name}: seat pack behind the saddle`).toBeLessThan(a.points.saddle[0]);
   void circleBox;

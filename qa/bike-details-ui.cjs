@@ -29,7 +29,9 @@ reset();
   const a=html.indexOf('id="bikeDetailsBox"'),b=html.indexOf('id="pressureToolBox"');
   const dlg=html.slice(a,b);
   check(a>0 && a<b && dlg.includes('id="bikeFrameSection"') && dlg.includes('id="bikeMaxWeightSection"') && /Today's details/.test(dlg),'BK-UI-01 Frame, Maximum weight and Today\'s details');
-  check(!/<h3[^>]*>\s*(Look|Geometry)\b/i.test(dlg) && !/id="bike(Look|Geometry)/i.test(dlg),'BK-UI-01 no Look or Geometry section');
+  // Look arrives at the launch (sub-project 6, Task 4), below the two-tap start; Geometry is still sub-project 9's.
+  check(!/<h3[^>]*>\s*Geometry\b/i.test(dlg) && !/id="bikeGeometry/i.test(dlg),'BK-UI-01 no Geometry section');
+  check(dlg.indexOf('id="bikeLook"')>dlg.indexOf('id="bikeQuick"') && dlg.indexOf('id="bikeLook"')<dlg.indexOf('id="bikeMoreDetails"'),'BK-UI-01 Look sits below the two-tap start');
   check(html.indexOf('id="bikeProfilePanel"')>a && html.indexOf('id="bikeProfilePanel"')<b,'BK-UI-01 the editor moved out of the tyre tool into the dialog');
 }
 // [BK-UI-02] openers, and focus returns to the opener

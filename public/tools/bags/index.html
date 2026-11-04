@@ -1506,6 +1506,43 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .fit-quick-result ul{margin:0 0 6px 18px;padding:0}
 .fit-quick-result p{margin:0}
 .bike-more{margin:8px 0}
+/* Look (spec 7.4): taps only, each shown at once on the drawing that stays in view above them. */
+.bike-look{margin:0 0 14px}
+.bike-look h3{margin:0 0 4px}
+.look-preview{position:sticky;top:-16px;z-index:2;background:var(--panel);padding:6px 0 4px;margin:0 0 6px;border-bottom:1px solid var(--line)}
+.look-preview svg{display:block;width:100%;max-width:420px;height:auto;margin:0 auto}
+.look-guess{margin:0 0 8px;color:var(--muted);font-size:13px;min-height:1.2em}
+.bike-look fieldset{border:0;padding:0;margin:0 0 10px}
+.bike-look legend{font-weight:600;margin:0 0 4px}
+.look-swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px}
+.look-chips,.look-more{display:flex;flex-wrap:wrap;gap:6px}
+.look-more{margin-top:6px}
+.look-swatch,.look-chip{position:relative;display:flex;align-items:center;gap:8px;min-height:44px;min-width:44px;padding:0 10px;box-sizing:border-box;
+  border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:14px;background:transparent;color:inherit;font-family:inherit}
+.look-swatch input,.look-chip input[type=radio]{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+.look-swatch:has(input:checked),.look-chip:has(input:checked),.look-chip.on{outline:2px solid var(--blaze);outline-offset:1px}
+.look-swatch:has(input:focus-visible),.look-chip:has(input:focus-visible),.look-chip:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.look-dot{flex:none;width:22px;height:22px;border-radius:50%;border:1px solid var(--muted)}
+.look-dot.none{background:transparent;border-style:dashed}
+.look-picker input[type=color]{flex:none;width:24px;height:24px;padding:0;border:1px solid var(--muted);border-radius:50%;background:none;cursor:pointer;-webkit-appearance:none;appearance:none;overflow:hidden}
+.look-picker input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+.look-picker input[type=color]::-webkit-color-swatch{border:none;border-radius:50%}
+.look-picker input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
+.look-status{margin:4px 0;font-size:13px;color:var(--muted);min-height:1.2em}
+#lookUndo{min-height:44px}
+.look-chip.hidden,.bike-look.hidden{display:none}
+/* From a photo (spec 7.4): the photo stays on the phone, drawn into a canvas the rider taps; a magnifier shows the spot. */
+.photo-pick{margin:8px 0;padding:8px;border:1px solid var(--line);border-radius:8px}
+.photo-choose input[type=file]{position:absolute;opacity:0;width:1px;height:1px;overflow:hidden}
+.photo-choose:has(input:focus-visible){outline:2px solid var(--ink);outline-offset:2px}
+.photo-hint{margin:6px 0;font-size:13px;color:var(--muted);min-height:1.2em}
+.photo-stage{position:relative}
+.photo-stage.hidden,.photo-pick .hidden{display:none}
+.photo-canvas{display:block;max-width:100%;max-height:45vh;width:auto;height:auto;margin:0 auto;cursor:crosshair;touch-action:manipulation}
+.photo-loupe{position:absolute;width:90px;height:90px;border-radius:50%;border:2px solid var(--ink);pointer-events:none;background:var(--panel)}
+.photo-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.photo-actions button{min-height:44px}
+.photo-note{margin:6px 0 0;font-size:13px;color:var(--muted)}
 .bike-more>summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600}
 .fit-triangle{width:120px;color:var(--ink,#000)}
 .fitfixes{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
@@ -1936,7 +1973,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 </div>
 <div id="bikeDetailsBox" class="pressure-tool-box bike-details-box hidden" role="dialog" aria-modal="true" aria-labelledby="bikeDetailsTitle">
   <section class="pressure-tool-card">
-    <header class="pressure-tool-head"><div><h2 id="bikeDetailsTitle" tabindex="-1">Bike details</h2><p id="bikeDetailsSummary">Frame, maximum weight and today's details</p></div><button type="button" id="bikeDetailsClose" aria-label="Close bike details">×</button></header>
+    <header class="pressure-tool-head"><div><h2 id="bikeDetailsTitle" tabindex="-1">Bike details</h2><p id="bikeDetailsSummary">Frame, maximum weight and today's details</p><a class="linky hidden" id="bikeDetailsBack" href="/#/you"></a></div><button type="button" id="bikeDetailsClose" aria-label="Close bike details">×</button></header>
     <div class="pressure-tool-body" id="bikeDetailsBody">
     <section class="bike-profile-panel" id="bikeProfilePanel">
       <section class="bike-quick" id="bikeQuick" aria-labelledby="bikeQuickTitle">
@@ -1946,6 +1983,24 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         <fieldset class="fit-sizes"><legend>Frame size</legend><div id="fitSizeChips"></div></fieldset>
         <div class="fit-quick-result" id="fitQuickResult" role="status" aria-live="polite"></div>
         <div class="bike-profile-status" id="bikeProfileStatus" role="status" aria-live="polite"></div>
+      </section>
+      <section class="bike-look" id="bikeLook" aria-labelledby="bikeLookTitle">
+        <h3 id="bikeLookTitle" tabindex="-1">Look</h3>
+        <p class="hint" id="lookHint"></p>
+        <div class="look-preview" id="lookPreview"></div>
+        <p class="look-guess" id="lookGuess"></p>
+        <fieldset><legend id="lookColourTitle">Colour</legend>
+          <div class="look-swatches" id="lookSwatches" role="radiogroup" aria-labelledby="lookColourTitle"></div>
+          <div class="look-more">
+            <label class="look-chip look-picker" id="lookPickerChip" for="lookPicker"><input type="color" id="lookPicker" value="#2563b8"><span id="lookPickerText"></span></label>
+            <button type="button" class="look-chip hidden" id="lookPhoto" aria-controls="lookPhotoBox"></button>
+          </div>
+          <div id="lookPhotoBox"></div>
+        </fieldset>
+        <fieldset><legend id="lookBarsTitle">Handlebar</legend><div class="look-chips" id="lookBars" role="radiogroup" aria-labelledby="lookBarsTitle"></div></fieldset>
+        <fieldset><legend id="lookEbikeTitle">E-bike</legend><div class="look-chips" id="lookEbike" role="radiogroup" aria-labelledby="lookEbikeTitle"></div></fieldset>
+        <p class="look-status" id="lookStatus" role="status" aria-live="polite"></p>
+        <button type="button" class="linky hidden" id="lookUndo"></button>
       </section>
       <details class="bike-more" id="bikeMoreDetails"><summary>More details (optional)</summary>
       <p>Choose Use these bike details to use them in this plan. Saving a reusable bike is optional. Repair details can stay blank when you only need tyre pressure.</p>
@@ -2836,8 +2891,29 @@ const BIKE_WORDING={
   room:{text:'{parts} = {total} kg. Under the {max} you entered ({includes}), that leaves {room} kg for you, dressed.',limit:true},
   roomAtMost:{text:'{parts} = {total} kg. Under the {max} you entered ({includes}), that leaves at most {room} kg for you, dressed. Not entered: {missing}.',limit:true},
   overBike:{text:'Bike and luggage are {over} kg over the {max} you entered, before counting you. Leave something at home, or check the figure you entered.',limit:true},
-  overLuggage:{text:'Luggage and water are {over} kg over the {max} you entered, before counting you. Leave something at home, or check the figure you entered.',limit:true}
+  overLuggage:{text:'Luggage and water are {over} kg over the {max} you entered, before counting you. Leave something at home, or check the figure you entered.',limit:true},
+  lookHint:{text:'Make the drawing look like your bike. Each tap shows at once, and you can always change it back.'},
+  lookNone:{text:'None'},
+  lookNotSet:{text:'Not set'},
+  lookMore:{text:'More colours'},
+  lookPhoto:{text:'From a photo'},
+  lookUndo:{text:'Undo'},
+  lookUndone:{text:'Back to how it looked.'},
+  lookDrop:{text:'Drop'},lookFlat:{text:'Flat'},lookOther:{text:'Other'},lookYes:{text:'Yes'},lookNo:{text:'No'},
+  lookGuessBars:{text:'Handlebar: {value} · guessed'},
+  lookGuessEbike:{text:'E-bike: {value} · guessed'},
+  lookSavedBike:{text:'Saved to {name}. Your plan keeps its own bike.'},
+  photoChoose:{text:'Choose or take a photo'},
+  photoTap:{text:'Tap your frame where the paint shows best.'},
+  photoUse:{text:'Use this colour'},
+  photoAgain:{text:'Tap again'},
+  photoClose:{text:'Close'},
+  photoLoupe:{text:'The spot you tapped, close up'},
+  photoFailed:{text:'This photo could not be opened. Try another one.'},
+  photoNote:{text:'The photo stays on your phone: it is not sent anywhere and not kept.'},
+  backTrip:{text:'Back to Trip'},backTools:{text:'Back to Tools'},backYou:{text:'Back to You'},backTyre:{text:'Back to Tyre pressure'}
 };
+const bikeWord=(key,values={})=>BIKE_WORDING[key].text.replace(/\{(\w+)\}/g,(m,k)=>values[k]??m);
 const FIT_STYLE_NAMES={unknown:'Not sure','diamond-level':'Diamond, level top tube','diamond-sloping':'Diamond, sloping top tube',compact:'Compact',trapeze:'Trapeze',mixte:'Mixte','step-through':'Step-through','full-suspension':'Full suspension'};
 const FIT_STYLE_PATHS={
   'diamond-level':'M16 10H44M16 10L28 28M44 10L28 28M44 10L48 24M28 28H10M16 10L10 28',
@@ -2890,6 +2966,7 @@ function updateFitQuick(){
   $('fitSizeChips').querySelectorAll?.('.fit-size').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.size===st.size)));
   const [first,...rest]=fitQuickResultText().split(FIT_QUICK_SEP);
   $('fitQuickResult').innerHTML=rest.length ? `<ul>${[first,...rest.slice(0,-1)].map(t=>`<li>${htmlEsc(t)}</li>`).join('')}</ul><p class="hint">${htmlEsc(rest[rest.length-1])}</p>` : `<p class="hint">${htmlEsc(first)}</p>`;
+  if(typeof renderLook==='function')renderLook();   // the drawing above Look follows the frame pictures and sizes too
 }
 function fitQuickChanged(){
   updateFitQuick();
@@ -3076,7 +3153,7 @@ function readBikeProfileEditor(){
   const fields=readFitFields(),was=BIKE_PROFILES.find(b=>b.id===raw.id) || (S.bikeProfile?.id===raw.id ? S.bikeProfile : null);
   raw.fit=fields.fit;raw.maxWeight=fields.maxWeight;
   raw.maxWeightAsked=!!(was?.maxWeightAsked || fields.maxWeight);
-  raw.look=was?.look ?? null;raw.geometry=was?.geometry ?? null;   // edited elsewhere, kept as they are
+  raw.look=was ? was.look ?? null : LOOK_NEW;raw.geometry=was?.geometry ?? null;   // edited elsewhere (Look below), kept as they are
   return normaliseBikeProfile(raw);
 }
 function bikeEditorIssue(){
@@ -3165,6 +3242,212 @@ function initialiseBikeProfiles(){
   $('bikeRemoveCancel').onclick=()=>{$('bikeRemovePrompt').classList.add('hidden');$('bikeRemove').focus({preventScroll:true});};
   $('bikeRemoveConfirm').onclick=removeSavedBike;
   renderBikeProfiles(true);
+}
+/* ---- Look (spec 7.4 "Look", 3.7): colour, handlebar and e-bike. One tap each, shown at once on the drawing above and, for the
+   plan's bike, on the rig behind; nothing is required, every choice goes back to Not set, and Undo restores the opening look. ---- */
+let LOOK_OPENING=null,LOOK_CHANGED=false,LOOK_NEW=null,LOOK_MESSAGE='',LOOK_PICKER_TIMER=null,LOOK_RETRY=null;
+let LOOK_PREVIEW=null,LOOK_PHOTO=null;   // a colour tapped on a photo, shown on the drawing until it is used; the open photo picker
+const LOOK_BARS=[['drop','lookDrop'],['flat','lookFlat'],['other','lookOther'],['','lookNotSet']];
+const LOOK_EBIKE=[['true','lookYes'],['false','lookNo'],['','lookNotSet']];
+// The bike Bike details shows: the plan's, a saved one opened without applying it, or none yet (a new bike).
+function lookTarget(){
+  const id=BIKE_PROFILE_EDITOR_ID;
+  if(id && S.bikeProfile && S.bikeProfile.id===id)return {kind:'plan',bike:S.bikeProfile};
+  const saved=id ? BIKE_PROFILES.find(b=>b.id===id) : null;
+  return saved ? {kind:'saved',bike:saved} : {kind:'new',bike:null};
+}
+function currentLook(){const t=lookTarget();return normaliseLook(t.bike ? t.bike.look : LOOK_NEW);}
+// The look the dialog opened with, kept until it closes or shows another bike.
+function rememberLookOpening(){LOOK_OPENING=currentLook();LOOK_CHANGED=false;LOOK_MESSAGE='';}
+function lookSwatches(){const B=bikeModule();return B ? B.SWATCHES : [];}
+
+function renderLookChoices(){
+  if(!$('lookSwatches'))return;
+  LOOK_READY=null;
+  $('lookHint').textContent=bikeWord('lookHint');
+  $('lookSwatches').innerHTML=[`<label class="look-swatch"><input type="radio" name="lookColour" value=""><span class="look-dot none"></span><span>${htmlEsc(bikeWord('lookNone'))}</span></label>`,
+    ...lookSwatches().map(w=>`<label class="look-swatch"><input type="radio" name="lookColour" value="${w.hex}"><span class="look-dot" style="background:${w.hex}"></span><span>${htmlEsc(w.name)}</span></label>`)].join('');
+  const chips=(name,list)=>list.map(([v,key])=>`<label class="look-chip"><input type="radio" name="${name}" value="${v}"><span>${htmlEsc(bikeWord(key))}</span></label>`).join('');
+  $('lookBars').innerHTML=chips('lookBars',LOOK_BARS);
+  $('lookEbike').innerHTML=chips('lookEbike',LOOK_EBIKE);
+  $('lookPickerText').textContent=bikeWord('lookMore');
+  $('lookPhoto').textContent=bikeWord('lookPhoto');
+  $('lookUndo').textContent=bikeWord('lookUndo');
+}
+// The bike as the form shows it, with the look being chosen: what the preview draws, frame pictures and sizes included.
+// A bike already made is drawn as it is (a frame-picture tap applies at once, so it is up to date); a new one from the form.
+function lookPreviewBike(){
+  const t=lookTarget(),raw=t.bike || (BIKE_PROFILE_FORM_READY ? readBikeProfileEditor() : null);
+  const look=currentLook()||{colour:null,bars:null,ebike:null};
+  return raw ? normaliseBikeProfile({...raw,look:LOOK_PREVIEW ? {...look,colour:LOOK_PREVIEW} : look}) : null;
+}
+let LOOK_READY=null;
+function renderLook(){
+  const box=$('lookPreview');if(!box)return;
+  const B=bikeModule();
+  $('bikeLook').classList.toggle('hidden',!B);   // without bike.js there is no drawing to make yours
+  if(!B)return;
+  $('lookPhoto').classList.remove('hidden');
+  $('lookPhoto').setAttribute('aria-expanded',String(!!LOOK_PHOTO));
+  const t=lookTarget(),look=currentLook()||{colour:null,bars:null,ebike:null},bike=lookPreviewBike();
+  const view=t.kind==='plan' ? planBagView() : null,spec=B.resolveBikeSpec(B.normaliseBike(bike),view),guess=[];
+  box.innerHTML=B.bikeArt(spec,view,{theme:bikeTheme()}).svg;
+  if(!look.bars)guess.push(bikeWord('lookGuessBars',{value:spec.bars.value}));
+  if(look.ebike===null)guess.push(bikeWord('lookGuessEbike',{value:spec.ebike.value ? 'yes' : 'no'}));
+  $('lookGuess').textContent=guess.join(' · ');
+  const swatch=lookSwatches().some(w=>w.hex===look.colour);
+  const check=(name,value)=>document.querySelectorAll?.(`input[name="${name}"]`).forEach(r=>{r.checked=r.value===value;});
+  check('lookColour',look.colour===null ? '' : swatch ? look.colour : '\u0000');
+  check('lookBars',look.bars||'');
+  check('lookEbike',look.ebike===null ? '' : String(look.ebike));
+  $('lookPickerChip').classList.toggle('on',!!look.colour && !swatch);
+  if(look.colour && document.activeElement!==$('lookPicker'))$('lookPicker').value=look.colour;
+  const ready=typeof DRAFT_READY!=='undefined' && DRAFT_READY;
+  if(LOOK_READY!==ready){LOOK_READY=ready;document.querySelectorAll?.('#bikeLook input').forEach(i=>{i.disabled=!ready;});}
+  $('lookUndo').classList.toggle('hidden',!LOOK_CHANGED);
+  $('lookStatus').textContent=LOOK_MESSAGE;
+}
+// One write chain with the plan's bike, so a burst of taps lands in the order it was tapped, under the format guard.
+function persistSavedBikes(){
+  BIKE_PROFILE_WRITES=BIKE_PROFILE_WRITES.catch(()=>false).then(()=>bikeStoreSet(BIKE_PROFILE_KEY,BIKE_PROFILES.map(normaliseBikeProfile)));
+  return BIKE_PROFILE_WRITES;
+}
+function lookWritten(result){
+  Promise.resolve(result).then(ok=>{if(ok===false && BIKE_PROFILE_MESSAGE===BIKE_NEWER_MESSAGE){LOOK_MESSAGE=BIKE_NEWER_MESSAGE;renderLook();}}).catch(()=>{});
+}
+// Puts a look on the bike shown, at once: the plan's bike (and its saved copy), a saved bike alone, or a new bike through the same
+// path as a frame-picture tap. `store` false only paints, for the colour picker while it is being dragged.
+function writeLook(look,store=true){
+  const t=lookTarget(),next=normaliseLook(look);
+  if(t.kind==='new'){
+    LOOK_NEW=next;
+    if(!store || !DRAFT_READY)return;
+    if(BIKE_PROFILE_BUSY){clearTimeout(LOOK_RETRY);LOOK_RETRY=setTimeout(()=>writeLook(currentLook()),60);return;}
+    Promise.resolve(applyPressureBikeDetails()).then(()=>renderLook()).catch(()=>{});
+    return;
+  }
+  const i=BIKE_PROFILES.findIndex(b=>b.id===t.bike.id);
+  if(i>=0)BIKE_PROFILES[i]=normaliseBikeProfile({...BIKE_PROFILES[i],look:next});
+  if(t.kind==='plan'){
+    const was=normaliseLook(S.bikeProfile.look)||{};
+    S.bikeProfile=normaliseBikeProfile({...S.bikeProfile,look:next});
+    // The preview first, in this task; the rig behind before the next frame: a colour only repaints the bike, bars or an
+    // e-bike move its anchors, so the bags follow.
+    const onlyColour=(was.bars??null)===(next?.bars??null) && (was.ebike??null)===(next?.ebike??null);
+    queueRig(onlyColour);
+  }
+  else LOOK_MESSAGE=bikeWord('lookSavedBike',{name:t.bike.name});
+  if(!store || !DRAFT_READY)return;
+  if(t.kind==='plan'){queueDraftSave();lookWritten(persistBikeProfileSelection());}
+  if(i>=0)lookWritten(persistSavedBikes());
+}
+let LOOK_RIG=null;
+function queueRig(onlyColour){
+  const full=!onlyColour || (LOOK_RIG && LOOK_RIG.full);
+  if(LOOK_RIG)cancelAnimationFrame?.(LOOK_RIG.id);
+  const run=()=>{LOOK_RIG=null;if(full)drawRig();else paintRigBike();};
+  if(typeof requestAnimationFrame!=='function'){run();return;}
+  LOOK_RIG={full,id:requestAnimationFrame(run)};
+}
+function setLook(change,store=true){
+  if(typeof DRAFT_READY!=='undefined' && !DRAFT_READY)return;
+  if(LOOK_PHOTO && 'colour' in change)closeLookPhoto();   // a swatch or the picker ends the photo
+  writeLook({...(currentLook()||{colour:null,bars:null,ebike:null}),...change},store);
+  LOOK_CHANGED=JSON.stringify(currentLook())!==JSON.stringify(LOOK_OPENING);
+  renderLook();
+}
+function undoLook(){
+  clearTimeout(LOOK_PICKER_TIMER);LOOK_PICKER_TIMER=null;
+  writeLook(LOOK_OPENING);LOOK_CHANGED=false;LOOK_MESSAGE=bikeWord('lookUndone');renderLook();
+  $('lookUndo').classList.add('hidden');$('bikeLookTitle').focus({preventScroll:true});
+}
+// The phone's own picker paints while it moves and stores once it settles; closing the dialog stores what is left.
+function lookPickerInput(){
+  setLook({colour:String($('lookPicker').value).toLowerCase()},false);
+  clearTimeout(LOOK_PICKER_TIMER);LOOK_PICKER_TIMER=setTimeout(flushLookPicker,400);
+}
+function flushLookPicker(){
+  if(LOOK_PICKER_TIMER===null)return;
+  clearTimeout(LOOK_PICKER_TIMER);LOOK_PICKER_TIMER=null;
+  setLook({colour:String($('lookPicker').value).toLowerCase()});
+}
+function initialiseLook(){
+  if(!$('bikeLook'))return;
+  renderLookChoices();
+  $('lookSwatches').addEventListener('change',e=>{if(e.target.name==='lookColour')setLook({colour:e.target.value || null});});
+  $('lookBars').addEventListener('change',e=>{if(e.target.name==='lookBars')setLook({bars:e.target.value || null});});
+  $('lookEbike').addEventListener('change',e=>{if(e.target.name==='lookEbike')setLook({ebike:e.target.value==='' ? null : e.target.value==='true'});});
+  $('lookPicker').addEventListener('input',lookPickerInput);
+  $('lookPicker').addEventListener('change',flushLookPicker);
+  $('lookUndo').onclick=undoLook;
+  $('lookPhoto').onclick=openLookPhoto;
+  // Another bike shown is a fresh start for Undo.
+  $('bikeSavedSelect').addEventListener('change',()=>{rememberLookOpening();renderLook();});
+  $('bikeNew').addEventListener('click',()=>{LOOK_NEW=null;rememberLookOpening();renderLook();});
+  renderLook();
+}
+
+/* ---- From a photo (spec 7.4, section 10): /tools/bags/bike-photo.js, loaded on the first tap and precached with the page. The photo
+   is read on the phone only; only the colour is kept, and only when the rider taps Use this colour. ---- */
+let LOOK_PHOTO_SCRIPT=null;
+function loadBikePhoto(){
+  if(window.WayfinchBikePhoto)return Promise.resolve(window.WayfinchBikePhoto);
+  if(!LOOK_PHOTO_SCRIPT)LOOK_PHOTO_SCRIPT=new Promise((resolve,reject)=>{
+    const script=document.createElement('script');script.src='bike-photo.js';
+    script.onload=()=>window.WayfinchBikePhoto ? resolve(window.WayfinchBikePhoto) : reject(Error('no picker'));
+    script.onerror=()=>{LOOK_PHOTO_SCRIPT=null;script.remove();reject(Error('not loaded'));};
+    document.head.appendChild(script);
+  });
+  return LOOK_PHOTO_SCRIPT;
+}
+async function openLookPhoto(){
+  if(LOOK_PHOTO){closeLookPhoto();renderLook();return;}
+  let module;
+  try{module=await loadBikePhoto();}catch(e){LOOK_MESSAGE=bikeWord('photoFailed');renderLook();return;}
+  if(LOOK_PHOTO || $('bikeDetailsBox').classList.contains('hidden'))return;
+  const words={choose:bikeWord('photoChoose'),tap:bikeWord('photoTap'),use:bikeWord('photoUse'),again:bikeWord('photoAgain'),
+    close:bikeWord('photoClose'),loupe:bikeWord('photoLoupe'),failed:bikeWord('photoFailed')};
+  const note=document.createElement('p');note.className='photo-note';note.textContent=bikeWord('photoNote');
+  LOOK_PHOTO=module.openPicker($('lookPhotoBox'),{words,
+    onPreview:hex=>{LOOK_PREVIEW=hex;renderLook();},
+    onUse:hex=>{LOOK_PHOTO=null;LOOK_PREVIEW=null;note.remove();setLook({colour:hex});$('lookPhoto').focus({preventScroll:true});},
+    onClose:()=>{LOOK_PHOTO=null;LOOK_PREVIEW=null;note.remove();renderLook();}});
+  LOOK_PHOTO.root.appendChild(note);
+  renderLook();
+}
+function closeLookPhoto(){
+  const picker=LOOK_PHOTO;if(!picker)return;
+  LOOK_PHOTO=null;LOOK_PREVIEW=null;picker.close();
+}
+
+/* ---- Opening a bike from the co-pilot (spec 7.1 "Bikes"): #bike-details=<id>&back=<screen>[&section=look] ---- */
+const BIKE_BACKS={trip:['/#/trip','backTrip'],tools:['/#/tools','backTools'],you:['/#/you','backYou'],tyre:['/#/tools/tyre','backTyre']};
+function bikeDetailsLink(hash){
+  const m=/^#bike-details=([^&]*)((?:&[a-z]+=[^&]*)*)$/.exec(String(hash||''));
+  if(!m)return null;
+  const params={};for(const part of m[2].split('&').filter(Boolean)){const [k,v]=part.split('=');params[k]=v;}
+  let id;try{id=decodeURIComponent(m[1]);}catch(e){return null;}
+  if(!dataId(id))return null;   // a bike id, or new
+  return {id,back:Object.hasOwn(BIKE_BACKS,params.back) ? params.back : 'you',section:params.section==='look' ? 'look' : 'top'};
+}
+// Opens that bike without applying it to the plan (a saved bike, or the plan's own when the id matches); `new` starts a new one.
+// The fragment is removed after, so a reload or Back does not open it again.
+function openBikeDetailsFromLink(hash=location.hash){
+  const link=bikeDetailsLink(hash);if(!link)return false;
+  try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
+  const saved=BIKE_PROFILES.find(b=>b.id===link.id),plan=S.bikeProfile && S.bikeProfile.id===link.id ? S.bikeProfile : null;
+  const [href,key]=BIKE_BACKS[link.back];
+  $('bikeDetailsBack').href=href;$('bikeDetailsBack').textContent=bikeWord(key);$('bikeDetailsBack').classList.remove('hidden');
+  openBikeDetails($('rigBikeDetails'),link.section==='look' ? 'look' : 'frame');
+  if(plan)fillBikeProfileForm(plan);
+  else if(saved){fillBikeProfileForm(saved);$('bikeSavedSelect').value=saved.id;}
+  else if(link.id==='new' || !S.bikeProfile){fillBikeProfileForm(null);$('bikeSavedSelect').value='';LOOK_NEW=null;}
+  // an id nobody has, with a bike in the plan: the plan's bike, so nothing is lost and nothing new is made
+  else fillBikeProfileForm(S.bikeProfile);
+  renderBikeProfiles();
+  rememberLookOpening();renderLook();
+  if(link.section==='look'){$('bikeLook').scrollIntoView?.({block:'start'});$('bikeLookTitle').focus({preventScroll:true});}
+  return true;
 }
 /* SRAM remains the calculation source; these helpers prepare and retain its inputs/results. */
 const PRESSURE_PSI_PER_BAR=14.503773773;
@@ -3401,7 +3684,9 @@ function openBikeDetails(opener=document.activeElement,section='frame'){
     root.classList.remove('hidden');
     beginDialog(root,true,closeBikeDetails,opener);
     $('bikeDetailsTitle').focus({preventScroll:true});
+    rememberLookOpening();renderLook();
   }
+  if(section==='look'){$('bikeLook').scrollIntoView?.({block:'start'});$('bikeLookTitle').focus({preventScroll:true});}
   if(section==='repair'){
     $('bikeMoreDetails').open=true;
     $('bikeRepairFields').open=true;$('bikeRepairFields').scrollIntoView?.({block:'start'});$('bikeTyres').focus({preventScroll:true});
@@ -3409,6 +3694,8 @@ function openBikeDetails(opener=document.activeElement,section='frame'){
 }
 function closeBikeDetails(){
   const root=$('bikeDetailsBox');if(root.classList.contains('hidden'))return;
+  closeLookPhoto();flushLookPicker();
+  LOOK_CHANGED=false;LOOK_MESSAGE='';$('lookUndo').classList.add('hidden');$('bikeDetailsBack').classList.add('hidden');
   root.classList.add('hidden');endDialog(root);
 }
 function openPressureTool(section='pressure',opener=document.activeElement){
@@ -11674,6 +11961,7 @@ function go(n){
 initialiseStableViewport();
 initialiseBikeProfiles();
 initialisePressureHelper();
+initialiseLook();
 S.month = new Date().getMonth();   // a new plan starts in the month the rider is in, not always in June
 $('month').innerHTML = MONTHS.map((m,i) => `<option value="${i}"${i===S.month?' selected':''}>${m}</option>`).join('');
 DRAFT_BASELINE = JSON.stringify(captureDraft());
@@ -11852,6 +12140,7 @@ window.applyCalibration = applyCalibration;
   renderPackingChecklist();
   initialiseOfflinePacking();
   initialiseWalkthrough(recovered || SETUPS.length>0);
+  openBikeDetailsFromLink();
 })();
 
 applyTheme(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
