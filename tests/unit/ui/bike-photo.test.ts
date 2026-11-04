@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { hexToOklab, oklabMedian } from '../../../src/core/bike/colour.ts';
-import { colourAt, fitSize, PATCH, patchAt } from '../../../src/ui/bike-photo/picker.ts';
+import { colourAt, drawLoupe, fitSize, PATCH, patchAt, patchOrigin } from '../../../src/ui/bike-photo/picker.ts';
 
 const deltaE = (a: string, b: string): number => {
   const [p, q] = [hexToOklab(a), hexToOklab(b)];
@@ -59,4 +59,26 @@ describe('the colour a tap gives', () => {
     expect(code).toContain('URL.revokeObjectURL');
     expect(source).not.toMatch(/capture=/);
   });
+
+  test('[LC-PHOTO-MEDIAN] the magnifier shows exactly the 15 x 15 pixels that are read, outlined whole', () => {
+    const calls: [string, ...number[]][] = [];
+    const ctx = {
+      imageSmoothingEnabled: true, strokeStyle: '', lineWidth: 0,
+      clearRect: (...a: number[]) => calls.push(['clearRect', ...a]),
+      drawImage: (_src: unknown, ...a: number[]) => calls.push(['drawImage', ...a]),
+      strokeRect: (...a: number[]) => calls.push(['strokeRect', ...a]),
+    };
+    for (const [x, y] of [[105, 55], [2, 3], [639, 479]] as const) {
+      calls.length = 0;
+      drawLoupe(ctx as unknown as CanvasRenderingContext2D, {} as CanvasImageSource, 640, 480, x, y, 90);
+      const [x0, y0] = patchOrigin(640, 480, x, y);
+      expect(calls.find((c) => c[0] === 'drawImage')!.slice(1)).toEqual([x0, y0, PATCH, PATCH, 0, 0, 90, 90]);
+      expect(calls.find((c) => c[0] === 'strokeRect')!.slice(1)).toEqual([1, 1, 88, 88]);
+      expect(ctx.imageSmoothingEnabled).toBe(false);
+      // the same square patchAt reads
+      const data = photo(640, 480, (px, py) => (px === x0 && py === y0 ? '#ffffff' : '#000000'));
+      expect(Array.from(patchAt(data, 640, 480, x, y).slice(0, 3))).toEqual([255, 255, 255]);
+    }
+  });
 });
+

@@ -22,10 +22,14 @@ export type PickerOptions = {
 export type Picker = { close: () => void; root: HTMLElement };
 
 /** The 15 x 15 pixels around (x, y), clamped to the image; the photo's colour elsewhere never counts. */
-export function patchAt(data: Uint8ClampedArray, width: number, height: number, x: number, y: number): Uint8ClampedArray {
+/** The top left corner of the 15 x 15 square read around (x, y), kept inside the image. */
+export function patchOrigin(width: number, height: number, x: number, y: number): [number, number] {
   const half = (PATCH - 1) / 2;
-  const x0 = Math.max(0, Math.min(width - PATCH, Math.round(x) - half));
-  const y0 = Math.max(0, Math.min(height - PATCH, Math.round(y) - half));
+  return [Math.max(0, Math.min(width - PATCH, Math.round(x) - half)), Math.max(0, Math.min(height - PATCH, Math.round(y) - half))];
+}
+
+export function patchAt(data: Uint8ClampedArray, width: number, height: number, x: number, y: number): Uint8ClampedArray {
+  const [x0, y0] = patchOrigin(width, height, x, y);
   const w = Math.min(PATCH, width);
   const h = Math.min(PATCH, height);
   const out = new Uint8ClampedArray(w * h * 4);
@@ -39,6 +43,17 @@ export function patchAt(data: Uint8ClampedArray, width: number, height: number, 
 /** The frame's colour at a tap: the lightest and darkest fifth dropped (gloss, shadow, cables), the median of the rest. */
 export function colourAt(data: Uint8ClampedArray, width: number, height: number, x: number, y: number): string | null {
   return oklabMedian(patchAt(data, width, height, x, y));
+}
+
+/** The magnifier: exactly the 15 x 15 pixels the colour is read from, drawn `size` px wide without smoothing and outlined whole. */
+export function drawLoupe(ctx: CanvasRenderingContext2D, source: CanvasImageSource, width: number, height: number, x: number, y: number, size: number): void {
+  const [x0, y0] = patchOrigin(width, height, x, y);
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, size, size);
+  ctx.drawImage(source, x0, y0, PATCH, PATCH, 0, 0, size, size);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, size - 2, size - 2);
 }
 
 /** The size the photo is drawn at: its long side at most 640 px, never enlarged. */
@@ -143,16 +158,9 @@ export function openPicker(host: HTMLElement, options: PickerOptions): Picker {
     const x = ((clientX - r.left) / (r.width || 1)) * canvas.width;
     const y = ((clientY - r.top) / (r.height || 1)) * canvas.height;
     const hex = colourAt(pixels.data, pixels.width, pixels.height, x, y);
-    // the magnifier: the spot, nine times as large, the 15 x 15 square that was read outlined
+    // the magnifier shows the very square the colour comes from
     const lctx = loupe.getContext('2d');
-    if (lctx) {
-      lctx.imageSmoothingEnabled = false;
-      lctx.clearRect(0, 0, loupe.width, loupe.height);
-      lctx.drawImage(canvas, x - 5, y - 5, 10, 10, 0, 0, loupe.width, loupe.height);
-      lctx.strokeStyle = '#ffffff';
-      lctx.lineWidth = 2;
-      lctx.strokeRect(loupe.width / 2 - 13, loupe.height / 2 - 13, 26, 26);
-    }
+    if (lctx) drawLoupe(lctx, canvas, canvas.width, canvas.height, x, y, loupe.width);
     loupe.style.left = `${Math.max(0, Math.min(r.width - 90, clientX - r.left - 45))}px`;
     loupe.style.top = `${Math.max(0, clientY - r.top - 110)}px`;
     showPicked(hex);

@@ -60,4 +60,21 @@ describe('the drawing set drawn by both pages', () => {
       expect(page.run(`bikeDrawing(${JSON.stringify(entry.bike)}, ${JSON.stringify(entry.bags)}, { theme:'light' }).svg`), entry.name).toBe(mine);
     }
   }, 60_000);
+
+  test('[C-DRAWING-SET] the preview Bike details shows is drawn through the same path: each entry in it equals bikeArt here', () => {
+    page.run('DRAFT_READY=true;S.step=1');
+    let n = 0;
+    for (const entry of drawingSet()) {
+      if (entry.bags !== null || n > 300) continue;
+      page.run(`S.bikeProfile=normaliseBikeProfile(${JSON.stringify(entry.bike)});fillBikeProfileForm(S.bikeProfile);renderLook();`);
+      const shown = page.run("document.getElementById('lookPreview').innerHTML") as string;
+      expect(shown, entry.name).toBe(bikeArt(resolveBikeSpec(entry.bike, null), null, { theme: 'dark' }).svg);
+      n += 1;
+    }
+    expect(n).toBeGreaterThan(100);
+    // the page draws its preview with bikeDrawing, the function the drawing set checks
+    const source = page.run('renderLook.toString()') as string;
+    expect(source).toContain('bikeDrawing(');
+  });
 });
+

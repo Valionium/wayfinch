@@ -1530,7 +1530,9 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .look-picker input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 .look-status{margin:4px 0;font-size:13px;color:var(--muted);min-height:1.2em}
 #lookUndo{min-height:44px}
-.look-chip.hidden,.bike-look.hidden,#lookUndo.hidden,#bikeDetailsBack.hidden{display:none}
+.look-chip.hidden,.bike-look.hidden,#lookUndo.hidden,#bikeDetailsBack.hidden,#bikeSwapUndo.hidden,#bikeUseShown.hidden,.bike-swap.hidden{display:none}
+.bike-swap{margin:6px 0;font-size:14px}
+#bikeSwapUndo,#bikeUseShown{min-height:44px}
 #bikeLook .look-picker input[type=color]{min-height:24px;min-width:24px;height:24px}
 #bikeDetailsBack{margin-top:2px}
 /* From a photo (spec 7.4): the photo stays on the phone, drawn into a canvas the rider taps; a magnifier shows the spot. */
@@ -1985,6 +1987,8 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         <fieldset class="fit-sizes"><legend>Frame size</legend><div id="fitSizeChips"></div></fieldset>
         <div class="fit-quick-result" id="fitQuickResult" role="status" aria-live="polite"></div>
         <div class="bike-profile-status" id="bikeProfileStatus" role="status" aria-live="polite"></div>
+        <p class="bike-swap hidden" id="bikeSwapNote" role="status"></p>
+        <div class="bike-profile-actions"><button class="linky hidden" id="bikeSwapUndo" type="button"></button><button class="go small hidden" id="bikeUseShown" type="button"></button></div>
       </section>
       <section class="bike-look" id="bikeLook" aria-labelledby="bikeLookTitle">
         <h3 id="bikeLookTitle" tabindex="-1">Look</h3>
@@ -2913,6 +2917,11 @@ const BIKE_WORDING={
   photoLoupe:{text:'The spot you tapped, close up'},
   photoFailed:{text:'This photo could not be opened. Try another one.'},
   photoNote:{text:'The photo stays on your phone: it is not sent anywhere and not kept.'},
+  swapNote:{text:'This plan now uses the new bike. {name} was only in this plan, so it is kept: Undo brings it back.'},
+  swapUndo:{text:'Undo: bring back {name}'},
+  swapUndone:{text:'{name} is back in this plan, as it was.'},
+  useShown:{text:'Use this bike for this plan'},
+  usingShown:{text:'Using {name} for this plan.'},
   backTrip:{text:'Back to Trip'},backTools:{text:'Back to Tools'},backYou:{text:'Back to You'},backTyre:{text:'Back to Tyre pressure'}
 };
 const bikeWord=(key,values={})=>BIKE_WORDING[key].text.replace(/\{(\w+)\}/g,(m,k)=>values[k]??m);
@@ -2973,7 +2982,8 @@ function updateFitQuick(){
 function fitQuickChanged(){
   updateFitQuick();
   if(!fitQuickState().size && fitQuickState().style==='unknown')return;   // nothing chosen: nothing to apply
-  Promise.resolve(applyPressureBikeDetails()).catch(()=>{});
+  // A bike opened from the co-pilot is that bike only: its taps save to it, never to the plan (sub-project 6 review, C1 and I1).
+  Promise.resolve(linkHoldsBike() ? saveShownBike() : applyPressureBikeDetails()).catch(()=>{});
 }
 function quickPickStyle(style){
   setFitFormStyle(style);$('fitTopTubeField').classList.toggle('hidden',style==='step-through');
@@ -3052,6 +3062,7 @@ function maxWeightIssue(maxWeight){
 }
 function fillBikeProfileForm(value){
   const p=normaliseBikeProfile(value);
+  LOOK_NEW=null;   // a look chosen for an earlier new bike never carries over to the next
   BIKE_PROFILE_EDITOR_ID=p?.id || '';
   let newName='My bike',suffix=2;
   while(BIKE_PROFILES.some(b=>b.name===newName))newName='My bike '+suffix++;
@@ -3138,11 +3149,24 @@ function renderBikeProfiles(force=false){
   $('bikeClear').disabled=!ready || !S.bikeProfile;
   ['bikeRemoveConfirm','bikeRemoveCancel'].forEach(id=>$(id).disabled=!ready);
   $('bikeProfileStatus').textContent=BIKE_PROFILE_MESSAGE;
+  const swap=liveBikeSwap();
+  $('bikeSwapNote').textContent=swap ? bikeWord('swapNote',{name:swap.prev.name}) : '';
+  $('bikeSwapNote').classList.toggle('hidden',!swap);
+  $('bikeSwapUndo').textContent=swap ? bikeWord('swapUndo',{name:swap.prev.name}) : '';
+  $('bikeSwapUndo').classList.toggle('hidden',!swap);
+  $('bikeUseShown').textContent=bikeWord('useShown');
+  $('bikeUseShown').classList.toggle('hidden',!linkHoldsBike() || !BIKE_PROFILE_EDITOR_ID);
+  $('bikeUseShown').disabled=!ready;
   renderBikeKitSummary();
   renderPressureHelper();
 }
 function useBikeProfile(value){
-  S.bikeProfile=normaliseBikeProfile(value);
+  // A plan bike that is in no saved list would be gone for good: keep it, with the kit choices it set, so Undo brings it back.
+  const was=S.bikeProfile ? normaliseBikeProfile(S.bikeProfile) : null,next=normaliseBikeProfile(value);
+  if(was && (!next || next.id!==was.id) && !BIKE_PROFILES.some(b=>b.id===was.id)){
+    BIKE_SWAPS.push({prev:was,kit:{...S.kit},newId:next ? next.id : null});BIKE_SWAPS.splice(0,Math.max(0,BIKE_SWAPS.length-5));
+  }
+  S.bikeProfile=next;
   applyTripKitDefaults();
   queueDraftSave();
   renderBikeProfiles(true);renderPressureHelper();renderKit();if(S.step===4)renderResult();drawRig();
@@ -3198,12 +3222,13 @@ async function saveBikeProfile(event){
   if(index<0 && BIKE_PROFILES.length>=MAX_BIKE_PROFILES){BIKE_PROFILE_MESSAGE='You have 20 saved bikes. Update or remove one before adding another.';renderBikeProfiles();return false;}
   BIKE_PROFILE_BUSY=true;BIKE_PROFILE_MESSAGE='Saving bike…';
   if(index<0)BIKE_PROFILES.push(p);else BIKE_PROFILES[index]=p;
-  useBikeProfile(p);
-  let librarySaved=false,currentSaved=false;
-  try{librarySaved=await bikeStoreSet(BIKE_PROFILE_KEY,BIKE_PROFILES.map(normaliseBikeProfile));currentSaved=await persistBikeProfileSelection();}
+  const keepPlan=linkHoldsBike();   // opened from the co-pilot: saved, and the plan keeps its own bike
+  if(keepPlan){BIKE_PROFILE_EDITOR_ID=p.id;LOOK_NEW=null;}else useBikeProfile(p);
+  let librarySaved=false,currentSaved=keepPlan;
+  try{librarySaved=await bikeStoreSet(BIKE_PROFILE_KEY,BIKE_PROFILES.map(normaliseBikeProfile));if(!keepPlan)currentSaved=await persistBikeProfileSelection();}
   catch(e){}
   BIKE_PROFILE_BUSY=false;
-  BIKE_PROFILE_MESSAGE=!librarySaved ? 'Using this bike. The saved-bike list is kept for this session only; Export to keep it.' : !currentSaved ? 'Bike saved. The current bike selection could not be stored; check the working-plan save status or Export before closing.' : `Saved ${p.name} and using it for this plan.`;
+  BIKE_PROFILE_MESSAGE=keepPlan && librarySaved ? bikeWord('lookSavedBike',{name:p.name}) : !librarySaved ? 'Using this bike. The saved-bike list is kept for this session only; Export to keep it.' : !currentSaved ? 'Bike saved. The current bike selection could not be stored; check the working-plan save status or Export before closing.' : `Saved ${p.name} and using it for this plan.`;
   renderBikeProfiles();return librarySaved && currentSaved;
 }
 async function chooseSavedBike(){
@@ -3238,7 +3263,7 @@ function initialiseBikeProfiles(){
   $('bikeSavedSelect').onchange=()=>{const p=BIKE_PROFILES.find(b=>b.id===$('bikeSavedSelect').value);if(p){fillBikeProfileForm(p);BIKE_PROFILE_MESSAGE=`Details shown for ${p.name}. Choose Use saved bike, or update and use it after editing.`;}$('bikeRemovePrompt').classList.add('hidden');renderBikeProfiles();};
   $('bikeUseSaved').onclick=chooseSavedBike;
   $('bikeClear').onclick=clearBikeProfile;
-  $('bikeNew').onclick=()=>{fillBikeProfileForm(null);$('bikeSavedSelect').value='';$('bikeRemovePrompt').classList.add('hidden');BIKE_PROFILE_MESSAGE='Enter another bike, then use its details or save it for next time. Your current plan keeps its bike until you apply the change.';renderBikeProfiles();$('bikeName').focus({preventScroll:true});};
+  $('bikeNew').onclick=startNewBike;
   $('bikeDrive').onchange=bikeProfileFieldVisibility;
   $('bikeRemove').onclick=()=>{const p=BIKE_PROFILES.find(b=>b.id===$('bikeSavedSelect').value);if(!p)return;$('bikeRemoveQuestion').textContent=`Remove ${p.name} from saved bikes? Plans using it keep their own copy.`;$('bikeRemovePrompt').classList.remove('hidden');};
   $('bikeRemoveCancel').onclick=()=>{$('bikeRemovePrompt').classList.add('hidden');$('bikeRemove').focus({preventScroll:true});};
@@ -3247,7 +3272,68 @@ function initialiseBikeProfiles(){
 }
 /* ---- Look (spec 7.4 "Look", 3.7): colour, handlebar and e-bike. One tap each, shown at once on the drawing above and, for the
    plan's bike, on the rig behind; nothing is required, every choice goes back to Not set, and Undo restores the opening look. ---- */
-let LOOK_OPENING=null,LOOK_CHANGED=false,LOOK_NEW=null,LOOK_MESSAGE='',LOOK_PICKER_TIMER=null,LOOK_RETRY=null;
+let LOOK_OPENING=null,LOOK_CHANGED=false,LOOK_NEW=null,LOOK_MESSAGE='',LOOK_PICKER_TIMER=null,LOOK_RETRY=null,LOOK_CREATING=false;
+// LINK_BIKE: Bike details was opened from the co-pilot. BIKE_SWAPS: plan bikes in no saved list that a tap replaced, newest last.
+let LINK_BIKE=false;const BIKE_SWAPS=[];
+// A bike opened from the co-pilot (#bike-details=...) is that bike only while it is not the plan's: no tap in it changes the plan's bike.
+function linkHoldsBike(){return LINK_BIKE && !(BIKE_PROFILE_EDITOR_ID && S.bikeProfile && S.bikeProfile.id===BIKE_PROFILE_EDITOR_ID);}
+// The replaced bike Undo can bring back: only while the plan still uses the bike that replaced it.
+function liveBikeSwap(){
+  const s=BIKE_SWAPS[BIKE_SWAPS.length-1];
+  return s && ((S.bikeProfile && s.newId===S.bikeProfile.id) || (!S.bikeProfile && s.newId===null)) ? s : null;
+}
+// Brings back the plan bike a tap replaced, with its look and the kit choices it set: the plan as it was.
+function undoBikeSwap(){
+  const s=liveBikeSwap();if(!s || BIKE_PROFILE_BUSY)return false;
+  BIKE_SWAPS.pop();
+  S.bikeProfile=normaliseBikeProfile(s.prev);S.kit={...s.kit};
+  queueDraftSave();persistBikeProfileSelection();
+  BIKE_PROFILE_MESSAGE=bikeWord('swapUndone',{name:s.prev.name});
+  renderBikeProfiles(true);renderPressureHelper();renderKit();if(S.step===4)renderResult();drawRig();
+  rememberLookOpening();renderLook();
+  return true;
+}
+// Saves the bike shown to the saved bikes, not to the plan: a bike opened from the co-pilot, or a new one started there.
+async function saveShownBike(){
+  if(!DRAFT_READY)return false;
+  if(BIKE_PROFILE_BUSY){clearTimeout(LOOK_RETRY);LOOK_RETRY=setTimeout(saveShownBike,60);return false;}
+  const issue=bikeEditorIssue();if(issue){BIKE_PROFILE_MESSAGE=issue;renderBikeProfiles();return false;}
+  const p=readBikeProfileEditor();if(!p)return false;
+  const i=BIKE_PROFILES.findIndex(b=>b.id===p.id);
+  if(i<0 && BIKE_PROFILES.length>=MAX_BIKE_PROFILES){BIKE_PROFILE_MESSAGE='You have 20 saved bikes. Update or remove one before adding another.';renderBikeProfiles();return false;}
+  if(i<0)BIKE_PROFILES.push(p);else BIKE_PROFILES[i]=p;
+  if(LOOK_OPENING && LOOK_OPENING.forId==='')LOOK_OPENING.forId=p.id;   // the new bike's first tap: Undo stays with it
+  BIKE_PROFILE_EDITOR_ID=p.id;LOOK_NEW=null;
+  BIKE_PROFILE_MESSAGE=bikeWord('lookSavedBike',{name:p.name});
+  BIKE_PROFILE_BUSY=true;renderBikeProfiles();
+  let ok=false;try{ok=await persistSavedBikes();}catch(e){}
+  BIKE_PROFILE_BUSY=false;
+  if(!ok && BIKE_PROFILE_MESSAGE!==BIKE_NEWER_MESSAGE)BIKE_PROFILE_MESSAGE='Saved for this session only; Export to keep it.';
+  if($('bikeSavedSelect'))$('bikeSavedSelect').value=p.id;
+  renderBikeProfiles();renderLook();return ok;
+}
+// The plain way, from a link, to put the bike shown on the plan.
+async function useShownBike(){
+  if(BIKE_PROFILE_BUSY || !DRAFT_READY)return false;
+  const issue=bikeEditorIssue();if(issue){BIKE_PROFILE_MESSAGE=issue;renderBikeProfiles();return false;}
+  const p=readBikeProfileEditor();if(!p)return false;
+  const i=BIKE_PROFILES.findIndex(b=>b.id===p.id);
+  if(i<0 && BIKE_PROFILES.length>=MAX_BIKE_PROFILES){BIKE_PROFILE_MESSAGE='You have 20 saved bikes. Update or remove one before adding another.';renderBikeProfiles();return false;}
+  if(i<0)BIKE_PROFILES.push(p);else BIKE_PROFILES[i]=p;
+  BIKE_PROFILE_BUSY=true;useBikeProfile(p);
+  let ok=false;try{ok=await persistSavedBikes();ok=(await persistBikeProfileSelection()) && ok;}catch(e){}
+  BIKE_PROFILE_BUSY=false;
+  BIKE_PROFILE_MESSAGE=ok ? bikeWord('usingShown',{name:p.name}) : 'Using this bike for this session. Check the working-plan save status or Export before closing.';
+  renderBikeProfiles();rememberLookOpening();renderLook();return ok;
+}
+// New bike, in Bike details: an empty form, and a fresh start for Undo.
+function startNewBike(){
+  fillBikeProfileForm(null);$('bikeSavedSelect').value='';$('bikeRemovePrompt').classList.add('hidden');
+  BIKE_PROFILE_MESSAGE='Enter another bike, then use its details or save it for next time. Your current plan keeps its bike until you apply the change.';
+  renderBikeProfiles();rememberLookOpening();renderLook();$('bikeName').focus({preventScroll:true});
+}
+// The flags a fragment can carry, read exactly: #dev, #quiet, or both joined with &. A bike id never counts as one.
+function hashFlags(hash){const parts=String(hash||'').replace(/^#/,'').split('&');return {dev:parts.includes('dev'),quiet:parts.includes('quiet')};}
 let LOOK_PREVIEW=null,LOOK_PHOTO=null;   // a colour tapped on a photo, shown on the drawing until it is used; the open photo picker
 const LOOK_BARS=[['drop','lookDrop'],['flat','lookFlat'],['other','lookOther'],['','lookNotSet']];
 const LOOK_EBIKE=[['true','lookYes'],['false','lookNo'],['','lookNotSet']];
@@ -3259,8 +3345,14 @@ function lookTarget(){
   return saved ? {kind:'saved',bike:saved} : {kind:'new',bike:null};
 }
 function currentLook(){const t=lookTarget();return normaliseLook(t.bike ? t.bike.look : LOOK_NEW);}
-// The look the dialog opened with, kept until it closes or shows another bike.
-function rememberLookOpening(){LOOK_OPENING=currentLook();LOOK_CHANGED=false;LOOK_MESSAGE='';}
+// The look the dialog opened with, for the bike it was opened for: Undo restores it on that bike only.
+function rememberLookOpening(){LOOK_OPENING={forId:BIKE_PROFILE_EDITOR_ID,look:currentLook()};LOOK_CHANGED=false;LOOK_MESSAGE='';}
+// Another bike shown (Use no bike, another tab, a restored plan): its own fresh start, so Undo never writes on the wrong bike.
+function followShownBike(){
+  if(!LOOK_OPENING || LOOK_OPENING.forId===BIKE_PROFILE_EDITOR_ID)return;
+  if(LOOK_CREATING && LOOK_OPENING.forId===''){LOOK_OPENING.forId=BIKE_PROFILE_EDITOR_ID;LOOK_CREATING=false;return;}
+  const message=LOOK_MESSAGE;rememberLookOpening();LOOK_MESSAGE=message;
+}
 function lookSwatches(){const B=bikeModule();return B ? B.SWATCHES : [];}
 
 function renderLookChoices(){
@@ -3291,9 +3383,10 @@ function renderLook(){
   if(!B)return;
   $('lookPhoto').classList.remove('hidden');
   $('lookPhoto').setAttribute('aria-expanded',String(!!LOOK_PHOTO));
+  followShownBike();
   const t=lookTarget(),look=currentLook()||{colour:null,bars:null,ebike:null},bike=lookPreviewBike();
-  const view=t.kind==='plan' ? planBagView() : null,spec=B.resolveBikeSpec(B.normaliseBike(bike),view),guess=[];
-  box.innerHTML=B.bikeArt(spec,view,{theme:bikeTheme()}).svg;
+  const view=t.kind==='plan' ? planBagView() : null,art=bikeDrawing(bike,view,{theme:bikeTheme()}),spec=art.spec,guess=[];
+  box.innerHTML=art.svg;   // drawn by bikeDrawing, the function the drawing-set check covers
   if(!look.bars)guess.push(bikeWord('lookGuessBars',{value:spec.bars.value}));
   if(look.ebike===null)guess.push(bikeWord('lookGuessEbike',{value:spec.ebike.value ? 'yes' : 'no'}));
   $('lookGuess').textContent=guess.join(' · ');
@@ -3306,7 +3399,8 @@ function renderLook(){
   if(look.colour && document.activeElement!==$('lookPicker'))$('lookPicker').value=look.colour;
   const ready=typeof DRAFT_READY!=='undefined' && DRAFT_READY;
   if(LOOK_READY!==ready){LOOK_READY=ready;document.querySelectorAll?.('#bikeLook input').forEach(i=>{i.disabled=!ready;});}
-  $('lookUndo').classList.toggle('hidden',!LOOK_CHANGED);
+  const swap=liveBikeSwap();
+  $('lookUndo').classList.toggle('hidden',!LOOK_CHANGED && !(swap && BIKE_PROFILE_EDITOR_ID===swap.newId));
   $('lookStatus').textContent=LOOK_MESSAGE;
 }
 // One write chain with the plan's bike, so a burst of taps lands in the order it was tapped, under the format guard.
@@ -3324,7 +3418,11 @@ function writeLook(look,store=true){
   if(t.kind==='new'){
     LOOK_NEW=next;
     if(!store || !DRAFT_READY)return;
+    // From a link the new bike goes to the saved bikes; in the page it starts as a frame-picture tap does, the plan bike it
+    // replaces kept for Undo.
+    if(linkHoldsBike()){saveShownBike().catch(()=>{});return;}
     if(BIKE_PROFILE_BUSY){clearTimeout(LOOK_RETRY);LOOK_RETRY=setTimeout(()=>writeLook(currentLook()),60);return;}
+    LOOK_CREATING=true;
     Promise.resolve(applyPressureBikeDetails()).then(()=>renderLook()).catch(()=>{});
     return;
   }
@@ -3355,12 +3453,18 @@ function setLook(change,store=true){
   if(typeof DRAFT_READY!=='undefined' && !DRAFT_READY)return;
   if(LOOK_PHOTO && 'colour' in change)closeLookPhoto();   // a swatch or the picker ends the photo
   writeLook({...(currentLook()||{colour:null,bars:null,ebike:null}),...change},store);
-  LOOK_CHANGED=JSON.stringify(currentLook())!==JSON.stringify(LOOK_OPENING);
+  followShownBike();
+  LOOK_CHANGED=JSON.stringify(currentLook())!==JSON.stringify(LOOK_OPENING.look);
   renderLook();
 }
+// Undo: the replaced plan bike when a tap swapped it, else the look of the bike Bike details opened with, on that bike only.
 function undoLook(){
   clearTimeout(LOOK_PICKER_TIMER);LOOK_PICKER_TIMER=null;
-  writeLook(LOOK_OPENING);LOOK_CHANGED=false;LOOK_MESSAGE=bikeWord('lookUndone');renderLook();
+  const swap=liveBikeSwap();
+  if(swap && BIKE_PROFILE_EDITOR_ID===swap.newId){undoBikeSwap();$('bikeLookTitle').focus({preventScroll:true});return;}
+  followShownBike();
+  if(!LOOK_CHANGED || LOOK_OPENING.forId!==BIKE_PROFILE_EDITOR_ID){LOOK_CHANGED=false;renderLook();return;}
+  writeLook(LOOK_OPENING.look);LOOK_CHANGED=false;LOOK_MESSAGE=bikeWord('lookUndone');renderLook();
   $('lookUndo').classList.add('hidden');$('bikeLookTitle').focus({preventScroll:true});
 }
 // The phone's own picker paints while it moves and stores once it settles; closing the dialog stores what is left.
@@ -3385,7 +3489,8 @@ function initialiseLook(){
   $('lookPhoto').onclick=openLookPhoto;
   // Another bike shown is a fresh start for Undo.
   $('bikeSavedSelect').addEventListener('change',()=>{rememberLookOpening();renderLook();});
-  $('bikeNew').addEventListener('click',()=>{LOOK_NEW=null;rememberLookOpening();renderLook();});
+  $('bikeSwapUndo').onclick=()=>{undoBikeSwap();$('bikeDetailsTitle').focus({preventScroll:true});};
+  $('bikeUseShown').onclick=useShownBike;
   renderLook();
 }
 
@@ -3441,6 +3546,7 @@ function openBikeDetailsFromLink(hash=location.hash){
   const [href,key]=BIKE_BACKS[link.back];
   $('bikeDetailsBack').href=href;$('bikeDetailsBack').textContent=bikeWord(key);$('bikeDetailsBack').classList.remove('hidden');
   openBikeDetails($('rigBikeDetails'),link.section==='look' ? 'look' : 'frame');
+  LINK_BIKE=true;
   if(plan)fillBikeProfileForm(plan);
   else if(saved){fillBikeProfileForm(saved);$('bikeSavedSelect').value=saved.id;}
   else if(link.id==='new' || !S.bikeProfile){fillBikeProfileForm(null);$('bikeSavedSelect').value='';LOOK_NEW=null;}
@@ -3697,7 +3803,8 @@ function openBikeDetails(opener=document.activeElement,section='frame'){
 function closeBikeDetails(){
   const root=$('bikeDetailsBox');if(root.classList.contains('hidden'))return;
   closeLookPhoto();flushLookPicker();
-  LOOK_CHANGED=false;LOOK_MESSAGE='';$('lookUndo').classList.add('hidden');$('bikeDetailsBack').classList.add('hidden');
+  LOOK_CHANGED=false;LOOK_MESSAGE='';LINK_BIKE=false;$('lookUndo').classList.add('hidden');$('bikeDetailsBack').classList.add('hidden');
+  $('bikeUseShown').classList.add('hidden');
   root.classList.add('hidden');endDialog(root);
 }
 function openPressureTool(section='pressure',opener=document.activeElement){
@@ -7341,14 +7448,15 @@ function nightsNote(from, to){
 /* ---- The bike drawing: shapes, fills, layout, hit targets ---- */
 
 // The bike itself comes from /tools/bags/bike.js (spec 7.4), the module the app draws with, so both show the same bike.
-// Without it (a page opened on its own) nothing here throws: the rig shows its bags and the lists still work.
+// Without it (a page opened on its own, or the script missing) the rig falls back to today's plain drawing and its fixed places
+// (RIG_FALLBACK below), so every bag, spot and tap target is still there.
 function bikeModule(){ return window.WayfinchBike || null; }
 function bikeTheme(){ return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; }
 // One bike with a plan's bags in Contract 1's shape ({items, decks, bottles}, or null), as the app draws it.
 function bikeDrawing(profile, view, options){
   const B = bikeModule(); if(!B) return null;
   const spec = B.resolveBikeSpec(B.normaliseBike(profile), view || null);
-  return B.bikeArt(spec, view || null, options || { theme:bikeTheme() });
+  return { ...B.bikeArt(spec, view || null, options || { theme:bikeTheme() }), spec };
 }
 
 function inspectMap(){ return INSPECT; }
@@ -7403,13 +7511,40 @@ function planBagView(){
 // The page draws the bags, tags and tap targets from the anchors, where the bike says they go. Which mounts exist is bikeFit's,
 // the one frame-fit rule the plan uses, so a spot is offered exactly where a bag can go.
 function rigArt(){
-  const B = bikeModule(); if(!B) return null;
+  const B = bikeModule(); if(!B) return RIG_FALLBACK;
   const fit = bikeFit(S.bikeProfile), view = planBagView();
   const spec = { ...B.resolveBikeSpec(B.normaliseBike(S.bikeProfile), view),
     mounts:{ st:!!fit.cages.st, dt:!!fit.cages.dt, un:!!fit.cages.un, top:!!(fit.topMounts.front || fit.topMounts.rear), frame:!fit.frameBag.none } };
   return B.bikeArt(spec, null, { theme:bikeTheme(), idPrefix:'rig' });
 }
 function rigAnchors(){ const r = rigArt(); return r ? r.anchors : null; }
+
+// Today's drawing, for a page without bike.js: the plain outline and the fixed places it always had, in bike.js's anchor shape.
+const RIG_FALLBACK = (() => {
+  const TT = x => 52 + (x-127)*(44-52)/(189-127);   // the old top tube's height at x
+  const box = (x, y, w, h) => ({ x, y, w, h, rot:0 });
+  const rect = (key, x, y, w, h) => ({ key, kind:'rect', box:{ x, y, w, h } });
+  const shapes = ['132,57 184,50 147,97', '132,57 184,50 164,75 139,75', '132,57 184,50 171,66 136,66', '132,57 184,50 171,66 136,66'];
+  const boxes = [{x:132,y:50,w:52,h:47}, {x:132,y:50,w:52,h:25}, {x:132,y:50,w:52,h:16}, {x:132,y:50,w:52,h:16}];
+  const bottles = { st:{ cx:142, cy:81, rot:-16.5 }, dt:{ cx:161, cy:79, rot:47.3 }, un:{ cx:162, cy:99, rot:47.3 } };
+  const anchors = {
+    scale:0.11, points:{ bb:[143,106], rear:[95,98], front:[212,98], seatTop:[127,52], headTop:[189,44], headBottom:[194,59], saddle:[124,36], bar:[197,40] },
+    wheels:{ rear:{ cx:95, cy:98, r:40 }, front:{ cx:212, cy:98, r:40 } }, tubes:{ top:[[127,52],[189,44]], low:null, twin:null, shock:null },
+    seat:box(68,31,46,17), bar:box(184,20,30,18), top:{ front:box(155,TT(167.5)-10,25,10), rear:box(128,TT(140.5)-10,25,10) },
+    frame:{ shapes, boxes }, fork:box(199,65,12,22), rack:box(70,75,46,27), rackTop:box(69,52,48,6), barDeck:box(215,22,13,16), pack:box(8,24,29,34),
+    bottles,
+    hits:[rect('seat',58,24,64,36), rect('bar',186,10,42,38), rect('fork',190,56,30,42), rect('rack',58,66,66,44), rect('pack',2,14,44,54),
+      rect('top:front',154,26,31,24), rect('top:rear',123,28,29,22), rect('rackTop',64,47,58,16), rect('barDeck',210,17,23,26),
+      { key:'frame', kind:'poly', box:boxes[0], pts:shapes[0] },
+      ...Object.entries(bottles).map(([k, b]) => ({ key:'bottle:'+k, kind:'circle', box:{ x:b.cx-9, y:b.cy-9, w:18, h:18 }, circle:{ cx:b.cx, cy:b.cy, r:9 } }))],
+    tags:{ top:[156,30], bar:[199,14], frame:[161,121], seat:[91,24], fork:[216,74], rack:[93,120], pack:[22,18] },
+  };
+  const svg = '<circle class="bg-wheel" cx="95" cy="98" r="40"/><circle class="bg-wheel" cx="212" cy="98" r="40"/>'
+    + '<path class="bg-line" d="M143,106 L127,52 M143,106 L194,59 M127,52 L189,44 M189,44 L194,59 M194,59 L212,98 M143,106 L95,98 M127,52 L95,98"/>'
+    + '<path class="bg-line" d="M127,52 L123,38 M110,36 h29 M189,44 L197,40 M190,40 h16"/>'
+    + '<circle cx="143" cy="106" r="3.5" fill="var(--line)"/>';
+  return Object.freeze({ svg, anchors, label:'' });
+})();
 
 const r2 = n => Math.round(n * 100) / 100;
 // A place from the anchors as the page's bag shape: a rectangle, or, when it is turned with its tube, its corners as a polygon,
@@ -12097,8 +12232,8 @@ document.querySelectorAll('[data-to]').forEach(b => b.onclick = () => go(+b.data
 
 // The poll is on by default now — it is the only route from guessed numbers to
 // measured ones. #quiet in the URL hides it.
-S.pollOn  = !/quiet/.test(location.hash || '');
-S.devMode = /dev/.test(location.hash || '');   // #dev shows the pooled calibration
+S.pollOn  = !hashFlags(location.hash).quiet;
+S.devMode = hashFlags(location.hash).dev;   // #dev shows the pooled calibration; a bike id in #bike-details=... never does
 window.enableFeedback  = () => { S.pollOn = true;  renderResult(); return 'feedback poll on'; };
 window.disableFeedback = () => { S.pollOn = false; renderResult(); return 'feedback poll off'; };
 window.feedbackData    = () => exportFeedback();

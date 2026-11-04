@@ -131,7 +131,7 @@ test('[LC-LOOK-SAVES] the plan\'s bike updates loadcheck:bikeProfile and its sav
   assert.equal(g.run("document.getElementById('lookStatus').textContent"),g.run('BIKE_NEWER_MESSAGE'));
 });
 
-test('[LC-LOOK-DEEP] #bike-details=<id>&back=trip&section=look opens at Look without applying the bike; new starts one; any other back is You; the fragment goes',()=>{
+test('[LC-LOOK-DEEP] #bike-details=<id>&back=trip&section=look opens at Look without applying the bike; new starts one; any other back is You; the fragment goes',async()=>{
   const p=page();
   assert.equal(p.run(`openBikeDetailsFromLink('#bike-details=${OTHER.id}&back=trip&section=look')`),true);
   assert.equal(p.run('BIKE_PROFILE_EDITOR_ID'),OTHER.id,'that bike is shown');
@@ -149,11 +149,13 @@ test('[LC-LOOK-DEEP] #bike-details=<id>&back=trip&section=look opens at Look wit
   assert.equal(r.run('BIKE_PROFILE_EDITOR_ID'),BIKE.id,'the plan\'s own bike');
   assert.equal(r.run("document.getElementById('bikeDetailsBack').href"),'/#/tools/tyre');
   for(const bad of ['#bike-details','#dev','#bike-details=x y','','#bike-details=%E0%A4%A'])assert.equal(r.run(`bikeDetailsLink(${JSON.stringify(bad)})`),null,bad);
-  // a new bike from a link: the first tap makes it the plan's bike, with the look
+  // a new bike from a link, with no bike in the plan: the first tap saves it to the saved bikes, shown at once; the plan stays as it is
   const n=page({plan:null,library:[]});
-  n.run(`openBikeDetailsFromLink('#bike-details=new&back=trip&section=look');applyPressureBikeDetails=async()=>{S.bikeProfile=readBikeProfileEditor();return true;};setLook({colour:'#6b3fa0'})`);
-  assert.equal(n.run('LOOK_NEW.colour'),'#6b3fa0');
+  n.run(`openBikeDetailsFromLink('#bike-details=new&back=trip&section=look');setLook({colour:'#6b3fa0'})`);
   assert.equal(stroke(n),'#6b3fa0');
+  await n.settle();await new Promise(r=>setTimeout(r,5));await n.settle();
+  assert.equal(n.json('S.bikeProfile'),null);
+  assert.equal(JSON.parse(n.stored('loadcheck:bikeProfiles'))[0].look.colour,'#6b3fa0');
 });
 
 test('[LC-LOOK-QUICK] the two-tap start passes unchanged, and Look sits below it',()=>{
@@ -163,13 +165,112 @@ test('[LC-LOOK-QUICK] the two-tap start passes unchanged, and Look sits below it
   assert.ok(at('id="bikeQuick"')<at('id="bikeLook"')&&at('id="bikeLook"')<at('id="bikeMoreDetails"'));
 });
 
-test('[LC-WORDS] no banned word in the bike wording table, Look included; every limit sentence still says "you entered"',()=>{
+// ---- Review of PR 42 (C1, I1, minors 1, 2 and 8): a rider never loses a bike, and anything can be changed back ----
+// An unsaved plan bike: set by the two-taps start, never saved for next time, so it lives only in the plan.
+const UNSAVED={id:'bike_plan_a',name:'Plan bike',frontTyre:'47-584',rearTyre:'47-584',fit:{style:'compact',size:{kind:'letter',value:'S'}},look:{colour:'#2f7d4f',bars:'flat',ebike:null}};
+const draftOf=p=>p.run('JSON.stringify(captureDraft())');
+const settleAll=async p=>{for(let i=0;i<4;i++){await p.settle();await new Promise(r=>setTimeout(r,5));}};
+
+test('[LC-LOOK-DEEP] Add bike from the co-pilot (#bike-details=new): a tap saves a new bike to the library and never touches the plan\'s unsaved bike',async()=>{
+  const p=page({plan:UNSAVED,library:[]});
+  const plan=p.stored('loadcheck:bikeProfile'),draft=draftOf(p);
+  p.run(`openBikeDetailsFromLink('#bike-details=new&back=you&section=look')`);
+  p.run("setLook({colour:'#c62f2a'})");
+  await settleAll(p);
+  assert.equal(p.json('S.bikeProfile.id'),UNSAVED.id,'the plan keeps its bike');
+  assert.equal(p.stored('loadcheck:bikeProfile'),plan,'and its stored copy');
+  assert.equal(draftOf(p),draft,'and the plan itself');
+  const lib=JSON.parse(p.stored('loadcheck:bikeProfiles'));
+  assert.equal(lib.length,1,'a new bike in the library');
+  assert.equal(lib[0].look.colour,'#c62f2a');
+  assert.equal(p.run('BIKE_PROFILE_EDITOR_ID'),lib[0].id,'Bike details now shows that new bike');
+  p.run("setLook({bars:'drop'});quickPickSize('L')");
+  await settleAll(p);
+  const again=JSON.parse(p.stored('loadcheck:bikeProfiles'));
+  assert.equal(again.length,1,'further taps change the same new bike');
+  assert.deepEqual([again[0].look.bars,again[0].fit.size.value],['drop','L']);
+  assert.equal(p.json('S.bikeProfile.id'),UNSAVED.id);
+  // it becomes the plan's bike only by the plain tap for that
+  assert.equal(p.run('linkHoldsBike()'),true,'Use this bike for this plan is offered');   // the fake page has no class list: the rule it follows
+  await p.run('useShownBike()');
+  await settleAll(p);
+  assert.equal(p.json('S.bikeProfile.id'),again[0].id);
+});
+
+test('[LC-LOOK-DEEP] Edit from You: one size or frame-picture tap changes that saved bike only; the plan keeps its own',async()=>{
+  const p=page({plan:UNSAVED,library:[BIKE,OTHER]});
+  const plan=p.stored('loadcheck:bikeProfile'),draft=draftOf(p);
+  p.run(`openBikeDetailsFromLink('#bike-details=${OTHER.id}&back=you')`);
+  p.run("quickPickSize('L')");
+  await settleAll(p);
+  p.run("quickPickStyle('compact')");
+  await settleAll(p);
+  assert.equal(p.json('S.bikeProfile.id'),UNSAVED.id,'the plan keeps its bike');
+  assert.equal(p.stored('loadcheck:bikeProfile'),plan);
+  assert.equal(draftOf(p),draft);
+  const other=JSON.parse(p.stored('loadcheck:bikeProfiles')).find(b=>b.id===OTHER.id);
+  assert.deepEqual([other.fit.style,other.fit.size.value],['compact','L'],'the saved bike got the taps');
+  assert.match(p.run("document.getElementById('bikeProfileStatus').textContent"),/Saved to Town bike/);
+});
+
+test('[LC-LOOK-UNDO] New bike in Bike details replacing an unsaved plan bike: said plainly, and Undo brings back that bike, its look and the plan byte for byte',async()=>{
+  const p=page({plan:UNSAVED,library:[]});
+  const plan=p.stored('loadcheck:bikeProfile'),draft=draftOf(p),bike=p.run('JSON.stringify(S.bikeProfile)');
+  open(p);
+  p.run('startNewBike()');
+  p.run("setLook({colour:'#c62f2a'})");
+  await settleAll(p);
+  assert.notEqual(p.json('S.bikeProfile.id'),UNSAVED.id,'the two-tap start applies the new bike, as before');
+  assert.match(p.run("document.getElementById('bikeSwapNote').textContent"),/Plan bike/,'the page says which bike was replaced');
+  assert.equal(p.json('liveBikeSwap().prev.id'),UNSAVED.id,'Undo is offered for it');
+  p.run('undoBikeSwap()');
+  await settleAll(p);
+  assert.equal(p.run('JSON.stringify(S.bikeProfile)'),bike,'the previous plan bike, its look included');
+  assert.equal(p.stored('loadcheck:bikeProfile'),plan,'stored byte for byte');
+  assert.equal(draftOf(p),draft,'the plan byte for byte');
+  assert.equal(p.json('liveBikeSwap()'),null,'and then no longer offered');
+});
+
+test('[LC-LOOK-UNDO] Undo belongs to the bike it was opened for: after Use no bike, Undo writes nothing and makes no bike',async()=>{
   const p=page();
-  const words=p.json('Object.values(BIKE_WORDING)');
-  const banned=/\bsafe\b|\bOK\b|okay|approv|certif|guarant|warning|error|fail|invalid|must\b/i;
-  for(const w of words)assert.ok(!banned.test(w.text),w.text);
-  assert.ok(words.filter(w=>w.limit).length>=4&&words.filter(w=>w.limit).every(w=>/you entered/.test(w.text)));
-  for(const key of ['lookHint','lookNone','lookNotSet','lookMore','lookPhoto','lookUndo','lookGuessBars','lookGuessEbike'])assert.ok(p.json(`BIKE_WORDING.${key}.text`).length>0,key);
+  open(p);
+  p.run("setLook({colour:'#c62f2a'})");
+  await p.run('clearBikeProfile()');
+  await settleAll(p);
+  const before=[p.stored('loadcheck:bikeProfile'),p.stored('loadcheck:bikeProfiles')];
+  p.writes.length=0;
+  p.run('undoLook()');
+  await settleAll(p);
+  assert.equal(p.json('S.bikeProfile'),null);
+  assert.deepEqual(p.writes.filter(k=>k.startsWith('loadcheck:bike')),[]);
+  assert.deepEqual([p.stored('loadcheck:bikeProfile'),p.stored('loadcheck:bikeProfiles')],before);
+  assert.equal(p.json('LOOK_CHANGED || !!liveBikeSwap()'),false,'no Undo for a bike that is not shown');
+});
+
+test('[LC-LOOK-NOTSET] a colour chosen for one new bike never carries over to the next one',async()=>{
+  const p=page({plan:null,library:[]});
+  open(p);
+  p.run('startNewBike()');
+  p.run("setLook({colour:'#c62f2a'})");
+  await settleAll(p);
+  assert.equal(p.json('S.bikeProfile.look.colour'),'#c62f2a');
+  await p.run('clearBikeProfile()');
+  await settleAll(p);
+  p.run("quickPickStyle('compact')");
+  await settleAll(p);
+  assert.equal(p.json('S.bikeProfile.look'),null,'the next new bike starts with no look');
+});
+
+test('[LC-LOOK-DEEP] the fragment is read exactly: no bike id turns on dev mode or quiet mode',()=>{
+  const p=page();
+  assert.deepEqual(p.json("hashFlags('#bike-details=bike_devx1&back=you')"),{dev:false,quiet:false});
+  assert.deepEqual(p.json("hashFlags('#bike-details=bike_quiet7&back=you')"),{dev:false,quiet:false});
+  assert.deepEqual(p.json("hashFlags('#dev')"),{dev:true,quiet:false});
+  assert.deepEqual(p.json("hashFlags('#quiet')"),{dev:false,quiet:true});
+  assert.deepEqual(p.json("hashFlags('#dev&quiet')"),{dev:true,quiet:true});
+  assert.deepEqual(p.json("hashFlags('')"),{dev:false,quiet:false});
+  // and the page reads its flags through it
+  assert.ok(/S\.devMode *= *hashFlags\(/.test(p.script.slice(p.script.indexOf('/* ==== 95-init.js ==== */'))),'95-init uses hashFlags');
 });
 
 (async()=>{

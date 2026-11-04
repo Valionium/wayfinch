@@ -147,11 +147,20 @@ test('[LC-RIG-TAPS] every control that worked before still works: add, a second 
   for(const k of keys){const g=json(`INSPECT[${JSON.stringify(k)}]`);assert.ok(g.geom&&g.box.w>0&&g.box.h>0,`${k} has a shape the inspector can lift`);}
 });
 
-test('[LC-RIG-TAPS] with no bike.js the page still plans and draws its bags list, and the rig throws nothing',()=>{
+test('[LC-RIG-TAPS] with no bike.js the rig still shows a bike, the bags and every dashed spot, and each still adds its bag',()=>{
   const bare=appVM({bike:false});
-  bare.run(`S.bags=[{uid:1,pos:'seat',L:14}];S.step=2;drawRig();`);
-  assert.equal(bare.run('document.getElementById("rigBike").innerHTML'),'');
-  assert.equal(bare.run('frameShapeGlyph({pos:"frame"})'),'');
+  bare.run(`S.bags=[{uid:1,pos:'seat',L:14}];S.nextUid=2;S.decks={bar:false,rack:false};S.step=2;S.editMode='add';drawRig();`);
+  assert.ok(/class="bg-line"/.test(bare.run('document.getElementById("rigBike").innerHTML')),'the plain bike outline of today');
+  const svg=bare.run('document.getElementById("bagLayer").innerHTML+document.getElementById("bottleLayer").innerHTML');
+  assert.ok(/class="bagg owned[^"]*" data-bump="1"|class="bagg owned[^"]*"/.test(svg),'the seat pack is drawn');
+  for(const key of ['bar','frame','fork','rack','pack','top:front','top:rear','bottle:st','bottle:dt','bottle:un'])assert.ok(svg.includes(`data-add="${key}"`),`${key} is offered`);
+  assert.ok(svg.includes('data-deck="rack"'),'the rack deck is offered');
+  assert.ok(/<rect class="hit"/.test(svg),'with its tap targets');
+  bare.run("addBag('frame')");
+  assert.equal(bare.run("S.bags.some(b=>b.pos==='frame')"),true);
+  assert.ok(bare.run('frameShapeGlyph(S.bags.find(b=>b.pos==="frame"))').includes('sg-bag'),'the frame-bag picture beside its controls');
+  bare.run('Object.keys(S.kit).forEach(k=>S.kit[k]=false);KIT.forEach(k=>S.kit[k.id]=!!k.on);S.step=4;drawRig()');
+  assert.ok(bare.run('Object.keys(INSPECT).length')>0,'the finished plan opens its bags');
   assert.ok(bare.run('currentPlan().slots.length')>0);
 });
 

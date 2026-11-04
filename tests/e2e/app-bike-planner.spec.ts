@@ -299,9 +299,20 @@ test('[LC-PHOTO-OFFLINE] bike-photo.js loads only on the first tap, is precached
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   await context.setOffline(true);
   await page.reload({ waitUntil: 'load' });
+  const served: boolean[] = [];
+  page.on('response', (r) => { if (r.url().endsWith('/bike-photo.js')) served.push(r.fromServiceWorker()); });
+  expect(await page.evaluate('typeof window.WayfinchBikePhoto')).toBe('undefined'); // not loaded until the first tap
   await page.evaluate("openBikeDetails(document.getElementById('rigBikeDetails'), 'look')");
   await page.locator('#lookPhoto').click();
   await expect(page.locator('.photo-pick')).toBeVisible();
   await expect(page.locator('.photo-choose')).toContainText('Choose or take a photo');
+  expect(served).toEqual([true]); // asked for on the first tap, and served from the worker's cache
+  // and it works in flight mode: a photo, a tap, Use this colour, stored
+  const png = await lawnPhoto(page);
+  await page.locator('.photo-file').setInputFiles({ name: 'bike.png', mimeType: 'image/png', buffer: png });
+  await expect(page.locator('.photo-canvas')).toBeVisible();
+  await tapPhoto(page, 0.5, 450 / 800);
+  await page.getByRole('button', { name: 'Use this colour' }).click();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfile')!).look.colour as string)).toMatch(RED);
   await context.setOffline(false);
 });
