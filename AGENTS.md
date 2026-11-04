@@ -50,6 +50,10 @@ In the bag planner (sub-project 6, group 1) the rig is drawn by `/tools/bags/bik
 
 You stores `copilot:delete-request:v1` = {app, kind, v: 1, id, createdAt} and opens `/tools/bags/#copilot-delete=<id>`. The bag planner's half is `applyDeleteRequest()` (sub-project 6, group 2), the first thing its start-up does, before the draft is restored. It deletes only the bag-planner data that was saved **before `createdAt`**, and never anything made or saved later: a rider who taps Also delete bag planner data, then builds a new plan days before the bag planner first applies the request, keeps the new plan. Spec section 7.1, Contract 3, says the request is applied "before it restores its draft" and names the id; it does not name this limit, so this note adds it. A request is applied at most once, and never from the fragment alone; the fragment is removed in every case. How "before" is known: the draft by its `updatedAt`, setups and reports by their own times, everything else by `loadcheck:saved-at:v1`, which the page's `store.set` stamps when a value changes (bikes and setups one by one). A value with no stamp was saved by an older page and goes. Any new `loadcheck:*` key written outside `store.set` must call `stampKey`, or C-DELETE treats it as old. Tests: `qa/contracts.cjs`, `tests/e2e/app-contracts.spec.ts`.
 
+## Contract 2 (sub-project 6): the trip handoff
+
+The co-pilot's side is `src/ui/trip/handoff.ts` (Trip's Plan bags for this trip): GPX 1.1 into its `handoffs` store, `copilot:handoff:v1` into localStorage, then `/tools/bags/#copilot-handoff=<id>`; it deletes the handoff once `loadcheck:handoff-done` names its id, or after 24 hours. The bag planner's side is `receiveHandoff()` / `applyHandoff()` in the page: it never opens a co-pilot database that does not exist, makes no lookup for a handed-off route, and changes trip fields only. `contracts/handoff/` holds the shared GPX. Multi-section routes still plan differently in the two apps (DF-01-SECTIONS).
+
 ## Commands
 
 | Command | Runs |
