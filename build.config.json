@@ -1,6 +1,6 @@
 {
   "launch": false,
-  "deployEnabled": false,
+  "deployEnabled": true,
   "deployWithoutReviewer": false,
   "weatherMode": "auto",
   "dataOrigin": "https://wayfinch-data.pages.dev"
