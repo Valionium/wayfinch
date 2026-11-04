@@ -14,7 +14,8 @@ function render(options={}){
   return nodes.get('bagLayer').innerHTML;
 }
 function deck(which){
-  const svg=nodes.get('bagLayer').innerHTML,x=which==='bar'?215:69;
+  // the deck sits where bike.js anchors it for this bike (sub-project 6, Task 3), no longer at fixed points
+  const svg=nodes.get('bagLayer').innerHTML,x=run(`String(r2(rigAnchors().${which==='bar'?'barDeck':'rackTop'}.x))`).replace('.','\.');
   const groups=[...svg.matchAll(/<g class="([^"]*)"([^>]*)>([\s\S]*?)<\/g>/g)];
   const g=groups.find(m=>m[1].split(/\s+/).includes('deck')&&new RegExp(`class="bag-shell" x="${x}"`).test(m[3]));
   if(!g)return null;

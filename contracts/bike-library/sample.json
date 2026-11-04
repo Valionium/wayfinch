@@ -44,5 +44,37 @@
     "brakes": "unknown",
     "drive": "unknown",
     "shifting": "unknown"
+  },
+  {
+    "id": "bike_odd_values",
+    "name": "  Odd values  ",
+    "frontTyre": 42,
+    "rearTyre": "  47-584  ",
+    "padType": null,
+    "chainType": ["KMC"],
+    "hangerType": "",
+    "notes": "Every other field here is out of range or unknown; each drops only itself.",
+    "tyres": "square",
+    "valve": "Presta",
+    "brakes": "magic",
+    "drive": "rope",
+    "shifting": "telepathy",
+    "pressure": {
+      "bikeKg": 500, "wheel": "36", "rim": "wood", "rimMm": "wide", "frontMm": 5, "rearMm": "47",
+      "frontCasing": "paper", "rearCasing": "standard", "frontMinBar": -1, "frontMaxBar": 20, "rearMinBar": "2.5", "rearMaxBar": null
+    },
+    "fit": {
+      "style": "tandem", "size": { "kind": "cm", "value": 90 },
+      "bolts": { "st": "maybe", "dt": "yes", "un": true }, "topTubeBag": "perhaps",
+      "triangleCm": { "top": 20, "seat": 30, "down": 60 }, "seatGapCm": 100, "barWidthCm": "38"
+    },
+    "maxWeight": { "v": 500, "u": "kg", "includes": "bike" },
+    "maxWeightAsked": "yes",
+    "look": { "colour": "red", "bars": "aero", "ebike": true },
+    "geometry": {
+      "at": "yesterday", "maker": 7, "model": "Long Road", "year": 1850, "size": "", "wheel": "36",
+      "values": { "stack_mm": { "v": 2000, "src": "table" }, "reach_mm": { "v": "385", "src": "guess" }, "wings_mm": { "v": 3, "src": "table" } }
+    },
+    "wings": 2
   }
 ]

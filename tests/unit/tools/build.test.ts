@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +10,7 @@ import { buildDist, canonicalPath, MAX_PRECACHED_BYTES } from '../../../tools/bu
 
 const REPO = fileURLToPath(new URL('../../../', import.meta.url));
 const PAGE = `${REPO}public/tools/bags/index.html`;
+const ROOT_COPY = `${REPO}releases/load-check-root.html`; // what / serves until the launch (sub-project 6, Decision 2)
 const sha256 = (b: Buffer | string) => createHash('sha256').update(b).digest('hex');
 const tmpRoot = mkdtempSync(join(tmpdir(), 'wf-build-'));
 let n = 0;
@@ -57,7 +58,9 @@ test('[SW-BUILD-FILES] with the switch off dist holds only the page, the worker,
   const out = outDir();
   await buildDist({ out, launch: false });
   expect(listFiles(out)).toEqual(['_headers', 'build.json', 'index.html', 'offline-worker.js']);
-  expect(sha256(read(out, 'index.html'))).toBe(sha256(readFileSync(PAGE)));
+  // / is the frozen copy, not the bag planner, which changes behind the switch
+  expect(sha256(read(out, 'index.html'))).toBe(sha256(readFileSync(ROOT_COPY)));
+  expect(sha256(read(out, 'index.html'))).toBe('2f31b7568915da63625abb19b97c5850c2b37a192b19ee34bf564d5d3f1d5366');
   const b = buildJson(out);
   expect(b.v).toBe(1);
   expect(b.configHash).toBe(sha256(readFileSync(`${REPO}wrangler.jsonc`)));
@@ -138,6 +141,14 @@ test('[SW-HEADERS] the headers file sets caching and the referrer policy as deci
     expect(hOff[p], p).toBeUndefined();
     expect(hOn[p]?.['Cache-Control'], p).toBe('no-cache');
   }
+}, 60_000);
+
+test('[SW-BUILD-FILES] with the switch on the bag planner is served at /tools/bags/, and / is the app, not the frozen copy', async () => {
+  const on = outDir();
+  await buildDist({ out: on, launch: true, vite: async (dir: string) => { writeFileSync(join(dir, 'index.html'), '<!doctype html><div id="app"></div>'); } });
+  expect(sha256(read(on, 'tools/bags/index.html'))).toBe(sha256(readFileSync(PAGE)));
+  expect(sha256(read(on, 'index.html'))).not.toBe(sha256(readFileSync(ROOT_COPY)));
+  expect(existsSync(join(on, 'releases'))).toBe(false);
 }, 60_000);
 
 test('the command line takes --out and --launch', () => {

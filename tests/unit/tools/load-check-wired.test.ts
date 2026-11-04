@@ -11,17 +11,25 @@ const HELPERS = ['app-vm.cjs', 'plan-kit.cjs', 'run-all.cjs', 'paths.cjs']; // t
 // The page is never printed here: only its hash is compared.
 test("[LC-PAGE-LIVE] the page's hash is the one recorded", () => {
   // The tag load-check-zip-2026-10-30 holds the page as it was live (aa086001…). Since then: the top-tube wording and the update prompt.
-  const recorded = '2f31b7568915da63625abb19b97c5850c2b37a192b19ee34bf564d5d3f1d5366';
+  // Sub-project 6 changes the bag planner behind the launch switch (bike.js, the rig, Look); riders keep releases/load-check-root.html
+  // (LC-ROOT-FROZEN), so each change here is on purpose and recorded.
+  const recorded = 'c384022138aec1d5188925621d2ac944083238008e60c8cc3b8aa5d814a4bc98';
   expect(createHash('sha256').update(readFileSync(PAGE)).digest('hex')).toBe(recorded);
+});
+
+// The copy served at / until the launch (sub-project 6, Decision 2): the first GitHub release's page, live since 4 Nov 2026.
+test('[LC-ROOT-FROZEN] the frozen root copy has the hash that went live with the first release', () => {
+  const live = '2f31b7568915da63625abb19b97c5850c2b37a192b19ee34bf564d5d3f1d5366';
+  expect(createHash('sha256').update(readFileSync(`${REPO}releases/load-check-root.html`)).digest('hex')).toBe(live);
 });
 
 const suites = readdirSync(`${REPO}qa`).filter((f) => f.endsWith('.cjs') && !HELPERS.includes(f)).sort();
 
 test('[LC-QA-ALL] run-all runs every qa/*.cjs except the three helpers', () => {
-  expect(suites.length).toBe(36);
+  expect(suites.length).toBe(39);
   const r = spawnSync(process.execPath, [`${REPO}qa/run-all.cjs`], { cwd: REPO, encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } });
   for (const s of suites) expect(r.stdout).toContain(`PASS ${s} `);
-  expect(r.stdout).toContain('All 36 suites passed');
+  expect(r.stdout).toContain('All 39 suites passed');
   expect(r.status).toBe(0);
 }, 240_000);
 

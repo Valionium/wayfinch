@@ -35,8 +35,14 @@ test('[BK-WHERE] the Tools card shows the bike with its bags above "3 bags · 10
   await expect(card.locator('svg.bk')).toBeVisible();
   expect(await card.locator('.bk-bag').count()).toBeGreaterThan(0);
   await expect(card.getByText('3 bags · 10.2 kg')).toBeVisible();
-  await card.getByRole('link', { name: /^Your bike: touring bike/ }).click();
-  await expect(page).toHaveURL(`${app.origin}/tools/bags/#bike-details=${bike.id as string}&back=tools&section=look`);
+  const link = card.getByRole('link', { name: /^Your bike: touring bike/ });
+  await expect(link).toHaveAttribute('href', `/tools/bags/#bike-details=${bike.id as string}&back=tools&section=look`);
+  await link.click();
+  // The bag planner opens that bike at Look and then removes the fragment (LC-LOOK-DEEP, sub-project 6).
+  await expect(page).toHaveURL(`${app.origin}/tools/bags/`);
+  await expect(page.locator('#bikeLookTitle')).toBeFocused();
+  expect(await page.evaluate('BIKE_PROFILE_EDITOR_ID')).toBe(bike.id);
+  await expect(page.locator('#bikeDetailsBack')).toHaveAttribute('href', '/#/tools');
 });
 
 test('[BK-TAP-INSTANT] the bag planner saving a colour in another tab redraws this one before the next frame; the colour eases only with motion allowed', async ({ page, context }) => {

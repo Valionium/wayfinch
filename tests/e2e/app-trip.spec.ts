@@ -72,8 +72,14 @@ test('[BK-WHERE-TRIP] Trip draws the bike with its bags and caption at its top, 
   expect(await figure.locator('.bk-bag').count()).toBeGreaterThan(0);
   await expect(figure.locator('figcaption')).toBeVisible();
   expect((await figure.boundingBox())!.height).toBeLessThanOrEqual(120);
-  await figure.getByRole('link', { name: /^Your bike: / }).click();
-  await expect(page).toHaveURL(`${app.origin}/tools/bags/#bike-details=${sample[0]!.id as string}&back=trip&section=look`);
+  const link = figure.getByRole('link', { name: /^Your bike: / });
+  await expect(link).toHaveAttribute('href', `/tools/bags/#bike-details=${sample[0]!.id as string}&back=trip&section=look`);
+  await link.click();
+  // The bag planner opens that bike at Look and then removes the fragment (LC-LOOK-DEEP, sub-project 6).
+  await expect(page).toHaveURL(`${app.origin}/tools/bags/`);
+  await expect(page.locator('#bikeLookTitle')).toBeFocused();
+  expect(await page.evaluate('BIKE_PROFILE_EDITOR_ID')).toBe(sample[0]!.id);
+  await expect(page.locator('#bikeDetailsBack')).toHaveAttribute('href', '/#/trip');
 });
 
 test('[TRIP-GPX] a real GPX file becomes the route: figures, profile and days show, and they are still there after a reload', async ({ page }) => {

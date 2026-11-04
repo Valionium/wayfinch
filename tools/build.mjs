@@ -8,9 +8,14 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build as esbuild } from 'esbuild';
 import { writeImprint } from './build-legal.mjs';
+import bikeScript from './bike-script.cjs';
+
+const { bikeScriptOptions, photoScriptOptions } = bikeScript;
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const PAGE = join(ROOT, 'public', 'tools', 'bags', 'index.html');
+// Until the launch, / serves this frozen copy of the page that went live with the first release (sub-project 6, Decision 2), so edits
+// to the bag planner at public/tools/bags/ never reach riders with the switch off. A real bug before the launch is fixed in both.
+const ROOT_COPY = join(ROOT, 'releases', 'load-check-root.html');
 const WORKER_SOURCE = join(ROOT, 'src', 'offline-worker.ts');
 const PUBLIC = join(ROOT, 'public');
 const EMERGENCY_WORKER = join(ROOT, 'tools', 'emergency-worker.js');
@@ -66,26 +71,8 @@ async function runVite(outDir, { testHooks = false } = {}) {
  * The bike module for the bag planner (spec section 7.4): a classic script, `window.WayfinchBike`, so the page draws the same bike as
  * the app. Only a build with the launch switch on writes it.
  */
-async function compileBikeScript() {
-  const result = await esbuild({
-    stdin: {
-      contents: "import { bikeArt, nearestSwatchName, normaliseBike, oklabMedian, resolveBikeSpec, SWATCHES } from './src/core/bike/index.ts';\n"
-        + 'window.WayfinchBike = Object.freeze({ bikeArt, resolveBikeSpec, SWATCHES, nearestSwatchName, normaliseBike, oklabMedian });\n',
-      resolveDir: ROOT,
-      sourcefile: 'bike-entry.ts',
-      loader: 'ts',
-    },
-    absWorkingDir: ROOT,
-    bundle: true,
-    write: false,
-    format: 'iife',
-    target: 'es2020',
-    platform: 'browser',
-    charset: 'utf8',
-    legalComments: 'none',
-    minify: true,
-    logLevel: 'silent',
-  });
+async function compileBikeScript(options = bikeScriptOptions) {
+  const result = await esbuild(options);
   return Buffer.from(result.outputFiles[0].contents);
 }
 
@@ -109,10 +96,10 @@ async function compileWorker(buildId, precache) {
 /**
  * Builds the site into `out`.
  * `extraFiles` ({ 'assets/x.js': bytes }) are written and precached like any other file; only tests use it so far.
- * `pagePath` lets a test build a site around another page; `vite` lets a test watch for the one step only the launch runs.
+ * `pagePath` is the page served at / with the switch off (the frozen copy); a test may build a site around another page. `vite` lets a test watch for the one step only the launch runs.
  * `testHooks` (--test-hooks) is for the browser tests only, and only with the launch switch on: the off build is never touched.
  */
-export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = false, extraFiles = {}, pagePath = PAGE, vite = runVite, testHooks = false } = {}) {
+export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = false, extraFiles = {}, pagePath = ROOT_COPY, vite = runVite, testHooks = false } = {}) {
   const config = JSON.parse(readFileSync(join(ROOT, 'build.config.json'), 'utf8'));
   const launchOn = launch ?? config.launch === true;
   if (testHooks && !launchOn) throw new Error('--test-hooks needs --launch=on: the build with the switch off stays what it was.');
@@ -138,8 +125,10 @@ export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = 
     writeImprint(target);
     mkdirSync(join(target, 'tools', 'bags'), { recursive: true });
     writeFileSync(join(target, 'tools', 'bags', 'bike.js'), await compileBikeScript());
+    // The photo colour picker, loaded only when a rider taps From a photo; precached like every other file.
+    writeFileSync(join(target, 'tools', 'bags', 'bike-photo.js'), await compileBikeScript(photoScriptOptions));
   } else {
-    // With the switch off the page riders see stays Load Check, at /.
+    // With the switch off the page riders see stays Load Check, at /: the frozen copy, never the bag planner being worked on.
     writeFileSync(join(target, 'index.html'), readFileSync(pagePath));
   }
   for (const [path, bytes] of Object.entries(extraFiles)) {

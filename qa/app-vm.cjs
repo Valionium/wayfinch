@@ -7,14 +7,15 @@ const vm=require('node:vm');
 function sharedStore(){return {values:new Map(),vms:new Set()};}
 function appVM(options={}){
   const store=options.storage||sharedStore();
-  const html=fs.readFileSync(require('./paths.cjs').page,'utf8');
+  const html=fs.readFileSync(options.page||require('./paths.cjs').page,'utf8');
   const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
   const nodes=new Map(),events=new Map(),listeners={};
   const values=store.values;
   const element=id=>({id,innerHTML:'',textContent:'',value:'',dataset:{},style:{},children:[],attributes:[],
     classList:{add(){},remove(){},toggle(){},contains(){return false;}},querySelectorAll(){return [];},querySelector(){return null;},
     addEventListener(){},removeEventListener(){},setAttribute(){},getAttribute(){return null;},removeAttribute(){},
-    hasAttribute(){return false;},contains(){return false;},focus(){},scrollIntoView(){},closest(){return null;}});
+    hasAttribute(){return false;},contains(){return false;},focus(){},scrollIntoView(){},closest(){return null;},
+    insertAdjacentHTML(where,html){this.innerHTML+=html;}});
   const get=id=>{if(!nodes.has(id))nodes.set(id,element(id));return nodes.get(id);};
   const notify=(key,oldValue,newValue)=>{
     store.vms.forEach(other=>{if(other!==self)other.fireStorage(key,oldValue,newValue);});
@@ -29,6 +30,8 @@ function appVM(options={}){
   const context=vm.createContext({console,window,document,navigator:{onLine:true},location:{href:'https://example.test/index.html',protocol:'https:'},
     setTimeout,clearTimeout,URL,Blob,TextEncoder,AbortController,Response,Request,Headers,MessageChannel,
     fetch(){throw Error('Network requests are disabled in this test');}});
+  // The bike module the page loads before its own script (/tools/bags/bike.js), built from src/core/bike as the build does.
+  if(options.bike!==false)vm.runInContext(require('../tools/bike-script.cjs').bikeScriptSync(),context,{filename:'bike.js'});
   vm.runInContext(script.slice(0,script.indexOf('/* ==== 95-init.js ==== */')),context,{filename:'index.html'});
   const run=code=>vm.runInContext(code,context);
   // Rendering is tested separately through the markup-producing functions.
