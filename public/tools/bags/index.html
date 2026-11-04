@@ -9975,7 +9975,9 @@ const store = {
     return MEM[k] !== undefined ? MEM[k] : null;
   },
   async set(k, v, detailed=false){
+    if(DELETED_ELSEWHERE && String(k).startsWith('loadcheck:')) return detailed ? {saved:false,kind:'memory'} : false;
     if(k === SETUP_KEY && Array.isArray(v)) mergeOtherTabsSetups(v);
+    const before=String(k).startsWith('loadcheck:') ? readLocalRaw(k) : null;
     MEM[k] = v;
     let saved = false, kind='memory';
     try { if(window.storage){ await window.storage.set(k, JSON.stringify(v)); kind='host'; saved = true;
@@ -9986,6 +9988,7 @@ const store = {
       kind='browser'; saved = true;
     } catch(e){} }
     STORAGE_KIND=kind;
+    if(saved && kind === 'browser') stampSaved(k,v,before);
     if(saved && k === DRAFT_KEY) DRAFT_VERSION=draftVersionOf(v);
     if(saved && k === SETUP_KEY && Array.isArray(v)) v.forEach(x => x && SETUPS_SEEN.add(x.id));
     if(k === SETUP_KEY) SETUPS_STORED = saved;
@@ -9998,6 +10001,118 @@ function storageNote(){
        : STORAGE_KIND === 'browser' ? 'Saved in this browser — still here next time you open it.'
        : STORAGE_KIND === 'host'    ? 'Saved to your account.'
        : 'This session only — storage is unavailable, so a reload clears it. Export below to keep anything.';
+}
+
+/* ---- Also delete bag planner data (spec 7.1 Contract 3; AGENTS.md "Contract for C-DELETE") ----
+   The co-pilot stores copilot:delete-request:v1 = {app, kind, v:1, id, createdAt} and opens #copilot-delete=<id>.
+   Before the draft is restored, a stored valid request not applied yet removes, key by key, every loadcheck:* value
+   saved before createdAt, and nothing saved later. The draft, setups and reports carry their own times. Everything
+   else this page saves is stamped in loadcheck:saved-at:v1 when it is written (bikes and setups one by one); a value
+   with no stamp was saved by an older page, before any request could exist, and goes. Never a clear of all storage,
+   never a copilot:* key, never a cache. */
+const DELETE_REQUEST_KEY='copilot:delete-request:v1',DELETE_APPLIED_KEY='loadcheck:delete-applied',SAVED_AT_KEY='loadcheck:saved-at:v1';
+const SAVED_ITEM_KEYS=['loadcheck:setups','loadcheck:bikeProfiles'];
+const SUMMARY_KEY='loadcheck:summary:v1';
+let DELETED_ELSEWHERE=false;   // another tab applied a delete request: this one never writes its plan back
+function readLocalJson(k){
+  try { const raw=window.localStorage.getItem(k); return raw === null ? null : JSON.parse(raw); } catch(e){ return null; }
+}
+function readLocalRaw(k){ try { return window.localStorage.getItem(k); } catch(e){ return null; } }
+function readSavedAt(){
+  const v=readLocalJson(SAVED_AT_KEY);
+  const keys=dataObject(v) && dataObject(v.keys) ? v.keys : {},items=dataObject(v) && dataObject(v.items) ? v.items : {};
+  return {app:'load-check',kind:'saved-at',v:1,keys:{...keys},
+    items:Object.fromEntries(SAVED_ITEM_KEYS.map(k => [k,dataObject(items[k]) ? {...items[k]} : {}]))};
+}
+// Called after a value reached this browser's storage, with the stored text it replaced. Only a change is stamped: the same value
+// written again keeps its own time, or none. A list stamps only the entries that are new or changed.
+function stampSaved(k,v,beforeRaw){
+  if(!String(k).startsWith('loadcheck:') || [DRAFT_KEY,DRAFT_BROWSER_META_KEY,SAVED_AT_KEY,DELETE_APPLIED_KEY,SUMMARY_KEY].includes(k)) return;
+  try {
+    const ledger=readSavedAt(),now=new Date().toISOString(),text=typeof v === 'string' && k === WALKTHROUGH_KEY ? v : JSON.stringify(v);
+    if(text !== beforeRaw) ledger.keys[k]=now;
+    else if(!ledger.keys[k]) return;
+    if(SAVED_ITEM_KEYS.includes(k) && Array.isArray(v)){
+      let before=null; try { before=beforeRaw === null ? null : JSON.parse(beforeRaw); } catch(e){}
+      const old=new Map((Array.isArray(before) ? before : []).filter(x => x && typeof x.id === 'string').map(x => [x.id,JSON.stringify(x)]));
+      const stamps={};
+      for(const x of v){
+        if(!x || typeof x.id !== 'string') continue;
+        if(old.get(x.id) !== JSON.stringify(x)) stamps[x.id]=now;           // new or changed now
+        else if(ledger.items[k][x.id]) stamps[x.id]=ledger.items[k][x.id]; // unchanged: its own time, or none
+      }
+      ledger.items[k]=stamps;
+    }
+    window.localStorage.setItem(SAVED_AT_KEY,JSON.stringify(ledger));
+  } catch(e){}
+}
+function stampKey(k,v,beforeRaw){ stampSaved(k,v,beforeRaw); }
+function validDeleteRequest(r){
+  return dataObject(r) && r.app === 'copilot' && r.kind === 'delete-request' && r.v === 1 &&
+    typeof r.id === 'string' && /^[0-9a-f]{32}$/.test(r.id) && typeof r.createdAt === 'string' && Number.isFinite(Date.parse(r.createdAt)) ? r : null;
+}
+function localKeys(){
+  const out=[];
+  try { for(let i=0;i<window.localStorage.length;i++){ const k=window.localStorage.key(i); if(typeof k === 'string') out.push(k); } } catch(e){}
+  return out;
+}
+// The fragment is removed in every case; it never deletes anything by itself.
+function dropDeleteFragment(){
+  if(!/^#copilot-delete=/.test(String(location.hash || ''))) return;
+  try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
+}
+// Returns true when a request was applied now.
+function applyDeleteRequest(){
+  dropDeleteFragment();
+  const request=validDeleteRequest(readLocalJson(DELETE_REQUEST_KEY));
+  if(!request) return false;
+  const applied=readLocalJson(DELETE_APPLIED_KEY);
+  if(dataObject(applied) && applied.id === request.id) return false;
+  const cutoff=Date.parse(request.createdAt),ledger=readSavedAt();
+  const later=stamp => typeof stamp === 'string' && Number.isFinite(Date.parse(stamp)) && Date.parse(stamp) >= cutoff;
+  const remove=k => { try { window.localStorage.removeItem(k); } catch(e){} delete MEM[k]; };
+  const keepList=(k,keep) => {
+    const list=readLocalJson(k);
+    const kept=Array.isArray(list) ? list.filter(x => dataObject(x) && keep(x)) : [];
+    if(!kept.length){ remove(k); return false; }
+    if(kept.length !== list.length){ try { window.localStorage.setItem(k,JSON.stringify(kept)); } catch(e){} MEM[k]=kept; }
+    return true;
+  };
+  const kept={keys:{},items:{}};
+  for(const k of localKeys()){
+    if(!k.startsWith('loadcheck:') || [DELETE_APPLIED_KEY,SAVED_AT_KEY,DRAFT_BROWSER_META_KEY,BIKE_FORMAT_KEY].includes(k)) continue;
+    if(k === DRAFT_KEY){
+      const draft=readLocalJson(k);
+      if(dataObject(draft) && later(draft.updatedAt)) kept.keys[k]=true; else { remove(k); remove(DRAFT_BROWSER_META_KEY); }
+    } else if(k === SETUP_KEY){
+      if(keepList(k,x => later(ledger.items[k][x.id]) || later(x.updated))) kept.keys[k]=true;
+    } else if(k === FEEDBACK_KEY){
+      if(keepList(k,x => later(x.at))) kept.keys[k]=true;
+    } else if(k === BIKE_PROFILE_KEY){
+      if(keepList(k,x => later(ledger.items[k][x.id]))) kept.keys[k]=true;
+    } else if(k !== SUMMARY_KEY && later(ledger.keys[k])) kept.keys[k]=true;
+    else remove(k);
+  }
+  if(!kept.keys[BIKE_PROFILE_KEY]) remove(BIKE_FORMAT_KEY);   // the format mark guards a list; with no list there is nothing to guard
+  const left={app:'load-check',kind:'saved-at',v:1,keys:{},items:{}};
+  for(const k of Object.keys(kept.keys)) if(ledger.keys[k]) left.keys[k]=ledger.keys[k];
+  for(const k of SAVED_ITEM_KEYS){
+    const list=readLocalJson(k),ids=new Set(Array.isArray(list) ? list.map(x => x && x.id) : []);
+    left.items[k]=Object.fromEntries(Object.entries(ledger.items[k]).filter(([id]) => ids.has(id)));
+  }
+  try {
+    if(Object.keys(left.keys).length) window.localStorage.setItem(SAVED_AT_KEY,JSON.stringify(left)); else remove(SAVED_AT_KEY);
+    window.localStorage.setItem(DELETE_APPLIED_KEY,JSON.stringify({app:'load-check',kind:'delete-applied',v:1,id:request.id,at:new Date().toISOString()}));
+  } catch(e){}
+  return true;
+}
+// Another bag-planner tab applied a request: this tab discards its plan in memory and never writes it back.
+function followDeleteElsewhere(event){
+  if(event.key !== DELETE_APPLIED_KEY || !event.newValue || event.newValue === event.oldValue) return;
+  let applied=null; try { applied=JSON.parse(event.newValue); } catch(e){ return; }
+  if(!dataObject(applied) || applied.kind !== 'delete-applied') return;
+  DELETED_ELSEWHERE=true; DRAFT_FROZEN=true; DRAFT_READY=false; clearTimeout(DRAFT_TIMER); DRAFT_TIMER=null;
+  window.location.reload();
 }
 
 const DRAFT_KEY = 'loadcheck:draft';
@@ -10607,6 +10722,8 @@ function mergeOtherTabsSetups(list){
 }
 function followOtherTabs(event){
   try { if(event.storageArea && event.storageArea !== window.localStorage) return; } catch(e){ return; }
+  if(event.key === DELETE_APPLIED_KEY){ followDeleteElsewhere(event); return; }
+  if(DELETED_ELSEWHERE) return;
   const key=event.key,all=key === null;
   if(all || key === DRAFT_KEY) checkOtherTabs();
   if(all || key === SETUP_KEY){
@@ -11586,7 +11703,7 @@ let WALKTHROUGH_INDEX=0,WALKTHROUGH_SEEN=false;
 try{WALKTHROUGH_SEEN=['dismissed','done'].includes(window.localStorage.getItem(WALKTHROUGH_KEY));}catch(error){}
 function rememberWalkthrough(done=false){
   WALKTHROUGH_SEEN=true;
-  try{window.localStorage.setItem(WALKTHROUGH_KEY,done?'done':'dismissed');}catch(error){}
+  try{const before=readLocalRaw(WALKTHROUGH_KEY),value=done?'done':'dismissed';window.localStorage.setItem(WALKTHROUGH_KEY,value);stampKey(WALKTHROUGH_KEY,value,before);}catch(error){}
   $('walkthroughInvite').classList.add('hidden');
 }
 function renderWalkthrough(){
@@ -12256,6 +12373,8 @@ window.routeCheck = () => {
 window.applyCalibration = applyCalibration;
 
 (async () => {
+  // Contract 3: a stored delete request is applied before anything is read, so the draft is never restored first.
+  if(applyDeleteRequest()){ WALKTHROUGH_SEEN=false; MAX_WEIGHT_SKIPPED=false; }
   const savedSetups=await store.get(SETUP_KEY),savedReports=await store.get(FEEDBACK_KEY);
   SETUPS=Array.isArray(savedSetups) ? savedSetups.map(normaliseSetup).filter(Boolean) : [];
   SETUPS.forEach(x => SETUPS_SEEN.add(x.id));
