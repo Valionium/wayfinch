@@ -193,8 +193,11 @@ test('[C-HANDOFF] a trip from Wayfinch in a real browser: the bar asks, Apply lo
   await ready(page);
   await expect(page.locator('#handoffBar')).toBeVisible();
   await expect(page.locator('#handoffText')).toContainText('A trip from Wayfinch');
+  await expect(page.locator('#handoffUndo')).toBeHidden();
   await page.locator('#handoffApply').click();
   await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('#handoffCancel')).toBeHidden();
+  await expect(page.locator('#handoffApply')).toBeHidden();
   expect(await page.evaluate('[S.nights, S.pace, S.sleep, S.flatKph, S.departureDate, S.place && S.place.name]')).toEqual([2, 'hard', 'mixed', 22, '2026-06-12', 'Heidelberg']);
   expect(await page.evaluate('S.bags.length')).toBe(3);
   expect(await page.evaluate(() => location.hash)).toBe('');
