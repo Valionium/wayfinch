@@ -115,6 +115,11 @@ test('[LC-LOOK-TAPS] every Look choice is a labelled tap target of at least 44 p
   await planner(page, BIKES);
   await page.evaluate("openBikeDetails(document.getElementById('rigBikeDetails'), 'look')");
   const look = page.locator('#bikeLook');
+  // nothing changed yet: no Undo, and no Back link when Bike details was not opened from the co-pilot
+  await expect(page.locator('#lookUndo')).toBeHidden();
+  await expect(page.locator('#bikeDetailsBack')).toBeHidden();
+  const picker = await page.locator('#lookPicker').boundingBox();
+  expect(Math.abs(picker!.width - picker!.height)).toBeLessThan(1); // the picker's own swatch is a round dot
   const targets = look.locator('label.look-swatch, label.look-chip');
   expect(await targets.count()).toBe(17 + 1 + 4 + 3);
   for (const box of await targets.evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return { w: r.width, h: r.height, text: el.textContent!.trim() }; }))) {
@@ -127,15 +132,16 @@ test('[LC-LOOK-TAPS] every Look choice is a labelled tap target of at least 44 p
     expect(await page.evaluate(() => { const a = document.activeElement as HTMLInputElement | null; return a?.tagName === 'INPUT' && !['radio', 'color'].includes(a.type); }), name).toBe(false);
   }
   await expect(look.getByRole('radio', { name: 'Not set' }).first()).toBeChecked();
+  await expect(page.locator('#lookUndo')).toBeVisible();
 });
 
-test('[LC-LOOK-INSTANT] a swatch tap changes the preview\'s frame stroke in the same task, within 20 ms, and the rig behind with it', async ({ page }) => {
+/** Five swatch taps in a row. The stroke is read in the same task as each tap; the drawing is timed from the radio's change (what the
+ *  page does) to the repainted preview, so the browser's own focus and layout for a tapped radio are not counted. */
+async function fiveTaps(page: Page) {
   await planner(page, BIKES);
   await page.evaluate("openBikeDetails(document.getElementById('rigBikeDetails'), 'look')");
   await expect(page.locator('#lookPreview .bk-paint').first()).toHaveAttribute('stroke', '#2563b8');
-  // Five taps in a row. The stroke is read in the same task as the tap; the drawing is timed from the radio's change (what the page
-  // does) to the repainted preview, so the browser's own focus and layout for a tapped radio are not counted.
-  const r = await page.evaluate(() => new Promise<{ ms: number[]; strokes: (string | null | undefined)[]; rig: string | null | undefined }>((resolve) => {
+  return page.evaluate(() => new Promise<{ ms: number[]; strokes: (string | null | undefined)[]; rig: string | null | undefined }>((resolve) => {
     const ms: number[] = [];
     const strokes: (string | null | undefined)[] = [];
     let changed = 0;
@@ -149,13 +155,23 @@ test('[LC-LOOK-INSTANT] a swatch tap changes the preview\'s frame stroke in the 
     // the rig behind is repainted before the next frame is shown
     requestAnimationFrame(() => requestAnimationFrame(() => resolve({ ms, strokes, rig: document.querySelector('#rigBike .bk-paint')?.getAttribute('stroke') })));
   }));
+}
+
+test("[LC-LOOK-INSTANT] a swatch tap changes the preview frame's stroke in the same task, and the rig behind before the next frame", async ({ page }) => {
+  const r = await fiveTaps(page);
   expect(r.strokes).toEqual(['#c62f2a', '#2f7d4f', '#f1c232', '#1f2f55', '#c62f2a']);
   expect(r.rig).toBe('#c62f2a');
-  for (const ms of r.ms) expect(ms).toBeLessThanOrEqual(20);
   // Undo, in one tap, restores the opening look
   await page.locator('#lookUndo').click();
   await expect(page.locator('#lookPreview .bk-paint').first()).toHaveAttribute('stroke', '#2563b8');
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfile')!).look.colour)).toBe('#2563b8');
+});
+
+// The 20 ms is a time budget, so it is timed like the others: on the phone stand-in, alone, after every other project ([PERF- budgets).
+test('[LC-LOOK-INSTANT] each swatch tap is drawn within 20 ms on the phone stand-in, timed alone with the [PERF- budgets', async ({ page }) => {
+  const r = await fiveTaps(page);
+  expect(r.strokes[0]).toBe('#c62f2a');
+  for (const ms of r.ms) expect(ms).toBeLessThanOrEqual(20);
 });
 
 /** A photo made in the page: a lawn, with a red frame tube that has a white highlight and a black cable on it. */
