@@ -11,6 +11,8 @@ import type { LoadedApp } from './helpers.ts';
 let app: LoadedApp | undefined;
 test.afterEach(async () => { await app?.close(); app = undefined; });
 test.afterAll(() => removeBuilds());
+// Storage, workers and contracts, not looks: once per browser size, in the dark theme only, so the run stays inside its time.
+test.skip(({ colorScheme }) => colorScheme === 'light', 'storage, not the theme');
 
 const ID = 'fedcba9876543210fedcba9876543210';
 const ready = (page: Page) => page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY === true');

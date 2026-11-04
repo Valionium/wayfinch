@@ -23,7 +23,7 @@ const built = new Map<string, Promise<string>>();
 const roots: string[] = [];
 
 /** A real build in a fresh folder, once per worker, switch position and test hook (`window.__wf`, Task 17). */
-function siteFor(launch: boolean, testHooks = false): Promise<string> {
+export function siteFor(launch: boolean, testHooks = false): Promise<string> {
   const key = `${launch}:${testHooks}`;
   if (!built.has(key)) {
     const root = mkdtempSync(join(tmpdir(), 'wf-app-e2e-'));

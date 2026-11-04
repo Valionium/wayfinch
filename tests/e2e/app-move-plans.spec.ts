@@ -4,13 +4,16 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { legacySite } from './fixtures/legacy-site.mjs';
-import { buildSite, removeTempDirs, tempDir } from './fixtures/sw-helpers.ts';
+import { removeTempDirs, tempDir } from './fixtures/sw-helpers.ts';
+import { removeBuilds, siteFor } from './helpers.ts';
 import { startCfLike } from './server/cf-like.mjs';
 import type { CfLike } from './server/cf-like.mjs';
 
 let server: CfLike | undefined;
 test.afterEach(async () => { await server?.close(); server = undefined; });
-test.afterAll(() => removeTempDirs());
+test.afterAll(() => { removeTempDirs(); removeBuilds(); });
+// Storage, not looks: once per browser size, in the dark theme only, so the run stays inside its time.
+test.skip(({ colorScheme }) => colorScheme === 'light', 'storage, not the theme');
 
 const ready = (page: Page) => page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY === true');
 const saved = (page: Page) => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter((k) => k.startsWith('loadcheck:')).sort().map((k) => [k, localStorage.getItem(k)])));
@@ -61,8 +64,7 @@ test('[LC-MOVE-PLANS] hand placements, ticks, setups, three bikes and an old pre
   expect((JSON.parse(before['loadcheck:setups']!) as unknown[]).length).toBe(2);
 
   // The launch: the same origin now serves the launch build, and the rider opens the bag planner at its new address.
-  const next = await buildSite({ launch: true });
-  server.swap(next.dir);
+  server.swap(await siteFor(true)); // the launch build this worker already has
   await page.goto(`${server.origin}/tools/bags/`, { waitUntil: 'domcontentloaded' });
   await ready(page);
   await page.waitForTimeout(600);
