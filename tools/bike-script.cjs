@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS, so the QA suites (plain Node scripts) can require it too */
 // The bag planner's bike module, /tools/bags/bike.js (spec section 7.4): one entry for the build and for Load Check's QA suites, so
 // both run the same code. A classic script that sets window.WayfinchBike.
 const path=require('node:path');
