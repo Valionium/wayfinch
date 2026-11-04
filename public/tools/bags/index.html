@@ -3164,10 +3164,12 @@ function useBikeProfile(value){
   // A plan bike that is in no saved list would be gone for good: keep it, with the kit choices it set, so Undo brings it back.
   const was=S.bikeProfile ? normaliseBikeProfile(S.bikeProfile) : null,next=normaliseBikeProfile(value);
   if(was && (!next || next.id!==was.id) && !BIKE_PROFILES.some(b=>b.id===was.id)){
-    BIKE_SWAPS.push({prev:was,kit:{...S.kit},newId:next ? next.id : null});BIKE_SWAPS.splice(0,Math.max(0,BIKE_SWAPS.length-5));
+    BIKE_SWAPS.push({prev:was,kit:{...S.kit},touched:{...(S.kitTouched||{})},newId:next ? next.id : null});BIKE_SWAPS.splice(0,Math.max(0,BIKE_SWAPS.length-5));
   }
   S.bikeProfile=next;
   applyTripKitDefaults();
+  const swap=BIKE_SWAPS[BIKE_SWAPS.length-1];
+  if(swap && !swap.after && swap.newId===(next ? next.id : null))swap.after={...S.kit};   // what the swap's starting choices set
   queueDraftSave();
   renderBikeProfiles(true);renderPressureHelper();renderKit();if(S.step===4)renderResult();drawRig();
 }
@@ -3286,7 +3288,11 @@ function liveBikeSwap(){
 function undoBikeSwap(){
   const s=liveBikeSwap();if(!s || BIKE_PROFILE_BUSY)return false;
   BIKE_SWAPS.pop();
-  S.bikeProfile=normaliseBikeProfile(s.prev);S.kit={...s.kit};
+  S.bikeProfile=normaliseBikeProfile(s.prev);
+  // Only the kit items the swap's starting choices changed, and that the rider has not changed since, go back; every choice the
+  // rider made after the swap stays.
+  const after=s.after || {},touched=S.kitTouched || {},riderSince=id=>!!touched[id] && !s.touched[id];
+  for(const [id,before] of Object.entries(s.kit))if(Object.hasOwn(after,id) && after[id]!==before && S.kit[id]===after[id] && !riderSince(id))S.kit[id]=before;
   queueDraftSave();persistBikeProfileSelection();
   BIKE_PROFILE_MESSAGE=bikeWord('swapUndone',{name:s.prev.name});
   renderBikeProfiles(true);renderPressureHelper();renderKit();if(S.step===4)renderResult();drawRig();

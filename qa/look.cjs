@@ -273,6 +273,40 @@ test('[LC-LOOK-DEEP] the fragment is read exactly: no bike id turns on dev mode 
   assert.ok(/S\.devMode *= *hashFlags\(/.test(p.script.slice(p.script.indexOf('/* ==== 95-init.js ==== */'))),'95-init uses hashFlags');
 });
 
+test('[LC-LOOK-UNDO] Undo of a replaced bike keeps every kit choice made since: only what the swap alone changed goes back',async()=>{
+  // A tubeless plan bike: its starting kit has tyre plugs; the new, empty bike's has none
+  const tubeless={...UNSAVED,tyres:'tubeless'};
+  const p=page({plan:tubeless,library:[]});
+  p.run("Object.keys(S.kit).forEach(k=>S.kit[k]=false);KIT.forEach(k=>S.kit[k.id]=!!k.on);S.kitTouched={};applyTripKitDefaults();");
+  const plan=p.stored('loadcheck:bikeProfile'),bike=p.run('JSON.stringify(S.bikeProfile)');
+  assert.equal(p.json('S.kit.plugs'),true,'A starts with plugs');
+  const kitA=p.json('S.kit');
+  open(p);
+  p.run('startNewBike()');
+  p.run("quickPickStyle('compact')");
+  await settleAll(p);
+  assert.notEqual(p.json('S.bikeProfile.id'),UNSAVED.id,'the new bike replaced A');
+  assert.equal(p.json('S.kit.plugs'),false,'the swap took the plugs off');
+  // the rider's own choice after the swap: a lock packed by hand
+  const lockA=kitA.lock;
+  p.run(`S.kit.lock=${!lockA};S.kitTouched.lock=true;`);
+  const kitBefore=p.json('S.kit');
+  const other=p.run('JSON.stringify({placements:S.placements,packed:S.packed,pinned:S.pinned,bags:S.bags,qty:S.qty,kitTouched:S.kitTouched})');
+  p.run('undoBikeSwap()');
+  await settleAll(p);
+  assert.equal(p.run('JSON.stringify(S.bikeProfile)'),bike,'bike A is back, its look included');
+  assert.equal(p.stored('loadcheck:bikeProfile'),plan,'and its stored copy');
+  assert.equal(p.json('S.kit.lock'),!lockA,'the rider\'s lock stays as the rider set it');
+  assert.equal(p.json('S.kit.plugs'),true,'the plugs the swap alone took off come back');
+  const kitAfter=p.json('S.kit');
+  for(const id of Object.keys(kitBefore)){
+    if(id==='plugs')continue;
+    const swapChanged=kitA[id]!==kitBefore[id] && id!=='lock';
+    assert.equal(kitAfter[id],swapChanged ? kitA[id] : kitBefore[id],`kit ${id}`);
+  }
+  assert.equal(p.run('JSON.stringify({placements:S.placements,packed:S.packed,pinned:S.pinned,bags:S.bags,qty:S.qty,kitTouched:S.kitTouched})'),other,'placements, ticks and the rest byte for byte');
+});
+
 (async()=>{
   for(const [name,fn] of tests){await fn();passed++;console.log('ok',name);}
   console.log(`${passed} look tests passed`);

@@ -7,11 +7,16 @@ import { bannedHits } from '../../fixtures/banned.ts';
 const require = createRequire(import.meta.url);
 const { appVM } = require('../../../qa/app-vm.cjs') as { appVM: () => { run: (code: string) => unknown; html: string } };
 
-test('[LC-WORDS] no word of §8\'s list in the bike wording table, Look and the photo picker included; every limit sentence says "you entered"', () => {
+test('[LC-WORDS] no word of §8\'s list nor of the bag planner\'s own stricter list in the bike wording table, Look and the photo picker included; every limit sentence says "you entered"', () => {
   const page = appVM();
   const words = JSON.parse(page.run('JSON.stringify(Object.entries(BIKE_WORDING))') as string) as [string, { text: string; limit?: boolean }][];
   expect(words.length).toBeGreaterThan(40);
-  for (const [key, w] of words) expect(bannedHits(w.text), key).toEqual([]);
+  // §8's list, and the bag planner's own stricter words for its bike strings
+  const own = /warning|error|fail|invalid|must|safe|OK|okay|approv|certif|guarant/i;
+  for (const [key, w] of words) {
+    expect(bannedHits(w.text), key).toEqual([]);
+    expect(own.test(w.text), `${key}: ${w.text}`).toBe(false);
+  }
   const limits = words.filter(([, w]) => w.limit);
   expect(limits.length).toBeGreaterThanOrEqual(4);
   for (const [key, w] of limits) expect(w.text, key).toContain('you entered');
@@ -22,6 +27,9 @@ test('[LC-WORDS] no word of §8\'s list in the bike wording table, Look and the 
   const html = page.html;
   const dialog = html.slice(html.indexOf('id="bikeDetailsBox"'), html.indexOf('id="maxWeightBox"')).replace(/<[^>]+>/g, ' ');
   expect(bannedHits(dialog)).toEqual([]);
+  expect(dialog.match(own)).toBeNull();
   // and the swatch names the picker shows
-  expect(bannedHits(page.run('window.WayfinchBike.SWATCHES.map(s=>s.name).join(" ")') as string)).toEqual([]);
+  const swatches = page.run('window.WayfinchBike.SWATCHES.map(s=>s.name).join(" ")') as string;
+  expect(bannedHits(swatches)).toEqual([]);
+  expect(own.test(swatches)).toBe(false);
 });
