@@ -181,6 +181,46 @@ test('[C-DELETE-FRAGMENT] #copilot-delete= with no stored valid request deletes 
   assert.ok(!q.log.some(x=>x.startsWith('history:')),'no fragment, nothing to remove');
 });
 
+// ---- Contract 1: the load summary (spec 7.1). Its contents are checked against the schema in tests/unit/contracts/load-summary-page.test.ts ----
+test('[C-SUMMARY-WRITE] written once at start-up when the draft is ready; after a save only when it differs; no bags is {app, kind, v, at, empty}',async()=>{
+  const p=page();
+  const writes=[];const set=p.localStorage.setItem;p.localStorage.setItem=(k,v)=>{if(k==='loadcheck:summary:v1')writes.push(v);set(k,v);};
+  const html=fs.readFileSync(PAGE,'utf8'),init=html.slice(html.indexOf('/* ==== 95-init.js ==== */'));
+  assert.ok(/DRAFT_READY = true;\s*writeLoadSummary\(true\);/.test(init),'start-up writes it as soon as the draft is ready');
+  p.run('DRAFT_READY=true;S.bags=[];');
+  assert.equal(p.run('writeLoadSummary(true)'),true);
+  const empty=JSON.parse(writes.at(-1));
+  assert.deepEqual(Object.keys(empty),['app','kind','v','at','empty']);
+  assert.deepEqual({...empty,at:null},{app:'load-check',kind:'load-summary',v:1,at:null,empty:true});
+  // a save that changes the load writes it; a save that changes nothing it holds (a tick) does not
+  p.run('S.bags=[{uid:1,pos:"seat",L:14}];S.nextUid=2;S.kit.tent=true;');
+  await p.run('flushDraft()');
+  assert.equal(writes.length,2,'the save with a bag wrote it');
+  const full=JSON.parse(writes.at(-1));
+  assert.equal(full.bags.count,1);
+  assert.equal(full.planUpdatedAt,JSON.parse(p.stored('loadcheck:draft')).updatedAt,'planUpdatedAt is the saved plan\'s version');
+  p.run('S.packed.tent=true;');
+  await p.run('flushDraft()');
+  assert.equal(writes.length,2,'a tick saves the plan, and the summary says the same: not written');
+  p.run('S.bags.push({uid:2,pos:"frame",L:5});S.nextUid=3;');
+  await p.run('flushDraft()');
+  assert.equal(writes.length,3,'another bag: written');
+  // Start a new plan replaces it before reloading
+  let reloaded=0;p.context.window.location.reload=()=>{reloaded++;assert.equal(JSON.parse(p.stored('loadcheck:summary:v1')).empty,true,'replaced first');};
+  p.run('persistBikeProfileSelection=async()=>true;');
+  p.nodes.get('draftNew').dataset.confirm='yes';
+  await p.run("$('draftNew').onclick()");
+  assert.equal(reloaded,1);
+  assert.equal(JSON.parse(p.stored('loadcheck:summary:v1')).empty,true);
+});
+
+test('[C-SUMMARY-WRITE] a tab that saw another apply a delete request writes no summary',()=>{
+  const p=page();
+  p.run('DRAFT_READY=true;S.bags=[{uid:1,pos:"seat",L:14}];DELETED_ELSEWHERE=true;');
+  assert.equal(p.run('writeLoadSummary(true)'),false);
+  assert.equal(p.stored('loadcheck:summary:v1'),null);
+});
+
 // ---- Offline at /tools/bags/: the site's one worker (spec 7.1 item 6), and the line after the emergency switch (Decision 9) ----
 // A browser with a service worker container the test controls: `cached` says whether the site's copy is there.
 function offlinePage({storage=sharedStore(),cached=false}={}){
@@ -254,6 +294,36 @@ test('[LC-OFFLINE-AGAIN] Not now dismisses the line for good; the next visit wit
   const next=offlinePage({storage,cached:false});
   await next.run('initialiseOfflinePacking()');await next.settle();
   assert.equal(next.json('OFFLINE_AGAIN.shown'),false);
+});
+
+// ---- Outbound precision (spec 7.1 item 8) ----
+test('[LC-PRECISION] Nominatim gets the ends rounded to 0.01 degrees; elevation and terrain lookups go at 3 decimals, all through one function',async()=>{
+  const p=page();
+  const urls=[];
+  p.context.qaFetch=async url=>{urls.push(url);return url.includes('nominatim') ? {address:{town:'Heidelberg',state:'BW',country:'Germany',country_code:'de'}} : {elevation:[114,120]};};
+  p.run('fetchJson=qaFetch;');
+  await p.run('reverseName(49.412345,8.694567)');
+  assert.ok(urls[0].startsWith('https://nominatim.openstreetmap.org/reverse?') && urls[0].endsWith('&lat=49.41&lon=8.69'),'ends rounded to 0.01 degrees');
+  await p.run('reverseName(-0.004999,179.996)');
+  assert.ok(urls[1].endsWith('&lat=0.00&lon=180.00'));
+  await p.run('elevationsFor([{lat:49.412345,lon:8.694567},{lat:48.5734567,lon:7.7521234}])');
+  assert.ok(urls[2].includes('latitude=49.412,48.573&longitude=8.695,7.752'),'3 decimals');
+  const html=fs.readFileSync(PAGE,'utf8');
+  assert.equal((html.match(/ELEV_URL/g)||[]).length,2,'the elevation address is defined once and used once: in elevationsFor');
+  assert.equal((html.match(/api\.open-meteo\.com\/v1\/elevation/g)||[]).length,1);
+  assert.equal((html.match(/nominatim\.openstreetmap\.org\/reverse/g)||[]).length,1,'one Nominatim call, in reverseName');
+});
+
+// ---- Contract 2's hook (the handoff itself is group 2's cut): gpx.copilotRoute is kept by normalisePlan ----
+test('Contract 2 hook: a stored gpx.copilotRoute survives normalisePlan; anything that is not a route hash is dropped',()=>{
+  const p=page();
+  const gpx=p.run(`JSON.stringify(normaliseGPX({pts:[{lat:49,lon:8,elev:100,t:0,km:0},{lat:49.01,lon:8,elev:110,t:1,km:1.1119492664455877}],km:1.1,ascent:10,elevationSource:'file',hadElev:true}))`);
+  assert.ok(gpx && gpx!=='null','a plain route reads');
+  const hash='ab'.repeat(32);
+  p.context.qaGpx=gpx;p.context.qaHash=hash;
+  assert.equal(p.run('normaliseGPX({...JSON.parse(qaGpx),copilotRoute:qaHash}).copilotRoute'),hash);
+  assert.equal(p.run('"copilotRoute" in normaliseGPX({...JSON.parse(qaGpx),copilotRoute:"not a hash"})'),false);
+  assert.equal(p.run('"copilotRoute" in normaliseGPX(JSON.parse(qaGpx))'),false,'a route without it is unchanged');
 });
 
 (async()=>{

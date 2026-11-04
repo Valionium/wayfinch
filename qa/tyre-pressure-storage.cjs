@@ -1,82 +1,125 @@
+'use strict';
+// The tyre helper has left the bag planner (spec 7.1 item 3; sub-project 6, Task 6). Rewritten from the suite of the same name:
+// the saved tyrePressure and bikeProfile.pressure stay in the data format, without UI, and survive a save and an export; a new plan
+// clears the plan's; the rider's body weight is cleared everywhere it was stored. The tyre tool's own tests are in tests/unit/tools/tyre/.
 const assert=require('node:assert/strict');
-const {appVM}=require('./app-vm.cjs');
+const fs=require('node:fs');
+const {appVM,sharedStore}=require('./app-vm.cjs');
+const {page:PAGE}=require('./paths.cjs');
 let checks=0;
 const check=(value,message)=>{assert.ok(value,message);checks++;};
+const HARDWARE={bikeKg:12.3,wheel:'700c',rim:'hookless',rimMm:25,frontMm:45,rearMm:43,
+  frontCasing:'standard',rearCasing:'reinforced',frontMinBar:1.5,frontMaxBar:4,rearMinBar:1.7,rearMaxBar:4.2};
+const RECORD={frontBar:2,rearBar:2.2,inputKey:'{"systemKg":100.7}',source:'sram-axs',recordedAt:'2026-10-04T01:00:00.000Z'};
+const PRESSURE={riderKg:75,bagKg:2,extraKg:.4,waterL:1.5,bodyLoadKg:1,method:'estimate',loadedBikeKg:25.7,ride:'gravel',surface:'wet',unit:'psi',record:RECORD};
+const KEPT={...PRESSURE,riderKg:null};
+
 (async()=>{
+  // ---- [LC-NO-HELPER] ----
+  {
+    const html=fs.readFileSync(PAGE,'utf8');
+    const markup=html.slice(0,html.indexOf('<script>')),script=html.slice(html.indexOf('<script>'));
+    // assert.ok on booleans only: an assertion on the page's text would print the page
+    check(!/axs\.sram\.com|sram(?!-axs')/i.test(html),'[LC-NO-HELPER] no SRAM link or text anywhere in the page');
+    check((script.match(/sram/gi)||[]).length===2 && /source==='sram-axs'/.test(script),'[LC-NO-HELPER] "sram-axs" only as the stored record\'s source, kept by the normaliser');
+    for(const id of ['pressureToolBox','pressureToolOpen','pressureToolFromCheck','tyrePressurePanel','pressureRider','pressureMethod','pressureFront','pressureRear',
+      'pressureConfirmed','pressureSave','pressureCopy','pressureBagKg','bikeToolEdit','pressureEditBike'])
+      check(!markup.includes('id="'+id+'"') && !script.includes("'"+id+"'"),'[LC-NO-HELPER] no markup or call site for '+id);
+    for(const fn of ['renderPressureHelper','openPressureTool','closePressureTool','initialisePressureHelper','savePressureSuggestions','pressurePreparedInputs',
+      'loadedSystemWeight','pressureInputKey','pressureRecordHtml','pressureHardwarePending','PRESSURE_PLAN_INPUTS','PRESSURE_BIKE_INPUTS'])
+      check(!html.includes(fn),'[LC-NO-HELPER] no code: '+fn);
+    check(!/\.pressure-(?:panel|check|record|status|link|total|summary)\b|#pressureToolOpen/.test(markup),'[LC-NO-HELPER] no CSS of the helper');
+    const form=markup.slice(markup.indexOf('id="bikeProfileForm"'),markup.indexOf('</form>',markup.indexOf('id="bikeProfileForm"')));
+    check(form.includes('id="bikeBaseKg"'),'[LC-NO-HELPER] the bike weight is still edited in Bike details');
+    for(const id of ['bikeWheel','bikeRim','bikeRimMm','bikeFrontMm','bikeRearMm','bikeFrontCasing','bikeRearCasing','bikeFrontMin','bikeFrontMax','bikeRearMin','bikeRearMax'])
+      check(!markup.includes('id="'+id+'"'),'[LC-NO-HELPER] the other tyre and rim fields are gone from the dialog: '+id);
+    // every element the code reaches by id is still in the page (static, or made by the page's own templates)
+    const ids=new Set([...html.matchAll(/\bid="([^"$]+)"/g)].map(m=>m[1])),dynamic=new Set(['routeVisuals']);
+    const reached=[...new Set([...script.matchAll(/\$\('([A-Za-z0-9_-]+)'\)|getElementById\('([A-Za-z0-9_-]+)'\)/g)].map(m=>m[1]||m[2]))];
+    check(reached.length>100 && reached.every(id=>ids.has(id)||dynamic.has(id)),'[LC-NO-HELPER] no call site is left for a removed element: '+reached.filter(id=>!ids.has(id)&&!dynamic.has(id)).join(', '));
+    check(!/Tyre pressure/.test(script.slice(script.indexOf('const WALKTHROUGH_CARDS'),script.indexOf('let WALKTHROUGH_INDEX'))),'[LC-NO-HELPER] the walkthrough no longer points at the helper');
+  }
+
+  // ---- the data format, as before: every preserved field normalises faithfully ----
   const q=appVM(),{run}=q;
-  run(`
-    renderBikeProfiles=()=>{};
-    const qaHardware={bikeKg:12.3,wheel:'700c',rim:'hookless',rimMm:25,frontMm:45,rearMm:43,
-      frontCasing:'standard',rearCasing:'reinforced',frontMinBar:1.5,frontMaxBar:4,rearMinBar:1.7,rearMaxBar:4.2};
-    const qaRecord={frontBar:2,rearBar:2.2,inputKey:'{"systemKg":100.7}',source:'sram-axs',recordedAt:'2026-10-04T01:00:00.000Z'};
-    const qaPressure={riderKg:75,bagKg:2,extraKg:.4,waterL:1.5,bodyLoadKg:1,method:'estimate',loadedBikeKg:25.7,
-      ride:'gravel',surface:'wet',unit:'psi',record:qaRecord};
+  // the values are made inside the page's own realm: an object from this one fails the page's dataObject check
+  run(`var qaHardware=${JSON.stringify(HARDWARE)},qaRecord=${JSON.stringify(RECORD)},qaPressure=${JSON.stringify(PRESSURE)};`);
+  run(`renderBikeProfiles=()=>{};
     const qaBike=normaliseBikeProfile({id:'pressure_bike',name:'Pressure bike',tyres:'tubeless',pressure:qaHardware});
-    S.bikeProfile=qaBike;S.tyrePressure=normaliseTyrePressure(qaPressure);BIKE_PROFILES=[qaBike];
-    const qaCaptured=captureDraft();
-    const qaSetup=normaliseSetup({...qaCaptured,id:'pressure_setup',name:'Pressure trip',saved:'2026-10-04',
-      predicted:{mounted:35,kit:31,spare:4,spilled:0,kg:14}});
-    SETUPS=[qaSetup];
-    const qaExport=exportAll();
-  `);
-  check(run('qaCaptured.bikeProfile.pressure!==S.bikeProfile.pressure && qaCaptured.tyrePressure.record!==S.tyrePressure.record'),'hardware and pressure records capture independent snapshots');
-  check(run('JSON.stringify(normalisePressureBike(qaHardware))===JSON.stringify(qaHardware)'),'all measured tyre/rim fields and limits normalize faithfully');
+    S.bikeProfile=qaBike;S.tyrePressure=normaliseTyrePressure(qaPressure);BIKE_PROFILES=[qaBike];DRAFT_READY=true;`);
+  check(run('JSON.stringify(normalisePressureBike(qaHardware))===JSON.stringify(qaHardware)'),'all tyre/rim fields and limits normalise faithfully');
   check(run('normalisePressureBike(null).bikeKg===null && normalisePressureBike(null).frontMm===null && normalisePressureBike(null).rim==="unknown"'),'absent hardware remains explicitly unknown');
-  check(run('normalisePressureBike({bikeKg:"",rimMm:"",frontMm:"",frontMaxBar:""}).bikeKg===null && normalisePressureBike({frontMaxBar:""}).frontMaxBar===null'),'blank masses and limits are never interpreted as zero');
-  check(run('normalisePressureBike({frontMinBar:0,rearMinBar:"0"}).frontMinBar===0 && normalisePressureBike({rearMinBar:"0"}).rearMinBar===0'),'explicit zero minimum limits are retained');
-  check(run('normalisePressureBike({bikeKg:101,rimMm:4,frontMm:9,rearMm:151,frontMaxBar:16,rearMaxBar:-1}).bikeKg===null && normalisePressureBike({frontMaxBar:16}).frontMaxBar===null'),'out-of-range hardware measurements are not accepted');
-  check(run('normalisePressureBike({frontMinBar:5,frontMaxBar:4}).frontMinBar===5'),'contradictory valid limits remain visible for UI validation rather than silently being swapped');
-  check(run('normalisePressureBike({wheel:"<script>",rim:"bad",frontCasing:"bad"}).wheel==="unknown" && normalisePressureBike({rim:"bad"}).rim==="unknown"'),'unknown enum values fall back without executing imported data');
-  check(run('normaliseTyrePressure(null).riderKg===null && normaliseTyrePressure(null).bagKg===null && normaliseTyrePressure(null).waterL===null'),'old plans use incomplete blank masses and full-cage water default');
-  check(run('normaliseTyrePressure(null).extraKg===0 && normaliseTyrePressure({extraKg:"",bodyLoadKg:" "}).extraKg===0 && normaliseTyrePressure({bodyLoadKg:" "}).bodyLoadKg===0'),'missing and blank optional masses use explicit clean zero defaults');
-  check(run('normaliseTyrePressure({extraKg:null,bodyLoadKg:null}).extraKg===null && normaliseTyrePressure({extraKg:null,bodyLoadKg:null}).bodyLoadKg===null'),'explicit unknown optional masses remain unknown');
-  check(run('normaliseTyrePressure({bagKg:"0",waterL:"0"}).bagKg===0 && normaliseTyrePressure({waterL:"0"}).waterL===0'),'explicit zero empty luggage and empty bottle water stay valid');
-  check(run('normaliseTyrePressure({riderKg:351,bagKg:51,extraKg:-1,loadedBikeKg:251,bodyLoadKg:101}).riderKg===null && normaliseTyrePressure({bagKg:51}).bagKg===null'),'invalid plan masses are bounded');
-  check(run('normaliseTyrePressure({extraKg:101,bodyLoadKg:-1}).extraKg===null && normaliseTyrePressure({extraKg:101,bodyLoadKg:-1}).bodyLoadKg===null'),'invalid optional masses are not masked as zero');
-  check(run('normaliseTyrePressure({method:"bad",ride:"bad",surface:"bad",unit:"bad"}).method==="estimate" && normaliseTyrePressure({ride:"bad"}).ride==="gravel"'),'unsupported pressure options use clean defaults');
-  check(run('normaliseTyrePressure(qaPressure).record.frontBar===2 && normaliseTyrePressure(qaPressure).unit==="psi"'),'recorded pressures stay canonical bar while display unit is separate');
-  check(run('normaliseTyrePressure({...qaPressure,record:{...qaRecord,frontBar:0}}).record===null && normaliseTyrePressure({...qaPressure,record:{...qaRecord,rearBar:16}}).record===null'),'impossible recorded pressure values are discarded');
-  check(run('normaliseTyrePressure({...qaPressure,record:{...qaRecord,source:"other"}}).record===null'),'unsupported record source is not presented as SRAM');
-  check(run('normaliseTyrePressure({...qaPressure,record:{...qaRecord,recordedAt:"2026-10-04"}}).record===null && normaliseTyrePressure({...qaPressure,record:{...qaRecord,recordedAt:"2026-02-31T01:00:00.000Z"}}).record===null'),'record needs valid ISO timestamp rather than ambiguous date or invalid day');
-  check(run('normaliseTyrePressure({...qaPressure,record:{...qaRecord,inputKey:""}}).record===null && normaliseTyrePressure({...qaPressure,record:{...qaRecord,inputKey:"x".repeat(6001)}}).record===null'),'missing and oversized original input contexts are rejected');
-  check(run('normalisePlan({...qaCaptured,tyrePressure:undefined}).tyrePressure.record===null && normalisePlan({...qaCaptured,tyrePressure:undefined}).tyrePressure.bagKg===null'),'legacy plans remain usable without a pressure helper');
-  check(run('normaliseBikeProfile({id:"legacy_bike",name:"Legacy"}).pressure.frontMm===null'),'legacy reusable bikes gain blank hardware fields');
-  run('S.tyrePressure={...qaPressure,extraKg:101,bodyLoadKg:-1};const qaInvalidMassPlan=captureDraft();');
-  check(run('qaInvalidMassPlan.tyrePressure.extraKg===null && normalisePlan(qaInvalidMassPlan).tyrePressure.bodyLoadKg===null'),'invalid optional masses remain incomplete through capture and normalization');
-  await run('importAll(JSON.stringify({draft:qaInvalidMassPlan}))');
-  check(run('IMPORTED_DRAFT.tyrePressure.extraKg===null && IMPORTED_DRAFT.tyrePressure.bodyLoadKg===null'),'invalid imported optional masses remain incomplete until corrected');
-  run('SETUPS=[];BIKE_PROFILES=[];S.tyrePressure=normaliseTyrePressure({riderKg:55});');
-  await run('importAll(qaExport)');
-  check(run('BIKE_PROFILES[0].pressure.rimMm===25 && SETUPS[0].bikeProfile.pressure.frontMaxBar===4'),'reusable and saved hardware round trip together');
-  check(run('S.tyrePressure.riderKg===55 && IMPORTED_DRAFT.tyrePressure.riderKg===75 && IMPORTED_DRAFT.tyrePressure.record.frontBar===2'),'import does not overwrite current helper inputs until working plan is explicitly used');
-  check(run('SETUPS[0].tyrePressure.bodyLoadKg===1 && SETUPS[0].tyrePressure.record.inputKey===qaRecord.inputKey'),'saved record and original context round trip without recalculation');
-  check(JSON.parse(q.values.get('loadcheck:bikeProfiles'))[0].pressure.rearCasing==='reinforced','reusable hardware is saved durably');
-  run(`
-    renderClimate=()=>{};renderBags=()=>{};renderKit=()=>{};drawRig=()=>{};ensureClimate=()=>{};ensureRoute=()=>{};
-    BIKE_PROFILES[0].pressure.frontMm=50;
-    restorePlan(qaSetup,true,false);
-  `);
-  check(run('S.bikeProfile.pressure.frontMm===45 && S.tyrePressure.record.rearBar===2.2 && S.tyrePressure.riderKg===75'),'restoring saved trip retains its own hardware and recorded-pressure context');
-  await run('BIKE_PROFILE_WRITES');
-  check(JSON.parse(q.values.get('loadcheck:bikeProfile')).pressure.frontMm===45,'selected exact hardware snapshot persists for a future plan');
-  const comparison=run('setupComparisonRows(qaSetup,{...qaSetup,tyrePressure:{...qaPressure,bagKg:3,record:{...qaRecord,rearBar:2.5,inputKey:"different-context"}}})');
-  check(comparison.some(row=>row.name==='Tyre pressure · Empty luggage and fittings' && row.left==='2 kg' && row.right==='3 kg'),'saved comparison shows helper mass changes');
-  check(comparison.some(row=>row.name==='Tyre pressure · Recorded rear' && row.left==='2.2 bar' && row.right==='2.5 bar'),'saved comparison records exact canonical pressure changes');
-  check(comparison.some(row=>row.name==='Tyre pressure · Calculator inputs used' && row.left!==row.right),'different original calculator inputs are called out');
-  run(`
-    S.bikeProfile=qaBike;S.tyrePressure=normaliseTyrePressure({...qaPressure,method:'weighed',record:null});
-    for(let i=0;i<120;i++){
-      const id='x_'+String(i).padStart(3,'0')+'_'+'a'.repeat(74);
-      KIT.push({id,name:'Large-kit item '+i,cat:'Person',L:.01,kg:.01,pref:['frame'],added:true});S.kit[id]=true;
-    }
-    const qaLargeKey=pressureInputKey();
-    S.tyrePressure=normaliseTyrePressure({...S.tyrePressure,record:{...qaRecord,inputKey:qaLargeKey}});
-    const qaLargePlan=captureDraft();
-  `);
-  check(run('pressurePreparedInputs().ready && qaLargeKey.length<=6000 && qaLargePlan.tyrePressure.record!==null'),'large valid kit has a bounded signature and preserves recorded pressures on capture');
-  await run('importAll(JSON.stringify({draft:qaLargePlan}))');
-  check(run('IMPORTED_DRAFT.addedKit.length===120 && IMPORTED_DRAFT.tyrePressure.record.inputKey===qaLargeKey'),'120 long-id custom items and pressure context round trip without silently dropping record');
-  run(`S.custom['x_000_'+'a'.repeat(74)]={L:.01,kg:.02,rigid:0};`);
-  check(run('pressureInputKey()!==qaLargeKey && pressureRecordState().stale'),'compact fingerprint detects a changed custom-item weight and marks the recorded pressure stale');
+  check(run('normalisePressureBike({bikeKg:"",rimMm:"",frontMm:"",frontMaxBar:""}).bikeKg===null && normalisePressureBike({frontMaxBar:""}).frontMaxBar===null'),'blank masses and limits are never read as zero');
+  check(run('normalisePressureBike({frontMinBar:0,rearMinBar:"0"}).frontMinBar===0 && normalisePressureBike({rearMinBar:"0"}).rearMinBar===0'),'explicit zero minimum limits are kept');
+  check(run('normalisePressureBike({bikeKg:101,rimMm:4,frontMm:9,rearMm:151,frontMaxBar:16,rearMaxBar:-1}).bikeKg===null && normalisePressureBike({frontMaxBar:16}).frontMaxBar===null'),'out-of-range values are not accepted');
+  check(run('normalisePressureBike({wheel:"<script>",rim:"bad",frontCasing:"bad"}).wheel==="unknown" && normalisePressureBike({rim:"bad"}).rim==="unknown"'),'unknown enum values fall back');
+  check(run('normaliseTyrePressure(null).bagKg===null && normaliseTyrePressure(null).waterL===null && normaliseTyrePressure(null).extraKg===0'),'old plans read as blank, with clean zero defaults');
+  check(run('normaliseTyrePressure({bagKg:"0",waterL:"0"}).bagKg===0 && normaliseTyrePressure({bagKg:51}).bagKg===null'),'the bags\' own weight is bounded and an explicit zero stays');
+  check(run('normaliseTyrePressure(qaPressure).record.frontBar===2 && normaliseTyrePressure(qaPressure).unit==="psi"'),'a recorded pressure stays canonical bar with its display unit');
+  check(run('normaliseTyrePressure({...qaPressure,record:{...qaRecord,frontBar:0}}).record===null && normaliseTyrePressure({...qaPressure,record:{...qaRecord,source:"other"}}).record===null'),'impossible or foreign records are dropped, as before');
+  check(run('normalisePlan({...captureDraft(),tyrePressure:undefined}).tyrePressure.record===null'),'plans without the field stay usable');
+
+  // ---- [LC-TYRE-KEPT] ----
+  {
+    const captured=JSON.parse(run('JSON.stringify(captureDraft())'));
+    check(JSON.stringify(captured.tyrePressure)===JSON.stringify(KEPT),'[LC-TYRE-KEPT] a save keeps every tyrePressure field (the body weight aside)');
+    check(JSON.stringify(captured.bikeProfile.pressure)===JSON.stringify(HARDWARE),'[LC-TYRE-KEPT] a save keeps bikeProfile.pressure unchanged');
+    const exported=JSON.parse(run('exportAll()'));
+    check(JSON.stringify(exported.draft.tyrePressure)===JSON.stringify(KEPT) && JSON.stringify(exported.draft.bikeProfile.pressure)===JSON.stringify(HARDWARE),'[LC-TYRE-KEPT] an export keeps both unchanged');
+    check(JSON.stringify(exported.bikeProfiles[0].pressure)===JSON.stringify(HARDWARE),'[LC-TYRE-KEPT] the saved bike in an export keeps its tyre fields');
+    check(JSON.stringify(JSON.parse(run('JSON.stringify(normalisePlan(JSON.parse(JSON.stringify(captureDraft()))))')).tyrePressure)===JSON.stringify(KEPT),'[LC-TYRE-KEPT] a read-back of the saved plan keeps them');
+    // Bike details edits only the weight: the hidden tyre fields come through an edit and Use these bike details unchanged
+    run('persistBikeProfileSelection=async()=>true;fillBikeProfileForm(S.bikeProfile);');
+    q.nodes.get('bikeBaseKg').value='13.1';
+    check(await run('applyBikeDetails()')!==false,'[LC-TYRE-KEPT] the bike applies');
+    const pressure=JSON.parse(run('JSON.stringify(S.bikeProfile.pressure)'));
+    check(JSON.stringify(pressure)===JSON.stringify({...HARDWARE,bikeKg:13.1}),'[LC-TYRE-KEPT] only the weight changed; every other tyre field kept');
+    // a saved setup restored keeps its own copy
+    run(`const qaSetup=normaliseSetup({...captureDraft(),id:'pressure_setup',name:'Pressure trip',saved:'2026-10-04',predicted:{mounted:35,kit:31,spare:4,spilled:0,kg:14}});
+      renderClimate=()=>{};renderBags=()=>{};renderKit=()=>{};drawRig=()=>{};ensureClimate=()=>{};ensureRoute=()=>{};S.tyrePressure=normaliseTyrePressure(null);restorePlan(qaSetup,true,false);`);
+    check(run('S.tyrePressure.record.rearBar===2.2 && S.tyrePressure.bagKg===2 && S.bikeProfile.pressure.frontMm===45'),'[LC-TYRE-KEPT] a restored setup keeps its own tyre data');
+  }
+  // Start a new plan: the plan's tyre data goes with the plan
+  {
+    const storage=sharedStore();
+    const p=appVM({storage});
+    p.run(`var qaPressure=${JSON.stringify(PRESSURE)};`);
+    let reloaded=0;p.context.window.location.reload=()=>{reloaded++;};
+    p.run(`renderBikeProfiles=()=>{};S.tyrePressure=normaliseTyrePressure(qaPressure);S.bags=[{uid:1,pos:'seat',L:10}];S.nextUid=2;DRAFT_READY=true;`);
+    await p.run('flushDraft()');
+    check(JSON.parse(storage.values.get('loadcheck:draft')).tyrePressure.record.frontBar===2,'the plan holds its tyre data before the reset');
+    p.nodes.get('draftNew').dataset.confirm='yes';
+    await p.run("$('draftNew').onclick()");
+    check(reloaded===1 && storage.values.get('loadcheck:draft')==='null','[LC-TYRE-KEPT] Start a new plan clears the stored plan, its tyre data with it');
+  }
+
+  // ---- [LC-RIDER-GONE] ----
+  {
+    check(run('normaliseTyrePressure({riderKg:75}).riderKg===null && normaliseTyrePressure({riderKg:"80"}).riderKg===null'),'[LC-RIDER-GONE] the normaliser never keeps a body weight');
+    const storage=sharedStore();
+    const p=appVM({storage});
+    const oldPlan={trip:{month:5,nights:2},bags:[{uid:1,pos:'seat',L:14}],kit:{},tyrePressure:{...PRESSURE,riderKg:82.5},bikeProfile:{id:'b',name:'B',pressure:HARDWARE},updatedAt:'2026-10-30T08:00:00.000Z'};
+    const setups=[{id:'st1',name:'One',saved:'2026-10-01',tyrePressure:{...PRESSURE,riderKg:70}},{id:'st2',name:'Two',saved:'2026-10-02',tyrePressure:{bagKg:1}},{id:'st3',name:'Three',saved:'2026-10-03'}];
+    storage.values.set('loadcheck:draft',JSON.stringify(oldPlan));
+    storage.values.set('loadcheck:setups',JSON.stringify(setups));
+    p.run('clearStoredRiderWeight()');
+    const draft=JSON.parse(storage.values.get('loadcheck:draft'));
+    check(draft.tyrePressure.riderKg===null,'[LC-RIDER-GONE] the stored plan\'s body weight is cleared at first load');
+    const {updatedAt,...rest}=draft,{updatedAt:was,...before}=oldPlan;
+    check(JSON.stringify(rest)===JSON.stringify({...before,tyrePressure:{...PRESSURE,riderKg:null}}),'[LC-RIDER-GONE] every other byte of the plan stays');
+    check(Date.parse(updatedAt)>Date.parse(was),'[LC-RIDER-GONE] the plan gets a newer version, so an older tab does not write the weight back');
+    const after=JSON.parse(storage.values.get('loadcheck:setups'));
+    check(JSON.stringify(after)===JSON.stringify([{...setups[0],tyrePressure:{...PRESSURE,riderKg:null}},setups[1],setups[2]]),'[LC-RIDER-GONE] each saved setup\'s body weight is cleared, nothing else');
+    check(![...storage.values.values()].some(v=>/"riderKg":\s*-?[\d"]/.test(v)),'[LC-RIDER-GONE] no stored key holds a body weight afterwards');
+    const second=storage.values.get('loadcheck:draft');
+    p.run('clearStoredRiderWeight()');
+    check(storage.values.get('loadcheck:draft')===second,'[LC-RIDER-GONE] once cleared, a later load writes nothing');
+    const html=fs.readFileSync(PAGE,'utf8'),init=html.slice(html.indexOf('/* ==== 95-init.js ==== */'));
+    check(init.indexOf('clearStoredRiderWeight()')>0 && init.indexOf('clearStoredRiderWeight()')<init.indexOf('store.get(SETUP_KEY)'),'[LC-RIDER-GONE] it runs at start-up, before the plan and setups are read');
+    // an old export brings no body weight back, and an export holds none
+    await run('importAll(JSON.stringify({draft:{...captureDraft(),tyrePressure:{...qaPressure,riderKg:82}}}))');
+    check(run('IMPORTED_DRAFT!==null && IMPORTED_DRAFT.tyrePressure.riderKg===null && IMPORTED_DRAFT.tyrePressure.bagKg===2'),'[LC-RIDER-GONE] an imported old plan carries no body weight, and keeps the rest');
+    check(!/"riderKg":\s*-?\d/.test(run('exportAll()')),'[LC-RIDER-GONE] an export holds no body weight');
+  }
   console.log(JSON.stringify({suite:'tyre-pressure-storage',checks}));
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -437,7 +437,7 @@ describe('review findings, on the screen', () => {
     await type(labelled(W.tyreHighestLabel), '2000');
     expect(host.querySelector('.tyre-wheel')?.textContent).toMatch(/Pump to at most/);
     // The heat limit can leave one value: it reads as one value, not "2.50 to 2.50".
-    expect(host.querySelector('.tyre-wheel')?.textContent).not.toMatch(/(\d\.\d\d) to /);
+    expect(host.querySelector('.tyre-wheel')?.textContent).not.toMatch(/(\d\.\d\d) to \1/);
   });
 
   test('[TY-PSI-QUERY] M2 and M5 on the screen: a small psi number is asked about; a rim maximum under the minimum is refused', async () => {

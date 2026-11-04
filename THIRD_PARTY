@@ -10,8 +10,15 @@ Served from this site today (dist/): nothing from a third party.
 
 Loaded by the page from elsewhere, not bundled and not served from this site:
 
-- Leaflet 1.9.4, BSD 2-Clause licence, copyright Volodymyr Agafonkin and
-  CloudMade, loaded from unpkg.com.
+- Until the launch, the page at / (releases/load-check-root.html) loads
+  Leaflet 1.9.4 from unpkg.com, as it always has.
+
+Served with the launch switch on (vendor/leaflet-1.9.4/), and not before:
+
+- leaflet 1.9.4, BSD-2-Clause, Copyright (c) 2010-2023, Volodymyr Agafonkin;
+  Copyright (c) 2010-2011, CloudMade. The bag planner's street map. Its
+  leaflet.js, leaflet.css and images/ are the npm registry's published
+  package, unchanged, with its LICENSE file beside them.
 
 Served with the launch switch on (data/boundaries.v1.json), and not before:
 

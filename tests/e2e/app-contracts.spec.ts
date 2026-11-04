@@ -128,3 +128,39 @@ test('[LC-OFFLINE-AGAIN] after the switch took the copy: one line, its tap bring
   await page.waitForTimeout(300);
   await expect(page.locator('#offlineAgainBar')).toBeHidden();
 });
+
+/** The home-screen app: no browser bar, so no Back button but the page's own. Chromium can't be put in an installed window here,
+ *  so the page is told it is one before any script, as app-flight's FLOW-INSTALL-OFFLINE does. */
+async function standalone(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const real = window.matchMedia.bind(window);
+    window.matchMedia = (q: string) => (/display-mode:\s*standalone/.test(q)
+      ? ({ matches: true, media: q, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false } as MediaQueryList)
+      : real(q));
+  });
+}
+
+test('[LC-BACK] in the home-screen app, Back to Wayfinch is always at the top and goes to Tools; after Bike details from You, back to You', async ({ page }) => {
+  await standalone(page);
+  app = await loadApp(page, { launch: true, path: '/tools/bags/' });
+  await ready(page);
+  expect(await page.evaluate(() => matchMedia('(display-mode: standalone)').matches)).toBe(true);
+  const back = page.locator('#backToWayfinch');
+  await expect(back).toBeVisible();
+  await expect(back).toHaveText(/Back to Wayfinch/);
+  await expect(back).toHaveAttribute('href', '/#/tools');
+  // still there, at the top, far down the page
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await expect(back).toBeInViewport();
+  // after Bike details opened from You, it goes back to You
+  await openFresh(page, '/tools/bags/#bike-details=new&back=you');
+  await ready(page);
+  expect(await page.evaluate(() => matchMedia('(display-mode: standalone)').matches)).toBe(true);
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await expect(back).toHaveAttribute('href', '/#/you');
+  await page.locator('#bikeDetailsClose').click();
+  await expect(back).toHaveAttribute('href', '/#/you');
+  await back.click();
+  await page.waitForURL(`${app.origin}/#/you`);
+  expect(new URL(page.url()).pathname).toBe('/');
+});

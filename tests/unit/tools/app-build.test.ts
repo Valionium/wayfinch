@@ -144,3 +144,31 @@ test('the launch-on build is the same twice', async () => {
   expect(files(again)).toEqual(files(on));
   expect(text(again, 'build.json')).toBe(text(on, 'build.json'));
 }, 120_000);
+
+// Leaflet 1.9.4 from this site (spec 7.1 item 7): the npm registry's published package, checked against its integrity
+// (sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==) and copied unchanged.
+const LEAFLET: Record<string, string> = {
+  'leaflet.js': 'db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a',
+  'leaflet.css': 'a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6',
+  LICENSE: '53e8dc25862014e4324741ca18fbe3611e11d42ef69f59f86ea8c5389647d4cb',
+  'images/layers-2x.png': '066daca850d8ffbef007af00b06eac0015728dee279c51f3cb6c716df7c42edf',
+  'images/layers.png': '1dbbe9d028e292f36fcba8f8b3a28d5e8932754fc2215b9ac69e4cdecf5107c6',
+  'images/marker-icon-2x.png': '00179c4c1ee830d3a108412ae0d294f55776cfeb085c60129a39aa6fc4ae2528',
+  'images/marker-icon.png': '574c3a5cca85f4114085b6841596d62f00d7c892c7b03f28cbfa301deb1dc437',
+  'images/marker-shadow.png': '264f5c640339f042dd729062cfc04c17f8ea0f29882b538e3848ed8f10edb4da',
+};
+
+test('[LC-LEAFLET] Leaflet from /vendor/leaflet-1.9.4/ with subresource integrity, precached, long-lived; no unpkg in the page or its privacy text', () => {
+  const page = text(on, 'tools/bags/index.html');
+  const list = buildJson(on).files;
+  for (const [file, hash] of Object.entries(LEAFLET)) {
+    expect(sha256(readFileSync(join(on, 'vendor/leaflet-1.9.4', file))), file).toBe(hash);
+    expect(list[`/vendor/leaflet-1.9.4/${file}`], `${file} precached`).toBe(hash);
+  }
+  // the page asks for the same bytes, by the hash it always had
+  const sri = (file: string) => `sha256-${createHash('sha256').update(readFileSync(join(on, 'vendor/leaflet-1.9.4', file))).digest('base64')}`;
+  expect(page.includes(`'/vendor/leaflet-1.9.4/leaflet.js','${sri('leaflet.js')}'`)).toBe(true);
+  expect(page.includes(`'/vendor/leaflet-1.9.4/leaflet.css','${sri('leaflet.css')}'`)).toBe(true);
+  expect(page.includes('unpkg')).toBe(false); // the privacy text is part of the page
+  expect(text(on, '_headers')).toContain('/vendor/leaflet-1.9.4/*\n  Cache-Control: public, max-age=31536000, immutable\n');
+});
