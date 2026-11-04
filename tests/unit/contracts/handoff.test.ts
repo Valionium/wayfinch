@@ -17,7 +17,7 @@ import { handoffGpx, tripAttributes } from '../../../src/ui/trip/handoff.ts';
 import { loadFixtureRoute } from '../../fixtures/packs/index.ts';
 
 const require = createRequire(import.meta.url);
-type VM = { run: (code: string) => unknown; context: Record<string, unknown>; values: Map<string, string>; nodes: Map<string, { href?: string }> };
+type VM = { run: (code: string) => unknown; context: Record<string, unknown>; values: Map<string, string>; nodes: Map<string, { href?: string; textContent?: string }> };
 const { appVM } = require('../../../qa/app-vm.cjs') as { appVM: (o?: { bike?: boolean }) => VM };
 const { window } = new JSDOM('');
 const parseXml = (s: string): XmlDocLike => new window.DOMParser().parseFromString(s, 'application/xml') as unknown as XmlDocLike;
@@ -70,7 +70,7 @@ function planner(gpx: string | null, opts: { db?: boolean } = {}) {
     S.bags=[{uid:1,pos:'seat',L:14,userL:true},{uid:2,pos:'rack',L:15,pair:true}];S.nextUid=3;S.kit.tent=true;S.kitTouched={tent:true};S.qty={tubes:2};
     S.custom={tent:{L:3.2,kg:1.4,rigid:40}};S.packed={tent:true};S.pinned={tent:'2-0'};S.nights=4;S.month=2;S.pace='steady';S.flatKph=20;S.sleep='camp';
     S.bikeProfile=normaliseBikeProfile({id:'bike_mine',name:'Mine',pressure:{bikeKg:13}});S.tyrePressure=normaliseTyrePressure({bagKg:2});
-    SETUPS=[{id:'st1',name:'Alps'}];DRAFT_READY=true;`);
+    applyTripKitDefaults();SETUPS=[{id:'st1',name:'Alps'}];DRAFT_READY=true;`);
   const json = <T>(code: string): T => JSON.parse(page.run(`JSON.stringify(${code})`) as string) as T;
   return { page, log, json };
 }
@@ -116,7 +116,20 @@ describe('[C-HANDOFF] the bag planner applies a trip from Wayfinch', () => {
 });
 
 describe('[C-HANDOFF-UNDO] Undo and Cancel', () => {
-  test('Undo after Apply restores the plan byte for byte; Cancel changes nothing but the answer', async () => {
+  test('Undo takes back only what Apply changed: ticks, bags and kit changed since stay; a trip field the rider changed keeps the rider\'s value (review I3)', async () => {
+    const { gpx } = await handedOff('alpine-pass', { nights: 1, pace: 'hard', flatKph: 22 });
+    const { page, json } = planner(gpx);
+    await page.run('receiveHandoff()');
+    await page.run('applyHandoff()');
+    expect(json('[S.nights,S.pace,S.flatKph,!!S.gpx]')).toEqual([1, 'hard', 22, true]);
+    page.run("S.packed.pump=true;S.packed.tubes=true;S.bags[0].L=10;S.kit.lock=true;S.kitTouched.lock=true;S.flatKph=27;");
+    expect(page.run('undoHandoff()')).toBe(true);
+    expect(json('{packed:S.packed,bag:S.bags[0].L,lock:S.kit.lock}')).toEqual({ packed: { tent: true, pump: true, tubes: true }, bag: 10, lock: true });
+    expect(json('[S.nights,S.pace,S.flatKph,S.gpx,S.month]')).toEqual([4, 'steady', 27, null, 2]); // the rider's own speed stays
+    expect(page.run('undoHandoff()')).toBe(false); // once
+  });
+
+  test('Undo after Apply with nothing done since restores the plan byte for byte; Cancel changes nothing but the answer', async () => {
     const { gpx } = await handedOff('alpine-pass', { nights: 1, pace: 'hard' });
     const a = planner(gpx);
     await a.page.run('receiveHandoff()');
@@ -135,10 +148,22 @@ describe('[C-HANDOFF-UNDO] Undo and Cancel', () => {
   });
 });
 
+describe('[C-HANDOFF] where the nights came from (review I4)', () => {
+  test('nights left to the stage model travel as its suggestion, marked so, and the bar says it is Wayfinch\'s suggestion', async () => {
+    const { gpx } = await handedOff('multi-day-800', {});
+    expect(gpx).toMatch(/nights="\d+" nightsFrom="suggested" pace="sporting" flatKph="25"/);
+    const { page, json } = planner(gpx);
+    page.context.qaText = gpx;
+    expect(json<{ nightsSuggested?: boolean }>('handoffTrip(qaText)').nightsSuggested).toBe(true);
+    await page.run('receiveHandoff()');
+    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/\d+ nights, as Wayfinch suggests for this route/);
+  });
+});
+
 describe('[C-HANDOFF-ROUTE] the same route in both apps', () => {
   test('the 800 km fixture, handed off: the same distance, ascent and stage ends in both apps; its hash kept, and replaced by any other route', async () => {
-    for (const nights of [3, 6]) {
-      const { trip, gpx } = await handedOff('multi-day-800', { nights, pace: 'sporting' as Pace });
+    for (const nights of [null, 3, 6]) {
+      const { trip, gpx, settings } = await handedOff('multi-day-800', { nights, pace: 'sporting' as Pace });
       const { page, json } = planner(gpx);
       await page.run('receiveHandoff()');
       expect(await page.run('applyHandoff()')).toBe(true);
@@ -146,7 +171,10 @@ describe('[C-HANDOFF-ROUTE] the same route in both apps', () => {
       // the co-pilot's own plan of the route it handed over, read back from that GPX
       const parsed = parseGpx(gpx, parseXml);
       const route = await buildRoute(parsed.points, parsed.name, 'gpx');
-      const plan = planStages(route, { flatKph: 25, pace: 'sporting', nights });
+      // the co-pilot's own plan: nights left to the stage model are its suggestion (review I4)
+      const planned = settings.nights ?? planStages(route, { flatKph: 25, pace: 'sporting', nights: 0 }).suggestedNights;
+      expect(json('S.nights')).toBe(planned);
+      const plan = planStages(route, { flatKph: 25, pace: 'sporting', nights: planned });
       expect(route.hash).toBe(trip.route.hash);
       expect(mine.km).toBe(route.lengthKm);
       expect(mine.ascent).toBe(route.ascentM);

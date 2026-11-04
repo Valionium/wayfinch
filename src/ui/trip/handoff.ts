@@ -5,6 +5,7 @@ import type { Place } from '../../core/places/types.ts';
 import type { Route, Stay, Trip } from '../../core/types.ts';
 import { haversineKm } from '../../core/geo/haversine.ts';
 import { W } from '../../core/wording/en.ts';
+import { planStages } from '../../core/route/stages.ts';
 import { DEFAULT_SETTINGS } from '../../store/rules.ts';
 import type { Settings } from '../../store/rules.ts';
 
@@ -39,19 +40,24 @@ export function settlementNear(places: readonly Place[], at: { lat: number; lon:
 }
 
 /**
- * The `<cp:trip>` settings: only those the rider set. A setting still at its default, or nights left to the stage model, is not
- * listed, so the bag planner keeps its own. The route's hash always travels.
+ * The `<cp:trip>` settings. What shapes the days always travels, as the co-pilot plans them, so both apps end the days at the same
+ * place and count the same food (review of PR 43, I4): the nights (the stage model's suggestion when the rider left them to it, then
+ * marked `nightsFrom="suggested"`), the pace and the flat speed. The date and the stay go only when the rider set them. The route's
+ * hash always travels.
  */
 export function tripAttributes(trip: Trip, settings: Settings, names: { start: string | null; end: string | null }): [string, string][] {
   const out: [string, string][] = [['v', '1']];
-  if (settings.nights !== null) out.push(['nights', String(settings.nights)]);
+  // readSettings lays the trip's own speed and pace over the settings: what the co-pilot plans with
+  const nights = settings.nights ?? planStages(trip.route, { flatKph: settings.flatKph, pace: settings.pace, nights: 0 }).suggestedNights;
+  out.push(['nights', String(nights)]);
+  if (settings.nights === null) out.push(['nightsFrom', 'suggested']);
   if (trip.departureDate) {
     out.push(['departureDate', trip.departureDate]);
     out.push(['month', String(Number(trip.departureDate.slice(5, 7)))]);
   }
   if (settings.stay !== DEFAULT_SETTINGS.stay) out.push(['sleep', STAY_WORD[settings.stay]]);
-  if (settings.pace !== DEFAULT_SETTINGS.pace) out.push(['pace', settings.pace]);
-  if (settings.flatKph !== DEFAULT_SETTINGS.flatKph) out.push(['flatKph', String(settings.flatKph)]);
+  out.push(['pace', settings.pace]);
+  out.push(['flatKph', String(settings.flatKph)]);
   if (names.start) out.push(['startName', names.start]);
   if (names.end) out.push(['endName', names.end]);
   out.push(['route', trip.route.hash]);
@@ -79,6 +85,8 @@ export function handoffRefusal(route: Route, gpx: string | null): string | null 
 }
 
 export type HandoffDeps = {
+  /** Every handoff record the database holds (for the cleanup); absent where it can't be listed. */
+  listRecords?: () => Promise<{ id: string; createdAt: string }[]>;
   now: () => Date;
   randomId: () => string;
   /** The settlements the co-pilot holds for this route (its places), for the end names; [] when none. */
@@ -133,17 +141,27 @@ export function readEnvelope(storage: HandoffDeps['storage']): HandoffEnvelope |
     && typeof e.createdAt === 'string' && Number.isFinite(Date.parse(e.createdAt)) ? (e as HandoffEnvelope) : null;
 }
 
-/** Deletes the handoff once the bag planner has answered for its id, or after 24 hours. True when one went. */
-export async function cleanupHandoff(deps: Pick<HandoffDeps, 'now' | 'deleteRecord' | 'storage'>): Promise<boolean> {
-  const envelope = readEnvelope(deps.storage);
-  if (!envelope) return false;
-  const done = readJson(deps.storage, HANDOFF_DONE_KEY);
-  const answered = isObject(done) && done.kind === 'handoff-done' && done.id === envelope.id;
-  const old = deps.now().getTime() - Date.parse(envelope.createdAt) > HANDOFF_TTL_MS;
-  if (!answered && !old) return false;
-  await deps.deleteRecord(envelope.id).catch(() => undefined);
-  try { deps.storage.removeItem(HANDOFF_KEY); } catch { /* it goes next time */ }
-  return true;
+/**
+ * Deletes the handoff once the bag planner has answered for its id, or after 24 hours; and any record no envelope points at any more
+ * (a second handoff before the first was answered), so no route stays behind (review M5). True when the envelope went.
+ */
+export async function cleanupHandoff(deps: Pick<HandoffDeps, 'now' | 'deleteRecord' | 'storage' | 'listRecords'>): Promise<boolean> {
+  let envelope = readEnvelope(deps.storage);
+  let went = false;
+  if (envelope) {
+    const done = readJson(deps.storage, HANDOFF_DONE_KEY);
+    const answered = isObject(done) && done.kind === 'handoff-done' && done.id === envelope.id;
+    const old = deps.now().getTime() - Date.parse(envelope.createdAt) > HANDOFF_TTL_MS;
+    if (answered || old) {
+      await deps.deleteRecord(envelope.id).catch(() => undefined);
+      try { deps.storage.removeItem(HANDOFF_KEY); } catch { /* it goes next time */ }
+      envelope = null;
+      went = true;
+    }
+  }
+  const records = deps.listRecords ? await deps.listRecords().catch(() => []) : [];
+  for (const r of records) if (r.id !== envelope?.id) await deps.deleteRecord(r.id).catch(() => undefined);
+  return went;
 }
 
 /** At start-up: the handoff goes once the bag planner has answered for it, or after 24 hours. Only ever deletes. */
@@ -153,5 +171,6 @@ export async function cleanupStoredHandoff(): Promise<void> {
     now: () => new Date(),
     storage: localStorage,
     deleteRecord: (id) => inExistingTx([HANDOFF_STORE], async (tx) => { await tx.objectStore(HANDOFF_STORE).delete(id); }),
+    listRecords: () => inExistingTx([HANDOFF_STORE], async (tx) => (await tx.objectStore(HANDOFF_STORE).getAll()) as { id: string; createdAt: string }[]),
   }).catch(() => false);
 }

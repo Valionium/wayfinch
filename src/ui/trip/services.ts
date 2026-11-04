@@ -316,6 +316,7 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
         places: async (): Promise<Place[]> => { const db = await openExisting(); return db ? ((await db.getAll('places')) as Place[]) : []; },
         putRecord: (record: { id: string; gpx: string; createdAt: string }) => inTx([HANDOFF_STORE], 'readwrite', async (tx) => { await tx.objectStore(HANDOFF_STORE).put(record, record.id); }),
         deleteRecord: (id: string) => inExistingTx([HANDOFF_STORE], async (tx) => { await tx.objectStore(HANDOFF_STORE).delete(id); }),
+        listRecords: () => inExistingTx([HANDOFF_STORE], async (tx) => (await tx.objectStore(HANDOFF_STORE).getAll()) as { id: string; createdAt: string }[]),
       };
       await cleanupHandoff(deps);
       return handOffTrip(trip, settings, deps);

@@ -209,3 +209,21 @@ test('[C-HANDOFF] a trip from Wayfinch in a real browser: the bar asks, Apply lo
   expect(await page.evaluate('JSON.stringify(captureDraft())')).toBe(before);
   expect(errors).toEqual([]);
 });
+
+test('[LC-OFFLINE-AGAIN] after the switch took the copy, opening Wayfinch at / brings it back by itself; the bag planner then has nothing to say (review M8)', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/' });
+  await expect.poll(async () => (await registrations(page)).length, { timeout: 30_000 }).toBe(1);
+  await expect.poll(() => page.evaluate(async () => (await caches.keys()).some((n) => n.startsWith('wayfinch-precache-'))), { timeout: 30_000 }).toBe(true);
+  await page.evaluate(() => localStorage.setItem('loadcheck:offline-had', JSON.stringify({ app: 'load-check', kind: 'offline-had', v: 1 })));
+  await switchedOff(page);
+  expect(await registrations(page)).toEqual([]);
+  // the co-pilot registers the site's worker at every start, with no tap (src/ui/register.ts, APP-REGISTER)
+  await openFresh(page, '/');
+  await expect.poll(async () => (await registrations(page)).map((r) => r[1]), { timeout: 30_000 }).toEqual([`${app.origin}/offline-worker.js`]);
+  await expect.poll(() => page.evaluate(async () => (await caches.keys()).some((n) => n.startsWith('wayfinch-precache-'))), { timeout: 30_000 }).toBe(true);
+  await openFresh(page, '/tools/bags/');
+  await ready(page);
+  await page.waitForFunction('OFFLINE_PACKING.checked === true', undefined, { timeout: 30_000 });
+  await page.waitForTimeout(300);
+  await expect(page.locator('#offlineAgainBar')).toBeHidden();
+});

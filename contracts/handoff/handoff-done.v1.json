@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "handoff-done.v1.schema.json",
+  "title": "Handoff answered v1, bag planner to co-pilot (Contract 2): loadcheck:handoff-done",
+  "type": "object",
+  "required": [
+    "app",
+    "kind",
+    "v",
+    "id",
+    "outcome",
+    "at"
+  ],
+  "properties": {
+    "app": {
+      "const": "load-check"
+    },
+    "kind": {
+      "const": "handoff-done"
+    },
+    "v": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "outcome": {
+      "enum": [
+        "applied",
+        "cancelled"
+      ]
+    },
+    "at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,3})?Z$"
+    }
+  }
+}

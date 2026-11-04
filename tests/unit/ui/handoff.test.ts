@@ -18,7 +18,7 @@ function deps(over: Partial<HandoffDeps> = {}): HandoffDeps & { records: Map<str
   return {
     records, went, store,
     now: () => new Date('2026-11-04T10:00:00Z'), randomId: () => '0123456789abcdef0123456789abcdef', places: async () => [],
-    putRecord: async (r) => { records.set(r.id, r); }, deleteRecord: async (id) => { records.delete(id); },
+    putRecord: async (r) => { records.set(r.id, r); }, deleteRecord: async (id) => { records.delete(id); }, listRecords: async () => [...records.values()],
     storage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => { store.set(k, v); }, removeItem: (k) => { store.delete(k); } },
     go: (href) => { went.push(href); },
     ...over,
@@ -35,7 +35,8 @@ describe('[C-HANDOFF] the co-pilot hands the trip over', () => {
     expect(gpx.match(/<trkpt /g)!.length).toBe(4);
     expect(gpx.match(/<ele>/g)!.length).toBe(3);
     expect(gpx).toContain('<name>Heidelberg &amp; &lt;Strasbourg&gt;</name>');
-    expect(gpx).toContain(`<cp:trip v="1" route="${'ab'.repeat(32)}"/>`); // defaults are not listed
+    // what shapes the days always goes, nights left to the stage model as its suggestion; date and stay only when set
+    expect(gpx).toContain(`<cp:trip v="1" nights="0" nightsFrom="suggested" pace="sporting" flatKph="25" route="${'ab'.repeat(32)}"/>`);
     const set = tripAttributes({ ...trip(r), departureDate: '2026-11-02' }, { ...DEFAULT_SETTINGS, nights: 2, stay: 'accommodation', pace: 'hard', flatKph: 22 }, { start: 'Heidelberg', end: 'Strasbourg' });
     expect(Object.fromEntries(set)).toEqual({ v: '1', nights: '2', departureDate: '2026-11-02', month: '11', sleep: 'indoor', pace: 'hard', flatKph: '22', startName: 'Heidelberg', endName: 'Strasbourg', route: 'ab'.repeat(32) });
   });
@@ -89,5 +90,20 @@ describe('[C-HANDOFF] the co-pilot hands the trip over', () => {
     await handOffTrip(trip(), DEFAULT_SETTINGS, later);
     later.now = () => new Date('2026-11-05T10:00:01Z');
     expect(await cleanupHandoff(later)).toBe(true);
+  });
+
+  test('a second handoff before the first was answered leaves no route behind: the record no envelope points at goes, and after 24 hours the rest (review M5)', async () => {
+    const d = deps();
+    let n = 0;
+    d.randomId = () => String(++n).repeat(32).slice(0, 32);
+    await handOffTrip(trip(), DEFAULT_SETTINGS, d);
+    await handOffTrip(trip(), DEFAULT_SETTINGS, d);
+    expect(d.records.size).toBe(2);
+    expect(await cleanupHandoff(d)).toBe(false);
+    expect([...d.records.keys()]).toEqual(['2'.repeat(32)]);
+    d.now = () => new Date('2026-11-05T10:00:01Z');
+    expect(await cleanupHandoff(d)).toBe(true);
+    expect(d.records.size).toBe(0);
+    expect(d.store.has(HANDOFF_KEY)).toBe(false);
   });
 });

@@ -9910,7 +9910,7 @@ function handoffTrip(text){
   const el=doc && doc.getElementsByTagNameNS(CP_NS,'trip')[0];
   if(!el || el.getAttribute('v') !== '1') return {};
   const a=k => el.hasAttribute(k) ? el.getAttribute(k) : null, out={};
-  const nights=dataInteger(a('nights'),0,30); if(nights !== null) out.nights=nights;
+  const nights=dataInteger(a('nights'),0,30); if(nights !== null){ out.nights=nights; if(a('nightsFrom') === 'suggested') out.nightsSuggested=true; }
   const date=normaliseDepartureDate(a('departureDate')); if(date) out.departureDate=date;
   const month=dataInteger(a('month'),1,12); if(month !== null) out.month=month-1;
   if(['camp','mixed','indoor'].includes(a('sleep'))) out.sleep=a('sleep');
@@ -9946,13 +9946,15 @@ async function receiveHandoff(){
   if(!parsed || parsed.error){ dropHandoffFragment(); return false; }
   HANDOFF.id=id; HANDOFF.gpx=gpx; HANDOFF.trip=handoffTrip(gpx);
   const name=parsed.name || 'your route';
-  showHandoffBar(`A trip from Wayfinch: ${name}. Apply it to this plan? It sets the route and the trip's dates, nights, stay and pace; your bags, kit and bike stay as they are.${parsed.hasElev ? '' : ' This route has no heights, so its days are split by distance.'}`,{apply:true});
+  const t=HANDOFF.trip,nightsWords=t.nights === undefined ? '' : ` and ${t.nights === 1 ? '1 night' : t.nights+' nights'}${t.nightsSuggested ? ', as Wayfinch suggests for this route' : ''}`;
+  showHandoffBar(`A trip from Wayfinch: ${name}. Apply it to this plan? It sets the route, the trip's date, stay and pace${nightsWords}; your bags, kit and bike stay as they are.${parsed.hasElev ? '' : ' This route has no heights, so its days are split by distance.'}`,{apply:true});
   return true;
 }
 async function applyHandoff(){
   if(HANDOFF.busy || !HANDOFF.gpx || !DRAFT_READY) return false;
   HANDOFF.busy=true; $('handoffApply').disabled=true; $('handoffText').textContent='Loading the route from Wayfinch…';
-  const undo=JSON.stringify(captureDraft());   // taken before anything changes
+  const undo=JSON.stringify(captureDraft());   // taken before anything changes: for a route that can't be read
+  const before=handoffFields();
   const t=HANDOFF.trip || {};
   if(t.departureDate){ S.departureDate=t.departureDate; S.month=+t.departureDate.slice(5,7)-1; }
   else if(t.month !== undefined){ S.month=t.month; if(S.departureDate && +S.departureDate.slice(5,7)-1 !== S.month) S.departureDate=null; }
@@ -9975,16 +9977,43 @@ async function applyHandoff(){
   $('sleepChips').querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed',c.dataset.v === S.sleep));
   syncGPXControl(); renderClimate(); renderBags(); renderKit(); if(S.step === 4) renderResult(); drawRig();
   queueDraftSave();
-  HANDOFF.undo=undo; HANDOFF.busy=false;
+  HANDOFF.undo={before,after:handoffFields()}; HANDOFF.busy=false;
   writeHandoffDone('applied'); dropHandoffFragment(); setWayfinchBack('/#/trip');
   showHandoffBar('The route from Wayfinch is in this plan. Your bags, kit and bike are as they were.',{undo:true});
   return true;
 }
+// What Apply sets: the trip's fields, and the route with what loadGPX made of it. Copies, so later changes don't reach them.
+const HANDOFF_TRIP_FIELDS=['departureDate','month','nights','sleep','pace','flatKph'];
+function handoffFields(){
+  currentPlan();   // settled, so the placements are the plan's
+  return JSON.parse(JSON.stringify({trip:Object.fromEntries(HANDOFF_TRIP_FIELDS.map(k => [k,S[k] === undefined ? null : S[k]])),
+    route:{gpx:S.gpx,place:S.place,place2:S.place2},placements:S.placements}));
+}
+// Undo takes back only what Apply changed (review of PR 43, I3): each trip field still at the value Apply set goes back; one the
+// rider has changed since keeps the rider's value; the route goes back if it is still the one from Wayfinch. Ticks, bags, kit and
+// the bike, and anything else done since, stay as they are.
 function undoHandoff(){
   if(!HANDOFF.undo) return false;
-  restorePlan(JSON.parse(HANDOFF.undo),true,false);
+  const {before,after}=HANDOFF.undo,same=(a,b) => JSON.stringify(a) === JSON.stringify(b);
+  currentPlan();
+  const notPlacedSince=same(S.placements,after.placements);
+  for(const k of HANDOFF_TRIP_FIELDS) if(same(S[k] === undefined ? null : S[k],after.trip[k])) S[k]=before.trip[k];
+  if(same({gpx:S.gpx,place:S.place,place2:S.place2},after.route)){
+    cancelGPXLoad();
+    S.gpx=before.route.gpx; S.place=before.route.place; S.place2=before.route.place2;
+    if(!S.gpx && S.place && S.place2) ensureRoute(S.place,S.place2,S.month);
+  }
+  S.nightsAuto=false;
+  applyTripKitDefaults();   // untouched kit defaults follow the trip back
+  // where nothing was placed again since Apply, the plan's placements go back too; else the rider's stay
+  if(notPlacedSince) keepPlan({load:before.placements});
+  $('month').value=S.month; $('nights').value=S.nights; syncDepartureDate();
+  $('sleepWrap').classList.toggle('hidden',S.nights === 0);
+  $('sleepChips').querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed',c.dataset.v === S.sleep));
+  if(S.place) ensureClimate(S.place,S.month); if(S.place2) ensureClimate(S.place2,S.month);
+  syncGPXControl(); renderClimate(); renderBags(); renderKit(); if(S.step === 4) renderResult(); drawRig();
   HANDOFF.undo=null; queueDraftSave();
-  showHandoffBar('Undone: the plan is as it was before the route from Wayfinch.');
+  showHandoffBar('Undone: the route and trip settings from Wayfinch are taken back. What you changed since stays.');
   return true;
 }
 function cancelHandoff(){
@@ -11705,7 +11734,7 @@ function renderOfflinePackingStatus(){
 }
 async function inspectOfflinePacking(){
   if(OFFLINE_PACKING.busy)return;
-  const probe=++OFFLINE_PACKING.probe;let cached=false;
+  const probe=++OFFLINE_PACKING.probe;let cached=false,coming=null;
   if(!offlinePackingSupported()){OFFLINE_PACKING.checked=true;renderOfflinePackingStatus();return;}
   try{
     const registration=await offlineWithTimeout(navigator.serviceWorker.getRegistration(offlinePackingURLs().base.href),5000);
@@ -11713,9 +11742,17 @@ async function inspectOfflinePacking(){
       const info=await offlineWorkerMessage(registration.active,'LOADCHECK_OFFLINE_INFO');
       cached=info.cached===true;
     }
+    // A copy on its way (Wayfinch has just put the site's worker back): looked at again once it is active, and not yet "gone".
+    else if(ownOfflineRegistration(registration)) coming=registration.installing || registration.waiting;
   }catch(error){}
   if(probe!==OFFLINE_PACKING.probe || OFFLINE_PACKING.busy)return;
   OFFLINE_PACKING.cacheReady=cached;
+  if(coming){
+    const again=()=>{ if(coming.state==='activated' || coming.state==='redundant'){ coming.removeEventListener('statechange',again); inspectOfflinePacking(); } };
+    coming.addEventListener('statechange',again);
+    renderOfflinePackingStatus();
+    return;
+  }
   OFFLINE_PACKING.checked=true;renderOfflinePackingStatus();followOfflineCopy();
 }
 async function prepareOfflinePacking(){
