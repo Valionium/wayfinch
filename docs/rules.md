@@ -461,6 +461,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - The page in git has the recorded hash, so it changes only on purpose (§7.1, §12) [LC-PAGE-LIVE]
 - The QA runner runs every suite in qa/ except its three helpers (§12) [LC-QA-ALL]
 - The frozen bag rules and their fixtures are unchanged (§7.1, §12) [LC-FREEZE-01]
+- Until the launch, / serves releases/load-check-root.html, frozen at the first release's hash; the bag planner changes behind the switch (sub-project 6, Decision 2) [LC-ROOT-FROZEN]
 
 ## Builds, the new worker and the handover
 
@@ -860,3 +861,25 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - automated checks pass on every screen, both themes [FLOW-AXE]
 - touch targets ≥ 44 px on every control; every control labelled [FLOW-CONTRAST]
 - opening_hours isn't loaded on the first screen; it's precached [FLOW-CHUNKS]
+
+## Bag planner: your bike (sub-project 6, group 1)
+
+- on the sample and 200 generated libraries, the page's normaliseBikeProfile and the app's normaliseBike give identical output (§11.4) [DF-02]
+- the bike-library sample has a bike with every field, one with none and one with invalid values; both readers agree (§7.1 Bikes) [C-BIKE-SAMPLE]
+- each drawing-set entry drawn through bike.js in the page and through bikeArt in Vitest gives the same SVG string (§7.4) [C-DRAWING-SET]
+- every style, size and bag combination of the drawing set: each tap target sits on its anchor, inside the view, no two overlapping (§7.4 Bags and anchors) [LC-RIG-ANCHORS]
+- every rig control that worked before still works: tag, quick-pick, deck, frame shape, focus dimming, keyboard (§7.1 item 11) [LC-RIG-TAPS]
+- the selection fixtures and LC-FREEZE-01 unchanged; a bike without frame details plans byte-identically; the load summary unchanged (§7.1) [LC-RIG-SAME-PLAN]
+- safeDataThumb keeps the new bk-* classes and a hex stroke; a saved thumbnail keeps the colour, and a hostile string still fails (§7.4 Theme) [LC-RIG-THUMB]
+- every colour, bar and e-bike choice in Look is reachable with no text input, as a labelled radio or chip of at least 44 px (§7.4 Look) [LC-LOOK-TAPS]
+- a swatch tap changes the preview's frame stroke synchronously, drawn in 20 ms or less (§7.4 Look) [LC-LOOK-INSTANT]
+- after three changes Undo restores the Look of the dialog's opening, byte for byte; closing with no change writes nothing (§7.4 Look) [LC-LOOK-UNDO]
+- each Look choice returns to Not set: no colour shows the theme's outline, no bars shows the guess, an empty look is stored as null (§7.4 Look) [LC-LOOK-NOTSET]
+- saving the plan's bike's Look also updates loadcheck:bikeProfile, and a saved bike with the same id, under the format guard, in lower-case #rrggbb (§7.4 Look) [LC-LOOK-SAVES]
+- #bike-details=<id>&back=<screen>&section=look opens at Look without applying the bike to the plan; new starts a new one; any other back means You; the fragment is removed after (§7.1 Bikes) [LC-LOOK-DEEP]
+- the two-tap start of Bike details passes unchanged; Look sits below it (§7.4) [LC-LOOK-QUICK]
+- banned words on the bike wording table, and a limit sentence still says "you entered" (§8) [LC-WORDS]
+- from file choice to Use this colour, no network request (§7.4 Colour from a photo) [LC-PHOTO-NOREQ]
+- the photo is never stored: only the colour; canvas cleared, file input emptied, object URL revoked on leaving (§7.4, §10) [LC-PHOTO-NOSTORE]
+- oklabMedian on 15 x 15 pixels drops the lightest and darkest 20% and gives the frame's colour within delta E 2; the photo's overall colour isn't used; EXIF never read (§7.4) [LC-PHOTO-MEDIAN]
+- bike-photo.js loads on demand, is precached and works offline (§7.4, §9.1) [LC-PHOTO-OFFLINE]

@@ -15,6 +15,12 @@ test("[LC-PAGE-LIVE] the page's hash is the one recorded", () => {
   expect(createHash('sha256').update(readFileSync(PAGE)).digest('hex')).toBe(recorded);
 });
 
+// The copy served at / until the launch (sub-project 6, Decision 2): the first GitHub release's page, live since 4 Nov 2026.
+test('[LC-ROOT-FROZEN] the frozen root copy has the hash that went live with the first release', () => {
+  const live = '2f31b7568915da63625abb19b97c5850c2b37a192b19ee34bf564d5d3f1d5366';
+  expect(createHash('sha256').update(readFileSync(`${REPO}releases/load-check-root.html`)).digest('hex')).toBe(live);
+});
+
 const suites = readdirSync(`${REPO}qa`).filter((f) => f.endsWith('.cjs') && !HELPERS.includes(f)).sort();
 
 test('[LC-QA-ALL] run-all runs every qa/*.cjs except the three helpers', () => {

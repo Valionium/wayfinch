@@ -39,7 +39,7 @@ test('[APP-SWITCH-OFF] with the switch off no Vite step runs, and the build is w
   // nothing of public/ beyond the page itself: no manifest, no icons, no fonts
   expect(existsSync(join(out, 'manifest.webmanifest'))).toBe(false);
   expect(existsSync(join(out, 'icons'))).toBe(false);
-  const page = readFileSync(join(REPO, 'public', 'tools', 'bags', 'index.html'));
+  const page = readFileSync(join(REPO, 'releases', 'load-check-root.html')); // the frozen copy at / (sub-project 6, Task 1)
   expect(sha256(readFileSync(join(out, 'index.html')))).toBe(sha256(page));
   expect(text(out, '_headers')).toBe(OFF_HEADERS);
   // the precache list holds the page alone, so the build id depends on the page and nothing the app adds

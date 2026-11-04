@@ -10,7 +10,9 @@ import { build as esbuild } from 'esbuild';
 import { writeImprint } from './build-legal.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const PAGE = join(ROOT, 'public', 'tools', 'bags', 'index.html');
+// Until the launch, / serves this frozen copy of the page that went live with the first release (sub-project 6, Decision 2), so edits
+// to the bag planner at public/tools/bags/ never reach riders with the switch off. A real bug before the launch is fixed in both.
+const ROOT_COPY = join(ROOT, 'releases', 'load-check-root.html');
 const WORKER_SOURCE = join(ROOT, 'src', 'offline-worker.ts');
 const PUBLIC = join(ROOT, 'public');
 const EMERGENCY_WORKER = join(ROOT, 'tools', 'emergency-worker.js');
@@ -109,10 +111,10 @@ async function compileWorker(buildId, precache) {
 /**
  * Builds the site into `out`.
  * `extraFiles` ({ 'assets/x.js': bytes }) are written and precached like any other file; only tests use it so far.
- * `pagePath` lets a test build a site around another page; `vite` lets a test watch for the one step only the launch runs.
+ * `pagePath` is the page served at / with the switch off (the frozen copy); a test may build a site around another page. `vite` lets a test watch for the one step only the launch runs.
  * `testHooks` (--test-hooks) is for the browser tests only, and only with the launch switch on: the off build is never touched.
  */
-export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = false, extraFiles = {}, pagePath = PAGE, vite = runVite, testHooks = false } = {}) {
+export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = false, extraFiles = {}, pagePath = ROOT_COPY, vite = runVite, testHooks = false } = {}) {
   const config = JSON.parse(readFileSync(join(ROOT, 'build.config.json'), 'utf8'));
   const launchOn = launch ?? config.launch === true;
   if (testHooks && !launchOn) throw new Error('--test-hooks needs --launch=on: the build with the switch off stays what it was.');
@@ -139,7 +141,7 @@ export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = 
     mkdirSync(join(target, 'tools', 'bags'), { recursive: true });
     writeFileSync(join(target, 'tools', 'bags', 'bike.js'), await compileBikeScript());
   } else {
-    // With the switch off the page riders see stays Load Check, at /.
+    // With the switch off the page riders see stays Load Check, at /: the frozen copy, never the bag planner being worked on.
     writeFileSync(join(target, 'index.html'), readFileSync(pagePath));
   }
   for (const [path, bytes] of Object.entries(extraFiles)) {
