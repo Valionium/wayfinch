@@ -1752,6 +1752,11 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <button class="kitact" id="updateApply" type="button">Update ready — apply now</button>
     <span id="updateNote"></span>
   </div>
+  <div class="draftbar hidden" id="offlineAgainBar" role="status">
+    <span id="offlineAgainText">Your offline copy is no longer on this device. Tap Make available offline to keep the bag planner with you again.</span>
+    <button class="kitact" id="offlineAgainSave" type="button">Make available offline</button>
+    <button class="linky" id="offlineAgainLater" type="button">Not now</button>
+  </div>
   <div class="draftbar hidden" id="tabBar" role="status">
     <span id="tabText"></span>
     <button class="linky hidden" id="tabLoad">Load the newer plan</button>
@@ -11749,15 +11754,15 @@ $('walkthroughStart').onclick=openWalkthrough;
 $('walkthroughSkip').onclick=()=>{rememberWalkthrough();$('walkthroughOpen').focus({preventScroll:true});};
 
 /* ==== 89-offline-packing.js ==== */
-// The worker caches the public app. The existing draft keeps the plan and ticks.
-// Preparing or reopening offline never sends feedback or calls external APIs here.
+// The site's one worker (/offline-worker.js, scope /, spec 7.1 item 6) keeps the whole of Wayfinch, this page with it. The
+// existing draft keeps the plan and ticks. Preparing or reopening offline never sends feedback or calls external APIs here.
 const OFFLINE_PACKING={busy:false,checked:false,cacheReady:false,error:'',probe:0};
 function offlinePackingURLs(){
-  const base=new URL('./',location.href);
-  return {base,worker:new URL('offline-worker.js',base)};
+  const base=new URL('/',location.href);
+  return {base,worker:new URL('/offline-worker.js',base)};
 }
 function offlinePackingSupported(){
-  return location.protocol==='https:' && 'serviceWorker' in navigator &&
+  return (location.protocol==='https:' || window.isSecureContext===true) && 'serviceWorker' in navigator &&
     'caches' in window && typeof MessageChannel!=='undefined';
 }
 function ownOfflineRegistration(registration){
@@ -11813,21 +11818,21 @@ function renderOfflinePackingStatus(){
   const planSaved=offlineCurrentPlanSaved(),ready=OFFLINE_PACKING.cacheReady && planSaved && !OFFLINE_PACKING.error;
   let message;
   if(!DRAFT_READY)message='Loading your saved plan…';
-  else if(!supported)message='Offline app saving is available in Android Chrome at the published HTTPS address. You can still print or save a PDF here.';
-  else if(OFFLINE_PACKING.busy)message='Saving the app and your current plan on this device…';
+  else if(!supported)message='This browser can’t keep Wayfinch offline here. You can still print or save a PDF.';
+  else if(OFFLINE_PACKING.busy)message='Saving Wayfinch and your current plan on this device…';
   else if(OFFLINE_PACKING.error)message=OFFLINE_PACKING.error;
   else if(DRAFT_SAVE_STATUS.state==='failed')message='The app cannot keep your plan and ticks on this device right now. Export your plan or print a PDF, then try saving again.';
   else if(ready)message=online
-    ?'Ready on this device. Reopen this page in the same Chrome browser without internet.'
+    ?'Ready on this device. Wayfinch and this bag planner open without internet in this browser.'
     :'Offline. Your saved packing checklist and ticks work on this device.';
-  else if(OFFLINE_PACKING.cacheReady)message='The app is saved offline. Your current plan still needs to finish saving in this browser.';
-  else if(!online)message='Connect to the internet first to save the app for offline use. Your current checklist is still available while this page is open.';
-  else if(!OFFLINE_PACKING.checked)message='Checking whether the app is already saved on this device…';
-  else message='While online, save the app and your current plan here before you leave.';
+  else if(OFFLINE_PACKING.cacheReady)message='Wayfinch is saved offline. Your current plan still needs to finish saving in this browser.';
+  else if(!online)message='Connect to the internet first to save Wayfinch for offline use. Your current checklist is still available while this page is open.';
+  else if(!OFFLINE_PACKING.checked)message='Checking whether Wayfinch is already saved on this device…';
+  else message='While online, save Wayfinch and your current plan here before you leave.';
   panel.className='packing-offline'+(ready?' ready':'');
   panel.innerHTML=`<h4>Use on your phone offline</h4><p role="status" aria-live="polite">${htmlEsc(message)}</p>
     ${supported?`<button class="kitact" type="button" id="offlinePrepare"${!DRAFT_READY || OFFLINE_PACKING.busy || !online?' disabled':''}>${OFFLINE_PACKING.busy?'Saving…':OFFLINE_PACKING.cacheReady?'Refresh offline copy':'Make available offline'}</button>`:''}
-    <p class="offline-detail">${OFFLINE_PACKING.cacheReady?'Bookmark this page or use Chrome’s menu to add a home-screen shortcut. ':''}New place searches, live weather and street-map backgrounds need internet. The saved route outline and elevation chart remain available.</p>
+    <p class="offline-detail">${OFFLINE_PACKING.cacheReady?'One copy serves all of Wayfinch: the bag planner, the tyre tool and your trip. ':''}New place searches, live weather and street-map backgrounds need internet. The saved route outline and elevation chart remain available.</p>
     <p class="offline-detail">Saved on this device. Clearing this site’s browser data removes the offline app, plans and ticks. A printed list or saved PDF is another copy to keep.</p>`;
   const button=$('offlinePrepare');if(button)button.onclick=prepareOfflinePacking;
   restoreFocus(panel,focus);
@@ -11845,7 +11850,7 @@ async function inspectOfflinePacking(){
   }catch(error){}
   if(probe!==OFFLINE_PACKING.probe || OFFLINE_PACKING.busy)return;
   OFFLINE_PACKING.cacheReady=cached;
-  OFFLINE_PACKING.checked=true;renderOfflinePackingStatus();
+  OFFLINE_PACKING.checked=true;renderOfflinePackingStatus();followOfflineCopy();
 }
 async function prepareOfflinePacking(){
   if(!DRAFT_READY || OFFLINE_PACKING.busy || !offlinePackingSupported())return;
@@ -11867,9 +11872,43 @@ async function prepareOfflinePacking(){
   }catch(error){
     OFFLINE_PACKING.error=error?.message?.startsWith('Your current plan') || error?.message?.startsWith('The app is saved, but')
       ?error.message:'Offline setup could not finish. Connect and try again; you can print or save a PDF.';
-  }finally{OFFLINE_PACKING.busy=false;renderOfflinePackingStatus();}
+  }finally{OFFLINE_PACKING.busy=false;renderOfflinePackingStatus();followOfflineCopy();}
 }
-function initialiseOfflinePacking(){inspectOfflinePacking();initialiseUpdatePrompt();}
+/* ---- The offline copy came back? (Decision 9, owner's ruling A of 3 November) ----
+   The emergency switch removes the offline copy, and a later good deploy does not bring it back: only a tap does. Once this
+   page has seen its copy ready on this device, it keeps a mark; when a later look finds the copy gone, one short line asks
+   the rider to tap Make available offline again. Gone once dismissed (the mark goes) or once the copy is back. */
+const OFFLINE_HAD_KEY='loadcheck:offline-had';
+const OFFLINE_AGAIN={had:false,shown:false};
+async function readOfflineHad(){
+  const v=await store.get(OFFLINE_HAD_KEY);
+  OFFLINE_AGAIN.had=dataObject(v) && v.app === 'load-check' && v.kind === 'offline-had' && v.v === 1;
+}
+function showOfflineAgain(show){
+  OFFLINE_AGAIN.shown=show;
+  const bar=$('offlineAgainBar');if(!bar)return;
+  bar.classList.toggle('hidden',!show);
+  const button=$('offlineAgainSave');if(button)button.disabled=!show || OFFLINE_PACKING.busy || navigator.onLine===false;
+}
+function followOfflineCopy(){
+  if(!DRAFT_READY || OFFLINE_PACKING.busy || !OFFLINE_PACKING.checked)return;
+  if(OFFLINE_PACKING.cacheReady){
+    showOfflineAgain(false);
+    if(!OFFLINE_AGAIN.had){OFFLINE_AGAIN.had=true;store.set(OFFLINE_HAD_KEY,{app:'load-check',kind:'offline-had',v:1});}
+    return;
+  }
+  showOfflineAgain(OFFLINE_AGAIN.had && offlinePackingSupported());
+}
+function dismissOfflineAgain(){
+  OFFLINE_AGAIN.had=false;showOfflineAgain(false);
+  store.set(OFFLINE_HAD_KEY,null);
+}
+async function initialiseOfflinePacking(){
+  await readOfflineHad();
+  $('offlineAgainSave').onclick=()=>{prepareOfflinePacking();};
+  $('offlineAgainLater').onclick=dismissOfflineAgain;
+  inspectOfflinePacking();initialiseUpdatePrompt();
+}
 window.addEventListener('online',()=>{OFFLINE_PACKING.error='';if(!OFFLINE_PACKING.busy)inspectOfflinePacking();});
 window.addEventListener('offline',()=>{OFFLINE_PACKING.error='';if(!OFFLINE_PACKING.busy)inspectOfflinePacking();renderOfflinePackingStatus();});
 

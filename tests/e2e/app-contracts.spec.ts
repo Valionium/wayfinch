@@ -77,3 +77,54 @@ test('[C-DELETE-FRAGMENT] #copilot-delete= with no stored request deletes nothin
   const kept = JSON.parse(before) as Record<string, string>;
   for (const [k, v] of Object.entries(kept)) if (!['loadcheck:summary:v1', 'loadcheck:saved-at:v1'].includes(k)) expect(await page.evaluate((key) => localStorage.getItem(key), k), k).toBe(v);
 });
+
+/** What the emergency switch leaves behind (tools/emergency-worker.js): no registration and none of the site's caches. Data stays. */
+async function switchedOff(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    for (const name of await caches.keys()) if (name.startsWith('wayfinch-precache-')) await caches.delete(name);
+  });
+}
+const registrations = (page: Page) => page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).map((r) => [r.scope, (r.active ?? r.waiting ?? r.installing)?.scriptURL ?? '']));
+
+test('[LC-OFFLINE-SITE] Make available offline at /tools/bags/ registers the site\'s /offline-worker.js at scope /, and the panel reports that copy', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/tools/bags/' });
+  await ready(page);
+  expect(await registrations(page)).toEqual([]);
+  await page.evaluate('prepareOfflinePacking()');
+  await page.waitForFunction('OFFLINE_PACKING.cacheReady === true && OFFLINE_PACKING.busy === false', undefined, { timeout: 30_000 });
+  expect(await registrations(page)).toEqual([[`${app.origin}/`, `${app.origin}/offline-worker.js`]]);
+  expect(await page.evaluate('OFFLINE_PACKING.error')).toBe('');
+  await expect(page.locator('#offlinePackingPanel')).toContainText('Ready on this device');
+});
+
+test('[LC-OFFLINE-AGAIN] after the switch took the copy: one line, its tap brings the copy back and the line goes; Not now ends it for good; a rider who never had it never sees it', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/tools/bags/' });
+  await ready(page);
+  await page.waitForFunction('OFFLINE_PACKING.checked === true');
+  await expect(page.locator('#offlineAgainBar')).toBeHidden();   // never had it
+  await page.evaluate('prepareOfflinePacking()');
+  await page.waitForFunction('OFFLINE_PACKING.cacheReady === true && OFFLINE_PACKING.busy === false', undefined, { timeout: 30_000 });
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('loadcheck:offline-had'))).not.toBeNull();
+
+  await switchedOff(page);
+  await openFresh(page, '/tools/bags/');
+  await ready(page);
+  await expect(page.locator('#offlineAgainBar')).toBeVisible();
+  await expect(page.locator('#offlineAgainText')).toContainText('Make available offline');
+  await page.locator('#offlineAgainSave').click();
+  await expect(page.locator('#offlineAgainBar')).toBeHidden({ timeout: 30_000 });
+  expect(await registrations(page)).toEqual([[`${app.origin}/`, `${app.origin}/offline-worker.js`]]);
+
+  await switchedOff(page);
+  await openFresh(page, '/tools/bags/');
+  await ready(page);
+  await expect(page.locator('#offlineAgainBar')).toBeVisible();
+  await page.locator('#offlineAgainLater').click();
+  await expect(page.locator('#offlineAgainBar')).toBeHidden();
+  await openFresh(page, '/tools/bags/');
+  await ready(page);
+  await page.waitForFunction('OFFLINE_PACKING.checked === true');
+  await page.waitForTimeout(300);
+  await expect(page.locator('#offlineAgainBar')).toBeHidden();
+});

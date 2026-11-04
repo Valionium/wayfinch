@@ -181,6 +181,81 @@ test('[C-DELETE-FRAGMENT] #copilot-delete= with no stored valid request deletes 
   assert.ok(!q.log.some(x=>x.startsWith('history:')),'no fragment, nothing to remove');
 });
 
+// ---- Offline at /tools/bags/: the site's one worker (spec 7.1 item 6), and the line after the emergency switch (Decision 9) ----
+// A browser with a service worker container the test controls: `cached` says whether the site's copy is there.
+function offlinePage({storage=sharedStore(),cached=false}={}){
+  const p=page({storage});
+  const log=[];
+  const state={cached};
+  const worker=()=>({scriptURL:'https://example.test/offline-worker.js',state:'activated',addEventListener(){},removeEventListener(){},
+    postMessage(message,ports){log.push('message:'+message.type);if(ports&&ports[0])ports[0].postMessage({ok:true,cached:true});}});
+  const registration=()=>state.cached ? {active:worker(),installing:null,waiting:null,addEventListener(){},update:async()=>{}} : undefined;
+  p.context.qaWorkers={
+    async register(url,options){log.push('register:'+url+' '+JSON.stringify(options));state.cached=true;return registration();},
+    async getRegistration(url){log.push('getRegistration:'+url);return registration();},
+    ready:new Promise(()=>{}),addEventListener(){},removeEventListener(){},
+  };
+  p.context.window.isSecureContext=true;p.context.window.caches={};
+  Object.assign(p.context.location,{href:'https://example.test/tools/bags/'});
+  p.run('navigator.serviceWorker=qaWorkers;DRAFT_READY=true;DRAFT_SIGNATURE=JSON.stringify(captureDraft());DRAFT_READ_KIND="browser";initialiseDraftSaveStatus();');
+  // the page's own MessageChannel answers through the port the worker gets
+  const settle=()=>new Promise(resolve=>setTimeout(resolve,20));
+  return {...p,olog:log,state,settle};
+}
+
+test('[LC-OFFLINE-SITE] at /tools/bags/ the page looks up and registers only /offline-worker.js, scope /; the update prompt asks the site-wide registration',async()=>{
+  const p=offlinePage();
+  await p.run('initialiseOfflinePacking()');await p.settle();
+  assert.deepEqual(p.olog.filter(x=>x.startsWith('getRegistration')),['getRegistration:https://example.test/','getRegistration:https://example.test/'],'the offline check, then the update prompt: both at /');
+  await p.run('prepareOfflinePacking()');await p.settle();
+  assert.deepEqual(p.olog.filter(x=>x.startsWith('register')),['register:https://example.test/offline-worker.js {"scope":"https://example.test/","updateViaCache":"none"}']);
+  assert.ok(p.olog.includes('message:LOADCHECK_SAVE_APP'));
+  assert.equal(p.json('OFFLINE_PACKING.cacheReady'),true,'the panel reports the site-wide copy');
+  const html=fs.readFileSync(PAGE,'utf8');
+  const names=[...new Set([...html.matchAll(/[\w./-]*worker[\w-]*\.js/g)].map(m=>m[0]))];
+  assert.deepEqual(names,['/offline-worker.js'],'no other worker\'s name in the source');
+});
+
+test('[LC-OFFLINE-AGAIN] a rider who never had the offline copy never sees the line',async()=>{
+  const p=offlinePage({cached:false});
+  await p.run('initialiseOfflinePacking()');await p.settle();
+  assert.equal(p.json('OFFLINE_AGAIN.shown'),false);
+  assert.equal(p.stored('loadcheck:offline-had'),null);
+});
+
+test('[LC-OFFLINE-AGAIN] the copy seen once, then gone after the emergency switch: one line asks for a tap; the tap brings it back and the line goes',async()=>{
+  const storage=sharedStore();
+  const first=offlinePage({storage,cached:true});
+  await first.run('initialiseOfflinePacking()');await first.settle();
+  assert.equal(first.json('OFFLINE_AGAIN.shown'),false,'nothing to say while the copy is there');
+  assert.deepEqual(JSON.parse(first.stored('loadcheck:offline-had')),{app:'load-check',kind:'offline-had',v:1});
+  // the switch removed the registration and the caches; a later good deploy did not bring them back
+  const later=offlinePage({storage,cached:false});
+  await later.run('initialiseOfflinePacking()');await later.settle();
+  assert.equal(later.json('OFFLINE_AGAIN.shown'),true);
+  const words=later.html.slice(later.html.indexOf('id="offlineAgainText">'),later.html.indexOf('id="offlineAgainLater"'));
+  assert.ok(/Make available offline/.test(words),'it names the button to tap');
+  assert.ok(!/safe|guarant|prevent|warning|error|fail|must/i.test(words),'warm words, none of the banned ones');
+  await later.run('prepareOfflinePacking()');await later.settle();
+  assert.equal(later.json('OFFLINE_AGAIN.shown'),false,'the copy is back, the line is gone');
+  assert.ok(later.stored('loadcheck:offline-had'),'the mark stays for the next time');
+});
+
+test('[LC-OFFLINE-AGAIN] Not now dismisses the line for good; the next visit without the copy says nothing',async()=>{
+  const storage=sharedStore();
+  const first=offlinePage({storage,cached:true});
+  await first.run('initialiseOfflinePacking()');await first.settle();
+  const later=offlinePage({storage,cached:false});
+  await later.run('initialiseOfflinePacking()');await later.settle();
+  assert.equal(later.json('OFFLINE_AGAIN.shown'),true);
+  await later.run('dismissOfflineAgain()');
+  assert.equal(later.json('OFFLINE_AGAIN.shown'),false);
+  assert.equal(later.stored('loadcheck:offline-had'),'null');
+  const next=offlinePage({storage,cached:false});
+  await next.run('initialiseOfflinePacking()');await next.settle();
+  assert.equal(next.json('OFFLINE_AGAIN.shown'),false);
+});
+
 (async()=>{
   for(const [name,fn] of tests){await fn();passed++;console.log('ok',name);}
   console.log(`${passed} contract tests passed`);
