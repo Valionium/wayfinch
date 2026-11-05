@@ -843,6 +843,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - over generated inputs the result never exceeds a limit in the unit it was entered in, never goes below a tube floor, is never NaN, and widths or rims outside the tables are refused or said so [TY-PROP-LIMITS]
 - the 50 mm, 70 kg Vittoria case is informational: it stays inside the limits and its deviation is printed [TY-VITTORIA]
 - the sidewall maximum is the only required field when the rim is stated hooked; with the rim hookless or not stated, the tyre width is asked for too, and there is no figure (and no saved last figure) until it is given; without the maximum the screen says so and shows no figure; a limit that is asked about or refused shows no figure until answered [TY-UI-REQUIRED]
+- the three things a figure needs (the tyre maximum, the tyre widths, the rim type) come first, together in one card marked as needed, before the result; every optional field follows the result; limits, figures and wording rules unchanged (owner's device check, 5 Nov 2026) [TY-UI-NEEDED-FIRST]
 - handlebar, wheel and widths start from the bike labelled "from your bike"; weights from the load summary with its age; the plan bike is preselected; changes stay in the tyre tool; one bike's details never reach another's [TY-UI-FROM-BIKE]
 - rider weight starts from the weight entered in You, shown "from You"; with none entered the screen says 75 kg is assumed [TY-UI-FROM-YOU]
 - details are stored per bike id or under a default key, and #/tools/tyre opens the tool [TY-UI-STORE]

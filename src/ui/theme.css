@@ -144,6 +144,9 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 .tyre h3 { font-family: var(--font-display); font-size: 1.125rem; margin: 12px 0 4px; }
 .tyre-title { font-size: 1.5rem; margin: 8px 0; }
 .tyre-result { border-color: var(--blaze); }
+/* The three things a figure needs: one card at the top, marked by a heavier edge and a tag on each (owner's device check, 5 Nov). */
+.tyre-needed { border: 2px solid var(--ink); border-left-width: 6px; }
+.tyre-needed-tag { display: inline-block; margin-left: 6px; padding: 0 8px; border: 1px solid var(--ink); border-radius: 999px; font-size: 0.8125rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; vertical-align: middle; }
 .tyre-wheels { display: flex; gap: 12px; flex-wrap: wrap; }
 .tyre-wheel { flex: 1 1 8rem; }
 .tyre-wheel h3 { margin-top: 4px; }

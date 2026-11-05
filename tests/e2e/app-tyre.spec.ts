@@ -105,6 +105,27 @@ test('[TY-UI-OFFLINE] the tool works in flight mode and sends nothing', async ({
   expect(requests.filter((u) => !u.startsWith(app!.origin) && !u.startsWith('data:') && !u.startsWith('blob:'))).toEqual([]);
 });
 
+// The owner's device check of 5 November: the three things a figure needs were spread along the screen.
+test('[TY-UI-NEEDED-FIRST] the three things a figure needs are at the top, in one card drawn apart from the others, each marked', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools/tyre' });
+  const needed = page.locator('section.tyre-needed');
+  await expect(needed.getByRole('heading', { name: 'Needed for a figure', level: 2 })).toBeVisible();
+  await expect(needed.locator('.tyre-needed-tag')).toHaveCount(4);
+  for (const tag of await needed.locator('.tyre-needed-tag').all()) await expect(tag).toBeVisible();
+  await expect(needed.getByRole('textbox', { name: /Tyre maximum/ })).toBeVisible();
+  await expect(needed.getByRole('textbox', { name: /Front tyre width/ })).toBeVisible();
+  await expect(needed.getByRole('textbox', { name: /Rear tyre width/ })).toBeVisible();
+  await expect(needed.getByLabel('Hooked')).toBeVisible();
+  // Drawn apart: a heavier edge than any other card.
+  const edge = (sel: string) => page.locator(sel).first().evaluate((e) => parseFloat(getComputedStyle(e).borderLeftWidth));
+  expect(await edge('section.tyre-needed')).toBeGreaterThan(await edge('section.tyre-result'));
+  // Every card below the needed one, the answer first.
+  const tops = await page.locator('.tyre > section.card').evaluateAll((cards) => cards.map((c) => [c.className, c.getBoundingClientRect().top] as const));
+  expect(tops[0]![0]).toContain('tyre-needed');
+  expect(tops[1]![0]).toContain('tyre-result');
+  for (const [, top] of tops.slice(1)) expect(top).toBeGreaterThan(tops[0]![1]);
+});
+
 test('the tyre screen has no accessibility violations, no sideways scroll, 44 px controls, and a clean console', async ({ page }) => {
   const problems: string[] = [];
   page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') problems.push(m.text()); });
