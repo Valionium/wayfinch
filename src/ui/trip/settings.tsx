@@ -1,10 +1,11 @@
 // Trip settings (spec section 3.3). Every field saves when it is changed; a value outside its range is refused with the range
 // named, and the field goes back to the last good value. Nothing here works out the days: the services re-plan them.
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { W } from '../../core/wording/en.ts';
 import { keepFreshOffered } from '../../data/refresh.ts';
 import type { Settings } from '../../store/rules.ts';
 import { Card } from '../card.tsx';
+import { useFollowing } from '../follow.ts';
 import { suggestedNights } from './model.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
 
@@ -15,8 +16,7 @@ export function NumberField({ id, label, value, step, min, max, placeholder, onC
   onCommit: (value: number | null) => Promise<boolean>; problem: string | null;
 }) {
   const shown = value === null ? '' : String(value);
-  const [draft, setDraft] = useState(shown);
-  useEffect(() => setDraft(shown), [shown]);
+  const [draft, setDraft] = useFollowing(shown);
   return (
     <div class="field">
       <label for={id}>{label}</label>
@@ -36,8 +36,7 @@ export function NumberField({ id, label, value, step, min, max, placeholder, onC
 
 /** The choice shows at once; if the store refuses it, the last good one comes back. */
 export function Choice({ name, legend, value, options, onPick }: { name: string; legend: string; value: string; options: [string, string][]; onPick: (v: string) => Promise<boolean> }) {
-  const [shown, setShown] = useState(value);
-  useEffect(() => setShown(value), [value]);
+  const [shown, setShown] = useFollowing(value);
   return (
     <fieldset class="field choice">
       <legend>{legend}</legend>
@@ -54,13 +53,10 @@ export function Choice({ name, legend, value, options, onPick }: { name: string;
 export function TripSettings({ services, snap, reload }: { services: TripServices; snap: TripSnapshot; reload: () => Promise<void> }) {
   const { settings, trip } = snap;
   const [problems, setProblems] = useState<Partial<Record<string, string>>>({});
-  const [startDraft, setStartDraft] = useState(settings.startTime);
-  const [dateDraft, setDateDraft] = useState(trip?.departureDate ?? '');
-  useEffect(() => setDateDraft(trip?.departureDate ?? ''), [trip?.departureDate]);
+  const [startDraft, setStartDraft] = useFollowing(settings.startTime);
+  const [dateDraft, setDateDraft] = useFollowing(trip?.departureDate ?? '');
   const dateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [fresh, setFresh] = useState(settings.keepFresh);
-  useEffect(() => setFresh(settings.keepFresh), [settings.keepFresh]);
-  useEffect(() => setStartDraft(settings.startTime), [settings.startTime]);
+  const [fresh, setFresh] = useFollowing(settings.keepFresh);
 
   const save: Save = async (field, value) => {
     const result = await services.writeSettings({ [field]: value });

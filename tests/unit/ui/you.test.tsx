@@ -115,6 +115,30 @@ describe('Rider and water you can carry (spec section 3.5)', () => {
     expect(radio('units', 'imperial').checked).toBe(true);
   });
 
+  test('[YOU-RIDER] a weight typed the moment You appears, before the screen\'s effects have run, stays in the field and is kept on leaving it', async () => {
+    // CI found it (YOU-EXPORT-UI, three times): the field was typed into, then emptied before it was left, so no change fired and
+    // nothing was saved. Each field followed what was read with an effect that also ran once after the first paint, and that run
+    // put the read value back over what was typed before it. Here the typing comes in the same task as the first paint, as it can
+    // on a busy phone where input goes before the effects.
+    act(() => render(null, host));
+    let loaded!: () => void;
+    const gate = new Promise<void>((r) => { loaded = r; });
+    const svc = services();
+    render(<YouScreen services={{ ...svc, load: async () => { await gate; return svc.load(); } }} />, host);
+    loaded();
+    for (let i = 0; i < 5000 && !host.querySelector('#you-weight'); i++) await new Promise<void>((r) => setTimeout(r, 0));
+    const weight = field('you-weight');
+    weight.focus();
+    weight.value = '82';
+    weight.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle(150); // the effects after the first paint have run
+    expect(field('you-weight')).toBe(weight);
+    expect(weight.value).toBe('82');
+    await act(async () => { weight.dispatchEvent(new Event('change', { bubbles: true })); });
+    await until(() => localStorage.getItem('copilot:changed') !== null, 'the write to be reported');
+    expect((await readProfile()).weightKg).toBe(82);
+  });
+
   test('[YOU-RIDER] empty is allowed everywhere: a cleared weight is none, a cleared speed is the default, and nothing is required', async () => {
     await show();
     expect(field('you-weight').value).toBe('');
