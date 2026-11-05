@@ -42,9 +42,8 @@ export const FADES: readonly { name: string; from: string; to: string }[] = [
 
 /** What a new pattern starts with when the rider has not chosen yet: the try-out's second and third colours (Purple, Teal). */
 export const DEFAULT_COLOURS: readonly [string, string] = ['#6b3fa0', '#1f7f80'];
-/** Raw carbon's weave; its first colour for older pages and the 24 px marker is Black. */
+/** Raw carbon's weave (the rider's colours are kept, only not shown). */
 const WEAVE = ['#34373b', '#1f2124'] as const;
-export const CARBON_COLOUR = '#1d1d1f';
 /** The rim's carbon band and its inner edge. */
 const RIM_BAND = '#2b2d30';
 const RIM_EDGE = { light: '#5b5f63', dark: '#6c7075' } as const;

@@ -3425,14 +3425,13 @@ function syncLookExtras(look){
   if($('lookRimOut'))$('lookRimOut').textContent=p.rimMm===null ? P.paintRimUnset : P.paintRimValue(p.rimMm);
   $('lookRimNotSet')?.setAttribute('aria-pressed',String(p.rimMm===null));
 }
-// One change to the extras. A pattern or fork paints over the frame colour, so with none yet the tap also picks Blue; raw carbon picks
-// Black, the colour older pages and the 24 px marker show for it.
+// One change to the extras. A pattern or fork paints over the frame colour, so with none yet the tap also picks Blue. Raw carbon only sets
+// the colours aside while the weave shows: they stay stored and come back with any other pattern (review M5, as in the try-out).
 function setPaint(change,store=true){
   const B=lookExtras();if(!B)return;
   const look=currentLook() || {colour:null};
   const extra={};
-  if(change.pattern==='carbon')extra.colour=B.CARBON_COLOUR;
-  else if(!look.colour && ((change.pattern && change.pattern!=='solid') || change.fork))extra.colour=LOOK_FIRST_COLOUR;
+  if(!look.colour && ((change.pattern && change.pattern!=='solid') || change.fork))extra.colour=LOOK_FIRST_COLOUR;
   setLook({...extra,paint:{...lookPaint(),...change}},store);
 }
 function flushLookRim(){
@@ -11057,6 +11056,9 @@ function buildThumb(id){
   // A thumbnail keeps plain colours only (safeDataThumb): a patterned frame or fork is kept in the bike's first colour.
   const first = normaliseLook(S.bikeProfile && S.bikeProfile.look)?.colour;
   c.querySelectorAll('.bk-paint').forEach(n => { if((n.getAttribute('stroke') || '').startsWith('url(')){ if(first) n.setAttribute('stroke', first); else n.removeAttribute('stroke'); } });
+  // and the pattern tiles, gradients and filters those strokes used are not stored: nothing in the thumbnail points at them any more
+  c.querySelectorAll('svg.bk > defs > pattern, svg.bk > defs > linearGradient, svg.bk > defs > filter').forEach(n => n.remove());
+  c.querySelectorAll('svg.bk > defs').forEach(d => { if(!d.firstElementChild) d.remove(); });
   // nothing here is clickable, so drop every class that implies it is —
   // but keep .idle, which is what marks a bag you owned and did not mount
   c.querySelectorAll('.bagg, .btl').forEach(n => {

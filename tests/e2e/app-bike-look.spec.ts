@@ -231,3 +231,19 @@ test('[LC-LOOK-EXTRAS-SAVE] a change saved in another tab: a fade keeps its grad
   await expect(drawing.locator('.bk-paint.bk-frame').first()).toHaveAttribute('stroke', /^url\(/);
   await other.close();
 });
+
+test('[LC-LOOK-EXTRAS-SAVE] a setup\'s thumbnail of a patterned bike stores no pattern tiles: the size of the same bike in one colour (review M4)', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/tools/bags/' });
+  const sparkle = { ...BLUE, look: { ...BLUE.look, paint: { pattern: 'sparkle', colours: ['#6b3fa0', null], fork: { kind: 'pattern', pattern: 'sparkle', pair: 3 }, rimMm: null } } };
+  const thumbOf = async (b: object) => String(await page.evaluate(`S.bikeProfile = normaliseBikeProfile(${JSON.stringify(b)}); drawRig(); buildThumb('st1')`));
+  await expect(page.locator('#rigBike svg.bk')).toBeVisible();
+  const patterned = await thumbOf(sparkle);
+  const plain = await thumbOf(BLUE);
+  expect(patterned.includes('<pattern') || patterned.includes('<filter') || patterned.includes('url(#rigp')).toBe(false);
+  const unnamed = (s: string) => s.replace(/ aria-label="[^"]*"/g, '');
+  expect(unnamed(patterned)).toBe(unnamed(plain));
+  // rims stay, as plain circles
+  const rims = await thumbOf({ ...sparkle, look: { ...sparkle.look, paint: { ...sparkle.look.paint, rimMm: 40 } } });
+  expect((rims.match(/stroke="#2b2d30"/g) ?? []).length).toBe(2);
+  expect(rims.length).toBeLessThan(plain.length + 1000);
+});

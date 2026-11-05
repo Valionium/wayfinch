@@ -336,7 +336,7 @@ test('[LC-LOOK-EXTRAS] Frame pattern, its colours, the fork and the rims are lab
   assert.ok(/\.lx-rim input\[type=range\]\{[^}]*min-height:44px/.test(css),'the slider too');
 });
 
-test('[LC-LOOK-EXTRAS] each extra shows at once on the preview and the rig; with no colour a pattern starts on Blue, raw carbon on Black; Undo restores byte for byte',async()=>{
+test('[LC-LOOK-EXTRAS] each extra shows at once on the preview and the rig; with no colour a pattern starts on Blue; Undo restores byte for byte',async()=>{
   const p=page();
   const beforePlan=p.stored('loadcheck:bikeProfile'),beforeLib=p.stored('loadcheck:bikeProfiles');
   open(p);
@@ -358,12 +358,10 @@ test('[LC-LOOK-EXTRAS] each extra shows at once on the preview and the rig; with
   assert.equal(p.stored('loadcheck:bikeProfile'),beforePlan,'the plan\'s bike, byte for byte');
   assert.equal(p.stored('loadcheck:bikeProfiles'),beforeLib,'its saved copy, byte for byte');
   assert.equal(stroke(p),'#2563b8');
-  // no colour yet: the first pattern tap also picks Blue; raw carbon picks Black; a rim needs no colour
+  // no colour yet: the first pattern tap also picks Blue; a rim needs no colour
   p.run("setLook({colour:null})");
   p.run("setPaint({pattern:'stripes',colours:['#f1c232',null]})");
   assert.equal(p.json('S.bikeProfile.look.colour'),'#2563b8');
-  p.run("setPaint({pattern:'carbon'})");
-  assert.equal(p.json('S.bikeProfile.look.colour'),'#1d1d1f');
   p.run("setLook({colour:null,paint:null});setPaint({rimMm:20})");
   assert.equal(p.json('S.bikeProfile.look.colour'),null);
   assert.equal(p.json('S.bikeProfile.look.paint.rimMm'),20);
@@ -401,6 +399,22 @@ test('[LC-LOOK-EXTRAS-SAVE] the extras round-trip: saved, read again by a new pa
     const module=p.run('JSON.stringify(window.WayfinchBike.normaliseBike(JSON.parse(qaRaw)).look)');
     assert.equal(page,module,JSON.stringify(raw));
   }
+});
+
+test('[LC-LOOK-EXTRAS] Raw carbon keeps the colours the rider chose: they are only set aside while the weave shows, and come back with any other pattern (review M5)',async()=>{
+  const p=page();
+  open(p);
+  p.run("setLook({colour:'#c62f2a'});setPaint({pattern:'fade-h',colours:['#6b3fa0',null]})");
+  p.run("setPaint({pattern:'carbon'})");
+  assert.equal(p.json('S.bikeProfile.look.colour'),'#c62f2a','the first colour is kept');
+  assert.deepEqual(p.json('S.bikeProfile.look.paint.colours'),['#6b3fa0',null],'and the second');
+  assert.match(p.run("document.getElementById('lookPreview').innerHTML"),/aria-label="[^"]*raw carbon frame/);
+  p.run("setPaint({pattern:'solid'})");
+  assert.equal(stroke(p),'#c62f2a','back to one colour: red, not black');
+  p.run("setPaint({pattern:'fade-h'})");
+  assert.match(p.run("document.getElementById('lookPreview').innerHTML"),/aria-label="[^"]*red and purple frame, fade, front to back/);
+  await p.settle();
+  assert.equal(JSON.parse(p.stored('loadcheck:bikeProfile')).look.colour,'#c62f2a');
 });
 
 (async()=>{
