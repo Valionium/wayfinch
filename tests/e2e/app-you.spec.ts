@@ -80,7 +80,9 @@ function savedWeight(page: Page): () => Promise<void> {
   };
 }
 
-test('[YOU-RIDER] You opens as its own screen with the rider, water, learning, bikes, settings, data and legal cards, and a weight typed there is kept after a reload', async ({ page }) => {
+// TEMPORARY (diagnosis on CI, reverted before review): the two tests 20 times each.
+for (let n = 0; n < 20; n++) {
+test(`[YOU-RIDER] You opens as its own screen with the rider, water, learning, bikes, settings, data and legal cards, and a weight typed there is kept after a reload #${n}`, async ({ page }) => {
   const saved = savedWeight(page);
   app = await loadApp(page);
   await tab(page, 'You').click();
@@ -101,7 +103,7 @@ test('[YOU-RIDER] You opens as its own screen with the rider, water, learning, b
   await expect(page.getByText('82 kg').first()).toBeVisible();
 });
 
-test('[YOU-EXPORT-UI] Export downloads a JSON file named by the day, with the rider details in it', async ({ page }) => {
+test(`[YOU-EXPORT-UI] Export downloads a JSON file named by the day, with the rider details in it #${n}`, async ({ page }) => {
   const saved = savedWeight(page);
   app = await loadApp(page);
   await tab(page, 'You').click();
@@ -116,6 +118,7 @@ test('[YOU-EXPORT-UI] Export downloads a JSON file named by the day, with the ri
   const body = JSON.parse(await (await import('node:fs/promises')).readFile((await file.path())!, 'utf8')) as { app: string; profile: { weightKg: number | null } };
   expect(body).toMatchObject({ app: 'copilot', profile: { weightKg: 82 } });
 });
+}
 
 test('[PRIV-LEGAL-REACH] the imprint, the privacy notice and the licences are two taps from every tab: the tab, You, the link', async ({ page }) => {
   app = await loadApp(page);
