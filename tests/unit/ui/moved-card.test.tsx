@@ -64,9 +64,18 @@ test('[SW-MOVED-CARD] following the link counts as seen: the card does not come 
   expect(host.querySelector('.moved-card')).toBeNull();
 });
 
-test('[SW-MOVED-CARD] a new rider never sees it; a browser that keeps nothing shows it but never throws', async () => {
+test('[SW-MOVED-CARD] a new rider never sees it, also once the bag planner has written a draft later (review M4)', async () => {
   await show();
   expect(host.querySelector('.moved-card')).toBeNull();
+  // the co-pilot's first look found no Load Check keys: that is kept, so a draft the bag planner writes afterwards brings no card
+  expect(localStorage.getItem(MOVED_CARD_KEY)).not.toBeNull();
+  localStorage.setItem('loadcheck:draft', '{"v":1}');
+  render(null, host);
+  await show();
+  expect(host.querySelector('.moved-card')).toBeNull();
+});
+
+test('[SW-MOVED-CARD] a browser that keeps nothing shows it but never throws', async () => {
   localStorage.setItem('loadcheck:draft', '{"v":1}');
   const realSet = Storage.prototype.setItem;
   Storage.prototype.setItem = () => { throw new Error('quota'); };

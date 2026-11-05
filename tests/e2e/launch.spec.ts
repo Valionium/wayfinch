@@ -319,15 +319,43 @@ for (const start of ['legacy', 'step-one'] as const) {
   });
 }
 
-test('[SW-MOVED-CARD] a returning rider gets the card once, under Tools, its link in the same window; a new rider never does', async ({ context, page }) => {
+test('[SW-MOVED-CARD] a new rider never gets the card: not at first, and not after changing a plan in the bag planner (review M4)', async ({ page }) => {
   server = await startCfLike({ dir: await siteFor(true) });
   await page.goto(`${server.origin}/`, { waitUntil: 'domcontentloaded' });
   await expectCopilot(page);
   await page.waitForTimeout(500);
-  await expect(page.locator('.moved-card')).toHaveCount(0); // a new rider
+  await expect(page.locator('.moved-card')).toHaveCount(0);
+  // Tools, the bag planner, a change of nights (which writes loadcheck:draft), Back to Wayfinch
+  await page.goto(`${server.origin}/#/tools`, { waitUntil: 'domcontentloaded' });
+  await page.locator('main[data-screen="tools"] a[href="/tools/bags/"]').click();
+  await page.waitForURL(`${server.origin}/tools/bags/`);
+  await draftReady(page);
+  await page.evaluate('setNights(S.nights + 1)'); // the nights stepper's own handler
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('loadcheck:draft') !== null)).toBe(true);
+  await page.locator('#backToWayfinch').click();
+  await page.waitForURL(`${server.origin}/#/tools`);
+  await expectCopilot(page);
+  await page.waitForTimeout(500);
+  await expect(page.locator('.moved-card')).toHaveCount(0);
+  for (const hash of ['#/trip', '#/you']) {
+    await page.goto(`${server.origin}/${hash}`, { waitUntil: 'domcontentloaded' });
+    await expectCopilot(page);
+    await page.waitForTimeout(300);
+    await expect(page.locator('.moved-card')).toHaveCount(0);
+  }
+});
 
-  await page.evaluate(() => localStorage.setItem('loadcheck:setups', '[]'));
-  await page.reload({ waitUntil: 'domcontentloaded' });
+/** A returning rider: the bag planner's keys are there before the co-pilot first runs, as after the launch. */
+async function returningRider(page: Page, keys: Record<string, string>): Promise<void> {
+  server = await startCfLike({ dir: await siteFor(true) });
+  await page.goto(`${server.origin}/tools/bags/index.html`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate((k) => { localStorage.clear(); for (const [key, value] of Object.entries(k)) localStorage.setItem(key, value); }, keys);
+  await page.goto(`${server.origin}/`, { waitUntil: 'domcontentloaded' });
+  await expectCopilot(page);
+}
+
+test('[SW-MOVED-CARD] a returning rider gets the card once, under Tools, its link in the same window; once followed it is gone', async ({ context, page }) => {
+  await returningRider(page, { 'loadcheck:setups': '[]' });
   const card = page.locator('.moved-card');
   await expect(card).toBeVisible();
   await expect(card.locator('h2')).toHaveText('Load Check is now part of Wayfinch');
@@ -337,22 +365,22 @@ test('[SW-MOVED-CARD] a returning rider gets the card once, under Tools, its lin
   expect(await link.getAttribute('target')).toBeNull();
   const pagesBefore = context.pages().length;
   await link.click();
-  await page.waitForURL(`${server.origin}/tools/bags/`);
+  await page.waitForURL(`${server!.origin}/tools/bags/`);
   expect(context.pages().length).toBe(pagesBefore);
   await draftReady(page);
-  await page.goto(`${server.origin}/`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${server!.origin}/`, { waitUntil: 'domcontentloaded' });
   await expectCopilot(page);
   await page.waitForTimeout(500);
   await expect(page.locator('.moved-card')).toHaveCount(0);
+});
 
-  // Dismissed instead: gone, and still gone on the next start and on every tab.
-  await page.evaluate(() => { localStorage.removeItem('copilot:moved-card'); localStorage.setItem('loadcheck:draft', '{}'); });
-  await page.reload({ waitUntil: 'domcontentloaded' });
+test('[SW-MOVED-CARD] a returning rider who taps Got it: gone, and still gone on the next start and on every tab', async ({ page }) => {
+  await returningRider(page, { 'loadcheck:draft': '{}' });
   await expect(page.locator('.moved-card')).toBeVisible();
   await page.locator('.moved-card').getByRole('button', { name: 'Got it' }).click();
   await expect(page.locator('.moved-card')).toHaveCount(0);
   for (const hash of ['#/trip', '#/tools', '#/you']) {
-    await page.goto(`${server.origin}/${hash}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${server!.origin}/${hash}`, { waitUntil: 'domcontentloaded' });
     await expectCopilot(page);
     await page.waitForTimeout(300);
     await expect(page.locator('.moved-card')).toHaveCount(0);
