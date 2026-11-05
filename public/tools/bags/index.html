@@ -3099,7 +3099,11 @@ function readBikeProfileEditor(){
   for(const [key,id] of Object.entries(BIKE_PROFILE_INPUTS))raw[key]=$(id).value;
   if(!raw.name.trim())raw.name='Bike details';
   const fields=readFitFields(),was=BIKE_PROFILES.find(b=>b.id===raw.id) || (S.bikeProfile?.id===raw.id ? S.bikeProfile : null);
-  raw.pressure={...normalisePressureBike(was?.pressure),bikeKg:$(BIKE_WEIGHT_INPUT).value};   // the other tyre fields as saved
+  // The other tyre fields as they are: the plan's own when this is the plan's bike and it holds any, else the saved bike's (review M4)
+  const tyreData=b=>!!b && Object.entries(normalisePressureBike(b.pressure)).some(([k,v])=>k!=='bikeKg' && v!==null && v!=='unknown');
+  const plan=S.bikeProfile?.id===raw.id ? S.bikeProfile : null,saved=BIKE_PROFILES.find(b=>b.id===raw.id);
+  const tyres=plan && (tyreData(plan) || !tyreData(saved)) ? plan : saved || plan;
+  raw.pressure={...normalisePressureBike(tyres?.pressure),bikeKg:$(BIKE_WEIGHT_INPUT).value};
   raw.fit=fields.fit;raw.maxWeight=fields.maxWeight;
   raw.maxWeightAsked=!!(was?.maxWeightAsked || fields.maxWeight);
   raw.look=was ? was.look ?? null : LOOK_NEW;raw.geometry=was?.geometry ?? null;   // edited elsewhere (Look below), kept as they are

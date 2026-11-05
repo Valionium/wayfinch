@@ -79,6 +79,21 @@ const KEPT={...PRESSURE,riderKg:null};
       renderClimate=()=>{};renderBags=()=>{};renderKit=()=>{};drawRig=()=>{};ensureClimate=()=>{};ensureRoute=()=>{};S.tyrePressure=normaliseTyrePressure(null);restorePlan(qaSetup,true,false);`);
     check(run('S.tyrePressure.record.rearBar===2.2 && S.tyrePressure.bagKg===2 && S.bikeProfile.pressure.frontMm===45'),'[LC-TYRE-KEPT] a restored setup keeps its own tyre data');
   }
+  // Review M4: Use these bike details keeps the plan's own tyre data; the saved bike's only fills a plan that holds none
+  {
+    const m=appVM();
+    m.run(`var qaHardware=${JSON.stringify(HARDWARE)};renderBikeProfiles=()=>{};persistBikeProfileSelection=async()=>true;DRAFT_READY=true;
+      S.bikeProfile=normaliseBikeProfile({id:'bike_x',name:'X',pressure:qaHardware});
+      BIKE_PROFILES=[normaliseBikeProfile({id:'bike_x',name:'X',pressure:{...qaHardware,frontMm:50,rearMm:50}})];
+      fillBikeProfileForm(S.bikeProfile);`);
+    m.nodes.get('bikeBaseKg').value='12.9';
+    check(await m.run('applyBikeDetails()')!==false,'[LC-TYRE-KEPT] the plan\'s bike applies');
+    check(m.run('S.bikeProfile.pressure.frontMm===45 && S.bikeProfile.pressure.rearMm===43 && S.bikeProfile.pressure.bikeKg===12.9'),'[LC-TYRE-KEPT] the plan keeps its own tyre data, not the saved bike\'s edited one');
+    m.run(`S.bikeProfile=normaliseBikeProfile({id:'bike_x',name:'X'});fillBikeProfileForm(S.bikeProfile);`);
+    m.nodes.get('bikeBaseKg').value='12.9';
+    await m.run('applyBikeDetails()');
+    check(m.run('S.bikeProfile.pressure.frontMm===50'),'[LC-TYRE-KEPT] a plan with none takes the saved bike\'s');
+  }
   // Start a new plan: the plan's tyre data goes with the plan
   {
     const storage=sharedStore();
