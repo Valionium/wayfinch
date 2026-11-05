@@ -321,7 +321,7 @@ for (const start of ['legacy', 'step-one'] as const) {
     // The bag planner reads what is left without a fault: no pattern, no rims.
     await planner.reload({ waitUntil: 'domcontentloaded' });
     await draftReady(planner);
-    const svg = await planner.evaluate("bikeDrawing(BIKE_PROFILES[0], null, { theme: 'dark' })?.svg ?? ''");
+    const svg = String(await planner.evaluate("bikeDrawing(BIKE_PROFILES[0], null, { theme: 'dark' })?.svg ?? ''"));
     expect(svg).toContain('<svg');
     expect(svg.includes('url(#') || svg.includes('bk-rimband')).toBe(false);
   });

@@ -124,6 +124,15 @@ describe('the marker on the strip (spec section 7.4)', () => {
     show(<BikeMarker bike={null} />);
     expect(host.querySelector('.bike-marker svg')).not.toBeNull();
   });
+
+  test('[BK-PAINT-LAZY] a bike with look extras keeps a one-colour marker: its first colour, as today (patterns do not read at 24 px)', () => {
+    const paint = { pattern: 'marble', colours: ['#6b3fa0', '#1f7f80'], fork: { kind: 'own', colour: '#f1c232' }, rimMm: 50 };
+    show(<BikeMarker bike={normaliseBike({ id: 'm', look: { colour: '#c62f2a', paint } })} />);
+    const painted = host.querySelector('.bike-marker')!.innerHTML;
+    show(<BikeMarker bike={normaliseBike({ id: 'm', look: { colour: '#c62f2a' } })} />);
+    expect(painted).toBe(host.querySelector('.bike-marker')!.innerHTML);
+    expect(painted).not.toMatch(/url\(|bk-rimband|#f1c232/);
+  });
 });
 
 describe('every tap shows a change at once (the owner\'s rules)', () => {
