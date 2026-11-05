@@ -38,14 +38,14 @@ context.document.getElementById=node;
 context.document.body.classList={add(){},remove(){},toggle(){},contains(){return false;}};
 context.document.body.style.overflow='auto';
 context.document.removeEventListener=(type,handler)=>{if(events.get(type)===handler)events.delete(type);};
-const background=node('qaInfoBackground'),pressure=node('pressureToolBox'),info=node('calculationInfoBox');
+const background=node('qaInfoBackground'),pressure=node('bikeDetailsBox'),info=node('calculationInfoBox');
 for(const root of [background,pressure,info])root.parentElement=context.document.body;
 context.document.body.children=[background,pressure,info];
 const heading=node('calculationInfoTitle'),copy=node('calculationInfoCopy'),close=node('calculationInfoClose');
 for(const el of [heading,copy,close])el.parentElement=info;
 const pressureButton=node('qaPressureOpener');pressureButton.tagName='BUTTON';pressureButton.parentElement=background;
-const pressureClose=node('pressureToolClose');pressureClose.parentElement=pressure;
-const parentHeading=node('pressureToolTitle');parentHeading.parentElement=pressure;
+const pressureClose=node('bikeDetailsClose');pressureClose.parentElement=pressure;
+const parentHeading=node('bikeDetailsTitle');parentHeading.parentElement=pressure;
 function help(id,title,content,parent=background){
   const host=node(id+'Host');host.classList.add('info-help');host.parentElement=parent;
   const button=node(id);button.tagName='BUTTON';button.parentElement=host;button.dataset.infoTitle=title;
@@ -81,20 +81,20 @@ check(key('Escape').prevented,'Escape closes info dialog');
 check(info.classList.contains('hidden')&&copy.innerHTML===''&&mainHelp.getAttribute('aria-expanded')==='false','close clears popup content and expanded state');
 check(!background.inert&&!pressure.inert&&context.document.body.style.overflow==='auto'&&context.document.activeElement===mainHelp,'close restores original background, scroll and opener focus');
 
-run('beginDialog(document.getElementById("pressureToolBox"),true,()=>endDialog(document.getElementById("pressureToolBox")),qaPressureOpener)');
+run('beginDialog(document.getElementById("bikeDetailsBox"),true,()=>endDialog(document.getElementById("bikeDetailsBox")),qaPressureOpener)');
 pressure.classList.remove('hidden');
-check(info.inert&&background.inert&&!pressure.inert,'parent pressure modal initially isolates hidden info sibling');
+check(info.inert&&background.inert&&!pressure.inert,'parent modal (Bike details) initially isolates hidden info sibling');
 context.document.activeElement=nestedHelp;click(nestedHelp);
-check(run('DIALOGS.length')===2&&background.inert&&pressure.inert&&!info.inert,'nested help temporarily activates its root and isolates pressure controls');
+check(run('DIALOGS.length')===2&&background.inert&&pressure.inert&&!info.inert,'nested help temporarily activates its root and isolates the controls of the parent modal');
 check(context.document.activeElement===heading&&copy.innerHTML.includes('6.3 kg'),'nested help remains focusable with the correct explanation');
 check(key('Escape').prevented&&run('DIALOGS.length')===1,'Escape closes only the top nested explanation');
 check(!pressure.inert&&info.inert&&background.inert&&context.document.body.style.overflow==='hidden','closing nested help restores parent modal isolation');
-check(context.document.activeElement===nestedHelp,'nested close restores focus to its pressure-tool info button');
+check(context.document.activeElement===nestedHelp,'nested close restores focus to its info button in Bike details');
 click(nestedHelp);click(info);
 check(run('DIALOGS.length')===1&&info.classList.contains('hidden')&&context.document.activeElement===nestedHelp,'clicking info backdrop closes only info and restores parent focus');
 click(nestedHelp);click(close);
 check(run('DIALOGS.length')===1&&context.document.activeElement===nestedHelp,'named close control works inside another modal');
-run('endDialog(document.getElementById("pressureToolBox"))');pressure.classList.add('hidden');
+run('endDialog(document.getElementById("bikeDetailsBox"))');pressure.classList.add('hidden');
 check(run('DIALOGS.length')===0&&!info.inert&&!background.inert&&context.document.body.style.overflow==='auto'&&context.document.activeElement===pressureButton,'closing parent restores original page interaction and opener focus');
 
 click(mainHelp);mainHelp.isConnected=false;run('closeCalculationInfo()');
@@ -103,17 +103,17 @@ const inertHost=node('qaStaticInfo');inertHost.innerHTML='<p>Explanation <b>with
 context.document.querySelectorAll=selector=>selector==='[data-info]'?[inertHost]:[];run('initialiseCalculationInfo()');
 check(!inertHost.hasAttribute('data-info')&&inertHost.innerHTML.includes('<template data-info-content><p>Explanation <b>with emphasis</b>.</p>'),'static explanatory text converts once without losing content');
 
-run('DRAFT_READY=true;S.tyrePressure=normaliseTyrePressure({method:"weighed",riderKg:75,loadedBikeKg:25});');
-const before=run('JSON.stringify(S)'),weights=run('JSON.stringify(loadedSystemWeight())');
-run('renderPressureHelper();bagCapacityHelp({pos:"seat",L:10});');
-check(run('JSON.stringify(S)')===before&&run('JSON.stringify(loadedSystemWeight())')===weights,'rendering explanation templates never changes packing or weight calculations');
-check(node('pressureWeightHint').innerHTML.includes('<template data-info-content>')&&node('pressureWeightSummary').innerHTML.includes('Total loaded system: <strong>100 kg</strong>'),'pressure methodology is hidden while actual loaded-weight result remains visible');
+// The tyre helper's loaded-weight methodology left with it (sub-project 6, Task 6); the invariance below stays, on the kit weight.
+run('DRAFT_READY=true;');
+const before=run('JSON.stringify(S)'),weights=run('JSON.stringify([kitKg(),waterL()])');
+run('bagCapacityHelp({pos:"seat",L:10});');
+check(run('JSON.stringify(S)')===before&&run('JSON.stringify([kitKg(),waterL()])')===weights,'rendering explanation templates never changes packing or weight calculations');
 const dynamicBag=run('bagCapacityHelp({pos:"seat",L:10})');
 const dynamicHelp=help('qaBagInfo','How usable bag space is counted',dynamicBag.match(/<template data-info-content>([\s\S]*)<\/template>/)[1]);
 click(dynamicHelp);
 check(copy.innerHTML.includes(Math.round(run('packEff()')*100)+'%'),'opening calculated bag-space help displays the current packing allowance');
 run('closeCalculationInfo()');
-check(run('JSON.stringify(S)')===before&&run('JSON.stringify(loadedSystemWeight())')===weights,'opening and closing calculated help never changes the plan or weight result');
+check(run('JSON.stringify(S)')===before&&run('JSON.stringify([kitKg(),waterL()])')===weights,'opening and closing calculated help never changes the plan or weight result');
 run('ensureForecast=()=>{};');
 const confidence=run('resultConfidence(tripClimate())');
 check(/<h3 id="confidenceTitle">How this was checked<\/h3>/.test(confidence)&&confidence.includes('<template data-info-content><dl class="confidencegrid">'),'minimized final-step check retains detailed methodology in the info popup');

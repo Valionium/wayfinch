@@ -13,7 +13,7 @@ test("[LC-PAGE-LIVE] the page's hash is the one recorded", () => {
   // The tag load-check-zip-2026-10-30 holds the page as it was live (aa086001…). Since then: the top-tube wording and the update prompt.
   // Sub-project 6 changes the bag planner behind the launch switch (bike.js, the rig, Look); riders keep releases/load-check-root.html
   // (LC-ROOT-FROZEN), so each change here is on purpose and recorded.
-  const recorded = 'c384022138aec1d5188925621d2ac944083238008e60c8cc3b8aa5d814a4bc98';
+  const recorded = 'b171eda77e775da3d9c3cf1f1c5878514932563fc59d480371375ed9d76ab18e';
   expect(createHash('sha256').update(readFileSync(PAGE)).digest('hex')).toBe(recorded);
 });
 
@@ -25,11 +25,48 @@ test('[LC-ROOT-FROZEN] the frozen root copy has the hash that went live with the
 
 const suites = readdirSync(`${REPO}qa`).filter((f) => f.endsWith('.cjs') && !HELPERS.includes(f)).sort();
 
+// Sub-project 6's plan, "Load Check's QA suites after the move" (the owner approved it on 2 November 2026), corrected in group 2's pull
+// request: every suite is kept unless retired; the four below retired with the tyre helper. Suites added since are kept too.
+const KEPT = [
+  'bag-selection', 'selection-fixtures', 'plan-object', 'plan-stability', 'plan-storage', 'strap-display', 'packing-audit', 'trip-kit-defaults',
+  'trip-info', 'gpx-high-point-climate', 'places', 'routes', 'route-map-feedback', 'inputs', 'info-popups', 'info-layout-regression', 'feedback-ui',
+  'bag-help-layout', 'release-storage.test', 'bike-fit', 'bike-weight', 'bike-repair',
+  'bike-profile-storage', 'bike-details-ui', 'bike-quick-start', 'bike-profile-ui',
+  'walkthrough-fixes', 'fix-findings', 'release-offline.test', 'offline-redirect', 'tyre-pressure-storage',
+  // not in the plan's table: sub-project 4's update prompt, group 1's bike suites, group 2's contracts and fit properties
+  'update-prompt', 'bike-contract', 'look', 'rig', 'contracts', 'fit-props',
+].map((n) => `${n}.cjs`).sort();
+const RETIRED = ['tyre-pressure', 'pressure-tool-markup', 'pressure-tool', 'ui-pressure-layout'];
+
+test('[LC-QA-TABLE] run-all runs exactly the kept suites; each retired one has its reason in qa/RETIRED.md, and is gone', () => {
+  expect(suites).toEqual(KEPT);
+  const retired = readFileSync(`${REPO}qa/RETIRED.md`, 'utf8');
+  for (const name of RETIRED) {
+    expect(suites).not.toContain(`${name}.cjs`);
+    const row = retired.split('\n').find((line) => line.startsWith(`| \`${name}\` |`));
+    expect(row, name).toBeDefined();
+    expect(row!.split('|').filter((cell) => cell.trim()).length, `${name}: a reason and what moved`).toBe(3);
+  }
+});
+
+test("[LC-QA-TABLE] tyre-pressure's limit cases have an equal or tighter row in tests/unit/tools/tyre/ before it goes", () => {
+  const dir = `${REPO}tests/unit/tools/tyre/`;
+  const titles = readdirSync(dir).filter((f) => f.endsWith('.ts') || f.endsWith('.tsx')).map((f) => readFileSync(dir + f, 'utf8')).join('\n');
+  // Each of the retired suite's limit cases, and the tyre tool's row that covers it (the comparison is in the pull request):
+  for (const row of [
+    '[TY-PSI-QUERY] after the query, above 11 bar is rejected; so is above 160 psi, below the minimum, and anything not a positive number', // 0, -1, NaN, 16 bar, "2x"
+    '[TY-PSI-QUERY] each limit is compared in its entered unit', // the psi and bar round trip of a recorded limit
+    '[TY-PROP-LIMITS] a shown value never exceeds a limit in the unit it was entered in', // a record above the entered maximum
+    '[TY-WARN] a floor above the cap marks the setup incompatible, in words', // a minimum above its maximum
+    '[TY-HOOKLESS]', // no maximum entered: the standard limit still caps it
+  ]) expect(titles, row).toContain(row);
+});
+
 test('[LC-QA-ALL] run-all runs every qa/*.cjs except the three helpers', () => {
-  expect(suites.length).toBe(39);
+  expect(suites.length).toBe(KEPT.length);
   const r = spawnSync(process.execPath, [`${REPO}qa/run-all.cjs`], { cwd: REPO, encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } });
   for (const s of suites) expect(r.stdout).toContain(`PASS ${s} `);
-  expect(r.stdout).toContain('All 39 suites passed');
+  expect(r.stdout).toContain(`All ${KEPT.length} suites passed`);
   expect(r.status).toBe(0);
 }, 240_000);
 

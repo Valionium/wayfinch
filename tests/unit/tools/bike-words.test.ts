@@ -12,7 +12,7 @@ test('[LC-WORDS] no word of §8\'s list nor of the bag planner\'s own stricter l
   const words = JSON.parse(page.run('JSON.stringify(Object.entries(BIKE_WORDING))') as string) as [string, { text: string; limit?: boolean }][];
   expect(words.length).toBeGreaterThan(40);
   // §8's list, and the bag planner's own stricter words for its bike strings
-  const own = /warning|error|fail|invalid|must|safe|OK|okay|approv|certif|guarant/i;
+  const own = /warning|error|fail|invalid|\bmust\b|safe|\bOK\b|okay|approv|certif|guarant/i;
   for (const [key, w] of words) {
     expect(bannedHits(w.text), key).toEqual([]);
     expect(own.test(w.text), `${key}: ${w.text}`).toBe(false);

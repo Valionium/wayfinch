@@ -2,3 +2,4 @@
 public/tools/bags/index.html -text -diff
 qa/fixtures/legacy-offline-worker.js -text
 releases/load-check-root.html -text -diff
+public/vendor/** -text

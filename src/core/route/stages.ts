@@ -41,8 +41,9 @@ export function effortProfile(route: Route): { samples: Sample[]; effective: num
   const distance = Math.max(0, route.lengthKm);
   const ascent = route.ascentM !== null && Number.isFinite(route.ascentM) ? Math.max(0, route.ascentM) : null;
 
-  // The profile is the route thinned to 2,000 points, as in Load Check.
-  const profile = simplifyProfile(route.points.map((p) => ({ ...p })));
+  // The profile is the route thinned to 2,000 points, as in Load Check, whose profile holds its heights in whole metres
+  // (gpxProfileFrom rounds them once the climbing total is known): so both apps end the days at the same place (DF-01).
+  const profile = simplifyProfile(route.points.map((p) => ({ ...p, ele: p.ele === null ? null : Math.round(p.ele) })));
   const base = distanceSamples(profile, distance);
   let fallback: StageFallback | null = null;
   const gains: number[] = [];

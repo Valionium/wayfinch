@@ -15,7 +15,7 @@ const get=id=>{
   return node;
 };
 app.context.document.getElementById=get;app.context.document.removeEventListener=()=>{};
-app.run('renderKit=()=>{};drawRig=()=>{};renderResult=()=>{};queueDraftSave=()=>{};renderBikeProfiles=()=>{};renderPressureHelper=()=>{};closeBagPop=()=>{};renderPackingChecklist=()=>{};applyTheme=()=>{};syncGPXControl=()=>{};renderClimate=()=>{};');
+app.run('renderKit=()=>{};drawRig=()=>{};renderResult=()=>{};queueDraftSave=()=>{};renderBikeProfiles=()=>{};closeBagPop=()=>{};renderPackingChecklist=()=>{};applyTheme=()=>{};syncGPXControl=()=>{};renderClimate=()=>{};');
 let checks=0;const check=(v,m)=>{assert.ok(v,m);checks++;};
 const J=code=>JSON.parse(app.run(`JSON.stringify(${code})`)??'null');
 const field=(id,value)=>{get(id).value=value;};
@@ -124,9 +124,10 @@ const reset=()=>app.run(`S.step=4;S.bags=[{uid:1,pos:'frame',L:6}];S.bikeProfile
   // LC-WT-15 / 17: the bags' own weight is one value, a comma is a decimal point
   reset();
   app.run('S.tyrePressure={...normaliseTyrePressure(S.tyrePressure),bagKg:1.5}');
-  check(app.run('weightSectionHtml(currentPlan()).body').includes('value="1.5"'),'LC-WT-15 the tyre helper\'s empty-luggage value is the one shown');
+  check(app.run('weightSectionHtml(currentPlan()).body').includes('value="1.5"'),'LC-WT-15 the stored empty-luggage value (tyrePressure.bagKg, where older pages keep it) is the one shown');
   check(app.run("commitBagsOwnKg('2,4')") && app.run('normaliseTyrePressure(S.tyrePressure).bagKg')===2.4,'LC-WT-17 "2,4" means 2.4');
-  check(app.run('weightSectionHtml(currentPlan()).body').includes('value="2.4"') && /bagKg/.test(app.script.slice(app.script.indexOf('const PRESSURE_PLAN_INPUTS'),app.script.indexOf('const PRESSURE_PLAN_INPUTS')+200)),'LC-WT-15 both places edit this one value');
+  // The tyre helper, the other place that edited it, has left (sub-project 6, Task 6): the weight section is now the only one.
+  check(app.run('weightSectionHtml(currentPlan()).body').includes('value="2.4"') && !app.script.includes('PRESSURE_PLAN_INPUTS') && !app.html.includes('id="pressureBagKg"'),'LC-WT-15 the weight section edits this one value, and nothing else does');
   check(!app.run("commitBagsOwnKg('60')") && !app.run("commitBagsOwnKg('abc')") && app.run('normaliseTyrePressure(S.tyrePressure).bagKg')===2.4,'LC-WT-17 out of range or not a number keeps the last value');
 
   // LC-WT-01: the selection fixtures hold the report-only pairs

@@ -1006,7 +1006,7 @@ button.back:hover{color:var(--ink);border-color:var(--muted-dim)}
 .bike-field-heading{display:flex;align-items:center;gap:8px;min-width:0}
 .bike-field-heading>label{flex:1;min-width:0;margin-bottom:0}
 .bike-field-heading>[data-info],.bike-field-heading>.info-help{flex:0 0 auto}
-.bike-pressure-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.bike-weight-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .bike-profile-grid .hidden{display:none}
 .bike-profile-grid input,.bike-profile-grid select,.bike-profile-grid textarea,#bikeSavedSelect{display:block;width:100%;min-width:0;margin-top:5px;padding:9px;background:var(--panel-hi);border:1px solid var(--line);color:var(--ink);font:16px var(--body)}
 .bike-profile-field>input{margin-top:8px}
@@ -1020,24 +1020,8 @@ button.back:hover{color:var(--ink);border-color:var(--muted-dim)}
 .bike-profile-details dt{color:var(--muted-dim)}
 .bike-profile-details dd{overflow-wrap:anywhere;white-space:pre-wrap}
 .bike-profile-panel a{color:var(--sage);text-underline-offset:3px}
-.bike-pressure-fields{margin:15px 0;border-top:1px solid var(--line);padding-top:12px}
-.bike-pressure-fields>summary{cursor:pointer;color:var(--ink);font-size:14px;min-height:44px;line-height:1.6}
-.pressure-panel{border:1px solid var(--line);background:var(--panel);padding:14px;margin:16px 0;min-width:0;overflow-wrap:anywhere}
-.pressure-panel>summary{cursor:pointer;color:var(--ink);font-family:var(--mono);font-size:14px;min-height:44px;line-height:1.6}
-.pressure-panel p{font-size:13px;line-height:1.6;color:var(--muted);margin:9px 0}
-.pressure-panel a,.pressure-panel a:visited{color:var(--sage);text-underline-offset:3px}
-.pressure-panel h3{color:var(--ink);font-size:16px;margin:18px 0 8px}
-.pressure-panel .pressure-warning{border-left:3px solid var(--amber);padding-left:10px;color:var(--ink)}
-.pressure-total{font-family:var(--mono);font-size:16px;color:var(--ink);margin:10px 0}
-.pressure-total strong{font-size:23px}.pressure-summary{white-space:pre-wrap;background:var(--panel-hi);border:1px solid var(--line);padding:12px;font:13px/1.7 var(--mono);overflow-wrap:anywhere}
-.pressure-record{border:1px solid var(--sage);padding:12px;margin:12px 0}.pressure-record.stale{border-color:var(--amber)}
-.pressure-record b{color:var(--ink)}.pressure-check{display:grid;grid-template-columns:20px minmax(0,1fr);align-items:start;gap:10px;min-height:44px;font-size:13px;line-height:1.6;color:var(--ink);margin:12px 0;cursor:pointer;overflow-wrap:normal;word-break:normal}
-.pressure-check input[type=checkbox]{width:20px;height:20px;min-width:20px;min-height:20px;max-width:20px;padding:0;margin:1px 0 0;flex:0 0 20px;accent-color:var(--sage)}
-.pressure-check span{min-width:0;white-space:normal;overflow-wrap:break-word;word-break:normal}
-.pressure-panel button,.pressure-panel .pressure-link{min-height:44px;max-width:100%;white-space:normal}
-.pressure-panel a.pressure-link{display:inline-flex;align-items:center;padding:9px 13px;border:1px solid var(--blaze);color:var(--ink);font:14px var(--mono);text-decoration:none}
-.pressure-panel a.pressure-link:hover{background:var(--wash-blaze)}
-.pressure-panel .hidden{display:none}.pressure-status{min-height:1.6em;font-size:13px;color:var(--sage);line-height:1.6}
+.bike-weight-fields{margin:15px 0;border-top:1px solid var(--line);padding-top:12px}
+.bike-weight-fields>summary{cursor:pointer;color:var(--ink);font-size:14px;min-height:44px;line-height:1.6}
 @media(max-width:480px){.bike-profile-grid{grid-template-columns:1fr}.bike-profile-details{grid-template-columns:1fr}.bike-profile-details dd{margin-bottom:6px}}
 .forecast-note{border:1px solid var(--line);background:var(--panel);padding:14px;margin:4px 0 22px;font-family:var(--mono);font-size:13px;line-height:1.6;color:var(--muted)}
 .forecast-note h3{margin:0 0 7px;font-size:15px;color:var(--ink)}
@@ -1309,6 +1293,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .stp{width:44px;flex-basis:44px}
 .nstep button,.qty button{width:44px;min-width:44px}
 .linky,.reset,.pollreset,.nrevert,#pickReset{padding:8px 4px;display:inline-flex;align-items:center}
+.linky.hidden,.reset.hidden,.pollreset.hidden,.nrevert.hidden{display:none}
 .linky.retry{min-height:44px;align-items:center;display:inline-flex}
 .tickbox{width:44px;height:44px;flex-basis:44px;border:none;background:none!important;margin-right:0}
 .tickbox::before{content:'';position:absolute;inset:12px;border:1.4px solid var(--muted-dim)}
@@ -1449,7 +1434,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 /* Short guide: optional, readable on a phone, and separate from the plan. */
 .guide-launch-row{display:flex;justify-content:flex-end;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:25;background:var(--ground);border-bottom:1px solid var(--line-soft);margin:-16px 0 12px}
 .guide-launch-row button{min-height:44px;padding:8px 0 8px 12px;font-size:13px}
-.guide-launch-row #pressureToolOpen{padding:8px 12px;border-color:var(--blaze);color:var(--ink)}
+.guide-launch-row .back-wayfinch{margin-right:auto;display:inline-flex;align-items:center;min-height:44px;padding:8px 12px 8px 0;font-size:13px;color:var(--ink);text-underline-offset:3px}
 .guide-invite{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid var(--line);background:var(--panel);padding:12px;margin:0 0 16px}
 .guide-invite>div{flex:1 1 240px;min-width:0}.guide-invite b{display:block;color:var(--ink);font-size:16px}
 .guide-invite p{font-size:13px;line-height:1.5;color:var(--muted);margin-top:4px}
@@ -1467,23 +1452,22 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .walkthrough-copy h3,.walkthrough-options h3{font-size:13px;font-family:var(--mono);color:var(--sage);margin:14px 0 6px}
 .walkthrough-copy p{margin:0 0 10px}.walkthrough-options{font-size:14px;line-height:1.6;color:var(--muted)}
 .walkthrough-options ul{padding-left:20px}.walkthrough-options li{margin:6px 0}
-.pressure-tool-box{position:fixed;inset:0;z-index:1190;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.55)}
-.pressure-tool-card{display:flex;flex-direction:column;width:100%;max-width:720px;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);border:1px solid var(--line);background:var(--ground);box-shadow:0 12px 38px rgba(0,0,0,.24);min-width:0;overflow:hidden}
-.pressure-tool-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);flex-shrink:0}
-.pressure-tool-head h2{font-family:var(--disp);font-size:28px;line-height:1.2;color:var(--ink)}
-.pressure-tool-head p{font-size:13px;color:var(--muted);margin-top:3px}
-.pressure-tool-head button{width:44px;height:44px;flex:0 0 44px;font-size:26px;line-height:1;color:var(--ink);border:1px solid var(--line);background:var(--panel);cursor:pointer}
-.pressure-tool-body{overflow-y:auto;overscroll-behavior:contain;min-height:0;padding:16px;scroll-padding-top:12px}
-.pressure-tool-body>p{font-size:14px;line-height:1.6;color:var(--muted);margin-bottom:14px}
-.pressure-tool-body .bike-profile-panel{padding:0;border:0;background:none;margin:0}
-.pressure-tool-body .pressure-panel{padding:0;border:0;border-top:1px solid var(--line);background:none;margin:18px 0 0}
-.pressure-tool-body h3{font-size:18px;color:var(--ink);margin:12px 0 8px}.pressure-tool-body h4{font-size:15px;color:var(--ink);margin:10px 0}
+.bike-dialog-box{position:fixed;inset:0;z-index:1190;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.55)}
+.bike-dialog-card{display:flex;flex-direction:column;width:100%;max-width:720px;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);border:1px solid var(--line);background:var(--ground);box-shadow:0 12px 38px rgba(0,0,0,.24);min-width:0;overflow:hidden}
+.bike-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);flex-shrink:0}
+.bike-dialog-head h2{font-family:var(--disp);font-size:28px;line-height:1.2;color:var(--ink)}
+.bike-dialog-head p{font-size:13px;color:var(--muted);margin-top:3px}
+.bike-dialog-head button{width:44px;height:44px;flex:0 0 44px;font-size:26px;line-height:1;color:var(--ink);border:1px solid var(--line);background:var(--panel);cursor:pointer}
+.bike-dialog-body{overflow-y:auto;overscroll-behavior:contain;min-height:0;padding:16px;scroll-padding-top:12px}
+.bike-dialog-body>p{font-size:14px;line-height:1.6;color:var(--muted);margin-bottom:14px}
+.bike-dialog-body .bike-profile-panel{padding:0;border:0;background:none;margin:0}
+.bike-dialog-body h3{font-size:18px;color:var(--ink);margin:12px 0 8px}.bike-dialog-body h4{font-size:15px;color:var(--ink);margin:10px 0}
 .bike-tool-optional{border-top:1px solid var(--line);padding:10px 0;margin:12px 0;min-width:0}
 .bike-tool-optional>summary{cursor:pointer;min-height:44px;display:list-item;font-family:var(--mono);font-size:13px;color:var(--ink);line-height:1.6;padding:10px 0}
 .bike-tool-optional>label{display:block;font-size:13px;color:var(--muted)}
 .bike-tool-optional>label>input{display:block;width:100%;font-size:16px;margin:5px 0 12px}
-.pressure-tool-body .bike-pressure-fields{border:0;margin:0;padding:0}
-.pressure-tool-box.hidden{display:none}
+.bike-dialog-body .bike-weight-fields{border:0;margin:0;padding:0}
+.bike-dialog-box.hidden{display:none}
 .bike-details-box{z-index:1200}
 .bike-section{margin:0 0 14px;padding:0 0 10px;border-bottom:1px solid var(--line,#ccc)}
 .bike-section-title{margin:6px 0}
@@ -1578,7 +1562,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 .packing-disclosure>summary em{font-family:var(--mono);font-size:12px;font-style:normal;color:var(--muted);text-align:right}
 .packing-disclosure[open]>summary{border-bottom:1px solid var(--line-soft);padding-bottom:10px;margin-bottom:12px}
 @media(max-width:480px){.info-box{padding:8px}.info-card{max-height:min(560px,calc(100vh - 16px));max-height:min(560px,calc(100dvh - 16px))}.packing-disclosure>summary{grid-template-columns:minmax(0,1fr) 20px;gap:4px 10px}.packing-disclosure>summary b{grid-column:1;grid-row:1;font-size:22px}.packing-disclosure>summary em{grid-column:1;grid-row:2;text-align:left}.packing-disclosure>summary:after{grid-column:2;grid-row:1 / span 2}}
-@media(max-width:480px){.pressure-tool-box{padding:8px}.pressure-tool-card{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px)}.pressure-tool-head,.pressure-tool-body{padding:12px}.guide-launch-row{gap:12px}}
+@media(max-width:480px){.bike-dialog-box{padding:8px}.bike-dialog-card{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px)}.bike-dialog-head,.bike-dialog-body{padding:12px}.guide-launch-row{gap:12px}}
 .walkthrough-tip{margin-top:14px;border-left:3px solid var(--sage);padding-left:10px;font-size:14px;line-height:1.6;color:var(--muted)}
 .walkthrough-actions{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;margin-top:22px}
 .walkthrough-actions button{min-height:44px;padding:9px 14px;font-size:14px;max-width:100%;white-space:normal}
@@ -1621,11 +1605,11 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
   .popwhy,.pophead em,.pophead span,.packpanel p,.routecaveat,.alloc-why,.notewhy,
   .modebar button i,.bagrow .nm i,.bagmove-status,.result-save span,.save-message,
   .setuptools p,.setupcompare p,.bike-profile-panel p,.bike-profile-card p,
-  .bike-profile-details,.pressure-panel p,.pressure-check,.pressure-status,
+  .bike-profile-details,
   .forecast-note,.forecast-table,.route-map-block p,.route-map-legend,
   .route-map-height-legend,.packing-checklist p,.packing-save-status,
   .packing-item-meta,.packing-item-note,.packing-water ul,.packing-left-home ul,
-  .guide-invite p,.pressure-tool-head p,.packing-offline .offline-detail,
+  .guide-invite p,.bike-dialog-head p,.packing-offline .offline-detail,
   .pollwhy,.pollgrp>span,.pickhint,.rline,.advbar p,.lenlist li,.routewhy,
   .stage-explanation,.routefix,.climate-note,.elevationprofile p,
   .timeline .tride,.timeline .tmeta{font-size:14px;line-height:1.55}
@@ -1656,7 +1640,6 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
   .crumbs button{flex:1;min-width:0;font-size:14px;padding:10px 5px;letter-spacing:.03em}
   .guide-launch-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   .guide-launch-row button{max-width:100%;padding:8px;white-space:normal;line-height:1.4}
-  .guide-launch-row #pressureToolOpen{padding:8px}
   .row2,.custom-fields,.modebar,.reachgrid,.bike-profile-grid{grid-template-columns:1fr}
   .row2{gap:0}
   .field{margin-bottom:24px}
@@ -1671,7 +1654,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
   .opt i,.warnline,.deckline,.deckline .em,.warnline .em,.rline span,.nlab,
   .ntag,.meter span,.finding p em,.il em.moved,.movelist .il em.pv,
   .movelist .il em.dim,.notedone,.polldone,#bagTotal,.advbar #advCount,
-  .pairnote,.setuphead,.pressure-summary{font-size:14px}
+  .pairnote,.setuphead{font-size:14px}
   .rigtools{flex-wrap:wrap}
   .bagrow{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:12px}
   .bagrow .nm{grid-column:1;grid-row:1;flex-basis:auto}
@@ -1695,7 +1678,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
   .nav button{width:100%;min-height:50px}
   .tellrow #tellInput{flex-basis:calc(100% - 52px)}
   .tellrow .go.small{flex:1 1 100%;min-height:48px}
-  .info-copy,.pressure-panel p,.pressure-check,.pressure-tool-body>p,
+  .info-copy,.bike-dialog-body>p,
   .walkthrough-options,.lgl-body p,.lgl-body li{font-size:15px}
 }
 @media print{
@@ -1737,7 +1720,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <button data-to="1">Trip</button><button data-to="2">Bags</button><button data-to="3">Kit</button><button data-to="4">Check</button>
     </nav>
   </header>
-  <div class="guide-launch-row"><button class="kitact" id="pressureToolOpen" type="button" aria-haspopup="dialog" aria-controls="pressureToolBox">Tyre pressure</button><button class="linky" id="walkthroughOpen" type="button" aria-haspopup="dialog" aria-controls="walkthroughBox">Quick walkthrough</button></div>
+  <div class="guide-launch-row"><a class="back-wayfinch" id="backToWayfinch" href="/#/tools">← Back to Wayfinch</a><button class="linky" id="walkthroughOpen" type="button" aria-haspopup="dialog" aria-controls="walkthroughBox">Quick walkthrough</button></div>
   <aside class="guide-invite hidden" id="walkthroughInvite" aria-labelledby="walkthroughInviteTitle">
     <div><b id="walkthroughInviteTitle">First time here?</b><p>A short guide to Trip, Bags, Kit and Check.</p></div>
     <button class="kitact" id="walkthroughStart" type="button" aria-haspopup="dialog" aria-controls="walkthroughBox">Show me around</button>
@@ -1751,6 +1734,17 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
   <div class="draftbar hidden" id="updateBar" role="status">
     <button class="kitact" id="updateApply" type="button">Update ready — apply now</button>
     <span id="updateNote"></span>
+  </div>
+  <div class="draftbar hidden" id="handoffBar" role="status">
+    <span id="handoffText"></span>
+    <button class="kitact" id="handoffApply" type="button">Apply</button>
+    <button class="linky" id="handoffCancel" type="button">Cancel</button>
+    <button class="linky hidden" id="handoffUndo" type="button">Undo</button>
+  </div>
+  <div class="draftbar hidden" id="offlineAgainBar" role="status">
+    <span id="offlineAgainText">Your offline copy is no longer on this device. Tap Make available offline to keep the bag planner with you again.</span>
+    <button class="kitact" id="offlineAgainSave" type="button">Make available offline</button>
+    <button class="linky" id="offlineAgainLater" type="button">Not now</button>
   </div>
   <div class="draftbar hidden" id="tabBar" role="status">
     <span id="tabText"></span>
@@ -1866,7 +1860,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <div class="eyebrow">Step two</div>
     <h2 class="lede" id="stepTitle2" tabindex="-1">Your bag cupboard</h2>
     <p class="sub">List the bags you own and their labelled sizes. You can add a second bag where the bike has another mounting spot. The check will suggest which bags to mount and which can stay at home.</p>
-    <div class="bike-profile-card"><b id="bikeStepSummary">Bike repair details · optional</b><p>Use a bike profile for repair suggestions that match your tyres, brakes and drivetrain. Tyre pressure is available from the button above at any step.</p><button class="kitact" type="button" id="bikeDetailsOpen" aria-haspopup="dialog" aria-controls="bikeDetailsBox">Bike details</button></div>
+    <div class="bike-profile-card"><b id="bikeStepSummary">Bike repair details · optional</b><p>Use a bike profile for repair suggestions that match your tyres, brakes and drivetrain.</p><button class="kitact" type="button" id="bikeDetailsOpen" aria-haspopup="dialog" aria-controls="bikeDetailsBox">Bike details</button></div>
     <div class="recallwrap hidden" id="recallWrap">
       <div class="pickhead">Start from one you have saved</div>
       <div class="picks" id="recallList"></div>
@@ -1958,7 +1952,6 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <span id="quickSaveMsg">Your working plan is saved automatically in this browser.</span>
     </div>
     <div id="verdictBox"></div>
-    <div class="bike-profile-card"><b>Tyre pressure</b><p>All weights and tyre/rim details are together in the Tyre pressure tool. You can open it at any step.</p><button class="kitact" type="button" id="pressureToolFromCheck" aria-haspopup="dialog" aria-controls="pressureToolBox">Open tyre pressure</button></div>
     <div id="packingChecklist"></div>
     <div id="resultBox"></div>
 
@@ -1975,10 +1968,10 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <button class="linky" id="legalBtn" lang="de">Impressum &amp; Datenschutz</button>
   </footer>
 </div>
-<div id="bikeDetailsBox" class="pressure-tool-box bike-details-box hidden" role="dialog" aria-modal="true" aria-labelledby="bikeDetailsTitle">
-  <section class="pressure-tool-card">
-    <header class="pressure-tool-head"><div><h2 id="bikeDetailsTitle" tabindex="-1">Bike details</h2><p id="bikeDetailsSummary">Frame, maximum weight and today's details</p><a class="linky hidden" id="bikeDetailsBack" href="/#/you"></a></div><button type="button" id="bikeDetailsClose" aria-label="Close bike details">×</button></header>
-    <div class="pressure-tool-body" id="bikeDetailsBody">
+<div id="bikeDetailsBox" class="bike-dialog-box bike-details-box hidden" role="dialog" aria-modal="true" aria-labelledby="bikeDetailsTitle">
+  <section class="bike-dialog-card">
+    <header class="bike-dialog-head"><div><h2 id="bikeDetailsTitle" tabindex="-1">Bike details</h2><p id="bikeDetailsSummary">Frame, maximum weight and today's details</p><a class="linky hidden" id="bikeDetailsBack" href="/#/you"></a></div><button type="button" id="bikeDetailsClose" aria-label="Close bike details">×</button></header>
+    <div class="bike-dialog-body" id="bikeDetailsBody">
     <section class="bike-profile-panel" id="bikeProfilePanel">
       <section class="bike-quick" id="bikeQuick" aria-labelledby="bikeQuickTitle">
         <h3 id="bikeQuickTitle">Your frame</h3>
@@ -2009,7 +2002,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         <button type="button" class="linky hidden" id="lookUndo"></button>
       </section>
       <details class="bike-more" id="bikeMoreDetails"><summary>More details (optional)</summary>
-      <p>Choose Use these bike details to use them in this plan. Saving a reusable bike is optional. Repair details can stay blank when you only need tyre pressure.</p>
+      <p>Choose Use these bike details to use them in this plan. Saving a reusable bike is optional. Repair details can stay blank.</p>
       <details class="bike-tool-optional" id="bikeLibraryPanel"><summary>Saved bikes · optional</summary>
       <label for="bikeName">Bike name<input id="bikeName" type="text" maxlength="100" placeholder="A name for reuse"></label>
       <label for="bikeSavedSelect">Saved bikes</label><select id="bikeSavedSelect"><option value="">Choose a saved bike…</option></select>
@@ -2054,31 +2047,14 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         <p class="hint">Find it on the frame sticker, in the manual or on the maker's website. Your own weight is not asked.</p>
       </section>
       <h3 class="bike-section-title">Today's details</h3>
-        <div class="bike-pressure-fields" id="bikePressureFields">
-          <h4 class="bike-pressure-heading">Wheel and tyre details <span data-info="Tyre width and casing inputs">For MTB, a labelled 2.2 inch width is 55.88 mm. Check casing with the tyre manufacturer. For Goodyear tyres made for Zipp, select the exact model in SRAM's calculator.</span></h4>
-          <p>Use the labelled tyre widths and the wheel manufacturer's rim specifications. SRAM's guide takes one wheelset size and rim specification; if your front and rear rims differ, check them with the manufacturer separately.</p>
+        <div class="bike-weight-fields" id="bikeWeightFields">
+          <h4 class="bike-weight-heading">Bike weight</h4>
           <div class="bike-profile-grid">
             <div class="bike-profile-field bike-profile-wide" id="bikeBaseField">
-              <div class="bike-field-heading"><label for="bikeBaseKg">Bike without luggage · kg (for kit-based weight)</label><span data-info="What the bike weight includes">Include fitted racks and accessories. Leave empty bags, bottle shells and cages out if you will add their weight separately in the weight section below.</span></div>
+              <div class="bike-field-heading"><label for="bikeBaseKg">Bike without luggage · kg</label><span data-info="What the bike weight includes">Include fitted racks and accessories. Leave empty bags, bottle shells and cages out if you will add their weight separately in the weight section below.</span></div>
               <input id="bikeBaseKg" type="number" min="3" max="100" step="0.01" inputmode="decimal" placeholder="e.g. 11.5">
             </div>
-            <label for="bikeWheel">Wheel diameter<select id="bikeWheel"><option value="unknown">Not set</option><option value="700c">700c</option><option value="650b">650b</option><option value="650c">650c</option><option value="29">29 inch</option><option value="27.5">27.5 inch</option><option value="26">26 inch</option></select></label>
-            <label for="bikeRim">Rim type<select id="bikeRim"><option value="unknown">Not set</option><option value="tube-crochet">Tubes (crochet)</option><option value="tubular">Tubular</option><option value="tubeless-crochet">Hooks (tubeless crochet)</option><option value="hookless">Hookless (tubeless straight side)</option></select></label>
-            <div class="bike-profile-field bike-profile-wide">
-              <div class="bike-field-heading"><label for="bikeRimMm">Internal rim width · mm</label><span data-info="Measuring internal rim width">Internal width is between the tyre bead seats. It is different from the outside width of the rim.</span></div>
-              <input id="bikeRimMm" type="number" min="5" max="100" step="0.1" inputmode="decimal" placeholder="e.g. 23">
-            </div>
-            <label for="bikeFrontMm">Front labelled tyre width · mm<input id="bikeFrontMm" type="number" min="10" max="150" step="any" inputmode="decimal" placeholder="e.g. 40"></label>
-            <label for="bikeRearMm">Rear labelled tyre width · mm<input id="bikeRearMm" type="number" min="10" max="150" step="any" inputmode="decimal" placeholder="e.g. 40"></label>
-            <label for="bikeFrontCasing">Front casing<select id="bikeFrontCasing"><option value="unknown">Not set</option><option value="thin">Thin</option><option value="standard">Standard</option><option value="reinforced">Reinforced</option></select></label>
-            <label for="bikeRearCasing">Rear casing<select id="bikeRearCasing"><option value="unknown">Not set</option><option value="thin">Thin</option><option value="standard">Standard</option><option value="reinforced">Reinforced</option></select></label>
-            <p class="bike-profile-wide">Maximum limits are needed only when you keep a pressure result here. Use the lower applicable tyre/rim maximum. Minimum limits are optional if the manufacturer does not specify one.</p>
-            <label for="bikeFrontMin">Front minimum permitted · bar<input id="bikeFrontMin" type="number" min="0" max="15" step="0.01" inputmode="decimal" placeholder="If specified"></label>
-            <label for="bikeFrontMax">Front maximum permitted · bar<input id="bikeFrontMax" type="number" min="0.1" max="15" step="0.01" inputmode="decimal" placeholder="Lower of tyre / rim limits"></label>
-            <label for="bikeRearMin">Rear minimum permitted · bar<input id="bikeRearMin" type="number" min="0" max="15" step="0.01" inputmode="decimal" placeholder="If specified"></label>
-            <label for="bikeRearMax">Rear maximum permitted · bar<input id="bikeRearMax" type="number" min="0.1" max="15" step="0.01" inputmode="decimal" placeholder="Lower of tyre / rim limits"></label>
           </div>
-          <p>Use the strictest limits for the actual tyre, rim and tyre width. Hookless limits vary by wheel and width; a tube does not make an incompatible tyre suitable.</p>
         </div>
         <details class="bike-tool-optional" id="bikeRepairFields"><summary>Repair kit details · optional</summary>
         <div class="bike-profile-grid">
@@ -2097,7 +2073,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         </div>
         </details>
         <p>Check repair parts against the manufacturer's compatibility information. <span data-info="How a bike profile updates the kit">These references do not verify that a part fits. Check your actual tube, pads, chain/link and hanger against the manufacturer’s compatibility information. Saving updates untouched starting-list items; your manual kit choices stay yours.</span></p>
-        <div class="bike-profile-actions"><button class="go small" id="pressureApplyBike" type="button">Use these bike details</button><button class="kitact" id="bikeSave" type="submit">Save bike for next time</button><button class="linky" id="bikeClear" type="button">Use no bike profile</button></div>
+        <div class="bike-profile-actions"><button class="go small" id="bikeApply" type="button">Use these bike details</button><button class="kitact" id="bikeSave" type="submit">Save bike for next time</button><button class="linky" id="bikeClear" type="button">Use no bike profile</button></div>
       </form>
       <p>Saved on this device and included in Export / Import. Each saved setup keeps its own copy, so editing a bike will not alter an older trip.</p>
       <p>Repair references: <a href="https://www.schwalbe.com/en/technology-faq/tubeless/" target="_blank" rel="noopener">Schwalbe tubeless guidance</a> · <a href="https://productinfo.shimano.com/en/spec/general-chain-quick-link" target="_blank" rel="noopener">Shimano chain/link compatibility</a></p>
@@ -2106,10 +2082,10 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     </div>
   </section>
 </div>
-<div id="maxWeightBox" class="pressure-tool-box bike-details-box hidden" role="dialog" aria-modal="true" aria-labelledby="maxWeightTitle">
-  <section class="pressure-tool-card">
-    <header class="pressure-tool-head"><div><h2 id="maxWeightTitle" tabindex="-1">Your bike's maximum weight</h2></div><button type="button" id="mwClose" aria-label="Close and skip">×</button></header>
-    <div class="pressure-tool-body">
+<div id="maxWeightBox" class="bike-dialog-box bike-details-box hidden" role="dialog" aria-modal="true" aria-labelledby="maxWeightTitle">
+  <section class="bike-dialog-card">
+    <header class="bike-dialog-head"><div><h2 id="maxWeightTitle" tabindex="-1">Your bike's maximum weight</h2></div><button type="button" id="mwClose" aria-label="Close and skip">×</button></header>
+    <div class="bike-dialog-body">
       <div class="bike-profile-grid">
         <label for="mwValue">Maximum weight<span class="fit-pair"><input id="mwValue" type="text" inputmode="decimal" autocomplete="off"><select id="mwUnit" aria-label="Unit"><option value="kg">kg</option><option value="lb">lb</option></select></span></label>
         <label for="mwIncludes">Does this figure include the bike?<select id="mwIncludes"><option value="">Choose</option><option value="bike">Yes, rider, bike and luggage</option><option value="no-bike">No, rider and luggage only</option><option value="unsure">Not sure</option></select></label>
@@ -2117,57 +2093,6 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <p class="hint">Find it on the frame sticker, in the manual or on the maker's website. Your own weight is not asked.</p>
       <p id="mwMessage" role="status" aria-live="polite"></p>
       <div class="bike-profile-actions"><button class="go small" id="mwSave" type="button">Save</button><button class="linky" id="mwSkip" type="button">Skip</button></div>
-    </div>
-  </section>
-</div>
-<div id="pressureToolBox" class="pressure-tool-box hidden" aria-labelledby="pressureToolTitle" aria-describedby="pressureToolIntro">
-  <section class="pressure-tool-card">
-    <header class="pressure-tool-head"><div><h2 id="pressureToolTitle" tabindex="-1">Tyre pressure</h2><p>Bike details and pressure in one place</p></div><button type="button" id="pressureToolClose" aria-label="Close tyre pressure helper">×</button></header>
-    <div class="pressure-tool-body" id="pressureToolBody">
-      <p id="pressureToolIntro">Use this tool on its own, without a route or packing plan, or include the kit you have selected. Prepare the inputs for SRAM, open its calculator, and optionally keep the result here.</p>
-    <section class="bike-profile-panel" id="bikeToolCard">
-      <h3 id="pressureBikeTitle">1. Your bike, tyres and rims</h3><p id="bikeProfileSummary"></p>
-      <p>Wheel and tyre details, brakes, drivetrain and repair references now live in Bike details, together with the frame and the maximum weight.</p>
-      <div class="bike-profile-actions"><button class="kitact" id="bikeToolEdit" type="button" aria-haspopup="dialog" aria-controls="bikeDetailsBox">Bike details</button></div>
-    </section>
-    <section class="pressure-panel" id="tyrePressurePanel">
-      <p id="pressureSummaryLabel"></p>
-      <p>Prepare the weights and tyre/rim details for the <a href="https://axs.sram.com/guides/tire/pressure" target="_blank" rel="noopener noreferrer">official SRAM AXS pressure guide</a>. Enter its front and rear suggestions below to keep them with this plan, on your phone and in the printed list.</p>
-      <p>SRAM describes this guide as starting recommendations for Zipp wheels. For other wheels, confirm the approach and limits with your wheel manufacturer.</p>
-      <div id="pressureBikeInfo"></div>
-      <button class="linky" id="pressureEditBike" type="button">Review the tyre and rim fields above</button>
-      <h3>2. Total loaded weight <span id="pressureWeightHint"></span></h3>
-      <div class="bike-profile-grid" id="pressureWeightFields">
-        <label for="pressureRider">Rider in riding clothes · kg<input id="pressureRider" type="number" min="5" max="350" step="0.01" inputmode="decimal" placeholder="Your weight, dressed to ride"></label>
-        <label for="pressureMethod">Bike weight method<select id="pressureMethod"><option value="estimate">Use the current packing plan's kit weights</option><option value="weighed">Enter my total bike weight myself</option></select></label>
-        <label id="pressureLoadedField" class="hidden" for="pressureLoadedBike">Total bike weight with everything carried · kg<input id="pressureLoadedBike" type="number" min="3" max="250" step="0.01" inputmode="decimal" placeholder="Including bags, kit, food and water"></label>
-        <label id="pressureBagsField" for="pressureBagKg">Empty luggage and containers · kg<input id="pressureBagKg" type="number" min="0" max="50" step="0.01" inputmode="decimal" placeholder="Enter 0 if already in bike weight"></label>
-        <label id="pressureExtraField" for="pressureExtraKg">Unlisted carried gear · kg<input id="pressureExtraKg" type="number" min="0" max="100" step="0.01" inputmode="decimal"></label>
-        <label id="pressureWaterField" for="pressureWaterL">Water in bottle cages · L<input id="pressureWaterL" type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="Blank = bottles full"></label>
-        <label id="pressureBodyField" for="pressureBodyKg">Of this load, carried on your back · kg<input id="pressureBodyKg" type="number" min="0" max="100" step="0.01" inputmode="decimal"></label>
-      </div>
-      <div id="pressureWeightSummary"></div>
-      <h3>3. Open SRAM with your prepared inputs</h3>
-      <div class="bike-profile-grid">
-        <label for="pressureRide">Ride style<select id="pressureRide"><option value="road">Road</option><option value="cyclocross">Cyclocross</option><option value="gravel">Gravel</option><option value="xc">MTB cross country</option><option value="trail">MTB trail</option><option value="enduro">MTB enduro</option><option value="downhill">MTB downhill</option><option value="fatbike">Fatbike</option></select></label>
-        <label for="pressureSurface">Surface<select id="pressureSurface"><option value="dry">Dry</option><option value="wet">Wet</option></select></label>
-      </div>
-      <details class="bike-tool-optional" id="pressureInputDetails"><summary>Review prepared inputs</summary><div id="pressurePreparation"></div></details><p id="pressureReadyNote" class="pressure-status" role="status"></p>
-      <div class="bike-profile-actions"><button class="kitact" id="pressureCopy" type="button">Copy SRAM inputs</button><a class="go small pressure-link" href="https://axs.sram.com/guides/tire/pressure" target="_blank" rel="noopener noreferrer">Open SRAM calculator</a></div>
-      <p>Your details stay in Load Check. The link opens SRAM separately; enter the prepared values there. Online access is needed for a new calculation. <a href="https://www.sram.com/en/zipp/learn/how-to-calculate-tire-pressure" target="_blank" rel="noopener noreferrer">SRAM's input guide</a></p>
-      <details class="bike-tool-optional" id="pressureResultFields"><summary>4. Keep the SRAM suggestions · optional</summary>
-      <div class="bike-profile-grid">
-        <label class="bike-profile-wide" for="pressureUnit">Pressure unit<select id="pressureUnit"><option value="bar">bar</option><option value="psi">psi</option></select></label>
-        <label for="pressureFront">Front suggestion<input id="pressureFront" type="number" min="0.1" max="220" step="any" inputmode="decimal" placeholder="From SRAM"></label>
-        <label for="pressureRear">Rear suggestion<input id="pressureRear" type="number" min="0.1" max="220" step="any" inputmode="decimal" placeholder="From SRAM"></label>
-      </div>
-      <label class="pressure-check"><input id="pressureConfirmed" type="checkbox"><span>I used the current inputs in SRAM and checked the tyre/rim compatibility and manufacturer pressure limits.</span></label>
-      <div class="bike-profile-actions"><button class="go small" id="pressureSave" type="button">Save SRAM suggestions</button><button class="linky" id="pressureClear" type="button">Clear saved pressures</button></div>
-      <div class="pressure-status" id="pressureStatus" role="status" aria-live="polite"></div>
-      </details>
-      <div id="pressureSaved"></div>
-      <p>SRAM's suggestions are starting points for refinement. Check pressures before riding and after changes to your load or tyres. This helper checks recorded limits; it does not verify the hardware's compatibility.</p>
-    </section>
     </div>
   </section>
 </div>
@@ -2709,7 +2634,7 @@ function normaliseTyrePressure(value){
     typeof r.inputKey==='string' && r.inputKey.length>0 && r.inputKey.length<=6000
     ? {frontBar,rearBar,inputKey:r.inputKey,source:'sram-axs',recordedAt} : null;
   return {
-    riderKg:dataNumber(p.riderKg,5,350),bagKg:dataNumber(p.bagKg,0,50),extraKg:optionalKg('extraKg'),
+    riderKg:null,bagKg:dataNumber(p.bagKg,0,50),extraKg:optionalKg('extraKg'),
     waterL:dataNumber(p.waterL,0,100),bodyLoadKg:optionalKg('bodyLoadKg'),
     method:p.method==='weighed' ? 'weighed' : 'estimate',loadedBikeKg:dataNumber(p.loadedBikeKg,3,250),
     ride:['gravel','road','cyclocross','xc','trail','enduro','downhill','fatbike'].includes(p.ride) ? p.ride : 'gravel',
@@ -2847,7 +2772,7 @@ function bikeProfileDetails(value=S.bikeProfile){
   if(p.fit?.style && p.fit.style!=='unknown')rows.push(['Frame style',FIT_STYLE_NAMES[p.fit.style]]);
   const sz=bikeSizeLabel(p);if(sz)rows.push(['Frame size',sz]);
   const mw=maxWeightLabel(p.maxWeight);if(mw)rows.push(['Maximum weight',mw]);
-  rows.push(...pressureBikeRows(p.pressure));
+  if(p.pressure.bikeKg!==null)rows.push(['Bike without luggage',+p.pressure.bikeKg.toFixed(2)+' kg']);
   return rows;
 }
 function bikeSizeLabel(p){
@@ -2868,9 +2793,8 @@ function persistBikeProfileSelection(){
 const BIKE_PROFILE_INPUTS={name:'bikeName',tyres:'bikeTyres',frontTyre:'bikeFrontTyre',rearTyre:'bikeRearTyre',
   valve:'bikeValve',brakes:'bikeBrakes',padType:'bikePads',drive:'bikeDrive',shifting:'bikeShifting',
   chainType:'bikeChain',hangerType:'bikeHanger',notes:'bikeNotes'};
-const PRESSURE_BIKE_INPUTS={bikeKg:'bikeBaseKg',wheel:'bikeWheel',rim:'bikeRim',rimMm:'bikeRimMm',
-  frontMm:'bikeFrontMm',rearMm:'bikeRearMm',frontCasing:'bikeFrontCasing',rearCasing:'bikeRearCasing',
-  frontMinBar:'bikeFrontMin',frontMaxBar:'bikeFrontMax',rearMinBar:'bikeRearMin',rearMaxBar:'bikeRearMax'};
+// Of the tyre fields only the bike's weight is edited here (spec 7.1 item 3); the rest of bikeProfile.pressure is kept as it was saved.
+const BIKE_WEIGHT_INPUT='bikeBaseKg';
 function bikeProfileFieldVisibility(){
   const drive=$('bikeDrive').value;
   $('bikeChainField').classList.toggle('hidden',drive==='belt');
@@ -2983,7 +2907,7 @@ function fitQuickChanged(){
   updateFitQuick();
   if(!fitQuickState().size && fitQuickState().style==='unknown')return;   // nothing chosen: nothing to apply
   // A bike opened from the co-pilot is that bike only: its taps save to it, never to the plan (sub-project 6 review, C1 and I1).
-  Promise.resolve(linkHoldsBike() ? saveShownBike() : applyPressureBikeDetails()).catch(()=>{});
+  Promise.resolve(linkHoldsBike() ? saveShownBike() : applyBikeDetails()).catch(()=>{});
 }
 function quickPickStyle(style){
   setFitFormStyle(style);$('fitTopTubeField').classList.toggle('hidden',style==='step-through');
@@ -3067,8 +2991,7 @@ function fillBikeProfileForm(value){
   let newName='My bike',suffix=2;
   while(BIKE_PROFILES.some(b=>b.name===newName))newName='My bike '+suffix++;
   for(const [key,id] of Object.entries(BIKE_PROFILE_INPUTS))$(id).value=p ? p[key] : key==='name' ? newName : BIKE_PROFILE_LABELS[key] ? 'unknown' : '';
-  const pressure=normalisePressureBike(p?.pressure);
-  for(const [key,id] of Object.entries(PRESSURE_BIKE_INPUTS))$(id).value=pressure[key] ?? '';
+  $(BIKE_WEIGHT_INPUT).value=normalisePressureBike(p?.pressure).bikeKg ?? '';
   fillFitFields(p);
   BIKE_PROFILE_FORM_READY=true;
   bikeProfileFieldVisibility();
@@ -3138,13 +3061,12 @@ function renderBikeProfiles(force=false){
   select.value=BIKE_PROFILES.some(p=>p.id===selected) ? selected : '';
   if(force || !BIKE_PROFILE_FORM_READY){fillBikeProfileForm(S.bikeProfile);$('bikeRemovePrompt').classList.add('hidden');}
   $('bikeSave').textContent=BIKE_PROFILES.some(p=>p.id===BIKE_PROFILE_EDITOR_ID) ? 'Update saved bike' : 'Save bike for next time';
-  $('bikeProfileSummary').textContent=S.bikeProfile ? 'Currently used: '+bikeProfileSummary(S.bikeProfile) : 'No bike details applied yet. Enter what you need below.';
   $('bikeStepSummary').textContent=S.bikeProfile ? bikeProfileSummary(S.bikeProfile) : 'Bike repair details · optional';
   const ready=typeof DRAFT_READY!=='undefined' && DRAFT_READY && !BIKE_PROFILE_BUSY;
   select.disabled=!ready;
   Object.values(BIKE_PROFILE_INPUTS).forEach(id=>$(id).disabled=!ready);
-  Object.values(PRESSURE_BIKE_INPUTS).forEach(id=>$(id).disabled=!ready);
-  ['bikeNew','bikeSave','pressureApplyBike'].forEach(id=>$(id).disabled=!ready);
+  $(BIKE_WEIGHT_INPUT).disabled=!ready;
+  ['bikeNew','bikeSave','bikeApply'].forEach(id=>$(id).disabled=!ready);
   ['bikeUseSaved','bikeRemove'].forEach(id=>$(id).disabled=!ready || !select.value);
   $('bikeClear').disabled=!ready || !S.bikeProfile;
   ['bikeRemoveConfirm','bikeRemoveCancel'].forEach(id=>$(id).disabled=!ready);
@@ -3158,7 +3080,6 @@ function renderBikeProfiles(force=false){
   $('bikeUseShown').classList.toggle('hidden',!linkHoldsBike() || !BIKE_PROFILE_EDITOR_ID);
   $('bikeUseShown').disabled=!ready;
   renderBikeKitSummary();
-  renderPressureHelper();
 }
 function useBikeProfile(value){
   // A plan bike that is in no saved list would be gone for good: keep it, with the kit choices it set, so Undo brings it back.
@@ -3171,14 +3092,18 @@ function useBikeProfile(value){
   const swap=BIKE_SWAPS[BIKE_SWAPS.length-1];
   if(swap && !swap.after && swap.newId===(next ? next.id : null))swap.after={...S.kit};   // what the swap's starting choices set
   queueDraftSave();
-  renderBikeProfiles(true);renderPressureHelper();renderKit();if(S.step===4)renderResult();drawRig();
+  renderBikeProfiles(true);renderKit();if(S.step===4)renderResult();drawRig();
 }
 function readBikeProfileEditor(){
   const raw={id:BIKE_PROFILE_EDITOR_ID || newBikeProfileId()};
   for(const [key,id] of Object.entries(BIKE_PROFILE_INPUTS))raw[key]=$(id).value;
   if(!raw.name.trim())raw.name='Bike details';
-  raw.pressure=Object.fromEntries(Object.entries(PRESSURE_BIKE_INPUTS).map(([key,id])=>[key,$(id).value]));
   const fields=readFitFields(),was=BIKE_PROFILES.find(b=>b.id===raw.id) || (S.bikeProfile?.id===raw.id ? S.bikeProfile : null);
+  // The other tyre fields as they are: the plan's own when this is the plan's bike and it holds any, else the saved bike's (review M4)
+  const tyreData=b=>!!b && Object.entries(normalisePressureBike(b.pressure)).some(([k,v])=>k!=='bikeKg' && v!==null && v!=='unknown');
+  const plan=S.bikeProfile?.id===raw.id ? S.bikeProfile : null,saved=BIKE_PROFILES.find(b=>b.id===raw.id);
+  const tyres=plan && (tyreData(plan) || !tyreData(saved)) ? plan : saved || plan;
+  raw.pressure={...normalisePressureBike(tyres?.pressure),bikeKg:$(BIKE_WEIGHT_INPUT).value};
   raw.fit=fields.fit;raw.maxWeight=fields.maxWeight;
   raw.maxWeightAsked=!!(was?.maxWeightAsked || fields.maxWeight);
   raw.look=was ? was.look ?? null : LOOK_NEW;raw.geometry=was?.geometry ?? null;   // edited elsewhere (Look below), kept as they are
@@ -3186,26 +3111,14 @@ function readBikeProfileEditor(){
 }
 function bikeEditorIssue(){
   const fitIssue=fitFieldsIssue();if(fitIssue)return fitIssue;
-  for(const id of Object.values(PRESSURE_BIKE_INPUTS)){
-    const field=$(id);
-    if(field.validity && !field.validity.valid)return 'Correct the tyre/rim or bike-weight entry highlighted above.';
-  }
+  const field=$(BIKE_WEIGHT_INPUT);
+  if(field.validity && !field.validity.valid)return 'Correct the bike-weight entry highlighted above.';
   const p=readBikeProfileEditor()?.pressure;
   if(!p)return 'Check the bike details before using them.';
-  for(const [key,id] of Object.entries(PRESSURE_BIKE_INPUTS))
-    if(!['wheel','rim','frontCasing','rearCasing'].includes(key) && String($(id).value??'').trim()!=='' && p[key]===null)return 'Correct the tyre/rim or bike-weight entry above. Use the displayed numeric limits.';
-  if(['front','rear'].some(side=>p[side+'MinBar']!==null && p[side+'MaxBar']!==null && p[side+'MinBar']>p[side+'MaxBar']))return 'A minimum pressure is greater than its maximum. Check the recorded tyre/rim limits.';
+  if(String(field.value??'').trim()!=='' && p.bikeKg===null)return 'Correct the bike-weight entry above. Use the displayed numeric limits.';
   return '';
 }
-function pressureHardwarePending(){
-  // The visible editor can preview a library bike without applying its snapshot.
-  if(!BIKE_PROFILE_FORM_READY)return false;
-  if(bikeEditorIssue())return true;
-  const p=readBikeProfileEditor(),current=normaliseBikeProfile(S.bikeProfile);
-  return JSON.stringify(p?.pressure)!==JSON.stringify(normalisePressureBike(current?.pressure)) ||
-    ['tyres','frontTyre','rearTyre'].some(key=>(p?.[key]||(key==='tyres'?'unknown':''))!==(current?.[key]||(key==='tyres'?'unknown':'')));
-}
-async function applyPressureBikeDetails(){
+async function applyBikeDetails(){
   if(BIKE_PROFILE_BUSY || !DRAFT_READY)return false;
   const issue=bikeEditorIssue();
   if(issue){BIKE_PROFILE_MESSAGE=issue;renderBikeProfiles();return false;}
@@ -3213,7 +3126,7 @@ async function applyPressureBikeDetails(){
   let saved=false;try{saved=await persistBikeProfileSelection();}catch(e){}
   BIKE_PROFILE_BUSY=false;
   BIKE_PROFILE_MESSAGE=saved?'Using these bike details for this plan. Save bike for next time if you want it in your saved-bike list.':'Using these details for this session. Export to keep them if browser saving is unavailable.';
-  renderBikeProfiles();renderPressureHelper();return true;
+  renderBikeProfiles();return true;
 }
 async function saveBikeProfile(event){
   event?.preventDefault();if(BIKE_PROFILE_BUSY || !DRAFT_READY)return false;
@@ -3261,7 +3174,7 @@ async function removeSavedBike(){
 }
 function initialiseBikeProfiles(){
   $('bikeProfileForm').onsubmit=saveBikeProfile;
-  $('bikeProfileForm').addEventListener('input',()=>{if(BIKE_PROFILE_BUSY)return;BIKE_PROFILE_MESSAGE='Details edited. Choose Use these bike details to apply them, or save the bike for reuse.';$('bikeProfileStatus').textContent=BIKE_PROFILE_MESSAGE;renderPressureHelper();});
+  $('bikeProfileForm').addEventListener('input',()=>{if(BIKE_PROFILE_BUSY)return;BIKE_PROFILE_MESSAGE='Details edited. Choose Use these bike details to apply them, or save the bike for reuse.';$('bikeProfileStatus').textContent=BIKE_PROFILE_MESSAGE;});
   $('bikeSavedSelect').onchange=()=>{const p=BIKE_PROFILES.find(b=>b.id===$('bikeSavedSelect').value);if(p){fillBikeProfileForm(p);BIKE_PROFILE_MESSAGE=`Details shown for ${p.name}. Choose Use saved bike, or update and use it after editing.`;}$('bikeRemovePrompt').classList.add('hidden');renderBikeProfiles();};
   $('bikeUseSaved').onclick=chooseSavedBike;
   $('bikeClear').onclick=clearBikeProfile;
@@ -3295,7 +3208,7 @@ function undoBikeSwap(){
   for(const [id,before] of Object.entries(s.kit))if(Object.hasOwn(after,id) && after[id]!==before && S.kit[id]===after[id] && !riderSince(id))S.kit[id]=before;
   queueDraftSave();persistBikeProfileSelection();
   BIKE_PROFILE_MESSAGE=bikeWord('swapUndone',{name:s.prev.name});
-  renderBikeProfiles(true);renderPressureHelper();renderKit();if(S.step===4)renderResult();drawRig();
+  renderBikeProfiles(true);renderKit();if(S.step===4)renderResult();drawRig();
   rememberLookOpening();renderLook();
   return true;
 }
@@ -3429,7 +3342,7 @@ function writeLook(look,store=true){
     if(linkHoldsBike()){saveShownBike().catch(()=>{});return;}
     if(BIKE_PROFILE_BUSY){clearTimeout(LOOK_RETRY);LOOK_RETRY=setTimeout(()=>writeLook(currentLook()),60);return;}
     LOOK_CREATING=true;
-    Promise.resolve(applyPressureBikeDetails()).then(()=>renderLook()).catch(()=>{});
+    Promise.resolve(applyBikeDetails()).then(()=>renderLook()).catch(()=>{});
     return;
   }
   const i=BIKE_PROFILES.findIndex(b=>b.id===t.bike.id);
@@ -3533,6 +3446,9 @@ function closeLookPhoto(){
   LOOK_PHOTO=null;LOOK_PREVIEW=null;picker.close();
 }
 
+/* ---- Back to Wayfinch (spec 7.1 item 5): always there, at the top. /#/tools by default; after Bike details opened from the co-pilot,
+   the screen named by &back=; after a handoff, /#/trip. For this visit only: nothing is stored. ---- */
+function setWayfinchBack(href){ const a=$('backToWayfinch'); if(a) a.href=href; }
 /* ---- Opening a bike from the co-pilot (spec 7.1 "Bikes"): #bike-details=<id>&back=<screen>[&section=look] ---- */
 const BIKE_BACKS={trip:['/#/trip','backTrip'],tools:['/#/tools','backTools'],you:['/#/you','backYou'],tyre:['/#/tools/tyre','backTyre']};
 function bikeDetailsLink(hash){
@@ -3550,6 +3466,7 @@ function openBikeDetailsFromLink(hash=location.hash){
   try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
   const saved=BIKE_PROFILES.find(b=>b.id===link.id),plan=S.bikeProfile && S.bikeProfile.id===link.id ? S.bikeProfile : null;
   const [href,key]=BIKE_BACKS[link.back];
+  setWayfinchBack(href);
   $('bikeDetailsBack').href=href;$('bikeDetailsBack').textContent=bikeWord(key);$('bikeDetailsBack').classList.remove('hidden');
   openBikeDetails($('rigBikeDetails'),link.section==='look' ? 'look' : 'frame');
   LINK_BIKE=true;
@@ -3563,238 +3480,13 @@ function openBikeDetailsFromLink(hash=location.hash){
   if(link.section==='look'){$('bikeLook').scrollIntoView?.({block:'start'});$('bikeLookTitle').focus({preventScroll:true});}
   return true;
 }
-/* SRAM remains the calculation source; these helpers prepare and retain its inputs/results. */
-const PRESSURE_PSI_PER_BAR=14.503773773;
-const PRESSURE_RIDES={road:'Road',cyclocross:'Cyclocross',gravel:'Gravel',xc:'MTB Cross Country',trail:'MTB Trail',enduro:'MTB Enduro',downhill:'MTB Downhill',fatbike:'Fatbike'};
-const PRESSURE_RIMS={'tube-crochet':'Tubes (Crochet)',tubular:'Tubular','tubeless-crochet':'Hooks (Tubeless Crochet)',hookless:'Hookless (Tubeless Straight Side)'};
-const PRESSURE_CASINGS={thin:'Thin',standard:'Standard',reinforced:'Reinforced'};
-const PRESSURE_PLAN_INPUTS={riderKg:'pressureRider',method:'pressureMethod',loadedBikeKg:'pressureLoadedBike',bagKg:'pressureBagKg',extraKg:'pressureExtraKg',waterL:'pressureWaterL',bodyLoadKg:'pressureBodyKg',ride:'pressureRide',surface:'pressureSurface',unit:'pressureUnit'};
-let PRESSURE_FORM_SIGNATURE='',PRESSURE_RECORD_SIGNATURE='',PRESSURE_LAST_INPUT_KEY='',PRESSURE_MESSAGE='';
-function pressureNumber(value,digits=2){return Number.isFinite(value) ? +value.toFixed(digits) : '—';}
-function pressureBikeRows(value){
-  const p=normalisePressureBike(value),rows=[];
-  if(p.bikeKg!==null)rows.push(['Bike without luggage',pressureNumber(p.bikeKg)+' kg']);
-  if(p.wheel!=='unknown')rows.push(['Wheel diameter',/^(29|27\.5|26)$/.test(p.wheel)?p.wheel+' inch':p.wheel]);
-  if(p.rim!=='unknown')rows.push(['Rim type',PRESSURE_RIMS[p.rim]]);
-  if(p.rimMm!==null)rows.push(['Internal rim width',pressureNumber(p.rimMm)+' mm']);
-  for(const side of ['front','rear']){
-    const label=side==='front'?'Front':'Rear';
-    if(p[side+'Mm']!==null)rows.push([label+' labelled tyre width',pressureNumber(p[side+'Mm'])+' mm']);
-    if(p[side+'Casing']!=='unknown')rows.push([label+' casing',PRESSURE_CASINGS[p[side+'Casing']]]);
-    if(p[side+'MinBar']!==null)rows.push([label+' minimum permitted',pressureNumber(p[side+'MinBar'])+' bar']);
-    if(p[side+'MaxBar']!==null)rows.push([label+' maximum permitted',pressureNumber(p[side+'MaxBar'])+' bar']);
-  }
-  return rows;
-}
-function loadedSystemWeight(value=S.tyrePressure,profile=S.bikeProfile){
-  const p=normaliseTyrePressure(value),bike=normalisePressureBike(profile?.pressure);
-  const kitKgExact=+activeKit().reduce((sum,k)=>sum+itemKg(k),0).toFixed(6);
-  const cageWaterL=p.waterL===null?waterL():p.waterL;
-  const carriedKg=+(kitKgExact+cageWaterL+(p.bagKg??0)+(p.extraKg??0)).toFixed(6);
-  const missing=[];
-  if(p.riderKg===null)missing.push('rider weight');
-  let riderKg=p.riderKg,loadedBikeKg=null;
-  if(p.method==='weighed'){
-    loadedBikeKg=p.loadedBikeKg;
-    if(loadedBikeKg===null)missing.push('total bike weight with its carried load');
-  }else{
-    if(bike.bikeKg===null)missing.push('bike weight in the tyre/rim fields above');
-    if(p.bagKg===null)missing.push('empty luggage weight (enter 0 if already included)');
-    if(p.extraKg===null)missing.push('valid unlisted gear weight (enter 0 if none)');
-    if(p.bodyLoadKg===null)missing.push('valid body-carried load (enter 0 if none)');
-    if(p.bodyLoadKg>carriedKg+1e-6)missing.push('body-carried load must be part of the total carried load');
-    if(riderKg!==null)riderKg=+(riderKg+p.bodyLoadKg).toFixed(6);
-    if(bike.bikeKg!==null && p.bagKg!==null && p.bodyLoadKg<=carriedKg+1e-6)loadedBikeKg=+(bike.bikeKg+carriedKg-p.bodyLoadKg).toFixed(6);
-  }
-  if(riderKg!==null && riderKg>225)missing.push('SRAM rider input exceeds 225 kg');
-  if(loadedBikeKg!==null && loadedBikeKg>225)missing.push('SRAM bike input exceeds 225 kg');
-  const systemKg=riderKg!==null && loadedBikeKg!==null && !missing.length ? +(riderKg+loadedBikeKg).toFixed(6) : null;
-  return {method:p.method,riderKg,loadedBikeKg,systemKg,kitKg:kitKgExact,cageWaterL,carriedKg,missing};
-}
-function pressurePreparedInputs(value=S.tyrePressure,profile=S.bikeProfile){
-  const p=normaliseTyrePressure(value),bike=normalisePressureBike(profile?.pressure),weight=loadedSystemWeight(p,profile);
-  const missing=[...weight.missing];
-  if(p.method==='estimate' && p.waterL!==null && p.waterL>waterL()+1e-6)missing.push('cage water must not exceed the listed bottle capacity (add other water in Kit)');
-  if(!normaliseBikeProfile(profile))missing.push('applied bike details (choose Use these bike details above)');
-  for(const [key,label] of [['wheel','wheel diameter'],['rim','rim type'],['rimMm','internal rim width'],['frontMm','front labelled tyre width'],['rearMm','rear labelled tyre width'],['frontCasing','front casing'],['rearCasing','rear casing']])
-    if(bike[key]===null || bike[key]==='unknown')missing.push(label);
-  const roadWheel=['700c','650b','650c'].includes(bike.wheel),roadRide=['road','gravel','cyclocross'].includes(p.ride);
-  if(bike.wheel!=='unknown' && roadWheel!==roadRide)missing.push('wheel diameter matching the chosen SRAM ride style');
-  const warnings=[];
-  if(['front','rear'].some(side=>bike[side+'MinBar']!==null && bike[side+'MaxBar']!==null && bike[side+'MinBar']>bike[side+'MaxBar']))missing.push('minimum pressure must not exceed maximum pressure');
-  if(['front','rear'].some(side=>bike[side+'MaxBar']===null))warnings.push('Maximum tyre/rim limits are not fully recorded. Enter the strictest limits in your bike profile before saving pressures.');
-  if(bike.rim==='hookless')warnings.push('Hookless: verify the exact tyre/rim compatibility and width-specific pressure limits. Fitting a tube does not remove these requirements.');
-  if(p.method==='estimate')warnings.push('All selected carried kit counts, including items without bag space. Leave items you actually wear out of the carried list if already included in rider weight. Count bags and containers once.');
-  if(gearBags().some(b=>b.pos==='pack') && p.method==='estimate' && p.bodyLoadKg===0)warnings.push('A backpack is listed. Enter its carried mass in “Of this load, carried on your back” if you will use it.');
-  const width=mm=>roadRide ? pressureNumber(mm)+' mm' : pressureNumber(mm/25.4,4)+' inch ('+pressureNumber(mm)+' mm)';
-  const lines=[
-    'Ride style: '+PRESSURE_RIDES[p.ride], 'Surface: '+(p.surface==='wet'?'Wet':'Dry'),
-    'Mass units: KG', 'SRAM rider weight: '+pressureNumber(weight.riderKg)+' kg',
-    'SRAM bike weight: '+pressureNumber(weight.loadedBikeKg)+' kg',
-    'Total loaded system: '+pressureNumber(weight.systemKg)+' kg',
-    'Front labelled tyre width: '+(bike.frontMm===null?'Not set':width(bike.frontMm)),
-    'Front casing: '+(PRESSURE_CASINGS[bike.frontCasing]||'Not set'),
-    'Rear labelled tyre width: '+(bike.rearMm===null?'Not set':width(bike.rearMm)),
-    'Rear casing: '+(PRESSURE_CASINGS[bike.rearCasing]||'Not set'),
-    'Wheel diameter: '+(bike.wheel==='unknown'?'Not set':roadWheel?bike.wheel:bike.wheel+' inch'),
-    'Rim type: '+(PRESSURE_RIMS[bike.rim]||'Not set'),
-    'Internal rim width: '+(bike.rimMm===null?'Not set':pressureNumber(bike.rimMm)+' mm'),
-    'Use your own tyre and wheel settings, not ride-style defaults. Check the ranges and exact tyre models offered by SRAM.'
-  ];
-  return {settings:p,bike,weight,missing,warnings,ready:!missing.length,text:lines.join('\n')};
-}
-function pressureMeasuredLoadSignature(){
-  const text=JSON.stringify({kit:activeKit().map(k=>[k.id,itemKg(k)]).sort((a,b)=>a[0].localeCompare(b[0])),
-    bags:S.bags.map(b=>[b.uid,b.pos,b.L,!!b.pair]),decks:{bar:!!S.decks.bar,rack:!!S.decks.rack}});
-  // Compact local change marker, so large supported kit lists still fit in exports.
-  let a=2166136261,b=2654435769;
-  for(let i=0;i<text.length;i++){const c=text.charCodeAt(i);a=Math.imul(a^c,16777619);b=Math.imul(b^c,2246822519);}
-  return text.length+':'+(a>>>0).toString(16).padStart(8,'0')+(b>>>0).toString(16).padStart(8,'0');
-}
-function pressureInputKey(value=S.tyrePressure,profile=S.bikeProfile){
-  const input=pressurePreparedInputs(value,profile),p=input.settings,bike=input.bike;
-  // Only physical calculator inputs/limits matter; plan names and packed ticks do not.
-  return JSON.stringify({v:1,riderKg:input.weight.riderKg,bikeKg:input.weight.loadedBikeKg,
-    ride:p.ride,surface:p.surface,wheel:bike.wheel,rim:bike.rim,rimMm:bike.rimMm,
-    frontMm:bike.frontMm,rearMm:bike.rearMm,frontCasing:bike.frontCasing,rearCasing:bike.rearCasing,
-    frontMinBar:bike.frontMinBar,frontMaxBar:bike.frontMaxBar,rearMinBar:bike.rearMinBar,rearMaxBar:bike.rearMaxBar,
-    tyres:profile?.tyres||'unknown',frontTyre:profile?.frontTyre||'',rearTyre:profile?.rearTyre||'',complete:input.ready,
-    measuredLoad:p.method==='weighed'?pressureMeasuredLoadSignature():null});
-}
-function pressureLimitIssue(bike,frontBar,rearBar){
-  for(const [side,value] of [['front',frontBar],['rear',rearBar]]){
-    const min=bike[side+'MinBar'],max=bike[side+'MaxBar'];
-    if(max===null)return 'Maximum tyre/rim pressure limits are not fully recorded.';
-    if(min!==null && min>max)return 'A recorded minimum pressure is greater than its maximum.';
-    if(value>max+1e-6 || min!==null && value<min-1e-6)return `The recorded ${side} pressure is outside the entered manufacturer limits. Do not use it.`;
-  }
-  return '';
-}
-function pressureRecordState(value=S.tyrePressure,profile=S.bikeProfile){
-  const p=normaliseTyrePressure(value),record=p.record;
-  if(!record)return {record:null,stale:false,limitIssue:''};
-  const limitIssue=pressureLimitIssue(normalisePressureBike(profile?.pressure),record.frontBar,record.rearBar);
-  return {record,stale:!!limitIssue || record.inputKey!==pressureInputKey(p,profile),limitIssue};
-}
-function pressureRecordedContextSummary(record){
-  try{
-    const c=JSON.parse(record.inputKey);
-    if(!dataObject(c)||!Number.isFinite(c.riderKg)||!Number.isFinite(c.bikeKg))return 'Recorded inputs unavailable';
-    return `${pressureNumber(c.riderKg+c.bikeKg)} kg total · ${PRESSURE_RIDES[c.ride]||'ride style not set'} · ${c.surface==='wet'?'wet':'dry'} · ${pressureNumber(c.frontMm)}/${pressureNumber(c.rearMm)} mm tyres · ${pressureNumber(c.rimMm)} mm rim`;
-  }catch(e){return 'Recorded inputs unavailable';}
-}
-function pressureRecordHtml(value=S.tyrePressure,profile=S.bikeProfile,print=false){
-  const state=pressureRecordState(value,profile);if(!state.record)return '';
-  const r=state.record;
-  const date=new Date(r.recordedAt).toLocaleDateString('en-GB');
-  return `<section class="${print?'print-extra':'pressure-record'}${state.stale?' stale':''}"><${print?'h2':'h4'}>Recorded SRAM starting pressures${state.stale?' — review needed':''}</${print?'h2':'h4'}>
-    <p><b>Front ${pressureNumber(r.frontBar)} bar / ${pressureNumber(r.frontBar*PRESSURE_PSI_PER_BAR,1)} psi · Rear ${pressureNumber(r.rearBar)} bar / ${pressureNumber(r.rearBar*PRESSURE_PSI_PER_BAR,1)} psi</b></p>
-    <p>${htmlEsc(pressureRecordedContextSummary(r))} · saved ${htmlEsc(date)}</p>
-    <p>${state.limitIssue?htmlEsc(state.limitIssue):state.stale?'The load or bike inputs or carrying plan have changed. Reweigh if needed, recalculate in SRAM and review the manufacturer limits before using these recorded values.':'Starting suggestions entered from SRAM for the recorded inputs. Check your tyres, rims and pressure before riding.'}</p></section>`;
-}
-function pressureFieldIssue(){
-  const weighed=$('pressureMethod').value==='weighed';
-  const fields=[['pressureRider',5,350,'rider weight'],...(weighed
-    ? [['pressureLoadedBike',3,250,'total bike weight']]
-    : [['pressureBagKg',0,50,'empty luggage weight'],['pressureExtraKg',0,100,'unlisted gear weight'],['pressureWaterL',0,100,'cage water'],['pressureBodyKg',0,100,'body-carried load']])];
-  for(const [id,min,max,label] of fields){
-    const field=$(id),text=String(field.value??'').trim();
-    if(field.validity && !field.validity.valid || text!=='' && dataNumber(text,min,max)===null)return 'Correct the '+label+' entry. Use a number within the displayed limits.';
-  }
-  return '';
-}
-function renderPressureHelper(force=false){
-  if(!$('tyrePressurePanel'))return;
-  const p=normaliseTyrePressure(S.tyrePressure),input=pressurePreparedInputs(p),state=pressureRecordState(p);
-  const inputKey=pressureInputKey(p);
-  if(PRESSURE_LAST_INPUT_KEY!==inputKey){$('pressureConfirmed').checked=false;PRESSURE_LAST_INPUT_KEY=inputKey;PRESSURE_MESSAGE='';}
-  const formSignature=JSON.stringify({...p,record:null});
-  if(force || PRESSURE_FORM_SIGNATURE!==formSignature){
-    for(const [key,id] of Object.entries(PRESSURE_PLAN_INPUTS))$(id).value=p[key] ?? '';
-    PRESSURE_FORM_SIGNATURE=formSignature;
-  }
-  const recordSignature=JSON.stringify(p.record);
-  if(force || PRESSURE_RECORD_SIGNATURE!==recordSignature){
-    for(const side of ['front','rear'])$('pressure'+(side==='front'?'Front':'Rear')).value=p.record?pressureNumber(p.record[side+'Bar']*(p.unit==='psi'?PRESSURE_PSI_PER_BAR:1),6):'';
-    $('pressureConfirmed').checked=false;PRESSURE_RECORD_SIGNATURE=recordSignature;
-  }
-  const ready=typeof DRAFT_READY!=='undefined' && DRAFT_READY;
-  Object.values(PRESSURE_PLAN_INPUTS).forEach(id=>$(id).disabled=!ready);
-  ['pressureFront','pressureRear','pressureConfirmed','pressureSave'].forEach(id=>$(id).disabled=!ready);
-  const fieldIssue=pressureFieldIssue(),pending=pressureHardwarePending();
-  $('pressureCopy').disabled=!input.ready || !!fieldIssue || pending || BIKE_PROFILE_BUSY;
-  $('pressureSave').disabled=!ready || pending || BIKE_PROFILE_BUSY;
-  $('pressureClear').disabled=!ready || !p.record;
-  for(const [id,show] of [['bikeBaseField',p.method==='estimate'],['pressureLoadedField',p.method==='weighed'],['pressureBagsField',p.method==='estimate'],['pressureExtraField',p.method==='estimate'],['pressureWaterField',p.method==='estimate'],['pressureBodyField',p.method==='estimate']])$(id).classList.toggle('hidden',!show);
-  const weightMethod=p.method==='weighed'
-    ? 'The bike weight you enter already includes its bags, kit, food and water. None is added again. Include everything carried on the body in rider weight, including any backpack. Weighing the ready-to-ride bike and rider gives the most useful figures.'
-    : 'Rider weight includes riding clothes, shoes and helmet. Kit and food use the current selection and quantities; cage water assumes full bottles unless changed. Extra water selected in Kit is already included. Empty luggage includes the bags you will actually carry, bottles and cages, including any backpack. Enter only masses missing from the bike weight. The body-carried figure moves part of this load from bike to rider; it adds no extra weight.';
-  $('pressureWeightHint').innerHTML=infoHelp('How this weight is counted',`<p>${htmlEsc(weightMethod)}</p>`);
-  $('pressureBikeInfo').innerHTML=S.bikeProfile?`<p>Using: <b>${htmlEsc(S.bikeProfile.name)}</b>. Tyre and rim details are in the fields above.</p>`:'<p class="pressure-warning">Enter your tyre/rim details above, then choose Use these bike details. A saved bike name is not required.</p>';
-  const w=input.weight;
-  const weightBreakdown=p.method==='estimate'
-    ? `<p>Selected kit + food: ${pressureNumber(w.kitKg)} kg · Cage water: ${pressureNumber(w.cageWaterL)} kg · Empty luggage: ${p.bagKg===null?'not set':pressureNumber(p.bagKg)+' kg'} · Unlisted gear: ${pressureNumber(p.extraKg)} kg</p>`
-    : '<p>The entered bike weight already includes its carried load. The rider weight includes everything carried on the body.</p>';
-  $('pressureWeightSummary').innerHTML=`<div class="pressure-total">Total loaded system: <strong>${pressureNumber(w.systemKg)} kg</strong> ${infoHelp('Loaded weight breakdown',weightBreakdown)}</div>`+
-    `<p>For SRAM: rider ${pressureNumber(w.riderKg)} kg · loaded bike ${pressureNumber(w.loadedBikeKg)} kg. Count all carried weight once.</p>`;
-  $('pressurePreparation').innerHTML=(pending?'<p class="pressure-warning">Bike details edited or another bike previewed. Choose Use these bike details above before copying inputs or saving pressures.</p>':'')+
-    (fieldIssue?`<p class="pressure-warning">${htmlEsc(fieldIssue)} This edit has not been applied; the weight summary still uses your previous valid values.</p>`:'')+
-    (input.missing.length?`<p class="pressure-warning">Still needed: ${htmlEsc(input.missing.join('; '))}.</p>`:'')+
-    input.warnings.map(text=>`<p class="pressure-warning">${htmlEsc(text)}</p>`).join('')+`<div class="pressure-summary">${htmlEsc(input.text)}</div>`;
-  $('pressureSaved').innerHTML=pressureRecordHtml(p);
-  $('pressureSummaryLabel').textContent=pending?'Apply the edited bike details above.':fieldIssue?'Correct the weight entry.':state.record?(state.stale?'Saved pressures need review.':'Pressures saved.'):input.ready?'Inputs ready for SRAM.':'Prepare inputs for SRAM.';
-  $('pressureReadyNote').textContent=pending?'Choose Use these bike details first.':fieldIssue?fieldIssue:input.missing.length?'Still needed: '+input.missing.join('; ')+'.':'Inputs ready. Copy them and open the SRAM calculator in a separate tab.';
-  $('pressureStatus').textContent=PRESSURE_MESSAGE;
-  const maximum=p.unit==='psi'?15*PRESSURE_PSI_PER_BAR:15;
-  ['pressureFront','pressureRear'].forEach(id=>$(id).max=String(maximum));
-}
-function changePressureInputs(event){
-  const issue=pressureFieldIssue();
-  if(issue){$('pressureConfirmed').checked=false;PRESSURE_MESSAGE=issue;renderPressureHelper();return false;}
-  const old=normaliseTyrePressure(S.tyrePressure),raw={...old};
-  for(const [key,id] of Object.entries(PRESSURE_PLAN_INPUTS))raw[key]=$(id).value;
-  const p=normaliseTyrePressure(raw);
-  if(old.unit!==p.unit){
-    for(const id of ['pressureFront','pressureRear']){
-      const number=dataNumber($(id).value,.1,220);
-      if(number!==null)$(id).value=pressureNumber(number*(old.unit==='psi'?1/PRESSURE_PSI_PER_BAR:1)*(p.unit==='psi'?PRESSURE_PSI_PER_BAR:1),6);
-    }
-  }
-  S.tyrePressure=p;PRESSURE_FORM_SIGNATURE=JSON.stringify({...p,record:null});
-  if(event?.target?.id!=='pressureUnit')$('pressureConfirmed').checked=false;
-  PRESSURE_MESSAGE='';queueDraftSave();renderPressureHelper();renderPrintableChecklist();
-}
-function savePressureSuggestions(){
-  if(!DRAFT_READY)return false;
-  if(pressureHardwarePending() || BIKE_PROFILE_BUSY){PRESSURE_MESSAGE='Use the edited bike details above before saving SRAM suggestions.';renderPressureHelper();return false;}
-  const fieldIssue=pressureFieldIssue();
-  if(fieldIssue){PRESSURE_MESSAGE=fieldIssue;renderPressureHelper();return false;}
-  const p=normaliseTyrePressure(S.tyrePressure),input=pressurePreparedInputs(p);
-  let message='';
-  if(!input.ready)message='Complete the weights and tyre/rim inputs before saving the SRAM suggestions.';
-  const front=dataNumber($('pressureFront').value,.1,p.unit==='psi'?220:15),rear=dataNumber($('pressureRear').value,.1,p.unit==='psi'?220:15);
-  const frontBar=front===null?null:+(front/(p.unit==='psi'?PRESSURE_PSI_PER_BAR:1)).toFixed(6),rearBar=rear===null?null:+(rear/(p.unit==='psi'?PRESSURE_PSI_PER_BAR:1)).toFixed(6);
-  if(!message && (frontBar===null || rearBar===null || frontBar<.1 || rearBar<.1 || frontBar>15 || rearBar>15))message='Enter valid front and rear suggestions in the selected unit.';
-  if(!message && ['front','rear'].some(side=>input.bike[side+'MaxBar']===null))message='Enter and apply the front and rear maximum tyre/rim limits above before saving.';
-  if(!message){
-    for(const [side,value] of [['front',frontBar],['rear',rearBar]]){
-      const min=input.bike[side+'MinBar'],max=input.bike[side+'MaxBar'];
-      if(max!==null && value>max+1e-6 || min!==null && value<min-1e-6){message=`The ${side} suggestion is outside your recorded manufacturer limits. Check the inputs and compatibility; do not use this pressure.`;break;}
-    }
-  }
-  if(!message && !$('pressureConfirmed').checked)message='Confirm that these suggestions came from SRAM using the current inputs and that you checked the hardware and limits.';
-  if(message){PRESSURE_MESSAGE=message;renderPressureHelper();return false;}
-  S.tyrePressure={...p,record:{frontBar,rearBar,inputKey:pressureInputKey(p),source:'sram-axs',recordedAt:new Date().toISOString()}};
-  PRESSURE_MESSAGE='SRAM suggestions added to this working plan. Save this plan to keep a named copy; Export includes the pressures.';
-  queueDraftSave();renderPressureHelper();renderPackingChecklist();return true;
-}
 function openBikeDetails(opener=document.activeElement,section='frame'){
   const root=$('bikeDetailsBox');
   if(root.classList.contains('hidden')){
     closeBagPop();
     if(!$('legalBox').classList.contains('hidden'))closeLegal();
     if(!$('walkthroughBox').classList.contains('hidden'))closeWalkthrough();
-    renderBikeProfiles();renderPressureHelper();
+    renderBikeProfiles();
     root.classList.remove('hidden');
     beginDialog(root,true,closeBikeDetails,opener);
     $('bikeDetailsTitle').focus({preventScroll:true});
@@ -3813,28 +3505,7 @@ function closeBikeDetails(){
   $('bikeUseShown').classList.add('hidden');
   root.classList.add('hidden');endDialog(root);
 }
-function openPressureTool(section='pressure',opener=document.activeElement){
-  const root=$('pressureToolBox');
-  if(root.classList.contains('hidden')){
-    closeBagPop();
-    if(!$('legalBox').classList.contains('hidden'))closeLegal();
-    if(!$('walkthroughBox').classList.contains('hidden'))closeWalkthrough();
-    const p=normaliseTyrePressure(S.tyrePressure);
-    if(S.tyrePressure===null && !S.place && !S.gpx && !S.bags.length){S.tyrePressure={...p,method:'weighed'};queueDraftSave();}
-    renderBikeProfiles();renderPressureHelper();
-    root.classList.remove('hidden');
-    beginDialog(root,true,closePressureTool,opener);
-    $('pressureToolTitle').focus({preventScroll:true});
-  }
-  if(section==='repair')openBikeDetails(opener,'repair');
-}
-function closePressureTool(){
-  const root=$('pressureToolBox');if(root.classList.contains('hidden'))return;
-  root.classList.add('hidden');endDialog(root);
-}
-function initialisePressureHelper(){
-  $('pressureToolOpen').onclick=()=>openPressureTool('pressure',$('pressureToolOpen'));
-  $('pressureToolFromCheck').onclick=()=>openPressureTool('pressure',$('pressureToolFromCheck'));
+function initialiseBikeDetails(){
   $('bikeDetailsOpen').onclick=()=>openBikeDetails($('bikeDetailsOpen'),'repair');
   $('bikeDetailsClose').onclick=closeBikeDetails;
   $('mwSave').onclick=saveMaxWeight;$('mwSkip').onclick=skipMaxWeight;$('mwClose').onclick=skipMaxWeight;
@@ -3845,21 +3516,7 @@ function initialisePressureHelper(){
   $('fitStyleChoices').addEventListener('change',()=>{$('fitTopTubeField').classList.toggle('hidden',fitFormStyle()==='step-through');fitQuickChanged();});
   $('fitSizeChips').addEventListener('click',event=>{const b=event.target.closest?.('[data-size]');if(b)quickPickSize(b.dataset.size);});
   $('bikeMoreDetails').addEventListener('change',updateFitQuick);
-  $('pressureToolClose').onclick=closePressureTool;
-  $('pressureToolBox').addEventListener('click',event=>{if(event.target===$('pressureToolBox'))closePressureTool();});
-  $('pressureApplyBike').onclick=applyPressureBikeDetails;
-  Object.values(PRESSURE_PLAN_INPUTS).forEach(id=>$(id).addEventListener($(id).tagName==='SELECT'?'change':'input',changePressureInputs));
-  $('pressureEditBike').onclick=()=>openBikeDetails($('pressureEditBike'));
-  $('bikeToolEdit').onclick=()=>openBikeDetails($('bikeToolEdit'));
-  $('pressureSave').onclick=savePressureSuggestions;
-  $('pressureClear').onclick=()=>{if(!DRAFT_READY)return;S.tyrePressure={...normaliseTyrePressure(S.tyrePressure),record:null};PRESSURE_MESSAGE='Saved pressures cleared. Your weights and bike details remain.';queueDraftSave();renderPressureHelper();renderPackingChecklist();};
-  $('pressureCopy').onclick=async()=>{
-    const input=pressurePreparedInputs();if(!input.ready || pressureFieldIssue() || pressureHardwarePending() || BIKE_PROFILE_BUSY)return;
-    try{if(!navigator.clipboard?.writeText)throw Error('Clipboard unavailable');await navigator.clipboard.writeText(input.text);PRESSURE_MESSAGE='SRAM inputs copied. Paste or refer to them while filling in the official calculator.';}
-    catch(e){PRESSURE_MESSAGE='Could not copy automatically. Select the prepared inputs above and copy them manually.';}
-    $('pressureStatus').textContent=PRESSURE_MESSAGE;
-  };
-  renderPressureHelper(true);
+  $('bikeApply').onclick=applyBikeDetails;
 }
 function tripKitDefaults(nights=S.nights,sleep=S.sleep,bike=S.bikeProfile){
   const overnight=nights>0, camp=overnight && sleep!=='indoor';
@@ -4931,7 +4588,7 @@ function commitBagsOwnKg(text){
   if(v !== null && (v < 0 || v > 50)) return false;
   if(String(text).trim() !== '' && v === null) return false;
   S.tyrePressure = { ...normaliseTyrePressure(S.tyrePressure), bagKg:v };
-  queueDraftSave();renderPressureHelper();return true;
+  queueDraftSave();return true;
 }
 function weightSectionHtml(plan){
   const w = weightCheck(plan), p = normaliseBikeProfile(S.bikeProfile), bags = normaliseTyrePressure(S.tyrePressure).bagKg;
@@ -5342,6 +4999,7 @@ function replanOffer(plan){
 }
 // The note about a plan saved before sub-project 1 shows until that first save (design 8.4).
 function planSaved(){
+  writeLoadSummary();
   const plan = PLAN_CACHE.plan;
   if(plan && plan.notes.replan && plan.notes.replan.reason === 'migrated') plan.notes.replan = null;
 }
@@ -6138,13 +5796,14 @@ function densify(coords, want){
   return Array.from({length: want}, (_, i) => coords[Math.round(i * step)]);
 }
 
-// Heights for an arbitrary line, from the service we know answers.
+// Heights for an arbitrary line, from the service we know answers. Every elevation and terrain lookup comes through here, with its
+// coordinates rounded to 3 decimals, about 100 m, as the co-pilot sends them (spec 7.1 item 8, 5).
 async function elevationsFor(pts, signal=null){
   const out = [];
   for(let i = 0; i < pts.length; i += 100){
     const chunk = pts.slice(i, i + 100);
-    const url = `${ELEV_URL}?latitude=${chunk.map(p => p.lat.toFixed(4)).join(',')}` +
-                `&longitude=${chunk.map(p => p.lon.toFixed(4)).join(',')}`;
+    const url = `${ELEV_URL}?latitude=${chunk.map(p => p.lat.toFixed(3)).join(',')}` +
+                `&longitude=${chunk.map(p => p.lon.toFixed(3)).join(',')}`;
     let j; try { j = await fetchJson(url, 8000, signal); } catch(e){ return null; }
     if(!Array.isArray(j.elevation) || j.elevation.length !== chunk.length ||
        j.elevation.some(e => typeof e !== 'number' || !Number.isFinite(e) || e < -500 || e > 10000)) return null;
@@ -6734,7 +6393,7 @@ async function simplifyGPX(raw, limit, mode, signal){
   }
   return [...selected].sort((a,b)=>a-b).map(i=>({...raw[i]}));
 }
-async function gpxProfileFrom(parsed, signal=null){
+async function gpxProfileFrom(parsed, signal=null, opts={}){
   const raw=parsed.pts.map(p=>({...p})); let dist=0;
   for(let i=0;i<raw.length;i++){
     if(i && !raw[i].break) dist+=haversine(raw[i-1],raw[i]);
@@ -6744,7 +6403,7 @@ async function gpxProfileFrom(parsed, signal=null){
   if(dist>100000) return null;
   const sections=gpxSections(raw), missingCount=raw.filter(p=>p.elev===null).length;
   const fileCount=raw.length-missingCount; let terrainCount=0, interpolatedCount=0;
-  if(missingCount){
+  if(missingCount && !opts.noLookup){
     const missing=raw.map((p,i)=>p.elev===null?i:-1).filter(i=>i>=0);
     let sampled=missing.length<=100 ? missing : Array.from({length:100},(_,i)=>missing[Math.round(i*(missing.length-1)/99)]);
     // A short section between the evenly spaced samples would stay unmeasured and void the whole climbing total: give each one a sample.
@@ -6804,11 +6463,13 @@ async function gpxProfileFrom(parsed, signal=null){
 }
 
 // Names for the two ends, so the climate lookup has something to call them.
-// Nominatim is what openstreetmap.org itself uses, so it answers browsers.
+// Nominatim is what openstreetmap.org itself uses, so it answers browsers. Zoom 12 only returns a town, so the ends go rounded to
+// 0.01 degrees (spec 7.1 item 8).
+const roundTo = (n, places) => (Math.round(n * 10 ** places) / 10 ** places).toFixed(places);
 async function reverseName(lat, lon, signal=null){
   try {
     const j = await fetchJson(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12` +
-                              `&lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}`,8000,signal);
+                              `&lat=${roundTo(lat, 2)}&lon=${roundTo(lon, 2)}`,8000,signal);
     const a = j && j.address;
     if(!a) return null;
     const town = a.city || a.town || a.village || a.municipality || a.county || a.state;
@@ -6817,7 +6478,7 @@ async function reverseName(lat, lon, signal=null){
   } catch(e){ return null; }
 }
 
-async function loadGPX(text, filename, id=null){
+async function loadGPX(text, filename, id=null, opts={}){
   if(id===null) id=cancelGPXLoad();
   if(id!==GPX_LOAD_ID) return {cancelled:true};
   const controller=new AbortController(); GPX_LOAD_CONTROLLER=controller; GPX_LOAD_PENDING=true;
@@ -6826,12 +6487,14 @@ async function loadGPX(text, filename, id=null){
     const parsed=parseGPX(text);
     if(!parsed) return {error:'That did not read as a GPX track or route with valid coordinates.'};
     if(parsed.error) return {error:parsed.error};
-    const prof=await gpxProfileFrom(parsed,controller.signal);
+    const handoff=opts.handoff || null;
+    const prof=await gpxProfileFrom(parsed,controller.signal,{noLookup:!!handoff});
     if(!prof) return {error:'The track distance could not be processed. Try a shorter or simplified GPX.'};
     gpxAbort(controller.signal);if(id!==GPX_LOAD_ID)return {cancelled:true};
     prof.file=String(filename||'').slice(0,240);
     const a=prof.pts[0],b=prof.pts[prof.pts.length-1];
-    const [na,nb]=await Promise.all([reverseName(a.lat,a.lon,controller.signal),reverseName(b.lat,b.lon,controller.signal)]);
+    const [na,nb]=handoff ? [handoff.start ? {name:handoff.start} : null,handoff.end ? {name:handoff.end} : null]
+      : await Promise.all([reverseName(a.lat,a.lon,controller.signal),reverseName(b.lat,b.lon,controller.signal)]);
     gpxAbort(controller.signal);if(id!==GPX_LOAD_ID)return {cancelled:true};
     // Commit once, after all asynchronous work, so cancelling leaves the plan intact.
     if(typeof invalidateTripPreview==='function')invalidateTripPreview();
@@ -7491,6 +7154,9 @@ function fillColour(pct){
   }
   return 'rgb(224,68,40)';
 }
+// A deck is loaded only with kit strapped there (Contract 1). The plan straps the tent and mat to the rack top (deckClaims) and
+// nothing to the bar's bungees, which the rig draws as an empty deck.
+function deckLoaded(which){ return which === 'rack' && deckClaims().length > 0; }
 // The plan's bags in Contract 1's shape (spec 7.1): what bike.js reads of a plan. Usable bags only, as the plan counts them;
 // fills from the packed slots once the kit is known. It only reads the plan.
 function planBagView(){
@@ -7509,8 +7175,60 @@ function planBagView(){
     if(units.length > 1) item.pair = true;
     items.push(item);
   });
-  const deck = which => hasDeck(which) ? (stage >= 3 && (which === 'rack' ? deckClaims().length > 0 : A.slots.some(s => s.pos === 'bar')) ? 'loaded' : 'empty') : null;
+  const deck = which => hasDeck(which) ? (stage >= 3 && deckLoaded(which) ? 'loaded' : 'empty') : null;
   return { items, decks:{ bar:deck('bar'), rack:deck('rack') }, bottles };
+}
+
+/* ---- Contract 1: the load summary (spec 7.1), loadcheck:summary:v1, for the co-pilot. Worked out with the page's own functions;
+   it only reads the plan. Written once at start-up when the draft is ready, and after each save when it differs (its times aside).
+   A plan without any bag or bottle is {app, kind, v:1, at, empty:true}. ---- */
+const SUMMARY_POSITIONS = ['fork','bar','top','frame','bottle','seat','rack','pack'];
+function loadSummary(now = new Date()){
+  const at = now.toISOString();
+  if(!S.bags.length) return { app:'load-check', kind:'load-summary', v:1, at, empty:true };
+  const A = currentPlan(), r2 = n => +(+n).toFixed(2);
+  const fillOf = s => s && s.cap > 0 ? +Math.min(1, Math.max(0, (s.cap - s.left) / s.cap)).toFixed(3) : 0;
+  const items = [], positions = [];
+  // one entry per bag in use, as the page stores it; a bag the frame can't take is left out; a pair with one half in use is one bag
+  for(const b of gearBags()){
+    if(!bagSpec(b).usable) continue;
+    const used = physical(b).map(u => A.slots.find(x => x.key === u.key)).filter(Boolean);
+    if(!used.length) continue;
+    const item = { pos:b.pos, L:ratedL(b) };
+    if(b.pos === 'top' && TOP_ORDER.includes(b.slot)) item.slot = b.slot;
+    if(b.pos === 'frame') item.shape = frameShapeIdx(b);
+    if(used.length > 1){ item.pair = true; item.fill = used.map(fillOf); }
+    else { if(countOf(b) > 1) item.pair = false; item.fill = fillOf(used[0]); }
+    items.push(item); used.forEach(() => positions.push(b.pos));
+  }
+  const deck = which => hasDeck(which) ? (deckLoaded(which) ? 'loaded' : 'empty') : null;
+  const bottlesNow = liveBottles().filter(b => ['st','dt','un'].includes(b.slot) && +b.L > 0)
+    .map(b => ({ slot:b.slot, L:+b.L }));
+  const cageL = waterL(), extraL = r2(activeKit().filter(k => k.id === 'water').reduce((n, k) => n + itemL(k), 0));
+  const claimed = deckedIds(), deckKg = activeKit().filter(k => claimed.includes(k.id)).reduce((n, k) => n + itemKg(k), 0);
+  const byPositionKg = Object.fromEntries(SUMMARY_POSITIONS.map(pos => [pos, 0]));
+  for(const [pos, kg] of Object.entries(A.byPositionKg)) if(Object.hasOwn(byPositionKg, pos)) byPositionKg[pos] = r2(byPositionKg[pos] + kg);
+  byPositionKg.bottle = r2(cageL);
+  byPositionKg.rack = r2(byPositionKg.rack + deckKg);
+  const bike = normaliseBikeProfile(S.bikeProfile), bagsOwn = normaliseTyrePressure(S.tyrePressure).bagKg;
+  const filterNames = /\bwater filter\b/i;
+  return { app:'load-check', kind:'load-summary', v:1, at, planUpdatedAt:DRAFT_VERSION || at,
+    nights:S.nights, month:S.month + 1, departureDate:S.departureDate || null, mode:S.mode, foodDays:foodDays(), bikeId:bike ? bike.id : null,
+    bags:{ count:positions.length, positions, items },
+    decks:{ bar:deck('bar'), rack:deck('rack') },
+    water:{ bottles:bottlesNow, cageL, extraL, totalL:r2(cageL + extraL) },
+    weight:{ kitKg:r2(activeKit().reduce((n, k) => n + itemKg(k), 0)), cageWaterKg:r2(cageL), carriedKg:carriedKg(A),
+      bikeKg:bike ? bike.pressure.bikeKg : null, emptyLuggageKg:bagsOwn === undefined ? null : bagsOwn,
+      byPositionKg, unplacedKg:A.unplacedKg },
+    kit:{ waterFilter:activeKit().some(k => filterNames.test(k.name)) } };
+}
+// The stored summary, unless it says the same as this one; true when written.
+function writeLoadSummary(always = false){
+  if(!DRAFT_READY || deletedSinceLoad()) return false;
+  let next; try { next = loadSummary(); } catch(e){ return false; }
+  const stored = readLocalJson(SUMMARY_KEY), bare = x => JSON.stringify({ ...x, at:null, planUpdatedAt:null });
+  if(!always && dataObject(stored) && bare(stored) === bare(next)) return false;
+  try { window.localStorage.setItem(SUMMARY_KEY, JSON.stringify(next)); return true; } catch(e){ return false; }
 }
 
 // The rig's bike (spec 7.4, "Bags and anchors"): drawn by bike.js from the plan's bike and bags, without the bags themselves.
@@ -9143,7 +8861,7 @@ function renderResult(){
     <div class="meters">
       <div class="meter"><b>${kit} L</b><span>Kit volume ${infoHelp('How kit volume is counted','<p>The total uses your selected kit, quantities, packed sizes and food carried between resupply stops. Lightweight mode leaves eligible comfort items at home. Typical packed volumes vary by brand and compression.</p>')}</span></div>
       <div class="meter"><b>${mounted} L</b><span>Usable bag space ${infoHelp('Why usable space is lower than the labels',`<p>Bags are counted at ${Math.round(packEff()*100)} per cent of their labelled size to allow for seams, closures and awkward shapes. You own ${ratedTotal()} L of labelled bag capacity; this result counts only the mounted bags.</p><p>“It fits” means the selected kit fits within this estimated usable volume and the entered length limits. Check your actual bags and gear: their shape, opening and compression affect the fit.</p>`)}</span></div>
-      <div class="meter"><b>${(kitKg()+waterL()).toFixed(1)} kg</b><span>Kit + water ${infoHelp('What the packing weight includes',`<p>This adds selected kit and carried food to water in your bottle cages${waterL()?' (counted full)':''}. It excludes the bike, rider and empty luggage. The tyre pressure tool includes those separately.</p>`)}</span></div>
+      <div class="meter"><b>${(kitKg()+waterL()).toFixed(1)} kg</b><span>Kit + water ${infoHelp('What the packing weight includes',`<p>This adds selected kit and carried food to water in your bottle cages${waterL()?' (counted full)':''}. It excludes the bike, rider and empty luggage.</p>`)}</span></div>
     </div></div>${firstFixes({weatherReady,miss,over,fix,routeFailed,spill,stranded})}${resultConfidence(c)}${weatherNote}${routeNote}`;
   $('verdictBox').querySelectorAll('[data-result-jump]').forEach(button=>button.onclick=()=>jumpToResult(button.dataset.resultJump));
 
@@ -9862,7 +9580,6 @@ function renderResult(){
   });
   draftStatus(savedDraftMessage());
   queueDraftSave();
-  renderPressureHelper();
   renderPackingChecklist(A);
   if(resultFocus && typeof restoreFocus === 'function') restoreFocus($('s4'),resultFocus);
 }
@@ -9882,7 +9599,7 @@ function packingChecklistExtras(model,print=false){
 function renderPrintableChecklist(model=getChecklistModel()){
   const root=$('printChecklist');if(!root)return false;
   root.innerHTML=`<h1>Load Check · Packing checklist</h1><p class="print-trip">${htmlEsc(model.tripLabel)}</p><p class="print-details">${htmlEsc([...model.tripDetails,model.modeLabel].join(' · '))}</p>
-    ${bikeChecklistSummaryHtml(model.bikeProfile,true)}${pressureRecordHtml(S.tyrePressure,model.bikeProfile,true)}
+    ${bikeChecklistSummaryHtml(model.bikeProfile,true)}
     <p class="print-progress">${model.totals.packed} of ${model.totals.items} selected items packed · ${model.totals.remaining} remaining · ${packingChecklistNumber(model.totals.L)} L selected kit volume · ${packingChecklistNumber(model.totals.kg,3)} kg of kit. Water is listed separately. One box covers the complete named quantity.</p>
     ${model.warnings.map(message=>`<p class="print-warning">${htmlEsc(message)}</p>`).join('')}
     ${model.groups.map(group=>`<section class="print-group"><h2>${htmlEsc(group.title)}</h2>${group.subtitle?`<p class="print-group-subtitle">${htmlEsc(group.subtitle)}</p>`:''}<ul>${group.items.map(row=>
@@ -9913,7 +9630,7 @@ function renderPackingChecklist(allocation){
   root.className='packing-checklist';root.setAttribute('role','region');root.setAttribute('aria-labelledby','packingChecklistTitle');
   const groups=model.groups.map(group=>({...group,items:CHECKLIST_UNPACKED_ONLY ? group.items.filter(row=>!row.packed) : group.items})).filter(group=>group.items.length);
   root.innerHTML=`<details class="packing-disclosure"${wasOpen?' open':''}><summary><b id="packingChecklistTitle">Packing checklist</b><em>${model.totals.packed} of ${model.totals.items} packed</em></summary><div class="packing-disclosure-body"><p class="packing-trip">${htmlEsc(model.tripLabel)}</p><p>${htmlEsc([...model.tripDetails,model.modeLabel].join(' · '))}</p>
-    ${bikeChecklistSummaryHtml(model.bikeProfile)}${pressureRecordHtml(S.tyrePressure,model.bikeProfile)}
+    ${bikeChecklistSummaryHtml(model.bikeProfile)}
     <div class="packing-progress"><span class="packing-progress-text" id="packingProgressText" role="status" aria-live="polite" aria-atomic="true">${model.totals.packed} of ${model.totals.items} selected items packed · ${model.totals.remaining} remaining</span><progress value="${model.totals.packed}" max="${Math.max(1,model.totals.items)}" aria-label="Packing progress"></progress></div>
     <p>${packingChecklistNumber(model.totals.L)} L selected kit volume · ${packingChecklistNumber(model.totals.kg,3)} kg of kit. ${infoHelp('What the checklist totals and ticks mean','<p>Totals count the selected kit and carried food. Water is listed separately. One tick covers the complete named quantity, including every listed bag share. Shared items appear once; pack all their shares before ticking them.</p>')}</p>
     <div class="packing-save-status" id="packingSaveStatus" role="status" aria-live="polite"></div>
@@ -9975,7 +9692,9 @@ const store = {
     return MEM[k] !== undefined ? MEM[k] : null;
   },
   async set(k, v, detailed=false){
+    if(String(k).startsWith('loadcheck:') && deletedSinceLoad()) return detailed ? {saved:false,kind:'memory'} : false;
     if(k === SETUP_KEY && Array.isArray(v)) mergeOtherTabsSetups(v);
+    const before=String(k).startsWith('loadcheck:') ? readLocalRaw(k) : null;
     MEM[k] = v;
     let saved = false, kind='memory';
     try { if(window.storage){ await window.storage.set(k, JSON.stringify(v)); kind='host'; saved = true;
@@ -9986,6 +9705,7 @@ const store = {
       kind='browser'; saved = true;
     } catch(e){} }
     STORAGE_KIND=kind;
+    if(saved && kind === 'browser') stampSaved(k,v,before);
     if(saved && k === DRAFT_KEY) DRAFT_VERSION=draftVersionOf(v);
     if(saved && k === SETUP_KEY && Array.isArray(v)) v.forEach(x => x && SETUPS_SEEN.add(x.id));
     if(k === SETUP_KEY) SETUPS_STORED = saved;
@@ -9998,6 +9718,331 @@ function storageNote(){
        : STORAGE_KIND === 'browser' ? 'Saved in this browser — still here next time you open it.'
        : STORAGE_KIND === 'host'    ? 'Saved to your account.'
        : 'This session only — storage is unavailable, so a reload clears it. Export below to keep anything.';
+}
+
+/* ---- Also delete bag planner data (spec 7.1 Contract 3; AGENTS.md "Contract for C-DELETE") ----
+   The co-pilot stores copilot:delete-request:v1 = {app, kind, v:1, id, createdAt} and opens #copilot-delete=<id>.
+   Before the draft is restored, a stored valid request not applied yet removes, key by key, every loadcheck:* value
+   saved before createdAt, and nothing saved later. The draft, setups and reports carry their own times. Everything
+   else this page saves is stamped in loadcheck:saved-at:v1 when it is written (bikes and setups one by one); a value
+   with no stamp was saved by an older page, before any request could exist, and goes. Never a clear of all storage,
+   never a copilot:* key, never a cache. */
+const DELETE_REQUEST_KEY='copilot:delete-request:v1',DELETE_APPLIED_KEY='loadcheck:delete-applied',SAVED_AT_KEY='loadcheck:saved-at:v1';
+const SAVED_ITEM_KEYS=['loadcheck:setups','loadcheck:bikeProfiles'];
+const SUMMARY_KEY='loadcheck:summary:v1';
+let DELETED_ELSEWHERE=false;   // another tab applied a delete request: this one never writes its plan back
+const DELETING_KEY='loadcheck:delete-applying';   // written before the first removal, so other tabs stop at once (review M3)
+// What this tab last knew of the deletes; read at load and after its own apply. A tab that was frozen or in the back/forward
+// cache hears no storage event: before any save, and when it shows again, it compares this with what is stored (review I1).
+function deleteMark(){
+  try { return String(window.localStorage.getItem(DELETE_APPLIED_KEY))+'|'+String(window.localStorage.getItem(DELETING_KEY)); } catch(e){ return ''; }
+}
+let DELETE_SEEN=deleteMark();
+// True, and this tab drops everything it holds in memory and starts again from what is stored, when a delete was applied
+// since it last looked. Nothing of it is written back.
+function deletedSinceLoad(){
+  if(DELETED_ELSEWHERE) return true;
+  if(deleteMark() === DELETE_SEEN) return false;
+  dropForDelete();
+  return true;
+}
+function dropForDelete(){
+  if(DELETED_ELSEWHERE) return;
+  DELETED_ELSEWHERE=true; DRAFT_FROZEN=true; DRAFT_READY=false; clearTimeout(DRAFT_TIMER); DRAFT_TIMER=null;
+  window.location.reload();
+}
+function readLocalJson(k){
+  try { const raw=window.localStorage.getItem(k); return raw === null ? null : JSON.parse(raw); } catch(e){ return null; }
+}
+function readLocalRaw(k){ try { return window.localStorage.getItem(k); } catch(e){ return null; } }
+function readSavedAt(){
+  const v=readLocalJson(SAVED_AT_KEY);
+  const keys=dataObject(v) && dataObject(v.keys) ? v.keys : {},items=dataObject(v) && dataObject(v.items) ? v.items : {};
+  return {app:'load-check',kind:'saved-at',v:1,keys:{...keys},
+    items:Object.fromEntries(SAVED_ITEM_KEYS.map(k => [k,dataObject(items[k]) ? {...items[k]} : {}]))};
+}
+// The tyre helper has gone, and with it the rider's body weight (spec 7.1 item 3, 16 item 10): an older page's tyrePressure.riderKg
+// is cleared where it is stored, in the draft and each saved setup, leaving every other byte. Not a rider's save, so nothing is
+// stamped; the draft gets a newer version, so a tab still holding the old one takes this one instead of writing the weight back.
+function clearStoredRiderWeight(){
+  const hasWeight=x => dataObject(x) && dataObject(x.tyrePressure) && x.tyrePressure.riderKg !== undefined && x.tyrePressure.riderKg !== null;
+  try {
+    const draft=readLocalJson(DRAFT_KEY);
+    if(hasWeight(draft)){
+      const previous=Date.parse(draft.updatedAt);
+      draft.tyrePressure.riderKg=null;
+      draft.updatedAt=new Date(Math.max(Date.now(),Number.isFinite(previous) ? previous+1 : 0)).toISOString();
+      window.localStorage.setItem(DRAFT_KEY,JSON.stringify(draft));
+      try { writeDraftBrowserMeta(draft,false); } catch(e){}
+    }
+    const setups=readLocalJson(SETUP_KEY);
+    if(Array.isArray(setups) && setups.some(hasWeight)){
+      setups.forEach(x => { if(hasWeight(x)) x.tyrePressure.riderKg=null; });
+      window.localStorage.setItem(SETUP_KEY,JSON.stringify(setups));
+    }
+  } catch(e){}
+}
+// Called after a value reached this browser's storage, with the stored text it replaced. Only a change is stamped: the same value
+// written again keeps its own time, or none. A list stamps only the entries that are new or changed.
+function stampSaved(k,v,beforeRaw){
+  if(!String(k).startsWith('loadcheck:') || [DRAFT_KEY,DRAFT_BROWSER_META_KEY,SAVED_AT_KEY,DELETE_APPLIED_KEY,SUMMARY_KEY].includes(k)) return;
+  try {
+    const ledger=readSavedAt(),now=new Date().toISOString(),text=typeof v === 'string' && k === WALKTHROUGH_KEY ? v : JSON.stringify(v);
+    if(text !== beforeRaw) ledger.keys[k]=now;
+    else if(!ledger.keys[k]) return;
+    if(SAVED_ITEM_KEYS.includes(k) && Array.isArray(v)){
+      let before=null; try { before=beforeRaw === null ? null : JSON.parse(beforeRaw); } catch(e){}
+      const old=new Map((Array.isArray(before) ? before : []).filter(x => x && typeof x.id === 'string').map(x => [x.id,JSON.stringify(x)]));
+      const stamps={};
+      for(const x of v){
+        if(!x || typeof x.id !== 'string') continue;
+        if(old.get(x.id) !== JSON.stringify(x)) stamps[x.id]=now;           // new or changed now
+        else if(ledger.items[k][x.id]) stamps[x.id]=ledger.items[k][x.id]; // unchanged: its own time, or none
+      }
+      ledger.items[k]=stamps;
+    }
+    window.localStorage.setItem(SAVED_AT_KEY,JSON.stringify(ledger));
+  } catch(e){}
+}
+function stampKey(k,v,beforeRaw){ stampSaved(k,v,beforeRaw); }
+function validDeleteRequest(r){
+  return dataObject(r) && r.app === 'copilot' && r.kind === 'delete-request' && r.v === 1 &&
+    typeof r.id === 'string' && /^[0-9a-f]{32}$/.test(r.id) && typeof r.createdAt === 'string' && Number.isFinite(Date.parse(r.createdAt)) ? r : null;
+}
+function localKeys(){
+  const out=[];
+  try { for(let i=0;i<window.localStorage.length;i++){ const k=window.localStorage.key(i); if(typeof k === 'string') out.push(k); } } catch(e){}
+  return out;
+}
+// The fragment is removed in every case; it never deletes anything by itself.
+function dropDeleteFragment(){
+  if(!/^#copilot-delete=/.test(String(location.hash || ''))) return;
+  try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
+}
+// Returns true when a request was applied now.
+function applyDeleteRequest(){
+  dropDeleteFragment();
+  const request=validDeleteRequest(readLocalJson(DELETE_REQUEST_KEY));
+  if(!request) return false;
+  const applied=readLocalJson(DELETE_APPLIED_KEY);
+  if(dataObject(applied) && applied.id === request.id) return false;
+  try { window.localStorage.setItem(DELETING_KEY,JSON.stringify({id:request.id})); } catch(e){}
+  const cutoff=Date.parse(request.createdAt),ledger=readSavedAt(),now=Date.now();
+  // "Later" is at or after the request; a time later than now (a clock set back since) is later too, never "before" (review M2)
+  const later=stamp => typeof stamp === 'string' && Number.isFinite(Date.parse(stamp)) && (Date.parse(stamp) >= cutoff || Date.parse(stamp) > now);
+  // a day-only date (an older page's setup) is later only when it is a later day than the request's
+  const laterDay=day => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day) && day > request.createdAt.slice(0,10);
+  const remove=k => { try { window.localStorage.removeItem(k); } catch(e){} delete MEM[k]; };
+  const keepList=(k,keep) => {
+    const list=readLocalJson(k);
+    const kept=Array.isArray(list) ? list.filter(x => dataObject(x) && keep(x)) : [];
+    if(!kept.length){ remove(k); return false; }
+    if(kept.length !== list.length){ try { window.localStorage.setItem(k,JSON.stringify(kept)); } catch(e){} MEM[k]=kept; }
+    return true;
+  };
+  const kept={keys:{},items:{}};
+  for(const k of localKeys()){
+    if(!k.startsWith('loadcheck:') || [DELETE_APPLIED_KEY,DELETING_KEY,SAVED_AT_KEY,DRAFT_BROWSER_META_KEY,BIKE_FORMAT_KEY].includes(k)) continue;
+    if(k === DRAFT_KEY){
+      const draft=readLocalJson(k);
+      if(dataObject(draft) && later(draft.updatedAt)) kept.keys[k]=true; else { remove(k); remove(DRAFT_BROWSER_META_KEY); }
+    } else if(k === SETUP_KEY){
+      if(keepList(k,x => later(ledger.items[k][x.id]) || later(x.updated) || laterDay(x.saved))) kept.keys[k]=true;
+    } else if(k === FEEDBACK_KEY){
+      if(keepList(k,x => later(x.at))) kept.keys[k]=true;
+    } else if(k === BIKE_PROFILE_KEY){
+      if(keepList(k,x => later(ledger.items[k][x.id]) || later(x.geometry && x.geometry.at))) kept.keys[k]=true;
+    } else if(k !== SUMMARY_KEY && later(ledger.keys[k])) kept.keys[k]=true;
+    else remove(k);
+  }
+  if(!kept.keys[BIKE_PROFILE_KEY]) remove(BIKE_FORMAT_KEY);   // the format mark guards a list; with no list there is nothing to guard
+  const left={app:'load-check',kind:'saved-at',v:1,keys:{},items:{}};
+  for(const k of Object.keys(kept.keys)) if(ledger.keys[k]) left.keys[k]=ledger.keys[k];
+  for(const k of SAVED_ITEM_KEYS){
+    const list=readLocalJson(k),ids=new Set(Array.isArray(list) ? list.map(x => x && x.id) : []);
+    left.items[k]=Object.fromEntries(Object.entries(ledger.items[k]).filter(([id]) => ids.has(id)));
+  }
+  try {
+    if(Object.keys(left.keys).length) window.localStorage.setItem(SAVED_AT_KEY,JSON.stringify(left)); else remove(SAVED_AT_KEY);
+    window.localStorage.setItem(DELETE_APPLIED_KEY,JSON.stringify({app:'load-check',kind:'delete-applied',v:1,id:request.id,at:new Date().toISOString()}));
+  } catch(e){}
+  remove(DELETING_KEY);
+  DELETE_SEEN=deleteMark();   // this tab's own delete
+  return true;
+}
+/* ---- Contract 2: a trip from Wayfinch (spec 7.1) ----
+   The co-pilot keeps a GPX in its own database and opens #copilot-handoff=<id>. After the draft is ready, a stored valid
+   copilot:handoff:v1 with that id, not answered yet, is read: only from a co-pilot database that exists, read-only, closed at
+   once. A bar offers Apply and Cancel. Apply takes an Undo snapshot, sets the trip's fields, then loads the GPX (no lookups: its
+   heights and names are its own) and keeps its route hash; bags, kit the rider chose, sizes, ticks, placements, the bike, tyre
+   data and setups stay. Either answer is written to loadcheck:handoff-done and the fragment goes. */
+const HANDOFF_KEY='copilot:handoff:v1',HANDOFF_DONE_KEY='loadcheck:handoff-done',HANDOFF_DB='copilot',HANDOFF_STORE='handoffs',CP_NS='urn:x-wayfinch:trip:1';
+const HANDOFF={id:null,gpx:null,trip:null,undo:null,busy:false};
+function handoffFragmentId(hash=location.hash){ const m=/^#copilot-handoff=([0-9a-f]{32})$/.exec(String(hash||'')); return m ? m[1] : null; }
+function dropHandoffFragment(){
+  if(!/^#copilot-handoff=/.test(String(location.hash||''))) return;
+  try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
+}
+function validHandoff(e){
+  return dataObject(e) && e.app === 'copilot' && e.kind === 'handoff' && e.v === 1 && typeof e.id === 'string' && /^[0-9a-f]{32}$/.test(e.id) &&
+    typeof e.createdAt === 'string' && Number.isFinite(Date.parse(e.createdAt)) ? e : null;
+}
+// Never opens a database that does not exist: it is looked up first, and an open that would make one is undone.
+async function readHandoffGpx(id){
+  const idb=window.indexedDB;
+  if(!idb || typeof idb.databases !== 'function') return null;
+  let names; try { names=(await idb.databases()).map(d => d && d.name); } catch(e){ return null; }
+  if(!names.includes(HANDOFF_DB)) return null;
+  return new Promise(resolve => {
+    let req; try { req=idb.open(HANDOFF_DB); } catch(e){ resolve(null); return; }
+    req.onupgradeneeded=() => { try { req.transaction.abort(); } catch(e){} };
+    req.onerror=() => resolve(null); req.onblocked=() => resolve(null);
+    req.onsuccess=() => {
+      const db=req.result; db.onversionchange=() => db.close();
+      try {
+        if(!db.objectStoreNames.contains(HANDOFF_STORE)){ db.close(); resolve(null); return; }
+        const get=db.transaction(HANDOFF_STORE,'readonly').objectStore(HANDOFF_STORE).get(id);
+        get.onsuccess=() => { db.close(); const r=get.result; resolve(r && typeof r === 'object' && typeof r.gpx === 'string' ? r.gpx : null); };
+        get.onerror=() => { db.close(); resolve(null); };
+      } catch(e){ db.close(); resolve(null); }
+    };
+  });
+}
+// The settings the rider set, from <cp:trip>; a newer major version, or none, sets nothing.
+function handoffTrip(text){
+  let doc; try { doc=new DOMParser().parseFromString(text,'application/xml'); } catch(e){ return {}; }
+  const el=doc && doc.getElementsByTagNameNS(CP_NS,'trip')[0];
+  if(!el || el.getAttribute('v') !== '1') return {};
+  const a=k => el.hasAttribute(k) ? el.getAttribute(k) : null, out={};
+  const nights=dataInteger(a('nights'),0,30); if(nights !== null){ out.nights=nights; if(a('nightsFrom') === 'suggested') out.nightsSuggested=true; }
+  const date=normaliseDepartureDate(a('departureDate')); if(date) out.departureDate=date;
+  const month=dataInteger(a('month'),1,12); if(month !== null) out.month=month-1;
+  if(['camp','mixed','indoor'].includes(a('sleep'))) out.sleep=a('sleep');
+  if(a('pace') && Object.hasOwn(PACE,a('pace'))) out.pace=a('pace');
+  const flat=dataNumber(a('flatKph'),15,40); if(flat !== null) out.flatKph=flat;
+  for(const k of ['startName','endName']){ const v=a(k); if(v && v.trim()) out[k]=v.trim().slice(0,160); }
+  if(/^[0-9a-f]{64}$/.test(a('route') || '')) out.route=a('route');
+  return out;
+}
+// Every field Apply will change, in words (re-check N1): the route always, then only what the trip carries.
+function handoffChanges(t){
+  const parts=['the route'];
+  if(t.departureDate) parts.push('the date');
+  else if(t.month !== undefined) parts.push('the month');
+  if(t.nights !== undefined) parts.push(`${t.nights === 1 ? '1 night' : t.nights+' nights'}${t.nightsSuggested ? ', as Wayfinch suggests for this route' : ''}`);
+  if(t.sleep) parts.push('the stay');
+  if(t.pace) parts.push('the pace');
+  if(t.flatKph !== undefined) parts.push('the flat speed');
+  return parts.length === 1 ? parts[0] : parts.slice(0,-1).join(', ')+' and '+parts[parts.length-1];
+}
+function writeHandoffDone(outcome){
+  if(deletedSinceLoad()) return;
+  const before=readLocalRaw(HANDOFF_DONE_KEY),value={app:'load-check',kind:'handoff-done',v:1,id:HANDOFF.id,outcome,at:new Date().toISOString()};
+  try { window.localStorage.setItem(HANDOFF_DONE_KEY,JSON.stringify(value)); stampSaved(HANDOFF_DONE_KEY,value,before); } catch(e){}
+}
+function showHandoffBar(text,{apply=false,undo=false}={}){
+  const bar=$('handoffBar'); if(!bar) return;
+  $('handoffText').textContent=text;
+  $('handoffApply').classList.toggle('hidden',!apply); $('handoffCancel').classList.toggle('hidden',!apply);
+  $('handoffApply').disabled=HANDOFF.busy;
+  $('handoffUndo').classList.toggle('hidden',!undo);
+  bar.classList.toggle('hidden',!text);
+  WEIGHT_PROMPT_BLOCKS.handoffBar=apply;
+}
+// True when a handoff waits for the rider's answer.
+async function receiveHandoff(){
+  const id=handoffFragmentId();
+  if(!id){ dropHandoffFragment(); return false; }
+  const envelope=validHandoff(readLocalJson(HANDOFF_KEY)),done=readLocalJson(HANDOFF_DONE_KEY);
+  if(!envelope || envelope.id !== id || dataObject(done) && done.id === id){ dropHandoffFragment(); return false; }
+  const gpx=await readHandoffGpx(id);
+  if(!gpx){ dropHandoffFragment(); return false; }
+  const parsed=parseGPX(gpx);
+  if(!parsed || parsed.error){ dropHandoffFragment(); return false; }
+  HANDOFF.id=id; HANDOFF.gpx=gpx; HANDOFF.trip=handoffTrip(gpx);
+  const name=parsed.name || 'your route';
+  showHandoffBar(`A trip from Wayfinch: ${name}. Apply it to this plan? It sets ${handoffChanges(HANDOFF.trip)}; your bags, kit and bike stay as they are.${parsed.hasElev ? '' : ' This route has no heights, so its days are split by distance.'}`,{apply:true});
+  return true;
+}
+async function applyHandoff(){
+  if(HANDOFF.busy || !HANDOFF.gpx || !DRAFT_READY) return false;
+  HANDOFF.busy=true; $('handoffApply').disabled=true; $('handoffText').textContent='Loading the route from Wayfinch…';
+  const undo=JSON.stringify(captureDraft());   // taken before anything changes: for a route that can't be read
+  const before=handoffFields();
+  const t=HANDOFF.trip || {};
+  if(t.departureDate){ S.departureDate=t.departureDate; S.month=+t.departureDate.slice(5,7)-1; }
+  else if(t.month !== undefined){ S.month=t.month; if(S.departureDate && +S.departureDate.slice(5,7)-1 !== S.month) S.departureDate=null; }
+  if(t.nights !== undefined){ S.nights=t.nights; S.nightsAuto=false; }
+  if(t.sleep) S.sleep=t.sleep;
+  if(t.pace) S.pace=t.pace;
+  if(t.flatKph !== undefined) S.flatKph=t.flatKph;
+  // then the route, so the climate is asked for the new month
+  const res=await loadGPX(HANDOFF.gpx,'Route from Wayfinch',null,{handoff:{start:t.startName || null,end:t.endName || null}});
+  if(!res || !res.ok){
+    restorePlan(JSON.parse(undo),true,false);
+    HANDOFF.busy=false;
+    showHandoffBar('The route from Wayfinch could not be read. Your plan is unchanged.',{apply:true});
+    return false;
+  }
+  if(t.route) S.gpx.copilotRoute=t.route;
+  applyTripKitDefaults();   // only kit defaults the rider never touched follow the new trip
+  $('month').value=S.month; $('nights').value=S.nights; syncDepartureDate();
+  $('sleepWrap').classList.toggle('hidden',S.nights === 0);
+  $('sleepChips').querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed',c.dataset.v === S.sleep));
+  syncGPXControl(); renderClimate(); renderBags(); renderKit(); if(S.step === 4) renderResult(); drawRig();
+  queueDraftSave();
+  HANDOFF.undo={before,after:handoffFields()}; HANDOFF.busy=false;
+  writeHandoffDone('applied'); dropHandoffFragment(); setWayfinchBack('/#/trip');
+  showHandoffBar('The route from Wayfinch is in this plan. Your bags, kit and bike are as they were.',{undo:true});
+  return true;
+}
+// What Apply sets: the trip's fields, and the route with what loadGPX made of it. Copies, so later changes don't reach them.
+const HANDOFF_TRIP_FIELDS=['departureDate','month','nights','sleep','pace','flatKph'];
+function handoffFields(){
+  currentPlan();   // settled, so the placements are the plan's
+  return JSON.parse(JSON.stringify({trip:Object.fromEntries(HANDOFF_TRIP_FIELDS.map(k => [k,S[k] === undefined ? null : S[k]])),
+    route:{gpx:S.gpx,place:S.place,place2:S.place2},placements:S.placements}));
+}
+// Undo takes back only what Apply changed (review of PR 43, I3): each trip field still at the value Apply set goes back; one the
+// rider has changed since keeps the rider's value; the route goes back if it is still the one from Wayfinch. Ticks, bags, kit and
+// the bike, and anything else done since, stay as they are.
+function undoHandoff(){
+  if(!HANDOFF.undo) return false;
+  const {before,after}=HANDOFF.undo,same=(a,b) => JSON.stringify(a) === JSON.stringify(b);
+  currentPlan();
+  const notPlacedSince=same(S.placements,after.placements);
+  for(const k of HANDOFF_TRIP_FIELDS) if(same(S[k] === undefined ? null : S[k],after.trip[k])) S[k]=before.trip[k];
+  if(same({gpx:S.gpx,place:S.place,place2:S.place2},after.route)){
+    cancelGPXLoad();
+    S.gpx=before.route.gpx; S.place=before.route.place; S.place2=before.route.place2;
+    if(!S.gpx && S.place && S.place2) ensureRoute(S.place,S.place2,S.month);
+  }
+  S.nightsAuto=false;
+  applyTripKitDefaults();   // untouched kit defaults follow the trip back
+  // where nothing was placed again since Apply, the plan's placements go back too; else the rider's stay
+  if(notPlacedSince) keepPlan({load:before.placements});
+  $('month').value=S.month; $('nights').value=S.nights; syncDepartureDate();
+  $('sleepWrap').classList.toggle('hidden',S.nights === 0);
+  $('sleepChips').querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed',c.dataset.v === S.sleep));
+  if(S.place) ensureClimate(S.place,S.month); if(S.place2) ensureClimate(S.place2,S.month);
+  syncGPXControl(); renderClimate(); renderBags(); renderKit(); if(S.step === 4) renderResult(); drawRig();
+  HANDOFF.undo=null; queueDraftSave();
+  showHandoffBar('Undone: the route and trip settings from Wayfinch are taken back. What you changed since stays.');
+  return true;
+}
+function cancelHandoff(){
+  if(!HANDOFF.id || HANDOFF.busy) return false;
+  writeHandoffDone('cancelled'); dropHandoffFragment(); showHandoffBar('');
+  HANDOFF.gpx=null;
+  return true;
+}
+$('handoffApply').onclick=() => { applyHandoff(); };
+$('handoffCancel').onclick=cancelHandoff;
+$('handoffUndo').onclick=undoHandoff;
+// Another bag-planner tab applied a request: this tab discards its plan in memory and never writes it back.
+function followDeleteElsewhere(event){
+  if(![DELETE_APPLIED_KEY,DELETING_KEY].includes(event.key) || !event.newValue || event.newValue === event.oldValue) return;
+  dropForDelete();
 }
 
 const DRAFT_KEY = 'loadcheck:draft';
@@ -10139,7 +10184,10 @@ function normaliseGPX(p){
     hadElev:p.hadElev === true,elevationSource,segments:dataInteger(p.segments,1,GPX_MAX_SEGMENTS,1+pts.filter(pt=>pt.break).length),
     missingCount:dataInteger(p.missingCount,0,10000000,0),terrainCount:dataInteger(p.terrainCount,0,100,0),
     interpolatedCount:dataInteger(p.interpolatedCount,0,10000000,0),unavailableCount:dataInteger(p.unavailableCount,0,10000000,0),
-    elevationNote:dataText(p.elevationNote,500),high};
+    elevationNote:dataText(p.elevationNote,500),high,
+    // Contract 2's hook (spec 7.1 item 12): the co-pilot's route hash, kept with the route it came with. Any other route change
+    // makes a new record without it. The handoff that sets it is not built yet.
+    ...(typeof p.copilotRoute === 'string' && /^[0-9a-f]{64}$/.test(p.copilotRoute) ? {copilotRoute:p.copilotRoute} : {})};
 }
 function normaliseRouteSnapshot(p, from, to){
   if(!dataObject(p) || !from || !to || !dataObject(p.from) || !dataObject(p.to))return null;
@@ -10484,7 +10532,7 @@ function saveDraftInBrowser(value){
 }
 function persistDraft(serial){
   DRAFT_LATEST_SERIAL=serial;
-  if(DRAFT_FROZEN) return DRAFT_WRITES;
+  if(DRAFT_FROZEN || deletedSinceLoad()) return DRAFT_WRITES;
   // Nothing unsaved: a hidden or closing tab writes nothing, and instead notices a newer draft.
   if(serial === DRAFT_SIGNATURE && DRAFT_SAVE_STATUS.state === 'saved' && !DRAFT_PENDING_SERIAL){
     if(!window.storage){ const other=foreignDraft(); if(other) handleForeignDraft(other); }
@@ -10585,7 +10633,7 @@ function handleForeignDraft(other){
   showTabNotice('This plan was changed in another tab. Your last change here was not saved.',true);
 }
 function checkOtherTabs(){
-  if(!DRAFT_READY) return;
+  if(!DRAFT_READY || deletedSinceLoad()) return;
   if(window.storage){ foreignDraftAccount().then(other => { if(other) handleForeignDraft(other); }); return; }
   const other=foreignDraft(); if(other) handleForeignDraft(other);
 }
@@ -10607,6 +10655,8 @@ function mergeOtherTabsSetups(list){
 }
 function followOtherTabs(event){
   try { if(event.storageArea && event.storageArea !== window.localStorage) return; } catch(e){ return; }
+  if(event.key === DELETE_APPLIED_KEY || event.key === DELETING_KEY){ followDeleteElsewhere(event); return; }
+  if(DELETED_ELSEWHERE) return;
   const key=event.key,all=key === null;
   if(all || key === DRAFT_KEY) checkOtherTabs();
   if(all || key === SETUP_KEY){
@@ -10654,6 +10704,7 @@ $('draftNew').onclick = async () => {
     return;
   }
   const cleared=await store.set(DRAFT_KEY, null);
+  if(cleared){ try { window.localStorage.setItem(SUMMARY_KEY,JSON.stringify({app:'load-check',kind:'load-summary',v:1,at:new Date().toISOString(),empty:true})); } catch(e){} }
   if(!cleared){
     DRAFT_READY=true;
     setDraftSaveStatus('failed','memory',JSON.stringify(captureDraft()));
@@ -10925,26 +10976,7 @@ function setupComparisonRows(a,b){
   add('Bike · frame style',frameValue(a,q=>q.fit && q.fit.style!=='unknown' ? FIT_STYLE_NAMES[q.fit.style] : ''),frameValue(b,q=>q.fit && q.fit.style!=='unknown' ? FIT_STYLE_NAMES[q.fit.style] : ''));
   add('Bike · frame size',frameValue(a,bikeSizeLabel),frameValue(b,bikeSizeLabel));
   add('Bike · maximum weight',frameValue(a,q=>maxWeightLabel(q.maxWeight)),frameValue(b,q=>maxWeightLabel(q.maxWeight)));
-  const pressureHardware=s=>new Map(pressureBikeRows(normaliseBikeProfile(s.bikeProfile)?.pressure));
-  const ha=pressureHardware(a),hb=pressureHardware(b);
-  for(const label of new Set([...ha.keys(),...hb.keys()]))add('Bike · '+label,ha.get(label)||'Not set',hb.get(label)||'Not set');
-  const pa=normaliseTyrePressure(a.tyrePressure),pb=normaliseTyrePressure(b.tyrePressure);
-  const pressureLabel={method:{estimate:'Estimated from selected kit',weighed:'Entered total bike weight'},
-    ride:{gravel:'Gravel',road:'Road',cyclocross:'Cyclocross',xc:'Cross country',trail:'Trail',enduro:'Enduro',downhill:'Downhill',fatbike:'Fat bike'},
-    surface:{dry:'Dry',wet:'Wet'},unit:{bar:'bar',psi:'psi'}};
-  for(const [key,label,unit] of [['riderKg','Rider weight',' kg'],['bagKg','Empty luggage and fittings',' kg'],['extraKg','Additional unlisted load',' kg'],
-    ['waterL','Bottle water',' L'],['bodyLoadKg','Selected load carried on rider',' kg'],['method','Weight method',''],
-    ['loadedBikeKg','Entered total bike weight',' kg'],['ride','Riding type',''],['surface','Conditions',''],['unit','Display unit','']]){
-    const value=p=>p[key]===null ? (key==='waterL'?'Full bottle capacities':'Not set') : pressureLabel[key]?.[p[key]] || p[key]+unit;
-    add('Tyre pressure · '+label,value(pa),value(pb));
-  }
-  const recorded=(p,key)=>p.record ? key==='source' ? 'SRAM AXS' : ['frontBar','rearBar'].includes(key) ? p.record[key]+' bar' : p.record[key] : 'No result recorded';
-  for(const [key,label] of [['frontBar','Recorded front'],['rearBar','Recorded rear'],['recordedAt','Recorded at'],['source','Result source']])
-    add('Tyre pressure · '+label,recorded(pa,key),recorded(pb,key));
-  add('Tyre pressure · Recorded calculator context',pa.record ? pressureRecordedContextSummary(pa.record) : 'No result recorded',
-    pb.record ? pressureRecordedContextSummary(pb.record) : 'No result recorded');
-  if(pa.record && pb.record && pa.record.inputKey!==pb.record.inputKey)
-    add('Tyre pressure · Calculator inputs used','Recorded with first result','Different inputs recorded with second result');
+  add('Bike · weight without luggage',frameValue(a,q=>q.pressure.bikeKg===null ? '' : +q.pressure.bikeKg.toFixed(2)+' kg'),frameValue(b,q=>q.pressure.bikeKg===null ? '' : +q.pressure.bikeKg.toFixed(2)+' kg'));
   const track=s => s.gpx ? (s.gpx.name || s.gpx.file || 'Track')+' · '+s.gpx.km+' km · '+
     (s.gpx.ascent == null ? 'climbing unavailable' : s.gpx.ascent+' m ascent') : 'None';
   add('GPX track',track(a),track(b));
@@ -11453,6 +11485,7 @@ function disposeRouteMap(){
   const state=ROUTE_MAP_STATE;closeRouteMap('');
   state.profile=null;state.key='';state.geometry=null;state.host=null;state.selected=null;
 }
+// Leaflet 1.9.4 from this site (spec 7.1 item 7), the npm registry's published files, checked against these same hashes.
 function loadRouteMapLeaflet(){
   if(ROUTE_MAP_LEAFLET_PROMISE)return ROUTE_MAP_LEAFLET_PROMISE;
   const load=(tag,url,integrity,id)=>new Promise((resolve,reject)=>{
@@ -11461,8 +11494,8 @@ function loadRouteMapLeaflet(){
     let settled=false;const finish=(ok)=>{if(settled)return;settled=true;clearTimeout(timer);node.onload=null;node.onerror=null;if(!ok)node.remove();ok?resolve():reject(new Error('Map library unavailable'));};
     const timer=setTimeout(()=>finish(false),15000);node.onload=()=>finish(true);node.onerror=()=>finish(false);document.head.appendChild(node);
   });
-  const css=ROUTE_MAP_CSS_READY ? Promise.resolve() : load('link','https://unpkg.com/leaflet@1.9.4/dist/leaflet.css','sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=','routeMapLeafletCss').then(()=>{ROUTE_MAP_CSS_READY=true;});
-  const js=window.L?.version === '1.9.4' ? Promise.resolve() : load('script','https://unpkg.com/leaflet@1.9.4/dist/leaflet.js','sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=','routeMapLeafletJs');
+  const css=ROUTE_MAP_CSS_READY ? Promise.resolve() : load('link','/vendor/leaflet-1.9.4/leaflet.css','sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=','routeMapLeafletCss').then(()=>{ROUTE_MAP_CSS_READY=true;});
+  const js=window.L?.version === '1.9.4' ? Promise.resolve() : load('script','/vendor/leaflet-1.9.4/leaflet.js','sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=','routeMapLeafletJs');
   ROUTE_MAP_LEAFLET_PROMISE=Promise.allSettled([css,js]).then(results=>{
     const failure=results.find(result=>result.status === 'rejected');if(failure)throw failure.reason;
     if(window.L?.version !== '1.9.4')throw new Error('Map library unavailable');return window.L;
@@ -11578,15 +11611,14 @@ const WALKTHROUGH_CARDS=[
    tip:'Start with the list you need. You can adjust individual sizes later; you do not need to measure every item to run the check.'},
   {label:'Check',title:'Review the result, then pack',
    copy:'Start with Fix these first. Review missing gear, anything that does not fit and the weather notes. Open a bag to see its contents. Expand Packing checklist to tick items as they go in; its summary shows your progress.\n\nSave a named plan if you want to reuse it on another trip. Press an encircled i beside a result to read how it was estimated.',
-   optional:['Print the checklist, or choose Make available offline while connected and wait for Ready on this device.',
-     'Open Tyre pressure from the header whenever you need it. Its weights, tyre and rim details are together in one place.'],
+   optional:['Print the checklist, or choose Make available offline while connected and wait for Ready on this device.'],
    tip:'The result is a packing estimate. Check the suggested arrangement with your actual bags and gear before setting off.'}
 ];
 let WALKTHROUGH_INDEX=0,WALKTHROUGH_SEEN=false;
 try{WALKTHROUGH_SEEN=['dismissed','done'].includes(window.localStorage.getItem(WALKTHROUGH_KEY));}catch(error){}
 function rememberWalkthrough(done=false){
   WALKTHROUGH_SEEN=true;
-  try{window.localStorage.setItem(WALKTHROUGH_KEY,done?'done':'dismissed');}catch(error){}
+  try{if(deletedSinceLoad())return;const before=readLocalRaw(WALKTHROUGH_KEY),value=done?'done':'dismissed';window.localStorage.setItem(WALKTHROUGH_KEY,value);stampKey(WALKTHROUGH_KEY,value,before);}catch(error){}
   $('walkthroughInvite').classList.add('hidden');
 }
 function renderWalkthrough(){
@@ -11612,7 +11644,6 @@ function showWalkthroughCard(index){
 }
 function openWalkthrough(){
   const root=$('walkthroughBox');if(!root.classList.contains('hidden'))return;
-  closePressureTool();
   const active=document.activeElement,returnFocus=$('walkthroughInvite').contains(active)?$('walkthroughOpen'):active;
   closeBagPop();
   if(!$('legalBox').classList.contains('hidden'))closeLegal();
@@ -11632,15 +11663,15 @@ $('walkthroughStart').onclick=openWalkthrough;
 $('walkthroughSkip').onclick=()=>{rememberWalkthrough();$('walkthroughOpen').focus({preventScroll:true});};
 
 /* ==== 89-offline-packing.js ==== */
-// The worker caches the public app. The existing draft keeps the plan and ticks.
-// Preparing or reopening offline never sends feedback or calls external APIs here.
+// The site's one worker (/offline-worker.js, scope /, spec 7.1 item 6) keeps the whole of Wayfinch, this page with it. The
+// existing draft keeps the plan and ticks. Preparing or reopening offline never sends feedback or calls external APIs here.
 const OFFLINE_PACKING={busy:false,checked:false,cacheReady:false,error:'',probe:0};
 function offlinePackingURLs(){
-  const base=new URL('./',location.href);
-  return {base,worker:new URL('offline-worker.js',base)};
+  const base=new URL('/',location.href);
+  return {base,worker:new URL('/offline-worker.js',base)};
 }
 function offlinePackingSupported(){
-  return location.protocol==='https:' && 'serviceWorker' in navigator &&
+  return (location.protocol==='https:' || window.isSecureContext===true) && 'serviceWorker' in navigator &&
     'caches' in window && typeof MessageChannel!=='undefined';
 }
 function ownOfflineRegistration(registration){
@@ -11696,28 +11727,28 @@ function renderOfflinePackingStatus(){
   const planSaved=offlineCurrentPlanSaved(),ready=OFFLINE_PACKING.cacheReady && planSaved && !OFFLINE_PACKING.error;
   let message;
   if(!DRAFT_READY)message='Loading your saved plan…';
-  else if(!supported)message='Offline app saving is available in Android Chrome at the published HTTPS address. You can still print or save a PDF here.';
-  else if(OFFLINE_PACKING.busy)message='Saving the app and your current plan on this device…';
+  else if(!supported)message='This browser can’t keep Wayfinch offline here. You can still print or save a PDF.';
+  else if(OFFLINE_PACKING.busy)message='Saving Wayfinch and your current plan on this device…';
   else if(OFFLINE_PACKING.error)message=OFFLINE_PACKING.error;
   else if(DRAFT_SAVE_STATUS.state==='failed')message='The app cannot keep your plan and ticks on this device right now. Export your plan or print a PDF, then try saving again.';
   else if(ready)message=online
-    ?'Ready on this device. Reopen this page in the same Chrome browser without internet.'
+    ?'Ready on this device. Wayfinch and this bag planner open without internet in this browser.'
     :'Offline. Your saved packing checklist and ticks work on this device.';
-  else if(OFFLINE_PACKING.cacheReady)message='The app is saved offline. Your current plan still needs to finish saving in this browser.';
-  else if(!online)message='Connect to the internet first to save the app for offline use. Your current checklist is still available while this page is open.';
-  else if(!OFFLINE_PACKING.checked)message='Checking whether the app is already saved on this device…';
-  else message='While online, save the app and your current plan here before you leave.';
+  else if(OFFLINE_PACKING.cacheReady)message='Wayfinch is saved offline. Your current plan still needs to finish saving in this browser.';
+  else if(!online)message='Connect to the internet first to save Wayfinch for offline use. Your current checklist is still available while this page is open.';
+  else if(!OFFLINE_PACKING.checked)message='Checking whether Wayfinch is already saved on this device…';
+  else message='While online, save Wayfinch and your current plan here before you leave.';
   panel.className='packing-offline'+(ready?' ready':'');
   panel.innerHTML=`<h4>Use on your phone offline</h4><p role="status" aria-live="polite">${htmlEsc(message)}</p>
     ${supported?`<button class="kitact" type="button" id="offlinePrepare"${!DRAFT_READY || OFFLINE_PACKING.busy || !online?' disabled':''}>${OFFLINE_PACKING.busy?'Saving…':OFFLINE_PACKING.cacheReady?'Refresh offline copy':'Make available offline'}</button>`:''}
-    <p class="offline-detail">${OFFLINE_PACKING.cacheReady?'Bookmark this page or use Chrome’s menu to add a home-screen shortcut. ':''}New place searches, live weather and street-map backgrounds need internet. The saved route outline and elevation chart remain available.</p>
+    <p class="offline-detail">${OFFLINE_PACKING.cacheReady?'One copy serves all of Wayfinch: the bag planner, the tyre tool and your trip. ':''}New place searches, live weather and street-map backgrounds need internet. The saved route outline and elevation chart remain available.</p>
     <p class="offline-detail">Saved on this device. Clearing this site’s browser data removes the offline app, plans and ticks. A printed list or saved PDF is another copy to keep.</p>`;
   const button=$('offlinePrepare');if(button)button.onclick=prepareOfflinePacking;
   restoreFocus(panel,focus);
 }
 async function inspectOfflinePacking(){
   if(OFFLINE_PACKING.busy)return;
-  const probe=++OFFLINE_PACKING.probe;let cached=false;
+  const probe=++OFFLINE_PACKING.probe;let cached=false,coming=null;
   if(!offlinePackingSupported()){OFFLINE_PACKING.checked=true;renderOfflinePackingStatus();return;}
   try{
     const registration=await offlineWithTimeout(navigator.serviceWorker.getRegistration(offlinePackingURLs().base.href),5000);
@@ -11725,10 +11756,18 @@ async function inspectOfflinePacking(){
       const info=await offlineWorkerMessage(registration.active,'LOADCHECK_OFFLINE_INFO');
       cached=info.cached===true;
     }
+    // A copy on its way (Wayfinch has just put the site's worker back): looked at again once it is active, and not yet "gone".
+    else if(ownOfflineRegistration(registration)) coming=registration.installing || registration.waiting;
   }catch(error){}
   if(probe!==OFFLINE_PACKING.probe || OFFLINE_PACKING.busy)return;
   OFFLINE_PACKING.cacheReady=cached;
-  OFFLINE_PACKING.checked=true;renderOfflinePackingStatus();
+  if(coming){
+    const again=()=>{ if(coming.state==='activated' || coming.state==='redundant'){ coming.removeEventListener('statechange',again); inspectOfflinePacking(); } };
+    coming.addEventListener('statechange',again);
+    renderOfflinePackingStatus();
+    return;
+  }
+  OFFLINE_PACKING.checked=true;renderOfflinePackingStatus();followOfflineCopy();
 }
 async function prepareOfflinePacking(){
   if(!DRAFT_READY || OFFLINE_PACKING.busy || !offlinePackingSupported())return;
@@ -11750,9 +11789,43 @@ async function prepareOfflinePacking(){
   }catch(error){
     OFFLINE_PACKING.error=error?.message?.startsWith('Your current plan') || error?.message?.startsWith('The app is saved, but')
       ?error.message:'Offline setup could not finish. Connect and try again; you can print or save a PDF.';
-  }finally{OFFLINE_PACKING.busy=false;renderOfflinePackingStatus();}
+  }finally{OFFLINE_PACKING.busy=false;renderOfflinePackingStatus();followOfflineCopy();}
 }
-function initialiseOfflinePacking(){inspectOfflinePacking();initialiseUpdatePrompt();}
+/* ---- The offline copy came back? (Decision 9, owner's ruling A of 3 November) ----
+   The emergency switch removes the offline copy, and a later good deploy does not bring it back: only a tap does. Once this
+   page has seen its copy ready on this device, it keeps a mark; when a later look finds the copy gone, one short line asks
+   the rider to tap Make available offline again. Gone once dismissed (the mark goes) or once the copy is back. */
+const OFFLINE_HAD_KEY='loadcheck:offline-had';
+const OFFLINE_AGAIN={had:false,shown:false};
+async function readOfflineHad(){
+  const v=await store.get(OFFLINE_HAD_KEY);
+  OFFLINE_AGAIN.had=dataObject(v) && v.app === 'load-check' && v.kind === 'offline-had' && v.v === 1;
+}
+function showOfflineAgain(show){
+  OFFLINE_AGAIN.shown=show;
+  const bar=$('offlineAgainBar');if(!bar)return;
+  bar.classList.toggle('hidden',!show);
+  const button=$('offlineAgainSave');if(button)button.disabled=!show || OFFLINE_PACKING.busy || navigator.onLine===false;
+}
+function followOfflineCopy(){
+  if(!DRAFT_READY || OFFLINE_PACKING.busy || !OFFLINE_PACKING.checked)return;
+  if(OFFLINE_PACKING.cacheReady){
+    showOfflineAgain(false);
+    if(!OFFLINE_AGAIN.had){OFFLINE_AGAIN.had=true;store.set(OFFLINE_HAD_KEY,{app:'load-check',kind:'offline-had',v:1});}
+    return;
+  }
+  showOfflineAgain(OFFLINE_AGAIN.had && offlinePackingSupported());
+}
+function dismissOfflineAgain(){
+  OFFLINE_AGAIN.had=false;showOfflineAgain(false);
+  store.set(OFFLINE_HAD_KEY,null);
+}
+async function initialiseOfflinePacking(){
+  await readOfflineHad();
+  $('offlineAgainSave').onclick=()=>{prepareOfflinePacking();};
+  $('offlineAgainLater').onclick=dismissOfflineAgain;
+  inspectOfflinePacking();initialiseUpdatePrompt();
+}
 window.addEventListener('online',()=>{OFFLINE_PACKING.error='';if(!OFFLINE_PACKING.busy)inspectOfflinePacking();});
 window.addEventListener('offline',()=>{OFFLINE_PACKING.error='';if(!OFFLINE_PACKING.busy)inspectOfflinePacking();renderOfflinePackingStatus();});
 
@@ -12104,7 +12177,7 @@ function go(n){
 /* ================= INIT ================= */
 initialiseStableViewport();
 initialiseBikeProfiles();
-initialisePressureHelper();
+initialiseBikeDetails();
 initialiseLook();
 S.month = new Date().getMonth();   // a new plan starts in the month the rider is in, not always in June
 $('month').innerHTML = MONTHS.map((m,i) => `<option value="${i}"${i===S.month?' selected':''}>${m}</option>`).join('');
@@ -12256,6 +12329,9 @@ window.routeCheck = () => {
 window.applyCalibration = applyCalibration;
 
 (async () => {
+  // Contract 3: a stored delete request is applied before anything is read, so the draft is never restored first.
+  if(applyDeleteRequest()){ WALKTHROUGH_SEEN=false; MAX_WEIGHT_SKIPPED=false; }
+  clearStoredRiderWeight();
   const savedSetups=await store.get(SETUP_KEY),savedReports=await store.get(FEEDBACK_KEY);
   SETUPS=Array.isArray(savedSetups) ? savedSetups.map(normaliseSetup).filter(Boolean) : [];
   SETUPS.forEach(x => SETUPS_SEEN.add(x.id));
@@ -12278,13 +12354,14 @@ window.applyCalibration = applyCalibration;
   } else if(S.step === 4) renderResult();
   DRAFT_SIGNATURE = JSON.stringify(captureDraft());
   DRAFT_READY = true;
+  writeLoadSummary(true);
   renderBikeProfiles(true);
-  renderPressureHelper(true);
   initialiseDraftSaveStatus();
   renderPackingChecklist();
   initialiseOfflinePacking();
   initialiseWalkthrough(recovered || SETUPS.length>0);
   openBikeDetailsFromLink();
+  receiveHandoff();
 })();
 
 applyTheme(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
@@ -12410,8 +12487,8 @@ function legalHTML(){
   <h3>Speicherung in deinem Browser</h3>
   <p>Die App speichert lokal (<code>localStorage</code>, keine Cookies, keine Übertragung):
      deinen aktuellen Plan, wiederverwendbare Fahrradprofile mit deinen Reifen-, Bremsen- und Antriebsangaben,
-     das zuletzt verwendete Fahrradprofil, Reifendruck-Helfereingaben (Gewichte, Reifen- und Felgendetails, Fahrstil)
-     und von dir eingetragene SRAM-Druckvorschläge, gespeicherte Setups samt deiner Notizen und einem Bild des Fahrraddiagramms, deine Antworten auf
+     das zuletzt verwendete Fahrradprofil, früher im Reifendruck-Helfer eingetragene Reifen- und Felgenangaben ohne
+     dein Körpergewicht (es wird gelöscht), gespeicherte Setups samt deiner Notizen und einem Bild des Fahrraddiagramms, deine Antworten auf
      die Rückmeldefragen, zuletzt gesuchte Orte, zwischengespeicherte Wetterwerte, eine hochgeladene
      aufbereitete GPX-Strecke, eine berechnete Strecke, deine Hell/Dunkel-Wahl und ob du die Kurzanleitung
      geschlossen hast. Die gespeicherte Strecke enthält ausgewählte
@@ -12419,10 +12496,8 @@ function legalHTML(){
      nicht gespeichert. Exportierte JSON-Dateien enthalten den aktuellen Plan, gespeicherte Setups
      und Rückmeldungen einschließlich der gespeicherten Streckendaten und Fahrradprofile. Fahrradprofile enthalten
      die von dir eingetragenen Komponenten- und Ersatzteilreferenzen und Notizen; sie werden nicht an
-     Ortssuche, Wetter- oder Rückmeldungsdienste gesendet. Der Reifendruck-Helfer überträgt keine Gewichte oder
-     Fahrradangaben an SRAM. „Open SRAM calculator“ öffnet die externe SRAM-Seite; dort gelten die
-     Datenschutzregeln von SRAM und du gibst die vorbereiteten Werte selbst ein. Gespeicherte Druckvorschläge
-     und zugehörige Eingaben sind Teil deines Exports. Du entscheidest, mit wem du
+     Ortssuche, Wetter- oder Rückmeldungsdienste gesendet. Früher gespeicherte Reifen- und Felgenangaben
+     bleiben ohne Anzeige Teil deines Plans und Exports, damit ein Speichern sie nicht verliert. Du entscheidest, mit wem du
      diese Datei teilst. Über die Einstellungen deines Browsers löschbar. Da die
      Speicherung für die von dir gewünschte Funktion erforderlich ist, ist sie nach § 25 Abs. 2 Nr. 2
      TDDDG einwilligungsfrei.</p>
@@ -12455,9 +12530,7 @@ function legalHTML(){
       <a href="https://wiki.osmfoundation.org/wiki/Privacy_Policy" target="_blank" rel="noopener">Datenschutz</a></li>
     <li><b>BRouter, Valhalla, OSRM</b> — nur als Ausweichlösung, wenn der bevorzugte Dienst nicht
       antwortet oder seine Antwort keine brauchbaren Höhen enthält; sie erhalten dieselben Koordinaten.</li>
-    <li><b>unpkg</b> — liefert die Leaflet-Kartenbibliothek erst, wenn du „Open street map“ auswählst.
-      Der Dienst erhält dabei deine IP-Adresse und die technisch übermittelte Herkunftsseite.</li>
-    <li><b>OpenStreetMap-Kartenkacheln</b> (OpenStreetMap Foundation, UK) — werden ebenfalls erst durch
+    <li><b>OpenStreetMap-Kartenkacheln</b> (OpenStreetMap Foundation, UK) — werden erst durch
       „Open street map“ geladen. Der Anbieter sieht deine IP-Adresse, die Herkunftsseite und die
       angefragten Kartenausschnitte. Die GPX-Datei wird nicht an ihn gesendet.
       <a href="https://wiki.osmfoundation.org/wiki/Privacy_Policy" target="_blank" rel="noopener">Datenschutz</a></li>
@@ -12522,9 +12595,9 @@ function legalHTML(){
      are missing, up to 100 sampled track coordinates are sent to Open-Meteo for elevation lookup.
      The processed track is saved locally and included in JSON exports. Near-term forecasts request up to
      16 days for the selected coordinates and elevations; your date is used locally to choose the displayed days.
-     The route outline and elevation chart are drawn locally. Only pressing Open street map loads Leaflet
-     from unpkg and street-map tiles from OpenStreetMap. Those services see your IP address and referrer;
-     the tile provider also sees the viewed map areas. Your GPX file is not sent to them. Tiles use the
+     The route outline and elevation chart are drawn locally. Only pressing Open street map loads
+     street-map tiles from OpenStreetMap; the map library comes from this site. The tile provider sees your
+     IP address, the referrer and the viewed map areas. Your GPX file is not sent to them. Tiles use the
      normal browser cache and are not downloaded in bulk for offline use.
      Make available offline saves the public app document in this browser using a service worker;
      it does not upload your plan or packed checks. Reusable bike profiles, their component/spare-part
@@ -12543,7 +12616,6 @@ function legalHTML(){
 }
 
 function openLegal(){
-  closePressureTool();
   closeBagPop();
   const box = document.getElementById('legalBox');
   const returnFocus=document.activeElement;

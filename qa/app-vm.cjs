@@ -20,7 +20,7 @@ function appVM(options={}){
   const notify=(key,oldValue,newValue)=>{
     store.vms.forEach(other=>{if(other!==self)other.fireStorage(key,oldValue,newValue);});
   };
-  const localStorage={getItem:key=>values.get(key)??null,
+  const localStorage={getItem:key=>values.get(key)??null,get length(){return values.size;},key:i=>[...values.keys()][i]??null,
     setItem(key,value){const old=values.get(key)??null;values.set(key,String(value));notify(key,old,String(value));},
     removeItem(key){const old=values.get(key)??null;values.delete(key);notify(key,old,null);}};
   const on=(type,callback)=>{events.set(type,callback);(listeners[type]=listeners[type]||[]).push(callback);};

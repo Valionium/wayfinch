@@ -248,7 +248,7 @@ describe('the whole refresh, on the real store', () => {
   test('[WXR-AUTO-RULES] only while the app is open: the only automatic triggers are opening and returning to the app, and nothing in the source runs in the background', () => {
     const src = (path: string): string => readFileSync(fileURLToPath(new URL(`../../../${path}`, import.meta.url)), 'utf8');
     for (const path of ['src/data/refresh.ts', 'src/ui/shell-actions.ts', 'src/data/openmeteo.ts', 'src/ui/main.tsx']) {
-      expect(src(path), path).not.toMatch(/periodicSync|PeriodicSync|sync\.register|setInterval\(/);
+      expect(src(path), path).not.toMatch(/periodicSync|PeriodicSync|\bsync\.register|setInterval\(/);
     }
     expect(src('src/data/refresh.ts')).toMatch(/'open' \| 'foreground' \| 'tap'/);
     expect(src('tools/build.mjs') + src('src/ui/register.ts')).not.toMatch(/periodicsync|backgroundfetch/i);

@@ -43,4 +43,22 @@ check((nodes.get('departureDateHint').innerHTML.match(/class="info-button"/g)||[
 check(/for="departureDate"/.test(markup)&&/id="departureDate" aria-describedby="departureDateHint"/.test(markup),'date label and short description retain their input associations');
 run('S.departureDate="invalid";syncDepartureDate()');
 check(run('S.departureDate')===null&&visible(nodes.get('departureDateHint').innerHTML).startsWith('Leave blank to plan by month.'),'invalid restored date uses the concise blank-date prompt and retains help');
+// Moved here from the retired ui-pressure-layout suite (sub-project 6, Task 6), which also guarded these: links to outside sources
+// keep a theme-aware colour, an underline, and 4.5:1 contrast in both themes; the white Leaflet attribution bar keeps its dark blue.
+{
+  const flat=css.replace(/\/\*[\s\S]*?\*\//g,''),rules=[];
+  for(const m of flat.matchAll(/([^{}]+)\{([^{}]*)\}/g)){
+    const d={};for(const part of m[2].split(';')){const c=part.indexOf(':');if(c>0)d[part.slice(0,c).trim()]=part.slice(c+1).trim();}
+    for(const sel of m[1].trim().split(','))rules.push({sel:sel.trim(),d});
+  }
+  const ruleOf=sel=>Object.assign({},...rules.filter(r=>r.sel===sel).map(r=>r.d));
+  for(const sel of ['.route-map-outline-note a','.route-map-outline-note a:visited','.findnote a','.findnote a:visited']){
+    check(ruleOf(sel).color==='var(--sage)','external attribution link has theme-aware contrast: '+sel);
+    check(ruleOf(sel)['text-decoration']==='underline','link remains identifiable without relying on colour: '+sel);
+  }
+  check(ruleOf('.route-map-block .leaflet-control-attribution a').color==='#1e4e80','white Leaflet attribution bar retains its contrasting dark blue link');
+  const lum=hex=>{const c=hex.slice(1).match(/../g).map(x=>parseInt(x,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return .2126*c[0]+.7152*c[1]+.0722*c[2];};
+  const contrast=(a,b)=>{const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+  for(const palette of [ruleOf(':root'),ruleOf(':root[data-theme="light"]')])check(contrast(palette['--sage'],palette['--panel'])>=4.5,'attribution link colours clear 4.5:1 in both themes');
+}
 console.log(JSON.stringify({suite:'info-layout-regression',checks,scope:'source/markup checks; no local browser rendering'}));

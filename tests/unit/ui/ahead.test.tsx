@@ -245,7 +245,7 @@ describe('the strip', () => {
     expect(bands.map((b) => b.dataset.kind)).toEqual(kinds);
     for (const b of bands) {
       expect(b.getAttribute('aria-label')).toMatch(/^(Rain likely|Rain possible|Thunderstorm)( at your stop)?, km [\d.]+(–[\d.]+)?$/);
-      expect(b.getAttribute('aria-label')).not.toMatch(/km ([\d.]+)–$/);
+      expect(b.getAttribute('aria-label')).not.toMatch(/km ([\d.]+)–\1$/);
       expect(b.classList.contains(`ah-band-${b.dataset.kind}`)).toBe(true);
       expect(b.querySelector('svg.ah-bolt') !== null).toBe(b.dataset.kind === 'thunder');
     }

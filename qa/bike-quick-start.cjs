@@ -5,7 +5,7 @@ const {appVM}=require('./app-vm.cjs');
 const app=appVM();let checks=0;const check=(v,m)=>{assert.ok(v,m);checks++;};
 const html=app.html;
 const J=code=>JSON.parse(app.run(`JSON.stringify(${code})`)??'null');
-const dlg=html.slice(html.indexOf('id="bikeDetailsBox"'),html.indexOf('id="pressureToolBox"'));
+const dlg=html.slice(html.indexOf('id="bikeDetailsBox"'),html.indexOf('id="maxWeightBox"'));
 const at=s=>dlg.indexOf(s);
 
 // [BK-UI-07] the dialog opens on the frame pictures and the size row; everything else is under a closed "More details (optional)".
@@ -15,7 +15,7 @@ const at=s=>dlg.indexOf(s);
   check(at('id="fitStyleChoices"')>quick&&at('id="fitStyleChoices"')<more,'BK-UI-07 frame pictures are in the quick block');
   check(at('id="fitSizeChips"')>quick&&at('id="fitSizeChips"')<more&&at('id="fitQuickResult"')>quick&&at('id="fitQuickResult"')<more,'BK-UI-07 size row and result are in the quick block');
   check(/<details[^>]*id="bikeMoreDetails"(?![^>]*\sopen)[^>]*>\s*<summary>More details \(optional\)<\/summary>/.test(dlg),'BK-UI-07 More details is closed by default');
-  for(const id of ['fitBoltSt','fitBoltDt','fitBoltUn','fitTopTube','fitMeasureBox','fitMaxWeight','bikeRepairFields','bikeLibraryPanel','pressureApplyBike','bikeBaseKg'])
+  for(const id of ['fitBoltSt','fitBoltDt','fitBoltUn','fitTopTube','fitMeasureBox','fitMaxWeight','bikeRepairFields','bikeLibraryPanel','bikeApply','bikeBaseKg'])
     check(at('id="'+id+'"')>more,'BK-UI-07 '+id+' sits under More details');
   check(app.run(`FIT_STYLES.length>=8`)&&app.run(`['XS','S','M','L','XL'].every(l=>fitSizeChipLetters().includes(l))`),'BK-UI-07 sizes XS to XL');
 }
@@ -23,7 +23,7 @@ const at=s=>dlg.indexOf(s);
 {
   app.run(`fillFitFields(null);quickPickStyle('unknown');`);
   check(/Pick/.test(app.run(`fitQuickResultText()`)),'BK-UI-08 nothing chosen: an invitation, no numbers');
-  app.run(`applyPressureBikeDetails=async()=>true;quickPickStyle('diamond-level');quickPickSize('M');`);
+  app.run(`applyBikeDetails=async()=>true;quickPickStyle('diamond-level');quickPickSize('M');`);
   const a=app.run(`fitQuickResultText()`);
   check(/frame bag/i.test(a)&&/about 6 L/.test(a)&&/estimate/i.test(a)&&/bottle/i.test(a)&&/top-tube/i.test(a),'BK-UI-08 diamond M: frame bag, bottles, top tube, marked as estimates: '+a);
   app.run(`quickPickSize('XS');`);
@@ -50,7 +50,7 @@ const at=s=>dlg.indexOf(s);
   app.run(`fillFitFields(null)`);
   check(app.run(`fitFieldsIssue()`)===''&&app.run(`fitQuickState().style`)==='unknown'&&app.run(`fitQuickState().size`)==='','BK-UI-10 an empty form is valid and asks for nothing');
   let applied=0;app.context.__count=()=>applied++;
-  app.run(`applyPressureBikeDetails=async()=>{__count();return true;}`);
+  app.run(`applyBikeDetails=async()=>{__count();return true;}`);
   app.run(`closeBikeDetails()`);
   check(applied===0,'BK-UI-10 closing without a tap applies nothing');
   check(/closeBikeDetails\(\)\{[^}]*\}/.test(app.script)&&!/function closeBikeDetails\(\)\{[^}]*apply/.test(app.script),'BK-UI-10 closing never applies');
@@ -60,7 +60,7 @@ const at=s=>dlg.indexOf(s);
   const via=(setup)=>{app.run(`S.bags=[{uid:1,pos:'frame',L:6},{uid:2,pos:'bottle',slot:'dt',L:0.75},{uid:3,pos:'seat',L:10}];S.kit={tent:true,quilt:true,pad:true};S.bikeProfile=null;`);setup();
     return app.run(`JSON.stringify(freshPlan().slots.map(s=>[s.key,s.cap,s.items.map(i=>[i.id,i.vol])]))`);};
   const oldWay=via(()=>app.run(`S.bikeProfile=normaliseBikeProfile({id:'x',name:'X',fit:{style:'diamond-level',size:{kind:'letter',value:'M'},bolts:{st:'unknown',dt:'unknown',un:'unknown'},topTubeBag:'unknown'}})`));
-  const newWay=via(()=>{app.run(`fillFitFields(null);applyPressureBikeDetails=async()=>true;quickPickStyle('diamond-level');quickPickSize('M');S.bikeProfile=normaliseBikeProfile({id:'x',name:'X',fit:readFitFields().fit})`);});
+  const newWay=via(()=>{app.run(`fillFitFields(null);applyBikeDetails=async()=>true;quickPickStyle('diamond-level');quickPickSize('M');S.bikeProfile=normaliseBikeProfile({id:'x',name:'X',fit:readFitFields().fit})`);});
   check(oldWay===newWay,'BK-UI-11 byte-identical placements');
   check(oldWay.length>10,'BK-UI-11 the plan is not empty');
 }

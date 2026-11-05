@@ -14,7 +14,7 @@ const get=id=>{
   return node;
 };
 app.context.document.getElementById=get;app.context.document.removeEventListener=()=>{};
-app.run('renderKit=()=>{};drawRig=()=>{};renderResult=()=>{};queueDraftSave=()=>{};renderBikeProfiles=()=>{};renderPressureHelper=()=>{};closeBagPop=()=>{};');
+app.run('renderKit=()=>{};drawRig=()=>{};renderResult=()=>{};queueDraftSave=()=>{};renderBikeProfiles=()=>{};closeBagPop=()=>{};');
 let checks=0;const check=(v,m)=>{assert.ok(v,m);checks++;};
 const html=app.html;
 const field=(id,value)=>{get(id).value=value;};
@@ -26,21 +26,22 @@ reset();
 
 // [BK-UI-01] the sections
 {
-  const a=html.indexOf('id="bikeDetailsBox"'),b=html.indexOf('id="pressureToolBox"');
+  const a=html.indexOf('id="bikeDetailsBox"'),b=html.indexOf('id="maxWeightBox"');
   const dlg=html.slice(a,b);
   check(a>0 && a<b && dlg.includes('id="bikeFrameSection"') && dlg.includes('id="bikeMaxWeightSection"') && /Today's details/.test(dlg),'BK-UI-01 Frame, Maximum weight and Today\'s details');
   // Look arrives at the launch (sub-project 6, Task 4), below the two-tap start; Geometry is still sub-project 9's.
   check(!/<h3[^>]*>\s*Geometry\b/i.test(dlg) && !/id="bikeGeometry/i.test(dlg),'BK-UI-01 no Geometry section');
   check(dlg.indexOf('id="bikeLook"')>dlg.indexOf('id="bikeQuick"') && dlg.indexOf('id="bikeLook"')<dlg.indexOf('id="bikeMoreDetails"'),'BK-UI-01 Look sits below the two-tap start');
-  check(html.indexOf('id="bikeProfilePanel"')>a && html.indexOf('id="bikeProfilePanel"')<b,'BK-UI-01 the editor moved out of the tyre tool into the dialog');
+  check(html.indexOf('id="bikeProfilePanel"')>a && html.indexOf('id="bikeProfilePanel"')<b,'BK-UI-01 the editor lives in the dialog');
 }
 // [BK-UI-02] openers, and focus returns to the opener
 {
-  for(const id of ['rigBikeDetails','bikeDetailsOpen','pressureEditBike','bikeToolEdit']){
+  // The tyre helper's two openers left with it (sub-project 6, Task 6); the rig's and the Kit step's stay.
+  for(const id of ['rigBikeDetails','bikeDetailsOpen']){
     const m=html.match(new RegExp('<button[^>]*id="'+id+'"[^>]*>'));
-    check(m && /bikeDetailsBox/.test(html.slice(html.indexOf('id="'+id+'"')-200,html.indexOf('id="'+id+'"')+400)) || id==='pressureEditBike','BK-UI-02 opener '+id+' is in the page');
+    check(m && /bikeDetailsBox/.test(html.slice(html.indexOf('id="'+id+'"')-200,html.indexOf('id="'+id+'"')+400)),'BK-UI-02 opener '+id+' is in the page');
   }
-  check(/\$\('rigBikeDetails'\)\.onclick=\(\)=>openBikeDetails/.test(app.script) && /\$\('bikeDetailsOpen'\)\.onclick=\(\)=>openBikeDetails/.test(app.script) && /\$\('pressureEditBike'\)\.onclick=\(\)=>openBikeDetails/.test(app.script),'BK-UI-02 each opener calls openBikeDetails');
+  check(/\$\('rigBikeDetails'\)\.onclick=\(\)=>openBikeDetails/.test(app.script) && /\$\('bikeDetailsOpen'\)\.onclick=\(\)=>openBikeDetails/.test(app.script),'BK-UI-02 each opener calls openBikeDetails');
   app.run(`document.getElementById('legalBox').classList.add('hidden');document.getElementById('walkthroughBox').classList.add('hidden');`);
   const opener=get('rigBikeDetails');opener.isConnected=true;
   let error=null;
@@ -91,7 +92,7 @@ reset();
 }
 // [BK-UI-05] no gender question, no banned word
 {
-  const a=html.indexOf('id="bikeDetailsBox"'),b=html.indexOf('id="pressureToolBox"');
+  const a=html.indexOf('id="bikeDetailsBox"'),b=html.indexOf('id="maxWeightBox"');
   const dlg=html.slice(a,b).replace(/<[^>]+>/g,' ');
   check(!/\b(gender|male|female|woman|women|man|men|boy|girl|ladies)\b/i.test(dlg),'BK-UI-05 no gender question');
   const words=JSON.parse(app.run('JSON.stringify(Object.values(BIKE_WORDING))'));
@@ -109,4 +110,34 @@ reset();
   field('fitSeatGap','1.234,5');check(/3 to 60 cm/.test(issue()),'BK-UI-06 a number that is not plain is rejected with its range, not read as 1 or 234');
   reset();
 }
-console.log(JSON.stringify({suite:'bike-details-ui',checks}));
+// Moved here from the retired pressure-tool-markup and pressure-tool suites (sub-project 6, Task 6): what they guarded
+// besides the tyre helper. Unique ids; the bike weight in the form with its label and help; Use these bike details keeps the repair
+// references and the saved-bike list, works with no name and a full list, and an invalid bike weight overwrites nothing.
+(async()=>{
+  const markup=html.slice(0,html.indexOf('<script>'));
+  const ids=[...markup.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
+  check(ids.length>100,'the markup was read');
+  check(new Set(ids).size===ids.length,'every static id is unique');
+  check(/<button[^>]*id="bikeDetailsOpen"[^>]*aria-controls="bikeDetailsBox"/.test(markup),'the bike opener controls the Bike details dialog');
+  const form=markup.slice(markup.indexOf('id="bikeProfileForm"'),markup.indexOf('</form>',markup.indexOf('id="bikeProfileForm"')));
+  check(form.includes('id="bikeBaseKg"') && form.includes('<label for="bikeBaseKg">'),'the bike weight sits in the form with its own label');
+  const base=form.slice(form.indexOf('id="bikeBaseField"'),form.indexOf('id="bikeBaseKg"'));
+  check(base.includes('data-info="What the bike weight includes"') && !/<label[^>]*>[^<]*<span data-info/.test(base),'the bike-weight help sits beside the label, not inside it');
+  app.run(`S.bikeProfile=normaliseBikeProfile({id:'tool_bike',name:'Tool bike',tyres:'tubeless',frontTyre:'40-622',padType:'B05S',drive:'derailleur',chainType:'12 speed',notes:'Keep these repair details',
+      pressure:{bikeKg:12,wheel:'700c',rim:'tubeless-crochet',rimMm:23,frontMm:40,rearMm:45,frontCasing:'standard',rearCasing:'reinforced',frontMinBar:.5,frontMaxBar:3.5,rearMinBar:.5,rearMaxBar:4}});
+    BIKE_PROFILES=[normaliseBikeProfile(S.bikeProfile)];DRAFT_READY=true;persistBikeProfileSelection=async()=>true;fillBikeProfileForm(S.bikeProfile);`);
+  const library=app.run('JSON.stringify(BIKE_PROFILES)');
+  field('bikeBaseKg','12.5');
+  check(await app.run('applyBikeDetails()')!==false,'the bike applies');
+  check(app.run('S.bikeProfile.padType==="B05S" && S.bikeProfile.chainType==="12 speed" && S.bikeProfile.notes==="Keep these repair details" && S.bikeProfile.pressure.bikeKg===12.5'),'applying keeps the repair references and takes the weight');
+  check(app.run('JSON.stringify(BIKE_PROFILES)')===library,'applying does not overwrite the saved-bike list');
+  app.run('S.bikeProfile=null;BIKE_PROFILES=Array.from({length:20},(_,i)=>normaliseBikeProfile({id:"full_"+i,name:"Stored bike "+i}));fillBikeProfileForm(null);');
+  const full=app.run('JSON.stringify(BIKE_PROFILES)');
+  field('bikeName','');field('bikeBaseKg','11');
+  check(await app.run('applyBikeDetails()')!==false && app.run('S.bikeProfile!==null && S.bikeProfile.name.trim().length>0'),'an unnamed bike applies, with a usable name');
+  check(app.run('JSON.stringify(BIKE_PROFILES)')===full,'a full saved list neither blocks nor changes it');
+  field('bikeBaseKg','-1');get('bikeBaseKg').validity={valid:false};
+  check(await app.run('applyBikeDetails()')===false && app.run('S.bikeProfile.pressure.bikeKg')===11,'an invalid bike weight overwrites nothing');
+  get('bikeBaseKg').validity={valid:true};
+  console.log(JSON.stringify({suite:'bike-details-ui',checks}));
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -276,7 +276,8 @@ test('[LC-PHOTO-NOSTORE] only the colour is kept: storage and Cache Storage hold
   expect(after.idb).toEqual(before.idb);
   for (const [key, value] of Object.entries(after.local)) {
     expect(value, key).not.toMatch(/data:image|blob:|base64/);
-    if (value !== before.local[key]) expect(['loadcheck:bikeProfile', 'loadcheck:bikeProfiles', 'loadcheck:bikeProfilesFormat', 'loadcheck:draft'], key).toContain(key);
+    // what changed is the bike and the plan, and what is derived from them: their save stamps and the load summary (group 2)
+    if (value !== before.local[key]) expect(['loadcheck:bikeProfile', 'loadcheck:bikeProfiles', 'loadcheck:bikeProfilesFormat', 'loadcheck:draft', 'loadcheck:saved-at:v1', 'loadcheck:summary:v1'], key).toContain(key);
   }
   expect(await urls(page)).toEqual({ made: 2, revoked: 2 });
 });

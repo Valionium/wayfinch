@@ -104,6 +104,24 @@ function AddRoute({ services, snap, reload }: { services: TripServices; snap: Tr
   );
 }
 
+/** Contract 2: hands the route and the trip's settings to the bag planner, which asks before it changes anything. */
+function PlanBags({ handOff }: { handOff: NonNullable<TripServices['handOff']> }) {
+  const [busy, setBusy] = useState(false);
+  const [reason, setReason] = useState<string | null>(null);
+  return (
+    <div class="trip-handoff" data-handoff>
+      <button type="button" class="btn" disabled={busy} onClick={async () => {
+        setBusy(true); setReason(null);
+        const out = await handOff();
+        setBusy(false);
+        if (!out.ok) setReason(out.reason);
+      }}>{W.appHandoffButton}</button>
+      <p class="hint">{W.appHandoffNote}</p>
+      {reason ? <p class="notice" role="status">{reason}</p> : null}
+    </div>
+  );
+}
+
 export function TripScreen({ services }: { services: TripServices }) {
   const [snap, setSnap] = useState<TripSnapshot | null>(null);
   const alive = useRef(true);
@@ -141,6 +159,7 @@ export function TripScreen({ services }: { services: TripServices }) {
       <div class="trip-side">
         {snap ? <TripSettings services={services} snap={snap} reload={reload} /> : null}
         {snap?.trip ? <GetReady key={lineKey(snap.trip.route)} services={services} snap={snap} reload={reload} /> : null}
+        {snap?.trip && services.handOff ? <PlanBags handOff={services.handOff} /> : null}
         {offer ? <button type="button" class="btn" onClick={() => void promptInstall()}>{W.appTripInstall}</button> : null}
       </div>
     </div>
