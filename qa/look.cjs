@@ -31,7 +31,7 @@ function page({plan=BIKE,library=[BIKE,OTHER],format}={}){
   const json=code=>JSON.parse(q.run(`JSON.stringify(${code})`)??'null');
   const stored=key=>q.values.get(key)??null;
   const settle=()=>q.run('BIKE_PROFILE_WRITES.then(()=>true)');
-  return {...q,writes,json,stored,settle};
+  return {...q,storage,writes,json,stored,settle};
 }
 const open=(p,bike)=>{p.run(`openBikeDetails(null);fillBikeProfileForm(${bike?`BIKE_PROFILES.find(b=>b.id===${JSON.stringify(bike)})||S.bikeProfile`:'S.bikeProfile'});rememberLookOpening();renderLook();`);};
 const stroke=p=>(p.run("document.getElementById('lookPreview').innerHTML").match(/class="bk-paint[^"]*"[^>]*stroke="(#[0-9a-f]{6})"/)||[])[1]||null;
@@ -305,6 +305,102 @@ test('[LC-LOOK-UNDO] Undo of a replaced bike keeps every kit choice made since: 
     assert.equal(kitAfter[id],swapChanged ? kitA[id] : kitBefore[id],`kit ${id}`);
   }
   assert.equal(p.run('JSON.stringify({placements:S.placements,packed:S.packed,pinned:S.pinned,bags:S.bags,qty:S.qty,kitTouched:S.kitTouched})'),other,'placements, ticks and the rest byte for byte');
+});
+
+
+// ---- Look's extras (owner's wish, 5 November 2026): frame pattern, colours, fork, rim depth ----
+const MARBLE={pattern:'marble',colours:['#6b3fa0','#1f7f80'],fork:{kind:'pattern',pattern:'camo',pair:2},rimMm:45};
+const extrasHtml=p=>Object.fromEntries(['lookPattern','lookColour2','lookColour3','lookFork','lookForkColour','lookForkFade','lookForkPattern','lookForkPair','lookRimBox']
+  .map(id=>[id,p.run(`document.getElementById('${id}').innerHTML`)]));
+const radiosOf=html=>[...html.matchAll(/<label class="lx-(?:swatch|chip)"><input type="radio" name="(\w+)" value="([^"]*)">[\s\S]*?<span>([^<]+)<\/span><\/label>/g)].map(m=>({name:m[1],value:m[2],label:m[3]}));
+
+test('[LC-LOOK-EXTRAS] Frame pattern, its colours, the fork and the rims are labelled radios and one slider, built from bike.js\'s lists and words',()=>{
+  const p=page();
+  p.run('renderLookChoices()');
+  const h=extrasHtml(p),B=p.json('({p:window.WayfinchBike.PATTERN_LIST,f:window.WayfinchBike.FADES,s:window.WayfinchBike.SWATCHES})');
+  assert.deepEqual(radiosOf(h.lookPattern).map(r=>[r.value,r.label]),B.p.map(x=>[x.value,x.name]),'the 14 patterns, named as in the try-out');
+  assert.equal(B.p.length,14);
+  for(const id of ['lookColour2','lookColour3','lookForkColour'])assert.deepEqual(radiosOf(h[id]).map(r=>r.value),B.s.map(w=>w.hex),`${id}: the 16 swatches`);
+  assert.deepEqual(radiosOf(h.lookFork).map(r=>r.label),['Like the frame','Own colour','Fade','Pattern']);
+  for(const id of ['lookForkFade','lookForkPair'])assert.deepEqual(radiosOf(h[id]).map(r=>r.label),B.f.map(x=>x.name),`${id}: the six fades`);
+  assert.deepEqual(radiosOf(h.lookForkPattern).map(r=>r.label),['Water-dyed','Stripes','Speckle','Camo','Metallic sparkle','Liquid metal','Raw carbon']);
+  // the rims: one labelled slider, 15 to 60 mm, and Not set as a button; no text input anywhere in the extras
+  assert.match(h.lookRimBox,/<label for="lookRim">Rim depth<\/label>/);
+  assert.match(h.lookRimBox,/<input type="range" id="lookRim" min="15" max="60" step="1"/);
+  assert.match(h.lookRimBox,/<button type="button" class="lx-chip" id="lookRimNotSet" aria-pressed="false">Not set<\/button>/);
+  const inputs=Object.values(h).flatMap(x=>[...x.matchAll(/<input\b[^>]*>/g)].map(m=>m[0]));
+  assert.ok(inputs.every(i=>/type="(radio|range)"/.test(i)),'radios and the slider only');
+  assert.equal(inputs.filter(i=>/type="range"/.test(i)).length,1);
+  const css=p.html.slice(0,p.html.indexOf('</style>'));
+  assert.ok(/\.lx-swatch,\.lx-chip\{[^}]*min-height:44px;min-width:44px/.test(css),'each choice is at least 44 px');
+  assert.ok(/\.lx-rim input\[type=range\]\{[^}]*min-height:44px/.test(css),'the slider too');
+});
+
+test('[LC-LOOK-EXTRAS] each extra shows at once on the preview and the rig; with no colour a pattern starts on Blue, raw carbon on Black; Undo restores byte for byte',async()=>{
+  const p=page();
+  const beforePlan=p.stored('loadcheck:bikeProfile'),beforeLib=p.stored('loadcheck:bikeProfiles');
+  open(p);
+  const before=p.writes.length;
+  p.run("setPaint({pattern:'fade-h',colours:['#6b3fa0',null]})");
+  assert.equal(stroke(p),null,'the frame is no longer one hex colour');
+  assert.match(p.run("document.getElementById('lookPreview').innerHTML"),/class="bk-paint bk-frame"[^>]*stroke="url\(#bkpf\)"/,'the preview shows the fade at once');
+  assert.match(p.run("document.getElementById('rigBike').innerHTML"),/stroke="url\(#rigpf\)"/,'the rig behind too, with its own ids');
+  assert.equal(p.writes.length,before,'storage follows afterwards');
+  p.run("setPaint({fork:{kind:'own',colour:'#c62f2a'}});setPaint({rimMm:55})");
+  const html=p.run("document.getElementById('lookPreview').innerHTML");
+  assert.match(html,/class="bk-paint bk-fork"[^>]*stroke="#c62f2a"/);
+  assert.equal((html.match(/class="bk-rimband"/g)||[]).length,2);
+  assert.match(html,/aria-label="[^"]*blue and purple frame, fade, front to back, red fork, 55 mm deep rims/,'the name says the pattern and colours');
+  await p.settle();
+  assert.deepEqual(JSON.parse(p.stored('loadcheck:bikeProfile')).look.paint,{pattern:'fade-h',colours:['#6b3fa0',null],fork:{kind:'own',colour:'#c62f2a'},rimMm:55});
+  p.run('undoLook()');
+  await p.settle();
+  assert.equal(p.stored('loadcheck:bikeProfile'),beforePlan,'the plan\'s bike, byte for byte');
+  assert.equal(p.stored('loadcheck:bikeProfiles'),beforeLib,'its saved copy, byte for byte');
+  assert.equal(stroke(p),'#2563b8');
+  // no colour yet: the first pattern tap also picks Blue; raw carbon picks Black; a rim needs no colour
+  p.run("setLook({colour:null})");
+  p.run("setPaint({pattern:'stripes',colours:['#f1c232',null]})");
+  assert.equal(p.json('S.bikeProfile.look.colour'),'#2563b8');
+  p.run("setPaint({pattern:'carbon'})");
+  assert.equal(p.json('S.bikeProfile.look.colour'),'#1d1d1f');
+  p.run("setLook({colour:null,paint:null});setPaint({rimMm:20})");
+  assert.equal(p.json('S.bikeProfile.look.colour'),null);
+  assert.equal(p.json('S.bikeProfile.look.paint.rimMm'),20);
+  // Not set takes the rims back to today's
+  p.run("setPaint({rimMm:null})");
+  assert.equal(p.json("'paint' in S.bikeProfile.look"),false,'nothing left of the extras: the look is as before');
+});
+
+test('[LC-LOOK-EXTRAS-SAVE] the extras round-trip: saved, read again by a new page, exported and imported, and read by bike.js the same way',async()=>{
+  const p=page();
+  open(p);
+  p.run(`setLook({paint:${JSON.stringify(MARBLE)}})`);
+  await p.settle();
+  for(const key of ['loadcheck:bikeProfile','loadcheck:bikeProfiles']){
+    const v=JSON.parse(p.stored(key));
+    assert.deepEqual((Array.isArray(v)?v.find(b=>b.id===BIKE.id):v).look.paint,MARBLE,key);
+  }
+  // another page on the same storage reads it back
+  const q=appVM({storage:p.storage});
+  q.run('BIKE_PROFILES=JSON.parse(window.localStorage.getItem(BIKE_PROFILE_KEY)).map(normaliseBikeProfile).filter(Boolean);S.bikeProfile=normaliseBikeProfile(JSON.parse(window.localStorage.getItem(BIKE_PROFILE_CURRENT_KEY)))');
+  assert.deepEqual(JSON.parse(q.run('JSON.stringify(S.bikeProfile.look.paint)')),MARBLE);
+  // export, then import into an empty page
+  const file=p.run('exportAll()');
+  assert.deepEqual(JSON.parse(file).bikeProfiles.find(b=>b.id===BIKE.id).look.paint,MARBLE);
+  const r=appVM();
+  r.context.qaFile=file;
+  await r.run('importAll(qaFile)');
+  assert.deepEqual(JSON.parse(r.run(`JSON.stringify(BIKE_PROFILES.find(b=>b.id===${JSON.stringify(BIKE.id)}).look.paint)`)),MARBLE);
+  // the page and bike.js read every field, and every broken one, the same way
+  const raws=[MARBLE,{pattern:'tartan',colours:['#ABCDEF','x']},{fork:{kind:'fade',pair:'3'}},{fork:{kind:'own'}},{rimMm:'45'},{rimMm:61},{pattern:'solid'},[],'marble',null,
+    {fork:{kind:'pattern',pattern:'panel',pair:1}},{colours:[null,'#000000'],extra:true}];
+  for(const raw of raws){
+    p.context.qaRaw=JSON.stringify({id:'x',look:{colour:'#2563b8',paint:raw}});
+    const page=p.run('JSON.stringify(normaliseBikeProfile(JSON.parse(qaRaw)).look)');
+    const module=p.run('JSON.stringify(window.WayfinchBike.normaliseBike(JSON.parse(qaRaw)).look)');
+    assert.equal(page,module,JSON.stringify(raw));
+  }
 });
 
 (async()=>{
