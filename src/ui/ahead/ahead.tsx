@@ -33,13 +33,13 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
   // On a computer (the rail layout) the picker is open from the start, with no position asked for (spec 9.2).
   const rail = railSignal.value;
   const [pickerOpen, setPickerOpen] = useState(!v.answers || rail);
-  // Set once the rider starts on the open picker (a focus, a key, a pick); only the rider closes it then.
+  // Set once the rider starts on the open picker (a key, a slider move, a pick; a focus alone is not); only the rider closes it then.
   const pickerUse = useRef(false);
   const setPicker = (open: boolean): void => { pickerUse.current = false; setPickerOpen(open); };
   // First use opens the picker; on a phone, answers showing for the first time close it again, unless the rider has started on it.
-  // Nothing else closes it but the rider: not the clock, a new fix or a re-read (each makes a new position line, which the effect
-  // watched before, so the picker shut each minute with the typing in it), and not the effect's own run after the first paint,
-  // which closed it again under an early tap.
+  // Otherwise only the rider closes it, or their own Update position while it is unused (below): not the clock, a fix from elsewhere
+  // or a re-read (each makes a new position line, which the effect watched before, so the picker shut each minute with the typing
+  // in it), and not the effect's own run after the first paint, which closed it again under an early tap.
   const hadAnswers = useRef(v.answers);
   useEffect(() => {
     if (hadAnswers.current === v.answers) return;
@@ -48,6 +48,9 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
   }, [v.answers]);
   // A position set with the picker closes it on a phone; on a computer it stays open, ready for the next (spec 9.2).
   const pickerUsed = (): void => { if (!railSignal.peek()) setPicker(false); };
+  // On a phone, a position kept from Update position closes a picker the rider opened but has not used, so the notes, the strip and
+  // the cards under it are in view at 360 px again; a used one stays open with the newer position beside it (coordinator's ruling).
+  const fixKept = (): void => { if (!railSignal.peek() && !pickerUse.current) setPicker(false); };
 
   const toggle = (name: CardName): void => setOpen((was) => {
     const next = new Set(was);
@@ -88,7 +91,7 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
             canShare={v.canShare} actions={actions} onClose={() => setSharing(false)}
           />
         ) : null}
-        <PositionControls v={v} actions={actions} pickerOpen={pickerOpen} onPicker={setPicker} pickerUse={pickerUse} onPickerUsed={pickerUsed} rail={rail} />
+        <PositionControls v={v} actions={actions} pickerOpen={pickerOpen} onPicker={setPicker} pickerUse={pickerUse} onPickerUsed={pickerUsed} onFixKept={fixKept} rail={rail} />
         {v.answers ? (
           <>
             {s.notes.length > 0 ? <ul class="ah-notes notice">{s.notes.map((n, i) => <li key={i}>{n}</li>)}</ul> : null}

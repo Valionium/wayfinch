@@ -127,4 +127,11 @@ test('[AH-MANUAL] at 360 px a tap the moment Ahead shows opens the picker, and i
   await picker.getByRole('button', { name: 'Use this position' }).click();
   await expect(line).toContainText(/km 12\.5 of [\d.]+/);
   await expect(picker).toBeHidden();
+  // Opened and only tapped into, then Update position: the kept fix closes it, so what is under it is in view again.
+  await page.getByRole('button', { name: 'Set position by hand' }).click();
+  await km.focus();
+  await page.locator('[data-update-position]').click();
+  await page.clock.runFor(1_000);
+  await expect(line).toContainText('±20 m');
+  await expect(picker).toBeHidden();
 });
