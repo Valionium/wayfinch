@@ -35,13 +35,14 @@ export function useTheme(): Theme {
 let drawings = 0;
 // The look extras (patterns, fork, rims) are their own chunk, loaded only for a bike that has them: the first screen never carries them.
 let extras: typeof import('../../core/bike/paint.ts') | undefined;
-const withoutColour = (svg: string): string => svg.replace(/ stroke="#[0-9a-f]{6}"/g, '').replace(/ aria-label="[^"]*"/, '');
+const unnamed = (svg: string): string => svg.replace(/ aria-label="[^"]*"/, '');
 
-/** Writes the drawing; when only the colour moved, it repaints the frame and fork in place. */
+/** Writes the drawing; when only the one colour moved (every painted stroke is it, no pattern on either side), it repaints the frame and fork in place. */
 function paint(box: HTMLElement, last: { svg: string }, svg: string, colour: string | null): void {
   if (last.svg === svg) return;
   const svgEl = box.firstElementChild;
-  if (colour && svgEl && last.svg && withoutColour(last.svg) === withoutColour(svg)) {
+  // The new drawing without its one colour must be the old one without any hex colour: a pattern's url() or a second colour never passes.
+  if (colour && svgEl && unnamed(last.svg.replace(/ stroke="#[0-9a-f]{6}"/g, '')) === unnamed(svg.split(` stroke="${colour}"`).join(''))) {
     for (const el of box.querySelectorAll('.bk-paint')) el.setAttribute('stroke', colour);
     const label = /aria-label="([^"]*)"/.exec(svg)?.[1];
     if (label) svgEl.setAttribute('aria-label', label);
@@ -66,9 +67,9 @@ export function BikeDrawing({ bike, summary, size = 'large', back, caption = tru
   const theme = useTheme();
   const [prefix] = useState(() => `bk${(drawings += 1)}-`);
   const look = bike?.look?.paint;
-  const [ready, setReady] = useState(!!extras);
+  const [ready, setReady] = useState(0);
   useEffect(() => {
-    if (look && !extras) import('../../core/bike/paint.ts').then((m) => { extras = m; setReady(true); }, () => {});
+    if (look && !extras) import('../../core/bike/paint.ts').then((m) => { extras = m; setReady(1); }, () => {});
   }, [look]);
   // Drawn again only when what it is drawn from changes.
   const { spec, art, words } = useMemo(() => {

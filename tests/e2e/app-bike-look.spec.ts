@@ -195,3 +195,39 @@ test('[BK-PAINT-LAZY] the co-pilot asks for the extras only for a bike that has 
   await expect(page.locator('.bike-large svg.bk .bk-paint.bk-frame').first()).toHaveAttribute('stroke', /^url\(/);
   expect(asked.length).toBe(1);
 });
+
+// Review of PR 46, I1: the co-pilot's quick repaint (one colour moved) must never flatten a second colour or a pattern.
+const twoTone = (fork: string) => ({ ...BLUE, look: { colour: '#c62f2a', bars: 'drop', ebike: false, paint: { pattern: 'blocks', colours: ['#2563b8', null], fork: { kind: 'own', colour: fork } } } });
+const fadeOf = (to: string) => ({ ...BLUE, look: { ...BLUE.look, paint: { pattern: 'fade-h', colours: [to, null], fork: { kind: 'own', colour: '#4b4f54' } } } });
+
+test('[BK-PAINT-LAZY] cold start on Trip: two-tone blocks and a fork of its own colour, without rims, keep their own colours', async ({ page }) => {
+  app = await loadApp(page, { launch: true });
+  await page.goto(`${app.origin}/#/trip`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate((e) => { localStorage.clear(); for (const [k, v] of Object.entries(e)) localStorage.setItem(k, v); }, seed(twoTone('#4b4f54')));
+  await page.reload({ waitUntil: 'load' });
+  const drawing = page.locator('.bike-large svg.bk').first();
+  await expect(drawing).toHaveAttribute('aria-label', /red and blue frame, two-tone blocks, graphite fork/);
+  await expect(drawing.locator('.bk-paint.bk-stays')).toHaveAttribute('stroke', '#2563b8');
+  await expect(drawing.locator('.bk-paint.bk-fork')).toHaveAttribute('stroke', '#4b4f54');
+  await expect(drawing.locator('.bk-paint.bk-frame').first()).toHaveAttribute('stroke', '#c62f2a');
+});
+
+test('[LC-LOOK-EXTRAS-SAVE] a change saved in another tab: a fade keeps its gradient and the fork takes its new colour', async ({ page, context }) => {
+  app = await loadApp(page, { launch: true });
+  await page.goto(`${app.origin}/#/trip`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate((e) => { localStorage.clear(); for (const [k, v] of Object.entries(e)) localStorage.setItem(k, v); }, seed(fadeOf('#6b3fa0')));
+  await page.reload({ waitUntil: 'load' });
+  const drawing = page.locator('.bike-large svg.bk').first();
+  await expect(drawing.locator('.bk-paint.bk-frame').first()).toHaveAttribute('stroke', /^url\(/);
+  // the bag planner, in another tab, changes the fork's colour, then the fade's second colour
+  const other = await context.newPage();
+  await other.goto(`${app.origin}/#/you`, { waitUntil: 'domcontentloaded' });
+  const changed = { ...fadeOf('#6b3fa0'), look: { ...fadeOf('#6b3fa0').look, paint: { ...fadeOf('#6b3fa0').look.paint, fork: { kind: 'own', colour: '#f1c232' } } } };
+  await other.evaluate((e) => { for (const [k, v] of Object.entries(e)) localStorage.setItem(k, v); }, seed(changed));
+  await expect(drawing.locator('.bk-paint.bk-fork')).toHaveAttribute('stroke', '#f1c232');
+  await expect(drawing.locator('.bk-paint.bk-frame').first()).toHaveAttribute('stroke', /^url\(/);
+  await other.evaluate((e) => { for (const [k, v] of Object.entries(e)) localStorage.setItem(k, v); }, seed({ ...changed, look: { ...changed.look, paint: { ...changed.look.paint, colours: ['#1f7f80', null] } } }));
+  await expect(drawing).toHaveAttribute('aria-label', /blue and teal frame, fade, front to back, yellow fork/);
+  await expect(drawing.locator('.bk-paint.bk-frame').first()).toHaveAttribute('stroke', /^url\(/);
+  await other.close();
+});
