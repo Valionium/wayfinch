@@ -38,3 +38,18 @@ export function rainyStop(over: InputCase = {}): ScreenInputs {
   });
   return { ...i, hours: i.places.map((p) => preparedHours(p)) };
 }
+
+/**
+ * The owner's device check of 5 November, as near as the builders allow: a 42.9 km day from km 14.6 to the stop at km 57.5, water
+ * 2.2 km on, a café 11.6 km on, the Sleep card's place at the stop, and four more places near the start (a campsite, a tap, a
+ * campsite, a café). Before the fix the strip drew them bunched at the left, and no icon at the stop.
+ */
+export function ownersDay(): ScreenInputs {
+  return inputsOf({
+    trip: testTrip({ route: flatRoute(100, { stageEnds: [57.5, 100] }) }), positions: [pos({ km: 14.6, at: `${SAT} 09:00` })], now: `${SAT} 09:00`, litres: 1,
+    spots: [
+      { b: tap(), km: 16.8 }, { b: cafe('Mo-Su 08:00-18:00'), km: 26.2 }, { b: campsite(), km: 57.5 },
+      { b: campsite(), km: 17.5 }, { b: tap(), km: 18.4 }, { b: campsite(), km: 19 }, { b: cafe('Mo-Su 08:00-18:00'), km: 20.2 },
+    ],
+  });
+}

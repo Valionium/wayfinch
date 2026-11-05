@@ -14,7 +14,7 @@ import { flatRoute, pos, testTrip } from '../../fixtures/build.ts';
 import { bannedHits } from '../../fixtures/banned.ts';
 import { stamps } from '../core/engines/weather-helpers.ts';
 import { inputsOf } from '../core/screen/screen-helpers.ts';
-import { FRI, rainyStop, SAT } from './ahead-fixture.ts';
+import { FRI, ownersDay, rainyStop, SAT } from './ahead-fixture.ts';
 import { buttonNamed, click, expandAll, fakeActions, host, show, typeInto, viewOf } from './ahead-helpers.tsx';
 
 afterEach(() => { render(null, host); });
@@ -217,19 +217,27 @@ describe('cards', () => {
 });
 
 
-/** Every icon of the strip is on the page, alone at its kilometre or in a "+N" button; two rows at most; none covers another. */
+/**
+ * Every icon of the strip is on the page once, alone at its kilometre or in a group's button ("+N"); all on the line, in one row
+ * (the owner's device check of 5 November: "the icons should be on the line, spread along the route"); none covers another; each
+ * button stands at its first icon's kilometre, and an icon at the day's stop at the end.
+ */
 function expectIconsPlaced(s: Screen['strip']): void {
-  const singles = [...host.querySelectorAll<HTMLButtonElement>('.ah-icon:not(.ah-icon-more)')];
-  const more = [...host.querySelectorAll<HTMLButtonElement>('.ah-icon-more')];
-  const kms = [...singles.map((b) => Number(b.dataset.km)), ...more.flatMap((b) => b.dataset.kms!.split(' ').map(Number))].sort((x, y) => x - y);
+  const buttons = [...host.querySelectorAll<HTMLButtonElement>('.ah-icon')];
+  const kms = buttons.flatMap((b) => (b.dataset.kms ?? b.dataset.km!).split(' ').map(Number)).sort((x, y) => x - y);
   expect(kms).toEqual(s.icons.map((x) => x.km).sort((x, y) => x - y));
-  for (const b of singles) expect(parseFloat(b.style.left)).toBeLessThanOrEqual(((Number(b.dataset.km) - s.startKm) / (s.endKm - s.startKm)) * 100 + 0.01);
-  const all = [...singles, ...more];
-  expect(new Set(all.map((b) => b.style.top)).size).toBeLessThanOrEqual(2);
-  const byRow = new Map<string, number[]>();
-  for (const b of all) byRow.set(b.style.top, [...(byRow.get(b.style.top) ?? []), parseFloat(b.style.left)]);
-  for (const xs of byRow.values()) xs.sort((x, y) => x - y).forEach((x, n) => { if (n > 0) expect(x - xs[n - 1]!).toBeGreaterThanOrEqual((46 / 230) * 100 - 0.01); });
-  expect(parseFloat(host.querySelector<HTMLElement>('.ah-strip-icons')!.style.height)).toBeLessThanOrEqual(92);
+  const x = (km: number): number => Math.max(0, Math.min(100, ((km - s.startKm) / (s.endKm - s.startKm)) * 100));
+  for (const b of buttons) {
+    expect(b.style.top, 'on the line: no second row').toBe('');
+    expect(b.closest('.ah-strip-line-row'), 'in the row of the line').not.toBeNull();
+    const first = Number(b.dataset.km);
+    expect(parseFloat(b.style.left)).toBeCloseTo(x(first), 1);
+    expect(b.dataset.kms === undefined ? [first] : b.dataset.kms.split(' ').map(Number)).toContain(first);
+  }
+  const lefts = buttons.map((b) => parseFloat(b.style.left)).sort((a, c) => a - c);
+  lefts.forEach((l, n) => { if (n > 0) expect(l - lefts[n - 1]!).toBeGreaterThanOrEqual((46 / 230) * 100 - 0.01); });
+  // A group holds only icons within one icon's width after its place.
+  for (const b of buttons.filter((y) => y.dataset.kms)) for (const km of b.dataset.kms!.split(' ').map(Number)) expect(Math.abs(x(km) - parseFloat(b.style.left))).toBeLessThan((46 / 230) * 100);
 }
 
 describe('the strip', () => {
@@ -271,11 +279,36 @@ describe('the strip', () => {
     const crowded = [126, 126.5, 127, 127.5, 128, 128.5].map((km, n) => ({ kind: (['water', 'food', 'sleep', 'cover', 'water', 'food'] as const)[n]!, km, opens: (['water', 'food', 'sleep', 'weather', 'water', 'food'] as const)[n]! }));
     await show({ ...v, screen: { ...v.screen, strip: { ...s, icons: crowded } } }, fakeActions().actions);
     expectIconsPlaced({ ...s, icons: crowded });
+    // One button on the line at the first place, its icon and "+5" for the rest; its name says every one of them.
     const more = host.querySelector<HTMLButtonElement>('.ah-icon-more')!;
     expect(more.textContent).toBe('+5');
-    expect(more.getAttribute('aria-label')).toBe('+5: Food at km 126.5, Sleep place at km 127, Cover at km 127.5, Water at km 128, Food at km 128.5');
+    expect(more.classList.contains('ah-icon-water')).toBe(true);
+    expect(more.querySelector('svg')).not.toBeNull();
+    expect(more.getAttribute('aria-label')).toBe('Water at km 126, +5: Food at km 126.5, Sleep place at km 127, Cover at km 127.5, Water at km 128, Food at km 128.5');
     await click(more);
     for (const c of ['food', 'sleep', 'weather', 'water']) expect(host.querySelector(`[data-card="${c}"] .ah-toggle`)!.getAttribute('aria-expanded'), c).toBe('true');
+  });
+
+  test('[AH-STRIP-LINE] the owner\'s day: the places spread along the line, the Sleep card\'s place at the end, nothing bunched at the left', async () => {
+    const v = trip(viewOf(ownersDay()));
+    const s = v.screen.strip;
+    await show(v, fakeActions().actions);
+    expectIconsPlaced(s);
+    const buttons = [...host.querySelectorAll<HTMLButtonElement>('.ah-icon')];
+    // the stop's sleep place: its own icon, at the right end
+    const end = buttons.find((b) => parseFloat(b.style.left) === 100)!;
+    expect(end, 'an icon at the end').toBeDefined();
+    expect(end.classList.contains('ah-icon-sleep')).toBe(true);
+    expect(Number(end.dataset.km)).toBe(57.5);
+    // the café 11.6 km on, at its own place
+    const cafe = buttons.find((b) => Number(b.dataset.km) === 26.2)!;
+    expect(cafe.dataset.kms).toBeUndefined();
+    // spread: from the first place to the stop, not one corner
+    const lefts = buttons.map((b) => parseFloat(b.style.left));
+    expect(Math.max(...lefts) - Math.min(...lefts)).toBeGreaterThan(90);
+    expect(buttons.filter((b) => parseFloat(b.style.left) < 25).length).toBe(1);
+    await click(end);
+    expect(host.querySelector('[data-card="sleep"] .ah-toggle')!.getAttribute('aria-expanded')).toBe('true');
   });
 
   test('[BK-WHERE-STRIP] [AH-STRIP] the bike marker sits at the left end, facing the way of travel, at most 24 px tall, decorative', async () => {

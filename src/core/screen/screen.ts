@@ -178,7 +178,12 @@ function stripOf(i: ScreenInputs, ride: DayRide, schedule: Schedule, windows: Ra
   const foodNamed = namedKms(cards.food);
   const ideaKms = ideas ? [ideas.title?.km ?? null, ...ideas.timeline.map((x) => x.km)] : [];
   for (const km of [...ideaKms, ...foodNamed].flatMap((k) => (k === null ? [] : [k])).filter(onStrip).slice(0, FOOD_ICONS)) add('food', km, 'food');
-  for (const km of cards.sleep.items.flatMap((x) => (typeof x.stamp?.km === 'number' ? [x.stamp.km] : [])).filter(onStrip).sort((a, b) => a - b).slice(0, ICONS_PER_KIND)) add('sleep', km, 'sleep');
+  // The place the Sleep card names first (often at the day's stop), then the nearest others: the owner's device check of 5 November
+  // found the card naming the stop's campsite while the strip drew only two nearer ones.
+  const sleepNamed = cards.sleep.stamp?.km;
+  const sleepKms = cards.sleep.items.flatMap((x) => (typeof x.stamp?.km === 'number' ? [x.stamp.km] : [])).filter(onStrip).sort((a, b) => a - b);
+  const sleepFirst = typeof sleepNamed === 'number' && onStrip(sleepNamed) ? [sleepNamed, ...sleepKms.filter((km) => km !== sleepNamed)] : sleepKms;
+  for (const km of sleepFirst.slice(0, ICONS_PER_KIND)) add('sleep', km, 'sleep');
   for (const km of coverIcons(plans, onTheRide(windows, ride))) add('cover', km, 'weather');
   icons.sort((a, b) => a.km - b.km || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
   return {

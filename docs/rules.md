@@ -757,6 +757,8 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 
 - the page shows exactly Screen's strings, in the order of §3.2, on the 165 km rainy fixture; a test walks Screen and finds each in the DOM [AH-TEXTS]
 - bands solid, hatched and red with a mark, not only colour; icons at their km; tapping one opens its card; bike marker at the left, facing travel, ≤ 24 px tall [AH-STRIP]
+- icons sit on the line, centred at their kilometre, spread along the route, over a band where one lies there (the band shows above and below the icon and stays tappable); icons that would cover each other share one button on the line at the first one's place, "+N" naming the rest; one at the day's stop sits at the end; 44 px targets, no sideways scroll at 360 px (owner's device check, 5 Nov 2026) [AH-STRIP-LINE]
+- the place the Sleep card names has its icon on the strip, whatever sleep places lie before it (owner's device check, 5 Nov 2026) [AH-STRIP-STOP]
 - Water, Food, Daylight, Weather, Climbing, Sleep, always; each shows its status in words and its stamp [AH-CARD-ORDER]
 - a tap expands that card's items; Weather's order per §3.2; "Raining anyway? Shelter" opens the chip [AH-EXPAND]
 - "How much water do you have?" with 0, 0.25, 0.5, 0.75, 1, 1.5, 2, 3 L, custom; "Still about 0.6 L?" one tap; unconfirmed reads unknown [AH-WATER-Q]
