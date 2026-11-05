@@ -427,6 +427,30 @@ test('[LC-LOOK-EXTRAS] Raw carbon on a bike with no colour yet stores Black, so 
   assert.equal(p.json('S.bikeProfile.look.colour'),'#2f7d4f');
 });
 
+// Owner's try-out, 5 Nov 2026: Bike details opened from Wayfinch, closed by the cross, Escape or a tap beside it, goes back there.
+test('[BK-RETURN] closing Bike details opened from Wayfinch goes back: one step back when Wayfinch opened the page, else the named screen in its place; opened here, it stays',async()=>{
+  const at=(referrer,length)=>{
+    const p=page(),went=[];
+    p.context.history.back=()=>went.push('back');p.context.history.length=length;
+    Object.assign(p.context.location,{origin:'https://example.test',replace:h=>went.push('replace '+h)});
+    p.context.document.referrer=referrer;
+    return {p,went};
+  };
+  const a=at('https://example.test/',3);
+  a.p.run(`openBikeDetailsFromLink('#bike-details=${OTHER.id}&back=you&section=look');setLook({colour:'#c62f2a'});closeBikeDetails()`);
+  await a.p.settle();await new Promise(r=>setTimeout(r,80));
+  assert.deepEqual(a.went,['back'],'opened from Wayfinch in this window: one step back');
+  assert.equal(JSON.parse(a.p.stored('loadcheck:bikeProfiles')).find(b=>b.id===OTHER.id).look.colour,'#c62f2a');
+  for(const [referrer,length] of [['',1],['https://example.test/tools/bags/',3],['https://elsewhere.test/',3],['https://example.test/',1]]){
+    const b=at(referrer,length);
+    b.p.run(`openBikeDetailsFromLink('#bike-details=new&back=trip');closeBikeDetails()`);
+    assert.deepEqual(b.went,['replace /#/trip'],referrer+' '+length);
+  }
+  const c=at('https://example.test/',3);
+  open(c.p);c.p.run('closeBikeDetails()');
+  assert.deepEqual(c.went,[],'opened in the bag planner itself: closing stays here');
+});
+
 (async()=>{
   for(const [name,fn] of tests){await fn();passed++;console.log('ok',name);}
   console.log(`${passed} look tests passed`);

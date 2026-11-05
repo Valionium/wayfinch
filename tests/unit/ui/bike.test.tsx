@@ -161,6 +161,22 @@ describe('every tap shows a change at once (the owner\'s rules)', () => {
   });
 });
 
+describe("back from the bag planner (owner's try-out, 5 Nov 2026)", () => {
+  test('[BK-RETURN] a page the browser brings back from its back-forward cache draws the bike as the bag planner saved it meanwhile', async () => {
+    localStorage.setItem('loadcheck:bikeProfile', JSON.stringify({ ...sample[0], look: { colour: '#2f7d4f', bars: 'drop', ebike: false } }));
+    refreshBikeSource();
+    act(() => go('tools'));
+    show(<ToolsScreen services={browserServices()} />);
+    expect(host.querySelector('.bk-paint')!.getAttribute('stroke')).toBe('#2f7d4f');
+    // Saved in the bag planner while this page sat in the cache: no storage event reached it.
+    localStorage.setItem('loadcheck:bikeProfile', JSON.stringify({ ...sample[0], look: { colour: '#c62f2a', bars: 'drop', ebike: false } }));
+    await act(async () => { window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false })); await flush(); });
+    expect(host.querySelector('.bk-paint')!.getAttribute('stroke')).toBe('#2f7d4f');   // a fresh load reads everything anyway
+    await act(async () => { window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); await flush(); });
+    expect(host.querySelector('.bk-paint')!.getAttribute('stroke')).toBe('#c62f2a');
+  });
+});
+
 describe('where the bike appears (spec section 3.7)', () => {
   test('[BK-WHERE] the Tools card draws the bike with its bags, under "3 bags · 10.2 kg", and a tap goes to its Look', () => {
     localStorage.setItem('loadcheck:bikeProfile', JSON.stringify(sample[0]));

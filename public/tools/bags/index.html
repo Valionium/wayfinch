@@ -3663,6 +3663,24 @@ function closeLookPhoto(){
 /* ---- Back to Wayfinch (spec 7.1 item 5): always there, at the top. /#/tools by default; after Bike details opened from the co-pilot,
    the screen named by &back=; after a handoff, /#/trip. For this visit only: nothing is stored. ---- */
 function setWayfinchBack(href){ const a=$('backToWayfinch'); if(a) a.href=href; }
+// Back to the place in Wayfinch the rider came from (owner's try-out, 5 Nov 2026). When this page was opened from Wayfinch in this
+// window, that place is one step back in the history: going there leaves no extra step, so the phone's own Back never brings the
+// bag planner up again. Opened any other way (a new window, a saved link), the screen the link named takes this page's place.
+// Saves still under way finish first (a second at most); leaving the page saves the working plan (pagehide).
+function cameFromWayfinch(){
+  try { const r=new URL(document.referrer); return r.origin===location.origin && r.pathname==='/' && history.length>1; } catch(e){ return false; }
+}
+function returnToWayfinch(href,started=Date.now()){
+  if(BIKE_PROFILE_BUSY && Date.now()-started<1000){ setTimeout(()=>returnToWayfinch(href,started),30); return; }
+  try { if(cameFromWayfinch()) history.back(); else location.replace(href); } catch(e){}
+}
+function backLinkTap(event){
+  if(event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;   // a new tab or window: the link's own way
+  event.preventDefault();
+  const href=event.currentTarget.href;
+  LINK_BIKE=false;closeBikeDetails();   // closed here, so it does not go back a second time
+  returnToWayfinch(href);
+}
 /* ---- Opening a bike from the co-pilot (spec 7.1 "Bikes"): #bike-details=<id>&back=<screen>[&section=look] ---- */
 const BIKE_BACKS={trip:['/#/trip','backTrip'],tools:['/#/tools','backTools'],you:['/#/you','backYou'],tyre:['/#/tools/tyre','backTyre']};
 function bikeDetailsLink(hash){
@@ -3712,16 +3730,21 @@ function openBikeDetails(opener=document.activeElement,section='frame'){
     $('bikeRepairFields').open=true;$('bikeRepairFields').scrollIntoView?.({block:'start'});$('bikeTyres').focus({preventScroll:true});
   }
 }
+// Opened from Wayfinch (#bike-details=...), closing it, by the cross, Escape or a tap beside it, goes back there.
 function closeBikeDetails(){
   const root=$('bikeDetailsBox');if(root.classList.contains('hidden'))return;
+  const back=LINK_BIKE ? $('bikeDetailsBack').href : null;
   closeLookPhoto();flushLookPicker();if(LOOK_RIM_TIMER!==null)flushLookRim();
   LOOK_CHANGED=false;LOOK_MESSAGE='';LINK_BIKE=false;$('lookUndo').classList.add('hidden');$('bikeDetailsBack').classList.add('hidden');
   $('bikeUseShown').classList.add('hidden');
   root.classList.add('hidden');endDialog(root);
+  if(back)returnToWayfinch(back);
 }
 function initialiseBikeDetails(){
   $('bikeDetailsOpen').onclick=()=>openBikeDetails($('bikeDetailsOpen'),'repair');
   $('bikeDetailsClose').onclick=closeBikeDetails;
+  $('bikeDetailsBack').addEventListener('click',backLinkTap);
+  $('backToWayfinch').addEventListener('click',backLinkTap);
   $('mwSave').onclick=saveMaxWeight;$('mwSkip').onclick=skipMaxWeight;$('mwClose').onclick=skipMaxWeight;
   $('bikeDetailsBox').addEventListener('click',event=>{if(event.target===$('bikeDetailsBox'))closeBikeDetails();});
   $('rigBikeDetails').onclick=()=>openBikeDetails($('rigBikeDetails'));

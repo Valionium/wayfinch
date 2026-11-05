@@ -52,6 +52,8 @@ export function listenForBikeChanges(target: Pick<Window, 'addEventListener'> = 
     const key = (event as StorageEvent).key;
     if (key === null || key.startsWith('loadcheck:')) refreshBikeSource();
   });
+  // Back from the bag planner, this page may come out of the browser's back-forward cache, which held no storage events.
+  target.addEventListener('pageshow', (event) => { if ((event as PageTransitionEvent).persisted) refreshBikeSource(); });
 }
 
 if (typeof localStorage !== 'undefined') refreshBikeSource();

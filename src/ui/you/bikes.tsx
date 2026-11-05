@@ -20,13 +20,24 @@ export function bikeRows(plan: BikeRecord | null, library: BikeRecord[]): BikeRo
   return rows;
 }
 
+/** The mark a link into the bag planner leaves on this place in the history: the way back lands at the bikes (owner's try-out, 5 Nov 2026). */
+export const AT_BIKES = 'bikes';
+function markBikes(event: MouseEvent): void {
+  if (!(event.target as Element | null)?.closest?.('a[href^="/tools/bags/"]')) return;
+  try {
+    history.replaceState({ ...(history.state as object | null), wfAt: AT_BIKES }, '');
+  } catch {
+    // No history to mark: the way back opens You at the top.
+  }
+}
+
 export function BikesCards() {
   const source = bikeSource.value;
   const rows = bikeRows(source.bike, source.bikes);
   return (
     <>
       <Card title={Y.youBikesTitle}>
-        <div data-bikes>
+        <div data-bikes onClick={markBikes}>
           {rows.length === 0 ? <p class="muted">{Y.youBikesNone}</p> : (
             <ul class="you-bikes">
               {rows.map(({ bike, mark }) => (

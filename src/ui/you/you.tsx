@@ -12,7 +12,7 @@ import { screenSignal } from '../nav.ts';
 import { applyTheme } from '../theme-apply.ts';
 import type { ThemeChoice } from '../theme-apply.ts';
 import { Choice } from '../trip/settings.tsx';
-import { BikesCards } from './bikes.tsx';
+import { AT_BIKES, BikesCards } from './bikes.tsx';
 import { DataCard } from './data.tsx';
 import { LearnCard } from './learn.tsx';
 import { RiderCards } from './rider.tsx';
@@ -67,6 +67,13 @@ export function YouScreen({ services }: { services: YouServices }) {
   useEffect(() => {
     if (atLegal && loaded) document.querySelector('[data-legal-links]')?.closest('section')?.scrollIntoView?.({ block: 'start' });
   }, [atLegal, loaded]);
+  // Back from the bag planner's Bike details, opened from the bikes: You opens at the bikes, once.
+  useEffect(() => {
+    const state = (typeof history === 'undefined' ? null : history.state) as { wfAt?: unknown } | null;
+    if (!loaded || state?.wfAt !== AT_BIKES) return;
+    document.querySelector('[data-bikes]')?.closest('section')?.scrollIntoView?.({ block: 'start' });
+    try { history.replaceState({ ...state, wfAt: null }, ''); } catch { /* the mark stays: the next return lands there too */ }
+  }, [loaded]);
 
   if (snap === null) return <p class="muted" aria-busy="true">{Y.youLoading}</p>;
   return (

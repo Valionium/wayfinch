@@ -284,10 +284,9 @@ test('[LC-GLIDE] Chromium: both apps opt in under no-preference only; one wf-bik
   await expect(page.locator('#lookPreview svg')).toBeVisible();
   expect((await named(page)).map((n) => n.viewBox)).toEqual(['0 0 320 150']);
   expect(await page.evaluate(() => getComputedStyle(document.querySelector('#lookPreview svg')!).getPropertyValue('view-transition-name'))).toBe('wf-bike');
+  // Closing Bike details opened from Wayfinch goes back there (owner's try-out, 5 Nov 2026, BK-RETURN): a transition again, the
+  // drawing on Tools named, already when the page is revealed: the bike glides back
   await page.locator('#bikeDetailsClose').click();
-  expect((await named(page)).map((n) => n.id)).toEqual(['rigSvg']);
-  // Back to Wayfinch: a transition again, the drawing on Tools named, already when the page is revealed: the bike glides back
-  await page.locator('#backToWayfinch').click();
   await page.waitForURL(`${app.origin}/#/tools`);
   await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
   expect(await revealed(page)).toBe('true');
@@ -299,6 +298,12 @@ test('[LC-GLIDE] Chromium: both apps opt in under no-preference only; one wf-bik
     await page.waitForURL(/\/tools\/bags\/$/);
     await ready(page);
     expect(await revealed(page)).toBe('true');
+    // Bike details opened in the bag planner itself: its preview is named while it is open, the rig again once it closes
+    await page.evaluate("openBikeDetails(document.getElementById('rigBikeDetails'), 'look')");
+    await expect(page.locator('#lookPreview svg')).toBeVisible();
+    expect((await named(page)).map((n) => n.viewBox)).toEqual(['0 0 320 150']);
+    await page.locator('#bikeDetailsClose').click();
+    expect((await named(page)).map((n) => n.id)).toEqual(['rigSvg']);
     await page.locator('#backToWayfinch').click();
     await page.waitForURL(`${app.origin}/#/tools`);
     await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
@@ -312,7 +317,6 @@ test('[LC-GLIDE] Chromium: both apps opt in under no-preference only; one wf-bik
   await page.waitForURL(/\/tools\/bags\//);
   await ready(page);
   await page.locator('#bikeDetailsClose').click();
-  await page.locator('#backToWayfinch').click();
   await page.waitForURL(`${app.origin}/#/trip`);
   await expect(page.locator('main[data-screen="trip"] .bike-large svg')).toBeVisible();
   expect(await revealed(page)).toBe('true');
@@ -336,8 +340,7 @@ test('[LC-GLIDE-OFF] with reduced motion, and in browsers without the transition
   // no transition: Chromium says so; Firefox has no pagereveal at all
   expect(await revealed(page)).toBe(browserName === 'chromium' ? 'false' : null);
   expect(await named(page)).toEqual([]);
-  await page.locator('#bikeDetailsClose').click();
-  await page.locator('#backToWayfinch').click();
+  await page.locator('#bikeDetailsClose').click();   // opened from Wayfinch: closing goes back there (BK-RETURN)
   await page.waitForURL(`${app.origin}/#/tools`);
   await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
   // motion allowed in a browser without the transition: the same plain switch
