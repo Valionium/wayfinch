@@ -10325,7 +10325,43 @@ function captureDraft(){
 // The theme belongs to a plan only once the rider has chosen one; following the system is not a choice, so it neither counts as a change nor locks the app to that theme.
 let THEME_CHOSEN = false;
 function captureSettings(){ return {theme:S.theme === 'light' ? 'light' : 'dark',packEff:S.packEff == null ? null : S.packEff}; }
-// What the working plan remembers: no theme until one was chosen.
+/* ---- One theme for both apps (owner's try-out, 5 Nov 2026). Each app writes only its own storage (spec 7.1): this page
+   loadcheck:theme:v1 with each tap on its theme button (and loadcheck:theme, which older pages read), Wayfinch copilot:theme:v1
+   with each choice in You; both {app, kind:'theme', v:1, theme, at}. Both apps show the most recent, at the same moment Wayfinch's.
+   With neither, a rider's older choices: Wayfinch's own light or dark (copilot:settings), else this page's, else the phone's.
+   Wayfinch decides the same way (src/ui/theme-apply.ts, THEME-ONE). ---- */
+const THEME_CHOICE_KEY='loadcheck:theme:v1';
+function themeChoiceFrom(get){
+  const read=k=>{ try { return JSON.parse(get(k) ?? 'null'); } catch(e){ return null; } };
+  const choice=(k,app)=>{
+    const v=read(k);
+    if(!v || typeof v!=='object' || v.app!==app || v.kind!=='theme' || v.v!==1 || !['auto','light','dark'].includes(v.theme)) return null;
+    const at=typeof v.at==='string' ? Date.parse(v.at) : NaN;
+    return Number.isNaN(at) ? null : {theme:v.theme,at};
+  };
+  const theirs=choice('copilot:theme:v1','copilot'),mine=choice(THEME_CHOICE_KEY,'load-check');
+  if(theirs && mine) return mine.at>theirs.at ? mine.theme : theirs.theme;
+  if(theirs || mine) return (theirs || mine).theme;
+  const settings=read('copilot:settings'),own=settings && typeof settings==='object' ? settings.theme : null;
+  if(own==='light' || own==='dark') return own;
+  const old=read('loadcheck:theme');
+  return old==='light' || old==='dark' ? old : 'auto';
+}
+function themeChoiceNow(stored={}){
+  return themeChoiceFrom(k=>{ if(Object.hasOwn(stored,k)) return stored[k]; try { return window.localStorage.getItem(k); } catch(e){ return null; } });
+}
+function systemTheme(){ return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
+// Shows the one theme: a light or dark choice sticks, automatic follows the phone.
+function followThemeChoice(stored){
+  if(typeof applyTheme!=='function') return;   // the page's start-up code is not here (a QA run of its functions alone)
+  const t=themeChoiceNow(stored);
+  THEME_CHOSEN=t!=='auto';
+  const shown=THEME_CHOSEN ? t : systemTheme();
+  if(shown!==document.documentElement.getAttribute('data-theme') || shown!==S.theme) applyTheme(shown);
+}
+function noteThemeChoice(t){ store.set(THEME_CHOICE_KEY,{app:'load-check',kind:'theme',v:1,theme:t,at:new Date().toISOString()}); }
+// What the working plan remembers: no theme until one was chosen (here, or in Wayfinch: the one theme). It is never applied from the
+// plan at start-up: the one theme is.
 function draftSettings(){ const all = captureSettings(); if(!THEME_CHOSEN) delete all.theme; return all; }
 function normaliseSettings(value){
   if(!dataObject(value)) return null;
@@ -10339,7 +10375,7 @@ async function useSettings(settings){
   settings=normaliseSettings(settings); if(!settings) return false;
   if(settings.theme){ THEME_CHOSEN=true; S.theme=settings.theme; applyTheme(settings.theme); }
   if(Object.hasOwn(settings,'packEff')) S.packEff=settings.packEff;
-  if(settings.theme) await store.set('loadcheck:theme',settings.theme);
+  if(settings.theme){ await store.set('loadcheck:theme',settings.theme); noteThemeChoice(settings.theme); }
   if(Object.hasOwn(settings,'packEff')) await store.set('loadcheck:packEff',settings.packEff);
   queueDraftSave(); return true;
 }
@@ -10663,7 +10699,8 @@ function restorePlan(p, draft, restoreSettings=true){
     ROUTE[key]=p.routeSnapshot;
   }
   S.step = [1,2,3,4].includes(+p.step) ? +p.step : 1;
-  if(draft && restoreSettings && p.settings) useSettings(p.settings);
+  // The theme is the rider's one choice for both apps now, not the plan's: a working plan brings back only its packing factor.
+  if(draft && restoreSettings && p.settings && Object.hasOwn(p.settings,'packEff')) useSettings({packEff:p.settings.packEff});
   [1,2,3,4].forEach(i => $('s'+i).classList.toggle('hidden', i !== S.step));
   $('crumbs').querySelectorAll('button').forEach(b =>
     b.setAttribute('aria-current', +b.dataset.to === S.step ? 'step' : 'false'));
@@ -10905,12 +10942,12 @@ function followOtherTabs(event){
   }
   // Follow the packing factor and the theme, without writing them back.
   if(key === 'loadcheck:packEff'){ try { const eff=dataNumber(JSON.parse(event.newValue),0.7,1); S.packEff=eff !== null ? eff : null; } catch(e){} }
-  if(key === 'loadcheck:theme'){ try { const theme=JSON.parse(event.newValue); if(['light','dark'].includes(theme)) applyTheme(theme); } catch(e){} }
+  if(all || ['loadcheck:theme',THEME_CHOICE_KEY,'copilot:theme:v1','copilot:settings'].includes(key)){ try { followThemeChoice(); } catch(e){} }
 }
 window.addEventListener('storage', followOtherTabs);
 // A hidden, frozen or cached tab may never have received the storage event (rule 8).
-document.addEventListener('visibilitychange', () => { if(document.hidden) flushDraft(); else checkOtherTabs(); });
-window.addEventListener('pageshow', checkOtherTabs);
+document.addEventListener('visibilitychange', () => { if(document.hidden) flushDraft(); else { checkOtherTabs(); followThemeChoice(); } });
+window.addEventListener('pageshow', () => { checkOtherTabs(); followThemeChoice(); });
 window.addEventListener('pagehide', flushDraft);
 function showRecoveredDraft(){
   $('draftText').textContent = 'Your working plan was restored from this browser.';
@@ -12307,7 +12344,7 @@ function applyTheme(t){
   else paintRigBike();                // the frame's casing follows the theme
   if(typeof renderLook==='function')renderLook();
 }
-function setTheme(t){ THEME_CHOSEN = true; S.theme = t; applyTheme(t); store.set('loadcheck:theme', t); queueDraftSave(); }
+function setTheme(t){ THEME_CHOSEN = true; S.theme = t; applyTheme(t); store.set('loadcheck:theme', t); noteThemeChoice(t); queueDraftSave(); }
 
 // Typing works everywhere; speech is offered on top where the browser has it.
 const MIC = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -12594,8 +12631,8 @@ window.applyCalibration = applyCalibration;
   SETUPS.forEach(x => SETUPS_SEEN.add(x.id));
   FEEDBACK=Array.isArray(savedReports) ? savedReports.map(normaliseReport).filter(Boolean) : [];
   await loadBikeProfileData();
-  const savedTheme = await store.get('loadcheck:theme');
-  if(['light','dark'].includes(savedTheme)){ THEME_CHOSEN = true; applyTheme(savedTheme); }
+  // The one theme, with this page's records as its store holds them (an embedding host's storage too)
+  followThemeChoice({'loadcheck:theme':JSON.stringify(await store.get('loadcheck:theme')),[THEME_CHOICE_KEY]:JSON.stringify(await store.get(THEME_CHOICE_KEY))});
   CLIMATE = savedClimate(await store.get(CLIMATE_KEY));
   const savedPlaces=await store.get(RECENT_KEY);
   RECENT=Array.isArray(savedPlaces) ? savedPlaces.slice(0,6).map(normalisePlace).filter(Boolean) : [];
@@ -12621,7 +12658,8 @@ window.applyCalibration = applyCalibration;
   receiveHandoff();
 })();
 
-applyTheme(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+followThemeChoice();
+window.matchMedia?.('(prefers-color-scheme: light)').addEventListener?.('change',()=>{ if(!THEME_CHOSEN) followThemeChoice(); });
 $('themeBtn').onclick = () =>
   setTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
 setupSpeech();

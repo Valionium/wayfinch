@@ -10,8 +10,9 @@ import { Card } from '../card.tsx';
 import { useFollowing } from '../follow.ts';
 import { LegalLinks } from '../legal/links.tsx';
 import { screenSignal } from '../nav.ts';
-import { applyTheme } from '../theme-apply.ts';
+import { applyTheme, themeChoice, themeNow } from '../theme-apply.ts';
 import type { ThemeChoice } from '../theme-apply.ts';
+import { noteThemeChoice } from '../theme-choice.ts';
 import { Choice } from '../trip/settings.tsx';
 import { AT_BIKES, BikesCards } from './bikes.tsx';
 import { DataCard } from './data.tsx';
@@ -27,7 +28,8 @@ function SettingsCard({ services, snap, reload }: { services: YouServices; snap:
   const save = async (field: 'theme' | 'keepFresh', value: unknown): Promise<boolean> => {
     const result = await services.writeSettings({ [field]: value });
     setProblem(result.ok ? null : (result.reasons[field] ?? result.note ?? W.appStoreNotKept));
-    if (result.ok && field === 'theme') applyTheme(value as ThemeChoice);
+    // One theme for both apps: the bag planner reads this choice and shows it too (owner's try-out, 5 Nov 2026)
+    if (result.ok && field === 'theme') { noteThemeChoice(value as ThemeChoice); applyTheme(themeNow()); }
     await reload();
     return result.ok;
   };
@@ -35,7 +37,7 @@ function SettingsCard({ services, snap, reload }: { services: YouServices; snap:
     <Card title={Y.youSettingsTitle}>
       <div data-you-settings>
         <Choice
-          name="theme" legend={Y.youThemeLegend} value={settings.theme} onPick={(v) => save('theme', v)}
+          name="theme" legend={Y.youThemeLegend} value={themeChoice.value} onPick={(v) => save('theme', v)}
           options={[['auto', Y.youThemeAuto], ['light', Y.youThemeLight], ['dark', Y.youThemeDark]]}
         />
         {keepFreshOffered(services.weatherMode) ? (
@@ -81,7 +83,7 @@ export function YouScreen({ services }: { services: YouServices }) {
       {snap.available ? null : <p class="notice" role="status">{Y.youUnavailable}</p>}
       <RiderCards services={services} snap={snap} reload={reload} />
       <LearnCard services={services} snap={snap} reload={reload} />
-      <BikesCards key={snap.settings.theme} />
+      <BikesCards key={themeChoice.value} />
       <SettingsCard services={services} snap={snap} reload={reload} />
       <DataCard services={services} reload={reload} />
       <LegalLinks />

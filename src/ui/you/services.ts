@@ -14,12 +14,13 @@ import { DEFAULT_PROFILE, readProfile } from '../../store/profile.ts';
 import { DEFAULT_SETTINGS } from '../../store/rules.ts';
 import type { Settings } from '../../store/rules.ts';
 import { readSettings } from '../../store/settings.ts';
-import { readLocalSettings } from '../../store/settings-local.ts';
+import { readLocalSettings, SETTINGS_KEY } from '../../store/settings-local.ts';
 import { readTrip } from '../../store/trip.ts';
 import { logRide, readRides, writeProfile } from '../../store/you.ts';
 import type { ProfileField, ProfileWrite } from '../../store/you.ts';
 import { forgetRiderKg, loadRiderKg } from '../rider-kg.ts';
-import { applyTheme } from '../theme-apply.ts';
+import { applyTheme, themeNow } from '../theme-apply.ts';
+import { noteThemeChoice } from '../theme-choice.ts';
 import { browserTripServices } from '../trip/services.ts';
 import type { SettingsOutcome } from '../trip/services.ts';
 
@@ -203,7 +204,9 @@ export function browserYouServices(now: () => Date = () => new Date(), navigate:
       }
     },
     exportFile: async () => {
-      const file = await exportAll();
+      // The one theme both apps show, which may be the bag planner's newer choice (theme-apply.ts)
+      const stored = await exportAll();
+      const file = { ...stored, settings: { ...stored.settings, theme: themeNow() } };
       return { name: `wayfinch-data-${now().toISOString().slice(0, 10)}.json`, text: `${JSON.stringify(file, null, 2)}\n` };
     },
     save: (name, text) => {
@@ -227,16 +230,19 @@ export function browserYouServices(now: () => Date = () => new Date(), navigate:
       }
       // Read what is here first, so this window may write over it (the store's rule).
       await Promise.all([readProfile(), readSettings(), readRides(), readTrip()]).catch(() => undefined);
+      const before = localStorage.getItem(SETTINGS_KEY);
       const result = await importAll(file);
+      // Settings that came with the file are a choice made now: the bag planner shows their theme too.
+      if (result.ok && localStorage.getItem(SETTINGS_KEY) !== before) noteThemeChoice(readLocalSettings().settings.theme);
       await loadRiderKg();
-      applyTheme(readLocalSettings().settings.theme);
+      applyTheme(themeNow());
       return result;
     },
     deleteAll: async (alsoBags) => {
       try {
         await deleteCopilotData();
         forgetRiderKg();
-        applyTheme(readLocalSettings().settings.theme);
+        applyTheme(themeNow());
       } catch {
         return { ok: false };
       }

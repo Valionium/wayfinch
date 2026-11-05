@@ -903,6 +903,8 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - the extras round-trip through saving, export and import, and both pages (bag planner and co-pilot) [LC-LOOK-EXTRAS-SAVE]
 - the bike's panel above Look covers whatever scrolls under it, a checked option's ring included, and every Look control taken by keyboard shows its whole focus ring below the panel, at 360 and 1280 px in both themes (owner's try-out, 5 Nov 2026) [LC-LOOK-RING]
 - opened from Wayfinch (You, Trip or Tools), whatever the rider does in Bike details (add a bike, change the Look, use it for the plan, save), the cross, Escape, Back to <screen> and the browser's Back return to that place in Wayfinch, You at the bikes, the bike's changes shown, leaving no step back into the bag planner; online, offline and as the installed app (owner's try-out, 5 Nov 2026) [BK-RETURN]
+- one theme for both apps (owner's try-out, 5 Nov 2026): each app writes only its own record of a choice ({app, kind: 'theme', v: 1, theme, at}: copilot:theme:v1, loadcheck:theme:v1); both show the most recent, at the same moment Wayfinch's; with neither, Wayfinch's own light or dark, else the bag planner's older choice, else automatic; the page and the app decide alike on every mix [THEME-ONE]
+- a theme chosen in either app shows in the other at once in an open tab, on the way back, and in a tab when it shows again or comes out of the back-forward cache; Wayfinch's export carries the one theme, and an import's settings (either app's) count as a choice [THEME-SYNC]
 - From a photo, Front, back and fork: three taps set a front-to-back fade and the fork's own colour; the photo never leaves the phone [LC-PHOTO-THREE]
 
 ## Bag planner: separation and contracts (sub-project 6, group 2)

@@ -7,6 +7,7 @@ import type { BikeRecord } from '../../core/bike/normalise.ts';
 import type { LoadSummary } from '../../core/types.ts';
 import { W } from '../../core/wording/en.ts';
 import './bike.css';
+import { themeChoice } from '../theme-apply.ts';
 import { bikeDetailsHref } from './link.ts';
 import type { BackScreen } from './link.ts';
 
@@ -21,15 +22,17 @@ function currentTheme(): Theme {
 
 /** The fill ramp follows the theme, as in the bag planner; so does the casing's tone (owner's ruling A). */
 export function useTheme(): Theme {
-  const [theme, setTheme] = useState(currentTheme);
+  // The rider's choice, made in either app, redraws at once (owner's try-out, 5 Nov 2026); the phone's own setting too.
+  void themeChoice.value;
+  const [, setPhone] = useState(0);
   useEffect(() => {
     if (typeof matchMedia !== 'function') return undefined;
     const query = matchMedia('(prefers-color-scheme: light)');
-    const update = () => setTheme(currentTheme());
+    const update = () => setPhone((n) => n + 1);
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
   }, []);
-  return theme;
+  return currentTheme();
 }
 
 let drawings = 0;
