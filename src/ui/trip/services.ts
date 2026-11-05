@@ -306,11 +306,14 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
     setDeparture: (date) => inTurn(() => changeDeparture(date)),
 
     handOff: () => inTurn(async () => {
+      // Plan bags for this trip is a tap away: its code is a chunk of its own, so the first screen does not carry it. A chunk that
+      // can't be loaded (a tab open across two releases) asks for a reload.
+      const m = await import('./handoff.ts').catch(() => undefined);
+      if (!m) return { ok: false as const, reason: W.appLazyFailed };
+      const { cleanupHandoff, HANDOFF_STORE, handOffTrip } = m;
       const trip = await readTrip();
       if (!trip) return { ok: false as const, reason: W.appHandoffNoRoute };
       const settings = await readSettings();
-      // Plan bags for this trip is a tap away: its code is a chunk of its own, so the first screen does not carry it
-      const { cleanupHandoff, HANDOFF_STORE, handOffTrip } = await import('./handoff.ts');
       const deps = {
         now, storage: localStorage, go: (href: string) => window.location.assign(href),
         randomId: () => [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join(''),

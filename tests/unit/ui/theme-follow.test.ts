@@ -2,7 +2,7 @@
 // One theme for both apps (owner's try-out, 5 November 2026): Wayfinch shows a choice made in the bag planner at once, and in a tab that
 // was hidden or cached when it shows again. The rule itself, and the page deciding alike: tests/unit/contracts/theme.test.ts.
 import { afterEach, describe, expect, test } from 'vitest';
-import '../../../src/ui/page-return.ts';   // as main.tsx loads it once the first screen is drawn
+import { noteOlderChoice } from '../../../src/ui/page-return.ts';   // as main.tsx loads it once the first screen is drawn
 import { applyTheme, firstTheme, themeChoice } from '../../../src/ui/theme-apply.ts';
 import { noteThemeChoice, themeNow } from '../../../src/ui/theme-choice.ts';
 
@@ -78,11 +78,28 @@ describe("records that are not what they claim (review of PR 49, M5), and a ride
   test("[THEME-SYNC] Load Check's older choice alone: the rule writes it as Wayfinch's own record, dated at the start of time, so the next start paints it at once and any real choice wins", () => {
     localStorage.setItem('loadcheck:theme', JSON.stringify('light'));
     expect(firstTheme('auto')).toBe('auto');   // this one start, before the rule has run
-    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false }));   // page-return.ts follows
+    noteOlderChoice();   // page-return.ts, as it loads at a start
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false }));   // and follows
     expect(themeChoice.value).toBe('light');
     expect(JSON.parse(localStorage.getItem('copilot:theme:v1')!)).toEqual({ app: 'copilot', kind: 'theme', v: 1, theme: 'light', at: '1970-01-01T00:00:00.000Z' });
     expect(firstTheme('auto')).toBe('light');   // every start after
     localStorage.setItem('loadcheck:theme:v1', theirs('dark', '2000-01-01T00:00:00.000Z'));
     expect(themeNow()).toBe('dark');
+  });
+});
+
+describe('Delete co-pilot data (review of PR 49, re-check)', () => {
+  test("[THEME-SYNC] after a delete, nothing in the open page writes Wayfinch's theme record back, whatever event follows", () => {
+    localStorage.setItem('loadcheck:theme', JSON.stringify('dark'));
+    noteOlderChoice();
+    expect(localStorage.getItem('copilot:theme:v1')).not.toBeNull();
+    // Delete co-pilot data's own removal of every copilot: key (src/store/export.ts), without the database jsdom lacks
+    for (const k of Object.keys(localStorage)) if (k.startsWith('copilot:')) localStorage.removeItem(k);
+    window.dispatchEvent(new StorageEvent('storage', { key: 'copilot:changed' }));
+    window.dispatchEvent(new StorageEvent('storage', { key: 'loadcheck:theme' }));
+    document.dispatchEvent(new Event('visibilitychange'));
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+    expect(Object.keys(localStorage).filter((k) => k.startsWith('copilot:'))).toEqual([]);
+    expect(themeChoice.value).toBe('dark');   // still shown: the bag planner's choice is the one theme
   });
 });

@@ -93,6 +93,9 @@ describe('ruling A, measured where the bike is drawn', () => {
       expect(contrastRatio(s.hex, hexOf('dark', tone)), s.name).toBeGreaterThanOrEqual(CASING_MIN_CONTRAST);
       const spec = resolveBikeSpec(bikeWith(s.hex), null);
       expect(casingOf(bikeArt(spec, null, { theme: 'dark' }).svg, 'bk-frame'), s.name).toBe(tone);
+      // the 24 px marker on Ahead's strip: the same tone on its frame and fork
+      const marker = markerArt(spec, 'dark');
+      expect([casingOf(marker, 'bk-frame'), casingOf(marker, 'bk-fork')], `marker ${s.name}`).toEqual([tone, tone]);
     }
     expect(casingFor('#a3c4f3', 'dark')).toBe('ground');   // the owner's light blue: a dark outline, not a grey halo
   });

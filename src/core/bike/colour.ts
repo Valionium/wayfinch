@@ -124,10 +124,8 @@ const RULED_LIGHT: readonly string[] = ['#7b5434'];
  */
 export function darkCasing(colours: readonly string[]): CasingTone {
   const worst = (hex: string): number => Math.min(...colours.map((c) => contrastRatio(c, hex)));
-  const { muted, ink } = CASINGS.dark;
-  if (worst(muted) >= CASING_MIN_CONTRAST) return 'muted';
-  if (worst('#242B20') >= CASING_MIN_CONTRAST) return 'ground';
-  return worst(ink) > worst(muted) ? 'ink' : 'muted';
+  const muted = worst(CASINGS.dark.muted);
+  return muted >= CASING_MIN_CONTRAST ? 'muted' : worst('#242B20') >= CASING_MIN_CONTRAST ? 'ground' : worst(CASINGS.dark.ink) > muted ? 'ink' : 'muted';
 }
 
 /**

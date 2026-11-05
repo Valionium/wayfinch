@@ -23,12 +23,12 @@ export function applyTheme(theme: ThemeChoice, root: HTMLElement = document.docu
 export function firstTheme(own: ThemeChoice): ThemeChoice {
   try {
     const record = (key: string, app: string): [string, ThemeChoice] | null => {
-      const m = /^\{"app":"([a-z-]+)","kind":"theme","v":1,"theme":"(auto|light|dark)","at":"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z)"\}$/.exec(localStorage.getItem(key) ?? '');
+      const m = /^\{"app":"([a-z-]+)","kind":"theme","v":1,"theme":"(auto|light|dark)","at":"([\d-]{10}T[\d:.]{12}Z)"\}$/.exec(localStorage.getItem(key) ?? '');
       return m?.[1] === app ? [m[3]!, m[2] as ThemeChoice] : null;
     };
     const mine = record('copilot:theme:v1', 'copilot');
     const theirs = record('loadcheck:theme:v1', 'load-check');
-    return (theirs && !(mine && mine[0] >= theirs[0]) ? theirs : mine)?.[1] ?? own;
+    return (!mine || (theirs && theirs[0] > mine[0]) ? theirs : mine)?.[1] ?? own;
   } catch {
     return own;
   }
