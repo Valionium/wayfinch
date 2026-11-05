@@ -161,9 +161,10 @@ export function RouteStrip({ strip, bike, onOpen, onSetPosition }: {
             {strip.bands.map((b, i) => (
               <button
                 key={`b${i}`} type="button" class={`ah-band ah-band-${b.kind}`} data-kind={b.kind}
-                style={{ left: pct(along(b.fromKm, strip)), width: pct(Math.max(0, along(b.toKm, strip) - along(b.fromKm, strip))) }}
+                style={{ left: pct(along(b.fromKm, strip)), '--band-w': pct(Math.max(0, along(b.toKm, strip) - along(b.fromKm, strip))) }}
                 aria-label={bandWords(b, strip.endKm)} onClick={() => onOpen(b.opens)}
               >
+                <span class="ah-band-bar" aria-hidden="true" />
                 {b.kind === 'thunder' ? <Bolt /> : null}
               </button>
             ))}

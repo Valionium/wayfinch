@@ -26,12 +26,19 @@
 .ah-strip-track { position: relative; flex: 1 1 auto; min-width: 0; margin-right: 22px; }
 .ah-strip-line { position: absolute; left: 0; right: 0; top: 21px; height: 2px; background: var(--muted); }
 .ah-strip-bands { position: relative; height: 44px; }
-.ah-band { position: absolute; top: 0; height: 44px; min-width: 12px; padding: 0; border: 0; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ground); } /* the button is the 44 px tap target */
-.ah-band::before { content: ''; position: absolute; left: 0; right: 0; top: 8px; bottom: 8px; border: 2px solid var(--ice); border-radius: 4px; } /* the 28 px bar */
-.ah-band > * { position: relative; }
-.ah-band-likely::before { background: var(--ice); }
-.ah-band-possible::before { background: repeating-linear-gradient(135deg, var(--ice) 0 3px, transparent 3px 8px); }
-.ah-band-thunder::before { background: var(--red); border-color: var(--red); }
+/* The button is the 44 px tap target, also for a band of a kilometre or less: its content box is the band (--band-w, of the strip),
+   and padding on both sides, taken back by its left margin, makes it 44 px wide around the band's middle. The bar shows the band
+   itself, at least 12 px. Percentages in padding and margin are of the strip, as the band's own width is. */
+.ah-band {
+  position: absolute; top: 0; height: 44px; box-sizing: content-box; width: var(--band-w);
+  padding: 0 max(0px, calc((44px - var(--band-w)) / 2)); margin-left: min(0px, calc((var(--band-w) - 44px) / 2));
+  border: 0; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ground);
+}
+.ah-band-bar { display: block; flex: none; width: 100%; min-width: 12px; height: 28px; box-sizing: border-box; border: 2px solid var(--ice); border-radius: 4px; } /* the 28 px bar */
+.ah-band > .ah-bolt { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.ah-band-likely .ah-band-bar { background: var(--ice); }
+.ah-band-possible .ah-band-bar { background: repeating-linear-gradient(135deg, var(--ice) 0 3px, transparent 3px 8px); }
+.ah-band-thunder .ah-band-bar { background: var(--red); border-color: var(--red); }
 .ah-strip-icons { position: relative; }
 .ah-icon { position: absolute; width: 44px; height: 44px; margin-left: -22px; border-radius: 50%; border: 1px solid var(--line); background: var(--ground); color: var(--ink); display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
 .ah-icon-water { color: var(--ice); }
