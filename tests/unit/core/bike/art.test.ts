@@ -283,6 +283,9 @@ describe("the casing, owner's ruling A of 3 November 2026", () => {
         }
       }
     }
+    // Brown's tone is the light theme's tone it stands out from most
+    for (const [tone, hex] of Object.entries(CASINGS.light)) expect(contrastRatio('#7b5434', CASINGS.light.panel), tone).toBeGreaterThanOrEqual(contrastRatio('#7b5434', hex));
+    expect(casingFor('#7b5434', 'light')).toBe('panel');
     // A colour of the picker or a photo keeps muted as well.
     expect(casingFor('#7c5535', 'light')).toBe('muted');
   });

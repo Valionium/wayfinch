@@ -12,6 +12,7 @@ import { BikeDrawing } from '../../../src/ui/bike/drawing.tsx';
 import { bikeDetailsHref, openBikeDetails } from '../../../src/ui/bike/link.ts';
 import type { BackScreen } from '../../../src/ui/bike/link.ts';
 import { refreshBikeSource } from '../../../src/ui/bike/live.ts';
+import '../../../src/ui/page-return.ts';   // as main.tsx loads it once the first screen is drawn
 import { BikeMarker } from '../../../src/ui/bike/marker.tsx';
 import { go } from '../../../src/ui/nav.ts';
 import { ToolsScreen } from '../../../src/ui/tools/tools.tsx';

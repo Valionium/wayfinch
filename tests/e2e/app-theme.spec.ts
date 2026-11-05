@@ -88,7 +88,8 @@ test('[THEME-ONE] an existing rider: the bag planner\'s older choice shows in Wa
   const start = await phone(page);
   await page.evaluate((t) => { localStorage.clear(); localStorage.setItem('loadcheck:theme', JSON.stringify(t)); }, other(start));
   await page.reload({ waitUntil: 'load' });
-  expect(await shown(page)).toBe(other(start));
+  // an older choice of the bag planner alone is read by the rule, loaded right after the first screen (once, on the first launch)
+  await expect.poll(() => shown(page)).toBe(other(start));
   await planner(page);
   expect(await shown(page)).toBe(other(start));
   await page.evaluate((t) => { localStorage.setItem('copilot:settings', JSON.stringify({ updatedAt: '2026-11-01T08:00:00.000Z', theme: t })); }, start);

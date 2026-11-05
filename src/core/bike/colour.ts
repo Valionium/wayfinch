@@ -137,13 +137,6 @@ export function darkCasing(colours: readonly string[]): CasingTone {
 export function casingFor(paint: string, theme: 'dark' | 'light'): CasingTone {
   if (!isHex(paint)) return 'muted';
   if (theme === 'dark') return darkCasing([paint.toLowerCase()]);
-  if (!RULED_LIGHT.includes(paint.toLowerCase())) return 'muted';
-  const tones = CASINGS[theme] as Record<string, string>;
-  let best: CasingTone = 'muted';
-  let bestRatio = 0;
-  for (const [tone, hex] of Object.entries(tones)) {
-    const r = contrastRatio(paint, hex);
-    if (r > bestRatio) { best = tone as CasingTone; bestRatio = r; }
-  }
-  return best;
+  // Brown, the one swatch ruling A moves in the light theme: to panel, the light tone it stands out from most (6.3:1; BK-COLOUR-CASING)
+  return RULED_LIGHT.includes(paint.toLowerCase()) ? 'panel' : 'muted';
 }

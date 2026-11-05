@@ -5,7 +5,7 @@
 import { createRequire } from 'node:module';
 import fc from 'fast-check';
 import { describe, expect, test } from 'vitest';
-import { themeFrom } from '../../../src/ui/theme-apply.ts';
+import { themeFrom } from '../../../src/ui/theme-choice.ts';
 
 const require = createRequire(import.meta.url);
 const { appVM, sharedStore } = require('../../../qa/app-vm.cjs') as {

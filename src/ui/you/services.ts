@@ -19,8 +19,8 @@ import { readTrip } from '../../store/trip.ts';
 import { logRide, readRides, writeProfile } from '../../store/you.ts';
 import type { ProfileField, ProfileWrite } from '../../store/you.ts';
 import { forgetRiderKg, loadRiderKg } from '../rider-kg.ts';
-import { applyTheme, themeNow } from '../theme-apply.ts';
-import { noteThemeChoice } from '../theme-choice.ts';
+import { applyTheme } from '../theme-apply.ts';
+import { noteThemeChoice, themeNow } from '../theme-choice.ts';
 import { browserTripServices } from '../trip/services.ts';
 import type { SettingsOutcome } from '../trip/services.ts';
 
@@ -204,7 +204,7 @@ export function browserYouServices(now: () => Date = () => new Date(), navigate:
       }
     },
     exportFile: async () => {
-      // The one theme both apps show, which may be the bag planner's newer choice (theme-apply.ts)
+      // The one theme both apps show, which may be the bag planner's newer choice (theme-choice.ts)
       const stored = await exportAll();
       const file = { ...stored, settings: { ...stored.settings, theme: themeNow() } };
       return { name: `wayfinch-data-${now().toISOString().slice(0, 10)}.json`, text: `${JSON.stringify(file, null, 2)}\n` };
