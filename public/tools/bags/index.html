@@ -3053,6 +3053,7 @@ function maxWeightIssue(maxWeight){
   return '';
 }
 function fillBikeProfileForm(value){
+  BIKE_FORM_DIRTY=false;
   const p=normaliseBikeProfile(value);
   LOOK_NEW=null;   // a look chosen for an earlier new bike never carries over to the next
   BIKE_PROFILE_EDITOR_ID=p?.id || '';
@@ -3190,7 +3191,7 @@ async function applyBikeDetails(){
   if(BIKE_PROFILE_BUSY || !DRAFT_READY)return false;
   const issue=bikeEditorIssue();
   if(issue){BIKE_PROFILE_MESSAGE=issue;renderBikeProfiles();return false;}
-  BIKE_PROFILE_BUSY=true;useBikeProfile(readBikeProfileEditor());
+  BIKE_PROFILE_BUSY=true;BIKE_FORM_DIRTY=false;useBikeProfile(readBikeProfileEditor());
   let saved=false;try{saved=await persistBikeProfileSelection();}catch(e){}
   BIKE_PROFILE_BUSY=false;
   BIKE_PROFILE_MESSAGE=saved?'Using these bike details for this plan. Save bike for next time if you want it in your saved-bike list.':'Using these details for this session. Export to keep them if browser saving is unavailable.';
@@ -3203,7 +3204,7 @@ async function saveBikeProfile(event){
   const p=readBikeProfileEditor();if(!p)return false;
   const index=BIKE_PROFILES.findIndex(b=>b.id===p.id);
   if(index<0 && BIKE_PROFILES.length>=MAX_BIKE_PROFILES){BIKE_PROFILE_MESSAGE='You have 20 saved bikes. Update or remove one before adding another.';renderBikeProfiles();return false;}
-  BIKE_PROFILE_BUSY=true;BIKE_PROFILE_MESSAGE='Saving bike…';
+  BIKE_PROFILE_BUSY=true;BIKE_FORM_DIRTY=false;BIKE_PROFILE_MESSAGE='Saving bike…';
   if(index<0)BIKE_PROFILES.push(p);else BIKE_PROFILES[index]=p;
   const keepPlan=linkHoldsBike();   // opened from the co-pilot: saved, and the plan keeps its own bike
   if(keepPlan){BIKE_PROFILE_EDITOR_ID=p.id;LOOK_NEW=null;}else useBikeProfile(p);
@@ -3292,7 +3293,7 @@ async function saveShownBike(){
   if(LOOK_OPENING && LOOK_OPENING.forId==='')LOOK_OPENING.forId=p.id;   // the new bike's first tap: Undo stays with it
   BIKE_PROFILE_EDITOR_ID=p.id;LOOK_NEW=null;
   BIKE_PROFILE_MESSAGE=bikeWord('lookSavedBike',{name:p.name});
-  BIKE_PROFILE_BUSY=true;renderBikeProfiles();
+  BIKE_PROFILE_BUSY=true;BIKE_FORM_DIRTY=false;renderBikeProfiles();
   let ok=false;try{ok=await persistSavedBikes();}catch(e){}
   BIKE_PROFILE_BUSY=false;
   if(!ok && BIKE_PROFILE_MESSAGE!==BIKE_NEWER_MESSAGE)BIKE_PROFILE_MESSAGE='Saved for this session only; Export to keep it.';
@@ -3307,7 +3308,7 @@ async function useShownBike(){
   const i=BIKE_PROFILES.findIndex(b=>b.id===p.id);
   if(i<0 && BIKE_PROFILES.length>=MAX_BIKE_PROFILES){BIKE_PROFILE_MESSAGE='You have 20 saved bikes. Update or remove one before adding another.';renderBikeProfiles();return false;}
   if(i<0)BIKE_PROFILES.push(p);else BIKE_PROFILES[i]=p;
-  BIKE_PROFILE_BUSY=true;useBikeProfile(p);
+  BIKE_PROFILE_BUSY=true;BIKE_FORM_DIRTY=false;useBikeProfile(p);
   let ok=false;try{ok=await persistSavedBikes();ok=(await persistBikeProfileSelection()) && ok;}catch(e){}
   BIKE_PROFILE_BUSY=false;
   BIKE_PROFILE_MESSAGE=ok ? bikeWord('usingShown',{name:p.name}) : 'Using this bike for this session. Check the working-plan save status or Export before closing.';
@@ -3670,8 +3671,11 @@ function setWayfinchBack(href){ const a=$('backToWayfinch'); if(a) a.href=href; 
 function cameFromWayfinch(){
   try { const r=new URL(document.referrer); return r.origin===location.origin && r.pathname==='/' && history.length>1; } catch(e){ return false; }
 }
+let LEAVING=false;   // a way back is under way: a second tap, or a second waiting timer, adds no second step (review M2)
 function returnToWayfinch(href,started=Date.now()){
+  if(LEAVING) return;
   if(BIKE_PROFILE_BUSY && Date.now()-started<1000){ setTimeout(()=>returnToWayfinch(href,started),30); return; }
+  LEAVING=true;
   try { if(cameFromWayfinch()) history.back(); else location.replace(href); } catch(e){}
 }
 function backLinkTap(event){
@@ -3720,7 +3724,7 @@ function openBikeDetails(opener=document.activeElement,section='frame'){
     if(!$('walkthroughBox').classList.contains('hidden'))closeWalkthrough();
     renderBikeProfiles();
     root.classList.remove('hidden');
-    beginDialog(root,true,closeBikeDetails,opener);
+    beginDialog(root,true,closeBikeDetailsSoftly,opener);
     $('bikeDetailsTitle').focus({preventScroll:true});
     rememberLookOpening();renderLook();
   }
@@ -3729,6 +3733,21 @@ function openBikeDetails(opener=document.activeElement,section='frame'){
     $('bikeMoreDetails').open=true;
     $('bikeRepairFields').open=true;$('bikeRepairFields').scrollIntoView?.({block:'start'});$('bikeTyres').focus({preventScroll:true});
   }
+}
+// Typed details not saved yet (name, tyres, weight, measurements, repair notes): Save, Use or a Look tap saves the form (review M1).
+let BIKE_FORM_DIRTY=false;
+function bikeFormEdited(e){ const t=e && e.target; if(t && t.id!=='bikeSavedSelect' && t.closest?.('#bikeMoreDetails')) BIKE_FORM_DIRTY=true; }
+// Escape and a tap beside the dialog: opened from Wayfinch with typed details not saved yet, the dialog stays and says so, as closing
+// never saves (BK-UI-10); the cross and the Back links are the rider's own way out.
+function closeBikeDetailsSoftly(){
+  if(LINK_BIKE && BIKE_FORM_DIRTY && !$('bikeDetailsBox').classList.contains('hidden')){
+    BIKE_PROFILE_MESSAGE='Not saved yet: Save bike for next time keeps what you typed. × leaves without it.';
+    renderBikeProfiles();
+    if($('bikeMoreDetails'))$('bikeMoreDetails').open=true;
+    $('bikeSave').focus?.();
+    return;
+  }
+  closeBikeDetails();
 }
 // Opened from Wayfinch (#bike-details=...), closing it, by the cross, Escape or a tap beside it, goes back there.
 function closeBikeDetails(){
@@ -3746,7 +3765,9 @@ function initialiseBikeDetails(){
   $('bikeDetailsBack').addEventListener('click',backLinkTap);
   $('backToWayfinch').addEventListener('click',backLinkTap);
   $('mwSave').onclick=saveMaxWeight;$('mwSkip').onclick=skipMaxWeight;$('mwClose').onclick=skipMaxWeight;
-  $('bikeDetailsBox').addEventListener('click',event=>{if(event.target===$('bikeDetailsBox'))closeBikeDetails();});
+  $('bikeDetailsBox').addEventListener('click',event=>{if(event.target===$('bikeDetailsBox'))closeBikeDetailsSoftly();});
+  $('bikeDetailsBox').addEventListener('input',bikeFormEdited);
+  window.addEventListener('pageshow',event=>{ if(event.persisted) LEAVING=false; });   // back in this page from Wayfinch's history
   $('rigBikeDetails').onclick=()=>openBikeDetails($('rigBikeDetails'));
   renderFitStyleChoices();
   renderFitSizeChips();updateFitQuick();
@@ -10331,14 +10352,15 @@ function captureSettings(){ return {theme:S.theme === 'light' ? 'light' : 'dark'
    With neither, a rider's older choices: Wayfinch's own light or dark (copilot:settings), else this page's, else the phone's.
    Wayfinch decides the same way (src/ui/theme-apply.ts, THEME-ONE). ---- */
 const THEME_CHOICE_KEY='loadcheck:theme:v1';
+function themeRecordOf(get,k,app){
+  let v=null; try { v=JSON.parse(get(k) ?? 'null'); } catch(e){ return null; }
+  if(!v || typeof v!=='object' || v.app!==app || v.kind!=='theme' || v.v!==1 || !['auto','light','dark'].includes(v.theme)) return null;
+  const at=typeof v.at==='string' ? Date.parse(v.at) : NaN;
+  return Number.isNaN(at) ? null : {theme:v.theme,at};
+}
 function themeChoiceFrom(get){
   const read=k=>{ try { return JSON.parse(get(k) ?? 'null'); } catch(e){ return null; } };
-  const choice=(k,app)=>{
-    const v=read(k);
-    if(!v || typeof v!=='object' || v.app!==app || v.kind!=='theme' || v.v!==1 || !['auto','light','dark'].includes(v.theme)) return null;
-    const at=typeof v.at==='string' ? Date.parse(v.at) : NaN;
-    return Number.isNaN(at) ? null : {theme:v.theme,at};
-  };
+  const choice=(k,app)=>themeRecordOf(get,k,app);
   const theirs=choice('copilot:theme:v1','copilot'),mine=choice(THEME_CHOICE_KEY,'load-check');
   if(theirs && mine) return mine.at>theirs.at ? mine.theme : theirs.theme;
   if(theirs || mine) return (theirs || mine).theme;
@@ -10348,7 +10370,12 @@ function themeChoiceFrom(get){
   return old==='light' || old==='dark' ? old : 'auto';
 }
 function themeChoiceNow(stored={}){
-  return themeChoiceFrom(k=>{ if(Object.hasOwn(stored,k)) return stored[k]; try { return window.localStorage.getItem(k); } catch(e){ return null; } });
+  return themeChoiceFrom(k=>{
+    if(Object.hasOwn(stored,k)) return stored[k];
+    // an embedding host keeps this page's own records (review M6): those this tab wrote or read at start-up
+    if(window.storage && k.startsWith('loadcheck:') && MEM[k]!==undefined) return JSON.stringify(MEM[k]);
+    try { return window.localStorage.getItem(k); } catch(e){ return null; }
+  });
 }
 function systemTheme(){ return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
 // Shows the one theme: a light or dark choice sticks, automatic follows the phone.
@@ -10359,7 +10386,11 @@ function followThemeChoice(stored){
   const shown=THEME_CHOSEN ? t : systemTheme();
   if(shown!==document.documentElement.getAttribute('data-theme') || shown!==S.theme) applyTheme(shown);
 }
-function noteThemeChoice(t){ store.set(THEME_CHOICE_KEY,{app:'load-check',kind:'theme',v:1,theme:t,at:new Date().toISOString()}); }
+// Stamped just after Wayfinch's record when that one is dated later (a clock set wrong, review I2), so this tap is the newest choice.
+function noteThemeChoice(t){
+  let other=null; try { other=themeRecordOf(k=>window.localStorage.getItem(k),'copilot:theme:v1','copilot'); } catch(e){}
+  store.set(THEME_CHOICE_KEY,{app:'load-check',kind:'theme',v:1,theme:t,at:new Date(Math.max(Date.now(),other ? other.at+1 : 0)).toISOString()});
+}
 // What the working plan remembers: no theme until one was chosen (here, or in Wayfinch: the one theme). It is never applied from the
 // plan at start-up: the one theme is.
 function draftSettings(){ const all = captureSettings(); if(!THEME_CHOSEN) delete all.theme; return all; }
@@ -12632,7 +12663,9 @@ window.applyCalibration = applyCalibration;
   FEEDBACK=Array.isArray(savedReports) ? savedReports.map(normaliseReport).filter(Boolean) : [];
   await loadBikeProfileData();
   // The one theme, with this page's records as its store holds them (an embedding host's storage too)
-  followThemeChoice({'loadcheck:theme':JSON.stringify(await store.get('loadcheck:theme')),[THEME_CHOICE_KEY]:JSON.stringify(await store.get(THEME_CHOICE_KEY))});
+  const oldTheme=await store.get('loadcheck:theme'),themeRecord=await store.get(THEME_CHOICE_KEY);
+  if(window.storage){ if(oldTheme!==null) MEM['loadcheck:theme']=oldTheme; if(themeRecord!==null) MEM[THEME_CHOICE_KEY]=themeRecord; }
+  followThemeChoice({'loadcheck:theme':JSON.stringify(oldTheme),[THEME_CHOICE_KEY]:JSON.stringify(themeRecord)});
   CLIMATE = savedClimate(await store.get(CLIMATE_KEY));
   const savedPlaces=await store.get(RECENT_KEY);
   RECENT=Array.isArray(savedPlaces) ? savedPlaces.slice(0,6).map(normalisePlace).filter(Boolean) : [];

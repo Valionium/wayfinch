@@ -7,7 +7,7 @@ import { PT } from '../wording/en-paint.ts';
 import { W } from '../wording/en.ts';
 import { bikeArt } from './art.ts';
 import type { Anchors, ArtOptions, P } from './art.ts';
-import { CASINGS, casingFor, contrastRatio, darkCasing, nearestSwatchName } from './colour.ts';
+import { CASING_MIN_CONTRAST, CASINGS, casingFor, contrastRatio, darkCasing, nearestSwatchName } from './colour.ts';
 import type { CasingTone } from './colour.ts';
 import type { Fork, ForkPattern, Paint, Pattern } from './normalise.ts';
 import type { BagView, BikeSpec } from './spec.ts';
@@ -210,6 +210,37 @@ export function shownColours(paint: Paint, colour: string | null): string[] {
 
 export type PaintedPart = 'bk-frame' | 'bk-stays' | 'bk-fork';
 
+/** The backgrounds the bike is drawn on in both apps and both themes: the page's ground, and the panel of the cards and of Look. */
+export const BACKGROUNDS = { light: ['#F4F2E8', '#FBFAF3'], dark: ['#1B2018', '#242B20'] } as const;
+const BROWN = '#7b5434';
+
+/** Ruling A, measured where the bike is drawn: on every background, the casing or else the colour itself stands out at 3:1. */
+export function readableOn(colour: string, tone: CasingTone, theme: 'dark' | 'light'): boolean {
+  const casing = (CASINGS[theme] as Record<string, string>)[tone]!;
+  return BACKGROUNDS[theme].every((bg) => contrastRatio(casing, bg) >= CASING_MIN_CONTRAST || contrastRatio(colour, bg) >= CASING_MIN_CONTRAST);
+}
+
+/**
+ * Each painted part's casing. Dark: darkCasing, part by part. Light: one casing for all parts as before (casingForAll), wherever it
+ * keeps every colour readable; where it does not (owner's decision of 5 Nov 2026: a pale fork beside Brown's panel casing, pale chrome
+ * or silver beside Brown), each part it fails takes, of the light tones that keep its colours readable, the one with the sharpest
+ * edge, never muted under Brown (ruling A).
+ */
+export function partCasings(paint: Paint, colour: string | null, theme: 'dark' | 'light'): Record<PaintedPart, CasingTone> | null {
+  const parts = partColours(paint, colour);
+  if (!parts) return null;
+  const out = {} as Record<PaintedPart, CasingTone>;
+  const one = theme === 'light' ? casingForAll(shownColours(paint, colour), 'light') : null;
+  for (const [part, colours] of Object.entries(parts) as [PaintedPart, string[]][]) {
+    if (!one) { out[part] = darkCasing(colours); continue; }
+    const fits = (t: CasingTone) => colours.every((c) => readableOn(c, t, 'light')) && !(t === 'muted' && colours.includes(BROWN));
+    if (fits(one)) { out[part] = one; continue; }
+    const edge = (t: CasingTone) => Math.min(...colours.map((c) => contrastRatio(c, (CASINGS.light as Record<string, string>)[t]!)));
+    out[part] = (Object.keys(CASINGS.light) as CasingTone[]).filter(fits).reduce((a, b) => (edge(b) > edge(a) ? b : a));
+  }
+  return out;
+}
+
 /** The colours each painted part shows: the frame's tubes, the stays (Two-tone blocks give them the second colour) and the fork. */
 export function partColours(paint: Paint, colour: string | null): Record<PaintedPart, string[]> | null {
   if (!colour) return null;
@@ -302,11 +333,11 @@ export function paintedArt(spec: BikeSpec, bags: BagView | null, options: ArtOpt
     // Owner's ruling A, for every colour the frame and fork show. In the dark theme each part has its own casing (owner's try-out,
     // 5 Nov 2026): a light frame keeps its crisp dark outline beside a fork in a darker colour.
     const cls = (tone: CasingTone): string => (tone === 'muted' ? 'class="bk-casing"' : `class="bk-casing bk-casing-${tone}"`);
-    const parts = partColours(paint, colour)!;
-    svg = theme === 'dark'
-      ? svg.replace(/class="bk-casing(?: bk-casing-\w+)?"([^>]*\/><path class="bk-paint (bk-stays|bk-frame|bk-fork)")/g,
-        (_m, rest: string, part: PaintedPart) => `${cls(darkCasing(parts[part]))}${rest}`)
-      : svg.replace(/class="bk-casing(?: bk-casing-\w+)?"/g, cls(casingForAll(shownColours(paint, colour), theme)));
+    const tones = partCasings(paint, colour, theme)!;
+    svg = new Set(Object.values(tones)).size === 1 && theme === 'light'
+      ? svg.replace(/class="bk-casing(?: bk-casing-\w+)?"/g, cls(tones['bk-frame']))
+      : svg.replace(/class="bk-casing(?: bk-casing-\w+)?"([^>]*\/><path class="bk-paint (bk-stays|bk-frame|bk-fork)")/g,
+        (_m, rest: string, part: PaintedPart) => `${cls(tones[part])}${rest}`);
   }
 
   // The rims: a carbon band inside the tyre, as deep as the rim, at the drawing's scale (0.11 units per mm, less on a shrunk bike).

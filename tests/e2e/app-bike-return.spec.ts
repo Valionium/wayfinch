@@ -128,3 +128,24 @@ test('[BK-RETURN] offline, as the installed app: Edit, a new colour, the cross, 
   await onYouAtBikes(page);
   await expect(youBike(page, 'Town bike').locator('.bk-paint.bk-frame').first()).toHaveAttribute('stroke', '#1f2f55');
 });
+
+// Review of PR 49, M1: Escape or a tap beside the dialog never drops what the rider typed and has not saved.
+test('[BK-RETURN] Add a bike, a name typed and not saved: Escape and a tap beside the dialog keep it open with the name; once saved, Escape goes back', async ({ page }) => {
+  await wayfinch(page, '#/you');
+  await tapInto(page, page.getByRole('link', { name: 'Add a bike' }));
+  await moreDetails(page);
+  await page.locator('#bikeName').fill('Gravel');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await expect(page.locator('#bikeProfileStatus')).toContainText('Not saved yet');
+  expect(new URL(page.url()).pathname).toBe('/tools/bags/');
+  // beside the sheet, on the dimmed page
+  await page.locator('#bikeDetailsBox').click({ position: { x: 3, y: 3 } });
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await expect(page.locator('#bikeName')).toHaveValue('Gravel');
+  await page.locator('#bikeSave').click();
+  await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles')!) as { name: string }[]).map((b) => b.name))).toContain('Gravel');
+  await page.keyboard.press('Escape');
+  await onYouAtBikes(page);
+  await expect(youBike(page, 'Gravel')).toBeVisible();
+});

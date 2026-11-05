@@ -117,15 +117,16 @@ const RULED_LIGHT: readonly string[] = ['#7b5434'];
 
 /**
  * The dark theme's casing under every colour shown (owner's try-out, 5 November 2026: a light frame's grey casing blurred its edge).
- * Muted, section 3.6's own, where every colour stands out from it at 3:1; else the ground, a dark outline as the light theme has,
- * where they all stand out from that; else the lighter tone (muted or ink) they stand out from most, which keeps the shape readable on
- * any dark background. Ruling A's Silver and Sand get the ground, as before.
+ * Muted, section 3.6's own, where every colour stands out from it at 3:1; else the ground, a dark outline that blends into the page,
+ * where they all stand out at 3:1 from the panel (#242B20, the lighter of the two backgrounds the bike is drawn on, so from the page
+ * too: review I1); else the lighter tone (muted or ink) they stand out from most, which itself stands out from both backgrounds.
+ * Ruling A's Silver and Sand get the ground, as before.
  */
 export function darkCasing(colours: readonly string[]): CasingTone {
   const worst = (hex: string): number => Math.min(...colours.map((c) => contrastRatio(c, hex)));
-  const { muted, ground, ink } = CASINGS.dark;
+  const { muted, ink } = CASINGS.dark;
   if (worst(muted) >= CASING_MIN_CONTRAST) return 'muted';
-  if (worst(ground) >= CASING_MIN_CONTRAST) return 'ground';
+  if (worst('#242B20') >= CASING_MIN_CONTRAST) return 'ground';
   return worst(ink) > worst(muted) ? 'ink' : 'muted';
 }
 

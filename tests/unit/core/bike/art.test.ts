@@ -315,9 +315,9 @@ describe('the marker on the route strip (spec section 7.4)', () => {
     expect(Number(els[0]!.attrs.height)).toBeLessThanOrEqual(24);
     expect(new Set(els.slice(1).map((e) => e.attrs.class))).toEqual(new Set(['bk-tyre', 'bk-casing', 'bk-paint bk-frame', 'bk-paint bk-fork']));
     expect(m).toContain('stroke="#c62f2a"');
-    // in the dark theme red has the ground's casing, a dark outline (BK-DARK-CRISP): the same parts
+    // in the dark theme red has the ink casing, readable on the panel too (BK-DARK-CRISP, review I1): the same parts
     const dark = elements(markerArt(resolveBikeSpec(normaliseBike({ id: 'm', look: { colour: '#c62f2a' } }), null), 'dark'));
-    expect(new Set(dark.slice(1).map((e) => e.attrs.class))).toEqual(new Set(['bk-tyre', 'bk-casing bk-casing-ground', 'bk-paint bk-frame', 'bk-paint bk-fork']));
+    expect(new Set(dark.slice(1).map((e) => e.attrs.class))).toEqual(new Set(['bk-tyre', 'bk-casing bk-casing-ink', 'bk-paint bk-frame', 'bk-paint bk-fork']));
     expect(m).not.toMatch(/aria-label|role=/);
   });
 });

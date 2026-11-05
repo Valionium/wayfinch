@@ -12,7 +12,6 @@ import { listenForInstall } from './install.ts';
 import { makeUpdater, startOfflineWorker } from './register.ts';
 import { openOnFirstScreen } from './trip/first.ts';
 import { browserTripServices } from './trip/services.ts';
-import { cleanupStoredHandoff } from './trip/handoff.ts';
 
 applyTheme(firstTheme(readLocalSettings().settings.theme));
 void loadRiderKg();
@@ -32,8 +31,7 @@ void watchDegraded({
   addOnlineListener: (cb) => { window.addEventListener('online', cb); window.addEventListener('offline', cb); },
 });
 startAutoWeather();
-void cleanupStoredHandoff();
-// A theme chosen in the bag planner, and bikes it saved while this page was away: after the first screen.
+// After the first screen: the one theme's rule, what the page missed while away, and the handoff's cleanup (page-return.ts).
 void import('./page-return.ts');
 void openOnFirstScreen(browserTripServices(), location.hash.replace(/^#\/?/, '') !== '');
 // Only a --test-hooks build has this; in any other the condition is false and the hook is not built in.

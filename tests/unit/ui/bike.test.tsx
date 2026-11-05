@@ -163,17 +163,17 @@ describe('every tap shows a change at once (the owner\'s rules)', () => {
 });
 
 describe("the dark theme's casing moves with the colour (BK-DARK-CRISP)", () => {
-  test("[BK-TAP-INSTANT] blue to red in the dark theme still repaints in place, and the casing takes red's tone", async () => {
+  test("[BK-TAP-INSTANT] blue to white in the dark theme still repaints in place, and the casing takes white's tone", async () => {
     localStorage.setItem('loadcheck:bikeProfile', JSON.stringify({ ...sample[0], look: { colour: '#2563b8', bars: 'drop', ebike: false } }));
     refreshBikeSource();
     act(() => go('tools'));
     show(<ToolsScreen services={browserServices()} />);
     const before = host.querySelector('.bk-paint')!;
     expect(host.querySelector('.bk-casing')!.getAttribute('class')).toBe('bk-casing bk-casing-ink');
-    localStorage.setItem('loadcheck:bikeProfile', JSON.stringify({ ...sample[0], look: { colour: '#c62f2a', bars: 'drop', ebike: false } }));
+    localStorage.setItem('loadcheck:bikeProfile', JSON.stringify({ ...sample[0], look: { colour: '#f4f4f2', bars: 'drop', ebike: false } }));
     await act(async () => { window.dispatchEvent(new StorageEvent('storage', { key: 'loadcheck:bikeProfile' })); await flush(); });
     expect(host.querySelector('.bk-paint')).toBe(before);
-    expect(before.getAttribute('stroke')).toBe('#c62f2a');
+    expect(before.getAttribute('stroke')).toBe('#f4f4f2');
     expect([...host.querySelectorAll('.bk-casing')].every((el) => el.getAttribute('class') === 'bk-casing bk-casing-ground')).toBe(true);
   });
 });

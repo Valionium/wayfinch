@@ -16,7 +16,6 @@ import { WEATHER_MODE } from '../../data/weather-mode.ts';
 import type { WeatherMode } from '../../data/weather-mode.ts';
 import { NewerDataError, RefusedError } from '../../store/changed.ts';
 import { inExistingTx, inTx, openExisting } from '../../store/db.ts';
-import { cleanupHandoff, HANDOFF_STORE, handOffTrip } from './handoff.ts';
 import type { HandoffOutcome } from './handoff.ts';
 import type { Place } from '../../core/places/types.ts';
 import { readInputs } from '../../store/inputs.ts';
@@ -310,6 +309,8 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
       const trip = await readTrip();
       if (!trip) return { ok: false as const, reason: W.appHandoffNoRoute };
       const settings = await readSettings();
+      // Plan bags for this trip is a tap away: its code is a chunk of its own, so the first screen does not carry it
+      const { cleanupHandoff, HANDOFF_STORE, handOffTrip } = await import('./handoff.ts');
       const deps = {
         now, storage: localStorage, go: (href: string) => window.location.assign(href),
         randomId: () => [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join(''),

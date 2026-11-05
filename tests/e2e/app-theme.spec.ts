@@ -83,17 +83,23 @@ test('[THEME-SYNC] You, Edit, the theme button in the bag planner, the cross: ba
   expect(casing).toBe(other(start) === 'dark' ? 'bk-casing bk-casing-ground' : 'bk-casing');
 });
 
-test('[THEME-ONE] an existing rider: the bag planner\'s older choice shows in Wayfinch; with an older choice in both, Wayfinch\'s', async ({ page }) => {
+test("[THEME-ONE] an existing rider: the bag planner's older choice shows in Wayfinch; with an older choice in both, Wayfinch's", async ({ page }) => {
   app = await loadApp(page, { launch: true, path: '/#/you' });
   const start = await phone(page);
   await page.evaluate((t) => { localStorage.clear(); localStorage.setItem('loadcheck:theme', JSON.stringify(t)); }, other(start));
   await page.reload({ waitUntil: 'load' });
-  // an older choice of the bag planner alone is read by the rule, loaded right after the first screen (once, on the first launch)
   await expect.poll(() => shown(page)).toBe(other(start));
   await planner(page);
   expect(await shown(page)).toBe(other(start));
-  await page.evaluate((t) => { localStorage.setItem('copilot:settings', JSON.stringify({ updatedAt: '2026-11-01T08:00:00.000Z', theme: t })); }, start);
+  // another rider, with an older choice in both apps
+  await page.evaluate(([t, mine]) => {
+    localStorage.clear();
+    localStorage.setItem('loadcheck:theme', JSON.stringify(t));
+    localStorage.setItem('copilot:settings', JSON.stringify({ updatedAt: '2026-11-01T08:00:00.000Z', theme: mine }));
+  }, [other(start), start]);
   await you(page);
+  await page.reload({ waitUntil: 'load' });
+  await expect(page.locator('[data-you-loaded]')).toBeVisible();
   expect(await shown(page)).toBe(start);
   await expect(themeRadio(page, start === 'light' ? 'Light' : 'Dark')).toBeChecked();
   await planner(page);
@@ -132,4 +138,45 @@ test('[THEME-SYNC] the bag planner\'s Apply imported settings is a choice: Wayfi
   await you(page);
   expect(await shown(page)).toBe(other(start));
   await expect(themeRadio(page, other(start) === 'light' ? 'Light' : 'Dark')).toBeChecked();
+});
+
+// Review of PR 49, I3: a rider with only Load Check's older choice gets it painted at once from the second start on, with no change after.
+test("[THEME-SYNC] Load Check's older choice alone: from the second start of Wayfinch the first paint already has it, and nothing changes after", async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/you' });
+  const start = await phone(page);
+  await page.evaluate((t) => { localStorage.clear(); localStorage.setItem('loadcheck:theme', JSON.stringify(t)); }, other(start));
+  await page.reload({ waitUntil: 'load' });
+  await expect.poll(() => shown(page)).toBe(other(start));   // the first start: the rule, right after the first screen
+  // on the next start: the theme of the first frame painted, and every change after it
+  await page.addInitScript(() => {
+    const w = window as unknown as { __first?: string | null; __after: (string | null)[] };
+    w.__after = [];
+    requestAnimationFrame(() => {
+      w.__first = document.documentElement.getAttribute('data-theme');
+      new MutationObserver(() => w.__after.push(document.documentElement.getAttribute('data-theme'))).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    });
+  });
+  await page.reload({ waitUntil: 'load' });
+  await expect(page.locator('[data-you-loaded]')).toBeVisible();
+  await page.waitForTimeout(500);
+  const seen = await page.evaluate(() => { const w = window as unknown as { __first?: string | null; __after: (string | null)[] }; return { first: w.__first, after: w.__after.filter((t) => t !== w.__first) }; });
+  expect(seen).toEqual({ first: other(start), after: [] });
+});
+
+// Review of PR 49, M6: in an embedding host (window.storage) the bag planner keeps the rider's choice when its tab shows again.
+test("[THEME-SYNC] with an embedding host's storage, the bag planner's own choice holds when the tab shows again", async ({ page }) => {
+  await page.addInitScript(() => {
+    const kept = new Map<string, string>();
+    (window as unknown as { storage: object }).storage = {
+      get: async (k: string) => (kept.has(k) ? { value: kept.get(k) } : null),
+      set: async (k: string, v: string) => { kept.set(k, v); return { key: k, value: v }; },
+    };
+  });
+  app = await loadApp(page, { launch: true, path: '/tools/bags/' });
+  await page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY === true');
+  const start = await phone(page);
+  await page.locator('#themeBtn').click();
+  expect(await shown(page)).toBe(other(start));
+  await page.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); });
+  expect(await shown(page)).toBe(other(start));
 });
