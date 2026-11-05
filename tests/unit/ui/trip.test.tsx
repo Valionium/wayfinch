@@ -2,7 +2,7 @@
 // The Trip screen on the real store (fake IndexedDB), with a fixed clock and a stand-in for the network.
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
-import { render } from 'preact';
+import { options, render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { buildScreen } from '../../../src/core/screen/screen.ts';
@@ -239,6 +239,42 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     await until(() => text().includes(W.appStoreStartTimeRange), 'the start range', 1000);
     await settle(30);
     expect(host.querySelector<HTMLInputElement>('#trip-start')!.value).toBe('08:30');
+  }, 20_000);
+
+  test('[TRIP-SETTINGS] nights typed the moment the settings appear, before their effects have run, stay in the field and are kept', async () => {
+    // Review M3 of PR 47, the twin of YOU-RIDER's: a field's effect that also ran after the first paint put the read value back over
+    // what was typed before it. The effects after that paint are held here until the test lets them go, so the typing comes first.
+    await withRoute();
+    act(() => render(null, host));
+    const real = services();
+    let asked = false;
+    let loaded!: () => void;
+    const gate = new Promise<void>((r) => { loaded = r; });
+    render(<TripScreen services={{ ...real, load: async () => { asked = true; await gate; return real.load(); } }} />, host);
+    for (let i = 0; i < 500 && !asked; i++) await new Promise<void>((r) => setTimeout(r, 10));
+    expect(asked).toBe(true);
+    const held: (() => void)[] = [];
+    const was = options.requestAnimationFrame;
+    options.requestAnimationFrame = (run) => { held.push(run); };
+    let nights!: HTMLInputElement;
+    try {
+      loaded();
+      for (let i = 0; i < 5000 && !host.querySelector('#trip-nights'); i++) await new Promise<void>((r) => setTimeout(r, 0));
+      nights = host.querySelector<HTMLInputElement>('#trip-nights')!;
+      nights.focus();
+      nights.value = '3';
+      nights.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 0));
+    } finally {
+      options.requestAnimationFrame = was;
+      for (const run of held) run();
+    }
+    await settle(150);
+    expect(host.querySelector('#trip-nights')).toBe(nights);
+    expect(nights.value).toBe('3');
+    await act(async () => { nights.dispatchEvent(new Event('change', { bubbles: true })); });
+    await until(() => host.querySelectorAll('[data-summary] ol li').length === 4, 'four days');
+    expect((await readTrip())!.route.stages).toHaveLength(4);
   }, 20_000);
 
   test('[TRIP-SETTINGS] a value out of range is refused with the range named, the last good value stays, and nothing is saved', async () => {

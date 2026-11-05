@@ -33,12 +33,13 @@ const tab = (page: Page, name: string) => page.getByRole('navigation', { name: '
  * page threw. YOU-EXPORT-UI failed this way three times in CI (the field typed and left, no write reported in 30 s) and never in
  * 90 local runs, so a failure must carry its own evidence.
  */
-function savedWeight(page: Page): () => Promise<void> {
+async function savedWeight(page: Page): Promise<() => Promise<void>> {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
   // What the field and the database did, in the page's own order: whether the change fired, and how each open of the store ended.
-  void page.addInitScript(() => {
+  // Awaited, so the script is in place before the first load (review M2 of PR 47).
+  await page.addInitScript(() => {
     const log: string[] = [];
     (window as unknown as { __wfLog: string[] }).__wfLog = log;
     const say = (s: string): void => { if (log.length < 150) log.push(`${Math.round(performance.now())} ${s}`); };
@@ -81,7 +82,7 @@ function savedWeight(page: Page): () => Promise<void> {
 }
 
 test('[YOU-RIDER] You opens as its own screen with the rider, water, learning, bikes, settings, data and legal cards, and a weight typed there is kept after a reload', async ({ page }) => {
-  const saved = savedWeight(page);
+  const saved = await savedWeight(page);
   app = await loadApp(page);
   await tab(page, 'You').click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('You');
@@ -102,7 +103,7 @@ test('[YOU-RIDER] You opens as its own screen with the rider, water, learning, b
 });
 
 test('[YOU-EXPORT-UI] Export downloads a JSON file named by the day, with the rider details in it', async ({ page }) => {
-  const saved = savedWeight(page);
+  const saved = await savedWeight(page);
   app = await loadApp(page);
   await tab(page, 'You').click();
   await expect(page.locator('[data-you-loaded]')).toBeVisible();
@@ -278,7 +279,7 @@ test('[WXR-AUTO-WIRED] in the browser: the automatic forecast shows on the Weath
 });
 
 test('[YOU-DELETE-UI] after Delete now and a reload, no empty database comes back, also with Keep trip data fresh on', async ({ page }) => {
-  const saved = savedWeight(page);
+  const saved = await savedWeight(page);
   app = await loadApp(page);
   await tab(page, 'You').click();
   await page.getByLabel('Your weight (kg)').fill('82');
