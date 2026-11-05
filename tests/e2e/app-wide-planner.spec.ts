@@ -328,3 +328,53 @@ test('[LC-GLIDE-OFF] with reduced motion, and in browsers without the transition
   }
   expect(errors).toEqual([]);
 });
+
+test('[LC-GLIDE-OFF] the transition never delays a navigation: Tools to the bag planner and back takes at most 1 s longer with motion allowed than with reduced motion', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools' });
+  await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
+  /** One round trip by the rider's own taps, timed from the tap until each page is ready. */
+  const roundTrip = async (): Promise<number> => {
+    const started = Date.now();
+    await page.locator('main[data-screen="tools"] a[href="/tools/bags/"]').click();
+    await page.waitForURL(/\/tools\/bags\/$/);
+    await ready(page);
+    await page.locator('#backToWayfinch').click();
+    await page.waitForURL(`${app!.origin}/#/tools`);
+    await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
+    return Date.now() - started;
+  };
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await roundTrip(); // warm: the worker's copies and the browser's caches
+  const times: Record<'reduce' | 'no-preference', number[]> = { reduce: [], 'no-preference': [] };
+  for (let i = 0; i < 2; i += 1) {
+    for (const motion of ['reduce', 'no-preference'] as const) {
+      await page.emulateMedia({ reducedMotion: motion });
+      times[motion].push(await roundTrip());
+    }
+  }
+  const best = (list: number[]) => Math.min(...list);
+  expect(best(times['no-preference']), JSON.stringify(times)).toBeLessThanOrEqual(best(times.reduce) + 1000);
+});
+
+test('[LC-WIDE-COLS] whenever the rig is sticky, all of it fits in the window: its foot and legend never hide below the edge, also with larger text (review M6)', async ({ page }) => {
+  for (const [w, h, font] of [[1100, 560, null], [1280, 720, null], [1920, 1080, null], [1100, 600, '150%'], [1280, 720, '150%'], [1440, 900, '200%'], [1100, 560, '200%'], [1280, 600, '150%']] as const) {
+    await planner(page, w, h);
+    // A larger default text size: what a rider's browser setting does to the page's relative sizes, and a minimum font size to its px ones.
+    if (font) await page.addStyleTag({ content: `html{font-size:${font} !important} body,body *{font-size:max(1em, ${font === '150%' ? 20 : 26}px) !important}` });
+    await page.evaluate("S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'frame', L:6 }, { uid:3, pos:'bar', L:12 }, { uid:4, pos:'rack', L:15, pair:true }, { uid:5, pos:'bottle', slot:'dt', L:0.75 }, { uid:6, pos:'fork', L:3, pair:true }]; S.nextUid = 7; go(2); go(3); go(4)");
+    if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
+    await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+    await page.waitForTimeout(300);
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
+    await page.waitForTimeout(200);
+    const facts = await page.evaluate(() => {
+      const rig = document.getElementById('rigBox')!;
+      const r = rig.getBoundingClientRect();
+      return { sticky: getComputedStyle(rig).position === 'sticky', bottom: r.bottom, height: window.innerHeight };
+    });
+    if (!font) expect(facts.sticky, `${w} x ${h}`).toBe(true); // the usual case: it does stick
+    if (facts.sticky) expect(facts.bottom, `${w} x ${h} ${font ?? ''}`).toBeLessThanOrEqual(facts.height);
+    await app!.close();
+    app = undefined;
+  }
+});

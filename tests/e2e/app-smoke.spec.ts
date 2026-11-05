@@ -30,3 +30,19 @@ test('[FLOW-FLIGHT] smoke: a prepared trip opens offline on Ahead, with its six 
   await page.locator('.ah-chips').getByRole('button', { name: 'Emergency', exact: true }).click();
   await expect(page.locator('#chip-emergency').getByRole('link', { name: 'Call 112' })).toHaveAttribute('href', 'tel:112');
 });
+
+test('[LC-GLIDE] smoke: Tools to the bag planner and Back to Wayfinch, by the rider\'s taps, with no page error (WebKit has the transition too)', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  app = await loadApp(page, { launch: true, path: '/#/tools' });
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tools');
+  for (let i = 0; i < 2; i += 1) {
+    await page.locator('main[data-screen="tools"] a[href="/tools/bags/"]').click();
+    await page.waitForURL(/\/tools\/bags\/$/);
+    await page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY === true');
+    await page.locator('#backToWayfinch').click();
+    await page.waitForURL(`${app.origin}/#/tools`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tools');
+  }
+  expect(errors).toEqual([]);
+});

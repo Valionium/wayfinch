@@ -1403,15 +1403,15 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .route-map-outline-note a:hover,.findnote a:hover{color:var(--ink)}
 @media(max-width:560px){.route-map-host{height:300px}.route-map-controls button{flex:1 1 auto}.route-map-block{padding:10px}}
 /* Wide screens (spec 7.1 item 13): from about 1100 px the rig and its inspector sit in a column of their own on the left, wide
-   enough for the inspector's side-by-side panel, and the steps on the right. Sticky below Back to Wayfinch when the window is tall
-   enough to show the whole rig. Layout only: nothing here changes a plan. */
+   enough for the inspector's side-by-side panel, and the steps on the right. Sticky below Back to Wayfinch only while the whole rig
+   fits in the window (rig-fits, set by syncPlannerTop), also with larger text. Layout only: nothing here changes a plan. */
 @media screen and (min-width:1100px){
   .wrap{max-width:1320px}
   .planner-cols{display:grid;grid-template-columns:minmax(640px,1fr) minmax(360px,1fr);column-gap:32px;align-items:start}
   .planner-cols>main{min-width:0}
   .rig svg{max-height:none}
   .route-map-host{height:min(600px,calc(100vh - 160px))}
-  @media (min-height:560px){.planner-cols>.rig{position:sticky;top:var(--planner-top,56px);z-index:5;background:var(--ground)}}
+  .planner-cols>.rig.rig-fits{position:sticky;top:var(--planner-top,56px);z-index:5;background:var(--ground)}
 }
 .dropzone-over{outline:2px dashed var(--blaze);outline-offset:4px}
 /* The bike glides from Wayfinch into the bag planner and back (spec 9.8): a cross-document view transition where motion is allowed
@@ -12467,13 +12467,19 @@ window.addEventListener('drop',e => {
   if(hit.zone.accepts(f)) hit.zone.read(f); else hit.zone.refuse();
 });
 // The two columns' rig sticks just below Back to Wayfinch, whatever height that row has.
+// It sticks only while all of it fits below that row (review M6): with larger text a taller rig scrolls with the page, so its foot
+// and legend never hide below the window's edge.
 function syncPlannerTop(){
   try {
-    const back=$('backToWayfinch'),row=back && typeof back.closest==='function' ? back.closest('.guide-launch-row') : null;
-    if(row) document.documentElement.style.setProperty('--planner-top',(row.offsetHeight+8)+'px');
+    const back=$('backToWayfinch'),row=back && typeof back.closest==='function' ? back.closest('.guide-launch-row') : null,rig=$('rigBox');
+    if(!row || !rig) return;
+    const top=row.offsetHeight+8;
+    document.documentElement.style.setProperty('--planner-top',top+'px');
+    rig.classList.toggle('rig-fits',rig.offsetHeight+top<=window.innerHeight);
   } catch(e){}
 }
 window.addEventListener('resize',syncPlannerTop);
+try { if(typeof ResizeObserver==='function') new ResizeObserver(syncPlannerTop).observe($('rigBox')); } catch(e){}
 syncPlannerTop();
 $('tellGo').onclick = async () => {
   const v = $('tellInput').value.trim();
