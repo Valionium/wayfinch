@@ -166,6 +166,8 @@ export async function cleanupHandoff(deps: Pick<HandoffDeps, 'now' | 'deleteReco
 
 /** At start-up: the handoff goes once the bag planner has answered for it, or after 24 hours. Only ever deletes. */
 export async function cleanupStoredHandoff(): Promise<void> {
+  // No envelope, nothing handed off since the last cleanup (each handoff cleans before it writes): the database is not touched.
+  try { if (localStorage.getItem(HANDOFF_KEY) === null) return; } catch { return; }
   const { inExistingTx } = await import('../../store/db.ts');
   await cleanupHandoff({
     now: () => new Date(),
