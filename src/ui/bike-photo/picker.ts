@@ -10,6 +10,8 @@ export const PATCH = 15;
 
 /** The words the picker shows; the page passes its own, from its bike wording table. */
 export type PickerWords = { choose: string; tap: string; use: string; again: string; close: string; loupe: string; failed: string };
+/** Front, back and fork (the look extras, owner's wish of 5 November 2026): three taps, in order, each a colour. */
+export type ThreeTaps = { modes: string; one: string; three: string; steps: [string, string, string]; done: string; use: string };
 export type PickerOptions = {
   words: PickerWords;
   /** A colour was tapped: show it on the drawing, without keeping it. */
@@ -18,6 +20,8 @@ export type PickerOptions = {
   onUse: (hex: string) => void;
   /** The picker closed; the page restores whatever it showed before. */
   onClose: () => void;
+  /** Offers the second way, Front, back and fork: the taps so far are shown with onTaps and kept with onUseTaps. */
+  three?: ThreeTaps & { onTaps: (taps: readonly string[]) => void; onUseTaps: (taps: readonly string[]) => void };
 };
 export type Picker = { close: () => void; root: HTMLElement };
 
@@ -82,12 +86,19 @@ export function openPicker(host: HTMLElement, options: PickerOptions): Picker {
   loupe.setAttribute('role', 'img');
   loupe.setAttribute('aria-label', words.loupe);
   stage.append(canvas, loupe);
+  // The two ways, once a photo is open: one colour (as before), or the frame's front and back and the fork, tapped in turn.
+  const three = options.three;
+  const modes = el('div', { className: 'photo-modes hidden' });
+  modes.setAttribute('role', 'group');
+  const modeOne = el('button', { type: 'button', className: 'look-chip', textContent: three?.one ?? '' });
+  const modeThree = el('button', { type: 'button', className: 'look-chip', textContent: three?.three ?? '' });
+  if (three) { modes.setAttribute('aria-label', three.modes); modes.append(modeOne, modeThree); }
   const actions = el('div', { className: 'photo-actions' });
   const use = el('button', { type: 'button', className: 'go small hidden', textContent: words.use });
   const again = el('button', { type: 'button', className: 'linky hidden', textContent: words.again });
   const close = el('button', { type: 'button', className: 'linky', textContent: words.close });
   actions.append(use, again, close);
-  root.append(chooseLabel, hint, stage, actions);
+  root.append(chooseLabel, modes, hint, stage, actions);
   host.append(root);
 
   let url: string | null = null;
@@ -95,6 +106,15 @@ export function openPicker(host: HTMLElement, options: PickerOptions): Picker {
   let picked: string | null = null;
   let pixels: ImageData | null = null;
   let closed = false;
+  let mode: 'one' | 'three' = 'one';
+  let taps: string[] = [];
+  const showMode = () => {
+    modeOne.setAttribute('aria-pressed', String(mode === 'one'));
+    modeThree.setAttribute('aria-pressed', String(mode === 'three'));
+  };
+  showMode();
+  /** The hint for the next tap. */
+  const nextHint = () => (mode === 'three' && three ? (taps.length < 3 ? three.steps[taps.length]! : three.done) : words.tap);
 
   const release = () => {
     if (image) { image.onload = null; image.onerror = null; image.removeAttribute('src'); image = null; }
@@ -113,8 +133,26 @@ export function openPicker(host: HTMLElement, options: PickerOptions): Picker {
     use.classList.toggle('hidden', !hex);
     again.classList.toggle('hidden', !hex);
     loupe.classList.toggle('hidden', !hex);
-    options.onPreview(hex);
+    if (mode === 'three' && three) {
+      use.textContent = three.use;
+      three.onTaps(taps);
+    } else {
+      use.textContent = words.use;
+      options.onPreview(hex);
+    }
   };
+  const setMode = (next: 'one' | 'three') => {
+    if (mode === next) return;
+    // the drawing goes back to how it was before any tap, then the new way starts
+    if (mode === 'three' && three) { taps = []; three.onTaps(taps); }
+    mode = next;
+    taps = [];
+    showMode();
+    showPicked(null);
+    hint.textContent = nextHint();
+  };
+  modeOne.addEventListener('click', () => setMode('one'));
+  modeThree.addEventListener('click', () => setMode('three'));
   const finish = () => {
     if (closed) return;
     closed = true;
@@ -128,6 +166,7 @@ export function openPicker(host: HTMLElement, options: PickerOptions): Picker {
     const f = file.files?.[0];
     release();
     clearCanvas();
+    taps = [];
     showPicked(null);
     if (!f) return;
     url = URL.createObjectURL(f);
@@ -144,7 +183,9 @@ export function openPicker(host: HTMLElement, options: PickerOptions): Picker {
       release();                          // the canvas holds the pixels now; the file and its image go
       file.value = '';
       stage.classList.remove('hidden');
-      hint.textContent = words.tap;
+      modes.classList.toggle('hidden', !three);
+      taps = [];
+      hint.textContent = nextHint();
       // the photo in full view, below the drawing that stays at the top
       stage.scrollIntoView?.({ block: 'end' });
     };
@@ -163,12 +204,23 @@ export function openPicker(host: HTMLElement, options: PickerOptions): Picker {
     if (lctx) drawLoupe(lctx, canvas, canvas.width, canvas.height, x, y, loupe.width);
     loupe.style.left = `${Math.max(0, Math.min(r.width - 90, clientX - r.left - 45))}px`;
     loupe.style.top = `${Math.max(0, clientY - r.top - 110)}px`;
+    if (mode === 'three' && hex) {
+      // a fourth tap starts again from the front
+      taps = taps.length >= 3 ? [hex] : [...taps, hex];
+      hint.textContent = nextHint();
+    }
     showPicked(hex);
   };
   canvas.addEventListener('click', (e) => tapAt(e.clientX, e.clientY));
 
-  use.addEventListener('click', () => { const hex = picked; finish(); if (hex) options.onUse(hex); });
-  again.addEventListener('click', () => { showPicked(null); hint.textContent = words.tap; });
+  use.addEventListener('click', () => {
+    const hex = picked;
+    const kept = taps;
+    const both = mode === 'three' && three;
+    finish();
+    if (both) { if (kept.length > 0) three.onUseTaps(kept); } else if (hex) options.onUse(hex);
+  });
+  again.addEventListener('click', () => { taps = []; showPicked(null); hint.textContent = nextHint(); });
   close.addEventListener('click', () => { finish(); options.onClose(); });
 
   hint.textContent = '';

@@ -298,6 +298,34 @@ for (const start of ['legacy', 'step-one'] as const) {
     expect(after[0]!.look).toBeNull(); // and so is the Look
   });
 
+  test(`[BK-PAINT-OLD-PAGE] known risk, not a guarantee: ${which} page re-saving a bike drops its look extras (pattern, fork, rims); format stays 2 and the bike then draws in one colour`, async ({ context, page }) => {
+    await phone(page, start);
+    await launch();
+    const { planner } = await plannerSaves(context);
+    // The bag planner gives the bike a pattern, a fork of its own and deep rims.
+    await planner.evaluate(`(async () => {
+      const list = BIKE_PROFILES.map((b) => normaliseBikeProfile({ ...b, look: { colour: '#2563b8', bars: null, ebike: null,
+        paint: { pattern: 'marble', colours: ['#6b3fa0', '#1f7f80'], fork: { kind: 'own', colour: '#c62f2a' }, rimMm: 50 } } }));
+      if (!(await bikeStoreSet(BIKE_PROFILE_KEY, list))) throw new Error('the planner could not save');
+    })()`);
+    expect(await planner.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfiles')!)[0].look.paint.pattern)).toBe('marble');
+    // The old page reads the list as its own start-up does and saves it back, as its weight question or bike editor would.
+    expect(await page.evaluate(`(async () => {
+      BIKE_PROFILES = JSON.parse(localStorage.getItem(BIKE_PROFILE_KEY)).map(normaliseBikeProfile).filter(Boolean);
+      return bikeStoreSet(BIKE_PROFILE_KEY, BIKE_PROFILES);
+    })()`)).toBe(true);
+    const after = JSON.parse((await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles')))!) as { id: string; look: { paint?: unknown } | null }[];
+    expect(after.map((b) => b.id)).toEqual(['bike-before']);
+    expect(after[0]!.look?.paint).toBeUndefined(); // the extras are gone
+    expect(await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfilesFormat'))).toBe('2'); // and a rollback can still edit bikes
+    // The bag planner reads what is left without a fault: no pattern, no rims.
+    await planner.reload({ waitUntil: 'domcontentloaded' });
+    await draftReady(planner);
+    const svg = await planner.evaluate("bikeDrawing(BIKE_PROFILES[0], null, { theme: 'dark' })?.svg ?? ''");
+    expect(svg).toContain('<svg');
+    expect(svg.includes('url(#') || svg.includes('bk-rimband')).toBe(false);
+  });
+
   test(`[SW-OLD-TAB-WRITES] a future bike format (3, which no page writes today) would block ${which} bike write, with its message`, async ({ context, page }) => {
     await phone(page, start);
     await launch();

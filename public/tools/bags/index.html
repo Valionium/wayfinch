@@ -1567,6 +1567,8 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .photo-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .photo-actions button{min-height:44px}
 .photo-note{margin:6px 0 0;font-size:13px;color:var(--muted)}
+.photo-modes{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.photo-modes .look-chip[aria-pressed=true]{outline:2px solid var(--blaze);outline-offset:1px}
 .bike-more>summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600}
 .fit-triangle{width:120px;color:var(--ink,#000)}
 .fitfixes{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
@@ -3318,6 +3320,14 @@ function startNewBike(){
 // The flags a fragment can carry, read exactly: #dev, #quiet, or both joined with &. A bike id never counts as one.
 function hashFlags(hash){const parts=String(hash||'').replace(/^#/,'').split('&');return {dev:parts.includes('dev'),quiet:parts.includes('quiet')};}
 let LOOK_PREVIEW=null,LOOK_PHOTO=null;   // a colour tapped on a photo, shown on the drawing until it is used; the open photo picker
+let LOOK_PREVIEW_TAPS=null;   // Front, back and fork from a photo: the taps so far, shown on the drawing until they are used
+// Front, back and fork: the front is the frame's colour, the back makes a front-to-back fade, the fork takes its own colour.
+function lookFromTaps(look,taps){
+  if(!taps || !taps.length)return look;
+  const p=look.paint || {pattern:'solid',colours:[null,null],fork:null,rimMm:null};
+  const paint=taps.length<2 ? p : {...p,pattern:'fade-h',colours:[taps[1],p.colours[1]],fork:taps[2] ? {kind:'own',colour:taps[2]} : p.fork};
+  return {...look,colour:taps[0],paint};
+}
 const LOOK_BARS=[['drop','lookDrop'],['flat','lookFlat'],['other','lookOther'],['','lookNotSet']];
 const LOOK_EBIKE=[['true','lookYes'],['false','lookNo'],['','lookNotSet']];
 // The bike Bike details shows: the plan's, a saved one opened without applying it, or none yet (a new bike).
@@ -3463,7 +3473,7 @@ function initialiseLookExtras(){
 function lookPreviewBike(){
   const t=lookTarget(),raw=t.bike || (BIKE_PROFILE_FORM_READY ? readBikeProfileEditor() : null);
   const look=currentLook()||{colour:null,bars:null,ebike:null};
-  return raw ? normaliseBikeProfile({...raw,look:LOOK_PREVIEW ? {...look,colour:LOOK_PREVIEW} : look}) : null;
+  return raw ? normaliseBikeProfile({...raw,look:lookFromTaps(LOOK_PREVIEW ? {...look,colour:LOOK_PREVIEW} : look,LOOK_PREVIEW_TAPS)}) : null;
 }
 let LOOK_READY=null;
 function renderLook(){
@@ -3610,13 +3620,25 @@ async function openLookPhoto(){
   LOOK_PHOTO=module.openPicker($('lookPhotoBox'),{words,
     onPreview:hex=>{LOOK_PREVIEW=hex;renderLook();},
     onUse:hex=>{LOOK_PHOTO=null;LOOK_PREVIEW=null;note.remove();setLook({colour:hex});$('lookPhoto').focus({preventScroll:true});},
-    onClose:()=>{LOOK_PHOTO=null;LOOK_PREVIEW=null;note.remove();renderLook();}});
+    onClose:()=>{LOOK_PHOTO=null;LOOK_PREVIEW=null;LOOK_PREVIEW_TAPS=null;note.remove();renderLook();},
+    three:lookPhotoThree(note)});
   LOOK_PHOTO.root.appendChild(note);
   renderLook();
 }
+// The picker's second way, Front, back and fork, with bike.js's words; without bike.js's extras, only one colour is offered.
+function lookPhotoThree(note){
+  const B=lookExtras();if(!B)return undefined;
+  const P=B.PAINT_WORDS;
+  return {modes:P.paintPhotoModes,one:P.paintPhotoOne,three:P.paintPhotoThree,steps:[P.paintPhotoFront,P.paintPhotoBack,P.paintPhotoFork],done:P.paintPhotoDone,use:P.paintPhotoUse,
+    onTaps:taps=>{LOOK_PREVIEW_TAPS=taps.length ? [...taps] : null;renderLook();},
+    onUseTaps:taps=>{
+      LOOK_PHOTO=null;LOOK_PREVIEW=null;LOOK_PREVIEW_TAPS=null;note.remove();
+      setLook(lookFromTaps(currentLook() || {colour:null,bars:null,ebike:null},taps));$('lookPhoto').focus({preventScroll:true});
+    }};
+}
 function closeLookPhoto(){
   const picker=LOOK_PHOTO;if(!picker)return;
-  LOOK_PHOTO=null;LOOK_PREVIEW=null;picker.close();
+  LOOK_PHOTO=null;LOOK_PREVIEW=null;LOOK_PREVIEW_TAPS=null;picker.close();
 }
 
 /* ---- Back to Wayfinch (spec 7.1 item 5): always there, at the top. /#/tools by default; after Bike details opened from the co-pilot,
