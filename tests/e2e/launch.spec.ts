@@ -238,10 +238,10 @@ test('[SW-NO-MARKER] the co-pilot\'s / has no Load Check marker, so an old worke
  * the bag planner saves. Its last line of defence is its own check before each write.
  */
 const staleChange = (page: Page) => page.evaluate(`(() => {
-  const deaf = (e) => e.stopImmediatePropagation();
-  window.addEventListener('storage', deaf, true);
-  window.addEventListener('pageshow', deaf, true);
-  document.addEventListener('visibilitychange', deaf, true);
+  // The page's own listeners are taken off by name: a listener added in front of them would not stop them.
+  window.removeEventListener('storage', followOtherTabs);
+  window.removeEventListener('pageshow', checkOtherTabs);
+  document.addEventListener('visibilitychange', (e) => e.stopImmediatePropagation(), true);
   window.queueDraftSave = () => {};
   S.nights = 5;
 })()`);
@@ -260,7 +260,9 @@ async function plannerSaves(context: BrowserContext): Promise<{ planner: Page; d
 }
 
 for (const start of ['legacy', 'step-one'] as const) {
-  test(`[SW-OLD-TAB-WRITES] ${start === 'legacy' ? "the old site's" : "the first release's"} page left open at / writes after the bag planner saved: the newer draft stays, and a newer bike format blocks its write`, async ({ context, page }) => {
+  const which = start === 'legacy' ? "the old site's" : "the first release's";
+
+  test(`[SW-OLD-TAB-WRITES] ${which} page left open at / writes after the bag planner saved: the newer draft stays`, async ({ context, page }) => {
     await phone(page, start);
     await launch();
     await staleChange(page);
@@ -270,24 +272,86 @@ for (const start of ['legacy', 'step-one'] as const) {
     await page.evaluate('flushDraft()');
     expect(await page.evaluate(() => localStorage.getItem('loadcheck:draft'))).toBe(draft);
     expect(await page.evaluate(() => !document.getElementById('tabBar')!.classList.contains('hidden') && /changed in another tab/.test(document.getElementById('tabText')!.textContent ?? ''))).toBe(true);
-    // Hiding it writes nothing either.
+    // Hiding it writes nothing either, and nor does closing it.
     await page.evaluate('flushDraft()');
     expect(await page.evaluate(() => localStorage.getItem('loadcheck:draft'))).toBe(draft);
-
-    // A bike list a newer page marked with a higher format: the old tab never rewrites it, and says why.
-    await page.evaluate(() => localStorage.setItem('loadcheck:bikeProfilesFormat', '3'));
-    const bikes = await page.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles'));
-    const wrote = await page.evaluate('bikeStoreSet(BIKE_PROFILE_KEY, [normaliseBikeProfile({ id: "bike-old-tab", name: "Old tab" })])');
-    expect(wrote).toBe(false);
-    expect(await page.evaluate('BIKE_PROFILE_MESSAGE === BIKE_NEWER_MESSAGE')).toBe(true);
-    expect(await page.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles'))).toBe(bikes);
-    // Closing it writes nothing.
     await page.close({ runBeforeUnload: true });
     expect(await planner.evaluate(() => localStorage.getItem('loadcheck:draft'))).toBe(draft);
-    expect(await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles'))).toBe(bikes);
   });
 
-  test(`[SW-OLD-TAB-WRITES] ${start === 'legacy' ? "the old site's" : "the first release's"} page writes no saved-at stamps; a delete request still judges its later draft by its own time and keeps it`, async ({ context, page }) => {
+  test(`[SW-OLD-TAB-WRITES] known risk, not a guarantee (review I1): ${which} stale tab's bike write replaces the bag planner's newer bike list, since both pages are at bike format 2`, async ({ context, page }) => {
+    await phone(page, start);
+    await launch();
+    await staleChange(page);
+    const { planner } = await plannerSaves(context);
+    // The bag planner adds a bike and gives the old one a Look, through its own guarded write.
+    await planner.evaluate(`(async () => {
+      const list = BIKE_PROFILES.map((b) => (b.id === 'bike-before' ? normaliseBikeProfile({ ...b, look: { colour: '#aa3300', bars: 'flat', ebike: true } }) : b));
+      list.push(normaliseBikeProfile({ id: 'bike-new', name: 'New bike' }));
+      if (!(await bikeStoreSet(BIKE_PROFILE_KEY, list))) throw new Error('the planner could not save');
+    })()`);
+    expect(await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfilesFormat'))).toBe('2');
+    // The old tab, which heard nothing, writes its own list, as its weight question, bolt check or bike editor would.
+    expect(await page.evaluate('bikeStoreSet(BIKE_PROFILE_KEY, BIKE_PROFILES)')).toBe(true);
+    const after = JSON.parse((await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles')))!) as { id: string; look: unknown }[];
+    expect(after.map((b) => b.id)).toEqual(['bike-before']); // the new bike is gone
+    expect(after[0]!.look).toBeNull(); // and so is the Look
+  });
+
+  test(`[SW-OLD-TAB-WRITES] a future bike format (3, which no page writes today) would block ${which} bike write, with its message`, async ({ context, page }) => {
+    await phone(page, start);
+    await launch();
+    await staleChange(page);
+    await plannerSaves(context);
+    await page.evaluate(() => localStorage.setItem('loadcheck:bikeProfilesFormat', '3'));
+    const bikes = await page.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles'));
+    expect(await page.evaluate('bikeStoreSet(BIKE_PROFILE_KEY, [normaliseBikeProfile({ id: "bike-old-tab", name: "Old tab" })])')).toBe(false);
+    expect(await page.evaluate('BIKE_PROFILE_MESSAGE === BIKE_NEWER_MESSAGE')).toBe(true);
+    expect(await page.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles'))).toBe(bikes);
+  });
+
+  test(`[SW-OLD-TAB-WRITES] known risk, not a guarantee (review M1): a setup or bike ${which} page saves just after a delete request goes with the rest, as it has no stamp`, async ({ context, page }) => {
+    await phone(page, start);
+    await launch();
+    const planner = await context.newPage();
+    const requestId = 'aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbb';
+    await page.evaluate((rid) => localStorage.setItem('copilot:delete-request:v1', JSON.stringify({ app: 'copilot', kind: 'delete-request', v: 1, id: rid, createdAt: new Date().toISOString() })), requestId);
+    await page.waitForTimeout(20);
+    await page.evaluate(`(async () => {
+      await saveSetup('After', 'saved after the request');
+      await bikeStoreSet(BIKE_PROFILE_KEY, [...BIKE_PROFILES, normaliseBikeProfile({ id: 'bike-after', name: 'After' })]);
+    })()`);
+    expect(await page.evaluate('SETUPS.map((s) => s.name)')).toContain('After');
+    await planner.goto(`${server!.origin}/tools/bags/#copilot-delete=${requestId}`, { waitUntil: 'domcontentloaded' });
+    await draftReady(planner);
+    expect(await planner.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:delete-applied')!).id)).toBe(requestId);
+    expect(await planner.evaluate(() => [localStorage.getItem('loadcheck:setups'), localStorage.getItem('loadcheck:bikeProfiles')])).toEqual([null, null]);
+  });
+
+  test(`[SW-OLD-TAB-WRITES] known risk, not a guarantee (review M2): after a delete, ${which} tab still open writes the deleted setups and bikes back with its next save`, async ({ context, page }) => {
+    await phone(page, start);
+    await launch();
+    const planner = await context.newPage();
+    const requestId = 'ccccccccccccccccdddddddddddddddd';
+    await planner.goto(`${server!.origin}/tools/bags/`, { waitUntil: 'domcontentloaded' });
+    await draftReady(planner);
+    await planner.evaluate((rid) => localStorage.setItem('copilot:delete-request:v1', JSON.stringify({ app: 'copilot', kind: 'delete-request', v: 1, id: rid, createdAt: new Date(Date.now() + 1000).toISOString() })), requestId);
+    await planner.goto('about:blank');
+    await planner.goto(`${server!.origin}/tools/bags/#copilot-delete=${requestId}`, { waitUntil: 'domcontentloaded' });
+    await draftReady(planner);
+    expect(await planner.evaluate(() => [localStorage.getItem('loadcheck:setups'), localStorage.getItem('loadcheck:bikeProfiles')])).toEqual([null, null]);
+    // The old tab heard the removals (nothing held back) and still holds the lists in memory; its next saves write them back.
+    await page.evaluate(`(async () => {
+      await saveSetup('Again', '');
+      await bikeStoreSet(BIKE_PROFILE_KEY, BIKE_PROFILES);
+    })()`);
+    const setups = JSON.parse((await planner.evaluate(() => localStorage.getItem('loadcheck:setups')))!) as { name: string }[];
+    expect(setups.map((x) => x.name).sort()).toEqual(['Again', 'Before']);
+    const bikes = JSON.parse((await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles')))!) as { id: string }[];
+    expect(bikes.map((b) => b.id)).toEqual(['bike-before']);
+  });
+
+  test(`[SW-OLD-TAB-WRITES] ${which} page writes no saved-at stamps; a delete request still judges its later draft by its own time and keeps it`, async ({ context, page }) => {
     await phone(page, start);
     await launch();
     await staleChange(page);

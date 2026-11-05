@@ -91,6 +91,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - A failing check saves a regression file and can be replayed (§11.1) [HON-SIM-FAIL]
 - One seed always gives the same run (§11.1) [HON-SIM-SEED]
 - Every property test runs on the fixed seed and run count, or the ones FC_SEED and FC_RUNS give, through @fast-check/vitest too (§11.1) [HON-PROP-SEED]
+- A scheduled run of every property test on a random seed, which prints its seed, so the fixed seed of pull requests doesn't hide a counterexample for good (§11.1, §11.8) [HON-PROP-SWEEP]
 - One screen on a long route builds within the time budget (§4.5) [HON-BUDGET]
 
 ## Contracts
@@ -916,7 +917,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - from the step-one worker, the launch build waits; the prompt applies it; / is then the co-pilot and /tools/bags/ the bag planner, both offline; every saved plan intact (§9.5 step two, §11) [SW-LAUNCH-UPDATE]
 - from the old worker straight to the launch build: the first online open serves the old copy; the new worker installs and takes over on its first install; the next open is the co-pilot; no loadcheck-offline-* cache left; every loadcheck:* key byte-identical; /tools/bags/ offline; with no signal throughout, the old copy keeps serving (§9.5, Review Focus 1) [SW-JUMP]
 - the co-pilot's / carries no loadcheck-offline-shell marker, so an old worker still in charge can't store it (§9.5 step 3) [SW-NO-MARKER]
-- a tab of an old page left open at / that writes after the bag planner saved never overwrites the newer draft (M9); a newer bike format blocks its bike write with its message; it writes no saved-at stamps, and a delete request still judges its writes by their own times (§9.5 step 4, §7.1 Contract 3, Review Focus 3) [SW-OLD-TAB-WRITES]
+- a tab of an old page left open at / that writes after the bag planner saved never overwrites the newer draft (M9); a future bike format would block its bike write with its message; it writes no saved-at stamps, and a delete request still judges its draft by its own time; its known risks (bike list replaced, a save just after a delete request, deleted lists written back) are pinned as tests of today's behaviour (AGENTS.md) (§9.5 step 4, §7.1 Contract 3, Review Focus 3) [SW-OLD-TAB-WRITES]
 - a rider with loadcheck:draft or loadcheck:setups gets a one-time card "Load Check is now part of Wayfinch", under Tools, its link in the same window; once dismissed it is gone; a new rider never sees it (§9.5 step two) [SW-MOVED-CARD]
 - the launch build's precache holds the shell, its lazy chunks, the bag planner, bike.js, bike-photo.js, Leaflet, the licences, imprint and privacy pages and the boundary file, at canonical addresses only, each at most 2 MiB; the manifest's shortcuts open offline (§9.1, §9.6) [SW-PRECACHE-ALL]
 - from about 1100 px the bag planner has two columns: the rig and the inspector sticky on the left, the steps on the right, Back to Wayfinch in view; nothing changes under 600 px; a taller map on wide screens (§7.1 item 13) [LC-WIDE-COLS]
