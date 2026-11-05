@@ -88,3 +88,50 @@ test('[AH-ROUTINE] it keeps the reading within 50 m, and the accuracy is on the 
   await page.locator('[data-update-position]').click();
   await expect(page.locator('[data-position-line]')).toContainText('±30 m');
 });
+
+test('[AH-MANUAL] at 360 px a tap the moment Ahead shows opens the picker, and it keeps a slowly typed kilometre across minute ticks and a new fix', async ({ page }) => {
+  // The review of PR 47: the picker closed at each minute tick, with what was typed in it, as the position line's age moved on.
+  const at = (await loadFixtureRoute('heidelberg-strasbourg')).points[200]!;
+  await fakeGeolocation(page, { mode: 'readings', accuracies: [20], lat: at.lat, lon: at.lon });
+  await page.setViewportSize({ width: 360, height: 640 });
+  await page.clock.install(); // the real time, flowing, which the test moves on by whole minutes
+  app = await loadApp(page);
+  await preparedTrip(page, 'heidelberg-strasbourg', { departureDate: today(), places: true });
+  await onAhead(page);
+  const line = page.locator('[data-position-line]');
+  await page.locator('[data-update-position]').click();
+  await expect(line).toContainText('±20 m');
+  // Opened again, the screen has answers and the picker closed; the tap comes as soon as the button is there.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: 'Set position by hand' }).click();
+  const picker = page.locator('#ah-picker');
+  await expect(picker).toBeVisible();
+  const km = picker.getByLabel('Route kilometre');
+  await km.fill('');
+  for (const key of ['1', '2', '.', '5']) {
+    await expect(picker, `the picker still open before "${key}"`).toBeVisible();
+    await km.pressSequentially(key);
+    await page.clock.runFor(61_000); // a minute between keys: the line's age moves on each time
+  }
+  await expect(line).toContainText('min ago');
+  await expect(picker).toBeVisible();
+  await expect(km).toHaveValue('12.5');
+  // A new fix while the picker is open: it and the typing stay.
+  const before = await line.textContent();
+  await page.locator('[data-update-position]').click();
+  await page.clock.runFor(1_000);
+  await expect(line).not.toHaveText(before ?? '');
+  await expect(picker).toBeVisible();
+  await expect(km).toHaveValue('12.5');
+  // Used, it sets the position and closes, as on a phone before.
+  await picker.getByRole('button', { name: 'Use this position' }).click();
+  await expect(line).toContainText(/km 12\.5 of [\d.]+/);
+  await expect(picker).toBeHidden();
+  // Opened and only tapped into, then Update position: the kept fix closes it, so what is under it is in view again.
+  await page.getByRole('button', { name: 'Set position by hand' }).click();
+  await km.focus();
+  await page.locator('[data-update-position]').click();
+  await page.clock.runFor(1_000);
+  await expect(line).toContainText('±20 m');
+  await expect(picker).toBeHidden();
+});

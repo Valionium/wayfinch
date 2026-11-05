@@ -139,6 +139,24 @@ describe('Rider and water you can carry (spec section 3.5)', () => {
     expect((await readProfile()).weightKg).toBe(82);
   });
 
+  test('[YOU-RIDER] a weight changed elsewhere (another tab, the bag planner) shows in the field at each step while it is not being typed in, also after a refused value', async () => {
+    // Review M3 of PR 47: the fields follow a stored value only when it changes; nothing else pinned that half.
+    await show();
+    const elsewhere = services(); // another window's own services, on the same store
+    const tellOthers = (): void => { window.dispatchEvent(new StorageEvent('storage', { key: 'copilot:changed', newValue: localStorage.getItem('copilot:changed') })); };
+    for (const kg of [70, 71, 70]) {
+      await elsewhere.writeProfile({ weightKg: kg });
+      tellOthers();
+      await until(() => field('you-weight').value === String(kg), `the field to show ${kg}`);
+    }
+    await type(field('you-weight'), '900');
+    await until(() => text().includes(W.appStoreWeightRange), 'the refusal');
+    expect(field('you-weight').value).toBe('70');
+    await elsewhere.writeProfile({ weightKg: 72 });
+    tellOthers();
+    await until(() => field('you-weight').value === '72', 'the field to show 72 after the refusal');
+  });
+
   test('[YOU-RIDER] empty is allowed everywhere: a cleared weight is none, a cleared speed is the default, and nothing is required', async () => {
     await show();
     expect(field('you-weight').value).toBe('');

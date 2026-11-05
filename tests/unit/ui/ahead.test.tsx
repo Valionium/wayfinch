@@ -2,7 +2,7 @@
 // Ahead's page against the screen it was given (plan Tasks 15 and 16): the words are the screen's, in section 3.2's order, and
 // each tap does what its words say through the actions object, and nothing else.
 import { afterEach, describe, expect, test } from 'vitest';
-import { render } from 'preact';
+import { options, render } from 'preact';
 import { act } from 'preact/test-utils';
 import { AheadScreen } from '../../../src/ui/ahead/ahead.tsx';
 import { railSignal } from '../../../src/ui/wide/wide.ts';
@@ -185,6 +185,176 @@ describe('cards', () => {
     await act(async () => { render(<AheadScreen view={after} actions={actions} />, host); }); // the same page, a new screen
     expect(kmField().value).toBe(String(after.screen.ride.startKm));
     railSignal.value = false;
+  });
+
+  test('[AH-MANUAL] a tap on Set position by hand the moment Ahead appears, before its effects have run, opens the picker', async () => {
+    // Ahead's effect also ran once after the first paint and closed the picker again, so a tap before it did nothing. Here the
+    // effects after the paint are held until the test lets them go: the tap comes first, as it can on a busy phone.
+    const v = trip(viewOf(rainyStop()));
+    expect(v.answers).toBe(true);
+    await act(async () => { render(null, host); });
+    const held: (() => void)[] = [];
+    const was = options.requestAnimationFrame;
+    options.requestAnimationFrame = (run) => { held.push(run); };
+    try {
+      render(<AheadScreen view={v} actions={fakeActions().actions} />, host);
+      expect(host.querySelector('#ah-picker')).toBeNull();
+      buttonNamed('Set position by hand').click();
+      await new Promise((r) => setTimeout(r, 0));
+    } finally {
+      options.requestAnimationFrame = was;
+      for (const run of held) run();
+    }
+    await act(async () => { await new Promise((r) => setTimeout(r, 150)); });
+    expect(host.querySelector('#ah-picker')).not.toBeNull();
+  });
+
+  test('[AH-MANUAL] a picker the rider opened stays open with what was typed through new screens, also a new position, until it is closed or used', async () => {
+    const { actions, calls } = fakeActions();
+    const at = (km: number, time: string) => trip(viewOf(rainyStop({ now: `${SAT} ${time}`, positions: [pos({ km, at: `${SAT} 14:20` })] })));
+    await show(at(40, '14:20'), actions);
+    await click(buttonNamed('Set position by hand'));
+    const kmField = () => host.querySelector<HTMLInputElement>('#ah-picker input[type=number]');
+    await typeInto(kmField()!, '7');
+    for (const next of [at(40, '14:21'), at(40, '14:25'), at(141, '14:30')]) {
+      await act(async () => { render(<AheadScreen view={next} actions={actions} />, host); });
+      expect(kmField()?.value).toBe('7');
+    }
+    await typeInto(kmField()!, '77');
+    await click(buttonNamed('Use this position'));
+    expect(calls.filter((c) => c[0] === 'setManual')).toEqual([['setManual', 77]]);
+    expect(kmField()).toBeNull(); // used: on a phone it closes
+    await click(buttonNamed('Set position by hand'));
+    expect(kmField()).not.toBeNull();
+    await click(buttonNamed('Set position by hand'));
+    expect(kmField()).toBeNull(); // closed by the rider
+  });
+
+  test('[AH-FIRST-USE] on a phone the picker of first use closes when answers first show, unless the rider has started using it', async () => {
+    const { actions } = fakeActions();
+    const none = trip(viewOf(rainyStop({ now: `${SAT} 09:00`, positions: [] })));
+    const found = trip(viewOf(rainyStop({ now: `${SAT} 09:00`, positions: [pos({ km: 3, at: `${SAT} 09:00` })] })));
+    expect([none.answers, found.answers]).toEqual([false, true]);
+    const kmField = () => host.querySelector<HTMLInputElement>('#ah-picker input[type=number]');
+    // Untouched: a position closes it, as section 3.2's returning screen has it.
+    await show(none, actions);
+    expect(kmField()).not.toBeNull();
+    await act(async () => { render(<AheadScreen view={found} actions={actions} />, host); });
+    expect(kmField()).toBeNull();
+    // Being typed into: a fix arriving then leaves the picker and the typing alone.
+    await show(none, actions);
+    kmField()!.focus();
+    await typeInto(kmField()!, '4');
+    await act(async () => { render(<AheadScreen view={found} actions={actions} />, host); });
+    expect(kmField()?.value).toBe('4');
+  });
+
+  describe('what counts as using the picker (review I1 of PR 48: a keystroke, a slider move or a pick; focus alone never)', () => {
+    const at = (km: number) => trip(viewOf(rainyStop({ positions: [pos({ km, at: `${SAT} 14:20` })] })));
+    const kmField = () => host.querySelector<HTMLInputElement>('#ah-picker input[type=number]');
+    const slider = () => host.querySelector<HTMLInputElement>('#ah-picker input[type=range]');
+    const again = async (v: AheadTrip, actions: ReturnType<typeof fakeActions>['actions']) => { await act(async () => { render(<AheadScreen view={v} actions={actions} />, host); }); };
+    const focusOnly = async (el: HTMLElement) => { await act(async () => { el.focus(); el.dispatchEvent(new FocusEvent('focus')); el.blur(); }); };
+    afterEach(() => { railSignal.value = false; });
+
+    test('[AH-MANUAL] on a computer a picker only focused (Tab through, no key) still follows a new position', async () => {
+      const { actions } = fakeActions();
+      railSignal.value = true;
+      const before = at(40);
+      const after = at(141);
+      await show(before, actions);
+      expect(kmField()!.value).toBe(String(before.screen.ride.startKm));
+      await focusOnly(kmField()!);
+      await focusOnly(slider()!);
+      await again(after, actions);
+      expect(kmField()!.value).toBe(String(after.screen.ride.startKm));
+      expect(text()).not.toContain(W.appAheadManualNewer(showKm(after.screen.ride.startKm)));
+    });
+
+    test('[AH-MANUAL] on a phone a picker opened and only focused follows a new screen\'s position', async () => {
+      const { actions } = fakeActions();
+      const after = at(141);
+      await show(at(40), actions);
+      await click(buttonNamed('Set position by hand'));
+      await focusOnly(kmField()!);
+      await again(after, actions);
+      expect(kmField()!.value).toBe(String(after.screen.ride.startKm));
+    });
+
+    test('[AH-MANUAL] a picker holding the rider\'s typing keeps it, and shows the newer position beside it, so Use never sets an older one unseen', async () => {
+      for (const rail of [true, false]) {
+        const { actions } = fakeActions();
+        railSignal.value = rail;
+        const after = at(141);
+        const newer = W.appAheadManualNewer(showKm(after.screen.ride.startKm));
+        await show(at(40), actions);
+        if (!kmField()) await click(buttonNamed('Set position by hand'));
+        await typeInto(kmField()!, '42');
+        expect(text()).not.toContain(newer);
+        await again(after, actions);
+        expect(kmField()!.value, rail ? 'computer' : 'phone').toBe('42');
+        expect(host.querySelector('#ah-picker')!.textContent, rail ? 'computer' : 'phone').toContain(newer);
+        // A pick and a slider move count as using it too.
+        await show(at(40), actions);
+        if (!kmField()) await click(buttonNamed('Set position by hand'));
+        await typeInto(slider()!, '50');
+        await again(after, actions);
+        expect(kmField()!.value).toBe('50');
+        expect(host.querySelector('#ah-picker')!.textContent).toContain(newer);
+      }
+    });
+
+    test('[AH-MANUAL] a refused position keeps the typing, also through a new screen afterwards', async () => {
+      const { actions, calls } = fakeActions({ kept: false });
+      await show(at(40), actions);
+      await click(buttonNamed('Set position by hand'));
+      await typeInto(kmField()!, '77');
+      await click(buttonNamed('Use this position'));
+      expect(calls.filter((c) => c[0] === 'setManual')).toEqual([['setManual', 77]]);
+      expect(kmField()?.value).toBe('77');
+      await again(at(141), actions);
+      expect(kmField()?.value).toBe('77');
+    });
+
+    test('[AH-MANUAL] a position refused after the store moved on (a new start shown before the refusal) keeps the typed kilometre', async () => {
+      const { actions: base } = fakeActions();
+      const moved = at(141);
+      // The new screen is shown, and its effects run, while the store's answer is still awaited.
+      let shown = false;
+      const actions = { ...base, setManual: async () => { await again(moved, actions); shown = true; return false; } };
+      await show(at(40), actions);
+      await click(buttonNamed('Set position by hand'));
+      await typeInto(kmField()!, '77');
+      buttonNamed('Use this position').click(); // outside act, so the new screen's effects are not held until the refusal
+      await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+      expect(shown).toBe(true);
+      expect(kmField()?.value).toBe('77');
+    });
+
+    test('[AH-MANUAL] on a phone Update position closes a picker the rider opened but has not used, so the warnings show; a used one stays open', async () => {
+      const { actions, calls } = fakeActions();
+      await show(at(40), actions);
+      await click(buttonNamed('Set position by hand'));
+      await focusOnly(kmField()!);
+      await click(host.querySelector('[data-update-position]'));
+      expect(calls.filter((c) => c[0] === 'updatePosition')).toHaveLength(1);
+      expect(kmField()).toBeNull();
+      await click(buttonNamed('Set position by hand'));
+      await typeInto(kmField()!, '42');
+      await click(host.querySelector('[data-update-position]'));
+      expect(kmField()?.value).toBe('42');
+      // Not kept (denied, no fix): nothing closes.
+      const refused = fakeActions({ kept: false }).actions;
+      await show(at(40), refused);
+      await click(buttonNamed('Set position by hand'));
+      await click(host.querySelector('[data-update-position]'));
+      expect(kmField()).not.toBeNull();
+      // On a computer the picker stays open (spec 9.2).
+      railSignal.value = true;
+      await show(at(40), actions);
+      await click(host.querySelector('[data-update-position]'));
+      expect(kmField()).not.toBeNull();
+    });
   });
 
   test('[AH-EMERGENCY] Update position inside Emergency says what it is doing there: finding, or why it could not', async () => {
