@@ -40,6 +40,7 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   appAheadManualStripValue: [['80', '165']],
   appAheadManualTownOption: [['Rastatt', '112']],
   appAheadManualBadKm: [['165']],
+  appAheadManualNewer: [['141']],
   appAheadStripLabel: [['Today', '125', '165']],
   appAheadIconWater: [['131']],
   appAheadIconFood: [['131']],

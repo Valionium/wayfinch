@@ -184,6 +184,54 @@ describe('manual position', () => {
     await until(() => /km 124 of 165/.test(host.querySelector('[data-position-line]')?.textContent ?? ''), 'the town');
     stop();
   }, 20_000);
+  test('[AH-MANUAL] on a phone, an open picker keeps what the rider typed across the minute tick, a new GPS fix and a re-read, and closes once the typed position is used', async () => {
+    // The review of PR 47 found it: the picker closed at each minute tick, since an effect watched the position line, whose
+    // "N min ago" changes every minute, and the kilometre typed so far went with it. A rider typing slowly must keep both.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const i = rainyStop();
+    await seed(i);
+    let clock = new Date(i.now.getTime());
+    const geo = fakeGeo();
+    const shell = browserAhead(deps({ now: () => clock, geolocation: () => geo }));
+    const stop = shell.start();
+    await act(async () => { render(<Live shell={shell} />, host); });
+    await until(() => host.querySelector('[data-position-line]') !== null, 'the position line');
+    const line = () => host.querySelector('[data-position-line]')!.textContent ?? '';
+    const kmField = () => host.querySelector<HTMLInputElement>('#ah-picker input[type=number]');
+    await click(buttonNamed('Set position by hand'));
+    const typed = kmField()!;
+    typed.focus();
+    await typeInto(typed, '12.5');
+
+    // The minute tick: the line's age moves on, the picker and its typing stay.
+    const first = line();
+    clock = new Date(clock.getTime() + 3 * 60_000);
+    await act(async () => { vi.advanceTimersByTime(60_000); });
+    await until(() => line() !== first, () => `the line to move on: ${line()}`);
+    expect(line()).toMatch(/3 min ago/);
+    expect(kmField()).toBe(typed);
+    expect(typed.value).toBe('12.5');
+
+    // A new GPS fix from an earlier Update position: the rider moved on, the picker and its typing stay.
+    const fixed = shell.actions.updatePosition();
+    geo.emit(10, 131);
+    await fixed;
+    await until(() => /km 131 of 165/.test(line()), () => `the new fix: ${line()}`);
+    expect(kmField()).toBe(typed);
+    expect(typed.value).toBe('12.5');
+
+    // The page shown again re-reads the store: the same.
+    document.dispatchEvent(new Event('visibilitychange'));
+    await settle(50);
+    expect(kmField()).toBe(typed);
+    expect(typed.value).toBe('12.5');
+
+    // Using it sets the position and closes the picker, as on a phone before.
+    await click(buttonNamed('Use this position'));
+    await until(() => /km 12\.5 of 165/.test(line()), () => `the position by hand: ${line()}`, 3000);
+    expect(kmField()).toBeNull();
+    stop();
+  }, 20_000);
   test('[AH-MANUAL] a kilometre outside the route is refused in words, and nothing is kept', async () => {
     const i = rainyStop();
     await seed(i);

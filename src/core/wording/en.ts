@@ -1022,6 +1022,8 @@ export const W = {
   appAheadManualNoTowns: 'No towns are saved for this route yet. Get ready offline saves them.',
   appAheadManualSet: 'Use this position',
   appAheadManualBadKm: (length: string): string => `Enter a kilometre from 0 to ${length}.`,
+  /** Beside a picker that holds what the rider typed, once a newer position is shown: Use would set the typed one. */
+  appAheadManualNewer: (km: string): string => `Newer position: km ${km}`,
   appAheadToTrip: 'Open Trip',
   appAheadUnreadable: "Your trip couldn't be read on this phone just now. Try again; if it keeps failing, reload the app.",
   appAheadRetry: 'Try again',

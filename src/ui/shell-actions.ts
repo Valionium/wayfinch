@@ -199,7 +199,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
   };
 
   /** Keeps a position, measured on `route`. Refused (the route changed meanwhile, or it lies off the route): the rider is told. */
-  const keep = async (p: Position, route: Route): Promise<void> => {
+  const keep = async (p: Position, route: Route): Promise<boolean> => {
     let kept = false;
     try {
       kept = (await inTurn(() => addPosition(p, deps.now(), route.id))).kept;
@@ -209,6 +209,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     position = kept ? { kind: 'idle' } : { kind: 'said', text: W.appAheadNotKept };
     await load();
     touch();
+    return kept;
   };
 
   const routeNow = async (): Promise<ScreenInputs | null> => {
@@ -221,27 +222,32 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
 
   const actions: AheadActions = {
     async updatePosition() {
-      if (position.kind === 'watching') return;
+      if (position.kind === 'watching') return false;
       pendingFix = null;
       say({ kind: 'watching' });
       const fix = await watchBest(ROUTINE, deps.geolocation());
       if (isFailure(fix)) {
         say({ kind: 'said', text: FAILURE_TEXT[fix.kind] });
-        return;
+        return false;
       }
       // Read again: the route may have been replaced while the phone was looking.
       const now = await routeNow();
       if (!now) {
         say({ kind: 'said', text: W.appAheadNotKept });
-        return;
+        return false;
       }
       const found = locateFix(fix, now.trip.route, now.positions);
-      if (found.kind === 'no-position') say({ kind: 'said', text: W.appAheadNoPosition });
-      else if (found.kind === 'ask') {
+      if (found.kind === 'no-position') {
+        say({ kind: 'said', text: W.appAheadNoPosition });
+        return false;
+      }
+      if (found.kind === 'ask') {
         pendingFix = fix;
         const [a, b] = found.options.map((km) => showKm(km)) as [string, string];
         say({ kind: 'ask', question: W.appAheadAsk(a, b), options: found.options.map((km) => ({ km, text: W.appAheadAskKm(showKm(km)) })) });
-      } else await keep(found.position, now.trip.route);
+        return false;
+      }
+      return keep(found.position, now.trip.route);
     },
 
     async choosePass(km: Km) {
@@ -251,9 +257,9 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       const p = fix && now ? onPass(fix, now.trip.route, km) : null;
       if (!p || !now) {
         say({ kind: 'said', text: W.appAheadNotKept });
-        return;
+        return false;
       }
-      await keep(p, now.trip.route);
+      return keep(p, now.trip.route);
     },
 
     async setManual(at) {
@@ -261,15 +267,15 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       const now = await routeNow();
       if (!now) {
         say({ kind: 'said', text: W.appAheadNotKept });
-        return;
+        return false;
       }
       const km = typeof at === 'number' ? at : at.km;
       const p = manualAt(now.trip.route, km, deps.now());
       if (!p || km < 0 || km > now.trip.route.lengthKm) {
         say({ kind: 'said', text: W.appAheadManualBadKm(showKm(now.trip.route.lengthKm)) });
-        return;
+        return false;
       }
-      await keep(p, now.trip.route);
+      return keep(p, now.trip.route);
     },
 
     async confirmWater(litres) {
