@@ -29,23 +29,55 @@ const tab = (page: Page, name: string) => page.getByRole('navigation', { name: '
 
 /**
  * Waits until the weight typed in You is kept: the store tells the other windows once the write is done. If it never is, the failure
- * says what the screen shows (the field, its problem line, where the focus is) and any error the page threw: YOU-EXPORT-UI failed
- * this way once in CI (the field typed and left, no write reported in 30 s) and never in 90 local runs, so the next failure must
- * carry its own evidence.
+ * says what the screen shows (the field, its problem line, where the focus is), what the field and the database did, and any error the
+ * page threw. YOU-EXPORT-UI failed this way three times in CI (the field typed and left, no write reported in 30 s) and never in
+ * 90 local runs, so a failure must carry its own evidence.
  */
 function savedWeight(page: Page): () => Promise<void> {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
-  return () => expect.poll(async () => ({
+  // What the field and the database did, in the page's own order: whether the change fired, and how each open of the store ended.
+  void page.addInitScript(() => {
+    const log: string[] = [];
+    (window as unknown as { __wfLog: string[] }).__wfLog = log;
+    const say = (s: string): void => { if (log.length < 150) log.push(`${Math.round(performance.now())} ${s}`); };
+    for (const type of ['focusin', 'focusout', 'input', 'change']) {
+      document.addEventListener(type, (e) => {
+        const el = e.target as HTMLInputElement | null;
+        if (el?.id === 'you-weight') say(`${type} "${el.value}"${el.isConnected ? '' : ' detached'}`);
+      }, true);
+    }
+    const open = indexedDB.open.bind(indexedDB);
+    indexedDB.open = ((name: string, version?: number) => {
+      const request = version === undefined ? open(name) : open(name, version);
+      say(`open ${name} ${version ?? '-'}`);
+      request.addEventListener('upgradeneeded', (e) => say(`upgrade ${name} ${version ?? '-'} from ${(e as IDBVersionChangeEvent).oldVersion}`));
+      request.addEventListener('blocked', () => say(`blocked ${name} ${version ?? '-'}`));
+      request.addEventListener('success', () => say(`opened ${name} ${version ?? '-'} at ${request.result.version}`));
+      request.addEventListener('error', () => say(`failed ${name} ${version ?? '-'} ${request.error?.name ?? ''}`));
+      return request;
+    }) as typeof indexedDB.open;
+  });
+  const look = async () => ({
     told: await page.evaluate(() => localStorage.getItem('copilot:changed') !== null),
     screen: await page.evaluate(() => ({
       field: (document.getElementById('you-weight') as HTMLInputElement | null)?.value ?? null,
       problem: document.getElementById('you-weight-problem')?.textContent ?? null,
-      focus: document.activeElement?.id ?? document.activeElement?.tagName ?? null,
+      focus: document.activeElement?.id || document.activeElement?.tagName || null,
+      hash: location.hash,
     })),
     errors: errors.slice(0, 3),
-  }), { timeout: 30_000 }).toMatchObject({ told: true });
+    log: await page.evaluate(() => (window as unknown as { __wfLog?: string[] }).__wfLog ?? []),
+  });
+  return async () => {
+    try {
+      await expect.poll(async () => (await look()).told, { timeout: 30_000 }).toBe(true);
+    } catch (e) {
+      // toMatchObject's diff shows only the keys it was asked for, so the evidence is printed whole.
+      throw new Error(`the weight was not reported as kept: ${JSON.stringify(await look().catch(() => null))}`, { cause: e });
+    }
+  };
 }
 
 test('[YOU-RIDER] You opens as its own screen with the rider, water, learning, bikes, settings, data and legal cards, and a weight typed there is kept after a reload', async ({ page }) => {
