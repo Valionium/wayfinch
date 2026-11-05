@@ -9924,6 +9924,17 @@ function handoffTrip(text){
   if(/^[0-9a-f]{64}$/.test(a('route') || '')) out.route=a('route');
   return out;
 }
+// Every field Apply will change, in words (re-check N1): the route always, then only what the trip carries.
+function handoffChanges(t){
+  const parts=['the route'];
+  if(t.departureDate) parts.push('the date');
+  else if(t.month !== undefined) parts.push('the month');
+  if(t.nights !== undefined) parts.push(`${t.nights === 1 ? '1 night' : t.nights+' nights'}${t.nightsSuggested ? ', as Wayfinch suggests for this route' : ''}`);
+  if(t.sleep) parts.push('the stay');
+  if(t.pace) parts.push('the pace');
+  if(t.flatKph !== undefined) parts.push('the flat speed');
+  return parts.length === 1 ? parts[0] : parts.slice(0,-1).join(', ')+' and '+parts[parts.length-1];
+}
 function writeHandoffDone(outcome){
   if(deletedSinceLoad()) return;
   const before=readLocalRaw(HANDOFF_DONE_KEY),value={app:'load-check',kind:'handoff-done',v:1,id:HANDOFF.id,outcome,at:new Date().toISOString()};
@@ -9950,8 +9961,7 @@ async function receiveHandoff(){
   if(!parsed || parsed.error){ dropHandoffFragment(); return false; }
   HANDOFF.id=id; HANDOFF.gpx=gpx; HANDOFF.trip=handoffTrip(gpx);
   const name=parsed.name || 'your route';
-  const t=HANDOFF.trip,nightsWords=t.nights === undefined ? '' : ` and ${t.nights === 1 ? '1 night' : t.nights+' nights'}${t.nightsSuggested ? ', as Wayfinch suggests for this route' : ''}`;
-  showHandoffBar(`A trip from Wayfinch: ${name}. Apply it to this plan? It sets the route, the trip's date, stay and pace${nightsWords}; your bags, kit and bike stay as they are.${parsed.hasElev ? '' : ' This route has no heights, so its days are split by distance.'}`,{apply:true});
+  showHandoffBar(`A trip from Wayfinch: ${name}. Apply it to this plan? It sets ${handoffChanges(HANDOFF.trip)}; your bags, kit and bike stay as they are.${parsed.hasElev ? '' : ' This route has no heights, so its days are split by distance.'}`,{apply:true});
   return true;
 }
 async function applyHandoff(){

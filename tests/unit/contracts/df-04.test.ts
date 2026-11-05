@@ -141,7 +141,9 @@ describe('[DF-04] Contract 2: the handoff', () => {
       expect(cpTripSchema(sent), JSON.stringify(cpTripSchema.errors)).toBe(true);
       page.context.qaText = handoffGpx(trip.route, attributes);
       const got = JSON.parse(page.run('JSON.stringify(handoffTrip(qaText))') as string) as Record<string, unknown>;
-      const want: Record<string, unknown> = { nights: Number(sent.nights), pace: c.pace, flatKph: c.flatKph, route: c.hash };
+      const want: Record<string, unknown> = { nights: Number(sent.nights), route: c.hash };
+      if (c.pace !== DEFAULT_SETTINGS.pace) want.pace = c.pace;
+      if (c.flatKph !== DEFAULT_SETTINGS.flatKph) want.flatKph = c.flatKph;
       if (c.nights === null) want.nightsSuggested = true;
       if (c.date) { want.departureDate = c.date; want.month = Number(c.date.slice(5, 7)) - 1; }
       if (c.stay !== DEFAULT_SETTINGS.stay) want.sleep = SLEEP[c.stay];

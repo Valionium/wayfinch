@@ -148,10 +148,36 @@ describe('[C-HANDOFF-UNDO] Undo and Cancel', () => {
   });
 });
 
+describe('[C-HANDOFF] what travels, and the bar names it (re-check N1)', () => {
+  test('a co-pilot at its defaults keeps the bag planner\'s own pace, speed and stay; the bar names only what it changes', async () => {
+    const { gpx } = await handedOff('loop', { nights: 2 });
+    const { page, json } = planner(gpx);
+    page.run("S.pace='steady';S.flatKph=20;S.sleep='indoor';");
+    await page.run('receiveHandoff()');
+    const text = String(page.nodes.get('handoffText')!.textContent);
+    expect(text).toMatch(/2 nights/);
+    expect(text).not.toMatch(/the pace|speed|the stay/);
+    await page.run('applyHandoff()');
+    expect(json('[S.pace,S.flatKph,S.sleep,S.nights]')).toEqual(['steady', 20, 'indoor', 2]);
+  });
+  test('a pace, speed and stay the rider set in the co-pilot arrive, and the bar names each', async () => {
+    const { gpx } = await handedOff('loop', { nights: 2, pace: 'hard', flatKph: 28, stay: 'mixed' });
+    const { page, json } = planner(gpx);
+    await page.run('receiveHandoff()');
+    const text = String(page.nodes.get('handoffText')!.textContent);
+    expect(text).toMatch(/the pace/);
+    expect(text).toMatch(/the flat speed/);
+    expect(text).toMatch(/the stay/);
+    await page.run('applyHandoff()');
+    expect(json('[S.pace,S.flatKph,S.sleep]')).toEqual(['hard', 28, 'mixed']);
+  });
+});
+
 describe('[C-HANDOFF] where the nights came from (review I4)', () => {
   test('nights left to the stage model travel as its suggestion, marked so, and the bar says it is Wayfinch\'s suggestion', async () => {
     const { gpx } = await handedOff('multi-day-800', {});
-    expect(gpx).toMatch(/nights="\d+" nightsFrom="suggested" pace="sporting" flatKph="25"/);
+    expect(gpx).toMatch(/nights="\d+" nightsFrom="suggested" startName=/);
+    expect(gpx).not.toMatch(/ pace=| flatKph=/); // pace and speed at the co-pilot's defaults stay home (re-check N1)
     const { page, json } = planner(gpx);
     page.context.qaText = gpx;
     expect(json<{ nightsSuggested?: boolean }>('handoffTrip(qaText)').nightsSuggested).toBe(true);

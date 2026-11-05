@@ -15,6 +15,8 @@ export const HANDOFF_STORE = 'handoffs';
 /** The namespace of the one extension element, `<cp:trip>`. Readers that don't know it ignore it (Contract rule 3). */
 export const CP_NS = 'urn:x-wayfinch:trip:1';
 export const HANDOFF_TTL_MS = 24 * 3_600_000;
+/** A record younger than this may be another window's, put just before its envelope: the cleanup leaves it (re-check N2). */
+export const HANDOFF_FRESH_MS = 10 * 60_000;
 // Load Check's own limits (spec 7.1 Contract 2): over them a route is not handed off.
 export const HANDOFF_MAX_BYTES = 20 * 1024 * 1024;
 export const HANDOFF_MAX_POINTS = 200_000;
@@ -40,10 +42,10 @@ export function settlementNear(places: readonly Place[], at: { lat: number; lon:
 }
 
 /**
- * The `<cp:trip>` settings. What shapes the days always travels, as the co-pilot plans them, so both apps end the days at the same
- * place and count the same food (review of PR 43, I4): the nights (the stage model's suggestion when the rider left them to it, then
- * marked `nightsFrom="suggested"`), the pace and the flat speed. The date and the stay go only when the rider set them. The route's
- * hash always travels.
+ * The `<cp:trip>` settings. The nights always travel, so both apps end the days at the same place and count the same food (review
+ * of PR 43, I4): the stage model's suggestion when the rider left them to it, then marked `nightsFrom="suggested"`. The pace, the
+ * flat speed and the stay go only when the rider set them in the co-pilot, so a bag-planner rider's own are kept (re-check N1); so
+ * does the date. The route's hash always travels.
  */
 export function tripAttributes(trip: Trip, settings: Settings, names: { start: string | null; end: string | null }): [string, string][] {
   const out: [string, string][] = [['v', '1']];
@@ -56,8 +58,8 @@ export function tripAttributes(trip: Trip, settings: Settings, names: { start: s
     out.push(['month', String(Number(trip.departureDate.slice(5, 7)))]);
   }
   if (settings.stay !== DEFAULT_SETTINGS.stay) out.push(['sleep', STAY_WORD[settings.stay]]);
-  out.push(['pace', settings.pace]);
-  out.push(['flatKph', String(settings.flatKph)]);
+  if (settings.pace !== DEFAULT_SETTINGS.pace) out.push(['pace', settings.pace]);
+  if (settings.flatKph !== DEFAULT_SETTINGS.flatKph) out.push(['flatKph', String(settings.flatKph)]);
   if (names.start) out.push(['startName', names.start]);
   if (names.end) out.push(['endName', names.end]);
   out.push(['route', trip.route.hash]);
@@ -160,7 +162,11 @@ export async function cleanupHandoff(deps: Pick<HandoffDeps, 'now' | 'deleteReco
     }
   }
   const records = deps.listRecords ? await deps.listRecords().catch(() => []) : [];
-  for (const r of records) if (r.id !== envelope?.id) await deps.deleteRecord(r.id).catch(() => undefined);
+  const now = deps.now().getTime();
+  for (const r of records) {
+    const young = now - Date.parse(r.createdAt) < HANDOFF_FRESH_MS;
+    if (r.id !== envelope?.id && !young) await deps.deleteRecord(r.id).catch(() => undefined);
+  }
   return went;
 }
 

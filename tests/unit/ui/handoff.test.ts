@@ -35,8 +35,8 @@ describe('[C-HANDOFF] the co-pilot hands the trip over', () => {
     expect(gpx.match(/<trkpt /g)!.length).toBe(4);
     expect(gpx.match(/<ele>/g)!.length).toBe(3);
     expect(gpx).toContain('<name>Heidelberg &amp; &lt;Strasbourg&gt;</name>');
-    // what shapes the days always goes, nights left to the stage model as its suggestion; date and stay only when set
-    expect(gpx).toContain(`<cp:trip v="1" nights="0" nightsFrom="suggested" pace="sporting" flatKph="25" route="${'ab'.repeat(32)}"/>`);
+    // the nights always go, left to the stage model as its suggestion; pace, speed, date and stay only when the rider set them
+    expect(gpx).toContain(`<cp:trip v="1" nights="0" nightsFrom="suggested" route="${'ab'.repeat(32)}"/>`);
     const set = tripAttributes({ ...trip(r), departureDate: '2026-11-02' }, { ...DEFAULT_SETTINGS, nights: 2, stay: 'accommodation', pace: 'hard', flatKph: 22 }, { start: 'Heidelberg', end: 'Strasbourg' });
     expect(Object.fromEntries(set)).toEqual({ v: '1', nights: '2', departureDate: '2026-11-02', month: '11', sleep: 'indoor', pace: 'hard', flatKph: '22', startName: 'Heidelberg', endName: 'Strasbourg', route: 'ab'.repeat(32) });
   });
@@ -100,10 +100,26 @@ describe('[C-HANDOFF] the co-pilot hands the trip over', () => {
     await handOffTrip(trip(), DEFAULT_SETTINGS, d);
     expect(d.records.size).toBe(2);
     expect(await cleanupHandoff(d)).toBe(false);
+    expect(d.records.size).toBe(2); // the first is younger than 10 minutes: it might be another window's, on its way
+    d.now = () => new Date('2026-11-04T10:11:00Z');
+    expect(await cleanupHandoff(d)).toBe(false);
     expect([...d.records.keys()]).toEqual(['2'.repeat(32)]);
     d.now = () => new Date('2026-11-05T10:00:01Z');
     expect(await cleanupHandoff(d)).toBe(true);
     expect(d.records.size).toBe(0);
     expect(d.store.has(HANDOFF_KEY)).toBe(false);
+  });
+
+  test('two co-pilot windows: a cleanup between the other window\'s record and its envelope keeps that fresh record (re-check N2)', async () => {
+    const a = deps();
+    a.store.set(HANDOFF_KEY, JSON.stringify({ app: 'copilot', kind: 'handoff', v: 1, id: '1'.repeat(32), createdAt: '2026-11-04T09:58:00.000Z' }));
+    a.records.set('1'.repeat(32), { id: '1'.repeat(32), gpx: 'x', createdAt: '2026-11-04T09:58:00.000Z' });
+    const b = { ...a };   // the second window: the same storage and database
+    a.randomId = () => '2'.repeat(32);
+    a.putRecord = async (r) => { a.records.set(r.id, r); await cleanupHandoff(b); }; // b starts up right after the record is put
+    const out = await handOffTrip(trip(), DEFAULT_SETTINGS, a);
+    expect(out.ok).toBe(true);
+    expect(a.records.has('2'.repeat(32))).toBe(true);
+    expect(JSON.parse(a.store.get(HANDOFF_KEY)!).id).toBe('2'.repeat(32));
   });
 });

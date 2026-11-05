@@ -6,8 +6,6 @@
   "required": [
     "v",
     "nights",
-    "pace",
-    "flatKph",
     "route"
   ],
   "additionalProperties": false,
