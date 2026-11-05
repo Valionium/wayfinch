@@ -9,6 +9,10 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
+<!-- The bike glides between Wayfinch and the bag planner (spec section 9.8), where motion is allowed and the browser has it. Written
+     here, not in the built stylesheet: from there the opt-in was sometimes not yet in effect when the page was revealed, and the
+     browser dropped the transition with an error. The named drawing is in src/ui/bike/bike.css. -->
+<style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style>
 </head>
 <body>
 <div id="app"></div>

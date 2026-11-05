@@ -249,6 +249,8 @@ const BIKES = JSON.stringify([{ id: 'bike_glide', name: 'Glide', look: { colour:
 
 test('[LC-GLIDE] Chromium: both apps opt in under no-preference only; one wf-bike per page, on a 320 x 150 drawing; the small drawings never; the bike glides both ways', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'cross-document view transitions: Chromium');
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
   await watchReveal(page);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   app = await loadApp(page, { launch: true, path: '/#/tools' });
@@ -282,6 +284,18 @@ test('[LC-GLIDE] Chromium: both apps opt in under no-preference only; one wf-bik
   await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
   expect(await revealed(page)).toBe('true');
   expect((await named(page)).length).toBe(1);
+  // and once more both ways, from the bag planner's own card: every reveal glides, and no page reports an aborted transition
+  for (let i = 0; i < 2; i += 1) {
+    await page.locator('main[data-screen="tools"] a[href="/tools/bags/"]').click();
+    await page.waitForURL(/\/tools\/bags\/$/);
+    await ready(page);
+    expect(await revealed(page)).toBe('true');
+    await page.locator('#backToWayfinch').click();
+    await page.waitForURL(`${app.origin}/#/tools`);
+    await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
+    expect(await revealed(page)).toBe('true');
+  }
+  expect(errors).toEqual([]);
 });
 
 test('[LC-GLIDE-OFF] with reduced motion, and in browsers without the transition, pages switch normally and at once', async ({ page, browserName }) => {
