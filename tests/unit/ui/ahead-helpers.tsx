@@ -16,7 +16,7 @@ export function fakeActions(o: { share?: boolean; copy?: boolean } = {}): { acti
   const rec = (name: keyof AheadActions) => (...args: unknown[]) => { calls.push([name, ...args]); return Promise.resolve(); };
   const actions: AheadActions = {
     updatePosition: rec('updatePosition') as AheadActions['updatePosition'],
-    setManual: rec('setManual') as AheadActions['setManual'],
+    setManual: (at) => { calls.push(['setManual', at]); return Promise.resolve(true); },
     choosePass: rec('choosePass') as AheadActions['choosePass'],
     confirmWater: (l) => { calls.push(['confirmWater', l]); return Promise.resolve(null); },
     updateWeather: rec('updateWeather') as AheadActions['updateWeather'],

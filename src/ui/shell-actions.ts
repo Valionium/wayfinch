@@ -199,7 +199,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
   };
 
   /** Keeps a position, measured on `route`. Refused (the route changed meanwhile, or it lies off the route): the rider is told. */
-  const keep = async (p: Position, route: Route): Promise<void> => {
+  const keep = async (p: Position, route: Route): Promise<boolean> => {
     let kept = false;
     try {
       kept = (await inTurn(() => addPosition(p, deps.now(), route.id))).kept;
@@ -209,6 +209,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     position = kept ? { kind: 'idle' } : { kind: 'said', text: W.appAheadNotKept };
     await load();
     touch();
+    return kept;
   };
 
   const routeNow = async (): Promise<ScreenInputs | null> => {
@@ -261,15 +262,15 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       const now = await routeNow();
       if (!now) {
         say({ kind: 'said', text: W.appAheadNotKept });
-        return;
+        return false;
       }
       const km = typeof at === 'number' ? at : at.km;
       const p = manualAt(now.trip.route, km, deps.now());
       if (!p || km < 0 || km > now.trip.route.lengthKm) {
         say({ kind: 'said', text: W.appAheadManualBadKm(showKm(now.trip.route.lengthKm)) });
-        return;
+        return false;
       }
-      await keep(p, now.trip.route);
+      return keep(p, now.trip.route);
     },
 
     async confirmWater(litres) {

@@ -2,7 +2,7 @@
 // Ahead's page against the screen it was given (plan Tasks 15 and 16): the words are the screen's, in section 3.2's order, and
 // each tap does what its words say through the actions object, and nothing else.
 import { afterEach, describe, expect, test } from 'vitest';
-import { render } from 'preact';
+import { options, render } from 'preact';
 import { act } from 'preact/test-utils';
 import { AheadScreen } from '../../../src/ui/ahead/ahead.tsx';
 import { railSignal } from '../../../src/ui/wide/wide.ts';
@@ -185,6 +185,68 @@ describe('cards', () => {
     await act(async () => { render(<AheadScreen view={after} actions={actions} />, host); }); // the same page, a new screen
     expect(kmField().value).toBe(String(after.screen.ride.startKm));
     railSignal.value = false;
+  });
+
+  test('[AH-MANUAL] a tap on Set position by hand the moment Ahead appears, before its effects have run, opens the picker', async () => {
+    // Ahead's effect also ran once after the first paint and closed the picker again, so a tap before it did nothing. Here the
+    // effects after the paint are held until the test lets them go: the tap comes first, as it can on a busy phone.
+    const v = trip(viewOf(rainyStop()));
+    expect(v.answers).toBe(true);
+    await act(async () => { render(null, host); });
+    const held: (() => void)[] = [];
+    const was = options.requestAnimationFrame;
+    options.requestAnimationFrame = (run) => { held.push(run); };
+    try {
+      render(<AheadScreen view={v} actions={fakeActions().actions} />, host);
+      expect(host.querySelector('#ah-picker')).toBeNull();
+      buttonNamed('Set position by hand').click();
+      await new Promise((r) => setTimeout(r, 0));
+    } finally {
+      options.requestAnimationFrame = was;
+      for (const run of held) run();
+    }
+    await act(async () => { await new Promise((r) => setTimeout(r, 150)); });
+    expect(host.querySelector('#ah-picker')).not.toBeNull();
+  });
+
+  test('[AH-MANUAL] a picker the rider opened stays open with what was typed through new screens, also a new position, until it is closed or used', async () => {
+    const { actions, calls } = fakeActions();
+    const at = (km: number, time: string) => trip(viewOf(rainyStop({ now: `${SAT} ${time}`, positions: [pos({ km, at: `${SAT} 14:20` })] })));
+    await show(at(40, '14:20'), actions);
+    await click(buttonNamed('Set position by hand'));
+    const kmField = () => host.querySelector<HTMLInputElement>('#ah-picker input[type=number]');
+    await typeInto(kmField()!, '7');
+    for (const next of [at(40, '14:21'), at(40, '14:25'), at(141, '14:30')]) {
+      await act(async () => { render(<AheadScreen view={next} actions={actions} />, host); });
+      expect(kmField()?.value).toBe('7');
+    }
+    await typeInto(kmField()!, '77');
+    await click(buttonNamed('Use this position'));
+    expect(calls.filter((c) => c[0] === 'setManual')).toEqual([['setManual', 77]]);
+    expect(kmField()).toBeNull(); // used: on a phone it closes
+    await click(buttonNamed('Set position by hand'));
+    expect(kmField()).not.toBeNull();
+    await click(buttonNamed('Set position by hand'));
+    expect(kmField()).toBeNull(); // closed by the rider
+  });
+
+  test('[AH-FIRST-USE] on a phone the picker of first use closes when answers first show, unless the rider has started using it', async () => {
+    const { actions } = fakeActions();
+    const none = trip(viewOf(rainyStop({ now: `${SAT} 09:00`, positions: [] })));
+    const found = trip(viewOf(rainyStop({ now: `${SAT} 09:00`, positions: [pos({ km: 3, at: `${SAT} 09:00` })] })));
+    expect([none.answers, found.answers]).toEqual([false, true]);
+    const kmField = () => host.querySelector<HTMLInputElement>('#ah-picker input[type=number]');
+    // Untouched: a position closes it, as section 3.2's returning screen has it.
+    await show(none, actions);
+    expect(kmField()).not.toBeNull();
+    await act(async () => { render(<AheadScreen view={found} actions={actions} />, host); });
+    expect(kmField()).toBeNull();
+    // Being typed into: a fix arriving then leaves the picker and the typing alone.
+    await show(none, actions);
+    kmField()!.focus();
+    await typeInto(kmField()!, '4');
+    await act(async () => { render(<AheadScreen view={found} actions={actions} />, host); });
+    expect(kmField()?.value).toBe('4');
   });
 
   test('[AH-EMERGENCY] Update position inside Emergency says what it is doing there: finding, or why it could not', async () => {

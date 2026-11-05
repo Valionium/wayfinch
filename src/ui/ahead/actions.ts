@@ -54,8 +54,8 @@ export type AheadView =
 
 export type AheadActions = {
   updatePosition(): Promise<void>;
-  /** A kilometre, or a town of `towns`: always on the route, and it overrides GPS (section 6.1). */
-  setManual(at: Km | Town): Promise<void>;
+  /** A kilometre, or a town of `towns`: always on the route, and it overrides GPS (section 6.1). True once it is kept. */
+  setManual(at: Km | Town): Promise<boolean>;
   /** One of the two kilometres a position near two passes was asked about. */
   choosePass(km: Km): Promise<void>;
   confirmWater(litres: number): Promise<string | null>;
