@@ -7,6 +7,7 @@ import type { BikeRecord } from '../../core/bike/normalise.ts';
 import type { LoadSummary } from '../../core/types.ts';
 import { W } from '../../core/wording/en.ts';
 import './bike.css';
+import { themeChoice } from '../theme-apply.ts';
 import { bikeDetailsHref } from './link.ts';
 import type { BackScreen } from './link.ts';
 
@@ -21,21 +22,24 @@ function currentTheme(): Theme {
 
 /** The fill ramp follows the theme, as in the bag planner; so does the casing's tone (owner's ruling A). */
 export function useTheme(): Theme {
-  const [theme, setTheme] = useState(currentTheme);
+  // The rider's choice, made in either app, redraws at once (owner's try-out, 5 Nov 2026); the phone's own setting too.
+  void themeChoice.value;
+  const [, setPhone] = useState(0);
   useEffect(() => {
     if (typeof matchMedia !== 'function') return undefined;
     const query = matchMedia('(prefers-color-scheme: light)');
-    const update = () => setTheme(currentTheme());
+    const update = () => setPhone((n) => n + 1);
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
   }, []);
-  return theme;
+  return currentTheme();
 }
 
 let drawings = 0;
 // The look extras (patterns, fork, rims) are their own chunk, loaded only for a bike that has them: the first screen never carries them.
 let extras: typeof import('../../core/bike/paint.ts') | undefined;
-const unnamed = (svg: string): string => svg.replace(/ aria-label="[^"]*"/, '');
+// The casing's tone may move with the colour (the dark theme's, BK-DARK-CRISP): it is repainted in place too.
+const unnamed = (svg: string): string => svg.replace(/ aria-label="[^"]*"/, '').replace(/class="bk-casing[^"]*"/g, 'class="bk-casing"');
 
 /** Writes the drawing; when only the one colour moved (every painted stroke is it, no pattern on either side), it repaints the frame and fork in place. */
 function paint(box: HTMLElement, last: { svg: string }, svg: string, colour: string | null): void {
@@ -44,6 +48,8 @@ function paint(box: HTMLElement, last: { svg: string }, svg: string, colour: str
   // The new drawing without its one colour must be the old one without any hex colour: a pattern's url() or a second colour never passes.
   if (colour && svgEl && unnamed(last.svg.replace(/ stroke="#[0-9a-f]{6}"/g, '')) === unnamed(svg.split(` stroke="${colour}"`).join(''))) {
     for (const el of box.querySelectorAll('.bk-paint')) el.setAttribute('stroke', colour);
+    const casing = /class="(bk-casing[^"]*)"/.exec(svg)?.[1];
+    if (casing) for (const el of box.querySelectorAll('.bk-casing')) el.setAttribute('class', casing);
     const label = /aria-label="([^"]*)"/.exec(svg)?.[1];
     if (label) svgEl.setAttribute('aria-label', label);
   } else {

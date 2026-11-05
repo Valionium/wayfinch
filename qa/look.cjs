@@ -427,6 +427,81 @@ test('[LC-LOOK-EXTRAS] Raw carbon on a bike with no colour yet stores Black, so 
   assert.equal(p.json('S.bikeProfile.look.colour'),'#2f7d4f');
 });
 
+// Owner's try-out, 5 Nov 2026: Bike details opened from Wayfinch, closed by the cross, Escape or a tap beside it, goes back there.
+test('[BK-RETURN] closing Bike details opened from Wayfinch goes back: one step back when Wayfinch opened the page, else the named screen in its place; opened here, it stays',async()=>{
+  const at=(referrer,length)=>{
+    const p=page(),went=[];
+    p.context.history.back=()=>went.push('back');p.context.history.length=length;
+    Object.assign(p.context.location,{origin:'https://example.test',replace:h=>went.push('replace '+h)});
+    p.context.document.referrer=referrer;
+    return {p,went};
+  };
+  const a=at('https://example.test/',3);
+  a.p.run(`openBikeDetailsFromLink('#bike-details=${OTHER.id}&back=you&section=look');setLook({colour:'#c62f2a'});closeBikeDetails()`);
+  await a.p.settle();await new Promise(r=>setTimeout(r,80));
+  assert.deepEqual(a.went,['back'],'opened from Wayfinch in this window: one step back');
+  assert.equal(JSON.parse(a.p.stored('loadcheck:bikeProfiles')).find(b=>b.id===OTHER.id).look.colour,'#c62f2a');
+  for(const [referrer,length] of [['',1],['https://example.test/tools/bags/',3],['https://elsewhere.test/',3],['https://example.test/',1]]){
+    const b=at(referrer,length);
+    b.p.run(`openBikeDetailsFromLink('#bike-details=new&back=trip');closeBikeDetails()`);
+    assert.deepEqual(b.went,['replace /#/trip'],referrer+' '+length);
+  }
+  const c=at('https://example.test/',3);
+  open(c.p);c.p.run('closeBikeDetails()');
+  assert.deepEqual(c.went,[],'opened in the bag planner itself: closing stays here');
+});
+
+// Review of PR 49, M2: two leaving taps close together (both waiting on a save) go back one step, not two.
+test('[BK-RETURN] two taps on a way back while a save is under way go back one step only',async()=>{
+  const p=page(),went=[];
+  p.context.history.back=()=>went.push('back');p.context.history.length=3;
+  Object.assign(p.context.location,{origin:'https://example.test',replace:h=>went.push('replace '+h)});
+  p.context.document.referrer='https://example.test/';
+  p.run(`openBikeDetailsFromLink('#bike-details=${OTHER.id}&back=you&section=look')`);
+  p.run('BIKE_PROFILE_BUSY=true');
+  const tap=()=>p.run("backLinkTap({button:0,preventDefault(){},currentTarget:{href:'/#/you'}})");
+  tap();tap();
+  p.run('BIKE_PROFILE_BUSY=false');
+  await new Promise(r=>setTimeout(r,120));
+  assert.deepEqual(went,['back']);
+});
+
+// Review of PR 49, M1: Escape or a tap beside Bike details opened from Wayfinch never drops what the rider typed and has not saved.
+test('[BK-RETURN] typed, unsaved details: Escape or a tap beside the dialog keep it open and say so; after a save, or with nothing typed, they leave',async()=>{
+  const at=()=>{
+    const p=page(),went=[];
+    p.context.history.back=()=>went.push('back');p.context.history.length=3;
+    Object.assign(p.context.location,{origin:'https://example.test',replace:h=>went.push('replace '+h)});
+    p.context.document.referrer='https://example.test/';
+    p.run(`openBikeDetailsFromLink('#bike-details=new&back=you')`);
+    return {p,went};
+  };
+  const a=at();
+  // typing in More details (the real page's input event, from a field inside it)
+  a.p.run("document.getElementById('bikeName').value='Gravel';bikeFormEdited({target:{id:'bikeName',closest:s=>s==='#bikeMoreDetails'}})");
+  a.p.run('closeBikeDetailsSoftly()');
+  assert.deepEqual(a.went,[],'stays');
+  assert.equal(a.p.run("document.getElementById('bikeDetailsBox').classList.contains('hidden')"),false);
+  assert.match(a.p.run('BIKE_PROFILE_MESSAGE'),/Not saved yet/);
+  // the cross still leaves: the rider's own way out
+  a.p.run('closeBikeDetails()');
+  assert.deepEqual(a.went,['back']);
+  const b=at();
+  b.p.run("bikeFormEdited({target:{id:'bikeSavedSelect',closest:()=>true}})");   // choosing another saved bike is not typing
+  b.p.run('closeBikeDetailsSoftly()');
+  assert.deepEqual(b.went,['back'],'nothing typed: leaves');
+});
+
+// Review of PR 49, I2: a record of Wayfinch dated in the future (a clock set wrong) never outlives the rider's next tap here.
+test('[THEME-SYNC] the bag planner stamps its choice just after a future-dated Wayfinch record, so the tap wins',()=>{
+  const p=page();
+  const ahead=new Date(Date.now()+86400000).toISOString();
+  p.localStorage.setItem('copilot:theme:v1',JSON.stringify({app:'copilot',kind:'theme',v:1,theme:'dark',at:ahead}));
+  p.run("noteThemeChoice('light')");
+  assert.equal(p.run('themeChoiceNow()'),'light');
+  assert.equal(JSON.parse(p.stored('loadcheck:theme:v1')).at,new Date(Date.parse(ahead)+1).toISOString());
+});
+
 (async()=>{
   for(const [name,fn] of tests){await fn();passed++;console.log('ok',name);}
   console.log(`${passed} look tests passed`);

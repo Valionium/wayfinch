@@ -7,7 +7,7 @@ import { PT } from '../wording/en-paint.ts';
 import { W } from '../wording/en.ts';
 import { bikeArt } from './art.ts';
 import type { Anchors, ArtOptions, P } from './art.ts';
-import { CASINGS, casingFor, contrastRatio, nearestSwatchName } from './colour.ts';
+import { CASING_MIN_CONTRAST, CASINGS, casingFor, contrastRatio, darkCasing, nearestSwatchName } from './colour.ts';
 import type { CasingTone } from './colour.ts';
 import type { Fork, ForkPattern, Paint, Pattern } from './normalise.ts';
 import type { BagView, BikeSpec } from './spec.ts';
@@ -183,6 +183,7 @@ function frameColours(pattern: Pattern, c1: string, more: readonly [string, stri
 
 /** The casing under several colours: muted, unless one of them is a colour owner's ruling A moves; then the theme's tone that stands out most from all of them. */
 export function casingForAll(colours: readonly string[], theme: 'dark' | 'light'): CasingTone {
+  if (theme === 'dark') return darkCasing(colours);
   if (colours.every((c) => casingFor(c, theme) === 'muted')) return 'muted';
   let best: CasingTone = 'muted';
   let bestRatio = -1;
@@ -194,6 +195,63 @@ export function casingForAll(colours: readonly string[], theme: 'dark' | 'light'
 }
 
 const nameOf = (hex: string): string => nearestSwatchName(hex) ?? hex;
+
+/** Every colour the frame, stays and fork show with these extras: what owner's ruling A keeps readable. None without a frame colour. */
+export function shownColours(paint: Paint, colour: string | null): string[] {
+  if (!colour) return [];
+  const u = usable(paint, colour);
+  const shown = frameColours(u.pattern, colour, u.more);
+  const fk = u.fork;
+  if (fk?.kind === 'own') shown.push(fk.colour);
+  if (fk?.kind === 'fade') shown.push(FADES[fk.pair]!.from, FADES[fk.pair]!.to);
+  if (fk?.kind === 'pattern') shown.push(...(fk.pattern === 'carbon' ? WEAVE : [FADES[fk.pair]!.from, FADES[fk.pair]!.to]));
+  return shown;
+}
+
+export type PaintedPart = 'bk-frame' | 'bk-stays' | 'bk-fork';
+
+/** The backgrounds the bike is drawn on in both apps and both themes: the page's ground, and the panel of the cards and of Look. */
+export const BACKGROUNDS = { light: ['#F4F2E8', '#FBFAF3'], dark: ['#1B2018', '#242B20'] } as const;
+const BROWN = '#7b5434';
+
+/** Ruling A, measured where the bike is drawn: on every background, the casing or else the colour itself stands out at 3:1. */
+export function readableOn(colour: string, tone: CasingTone, theme: 'dark' | 'light'): boolean {
+  const casing = (CASINGS[theme] as Record<string, string>)[tone]!;
+  return BACKGROUNDS[theme].every((bg) => contrastRatio(casing, bg) >= CASING_MIN_CONTRAST || contrastRatio(colour, bg) >= CASING_MIN_CONTRAST);
+}
+
+/**
+ * Each painted part's casing. Dark: darkCasing, part by part. Light: one casing for all parts as before (casingForAll), wherever it
+ * keeps every colour readable; where it does not (owner's decision of 5 Nov 2026: a pale fork beside Brown's panel casing, pale chrome
+ * or silver beside Brown), each part it fails takes, of the light tones that keep its colours readable, the one with the sharpest
+ * edge, never muted under Brown (ruling A).
+ */
+export function partCasings(paint: Paint, colour: string | null, theme: 'dark' | 'light'): Record<PaintedPart, CasingTone> | null {
+  const parts = partColours(paint, colour);
+  if (!parts) return null;
+  const out = {} as Record<PaintedPart, CasingTone>;
+  const one = theme === 'light' ? casingForAll(shownColours(paint, colour), 'light') : null;
+  for (const [part, colours] of Object.entries(parts) as [PaintedPart, string[]][]) {
+    if (!one) { out[part] = darkCasing(colours); continue; }
+    const fits = (t: CasingTone) => colours.every((c) => readableOn(c, t, 'light')) && !(t === 'muted' && colours.includes(BROWN));
+    if (fits(one)) { out[part] = one; continue; }
+    const edge = (t: CasingTone) => Math.min(...colours.map((c) => contrastRatio(c, (CASINGS.light as Record<string, string>)[t]!)));
+    out[part] = (Object.keys(CASINGS.light) as CasingTone[]).filter(fits).reduce((a, b) => (edge(b) > edge(a) ? b : a));
+  }
+  return out;
+}
+
+/** The colours each painted part shows: the frame's tubes, the stays (Two-tone blocks give them the second colour) and the fork. */
+export function partColours(paint: Paint, colour: string | null): Record<PaintedPart, string[]> | null {
+  if (!colour) return null;
+  const u = usable(paint, colour);
+  const all = frameColours(u.pattern, colour, u.more);
+  const frame = u.pattern === 'blocks' ? [colour] : all;
+  const fk = u.fork;
+  const pair = fk && fk.kind !== 'own' ? [FADES[fk.pair]!.from, FADES[fk.pair]!.to] : [];
+  const fork = !fk ? frame : fk.kind === 'own' ? [fk.colour] : fk.kind === 'pattern' && fk.pattern === 'carbon' ? [...WEAVE] : pair;
+  return { 'bk-frame': frame, 'bk-stays': u.pattern === 'blocks' ? [u.more[0]] : all, 'bk-fork': fork };
+}
 
 /** The extras, made safe to draw: a pattern missing one of its colours takes the starting ones; with no frame colour only the rims apply. */
 function usable(paint: Paint, colour: string | null): { pattern: Pattern; more: [string, string]; fork: Fork | null; rimMm: number | null } {
@@ -239,7 +297,6 @@ export function paintedArt(spec: BikeSpec, bags: BagView | null, options: ArtOpt
   const f = frameBox(a);
   const defs: string[] = [];
   let svg = art.svg;
-  const shown: string[] = [];
 
   if (colour) {
     const c1 = colour;
@@ -257,28 +314,30 @@ export function paintedArt(spec: BikeSpec, bags: BagView | null, options: ArtOpt
       case 'solid': break;
       default: defs.push(texture(u.pattern, `${id}t`, f, [c1, c2, c3])); frame = rear = `url(#${id}t)`;
     }
-    shown.push(...frameColours(u.pattern, c1, u.more));
     // The fork continues the frame's pattern, or has its own colour, fade or pattern.
     let fork = frame;
     const fk = u.fork;
-    if (fk?.kind === 'own') { fork = fk.colour; shown.push(fk.colour); }
+    if (fk?.kind === 'own') fork = fk.colour;
     if (fk?.kind === 'fade') {
       const pair = FADES[fk.pair]!;
       defs.push(linear(`${id}k`, a.points.headBottom, a.points.front, [[0, pair.from], [1, pair.to]]));
       fork = `url(#${id}k)`;
-      shown.push(pair.from, pair.to);
     }
     if (fk?.kind === 'pattern') {
       const pair = FADES[fk.pair]!;
       defs.push(texture(fk.pattern, `${id}u`, f, [pair.from, pair.to, pair.from]));
       fork = `url(#${id}u)`;
-      shown.push(...(fk.pattern === 'carbon' ? WEAVE : [pair.from, pair.to]));
     }
     const strokeOf = { 'bk-stays': rear, 'bk-frame': frame, 'bk-fork': fork } as Record<string, string>;
     svg = svg.replace(/(<path class="bk-paint (bk-stays|bk-frame|bk-fork)"[^>]*?) stroke="#[0-9a-f]{6}"/g, (_m, head: string, part: string) => `${head} stroke="${strokeOf[part]}"`);
-    // Owner's ruling A, for every colour the frame and fork show.
-    const tone = casingForAll(shown, theme);
-    svg = svg.replace(/class="bk-casing(?: bk-casing-\w+)?"/g, tone === 'muted' ? 'class="bk-casing"' : `class="bk-casing bk-casing-${tone}"`);
+    // Owner's ruling A, for every colour the frame and fork show. In the dark theme each part has its own casing (owner's try-out,
+    // 5 Nov 2026): a light frame keeps its crisp dark outline beside a fork in a darker colour.
+    const cls = (tone: CasingTone): string => (tone === 'muted' ? 'class="bk-casing"' : `class="bk-casing bk-casing-${tone}"`);
+    const tones = partCasings(paint, colour, theme)!;
+    svg = new Set(Object.values(tones)).size === 1 && theme === 'light'
+      ? svg.replace(/class="bk-casing(?: bk-casing-\w+)?"/g, cls(tones['bk-frame']))
+      : svg.replace(/class="bk-casing(?: bk-casing-\w+)?"([^>]*\/><path class="bk-paint (bk-stays|bk-frame|bk-fork)")/g,
+        (_m, rest: string, part: PaintedPart) => `${cls(tones[part])}${rest}`);
   }
 
   // The rims: a carbon band inside the tyre, as deep as the rim, at the drawing's scale (0.11 units per mm, less on a shrunk bike).

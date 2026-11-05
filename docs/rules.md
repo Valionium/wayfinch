@@ -808,6 +808,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - look.paint {pattern, colours, fork, rimMm} reads back as stored; an invalid field drops only itself; bike format stays 2 [BK-PAINT-NORMALISE]
 - the co-pilot: the extras load as their own chunk only for a bike that has them; the first screen's JavaScript does not grow; the Ahead marker stays one colour [BK-PAINT-LAZY]
 - known risk, pinned: the frozen page at / re-saving a bike drops its look extras (format 2 kept so a rollback can still edit bikes) [BK-PAINT-OLD-PAGE]
+- the casing readable where the bike is drawn (owner's try-out and decision, 5 Nov 2026; review of PR 49): on every background of both apps and both themes (ground, panel) the casing or else the colour stands out at 3:1, for every colour shown, over every swatch, all 14 patterns with every second and third colour, and every way of the fork. Dark: each part muted where its colours stand out from it at 3:1, else the ground where they stand out at 3:1 from the panel too, else the lighter tone they stand out from most. Light: main's one casing wherever it keeps every colour readable (byte for byte as before), else per part the readable tone with the sharpest edge, never muted under Brown [BK-DARK-CRISP]
 
 ## App: You and the legal pages
 
@@ -900,6 +901,10 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - bike-photo.js loads on demand, is precached and works offline (§7.4, §9.1) [LC-PHOTO-OFFLINE]
 - Look's extras: frame pattern, its second and third colours, the fork, rim depth: labelled radios and one slider, each target at least 44 px, keyboard-reachable, names that say the pattern and colours; at 360 and 1280 px in both themes; every tap shows at once and Undo restores all (owner's wish, 5 Nov 2026) [LC-LOOK-EXTRAS]
 - the extras round-trip through saving, export and import, and both pages (bag planner and co-pilot) [LC-LOOK-EXTRAS-SAVE]
+- the bike's panel above Look covers whatever scrolls under it, a checked option's ring included, and every Look control taken by keyboard shows its whole focus ring below the panel, at 360 and 1280 px in both themes (owner's try-out, 5 Nov 2026) [LC-LOOK-RING]
+- opened from Wayfinch (You, Trip or Tools), whatever the rider does in Bike details (add a bike, change the Look, use it for the plan, save), the cross, Escape, Back to <screen> and the browser's Back return to that place in Wayfinch, You at the bikes, the bike's changes shown, leaving no step back into the bag planner; online, offline and as the installed app (owner's try-out, 5 Nov 2026) [BK-RETURN]
+- one theme for both apps (owner's try-out, 5 Nov 2026): each app writes only its own record of a choice ({app, kind: 'theme', v: 1, theme, at}: copilot:theme:v1, loadcheck:theme:v1); both show the most recent, at the same moment Wayfinch's; with neither, Wayfinch's own light or dark, else the bag planner's older choice, else automatic; the page and the app decide alike on every mix [THEME-ONE]
+- a theme chosen in either app shows in the other at once in an open tab, on the way back, and in a tab when it shows again or comes out of the back-forward cache; Wayfinch's export carries the one theme, and an import's settings (either app's) count as a choice [THEME-SYNC]
 - From a photo, Front, back and fork: three taps set a front-to-back fade and the fork's own colour; the photo never leaves the phone [LC-PHOTO-THREE]
 
 ## Bag planner: separation and contracts (sub-project 6, group 2)

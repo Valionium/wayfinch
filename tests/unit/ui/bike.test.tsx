@@ -12,6 +12,7 @@ import { BikeDrawing } from '../../../src/ui/bike/drawing.tsx';
 import { bikeDetailsHref, openBikeDetails } from '../../../src/ui/bike/link.ts';
 import type { BackScreen } from '../../../src/ui/bike/link.ts';
 import { refreshBikeSource } from '../../../src/ui/bike/live.ts';
+import '../../../src/ui/page-return.ts';   // as main.tsx loads it once the first screen is drawn
 import { BikeMarker } from '../../../src/ui/bike/marker.tsx';
 import { go } from '../../../src/ui/nav.ts';
 import { ToolsScreen } from '../../../src/ui/tools/tools.tsx';
@@ -158,6 +159,38 @@ describe('every tap shows a change at once (the owner\'s rules)', () => {
     const now = svg();
     await act(async () => { window.dispatchEvent(new StorageEvent('storage', { key: 'copilot:settings' })); await flush(); });
     expect(svg()).toBe(now);
+  });
+});
+
+describe("the dark theme's casing moves with the colour (BK-DARK-CRISP)", () => {
+  test("[BK-TAP-INSTANT] blue to white in the dark theme still repaints in place, and the casing takes white's tone", async () => {
+    localStorage.setItem('loadcheck:bikeProfile', JSON.stringify({ ...sample[0], look: { colour: '#2563b8', bars: 'drop', ebike: false } }));
+    refreshBikeSource();
+    act(() => go('tools'));
+    show(<ToolsScreen services={browserServices()} />);
+    const before = host.querySelector('.bk-paint')!;
+    expect(host.querySelector('.bk-casing')!.getAttribute('class')).toBe('bk-casing bk-casing-ink');
+    localStorage.setItem('loadcheck:bikeProfile', JSON.stringify({ ...sample[0], look: { colour: '#f4f4f2', bars: 'drop', ebike: false } }));
+    await act(async () => { window.dispatchEvent(new StorageEvent('storage', { key: 'loadcheck:bikeProfile' })); await flush(); });
+    expect(host.querySelector('.bk-paint')).toBe(before);
+    expect(before.getAttribute('stroke')).toBe('#f4f4f2');
+    expect([...host.querySelectorAll('.bk-casing')].every((el) => el.getAttribute('class') === 'bk-casing bk-casing-ground')).toBe(true);
+  });
+});
+
+describe("back from the bag planner (owner's try-out, 5 Nov 2026)", () => {
+  test('[BK-RETURN] a page the browser brings back from its back-forward cache draws the bike as the bag planner saved it meanwhile', async () => {
+    localStorage.setItem('loadcheck:bikeProfile', JSON.stringify({ ...sample[0], look: { colour: '#2f7d4f', bars: 'drop', ebike: false } }));
+    refreshBikeSource();
+    act(() => go('tools'));
+    show(<ToolsScreen services={browserServices()} />);
+    expect(host.querySelector('.bk-paint')!.getAttribute('stroke')).toBe('#2f7d4f');
+    // Saved in the bag planner while this page sat in the cache: no storage event reached it.
+    localStorage.setItem('loadcheck:bikeProfile', JSON.stringify({ ...sample[0], look: { colour: '#c62f2a', bars: 'drop', ebike: false } }));
+    await act(async () => { window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false })); await flush(); });
+    expect(host.querySelector('.bk-paint')!.getAttribute('stroke')).toBe('#2f7d4f');   // a fresh load reads everything anyway
+    await act(async () => { window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); await flush(); });
+    expect(host.querySelector('.bk-paint')!.getAttribute('stroke')).toBe('#c62f2a');
   });
 });
 

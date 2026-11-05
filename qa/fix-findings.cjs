@@ -354,7 +354,7 @@ pending.push((async()=>{const app=fresh();
  check(!('theme' in app.run(`draftSettings()`))&&app.run(`captureSettings().theme`)==='light','platform-3 the working plan records no theme until one is chosen (exports still do)');
  app.run(`THEME_CHOSEN=true`);
  check(app.run(`draftSettings().theme`)==='light'&&!same(),'platform-3 a chosen theme is recorded and counts as a change');
- check(app.html.includes('function setTheme(t){ THEME_CHOSEN = true;')&&app.html.includes('THEME_CHOSEN = true; applyTheme(savedTheme)')&&app.html.includes('{ THEME_CHOSEN=true; S.theme=settings.theme;'),'platform-3 choosing, loading or importing a theme counts as a choice');
+ check(app.html.includes('function setTheme(t){ THEME_CHOSEN = true;')&&app.html.includes("THEME_CHOSEN=t!=='auto';")&&app.html.includes('{ THEME_CHOSEN=true; S.theme=settings.theme;'),'platform-3 choosing, loading or importing a theme counts as a choice');
  check(app.html.includes('let DRAFT_BASELINE')&&app.html.includes('S.month = new Date().getMonth();')&&app.html.includes('DRAFT_BASELINE = JSON.stringify(captureDraft());'),'platform-2 the baseline is refreshed once the start month is set');
 })());
 Promise.all(pending).then(()=>console.log(JSON.stringify({status:'passed',checks})));

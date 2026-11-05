@@ -212,11 +212,12 @@ describe('colour and casing (spec sections 3.6 and 7.4)', () => {
   const spec = (colour: string | null) => resolveBikeSpec(normaliseBike({ id: 'c', look: { colour }, fit: { style: 'full-suspension' } }), BAG_SETS.everything!);
 
   test('[BK-COLOUR-CASING] the colour is only on frame and fork, as stroke="#rrggbb", over a casing 1.5 units wider in muted', () => {
-    const els = elements(bikeArt(spec('#2f7d4f'), BAG_SETS.everything!).svg);
-    const painted = els.filter((e) => Object.values(e.attrs).some((v) => v.toLowerCase().includes('2f7d4f')));
+    // Purple: muted in both themes (in the dark, since the owner's try-out of 5 Nov 2026, only where the colour stands out from it: BK-DARK-CRISP)
+    const els = elements(bikeArt(spec('#6b3fa0'), BAG_SETS.everything!).svg);
+    const painted = els.filter((e) => Object.values(e.attrs).some((v) => v.toLowerCase().includes('6b3fa0')));
     expect(painted.length).toBeGreaterThanOrEqual(2);
     for (const e of painted) {
-      expect(e.attrs.stroke).toBe('#2f7d4f');
+      expect(e.attrs.stroke).toBe('#6b3fa0');
       expect(e.attrs.fill).toBe('none');
       expect(e.attrs.class).toMatch(/^bk-paint bk-(frame|stays|fork)$/);
       const casing = els[els.indexOf(e) - 1]!;
@@ -265,10 +266,12 @@ describe("the casing, owner's ruling A of 3 November 2026", () => {
     return new RegExp(`--${name}:\\s*(#[0-9A-Fa-f]{6})`).exec(body)![1]!.toUpperCase();
   };
 
-  test('[BK-COLOUR-CASING] only Brown (light), Silver and Sand (dark) leave muted, and they stand out from their casing at 3:1 or more; the swatches are as the spec fixes them', () => {
+  test('[BK-COLOUR-CASING] in the light theme only Brown leaves muted, and it stands out from its casing at 3:1 or more (the dark theme: BK-DARK-CRISP); the swatches are as the spec fixes them', () => {
     expect(SWATCHES.map((s) => `${s.name} ${s.hex}`).join(', ')).toBe('Black #1d1d1f, Graphite #4b4f54, Silver #b9bdc1, White #f4f4f2, Sand #cbb68e, Brown #7b5434, Red #c62f2a, Orange #e46b1f, Yellow #f1c232, Olive #6d7a37, Green #2f7d4f, Teal #1f7f80, Blue #2563b8, Navy #1f2f55, Purple #6b3fa0, Pink #d6619b');
-    const ruled: Record<'light' | 'dark', string[]> = { light: ['Brown'], dark: ['Silver', 'Sand'] };
-    for (const theme of ['light', 'dark'] as const) {
+    const ruled: Record<'light', string[]> = { light: ['Brown'] };
+    // Silver and Sand, ruled for the dark theme on 3 November, still leave muted there, for the ground (BK-DARK-CRISP)
+    for (const hex of ['#b9bdc1', '#cbb68e']) expect(casingFor(hex, 'dark')).toBe('ground');
+    for (const theme of ['light'] as const) {
       for (const s of SWATCHES) {
         const tone = casingFor(s.hex, theme);
         if (ruled[theme].includes(s.name)) {
@@ -280,6 +283,9 @@ describe("the casing, owner's ruling A of 3 November 2026", () => {
         }
       }
     }
+    // Brown's tone is the light theme's tone it stands out from most
+    for (const [tone, hex] of Object.entries(CASINGS.light)) expect(contrastRatio('#7b5434', CASINGS.light.panel), tone).toBeGreaterThanOrEqual(contrastRatio('#7b5434', hex));
+    expect(casingFor('#7b5434', 'light')).toBe('panel');
     // A colour of the picker or a photo keeps muted as well.
     expect(casingFor('#7c5535', 'light')).toBe('muted');
   });
@@ -303,12 +309,15 @@ describe("the casing, owner's ruling A of 3 November 2026", () => {
 
 describe('the marker on the route strip (spec section 7.4)', () => {
   test('[BK-ART-ANCHORS] the marker is wheels, frame and fork only, at most 24 px tall, decorative, in the rider\'s colour', () => {
-    const m = markerArt(resolveBikeSpec(normaliseBike({ id: 'm', look: { colour: '#c62f2a' } }), null));
+    const m = markerArt(resolveBikeSpec(normaliseBike({ id: 'm', look: { colour: '#c62f2a' } }), null), 'light');
     const els = elements(m);
     expect(els[0]!.attrs['aria-hidden']).toBe('true');
     expect(Number(els[0]!.attrs.height)).toBeLessThanOrEqual(24);
     expect(new Set(els.slice(1).map((e) => e.attrs.class))).toEqual(new Set(['bk-tyre', 'bk-casing', 'bk-paint bk-frame', 'bk-paint bk-fork']));
     expect(m).toContain('stroke="#c62f2a"');
+    // in the dark theme red has the ink casing, readable on the panel too (BK-DARK-CRISP, review I1): the same parts
+    const dark = elements(markerArt(resolveBikeSpec(normaliseBike({ id: 'm', look: { colour: '#c62f2a' } }), null), 'dark'));
+    expect(new Set(dark.slice(1).map((e) => e.attrs.class))).toEqual(new Set(['bk-tyre', 'bk-casing bk-casing-ink', 'bk-paint bk-frame', 'bk-paint bk-fork']));
     expect(m).not.toMatch(/aria-label|role=/);
   });
 });

@@ -16,7 +16,6 @@ import { WEATHER_MODE } from '../../data/weather-mode.ts';
 import type { WeatherMode } from '../../data/weather-mode.ts';
 import { NewerDataError, RefusedError } from '../../store/changed.ts';
 import { inExistingTx, inTx, openExisting } from '../../store/db.ts';
-import { cleanupHandoff, HANDOFF_STORE, handOffTrip } from './handoff.ts';
 import type { HandoffOutcome } from './handoff.ts';
 import type { Place } from '../../core/places/types.ts';
 import { readInputs } from '../../store/inputs.ts';
@@ -307,6 +306,11 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
     setDeparture: (date) => inTurn(() => changeDeparture(date)),
 
     handOff: () => inTurn(async () => {
+      // Plan bags for this trip is a tap away: its code is a chunk of its own, so the first screen does not carry it. A chunk that
+      // can't be loaded (a tab open across two releases) asks for a reload.
+      const m = await import('./handoff.ts').catch(() => undefined);
+      if (!m) return { ok: false as const, reason: W.appLazyFailed };
+      const { cleanupHandoff, HANDOFF_STORE, handOffTrip } = m;
       const trip = await readTrip();
       if (!trip) return { ok: false as const, reason: W.appHandoffNoRoute };
       const settings = await readSettings();

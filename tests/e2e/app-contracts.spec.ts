@@ -162,9 +162,16 @@ test('[LC-BACK] in the home-screen app, Back to Wayfinch is always at the top an
   expect(await page.evaluate(() => matchMedia('(display-mode: standalone)').matches)).toBe(true);
   await expect(page.locator('#bikeDetailsBox')).toBeVisible();
   await expect(back).toHaveAttribute('href', '/#/you');
+  // Bike details is open over the page: its own Back to You, at its top, goes there
+  await expect(page.locator('#bikeDetailsBack')).toHaveAttribute('href', '/#/you');
+  await page.locator('#bikeDetailsBack').click();
+  await page.waitForURL(`${app.origin}/#/you`);
+  expect(new URL(page.url()).pathname).toBe('/');
+  // and closing Bike details itself goes back to You too (owner's try-out, 5 Nov 2026, BK-RETURN)
+  await openFresh(page, '/tools/bags/#bike-details=new&back=you');
+  await ready(page);
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
   await page.locator('#bikeDetailsClose').click();
-  await expect(back).toHaveAttribute('href', '/#/you');
-  await back.click();
   await page.waitForURL(`${app.origin}/#/you`);
   expect(new URL(page.url()).pathname).toBe('/');
 });
