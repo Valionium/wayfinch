@@ -4,7 +4,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { fixtureGpx } from '../fixtures/gpx.ts';
-import { loadApp, preparedTrip, removeBuilds } from './helpers.ts';
+import { goOffline, loadApp, preparedTrip, removeBuilds } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
 import type { StoreInPage } from './fixtures/store-page.ts';
 
@@ -94,6 +94,26 @@ test('[TRIP-GPX] a real GPX file becomes the route: figures, profile and days sh
   await expect(page.getByText('Day 1 ·').first()).toBeVisible();
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-summary]')).toContainText('Fixture: Heidelberg to Strasbourg');
+  expect(problems).toEqual([]);
+});
+
+// The owner's device check of 5 November: the link opened #/you/legal, which showed only the heading "You".
+test('[TRIP-ATTRIBUTION] Licences under the route opens the licences page, in flight mode too; #/you/legal shows You at its legal links', async ({ page }) => {
+  const problems = watch(page);
+  app = await loadApp(page);
+  await expect.poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBe(1);
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+  await page.locator('input[type=file]').setInputFiles(await gpx('loop'));
+  await goOffline(page);
+  await page.locator('[data-summary]').getByRole('link', { name: 'Licences', exact: true }).click();
+  await expect(page).toHaveURL(`${app.origin}/legal/licences/`);
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(/Licences and data/);
+  await expect(page.locator('main')).toContainText("Drafted by an AI from the project's spec. Not legal advice.");
+  await page.goto(`${app.origin}/#/you/legal`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('You');
+  await expect(page.locator('[data-legal-links]').getByRole('link', { name: 'Licences and data', exact: true })).toBeInViewport();
   expect(problems).toEqual([]);
 });
 

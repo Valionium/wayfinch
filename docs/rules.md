@@ -620,6 +620,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - a production build's JS contains no __wf [APP-NO-HOOK]
 - the shell registers /offline-worker.js with { scope: '/', updateViaCache: 'none' } and no module type, once, after its first render; no second registration [APP-REGISTER]
 - a waiting worker shows "Update ready — apply now"; the tap saves first, sends WF_APPLY, and reloads only on controllerchange; update checks at launch and on return to the foreground, at most hourly; the page never reloads by itself [APP-UPDATE-PROMPT]
+- every screen name the shell knows renders content of its own, never only its heading; #/you/legal shows You with its legal links in view (owner's device check, 5 Nov 2026) [APP-SCREENS-FULL]
 
 ## App: Shared UI pieces
 
@@ -732,7 +733,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - no string on Trip says the trip is ready, safe or complete; "Get ready offline" is the only use of the word (banned list extended for these strings) [TRIP-NOT-READY-WORD]
 - iPhone user agent in a browser tab: before the first download, the ask to add to the home screen and download inside it. Not a block when the page can't tell [TRIP-IPHONE]
 - Android's beforeinstallprompt gives an Install button; none without it [TRIP-INSTALL]
-- Licences reachable; "© OpenStreetMap contributors" with the pack date on Trip's summary [TRIP-ATTRIBUTION]
+- Licences reachable: Trip's Licences link opens the licences page /legal/licences/, offline too; "© OpenStreetMap contributors" with the pack date on Trip's summary [TRIP-ATTRIBUTION]
 
 ## App: Plan from A to B
 

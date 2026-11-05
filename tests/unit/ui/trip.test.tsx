@@ -455,7 +455,8 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     expect(credit.getAttribute('href')).toBe('https://www.openstreetmap.org/copyright');
     expect(host.querySelector('[data-summary]')!.textContent).toContain('map data of 25 Oct');
     const licences = [...host.querySelectorAll('a')].find((a) => a.textContent === W.appTripLicences)!;
-    expect(licences.getAttribute('href')).toBe('#/you/legal');
+    // The licences page itself, a page of the site the worker precaches (owner's device check, 5 Nov: #/you/legal showed only "You").
+    expect(licences.getAttribute('href')).toBe('/legal/licences/');
     render(null, host);
     await show(services(preparing(allOk, { places: 2 })));
     await click(button(/^(Update|Get ready offline)$/));
