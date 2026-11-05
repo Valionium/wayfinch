@@ -12468,19 +12468,23 @@ window.addEventListener('drop',e => {
 });
 // The two columns' rig sticks just below Back to Wayfinch, whatever height that row has.
 // It sticks only while all of it fits below that row (review M6): with larger text a taller rig scrolls with the page, so its foot
-// and legend never hide below the window's edge.
-function syncPlannerTop(){
+// and legend never hide below the window's edge. A toolbar that hides on scroll changes the window by up to 80 px, so it starts to
+// stick only with 80 px to spare, and stops only when it no longer fits at all: it never flips mid-scroll (review R1). When the rig
+// itself changes size (a step, a bag), the 80 px rule is asked again then, so the change shows with the rider's own tap, not later.
+const RIG_FIT_SPARE=80;
+function syncPlannerTop(rigChanged){
   try {
     const back=$('backToWayfinch'),row=back && typeof back.closest==='function' ? back.closest('.guide-launch-row') : null,rig=$('rigBox');
     if(!row || !rig) return;
     const top=row.offsetHeight+8;
     document.documentElement.style.setProperty('--planner-top',top+'px');
-    rig.classList.toggle('rig-fits',rig.offsetHeight+top<=window.innerHeight);
+    const need=rig.offsetHeight+top,sticking=rig.classList.contains('rig-fits') && rigChanged !== true;
+    rig.classList.toggle('rig-fits',sticking ? need<=window.innerHeight : need<=window.innerHeight-RIG_FIT_SPARE);
   } catch(e){}
 }
-window.addEventListener('resize',syncPlannerTop);
-try { if(typeof ResizeObserver==='function') new ResizeObserver(syncPlannerTop).observe($('rigBox')); } catch(e){}
-syncPlannerTop();
+window.addEventListener('resize',() => syncPlannerTop(false));
+try { if(typeof ResizeObserver==='function') new ResizeObserver(() => syncPlannerTop(true)).observe($('rigBox')); } catch(e){}
+syncPlannerTop(true);
 $('tellGo').onclick = async () => {
   const v = $('tellInput').value.trim();
   if(!v) return;

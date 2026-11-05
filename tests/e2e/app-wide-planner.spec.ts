@@ -378,3 +378,37 @@ test('[LC-WIDE-COLS] whenever the rig is sticky, all of it fits in the window: i
     app = undefined;
   }
 });
+
+test('[LC-WIDE-COLS] a toolbar that hides on scroll (up to 80 px of window height) never makes the rig flip between sticky and not (review R1)', async ({ page }) => {
+  const finishedPlan = async () => {
+    await page.evaluate("S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'frame', L:6 }, { uid:3, pos:'bar', L:12 }]; S.nextUid = 4; go(2); go(3); go(4)");
+    if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
+    await page.waitForTimeout(300);
+  };
+  await planner(page, 1280, 720);
+  await finishedPlan();
+  // What the rig needs: its own height below Back to Wayfinch's row.
+  const need = Math.ceil(await page.evaluate(() => document.getElementById('rigBox')!.offsetHeight + parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--planner-top'))));
+  await app!.close();
+  app = undefined;
+  const fits = () => page.evaluate(() => document.getElementById('rigBox')!.classList.contains('rig-fits'));
+  // A device whose window is `start` px tall with its toolbar hidden, and 80 px less with it shown, scrolled back and forth.
+  for (const start of [need + 40, need + 80]) {
+    await planner(page, 1280, start);
+    await finishedPlan();
+    const states: boolean[] = [];
+    for (const h of [start, start - 80, start, start - 80, start]) {
+      await page.setViewportSize({ width: 1280, height: h });
+      await page.waitForTimeout(150);
+      states.push(await fits());
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
+      const facts = await page.evaluate(() => ({ sticky: getComputedStyle(document.getElementById('rigBox')!).position === 'sticky', bottom: document.getElementById('rigBox')!.getBoundingClientRect().bottom, height: window.innerHeight }));
+      if (facts.sticky) expect(facts.bottom, `${h}`).toBeLessThanOrEqual(facts.height);
+      await page.evaluate(() => window.scrollTo(0, 0));
+    }
+    // inside the band it never sticks; with 80 px to spare it sticks throughout
+    expect(states, `${start}`).toEqual(Array(5).fill(start === need + 80));
+    await app!.close();
+    app = undefined;
+  }
+});
