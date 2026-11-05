@@ -43,6 +43,11 @@
 .bike-tap { display: block; border-radius: 8px; color: inherit; text-decoration: none; }
 .bike-art { display: block; }
 .bike-large .bike-art { max-width: 32rem; margin: 0 auto; }
+/* The one drawing a page shows large, on Trip or Tools, is the bike that glides into the bag planner and back (section 9.8): one screen
+   at a time, so one per page. The small drawings in You and the strip's marker are never named. */
+@media (prefers-reduced-motion: no-preference) {
+  .bike-large .bike-art { view-transition-name: wf-bike; }
+}
 .bike-small .bike-art { width: 7.5rem; }
 .bike-caption { margin: 4px 0 0; }
 .bike-caption a { display: inline-flex; align-items: center; min-height: 44px; color: var(--blaze); font-weight: 600; }

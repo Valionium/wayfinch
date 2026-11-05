@@ -90,6 +90,8 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - A simulator check that applied to under ten moments fails the run (§11.1) [HON-SIM-GATE]
 - A failing check saves a regression file and can be replayed (§11.1) [HON-SIM-FAIL]
 - One seed always gives the same run (§11.1) [HON-SIM-SEED]
+- Every property test runs on the fixed seed and run count, or the ones FC_SEED and FC_RUNS give, through @fast-check/vitest too (§11.1) [HON-PROP-SEED]
+- A scheduled run of every property test on a random seed, which prints its seed, so the fixed seed of pull requests doesn't hide a counterexample for good (§11.1, §11.8) [HON-PROP-SWEEP]
 - One screen on a long route builds within the time budget (§4.5) [HON-BUDGET]
 
 ## Contracts
@@ -909,3 +911,18 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Contracts 1-3: values generated from the schemas round-trip byte-identically through both sides (§11.4) [DF-04]
 - over generated plans and bikes: without frame details bikeFit gives today's values and the plan is byte-identical; a bag the frame can't take is never used and never dropped; a typed size never changes; each other value comes from the first available source (§15 row 6) [LC-FIT-PROPS]
 - a GPX in several sections plans the same stages in both apps: Load Check smooths heights and counts climbing within each section, resetting at a gap; the port's route keeps no section breaks, so a height jump across a gap counts as climbing there and the stage ends differ. Needs the break in the route's points, which the route hash encodes (Contract 5): the coordinator's and owner's call (§11.4) [DF-01-SECTIONS]
+
+## Launch paths and wide layout (sub-project 6, group 4)
+
+- from the step-one worker, the launch build waits; the prompt applies it; / is then the co-pilot and /tools/bags/ the bag planner, both offline; every saved plan intact (§9.5 step two, §11) [SW-LAUNCH-UPDATE]
+- from the old worker straight to the launch build: the first online open serves the old copy; the new worker installs and takes over on its first install; the next open is the co-pilot; no loadcheck-offline-* cache left; every loadcheck:* key byte-identical; /tools/bags/ offline; with no signal throughout, the old copy keeps serving (§9.5, Review Focus 1) [SW-JUMP]
+- the co-pilot's / carries no loadcheck-offline-shell marker, so an old worker still in charge can't store it (§9.5 step 3) [SW-NO-MARKER]
+- a tab of an old page left open at / that writes after the bag planner saved never overwrites the newer draft (M9); a future bike format would block its bike write with its message; it writes no saved-at stamps, and a delete request still judges its draft by its own time; its known risks (bike list replaced, a save just after a delete request, deleted lists written back) are pinned as tests of today's behaviour (AGENTS.md) (§9.5 step 4, §7.1 Contract 3, Review Focus 3) [SW-OLD-TAB-WRITES]
+- a rider with loadcheck:draft or loadcheck:setups gets a one-time card "Load Check is now part of Wayfinch", under Tools, its link in the same window; once dismissed it is gone; a new rider never sees it (§9.5 step two) [SW-MOVED-CARD]
+- the launch build's precache holds the shell, its lazy chunks, the bag planner, bike.js, bike-photo.js, Leaflet, the licences, imprint and privacy pages and the boundary file, at canonical addresses only, each at most 2 MiB; the manifest's shortcuts open offline (§9.1, §9.6) [SW-PRECACHE-ALL]
+- from about 1100 px the bag planner has two columns: the rig and the inspector sticky on the left, the steps on the right, Back to Wayfinch in view; nothing changes under 600 px; a taller map on wide screens (§7.1 item 13) [LC-WIDE-COLS]
+- the inspector's side-by-side test measures its column, not the window, so it never falls back to the full-window sheet in the two columns (§7.1 item 13) [LC-WIDE-INSPECTOR]
+- a GPX or JSON file dropped on its zone is read as if chosen; a drop anywhere else is cancelled; the file pickers stay (§7.1 item 13) [LC-WIDE-DROP]
+- the step-4 fill tip also shows on keyboard focus; selectBags unchanged (§7.1 item 13) [LC-WIDE-TIP]
+- both apps opt in to the cross-document view transition only under prefers-reduced-motion: no-preference; at most one element named wf-bike per page, on a drawing with the 320 x 150 viewBox; the strip marker and small drawings never named (§9.8) [LC-GLIDE]
+- in a browser without view transitions, or with reduced motion, pages switch normally, and the transition never delays a navigation (§9.8) [LC-GLIDE-OFF]

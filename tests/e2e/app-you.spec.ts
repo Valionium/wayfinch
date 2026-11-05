@@ -27,7 +27,29 @@ const outside = (log: string[], origin: string): string[] => log.filter((line) =
 
 const tab = (page: Page, name: string) => page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name });
 
+/**
+ * Waits until the weight typed in You is kept: the store tells the other windows once the write is done. If it never is, the failure
+ * says what the screen shows (the field, its problem line, where the focus is) and any error the page threw: YOU-EXPORT-UI failed
+ * this way once in CI (the field typed and left, no write reported in 30 s) and never in 90 local runs, so the next failure must
+ * carry its own evidence.
+ */
+function savedWeight(page: Page): () => Promise<void> {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
+  return () => expect.poll(async () => ({
+    told: await page.evaluate(() => localStorage.getItem('copilot:changed') !== null),
+    screen: await page.evaluate(() => ({
+      field: (document.getElementById('you-weight') as HTMLInputElement | null)?.value ?? null,
+      problem: document.getElementById('you-weight-problem')?.textContent ?? null,
+      focus: document.activeElement?.id ?? document.activeElement?.tagName ?? null,
+    })),
+    errors: errors.slice(0, 3),
+  }), { timeout: 30_000 }).toMatchObject({ told: true });
+}
+
 test('[YOU-RIDER] You opens as its own screen with the rider, water, learning, bikes, settings, data and legal cards, and a weight typed there is kept after a reload', async ({ page }) => {
+  const saved = savedWeight(page);
   app = await loadApp(page);
   await tab(page, 'You').click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('You');
@@ -39,7 +61,7 @@ test('[YOU-RIDER] You opens as its own screen with the rider, water, learning, b
   await page.getByLabel('Your weight (kg)').blur();
   await expect(page.getByLabel('Your weight (kg)')).toHaveValue('82');
   // The write is kept once the other windows are told; reload only after that.
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('copilot:changed')), { timeout: 30_000 }).not.toBeNull();
+  await saved();
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByLabel('Your weight (kg)')).toHaveValue('82');
   // The tyre tool starts from it.
@@ -48,11 +70,13 @@ test('[YOU-RIDER] You opens as its own screen with the rider, water, learning, b
 });
 
 test('[YOU-EXPORT-UI] Export downloads a JSON file named by the day, with the rider details in it', async ({ page }) => {
+  const saved = savedWeight(page);
   app = await loadApp(page);
   await tab(page, 'You').click();
+  await expect(page.locator('[data-you-loaded]')).toBeVisible();
   await page.getByLabel('Your weight (kg)').fill('82');
   await page.getByLabel('Your weight (kg)').blur();
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('copilot:changed')), { timeout: 30_000 }).not.toBeNull();
+  await saved();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export my data' }).click();
   const file = await download;
@@ -222,11 +246,12 @@ test('[WXR-AUTO-WIRED] in the browser: the automatic forecast shows on the Weath
 });
 
 test('[YOU-DELETE-UI] after Delete now and a reload, no empty database comes back, also with Keep trip data fresh on', async ({ page }) => {
+  const saved = savedWeight(page);
   app = await loadApp(page);
   await tab(page, 'You').click();
   await page.getByLabel('Your weight (kg)').fill('82');
   await page.getByLabel('Your weight (kg)').blur();
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('copilot:changed')), { timeout: 30_000 }).not.toBeNull();
+  await saved();
   await page.getByRole('button', { name: 'Delete co-pilot data' }).click();
   await page.getByRole('button', { name: 'Delete now' }).click();
   await expect(page.getByText('Deleted from this phone.')).toBeVisible();
