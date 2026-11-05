@@ -6,7 +6,9 @@ import type { BagView, BikeSpec, PlanView } from './spec.ts';
 import { parseTyre } from './tyres.ts';
 
 export { bikeArt, bottleArt, fillColour, labelOf, markerArt } from './art.ts';
-export type { Anchors, ArtOptions, Box, Hit, Placed, Spot } from './art.ts';
+export type { Anchors, ArtOptions, Box, Placed, Spot } from './art.ts';
+export { targetsOf } from './targets.ts';
+export type { Hit, Targets } from './targets.ts';
 export { SWATCHES, hexToOklab, nearestSwatchName, oklabMedian, oklabToHex } from './colour.ts';
 export { normaliseBike } from './normalise.ts';
 export type { BikeRecord } from './normalise.ts';

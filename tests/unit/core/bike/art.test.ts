@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { bikeArt, markerArt } from '../../../../src/core/bike/art.ts';
 import { CASINGS, casingFor, contrastRatio, SWATCHES } from '../../../../src/core/bike/colour.ts';
 import type { Anchors, Box, Placed } from '../../../../src/core/bike/art.ts';
+import { targetsOf } from '../../../../src/core/bike/targets.ts';
 import { normaliseBike } from '../../../../src/core/bike/normalise.ts';
 import { resolveBikeSpec } from '../../../../src/core/bike/spec.ts';
 import type { BagView } from '../../../../src/core/bike/spec.ts';
@@ -61,8 +62,9 @@ function checkAnchors(a: Anchors, name: string, mounts: { st: boolean; dt: boole
   // The backpack stays off the bike: wholly behind the rear wheel.
   expect(a.pack.x + a.pack.w, `${name}: backpack`).toBeLessThan(a.wheels.rear.cx - a.wheels.rear.r);
   // Tap targets never overlap (spec section 14). A bottle sits on top of the frame bag's shape, as in the bag planner today.
-  const rects = a.hits.filter((h) => h.kind === 'rect');
-  const circles = a.hits.filter((h) => h.kind === 'circle');
+  const { hits } = targetsOf(a);
+  const rects = hits.filter((h) => h.kind === 'rect');
+  const circles = hits.filter((h) => h.kind === 'circle');
   for (let i = 0; i < rects.length; i += 1) for (let j = i + 1; j < rects.length; j += 1) {
     expect(overlap(rects[i]!.box, rects[j]!.box), `${name}: ${rects[i]!.key} and ${rects[j]!.key}`).toBe(false);
   }
@@ -71,10 +73,10 @@ function checkAnchors(a: Anchors, name: string, mounts: { st: boolean; dt: boole
     for (const r of rects) expect(circleMeetsBox(circles[i]!.circle!, r.box), `${name}: ${circles[i]!.key} and ${r.key}`).toBe(false);
   }
   // Each target holds its own place: a target never loses its centre to another.
-  for (const h of a.hits) expect(h.box.w * h.box.h, `${name}: ${h.key} size`).toBeGreaterThan(40);
+  for (const h of hits) expect(h.box.w * h.box.h, `${name}: ${h.key} size`).toBeGreaterThan(40);
   const places: [string, Placed | null][] = [['seat', a.seat], ['bar', a.bar], ['pack', a.pack], ['top:front', a.top.front], ['top:rear', a.top.rear]];
   for (const [key, p] of places) {
-    const h = a.hits.find((x) => x.key === key);
+    const h = hits.find((x) => x.key === key);
     if (!p || !h) continue;
     const [cx, cy] = [p.x + p.w / 2, p.y + p.h / 2];
     expect(cx >= h.box.x - 0.01 && cx <= h.box.x + h.box.w + 0.01 && cy >= h.box.y - 0.01 && cy <= h.box.y + h.box.h + 0.01, `${name}: ${key} keeps its centre`).toBe(true);

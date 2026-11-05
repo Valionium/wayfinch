@@ -799,6 +799,15 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Make it yours and Edit build the exact fragments; back ∈ trip, tools, you, tyre [BK-DEEPLINK]
 - bags drawn only when the summary's bikeId matches the bike, both null counting [BK-MATCH-BAGS]
 - drawing sends nothing (network log) [BK-NO-REQUEST]
+- look extras (owner's wish, 5 Nov 2026): a bike with no extras, broken ones or none usable draws byte for byte as bikeArt; with no frame colour only the rims apply [BK-PAINT-SAME]
+- the 14 frame patterns of the owner's try-out, each deterministic, each different from one colour, every paint it uses defined in the drawing with the drawing's id prefix; one gradient across frame, stays and fork; up to three colours, a missing one the starting Purple and Teal; raw carbon ignores the colours [BK-PAINT-PATTERNS]
+- the fork: like the frame (continues its pattern), its own colour, one of six fades from crown to dropout, or its own texture in a fade pair [BK-PAINT-FORK]
+- rim depth 15–60 mm: a black carbon band inside the tyre at the drawing's scale (0.11 units per mm), over the spokes; none set is today's rim [BK-PAINT-RIM]
+- every pattern keeps the casing 1.5 units wider in both themes; owner's ruling A applies to every colour shown (muted unless one is a moved swatch, then the tone best for all) [BK-PAINT-CASING]
+- the accessible name says the pattern and its colours, the fork and the rims [BK-PAINT-LABEL]
+- look.paint {pattern, colours, fork, rimMm} reads back as stored; an invalid field drops only itself; bike format stays 2 [BK-PAINT-NORMALISE]
+- the co-pilot: the extras load as their own chunk only for a bike that has them; the first screen's JavaScript does not grow; the Ahead marker stays one colour [BK-PAINT-LAZY]
+- known risk, pinned: the frozen page at / re-saving a bike drops its look extras (format 2 kept so a rollback can still edit bikes) [BK-PAINT-OLD-PAGE]
 
 ## App: You and the legal pages
 
@@ -889,6 +898,9 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - the photo is never stored: only the colour; canvas cleared, file input emptied, object URL revoked on leaving (§7.4, §10) [LC-PHOTO-NOSTORE]
 - oklabMedian on 15 x 15 pixels drops the lightest and darkest 20% and gives the frame's colour within delta E 2; the photo's overall colour isn't used; EXIF never read (§7.4) [LC-PHOTO-MEDIAN]
 - bike-photo.js loads on demand, is precached and works offline (§7.4, §9.1) [LC-PHOTO-OFFLINE]
+- Look's extras: frame pattern, its second and third colours, the fork, rim depth: labelled radios and one slider, each target at least 44 px, keyboard-reachable, names that say the pattern and colours; at 360 and 1280 px in both themes; every tap shows at once and Undo restores all (owner's wish, 5 Nov 2026) [LC-LOOK-EXTRAS]
+- the extras round-trip through saving, export and import, and both pages (bag planner and co-pilot) [LC-LOOK-EXTRAS-SAVE]
+- From a photo, Front, back and fork: three taps set a front-to-back fade and the fork's own colour; the photo never leaves the phone [LC-PHOTO-THREE]
 
 ## Bag planner: separation and contracts (sub-project 6, group 2)
 

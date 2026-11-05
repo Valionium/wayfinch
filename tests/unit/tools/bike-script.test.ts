@@ -22,7 +22,8 @@ test('[BK-ART-ANCHORS] with the switch on the bag planner gets /tools/bags/bike.
   // The page's own realm: its records come from its own JSON.parse.
   const context = { window: {} as Record<string, unknown>, text: JSON.stringify(sample[0]) };
   runInNewContext(source, context);
-  expect(Object.keys(context.window.WayfinchBike as object).sort()).toEqual(['SWATCHES', 'bikeArt', 'nearestSwatchName', 'normaliseBike', 'oklabMedian', 'resolveBikeSpec'].sort());
+  expect(Object.keys(context.window.WayfinchBike as object).sort()).toEqual(['SWATCHES', 'bikeArt', 'nearestSwatchName', 'normaliseBike', 'oklabMedian', 'resolveBikeSpec',
+    'PATTERN_LIST', 'FADES', 'DEFAULT_COLOURS', 'PAINT_WORDS'].sort());
   const theirs = runInNewContext('const B = window.WayfinchBike; B.bikeArt(B.resolveBikeSpec(B.normaliseBike(JSON.parse(text)), null), null).svg', context) as string;
   const mine = bikeArt(resolveBikeSpec(normaliseBike(sample[0]), null), null);
   expect(mine.label).toContain('blue frame');

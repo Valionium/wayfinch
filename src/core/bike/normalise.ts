@@ -12,7 +12,16 @@ export type Fit = {
 };
 export type MaxWeight = { v: number; u: 'kg' | 'lb'; includes: 'bike' | 'no-bike' | 'unsure' };
 export type Bars = 'drop' | 'flat' | 'other';
-export type Look = { colour: string | null; bars: Bars | null; ebike: boolean | null };
+/** The look extras (owner's wish, 5 November 2026): how the frame is painted, the fork, the rims. `colour` stays the first colour. */
+export const PATTERNS = ['solid', 'fade-h', 'fade-v', 'split', 'blocks', 'shift', 'panel', 'marble', 'stripes', 'speckle', 'camo', 'sparkle', 'chrome', 'carbon'] as const;
+export type Pattern = (typeof PATTERNS)[number];
+/** The patterns a fork can have of its own: the textures. */
+export const FORK_PATTERNS = PATTERNS.slice(7) as readonly ForkPattern[];
+export type ForkPattern = 'marble' | 'stripes' | 'speckle' | 'camo' | 'sparkle' | 'chrome' | 'carbon';
+export type Fork = { kind: 'own'; colour: string } | { kind: 'fade'; pair: number } | { kind: 'pattern'; pattern: ForkPattern; pair: number };
+/** `colours` are the second and third; `pair` is one of the six fade pairs; a rim depth is 15 to 60 mm. */
+export type Paint = { pattern: Pattern; colours: [string | null, string | null]; fork: Fork | null; rimMm: number | null };
+export type Look = { colour: string | null; bars: Bars | null; ebike: boolean | null; paint?: Paint };
 export type WheelWord = '700c' | '650b' | '650c' | '29' | '27.5' | '26';
 export type Geometry = {
   at: string | null; maker: string; model: string; year: number | null; size: string; wheel: WheelWord | null;
@@ -129,14 +138,29 @@ function maxWeightOf(value: unknown): MaxWeight | null {
   return kg >= 20 && kg <= 400 ? { v: round1(v), u, includes: value.includes as MaxWeight['includes'] } : null;
 }
 
+const hexOf = (v: unknown): string | null => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : null);
+
+/** The look extras; anything unknown or broken drops only itself, and nothing set is none (today's drawing). */
+function paintOf(v: unknown): Paint | null {
+  if (!isObject(v)) return null;
+  const c = Array.isArray(v.colours) ? v.colours as unknown[] : [];
+  const f = isObject(v.fork) ? v.fork : {};
+  const pair = int(f.pair, 0, 5);
+  const own = hexOf(f.colour);
+  const fork: Fork | null = f.kind === 'own' && own ? { kind: 'own', colour: own } : f.kind === 'fade' && pair !== null ? { kind: 'fade', pair }
+    : f.kind === 'pattern' && pair !== null && FORK_PATTERNS.includes(f.pattern as ForkPattern) ? { kind: 'pattern', pattern: f.pattern as ForkPattern, pair } : null;
+  const p: Paint = { pattern: oneOf(v.pattern, PATTERNS, 'solid'), colours: [hexOf(c[0]), hexOf(c[1])], fork, rimMm: int(v.rimMm, 15, 60) };
+  return p.pattern === 'solid' && !p.colours[0] && !p.colours[1] && !fork && p.rimMm === null ? null : p;
+}
+
 function lookOf(value: unknown): Look | null {
   if (!isObject(value)) return null;
-  const colour = typeof value.colour === 'string' && /^#[0-9a-fA-F]{6}$/.test(value.colour) ? value.colour.toLowerCase() : null;
+  const paint = paintOf(value.paint);
   const look: Look = {
-    colour, bars: value.bars === 'drop' || value.bars === 'flat' || value.bars === 'other' ? value.bars : null,
-    ebike: typeof value.ebike === 'boolean' ? value.ebike : null,
+    colour: hexOf(value.colour), bars: value.bars === 'drop' || value.bars === 'flat' || value.bars === 'other' ? value.bars : null,
+    ebike: typeof value.ebike === 'boolean' ? value.ebike : null, ...(paint ? { paint } : {}),
   };
-  return look.colour === null && look.bars === null && look.ebike === null ? null : look;
+  return look.colour === null && look.bars === null && look.ebike === null && !paint ? null : look;
 }
 
 function geometryOf(value: unknown): Geometry | null {

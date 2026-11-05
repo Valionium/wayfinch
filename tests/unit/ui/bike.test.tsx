@@ -124,6 +124,15 @@ describe('the marker on the strip (spec section 7.4)', () => {
     show(<BikeMarker bike={null} />);
     expect(host.querySelector('.bike-marker svg')).not.toBeNull();
   });
+
+  test('[BK-PAINT-LAZY] a bike with look extras keeps a one-colour marker: its first colour, as today (patterns do not read at 24 px)', () => {
+    const paint = { pattern: 'marble', colours: ['#6b3fa0', '#1f7f80'], fork: { kind: 'own', colour: '#f1c232' }, rimMm: 50 };
+    show(<BikeMarker bike={normaliseBike({ id: 'm', look: { colour: '#c62f2a', paint } })} />);
+    const painted = host.querySelector('.bike-marker')!.innerHTML;
+    show(<BikeMarker bike={normaliseBike({ id: 'm', look: { colour: '#c62f2a' } })} />);
+    expect(painted).toBe(host.querySelector('.bike-marker')!.innerHTML);
+    expect(painted).not.toMatch(/url\(|bk-rimband|#f1c232/);
+  });
 });
 
 describe('every tap shows a change at once (the owner\'s rules)', () => {
@@ -177,5 +186,39 @@ describe('where the bike appears (spec section 3.7)', () => {
     show(<ToolsScreen services={browserServices()} />);
     expect(host.querySelector('.card svg.bk')!.getAttribute('aria-label')).toBe('Your bike: gravel bike, 700 × 40 mm tyres, drop bars.');
     expect(host.querySelector('.card a.bike-tap')!.getAttribute('href')).toBe('/tools/bags/#bike-details=new&back=tools&section=look');
+  });
+});
+
+describe('the look extras on the co-pilot (review of PR 46, I1)', () => {
+  const wait = async () => { for (let i = 0; i < 50; i += 1) await new Promise((r) => setTimeout(r, 10)); };
+  const painted = (paint: object, colour = '#c62f2a') =>
+    normaliseBike({ id: 'a', fit: { style: 'diamond-level', size: { kind: 'letter', value: 'M' } }, look: { colour, paint } })!;
+  const stroke = (cls: string) => host.querySelector(`.bk-paint.${cls}`)?.getAttribute('stroke');
+
+  test('[BK-PAINT-LAZY] cold start: once the extras arrive, two-tone blocks and a fork of its own colour keep their own colours; a change of the fork alone repaints only the fork', async () => {
+    const blocks = { pattern: 'blocks', colours: ['#2563b8', null], fork: { kind: 'own', colour: '#4b4f54' } };
+    show(<BikeDrawing bike={painted(blocks)} summary={null} size="small" back="you" caption={false} />);
+    await act(wait);
+    expect([stroke('bk-frame'), stroke('bk-stays'), stroke('bk-fork')]).toEqual(['#c62f2a', '#2563b8', '#4b4f54']);
+    show(<BikeDrawing bike={painted({ ...blocks, fork: { kind: 'own', colour: '#f1c232' } })} summary={null} size="small" back="you" caption={false} />);
+    await act(wait);
+    expect([stroke('bk-frame'), stroke('bk-stays'), stroke('bk-fork')]).toEqual(['#c62f2a', '#2563b8', '#f1c232']);
+  });
+
+  test('[BK-PAINT-LAZY] a fade keeps its gradient when only the fork\'s own colour changes; a plain colour change still repaints in place', async () => {
+    const fade = { pattern: 'fade-h', colours: ['#6b3fa0', null], fork: { kind: 'own', colour: '#4b4f54' } };
+    show(<BikeDrawing bike={painted(fade)} summary={null} size="small" back="you" caption={false} />);
+    await act(wait);
+    expect(stroke('bk-frame')).toMatch(/^url\(#bk\d+-pf\)$/);
+    show(<BikeDrawing bike={painted({ ...fade, fork: { kind: 'own', colour: '#f1c232' } })} summary={null} size="small" back="you" caption={false} />);
+    await act(wait);
+    expect(stroke('bk-frame')).toMatch(/^url\(#bk\d+-pf\)$/);
+    expect(stroke('bk-fork')).toBe('#f1c232');
+    // without extras the shortcut still holds: the same elements, the new colour
+    show(<BikeDrawing bike={normaliseBike({ id: 'p', look: { colour: '#c62f2a' } })} summary={null} size="small" back="you" caption={false} />);
+    const before = host.querySelector('.bk-paint');
+    show(<BikeDrawing bike={normaliseBike({ id: 'p', look: { colour: '#2f7d4f' } })} summary={null} size="small" back="you" caption={false} />);
+    expect(host.querySelector('.bk-paint')).toBe(before);
+    expect(stroke('bk-frame')).toBe('#2f7d4f');
   });
 });
