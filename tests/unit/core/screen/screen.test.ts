@@ -10,6 +10,7 @@ import { preparedHours } from '../engines/leaveby-helpers.ts';
 import { stamps } from '../engines/weather-helpers.ts';
 import type { Spot } from '../engines/water-helpers.ts';
 import { inputsOf } from './screen-helpers.ts';
+import { ownersDay } from '../../ui/ahead-fixture.ts';
 import { scenario } from '../../../gen/scenario.ts';
 
 const FRI = '2026-10-16';
@@ -434,6 +435,16 @@ describe('the strip', () => {
       const card = s.cards[icon.opens as 'water'];
       expect([card.stamp?.km, ...card.items.map((i) => i.stamp?.km)]).toContain(icon.km);
     }
+  });
+  // The owner's device check of 5 November: Sleep named a place at the stop, and the strip drew the two nearer campsites instead.
+  test('[AH-STRIP-STOP] the place the Sleep card names has its icon, at the stop of the day, whatever sleep places lie before it', () => {
+    const s = screen(ownersDay());
+    expect(s.cards.sleep.stamp?.km).toBe(57.5);
+    expect(s.strip.endKm).toBe(57.5);
+    const sleep = s.strip.icons.filter((x) => x.kind === 'sleep').map((x) => x.km);
+    expect(sleep).toContain(57.5);
+    expect(sleep.length).toBeLessThanOrEqual(2);
+    expect(sleep).toEqual([17.5, 57.5]); // the named place, and the nearest other
   });
   test('[HON-ONE-SCREEN] one place on two passes gets an icon per pass, never one lookup by id', () => {
     const route = flatRoute(100, { stageEnds: [100] });

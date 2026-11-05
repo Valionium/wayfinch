@@ -2,6 +2,7 @@
 // `tyreEstimate` give and computes no pressure itself. It reads Load Check's records and never writes them.
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
+import { T } from '../../core/wording/en-tyre.ts';
 import { W, shortMapDate } from '../../core/wording/en.ts';
 import { Card, Notice } from '../../ui/card.tsx';
 import { checkLimit, tyreEstimate } from './core.ts';
@@ -34,6 +35,9 @@ const bar2 = (n: number): string => n.toFixed(2);
 
 // ---- small pieces --------------------------------------------------------------------------------------------------------------
 
+/** The mark on each of the three things a figure needs. */
+const NeededTag = () => <> <span class="tyre-needed-tag">{T.tyreNeededTag}</span></>;
+
 function SourceLine({ source, plan }: { source: Source; plan?: string }) {
   if (source === 'bike') return <>{W.tyreFromBike}</>;
   if (source === 'plan') return <>{plan ?? ''}</>;
@@ -42,16 +46,16 @@ function SourceLine({ source, plan }: { source: Source; plan?: string }) {
 }
 
 /** A field that starts from somewhere else shows its value, where it came from, and Change; once changed it is an ordinary field. */
-function Field({ label, source, plan, valueText, editor, onReset, id, resetLabel }: {
-  label: string; source: Source; plan?: string; valueText: string; editor: ComponentChildren; onReset?: () => void; id: string; resetLabel: string;
+function Field({ label, source, plan, valueText, editor, onReset, id, resetLabel, needed }: {
+  label: string; source: Source; plan?: string; valueText: string; editor: ComponentChildren; onReset?: () => void; id: string; resetLabel: string; needed?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const fromElsewhere = source === 'bike' || source === 'plan' || source === 'you';
   return (
-    <div class="tyre-field" data-source={source}>
+    <div class="tyre-field" data-source={source} data-needed={needed}>
       {fromElsewhere && !editing ? (
         <div class="tyre-from">
-          <span class="tyre-label" id={`${id}-label`}>{label}</span>
+          <span class="tyre-label" id={`${id}-label`}>{label}{needed ? <NeededTag /> : null}</span>
           <span class="tyre-value">{valueText}</span>
           <span class="muted"><SourceLine source={source} plan={plan} /> · </span>
           <button type="button" class="btn" onClick={() => setEditing(true)} aria-describedby={`${id}-label`}>{W.tyreChange}</button>
@@ -66,7 +70,7 @@ function Field({ label, source, plan, valueText, editor, onReset, id, resetLabel
   );
 }
 
-function NumberInput({ id, label, value, onCommit, unit, assumed, signed = false }: { id: string; label: string; value: number | undefined; onCommit: (n: number | undefined) => void; unit?: string; assumed?: number; signed?: boolean }) {
+function NumberInput({ id, label, value, onCommit, unit, assumed, signed = false, needed = false }: { id: string; label: string; value: number | undefined; onCommit: (n: number | undefined) => void; unit?: string; assumed?: number; signed?: boolean; needed?: boolean }) {
   const [text, setText] = useState(value === undefined ? '' : String(value));
   const [bad, setBad] = useState(false);
   useEffect(() => {
@@ -76,7 +80,7 @@ function NumberInput({ id, label, value, onCommit, unit, assumed, signed = false
   }, [value]);
   return (
     <label class="tyre-input" for={id}>
-      <span class="tyre-label">{label}</span>
+      <span class="tyre-label">{label}{needed ? <NeededTag /> : null}</span>
       <input
         id={id} type="text" inputMode="decimal" autoComplete="off" value={text}
         aria-invalid={bad ? 'true' : undefined}
@@ -97,12 +101,12 @@ function NumberInput({ id, label, value, onCommit, unit, assumed, signed = false
   );
 }
 
-function Choice<T extends string>({ id, label, value, options, onChange, source }: {
-  id: string; label: string; value: T | undefined; options: readonly { value: T; label: string }[]; onChange: (v: T) => void; source?: Source;
+function Choice<V extends string>({ id, label, value, options, onChange, source, needed }: {
+  id: string; label: string; value: V | undefined; options: readonly { value: V; label: string }[]; onChange: (v: V) => void; source?: Source; needed?: string;
 }) {
   return (
-    <fieldset class="tyre-choice">
-      <legend class="tyre-label">{label}{source === 'bike' ? <span class="muted"> · {W.tyreFromBike}</span> : null}</legend>
+    <fieldset class="tyre-choice" data-needed={needed}>
+      <legend class="tyre-label">{label}{needed ? <NeededTag /> : null}{source === 'bike' ? <span class="muted"> · {W.tyreFromBike}</span> : null}</legend>
       <div class="tyre-options">
         {options.map((o) => (
           <label key={o.value} class="tyre-option">
@@ -116,8 +120,8 @@ function Choice<T extends string>({ id, label, value, options, onChange, source 
 }
 
 /** A pressure limit: the number, its unit, and the "Did you mean 65 psi?" question. Anything not accepted clears the limit, so no figure shows. */
-function LimitInput({ id, label, required, value, min, onCommit, onPending }: {
-  id: string; label: string; required: boolean; value: Limit | null | undefined; min?: Limit | null; onCommit: (l: Limit | null) => void; onPending: (id: string, label: string | null) => void;
+function LimitInput({ id, label, required, value, min, onCommit, onPending, needed }: {
+  id: string; label: string; required: boolean; value: Limit | null | undefined; min?: Limit | null; onCommit: (l: Limit | null) => void; onPending: (id: string, label: string | null) => void; needed?: string;
 }) {
   const [text, setText] = useState(value ? String(value.value) : '');
   const [unit, setUnit] = useState<Unit>(value?.unit ?? 'bar');
@@ -139,9 +143,9 @@ function LimitInput({ id, label, required, value, min, onCommit, onPending }: {
     else { setNote({ kind: 'reject', text: c.reason }); onCommit(null); }
   };
   return (
-    <div class="tyre-limit">
+    <div class="tyre-limit" data-needed={needed}>
       <label class="tyre-input" for={id}>
-        <span class="tyre-label">{label}{required ? ' *' : ''}</span>
+        <span class="tyre-label">{label}{required ? ' *' : ''}{needed ? <NeededTag /> : null}</span>
         <input id={id} type="text" inputMode="decimal" autoComplete="off" value={text} aria-describedby={note ? `${id}-note` : undefined}
           onInput={(e) => { const t = (e.currentTarget as HTMLInputElement).value; setText(t); evaluate(t, unit, false); }} />
       </label>
@@ -318,12 +322,25 @@ export function TyreScreen({ services }: { services: TyreServices }) {
       {!kept ? <Notice>{W.tyreNotSaved}</Notice> : null}
       <p class="muted">{W.tyreSavedHere}</p>
 
-      <Card title={W.tyreSectionLimits}>
+      {/* The three things a figure needs, first and together, and marked (the owner's device check, 5 November 2026). Every optional
+          field follows the result. */}
+      <section class="card tyre-needed" aria-labelledby="tyre-needed-title">
+        <h2 id="tyre-needed-title">{T.tyreNeededTitle}</h2>
+        <p>{T.tyreNeededIntro}</p>
         <p class="muted">{W.tyreLimitHint}</p>
-        <LimitInput key={`max-${key}`} id="tyre-max" label={W.tyreLimitMaxLabel} required value={details.tyreMax} min={details.tyreMin} onPending={onPending}
+        <LimitInput key={`max-${key}`} id="tyre-max" label={W.tyreLimitMaxLabel} required needed="max" value={details.tyreMax} min={details.tyreMin} onPending={onPending}
           onCommit={(l) => change({ tyreMax: l ?? undefined })} />
         <p class="muted">{W.tyreLimitBothWheels}</p>
-      </Card>
+        {bike?.unreadFront && src.frontMm === 'assumed' ? <p class="muted">{W.tyreCouldntRead(bike.unreadFront)}</p> : null}
+        {bike?.unreadRear && src.rearMm === 'assumed' ? <p class="muted">{W.tyreCouldntRead(bike.unreadRear)}</p> : null}
+        <Field id={bikeKey('front')} label={W.tyreFrontWidthLabel} source={src.frontMm} needed="front" valueText={`${v.front.printedMm} mm`} resetLabel={resetFor('frontMm')} onReset={resetter('frontMm')}
+          editor={<NumberInput key={`front-${key}`} id="tyre-front" label={W.tyreFrontWidthLabel} needed value={own('frontMm', v.front.printedMm)} assumed={v.front.printedMm} onCommit={(n) => change({ frontMm: n })} unit="mm" />} />
+        <Field id={bikeKey('rear')} label={W.tyreRearWidthLabel} source={src.rearMm} needed="rear" valueText={`${v.rear.printedMm} mm`} resetLabel={resetFor('rearMm')} onReset={resetter('rearMm')}
+          editor={<NumberInput key={`rear-${key}`} id="tyre-rear" label={W.tyreRearWidthLabel} needed value={own('rearMm', v.rear.printedMm)} assumed={v.rear.printedMm} onCommit={(n) => change({ rearMm: n })} unit="mm" />} />
+        {resolved.rearFollowsFront && (v.rimType === 'hookless' || v.rimType === 'unset') ? <p class="muted">{W.tyreRearLabelShort}: {W.tyreSameAsFront}</p> : null}
+        <Choice<RimType> id="tyre-rimtype" label={W.tyreRimTypeLabel} source={src.rimType} needed="rim" value={choiceValue('rimType', v.rimType)} onChange={(x) => change({ rimType: x })}
+          options={[{ value: 'hooked', label: W.tyreRimHooked }, { value: 'hookless', label: W.tyreRimHookless }, { value: 'tubular', label: W.tyreRimTubular }]} />
+      </section>
 
       <section class="card tyre-result" aria-live="polite" aria-labelledby="tyre-result-title" ref={resultRef}>
         <h2 id="tyre-result-title">{W.tyreResultTitle}</h2>
@@ -404,13 +421,6 @@ export function TyreScreen({ services }: { services: TyreServices }) {
       </Card>
 
       <Card title={W.tyreSectionTyres}>
-        {bike?.unreadFront && src.frontMm === 'assumed' ? <p class="muted">{W.tyreCouldntRead(bike.unreadFront)}</p> : null}
-        {bike?.unreadRear && src.rearMm === 'assumed' ? <p class="muted">{W.tyreCouldntRead(bike.unreadRear)}</p> : null}
-        <Field id={bikeKey('front')} label={W.tyreFrontWidthLabel} source={src.frontMm} valueText={`${v.front.printedMm} mm`} resetLabel={resetFor('frontMm')} onReset={resetter('frontMm')}
-          editor={<NumberInput key={`front-${key}`} id="tyre-front" label={W.tyreFrontWidthLabel} value={own('frontMm', v.front.printedMm)} assumed={v.front.printedMm} onCommit={(n) => change({ frontMm: n })} unit="mm" />} />
-        <Field id={bikeKey('rear')} label={W.tyreRearWidthLabel} source={src.rearMm} valueText={`${v.rear.printedMm} mm`} resetLabel={resetFor('rearMm')} onReset={resetter('rearMm')}
-          editor={<NumberInput key={`rear-${key}`} id="tyre-rear" label={W.tyreRearWidthLabel} value={own('rearMm', v.rear.printedMm)} assumed={v.rear.printedMm} onCommit={(n) => change({ rearMm: n })} unit="mm" />} />
-        {resolved.rearFollowsFront && (v.rimType === 'hookless' || v.rimType === 'unset') ? <p class="muted">{W.tyreRearLabelShort}: {W.tyreSameAsFront}</p> : null}
         <Choice<Casing> id="tyre-casing" label={W.tyreCasingLabel} source={src.casing} value={choiceValue('casing', v.casing)} onChange={(x) => change({ casing: x })}
           options={[{ value: 'supple', label: W.tyreCasingSupple }, { value: 'standard', label: W.tyreCasingStandard }, { value: 'reinforced', label: W.tyreCasingReinforced }]} />
         <Choice<Setup> id="tyre-setup" label={W.tyreSetupLabel} source={src.setup} value={choiceValue('setup', v.setup)} onChange={(x) => change({ setup: x })}
@@ -426,8 +436,6 @@ export function TyreScreen({ services }: { services: TyreServices }) {
                 {WHEELS.map((w) => <option key={w.bsdMm} value={String(w.bsdMm)}>{w.label}</option>)}
               </select>
             </label>} />
-        <Choice<RimType> id="tyre-rimtype" label={W.tyreRimTypeLabel} source={src.rimType} value={choiceValue('rimType', v.rimType)} onChange={(x) => change({ rimType: x })}
-          options={[{ value: 'hooked', label: W.tyreRimHooked }, { value: 'hookless', label: W.tyreRimHookless }, { value: 'tubular', label: W.tyreRimTubular }]} />
         <Field id={bikeKey('rim')} label={W.tyreRimInnerLabel} source={src.rimInnerMm} valueText={`${v.rimInnerMm} mm`} resetLabel={resetFor('rimInnerMm')} onReset={resetter('rimInnerMm')}
           editor={<NumberInput key={`rim-${key}`} id="tyre-rim" label={W.tyreRimInnerLabel} value={own('rimInnerMm', v.rimInnerMm)} assumed={v.rimInnerMm} onCommit={(n) => change({ rimInnerMm: n })} unit="mm" />} />
       </Card>

@@ -67,6 +67,7 @@ function AheadHost() {
   return <AheadScreen view={aheadShell.view.value} actions={aheadShell.actions} />;
 }
 
+// #/you/legal (an address some riders may have kept) is You, scrolled to its legal links: no screen name ever shows only a heading.
 function Screen({ name }: { name: ScreenName }) {
   const tab = tabOf(name);
   return (
@@ -77,7 +78,7 @@ function Screen({ name }: { name: ScreenName }) {
       {name === 'ahead' ? <AheadHost /> : null}
       {name === 'trip' ? <TripScreen services={tripServices} /> : null}
       {name === 'tools' ? <ToolsScreen services={tyreServices} /> : null}
-      {name === 'you' ? <YouHost /> : null}
+      {tab === 'you' ? <YouHost /> : null}
       {name === 'tools/tyre' ? <TyreScreen services={tyreServices} /> : null}
     </main>
   );

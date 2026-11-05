@@ -5,6 +5,10 @@ import { expect, test } from '@playwright/test';
 import type { Page, Request } from '@playwright/test';
 import { atPosition, goOffline, loadApp, preparedTrip, removeBuilds } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
+import { sunOf } from '../gen/clocks.ts';
+import { encodeCase } from '../sim/harness.ts';
+import { ownersDay, rainyStop, SAT } from '../unit/ui/ahead-fixture.ts';
+import { stamps } from '../unit/core/engines/weather-helpers.ts';
 
 let app: LoadedApp | undefined;
 test.afterEach(async () => { await app?.close(); app = undefined; });
@@ -95,3 +99,115 @@ test('Ahead has no automatic accessibility violations with everything open, and 
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+// ---- The strip's icons on the line (the owner's device check of 5 November) -------------------------------------------------------
+
+/** Draws a moment on Ahead through the test-hooks build's door, with the fixtures' sun in a form the case file can carry. */
+async function drawCase(page: Page, inputs: ReturnType<typeof ownersDay>): Promise<void> {
+  const sun = sunOf({ kind: 'stub', tz: 'Europe/Berlin', sunset: '18:42', dusk: '19:17' });
+  const json = encodeCase({ id: 'AH-STRIP-LINE', seed: 0, replayPath: '', message: '', inputs: { ...inputs, sun } });
+  await page.waitForFunction(() => '__wf' in window);
+  await page.evaluate((text) => (window as unknown as { __wf: { loadCase: (t: string) => void } }).__wf.loadCase(text), json);
+  await expect(page.locator('[data-strip] .ah-icon').first()).toBeVisible();
+}
+
+/** Where the strip's line, track, marker, icons and bands are on the page. */
+const stripGeometry = (page: Page) => page.evaluate(() => {
+  const box = (el: Element) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, cx: r.left + r.width / 2, cy: r.top + r.height / 2 }; };
+  const strip = document.querySelector('[data-strip]')!;
+  return {
+    line: box(strip.querySelector('.ah-strip-line')!),
+    marker: box(strip.querySelector('.bike-marker')!),
+    icons: [...strip.querySelectorAll<HTMLElement>('.ah-icon')].map((b) => ({ ...box(b), km: Number(b.dataset.km), kind: b.className, disc: box(b.querySelector('svg')!) })),
+    bands: [...strip.querySelectorAll<HTMLElement>('.ah-band')].map((b) => {
+      const bar = box(b.querySelector('.ah-band-bar')!);
+      // Is there a point of the band a finger can reach, and does the bar show above or below whatever covers it?
+      const hits: boolean[] = [];
+      const r = b.getBoundingClientRect();
+      for (let fx = 0.05; fx < 1; fx += 0.1) for (let fy = 0.05; fy < 1; fy += 0.1) hits.push(document.elementFromPoint(r.left + fx * r.width, r.top + fy * r.height)?.closest('.ah-band') === b);
+      return { bar, tappable: hits.some(Boolean) };
+    }),
+    scroll: document.documentElement.scrollWidth - window.innerWidth,
+  };
+});
+
+test('[AH-STRIP-LINE] the owner\'s day at 360 and 1280 px: the icons on the line at their kilometre, spread along it, the stop\'s sleep place at the end', async ({ page }) => {
+  test.skip(!['app-phone', 'app-laptop'].includes(test.info().project.name), 'both widths in the phone and laptop projects');
+  const inputs = ownersDay();
+  await page.clock.install({ time: inputs.now }); // the moment of the case, so the page draws that day
+  app = await loadApp(page, { launch: true, testHooks: true });
+  await drawCase(page, inputs);
+  const g = await stripGeometry(page);
+  const start = 14.6;
+  const end = 57.5;
+  expect(g.scroll).toBeLessThanOrEqual(0);
+  expect(g.icons.length).toBeGreaterThanOrEqual(3);
+  for (const icon of g.icons) {
+    expect(Math.abs(icon.cy - g.line.cy), `${icon.kind} on the line`).toBeLessThanOrEqual(1);
+    expect(Math.abs(icon.cx - (g.line.x + ((icon.km - start) / (end - start)) * g.line.w)), `${icon.kind} at km ${icon.km}`).toBeLessThanOrEqual(3);
+    expect(icon.w).toBeGreaterThanOrEqual(44);
+    expect(icon.h).toBeGreaterThanOrEqual(44);
+    expect(icon.x, 'clear of the bike marker').toBeGreaterThanOrEqual(g.marker.x + g.marker.w);
+  }
+  const last = g.icons[g.icons.length - 1]!;
+  expect(last.km).toBe(end);
+  expect(last.kind).toContain('ah-icon-sleep');
+  expect(Math.abs(last.cx - (g.line.x + g.line.w))).toBeLessThanOrEqual(3);
+  // none covers another
+  for (let n = 1; n < g.icons.length; n += 1) expect(g.icons[n]!.x).toBeGreaterThanOrEqual(g.icons[n - 1]!.x + g.icons[n - 1]!.w);
+  // spread: the first place near the start, the last at the stop
+  expect(last.cx - g.icons[0]!.cx).toBeGreaterThan(0.85 * g.line.w);
+});
+
+test('[AH-STRIP-LINE] an icon over a rain band: the band shows above and below it and can still be tapped', async ({ page }) => {
+  test.skip(!['app-phone', 'app-laptop'].includes(test.info().project.name), 'both widths in the phone and laptop projects');
+  const inputs = rainyStop();
+  await page.clock.install({ time: inputs.now }); // the moment of the case, so its rain is the forecast's present
+  app = await loadApp(page, { launch: true, testHooks: true });
+  await drawCase(page, inputs);
+  const g = await stripGeometry(page);
+  expect(g.bands.length).toBeGreaterThan(0);
+  for (const band of g.bands) {
+    expect(band.tappable).toBe(true);
+    for (const icon of g.icons.filter((i) => i.cx > band.bar.x && i.cx < band.bar.x + band.bar.w)) {
+      expect(band.bar.y, 'the bar shows above the icon').toBeLessThan(icon.disc.y);
+      expect(band.bar.y + band.bar.h, 'and below it').toBeGreaterThan(icon.disc.y + icon.disc.h);
+    }
+  }
+  expect(g.scroll).toBeLessThanOrEqual(0);
+});
+
+// Review I1 of PR 45: a shelter icon over a thunder band hid the band's bolt, leaving the warning to colour alone (AH-STRIP).
+// Wider: thunder from before the rider to km 137, its shelter (Café Lindenhof, km 131, open, seats inside) at the middle. Narrower: a
+// band of 0.8 km around the water and food icons at km 131.
+for (const [name, range, what] of [['wider than the icon', [100, 137], 'Cover'], ['narrower than the icon', [130.6, 131.4], 'Water']] as const) {
+  test(`[AH-STRIP] a thunder band ${name} keeps its bolt in sight with an icon (${what}) at its middle`, async ({ page }) => {
+    test.skip(!['app-phone', 'app-laptop'].includes(test.info().project.name), 'both widths in the phone and laptop projects');
+    const inputs = rainyStop({
+      spells: [{ range: [...range], stamps: stamps(SAT, 13, 15), pp: 80, code: 95, mm: 2 }],
+      opts: { from: '2026-10-16 01:00', extraKms: [125, range[0], 131, range[1], 137] },
+    });
+    await page.clock.install({ time: inputs.now });
+    app = await loadApp(page, { launch: true, testHooks: true });
+    await drawCase(page, inputs);
+    const seen = await page.evaluate((kind) => {
+      const strip = document.querySelector('[data-strip]')!;
+      const band = strip.querySelector<HTMLElement>('.ah-band-thunder')!;
+      const bolt = band.querySelector('.ah-bolt')!.getBoundingClientRect();
+      const bar = band.querySelector('.ah-band-bar')!.getBoundingClientRect();
+      const marks = [...strip.querySelectorAll('.ah-icon > svg, .ah-icon-n')].map((d) => d.getBoundingClientRect());
+      const overlaps = (a: DOMRect, b: DOMRect) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      const over = [...strip.querySelectorAll<HTMLElement>('.ah-icon')].filter((i) => {
+        const r = i.getBoundingClientRect();
+        return r.left + r.width / 2 >= bar.left - 1 && r.left + r.width / 2 <= bar.right + 1 && (i.getAttribute('aria-label') ?? '').includes(kind);
+      });
+      const top = document.elementFromPoint(bolt.left + bolt.width / 2, bolt.top + bolt.height / 2);
+      return { iconOver: over.length, covered: marks.some((d) => overlaps(d, bolt)), boltOnTop: top?.closest('.ah-bolt') !== null, barW: bar.width };
+    }, what);
+    expect(seen.iconOver, `the ${what} icon lies over the thunder band`).toBeGreaterThan(0);
+    expect(seen.covered, 'no icon covers the bolt').toBe(false);
+    expect(seen.boltOnTop, 'the bolt is what shows at its place').toBe(true);
+    if (name === 'narrower than the icon') expect(seen.barW).toBeLessThan(44);
+    if (name === 'wider than the icon') expect(seen.barW).toBeGreaterThan(44);
+  });
+}

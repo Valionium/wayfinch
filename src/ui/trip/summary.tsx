@@ -32,7 +32,7 @@ export function RouteSummary({ snap }: { snap: TripSnapshot }) {
         </ol>
         {missingHeights ? <p class="muted">{W.appTripHeightsPending}</p> : snap.heightsLookedUp ? <p class="muted">{W.appTripHeightsCredit}</p> : null}
         {trip.route.source === 'planned' || snap.prepared?.build ? <OsmCredit lead={W.appTripOsmLead} date={packDate(snap.prepared?.build)} /> : null}
-        <p class="muted"><a href="#/you/legal">{W.appTripLicences}</a></p>
+        <p class="muted"><a href="/legal/licences/">{W.appTripLicences}</a></p>
       </div>
     </Card>
   );

@@ -61,25 +61,27 @@ const along = (km: number, s: Strip): number => {
 const pct = (x: number): string => `${(x * 100).toFixed(2)}%`;
 
 /**
- * Icons close together share a column at the first one's place, so none covers another and the strip keeps two rows at most:
- * the first icon on top; below it the second, or, with more, one button for the rest ("+3"), which opens their cards.
+ * The icons sit on the line at their kilometre (the owner's device check of 5 November: "the icons should be on the line, spread
+ * along the route"). Icons that would cover each other share one button at the first one's place, its icon and "+3" for the rest,
+ * which opens all their cards. An icon at the day's stop keeps the end, and what lies within one icon of it joins it there, with a
+ * sleep place shown first; so a group is never placed far from any icon in it.
  */
 const ICON_PX = 46;
-type Slot = { x: number; row: 0 | 1; icons: StripIcon[] };
+type Slot = { x: number; icons: StripIcon[] };
 function slotsOf(icons: StripIcon[], s: Strip, trackPx: number): Slot[] {
   const gap = ICON_PX / Math.max(trackPx, ICON_PX);
-  const groups: { x: number; icons: StripIcon[] }[] = [];
+  const end = icons.some((i) => along(i.km, s) >= 1) ? 1 - gap : 2;
+  const slots: Slot[] = [];
+  const last: StripIcon[] = [];
   for (const icon of icons) {
     const x = along(icon.km, s);
-    const last = groups[groups.length - 1];
-    if (last && x - last.x < gap) last.icons.push(icon);
-    else groups.push({ x, icons: [icon] });
+    const prev = slots[slots.length - 1];
+    if (x > end) last.push(icon);
+    else if (prev && x - prev.x < gap) prev.icons.push(icon);
+    else slots.push({ x, icons: [icon] });
   }
-  return groups.flatMap((g): Slot[] => {
-    const [first, ...rest] = g.icons;
-    const top: Slot = { x: g.x, row: 0, icons: [first!] };
-    return rest.length === 0 ? [top] : [top, { x: g.x, row: 1, icons: rest }];
-  });
+  if (last.length) slots.push({ x: 1, icons: last.sort((a, b) => along(b.km, s) - along(a.km, s) || +(b.kind === 'sleep') - +(a.kind === 'sleep')) });
+  return slots;
 }
 
 const tenth = (km: number): number => Math.round(km * 10) / 10;
@@ -146,7 +148,6 @@ export function RouteStrip({ strip, bike, onOpen, onSetPosition }: {
     return () => window.removeEventListener('resize', measure);
   }, []);
   const slots = slotsOf(strip.icons, strip, trackPx);
-  const rowCount = slots.some((x) => x.row === 1) ? 2 : 1;
   return (
     <section class="ah-strip" aria-label={W.appAheadStripLabel(strip.label, showKm(strip.startKm), showKm(strip.endKm))} data-strip>
       <div class="ah-strip-head">
@@ -160,7 +161,7 @@ export function RouteStrip({ strip, bike, onOpen, onSetPosition }: {
           <div class="ah-strip-bands">
             {strip.bands.map((b, i) => (
               <button
-                key={`b${i}`} type="button" class={`ah-band ah-band-${b.kind}`} data-kind={b.kind}
+                key={i} type="button" class={`ah-band ah-band-${b.kind}`} data-kind={b.kind}
                 style={{ left: pct(along(b.fromKm, strip)), '--band-w': pct(Math.max(0, along(b.toKm, strip) - along(b.fromKm, strip))) }}
                 aria-label={bandWords(b, strip.endKm)} onClick={() => onOpen(b.opens)}
               >
@@ -169,24 +170,19 @@ export function RouteStrip({ strip, bike, onOpen, onSetPosition }: {
               </button>
             ))}
           </div>
-          <div class="ah-strip-icons" style={{ height: `${rowCount * ICON_PX}px` }}>
-            {slots.map((slot, i) => {
-              const style = { left: pct(slot.x), top: `${slot.row * ICON_PX}px` };
-              const one = slot.icons.length === 1 ? slot.icons[0]! : null;
-              return one ? (
+          <div class="ah-strip-icons ah-strip-line-row">
+            {slots.map(({ x, icons: [one, ...rest] }, i) => {
+              const word = (icon: StripIcon): string => ICON_WORD[icon.kind](showKm(icon.km));
+              const more = rest.length ? W.appAheadIconMore(rest.length) : '';
+              return (
                 <button
-                  key={`i${i}`} type="button" class={`ah-icon ah-icon-${one.kind}`} data-km={String(one.km)} style={style}
-                  aria-label={ICON_WORD[one.kind](showKm(one.km))} onClick={() => onOpen(one.opens as CardName)}
+                  key={i} type="button" class={`ah-icon ah-icon-${one!.kind}${more && ' ah-icon-more'}`} data-km={one!.km}
+                  data-kms={more ? [one!, ...rest].map((icon) => icon.km).join(' ') : undefined} style={{ left: pct(x) }}
+                  aria-label={more ? `${word(one!)}, ${more}: ${rest.map(word).join(', ')}` : word(one!)}
+                  onClick={() => { for (const name of new Set([one!, ...rest].map((icon) => icon.opens as CardName))) onOpen(name); }}
                 >
-                  <Glyph kind={one.kind} />
-                </button>
-              ) : (
-                <button
-                  key={`i${i}`} type="button" class="ah-icon ah-icon-more" data-kms={slot.icons.map((x) => x.km).join(' ')} style={style}
-                  aria-label={`${W.appAheadIconMore(slot.icons.length)}: ${slot.icons.map((x) => ICON_WORD[x.kind](showKm(x.km))).join(', ')}`}
-                  onClick={() => { for (const name of new Set(slot.icons.map((x) => x.opens as CardName))) onOpen(name); }}
-                >
-                  {W.appAheadIconMore(slot.icons.length)}
+                  <Glyph kind={one!.kind} />
+                  {more ? <span class="ah-icon-n">{more}</span> : null}
                 </button>
               );
             })}

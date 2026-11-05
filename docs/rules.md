@@ -620,6 +620,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - a production build's JS contains no __wf [APP-NO-HOOK]
 - the shell registers /offline-worker.js with { scope: '/', updateViaCache: 'none' } and no module type, once, after its first render; no second registration [APP-REGISTER]
 - a waiting worker shows "Update ready — apply now"; the tap saves first, sends WF_APPLY, and reloads only on controllerchange; update checks at launch and on return to the foreground, at most hourly; the page never reloads by itself [APP-UPDATE-PROMPT]
+- every screen name the shell knows renders content of its own, never only its heading; #/you/legal shows You with its legal links in view, in You's own wide layout and drop zone on a computer (owner's device check, 5 Nov 2026) [APP-SCREENS-FULL]
 
 ## App: Shared UI pieces
 
@@ -732,7 +733,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - no string on Trip says the trip is ready, safe or complete; "Get ready offline" is the only use of the word (banned list extended for these strings) [TRIP-NOT-READY-WORD]
 - iPhone user agent in a browser tab: before the first download, the ask to add to the home screen and download inside it. Not a block when the page can't tell [TRIP-IPHONE]
 - Android's beforeinstallprompt gives an Install button; none without it [TRIP-INSTALL]
-- Licences reachable; "© OpenStreetMap contributors" with the pack date on Trip's summary [TRIP-ATTRIBUTION]
+- Licences reachable: Trip's Licences link opens the licences page /legal/licences/, offline too; "© OpenStreetMap contributors" with the pack date on Trip's summary [TRIP-ATTRIBUTION]
 
 ## App: Plan from A to B
 
@@ -756,6 +757,8 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 
 - the page shows exactly Screen's strings, in the order of §3.2, on the 165 km rainy fixture; a test walks Screen and finds each in the DOM [AH-TEXTS]
 - bands solid, hatched and red with a mark, not only colour; icons at their km; tapping one opens its card; bike marker at the left, facing travel, ≤ 24 px tall [AH-STRIP]
+- icons sit on the line, centred at their kilometre, spread along the route, over a band where one lies there (the band shows above and below the icon and stays tappable); icons that would cover each other share one button on the line at the first one's place, "+N" naming the rest; one at the day's stop sits at the end; 44 px targets, no sideways scroll at 360 px (owner's device check, 5 Nov 2026) [AH-STRIP-LINE]
+- the place the Sleep card names has its icon on the strip, whatever sleep places lie before it (owner's device check, 5 Nov 2026) [AH-STRIP-STOP]
 - Water, Food, Daylight, Weather, Climbing, Sleep, always; each shows its status in words and its stamp [AH-CARD-ORDER]
 - a tap expands that card's items; Weather's order per §3.2; "Raining anyway? Shelter" opens the chip [AH-EXPAND]
 - "How much water do you have?" with 0, 0.25, 0.5, 0.75, 1, 1.5, 2, 3 L, custom; "Still about 0.6 L?" one tap; unconfirmed reads unknown [AH-WATER-Q]
@@ -842,6 +845,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - over generated inputs the result never exceeds a limit in the unit it was entered in, never goes below a tube floor, is never NaN, and widths or rims outside the tables are refused or said so [TY-PROP-LIMITS]
 - the 50 mm, 70 kg Vittoria case is informational: it stays inside the limits and its deviation is printed [TY-VITTORIA]
 - the sidewall maximum is the only required field when the rim is stated hooked; with the rim hookless or not stated, the tyre width is asked for too, and there is no figure (and no saved last figure) until it is given; without the maximum the screen says so and shows no figure; a limit that is asked about or refused shows no figure until answered [TY-UI-REQUIRED]
+- the three things a figure needs (the tyre maximum, the tyre widths, the rim type) come first, together in one card marked as needed, before the result; every optional field follows the result; limits, figures and wording rules unchanged (owner's device check, 5 Nov 2026) [TY-UI-NEEDED-FIRST]
 - handlebar, wheel and widths start from the bike labelled "from your bike"; weights from the load summary with its age; the plan bike is preselected; changes stay in the tyre tool; one bike's details never reach another's [TY-UI-FROM-BIKE]
 - rider weight starts from the weight entered in You, shown "from You"; with none entered the screen says 75 kg is assumed [TY-UI-FROM-YOU]
 - details are stored per bike id or under a default key, and #/tools/tyre opens the tool [TY-UI-STORE]
@@ -924,5 +928,5 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - the inspector's side-by-side test measures its column, not the window, so it never falls back to the full-window sheet in the two columns (§7.1 item 13) [LC-WIDE-INSPECTOR]
 - a GPX or JSON file dropped on its zone is read as if chosen; a drop anywhere else is cancelled; the file pickers stay (§7.1 item 13) [LC-WIDE-DROP]
 - the step-4 fill tip also shows on keyboard focus; selectBags unchanged (§7.1 item 13) [LC-WIDE-TIP]
-- both apps opt in to the cross-document view transition only under prefers-reduced-motion: no-preference; at most one element named wf-bike per page, on a drawing with the 320 x 150 viewBox; the strip marker and small drawings never named (§9.8) [LC-GLIDE]
-- in a browser without view transitions, or with reduced motion, pages switch normally, and the transition never delays a navigation (§9.8) [LC-GLIDE-OFF]
+- both apps opt in to the cross-document view transition only under prefers-reduced-motion: no-preference; at most one element named wf-bike per page, on a drawing with the 320 x 150 viewBox; the strip marker and small drawings never named; the bike glides both ways: Wayfinch's drawing is named when its page is revealed (owner's device check, 5 Nov 2026) (§9.8) [LC-GLIDE]
+- in a browser without view transitions, or with reduced motion, pages switch normally, and the transition never delays a navigation; the shell's one render-blocking element is its precached entry script, the page is empty before it runs, a slow one shows the screen in the first frame and a failed one holds nothing (§9.8) [LC-GLIDE-OFF]

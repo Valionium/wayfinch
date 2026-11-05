@@ -4,7 +4,7 @@ import { act } from 'preact/test-utils';
 import { afterAll, afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { App } from '../../../src/ui/app.tsx';
 import { noteTripFacts } from '../../../src/ui/degraded.ts';
-import { go, screenFromHash, screenSignal } from '../../../src/ui/nav.ts';
+import { SCREEN_NAMES, go, screenFromHash, screenSignal } from '../../../src/ui/nav.ts';
 import { resetRegistration, startOfflineWorker } from '../../../src/ui/register.ts';
 import { UPDATE_CHECK_MS, createUpdater } from '../../../src/ui/update.ts';
 import type { UpdaterEnv } from '../../../src/ui/update.ts';
@@ -177,6 +177,29 @@ test('the shell opens on Trip with no trip, shows four labelled tabs, and follow
   expect(screenFromHash('', 'trip')).toBe('trip');
   expect(screenSignal.value).toBe('tools/tyre');
 });
+
+// The owner's device check of 5 November: Trip's Licences link opened #/you/legal, which showed only the heading "You".
+test('[APP-SCREENS-FULL] every screen name the shell knows renders content of its own, never only its heading; #/you/legal shows the legal links', async () => {
+  // What a screen shows besides its heading, a §8 notice or a "Loading" line.
+  const own = () => [...host.querySelectorAll('main > *')].filter((el) => el.tagName !== 'H1' && !el.matches('.notice, [aria-busy]'));
+  const settle = async (done: () => boolean) => {
+    for (let i = 0; i < 300 && !done(); i += 1) await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+  };
+  for (const name of SCREEN_NAMES) {
+    render(null, host);
+    go(name);
+    render(<App />, host);
+    await settle(() => own().length > 0);
+    expect(own().length, `${name} shows more than its heading`).toBeGreaterThan(0);
+    expect(host.querySelector('main')!.getAttribute('data-screen')).toBe(name);
+  }
+  render(null, host);
+  go('you/legal');
+  render(<App />, host);
+  await settle(() => host.querySelector('[data-legal-links]') !== null);
+  expect(host.querySelector('[data-legal-links] a[href="/legal/licences/"]'), 'the licences link on #/you/legal').not.toBeNull();
+  expect(host.querySelector('nav.tabs a[aria-current="page"]')?.textContent).toBe('You');
+}, 30_000);
 
 test('[APP-DEGRADED] the shell shows "Add a route" on Trip and Ahead, never on Tools or You', async () => {
   noteTripFacts(false, false);

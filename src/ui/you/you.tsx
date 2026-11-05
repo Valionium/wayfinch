@@ -8,6 +8,7 @@ import { keepFreshOffered } from '../../data/refresh.ts';
 import { onChanged } from '../../store/changed.ts';
 import { Card } from '../card.tsx';
 import { LegalLinks } from '../legal/links.tsx';
+import { screenSignal } from '../nav.ts';
 import { applyTheme } from '../theme-apply.ts';
 import type { ThemeChoice } from '../theme-apply.ts';
 import { Choice } from '../trip/settings.tsx';
@@ -60,6 +61,12 @@ export function YouScreen({ services }: { services: YouServices }) {
     // Another window's change to the profile, settings or rides is read again.
     return onChanged(() => void reload());
   }, [reload]);
+  // #/you/legal opens You at its legal links.
+  const atLegal = screenSignal.value === 'you/legal';
+  const loaded = snap !== null;
+  useEffect(() => {
+    if (atLegal && loaded) document.querySelector('[data-legal-links]')?.closest('section')?.scrollIntoView?.({ block: 'start' });
+  }, [atLegal, loaded]);
 
   if (snap === null) return <p class="muted" aria-busy="true">{Y.youLoading}</p>;
   return (

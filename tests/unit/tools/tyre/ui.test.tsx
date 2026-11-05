@@ -3,6 +3,7 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { W } from '../../../../src/core/wording/en.ts';
+import { T } from '../../../../src/core/wording/en-tyre.ts';
 import { readHost } from '../../../../src/tools/tyre/host.ts';
 import { TYRE_KEY, exportTyres, importTyres, readStore } from '../../../../src/tools/tyre/storage.ts';
 import type { KeyValueStore } from '../../../../src/tools/tyre/storage.ts';
@@ -502,6 +503,38 @@ describe('re-check findings, on the screen', () => {
     const wheel = host.querySelector('.tyre-wheel')?.textContent ?? '';
     expect(wheel).toMatch(/Pump to at most/);
     expect(wheel).not.toContain('Aim for');
+  });
+
+  // The owner's device check of 5 November: "these should be at the top, and not distributed somewhere along ... or at least it
+  // should be highlighted. Or both." Both: one card at the top, marked, and every optional field after the result.
+  test('[TY-UI-NEEDED-FIRST] the maximum, the tyre widths and the rim type come first, together in one marked card; everything optional follows the result', async () => {
+    for (const mem of [memory(), memory(LOADCHECK)]) {
+      render(null, host);
+      await mount(services(mem));
+      const screen = host.querySelector('.tyre')!;
+      const cards = [...screen.querySelectorAll(':scope > section.card')];
+      const needed = cards[0]!;
+      expect(needed.classList.contains('tyre-needed'), 'the first card is the needed one').toBe(true);
+      expect(needed.querySelector('h2')?.textContent).toBe(T.tyreNeededTitle);
+      expect(needed.textContent).toContain(T.tyreNeededIntro);
+      // The three things, in this order, each marked; nothing else in the card asks for input.
+      const marked = [...needed.querySelectorAll('[data-needed]')].map((el) => el.getAttribute('data-needed'));
+      expect(marked).toEqual(['max', 'front', 'rear', 'rim']);
+      for (const el of needed.querySelectorAll('[data-needed]')) expect(el.querySelector('.tyre-needed-tag')?.textContent, el.getAttribute('data-needed')!).toBe(T.tyreNeededTag);
+      expect(needed.querySelector('#tyre-max')).not.toBeNull();
+      expect(needed.querySelectorAll('input[name="tyre-rimtype"]').length).toBe(3);
+      expect(needed.textContent).toContain(W.tyreFrontWidthLabel);
+      expect(needed.textContent).toContain(W.tyreRearWidthLabel);
+      // No other field is marked, and none of the three is asked for anywhere else.
+      expect(screen.querySelectorAll('[data-needed]').length).toBe(4);
+      expect(screen.querySelectorAll('input[name="tyre-rimtype"]').length).toBe(3);
+      expect([...screen.querySelectorAll('.tyre-label')].filter((l) => l.textContent?.startsWith(W.tyreFrontWidthLabel)).length).toBe(1);
+      // Then the answer, then everything optional.
+      expect(cards[1]!.classList.contains('tyre-result')).toBe(true);
+      const optional = cards.slice(2).map((c) => c.querySelector('h2')?.textContent);
+      expect(optional.slice(0, 7)).toEqual([W.tyreLimitsMoreTitle, W.tyreSectionRider, W.tyreSectionBars, W.tyreSectionTyres, W.tyreSectionRim, W.tyreSectionSurface, W.tyreSectionHeat]);
+      expect(optional).toContain(W.tyreSectionMeasured);
+    }
   });
 
   test('[TY-UI-REQUIRED] R8: when a question opens, the Limits field is brought back into view', async () => {

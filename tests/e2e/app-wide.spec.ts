@@ -236,6 +236,19 @@ test('[WIDE-FOCUS] the focus always shows and is never under the bottom bar; the
   expect(await page.locator('#ah-picker input[type="number"]').count()).toBe(1);
 });
 
+// Review M4 of PR 45: #/you/legal is You at its legal links, in You's own layout on a computer.
+test('[APP-SCREENS-FULL] [WIDE-PANES] at 1280 x 720 #/you/legal is You in its two columns, at its legal links', async ({ page }) => {
+  await open(page, 1280, 720, 'you');
+  await expect(page.locator('[data-you-loaded]')).toBeVisible();
+  const layout = () => page.locator('main.screen').evaluate((m) => ({ display: getComputedStyle(m).display, columns: getComputedStyle(m).gridTemplateColumns, width: m.getBoundingClientRect().width }));
+  const you = await layout();
+  expect(you.display).toBe('grid');
+  await page.goto(`${app!.origin}/#/you/legal`);
+  await expect(page.locator('main[data-screen="you/legal"] [data-you-loaded]')).toBeVisible();
+  expect(await layout()).toEqual(you);
+  await expect(page.locator('[data-legal-links]').getByRole('link', { name: 'Licences and data', exact: true })).toBeInViewport();
+});
+
 test('[WIDE-DROP] a GPX file dropped anywhere on Trip becomes the route; the file picker stays', async ({ page }) => {
   await open(page, 1280, 720, 'trip', { trip: false });
   await expect(page.locator('[data-add-route] input[type=file]')).toBeAttached();

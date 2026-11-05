@@ -138,6 +138,21 @@ test('[PERF-JS-LAZY] all lazy chunks together sit under 200 KB gzipped (200,000 
   expect(figures.lazyJsGzip).toBeLessThanOrEqual(200_000);
 });
 
+// The glide back (the owner's device check of 5 November): Wayfinch's entry script holds the first frame until it has run, so the bike is
+// drawn, and named, when the page is revealed. The hold can keep back nothing a rider could see: before the script runs the page is
+// empty. It is the only thing that holds a frame, and the worker keeps it, so offline it comes from the phone itself.
+test('[LC-GLIDE-OFF] the one render-blocking element of the shell is its entry script, precached; before it runs the page shows nothing', () => {
+  const html = text(on, 'index.html');
+  const blocking = [...html.matchAll(/<[^>]*\bblocking="([^"]*)"[^>]*>/g)];
+  expect(blocking.map((m) => m[1])).toEqual(['render']);
+  const entry = /^<script type="module"[^>]*\ssrc="\/(assets\/[^"]+\.js)"/.exec(blocking[0]![0]);
+  expect(entry, 'the entry module script').not.toBeNull();
+  expect(Object.keys(buildJson(on).files)).toContain(`/${entry![1]}`);
+  // Nothing else may hold a frame: no other script in the body, no render-blocking stylesheet from outside.
+  const body = /<body>([\s\S]*)<\/body>/.exec(html)![1]!;
+  expect(body.replace(/<!--[\s\S]*?-->/g, '').trim()).toBe('<div id="app"></div>');
+});
+
 test('the launch-on build is the same twice', async () => {
   const again = join(tmpRoot, 'on-again');
   await buildDist({ out: again, launch: true });

@@ -694,7 +694,6 @@ export const W = {
   tyreHeadingWarnings: 'Check these',
   tyreIncompatibleTitle: 'No figure: these parts do not fit together',
   tyreRefusedTitle: 'No figure yet',
-  tyreSectionLimits: 'Limits',
   tyreSectionRider: 'Rider and load',
   tyreSectionBars: 'Handlebar',
   tyreSectionTyres: 'Tyres',
