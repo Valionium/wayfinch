@@ -43,6 +43,12 @@ function dragEvent(type: string, files: File[]): DragEvent {
   return e;
 }
 
+// Review M4 of PR 45: #/you/legal is You, so a dropped export file goes to You's import there too.
+test('[WIDE-DROP] [APP-SCREENS-FULL] on #/you/legal a dropped file goes to You\'s file input, as on #/you', () => {
+  document.body.innerHTML = '<main class="screen" data-screen="you/legal"><input type="file" id="you"></main>';
+  expect(zoneInput(document, 'you/legal')).toBe(document.getElementById('you'));
+});
+
 test('[WIDE-DROP] a file dropped on You goes to the screen\'s file input, on Trip to Add a route\'s, and on Ahead nowhere', () => {
   document.body.innerHTML = '<main class="screen" data-screen="you"><input type="file" id="you"></main><div data-add-route><input type="file" id="trip"></div>';
   const you = document.getElementById('you') as HTMLInputElement;

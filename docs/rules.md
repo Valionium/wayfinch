@@ -620,7 +620,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - a production build's JS contains no __wf [APP-NO-HOOK]
 - the shell registers /offline-worker.js with { scope: '/', updateViaCache: 'none' } and no module type, once, after its first render; no second registration [APP-REGISTER]
 - a waiting worker shows "Update ready — apply now"; the tap saves first, sends WF_APPLY, and reloads only on controllerchange; update checks at launch and on return to the foreground, at most hourly; the page never reloads by itself [APP-UPDATE-PROMPT]
-- every screen name the shell knows renders content of its own, never only its heading; #/you/legal shows You with its legal links in view (owner's device check, 5 Nov 2026) [APP-SCREENS-FULL]
+- every screen name the shell knows renders content of its own, never only its heading; #/you/legal shows You with its legal links in view, in You's own wide layout and drop zone on a computer (owner's device check, 5 Nov 2026) [APP-SCREENS-FULL]
 
 ## App: Shared UI pieces
 

@@ -47,13 +47,13 @@
   .screen[data-screen='tools'] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; align-items: start; align-content: start; }
   .screen[data-screen='tools'] > h1, .screen[data-screen='tools'] > .notice { grid-column: 1 / -1; }
 
-  /* You: a form in two columns, with text lines of at most about 70 characters. */
-  .screen[data-screen='you'] { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); column-gap: 32px; align-items: start; align-content: start; }
-  .screen[data-screen='you'] > h1, .screen[data-screen='you'] > .notice { grid-column: 1 / -1; }
-  .screen[data-screen='you'] p, .screen[data-screen='you'] li { max-width: 70ch; }
+  /* You: a form in two columns, with text lines of at most about 70 characters; #/you/legal is You at its legal links. */
+  .screen[data-screen^='you'] { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); column-gap: 32px; align-items: start; align-content: start; }
+  .screen[data-screen^='you'] > h1, .screen[data-screen^='you'] > .notice { grid-column: 1 / -1; }
+  .screen[data-screen^='you'] p, .screen[data-screen^='you'] li { max-width: 70ch; }
 
-  /* Other screens (the tyre calculator, legal pages) keep a readable line. */
-  .screen[data-screen='tools/tyre'], .screen[data-screen='you/legal'] { max-width: 56rem; }
+  /* The tyre calculator keeps a readable line. */
+  .screen[data-screen='tools/tyre'] { max-width: 56rem; }
 
   /* Cards and fields adapt to the pane they sit in, not to the window. */
   @container (min-width: 32rem) {

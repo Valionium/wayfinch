@@ -161,7 +161,7 @@ export function RouteStrip({ strip, bike, onOpen, onSetPosition }: {
           <div class="ah-strip-bands">
             {strip.bands.map((b, i) => (
               <button
-                key={`b${i}`} type="button" class={`ah-band ah-band-${b.kind}`} data-kind={b.kind}
+                key={i} type="button" class={`ah-band ah-band-${b.kind}`} data-kind={b.kind}
                 style={{ left: pct(along(b.fromKm, strip)), '--band-w': pct(Math.max(0, along(b.toKm, strip) - along(b.fromKm, strip))) }}
                 aria-label={bandWords(b, strip.endKm)} onClick={() => onOpen(b.opens)}
               >
@@ -176,7 +176,7 @@ export function RouteStrip({ strip, bike, onOpen, onSetPosition }: {
               const more = rest.length ? W.appAheadIconMore(rest.length) : '';
               return (
                 <button
-                  key={`i${i}`} type="button" class={`ah-icon ah-icon-${one!.kind}${more && ' ah-icon-more'}`} data-km={String(one!.km)}
+                  key={i} type="button" class={`ah-icon ah-icon-${one!.kind}${more && ' ah-icon-more'}`} data-km={one!.km}
                   data-kms={more ? [one!, ...rest].map((icon) => icon.km).join(' ') : undefined} style={{ left: pct(x) }}
                   aria-label={more ? `${word(one!)}, ${more}: ${rest.map(word).join(', ')}` : word(one!)}
                   onClick={() => { for (const name of new Set([one!, ...rest].map((icon) => icon.opens as CardName))) onOpen(name); }}

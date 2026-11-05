@@ -1,12 +1,14 @@
 // Files dropped on the window (spec section 3.8). A GPX file anywhere on Trip is handed to the same file input the picker uses; an
 // export file anywhere on You likewise. Every other drop is cancelled at window level, so the browser never opens or downloads a
 // file that missed a zone. The file pickers stay: this only adds a second way in.
+import { tabOf } from '../nav.ts';
 import type { ScreenName } from '../nav.ts';
 
 /** Where a file dropped on a screen goes: that screen's own file input, which does the reading and the saying. */
-const ZONES: Partial<Record<ScreenName, string>> = {
+const ZONES: Partial<Record<string, string>> = {
   trip: '[data-add-route] input[type="file"]',
-  you: 'main[data-screen="you"] input[type="file"]',
+  // also on #/you/legal, which is You at its legal links (review M4 of PR 45): the screen's tab decides
+  you: 'main[data-screen^="you"] input[type="file"]',
 };
 
 const carriesFiles = (e: DragEvent): boolean => Array.from(e.dataTransfer?.types ?? []).includes('Files');
@@ -21,7 +23,7 @@ export function pickInto(input: HTMLInputElement, file: File): void {
 
 /** The file input a drop on this screen goes to, or null where the screen takes no drops. */
 export function zoneInput(root: ParentNode, screen: ScreenName): HTMLInputElement | null {
-  const selector = ZONES[screen];
+  const selector = ZONES[tabOf(screen)];
   return selector ? root.querySelector<HTMLInputElement>(selector) : null;
 }
 
