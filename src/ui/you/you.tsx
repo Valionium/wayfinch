@@ -7,6 +7,7 @@ import { W } from '../../core/wording/en.ts';
 import { keepFreshOffered } from '../../data/refresh.ts';
 import { onChanged } from '../../store/changed.ts';
 import { Card } from '../card.tsx';
+import { useFollowing } from '../follow.ts';
 import { LegalLinks } from '../legal/links.tsx';
 import { screenSignal } from '../nav.ts';
 import { applyTheme } from '../theme-apply.ts';
@@ -21,9 +22,8 @@ import './you.css';
 
 function SettingsCard({ services, snap, reload }: { services: YouServices; snap: YouSnapshot; reload: () => Promise<void> }) {
   const { settings } = snap;
-  const [fresh, setFresh] = useState(settings.keepFresh);
+  const [fresh, setFresh] = useFollowing(settings.keepFresh);
   const [problem, setProblem] = useState<string | null>(null);
-  useEffect(() => setFresh(settings.keepFresh), [settings.keepFresh]);
   const save = async (field: 'theme' | 'keepFresh', value: unknown): Promise<boolean> => {
     const result = await services.writeSettings({ [field]: value });
     setProblem(result.ok ? null : (result.reasons[field] ?? result.note ?? W.appStoreNotKept));
