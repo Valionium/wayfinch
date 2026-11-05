@@ -3426,12 +3426,13 @@ function syncLookExtras(look){
   $('lookRimNotSet')?.setAttribute('aria-pressed',String(p.rimMm===null));
 }
 // One change to the extras. A pattern or fork paints over the frame colour, so with none yet the tap also picks Blue. Raw carbon only sets
-// the colours aside while the weave shows: they stay stored and come back with any other pattern (review M5, as in the try-out).
+// the colours aside while the weave shows: they stay stored and come back with any other pattern (review M5, as in the try-out). With
+// no colour yet, Raw carbon picks Black, so the 24 px marker, older pages and thumbnails show a dark frame (review M6).
 function setPaint(change,store=true){
   const B=lookExtras();if(!B)return;
   const look=currentLook() || {colour:null};
   const extra={};
-  if(!look.colour && ((change.pattern && change.pattern!=='solid') || change.fork))extra.colour=LOOK_FIRST_COLOUR;
+  if(!look.colour && ((change.pattern && change.pattern!=='solid') || change.fork))extra.colour=change.pattern==='carbon' ? '#1d1d1f' : LOOK_FIRST_COLOUR;
   setLook({...extra,paint:{...lookPaint(),...change}},store);
 }
 function flushLookRim(){

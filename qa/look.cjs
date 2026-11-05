@@ -416,6 +416,16 @@ test('[LC-LOOK-EXTRAS] Raw carbon keeps the colours the rider chose: they are on
   await p.settle();
   assert.equal(JSON.parse(p.stored('loadcheck:bikeProfile')).look.colour,'#c62f2a');
 });
+test('[LC-LOOK-EXTRAS] Raw carbon on a bike with no colour yet stores Black, so the 24 px marker, older pages and thumbnails show a dark frame (review M6)',async()=>{
+  const p=page();
+  open(p);
+  p.run("setLook({colour:null});setPaint({pattern:'carbon'})");
+  assert.equal(p.json('S.bikeProfile.look.colour'),'#1d1d1f');
+  assert.equal(p.json('S.bikeProfile.look.paint.pattern'),'carbon');
+  // a colour already chosen is kept (review M5)
+  p.run("setLook({colour:'#2f7d4f',paint:null});setPaint({pattern:'carbon'})");
+  assert.equal(p.json('S.bikeProfile.look.colour'),'#2f7d4f');
+});
 
 (async()=>{
   for(const [name,fn] of tests){await fn();passed++;console.log('ok',name);}
