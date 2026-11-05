@@ -3,6 +3,14 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  // The entry script holds the first frame until it has run (blocking="render"), so the bike is drawn, and named, when a page that
+  // glides in from the bag planner is revealed (spec section 9.8; the owner's device check of 5 November). Before it runs the page is
+  // an empty #app, so the hold keeps back nothing a rider could see; a script that fails ends it (LC-GLIDE-OFF). Vite drops the
+  // attribute from index.html's own tag, so it is put back on the built one here.
+  plugins: [{
+    name: 'wf-render-blocking-entry',
+    transformIndexHtml: { order: 'post', handler: (html: string) => html.replace(/<script type="module"( crossorigin)? src="\/assets\//, (m) => m.replace('<script type="module"', '<script type="module" blocking="render"')) },
+  }],
   base: '/',
   publicDir: false,
   // development: false always: a NODE_ENV of "test" would otherwise build the dev JSX, with file paths in it.

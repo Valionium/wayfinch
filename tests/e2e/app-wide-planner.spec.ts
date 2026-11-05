@@ -239,11 +239,19 @@ const named = (page: Page) => page.evaluate(() => [...document.querySelectorAll(
   .filter((el) => getComputedStyle(el).getPropertyValue('view-transition-name') === 'wf-bike')
   .map((el) => ({ id: el.id, cls: el.getAttribute('class') ?? '', viewBox: (el.tagName.toLowerCase() === 'svg' ? el : el.querySelector('svg'))?.getAttribute('viewBox') ?? null })));
 
-/** Records, on every page this window opens, whether the browser gave the page a view transition. */
+/** Records, on every page this window opens, whether the browser gave the page a view transition, and how many elements were named
+ *  wf-bike at that moment: only an element named then can glide (the owner's device check of 5 November: on the way back the bike
+ *  "just appears somewhere else", because Wayfinch drew it after the page was revealed). */
 const watchReveal = (page: Page) => page.addInitScript(() => {
-  window.addEventListener('pagereveal', (e) => { sessionStorage.setItem('wf:vt', String(!!(e as Event & { viewTransition?: unknown }).viewTransition)); });
+  window.addEventListener('pagereveal', (e) => {
+    sessionStorage.setItem('wf:vt', String(!!(e as Event & { viewTransition?: unknown }).viewTransition));
+    const named = [...document.querySelectorAll('*')].filter((el) => getComputedStyle(el).getPropertyValue('view-transition-name') === 'wf-bike').length;
+    sessionStorage.setItem('wf:vt-named', String(named));
+  });
 });
 const revealed = (page: Page) => page.evaluate(() => sessionStorage.getItem('wf:vt'));
+/** How many elements were named wf-bike when this page was revealed. */
+const namedAtReveal = (page: Page) => page.evaluate(() => sessionStorage.getItem('wf:vt-named'));
 
 const BIKES = JSON.stringify([{ id: 'bike_glide', name: 'Glide', look: { colour: '#3366cc', bars: 'drop', ebike: false } }]);
 
@@ -278,11 +286,12 @@ test('[LC-GLIDE] Chromium: both apps opt in under no-preference only; one wf-bik
   expect(await page.evaluate(() => getComputedStyle(document.querySelector('#lookPreview svg')!).getPropertyValue('view-transition-name'))).toBe('wf-bike');
   await page.locator('#bikeDetailsClose').click();
   expect((await named(page)).map((n) => n.id)).toEqual(['rigSvg']);
-  // Back to Wayfinch: a transition again, the drawing on Tools named
+  // Back to Wayfinch: a transition again, the drawing on Tools named, already when the page is revealed: the bike glides back
   await page.locator('#backToWayfinch').click();
   await page.waitForURL(`${app.origin}/#/tools`);
   await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
   expect(await revealed(page)).toBe('true');
+  expect(await namedAtReveal(page)).toBe('1');
   expect((await named(page)).length).toBe(1);
   // and once more both ways, from the bag planner's own card: every reveal glides, and no page reports an aborted transition
   for (let i = 0; i < 2; i += 1) {
@@ -294,7 +303,20 @@ test('[LC-GLIDE] Chromium: both apps opt in under no-preference only; one wf-bik
     await page.waitForURL(`${app.origin}/#/tools`);
     await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
     expect(await revealed(page)).toBe('true');
+    expect(await namedAtReveal(page)).toBe('1');
   }
+  // From Trip and back to Trip: the same
+  await page.goto(`${app.origin}/#/trip`);
+  await expect(page.locator('main[data-screen="trip"] .bike-large svg')).toBeVisible();
+  await page.locator('main[data-screen="trip"] .bike-tap').click();
+  await page.waitForURL(/\/tools\/bags\//);
+  await ready(page);
+  await page.locator('#bikeDetailsClose').click();
+  await page.locator('#backToWayfinch').click();
+  await page.waitForURL(`${app.origin}/#/trip`);
+  await expect(page.locator('main[data-screen="trip"] .bike-large svg')).toBeVisible();
+  expect(await revealed(page)).toBe('true');
+  expect(await namedAtReveal(page)).toBe('1');
   expect(errors).toEqual([]);
 });
 
@@ -354,6 +376,43 @@ test('[LC-GLIDE-OFF] the transition never delays a navigation: Tools to the bag 
   }
   const best = (list: number[]) => Math.min(...list);
   expect(best(times['no-preference']), JSON.stringify(times)).toBeLessThanOrEqual(best(times.reduce) + 1000);
+});
+
+// Wayfinch's entry script holds the first frame until it has run (blocking="render"), so the bike is drawn, and named, when the page is
+// revealed. Before it has run the page is empty (tools/build: an empty #app), so the hold keeps back nothing a rider could see; these
+// show it ends when the script does, and that a script that fails does not hold the page.
+/** Records the first frame the page draws: when, and whether the screen was in it. */
+const watchFirstFrame = (page: Page) => page.addInitScript(() => {
+  requestAnimationFrame(() => {
+    sessionStorage.setItem('wf:frame', JSON.stringify({ at: performance.now(), screen: document.querySelector('main[data-screen]') !== null }));
+  });
+});
+const firstFrame = (page: Page) => page.evaluate(() => JSON.parse(sessionStorage.getItem('wf:frame') ?? 'null') as { at: number; screen: boolean } | null);
+const scriptEnd = (page: Page) => page.evaluate(() => (performance.getEntriesByType('resource') as PerformanceResourceTiming[]).find((e) => /\/assets\/index-[^/]+\.js$/.test(e.name))?.responseEnd ?? null);
+
+test('[LC-GLIDE-OFF] the entry script holds the first frame only until it has run: a slow one shows the screen in the first frame, a failed one holds nothing', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'render blocking by a script: Chromium');
+  await watchFirstFrame(page);
+  // Slow: the script arrives 1.5 s late; the first frame follows it at once, with the screen in it.
+  await page.route(/\/assets\/index-[^/]+\.js$/, async (route) => { await new Promise((r) => setTimeout(r, 1500)); await route.continue(); });
+  app = await loadApp(page, { launch: true, path: '/#/tools' });
+  await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
+  await expect.poll(() => firstFrame(page)).not.toBeNull();
+  const slow = (await firstFrame(page))!;
+  const arrived = (await scriptEnd(page))!;
+  expect(arrived).toBeGreaterThan(1400);
+  expect(slow.screen).toBe(true);
+  expect(slow.at - arrived).toBeLessThan(1000);
+  await app.close();
+  app = undefined;
+  // Failed: no script at all; the page still draws its frames.
+  await page.unroute(/\/assets\/index-[^/]+\.js$/);
+  await page.route(/\/assets\/index-[^/]+\.js$/, (route) => route.abort());
+  app = await loadApp(page, { launch: true, path: '/#/tools' });
+  await expect.poll(() => firstFrame(page), { timeout: 5000 }).not.toBeNull();
+  const failed = (await firstFrame(page))!;
+  expect(failed.screen).toBe(false);
+  expect(failed.at).toBeLessThan(3000);
 });
 
 test('[LC-WIDE-COLS] whenever the rig is sticky, all of it fits in the window: its foot and legend never hide below the edge, also with larger text (review M6)', async ({ page }) => {
