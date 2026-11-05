@@ -1402,6 +1402,18 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .route-map-outline-note a,.route-map-outline-note a:visited,.findnote a,.findnote a:visited{color:var(--sage);text-decoration:underline;text-underline-offset:3px}
 .route-map-outline-note a:hover,.findnote a:hover{color:var(--ink)}
 @media(max-width:560px){.route-map-host{height:300px}.route-map-controls button{flex:1 1 auto}.route-map-block{padding:10px}}
+/* Wide screens (spec 7.1 item 13): from about 1100 px the rig and its inspector sit in a column of their own on the left, wide
+   enough for the inspector's side-by-side panel, and the steps on the right. Sticky below Back to Wayfinch when the window is tall
+   enough to show the whole rig. Layout only: nothing here changes a plan. */
+@media screen and (min-width:1100px){
+  .wrap{max-width:1320px}
+  .planner-cols{display:grid;grid-template-columns:minmax(640px,1fr) minmax(360px,1fr);column-gap:32px;align-items:start}
+  .planner-cols>main{min-width:0}
+  .rig svg{max-height:none}
+  .route-map-host{height:min(600px,calc(100vh - 160px))}
+  @media (min-height:560px){.planner-cols>.rig{position:sticky;top:var(--planner-top,56px);z-index:5;background:var(--ground)}}
+}
+.dropzone-over{outline:2px dashed var(--blaze);outline-offset:4px}
 /* Packing checklist: one checkbox means the complete named quantity. */
 .packing-checklist{margin:16px 0;border:1px solid var(--line);background:var(--panel);padding:14px;min-width:0}
 .packing-checklist h3{font-family:var(--disp);font-size:24px;font-weight:600;margin:0 0 7px}
@@ -1751,6 +1763,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <button class="linky hidden" id="tabLoad">Load the newer plan</button>
   </div>
 
+  <div class="planner-cols" id="plannerCols">
   <div class="rig" id="rigBox">
     <svg id="rigSvg" viewBox="0 0 320 150" role="group" aria-label="Your bike, bags and bottle cages" tabindex="-1">
       <defs id="rigDefs"></defs>
@@ -1963,6 +1976,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
   </section>
 
   </main>
+  </div>
   <footer class="sitefoot">
     <span>Load Check · a free tool, and its figures are estimates</span>
     <button class="linky" id="legalBtn" lang="de">Impressum &amp; Datenschutz</button>
@@ -9433,14 +9447,7 @@ function renderResult(){
       $('impMsg').textContent = IMPORT_SIZE_MESSAGE;
       e.target.value=''; return;
     }
-    const rd = new FileReader();
-    rd.onload = async () => {
-      const message=await importAll(String(rd.result));
-      // Import rebuilds the result panel; address its new status element.
-      if($('impMsg')) $('impMsg').textContent=message;
-    };
-    rd.onerror = () => { $('impMsg').textContent = 'Could not read that file. Choose the JSON export again.'; };
-    rd.readAsText(f);
+    readImportFile(f);
   };
   const nameEl = $('setupName'), noteEl = $('setupNote');
   nameEl.value = S.pendingSaveName;
@@ -10768,6 +10775,18 @@ function mergeImportedBikeProfiles(profiles){
     BIKE_PROFILES.push(copy);added++;
   }
   return {remapped,added,conflicts,atLimit};
+}
+// A JSON export chosen with Import or dropped on its row (spec 7.1 item 13): the same path.
+function readImportFile(f){
+  if(f.size > MAX_IMPORT_BYTES){ if($('impMsg')) $('impMsg').textContent = IMPORT_SIZE_MESSAGE; return; }
+  const rd = new FileReader();
+  rd.onload = async () => {
+    const message=await importAll(String(rd.result));
+    // Import rebuilds the result panel; address its new status element.
+    if($('impMsg')) $('impMsg').textContent=message;
+  };
+  rd.onerror = () => { if($('impMsg')) $('impMsg').textContent = 'Could not read that file. Choose the JSON export again.'; };
+  rd.readAsText(f);
 }
 async function importAll(text){
   if(typeof text !== 'string' || text.length > MAX_IMPORT_BYTES || importByteLength(text) > MAX_IMPORT_BYTES) return IMPORT_SIZE_MESSAGE;
@@ -12291,22 +12310,31 @@ $('modeBar').querySelectorAll('button').forEach(b => b.onclick = () => {
 });
 $('quickSave').onclick = () => saveSetup(S.pendingSaveName.trim(), S.pendingSaveNote.trim());
 // hover on the finished plan tells you how full a bag is before you open it
-$('rigSvg').addEventListener('mousemove', e => {
+// and so does keyboard focus on a bag (spec 7.1 item 13), placed above the focused bag. It only reads the plan.
+function showFillTip(target, x, y, keyboard){
   const tip = $('rigTip');
   if(S.step !== 4 || !$('bagPop').classList.contains('hidden')){ tip.classList.add('hidden'); return; }
-  const g = e.target.closest('[data-inspect]');
+  const g = target && target.closest ? target.closest('[data-inspect]') : null;
   if(!g){ tip.classList.add('hidden'); return; }
   const s = currentPlan().slots.find(x => x.key === g.dataset.inspect);
   const geo = INSPECT[g.dataset.inspect];
   if(!s || !geo){ tip.classList.add('hidden'); return; }
   const pctFull = s.cap > 0 ? Math.round((s.cap - s.left) / s.cap * 100) : 0;
-  tip.innerHTML = `<b>${htmlEsc(geo.label)}</b> ${pctFull}% full <em>click to look inside</em>`;
+  tip.innerHTML = `<b>${htmlEsc(geo.label)}</b> ${pctFull}% full <em>${keyboard ? 'Enter to look inside' : 'click to look inside'}</em>`;
   const box = $('rigBox').getBoundingClientRect();
-  tip.style.left = Math.max(4, Math.min(box.width - 150, e.clientX - box.left + 12)) + 'px';
-  tip.style.top  = Math.max(4, e.clientY - box.top - 34) + 'px';
+  tip.style.left = Math.max(4, Math.min(box.width - 150, x - box.left + 12)) + 'px';
+  tip.style.top  = Math.max(4, y - box.top - 34) + 'px';
   tip.classList.remove('hidden');
-});
+}
+$('rigSvg').addEventListener('mousemove', e => showFillTip(e.target, e.clientX, e.clientY, false));
 $('rigSvg').addEventListener('mouseleave', () => $('rigTip').classList.add('hidden'));
+$('rigSvg').addEventListener('focusin', e => {
+  const g = e.target && e.target.closest ? e.target.closest('[data-inspect]') : null;
+  if(!g){ $('rigTip').classList.add('hidden'); return; }
+  const r = g.getBoundingClientRect();
+  showFillTip(g, r.left + r.width / 2 - 12, r.top, true);
+});
+$('rigSvg').addEventListener('focusout', () => $('rigTip').classList.add('hidden'));
 document.querySelectorAll('[data-to]').forEach(b => b.onclick = () => go(+b.dataset.to));
 
 // The poll is on by default now — it is the only route from guessed numbers to
@@ -12376,8 +12404,12 @@ $('gpxPick').onclick = () => {
 };
 $('gpxFile').onchange = e => {
   const f = e.target.files[0]; if(!f) return;
-  const id=cancelGPXLoad();
   e.target.value='';
+  readGPXFile(f);
+};
+// A GPX chosen with the picker or dropped on its zone (spec 7.1 item 13): the same path.
+function readGPXFile(f){
+  const id=cancelGPXLoad();
   if(f.size>GPX_MAX_BYTES){syncGPXControl();$('gpxMsg').textContent='Choose a GPX file of 20 MB or less.';return;}
   GPX_LOAD_PENDING=true;$('gpxPick').textContent='Cancel GPX loading';
   $('gpxMsg').textContent = 'Reading ' + f.name + '…';
@@ -12394,7 +12426,47 @@ $('gpxFile').onchange = e => {
   };
   rd.onerror = () => {if(id!==GPX_LOAD_ID)return;cancelGPXLoad();syncGPXControl();$('gpxMsg').textContent='Could not read that file. Your current plan is unchanged.';};
   rd.readAsText(f);
+}
+/* ---- Dropping files (spec 7.1 item 13): a GPX on the route's row, a JSON export on Import. A file dropped anywhere else is
+   cancelled, so the browser never opens or downloads it; a drag without files (text, a link) is left alone. The pickers stay. ---- */
+const DROP_ZONES={
+  gpx:{accepts:f => /\.gpx$/i.test(f.name) || /gpx|xml/i.test(f.type),read:readGPXFile,
+    refuse:() => {$('gpxMsg').textContent='That is not a GPX file. Drop a .gpx file here, or choose one.';}},
+  json:{accepts:f => /\.json$/i.test(f.name) || /json/i.test(f.type),read:f => readImportFile(f),
+    refuse:() => {if($('impMsg'))$('impMsg').textContent='That is not a Load Check JSON export. Drop the .json file here, or choose one.';}}
 };
+function dropZoneOf(target){
+  const el=target && target.closest ? target.closest('.gpxbar,.datarow') : null;
+  return el ? {el,zone:DROP_ZONES[el.classList.contains('gpxbar') ? 'gpx' : 'json']} : null;
+}
+const draggingFiles=e => !!e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
+function clearDropMarks(){document.querySelectorAll('.dropzone-over').forEach(el => el.classList.remove('dropzone-over'));}
+['dragenter','dragover'].forEach(type => window.addEventListener(type,e => {
+  if(!draggingFiles(e)) return;
+  e.preventDefault();
+  const hit=dropZoneOf(e.target);
+  e.dataTransfer.dropEffect=hit ? 'copy' : 'none';
+  clearDropMarks();
+  if(hit) hit.el.classList.add('dropzone-over');
+}));
+window.addEventListener('dragleave',e => { if(!e.relatedTarget) clearDropMarks(); });
+window.addEventListener('drop',e => {
+  if(!draggingFiles(e)) return;
+  e.preventDefault();
+  clearDropMarks();
+  const hit=dropZoneOf(e.target),f=e.dataTransfer.files && e.dataTransfer.files[0];
+  if(!hit || !f) return;
+  if(hit.zone.accepts(f)) hit.zone.read(f); else hit.zone.refuse();
+});
+// The two columns' rig sticks just below Back to Wayfinch, whatever height that row has.
+function syncPlannerTop(){
+  try {
+    const back=$('backToWayfinch'),row=back && typeof back.closest==='function' ? back.closest('.guide-launch-row') : null;
+    if(row) document.documentElement.style.setProperty('--planner-top',(row.offsetHeight+8)+'px');
+  } catch(e){}
+}
+window.addEventListener('resize',syncPlannerTop);
+syncPlannerTop();
 $('tellGo').onclick = async () => {
   const v = $('tellInput').value.trim();
   if(!v) return;

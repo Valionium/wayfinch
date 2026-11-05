@@ -3,8 +3,9 @@ import { defineConfig } from '@playwright/test';
 // Chromium for the handover tests (sub-project 4), and the app's own projects below (sub-project 5).
 // No retries: a flaky handover is a finding, not noise. List reporter only, and no page dumps (the page isn't printed).
 const APP_SPECS = /app-.*\.spec\.ts/;
-// The wide-screen tests (Task 22) set their own window sizes; they run in the two projects below, in Chromium and in Firefox.
-const WIDE = /app-wide\.spec\.ts/;
+// The wide-screen tests (Task 22, and the bag planner's of sub-project 6) set their own window sizes; they run in the two projects
+// below, in Chromium and in Firefox.
+const WIDE = /app-wide(-planner)?\.spec\.ts/;
 // Budgets (§4.5) are timed on the phone stand-in alone, after every other project: three other browsers on the same machine are not a phone.
 const BUDGETS = /\[PERF-/;
 const FUNCTIONAL = ['chromium-phone', 'chromium-laptop', 'app-phone', 'app-phone-light', 'app-laptop', 'app-laptop-light', 'app-wide', 'app-wide-firefox'];
