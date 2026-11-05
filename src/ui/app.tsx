@@ -6,6 +6,7 @@ import { AheadScreen } from './ahead/ahead.tsx';
 import { browserAhead } from './shell-actions.ts';
 import { browserServices } from '../tools/tyre/services.ts';
 import { lazy } from './lazy.tsx';
+import { MovedCard } from './moved-card.tsx';
 import { riderKg } from './rider-kg.ts';
 import { Degraded } from './card.tsx';
 import { degradedSignal, kindsOnScreen } from './degraded.ts';
@@ -61,6 +62,7 @@ function Screen({ name }: { name: ScreenName }) {
     <main class="screen" id="main" data-screen={name}>
       <h1>{TITLES[tab]}</h1>
       {kindsOnScreen(degradedSignal.value, tab).map((kind) => <Degraded key={kind} kind={kind} />)}
+      <MovedCard />
       {name === 'ahead' ? <AheadHost /> : null}
       {name === 'trip' ? <TripScreen services={tripServices} /> : null}
       {name === 'tools' ? <ToolsScreen services={tyreServices} /> : null}
