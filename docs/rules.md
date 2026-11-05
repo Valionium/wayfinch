@@ -808,6 +808,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - look.paint {pattern, colours, fork, rimMm} reads back as stored; an invalid field drops only itself; bike format stays 2 [BK-PAINT-NORMALISE]
 - the co-pilot: the extras load as their own chunk only for a bike that has them; the first screen's JavaScript does not grow; the Ahead marker stays one colour [BK-PAINT-LAZY]
 - known risk, pinned: the frozen page at / re-saving a bike drops its look extras (format 2 kept so a rollback can still edit bikes) [BK-PAINT-OLD-PAGE]
+- the dark theme as crisp as the light (owner's try-out, 5 Nov 2026): each painted part's casing is muted where its colours stand out from it at 3:1, else the ground (a dark outline, as the light theme's), else the lighter tone they stand out from most; every colour shown readable (ruling A) over every swatch, all 14 patterns and every way of the fork; the light theme byte for byte as before [BK-DARK-CRISP]
 
 ## App: You and the legal pages
 

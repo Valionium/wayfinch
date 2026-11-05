@@ -135,14 +135,17 @@ describe('the casing and the name', () => {
   test('[BK-PAINT-CASING] owner\'s ruling A for every colour shown: muted unless a shown colour is one it moves; then the tone that stands out from all', () => {
     const silver = '#b9bdc1';
     const brown = '#7b5434';
-    expect(casingForAll(['#2563b8', '#c62f2a'], 'dark')).toBe('muted');
-    // Silver on its own moves in the dark theme, and still does as one colour of a fade
+    expect(casingForAll(['#2563b8', '#c62f2a'], 'light')).toBe('muted');
+    // the dark theme (BK-DARK-CRISP): blue and red stand out from neither muted nor the ground at 3:1, so the lighter tone they stand
+    // out from most; Silver on its own moves, and still does as one colour of a fade
+    expect(casingForAll(['#2563b8', '#c62f2a'], 'dark')).toBe('ink');
     const tone = casingForAll(['#2563b8', silver], 'dark');
     expect(tone).not.toBe('muted');
     expect(draw({ pattern: 'fade-h', colours: [silver, null] }, '#2563b8', 'dark').svg).toContain(`class="bk-casing bk-casing-${tone}"`);
-    // the chosen tone is the best for the worst colour shown
-    const worst = (t: string) => Math.min(...['#2563b8', silver].map((c) => contrastRatio(c, (CASINGS.dark as Record<string, string>)[t]!)));
-    for (const t of Object.keys(CASINGS.dark)) expect(worst(tone)).toBeGreaterThanOrEqual(worst(t));
+    // in the light theme the chosen tone is the best for the worst colour shown
+    const worst = (t: string) => Math.min(...['#c62f2a', brown].map((c) => contrastRatio(c, (CASINGS.light as Record<string, string>)[t]!)));
+    const lightTone = casingForAll(['#c62f2a', brown], 'light');
+    for (const t of Object.keys(CASINGS.light)) expect(worst(lightTone)).toBeGreaterThanOrEqual(worst(t));
     expect(casingForAll([brown], 'light')).not.toBe('muted');
     // a fade between two swatches no rule moves keeps muted, in both themes
     for (const theme of ['dark', 'light'] as const) for (const a of SWATCHES) {
