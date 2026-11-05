@@ -39,7 +39,9 @@
 /* The bar is 40 px, taller than an icon's 30 px disc, so a band under an icon shows above and below it; the button is 64 px, so a
    finger reaches it there too, above and below the icon's 44 px target. */
 .ah-band-bar { display: block; flex: none; width: 100%; min-width: 12px; height: 40px; box-sizing: border-box; border: 2px solid var(--ice); border-radius: 4px; }
-.ah-band > .ah-bolt { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+/* The bolt is a badge on the bar's top edge, above the row of icon discs (which start 17 px down), so no icon can cover it at any
+   width: the thunder warning never rests on colour alone (review I1 of PR 45). Its own ground keeps it readable on bar and panel. */
+.ah-band > .ah-bolt { position: absolute; left: 50%; top: 0; width: 16px; height: 16px; padding: 2px; box-sizing: border-box; transform: translateX(-50%); border-radius: 50%; border: 1px solid var(--red); background: var(--ground); color: var(--ink); }
 .ah-band-likely .ah-band-bar { background: var(--ice); }
 .ah-band-possible .ah-band-bar { background: repeating-linear-gradient(135deg, var(--ice) 0 3px, transparent 3px 8px); }
 .ah-band-thunder .ah-band-bar { background: var(--red); border-color: var(--red); }

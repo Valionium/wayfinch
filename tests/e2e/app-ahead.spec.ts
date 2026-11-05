@@ -7,7 +7,8 @@ import { atPosition, goOffline, loadApp, preparedTrip, removeBuilds } from './he
 import type { LoadedApp } from './helpers.ts';
 import { sunOf } from '../gen/clocks.ts';
 import { encodeCase } from '../sim/harness.ts';
-import { ownersDay, rainyStop } from '../unit/ui/ahead-fixture.ts';
+import { ownersDay, rainyStop, SAT } from '../unit/ui/ahead-fixture.ts';
+import { stamps } from '../unit/core/engines/weather-helpers.ts';
 
 let app: LoadedApp | undefined;
 test.afterEach(async () => { await app?.close(); app = undefined; });
@@ -175,3 +176,38 @@ test('[AH-STRIP-LINE] an icon over a rain band: the band shows above and below i
   }
   expect(g.scroll).toBeLessThanOrEqual(0);
 });
+
+// Review I1 of PR 45: a shelter icon over a thunder band hid the band's bolt, leaving the warning to colour alone (AH-STRIP).
+// Wider: thunder from before the rider to km 137, its shelter (Café Lindenhof, km 131, open, seats inside) at the middle. Narrower: a
+// band of 0.8 km around the water and food icons at km 131.
+for (const [name, range, what] of [['wider than the icon', [100, 137], 'Cover'], ['narrower than the icon', [130.6, 131.4], 'Water']] as const) {
+  test(`[AH-STRIP] a thunder band ${name} keeps its bolt in sight with an icon (${what}) at its middle`, async ({ page }) => {
+    test.skip(!['app-phone', 'app-laptop'].includes(test.info().project.name), 'both widths in the phone and laptop projects');
+    const inputs = rainyStop({
+      spells: [{ range: [...range], stamps: stamps(SAT, 13, 15), pp: 80, code: 95, mm: 2 }],
+      opts: { from: '2026-10-16 01:00', extraKms: [125, range[0], 131, range[1], 137] },
+    });
+    await page.clock.install({ time: inputs.now });
+    app = await loadApp(page, { launch: true, testHooks: true });
+    await drawCase(page, inputs);
+    const seen = await page.evaluate((kind) => {
+      const strip = document.querySelector('[data-strip]')!;
+      const band = strip.querySelector<HTMLElement>('.ah-band-thunder')!;
+      const bolt = band.querySelector('.ah-bolt')!.getBoundingClientRect();
+      const bar = band.querySelector('.ah-band-bar')!.getBoundingClientRect();
+      const marks = [...strip.querySelectorAll('.ah-icon > svg, .ah-icon-n')].map((d) => d.getBoundingClientRect());
+      const overlaps = (a: DOMRect, b: DOMRect) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      const over = [...strip.querySelectorAll<HTMLElement>('.ah-icon')].filter((i) => {
+        const r = i.getBoundingClientRect();
+        return r.left + r.width / 2 >= bar.left - 1 && r.left + r.width / 2 <= bar.right + 1 && (i.getAttribute('aria-label') ?? '').includes(kind);
+      });
+      const top = document.elementFromPoint(bolt.left + bolt.width / 2, bolt.top + bolt.height / 2);
+      return { iconOver: over.length, covered: marks.some((d) => overlaps(d, bolt)), boltOnTop: top?.closest('.ah-bolt') !== null, barW: bar.width };
+    }, what);
+    expect(seen.iconOver, `the ${what} icon lies over the thunder band`).toBeGreaterThan(0);
+    expect(seen.covered, 'no icon covers the bolt').toBe(false);
+    expect(seen.boltOnTop, 'the bolt is what shows at its place').toBe(true);
+    if (name === 'narrower than the icon') expect(seen.barW).toBeLessThan(44);
+    if (name === 'wider than the icon') expect(seen.barW).toBeGreaterThan(44);
+  });
+}
