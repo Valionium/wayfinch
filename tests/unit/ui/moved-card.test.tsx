@@ -3,7 +3,7 @@
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import { W } from '../../../src/core/wording/en.ts';
+import { M } from '../../../src/core/wording/en-moved.ts';
 import { MOVED_CARD_KEY, MovedCard, returningLoadCheckRider } from '../../../src/ui/moved-card.tsx';
 
 const host = document.createElement('div');
@@ -36,9 +36,9 @@ test('[SW-MOVED-CARD] the card says where Load Check went, links to the bag plan
   const link = card!.querySelector('a')!;
   expect(link.getAttribute('href')).toBe('/tools/bags/');
   expect(link.hasAttribute('target')).toBe(false);
-  expect(link.textContent).toBe(W.appMovedOpen);
+  expect(link.textContent).toBe(M.movedOpen);
   const dismiss = card!.querySelector('button')!;
-  expect(dismiss.textContent).toBe(W.appMovedDismiss);
+  expect(dismiss.textContent).toBe(M.movedDismiss);
   await act(() => { dismiss.click(); });
   expect(host.querySelector('.moved-card')).toBeNull();
   expect(localStorage.getItem(MOVED_CARD_KEY)).not.toBeNull();

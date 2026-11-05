@@ -3,19 +3,11 @@
 // `loadcheck:setups`, which are only read. The link stays in the same window, so an iPhone rider stays in the home-screen app that holds
 // the plans. Gone for good once dismissed or followed; the mark is the co-pilot's own key.
 import { useState } from 'preact/hooks';
-import { W } from '../core/wording/en.ts';
+import { M } from '../core/wording/en-moved.ts';
 
-export const MOVED_CARD_KEY = 'copilot:moved-card';
+import { MOVED_CARD_KEY, movedCardDue } from './moved-due.ts';
 
-const read = (key: string): string | null => {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-};
-
-export const returningLoadCheckRider = (): boolean => read('loadcheck:draft') !== null || read('loadcheck:setups') !== null;
+export { MOVED_CARD_KEY, returningLoadCheckRider } from './moved-due.ts';
 
 function markSeen(): void {
   try {
@@ -26,7 +18,7 @@ function markSeen(): void {
 }
 
 export function MovedCard() {
-  const [shown, setShown] = useState(() => read(MOVED_CARD_KEY) === null && returningLoadCheckRider());
+  const [shown, setShown] = useState(movedCardDue);
   if (!shown) return null;
   const done = () => {
     markSeen();
@@ -34,11 +26,11 @@ export function MovedCard() {
   };
   return (
     <section class="card moved-card">
-      <h2>{W.appMovedTitle}</h2>
-      <p>{W.appMovedText}</p>
+      <h2>{M.movedTitle}</h2>
+      <p>{M.movedText}</p>
       <p class="moved-card-actions">
-        <a class="btn btn-primary" href="/tools/bags/" onClick={markSeen}>{W.appMovedOpen}</a>
-        <button type="button" class="btn" onClick={done}>{W.appMovedDismiss}</button>
+        <a class="btn btn-primary" href="/tools/bags/" onClick={markSeen}>{M.movedOpen}</a>
+        <button type="button" class="btn" onClick={done}>{M.movedDismiss}</button>
       </p>
     </section>
   );

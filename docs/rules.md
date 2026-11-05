@@ -90,6 +90,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - A simulator check that applied to under ten moments fails the run (§11.1) [HON-SIM-GATE]
 - A failing check saves a regression file and can be replayed (§11.1) [HON-SIM-FAIL]
 - One seed always gives the same run (§11.1) [HON-SIM-SEED]
+- Every property test runs on the fixed seed and run count, or the ones FC_SEED and FC_RUNS give, through @fast-check/vitest too (§11.1) [HON-PROP-SEED]
 - One screen on a long route builds within the time budget (§4.5) [HON-BUDGET]
 
 ## Contracts

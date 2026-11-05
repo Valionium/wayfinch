@@ -441,6 +441,8 @@ describe('limitFor', () => {
 
 const FOOD_SHOPS = new Set(['supermarket', 'convenience', 'bakery', 'kiosk']);
 const isFoodShop = (p: Place): boolean => (p.kind === 'shop' && FOOD_SHOPS.has(p.tags['shop'] ?? '')) || (p.kind === 'fuel_shop' && (p.tags['shop'] ?? 'no') !== 'no');
+// §6.12's food for tonight also counts "a food place or restaurant within 1 km of the day's stop".
+const isFoodPlace = (p: Place): boolean => isFoodShop(p) || p.kind === 'cafe' || p.kind === 'restaurant' || p.kind === 'ice_cream';
 
 /** Written apart from the engine: one minute-free reading of the limits at one departure, by the Schedule and hours check alone. */
 function oracle(f: LeaveFacts, r: LeaveBy) {
@@ -452,10 +454,13 @@ function oracle(f: LeaveFacts, r: LeaveBy) {
   const sunNow = f.sun(pt.lat, pt.lon, ride.date);
   const limit = fineLimit(sunNow, f.schedule.ridingMinTo(stop));
   const water = f.ride.phase === 'after-ride' ? findS1S2(f, { tomorrowOnly: true }) : findS1S2(f);
-  const waterStops = r.kept.includes('water') ? [water.s1, water.s2].flatMap((t) => (t.kind === 'place' && t.km < stop && !(t.place.waterClass === 'A' && !t.place.indoorOrLimited) ? [t.match] : [])) : [];
+  // One stop per pass: S1 and S2 can be the same place at the same kilometre, and the rider stops there once.
+  const waterStops = (r.kept.includes('water') ? [water.s1, water.s2].flatMap((t) => (t.kind === 'place' && t.km < stop && !(t.place.waterClass === 'A' && !t.place.indoorOrLimited) ? [t.match] : [])) : [])
+    .filter((m, i, all) => all.findIndex((x) => x.placeId === m.placeId && x.km === m.km) === i);
+  const tonight = r.kept.includes('food-tonight');
   const shops = f.matches.filter((m) => {
     const p = byId.get(m.placeId);
-    return p && isFoodShop(p) && m.km >= ride.startKm && m.km <= stop + 1;
+    return p && m.km >= ride.startKm && m.km <= stop + 1 && (isFoodShop(p) || (tonight && isFoodPlace(p) && Math.abs(m.km - stop) <= 1));
   });
   const arrivalAt = (d: Date, stops: RouteMatch[], m: RouteMatch): Date => {
     let s = f.schedule.withDeparture(d);
@@ -560,7 +565,8 @@ describe('properties', () => {
     const { s1, s2 } = f.ride.phase === 'after-ride' ? findS1S2(f, { tomorrowOnly: true }) : findS1S2(f);
     const allowed = [s1, s2].flatMap((t) => (t.kind === 'place' && t.km < f.ride.stopKm && !(t.place.waterClass === 'A' && !t.place.indoorOrLimited) ? [t.place.id] : []));
     expect([...r.waterSources].sort()).toEqual([...new Set(allowed)].sort());
-    if (r.unrounded !== null) expect(r.limits.filter((l) => l.id === 'water')).toHaveLength(new Set([s1, s2].flatMap((t) => (t.kind === 'place' && t.km < f.ride.stopKm && !(t.place.waterClass === 'A' && !t.place.indoorOrLimited) ? [t.km] : []))).size);
+    // One limit per pass: two places at the same kilometre are two limits, one place passed once is one.
+    if (r.unrounded !== null) expect(r.limits.filter((l) => l.id === 'water')).toHaveLength(new Set([s1, s2].flatMap((t) => (t.kind === 'place' && t.km < f.ride.stopKm && !(t.place.waterClass === 'A' && !t.place.indoorOrLimited) ? [`${t.place.id}|${t.km}`] : []))).size);
   }, 60_000);
 
   test('[LB-PROP-S1S2] after the ride, tonight\'s water adds no limit: S1 and S2 are tomorrow\'s alone', () => {

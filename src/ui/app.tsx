@@ -1,12 +1,13 @@
 // The app's shell: the update bar, the current screen and the four tabs (spec section 3.1).
 // The screens are placeholders until their groups arrive; the shell already opens on Trip when no trip runs.
-import { useEffect } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
+import type { FunctionComponent } from 'preact';
 import { W } from '../core/wording/en.ts';
 import { AheadScreen } from './ahead/ahead.tsx';
 import { browserAhead } from './shell-actions.ts';
 import { browserServices } from '../tools/tyre/services.ts';
 import { lazy } from './lazy.tsx';
-import { MovedCard } from './moved-card.tsx';
+import { movedCardDue } from './moved-due.ts';
 import { riderKg } from './rider-kg.ts';
 import { Degraded } from './card.tsx';
 import { degradedSignal, kindsOnScreen } from './degraded.ts';
@@ -50,6 +51,16 @@ const TITLES: Record<TabName, string> = {
   you: W.appTabYou,
 };
 
+/** The moved card, loaded only for a rider it is due to: a chunk of its own, so the first screen stays within its budget. */
+function MovedCardSlot() {
+  const [Card, setCard] = useState<FunctionComponent | null>(null);
+  useEffect(() => {
+    if (!movedCardDue()) return;
+    import('./moved-card.tsx').then((m) => setCard(() => m.MovedCard), () => undefined);
+  }, []);
+  return Card ? <Card /> : null;
+}
+
 /** Ahead reads the store only while it is shown; another window's change re-reads it. */
 function AheadHost() {
   useEffect(() => aheadShell.start(), []);
@@ -62,7 +73,7 @@ function Screen({ name }: { name: ScreenName }) {
     <main class="screen" id="main" data-screen={name}>
       <h1>{TITLES[tab]}</h1>
       {kindsOnScreen(degradedSignal.value, tab).map((kind) => <Degraded key={kind} kind={kind} />)}
-      <MovedCard />
+      <MovedCardSlot />
       {name === 'ahead' ? <AheadHost /> : null}
       {name === 'trip' ? <TripScreen services={tripServices} /> : null}
       {name === 'tools' ? <ToolsScreen services={tyreServices} /> : null}

@@ -756,11 +756,6 @@ export const W = {
   tyreBagCardNone: 'No bag plan yet',
   tyreBagCardLine: (count: number, kg: string): string => `${count} ${count === 1 ? 'bag' : 'bags'} · ${kg} kg`,
   tyreBagCardAge: (date: string): string => `Saved ${date}`,
-  // The one-time card for a rider who comes from Load Check (spec section 9.5 step two).
-  appMovedTitle: 'Load Check is now part of Wayfinch',
-  appMovedText: 'Your plans, setups and bikes are all here. Load Check is now the Bag planner, under Tools.',
-  appMovedOpen: 'Open the Bag planner',
-  appMovedDismiss: 'Got it',
   // Extras: heat and altitude, weighed loads and calipered widths, the SRAM cross-check.
   tyreWarnHeatPump: (label: string, bar: string, psi: string): string => `Pump to at most ${bar} bar (${psi} psi) for the ${label.toLowerCase()} tyre: the heat and height later on the trip raise it from there.`,
   tyreWarnHeatBelowFloor: (label: string): string => `${label}: the pressure the heat allows is below the minimum for this tyre. Pump lower, or start the day cooler, and check often.`,
