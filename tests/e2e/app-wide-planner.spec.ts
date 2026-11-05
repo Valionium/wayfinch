@@ -215,3 +215,102 @@ test('[LC-WIDE-TIP] the fill tip of the finished plan also shows on keyboard foc
   await expect(tip).toBeHidden();
   expect(await page.evaluate('JSON.stringify(currentPlan().slots.map((s) => [s.key, s.items.map((k) => k.id)]))')).toBe(plan);
 });
+
+// ---- The glide (sub-project 6, Task 11; spec section 9.8) ----------------------------------------------------------------------
+
+/** Whether this page opts in to the cross-document transition only inside prefers-reduced-motion: no-preference, and nowhere else. */
+const optIn = (page: Page) => page.evaluate(() => {
+  let inside = 0;
+  let outside = 0;
+  const walk = (rules: CSSRuleList, motionOk: boolean): void => {
+    for (const r of [...rules]) {
+      if (r.cssText.startsWith('@view-transition')) { if (motionOk) inside += 1; else outside += 1; }
+      if (r instanceof CSSMediaRule) walk(r.cssRules, motionOk || /prefers-reduced-motion:\s*no-preference/.test(r.conditionText));
+    }
+  };
+  for (const sheet of [...document.styleSheets]) {
+    try { walk(sheet.cssRules, false); } catch { /* another origin's sheet */ }
+  }
+  return { inside, outside };
+});
+
+/** Every element named wf-bike, with whether it is or holds the 320 x 150 drawing. */
+const named = (page: Page) => page.evaluate(() => [...document.querySelectorAll('*')]
+  .filter((el) => getComputedStyle(el).getPropertyValue('view-transition-name') === 'wf-bike')
+  .map((el) => ({ id: el.id, cls: el.getAttribute('class') ?? '', viewBox: (el.tagName.toLowerCase() === 'svg' ? el : el.querySelector('svg'))?.getAttribute('viewBox') ?? null })));
+
+/** Records, on every page this window opens, whether the browser gave the page a view transition. */
+const watchReveal = (page: Page) => page.addInitScript(() => {
+  window.addEventListener('pagereveal', (e) => { sessionStorage.setItem('wf:vt', String(!!(e as Event & { viewTransition?: unknown }).viewTransition)); });
+});
+const revealed = (page: Page) => page.evaluate(() => sessionStorage.getItem('wf:vt'));
+
+const BIKES = JSON.stringify([{ id: 'bike_glide', name: 'Glide', look: { colour: '#3366cc', bars: 'drop', ebike: false } }]);
+
+test('[LC-GLIDE] Chromium: both apps opt in under no-preference only; one wf-bike per page, on a 320 x 150 drawing; the small drawings never; the bike glides both ways', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'cross-document view transitions: Chromium');
+  await watchReveal(page);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  app = await loadApp(page, { launch: true, path: '/#/tools' });
+  await page.evaluate((b) => { localStorage.setItem('loadcheck:bikeProfiles', b); localStorage.setItem('loadcheck:bikeProfile', JSON.stringify(JSON.parse(b)[0])); }, BIKES);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
+  expect(await optIn(page)).toEqual({ inside: 1, outside: 0 });
+  expect(await named(page)).toEqual([expect.objectContaining({ viewBox: '0 0 320 150' })]);
+  // You: only small drawings, none named
+  await page.goto(`${app.origin}/#/you`);
+  await expect(page.locator('.bike-small svg').first()).toBeVisible({ timeout: 20_000 });
+  expect(await named(page)).toEqual([]);
+  // The Tools card into the bag planner: a view transition, the rig named
+  await page.goto(`${app.origin}/#/tools`);
+  await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
+  await page.locator('main[data-screen="tools"] .bike-tap').click();
+  await page.waitForURL(/\/tools\/bags\//);
+  await ready(page);
+  expect(await revealed(page)).toBe('true');
+  expect(await optIn(page)).toEqual({ inside: 1, outside: 0 });
+  // opened on Bike details: the preview is the named one, the rig not
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await expect(page.locator('#lookPreview svg')).toBeVisible();
+  expect((await named(page)).map((n) => n.viewBox)).toEqual(['0 0 320 150']);
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('#lookPreview svg')!).getPropertyValue('view-transition-name'))).toBe('wf-bike');
+  await page.locator('#bikeDetailsClose').click();
+  expect((await named(page)).map((n) => n.id)).toEqual(['rigSvg']);
+  // Back to Wayfinch: a transition again, the drawing on Tools named
+  await page.locator('#backToWayfinch').click();
+  await page.waitForURL(`${app.origin}/#/tools`);
+  await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
+  expect(await revealed(page)).toBe('true');
+  expect((await named(page)).length).toBe(1);
+});
+
+test('[LC-GLIDE-OFF] with reduced motion, and in browsers without the transition, pages switch normally and at once', async ({ page, browserName }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await watchReveal(page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  app = await loadApp(page, { launch: true, path: '/#/tools' });
+  await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
+  expect(await named(page)).toEqual([]);
+  const started = Date.now();
+  await page.locator('main[data-screen="tools"] .bike-tap').click();
+  await page.waitForURL(/\/tools\/bags\//);
+  await ready(page);
+  expect(Date.now() - started).toBeLessThan(15_000);
+  // no transition: Chromium says so; Firefox has no pagereveal at all
+  expect(await revealed(page)).toBe(browserName === 'chromium' ? 'false' : null);
+  expect(await named(page)).toEqual([]);
+  await page.locator('#bikeDetailsClose').click();
+  await page.locator('#backToWayfinch').click();
+  await page.waitForURL(`${app.origin}/#/tools`);
+  await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
+  // motion allowed in a browser without the transition: the same plain switch
+  if (browserName !== 'chromium') {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.locator('main[data-screen="tools"] .bike-tap').click();
+    await page.waitForURL(/\/tools\/bags\//);
+    await ready(page);
+    expect(await revealed(page)).toBeNull();
+  }
+  expect(errors).toEqual([]);
+});

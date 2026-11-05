@@ -1414,6 +1414,14 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
   @media (min-height:560px){.planner-cols>.rig{position:sticky;top:var(--planner-top,56px);z-index:5;background:var(--ground)}}
 }
 .dropzone-over{outline:2px dashed var(--blaze);outline-offset:4px}
+/* The bike glides from Wayfinch into the bag planner and back (spec 9.8): a cross-document view transition where motion is allowed
+   and the browser has it. One drawing is named: the rig, or the Look preview while Bike details is open. Nothing depends on it. */
+@media (prefers-reduced-motion:no-preference){
+  @view-transition{navigation:auto}
+  #rigSvg{view-transition-name:wf-bike}
+  :root:has(#bikeDetailsBox:not(.hidden)) #rigSvg{view-transition-name:none}
+  #bikeDetailsBox:not(.hidden) #lookPreview svg{view-transition-name:wf-bike}
+}
 /* Packing checklist: one checkbox means the complete named quantity. */
 .packing-checklist{margin:16px 0;border:1px solid var(--line);background:var(--panel);padding:14px;min-width:0}
 .packing-checklist h3{font-family:var(--disp);font-size:24px;font-weight:600;margin:0 0 7px}

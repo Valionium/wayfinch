@@ -173,3 +173,9 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 html { scroll-padding-bottom: 5rem; }
 
 .tyre-result { scroll-margin-top: 8px; }
+
+/* The bike glides between Wayfinch and the bag planner (spec section 9.8): a cross-document view transition, where motion is allowed
+   and the browser has it. Nothing depends on it; elsewhere pages switch as always. The named drawing is in bike.css. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+}
