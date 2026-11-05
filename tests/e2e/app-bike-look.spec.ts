@@ -247,3 +247,52 @@ test('[LC-LOOK-EXTRAS-SAVE] a setup\'s thumbnail of a patterned bike stores no p
   expect((rims.match(/stroke="#2b2d30"/g) ?? []).length).toBe(2);
   expect(rims.length).toBeLessThan(plain.length + 1000);
 });
+
+// Owner's try-out of 5 Nov 2026: the ring of a checked option peeked out beside the bike's panel as it scrolled under it.
+test('[LC-LOOK-RING] the bike\'s panel covers every checked option that scrolls under it, ring and all, and is opaque', async ({ page }) => {
+  await look(page, seed(PAINTED));
+  expect(await page.locator('#lookPreview').evaluate((el) => getComputedStyle(el).backgroundColor)).toMatch(/^rgb\(/);
+  const checked = await page.locator('#bikeLook label:has(input:checked), #bikeLook .look-chip.on').evaluateAll((els) => els.filter((el) => (el as HTMLElement).offsetParent !== null).length);
+  expect(checked).toBeGreaterThan(4);
+  for (let i = 0; i < checked; i++) {
+    // scroll so this option sits half under the panel's lower edge, where the owner saw its ring
+    const out = await page.evaluate((n) => {
+      const el = [...document.querySelectorAll('#bikeLook label:has(input:checked), #bikeLook .look-chip.on')].filter((e) => (e as HTMLElement).offsetParent !== null)[n]!;
+      const body = document.getElementById('bikeDetailsBody')!, preview = document.getElementById('lookPreview')!;
+      const r = el.getBoundingClientRect();
+      body.scrollTop += r.top + r.height / 2 - preview.getBoundingClientRect().bottom;
+      const a = el.getBoundingClientRect(), p = preview.getBoundingClientRect();
+      // the checked ring: 2 px at 1 px from the option
+      return { name: el.textContent!.trim(), stuck: Math.abs(a.top + a.height / 2 - p.bottom) < 2, left: a.left - 3 >= p.left - 0.5, right: a.right + 3 <= p.right + 0.5 };
+    }, i);
+    if (!out.stuck) continue;   // too near the end to scroll under the panel
+    expect(out.left && out.right, out.name).toBe(true);
+  }
+});
+
+test('[LC-LOOK-RING] every Look control taken by keyboard, forwards and back, shows its whole focus ring below the bike\'s panel', async ({ page }) => {
+  await look(page, seed(PAINTED));
+  await page.locator('#bikeLookTitle').focus();
+  const check = async (dir: 'Tab' | 'Shift+Tab'): Promise<number> => {
+    let seen = 0;
+    for (let step = 0; step < 80; step++) {
+      await page.keyboard.press(dir);
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));   // what the rider sees next
+      const at = await page.evaluate((g) => {
+        const el = document.activeElement;
+        if (!el || !document.getElementById('bikeLook')!.contains(el) || el.id === 'bikeLookTitle') return null;
+        const body = document.getElementById('bikeDetailsBody')!, preview = document.getElementById('lookPreview')!;
+        const b = body.getBoundingClientRect(), p = preview.getBoundingClientRect(), r = (el.closest('.look-swatch,.look-chip') ?? el).getBoundingClientRect();
+        const bottom = b.top + body.clientTop + body.clientHeight, right = b.left + body.clientLeft + body.clientWidth;
+        return { name: (el.getAttribute('aria-label') || el.closest('label')?.textContent || el.textContent || el.id || '').trim(),
+          below: r.top - g >= p.bottom - 0.5, inside: r.bottom + g <= bottom + 0.5 && r.left - g >= b.left - 0.5 && r.right + g <= right + 0.5 };
+      }, 4);
+      if (!at) { if (seen > 0) break; continue; }
+      seen++;
+      expect(at.below && at.inside, `${dir} ${at.name}: ${JSON.stringify(at)}`).toBe(true);
+    }
+    return seen;
+  };
+  expect(await check('Tab')).toBeGreaterThan(8);
+  expect(await check('Shift+Tab')).toBeGreaterThan(8);
+});

@@ -1513,7 +1513,9 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 /* Look (spec 7.4): taps only, each shown at once on the drawing that stays in view above them. */
 .bike-look{margin:0 0 14px}
 .bike-look h3{margin:0 0 4px}
-.look-preview{position:sticky;top:-16px;z-index:2;background:var(--panel);padding:6px 0 4px;margin:0 0 6px;border-bottom:1px solid var(--line)}
+/* 6 px wider than the options on each side: a checked ring (3 px) or a focus ring (4 px) that scrolls under the panel stays under it
+   (owner's try-out, 5 Nov 2026). The dialog's body has 12-16 px of room on each side. */
+.look-preview{position:sticky;top:-16px;z-index:2;background:var(--panel);padding:6px 6px 4px;margin:0 -6px 6px;border-bottom:1px solid var(--line)}
 .look-preview svg{display:block;width:100%;max-width:420px;height:auto;margin:0 auto}
 .look-guess{margin:0 0 8px;color:var(--muted);font-size:13px;min-height:1.2em}
 .bike-look fieldset{border:0;padding:0;margin:0 0 10px}
@@ -3578,6 +3580,22 @@ function flushLookPicker(){
   clearTimeout(LOOK_PICKER_TIMER);LOOK_PICKER_TIMER=null;
   setLook({colour:String($('lookPicker').value).toLowerCase()});
 }
+// A control taken by keyboard shows its whole focus ring (4 px around it, or around its label) between the bike's panel, which stays
+// in view above Look, and the dialog's lower edge. The browser brings the control itself into view, not the ring, and not past the
+// panel; this scrolls the rest, once now and once after the browser's own scrolling.
+function keepLookFocusInView(e){
+  const body=$('bikeDetailsBody'),preview=$('lookPreview'),el=e.target;
+  if(!body || !preview || !el || el===$('bikeLookTitle'))return;
+  const fit=()=>{
+    const r=(el.closest('.look-swatch,.look-chip') || el).getBoundingClientRect(),b=body.getBoundingClientRect();
+    if(!r.height)return;
+    const top=preview.getBoundingClientRect().bottom+2,bottom=b.top+body.clientTop+body.clientHeight-2;
+    if(r.top-4<top)body.scrollTop-=top-(r.top-4);
+    else if(r.bottom+4>bottom)body.scrollTop+=Math.min(r.bottom+4-bottom,r.top-4-top);
+  };
+  fit();
+  requestAnimationFrame(fit);
+}
 function initialiseLook(){
   if(!$('bikeLook'))return;
   renderLookChoices();
@@ -3589,6 +3607,7 @@ function initialiseLook(){
   $('lookUndo').onclick=undoLook;
   $('lookPhoto').onclick=openLookPhoto;
   initialiseLookExtras();
+  $('bikeLook').addEventListener('focusin',keepLookFocusInView);
   // Another bike shown is a fresh start for Undo.
   $('bikeSavedSelect').addEventListener('change',()=>{rememberLookOpening();renderLook();});
   $('bikeSwapUndo').onclick=()=>{undoBikeSwap();$('bikeDetailsTitle').focus({preventScroll:true});};

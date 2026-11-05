@@ -900,6 +900,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - bike-photo.js loads on demand, is precached and works offline (§7.4, §9.1) [LC-PHOTO-OFFLINE]
 - Look's extras: frame pattern, its second and third colours, the fork, rim depth: labelled radios and one slider, each target at least 44 px, keyboard-reachable, names that say the pattern and colours; at 360 and 1280 px in both themes; every tap shows at once and Undo restores all (owner's wish, 5 Nov 2026) [LC-LOOK-EXTRAS]
 - the extras round-trip through saving, export and import, and both pages (bag planner and co-pilot) [LC-LOOK-EXTRAS-SAVE]
+- the bike's panel above Look covers whatever scrolls under it, a checked option's ring included, and every Look control taken by keyboard shows its whole focus ring below the panel, at 360 and 1280 px in both themes (owner's try-out, 5 Nov 2026) [LC-LOOK-RING]
 - From a photo, Front, back and fork: three taps set a front-to-back fade and the fork's own colour; the photo never leaves the phone [LC-PHOTO-THREE]
 
 ## Bag planner: separation and contracts (sub-project 6, group 2)
