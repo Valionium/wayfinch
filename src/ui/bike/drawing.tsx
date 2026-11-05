@@ -33,6 +33,8 @@ export function useTheme(): Theme {
 }
 
 let drawings = 0;
+// The look extras (patterns, fork, rims) are their own chunk, loaded only for a bike that has them: the first screen never carries them.
+let extras: typeof import('../../core/bike/paint.ts') | undefined;
 const withoutColour = (svg: string): string => svg.replace(/ stroke="#[0-9a-f]{6}"/g, '').replace(/ aria-label="[^"]*"/, '');
 
 /** Writes the drawing; when only the colour moved, it repaints the frame and fork in place. */
@@ -63,12 +65,18 @@ export type BikeDrawingProps = {
 export function BikeDrawing({ bike, summary, size = 'large', back, caption = true, known }: BikeDrawingProps) {
   const theme = useTheme();
   const [prefix] = useState(() => `bk${(drawings += 1)}-`);
+  const look = bike?.look?.paint;
+  const [ready, setReady] = useState(!!extras);
+  useEffect(() => {
+    if (look && !extras) import('../../core/bike/paint.ts').then((m) => { extras = m; setReady(true); }, () => {});
+  }, [look]);
   // Drawn again only when what it is drawn from changes.
   const { spec, art, words } = useMemo(() => {
     const plan = size === 'large' ? bagViewOf(summary, bike, known ?? (bike ? [bike.id] : [])) : null;
     const s = resolveBikeSpec(bike, plan);
-    return { spec: s, art: bikeArt(s, plan, { theme, idPrefix: prefix }), words: captionOf(s, bike, plan) };
-  }, [bike, summary, known, size, theme, prefix]);
+    const o = { theme, idPrefix: prefix };
+    return { spec: s, art: look && extras ? extras.paintedArt(s, plan, o, look) : bikeArt(s, plan, o), words: captionOf(s, bike, plan) };
+  }, [bike, summary, known, size, theme, prefix, ready]);
   const href = bikeDetailsHref(bike?.id ?? 'new', back, 'look');
   const box = useRef<HTMLSpanElement>(null);
   const last = useRef({ svg: '' });

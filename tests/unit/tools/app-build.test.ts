@@ -187,3 +187,16 @@ test('[LC-LEAFLET] Leaflet from /vendor/leaflet-1.9.4/ with subresource integrit
   expect(page.includes('unpkg')).toBe(false); // the privacy text is part of the page
   expect(text(on, '_headers')).toContain('/vendor/leaflet-1.9.4/*\n  Cache-Control: public, max-age=31536000, immutable\n');
 });
+
+test("[BK-PAINT-LAZY] the look extras are their own chunk: no pattern, texture or its words in the first screen's JavaScript", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  for (const mark of ['feTurbulence', 'bk-rimband', 'Water-dyed', 'Liquid metal', 'patternTransform']) expect(first.includes(mark), mark).toBe(false);
+  const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
+  const chunk = lazy.filter((f) => text(on, f).includes('feTurbulence'));
+  expect(chunk.length).toBe(1);
+  expect(text(on, chunk[0]!)).toContain('Water-dyed');
+  // loaded by a dynamic import from the first screen, never a static one or a preload
+  expect(first).toContain(`/${chunk[0]!.replace(/^assets\//, '')}`.slice(1));
+  expect(text(on, 'index.html')).not.toContain(chunk[0]!);
+});

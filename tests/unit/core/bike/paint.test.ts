@@ -76,7 +76,7 @@ describe('frame patterns (owner\'s wish of 5 November 2026)', () => {
   });
 
   test('[BK-PAINT-PATTERNS] two drawings on one page never share an id: every id carries the drawing\'s prefix', () => {
-    for (const p of PATTERN_LIST) for (const id of ids(draw({ pattern: p.value, rimMm: 40 }, '#2563b8', 'dark', 'rig').svg)) expect(id.startsWith('rig'), id).toBe(true);
+    for (const p of PATTERN_LIST) for (const id of ids(draw({ pattern: p.value, rimMm: 40 }, "#2563b8", "dark", "rig").svg)) expect(id?.startsWith("rig"), id).toBe(true);
   });
 });
 

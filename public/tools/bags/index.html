@@ -1538,6 +1538,22 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .bike-swap{margin:6px 0;font-size:14px}
 #bikeSwapUndo,#bikeUseShown{min-height:44px}
 #bikeLook .look-picker input[type=color]{min-height:24px;min-width:24px;height:24px}
+/* Look's extras (owner's wish, 5 Nov 2026): frame pattern, its colours, the fork, rim depth. Built by renderLookChoices from bike.js. */
+.lx-swatch,.lx-chip{position:relative;display:flex;align-items:center;gap:8px;min-height:44px;min-width:44px;padding:0 10px;box-sizing:border-box;
+  border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:14px;background:transparent;color:inherit;font-family:inherit}
+.lx-swatch input,.lx-chip input[type=radio]{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+.lx-swatch:has(input:checked),.lx-chip:has(input:checked),.lx-chip[aria-pressed=true]{outline:2px solid var(--blaze);outline-offset:1px}
+.lx-swatch:has(input:focus-visible),.lx-chip:has(input:focus-visible),.lx-chip:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.lx-dot{flex:none;width:22px;height:22px;border-radius:50%;border:1px solid var(--muted)}
+.lx-sub{margin:8px 0 4px;font-size:13px;color:var(--muted)}
+.lx-note{margin:6px 0 0;font-size:13px;color:var(--muted);min-height:1.2em}
+.lx-box.hidden{display:none}
+.lx-rim{display:grid;gap:4px}
+.lx-rim-head{display:flex;justify-content:space-between;gap:8px;align-items:baseline;font-variant-numeric:tabular-nums}
+.lx-rim input[type=range]{width:100%;min-height:44px;accent-color:var(--blaze);margin:0}
+.lx-rim input[type=range]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.lx-scale{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.lx-rim .lx-chip{justify-self:start}
 #bikeDetailsBack{margin-top:2px}
 /* From a photo (spec 7.4): the photo stays on the phone, drawn into a canvas the rider taps; a magnifier shows the spot. */
 .photo-pick{margin:8px 0;padding:8px;border:1px solid var(--line);border-radius:8px}
@@ -2018,6 +2034,20 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
           </div>
           <div id="lookPhotoBox"></div>
         </fieldset>
+        <fieldset id="lookPatternSet"><legend id="lookPatternTitle">Frame pattern</legend>
+          <div class="look-chips" id="lookPattern" role="radiogroup" aria-labelledby="lookPatternTitle"></div>
+          <p class="lx-note" id="lookPatternNote"></p>
+          <div class="lx-box" id="lookColour2Box"><p class="lx-sub" id="lookColour2Title"></p><div class="look-swatches" id="lookColour2" role="radiogroup" aria-labelledby="lookColour2Title"></div></div>
+          <div class="lx-box" id="lookColour3Box"><p class="lx-sub" id="lookColour3Title"></p><div class="look-swatches" id="lookColour3" role="radiogroup" aria-labelledby="lookColour3Title"></div></div>
+        </fieldset>
+        <fieldset id="lookForkSet"><legend id="lookForkTitle">Fork</legend>
+          <div class="look-chips" id="lookFork" role="radiogroup" aria-labelledby="lookForkTitle"></div>
+          <div class="lx-box" id="lookForkOwnBox"><p class="lx-sub" id="lookForkColourTitle"></p><div class="look-swatches" id="lookForkColour" role="radiogroup" aria-labelledby="lookForkColourTitle"></div></div>
+          <div class="lx-box" id="lookForkFadeBox"><p class="lx-sub" id="lookForkFadeTitle"></p><div class="look-swatches" id="lookForkFade" role="radiogroup" aria-labelledby="lookForkFadeTitle"></div></div>
+          <div class="lx-box" id="lookForkPatternBox"><p class="lx-sub" id="lookForkPatternTitle"></p><div class="look-chips" id="lookForkPattern" role="radiogroup" aria-labelledby="lookForkPatternTitle"></div>
+            <p class="lx-sub" id="lookForkPairTitle"></p><div class="look-swatches" id="lookForkPair" role="radiogroup" aria-labelledby="lookForkPairTitle"></div></div>
+        </fieldset>
+        <fieldset id="lookRimSet"><legend id="lookRimTitle">Rims</legend><div class="lx-rim" id="lookRimBox"></div></fieldset>
         <fieldset><legend id="lookBarsTitle">Handlebar</legend><div class="look-chips" id="lookBars" role="radiogroup" aria-labelledby="lookBarsTitle"></div></fieldset>
         <fieldset><legend id="lookEbikeTitle">E-bike</legend><div class="look-chips" id="lookEbike" role="radiogroup" aria-labelledby="lookEbikeTitle"></div></fieldset>
         <p class="look-status" id="lookStatus" role="status" aria-live="polite"></p>
@@ -2726,11 +2756,23 @@ function normaliseMaxWeight(value){
   const kg=u==='lb' ? v*LB_TO_KG : v;
   return kg>=20 && kg<=400 ? {v:round1(v),u,includes:value.includes} : null;
 }
+// The look extras (owner's wish, 5 Nov 2026): frame pattern, second and third colours, the fork, rim depth. Read as bike.js reads them
+// (src/core/bike/normalise.ts): an invalid field drops only itself, nothing set is none, and the bike format stays 2.
+const LOOK_PATTERNS=['solid','fade-h','fade-v','split','blocks','shift','panel','marble','stripes','speckle','camo','sparkle','chrome','carbon'];
+const lookHex=v=>typeof v==='string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : null;
+function normalisePaint(v){
+  if(!dataObject(v))return null;
+  const c=Array.isArray(v.colours) ? v.colours : [],f=dataObject(v.fork) ? v.fork : {},pair=dataInteger(f.pair,0,5),own=lookHex(f.colour);
+  const fork=f.kind==='own' && own ? {kind:'own',colour:own} : f.kind==='fade' && pair!==null ? {kind:'fade',pair}
+    : f.kind==='pattern' && pair!==null && LOOK_PATTERNS.slice(7).includes(f.pattern) ? {kind:'pattern',pattern:f.pattern,pair} : null;
+  const p={pattern:LOOK_PATTERNS.includes(v.pattern) ? v.pattern : 'solid',colours:[lookHex(c[0]),lookHex(c[1])],fork,rimMm:dataInteger(v.rimMm,15,60)};
+  return p.pattern==='solid' && !p.colours[0] && !p.colours[1] && !fork && p.rimMm===null ? null : p;
+}
 function normaliseLook(value){
   if(!dataObject(value))return null;
-  const colour=typeof value.colour==='string' && /^#[0-9a-fA-F]{6}$/.test(value.colour) ? value.colour.toLowerCase() : null;
-  const look={colour,bars:['drop','flat','other'].includes(value.bars) ? value.bars : null,ebike:typeof value.ebike==='boolean' ? value.ebike : null};
-  return look.colour===null && look.bars===null && look.ebike===null ? null : look;
+  const paint=normalisePaint(value.paint);
+  const look={colour:lookHex(value.colour),bars:['drop','flat','other'].includes(value.bars) ? value.bars : null,ebike:typeof value.ebike==='boolean' ? value.ebike : null,...(paint ? {paint} : {})};
+  return look.colour===null && look.bars===null && look.ebike===null && !paint ? null : look;
 }
 function normaliseGeometry(value){
   if(!dataObject(value))return null;
@@ -3308,6 +3350,113 @@ function renderLookChoices(){
   $('lookPickerText').textContent=bikeWord('lookMore');
   $('lookPhoto').textContent=bikeWord('lookPhoto');
   $('lookUndo').textContent=bikeWord('lookUndo');
+  renderLookExtras();
+}
+/* ---- Look's extras (owner's wish, 5 Nov 2026, from the try-out he approved): frame pattern with up to three colours, the fork, rim
+   depth. Names, patterns and fade pairs come from bike.js (src/core/bike/paint.ts, src/core/wording/en-paint.ts), so both apps say
+   and draw the same. Every tap shows at once, nothing is required, Not set and Undo bring anything back. ---- */
+const LOOK_FIRST_COLOUR='#2563b8';   // a pattern or fork picked with no frame colour yet starts on Blue, the picker's own colour
+let LOOK_RIM_TIMER=null;
+function lookExtras(){const B=bikeModule();return B && B.PATTERN_LIST && B.PAINT_WORDS ? B : null;}
+function renderLookExtras(){
+  const B=lookExtras();
+  for(const id of ['lookPatternSet','lookForkSet','lookRimSet'])$(id).hidden=!B;
+  if(!B)return;
+  const P=B.PAINT_WORDS;
+  const radio=(cls,name,value,label,dot)=>`<label class="${cls}"><input type="radio" name="${name}" value="${htmlEsc(String(value))}">${dot ? `<span class="lx-dot" style="background:${dot}"></span>` : ''}<span>${htmlEsc(label)}</span></label>`;
+  const swatches=name=>B.SWATCHES.map(w=>radio('lx-swatch',name,w.hex,w.name,w.hex)).join('');
+  const pairs=name=>B.FADES.map((p,i)=>radio('lx-swatch',name,i,p.name,`linear-gradient(135deg,${p.from},${p.to})`)).join('');
+  $('lookPatternTitle').textContent=P.paintPatternTitle;
+  $('lookPattern').innerHTML=B.PATTERN_LIST.map(p=>radio('lx-chip','lookPattern',p.value,p.name)).join('');
+  $('lookColour2').innerHTML=swatches('lookColour2');
+  $('lookColour3Title').textContent=P.paintThird;
+  $('lookColour3').innerHTML=swatches('lookColour3');
+  $('lookForkTitle').textContent=P.paintForkTitle;
+  $('lookFork').innerHTML=[['frame',P.paintForkFrame],['own',P.paintForkOwn],['fade',P.paintForkFade],['pattern',P.paintForkPattern]].map(([v,l])=>radio('lx-chip','lookFork',v,l)).join('');
+  $('lookForkColourTitle').textContent=P.paintForkColour;
+  $('lookForkColour').innerHTML=swatches('lookForkColour');
+  $('lookForkFadeTitle').textContent=P.paintForkFadeLabel;
+  $('lookForkFade').innerHTML=pairs('lookForkFade');
+  $('lookForkPatternTitle').textContent=P.paintForkPatternLabel;
+  $('lookForkPattern').innerHTML=B.PATTERN_LIST.filter(p=>LOOK_PATTERNS.slice(7).includes(p.value)).map(p=>radio('lx-chip','lookForkPattern',p.value,p.name)).join('');
+  $('lookForkPairTitle').textContent=P.paintForkPairLabel;
+  $('lookForkPair').innerHTML=pairs('lookForkPair');
+  $('lookRimTitle').textContent=P.paintRimTitle;
+  $('lookRimBox').innerHTML=`<div class="lx-rim-head"><label for="lookRim">${htmlEsc(P.paintRimDepth)}</label><strong id="lookRimOut"></strong></div>`
+    +'<input type="range" id="lookRim" min="15" max="60" step="1" value="40" aria-describedby="lookRimOut">'
+    +`<div class="lx-scale" aria-hidden="true"><span>${htmlEsc(P.paintRimLow)}</span><span>${htmlEsc(P.paintRimHigh)}</span></div>`
+    +`<button type="button" class="lx-chip" id="lookRimNotSet" aria-pressed="false">${htmlEsc(P.paintRimNotSet)}</button>`;
+}
+const LOOK_NO_PAINT={pattern:'solid',colours:[null,null],fork:null,rimMm:null};
+function lookPaint(){const l=currentLook();return l && l.paint ? l.paint : LOOK_NO_PAINT;}
+// The extras' controls show the look: the pattern and its note, the colours it uses, the fork's choice and its own row, the rim depth.
+function syncLookExtras(look){
+  const B=lookExtras();if(!B)return;
+  const P=B.PAINT_WORDS,p=look.paint || LOOK_NO_PAINT,meta=B.PATTERN_LIST.find(x=>x.value===p.pattern) || B.PATTERN_LIST[0];
+  const check=(name,value)=>document.querySelectorAll?.(`input[name="${name}"]`).forEach(r=>{r.checked=value!==null && r.value===String(value);});
+  check('lookPattern',p.pattern);
+  $('lookPatternNote').textContent=meta.note;
+  $('lookColour2Box').classList.toggle('hidden',meta.colours<2);
+  $('lookColour3Box').classList.toggle('hidden',meta.colours<3);
+  $('lookColour2Title').textContent=p.pattern==='blocks' ? P.paintRear : P.paintSecond;
+  check('lookColour2',p.colours[0] || B.DEFAULT_COLOURS[0]);
+  check('lookColour3',p.colours[1] || B.DEFAULT_COLOURS[1]);
+  const fork=p.fork,kind=fork ? fork.kind : 'frame';
+  check('lookFork',kind);
+  $('lookForkOwnBox').classList.toggle('hidden',kind!=='own');
+  $('lookForkFadeBox').classList.toggle('hidden',kind!=='fade');
+  $('lookForkPatternBox').classList.toggle('hidden',kind!=='pattern');
+  check('lookForkColour',kind==='own' ? fork.colour : null);
+  check('lookForkFade',kind==='fade' ? fork.pair : null);
+  check('lookForkPattern',kind==='pattern' ? fork.pattern : null);
+  check('lookForkPair',kind==='pattern' ? fork.pair : null);
+  const rim=$('lookRim');
+  if(rim && p.rimMm!==null && document.activeElement!==rim)rim.value=String(p.rimMm);
+  if($('lookRimOut'))$('lookRimOut').textContent=p.rimMm===null ? P.paintRimUnset : P.paintRimValue(p.rimMm);
+  $('lookRimNotSet')?.setAttribute('aria-pressed',String(p.rimMm===null));
+}
+// One change to the extras. A pattern or fork paints over the frame colour, so with none yet the tap also picks Blue; raw carbon picks
+// Black, the colour older pages and the 24 px marker show for it.
+function setPaint(change,store=true){
+  const B=lookExtras();if(!B)return;
+  const look=currentLook() || {colour:null};
+  const extra={};
+  if(change.pattern==='carbon')extra.colour=B.CARBON_COLOUR;
+  else if(!look.colour && ((change.pattern && change.pattern!=='solid') || change.fork))extra.colour=LOOK_FIRST_COLOUR;
+  setLook({...extra,paint:{...lookPaint(),...change}},store);
+}
+function flushLookRim(){
+  clearTimeout(LOOK_RIM_TIMER);LOOK_RIM_TIMER=null;
+  if($('lookRim'))setPaint({rimMm:Number($('lookRim').value)});
+}
+function initialiseLookExtras(){
+  $('lookPatternSet').addEventListener('change',e=>{
+    const t=e.target,B=lookExtras(),p=lookPaint();if(!B)return;
+    if(t.name==='lookPattern'){
+      const n=(B.PATTERN_LIST.find(x=>x.value===t.value) || {colours:1}).colours,D=B.DEFAULT_COLOURS;
+      setPaint({pattern:t.value,colours:[p.colours[0] || (n>=2 ? D[0] : null),p.colours[1] || (n>=3 ? D[1] : null)]});
+    }
+    if(t.name==='lookColour2')setPaint({colours:[t.value,p.colours[1]]});
+    if(t.name==='lookColour3')setPaint({colours:[p.colours[0],t.value]});
+  });
+  $('lookForkSet').addEventListener('change',e=>{
+    const t=e.target,fork=lookPaint().fork,pair=fork && fork.kind!=='own' ? fork.pair : 0;
+    const pattern=fork && fork.kind==='pattern' ? fork.pattern : 'marble';
+    if(t.name==='lookFork')setPaint({fork:t.value==='own' ? {kind:'own',colour:fork && fork.kind==='own' ? fork.colour : '#1d1d1f'}
+      : t.value==='fade' ? {kind:'fade',pair} : t.value==='pattern' ? {kind:'pattern',pattern,pair} : null});
+    if(t.name==='lookForkColour')setPaint({fork:{kind:'own',colour:t.value}});
+    if(t.name==='lookForkFade')setPaint({fork:{kind:'fade',pair:Number(t.value)}});
+    if(t.name==='lookForkPattern')setPaint({fork:{kind:'pattern',pattern:t.value,pair}});
+    if(t.name==='lookForkPair')setPaint({fork:{kind:'pattern',pattern,pair:Number(t.value)}});
+  });
+  // The slider paints while it moves and stores once it settles, as the colour picker does.
+  $('lookRimBox').addEventListener('input',e=>{
+    if(e.target.id!=='lookRim')return;
+    setPaint({rimMm:Number(e.target.value)},false);
+    clearTimeout(LOOK_RIM_TIMER);LOOK_RIM_TIMER=setTimeout(flushLookRim,400);
+  });
+  $('lookRimBox').addEventListener('change',e=>{if(e.target.id==='lookRim')flushLookRim();});
+  $('lookRimBox').addEventListener('click',e=>{if(e.target.closest?.('#lookRimNotSet')){clearTimeout(LOOK_RIM_TIMER);LOOK_RIM_TIMER=null;setPaint({rimMm:null});}});
 }
 // The bike as the form shows it, with the look being chosen: what the preview draws, frame pictures and sizes included.
 // A bike already made is drawn as it is (a frame-picture tap applies at once, so it is up to date); a new one from the form.
@@ -3336,6 +3485,7 @@ function renderLook(){
   check('lookColour',look.colour===null ? '' : swatch ? look.colour : '\u0000');
   check('lookBars',look.bars||'');
   check('lookEbike',look.ebike===null ? '' : String(look.ebike));
+  syncLookExtras(look);
   $('lookPickerChip').classList.toggle('on',!!look.colour && !swatch);
   if(look.colour && document.activeElement!==$('lookPicker'))$('lookPicker').value=look.colour;
   const ready=typeof DRAFT_READY!=='undefined' && DRAFT_READY;
@@ -3400,7 +3550,7 @@ function setLook(change,store=true){
 }
 // Undo: the replaced plan bike when a tap swapped it, else the look of the bike Bike details opened with, on that bike only.
 function undoLook(){
-  clearTimeout(LOOK_PICKER_TIMER);LOOK_PICKER_TIMER=null;
+  clearTimeout(LOOK_PICKER_TIMER);LOOK_PICKER_TIMER=null;clearTimeout(LOOK_RIM_TIMER);LOOK_RIM_TIMER=null;
   const swap=liveBikeSwap();
   if(swap && BIKE_PROFILE_EDITOR_ID===swap.newId){undoBikeSwap();$('bikeLookTitle').focus({preventScroll:true});return;}
   followShownBike();
@@ -3428,6 +3578,7 @@ function initialiseLook(){
   $('lookPicker').addEventListener('change',flushLookPicker);
   $('lookUndo').onclick=undoLook;
   $('lookPhoto').onclick=openLookPhoto;
+  initialiseLookExtras();
   // Another bike shown is a fresh start for Undo.
   $('bikeSavedSelect').addEventListener('change',()=>{rememberLookOpening();renderLook();});
   $('bikeSwapUndo').onclick=()=>{undoBikeSwap();$('bikeDetailsTitle').focus({preventScroll:true});};
@@ -3522,7 +3673,7 @@ function openBikeDetails(opener=document.activeElement,section='frame'){
 }
 function closeBikeDetails(){
   const root=$('bikeDetailsBox');if(root.classList.contains('hidden'))return;
-  closeLookPhoto();flushLookPicker();
+  closeLookPhoto();flushLookPicker();if(LOOK_RIM_TIMER!==null)flushLookRim();
   LOOK_CHANGED=false;LOOK_MESSAGE='';LINK_BIKE=false;$('lookUndo').classList.add('hidden');$('bikeDetailsBack').classList.add('hidden');
   $('bikeUseShown').classList.add('hidden');
   root.classList.add('hidden');endDialog(root);
@@ -7146,8 +7297,8 @@ function bikeTheme(){ return document.documentElement.getAttribute('data-theme')
 // One bike with a plan's bags in Contract 1's shape ({items, decks, bottles}, or null), as the app draws it.
 function bikeDrawing(profile, view, options){
   const B = bikeModule(); if(!B) return null;
-  const spec = B.resolveBikeSpec(B.normaliseBike(profile), view || null);
-  return { ...B.bikeArt(spec, view || null, options || { theme:bikeTheme() }), spec };
+  const bike = B.normaliseBike(profile), spec = B.resolveBikeSpec(bike, view || null);
+  return { ...B.bikeArt(spec, view || null, options || { theme:bikeTheme() }, bike && bike.look && bike.look.paint || null), spec };
 }
 
 function inspectMap(){ return INSPECT; }
@@ -7258,10 +7409,10 @@ function writeLoadSummary(always = false){
 // the one frame-fit rule the plan uses, so a spot is offered exactly where a bag can go.
 function rigArt(){
   const B = bikeModule(); if(!B) return RIG_FALLBACK;
-  const fit = bikeFit(S.bikeProfile), view = planBagView();
-  const spec = { ...B.resolveBikeSpec(B.normaliseBike(S.bikeProfile), view),
+  const fit = bikeFit(S.bikeProfile), view = planBagView(), bike = B.normaliseBike(S.bikeProfile);
+  const spec = { ...B.resolveBikeSpec(bike, view),
     mounts:{ st:!!fit.cages.st, dt:!!fit.cages.dt, un:!!fit.cages.un, top:!!(fit.topMounts.front || fit.topMounts.rear), frame:!fit.frameBag.none } };
-  return B.bikeArt(spec, null, { theme:bikeTheme(), idPrefix:'rig' });
+  return B.bikeArt(spec, null, { theme:bikeTheme(), idPrefix:'rig' }, bike && bike.look && bike.look.paint || null);
 }
 function rigAnchors(){ const r = rigArt(); return r ? r.anchors : null; }
 
@@ -10881,6 +11032,9 @@ function buildThumb(id){
   const c = svg.cloneNode(true);
   c.removeAttribute('id');
   c.querySelectorAll('.hit, .bagg.ghost, .btl.ghost, .pairghost, .shapenums').forEach(n => n.remove());
+  // A thumbnail keeps plain colours only (safeDataThumb): a patterned frame or fork is kept in the bike's first colour.
+  const first = normaliseLook(S.bikeProfile && S.bikeProfile.look)?.colour;
+  c.querySelectorAll('.bk-paint').forEach(n => { if((n.getAttribute('stroke') || '').startsWith('url(')){ if(first) n.setAttribute('stroke', first); else n.removeAttribute('stroke'); } });
   // nothing here is clickable, so drop every class that implies it is —
   // but keep .idle, which is what marks a bag you owned and did not mount
   c.querySelectorAll('.bagg, .btl').forEach(n => {
