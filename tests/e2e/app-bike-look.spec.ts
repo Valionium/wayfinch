@@ -4,7 +4,7 @@
 // when WAYFINCH_SHOTS names a folder.
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
-import type { Page, TestInfo } from '@playwright/test';
+import type { Locator, Page, TestInfo } from '@playwright/test';
 import { loadApp, removeBuilds } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
 
@@ -115,17 +115,19 @@ test('[LC-LOOK-FORK] the fork\'s first and second colour: the frame\'s swatches,
   const first = page.getByRole('radiogroup', { name: 'First colour, at the crown', exact: true });
   const second = page.getByRole('radiogroup', { name: 'Second colour, at the dropouts', exact: true });
   const presets = page.getByRole('radiogroup', { name: 'Fade, from the crown down to the dropouts', exact: true });
-  for (const group of [first, second]) {
+  const names = (group: Locator) => group.getByRole('radio').evaluateAll((els) => els.map((el) => (el as HTMLInputElement).labels![0]!.textContent!.trim()));
+  const chosen = (group: Locator) => group.locator('label:has(input:checked)').evaluateAll((els) => els.map((el) => el.textContent!.trim()));
+  // Blue to purple's own two shades are not swatches: each row shows its shade first, chosen (review of PR 50, M2)
+  for (const [group, shade] of [[first, 'Blue, the pair\'s own shade'], [second, 'Purple, the pair\'s own shade']] as const) {
     await expect(group).toBeVisible();
-    expect(await group.getByRole('radio').evaluateAll((els) => els.map((el) => (el as HTMLInputElement).labels![0]!.textContent!.trim()))).toEqual(SWATCH_NAMES);
+    expect(await names(group)).toEqual([shade, ...SWATCH_NAMES]);
+    expect(await chosen(group)).toEqual([shade]);
     for (const box of await group.locator('label').evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return { w: r.width, h: r.height, text: el.textContent!.trim() }; }))) {
       expect(box.h, box.text).toBeGreaterThanOrEqual(44);
       expect(box.w, box.text).toBeGreaterThanOrEqual(44);
     }
   }
-  // the first preset is chosen, and no swatch: its colours are its own
   await expect(presets.getByRole('radio', { name: 'Blue to purple' })).toBeChecked();
-  expect(await first.locator('input:checked').count()).toBe(0);
   // one tap: the drawing changes at once, the preset is no longer chosen
   const stops = await page.evaluate(() => {
     const label = [...document.querySelectorAll('#lookForkFrom label')].find((l) => l.textContent!.trim() === 'Red') as HTMLElement;
@@ -135,6 +137,20 @@ test('[LC-LOOK-FORK] the fork\'s first and second colour: the frame\'s swatches,
   expect(stops).toEqual(['#c62f2a', '#7a4fb0']);
   await expect(first.getByRole('radio', { name: 'Red' })).toBeChecked();
   expect(await presets.locator('input:checked').count()).toBe(0);
+  expect(await names(first)).toEqual(SWATCH_NAMES);   // the shade goes with the preset's colour
+  expect(await chosen(second)).toEqual(['Purple, the pair\'s own shade']);
+  await expect(page.locator('#lookPreview svg')).toHaveAttribute('aria-label', /fork fading red to purple/);
+  // after each preset, each row shows one colour chosen: the preset's, a swatch or its own shade
+  for (const preset of ['Teal to blue', 'Orange to red', 'Silver to black', 'Olive to sand', 'Blue to purple']) {
+    await presets.locator('label', { hasText: new RegExp(`^${preset}$`) }).click();
+    const [a, b] = preset.split(' to ');
+    expect((await chosen(first))[0], preset).toMatch(new RegExp(`^${a}`, 'i'));
+    expect((await chosen(second))[0], preset).toMatch(new RegExp(`^${b}`, 'i'));
+    expect([(await chosen(first)).length, (await chosen(second)).length], preset).toEqual([1, 1]);
+  }
+  // a swatch for one end, then the pair's own shade at the other still chosen; the preset comes back with its tap (above)
+  await first.locator('label', { hasText: /^Red$/ }).click();
+  expect(await chosen(second)).toEqual(['Purple, the pair\'s own shade']);
   // by keyboard: the arrows move along the second colour and each step draws, with the two colours named
   await second.locator('label', { hasText: /^Black$/ }).click();
   await second.getByRole('radio', { name: 'Black' }).focus();
@@ -381,19 +397,25 @@ test('[LC-LOOK-RING] the bike\'s panel covers every checked option that scrolls 
   }
 });
 
-test('[LC-LOOK-RING] every Look control taken by keyboard, forwards and back, shows its whole focus ring below the bike\'s panel', async ({ page }) => {
-  await look(page, seed(PAINTED));
+// Review of PR 50, I3: the ring is drawn on the option's label (the extras' .lx-swatch and .lx-chip too), so the test measures the
+// label; seeds that show the fork's two colour rows, with the chosen colours at a row's ends and with a preset's own colours.
+const withFork = (pattern: string, fork: object) => ({ ...BLUE, look: { ...BLUE.look, paint: { pattern, colours: ['#6b3fa0', '#1f7f80'], fork, rimMm: 50 } } });
+const RING_SEEDS: [string, object][] = [['painted', PAINTED], ['fade preset', withFork('solid', { kind: 'fade', pair: 0 })],
+  ['fade Black to Pink', withFork('marble', { kind: 'fade', pair: 3, colours: ['#1d1d1f', '#d6619b'] })],
+  ['stripes Pink to Black', withFork('solid', { kind: 'pattern', pattern: 'stripes', pair: 4, colours: ['#d6619b', '#1d1d1f'] })]];
+for (const [seedName, bike] of RING_SEEDS) test(`[LC-LOOK-RING] every Look control taken by keyboard, forwards and back, shows its whole focus ring below the bike's panel (${seedName})`, async ({ page }) => {
+  await look(page, seed(bike));
   await page.locator('#bikeLookTitle').focus();
   const check = async (dir: 'Tab' | 'Shift+Tab'): Promise<number> => {
     let seen = 0;
-    for (let step = 0; step < 80; step++) {
+    for (let step = 0; step < 120; step++) {
       await page.keyboard.press(dir);
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));   // what the rider sees next
       const at = await page.evaluate((g) => {
         const el = document.activeElement;
         if (!el || !document.getElementById('bikeLook')!.contains(el) || el.id === 'bikeLookTitle') return null;
         const body = document.getElementById('bikeDetailsBody')!, preview = document.getElementById('lookPreview')!;
-        const b = body.getBoundingClientRect(), p = preview.getBoundingClientRect(), r = (el.closest('.look-swatch,.look-chip') ?? el).getBoundingClientRect();
+        const b = body.getBoundingClientRect(), p = preview.getBoundingClientRect(), r = (el.closest('label') ?? el).getBoundingClientRect();
         const bottom = b.top + body.clientTop + body.clientHeight, right = b.left + body.clientLeft + body.clientWidth;
         return { name: (el.getAttribute('aria-label') || el.closest('label')?.textContent || el.textContent || el.id || '').trim(),
           below: r.top - g >= p.bottom - 0.5, inside: r.bottom + g <= bottom + 0.5 && r.left - g >= b.left - 0.5 && r.right + g <= right + 0.5 };

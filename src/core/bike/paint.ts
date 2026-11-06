@@ -45,10 +45,21 @@ export function forkColours(fork: Exclude<Fork, { kind: 'own' }>): [string, stri
   return fork.colours ? [fork.colours[0], fork.colours[1]] : [FADES[fork.pair]!.from, FADES[fork.pair]!.to];
 }
 
-/** The name of a fork's two colours: the preset's when they are a preset's, else the two swatches' names ("Red to Yellow"). */
+/** A fork colour's name: a preset's own shade by the preset's word for it ("Blue" of Blue to purple, though its light blue is nearest
+ *  the Teal swatch), else the nearest swatch's (review of PR 50, M2). */
+export function colourName(hex: string): string {
+  for (const p of FADES) {
+    const [x, y] = p.name.split(' to ') as [string, string];
+    if (p.from === hex) return x;
+    if (p.to === hex) return y.charAt(0).toUpperCase() + y.slice(1);
+  }
+  return nameOf(hex);
+}
+
+/** The name of a fork's two colours: the preset's when they are a preset's, else each colour's name ("Red to Yellow"). */
 function pairName(fork: Exclude<Fork, { kind: 'own' }>): string {
   const [from, to] = forkColours(fork);
-  return FADES.find((p) => p.from === from && p.to === to)?.name ?? PT.paintPairName(nameOf(from), nameOf(to));
+  return FADES.find((p) => p.from === from && p.to === to)?.name ?? PT.paintPairName(colourName(from), colourName(to));
 }
 
 /**
@@ -183,29 +194,53 @@ function texture(kind: ForkPattern, id: string, f: Frame, cols: readonly [string
   if (kind === 'marble') {
     // The try-out's swirl: a sine through the three colours, about 20 units a turn, across the frame.
     const turn = 2 * Math.PI * 3.2;
-    const list: [number, string][] = [];
-    for (let i = 0; i <= 12; i += 1) {
-      const t = 0.5 + 0.5 * Math.sin((2 * Math.PI * i) / 12);
-      list.push([i / 12, t < 0.5 ? mixHex(a, b, t * 2) : mixHex(b, c, (t - 0.5) * 2)]);
-    }
-    return tile(id, origin, w, h, body(linear(`${id}g`, [0, 0], [turn, 0], list, ' spreadMethod="repeat"'), 18, '0.03 0.05'));
+    return tile(id, origin, w, h, body(linear(`${id}g`, [0, 0], [turn, 0], marbleStops(a, b, c), ' spreadMethod="repeat"'), 18, '0.03 0.05'));
   }
   // Liquid metal: light and dark bands tinted with the colour, slanted, sharpened towards the light, gently warped.
-  const dark = rgbHex(mix([60, 63, 67], hexRgb(a), 0.45));
-  const light = rgbHex(mix([244, 245, 246], hexRgb(a), 0.15));
   const dir = Math.hypot(0.55, 1);
   const period = (2 * Math.PI * 2.1) / dir;
-  const list: [number, string][] = [];
-  for (let i = 0; i <= 12; i += 1) list.push([i / 12, mixHex(dark, light, (0.5 + 0.5 * Math.sin((2 * Math.PI * i) / 12)) ** 2.2)]);
+  const list = metalStops(a);
   return tile(id, origin, w, h, body(linear(`${id}g`, [0, 0], [(0.55 / dir) * period, (1 / dir) * period], list, ' spreadMethod="repeat"'), 6, '0.02 0.03'));
 }
+
+/** Liquid metal's two tones, its dark and its light band, tinted with one colour. */
+const metal = (c: string): string[] => [rgbHex(mix([60, 63, 67], hexRgb(c), 0.45)), rgbHex(mix([244, 245, 246], hexRgb(c), 0.15))];
+/** Water-dyed's bands: a sine through the three colours. */
+function marbleStops(a: string, b: string, c: string): [number, string][] {
+  const list: [number, string][] = [];
+  for (let i = 0; i <= 12; i += 1) {
+    const t = 0.5 + 0.5 * Math.sin((2 * Math.PI * i) / 12);
+    list.push([i / 12, t < 0.5 ? mixHex(a, b, t * 2) : mixHex(b, c, (t - 0.5) * 2)]);
+  }
+  return list;
+}
+/** Liquid metal's bands, from its dark tone to its light one, sharpened towards the light. */
+function metalStops(a: string): [number, string][] {
+  const [dark, light] = metal(a) as [string, string];
+  const list: [number, string][] = [];
+  for (let i = 0; i <= 12; i += 1) list.push([i / 12, mixHex(dark, light, (0.5 + 0.5 * Math.sin((2 * Math.PI * i) / 12)) ** 2.2)]);
+  return list;
+}
+const tonesOf = (list: [number, string][]): string[] => [...new Set(list.map((x) => x[1]))];
 
 /** The colours a frame pattern shows (two or three for most, the weave for raw carbon). */
 function frameColours(pattern: Pattern, c1: string, more: readonly [string, string]): string[] {
   const n = PATTERN_OF.get(pattern)!.colours;
   if (pattern === 'carbon') return [...WEAVE];
-  if (pattern === 'chrome') return [rgbHex(mix([60, 63, 67], hexRgb(c1), 0.45)), rgbHex(mix([244, 245, 246], hexRgb(c1), 0.15))];
+  if (pattern === 'chrome') return metal(c1);
   return [c1, ...more].slice(0, n);
+}
+
+/** The colours a fork of its own draws (review of PR 50, I2: the casing is worked out on these, never on a colour it does not draw):
+ *  its own colour, its fade's two, the weave, every band of water-dyed or of liquid metal (tinted by the first colour only), or its
+ *  two colours. `asBefore`: a preset fork stored before the rider's own pairs gives its pair, which its casing was worked out on
+ *  until then; partCasings keeps that casing wherever every colour drawn reads on it, so those forks draw as before. */
+function forkShows(fk: Fork, asBefore = false): string[] {
+  if (fk.kind === 'own') return [fk.colour];
+  if (fk.kind === 'pattern' && fk.pattern === 'carbon') return [...WEAVE];
+  const [from, to] = forkColours(fk);
+  if (fk.kind === 'fade' || (asBefore && !fk.colours)) return [from, to];
+  return fk.pattern === 'chrome' ? tonesOf(metalStops(from)) : fk.pattern === 'marble' ? tonesOf(marbleStops(from, to, from)) : [from, to];
 }
 
 /** The casing under several colours: muted, unless one of them is a colour owner's ruling A moves; then the theme's tone that stands out most from all of them. */
@@ -228,10 +263,7 @@ export function shownColours(paint: Paint, colour: string | null): string[] {
   if (!colour) return [];
   const u = usable(paint, colour);
   const shown = frameColours(u.pattern, colour, u.more);
-  const fk = u.fork;
-  if (fk?.kind === 'own') shown.push(fk.colour);
-  if (fk?.kind === 'fade') shown.push(...forkColours(fk));
-  if (fk?.kind === 'pattern') shown.push(...(fk.pattern === 'carbon' ? WEAVE : forkColours(fk)));
+  if (u.fork) shown.push(...forkShows(u.fork, true));
   return shown;
 }
 
@@ -254,29 +286,32 @@ export function readableOn(colour: string, tone: CasingTone, theme: 'dark' | 'li
  * edge, never muted under Brown (ruling A).
  */
 export function partCasings(paint: Paint, colour: string | null, theme: 'dark' | 'light'): Record<PaintedPart, CasingTone> | null {
-  const parts = partColours(paint, colour);
-  if (!parts) return null;
+  const drawn = partColours(paint, colour);
+  const parts = partColours(paint, colour, true);
+  if (!drawn || !parts) return null;
   const out = {} as Record<PaintedPart, CasingTone>;
   const one = theme === 'light' ? casingForAll(shownColours(paint, colour), 'light') : null;
+  const fits = (cs: string[], t: CasingTone) => cs.every((c) => readableOn(c, t, 'light')) && !(t === 'muted' && cs.includes(BROWN));
+  const edge = (cs: string[], t: CasingTone) => Math.min(...cs.map((c) => contrastRatio(c, (CASINGS.light as Record<string, string>)[t]!)));
+  const best = (cs: string[]) => (Object.keys(CASINGS.light) as CasingTone[]).filter((t) => fits(cs, t)).reduce((a, b) => (edge(cs, b) > edge(cs, a) ? b : a));
   for (const [part, colours] of Object.entries(parts) as [PaintedPart, string[]][]) {
-    if (!one) { out[part] = darkCasing(colours); continue; }
-    const fits = (t: CasingTone) => colours.every((c) => readableOn(c, t, 'light')) && !(t === 'muted' && colours.includes(BROWN));
-    if (fits(one)) { out[part] = one; continue; }
-    const edge = (t: CasingTone) => Math.min(...colours.map((c) => contrastRatio(c, (CASINGS.light as Record<string, string>)[t]!)));
-    out[part] = (Object.keys(CASINGS.light) as CasingTone[]).filter(fits).reduce((a, b) => (edge(b) > edge(a) ? b : a));
+    let tone = !one ? darkCasing(colours) : fits(colours, one) ? one : best(colours);
+    // A preset liquid-metal fork stored before keeps its casing wherever its two tones read on it; else they choose (review of PR 50, I2).
+    const shows = drawn[part];
+    if (shows !== colours && !(one ? fits(shows, tone) : shows.every((c) => readableOn(c, tone, 'dark')))) tone = one ? best(shows) : darkCasing(shows);
+    out[part] = tone;
   }
   return out;
 }
 
-/** The colours each painted part shows: the frame's tubes, the stays (Two-tone blocks give them the second colour) and the fork. */
-export function partColours(paint: Paint, colour: string | null): Record<PaintedPart, string[]> | null {
+/** The colours each painted part shows: the frame's tubes, the stays (Two-tone blocks give them the second colour) and the fork.
+ *  `asBefore` as forkShows. */
+export function partColours(paint: Paint, colour: string | null, asBefore = false): Record<PaintedPart, string[]> | null {
   if (!colour) return null;
   const u = usable(paint, colour);
   const all = frameColours(u.pattern, colour, u.more);
   const frame = u.pattern === 'blocks' ? [colour] : all;
-  const fk = u.fork;
-  const pair = fk && fk.kind !== 'own' ? forkColours(fk) : [];
-  const fork = !fk ? frame : fk.kind === 'own' ? [fk.colour] : fk.kind === 'pattern' && fk.pattern === 'carbon' ? [...WEAVE] : pair;
+  const fork = u.fork ? forkShows(u.fork, asBefore) : frame;
   return { 'bk-frame': frame, 'bk-stays': u.pattern === 'blocks' ? [u.more[0]] : all, 'bk-fork': fork };
 }
 
@@ -300,7 +335,9 @@ function paintLabel(label: string, colour: string | null, u: ReturnType<typeof u
   const fork = u.fork;
   if (fork?.kind === 'own') extra.push(PT.paintForkColourLabel(nameOf(fork.colour)));
   if (fork?.kind === 'fade') extra.push(PT.paintForkFadeName(pairName(fork)));
-  if (fork?.kind === 'pattern') extra.push(fork.pattern === 'carbon' ? PT.paintForkPatternName(PT.paintCarbon, null) : PT.paintForkPatternName(PATTERN_OF.get(fork.pattern)!.name, pairName(fork)));
+  // a fork pattern names its two colours; liquid metal only the one that tints it (review of PR 50, M1)
+  if (fork?.kind === 'pattern') extra.push(fork.pattern === 'carbon' ? PT.paintForkPatternName(PT.paintCarbon, null)
+    : PT.paintForkPatternName(PATTERN_OF.get(fork.pattern)!.name, fork.pattern === 'chrome' ? colourName(forkColours(fork)[0]) : pairName(fork)));
   if (u.rimMm !== null) extra.push(PT.paintRimLabel(u.rimMm));
   if (extra.length === 0 && (!colour || u.pattern === 'solid')) return label;
   const old = colour ? W.bikeColourFrame(nameOf(colour)) : '';

@@ -56,6 +56,7 @@ export const PT = {
   paintForkTo: 'Second colour, at the dropouts',
   paintForkGround: 'First colour, the ground',
   paintForkFleck: 'Second colour, the pattern',
+  paintForkPairShade: (name: string): string => `${name}, the pair's own shade`,
 
   // ---- the six colour pairs of a fade ----
   paintPairBluePurple: 'Blue to purple',

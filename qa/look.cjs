@@ -498,6 +498,34 @@ test('[LC-LOOK-FORK] a colour tap shows at once and stores both colours with the
   assert.equal(p.stored('loadcheck:bikeProfiles'),beforeLib,'its saved copy, byte for byte');
 });
 
+// Review of PR 50, M2: four presets use colours that are not swatches; the rows show them as the pair's own shade, chosen.
+test('[LC-LOOK-FORK] a preset\'s colours that are not swatches show in each row as the pair\'s own shade, chosen; picking a preset\'s own two colours shows that preset',()=>{
+  const p=page();
+  open(p);
+  const own=row=>({value:p.run(`document.getElementById('${row}OwnInput').value`),name:p.run(`document.getElementById('${row}OwnName').textContent`)});
+  p.run('renderLookChoices()');
+  const named=hex=>({'#5f8fd0':"Blue, the pair's own shade",'#7a4fb0':"Purple, the pair's own shade"})[hex];
+  p.run("lookForkChange('lookFork','fade')");
+  assert.deepEqual(own('lookForkFrom'),{value:'#5f8fd0',name:named('#5f8fd0')},'Blue to purple: its first colour');
+  assert.deepEqual(own('lookForkTo'),{value:'#7a4fb0',name:named('#7a4fb0')},'and its second');
+  assert.match(p.html,/id="lookForkFrom" role="radiogroup"/);
+  for(const row of ['lookForkFrom','lookForkTo']){
+    const html=p.run(`document.getElementById('${row}').innerHTML`);
+    assert.ok(html.indexOf(`id="${row}Own"`)>=0 && html.indexOf(`id="${row}Own"`)<html.indexOf('value="#1d1d1f"'),`${row}: the pair's own shade comes first`);
+    assert.match(html,new RegExp(`<label class="lx-swatch hidden" id="${row}Own"><input type="radio" name="${row}" value="" id="${row}OwnInput">`),`${row}: a radio of the row, named by its label`);
+  }
+  // a colour tap, then the pair's own shade again: the preset, stored as before
+  p.run("lookForkChange('lookForkFade','1')");
+  assert.equal(own('lookForkFrom').value,'#1f8f90','Teal to blue: its teal is not a swatch');
+  p.run("lookForkChange('lookForkFrom','#c62f2a')");
+  assert.deepEqual(forkOf(p).colours,['#c62f2a','#2563b8']);
+  p.run("lookForkChange('lookForkFrom','#1f8f90')");
+  assert.deepEqual(forkOf(p),{kind:'fade',pair:1},'the pair\'s own two colours again: Teal to blue');
+  // two swatches equal to a preset's colours: that preset
+  p.run("lookForkChange('lookForkFrom','#6b3fa0');lookForkChange('lookForkTo','#d6619b')");
+  assert.deepEqual(forkOf(p),{kind:'fade',pair:3},'Purple then Pink: Purple to pink');
+});
+
 test('[LC-LOOK-FORK] with no frame colour yet a fork colour tap also picks Blue, as every fork tap does',()=>{
   const p=page();
   open(p);

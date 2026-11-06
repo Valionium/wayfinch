@@ -6,6 +6,7 @@ import { bannedHits } from '../../fixtures/banned.ts';
 const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   paintRimValue: [[15], [30], [60]],
   paintPairName: [['Red', 'Yellow'], ['Navy', 'Pink']],
+  paintForkPairShade: [['Blue'], ['Silver']],
   paintFrameLabel: [[['Blue', 'Purple'], 'Fade, front to back']],
   paintForkColourLabel: [['Red']],
   paintForkFadeName: [['Blue to purple']],

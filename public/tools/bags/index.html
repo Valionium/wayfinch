@@ -1549,7 +1549,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .lx-dot{flex:none;width:22px;height:22px;border-radius:50%;border:1px solid var(--muted)}
 .lx-sub{margin:8px 0 4px;font-size:13px;color:var(--muted)}
 .lx-note{margin:6px 0 0;font-size:13px;color:var(--muted);min-height:1.2em}
-.lx-box.hidden{display:none}
+.lx-box.hidden,.lx-swatch.hidden{display:none}
 .lx-rim{display:grid;gap:4px}
 .lx-rim-head{display:flex;justify-content:space-between;gap:8px;align-items:baseline;font-variant-numeric:tabular-nums}
 .lx-rim input[type=range]{width:100%;min-height:44px;accent-color:var(--blaze);margin:0}
@@ -3398,8 +3398,10 @@ function renderLookExtras(){
   $('lookForkPattern').innerHTML=B.PATTERN_LIST.filter(p=>LOOK_PATTERNS.slice(7).includes(p.value)).map(p=>radio('lx-chip','lookForkPattern',p.value,p.name)).join('');
   $('lookForkPairTitle').textContent=P.paintForkPairLabel;
   $('lookForkPair').innerHTML=pairs('lookForkPair');
-  $('lookForkFrom').innerHTML=swatches('lookForkFrom');
-  $('lookForkTo').innerHTML=swatches('lookForkTo');
+  // each row starts with the pair's own shade, shown while the fork's colour there is not a swatch (a preset's: review of PR 50, M2)
+  const own=name=>`<label class="lx-swatch hidden" id="${name}Own"><input type="radio" name="${name}" value="" id="${name}OwnInput"><span class="lx-dot" id="${name}OwnDot"></span><span id="${name}OwnName"></span></label>`;
+  $('lookForkFrom').innerHTML=own('lookForkFrom')+swatches('lookForkFrom');
+  $('lookForkTo').innerHTML=own('lookForkTo')+swatches('lookForkTo');
   $('lookRimTitle').textContent=P.paintRimTitle;
   $('lookRimBox').innerHTML=`<div class="lx-rim-head"><label for="lookRim">${htmlEsc(P.paintRimDepth)}</label><strong id="lookRimOut"></strong></div>`
     +'<input type="range" id="lookRim" min="15" max="60" step="1" value="40" aria-describedby="lookRimOut">'
@@ -3436,8 +3438,12 @@ function syncLookExtras(look){
   $('lookForkToRow').classList.toggle('hidden',kind==='pattern' && fork.pattern==='chrome');
   $('lookForkFromTitle').textContent=kind==='fade' ? P.paintForkFrom : P.paintForkGround;
   $('lookForkToTitle').textContent=kind==='fade' ? P.paintForkTo : P.paintForkFleck;
-  check('lookForkFrom',from);
-  check('lookForkTo',to);
+  for(const [row,c] of [['lookForkFrom',from],['lookForkTo',to]]){
+    const shade=c!==null && !B.SWATCHES.some(w=>w.hex===c),chip=$(row+'Own');   // the rows are built once bike.js is in
+    if(chip)chip.classList.toggle('hidden',!shade);
+    if(chip && shade){$(row+'OwnInput').value=c;$(row+'OwnDot').style.background=c;$(row+'OwnName').textContent=P.paintForkPairShade(B.colourName(c));}
+    check(row,c);
+  }
   const rim=$('lookRim');
   if(rim && p.rimMm!==null && document.activeElement!==rim)rim.value=String(p.rimMm);
   if($('lookRimOut'))$('lookRimOut').textContent=p.rimMm===null ? P.paintRimUnset : P.paintRimValue(p.rimMm);
@@ -3612,7 +3618,8 @@ function keepLookFocusInView(e){
   const body=$('bikeDetailsBody'),preview=$('lookPreview'),el=e.target;
   if(!body || !preview || !el || el===$('bikeLookTitle'))return;
   const fit=()=>{
-    const r=(el.closest('.look-swatch,.look-chip') || el).getBoundingClientRect(),b=body.getBoundingClientRect();
+    // the ring is the option's: on its label (Look's own swatches and chips, and the extras' .lx-swatch and .lx-chip; review of PR 50, I3)
+    const r=(el.closest('label') || el).getBoundingClientRect(),b=body.getBoundingClientRect();
     if(!r.height)return;
     const top=preview.getBoundingClientRect().bottom+2,bottom=b.top+body.clientTop+body.clientHeight-2;
     if(r.top-4<top)body.scrollTop-=top-(r.top-4);

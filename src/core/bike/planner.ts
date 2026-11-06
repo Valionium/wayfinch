@@ -28,5 +28,5 @@ export function bikeArt(spec: BikeSpec, bags: BagView | null, options: ArtOption
 export { SWATCHES, nearestSwatchName, oklabMedian } from './colour.ts';
 export { normaliseBike } from './normalise.ts';
 export { resolveBikeSpec } from './spec.ts';
-export { DEFAULT_COLOURS, FADES, forkColours, pairFor, PATTERN_LIST } from './paint.ts';
+export { colourName, DEFAULT_COLOURS, FADES, forkColours, pairFor, PATTERN_LIST } from './paint.ts';
 export { PT as PAINT_WORDS } from '../wording/en-paint.ts';
