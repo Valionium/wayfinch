@@ -225,6 +225,8 @@ export function TyreScreen({ services }: { services: TyreServices }) {
   const read = (): { host: HostData; saved: string[] } => ({ host: services.host(), saved: savedBikeIds(services.storage) });
   const [snap, setSnap] = useState(read);
   const { host, saved } = snap;
+  // Set when the rider picks a bike or types in the tool: "Without a bike" that only meant "no bike was saved" is not a pick.
+  const touched = useRef(false);
   const [gone, setGone] = useState<'next' | 'none' | null>(null);
   const load = (k: string): { key: string; details: Details } => {
     const r = readStore(services.storage);
@@ -237,6 +239,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
   const [kept, setKept] = useState(true);
   const [pending, setPending] = useState<Record<string, string>>({});
   const onPending = (id: string, label: string | null): void => {
+    if (label !== null) touched.current = true;
     setPending((p) => {
       if ((p[id] ?? null) === label) return p;
       const next = { ...p };
@@ -255,7 +258,11 @@ export function TyreScreen({ services }: { services: TyreServices }) {
       const next = read();
       setSnap((old) => (JSON.stringify(old) === JSON.stringify(next) ? old : next));
       const now = latest.current;
-      if (now !== DEFAULT_KEY && !next.saved.includes(now)) {
+      if (now === DEFAULT_KEY && !touched.current && next.saved.length > 0) {
+        // Opened with no saved bike and nothing done yet: the first bike saved is the choice.
+        setGone(null);
+        setSession(load(bikeInUse(services.storage, next.host, next.saved) ?? DEFAULT_KEY));
+      } else if (now !== DEFAULT_KEY && !next.saved.includes(now)) {
         const use = bikeInUse(services.storage, next.host, next.saved);
         setGone(use ? 'next' : 'none');
         setPending({});
@@ -279,6 +286,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
   const result = resolved.input ? tyreEstimate(resolved.input) : null;
 
   const change = (patch: Partial<Details>): void => {
+    touched.current = true;
     const next = { ...details, ...patch };
     for (const k of Object.keys(next) as (keyof Details)[]) if (next[k] === undefined) delete next[k];
     setSession({ key, details: next });
@@ -345,7 +353,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
 
       <label class="tyre-input" for="tyre-bike">
         <span class="tyre-label">{W.tyreBikeLabel}</span>
-        <select id="tyre-bike" value={key} onChange={(e) => { setGone(null); setPending({}); setSession(load((e.currentTarget as HTMLSelectElement).value)); }}>
+        <select id="tyre-bike" value={key} onChange={(e) => { touched.current = true; setGone(null); setPending({}); setSession(load((e.currentTarget as HTMLSelectElement).value)); }}>
           {host.bikes.filter((b) => saved.includes(b.id)).map((b) => <option key={b.id} value={b.id}>{b.name}{b.id === host.planBikeId ? W.tyreBikeInPlan : ''}</option>)}
           <option value={DEFAULT_KEY}>{saved.length ? T.tyreBikeWithout : W.tyreBikeNone}</option>
         </select>
