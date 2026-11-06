@@ -298,17 +298,22 @@ for (const start of ['legacy', 'step-one'] as const) {
     expect(after[0]!.look).toBeNull(); // and so is the Look
   });
 
-  test(`[BK-PAINT-OLD-PAGE] known risk, not a guarantee: ${which} page re-saving a bike drops its look extras (pattern, fork, rims) from its bikes, draft and setups; the colour stays, format stays 2`, async ({ context, page }) => {
+  test(`[BK-PAINT-OLD-PAGE] known risk, not a guarantee: ${which} page re-saving a bike drops its look extras (pattern, fork, the fork's own two colours, rims) from its bikes, draft and setups; the colour stays, format stays 2`, async ({ context, page }) => {
     await phone(page, start);
     await launch();
     const { planner } = await plannerSaves(context);
     const LOOK = { colour: '#2563b8', bars: null, ebike: null };
-    // The bag planner gives the bike a pattern, a fork of its own and deep rims.
+    // The bag planner gives the bike a pattern, a fork of its own and deep rims, and adds one with a fork fade in the rider's own two
+    // colours (owner's wish, 6 Nov 2026), stored as its Look stores them: both colours, and the nearest preset as `pair`.
     await planner.evaluate(`(async () => {
       const list = BIKE_PROFILES.map((b) => normaliseBikeProfile({ ...b, look: { colour: '#2563b8', bars: null, ebike: null,
         paint: { pattern: 'marble', colours: ['#6b3fa0', '#1f7f80'], fork: { kind: 'own', colour: '#c62f2a' }, rimMm: 50 } } }));
+      list.push(normaliseBikeProfile({ id: 'bike-fork', name: 'Fork bike', look: { colour: '#2563b8', bars: null, ebike: null,
+        paint: { pattern: 'solid', colours: [null, null], fork: { kind: 'fade', ...window.WayfinchBike.pairFor('#c62f2a', '#f1c232') }, rimMm: null } } }));
       if (!(await bikeStoreSet(BIKE_PROFILE_KEY, list))) throw new Error('the planner could not save');
     })()`);
+    const fork = (JSON.parse((await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles')))!) as { look: { paint?: { fork?: unknown } } }[])[1]!.look.paint!.fork;
+    expect(fork).toEqual({ kind: 'fade', pair: 5, colours: ['#c62f2a', '#f1c232'] });   // Olive to sand: the preset nearest Red to Yellow in OKLab
     // Two tabs share storage, but a write reaches the other tab a moment later: the old page waits until it sees it.
     await page.waitForFunction(() => (localStorage.getItem('loadcheck:bikeProfiles') ?? '').includes('"marble"'));
     // The old page reads the list as its own start-up does and saves it back, as its weight question or bike editor would.
@@ -318,13 +323,14 @@ for (const start of ['legacy', 'step-one'] as const) {
     })()`)).toBe(true);
     await planner.waitForFunction(() => !(localStorage.getItem('loadcheck:bikeProfiles') ?? '"marble"').includes('"marble"'));
     const after = JSON.parse((await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles')))!) as { id: string; look: { paint?: unknown } | null }[];
-    expect(after.map((b) => b.id)).toEqual(['bike-before']);
-    // the extras are gone; the first colour and the rest of the Look stay (review M1)
+    expect(after.map((b) => b.id)).toEqual(['bike-before', 'bike-fork']);
+    // the extras are gone, the fork's own two colours and its preset with them; the first colour and the rest of the Look stay (review M1)
     expect(after[0]!.look).toEqual(LOOK);
+    expect(after[1]!.look).toEqual(LOOK);
     expect(await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfilesFormat'))).toBe('2'); // and a rollback can still edit bikes
     // The same for the plan's bike in the draft and in a setup the old page writes (review M2): the extras go, the colour stays.
     const written = await page.evaluate(`(async () => {
-      S.bikeProfile = normaliseBikeProfile(${JSON.stringify({ id: 'bike-before', name: 'Before bike', look: { ...{ colour: '#2563b8', bars: null, ebike: null }, paint: { pattern: 'marble', colours: ['#6b3fa0', null], fork: null, rimMm: 50 } } })});
+      S.bikeProfile = normaliseBikeProfile(${JSON.stringify({ id: 'bike-before', name: 'Before bike', look: { ...{ colour: '#2563b8', bars: null, ebike: null }, paint: { pattern: 'marble', colours: ['#6b3fa0', null], fork: { kind: 'pattern', pattern: 'camo', pair: 2, colours: ['#2f7d4f', '#f1c232'] }, rimMm: 50 } } })});
       const draftLook = capturePlan().bikeProfile.look;
       await saveSetup('Stale tab', '');
       const setup = JSON.parse(localStorage.getItem('loadcheck:setups')).find((s) => s.name === 'Stale tab');

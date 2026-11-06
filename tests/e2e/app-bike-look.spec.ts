@@ -105,6 +105,93 @@ test('[LC-LOOK-EXTRAS] the rig and Look draw a painted bike the same way, and th
   await shot(page, info, 'look-painted');
 });
 
+// The fork's own two colours (owner's wish, 6 Nov 2026: "I want to be able to customize colour pairs").
+const SWATCH_NAMES = ['Black', 'Graphite', 'Silver', 'White', 'Sand', 'Brown', 'Red', 'Orange', 'Yellow', 'Olive', 'Green', 'Teal', 'Blue', 'Navy', 'Purple', 'Pink'];
+const forkStops = (page: Page) => page.locator('#lookPreview linearGradient[id="bkpk"] stop').evaluateAll((els) => els.map((el) => el.getAttribute('stop-color')));
+
+test('[LC-LOOK-FORK] the fork\'s first and second colour: the frame\'s swatches, named, 44 px, by tap and keyboard; a preset fills both; Undo brings all back', async ({ page }, info) => {
+  await look(page, seed(BLUE));
+  await page.locator('#lookFork label', { hasText: /^Fade$/ }).click();
+  const first = page.getByRole('radiogroup', { name: 'First colour, at the crown', exact: true });
+  const second = page.getByRole('radiogroup', { name: 'Second colour, at the dropouts', exact: true });
+  const presets = page.getByRole('radiogroup', { name: 'Fade, from the crown down to the dropouts', exact: true });
+  for (const group of [first, second]) {
+    await expect(group).toBeVisible();
+    expect(await group.getByRole('radio').evaluateAll((els) => els.map((el) => (el as HTMLInputElement).labels![0]!.textContent!.trim()))).toEqual(SWATCH_NAMES);
+    for (const box of await group.locator('label').evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return { w: r.width, h: r.height, text: el.textContent!.trim() }; }))) {
+      expect(box.h, box.text).toBeGreaterThanOrEqual(44);
+      expect(box.w, box.text).toBeGreaterThanOrEqual(44);
+    }
+  }
+  // the first preset is chosen, and no swatch: its colours are its own
+  await expect(presets.getByRole('radio', { name: 'Blue to purple' })).toBeChecked();
+  expect(await first.locator('input:checked').count()).toBe(0);
+  // one tap: the drawing changes at once, the preset is no longer chosen
+  const stops = await page.evaluate(() => {
+    const label = [...document.querySelectorAll('#lookForkFrom label')].find((l) => l.textContent!.trim() === 'Red') as HTMLElement;
+    label.click();
+    return [...document.querySelectorAll('#lookPreview linearGradient[id="bkpk"] stop')].map((s) => s.getAttribute('stop-color'));
+  });
+  expect(stops).toEqual(['#c62f2a', '#7a4fb0']);
+  await expect(first.getByRole('radio', { name: 'Red' })).toBeChecked();
+  expect(await presets.locator('input:checked').count()).toBe(0);
+  // by keyboard: the arrows move along the second colour and each step draws, with the two colours named
+  await second.locator('label', { hasText: /^Black$/ }).click();
+  await second.getByRole('radio', { name: 'Black' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(second.getByRole('radio', { name: 'Graphite' })).toBeChecked();
+  await expect.poll(() => forkStops(page)).toEqual(['#c62f2a', '#4b4f54']);
+  await expect(page.locator('#lookPreview svg')).toHaveAttribute('aria-label', /blue frame, fork fading red to graphite/);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfile')!).look.paint.fork.colours)).toEqual(['#c62f2a', '#4b4f54']);
+  await shot(page, info, 'fork-colours');
+  // a preset fills both colours; a pair equal to a preset shows that preset as chosen
+  await presets.locator('label', { hasText: /^Purple to pink$/ }).click();
+  await expect(first.getByRole('radio', { name: 'Purple' })).toBeChecked();
+  await expect(second.getByRole('radio', { name: 'Pink' })).toBeChecked();
+  await first.locator('label', { hasText: /^Olive$/ }).click();
+  await second.locator('label', { hasText: /^Sand$/ }).click();
+  await expect(presets.getByRole('radio', { name: 'Olive to sand' })).toBeChecked();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfile')!).look.paint.fork)).toEqual({ kind: 'fade', pair: 5 });
+  // Own pattern keeps the pair; its rows say ground and pattern; raw carbon hides both, liquid metal the second
+  await first.locator('label', { hasText: /^Red$/ }).click();
+  await page.locator('#lookFork label', { hasText: /^Pattern$/ }).click();
+  const ground = page.getByRole('radiogroup', { name: 'First colour, the ground', exact: true });
+  const fleck = page.getByRole('radiogroup', { name: 'Second colour, the pattern', exact: true });
+  await expect(ground.getByRole('radio', { name: 'Red' })).toBeChecked();
+  await expect(fleck.getByRole('radio', { name: 'Sand' })).toBeChecked();
+  await expect(page.locator('#lookPreview svg')).toHaveAttribute('aria-label', /water-dyed fork, red to sand/);
+  await page.locator('#lookForkPattern label', { hasText: /^Raw carbon$/ }).click();
+  await expect(ground).toBeHidden();
+  await expect(fleck).toBeHidden();
+  await page.locator('#lookForkPattern label', { hasText: /^Liquid metal$/ }).click();
+  await expect(ground).toBeVisible();
+  await expect(fleck).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  // Undo: the opening look, byte for byte
+  await page.locator('#lookUndo').click();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfile')!).look)).toEqual(BLUE.look);
+});
+
+test('[LC-LOOK-FORK] Tab reaches each fork colour group and its checked swatch, every one inside the dialog below the bike\'s panel', async ({ page }) => {
+  await look(page, seed({ ...BLUE, look: { ...BLUE.look, paint: { pattern: 'solid', colours: [null, null], fork: { kind: 'fade', pair: 2, colours: ['#1f2f55', '#d6619b'] }, rimMm: null } } }));
+  await page.locator('#bikeLookTitle').focus();
+  const reached: string[] = [];
+  for (let step = 0; step < 60 && reached.length < 2; step++) {
+    await page.keyboard.press('Tab');
+    const at = await page.evaluate(() => {
+      const el = document.activeElement as HTMLInputElement | null;
+      if (!el || !['lookForkFrom', 'lookForkTo'].includes(el.name)) return null;
+      const group = el.closest('[role="radiogroup"]')!;
+      const r = el.closest('label')!.getBoundingClientRect(), p = document.getElementById('lookPreview')!.getBoundingClientRect();
+      return { at: `${document.getElementById(group.getAttribute('aria-labelledby')!)!.textContent}: ${el.closest('label')!.textContent!.trim()}`, below: r.top >= p.bottom - 0.5, checked: el.checked };
+    });
+    if (!at) continue;
+    expect(at.below && at.checked, at.at).toBe(true);
+    reached.push(at.at);
+  }
+  expect(reached).toEqual(['First colour, at the crown: Navy', 'Second colour, at the dropouts: Pink']);
+});
+
 /** A side-on "photo": a lawn, the frame's front red, its back blue, the fork yellow. */
 async function threeColourPhoto(page: Page): Promise<Buffer> {
   const b64 = await page.evaluate(async () => {
@@ -178,6 +265,30 @@ test('[LC-LOOK-EXTRAS-SAVE] what the bag planner saves, the co-pilot draws: Trip
   await expect(drawing.locator('.bk-rimband')).toHaveCount(2);
   await expect(page.getByRole('link', { name: /blue and purple frame, stripes, black fork, 60 mm deep rims/ })).toBeVisible();
   await shot(page, info, 'copilot-trip');
+});
+
+test('[BK-FORK-SAVE] the fork\'s own two colours, picked in Look, are what Wayfinch draws and names, and follow a change from another tab', async ({ page, context }, info) => {
+  await look(page, seed(BLUE));
+  await page.locator('#lookFork label', { hasText: /^Fade$/ }).click();
+  await page.getByRole('radiogroup', { name: 'First colour, at the crown', exact: true }).locator('label', { hasText: /^Red$/ }).click();
+  await page.getByRole('radiogroup', { name: 'Second colour, at the dropouts', exact: true }).locator('label', { hasText: /^Yellow$/ }).click();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfile')!).look.paint?.fork?.colours)).toEqual(['#c62f2a', '#f1c232']);
+  await page.goto(`${app!.origin}/#/trip`, { waitUntil: 'load' });
+  const drawing = page.locator('.bike-large svg.bk').first();
+  await expect(drawing.locator('.bk-paint.bk-fork')).toHaveAttribute('stroke', /^url\(#bk\d+-pk\)$/);
+  const stops = () => drawing.locator('linearGradient[id$="-pk"] stop').evaluateAll((els) => els.map((el) => el.getAttribute('stop-color')));
+  await expect.poll(stops).toEqual(['#c62f2a', '#f1c232']);
+  await expect(page.getByRole('link', { name: /blue frame, fork fading red to yellow/ })).toBeVisible();
+  await shot(page, info, 'copilot-fork');
+  // the bag planner, in another tab, changes the second colour: the drawing follows, in full
+  const other = await context.newPage();
+  await other.goto(`${app!.origin}/#/you`, { waitUntil: 'domcontentloaded' });
+  const bike = await page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfile')!));
+  bike.look.paint.fork = { kind: 'fade', pair: 2, colours: ['#c62f2a', '#1f2f55'] };
+  await other.evaluate((e) => { for (const [k, v] of Object.entries(e)) localStorage.setItem(k, v); }, seed(bike));
+  await expect.poll(stops).toEqual(['#c62f2a', '#1f2f55']);
+  await expect(drawing).toHaveAttribute('aria-label', /fork fading red to navy/);
+  await other.close();
 });
 
 test('[BK-PAINT-LAZY] the co-pilot asks for the extras only for a bike that has them, and the Ahead strip\'s marker stays one colour', async ({ page }) => {

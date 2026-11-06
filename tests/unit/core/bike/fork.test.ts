@@ -3,10 +3,12 @@
 // beside `pair`, which always names the nearest preset, so a page that knows only the presets still draws a sensible fork.
 import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
-import { hexToOklab, nearestSwatchName, SWATCHES } from '../../../../src/core/bike/colour.ts';
+import { CASINGS, contrastRatio, hexToOklab, nearestSwatchName, SWATCHES } from '../../../../src/core/bike/colour.ts';
+import type { CasingTone } from '../../../../src/core/bike/colour.ts';
 import { FORK_PATTERNS, normaliseBike } from '../../../../src/core/bike/normalise.ts';
 import type { Fork, Paint } from '../../../../src/core/bike/normalise.ts';
-import { FADES, forkColours, paintedArt, pairFor, PATTERN_LIST } from '../../../../src/core/bike/paint.ts';
+import { BACKGROUNDS, FADES, forkColours, paintedArt, pairFor, partCasings, PATTERN_LIST } from '../../../../src/core/bike/paint.ts';
+import type { PaintedPart } from '../../../../src/core/bike/paint.ts';
 import { resolveBikeSpec } from '../../../../src/core/bike/spec.ts';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test data, written by hand
@@ -124,4 +126,51 @@ describe('what is stored', () => {
     expect(JSON.stringify(bikeWith('#2563b8', pattern).look!.paint!.fork)).toBe('{"kind":"pattern","pattern":"stripes","pair":0,"colours":["#1d1d1f","#f4f4f2"]}');
     expect(JSON.stringify(bikeWith('#2563b8', { fork: { kind: 'fade', pair: 2 } }).look!.paint!.fork)).toBe('{"kind":"fade","pair":2}');
   });
+});
+
+// Ruling A for the rider's own pairs, measured where the bike is drawn. Written here on its own, not taken from the code it checks: the
+// colours each part shows come from the paint itself, so a casing worked out on the preset's colours instead of the rider's would fail.
+const BGS = { light: ['#F4F2E8', '#FBFAF3'], dark: ['#1B2018', '#242B20'] } as const;
+const WEAVE = ['#34373b', '#1f2124'];
+function readable(colour: string, theme: 'dark' | 'light', tone: CasingTone): boolean {
+  const casing = (CASINGS[theme] as Record<string, string>)[tone]!;
+  if (theme === 'light' && tone === 'muted' && colour === '#7b5434') return false;   // Brown never on muted (ruling A)
+  return BGS[theme].every((bg) => contrastRatio(casing, bg) >= 3 || contrastRatio(colour, bg) >= 3);
+}
+const casingIn = (svg: string, part: string): CasingTone => (new RegExp(`class="bk-casing(?: bk-casing-(\\w+))?"[^>]*/><path class="bk-paint ${part}"`).exec(svg)?.[1] as CasingTone | undefined) ?? 'muted';
+
+describe('the rider\'s own pairs stay readable', () => {
+  test('[BK-FORK-CONTRAST] every swatch frame x every swatch x swatch fork pair x every way of the fork x both themes: each part readable on both apps\' ground and panel', () => {
+    expect(BGS).toEqual(BACKGROUNDS);   // the backgrounds BK-DARK-CRISP reads from theme.css and the page
+    let n = 0;
+    const tones = new Set<string>();
+    for (const colour of HEX) for (const a of HEX) for (const b of HEX) for (const way of ['fade', ...FORK_PATTERNS] as const) {
+      const fork = (way === 'fade' ? { kind: 'fade', pair: 0, colours: [a, b] } : { kind: 'pattern', pattern: way, pair: 0, colours: [a, b] }) as Fork;
+      const paint: Paint = { pattern: 'solid', colours: [null, null], fork, rimMm: null };
+      const shown: Record<PaintedPart, string[]> = { 'bk-frame': [colour], 'bk-stays': [colour], 'bk-fork': way === 'carbon' ? WEAVE : [a, b] };
+      for (const theme of ['light', 'dark'] as const) {
+        const t = partCasings(paint, colour, theme)!;
+        for (const part of Object.keys(shown) as PaintedPart[]) {
+          const bad = shown[part].filter((c) => !readable(c, theme, t[part]));
+          if (bad.length) expect(bad, `${theme} frame ${nearestSwatchName(colour)}, ${way} ${nearestSwatchName(a)} to ${nearestSwatchName(b)}, ${part} on ${t[part]}`).toEqual([]);
+          tones.add(`${theme} ${t[part]}`);
+        }
+        n += 1;
+      }
+    }
+    expect(n).toBe(16 * 256 * 8 * 2);
+    expect(tones.size).toBeGreaterThanOrEqual(5);   // the rule is at work, not one tone for all
+  }, 300_000);
+
+  test('[BK-FORK-CONTRAST] the drawing carries each part\'s casing and the rider\'s colours, every pair, a fade and a pattern, both themes', () => {
+    for (const a of HEX) for (const b of HEX) for (const theme of ['light', 'dark'] as const) for (const way of ['fade', 'camo'] as const) {
+      const fork = way === 'fade' ? { kind: 'fade', pair: 0, colours: [a, b] } : { kind: 'pattern', pattern: 'camo', pair: 0, colours: [a, b] };
+      const bike = bikeWith('#7b5434', { fork });
+      const svg = paintedArt(resolveBikeSpec(bike, null), null, { theme }, bike.look!.paint!).svg;
+      const t = partCasings(bike.look!.paint!, '#7b5434', theme)!;
+      for (const part of ['bk-frame', 'bk-stays', 'bk-fork'] as const) expect(casingIn(svg, part), `${theme} ${way} ${a} ${b} ${part}`).toBe(t[part]);
+      if (way === 'fade') expect(stopsOf(svg, 'bkpk')).toEqual([a, b]);
+      else expect(forkTile(svg)).toContain(`fill="${a}"`);
+    }
+  }, 120_000);
 });

@@ -2050,6 +2050,8 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
           <div class="lx-box" id="lookForkFadeBox"><p class="lx-sub" id="lookForkFadeTitle"></p><div class="look-swatches" id="lookForkFade" role="radiogroup" aria-labelledby="lookForkFadeTitle"></div></div>
           <div class="lx-box" id="lookForkPatternBox"><p class="lx-sub" id="lookForkPatternTitle"></p><div class="look-chips" id="lookForkPattern" role="radiogroup" aria-labelledby="lookForkPatternTitle"></div>
             <p class="lx-sub" id="lookForkPairTitle"></p><div class="look-swatches" id="lookForkPair" role="radiogroup" aria-labelledby="lookForkPairTitle"></div></div>
+          <div class="lx-box" id="lookForkTwoBox"><div class="lx-box" id="lookForkFromRow"><p class="lx-sub" id="lookForkFromTitle"></p><div class="look-swatches" id="lookForkFrom" role="radiogroup" aria-labelledby="lookForkFromTitle"></div></div>
+            <div class="lx-box" id="lookForkToRow"><p class="lx-sub" id="lookForkToTitle"></p><div class="look-swatches" id="lookForkTo" role="radiogroup" aria-labelledby="lookForkToTitle"></div></div></div>
         </fieldset>
         <fieldset id="lookRimSet"><legend id="lookRimTitle">Rims</legend><div class="lx-rim" id="lookRimBox"></div></fieldset>
         <fieldset><legend id="lookBarsTitle">Handlebar</legend><div class="look-chips" id="lookBars" role="radiogroup" aria-labelledby="lookBarsTitle"></div></fieldset>
@@ -2767,8 +2769,10 @@ const lookHex=v=>typeof v==='string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerC
 function normalisePaint(v){
   if(!dataObject(v))return null;
   const c=Array.isArray(v.colours) ? v.colours : [],f=dataObject(v.fork) ? v.fork : {},pair=dataInteger(f.pair,0,5),own=lookHex(f.colour);
-  const fork=f.kind==='own' && own ? {kind:'own',colour:own} : f.kind==='fade' && pair!==null ? {kind:'fade',pair}
-    : f.kind==='pattern' && pair!==null && LOOK_PATTERNS.slice(7).includes(f.pattern) ? {kind:'pattern',pattern:f.pattern,pair} : null;
+  // a fade's or fork pattern's own two colours (owner's wish, 6 Nov 2026), kept only whole: else the preset pair
+  const fc=Array.isArray(f.colours) ? f.colours : [],k=[lookHex(fc[0]),lookHex(fc[1])],two=k[0] && k[1] ? {colours:k} : {};
+  const fork=f.kind==='own' && own ? {kind:'own',colour:own} : pair===null ? null : f.kind==='fade' ? {kind:'fade',pair,...two}
+    : f.kind==='pattern' && LOOK_PATTERNS.slice(7).includes(f.pattern) ? {kind:'pattern',pattern:f.pattern,pair,...two} : null;
   const p={pattern:LOOK_PATTERNS.includes(v.pattern) ? v.pattern : 'solid',colours:[lookHex(c[0]),lookHex(c[1])],fork,rimMm:dataInteger(v.rimMm,15,60)};
   return p.pattern==='solid' && !p.colours[0] && !p.colours[1] && !fork && p.rimMm===null ? null : p;
 }
@@ -3394,6 +3398,8 @@ function renderLookExtras(){
   $('lookForkPattern').innerHTML=B.PATTERN_LIST.filter(p=>LOOK_PATTERNS.slice(7).includes(p.value)).map(p=>radio('lx-chip','lookForkPattern',p.value,p.name)).join('');
   $('lookForkPairTitle').textContent=P.paintForkPairLabel;
   $('lookForkPair').innerHTML=pairs('lookForkPair');
+  $('lookForkFrom').innerHTML=swatches('lookForkFrom');
+  $('lookForkTo').innerHTML=swatches('lookForkTo');
   $('lookRimTitle').textContent=P.paintRimTitle;
   $('lookRimBox').innerHTML=`<div class="lx-rim-head"><label for="lookRim">${htmlEsc(P.paintRimDepth)}</label><strong id="lookRimOut"></strong></div>`
     +'<input type="range" id="lookRim" min="15" max="60" step="1" value="40" aria-describedby="lookRimOut">'
@@ -3420,9 +3426,18 @@ function syncLookExtras(look){
   $('lookForkFadeBox').classList.toggle('hidden',kind!=='fade');
   $('lookForkPatternBox').classList.toggle('hidden',kind!=='pattern');
   check('lookForkColour',kind==='own' ? fork.colour : null);
-  check('lookForkFade',kind==='fade' ? fork.pair : null);
   check('lookForkPattern',kind==='pattern' ? fork.pattern : null);
-  check('lookForkPair',kind==='pattern' ? fork.pair : null);
+  // The fork's two colours: a preset shows as chosen while the pair is that preset's own; the rows show the pair's colours. Rows that
+  // would change nothing are hidden: both for raw carbon, the second for liquid metal (tinted by the first only).
+  const pairs=kind==='fade' || kind==='pattern',[from,to]=pairs ? B.forkColours(fork) : [null,null],preset=pairs ? B.pairFor(from,to) : null;
+  check('lookForkFade',kind==='fade' && !preset.colours ? preset.pair : null);
+  check('lookForkPair',kind==='pattern' && !preset.colours ? preset.pair : null);
+  $('lookForkTwoBox').classList.toggle('hidden',!pairs || fork.pattern==='carbon');
+  $('lookForkToRow').classList.toggle('hidden',kind==='pattern' && fork.pattern==='chrome');
+  $('lookForkFromTitle').textContent=kind==='fade' ? P.paintForkFrom : P.paintForkGround;
+  $('lookForkToTitle').textContent=kind==='fade' ? P.paintForkTo : P.paintForkFleck;
+  check('lookForkFrom',from);
+  check('lookForkTo',to);
   const rim=$('lookRim');
   if(rim && p.rimMm!==null && document.activeElement!==rim)rim.value=String(p.rimMm);
   if($('lookRimOut'))$('lookRimOut').textContent=p.rimMm===null ? P.paintRimUnset : P.paintRimValue(p.rimMm);
@@ -3442,6 +3457,24 @@ function flushLookRim(){
   clearTimeout(LOOK_RIM_TIMER);LOOK_RIM_TIMER=null;
   if($('lookRim'))setPaint({rimMm:Number($('lookRim').value)});
 }
+// One tap on a fork control. The fork's way and pattern keep its two colours; a preset fills both; a colour tap changes one end and
+// stores the pair as pairFor says: a preset's own two as that preset, any other pair as both colours with the nearest preset.
+function lookForkChange(name,value){
+  const B=lookExtras();if(!B)return;
+  const fork=lookPaint().fork,pair=fork && fork.kind!=='own' ? fork.pair : 0;
+  const pattern=fork && fork.kind==='pattern' ? fork.pattern : 'marble';
+  const keep=fork && fork.kind!=='own' && fork.colours ? {colours:fork.colours} : {};
+  if(name==='lookFork')setPaint({fork:value==='own' ? {kind:'own',colour:fork && fork.kind==='own' ? fork.colour : '#1d1d1f'}
+    : value==='fade' ? {kind:'fade',pair,...keep} : value==='pattern' ? {kind:'pattern',pattern,pair,...keep} : null});
+  if(name==='lookForkColour')setPaint({fork:{kind:'own',colour:value}});
+  if(name==='lookForkFade')setPaint({fork:{kind:'fade',pair:Number(value)}});
+  if(name==='lookForkPattern')setPaint({fork:{kind:'pattern',pattern:value,pair,...keep}});
+  if(name==='lookForkPair')setPaint({fork:{kind:'pattern',pattern,pair:Number(value)}});
+  if((name==='lookForkFrom' || name==='lookForkTo') && fork && fork.kind!=='own'){
+    const [from,to]=B.forkColours(fork),two=name==='lookForkFrom' ? B.pairFor(value,to) : B.pairFor(from,value);
+    setPaint({fork:fork.kind==='fade' ? {kind:'fade',...two} : {kind:'pattern',pattern,...two}});
+  }
+}
 function initialiseLookExtras(){
   $('lookPatternSet').addEventListener('change',e=>{
     const t=e.target,B=lookExtras(),p=lookPaint();if(!B)return;
@@ -3452,16 +3485,7 @@ function initialiseLookExtras(){
     if(t.name==='lookColour2')setPaint({colours:[t.value,p.colours[1]]});
     if(t.name==='lookColour3')setPaint({colours:[p.colours[0],t.value]});
   });
-  $('lookForkSet').addEventListener('change',e=>{
-    const t=e.target,fork=lookPaint().fork,pair=fork && fork.kind!=='own' ? fork.pair : 0;
-    const pattern=fork && fork.kind==='pattern' ? fork.pattern : 'marble';
-    if(t.name==='lookFork')setPaint({fork:t.value==='own' ? {kind:'own',colour:fork && fork.kind==='own' ? fork.colour : '#1d1d1f'}
-      : t.value==='fade' ? {kind:'fade',pair} : t.value==='pattern' ? {kind:'pattern',pattern,pair} : null});
-    if(t.name==='lookForkColour')setPaint({fork:{kind:'own',colour:t.value}});
-    if(t.name==='lookForkFade')setPaint({fork:{kind:'fade',pair:Number(t.value)}});
-    if(t.name==='lookForkPattern')setPaint({fork:{kind:'pattern',pattern:t.value,pair}});
-    if(t.name==='lookForkPair')setPaint({fork:{kind:'pattern',pattern,pair:Number(t.value)}});
-  });
+  $('lookForkSet').addEventListener('change',e=>lookForkChange(e.target.name,e.target.value));
   // The slider paints while it moves and stores once it settles, as the colour picker does.
   $('lookRimBox').addEventListener('input',e=>{
     if(e.target.id!=='lookRim')return;

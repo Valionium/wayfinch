@@ -427,6 +427,129 @@ test('[LC-LOOK-EXTRAS] Raw carbon on a bike with no colour yet stores Black, so 
   assert.equal(p.json('S.bikeProfile.look.colour'),'#2f7d4f');
 });
 
+// ---- The fork's own two colours (owner's wish, 6 Nov 2026: "I want to be able to customize colour pairs") ----
+const forkOf=p=>p.json('S.bikeProfile.look.paint.fork');
+const forkStops=p=>[...(/<linearGradient id="bkpk"[^>]*>(.*?)<\/linearGradient>/.exec(p.run("document.getElementById('lookPreview').innerHTML"))||[,''])[1].matchAll(/stop-color="([^"]+)"/g)].map(m=>m[1]);
+
+test('[LC-LOOK-FORK] a first and a second colour row for the fork, the frame\'s 16 swatches each, named, in groups their titles name',()=>{
+  const p=page();
+  p.run('renderLookChoices()');
+  const B=p.json('({s:window.WayfinchBike.SWATCHES})');
+  for(const id of ['lookForkFrom','lookForkTo']){
+    const html=p.run(`document.getElementById('${id}').innerHTML`);
+    assert.deepEqual(radiosOf(html).map(r=>[r.name,r.value,r.label]),B.s.map(w=>[id,w.hex,w.name]),`${id}: the 16 swatches, each named`);
+    assert.match(p.html,new RegExp(`id="${id}" role="radiogroup" aria-labelledby="${id}Title"`),`${id}: a group named by its title`);
+  }
+  // the titles say which end: the crown and the dropouts for a fade, the ground and the pattern for a fork pattern
+  open(p);
+  p.run("setPaint({fork:{kind:'fade',pair:0}})");
+  assert.deepEqual([p.run("document.getElementById('lookForkFromTitle').textContent"),p.run("document.getElementById('lookForkToTitle').textContent")],
+    ['First colour, at the crown','Second colour, at the dropouts']);
+  p.run("setPaint({fork:{kind:'pattern',pattern:'speckle',pair:0}})");
+  assert.deepEqual([p.run("document.getElementById('lookForkFromTitle').textContent"),p.run("document.getElementById('lookForkToTitle').textContent")],
+    ['First colour, the ground','Second colour, the pattern']);
+});
+
+test('[LC-LOOK-FORK] a colour tap shows at once and stores both colours with the nearest preset; a preset tap fills both; the way and pattern keep the pair; Undo brings all back',async()=>{
+  const p=page();
+  const beforePlan=p.stored('loadcheck:bikeProfile'),beforeLib=p.stored('loadcheck:bikeProfiles');
+  open(p);
+  p.run("lookForkChange('lookFork','fade')");
+  assert.deepEqual(forkOf(p),{kind:'fade',pair:0},'Fade starts on the first preset, as before');
+  const before=p.writes.length;
+  p.run("lookForkChange('lookForkFrom','#c62f2a')");
+  assert.deepEqual(forkStops(p),['#c62f2a','#7a4fb0'],'the preview shows the new first colour at once');
+  assert.equal(p.writes.length,before,'storage follows afterwards');
+  p.run("lookForkChange('lookForkTo','#f1c232')");
+  assert.deepEqual(forkStops(p),['#c62f2a','#f1c232']);
+  assert.match(p.run("document.getElementById('lookPreview').innerHTML"),/aria-label="[^"]*blue frame, fork fading red to yellow/);
+  assert.match(p.run("document.getElementById('rigBike').innerHTML"),/<linearGradient id="rigpk"[^>]*><stop offset="0" stop-color="#c62f2a"\/><stop offset="1" stop-color="#f1c232"\/>/,'the rig behind too');
+  const want=p.json("window.WayfinchBike.pairFor('#c62f2a','#f1c232')");
+  assert.deepEqual(want.colours,['#c62f2a','#f1c232']);
+  assert.deepEqual(forkOf(p),{kind:'fade',...want},'both colours, with the nearest preset for older pages');
+  await p.settle();
+  assert.deepEqual(JSON.parse(p.stored('loadcheck:bikeProfile')).look.paint.fork,{kind:'fade',...want});
+  // the fork's way and pattern keep the rider's pair
+  p.run("lookForkChange('lookFork','pattern')");
+  assert.deepEqual(forkOf(p),{kind:'pattern',pattern:'marble',...want});
+  p.run("lookForkChange('lookForkPattern','stripes')");
+  assert.deepEqual(forkOf(p),{kind:'pattern',pattern:'stripes',...want});
+  p.run("lookForkChange('lookFork','fade')");
+  assert.deepEqual(forkOf(p),{kind:'fade',...want});
+  // a preset tap fills both colours: the preset alone is stored, as before
+  p.run("lookForkChange('lookForkFade','3')");
+  assert.deepEqual(forkOf(p),{kind:'fade',pair:3});
+  assert.deepEqual(forkStops(p),['#6b3fa0','#d6619b']);
+  // a pair tapped to equal a preset is that preset
+  p.run("lookForkChange('lookForkFrom','#6d7a37');lookForkChange('lookForkTo','#cbb68e')");
+  assert.deepEqual(forkOf(p),{kind:'fade',pair:5},'Olive then Sand: the Olive to sand preset');
+  p.run("lookForkChange('lookFork','pattern');lookForkChange('lookForkPair','1')");
+  assert.deepEqual(forkOf(p),{kind:'pattern',pattern:'marble',pair:1});
+  p.run("lookForkChange('lookForkTo','#1d1d1f')");
+  assert.deepEqual(forkOf(p),{kind:'pattern',pattern:'marble',...p.json("window.WayfinchBike.pairFor('#1f8f90','#1d1d1f')")},'the preset\'s first colour stays');
+  // Own colour and Like the frame, as before
+  p.run("lookForkChange('lookFork','own')");
+  assert.deepEqual(forkOf(p),{kind:'own',colour:'#1d1d1f'});
+  p.run("lookForkChange('lookFork','frame')");
+  assert.equal(p.json("'paint' in S.bikeProfile.look"),false,'like the frame: nothing left of the extras');
+  p.run('undoLook()');
+  await p.settle();
+  assert.equal(p.stored('loadcheck:bikeProfile'),beforePlan,'the plan\'s bike, byte for byte');
+  assert.equal(p.stored('loadcheck:bikeProfiles'),beforeLib,'its saved copy, byte for byte');
+});
+
+test('[LC-LOOK-FORK] with no frame colour yet a fork colour tap also picks Blue, as every fork tap does',()=>{
+  const p=page();
+  open(p);
+  p.run("setLook({colour:null});lookForkChange('lookFork','fade');lookForkChange('lookForkFrom','#c62f2a')");
+  assert.equal(p.json('S.bikeProfile.look.colour'),'#2563b8');
+  assert.deepEqual(p.json('S.bikeProfile.look.paint.fork.colours'),['#c62f2a','#7a4fb0']);
+});
+
+const OWN_PAIR={pattern:'solid',colours:[null,null],fork:{kind:'pattern',pattern:'camo',pair:2,colours:['#2f7d4f','#f1c232']},rimMm:null};
+test('[BK-FORK-SAVE] the fork\'s own colours round-trip: saved, read by a new page, exported and imported, in a setup and the draft; the page and bike.js read every fork alike',async()=>{
+  const p=page();
+  open(p);
+  p.run(`setLook({paint:${JSON.stringify(OWN_PAIR)}})`);
+  await p.settle();
+  for(const key of ['loadcheck:bikeProfile','loadcheck:bikeProfiles']){
+    const v=JSON.parse(p.stored(key));
+    assert.deepEqual((Array.isArray(v)?v.find(b=>b.id===BIKE.id):v).look.paint,OWN_PAIR,key);
+  }
+  const q=appVM({storage:p.storage});
+  q.run('BIKE_PROFILES=JSON.parse(window.localStorage.getItem(BIKE_PROFILE_KEY)).map(normaliseBikeProfile).filter(Boolean);S.bikeProfile=normaliseBikeProfile(JSON.parse(window.localStorage.getItem(BIKE_PROFILE_CURRENT_KEY)))');
+  assert.deepEqual(JSON.parse(q.run('JSON.stringify(S.bikeProfile.look.paint)')),OWN_PAIR,'another page reads it back');
+  // export, then import into an empty page
+  const file=p.run('exportAll()');
+  assert.deepEqual(JSON.parse(file).bikeProfiles.find(b=>b.id===BIKE.id).look.paint,OWN_PAIR);
+  const r=appVM();
+  r.context.qaFile=file;
+  await r.run('importAll(qaFile)');
+  assert.deepEqual(JSON.parse(r.run(`JSON.stringify(BIKE_PROFILES.find(b=>b.id===${JSON.stringify(BIKE.id)}).look.paint)`)),OWN_PAIR);
+  // the plan's bike in the draft and in a setup, saved and loaded again
+  assert.deepEqual(p.json('capturePlan().bikeProfile.look.paint'),OWN_PAIR,'the draft');
+  p.run("buildThumb=()=>''");   // no rig to draw here: the thumbnail is the browser tests' (LC-LOOK-EXTRAS-SAVE)
+  await p.run("saveSetup('Own fork','')");
+  const setup=JSON.parse(p.stored('loadcheck:setups')).find(s=>s.name==='Own fork');
+  assert.deepEqual((setup.plan||setup).bikeProfile.look.paint,OWN_PAIR,'the setup');
+  p.run("S.bikeProfile=normaliseBikeProfile({id:'other',name:'Other'})");
+  p.run(`loadSetup(${JSON.stringify(setup.id)})`);
+  assert.deepEqual(p.json('S.bikeProfile.look.paint'),OWN_PAIR,'loaded again');
+  // the page and bike.js read every fork, and every broken one, the same way
+  const forks=[{kind:'fade',pair:2,colours:['#C62F2A','#f1c232']},{kind:'fade',pair:2,colours:['#c62f2a']},{kind:'fade',pair:2,colours:['#c62f2a','red']},
+    {kind:'fade',pair:2,colours:'#c62f2a'},{kind:'fade',colours:['#c62f2a','#f1c232']},{kind:'pattern',pattern:'stripes',pair:0,colours:['#1d1d1f','#f4f4f2','#000000']},
+    {kind:'pattern',pattern:'panel',pair:0,colours:['#1d1d1f','#f4f4f2']},{kind:'own',colour:'#c62f2a',colours:['#1d1d1f','#f4f4f2']},{kind:'fade',pair:6,colours:['#1d1d1f','#f4f4f2']},
+    {kind:'fade',pair:'3',colours:[null,'#f4f4f2']},{kind:'pattern',pattern:'carbon',pair:5,colours:['#1d1d1f','#f4f4f2'],extra:1}];
+  for(const fork of forks){
+    p.context.qaRaw=JSON.stringify({id:'x',look:{colour:'#2563b8',paint:{fork}}});
+    const page=p.run('JSON.stringify(normaliseBikeProfile(JSON.parse(qaRaw)).look)');
+    const module=p.run('JSON.stringify(window.WayfinchBike.normaliseBike(JSON.parse(qaRaw)).look)');
+    assert.equal(page,module,JSON.stringify(fork));
+  }
+  assert.deepEqual(JSON.parse(p.run(`JSON.stringify(normaliseBikeProfile({id:'x',look:{colour:'#2563b8',paint:{fork:${JSON.stringify(forks[0])}}}}).look.paint.fork)`)),
+    {kind:'fade',pair:2,colours:['#c62f2a','#f1c232']});
+});
+
 // Owner's try-out, 5 Nov 2026: Bike details opened from Wayfinch, closed by the cross, Escape or a tap beside it, goes back there.
 test('[BK-RETURN] closing Bike details opened from Wayfinch goes back: one step back when Wayfinch opened the page, else the named screen in its place; opened here, it stays',async()=>{
   const at=(referrer,length)=>{
