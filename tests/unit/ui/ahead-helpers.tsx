@@ -78,3 +78,16 @@ export async function expandAll(): Promise<void> {
   for (const b of [...host.querySelectorAll<HTMLButtonElement>('.ah-toggle')]) if (b.getAttribute('aria-expanded') !== 'true') await click(b);
   for (const b of [...host.querySelectorAll<HTMLButtonElement>('button')].filter((x) => /^Show \d+ more$/.test(x.textContent ?? ''))) await click(b);
 }
+
+/**
+ * What a call button dials: it asks first (AH-CALL-CONFIRM), so this taps it, reads the one tel: link of the question, and cancels.
+ * Null when the button is not there.
+ */
+export async function dialled(button: Element | null | undefined): Promise<string | null> {
+  if (!button) return null;
+  await click(button);
+  const box = button.ownerDocument.querySelector('[data-call-ask]');
+  const href = box?.querySelector('a')?.getAttribute('href') ?? null;
+  if (box) await click(buttonNamed('Cancel', box));
+  return href;
+}

@@ -77,6 +77,7 @@ const page = (block) => `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Impressum · Imprint — Wayfinch</title>
 <meta name="robots" content="noindex">
+<meta name="format-detection" content="telephone=no">
 <link rel="stylesheet" href="/legal/legal.css">
 <script src="/legal/theme.js"></script>
 <!-- Opted in to the cross-document view transition as Wayfinch is: a page that is not drops the transition coming in from Wayfinch with an error. -->

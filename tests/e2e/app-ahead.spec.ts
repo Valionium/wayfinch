@@ -45,9 +45,19 @@ test('[AH-CALL] [AH-SHARE] showing the cards, the chips, Call and Website and th
   await ahead(page);
   const log = sent(page);
   await openEverything(page);
+  // every call open now (the cards, and Emergency) asks first (AH-CALL-CONFIRM): its question's one link is a tel:
+  const calls = page.locator('.ahead [data-call]');
+  expect(await calls.count()).toBeGreaterThan(0);
+  for (let i = 0; i < (await calls.count()); i += 1) {
+    await calls.nth(i).click();
+    const box = page.locator('[data-call-ask]');
+    await expect(box.getByRole('link')).toHaveAttribute('href', /^tel:(\+\d{7,15}|1\d{1,3})$/);
+    await box.getByRole('button', { name: 'Cancel' }).click();
+    await expect(box).toHaveCount(0);
+  }
   for (const chip of ['Bike shop', 'Shelter']) await page.locator('.ah-chips').getByRole('button', { name: chip, exact: true }).click();
   for (const href of await page.locator('a.ah-link').evaluateAll((as) => as.map((a) => a.getAttribute('href') ?? ''))) {
-    expect(href).toMatch(/^(tel:\+\d{7,15}|https?:\/\/)/);
+    expect(href).toMatch(/^https?:\/\//);   // a call is a button that asks first (AH-CALL-CONFIRM)
   }
   await page.getByRole('button', { name: 'Share progress' }).click();
   const sheet = page.locator('[data-share="progress"]');
@@ -77,7 +87,8 @@ test('[AH-EMERGENCY] offline after a reload: 112, the fallback line and the coor
   await page.goto(`${app!.origin}/#/ahead`, { waitUntil: 'domcontentloaded' });
   await page.locator('.ah-chips').getByRole('button', { name: 'Emergency', exact: true }).click();
   const card = page.locator('#chip-emergency');
-  await expect(card.getByRole('link', { name: 'Call 112' })).toHaveAttribute('href', 'tel:112');
+  await card.getByRole('button', { name: 'Call 112' }).click();   // it asks first (AH-CALL-CONFIRM), offline too
+  await expect(card.getByRole('link', { name: 'Call 112 now' })).toHaveAttribute('href', 'tel:112');
   await expect(card).toContainText('112 — works across Europe and on many mobile networks; check the local number');
   await expect(card).toContainText(/\d+\.\d{5}, \d+\.\d{5}/);
   // Nothing leaves the phone: every request, the app's own fonts included, is the app's own address answered by its worker.
@@ -85,6 +96,114 @@ test('[AH-EMERGENCY] offline after a reload: 112, the fallback line and the coor
     expect(new URL(r.url()).origin, r.url()).toBe(new URL(app!.origin).origin);
     expect((await r.response())?.fromServiceWorker(), r.url()).toBe(true);
   }
+});
+
+/** Every tel: link on the page, whether shown or not. */
+const telLinks = (page: Page) => page.evaluate(() => [...document.querySelectorAll('a[href]')].filter((a) => /^\s*tel:/i.test(a.getAttribute('href') ?? '')).length);
+
+test('[AH-CALL-CONFIRM] no tel: link is ever the first tap: on every screen, with everything open on Ahead, and Emergency with no route', async ({ page }) => {
+  await ahead(page);
+  await openEverything(page);
+  for (const chip of ['Bike shop', 'Pharmacy', 'Bail out by train', 'Toilets', 'Shelter', 'Emergency']) {
+    await page.locator('.ah-chips').getByRole('button', { name: chip, exact: true }).click();
+    const more = page.locator('.ahead button', { hasText: /^Show \d+ more$/ });
+    while ((await more.count()) > 0) await more.first().click();
+    expect(await telLinks(page), chip).toBe(0);
+  }
+  for (const hash of ['#/trip', '#/tools', '#/you', '#/tools/tyre']) {
+    await page.goto(`${app!.origin}/${hash}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#app .shell');
+    await page.waitForTimeout(300);
+    expect(await telLinks(page), hash).toBe(0);
+  }
+  // a rider with no route: a fresh address, so nothing is stored
+  await app!.close();
+  app = await loadApp(page, { launch: true, path: '/#/ahead' });
+  await expect(page.locator('[data-ahead="no-route"]')).toBeVisible();
+  await page.locator('.ah-chips').getByRole('button', { name: 'Emergency', exact: true }).click();
+  await expect(page.locator('#chip-emergency [data-call]').first()).toBeVisible();
+  expect(await telLinks(page)).toBe(0);
+});
+
+test('[AH-CALL-CONFIRM] offline at 360 px: Call 112 asks with the number and who it is, Call 112 now is the exact tel:112, Cancel changes nothing; 44 px targets', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  await ahead(page);
+  await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+  await goOffline(page);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const asked = sent(page);
+  await page.locator('.ah-chips').getByRole('button', { name: 'Emergency', exact: true }).click();
+  const card = page.locator('#chip-emergency');
+  const before = await card.innerHTML();
+  await card.getByRole('button', { name: 'Call 112' }).click();
+  const box = card.getByRole('alertdialog');
+  await expect(box).toContainText('Call 112?');
+  await expect(box).toContainText('All emergencies');
+  const now = box.getByRole('link', { name: 'Call 112 now' });
+  await expect(now).toHaveAttribute('href', 'tel:112');
+  expect(await telLinks(page)).toBe(1);
+  for (const el of [now, box.getByRole('button', { name: 'Cancel' })]) {
+    const b = (await el.boundingBox())!;
+    expect(b.height).toBeGreaterThanOrEqual(43.5);
+    expect(b.width).toBeGreaterThanOrEqual(43.5);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  // a scroll does not close it; Cancel does, and leaves the card as it was
+  await page.mouse.wheel(0, 400);
+  await expect(box).toBeVisible();
+  await box.getByRole('button', { name: 'Cancel' }).click();
+  await expect(box).toHaveCount(0);
+  expect(await card.innerHTML()).toBe(before);
+  expect(await telLinks(page)).toBe(0);
+  expect(asked.filter((l) => !l.includes(new URL(app!.origin).host))).toEqual([]);
+});
+
+test('[AH-CALL-CONFIRM] a text message only opens the messaging app with the words to change: SMS stays a plain sms: link, and nothing is sent', async ({ page }) => {
+  await ahead(page);
+  const log = sent(page);
+  await page.getByRole('button', { name: 'Share progress' }).click();
+  const sms = page.locator('[data-share="progress"]').getByRole('link', { name: 'SMS' });
+  await expect(sms).toHaveAttribute('href', /^sms:\?&body=[^&]+$/);   // no number: the rider picks one in the messaging app
+  expect(await sms.getAttribute('target')).toBeNull();
+  expect(log).toEqual([]);
+});
+
+test('[AH-EMERGENCY-POSITION] no route, offline, 360 px: Emergency’s own Update position shows the coordinates and their age; denied says what to do', async ({ page, context }) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  app = await loadApp(page, { launch: true, path: '/#/ahead' });
+  await expect(page.locator('[data-ahead="no-route"]')).toBeVisible();
+  const emergency = page.locator('#chip-emergency');
+  const open = async () => {
+    await page.locator('.ah-chips').getByRole('button', { name: 'Emergency', exact: true }).click();
+    await expect(emergency).toBeVisible();
+  };
+  // no permission: the browser says no
+  await open();
+  await emergency.getByRole('button', { name: 'Update position' }).click();
+  await expect(emergency.getByRole('status')).toContainText('Allow it in the phone settings');
+  // allowed, and offline: the phone's own position, with no request
+  await context.grantPermissions(['geolocation'], { origin: app.origin });
+  await context.setGeolocation({ latitude: 48.85837, longitude: 2.29448, accuracy: 9 });
+  await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+  await goOffline(page);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const asked = sent(page);
+  await open();
+  await emergency.getByRole('button', { name: 'Update position' }).click();
+  await expect(emergency).toContainText('48.85837, 2.29448');
+  await expect(emergency).toContainText(/Last position at \d{2}:\d{2} \((just now|1 min ago)\)/);
+  await expect(emergency).not.toContainText('No position yet');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  for (const el of await emergency.locator('button, a.btn').all()) {
+    if (!(await el.isVisible())) continue;
+    expect((await el.boundingBox())!.height).toBeGreaterThanOrEqual(43.5);
+  }
+  // 112 still asks first
+  await emergency.getByRole('button', { name: 'Call 112' }).click();
+  await expect(emergency.getByRole('link', { name: 'Call 112 now' })).toHaveAttribute('href', 'tel:112');
+  expect(asked.filter((l) => !l.includes(new URL(app!.origin).host))).toEqual([]);
 });
 
 test('Ahead has no automatic accessibility violations with everything open, and every control is at least 44 px', async ({ page }) => {

@@ -28,7 +28,8 @@ test('[FLOW-FLIGHT] smoke: a prepared trip opens offline on Ahead, with its six 
   await page.goto(`${app.origin}/#/ahead`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.ahead[data-ahead]')).toBeVisible();
   await page.locator('.ah-chips').getByRole('button', { name: 'Emergency', exact: true }).click();
-  await expect(page.locator('#chip-emergency').getByRole('link', { name: 'Call 112' })).toHaveAttribute('href', 'tel:112');
+  await page.locator('#chip-emergency').getByRole('button', { name: 'Call 112' }).click();   // it asks first (AH-CALL-CONFIRM)
+  await expect(page.locator('#chip-emergency').getByRole('link', { name: 'Call 112 now' })).toHaveAttribute('href', 'tel:112');
 });
 
 test('[LC-GLIDE] smoke: Tools to the bag planner and Back to Wayfinch, by the rider\'s taps, with no page error (WebKit has the transition too)', async ({ page }) => {

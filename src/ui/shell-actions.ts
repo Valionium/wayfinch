@@ -62,6 +62,10 @@ function browserDeps(): AheadDeps {
 const FAILURE_TEXT: Record<Failure['kind'], string> = {
   denied: W.appAheadDenied, unavailable: W.appAheadNoFix, timeout: W.appAheadNoFix, unsupported: W.appAheadNoGeo,
 };
+/** With no route there is no setting it by hand: each says what to do instead. */
+const HERE_FAILURE_TEXT: Record<Failure['kind'], string> = {
+  denied: W.appEmergencyHereDenied, unavailable: W.appEmergencyHereNoFix, timeout: W.appEmergencyHereTimeout, unsupported: W.appAheadNoGeo,
+};
 
 /** The settlements the route passes, in route order: the manual picker's towns. */
 function townsOf(i: ScreenInputs): Town[] {
@@ -93,6 +97,8 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
   let pendingFix: Fix | null = null;
   let hooked = false;
   let reading = 0;
+  // With no route: the fix Emergency's Update position found, for this page only. Positions are kept on a route, so it is not stored.
+  let here: Position | null = null;
 
   // One write at a time, as on Trip: the store refuses a write over a version this window has not read.
   let queue: Promise<unknown> = Promise.resolve();
@@ -133,29 +139,35 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     noteRoute(true);
   };
 
-  const emergencyAlone = (at: Date) => emergencyCard({ position: null, now: at, country: null, settlements: [], shelters: [], rescuePoints: [], thunderNear: false, dataDate: '' });
+  const emergencyAlone = (at: Date) => emergencyCard({
+    position: here, now: at, country: null, settlements: [], shelters: [], rescuePoints: [], thunderNear: false, dataDate: '',
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
   const unreadable = (at: Date): void => {
-    view.value = { kind: 'unreadable', canShare: deps.share !== null, emergency: emergencyAlone(at) };
+    view.value = { kind: 'unreadable', canShare: deps.share !== null, emergency: emergencyAlone(at), position };
     noteRoute(null);
   };
 
   const noRoute = (at: Date): void => {
     view.value = {
       kind: 'no-route', canShare: deps.share !== null,
-      emergency: emergencyAlone(at),
+      emergency: emergencyAlone(at), position,
     };
     noteTripFacts(false, false);
   };
 
   /** The screen again for the time now, from the inputs already read: no store, no network. */
   const freshen = (): void => {
-    if (hooked || !inputs || view.peek().kind !== 'trip') return;
+    const v = view.peek();
+    if (!hooked && here && v.kind !== 'trip' && v.kind !== 'loading') view.value = { ...v, emergency: emergencyAlone(deps.now()) };
+    if (hooked || !inputs || v.kind !== 'trip') return;
     present({ ...inputs, now: deps.now() });
   };
 
   /** The facts that change without a new screen: the position routine, Update weather, the bike, the map-link choice. */
   const touch = (): void => {
     const v = view.peek();
+    if (v.kind === 'no-route' || v.kind === 'unreadable') view.value = { ...v, position, emergency: emergencyAlone(deps.now()) };
     if (v.kind !== 'trip') return;
     view.value = { ...v, position, weatherSay, weatherBusy, notice, bike: bikeSource.peek().bike, mapLink: readMapLink() };
   };
@@ -226,15 +238,18 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       pendingFix = null;
       say({ kind: 'watching' });
       const fix = await watchBest(ROUTINE, deps.geolocation());
+      const alone = view.peek().kind !== 'trip';
       if (isFailure(fix)) {
-        say({ kind: 'said', text: FAILURE_TEXT[fix.kind] });
+        say({ kind: 'said', text: (alone ? HERE_FAILURE_TEXT : FAILURE_TEXT)[fix.kind] });
         return false;
       }
       // Read again: the route may have been replaced while the phone was looking.
       const now = await routeNow();
       if (!now) {
-        say({ kind: 'said', text: W.appAheadNotKept });
-        return false;
+        // No route: Emergency shows the fix as it came, with no route kilometre (owner's iPhone check, 6 Nov 2026).
+        if (alone) here = { ...fix, km: NaN, offRouteM: NaN, source: 'gps', approximate: !(fix.accuracyM <= APPROXIMATE_HELP_M) };
+        say(alone ? { kind: 'idle' } : { kind: 'said', text: W.appAheadNotKept });
+        return alone;
       }
       const found = locateFix(fix, now.trip.route, now.positions);
       if (found.kind === 'no-position') {

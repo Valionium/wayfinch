@@ -6,11 +6,9 @@ import type { EmergencyCard } from '../../core/engines/emergency.ts';
 import { W } from '../../core/wording/en.ts';
 import { ListMore } from '../card.tsx';
 import type { AheadActions, PositionState } from './actions.ts';
+import { CallButton, telOf } from '../call.tsx';
 import { Basis, Item } from './answer-parts.tsx';
 import { ShareSheet } from './share-sheet.tsx';
-
-/** Only digits and a leading +: what a dialler takes. The numbers come from the app's own dated table. */
-const telOf = (n: string): string => `tel:${n.replace(/[^\d+]/g, '')}`;
 
 export function EmergencyPanel({ card, canShare, actions, position }: { card: EmergencyCard; canShare: boolean; actions: AheadActions; position?: PositionState }) {
   const [sharing, setSharing] = useState(false);
@@ -18,17 +16,19 @@ export function EmergencyPanel({ card, canShare, actions, position }: { card: Em
   const rest = card.items.filter((x) => !card.numbers.includes(x.label));
   return (
     <div class="ah-emergency" data-emergency>
-      <h2 class="ah-emergency-title"><a class="btn btn-primary ah-call" href={telOf('112')}>{card.title}</a></h2>
+      {/* Each call asks first (owner's iPhone check, 6 Nov 2026); the numbers come from the app's own dated table. */}
+      <div class="ah-emergency-title"><CallButton cls="btn btn-primary ah-call" href={telOf('112')} shown={card.title} who={W.emergencyGeneralName} /></div>
       <p class="ah-emergency-fallback">{card.detail}</p>
       <ul class="ah-numbers">
         {numbers.map((x, i) => (
           <li key={i}>
-            <a class="btn ah-call" href={telOf(x.label)}>{x.label}</a> <span>{x.detail}</span>
+            <CallButton cls="btn ah-call" href={telOf(x.label)} shown={x.label} who={x.detail ?? ''} /> <span>{x.detail}</span>
           </li>
         ))}
       </ul>
       {card.notes.length > 0 ? <ul class="ah-notes">{card.notes.map((n, i) => <li key={i}>{n}</li>)}</ul> : null}
-      {card.updatePosition ? <p><button type="button" class="btn" onClick={() => void actions.updatePosition()} aria-busy={position?.kind === 'watching' ? 'true' : undefined}>{W.emergencyUpdatePosition}</button></p> : null}
+      {/* Always here, with or without a route (owner's iPhone check, 6 Nov 2026); with one it is Ahead's own. */}
+      <p><button type="button" class="btn" onClick={() => void actions.updatePosition()} aria-busy={position?.kind === 'watching' ? 'true' : undefined}>{W.emergencyUpdatePosition}</button></p>
       {/* The same words as at the top of Ahead, here where the tap was: the rider may not see the top from here. */}
       {position ? (
         <div role="status" aria-live="polite">

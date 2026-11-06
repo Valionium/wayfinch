@@ -336,6 +336,8 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   sleepLocked: [['yes']],
   callCall: [['+49 7221 123456']],
   callAlso: [['+49 171 1234567']],
+  callAsk: [['112'], ['+497221123456']],
+  callNow: [['112'], ['+497221123456']],
   callText: [['Tel. 07221 123456']],
   callWebsite: [['camping-rheinaue.de']],
   callLabel: [['Camping Rheinaue', '+49 7221 123456']],
