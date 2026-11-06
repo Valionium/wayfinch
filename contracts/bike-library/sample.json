@@ -13,6 +13,8 @@
     "brakes": "hydraulic-disc",
     "drive": "derailleur",
     "shifting": "cable",
+    "suspension": "front",
+    "rackMounts": "yes",
     "pressure": {
       "bikeKg": 14.2, "wheel": "700c", "rim": "tubeless-crochet", "rimMm": 23, "frontMm": 40, "rearMm": 42,
       "frontCasing": "standard", "rearCasing": "reinforced", "frontMinBar": 2.5, "frontMaxBar": 5, "rearMinBar": 2.5, "rearMaxBar": 5
@@ -43,7 +45,9 @@
     "valve": "unknown",
     "brakes": "unknown",
     "drive": "unknown",
-    "shifting": "unknown"
+    "shifting": "unknown",
+    "suspension": "unknown",
+    "rackMounts": "unknown"
   },
   {
     "id": "bike_odd_values",
@@ -59,6 +63,8 @@
     "brakes": "magic",
     "drive": "rope",
     "shifting": "telepathy",
+    "suspension": 7,
+    "rackMounts": "maybe",
     "pressure": {
       "bikeKg": 500, "wheel": "36", "rim": "wood", "rimMm": "wide", "frontMm": 5, "rearMm": "47",
       "frontCasing": "paper", "rearCasing": "standard", "frontMinBar": -1, "frontMaxBar": 20, "rearMinBar": "2.5", "rearMaxBar": null

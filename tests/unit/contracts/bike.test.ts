@@ -20,6 +20,8 @@ describe('the bike library read by both pages', () => {
     expect(sample.length).toBe(3);
     // every field of section 7.1's table, set
     for (const key of ['fit', 'maxWeight', 'look', 'geometry', 'pressure']) expect(full![key], key).toBeTruthy();
+    expect(full).toMatchObject({ suspension: 'front', rackMounts: 'yes' });
+    expect(odd).toMatchObject({ suspension: 7, rackMounts: 'maybe' });
     expect(normaliseBike(full)).toEqual(full);
     // none set: every block reads as not set
     expect(normaliseBike(plain)).toMatchObject({ fit: null, maxWeight: null, look: null, geometry: null, maxWeightAsked: false, name: 'My bike' });
@@ -29,6 +31,7 @@ describe('the bike library read by both pages', () => {
     expect(oddRead.fit).toMatchObject({ style: 'unknown', size: null, triangleCm: null, seatGapCm: null, barWidthCm: 38, bolts: { st: 'unknown', dt: 'yes', un: 'unknown' } });
     expect(oddRead.maxWeight).toBeNull();
     expect(oddRead.brakes).toBe('unknown');
+    expect(oddRead).toMatchObject({ suspension: 'unknown', rackMounts: 'unknown' });
     expect(oddRead.rearTyre).toBe('47-584');
     expect(oddRead.geometry).toEqual({ at: null, maker: '', model: 'Long Road', year: null, size: '', wheel: null, values: { reach_mm: { v: 385, src: 'estimate' } } });
     expect(Object.keys(oddRead)).not.toContain('wings');

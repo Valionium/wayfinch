@@ -54,6 +54,30 @@ describe("a bike as the bag planner stores it (spec section 7.1's table), read r
     }
   });
 
+  test("[TB-DETAILS-READ] suspension and rackMounts keep each listed value; anything else, a missing field or a wrong type reads 'unknown'; no other field changes", () => {
+    const base = normaliseBike(clone(full))!;
+    const rest = (b: Json): Json => { const others = { ...b }; delete others.suspension; delete others.rackMounts; return others; };
+    for (const suspension of ['none', 'front', 'full'] as const) {
+      const got = normaliseBike({ ...clone(full), suspension })!;
+      expect(got.suspension, suspension).toBe(suspension);
+      expect(rest(got), suspension).toEqual(rest(base));
+    }
+    for (const rackMounts of ['yes', 'no'] as const) {
+      const got = normaliseBike({ ...clone(full), rackMounts })!;
+      expect(got.rackMounts, rackMounts).toBe(rackMounts);
+      expect(rest(got), rackMounts).toEqual(rest(base));
+    }
+    for (const odd of [{ suspension: 'Full' }, { suspension: true }, { suspension: 2 }, { suspension: null }, { rackMounts: true }, { rackMounts: 'maybe' }, { rackMounts: 'Yes' }, {}]) {
+      const bike: Json = clone(full);
+      delete bike.suspension; delete bike.rackMounts;
+      const got = normaliseBike({ ...bike, ...odd })!;
+      expect(got.suspension, JSON.stringify(odd)).toBe('unknown');
+      expect(got.rackMounts, JSON.stringify(odd)).toBe('unknown');
+      expect(rest(got), JSON.stringify(odd)).toEqual(rest(base));
+    }
+    expect(normaliseBike({ id: 'bike_bare' })).toMatchObject({ suspension: 'unknown', rackMounts: 'unknown' });
+  });
+
   test('[BK-NORMALISE] a block with nothing set is null; a colour is stored in lower case; numbers round as the page rounds', () => {
     const bike = clone(full) as Json;
     bike.look = { colour: '#2563B8', bars: null, ebike: null };

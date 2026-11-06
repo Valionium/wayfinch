@@ -39,7 +39,7 @@ export type BikeRecord = {
   id: string; name: string; frontTyre: string; rearTyre: string; padType: string; chainType: string; hangerType: string; notes: string;
   tyres: 'unknown' | 'tubes' | 'tubeless' | 'other'; valve: 'unknown' | 'presta' | 'schrader' | 'dunlop' | 'other';
   brakes: 'unknown' | 'hydraulic-disc' | 'cable-disc' | 'rim' | 'other'; drive: 'unknown' | 'derailleur' | 'chain-hub' | 'belt';
-  shifting: 'unknown' | 'cable' | 'electronic' | 'none';
+  shifting: 'unknown' | 'cable' | 'electronic' | 'none'; suspension: 'unknown' | 'none' | 'front' | 'full'; rackMounts: YesNo;
   pressure: PressureBike; fit: Fit | null; maxWeight: MaxWeight | null; maxWeightAsked: boolean; look: Look | null; geometry: Geometry | null;
 };
 
@@ -50,7 +50,10 @@ const CHOICES = {
   brakes: ['unknown', 'hydraulic-disc', 'cable-disc', 'rim', 'other'],
   drive: ['unknown', 'derailleur', 'chain-hub', 'belt'],
   shifting: ['unknown', 'cable', 'electronic', 'none'],
+  suspension: ['unknown', 'none', 'front', 'full'],
+  rackMounts: ['unknown', 'yes', 'no'],
 } as const;
+type Choices = { [K in keyof typeof CHOICES]: (typeof CHOICES)[K][number] };
 const FIT_STYLES: readonly FitStyle[] = ['unknown', 'diamond-level', 'diamond-sloping', 'compact', 'trapeze', 'mixte', 'step-through', 'full-suspension'];
 const FIT_SIZES: readonly SizeLetter[] = ['XS', 'S', 'M', 'L', 'XL'];
 const WHEELS: readonly WheelWord[] = ['700c', '650b', '650c', '29', '27.5', '26'];
@@ -192,9 +195,8 @@ export function normaliseBike(raw: unknown): BikeRecord | null {
   const t = Object.fromEntries(Object.entries(TEXT).map(([key, max]) => [key, text(raw[key], max).trim()])) as Record<keyof typeof TEXT, string>;
   return {
     id: raw.id, ...t, name: t.name || 'My bike',
-    tyres: oneOf(raw.tyres, CHOICES.tyres, 'unknown'), valve: oneOf(raw.valve, CHOICES.valve, 'unknown'),
-    brakes: oneOf(raw.brakes, CHOICES.brakes, 'unknown'), drive: oneOf(raw.drive, CHOICES.drive, 'unknown'),
-    shifting: oneOf(raw.shifting, CHOICES.shifting, 'unknown'),
+    // each choice in CHOICES' order, which is the page's
+    ...Object.fromEntries(Object.entries(CHOICES).map(([key, values]) => [key, oneOf(raw[key], values as readonly string[], 'unknown')])) as Choices,
     pressure: pressureOf(raw.pressure), fit: fitOf(raw.fit), maxWeight: maxWeightOf(raw.maxWeight), maxWeightAsked: raw.maxWeightAsked === true,
     look: lookOf(raw.look), geometry: geometryOf(raw.geometry),
   };
