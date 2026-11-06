@@ -22,10 +22,11 @@ a { color: var(--blaze); text-underline-offset: 2px; }
 .lg-nav { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 8px 0; }
 /* A table scrolls sideways inside its own box at a readable size; words are never broken into pieces to squeeze it in. */
 .lg-table-wrap { overflow-x: auto; margin: 8px 0; background-color: var(--ground); }
-.lg-table-wrap th, .lg-table-wrap td { overflow-wrap: normal; word-break: normal; }
-table:not(.lg-pkg) th { min-width: 8rem; }
 /* The hint and edge shadows show only where the table does not fit its box: the box is narrower than the table's 40rem. */
 @container lg (max-width: 39.99rem) {
+  /* Narrow: words are never broken into pieces to squeeze the table in; it scrolls instead. Wider, the cells wrap as the page does and the table fits. */
+  .lg-table-wrap th, .lg-table-wrap td { overflow-wrap: normal; word-break: normal; }
+  table:not(.lg-pkg) th { min-width: 8rem; }
   .lg-table-wrap {
     background-image: linear-gradient(to right, var(--ground) 30%, transparent), linear-gradient(to left, var(--ground) 30%, transparent), linear-gradient(to right, var(--line), transparent), linear-gradient(to left, var(--line), transparent);
     background-position: left center, right center, left center, right center;
