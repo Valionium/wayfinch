@@ -725,6 +725,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - §3.3's example form; heights looked up credited to Copernicus [TRIP-SUMMARY]
 - with no running trip, Trip opens first and the bike is the first thing, ≤ 120 px tall; with a running trip, Ahead (§3.1's rules, month-only counts as running) [TRIP-FIRST]
 - the day before departure: "Day 1 · 78 km · leave by about 13:45"-form, the same time as the Daylight card [TRIP-DAY1-LEAVEBY]
+- the GPX pickers (Trip's and the bag planner's) name no file types: iOS turns an accept list into its own file types, has none for .gpx and greys every GPX out (owner's iPhone check, 6 Nov 2026); the reading refuses a JSON file, a photo and an empty file with "That did not read as a GPX track or route with valid coordinates.", and reads a GPX named .xml or with no extension; the JSON imports keep application/json,.json, which iOS knows [TRIP-GPX-IOS]
 
 ## App: Settings and Get ready
 

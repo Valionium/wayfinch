@@ -1,6 +1,7 @@
 // The smoke set (plan Decision 1, spec section 11.7): a few whole paths that every browser must walk. WebKit runs only these, in
 // its own CI job that never blocks a merge; Chromium runs them with the rest. Nothing here needs Chromium's own tools.
 import { expect, test } from '@playwright/test';
+import { fixtureGpx } from '../fixtures/gpx.ts';
 import { goOffline, loadApp, preparedTrip, removeBuilds } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
 
@@ -16,6 +17,14 @@ test('[APP-SWITCH-ON] smoke: the shell opens on Trip with its four tabs, and eac
     await page.locator('nav.tabs').getByRole('link', { name: tab }).click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(tab);
   }
+});
+
+test('[TRIP-GPX-IOS] smoke: Trip’s GPX picker names no file types (iOS greys out every .gpx otherwise), and a .gpx chosen there becomes the route', async ({ page }) => {
+  app = await loadApp(page);
+  const input = page.locator('[data-add-route] input[type=file]');
+  expect(await input.getAttribute('accept')).toBeNull();
+  await input.setInputFiles({ name: 'loop.gpx', mimeType: '', buffer: Buffer.from(await fixtureGpx('loop')) });
+  await expect(page.locator('[data-summary]')).toContainText('Heilbronn loop');
 });
 
 test('[FLOW-FLIGHT] smoke: a prepared trip opens offline on Ahead, with its six cards and Emergency', async ({ page }) => {

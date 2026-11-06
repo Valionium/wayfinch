@@ -82,7 +82,9 @@ function AddRoute({ services, snap, reload }: { services: TripServices; snap: Tr
       <div data-add-route>
         <label class="btn btn-primary file-pick">
           {W.appTripPickGpx}
-          <input type="file" accept=".gpx,application/gpx+xml,application/xml,text/xml" onChange={(e) => void onFile(e.currentTarget)} />
+          {/* No accept list (owner's iPhone check, 6 Nov 2026): iOS turns it into its own file types, has none for .gpx and greys
+              every GPX file out. Any file can be chosen; routeFromGpx refuses what is not a GPX, in words. */}
+          <input type="file" onChange={(e) => void onFile(e.currentTarget)} />
         </label>
         <p class="muted">{W.appTripGpxHint}</p>
         {busy ? <p role="status">{W.appTripReading}</p> : null}

@@ -1853,7 +1853,8 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <div class="chosen hidden" id="place2"></div>
       <div class="gpxbar">
         <button class="linky" id="gpxPick">Upload a GPX instead</button>
-        <input type="file" id="gpxFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" class="hidden">
+        <!-- no accept list: iOS has no file type for .gpx and greys every GPX out; the reading refuses what is not one -->
+        <input type="file" id="gpxFile" class="hidden">
         <span id="gpxMsg" role="status" aria-live="polite">Read locally for distance and climbing. Route coordinates are sent for names and weather; up to 100 sampled points are sent for heights if missing. Details in Privacy below.</span>
       </div>
     </div>
