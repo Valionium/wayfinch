@@ -51,6 +51,11 @@ export const PT = {
   paintForkFadeLabel: 'Fade, from the crown down to the dropouts',
   paintForkPatternLabel: 'Fork pattern',
   paintForkPairLabel: 'Its two colours',
+  // the fork's own two colours (owner's wish, 6 Nov 2026): the frame's swatches, the presets above fill both
+  paintForkFrom: 'First colour, at the crown',
+  paintForkTo: 'Second colour, at the dropouts',
+  paintForkGround: 'First colour, the ground',
+  paintForkFleck: 'Second colour, the pattern',
 
   // ---- the six colour pairs of a fade ----
   paintPairBluePurple: 'Blue to purple',
@@ -59,6 +64,7 @@ export const PT = {
   paintPairPurplePink: 'Purple to pink',
   paintPairSilverBlack: 'Silver to black',
   paintPairOliveSand: 'Olive to sand',
+  paintPairName: (from: string, to: string): string => `${from} to ${to}`,
 
   // ---- rims ----
   paintRimTitle: 'Rims',

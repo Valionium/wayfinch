@@ -7,7 +7,7 @@ import { PT } from '../wording/en-paint.ts';
 import { W } from '../wording/en.ts';
 import { bikeArt } from './art.ts';
 import type { Anchors, ArtOptions, P } from './art.ts';
-import { CASING_MIN_CONTRAST, CASINGS, casingFor, contrastRatio, darkCasing, nearestSwatchName } from './colour.ts';
+import { CASING_MIN_CONTRAST, CASINGS, casingFor, contrastRatio, darkCasing, hexToOklab, nearestSwatchName } from './colour.ts';
 import type { CasingTone } from './colour.ts';
 import type { Fork, ForkPattern, Paint, Pattern } from './normalise.ts';
 import type { BagView, BikeSpec } from './spec.ts';
@@ -39,6 +39,33 @@ export const FADES: readonly { name: string; from: string; to: string }[] = [
   { name: PT.paintPairOrangeRed, from: '#e9852c', to: '#c62f2a' }, { name: PT.paintPairPurplePink, from: '#6b3fa0', to: '#d6619b' },
   { name: PT.paintPairSilverBlack, from: '#c6cacd', to: '#1d1d1f' }, { name: PT.paintPairOliveSand, from: '#6d7a37', to: '#cbb68e' },
 ];
+
+/** A fade's or fork pattern's two colours: the rider's own (owner's wish, 6 Nov 2026), else its preset pair's. */
+export function forkColours(fork: Exclude<Fork, { kind: 'own' }>): [string, string] {
+  return fork.colours ? [fork.colours[0], fork.colours[1]] : [FADES[fork.pair]!.from, FADES[fork.pair]!.to];
+}
+
+/** The name of a fork's two colours: the preset's when they are a preset's, else the two swatches' names ("Red to Yellow"). */
+function pairName(fork: Exclude<Fork, { kind: 'own' }>): string {
+  const [from, to] = forkColours(fork);
+  return FADES.find((p) => p.from === from && p.to === to)?.name ?? PT.paintPairName(nameOf(from), nameOf(to));
+}
+
+/**
+ * What a page stores for a fork's two colours: a preset's own two as that preset alone (a fork stored before is unchanged), any other
+ * pair as both colours with `pair` the nearest preset in OKLab (both ends together), so a page that knows only the presets still draws
+ * a fork near the rider's.
+ */
+export function pairFor(from: string, to: string): { pair: number; colours?: [string, string] } {
+  const [a, b] = [from.toLowerCase(), to.toLowerCase()];
+  const exact = FADES.findIndex((p) => p.from === a && p.to === b);
+  if (exact >= 0) return { pair: exact };
+  const d = (x: string, y: string): number => { const [p, q] = [hexToOklab(x), hexToOklab(y)]; return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
+  let pair = 0;
+  let best = Infinity;
+  FADES.forEach((p, i) => { const cost = d(a, p.from) + d(b, p.to); if (cost < best) { best = cost; pair = i; } });
+  return { pair, colours: [a, b] };
+}
 
 /** What a new pattern starts with when the rider has not chosen yet: the try-out's second and third colours (Purple, Teal). */
 export const DEFAULT_COLOURS: readonly [string, string] = ['#6b3fa0', '#1f7f80'];
@@ -203,8 +230,8 @@ export function shownColours(paint: Paint, colour: string | null): string[] {
   const shown = frameColours(u.pattern, colour, u.more);
   const fk = u.fork;
   if (fk?.kind === 'own') shown.push(fk.colour);
-  if (fk?.kind === 'fade') shown.push(FADES[fk.pair]!.from, FADES[fk.pair]!.to);
-  if (fk?.kind === 'pattern') shown.push(...(fk.pattern === 'carbon' ? WEAVE : [FADES[fk.pair]!.from, FADES[fk.pair]!.to]));
+  if (fk?.kind === 'fade') shown.push(...forkColours(fk));
+  if (fk?.kind === 'pattern') shown.push(...(fk.pattern === 'carbon' ? WEAVE : forkColours(fk)));
   return shown;
 }
 
@@ -248,7 +275,7 @@ export function partColours(paint: Paint, colour: string | null): Record<Painted
   const all = frameColours(u.pattern, colour, u.more);
   const frame = u.pattern === 'blocks' ? [colour] : all;
   const fk = u.fork;
-  const pair = fk && fk.kind !== 'own' ? [FADES[fk.pair]!.from, FADES[fk.pair]!.to] : [];
+  const pair = fk && fk.kind !== 'own' ? forkColours(fk) : [];
   const fork = !fk ? frame : fk.kind === 'own' ? [fk.colour] : fk.kind === 'pattern' && fk.pattern === 'carbon' ? [...WEAVE] : pair;
   return { 'bk-frame': frame, 'bk-stays': u.pattern === 'blocks' ? [u.more[0]] : all, 'bk-fork': fork };
 }
@@ -272,8 +299,8 @@ function paintLabel(label: string, colour: string | null, u: ReturnType<typeof u
   else if (colour && u.pattern !== 'solid') frame = PT.paintFrameLabel(frameColours(u.pattern, colour, u.more).map(nameOf), PATTERN_OF.get(u.pattern)!.name);
   const fork = u.fork;
   if (fork?.kind === 'own') extra.push(PT.paintForkColourLabel(nameOf(fork.colour)));
-  if (fork?.kind === 'fade') extra.push(PT.paintForkFadeName(FADES[fork.pair]!.name));
-  if (fork?.kind === 'pattern') extra.push(fork.pattern === 'carbon' ? PT.paintForkPatternName(PT.paintCarbon, null) : PT.paintForkPatternName(PATTERN_OF.get(fork.pattern)!.name, FADES[fork.pair]!.name));
+  if (fork?.kind === 'fade') extra.push(PT.paintForkFadeName(pairName(fork)));
+  if (fork?.kind === 'pattern') extra.push(fork.pattern === 'carbon' ? PT.paintForkPatternName(PT.paintCarbon, null) : PT.paintForkPatternName(PATTERN_OF.get(fork.pattern)!.name, pairName(fork)));
   if (u.rimMm !== null) extra.push(PT.paintRimLabel(u.rimMm));
   if (extra.length === 0 && (!colour || u.pattern === 'solid')) return label;
   const old = colour ? W.bikeColourFrame(nameOf(colour)) : '';
@@ -319,13 +346,13 @@ export function paintedArt(spec: BikeSpec, bags: BagView | null, options: ArtOpt
     const fk = u.fork;
     if (fk?.kind === 'own') fork = fk.colour;
     if (fk?.kind === 'fade') {
-      const pair = FADES[fk.pair]!;
-      defs.push(linear(`${id}k`, a.points.headBottom, a.points.front, [[0, pair.from], [1, pair.to]]));
+      const [from, to] = forkColours(fk);
+      defs.push(linear(`${id}k`, a.points.headBottom, a.points.front, [[0, from], [1, to]]));
       fork = `url(#${id}k)`;
     }
     if (fk?.kind === 'pattern') {
-      const pair = FADES[fk.pair]!;
-      defs.push(texture(fk.pattern, `${id}u`, f, [pair.from, pair.to, pair.from]));
+      const [from, to] = forkColours(fk);
+      defs.push(texture(fk.pattern, `${id}u`, f, [from, to, from]));
       fork = `url(#${id}u)`;
     }
     const strokeOf = { 'bk-stays': rear, 'bk-frame': frame, 'bk-fork': fork } as Record<string, string>;

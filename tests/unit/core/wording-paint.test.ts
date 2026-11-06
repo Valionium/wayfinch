@@ -5,6 +5,7 @@ import { bannedHits } from '../../fixtures/banned.ts';
 // Test values for each template function of the look extras' wording. A new template without an entry here fails the test.
 const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   paintRimValue: [[15], [30], [60]],
+  paintPairName: [['Red', 'Yellow'], ['Navy', 'Pink']],
   paintFrameLabel: [[['Blue', 'Purple'], 'Fade, front to back']],
   paintForkColourLabel: [['Red']],
   paintForkFadeName: [['Blue to purple']],
