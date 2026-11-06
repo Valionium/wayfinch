@@ -296,7 +296,8 @@ export function partCasings(paint: Paint, colour: string | null, theme: 'dark' |
   const best = (cs: string[]) => (Object.keys(CASINGS.light) as CasingTone[]).filter((t) => fits(cs, t)).reduce((a, b) => (edge(cs, b) > edge(cs, a) ? b : a));
   for (const [part, colours] of Object.entries(parts) as [PaintedPart, string[]][]) {
     let tone = !one ? darkCasing(colours) : fits(colours, one) ? one : best(colours);
-    // A preset liquid-metal fork stored before keeps its casing wherever its two tones read on it; else they choose (review of PR 50, I2).
+    // A part keeps the casing worked out as before wherever every colour it draws reads on it; else those colours choose (review of
+    // PR 50: a preset liquid-metal fork's bands, I2; a water-dyed frame's bands, the follow-up).
     const shows = drawn[part];
     if (shows !== colours && !(one ? fits(shows, tone) : shows.every((c) => readableOn(c, tone, 'dark')))) tone = one ? best(shows) : darkCasing(shows);
     out[part] = tone;
@@ -304,12 +305,14 @@ export function partCasings(paint: Paint, colour: string | null, theme: 'dark' |
   return out;
 }
 
-/** The colours each painted part shows: the frame's tubes, the stays (Two-tone blocks give them the second colour) and the fork.
- *  `asBefore` as forkShows. */
+/** The colours each painted part shows: the frame's tubes, the stays (Two-tone blocks give them the second colour) and the fork. A
+ *  water-dyed frame shows every band it blends (a band can be darker than all three colours: review of PR 50, follow-up); with
+ *  `asBefore` its three colours, which its casing was worked out on until then (kept wherever every band reads on it), and forks as
+ *  forkShows. */
 export function partColours(paint: Paint, colour: string | null, asBefore = false): Record<PaintedPart, string[]> | null {
   if (!colour) return null;
   const u = usable(paint, colour);
-  const all = frameColours(u.pattern, colour, u.more);
+  const all = u.pattern === 'marble' && !asBefore ? tonesOf(marbleStops(colour, ...u.more)) : frameColours(u.pattern, colour, u.more);
   const frame = u.pattern === 'blocks' ? [colour] : all;
   const fork = u.fork ? forkShows(u.fork, asBefore) : frame;
   return { 'bk-frame': frame, 'bk-stays': u.pattern === 'blocks' ? [u.more[0]] : all, 'bk-fork': fork };

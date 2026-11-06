@@ -167,6 +167,24 @@ describe('ruling A, measured where the bike is drawn', () => {
     }
     expect(partCasings(paintOf('solid', { kind: 'fade', pair: 2 }), BROWN, 'light')).toEqual({ 'bk-frame': 'panel', 'bk-stays': 'panel', 'bk-fork': 'ink' });
   });
+
+  // Review of PR 50, follow-up: a water-dyed frame draws blended bands between its three colours, and a band can be darker than all
+  // three (Silver, Orange and Teal blend to #397c73), so its casing must be worked out on the bands it draws, not its three colours.
+  test('[BK-DARK-CRISP] water-dyed frames, every swatch as each of the three colours, both themes: every band the drawing blends reads on the casing the drawing gives the frame, the stays and the fork', () => {
+    let n = 0;
+    for (const colour of HEX) for (const c2 of HEX) for (const c3 of HEX) for (const theme of THEMES) {
+      const svg = draw(colour, paintOf('marble', null, c2, c3), theme);
+      const bands = [...(/<linearGradient id="bkptg"[^>]*>(.*?)<\/linearGradient>/.exec(svg)?.[1] ?? '').matchAll(/stop-color="(#[0-9a-f]{6})"/g)].map((m) => m[1]!);
+      expect(bands.length).toBe(13);
+      for (const part of ['bk-frame', 'bk-stays', 'bk-fork']) {
+        const tone = casingOf(svg, part);
+        const bad = bands.filter((c) => !readable(c, theme, tone));
+        if (bad.length) expect(bad, `${theme} ${colour} ${c2} ${c3} ${part} on ${tone}`).toEqual([]);
+      }
+      n += 1;
+    }
+    expect(n).toBe(16 ** 3 * 2);
+  }, 300_000);
 });
 
 describe('the light theme stays as main\'s wherever main kept every colour readable', () => {
