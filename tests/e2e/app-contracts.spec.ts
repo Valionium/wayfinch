@@ -217,6 +217,46 @@ test('[C-HANDOFF] a trip from Wayfinch in a real browser: the bar asks, Apply lo
   expect(errors).toEqual([]);
 });
 
+test('[BK-FORK-SAVE] the trip handoff leaves the bike alone: a fork\'s own two colours stay in the plan\'s bike, its saved copy and the draft', async ({ page }) => {
+  await plannerWithPlan(page);
+  const FORK = { kind: 'pattern', pattern: 'camo', pair: 2, colours: ['#2f7d4f', '#f1c232'] };
+  await page.evaluate(`(async () => {
+    S.bikeProfile = normaliseBikeProfile({ id: 'bike_e2e', name: 'Tourer', look: { colour: '#2563b8', paint: { fork: ${JSON.stringify(FORK)} } } });
+    await store.set('loadcheck:bikeProfile', S.bikeProfile);
+    await bikeStoreSet(BIKE_PROFILE_KEY, [S.bikeProfile]);
+    await flushDraft();
+  })()`);
+  const gpx = readFileSync(join(process.cwd(), 'contracts', 'handoff', 'heidelberg-strasbourg.gpx'), 'utf8');
+  await page.evaluate(async ({ gpx, id }) => {
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open('copilot', 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore('handoffs'); };
+      req.onsuccess = () => {
+        const tx = req.result.transaction('handoffs', 'readwrite');
+        tx.objectStore('handoffs').put({ id, gpx, createdAt: new Date().toISOString() }, id);
+        tx.oncomplete = () => { req.result.close(); resolve(); };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+    localStorage.setItem('copilot:handoff:v1', JSON.stringify({ app: 'copilot', kind: 'handoff', v: 1, id, createdAt: new Date().toISOString() }));
+  }, { gpx, id: ID });
+  const stored = () => page.evaluate(() => ['loadcheck:bikeProfile', 'loadcheck:bikeProfiles', 'loadcheck:draft'].map((k) => localStorage.getItem(k)));
+  const [bike, list] = await stored();
+  expect(JSON.parse(bike!).look.paint.fork).toEqual(FORK);
+  await openFresh(page, `/tools/bags/#copilot-handoff=${ID}`);
+  await ready(page);
+  await page.locator('#handoffApply').click();
+  await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
+  expect(await page.evaluate('S.place && S.place.name')).toBe('Heidelberg');   // the trip came in
+  expect(await page.evaluate('JSON.stringify(S.bikeProfile.look.paint.fork)')).toBe(JSON.stringify(FORK));
+  await page.evaluate('flushDraft()');
+  expect(JSON.parse((await stored())[2]!).bikeProfile.look.paint.fork).toEqual(FORK);
+  const [bikeAfter, listAfter] = await stored();
+  expect(bikeAfter).toBe(bike);
+  expect(listAfter).toBe(list);
+});
+
 test('[LC-OFFLINE-AGAIN] after the switch took the copy, opening Wayfinch at / brings it back by itself; the bag planner then has nothing to say (review M8)', async ({ page }) => {
   app = await loadApp(page, { launch: true, path: '/' });
   await expect.poll(async () => (await registrations(page)).length, { timeout: 30_000 }).toBe(1);
