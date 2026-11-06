@@ -90,3 +90,37 @@ test('[SW-MOVED-CARD] a browser that keeps nothing shows it but never throws', a
     Storage.prototype.setItem = realSet;
   }
 });
+
+const pageshow = (persisted: boolean) => act(() => { window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted })); });
+
+test('[SW-MOVED-RETURN] back from the bag planner out of the back-forward cache (Safari keeps the page as it was): the card is read again and goes', async () => {
+  localStorage.setItem('loadcheck:setups', '[]');
+  await show();
+  const link = host.querySelector<HTMLAnchorElement>('.moved-card a')!;
+  link.addEventListener('click', (e) => e.preventDefault());
+  await act(() => { link.click(); });
+  // the page as the cache kept it, still holding the card from before the jump
+  await pageshow(true);
+  expect(host.querySelector('.moved-card')).toBeNull();
+});
+
+test('[SW-MOVED-RETURN] the page the cache keeps has no card once it was followed: it goes as the page is left', async () => {
+  localStorage.setItem('loadcheck:draft', '{}');
+  await show();
+  const link = host.querySelector<HTMLAnchorElement>('.moved-card a')!;
+  link.addEventListener('click', (e) => e.preventDefault());
+  await act(() => { link.click(); });
+  expect(host.querySelector('.moved-card')).not.toBeNull();   // no flash on the tap itself
+  await act(() => { window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })); });
+  expect(host.querySelector('.moved-card')).toBeNull();
+});
+
+test('[SW-MOVED-RETURN] dismissed in another window: gone here too; a restore with the card still due keeps it', async () => {
+  localStorage.setItem('loadcheck:draft', '{}');
+  await show();
+  await pageshow(true);
+  expect(host.querySelector('.moved-card')).not.toBeNull();
+  localStorage.setItem(MOVED_CARD_KEY, 'seen');
+  await act(() => { window.dispatchEvent(new StorageEvent('storage', { key: MOVED_CARD_KEY })); });
+  expect(host.querySelector('.moved-card')).toBeNull();
+});

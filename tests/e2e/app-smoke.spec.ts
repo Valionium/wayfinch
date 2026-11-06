@@ -27,6 +27,27 @@ test('[TRIP-GPX-IOS] smoke: Trip’s GPX picker names no file types (iOS greys o
   await expect(page.locator('[data-summary]')).toContainText('Heilbronn loop');
 });
 
+test('[SW-MOVED-RETURN] smoke: Open the Bag planner on the moved card, then Back: the card is gone, also when the browser brings the page back from its cache', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/' });
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('loadcheck:setups', '[]'); });
+  await page.reload({ waitUntil: 'load' });
+  await expect(page.locator('.moved-card')).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  await page.evaluate(() => {
+    (window as unknown as { __before: boolean }).__before = true;
+    window.addEventListener('pageshow', (e) => { (window as unknown as { __restored: boolean }).__restored = e.persisted; });
+  });
+  await page.locator('.moved-card').getByRole('link').click();
+  await page.waitForURL(/\/tools\/bags\/$/);
+  await page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY === true', undefined, { timeout: 30_000 });
+  await page.locator('#backToWayfinch').click();
+  await page.waitForURL((u) => u.pathname === '/', { waitUntil: 'commit' });
+  await page.waitForSelector('#app .shell');
+  await expect(page.locator('.moved-card')).toHaveCount(0);
+  // Whether this browser kept the page in its cache (WebKit's job log says): the card is gone either way.
+  console.log(`SW-MOVED-RETURN restored from the cache: ${await page.evaluate(() => (window as unknown as { __before?: boolean }).__before === true)}`);
+});
+
 test('[FLOW-FLIGHT] smoke: a prepared trip opens offline on Ahead, with its six cards and Emergency', async ({ page }) => {
   app = await loadApp(page);
   await preparedTrip(page, 'heidelberg-strasbourg', { departureDate: new Date().toISOString().slice(0, 10), places: true });

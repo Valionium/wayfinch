@@ -2,7 +2,11 @@
 // icon at / opened the co-pilot instead of Load Check. Returning riders are known by the bag planner's own `loadcheck:draft` or
 // `loadcheck:setups`, which are only read. The link stays in the same window, so an iPhone rider stays in the home-screen app that holds
 // the plans. Gone for good once dismissed or followed; the mark is the co-pilot's own key.
-import { useState } from 'preact/hooks';
+//
+// Also after Back to Wayfinch (owner's iPhone rehearsal, 6 November 2026): Safari brings the page back from its back-forward cache as
+// it was before the jump, card and all, and no storage event reached it there. So the mark is read again as the page is left (the page
+// the cache keeps has no card), when it shows again, and when another window sets it.
+import { useEffect, useState } from 'preact/hooks';
 import { M } from '../core/wording/en-moved.ts';
 
 import { MOVED_CARD_KEY, movedCardDue } from './moved-due.ts';
@@ -17,8 +21,22 @@ function markSeen(): void {
   }
 }
 
+const marked = (): boolean => {
+  try {
+    return localStorage.getItem(MOVED_CARD_KEY) !== null;
+  } catch {
+    return false;
+  }
+};
+
 export function MovedCard() {
   const [shown, setShown] = useState(movedCardDue);
+  useEffect(() => {
+    const reread = (): void => { if (marked()) setShown(false); };
+    const events = ['pagehide', 'pageshow', 'storage'] as const;
+    for (const e of events) window.addEventListener(e, reread);
+    return () => { for (const e of events) window.removeEventListener(e, reread); };
+  }, []);
   if (!shown) return null;
   const done = () => {
     markSeen();
