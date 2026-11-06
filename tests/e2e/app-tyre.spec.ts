@@ -2,6 +2,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { T } from '../../src/core/wording/en-tyre.ts';
 import { goOffline, loadApp, removeBuilds } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
 
@@ -103,6 +104,19 @@ test('[TY-UI-OFFLINE] the tool works in flight mode and sends nothing', async ({
   expect(after.filter((r) => r.method !== 'GET' || ['fetch', 'xhr', 'websocket', 'ping', 'eventsource'].includes(r.type))).toEqual([]);
   expect(after.filter((r) => !r.url.startsWith(app!.origin))).toEqual([]);
   expect(requests.filter((u) => !u.startsWith(app!.origin) && !u.startsWith('data:') && !u.startsWith('blob:'))).toEqual([]);
+});
+
+// Review of PR 50, M4: two notes moved from en.ts to the tyre screen's own words (en-tyre.ts), so the first screen does not carry them.
+test('[TY-UI-OFFLINE] the heat note and the calipered-width note show on the tyre screen, online and in flight mode', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools/tyre' });
+  for (const text of [T.tyreHeatIntro, T.tyreCaliperHelp]) await expect(page.getByText(text, { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBe(1);
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+  await goOffline(page);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  for (const text of [T.tyreHeatIntro, T.tyreCaliperHelp]) await expect(page.getByText(text, { exact: true })).toBeVisible();
 });
 
 // The owner's device check of 5 November: the three things a figure needs were spread along the screen.

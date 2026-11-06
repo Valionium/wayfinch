@@ -116,8 +116,9 @@ describe('ruling A, measured where the bike is drawn', () => {
           expect(colours.filter((c) => !readable(c, theme, tones[part])), `${name} ${part} on ${tones[part]}`).toEqual([]);
         }
         if (theme === 'light') {
-          // the light theme keeps main's one casing wherever main kept every colour readable
-          if (mainKeepsReadable(shown, 'light')) expect(new Set(Object.values(tones)), name).toEqual(new Set([mainTone(shown, 'light')]));
+          // the light theme keeps main's one casing wherever main kept every colour readable, the colours drawn included (a preset
+          // liquid-metal fork's bands: review of PR 50, I2)
+          if (mainKeepsReadable(shown, 'light') && Object.values(parts).flat().every((c) => readable(c, 'light', mainTone(shown, 'light')))) expect(new Set(Object.values(tones)), name).toEqual(new Set([mainTone(shown, 'light')]));
           else lightChanged += 1;
         } else {
           const edge = (cs: readonly string[], t: CasingTone) => Math.min(...cs.map((c) => contrastRatio(c, hexOf('dark', t))));
@@ -128,6 +129,10 @@ describe('ruling A, measured where the bike is drawn', () => {
           for (const [part, cs] of Object.entries(parts) as [PaintedPart, string[]][]) {
             const tone = tones[part];
             if (edge(cs, tone) >= CASING_MIN_CONTRAST) continue;
+            // a preset liquid-metal fork stored before keeps the casing main worked out on its pair, wherever its bands read on it
+            // (review of PR 50, I2: old forks draw as before; tests/unit/core/bike/fork.test.ts, BK-FORK-SAME)
+            const asBefore = partColours(paint, colour, true)![part];
+            if (asBefore.join() !== cs.join() && tone === darkCasing(asBefore)) continue;
             for (const t of Object.keys(CASINGS.dark) as CasingTone[]) if (cs.every((c) => readable(c, 'dark', t))) expect(edge(cs, tone), `${name} ${part}`).toBeGreaterThanOrEqual(edge(cs, t));
           }
         }

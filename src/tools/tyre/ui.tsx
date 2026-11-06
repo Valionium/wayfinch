@@ -472,7 +472,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
       </Card>
 
       <Card title={W.tyreSectionHeat}>
-        <p class="muted">{W.tyreHeatIntro}</p>
+        <p class="muted">{T.tyreHeatIntro}</p>
         <NumberInput key={`hp-${key}`} id="tyre-heat-pump" label={W.tyreHeatPumpLabel} signed value={details.heat?.pumpC} onCommit={(n) => changeHeat({ pumpC: n })} unit="°C" />
         <NumberInput key={`hm-${key}`} id="tyre-heat-max" label={W.tyreHeatMaxLabel} signed value={details.heat?.maxC} onCommit={(n) => changeHeat({ maxC: n })} unit="°C" />
         <NumberInput key={`hh-${key}`} id="tyre-heat-pumph" label={W.tyrePumpHeightLabel} signed value={details.heat?.pumpHeightM} onCommit={(n) => changeHeat({ pumpHeightM: n })} unit="m" />
@@ -483,7 +483,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
 
       <Card title={W.tyreSectionMeasured}>
         <MeasuredFields key={`m-${key}`} value={details.measured} onCommit={(m) => change({ measured: m })} />
-        <p class="muted">{W.tyreCaliperHelp}</p>
+        <p class="muted">{T.tyreCaliperHelp}</p>
         <NumberInput key={`cf-${key}`} id="tyre-cfront" label={W.tyreCaliperFrontLabel} value={details.caliperFrontMm ?? undefined} onCommit={(n) => change({ caliperFrontMm: n ?? null })} unit="mm" />
         <NumberInput key={`cr-${key}`} id="tyre-crear" label={W.tyreCaliperRearLabel} value={details.caliperRearMm ?? undefined} onCommit={(n) => change({ caliperRearMm: n ?? null })} unit="mm" />
       </Card>
