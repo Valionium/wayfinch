@@ -18,7 +18,9 @@ export type Pattern = (typeof PATTERNS)[number];
 /** The patterns a fork can have of its own: the textures. */
 export const FORK_PATTERNS = PATTERNS.slice(7) as readonly ForkPattern[];
 export type ForkPattern = 'marble' | 'stripes' | 'speckle' | 'camo' | 'sparkle' | 'chrome' | 'carbon';
-export type Fork = { kind: 'own'; colour: string } | { kind: 'fade'; pair: number } | { kind: 'pattern'; pattern: ForkPattern; pair: number };
+/** A fade's or fork pattern's `colours` are the rider's own two (owner's wish, 6 Nov 2026); `pair` is then the nearest of the six. */
+export type Fork = { kind: 'own'; colour: string } | { kind: 'fade'; pair: number; colours?: [string, string] }
+  | { kind: 'pattern'; pattern: ForkPattern; pair: number; colours?: [string, string] };
 /** `colours` are the second and third; `pair` is one of the six fade pairs; a rim depth is 15 to 60 mm. */
 export type Paint = { pattern: Pattern; colours: [string | null, string | null]; fork: Fork | null; rimMm: number | null };
 export type Look = { colour: string | null; bars: Bars | null; ebike: boolean | null; paint?: Paint };
@@ -139,17 +141,21 @@ function maxWeightOf(value: unknown): MaxWeight | null {
 }
 
 const hexOf = (v: unknown): string | null => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : null);
+/** The first two of a list as colours, each one null if it is not "#rrggbb". */
+const hexes = (v: unknown): [string | null, string | null] => { const a = Array.isArray(v) ? v as unknown[] : []; return [hexOf(a[0]), hexOf(a[1])]; };
 
 /** The look extras; anything unknown or broken drops only itself, and nothing set is none (today's drawing). */
 function paintOf(v: unknown): Paint | null {
   if (!isObject(v)) return null;
-  const c = Array.isArray(v.colours) ? v.colours as unknown[] : [];
   const f = isObject(v.fork) ? v.fork : {};
   const pair = int(f.pair, 0, 5);
   const own = hexOf(f.colour);
-  const fork: Fork | null = f.kind === 'own' && own ? { kind: 'own', colour: own } : f.kind === 'fade' && pair !== null ? { kind: 'fade', pair }
-    : f.kind === 'pattern' && pair !== null && FORK_PATTERNS.includes(f.pattern as ForkPattern) ? { kind: 'pattern', pattern: f.pattern as ForkPattern, pair } : null;
-  const p: Paint = { pattern: oneOf(v.pattern, PATTERNS, 'solid'), colours: [hexOf(c[0]), hexOf(c[1])], fork, rimMm: int(v.rimMm, 15, 60) };
+  // the rider's own two colours, kept only whole: else the preset pair
+  const k = hexes(f.colours);
+  const two = k[0] && k[1] ? { colours: k as [string, string] } : {};
+  const fork: Fork | null = f.kind === 'own' && own ? { kind: 'own', colour: own } : pair === null ? null : f.kind === 'fade' ? { kind: 'fade', pair, ...two }
+    : f.kind === 'pattern' && FORK_PATTERNS.includes(f.pattern as ForkPattern) ? { kind: 'pattern', pattern: f.pattern as ForkPattern, pair, ...two } : null;
+  const p: Paint = { pattern: oneOf(v.pattern, PATTERNS, 'solid'), colours: hexes(v.colours), fork, rimMm: int(v.rimMm, 15, 60) };
   return p.pattern === 'solid' && !p.colours[0] && !p.colours[1] && !fork && p.rimMm === null ? null : p;
 }
 
