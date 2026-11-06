@@ -548,3 +548,76 @@ describe('re-check findings, on the screen', () => {
     delete (Element.prototype as unknown as Record<string, unknown>).scrollIntoView;
   });
 });
+
+describe('the bike box (device check, 6 November 2026)', () => {
+  const bikeB = { id: 'bike_b', name: 'Gravel hookless', look: { colour: null, bars: 'drop', ebike: null }, tyres: 'tubeless', frontTyre: '30-622', rearTyre: '30-622', pressure: { wheel: '700c', rim: 'hookless', rimMm: 21 } };
+  const bikeC = { ...bikeB, id: 'bike_c', name: 'my bike' };
+  const noPlan = { ...summary, bikeId: null };
+  const base = { 'loadcheck:summary:v1': JSON.stringify(noPlan) };
+  const sel = () => host.querySelector('#tyre-bike') as HTMLSelectElement;
+  const optionTexts = () => [...sel().options].map((o) => o.textContent);
+  const ledger = (stamps: Record<string, string>) => JSON.stringify({ app: 'load-check', kind: 'saved-at', v: 1, keys: {}, items: { 'loadcheck:bikeProfiles': stamps } });
+  const changed = async (mem: ReturnType<typeof memory>, patch: Record<string, string>, event: 'storage' | 'pageshow' | 'visibilitychange' = 'storage') => {
+    for (const [k, v] of Object.entries(patch)) mem.data.set(k, v);
+    await act(() => {
+      if (event === 'storage') window.dispatchEvent(new StorageEvent('storage', { key: 'loadcheck:bikeProfiles' }));
+      else if (event === 'pageshow') window.dispatchEvent(new Event('pageshow'));
+      else document.dispatchEvent(new Event('visibilitychange'));
+    });
+  };
+
+  test('[TY-UI-BIKEBOX] no saved bike: the box says so, and nothing else is offered', async () => {
+    await mount(services(memory({ ...base, 'loadcheck:bikeProfiles': '[]', 'loadcheck:bikeProfile': 'null' })));
+    expect(sel().value).toBe('default');
+    expect(optionTexts()).toEqual([W.tyreBikeNone]);
+  });
+
+  test('[TY-UI-BIKEBOX] one saved bike: it is preselected, "No saved bike" is gone, "Without a bike" stays', async () => {
+    await mount(services(memory({ ...base, 'loadcheck:bikeProfiles': JSON.stringify([bikeC]), 'loadcheck:bikeProfile': 'null' })));
+    expect(sel().value).toBe('bike_c');
+    expect(optionTexts()).not.toContain(W.tyreBikeNone);
+    expect(optionTexts()).toEqual(['my bike', T.tyreBikeWithout]);
+    expect(host.textContent).not.toContain(W.tyreBikeNone);
+  });
+
+  test('[TY-UI-BIKEBOX] several bikes: the plan\'s bike, else the most recently saved, else the current one', async () => {
+    const two = JSON.stringify([bike, bikeB]);
+    await mount(services(memory({ ...LOADCHECK, 'loadcheck:bikeProfiles': two })));
+    expect(sel().value).toBe(bike.id);
+    render(null, host);
+    await mount(services(memory({ ...base, 'loadcheck:bikeProfiles': two, 'loadcheck:bikeProfile': 'null', 'loadcheck:saved-at:v1': ledger({ [bike.id]: '2026-10-01T10:00:00Z', bike_b: '2026-11-02T10:00:00Z' }) })));
+    expect(sel().value).toBe('bike_b');
+    render(null, host);
+    await mount(services(memory({ ...base, 'loadcheck:bikeProfiles': two, 'loadcheck:bikeProfile': JSON.stringify(bikeB) })));
+    expect(sel().value).toBe('bike_b');
+    // Choosing "Without a bike" behaves as before.
+    await act(() => { sel().value = 'default'; sel().dispatchEvent(new Event('change', { bubbles: true })); });
+    expect(sel().value).toBe('default');
+  });
+
+  test('[TY-UI-BIKEBOX] a bike deleted while the tool is open: the box moves to the bike now in use, or to none', async () => {
+    const mem = memory({ ...base, 'loadcheck:bikeProfiles': JSON.stringify([bike, bikeB]), 'loadcheck:bikeProfile': JSON.stringify(bikeB) });
+    await mount(services(mem));
+    expect(sel().value).toBe('bike_b');
+    await changed(mem, { 'loadcheck:bikeProfiles': JSON.stringify([bike]), 'loadcheck:bikeProfile': 'null' });
+    expect(sel().value).toBe(bike.id);
+    await changed(mem, { 'loadcheck:bikeProfiles': '[]' });
+    expect(sel().value).toBe('default');
+    expect(optionTexts()).toEqual([W.tyreBikeNone]);
+  });
+
+  test('[TY-UI-BIKEBOX] a bike added in the bag planner shows at once and on return; a choice made by hand is kept', async () => {
+    const mem = memory({ ...base, 'loadcheck:bikeProfiles': '[]', 'loadcheck:bikeProfile': 'null' });
+    await mount(services(mem));
+    expect(sel().value).toBe('default');
+    await changed(mem, { 'loadcheck:bikeProfiles': JSON.stringify([bikeC]) });
+    expect(sel().value).toBe('bike_c');
+    expect(optionTexts()).toEqual(['my bike', T.tyreBikeWithout]);
+    await changed(mem, { 'loadcheck:bikeProfiles': JSON.stringify([bikeC, bikeB]) }, 'pageshow');
+    expect(optionTexts()).toContain('Gravel hookless');
+    await act(() => { sel().value = 'default'; sel().dispatchEvent(new Event('change', { bubbles: true })); });
+    await changed(mem, { 'loadcheck:bikeProfiles': JSON.stringify([bikeC, bikeB, { ...bikeB, id: 'bike_d', name: 'Third' }]) }, 'visibilitychange');
+    expect(sel().value).toBe('default');
+    expect(optionTexts()).toContain('Third');
+  });
+});

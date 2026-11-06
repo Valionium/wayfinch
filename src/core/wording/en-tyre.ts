@@ -7,4 +7,5 @@ export const T = {
   tyreNeededTitle: 'Needed for a figure',
   tyreNeededIntro: 'Start with these three: the maximum pressure printed on your tyre, your tyre width and your rim type. Everything further down is optional.',
   tyreNeededTag: 'needed',
+  tyreBikeWithout: 'Without a bike',
 };

@@ -1,6 +1,6 @@
 // The tyre screen (spec section 7.2): inputs on top of a figure that is recomputed on every change. It renders what `resolve` and
 // `tyreEstimate` give and computes no pressure itself. It reads Load Check's records and never writes them.
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { T } from '../../core/wording/en-tyre.ts';
 import { W, shortMapDate } from '../../core/wording/en.ts';
@@ -219,13 +219,14 @@ function WheelFigure({ label, w }: { label: string; w: Wheel }) {
 // ---- the screen ----------------------------------------------------------------------------------------------------------------
 
 export function TyreScreen({ services }: { services: TyreServices }) {
-  const host = useMemo(() => services.host(), [services]);
+  const [host, setHost] = useState(() => services.host());
+  const handPicked = useRef(false);
   const load = (k: string): { key: string; details: Details } => {
     const r = readStore(services.storage);
     return { key: k, details: r.ok ? entryOf(r.store, k).details : {} };
   };
   // The bike and its details change together, in one step: a render never pairs one bike's key with another's details.
-  const [session, setSession] = useState(() => load(host.planBikeId ?? DEFAULT_KEY));
+  const [session, setSession] = useState(() => load(host.usedBikeId ?? DEFAULT_KEY));
   const { key, details } = session;
   const [kept, setKept] = useState(true);
   const [pending, setPending] = useState<Record<string, string>>({});
@@ -238,6 +239,27 @@ export function TyreScreen({ services }: { services: TyreServices }) {
     });
   };
   const blockedBy = Object.values(pending)[0] ?? null;
+
+  // The bag planner may change its bikes while this is open (another tab) or while the phone was elsewhere: read them again when told,
+  // and when the page shows again. A bike that is gone moves the box to the bike now in use; a new one is followed unless the rider chose.
+  const latest = useRef({ key, pending: blockedBy });
+  latest.current = { key, pending: blockedBy };
+  useEffect(() => {
+    const reread = (): void => {
+      const next = services.host();
+      setHost((old) => (JSON.stringify(old) === JSON.stringify(next) ? old : next));
+      const { key: now, pending: busy } = latest.current;
+      const gone = now !== DEFAULT_KEY && !next.bikes.some((b) => b.id === now);
+      if (gone) { handPicked.current = false; setPending({}); setSession(load(next.usedBikeId ?? DEFAULT_KEY)); }
+      else if (!handPicked.current && busy === null && now !== (next.usedBikeId ?? DEFAULT_KEY)) setSession(load(next.usedBikeId ?? DEFAULT_KEY));
+    };
+    const onStorage = (e: Event): void => { const k = (e as StorageEvent).key; if (k === null || k.startsWith('loadcheck:')) reread(); };
+    const onVisible = (): void => { if (document.visibilityState !== 'hidden') reread(); };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('pageshow', reread);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('pageshow', reread); document.removeEventListener('visibilitychange', onVisible); };
+  }, [services]);
 
   const bike = host.bikes.find((b) => b.id === key) ?? null;
   // The plan's load belongs to the plan's bike: another bike has its own weights.
@@ -314,9 +336,9 @@ export function TyreScreen({ services }: { services: TyreServices }) {
 
       <label class="tyre-input" for="tyre-bike">
         <span class="tyre-label">{W.tyreBikeLabel}</span>
-        <select id="tyre-bike" value={key} onChange={(e) => { setPending({}); setSession(load((e.currentTarget as HTMLSelectElement).value)); }}>
-          <option value={DEFAULT_KEY}>{W.tyreBikeNone}</option>
+        <select id="tyre-bike" value={key} onChange={(e) => { handPicked.current = true; setPending({}); setSession(load((e.currentTarget as HTMLSelectElement).value)); }}>
           {host.bikes.map((b) => <option key={b.id} value={b.id}>{b.name}{b.id === host.planBikeId ? W.tyreBikeInPlan : ''}</option>)}
+          <option value={DEFAULT_KEY}>{host.bikes.length ? T.tyreBikeWithout : W.tyreBikeNone}</option>
         </select>
       </label>
       {!kept ? <Notice>{W.tyreNotSaved}</Notice> : null}

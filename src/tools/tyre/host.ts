@@ -9,6 +9,7 @@ import type { Pos } from './tables.ts';
 export const SUMMARY_KEY = 'loadcheck:summary:v1';
 export const BIKES_KEY = 'loadcheck:bikeProfiles';
 export const CURRENT_BIKE_KEY = 'loadcheck:bikeProfile';
+const SAVED_AT_KEY = 'loadcheck:saved-at:v1';
 
 export interface ReadOnlyStore { getItem(key: string): string | null }
 
@@ -18,6 +19,8 @@ export interface HostData {
   bikes: BikeInfo[];
   /** The bike of the current bag plan, when the library (or the current-bike record) holds it. */
   planBikeId: string | null;
+  /** The bike in use: the plan's, else the one the bag planner saved last, else its current one, else the last in its list. Null with no bike. */
+  usedBikeId: string | null;
 }
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -109,6 +112,18 @@ export function parseBike(raw: unknown): BikeInfo | null {
   return bike;
 }
 
+/** The bike the bag planner saved last, by its ledger of save times (bikes are stamped one by one); null when it names none. */
+function newestBikeId(kv: ReadOnlyStore, bikes: BikeInfo[]): string | null {
+  const ledger = json(kv, SAVED_AT_KEY);
+  const items = isObject(ledger) && isObject(ledger.items) && isObject(ledger.items[BIKES_KEY]) ? ledger.items[BIKES_KEY] : {};
+  let best: { id: string; at: number } | null = null;
+  for (const b of bikes) {
+    const at = typeof items[b.id] === 'string' ? Date.parse(items[b.id] as string) : NaN;
+    if (Number.isFinite(at) && (!best || at > best.at)) best = { id: b.id, at };
+  }
+  return best ? best.id : null;
+}
+
 /**
  * Everything the tyre screen reads, once. `riderKg` is a function because You lives in the co-pilot's store, which this module does not
  * import. A bike id nobody has (a deleted bike) is treated as none.
@@ -120,5 +135,5 @@ export function readHost(kv: ReadOnlyStore, riderKg: () => number | null = () =>
   if (current && !bikes.some((b) => b.id === current.id)) bikes.unshift(current);
   const summary = parseSummary(json(kv, SUMMARY_KEY));
   const planBikeId = summary?.bikeId && bikes.some((b) => b.id === summary.bikeId) ? summary.bikeId : null;
-  return { riderKg: riderKg(), summary, bikes, planBikeId };
+  return { riderKg: riderKg(), summary, bikes, planBikeId, usedBikeId: planBikeId ?? newestBikeId(kv, bikes) ?? (current ? current.id : (bikes[bikes.length - 1]?.id ?? null)) };
 }
