@@ -74,7 +74,7 @@ const page = (block) => `<!doctype html>
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Impressum · Imprint — Wayfinch</title>
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="/legal/legal.css">
