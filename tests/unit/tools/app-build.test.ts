@@ -208,3 +208,20 @@ test("[TY-UI-BIKEBOX] the tyre tool's bike-choice logic is in the tool's own chu
   const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
   expect(lazy.some((f) => text(on, f).includes('loadcheck:saved-at:v1'))).toBe(true);
 });
+
+// Sub-project 11, group 2: the Tools screen (with its bike line) is a chunk of its own, loaded by a dynamic import like the tyre tool.
+// 149,774 bytes is the first screen's figure on main (538e69e) at the branch point; the rule is that it may not rise above it.
+test("[TB-TOOLS-LAZY] the Tools screen is not among the first screen's files, and the first screen is at or below main's figure", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  expect(first.includes('bike-line')).toBe(false);
+  expect(first.includes('copilot:bikeChoice:v1')).toBe(false);
+  const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
+  const chunk = lazy.filter((f) => text(on, f).includes('bike-line'));
+  expect(chunk.length).toBe(1);
+  // loaded by a dynamic import from the first screen, never a static one or a preload
+  expect(first).toContain(`/${chunk[0]!.replace(/^assets\//, '')}`.slice(1));
+  expect(text(on, 'index.html')).not.toContain(chunk[0]!);
+  console.log(`TB-TOOLS-LAZY: first screen ${figures.firstJsGzip} bytes gzipped`);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(149_774);
+});

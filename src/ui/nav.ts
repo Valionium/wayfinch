@@ -8,11 +8,17 @@ export type ScreenName = (typeof SCREEN_NAMES)[number];
 export type TabName = 'ahead' | 'trip' | 'tools' | 'you';
 export const tabOf = (name: ScreenName): TabName => name.split('/')[0] as TabName;
 
-/** `#/tools/tyre` gives 'tools/tyre'. Anything that is not a screen gives `fallback`. */
+/** `#/tools/tyre` gives 'tools/tyre'; a `?bike=` after it (toolHref) is not part of the name. Anything that is not a screen gives `fallback`. */
 export function screenFromHash(hash: string, fallback: ScreenName): ScreenName {
-  const name = hash.replace(/^#\/?/, '').replace(/\/+$/, '');
+  const name = hash.replace(/^#\/?/, '').replace(/\?.*$/, '').replace(/\/+$/, '');
   return (SCREEN_NAMES as readonly string[]).includes(name) ? (name as ScreenName) : fallback;
 }
+
+/** The address of a tool that also chooses the bike (sub-project 11): the app takes the choice once and leaves the plain address. */
+export const toolHref = (screen: 'tools/tyre' | 'tools/care', bikeId: string): string => `#/${screen}?bike=${encodeURIComponent(bikeId)}`;
+
+/** The bike id a tool address names, when it is a well-formed one. */
+export const toolLinkBike = (hash: string): string | null => /^#\/tools\/[a-z]+\?bike=([a-zA-Z0-9_-]{1,100})$/.exec(hash)?.[1] ?? null;
 
 /** No address of its own: Ahead while a trip runs, otherwise Trip (3.1). With no store yet, no trip runs. */
 export const defaultScreen = (tripRunning: boolean): ScreenName => (tripRunning ? 'ahead' : 'trip');
