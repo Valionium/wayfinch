@@ -10,11 +10,13 @@ export type Pace = NonNullable<Trip['pace']>;
 export type Settings = {
   theme: 'auto' | 'light' | 'dark'; units: 'metric' | 'imperial'; keepFresh: boolean; slashKey: boolean;
   startTime: string; nights: number | null /* null: the stage model's suggestion */; pace: Pace; flatKph: number; stay: Stay; campWaterL: number;
+  /** The bike every tool starts with, as chosen in either app (sub-project 11); it only travels in an export, the live choice is src/ui/tools/bike-choice.ts. */
+  toolBike: string | null;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'auto', units: 'metric', keepFresh: true, slashKey: true,
-  startTime: '08:30', nights: null, pace: 'sporting', flatKph: 25, stay: 'camping', campWaterL: 2,
+  startTime: '08:30', nights: null, pace: 'sporting', flatKph: 25, stay: 'camping', campWaterL: 2, toolBike: null,
 };
 export const DEFAULT_CAMP_WATER_L = DEFAULT_SETTINGS.campWaterL;
 
@@ -45,6 +47,7 @@ const CHECKS: { [K in keyof Settings]: (value: unknown) => string | null } = {
   flatKph: (x) => (goodFlatKph(x) ? null : W.appStoreFlatKphRange),
   stay: (x) => (isIn(x, STAYS) ? null : W.appStoreStayChoice),
   campWaterL: (x) => (inRange(x, 0, 5) ? null : W.appStoreCampWaterRange),
+  toolBike: (x) => (x === null || (typeof x === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(x)) ? null : W.appStoreBikeChoice),
 };
 
 export const settingProblem = <K extends keyof Settings>(field: K, value: unknown): string | null => CHECKS[field](value);
