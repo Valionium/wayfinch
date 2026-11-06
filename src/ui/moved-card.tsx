@@ -34,8 +34,9 @@ export function MovedCard() {
   useEffect(() => {
     const reread = (): void => { if (marked()) setShown(false); };
     const events = ['pagehide', 'pageshow', 'storage'] as const;
-    for (const e of events) window.addEventListener(e, reread);
-    return () => { for (const e of events) window.removeEventListener(e, reread); };
+    const w = window;   // the same window at clean-up, also when that runs late
+    for (const e of events) w.addEventListener(e, reread);
+    return () => { for (const e of events) w.removeEventListener(e, reread); };
   }, []);
   if (!shown) return null;
   const done = () => {
