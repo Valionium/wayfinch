@@ -4,7 +4,7 @@
 // The browser path, online and offline, is in tests/e2e/app-ahead.spec.ts.
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { W } from '../../../src/core/wording/en.ts';
@@ -112,10 +112,70 @@ describe('the confirmation', () => {
     const sleep = host.querySelector('[data-card="sleep"]')!;
     await click(buttonNamed('Call +49 7221 123456', sleep));
     const box = ask(sleep)!;
-    expect(box.textContent).toContain(W.callAsk('+497221123456'));
+    expect(box.textContent).toContain(W.callAsk('+49 7221 123456'));   // as the place shows it (review of PR 53, M2)
     expect(box.textContent).toMatch(/Camping Rheinaue/);
     expect(telLinks(sleep).map((a) => a.getAttribute('href'))).toEqual(['tel:+497221123456']);
     await click(buttonNamed(W.callCancel, box));
     expect(telLinks(sleep)).toEqual([]);
+  });
+});
+
+describe('review of PR 53', () => {
+  test('[AH-CALL-CONFIRM] a second activation within about 400 ms of the question opening never dials, by tap or by key; later it does', async () => {
+    const v = trip(viewOf(rainyStop()));
+    await show(v, fakeActions().actions);
+    await click(buttonNamed('Emergency', host.querySelector('.ah-chips')!));
+    const card = host.querySelector('#chip-emergency')!;
+    let clock = 1_000;
+    const now = vi.spyOn(performance, 'now').mockImplementation(() => clock);
+    try {
+      await click(buttonNamed(W.emergencyCall, card));
+      const tap = (): boolean => {
+        const e = new MouseEvent('click', { bubbles: true, cancelable: true });
+        telLinks(card)[0]!.dispatchEvent(e);
+        return e.defaultPrevented;
+      };
+      clock += 150;
+      expect(tap()).toBe(true);    // the double tap: held back
+      clock += 249;
+      expect(tap()).toBe(true);    // 399 ms
+      clock += 2;
+      expect(tap()).toBe(false);   // 401 ms: the rider's own call goes through
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  test('[AH-CALL-CONFIRM] a place\'s number reads as the place shows it; a screen reader hears it digit by digit in its groups; the link dials the exact number', async () => {
+    const v = trip(viewOf(rainyStop()));
+    await show(v, fakeActions().actions);
+    await click(host.querySelector('[data-card="sleep"] .ah-toggle'));
+    const sleep = host.querySelector('[data-card="sleep"]')!;
+    await click(buttonNamed('Call +49 7221 123456', sleep));
+    const box = ask(sleep)!;
+    expect(box.textContent).toContain(W.callAsk('+49 7221 123456'));
+    const link = telLinks(sleep)[0]!;
+    expect(link.getAttribute('href')).toBe('tel:+497221123456');
+    expect(link.textContent).toBe(W.callNow('+49 7221 123456'));
+    expect(link.getAttribute('aria-label')).toBe(W.callNow('+49 7221 123456') + W.callDigits('+ 4 9, 7 2 2 1, 1 2 3 4 5 6'));
+    const q = box.querySelector('[tabindex="-1"]')!;
+    expect(q.querySelector('.visually-hidden')!.textContent).toBe(W.callDigits('+ 4 9, 7 2 2 1, 1 2 3 4 5 6'));
+  });
+
+  test('[AH-CALL-CONFIRM] 112 is read as one, one, two', async () => {
+    const v = trip(viewOf(rainyStop()));
+    await show(v, fakeActions().actions);
+    await click(buttonNamed('Emergency', host.querySelector('.ah-chips')!));
+    const card = host.querySelector('#chip-emergency')!;
+    await click(buttonNamed(W.emergencyCall, card));
+    expect(telLinks(card)[0]!.getAttribute('aria-label')).toBe(`${W.callNow('112')}${W.callDigits('1 1 2')}`);
+  });
+
+  test('[AH-EMERGENCY] Emergency\'s panel keeps its heading for heading navigation', async () => {
+    const v = trip(viewOf(rainyStop()));
+    await show(v, fakeActions().actions);
+    await click(buttonNamed('Emergency', host.querySelector('.ah-chips')!));
+    const h = host.querySelector('#chip-emergency h2');
+    expect(h?.textContent).toBe(W.appAheadChipEmergency);
   });
 });

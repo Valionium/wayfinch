@@ -91,7 +91,7 @@
 /* A call asks first (call.tsx): the question where the button was, the call below it, each at least 44 px; it fills its line. */
 .call-ask { display: flex; flex-direction: column; align-items: stretch; gap: 8px; flex-basis: 100%; margin: 4px 0; padding: 12px; border: 2px solid var(--blaze); border-radius: 12px; font-size: 1.125rem; font-weight: 400; }
 .call-ask .btn { min-height: 44px; }
-.call-now { font-size: 1.375rem; font-weight: 700; min-height: 56px; }
+.call-ask .call-now { font-size: 1.375rem; font-weight: 700; min-height: 56px; }
 .ah-sheet { border-color: var(--blaze); }
 .ah-sheet h2 { font-family: var(--font-display); font-size: 1.25rem; margin: 0 0 8px; }
 .ah-strip .bk-tyre { stroke: var(--muted); } /* the wheels read on both grounds; the line token is too faint at 24 px */

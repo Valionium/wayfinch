@@ -543,6 +543,8 @@ export const W = {
   callAsk: (number: string): string => `Call ${number}?`,
   callNow: (number: string): string => `Call ${number} now`,
   callCancel: 'Cancel',
+  // after the number, for a screen reader only: it then reads the digits, not one big number (review of PR 53, M2)
+  callDigits: (digits: string): string => ` Digits: ${digits}.`,
   callText: (number: string): string => `Phone ${number}`,
   callWebsite: (host: string): string => `Website ${host} (online)`,
   callLabel: (name: string, number: string): string => `Call ${name}, ${number}`,
@@ -1006,10 +1008,6 @@ export const W = {
   appAheadFinding: 'Finding your position…',
   appAheadApproxHelp: 'Your phone gave only an approximate position. To allow a precise one: on an iPhone, Settings, Privacy & Security, Location Services, your browser or Wayfinch, then turn on Precise Location. On Android, open the location permission of your browser or Wayfinch and choose Precise.',
   appAheadDenied: 'Location is off, or not allowed for Wayfinch. Set your position by hand instead.',
-  // Emergency with no route (owner's iPhone check, 6 Nov 2026): there is no route to set a position on by hand.
-  appEmergencyHereDenied: 'Location is off, or not allowed for Wayfinch. Allow it in the phone settings for your browser or Wayfinch, then tap Update position again. 112 works without it.',
-  appEmergencyHereNoFix: 'The phone found no position. Turn Location on, go where the sky is open, and tap Update position again.',
-  appEmergencyHereTimeout: 'No position within 45 seconds. Without signal a first fix can take minutes: stay where the sky is open and tap Update position again.',
   appAheadNoFix: 'No position fix within 45 seconds. Without signal a first fix can take minutes. Try again, or set your position by hand.',
   appAheadNoGeo: "This browser can't give a position. Set your position by hand.",
   appAheadNoPosition: "That reading couldn't be used as a position. Try again, or set your position by hand.",

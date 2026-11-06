@@ -8,8 +8,9 @@ import { join } from 'node:path';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { ScreenInputs } from '../../../src/core/types.ts';
+import type { Route, ScreenInputs } from '../../../src/core/types.ts';
 import { W } from '../../../src/core/wording/en.ts';
+import { H } from '../../../src/core/wording/en-here.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
 import { closeDb, DB_NAME } from '../../../src/store/db.ts';
 import { readInputs } from '../../../src/store/inputs.ts';
@@ -22,7 +23,7 @@ import { browserAhead } from '../../../src/ui/shell-actions.ts';
 import type { AheadDeps } from '../../../src/ui/shell-actions.ts';
 import { go } from '../../../src/ui/nav.ts';
 import { ROUTINE, watchBest } from '../../../src/ui/position.ts';
-import { at, pointAtKm } from '../../fixtures/build.ts';
+import { at, flatRoute, pointAtKm } from '../../fixtures/build.ts';
 import { rainyStop, SAT } from './ahead-fixture.ts';
 import { buttonNamed, click, dialled, host, typeInto } from './ahead-helpers.tsx';
 
@@ -56,7 +57,7 @@ async function seed(i: ScreenInputs, o: { prepared?: boolean } = {}): Promise<vo
   if (o.prepared !== false) await savePrepared(id, { at: i.now, steps: [], build: null, forecastFetchedAt: i.forecast?.fetchedAt ?? null, baselineYears: null });
 }
 
-type Geo = Geolocation & { calls: number; emit: (accuracy: number, km?: number) => void; fail: (code: number) => void };
+type Geo = Geolocation & { calls: number; emit: (accuracy: number, km?: number) => void; emitAt: (lat: number, lon: number, accuracy: number) => void; fail: (code: number) => void };
 function fakeGeo(): Geo {
   let success: PositionCallback | null = null;
   let failure: PositionErrorCallback | null = null;
@@ -68,6 +69,9 @@ function fakeGeo(): Geo {
     emit(accuracy: number, km = 125) {
       const { lat, lon } = pointAtKm(km);
       success?.({ coords: { latitude: lat, longitude: lon, accuracy }, timestamp: Date.now() } as unknown as GeolocationPosition);
+    },
+    emitAt(latitude: number, longitude: number, accuracy: number) {
+      success?.({ coords: { latitude, longitude, accuracy }, timestamp: Date.now() } as unknown as GeolocationPosition);
     },
     fail(code: number) { failure?.({ code, message: '' } as GeolocationPositionError); },
   };
@@ -446,7 +450,7 @@ describe('Emergency\'s own Update position (owner\'s iPhone check, 6 November 20
 
   test('[AH-EMERGENCY-POSITION] with no route, permission denied, no fix and the 45 s timeout each say what to do', async () => {
     // denied ends the routine at once; "no fix" and nothing at all end it at 45 s
-    for (const [why, words] of [[1, W.appEmergencyHereDenied], [2, W.appEmergencyHereNoFix], [null, W.appEmergencyHereTimeout]] as const) {
+    for (const [why, words] of [[1, H.hereDenied], [2, H.hereNoFix], [null, H.hereTimeout]] as const) {
       const geo = fakeGeo();
       const { stop, panel } = await noRouteEmergency(geo);
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
@@ -482,4 +486,50 @@ describe('Emergency\'s own Update position (owner\'s iPhone check, 6 November 20
     await until(() => (host.querySelector('#chip-emergency')?.textContent ?? '').includes(v.screen.chips.emergency.coords!), 'the same coordinates in Emergency');
     stop();
   });
+});
+
+describe('Emergency\'s Update position never waits on a question (review of PR 53)', () => {
+  /** Out to km 75 and back along the same line: km 32 and km 118 are the same spot. */
+  function outAndBack(): Route {
+    const points = [];
+    for (let k = 0; k <= 150; k++) points.push({ ...pointAtKm(k <= 75 ? k : 150 - k), ele: 100, km: k });
+    return { ...flatRoute(150), points, lengthKm: 150 };
+  }
+
+  test('[AH-EMERGENCY-POSITION] on an out-and-back route with no stored position, a fix where both passes meet shows its coordinates in Emergency at once; Ahead still asks which pass', async () => {
+    const i = rainyStop({ positions: [] });
+    await seed({ ...i, trip: { ...i.trip, route: outAndBack() } });
+    const geo = fakeGeo();
+    const shell = browserAhead(deps({ now: () => i.now, geolocation: () => geo }));
+    const stop = shell.start();
+    await until(() => shell.view.value.kind === 'trip', 'the screen');
+    await act(async () => { render(<Live shell={shell} />, host); });
+    await click(buttonNamed('Emergency', host.querySelector('.ah-chips')!));
+    const panel = (): Element => host.querySelector('#chip-emergency')!;
+    expect(panel().textContent).not.toMatch(/\d+\.\d{5}, \d+\.\d{5}/);
+    await click(buttonNamed(W.emergencyUpdatePosition, panel()));
+    const { lat, lon } = pointAtKm(32);
+    await act(async () => { geo.emit(12, 32); await new Promise((r) => setTimeout(r, 0)); });
+    await until(() => shell.view.value.kind === 'trip' && shell.view.value.position.kind === 'ask', 'the question on Ahead');
+    await until(() => (panel().textContent ?? '').includes(`${lat.toFixed(5)}, ${lon.toFixed(5)}`), 'the fix in Emergency');
+    expect(panel().textContent).toMatch(/Last position at \d{2}:\d{2} \((just now|1 min ago)\)/);
+    expect((await readInputs(i.now))!.positions).toEqual([]);   // nothing kept until the rider picks the pass
+    stop();
+  });
+
+  test('[AH-EMERGENCY-POSITION] with no route, a fix at 0, 0 (what a phone gives for none) is said, not dropped in silence', async () => {
+    const geo = fakeGeo();
+    const shell = browserAhead(deps({ geolocation: () => geo }));
+    const stop = shell.start();
+    await until(() => shell.view.value.kind === 'no-route', 'Ahead with no route');
+    const tapped = shell.actions.updatePosition();
+    geo.emitAt(0, 0, 10);
+    expect(await tapped).toBe(false);
+    await until(() => { const v = shell.view.value; return v.kind === 'no-route' && v.position?.kind === 'said'; }, 'a message');
+    const v = shell.view.value;
+    expect(v.kind === 'no-route' && v.position).toEqual({ kind: 'said', text: H.hereUnusable });
+    expect(v.kind === 'no-route' && v.emergency.coords).toBeNull();
+    stop();
+  });
+
 });

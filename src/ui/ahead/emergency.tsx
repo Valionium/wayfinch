@@ -17,6 +17,8 @@ export function EmergencyPanel({ card, canShare, actions, position }: { card: Em
   return (
     <div class="ah-emergency" data-emergency>
       {/* Each call asks first (owner's iPhone check, 6 Nov 2026); the numbers come from the app's own dated table. */}
+      {/* The panel's heading, for heading navigation; the call button stands where it was (review of PR 53, M3). */}
+      <h2 class="visually-hidden">{W.appAheadChipEmergency}</h2>
       <div class="ah-emergency-title"><CallButton cls="btn btn-primary ah-call" href={telOf('112')} shown={card.title} who={W.emergencyGeneralName} /></div>
       <p class="ah-emergency-fallback">{card.detail}</p>
       <ul class="ah-numbers">

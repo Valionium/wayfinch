@@ -55,6 +55,17 @@ test('[AH-CALL] [AH-SHARE] showing the cards, the chips, Call and Website and th
     await box.getByRole('button', { name: 'Cancel' }).click();
     await expect(box).toHaveCount(0);
   }
+  // and in each chip's panel: every number there is a callable one
+  for (const chip of ['Bike shop', 'Pharmacy', 'Bail out by train', 'Toilets', 'Shelter']) {
+    await page.locator('.ah-chips').getByRole('button', { name: chip, exact: true }).click();
+    const inPanel = page.locator('.ah-chip-panel [data-call]');
+    for (let i = 0; i < (await inPanel.count()); i += 1) {
+      await inPanel.nth(i).click();
+      const box = page.locator('[data-call-ask]');
+      await expect(box.getByRole('link'), chip).toHaveAttribute('href', /^tel:\+\d{7,15}$/);
+      await box.getByRole('button', { name: 'Cancel' }).click();
+    }
+  }
   for (const chip of ['Bike shop', 'Shelter']) await page.locator('.ah-chips').getByRole('button', { name: chip, exact: true }).click();
   for (const href of await page.locator('a.ah-link').evaluateAll((as) => as.map((a) => a.getAttribute('href') ?? ''))) {
     expect(href).toMatch(/^https?:\/\//);   // a call is a button that asks first (AH-CALL-CONFIRM)
@@ -96,6 +107,100 @@ test('[AH-EMERGENCY] offline after a reload: 112, the fallback line and the coor
     expect(new URL(r.url()).origin, r.url()).toBe(new URL(app!.origin).origin);
     expect((await r.response())?.fromServiceWorker(), r.url()).toBe(true);
   }
+});
+
+/** The opener's box and, once it is tapped, the call link's, both in page coordinates; and what lies under the old box now. */
+async function openAndMeasure(page: Page, opener: ReturnType<Page['locator']>) {
+  await opener.scrollIntoViewIfNeeded();
+  const before = await opener.evaluate((el) => { const r = el.getBoundingClientRect(); return { top: r.top + scrollY, bottom: r.bottom + scrollY, left: r.left + scrollX, right: r.right + scrollX }; });
+  await opener.click();
+  const box = page.locator('[data-call-ask]');
+  await expect(box).toBeVisible();
+  return page.evaluate((old) => {
+    const link = document.querySelector('[data-call-ask] a[href^="tel:"]')!.getBoundingClientRect();
+    const linkTop = link.top + scrollY, linkBottom = link.bottom + scrollY;
+    let under = 0;
+    for (let fy = 0; fy <= 1; fy += 0.05) for (let fx = 0.02; fx <= 0.98; fx += 0.12) {
+      const x = old.left + fx * (old.right - old.left) - scrollX, y = old.top + fy * (old.bottom - old.top) - scrollY;
+      const hit = document.elementFromPoint(x, y);
+      if (hit?.closest('a[href^="tel:"]')) under += 1;
+    }
+    return { clear: linkTop >= old.bottom + 16 || linkBottom <= old.top, under, height: link.height };
+  }, before);
+}
+
+const SIZES = [320, 360, 414, 768, 1280];
+
+test('[AH-CALL-CONFIRM] the call link never lies under any part of the button that opened it: 320 to 1280 px, text at 100 % and 200 %; Call N now is at least 56 px', async ({ page }) => {
+  await ahead(page);
+  for (const width of SIZES) for (const text of ['100%', '200%']) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.evaluate((t) => { document.documentElement.style.fontSize = t; }, text);
+    await openEverything(page);
+    const openers = page.locator('.ahead [data-call]');
+    const n = await openers.count();
+    expect(n).toBeGreaterThan(0);
+    for (let i = 0; i < n; i += 1) {
+      const m = await openAndMeasure(page, openers.nth(i));
+      const where = `${width} px, text ${text}, call ${i}`;
+      expect(m.clear, where).toBe(true);
+      expect(m.under, where).toBe(0);
+      expect(m.height, where).toBeGreaterThanOrEqual(55.5);
+      await page.locator('[data-call-ask]').getByRole('button', { name: 'Cancel' }).click();
+    }
+  }
+});
+
+test('[AH-CALL-CONFIRM] at 360 px a double tap on a call button never dials, low on it or high (50, 80, 90, 95, 99 %); nor a double Enter, nor Enter, Tab, Enter in a hurry', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  await ahead(page);
+  await openEverything(page);
+  // every activation of a tel: link that was not held back, and none leaves the page
+  await page.evaluate(() => {
+    (window as unknown as { __dials: number }).__dials = 0;
+    window.addEventListener('click', (e) => {
+      if (!(e.target as Element | null)?.closest?.('a[href^="tel:"]')) return;
+      if (!e.defaultPrevented) (window as unknown as { __dials: number }).__dials += 1;
+      e.preventDefault();
+    });
+  });
+  const dials = () => page.evaluate(() => (window as unknown as { __dials: number }).__dials);
+  const cancel = async () => {
+    const c = page.locator('[data-call-ask]').getByRole('button', { name: 'Cancel' });
+    if (await c.count()) await c.click();
+    await page.waitForTimeout(450);
+  };
+  const openers = page.locator('.ahead [data-call]');
+  const n = await openers.count();
+  for (let i = 0; i < n; i += 1) {
+    for (const f of [0.5, 0.8, 0.9, 0.95, 0.99]) {
+      const opener = openers.nth(i);
+      await opener.scrollIntoViewIfNeeded();
+      const b = (await opener.boundingBox())!;
+      const x = b.x + b.width / 2, y = b.y + b.height * f;
+      await page.mouse.click(x, y);
+      await page.waitForTimeout(150);
+      await page.mouse.click(x, y);
+      expect(await dials(), `call ${i} at ${f * 100} %`).toBe(0);
+      await cancel();
+    }
+    await openers.nth(i).focus();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    expect(await dials(), `call ${i}, Enter Enter`).toBe(0);
+    await cancel();
+    await openers.nth(i).focus();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Enter');
+    expect(await dials(), `call ${i}, Enter Tab Enter`).toBe(0);
+    await cancel();
+  }
+  // and a deliberate call still goes: after the question has stood a moment
+  await openers.first().click();
+  await page.waitForTimeout(450);
+  await page.locator('[data-call-ask]').getByRole('link').click();
+  expect(await dials()).toBe(1);
 });
 
 /** Every tel: link on the page, whether shown or not. */
