@@ -179,3 +179,27 @@ test('[TY-UI-STORE] switching bike in a real browser never writes one bike\'s de
   await page.locator('#tyre-bike').selectOption('default');
   await expect(page.getByRole('textbox', { name: /Tyre maximum/ })).toHaveValue('8');
 });
+
+test('[TY-UI-BIKEBOX] a bike removed in the real bag planner (its Remove saved bike button) is not preselected or offered in the tyre tool', async ({ page }) => {
+  const bikeB = { ...bike, id: 'bike_b2k9x1_4f7a2c9e', name: 'Gravel' };
+  app = await loadApp(page, { launch: true });
+  await page.goto(`${app.origin}/#/tools`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate((entries) => { for (const [k, v] of Object.entries(entries)) localStorage.setItem(k, v); }, { ...SEED, 'loadcheck:bikeProfiles': JSON.stringify([bike, bikeB]) });
+  await page.goto(`${app.origin}/#/tools/tyre`);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#tyre-bike')).toHaveValue(bike.id);
+  // The bag planner's own path: More details, Saved bikes, choose Trail Bike, Remove saved bike, confirm.
+  await page.goto(`${app.origin}/tools/bags/#bike-details=${bike.id}&back=you`, { waitUntil: 'load' });
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await page.evaluate(() => { (document.getElementById('bikeMoreDetails') as HTMLDetailsElement).open = true; (document.getElementById('bikeLibraryPanel') as HTMLDetailsElement).open = true; });
+  await page.locator('#bikeSavedSelect').selectOption(bike.id);
+  await page.locator('#bikeRemove').click();
+  await page.locator('#bikeRemoveConfirm').click();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfiles') ?? '[]').map((b: { id: string }) => b.id))).toEqual([bikeB.id]);
+  // The page keeps its current-bike record, as it does for a rider ("Plans using it keep their own copy").
+  expect(await page.evaluate(() => localStorage.getItem('loadcheck:bikeProfile'))).toContain('"name":"Trail Bike"');
+  await page.goto(`${app.origin}/#/tools/tyre`);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#tyre-bike')).toHaveValue(bikeB.id);
+  await expect(page.locator('#tyre-bike option')).toHaveText(['Gravel', 'Without a bike']);
+});

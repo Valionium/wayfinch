@@ -200,3 +200,11 @@ test("[BK-PAINT-LAZY] the look extras are their own chunk: no pattern, texture o
   expect(first).toContain(`/${chunk[0]!.replace(/^assets\//, '')}`.slice(1));
   expect(text(on, 'index.html')).not.toContain(chunk[0]!);
 });
+
+test("[TY-UI-BIKEBOX] the tyre tool's bike-choice logic is in the tool's own chunk, not in the first screen's JavaScript", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  expect(first.includes('loadcheck:saved-at:v1')).toBe(false);
+  const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
+  expect(lazy.some((f) => text(on, f).includes('loadcheck:saved-at:v1'))).toBe(true);
+});

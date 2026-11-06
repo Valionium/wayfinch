@@ -9,6 +9,8 @@ import { checkLimit, tyreEstimate } from './core.ts';
 import type { Bars, Casing, Limit, RimType, Setup, Surface, Unit, Wheel } from './core.ts';
 import { resolve } from './model.ts';
 import type { Context, Details, FieldName, Source } from './model.ts';
+import { bikeInUse, savedBikeIds } from './choice.ts';
+import type { HostData } from './host.ts';
 import { DEFAULT_KEY, entryOf, readStore, saveEntry } from './storage.ts';
 import type { LastResult } from './storage.ts';
 import { SRAM_URL, sramList } from './sram.ts';
@@ -219,14 +221,18 @@ function WheelFigure({ label, w }: { label: string; w: Wheel }) {
 // ---- the screen ----------------------------------------------------------------------------------------------------------------
 
 export function TyreScreen({ services }: { services: TyreServices }) {
-  const [host, setHost] = useState(() => services.host());
-  const handPicked = useRef(false);
+  // The bikes the bag planner has saved, read with the rest: a removed bike is never offered or chosen (see choice.ts).
+  const read = (): { host: HostData; saved: string[] } => ({ host: services.host(), saved: savedBikeIds(services.storage) });
+  const [snap, setSnap] = useState(read);
+  const { host, saved } = snap;
+  const [gone, setGone] = useState<'next' | 'none' | null>(null);
   const load = (k: string): { key: string; details: Details } => {
     const r = readStore(services.storage);
     return { key: k, details: r.ok ? entryOf(r.store, k).details : {} };
   };
-  // The bike and its details change together, in one step: a render never pairs one bike's key with another's details.
-  const [session, setSession] = useState(() => load(host.usedBikeId ?? DEFAULT_KEY));
+  // The tool opens on the bike in use. After that only the rider's own choice changes the bike, with one exception: a bike removed in
+  // the bag planner moves the box to the bike now in use (or to none), and a line says so.
+  const [session, setSession] = useState(() => load(bikeInUse(services.storage, host, saved) ?? DEFAULT_KEY));
   const { key, details } = session;
   const [kept, setKept] = useState(true);
   const [pending, setPending] = useState<Record<string, string>>({});
@@ -241,17 +247,20 @@ export function TyreScreen({ services }: { services: TyreServices }) {
   const blockedBy = Object.values(pending)[0] ?? null;
 
   // The bag planner may change its bikes while this is open (another tab) or while the phone was elsewhere: read them again when told,
-  // and when the page shows again. A bike that is gone moves the box to the bike now in use; a new one is followed unless the rider chose.
-  const latest = useRef({ key, pending: blockedBy });
-  latest.current = { key, pending: blockedBy };
+  // and when the page shows again.
+  const latest = useRef(key);
+  latest.current = key;
   useEffect(() => {
     const reread = (): void => {
-      const next = services.host();
-      setHost((old) => (JSON.stringify(old) === JSON.stringify(next) ? old : next));
-      const { key: now, pending: busy } = latest.current;
-      const gone = now !== DEFAULT_KEY && !next.bikes.some((b) => b.id === now);
-      if (gone) { handPicked.current = false; setPending({}); setSession(load(next.usedBikeId ?? DEFAULT_KEY)); }
-      else if (!handPicked.current && busy === null && now !== (next.usedBikeId ?? DEFAULT_KEY)) setSession(load(next.usedBikeId ?? DEFAULT_KEY));
+      const next = read();
+      setSnap((old) => (JSON.stringify(old) === JSON.stringify(next) ? old : next));
+      const now = latest.current;
+      if (now !== DEFAULT_KEY && !next.saved.includes(now)) {
+        const use = bikeInUse(services.storage, next.host, next.saved);
+        setGone(use ? 'next' : 'none');
+        setPending({});
+        setSession(load(use ?? DEFAULT_KEY));
+      }
     };
     const onStorage = (e: Event): void => { const k = (e as StorageEvent).key; if (k === null || k.startsWith('loadcheck:')) reread(); };
     const onVisible = (): void => { if (document.visibilityState !== 'hidden') reread(); };
@@ -336,11 +345,12 @@ export function TyreScreen({ services }: { services: TyreServices }) {
 
       <label class="tyre-input" for="tyre-bike">
         <span class="tyre-label">{W.tyreBikeLabel}</span>
-        <select id="tyre-bike" value={key} onChange={(e) => { handPicked.current = true; setPending({}); setSession(load((e.currentTarget as HTMLSelectElement).value)); }}>
-          {host.bikes.map((b) => <option key={b.id} value={b.id}>{b.name}{b.id === host.planBikeId ? W.tyreBikeInPlan : ''}</option>)}
-          <option value={DEFAULT_KEY}>{host.bikes.length ? T.tyreBikeWithout : W.tyreBikeNone}</option>
+        <select id="tyre-bike" value={key} onChange={(e) => { setGone(null); setPending({}); setSession(load((e.currentTarget as HTMLSelectElement).value)); }}>
+          {host.bikes.filter((b) => saved.includes(b.id)).map((b) => <option key={b.id} value={b.id}>{b.name}{b.id === host.planBikeId ? W.tyreBikeInPlan : ''}</option>)}
+          <option value={DEFAULT_KEY}>{saved.length ? T.tyreBikeWithout : W.tyreBikeNone}</option>
         </select>
       </label>
+      {gone ? <Notice>{gone === 'next' ? T.tyreBikeGoneNext : T.tyreBikeGoneNone}</Notice> : null}
       {!kept ? <Notice>{W.tyreNotSaved}</Notice> : null}
       <p class="muted">{W.tyreSavedHere}</p>
 

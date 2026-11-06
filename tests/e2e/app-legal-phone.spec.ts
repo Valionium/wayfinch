@@ -67,10 +67,6 @@ for (const scheme of ['light', 'dark'] as const) {
       const box = (await back.boundingBox())!;
       expect(box.y).toBeGreaterThanOrEqual(0);
       expect(box.height).toBeGreaterThanOrEqual(44);
-      // Nothing is hidden behind the bar: the last block of text ends below it, and the bar is solid.
-      const bar = await page.evaluate(() => document.querySelector('.lg-top')!.getBoundingClientRect().bottom);
-      const last = await page.evaluate(() => document.querySelector('main')!.lastElementChild!.getBoundingClientRect().bottom);
-      expect(last).toBeGreaterThan(bar);
       const bg = await page.evaluate(() => getComputedStyle(document.querySelector('.lg-top')!).backgroundColor);
       expect(bg, 'the bar is solid, so text never shows through it').not.toMatch(/rgba\(.*, 0\)|transparent/);
     }
@@ -94,4 +90,38 @@ test('[LEGAL-PHONE-BACK] on an iPhone the bar clears the notch (viewport-fit cov
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
   const gap = await page.evaluate(() => document.getElementById('de')!.getBoundingClientRect().top - document.querySelector('.lg-top')!.getBoundingClientRect().bottom);
   expect(gap).toBeGreaterThanOrEqual(0);
+});
+
+for (const width of [320, 360, 640, 700, 720, 760, 1280]) {
+  test(`[LEGAL-PHONE-FIT] at ${width} px the scroll hint shows exactly where a table does not fit its box`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 700 });
+    app = await loadApp(page);
+    for (const path of ['/legal/privacy/', '/legal/licences/']) {
+      await page.goto(`${app.origin}${path}`, { waitUntil: 'domcontentloaded' });
+      const boxes = await page.evaluate(() => [...document.querySelectorAll('.lg-table-wrap')].map((b) => {
+        const hint = getComputedStyle(b, '::before').content;
+        return { overflows: b.scrollWidth > b.clientWidth, hint: hint !== 'none' && hint !== 'normal' && hint.length > 2 };
+      }));
+      expect(boxes.length).toBeGreaterThan(0);
+      for (const b of boxes) expect(b.hint, `${path} at ${width}`).toBe(b.overflows);
+    }
+  });
+}
+
+test('[LEGAL-PHONE-BACK] a jump to a heading and a focused link above the view land in text, not behind the bar', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  app = await loadApp(page);
+  await page.goto(`${app.origin}/legal/privacy/#de`, { waitUntil: 'domcontentloaded' });
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  const below = () => page.evaluate(() => {
+    const bar = document.querySelector('.lg-top')!.getBoundingClientRect().bottom;
+    const el = document.elementFromPoint(60, bar + 6);
+    return { insideBar: !!el?.closest('.lg-top'), inMain: !!el?.closest('main') };
+  });
+  expect(await below()).toEqual({ insideBar: false, inMain: true });
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.evaluate(() => (document.querySelector('.lg-nav a') as HTMLElement).focus());
+  expect(await below()).toEqual({ insideBar: false, inMain: true });
+  const linkTop = await page.evaluate(() => document.activeElement!.getBoundingClientRect().top - document.querySelector('.lg-top')!.getBoundingClientRect().bottom);
+  expect(linkTop).toBeGreaterThanOrEqual(0);
 });

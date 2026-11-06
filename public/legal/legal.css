@@ -12,7 +12,7 @@ body { margin: 0; background: var(--ground); color: var(--ink); font: 1rem/1.5 s
 html { scroll-padding-top: calc(70px + env(safe-area-inset-top)); }
 .lg-top { position: sticky; top: 0; z-index: 10; padding: calc(8px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 8px calc(16px + env(safe-area-inset-left)); border-bottom: 1px solid var(--line); background: var(--panel); }
 .lg-back, .lg-nav a { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 8px; color: var(--ink); font-weight: 600; }
-.lg-main { max-width: 46rem; margin: 0 auto; padding: 16px calc(16px + env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left)); overflow-wrap: anywhere; }
+.lg-main { max-width: 46rem; margin: 0 auto; padding: 16px calc(16px + env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left)); overflow-wrap: anywhere; container: lg / inline-size; }
 h1 { font-size: 1.75rem; margin: 16px 0 8px; }
 h2 { font-size: 1.35rem; margin: 28px 0 8px; }
 h3 { font-size: 1.1rem; margin: 20px 0 4px; }
@@ -24,7 +24,8 @@ a { color: var(--blaze); text-underline-offset: 2px; }
 .lg-table-wrap { overflow-x: auto; margin: 8px 0; background-color: var(--ground); }
 .lg-table-wrap th, .lg-table-wrap td { overflow-wrap: normal; word-break: normal; }
 table:not(.lg-pkg) th { min-width: 8rem; }
-@media (max-width: 45rem) {
+/* The hint and edge shadows show only where the table does not fit its box: the box is narrower than the table's 40rem. */
+@container lg (max-width: 39.99rem) {
   .lg-table-wrap {
     background-image: linear-gradient(to right, var(--ground) 30%, transparent), linear-gradient(to left, var(--ground) 30%, transparent), linear-gradient(to right, var(--line), transparent), linear-gradient(to left, var(--line), transparent);
     background-position: left center, right center, left center, right center;
