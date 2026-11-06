@@ -8,9 +8,11 @@
 :root[data-theme='dark'] { color-scheme: dark; --ground: #1B2018; --panel: #242B20; --ink: #EFEDE0; --muted: #A8B198; --blaze: #FF7950; --line: #3E4A36; }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--ground); color: var(--ink); font: 1rem/1.5 system-ui, 'Segoe UI', Roboto, sans-serif; }
-.lg-top { padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+/* The way back stays on screen while reading (owner's iPhone check, 6 November 2026): a solid bar on top, clear of the notch (the pages ask for viewport-fit=cover). */
+html { scroll-padding-top: calc(70px + env(safe-area-inset-top)); }
+.lg-top { position: sticky; top: 0; z-index: 10; padding: calc(8px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 8px calc(16px + env(safe-area-inset-left)); border-bottom: 1px solid var(--line); background: var(--panel); }
 .lg-back, .lg-nav a { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 8px; color: var(--ink); font-weight: 600; }
-.lg-main { max-width: 46rem; margin: 0 auto; padding: 16px 16px 48px; overflow-wrap: anywhere; }
+.lg-main { max-width: 46rem; margin: 0 auto; padding: 16px calc(16px + env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left)); overflow-wrap: anywhere; container: lg / inline-size; }
 h1 { font-size: 1.75rem; margin: 16px 0 8px; }
 h2 { font-size: 1.35rem; margin: 28px 0 8px; }
 h3 { font-size: 1.1rem; margin: 20px 0 4px; }
@@ -18,8 +20,25 @@ a { color: var(--blaze); text-underline-offset: 2px; }
 :focus-visible { outline: 3px solid var(--blaze); outline-offset: 2px; }
 .lg-draft { border-left: 4px solid var(--blaze); padding: 8px 12px; background: var(--panel); font-weight: 600; }
 .lg-nav { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 8px 0; }
-.lg-table-wrap { overflow-x: auto; margin: 8px 0; }
-table { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: 0.9375rem; }
+/* A table scrolls sideways inside its own box at a readable size; words are never broken into pieces to squeeze it in. */
+.lg-table-wrap { overflow-x: auto; margin: 8px 0; background-color: var(--ground); }
+/* The hint and edge shadows show only where the table does not fit its box: the box is narrower than the table's 40rem. */
+@container lg (max-width: 39.99rem) {
+  /* Narrow: words are never broken into pieces to squeeze the table in; it scrolls instead. Wider, the cells wrap as the page does and the table fits. */
+  .lg-table-wrap th, .lg-table-wrap td { overflow-wrap: normal; word-break: normal; }
+  table:not(.lg-pkg) th { min-width: 8rem; }
+  .lg-table-wrap {
+    background-image: linear-gradient(to right, var(--ground) 30%, transparent), linear-gradient(to left, var(--ground) 30%, transparent), linear-gradient(to right, var(--line), transparent), linear-gradient(to left, var(--line), transparent);
+    background-position: left center, right center, left center, right center;
+    background-size: 28px 100%, 28px 100%, 12px 100%, 12px 100%;
+    background-repeat: no-repeat;
+    background-attachment: local, local, scroll, scroll;
+  }
+  /* The hint is style, not text: the pages' wording is untouched, and it stays in view while the table slides under it. */
+  .lg-table-wrap::before { content: 'Swipe sideways to see all columns \2192'; content: 'Swipe sideways to see all columns \2192' / ''; display: block; position: sticky; left: 0; padding: 0 0 4px; color: var(--muted); font-size: 0.8125rem; }
+  .lg-table-wrap:lang(de)::before { content: 'Seitlich wischen f\00FCr alle Spalten \2192'; content: 'Seitlich wischen f\00FCr alle Spalten \2192' / ''; }
+}
+table { border-collapse: collapse; width: 100%; min-width: 40rem; font-size: 0.9375rem; }
 th, td { text-align: left; vertical-align: top; border: 1px solid var(--line); padding: 6px 8px; }
 th { background: var(--panel); }
 .lg-note { color: var(--muted); }

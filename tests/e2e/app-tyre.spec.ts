@@ -179,3 +179,50 @@ test('[TY-UI-STORE] switching bike in a real browser never writes one bike\'s de
   await page.locator('#tyre-bike').selectOption('default');
   await expect(page.getByRole('textbox', { name: /Tyre maximum/ })).toHaveValue('8');
 });
+
+test('[TY-UI-BIKEBOX] a bike removed in the real bag planner (its Remove saved bike button) is not preselected or offered in the tyre tool', async ({ page }) => {
+  const bikeB = { ...bike, id: 'bike_b2k9x1_4f7a2c9e', name: 'Gravel' };
+  app = await loadApp(page, { launch: true });
+  await page.goto(`${app.origin}/#/tools`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate((entries) => { for (const [k, v] of Object.entries(entries)) localStorage.setItem(k, v); }, { ...SEED, 'loadcheck:bikeProfiles': JSON.stringify([bike, bikeB]) });
+  await page.goto(`${app.origin}/#/tools/tyre`);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#tyre-bike')).toHaveValue(bike.id);
+  // The bag planner's own path: More details, Saved bikes, choose Trail Bike, Remove saved bike, confirm.
+  await page.goto(`${app.origin}/tools/bags/#bike-details=${bike.id}&back=you`, { waitUntil: 'load' });
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await page.evaluate(() => { (document.getElementById('bikeMoreDetails') as HTMLDetailsElement).open = true; (document.getElementById('bikeLibraryPanel') as HTMLDetailsElement).open = true; });
+  await page.locator('#bikeSavedSelect').selectOption(bike.id);
+  await page.locator('#bikeRemove').click();
+  await page.locator('#bikeRemoveConfirm').click();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfiles') ?? '[]').map((b: { id: string }) => b.id))).toEqual([bikeB.id]);
+  // The page keeps its current-bike record, as it does for a rider ("Plans using it keep their own copy").
+  expect(await page.evaluate(() => localStorage.getItem('loadcheck:bikeProfile'))).toContain('"name":"Trail Bike"');
+  await page.goto(`${app.origin}/#/tools/tyre`);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#tyre-bike')).toHaveValue(bikeB.id);
+  await expect(page.locator('#tyre-bike option')).toHaveText(['Gravel', 'Without a bike']);
+});
+
+for (const typed of [false, true]) {
+  test(`[TY-UI-BIKEBOX] opened with no saved bike, a bike saved in the real bag planner (second tab) ${typed ? 'after typing leaves "Without a bike"' : 'becomes the choice'}`, async ({ page }) => {
+    app = await loadApp(page, { launch: true, path: '/#/tools/tyre' });
+    await expect(page.locator('#tyre-bike')).toHaveValue('default');
+    await expect(page.locator('#tyre-bike option')).toHaveText(['No saved bike']);
+    if (typed) await page.getByRole('textbox', { name: /Tyre maximum/ }).fill('5');
+    // The bag planner in a second tab of the same browser: More details, a name, Save bike for next time.
+    const planner = await page.context().newPage();
+    await planner.goto(`${app.origin}/tools/bags/#bike-details=new&back=you`, { waitUntil: 'load' });
+    await expect(planner.locator('#bikeDetailsBox')).toBeVisible();
+    await planner.evaluate(() => { (document.getElementById('bikeMoreDetails') as HTMLDetailsElement).open = true; (document.getElementById('bikeLibraryPanel') as HTMLDetailsElement).open = true; });
+    await planner.locator('#bikeName').fill('my bike');
+    await planner.locator('#bikeSave').click({ timeout: 8000 });
+    await expect.poll(() => planner.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfiles') ?? '[]').length)).toBe(1);
+    await planner.close();
+    await page.bringToFront();
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(page.locator('#tyre-bike option')).toHaveText(['my bike', 'Without a bike']);
+    if (typed) await expect(page.locator('#tyre-bike')).toHaveValue('default');
+    else await expect(page.locator('#tyre-bike option:checked')).toHaveText('my bike');
+  });
+}
