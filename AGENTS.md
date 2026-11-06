@@ -89,6 +89,7 @@ The co-pilot's side is `src/ui/trip/handoff.ts` (Trip's Plan bags for this trip;
 - Pull requests use fixed seeds.
 - `main` accepts changes only through pull requests with green `types-lint`, `unit-property`, `load-check-qa` and `browser` checks.
 - Never print or quote lines 20–25 of Load Check's page (`public/tools/bags/index.html`) in any copy. Read it only from line 26 on (`Read` with `offset` 26, or narrow Grep patterns). `.gitattributes` marks it `-diff`, so `git diff` and `git show` print nothing for it. Never run `gh pr diff` on a pull request that holds the page; review with `git diff -- . ':(exclude)public/tools/bags/index.html'`, and for the page's own edits `git diff --text -U0 -- public/tools/bags/index.html`, whose hunks must not touch lines 20–25.
+- No `tel:` link is ever the first tap (owner's iPhone check, 6 November 2026: the iPhone's home-screen app dials one at once). Every call goes through `CallButton` in `src/ui/call.tsx`, which asks first with the number and who it is (`AH-CALL-CONFIRM`); never write a `tel:` href anywhere else, in either app, and keep `<meta name="format-detection" content="telephone=no">` on every page.
 - The bag rules are frozen: `qa/selection-fixtures.cjs` and `LC-FREEZE-01` may not change without the owner.
 - Load Check's source is now this repository. The project folder's `index.html` is the archive; don't edit it.
 

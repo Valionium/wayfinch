@@ -47,9 +47,9 @@ export type AheadTrip = {
 /** With no route there is no screen, but the Emergency card stands: 112 and the fallback line (section 6.9). */
 export type AheadView =
   | { kind: 'loading' }
-  | { kind: 'no-route'; emergency: EmergencyCard; canShare: boolean }
+  | { kind: 'no-route'; emergency: EmergencyCard; canShare: boolean; position?: PositionState }
   /** The trip is there but could not be read: said so, with Try again, never "Add a route". */
-  | { kind: 'unreadable'; emergency: EmergencyCard; canShare: boolean }
+  | { kind: 'unreadable'; emergency: EmergencyCard; canShare: boolean; position?: PositionState }
   | AheadTrip;
 
 export type AheadActions = {

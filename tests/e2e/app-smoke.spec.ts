@@ -1,6 +1,7 @@
 // The smoke set (plan Decision 1, spec section 11.7): a few whole paths that every browser must walk. WebKit runs only these, in
 // its own CI job that never blocks a merge; Chromium runs them with the rest. Nothing here needs Chromium's own tools.
 import { expect, test } from '@playwright/test';
+import { fixtureGpx } from '../fixtures/gpx.ts';
 import { goOffline, loadApp, preparedTrip, removeBuilds } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
 
@@ -18,6 +19,35 @@ test('[APP-SWITCH-ON] smoke: the shell opens on Trip with its four tabs, and eac
   }
 });
 
+test('[TRIP-GPX-IOS] smoke: Trip’s GPX picker names no file types (iOS greys out every .gpx otherwise), and a .gpx chosen there becomes the route', async ({ page }) => {
+  app = await loadApp(page);
+  const input = page.locator('[data-add-route] input[type=file]');
+  expect(await input.getAttribute('accept')).toBeNull();
+  await input.setInputFiles({ name: 'loop.gpx', mimeType: '', buffer: Buffer.from(await fixtureGpx('loop')) });
+  await expect(page.locator('[data-summary]')).toContainText('Heilbronn loop');
+});
+
+test('[SW-MOVED-RETURN] smoke: Open the Bag planner on the moved card, then Back: the card is gone, also when the browser brings the page back from its cache', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/' });
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('loadcheck:setups', '[]'); });
+  await page.reload({ waitUntil: 'load' });
+  await expect(page.locator('.moved-card')).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  await page.evaluate(() => {
+    (window as unknown as { __before: boolean }).__before = true;
+    window.addEventListener('pageshow', (e) => { (window as unknown as { __restored: boolean }).__restored = e.persisted; });
+  });
+  await page.locator('.moved-card').getByRole('link').click();
+  await page.waitForURL(/\/tools\/bags\/$/);
+  await page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY === true', undefined, { timeout: 30_000 });
+  await page.locator('#backToWayfinch').click();
+  await page.waitForURL((u) => u.pathname === '/', { waitUntil: 'commit' });
+  await page.waitForSelector('#app .shell');
+  await expect(page.locator('.moved-card')).toHaveCount(0);
+  // Whether this browser kept the page in its cache (WebKit's job log says): the card is gone either way.
+  console.log(`SW-MOVED-RETURN restored from the cache: ${await page.evaluate(() => (window as unknown as { __before?: boolean }).__before === true)}`);
+});
+
 test('[FLOW-FLIGHT] smoke: a prepared trip opens offline on Ahead, with its six cards and Emergency', async ({ page }) => {
   app = await loadApp(page);
   await preparedTrip(page, 'heidelberg-strasbourg', { departureDate: new Date().toISOString().slice(0, 10), places: true });
@@ -28,7 +58,8 @@ test('[FLOW-FLIGHT] smoke: a prepared trip opens offline on Ahead, with its six 
   await page.goto(`${app.origin}/#/ahead`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.ahead[data-ahead]')).toBeVisible();
   await page.locator('.ah-chips').getByRole('button', { name: 'Emergency', exact: true }).click();
-  await expect(page.locator('#chip-emergency').getByRole('link', { name: 'Call 112' })).toHaveAttribute('href', 'tel:112');
+  await page.locator('#chip-emergency').getByRole('button', { name: 'Call 112' }).click();   // it asks first (AH-CALL-CONFIRM)
+  await expect(page.locator('#chip-emergency').getByRole('link', { name: 'Call 112 now' })).toHaveAttribute('href', 'tel:112');
 });
 
 test('[LC-GLIDE] smoke: Tools to the bag planner and Back to Wayfinch, by the rider\'s taps, with no page error (WebKit has the transition too)', async ({ page }) => {

@@ -9,7 +9,8 @@ import { MOVED_CARD_KEY, MovedCard, returningLoadCheckRider } from '../../../src
 const host = document.createElement('div');
 document.body.append(host);
 beforeEach(() => localStorage.clear());
-afterEach(() => render(null, host));
+// unmounted inside act, so the card's listeners are removed before the test environment goes (CI, run 42281580608)
+afterEach(() => act(() => { render(null, host); }));
 
 const show = () => act(() => { render(<MovedCard />, host); });
 
@@ -43,7 +44,7 @@ test('[SW-MOVED-CARD] the card says where Load Check went, links to the bag plan
   expect(host.querySelector('.moved-card')).toBeNull();
   expect(localStorage.getItem(MOVED_CARD_KEY)).not.toBeNull();
   // a later start: still gone
-  render(null, host);
+  act(() => { render(null, host); });
   await show();
   expect(host.querySelector('.moved-card')).toBeNull();
   // the bag planner's own keys were only read
@@ -59,7 +60,7 @@ test('[SW-MOVED-CARD] following the link counts as seen: the card does not come 
   link.addEventListener('click', (e) => e.preventDefault());
   await act(() => { link.click(); });
   expect(localStorage.getItem(MOVED_CARD_KEY)).not.toBeNull();
-  render(null, host);
+  act(() => { render(null, host); });
   await show();
   expect(host.querySelector('.moved-card')).toBeNull();
 });
@@ -70,7 +71,7 @@ test('[SW-MOVED-CARD] a new rider never sees it, also once the bag planner has w
   // the co-pilot's first look found no Load Check keys: that is kept, so a draft the bag planner writes afterwards brings no card
   expect(localStorage.getItem(MOVED_CARD_KEY)).not.toBeNull();
   localStorage.setItem('loadcheck:draft', '{"v":1}');
-  render(null, host);
+  act(() => { render(null, host); });
   await show();
   expect(host.querySelector('.moved-card')).toBeNull();
 });
@@ -80,7 +81,7 @@ test('[SW-MOVED-CARD] a browser that keeps nothing shows it but never throws', a
   const realSet = Storage.prototype.setItem;
   Storage.prototype.setItem = () => { throw new Error('quota'); };
   try {
-    render(null, host);
+    act(() => { render(null, host); });
     await show();
     const dismiss = host.querySelector<HTMLButtonElement>('.moved-card button')!;
     await act(() => { dismiss.click(); });
@@ -89,4 +90,38 @@ test('[SW-MOVED-CARD] a browser that keeps nothing shows it but never throws', a
   } finally {
     Storage.prototype.setItem = realSet;
   }
+});
+
+const pageshow = (persisted: boolean) => act(() => { window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted })); });
+
+test('[SW-MOVED-RETURN] back from the bag planner out of the back-forward cache (Safari keeps the page as it was): the card is read again and goes', async () => {
+  localStorage.setItem('loadcheck:setups', '[]');
+  await show();
+  const link = host.querySelector<HTMLAnchorElement>('.moved-card a')!;
+  link.addEventListener('click', (e) => e.preventDefault());
+  await act(() => { link.click(); });
+  // the page as the cache kept it, still holding the card from before the jump
+  await pageshow(true);
+  expect(host.querySelector('.moved-card')).toBeNull();
+});
+
+test('[SW-MOVED-RETURN] the page the cache keeps has no card once it was followed: it goes as the page is left', async () => {
+  localStorage.setItem('loadcheck:draft', '{}');
+  await show();
+  const link = host.querySelector<HTMLAnchorElement>('.moved-card a')!;
+  link.addEventListener('click', (e) => e.preventDefault());
+  await act(() => { link.click(); });
+  expect(host.querySelector('.moved-card')).not.toBeNull();   // no flash on the tap itself
+  await act(() => { window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })); });
+  expect(host.querySelector('.moved-card')).toBeNull();
+});
+
+test('[SW-MOVED-RETURN] dismissed in another window: gone here too; a restore with the card still due keeps it', async () => {
+  localStorage.setItem('loadcheck:draft', '{}');
+  await show();
+  await pageshow(true);
+  expect(host.querySelector('.moved-card')).not.toBeNull();
+  localStorage.setItem(MOVED_CARD_KEY, 'seen');
+  await act(() => { window.dispatchEvent(new StorageEvent('storage', { key: MOVED_CARD_KEY })); });
+  expect(host.querySelector('.moved-card')).toBeNull();
 });

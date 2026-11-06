@@ -539,6 +539,12 @@ export const W = {
   callNoContact: 'No phone or website mapped.',
   callCall: (number: string): string => `Call ${number}`,
   callAlso: (number: string): string => `also ${number}`,
+  // No number is dialled by the first tap (owner's iPhone check, 6 Nov 2026): each call button asks first, in its place.
+  callAsk: (number: string): string => `Call ${number}?`,
+  callNow: (number: string): string => `Call ${number} now`,
+  callCancel: 'Cancel',
+  // after the number, for a screen reader only: it then reads the digits, not one big number (review of PR 53, M2)
+  callDigits: (digits: string): string => ` Digits: ${digits}.`,
   callText: (number: string): string => `Phone ${number}`,
   callWebsite: (host: string): string => `Website ${host} (online)`,
   callLabel: (name: string, number: string): string => `Call ${name}, ${number}`,

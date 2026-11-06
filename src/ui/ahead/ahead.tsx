@@ -129,7 +129,7 @@ function NoRoute({ view, actions }: { view: Extract<AheadView, { kind: 'no-route
       <ChipRow shown={['emergency']} open={open ? 'emergency' : null} onOpen={(c) => setOpen(c !== null)} />
       {open ? (
         <section class="card ah-chip-panel ah-large" id="chip-emergency" aria-label={W.appAheadChipEmergency}>
-          <EmergencyPanel card={view.emergency} canShare={view.canShare} actions={actions} />
+          <EmergencyPanel card={view.emergency} canShare={view.canShare} actions={actions} position={view.position} />
         </section>
       ) : null}
     </div>

@@ -3,18 +3,20 @@
 import type { ComponentChildren } from 'preact';
 import { useId } from 'preact/hooks';
 import type { AnswerItem, ItemLink } from '../../core/types.ts';
+import { CallButton } from '../call.tsx';
 import { StatusBadge } from '../status.tsx';
 
 const SEPARATOR = ' · ';
 
 /**
- * A tel: link hands the number to the dialler; a website opens in the browser with no referrer. Nothing is sent before the tap.
- * The button's name is its own words ("Call +49 7221 123456"), and it is described by the item's label, which names the place.
+ * A call asks first and then hands the number to the dialler (call.tsx); a website opens in the browser with no referrer. Nothing is
+ * sent before the tap. The button's name is its own words ("Call +49 7221 123456"), and it is described by the item's label, which
+ * names the place; the question names it too.
  */
 function LinkButton({ link, describedBy }: { link: ItemLink; describedBy?: string | undefined }) {
-  return link.kind === 'tel'
-    ? <a class={`btn ah-link${link.secondary ? ' ah-link-secondary' : ''}`} href={link.href} aria-describedby={describedBy}>{link.shown}</a>
-    : <a class="btn ah-link" href={link.href} target="_blank" rel="noopener noreferrer" aria-describedby={describedBy}>{link.shown}</a>;
+  return link.kind === 'web'
+    ? <a class="btn ah-link" href={link.href} target="_blank" rel="noopener noreferrer" aria-describedby={describedBy}>{link.shown}</a>
+    : <CallButton cls={`btn ah-link${link.secondary ? ' ah-link-secondary' : ''}`} href={link.href} shown={link.shown} who={link.label} describedBy={describedBy} />;
 }
 
 /** The detail as the engine wrote it; a part that is a button's own words becomes that button. */

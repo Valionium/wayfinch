@@ -15,7 +15,7 @@ import { bannedHits } from '../../fixtures/banned.ts';
 import { stamps } from '../core/engines/weather-helpers.ts';
 import { inputsOf } from '../core/screen/screen-helpers.ts';
 import { FRI, ownersDay, rainyStop, SAT } from './ahead-fixture.ts';
-import { buttonNamed, click, expandAll, fakeActions, host, show, typeInto, viewOf } from './ahead-helpers.tsx';
+import { buttonNamed, click, dialled, expandAll, fakeActions, host, show, typeInto, viewOf } from './ahead-helpers.tsx';
 
 afterEach(() => { render(null, host); });
 
@@ -503,9 +503,12 @@ describe('call ahead', () => {
     const v = trip(viewOf(rainyStop()));
     await show(v, fakeActions().actions);
     await click(host.querySelector('[data-card="sleep"] .ah-toggle'));
-    const links = [...host.querySelectorAll<HTMLAnchorElement>('[data-card="sleep"] a.ah-link')];
-    expect(links.map((a) => a.getAttribute('href'))).toEqual(['tel:+497221123456', 'tel:+491711234567', 'https://camping-rheinaue.de']);
-    for (const a of links) expect(a.getAttribute('href')).toMatch(/^(tel:\+\d+|https?:\/\/)/);
+    // A call asks first (AH-CALL-CONFIRM): its button, then the question's one tel: link.
+    const links = [...host.querySelectorAll<HTMLElement>('[data-card="sleep"] .ah-link')];
+    const hrefs: (string | null)[] = [];
+    for (const l of links) hrefs.push(l.tagName === 'A' ? l.getAttribute('href') : await dialled(l));
+    expect(hrefs).toEqual(['tel:+497221123456', 'tel:+491711234567', 'https://camping-rheinaue.de']);
+    for (const h of hrefs) expect(h).toMatch(/^(tel:\+\d+|https?:\/\/)/);
     const site = links[2]!;
     expect(site.getAttribute('rel')).toBe('noopener noreferrer');
     expect(site.getAttribute('target')).toBe('_blank');
@@ -514,7 +517,7 @@ describe('call ahead', () => {
     expect(document.getElementById(links[0]!.getAttribute('aria-describedby')!)!.textContent).toMatch(/^Camping Rheinaue/);
     await click(buttonNamed('Bike shop', host.querySelector('.ah-chips')!));
     const panel = host.querySelector('#chip-bike')!;
-    expect(panel.querySelector<HTMLAnchorElement>('a.ah-link')!.getAttribute('href')).toBe('tel:+49785112345');
+    expect(await dialled(panel.querySelector('.ah-link'))).toBe('tel:+49785112345');
     expect(panel.textContent).toContain(W.callNoContact);
   });
 });
@@ -581,7 +584,7 @@ describe('Emergency', () => {
   test('[AH-EMERGENCY] with a position: 112 to call, the fallback line, the coordinates and Share my location', async () => {
     const v = trip(viewOf(rainyStop()));
     const card = await emergencyIn(v);
-    expect(card.querySelector('a[href="tel:112"]')).not.toBeNull();
+    expect(await dialled(buttonNamed(W.emergencyCall, card))).toBe('tel:112');
     expect(card.textContent).toContain(W.emergencyFallback);
     expect(card.textContent).toContain(v.screen.chips.emergency.coords!);
     expect(() => buttonNamed('Share my location', card)).not.toThrow();
@@ -596,7 +599,7 @@ describe('Emergency', () => {
     ];
     for (const v of states) {
       const card = await emergencyIn(v);
-      expect(card.querySelector('a[href="tel:112"]'), v.kind).not.toBeNull();
+      expect(await dialled(buttonNamed(W.emergencyCall, card)), v.kind).toBe('tel:112');
       expect(card.textContent).toContain(W.emergencyFallback);
     }
   });
@@ -619,7 +622,7 @@ describe('degraded', () => {
     const link = [...host.querySelectorAll('a')].find((a) => a.textContent === W.appAheadSpeedLink)!;
     expect(link.getAttribute('href')).toBe('#/trip');
     const card = await (async () => { await click(buttonNamed('Emergency', host.querySelector('.ah-chips')!)); return host.querySelector('#chip-emergency')!; })();
-    expect(card.querySelector('a[href="tel:112"]')).not.toBeNull();
+    expect(await dialled(buttonNamed(W.emergencyCall, card))).toBe('tel:112');
   });
 
   test('[AH-FIRST-USE] no position on a trip day after day 1: only Update position and the picker, no answers; before the trip, day 1\'s answers show', async () => {
