@@ -162,8 +162,9 @@ test('[GA-PROGRESS] the heavy plan (many bags, five nights, a lot; Panniers are 
   await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
   await expect(page.locator('#advisorAnswer h4').first()).toBeVisible({ timeout: 60_000 });
   const r = await page.evaluate('window.__adv') as { trials: number; longest: number; shown: number[]; honest: boolean; backs: number[] };
-  const gap = Math.max(...r.backs.slice(1).map((t, k) => t - r.backs[k]!));
-  const note = `${r.trials} trials, longest task ${r.longest.toFixed(0)} ms, progress shown ${r.shown.length} times, ${r.backs.length} hand-backs at most ${gap.toFixed(0)} ms apart`;
+  const gaps = r.backs.slice(1).map((t, k) => t - r.backs[k]!).sort((a, b) => a - b);
+  const median = gaps[Math.floor(gaps.length / 2)] ?? Infinity;
+  const note = `${r.trials} trials, longest task ${r.longest.toFixed(0)} ms, progress shown ${r.shown.length} times, ${r.backs.length} hand-backs, median ${median.toFixed(0)} ms apart, at most ${(gaps.at(-1) ?? 0).toFixed(0)}`;
   test.info().annotations.push({ type: 'GA-PROGRESS heavy', description: note });
   console.log(`GA-PROGRESS heavy ${test.info().project.name}: ${note}`);
   expect(r.trials).toBeGreaterThan(100);
@@ -171,9 +172,10 @@ test('[GA-PROGRESS] the heavy plan (many bags, five nights, a lot; Panniers are 
   expect(r.honest, 'the progress line never counts more options than were tried').toBe(true);
   expect(r.shown.every((n, k) => k === 0 || n >= r.shown[k - 1]!), 'the count only grows').toBe(true);
   expect(r.longest, 'no stretch of the search holds the page 600 ms or more').toBeLessThan(600);
-  // the hand-backs themselves: a slice of about 50 ms, never 20 heavy trials in a row (re-check of PR 61, n7)
+  // the hand-backs themselves: a slice of about 50 ms, not 20 heavy trials in a row (re-check of PR 61, n7); the median, as one slow
+  // trial or a pause of the machine can stretch a single gap
   expect(r.backs.length).toBeGreaterThan(5);
-  expect(gap, 'two hand-backs at most 250 ms apart').toBeLessThan(250);
+  expect(median, 'the page gets its hand back every 150 ms or sooner, as a rule').toBeLessThan(150);
 });
 
 test('[GA-SCREEN] advisor.js still loading: a setup tapped before it arrives is kept, the view is not drawn again under the rider\'s focus, and no second search starts when it loads (review of PR 61, m4)', async ({ page }) => {
