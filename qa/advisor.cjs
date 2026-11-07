@@ -276,6 +276,17 @@ test('[GA-ANSWER] each suggestion shows type and size range, the bike drawn with
   for(const bag of a.items[0].add)assert.ok(drawn.items.some(x=>x.pos===bag.pos),'drawn with the '+bag.pos);
 });
 
+test('[GA-ANSWER] a bike whose rack mounts are Not sure (no field, as sub-project 11 stores it): every pannier shown says "if your bike has rack mounts"',async()=>{
+  const p=page({bike:BARE,setup:"S.bags=[{uid:1,pos:'pack',L:15}];S.nextUid=2;S.nights=0;applyTripKitDefaults();"});
+  assert.equal(p.json("advisorInput('either','backpack').rackMounts"),null,'no field');
+  await ask(p,{style:'either',goal:'backpack'});
+  const a=p.json('ADVISOR.answer');
+  const racks=a.items.filter(s=>s.add.some(b=>b.pos==='rack'));
+  assert.ok(racks.length>0,'panniers are among the suggestions');
+  for(const s of racks)assert.ok(s.tags.includes('if your bike has rack mounts'));
+  assert.ok(textOf(view(p).answer).includes('if your bike has rack mounts'),'and the tag is on screen');
+});
+
 test('[GA-ANSWER] the words of each answer: a swap, a pair, already good, cannot reduce, nothing helps with what stays over, a search cut short',()=>{
   const p=page({setup:R2});
   const input="advisorInput('either','handling')";
@@ -351,6 +362,8 @@ test('[GA-STYLE-PAGE] R4 and every rider under Without a rack get no pannier and
     const why=["Without a rack, your panniers and rack deck are left out of these suggestions.","On mountain bike trails, panniers aren't offered."];
     assert.ok(!/\bpanniers?\b/i.test(why.reduce((t,w)=>t.replace(w,''),text)),`${r.id} ${style}: no pannier in the answer's words`);
     if(r===r4 && style==='either')assert.ok(text.includes(why[1]),'R4 under Either: the trails line says why');
+    // the tourer's own panniers and rack deck leave the plan under Without a rack (review of PR 57, R1), and the answer says so
+    if(r.id==='R3' && style==='no-rack')assert.ok(text.includes(why[0]),'R3 without a rack: the line says its rack kit is left out');
     if(r===r4)assert.ok(textOf(p.context.document.getElementById('advisorSteps').innerHTML).includes("Your bike has no rack mounts, so panniers aren't offered."),'R4: the line');
   }
 });
