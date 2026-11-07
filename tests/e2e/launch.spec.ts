@@ -376,7 +376,7 @@ for (const start of ['legacy', 'step-one'] as const) {
     // The bag planner reads what is left as Not sure, without a fault.
     await planner.reload({ waitUntil: 'domcontentloaded' });
     await draftReady(planner);
-    expect(await planner.evaluate('[BIKE_PROFILES[0].suspension, BIKE_PROFILES[0].rackMounts, BIKE_PROFILES[0].brakes]')).toEqual(['unknown', 'unknown', 'rim']);
+    expect(await planner.evaluate("['suspension' in BIKE_PROFILES[0], 'rackMounts' in BIKE_PROFILES[0], BIKE_PROFILES[0].brakes]")).toEqual([false, false, 'rim']);
   });
 
   test(`[SW-OLD-TAB-WRITES] a future bike format (3, which no page writes today) would block ${which} bike write, with its message`, async ({ context, page }) => {

@@ -130,6 +130,8 @@ reset();
   check(get('bikeSuspension').value==='unknown' && get('bikeRackMounts').value==='unknown','[TB-DETAILS-FORM] a new bike starts at Not sure');
   app.run(`fillBikeProfileForm(normaliseBikeProfile({id:'filled',suspension:'full',rackMounts:'yes'}))`);
   check(get('bikeSuspension').value==='full' && get('bikeRackMounts').value==='yes','[TB-DETAILS-FORM] a saved bike fills both');
+  app.run(`fillBikeProfileForm(normaliseBikeProfile({id:'older',name:'Older bike',brakes:'rim'}))`);
+  check(get('bikeSuspension').value==='unknown' && get('bikeRackMounts').value==='unknown','[TB-DETAILS-FORM] a bike from before shows Not sure');
   app.run('fillBikeProfileForm(null)');
 }
 // Saving them: on the saved bike and the plan's bike, after a reload too; back to Not sure stores 'unknown'.
@@ -155,7 +157,7 @@ async function detailsSave(){
   set('bikeSuspension','unknown');set('bikeRackMounts','unknown');
   check(await a.run('saveBikeProfile()')===true,'[TB-DETAILS-SAVE] the bike saves again');
   await a.run('BIKE_PROFILE_WRITES');
-  check(library().suspension==='unknown' && library().rackMounts==='unknown' && current().suspension==='unknown' && current().rackMounts==='unknown','[TB-DETAILS-SAVE] back to Not sure stores unknown');
+  check(![library(),current()].some(b=>'suspension' in b || 'rackMounts' in b),'[TB-DETAILS-SAVE] back to Not sure stores no field');
 }
 // Moved here from the retired pressure-tool-markup and pressure-tool suites (sub-project 6, Task 6): what they guarded
 // besides the tyre helper. Unique ids; the bike weight in the form with its label and help; Use these bike details keeps the repair

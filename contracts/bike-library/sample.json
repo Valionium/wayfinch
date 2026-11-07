@@ -45,9 +45,7 @@
     "valve": "unknown",
     "brakes": "unknown",
     "drive": "unknown",
-    "shifting": "unknown",
-    "suspension": "unknown",
-    "rackMounts": "unknown"
+    "shifting": "unknown"
   },
   {
     "id": "bike_odd_values",

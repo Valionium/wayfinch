@@ -31,7 +31,8 @@ describe('the bike library read by both pages', () => {
     expect(oddRead.fit).toMatchObject({ style: 'unknown', size: null, triangleCm: null, seatGapCm: null, barWidthCm: 38, bolts: { st: 'unknown', dt: 'yes', un: 'unknown' } });
     expect(oddRead.maxWeight).toBeNull();
     expect(oddRead.brakes).toBe('unknown');
-    expect(oddRead).toMatchObject({ suspension: 'unknown', rackMounts: 'unknown' });
+    expect(Object.keys(oddRead)).not.toContain('suspension');
+    expect(Object.keys(oddRead)).not.toContain('rackMounts');
     expect(oddRead.rearTyre).toBe('47-584');
     expect(oddRead.geometry).toEqual({ at: null, maker: '', model: 'Long Road', year: null, size: '', wheel: null, values: { reach_mm: { v: 385, src: 'estimate' } } });
     expect(Object.keys(oddRead)).not.toContain('wings');

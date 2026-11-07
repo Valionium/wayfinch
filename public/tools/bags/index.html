@@ -2675,6 +2675,7 @@ const BIKE_PROFILE_LABELS={
   suspension:{unknown:'Not sure',none:'None',front:'Front fork',full:'Full suspension'},
   rackMounts:{unknown:'Not sure',yes:'Yes',no:'No'},
 };
+const BIKE_PROFILE_ANSWERS=['suspension','rackMounts'];
 const BIKE_PROFILE_TEXT={name:100,frontTyre:120,rearTyre:120,padType:120,chainType:120,hangerType:120,notes:1000};
 function normalisePressureBike(value){
   const p=dataObject(value) ? value : {};
@@ -2711,8 +2712,11 @@ function normaliseBikeProfile(value){
   const profile={id:value.id};
   for(const [key,max] of Object.entries(BIKE_PROFILE_TEXT))profile[key]=dataText(value[key],max).trim();
   profile.name=profile.name || 'My bike';
-  for(const [key,labels] of Object.entries(BIKE_PROFILE_LABELS))
-    profile[key]=typeof value[key]==='string' && Object.hasOwn(labels,value[key]) ? value[key] : 'unknown';
+  for(const [key,labels] of Object.entries(BIKE_PROFILE_LABELS)){
+    const v=typeof value[key]==='string' && Object.hasOwn(labels,value[key]) ? value[key] : 'unknown';
+    // suspension and rack mounts (sub-project 11) are stored only as an answer: no field is Not sure, so a bike from before keeps its bytes
+    if(v!=='unknown' || !BIKE_PROFILE_ANSWERS.includes(key))profile[key]=v;
+  }
   profile.pressure=normalisePressureBike(value.pressure);
   profile.fit=normaliseFit(value.fit);
   profile.maxWeight=normaliseMaxWeight(value.maxWeight);
@@ -3070,7 +3074,7 @@ function fillBikeProfileForm(value){
   BIKE_PROFILE_EDITOR_ID=p?.id || '';
   let newName='My bike',suffix=2;
   while(BIKE_PROFILES.some(b=>b.name===newName))newName='My bike '+suffix++;
-  for(const [key,id] of Object.entries(BIKE_PROFILE_INPUTS))$(id).value=p ? p[key] : key==='name' ? newName : BIKE_PROFILE_LABELS[key] ? 'unknown' : '';
+  for(const [key,id] of Object.entries(BIKE_PROFILE_INPUTS))$(id).value=p ? p[key] ?? 'unknown' : key==='name' ? newName : BIKE_PROFILE_LABELS[key] ? 'unknown' : '';
   $(BIKE_WEIGHT_INPUT).value=normalisePressureBike(p?.pressure).bikeKg ?? '';
   fillFitFields(p);
   BIKE_PROFILE_FORM_READY=true;
