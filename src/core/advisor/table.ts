@@ -52,8 +52,9 @@ export const MAX_TRIALS = 1000;
  *   With a rack is included too (review of PR 57, m3).
  * - seatUnlikely / seatTight (decision 9): a seat pack size the measured seat gap calls unlikely is dropped (or 'tag': offered with
  *   "unlikely to fit"); a tight one is offered with "tight" (or 'offer': without the word).
- * - rackDeckWithoutRack (review of PR 57, I3; design §4 "never a pannier or rack deck"): without a rack (that style, or the trails
- *   answer where it blocks panniers) the rider's own rack deck is 'off' in every candidate, or 'kept'.
+ * - rackWithoutRack (review of PR 57, I3 and R1; design §4 "never a pannier or rack deck"): without a rack (that style, or the trails
+ *   answer where it blocks panniers) nothing is on a rack: 'off' takes the rider's own panniers and rack deck out of the base trial and
+ *   every candidate, so the answer compares against the rackless plan; 'kept' leaves the plan as it is.
  * - rangeUpToL, rangeHalfLitres (design §3.3, decision 3): the range shown runs up to this many litres above the chosen size; with
  *   rangeHalfLitres the top tube's +0.5 and +1.5 L count too (review m2), otherwise only + 1 and + 2 (the plan's literal rule).
  */
@@ -63,7 +64,7 @@ export const DECIDED = Object.freeze({
   noPanniersUnder: Object.freeze(['either', 'rack']) as readonly ('either' | 'rack')[],
   seatUnlikely: 'drop' as 'drop' | 'tag',
   seatTight: 'tag' as 'tag' | 'offer',
-  rackDeckWithoutRack: 'off' as 'off' | 'kept',
+  rackWithoutRack: 'off' as 'off' | 'kept',
   rangeUpToL: 2,
   rangeHalfLitres: true as boolean,
 });
