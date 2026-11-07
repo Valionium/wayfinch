@@ -55,8 +55,6 @@ export const W = {
   routeNoDateNote: 'No departure date yet, so the answers give distances only. Set it in Trip.',
   routeStampHere: 'here',
   routeNoPositionFromStart: 'No position yet: these answers count from the route start (km 0). Update position for answers from where you are.',
-  // While Ahead asks which pass (an out-and-back route), a position was found and waits for the rider's answer (after the launch, 7 Nov 2026).
-  routeAskPassFromStart: "Position found. Choose which pass you're on; until then the answers count from the route start (km 0).",
   routeStripDayOne: 'Day 1',
   routeStripToday: 'Today',
   routeStripTomorrow: (day: string): string => (day === '' ? 'Tomorrow' : `Tomorrow, ${day}`),
@@ -1014,8 +1012,7 @@ export const W = {
   appAheadNoGeo: "This browser can't give a position. Set your position by hand.",
   appAheadNoPosition: "That reading couldn't be used as a position. Try again, or set your position by hand.",
   appAheadNotKept: 'That position was not kept: the route changed, or it lies outside the route.',
-  appAheadAsk: (a: string, b: string): string => `Are you at km ${a} (way out) or km ${b} (way back)?`,
-  appAheadAskKm: (km: string): string => `km ${km}`,
+  // The which-pass question's words are in en-ask.ts, loaded with Update position's tap (after the launch, 7 Nov 2026).
   appAheadFirstUse: "Update your position, or set it by hand, to see what's ahead.",
   appAheadManualToggle: 'Set position by hand',
   appAheadManualTitle: 'Set your position by hand',

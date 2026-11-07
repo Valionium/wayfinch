@@ -618,6 +618,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - name and short name "Wayfinch", id and start_url /, scope /, standalone, en; icons 192, 512 and maskable; shortcuts /tools/bags/, /#/tools/tyre; description contains "trip planning, not health advice" [APP-MANIFEST]
 - a file under src/ui/ahead/ importing src/store or calling fetch fails lint (fixture run of ESLint) [APP-AHEAD-LINT]
 - a production build's JS contains no __wf [APP-NO-HOOK]
+- the app's files carry only the fields of build.config.json the app reads (weatherMode, dataOrigin): a build with only the launch switch or the deploy settings changed writes every file byte for byte the same, under the same name (review of PR 63, C1; after the launch, 7 Nov 2026) [APP-LAUNCH-BYTES]
 - the shell registers /offline-worker.js with { scope: '/', updateViaCache: 'none' } and no module type, once, after its first render; no second registration [APP-REGISTER]
 - a waiting worker shows "Update ready — apply now"; the tap saves first, sends WF_APPLY, and reloads only on controllerchange; update checks at launch and on return to the foreground, at most hourly; the page never reloads by itself [APP-UPDATE-PROMPT]
 - every screen name the shell knows renders content of its own, never only its heading; #/you/legal shows You with its legal links in view, in You's own wide layout and drop zone on a computer (owner's device check, 5 Nov 2026) [APP-SCREENS-FULL]
