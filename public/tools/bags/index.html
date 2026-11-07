@@ -3772,7 +3772,7 @@ function openBikeDetailsFromLink(hash=location.hash){
   try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
   const saved=BIKE_PROFILES.find(b=>b.id===link.id),plan=S.bikeProfile && S.bikeProfile.id===link.id ? S.bikeProfile : null;
   const [href,key]=BIKE_BACKS[link.back];
-  setWayfinchBack(href);
+  if(!inThisPage(href))setWayfinchBack(href);   // the Gear advisor is in this page: Back to Wayfinch keeps going to Wayfinch
   $('bikeDetailsBack').href=href;$('bikeDetailsBack').textContent=bikeWord(key);$('bikeDetailsBack').classList.remove('hidden');
   openBikeDetails($('rigBikeDetails'),link.section==='look' ? 'look' : 'frame');
   LINK_BIKE=true;
