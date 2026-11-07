@@ -3,8 +3,9 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { buildDist } from '../../../tools/build.mjs';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import type { Plugin } from 'vite';
+import { buildDist, runVite } from '../../../tools/build.mjs';
 import { measure } from '../../../tools/size-budget.mjs';
 
 const REPO = fileURLToPath(new URL('../../../', import.meta.url));
@@ -160,6 +161,38 @@ test('the launch-on build is the same twice', async () => {
   expect(text(again, 'build.json')).toBe(text(on, 'build.json'));
 }, 120_000);
 
+// Review of PR 63, C1: the whole of build.config.json once reached the entry chunk, so flipping the launch switch renamed every
+// chunk, and the bytes that deployed were not the bytes the owner had tested. Only the fields the app reads may reach its files.
+describe("the launch switch and the deploy settings never reach the app's files (review of PR 63, C1)", () => {
+  const real = JSON.parse(readFileSync(join(REPO, 'build.config.json'), 'utf8')) as Record<string, unknown>;
+  /** vite.config.ts as it is, with build.config.json read as `config` instead of the file on disk. */
+  const withConfig = (config: Record<string, unknown>): Plugin => ({
+    name: 'wf-test-config', enforce: 'pre',
+    load(id) { return /[\\/]build\.config\.json$/.test(id.split('?')[0]!) ? JSON.stringify(config, null, 2) : null; },
+  });
+  const built = async (name: string, config: Record<string, unknown>): Promise<Map<string, string>> => {
+    const dir = join(tmpRoot, name);
+    await runVite(dir, { plugins: [withConfig(config)] });
+    return new Map(files(dir).map((f) => [f, sha256(readFileSync(join(dir, f)))]));
+  };
+  let base = new Map<string, string>();
+  beforeAll(async () => { base = await built('config-real', real); }, 120_000);
+
+  test.each([
+    ['launch', { launch: !real['launch'] }],
+    ['deployEnabled and deployWithoutReviewer', { deployEnabled: !real['deployEnabled'], deployWithoutReviewer: !real['deployWithoutReviewer'] }],
+  ])('[APP-LAUNCH-BYTES] with only %s changed, every file Vite writes is byte-identical, under the same name', async (what, change) => {
+    const other = await built(`config-${what.replace(/\W+/g, '-')}`, { ...real, ...change });
+    expect([...other.keys()]).toEqual([...base.keys()]);
+    for (const [f, hash] of base) expect(other.get(f), f).toBe(hash);
+  }, 120_000);
+
+  test('[APP-LAUNCH-BYTES] the stand-in config does reach the build: a field the app reads (weatherMode) changes its files', async () => {
+    const other = await built('config-weather', { ...real, weatherMode: real['weatherMode'] === 'auto' ? 'tap' : 'auto' });
+    expect([...other.entries()].some(([f, hash]) => base.get(f) !== hash)).toBe(true);
+  }, 120_000);
+});
+
 // Leaflet 1.9.4 from this site (spec 7.1 item 7): the npm registry's published package, checked against its integrity
 // (sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==) and copied unchanged.
 const LEAFLET: Record<string, string> = {
@@ -199,6 +232,14 @@ test("[BK-PAINT-LAZY] the look extras are their own chunk: no pattern, texture o
   // loaded by a dynamic import from the first screen, never a static one or a preload
   expect(first).toContain(`/${chunk[0]!.replace(/^assets\//, '')}`.slice(1));
   expect(text(on, 'index.html')).not.toContain(chunk[0]!);
+});
+
+test("[AH-ASK-NOTE] Ahead's which-pass words are their own chunk, loaded with the tap: not in the first screen's JavaScript", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  for (const mark of ['(way back)', 'Choose which pass']) expect(first.includes(mark), mark).toBe(false);
+  const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
+  expect(lazy.filter((f) => text(on, f).includes('Choose which pass')).length).toBe(1);
 });
 
 test("[TY-UI-BIKEBOX] the tyre tool's bike-choice logic is in the tool's own chunk, not in the first screen's JavaScript", () => {

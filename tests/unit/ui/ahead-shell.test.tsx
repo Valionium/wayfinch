@@ -10,6 +10,7 @@ import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Route, ScreenInputs } from '../../../src/core/types.ts';
 import { W } from '../../../src/core/wording/en.ts';
+import { A } from '../../../src/core/wording/en-ask.ts';
 import { H } from '../../../src/core/wording/en-here.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
 import { closeDb, DB_NAME } from '../../../src/store/db.ts';
@@ -23,7 +24,7 @@ import { browserAhead } from '../../../src/ui/shell-actions.ts';
 import type { AheadDeps } from '../../../src/ui/shell-actions.ts';
 import { go } from '../../../src/ui/nav.ts';
 import { ROUTINE, watchBest } from '../../../src/ui/position.ts';
-import { at, flatRoute, pointAtKm } from '../../fixtures/build.ts';
+import { at, flatRoute, pointAtKm, rescue } from '../../fixtures/build.ts';
 import { rainyStop, SAT } from './ahead-fixture.ts';
 import { buttonNamed, click, dialled, host, typeInto } from './ahead-helpers.tsx';
 
@@ -514,6 +515,80 @@ describe('Emergency\'s Update position never waits on a question (review of PR 5
     await until(() => (panel().textContent ?? '').includes(`${lat.toFixed(5)}, ${lon.toFixed(5)}`), 'the fix in Emergency');
     expect(panel().textContent).toMatch(/Last position at \d{2}:\d{2} \((just now|1 min ago)\)/);
     expect((await readInputs(i.now))!.positions).toEqual([]);   // nothing kept until the rider picks the pass
+    stop();
+  });
+
+  test('[AH-ASK-NOTE] while Ahead asks which pass, the notes say a position was found and waits for the answer, never "No position yet"; a re-read keeps it, and once the pass is chosen neither shows', async () => {
+    const i = rainyStop({ positions: [] });
+    await seed({ ...i, trip: { ...i.trip, route: outAndBack(), departureDate: SAT } });
+    const geo = fakeGeo();
+    const shell = browserAhead(deps({ now: () => i.now, geolocation: () => geo }));
+    const stop = shell.start();
+    await until(() => shell.view.value.kind === 'trip', 'the screen');
+    await act(async () => { render(<Live shell={shell} />, host); });
+    const notes = (): string => host.querySelector('.ah-notes')?.textContent ?? '';
+    expect(notes()).toContain(W.routeNoPositionFromStart);   // before the tap it is true: there is no position
+    const tapped = shell.actions.updatePosition();
+    await act(async () => { geo.emit(12, 32); await new Promise((r) => setTimeout(r, 0)); });
+    expect(await tapped).toBe(false);
+    await until(() => shell.view.value.kind === 'trip' && shell.view.value.position.kind === 'ask', 'the question on Ahead');
+    await settle();
+    expect(notes()).toContain(A.askPassFromStart);
+    expect(notes()).not.toContain(W.routeNoPositionFromStart);
+    // the page shown again reads the store and builds the screen again: still the same words while the question is open
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+    await settle(50);
+    expect(shell.view.value.kind === 'trip' && shell.view.value.position.kind).toBe('ask');
+    expect(notes()).toContain(A.askPassFromStart);
+    expect(notes()).not.toContain(W.routeNoPositionFromStart);
+    const v = shell.view.value;
+    const km = v.kind === 'trip' && v.position.kind === 'ask' ? v.position.options[0]!.km : NaN;
+    expect(await shell.actions.choosePass(km)).toBe(true);
+    await until(() => host.querySelector('[data-position-line]') !== null, 'the position line');
+    expect(notes()).not.toContain(A.askPassFromStart);
+    expect(notes()).not.toContain(W.routeNoPositionFromStart);
+    stop();
+  });
+
+  test('[AH-EMERGENCY-POSITION] while Ahead asks which pass, Emergency adds no "not stored" note for a fix that lies on the route: the rescue line shows without it', async () => {
+    const i = rainyStop({ positions: [], rescuePoints: [{ ...rescue('KA-032').atKm(32, { off: 600 }), kms: [32, 118] }] });
+    await seed({ ...i, trip: { ...i.trip, route: outAndBack() } });
+    const geo = fakeGeo();
+    const shell = browserAhead(deps({ now: () => i.now, geolocation: () => geo }));
+    const stop = shell.start();
+    await until(() => shell.view.value.kind === 'trip', 'the screen');
+    const tapped = shell.actions.updatePosition();
+    await act(async () => { geo.emit(12, 32); await new Promise((r) => setTimeout(r, 0)); });
+    expect(await tapped).toBe(false);
+    await until(() => shell.view.value.kind === 'trip' && shell.view.value.position.kind === 'ask', 'the question on Ahead');
+    const v = shell.view.value;
+    const card = v.kind === 'trip' ? v.screen.chips.emergency : null;
+    expect(card?.rescue?.ref).toBe('KA-032');
+    const said = JSON.stringify(card);
+    expect(said).not.toContain(W.emergencyRescueNotStored);
+    expect(said).not.toContain(W.emergencySettlementsFar);
+    stop();
+  });
+
+  test('[AH-EMERGENCY-POSITION] while Ahead asks which pass, a fix more than 1 km from the route still gets the "not stored" note', async () => {
+    const i = rainyStop({ positions: [], rescuePoints: [{ ...rescue('KA-032').atKm(32, { off: 1800 }), kms: [32, 118] }] });
+    await seed({ ...i, trip: { ...i.trip, route: outAndBack() } });
+    const geo = fakeGeo();
+    const shell = browserAhead(deps({ now: () => i.now, geolocation: () => geo }));
+    const stop = shell.start();
+    await until(() => shell.view.value.kind === 'trip', 'the screen');
+    const sign = i.rescuePoints[0]!;
+    const { lat, lon } = pointAtKm(32);
+    // 1.2 km from the route, toward the sign: the sign is then 600 m away
+    const f = 1200 / 1800;
+    const tapped = shell.actions.updatePosition();
+    await act(async () => { geo.emitAt(lat + (sign.lat - lat) * f, lon + (sign.lon - lon) * f, 12); await new Promise((r) => setTimeout(r, 0)); });
+    expect(await tapped).toBe(false);
+    await until(() => shell.view.value.kind === 'trip' && shell.view.value.position.kind === 'ask', 'the question on Ahead');
+    const v = shell.view.value;
+    const card = v.kind === 'trip' ? v.screen.chips.emergency : null;
+    expect(card?.rescue?.ref).toBe('KA-032');
+    expect(JSON.stringify(card)).toContain(W.emergencyRescueNotStored);
     stop();
   });
 
