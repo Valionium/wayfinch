@@ -110,10 +110,58 @@ reset();
   field('fitSeatGap','1.234,5');check(/3 to 60 cm/.test(issue()),'BK-UI-06 a number that is not plain is rejected with its range, not read as 1 or 234');
   reset();
 }
+// Sub-project 11: Suspension and Rack mounts in More details, after Shifting, each defaulting to Not sure.
+{
+  const more=html.slice(html.indexOf('id="bikeMoreDetails"'),html.indexOf('</form>',html.indexOf('id="bikeProfileForm"')));
+  const at=id=>more.indexOf('id="'+id+'"');
+  const options=id=>{const m=more.match(new RegExp('<select id="'+id+'"[^>]*>(.*?)</select>'));return m ? [...m[1].matchAll(/<option value="([^"]*)">([^<]*)<\/option>/g)].map(o=>[o[1],o[2]]) : [];};
+  const labels=JSON.parse(app.run('JSON.stringify(BIKE_PROFILE_LABELS)'));
+  for(const [key,id,name] of [['suspension','bikeSuspension','Suspension'],['rackMounts','bikeRackMounts','Rack mounts']]){
+    check(new RegExp('<label for="'+id+'">'+name+'<select id="'+id+'"').test(more),'[TB-DETAILS-FORM] '+name+' is a select with its own label');
+    check(JSON.stringify(options(id))===JSON.stringify(Object.entries(labels[key] || {})) && options(id)[0]?.[0]==='unknown' && options(id)[0]?.[1]==='Not sure','[TB-DETAILS-FORM] '+name+' offers its labels, Not sure first');
+    check(at(id)>at('bikeShifting') && at('bikeShifting')>0 && at(id)<at('bikeChainField'),'[TB-DETAILS-FORM] '+name+' comes after Shifting');
+    check(app.run(`BIKE_PROFILE_INPUTS.${key}`)===id,'[TB-DETAILS-FORM] '+name+' is read and filled with the other details');
+  }
+  check(at('bikeSuspension')<at('bikeRackMounts'),'[TB-DETAILS-FORM] Suspension, then Rack mounts');
+  const hint=more.match(/<p class="hint" id="bikeRackMountsHint">([^<]*)<\/p>/);
+  check(hint && hint[1]==='Small threaded holes near the rear axle and on the seat stays, for a rack.' && /<select id="bikeRackMounts" aria-describedby="bikeRackMountsHint">/.test(more),'[TB-DETAILS-FORM] the rack-mounts hint, muted, tied to its select');
+  check(!/<label for="bikeRackMounts">(?:(?!<\/label>)[\s\S])*bikeRackMountsHint"?>/.test(more.replace('aria-describedby="bikeRackMountsHint"','')),'[TB-DETAILS-FORM] the hint is not part of the label');
+  app.run('fillBikeProfileForm(null)');
+  check(get('bikeSuspension').value==='unknown' && get('bikeRackMounts').value==='unknown','[TB-DETAILS-FORM] a new bike starts at Not sure');
+  app.run(`fillBikeProfileForm(normaliseBikeProfile({id:'filled',suspension:'full',rackMounts:'yes'}))`);
+  check(get('bikeSuspension').value==='full' && get('bikeRackMounts').value==='yes','[TB-DETAILS-FORM] a saved bike fills both');
+  app.run('fillBikeProfileForm(null)');
+}
+// Saving them: on the saved bike and the plan's bike, after a reload too; back to Not sure stores 'unknown'.
+async function detailsSave(){
+  const {appVM:tab,sharedStore}=require('./app-vm.cjs');
+  const store=sharedStore();
+  const stub='renderKit=()=>{};drawRig=()=>{};renderResult=()=>{};queueDraftSave=()=>{};renderBikeProfiles=()=>{};closeBagPop=()=>{};DRAFT_READY=true;';
+  const a=tab({storage:store});a.run(stub);
+  a.run(`S.bikeProfile=normaliseBikeProfile({id:'rack_bike',name:'Rack bike',brakes:'rim',drive:'derailleur'});BIKE_PROFILES=[S.bikeProfile];fillBikeProfileForm(S.bikeProfile);`);
+  const set=(id,v)=>{a.context.document.getElementById(id).value=v;};
+  set('bikeSuspension','front');set('bikeRackMounts','no');
+  check(await a.run('saveBikeProfile()')===true,'[TB-DETAILS-SAVE] the bike saves');
+  await a.run('BIKE_PROFILE_WRITES');
+  const library=()=>JSON.parse(store.values.get('loadcheck:bikeProfiles')).find(b=>b.id==='rack_bike'),current=()=>JSON.parse(store.values.get('loadcheck:bikeProfile'));
+  check(library().suspension==='front' && library().rackMounts==='no','[TB-DETAILS-SAVE] Front fork and No are on the saved bike');
+  check(current().id==='rack_bike' && current().suspension==='front' && current().rackMounts==='no','[TB-DETAILS-SAVE] and on loadcheck:bikeProfile, the plan\'s bike');
+  check(library().brakes==='rim' && library().drive==='derailleur' && library().fit===null,'[TB-DETAILS-SAVE] the other details stay, nothing in fit');
+  const b=tab({storage:store});b.run(stub);
+  await b.run('loadBikeProfileData()');
+  check(b.run('BIKE_PROFILES[0].suspension==="front" && BIKE_PROFILES[0].rackMounts==="no" && S.bikeProfile.suspension==="front" && S.bikeProfile.rackMounts==="no"'),'[TB-DETAILS-SAVE] after a reload both are still there');
+  b.run('fillBikeProfileForm(S.bikeProfile)');
+  check(b.context.document.getElementById('bikeSuspension').value==='front' && b.context.document.getElementById('bikeRackMounts').value==='no','[TB-DETAILS-SAVE] and the form shows them');
+  set('bikeSuspension','unknown');set('bikeRackMounts','unknown');
+  check(await a.run('saveBikeProfile()')===true,'[TB-DETAILS-SAVE] the bike saves again');
+  await a.run('BIKE_PROFILE_WRITES');
+  check(library().suspension==='unknown' && library().rackMounts==='unknown' && current().suspension==='unknown' && current().rackMounts==='unknown','[TB-DETAILS-SAVE] back to Not sure stores unknown');
+}
 // Moved here from the retired pressure-tool-markup and pressure-tool suites (sub-project 6, Task 6): what they guarded
 // besides the tyre helper. Unique ids; the bike weight in the form with its label and help; Use these bike details keeps the repair
 // references and the saved-bike list, works with no name and a full list, and an invalid bike weight overwrites nothing.
 (async()=>{
+  await detailsSave();
   const markup=html.slice(0,html.indexOf('<script>'));
   const ids=[...markup.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
   check(ids.length>100,'the markup was read');

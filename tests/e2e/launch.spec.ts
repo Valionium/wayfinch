@@ -345,6 +345,40 @@ for (const start of ['legacy', 'step-one'] as const) {
     expect(svg.includes('url(#') || svg.includes('bk-rimband')).toBe(false);
   });
 
+  test(`[BK-DETAILS-OLD-PAGE] known risk, not a guarantee: ${which} page re-saving a bike drops suspension and rackMounts; every other field stays, format stays 2`, async ({ context, page }) => {
+    await phone(page, start);
+    await launch();
+    const { planner } = await plannerSaves(context);
+    // The bag planner sets the two new details (sub-project 11) and some older ones the old page knows.
+    await planner.evaluate(`(async () => {
+      const list = BIKE_PROFILES.map((b) => normaliseBikeProfile({ ...b, brakes: 'rim', drive: 'derailleur', shifting: 'cable', suspension: 'front', rackMounts: 'yes',
+        look: { colour: '#2563b8', bars: 'drop', ebike: false } }));
+      if (!(await bikeStoreSet(BIKE_PROFILE_KEY, list))) throw new Error('the planner could not save');
+    })()`);
+    type Bike = Record<string, unknown> & { id: string };
+    const before = JSON.parse((await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles')))!) as Bike[];
+    expect(before[0]).toMatchObject({ suspension: 'front', rackMounts: 'yes' });
+    await page.waitForFunction(() => (localStorage.getItem('loadcheck:bikeProfiles') ?? '').includes('"rackMounts":"yes"'));
+    // The old page reads the list as its own start-up does and saves it back, as its weight question or bike editor would.
+    expect(await page.evaluate(`(async () => {
+      BIKE_PROFILES = JSON.parse(localStorage.getItem(BIKE_PROFILE_KEY)).map(normaliseBikeProfile).filter(Boolean);
+      return bikeStoreSet(BIKE_PROFILE_KEY, BIKE_PROFILES);
+    })()`)).toBe(true);
+    await planner.waitForFunction(() => !(localStorage.getItem('loadcheck:bikeProfiles') ?? '"rackMounts"').includes('"rackMounts"'));
+    const after = JSON.parse((await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles')))!) as Bike[];
+    // the two are gone; every other field is as the bag planner stored it
+    const others = (b: Bike): Bike => { const o = { ...b }; delete o.suspension; delete o.rackMounts; return o; };
+    expect(after.map((b) => b.id)).toEqual(['bike-before']);
+    expect(after[0]).not.toHaveProperty('suspension');
+    expect(after[0]).not.toHaveProperty('rackMounts');
+    expect(after[0]).toEqual(others(before[0]!));
+    expect(await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfilesFormat'))).toBe('2');
+    // The bag planner reads what is left as Not sure, without a fault.
+    await planner.reload({ waitUntil: 'domcontentloaded' });
+    await draftReady(planner);
+    expect(await planner.evaluate('[BIKE_PROFILES[0].suspension, BIKE_PROFILES[0].rackMounts, BIKE_PROFILES[0].brakes]')).toEqual(['unknown', 'unknown', 'rim']);
+  });
+
   test(`[SW-OLD-TAB-WRITES] a future bike format (3, which no page writes today) would block ${which} bike write, with its message`, async ({ context, page }) => {
     await phone(page, start);
     await launch();
