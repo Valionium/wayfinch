@@ -365,3 +365,33 @@ test('[GA-TRY] [GA-TRIAL-NO-TRACE] [GA-KEEP] [GA-REMOVE] in the browser: Try in 
   await expect.poll(() => page.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem('loadcheck:draft')!).bags))).toBe(kept);
   expect(errors).toEqual([]);
 });
+
+// ---- The way in from Tools, and back (sub-project 13, group 3, Task 9) ----
+
+test('[GA-TOOLS-CARD] [GA-BACK] Tools\' Gear advisor card opens the advisor in the bag planner; closing it lands on Tools', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools' });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'load' });
+  const open = page.getByRole('link', { name: 'Open Gear advisor' });
+  await expect(open).toHaveAttribute('href', '/tools/bags/#gear-advisor&back=tools');
+  await open.click();
+  await page.waitForURL(/\/tools\/bags\//);
+  await expect(page.locator('#advisorBox')).toBeVisible();
+  await expect(page.locator('#advisorBack')).toBeVisible();
+  await page.locator('#advisorClose').click();
+  await page.waitForURL((u) => u.pathname === '/' && u.hash === '#/tools');
+  await expect(page.getByRole('link', { name: 'Open Gear advisor' })).toBeVisible();
+});
+
+test('[GA-BACK] Bike details opened with back=advisor returns to the Gear advisor', async ({ page }) => {
+  const bike = { id: 'r2', name: 'Gravel', fit: { style: 'diamond-sloping', size: { kind: 'letter', value: 'M' } } };
+  await planner(page, { 'loadcheck:bikeProfiles': JSON.stringify([bike]), 'loadcheck:bikeProfile': JSON.stringify(bike) });
+  // a fresh visit, as Wayfinch's link makes it
+  await page.goto('about:blank');
+  await page.goto(`${app!.origin}/tools/bags/#bike-details=r2&back=advisor`, { waitUntil: 'load' });
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await page.locator('#bikeDetailsClose').click();
+  await expect(page.locator('#bikeDetailsBox')).toBeHidden();
+  await expect(page.locator('#advisorBox')).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe('/tools/bags/');
+});
