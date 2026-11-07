@@ -76,7 +76,7 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
       'https://www.roadbikerider.com/be-a-hero-on-rides-d3/',
       'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot',
     ],
-    note: "Book p. 49: tape the broken spoke or wrap it round a neighbour; pp. 208-209: broken spokes make the wheel wobble. Opening the brake's quick release is the draft's step 2, now for rim brakes only, named as the brake's own lever, with the weaker-brake caution and a step to close it again (rulings C1 and I1 on PR 59); \"more than a few spokes\" became \"more than one spoke\" (M1).",
+    note: "Book p. 49: tape the broken spoke or wrap it round a neighbour; pp. 208-209: broken spokes make the wheel wobble. Opening the brake's quick release is the draft's step 2, now for rim brakes only, named as the brake's own lever, with the weaker-brake caution and a step to close it again (rulings C1 and I1 on PR 59); \"more than a few spokes\" became \"more than one spoke\" (M1). The disc-brake step (\"check the wheel turns without touching the brake; if it rubs, ride slowly\") is the coordinator\'s wording and has no source: flagged for the owner at O5 (the real risk on a disc bike may be the rim touching the frame or fork).",
   },
   'brake-rub-rim': {
     urls: ['https://www.sheldonbrown.com/rim-brakes.html'],
@@ -98,7 +98,7 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
       'https://www.parktool.com/en-us/blog/repair-help/disc-brake-pad-removal-installation',
       'https://www.parktool.com/en-us/blog/repair-help/mechanical-disc-brake-alignment',
     ],
-    note: 'Book p. 213: oil, worn pads, air in the system (pumping firms the lever when air is in it); p. 120: a grinding noise as the worn-pad sign (book, more careful).',
+    note: 'Book p. 213: oil, worn pads, air in the system (pumping firms the lever when air is in it); p. 120: a grinding noise as the worn-pad sign (book, more careful). "Never touch the disc or pads with your fingers" (the coordinator\'s ruling I3 on PR 59): book p. 120, gloves for the disc braking surfaces.',
   },
   'gears-skipping': {
     urls: ['https://www.parktool.com/en-us/product/chain-wear-indicator-cc-3-2'],
@@ -106,7 +106,7 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
   },
   'bolt-loose': {
     urls: ['https://dedhambike.com/articles/torque-table-pg186.htm', 'https://www.cyclingnews.com/features/torque-wrenches-why-you-need-one-and-how-to-use-them'],
-    note: 'Book p. 40: carbon parts are checked with a torque wrench, not by twisting (book, more careful); p. 206: bar and stem bolts tight. The draft\'s "tighten by feel until firm" is unsourced (draft section 6) and is replaced by the printed torque, or only snug and have it checked (ruling I4 on PR 59). Carbon bolt torque: 4-6 Nm general vs 5.4/6.2/8.8 Nm by maker, so the card says to follow the printed number.',
+    note: 'Book p. 40: the twist test (twist the part to see whether it still moves; never twist carbon parts) and a torque wrench for carbon (book, more careful); p. 206: bar and stem bolts tight. Carbon bolt torque: 4-6 Nm general vs 5.4/6.2/8.8 Nm by maker, so the card says to follow the printed number. The draft\'s "tighten by feel until firm" is unsourced (draft section 6) and is replaced by the printed torque, or, without a wrench, even tightening a little at a time until the part passes the twist test (the coordinator\'s ruling R1 on PR 59, after I4).',
   },
   'tyre-torn': {
     urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know', 'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot'],
