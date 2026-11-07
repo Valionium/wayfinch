@@ -17,7 +17,7 @@ export function input(over: Partial<AdvisorInput> = {}): AdvisorInput {
     style: 'either', goal: 'handling', noPanniers: false,
     bags: [], decks: { rack: false, bar: false }, camping: false, nextUid: 10,
     frameShapes: SHAPES, frameReason: null, topSlotsFree: ['front', 'rear'],
-    rackMounts: 'yes',
+    rackMounts: 'yes', frameSize: 'M', seatGapCm: null,
     usable: () => ({ ok: true, reason: null }),
     trial: () => { throw new Error('candidates() never runs a trial'); },
     ...over,

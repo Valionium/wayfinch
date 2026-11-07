@@ -1,5 +1,5 @@
 // Validity and ranking of the Gear advisor's candidates (design §3.2, §3.3; plan Task 2).
-import { WEIGHTS } from './table.ts';
+import { DECIDED, WEIGHTS } from './table.ts';
 import type { AdvisorInput, Candidate, Pos, Suggestion, TrialResult } from './types.ts';
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
@@ -49,7 +49,9 @@ export function compareFor(goal: AdvisorInput['goal']): (a: Suggestion, b: Sugge
  * be chosen + 0.5 or + 1.5. A single valid size gives [chosen, chosen].
  */
 export function sizeRange(validSizes: number[], chosen: number, max: number): [number, number] {
+  const up = DECIDED.rangeUpToL;
+  const counts = (s: number) => DECIDED.rangeHalfLitres || Number.isInteger(Math.round((s - chosen) * 1e6) / 1e6);
   let top = chosen;
-  for (const s of validSizes) if (s > top && s <= chosen + 2 + 1e-9 && s <= max + 1e-9) top = s;
+  for (const s of validSizes) if (s > top && s <= chosen + up + 1e-9 && s <= max + 1e-9 && counts(s)) top = s;
   return [chosen, top];
 }

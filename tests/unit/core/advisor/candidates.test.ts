@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { candidates } from '../../../../src/core/advisor/candidates.ts';
-import { MAX_TRIALS, MIN_GAIN_BACK_L, MIN_GAIN_SCORE, SIZE_RANGES, sizesOf, WEIGHTS } from '../../../../src/core/advisor/table.ts';
+import { DECIDED, MAX_TRIALS, MIN_GAIN_BACK_L, MIN_GAIN_SCORE, SIZE_RANGES, sizesOf, WEIGHTS } from '../../../../src/core/advisor/table.ts';
 import type { AdvisorInput, Candidate } from '../../../../src/core/advisor/types.ts';
 import { GA } from '../../../../src/core/wording/en-advisor.ts';
 import { bag, input, SHAPES, TABLE_SIZES } from './fixtures.ts';
@@ -21,6 +21,20 @@ describe('the tables (decisions 2, 3, 6; the plan\'s tables)', () => {
     });
     for (const [pos, sizes] of Object.entries(TABLE_SIZES)) expect(sizesOf(pos as keyof typeof SIZE_RANGES), pos).toEqual(sizes);
     expect([MIN_GAIN_SCORE, MIN_GAIN_BACK_L, MAX_TRIALS]).toEqual([0.5, 0.5, 1000]);
+  });
+
+  test('[GA-CANDIDATES] every decided value is in table.ts, as the plan\'s decisions (and the review of PR 57) have them', () => {
+    expect(DECIDED).toEqual({
+      pairIsOneBag: true,                  // decision 4
+      forkNeedsMountsTag: true,            // decision 4
+      noPanniersUnder: ['either', 'rack'], // decision 5 (review m3: also under With a rack)
+      seatUnlikely: 'drop',                // decision 9
+      seatTight: 'tag',                    // decision 9
+      rackDeckWithoutRack: 'off',          // review I3 (design §4)
+      rangeUpToL: 2,                       // design §3.3
+      rangeHalfLitres: true,               // decision 3 (review m2: +0.5 and +1.5 L for the top tube)
+    });
+    expect(Object.isFrozen(DECIDED)).toBe(true);
   });
 });
 
@@ -72,6 +86,26 @@ describe('candidates', () => {
     // The other phases drop them as well.
     const rest = [...candidates(input({ usable, bags: [bag(1, 'top', 1, { slot: 'front' })], topSlotsFree: ['rear'] }), 'swap'), ...candidates(input({ usable }), 'add-two')];
     expect(rest.some((c) => c.add.some((b) => (b.pos === 'bar' && b.L > 12) || (b.pos === 'seat' && b.L > 12)))).toBe(false);
+  });
+
+  test('[GA-CANDIDATES] a small frame (XS or S) with no measured seat gap: every seat pack carries the planner\'s caution, as bagSpec\'s note does (review of PR 57, I2)', () => {
+    const bags = [bag(1, 'bar', 12)];
+    const seatOnes = (i: AdvisorInput) => all(i).filter((c) => c.add.some((b) => b.pos === 'seat'));
+    for (const frameSize of ['XS', 'S']) {
+      const seats = seatOnes(input({ frameSize, seatGapCm: null, bags, nextUid: 2 }));
+      expect(seats.length, frameSize).toBeGreaterThan(13);
+      for (const c of seats) expect(c.tags, frameSize).toContain(GA.advisorTagSmallFrame);
+      for (const c of all(input({ frameSize, seatGapCm: null, bags, nextUid: 2 })).filter((x) => !x.add.some((b) => b.pos === 'seat'))) {
+        expect(c.tags).not.toContain(GA.advisorTagSmallFrame);
+      }
+      // A classic script may be handed undefined for a gap never measured.
+      for (const c of seatOnes(input({ frameSize, seatGapCm: undefined, bags, nextUid: 2 }))) expect(c.tags).toContain(GA.advisorTagSmallFrame);
+      // A measured gap gives bagSpec's band instead, and no note.
+      for (const c of seatOnes(input({ frameSize, seatGapCm: 30, bags, nextUid: 2 }))) expect(c.tags).not.toContain(GA.advisorTagSmallFrame);
+    }
+    for (const frameSize of ['M', 'L', 'XL', null, undefined]) {
+      for (const c of seatOnes(input({ frameSize, seatGapCm: null, bags, nextUid: 2 }))) expect(c.tags, String(frameSize)).not.toContain(GA.advisorTagSmallFrame);
+    }
   });
 
   test('[GA-CANDIDATES] panniers put the rack deck on when the trip camps; fork cages say they need mounts; frame litres not measured say estimate', () => {
@@ -145,5 +179,34 @@ describe('the style and the rack mounts (design §2, §4)', () => {
     expect(unknown.some(rackish)).toBe(true);
     for (const c of unknown) expect(c.tags.includes(GA.advisorTagRackMounts)).toBe(c.add.some((b) => b.pos === 'rack'));
     for (const c of all(withBags({ rackMounts: 'yes' }))) expect(c.tags.includes(GA.advisorTagRackMounts)).toBe(false);
+  });
+
+  test('[GA-NO-MOUNTS] a missing rackMounts is Not sure, never Yes: undefined, null and \'unknown\' tag every pannier; \'yes\' tags none; \'no\' offers none (review of PR 57, I1)', () => {
+    // Sub-project 11 stores Not sure as an absent field; the page may hand the classic script undefined or null.
+    for (const rackMounts of [undefined, null, 'unknown', 'maybe'] as unknown as AdvisorInput['rackMounts'][]) {
+      const list = all(withBags({ rackMounts }));
+      const racks = list.filter((c) => c.add.some((b) => b.pos === 'rack'));
+      expect(racks.length, String(rackMounts)).toBeGreaterThan(15);
+      for (const c of list) expect(c.tags.includes(GA.advisorTagRackMounts), String(rackMounts)).toBe(c.add.some((b) => b.pos === 'rack'));
+    }
+    const yes = all(withBags({ rackMounts: 'yes' }));
+    expect(yes.some((c) => c.add.some((b) => b.pos === 'rack'))).toBe(true);
+    expect(yes.some((c) => c.tags.includes(GA.advisorTagRackMounts))).toBe(false);
+    expect(all(withBags({ rackMounts: 'no' })).some(rackish)).toBe(false);
+  });
+
+  test('[GA-STYLE] a rack deck the rider already has is off in every candidate without a rack (style no-rack, or the trails answer), and kept otherwise (review of PR 57, I3)', () => {
+    const decks = { rack: true, bar: true };
+    for (const over of [{ style: 'no-rack' as const }, { style: 'either' as const, noPanniers: true }]) {
+      const list = all(withBags({ ...over, decks }));
+      expect(list.length, JSON.stringify(over)).toBeGreaterThan(50);
+      expect(list.some(rackish), JSON.stringify(over)).toBe(false);
+      for (const c of list) expect(c.decks.bar).toBe(true); // only the rack deck goes
+    }
+    for (const style of ['either', 'rack'] as const) {
+      for (const c of all(withBags({ style, decks }))) expect(c.decks, style).toEqual(decks);
+    }
+    // No rack mounts stops new panniers, not the rider's own deck.
+    for (const c of all(withBags({ rackMounts: 'no', decks }))) expect(c.decks).toEqual(decks);
   });
 });

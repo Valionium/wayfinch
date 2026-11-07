@@ -8,6 +8,12 @@ export const GA = {
   advisorTagForkMounts: 'needs cage mounts on the fork',
   advisorTagTight: 'tight',
   advisorTagEstimate: 'estimate',
+  advisorTagUnlikely: 'unlikely to fit',
+  // The bag planner's own caution for a small frame with no measured seat gap (bagSpec's seat note), shortened to a tag.
+  advisorTagSmallFrame: 'small frame: check the clearance under the saddle',
+  // ---- an answer ----
+  // Get the backpack off, when litres stay on the back and nothing takes 0.5 L more off it (review of PR 57, I4).
+  advisorCannotReduce: 'No bag here takes more off your back.',
   // ---- a size range: "6–8 L", or "6 L" when only one size is valid ----
   advisorRange: (from: number, to: number): string => (from === to ? `${from} L` : `${from}–${to} L`),
 } as const;

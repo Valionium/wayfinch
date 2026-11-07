@@ -4,6 +4,7 @@ import { compareFor } from '../../../../src/core/advisor/rank.ts';
 import { advise, adviseSteps } from '../../../../src/core/advisor/search.ts';
 import { MAX_TRIALS } from '../../../../src/core/advisor/table.ts';
 import type { AdvisorAnswer, AdvisorInput, BagIn, Decks, Pos, TrialResult } from '../../../../src/core/advisor/types.ts';
+import { GA } from '../../../../src/core/wording/en-advisor.ts';
 import { bag, input } from './fixtures.ts';
 
 // A stand-in for the bag planner's packing, small and table-driven: items go, in the order given, into the first bag with room, the
@@ -97,6 +98,19 @@ describe('the answer (design §2, §3.3)', () => {
     expect(handling.items.map((s) => [s.kind, s.add[0]!.pos, s.add[0]!.L, s.score])).toEqual([['add', 'fork', 4, 9], ['add', 'frame', 4.5, 9.6], ['add', 'rack', 10, 10.8]]);
   });
 
+  test('[GA-THREE] an add and a swap of the same bag never both show: a swap of the seat pack for a frame bag that beats adding the frame bag is the one frame suggestion (review of PR 57, m1)', () => {
+    // Stand-in: a frame bag beside the seat pack splits the 2 kg; in place of it, the frame bag takes both.
+    const trial = (bags: BagIn[]): TrialResult => {
+      const frame = bags.some((b) => b.pos === 'frame'), seat = bags.some((b) => b.pos === 'seat');
+      const kgByPos = frame ? (seat ? { frame: 1, seat: 1 } : { frame: 2 }) : { seat: 2 };
+      return { overL: 0, spillIds: [], backL: 0, backKg: 0, outOfReach: 0, kgByPos, items: {} };
+    };
+    const answer = advise(input({ goal: 'handling', bags: [bag(1, 'seat', 14)], nextUid: 2, usable: (b) => ({ ok: b.pos === 'frame', reason: null }), trial }));
+    expect(answer.kind).toBe('suggestions');
+    if (answer.kind !== 'suggestions') return;
+    expect(answer.items.map((s) => [s.kind, s.remove, s.add[0]!.pos, s.score])).toEqual([['swap', 1, 'frame', 2]]);
+  });
+
   test('[GA-RANGE] a frame bag shows its own litres; every other size range comes from the valid sizes of its row', () => {
     const answer = advise(input({ goal: 'handling', bags: [bag(1, 'seat', 14)], nextUid: 2, trial: packer([{ id: 'a', L: 2.5, kg: 2 }]) }));
     expect(answer.kind).toBe('suggestions');
@@ -107,10 +121,25 @@ describe('the answer (design §2, §3.3)', () => {
     expect(answer.items.find((s) => s.add[0]!.pos === 'fork')!.rangeL).toEqual([2, 4]);
   });
 
+  test('[GA-RANGE] the range comes from the same suggestion\'s own valid sizes: an add valid only at 6 L shows "6 L", though a swap of that bag is valid at 6–8 L (review of PR 57, m4)', () => {
+    // Stand-in: a seat pack beside the bar roll is valid at 6 L only; in place of the bar roll, at 6–8 L. The add scores better.
+    const ok = (kgByPos: TrialResult['kgByPos']): TrialResult => ({ overL: 0, spillIds: [], backL: 0, backKg: 0, outOfReach: 0, kgByPos, items: {} });
+    const trial = (bags: BagIn[]): TrialResult => {
+      const seat = bags.find((b) => b.pos === 'seat'), bar = bags.some((b) => b.pos === 'bar');
+      if (!seat) return ok({ pack: 5 });
+      if (bar) return seat.L === 6 ? ok({ bar: 1 }) : { ...ok({}), outOfReach: 1 };
+      return seat.L >= 6 && seat.L <= 8 ? ok({ seat: 1 }) : { ...ok({}), outOfReach: 1 };
+    };
+    const answer = advise(input({ goal: 'handling', bags: [bag(1, 'bar', 12)], nextUid: 2, usable: (b) => ({ ok: b.pos === 'seat', reason: null }), trial }));
+    expect(answer.kind).toBe('suggestions');
+    if (answer.kind !== 'suggestions') return;
+    expect(answer.items.map((s) => [s.kind, s.add[0]!.L, s.rangeL])).toEqual([['add', 6, [6, 6]]]);
+  });
+
   test('[GA-ALREADY] a base with nothing on the back (backpack) or no gain of 0.5 (handling) gives already-good', () => {
     const calls: BagIn[][] = [];
     const empty = advise(input({ goal: 'backpack', bags: [bag(1, 'seat', 10)], nextUid: 2, trial: packer(items(3, 3), calls) }));
-    expect(empty).toEqual({ kind: 'already-good', tried: 1, frameReason: null });
+    expect(empty).toEqual({ kind: 'already-good', tried: 1, frameReason: null, partial: false });
     expect(calls).toHaveLength(1);
     // A 0.2 kg item in a seat pack: the best move (into a frame bag) lowers the score by 0.32, under 0.5.
     const light = advise(input({ goal: 'handling', bags: [bag(1, 'seat', 10)], nextUid: 2, trial: packer([{ id: 'a', L: 2, kg: 0.2 }]) }));
@@ -118,13 +147,19 @@ describe('the answer (design §2, §3.3)', () => {
     // At 0.4 kg the same move lowers it by 0.64.
     const heavier = advise(input({ goal: 'handling', bags: [bag(1, 'seat', 10)], nextUid: 2, trial: packer([{ id: 'a', L: 2, kg: 0.4 }]) }));
     expect(heavier.kind).toBe('suggestions');
-    // Back litres: a gain under 0.5 L is no gain. The only bag the bike takes is a 0.5 L top tube bag; 0.4 L of 3 L moves.
+    // Better handling with nothing at all to add: the bags already suit this.
+    expect(advise(input({ goal: 'handling', bags: [bag(1, 'seat', 10)], nextUid: 2, usable: () => ({ ok: false, reason: 'NO_MOUNT' }), trial: packer(items(3)) })).kind).toBe('already-good');
+  });
+
+  test('[GA-CANNOT-REDUCE] Get the backpack off never says already good while litres stay on the back: when nothing takes 0.5 L more off it, the answer is cannot-reduce with the litres left there (review of PR 57, I4)', () => {
+    // A gain under 0.5 L is no gain. The only bag the bike takes is a 0.5 L top tube bag; 0.4 L of 3 L moves.
     const tiny = (b: BagIn) => ({ ok: b.pos === 'top' && b.L === 0.5, reason: null });
     const back = advise(input({ goal: 'backpack', bags: [bag(1, 'pack', 15)], nextUid: 2, usable: tiny, trial: packer([{ id: 'a', L: 0.4, kg: 0.1 }, { id: 'b', L: 2.6, kg: 1 }]) }));
-    expect(back.kind).toBe('already-good');
-    // When everything fits and nothing at all can be added, the bags already suit this as well.
+    expect(back).toEqual({ kind: 'cannot-reduce', backL: 3, tried: 2, frameReason: null, partial: false });
+    // Nothing at all can be added: the same.
     const none = advise(input({ goal: 'backpack', bags: [bag(1, 'pack', 15)], nextUid: 2, usable: () => ({ ok: false, reason: 'NO_MOUNT' }), trial: packer(items(3)) }));
-    expect(none.kind).toBe('already-good');
+    expect(none).toEqual({ kind: 'cannot-reduce', backL: 3, tried: 1, frameReason: null, partial: false });
+    expect(GA.advisorCannotReduce).toBe('No bag here takes more off your back.');
   });
 
   test('[GA-NOTHING] when no candidate is valid: nothing-helps with the candidate of least overL as closest', () => {
@@ -144,7 +179,20 @@ describe('the answer (design §2, §3.3)', () => {
     expect(fixed.kind).toBe('suggestions');
     if (fixed.kind === 'suggestions') for (const s of fixed.items) expect(s.result.overL).toBe(0);
     // Nothing that can be added at all: nothing helps, with no closest option.
-    expect(advise(input({ usable: () => ({ ok: false, reason: 'NO_MOUNT' }), trial: packer(items(12)) }))).toEqual({ kind: 'nothing-helps', closest: null, tried: 1, frameReason: null });
+    expect(advise(input({ usable: () => ({ ok: false, reason: 'NO_MOUNT' }), trial: packer(items(12)) }))).toEqual({ kind: 'nothing-helps', closest: null, tried: 1, frameReason: null, partial: false });
+  });
+
+  test('[GA-NOTHING] of options leaving the same litres over, the closest leaves the fewest items over (review of PR 57, m4)', () => {
+    // Stand-in: every seat pack leaves 5 L over; the 4 L one leaves three items, the others one.
+    const trial = (bags: BagIn[]): TrialResult => {
+      const seat = bags.find((b) => b.pos === 'seat');
+      const spillIds = !seat ? ['a', 'b', 'c', 'd'] : seat.L === 4 ? ['a', 'b', 'c'] : ['a'];
+      return { overL: seat ? 5 : 10, spillIds, backL: 0, backKg: 0, outOfReach: 0, kgByPos: {}, items: {} };
+    };
+    const answer = advise(input({ goal: 'handling', usable: (b) => ({ ok: b.pos === 'seat', reason: null }), trial }));
+    expect(answer.kind).toBe('nothing-helps');
+    if (answer.kind !== 'nothing-helps') return;
+    expect([answer.closest!.add[0]!.L, answer.closest!.result.spillIds]).toEqual([5, ['a']]);
   });
 
   test('[GA-FRAME-FIT] frameShapes empty with a reason: no frame candidate, and the answer carries the reason', () => {
@@ -166,6 +214,7 @@ describe('slices (design §3.4: within a second, or in the background)', () => {
     expect(yields).toEqual(yields.map((_, k) => 20 * (k + 1)));
     expect(answer.tried).toBe(calls.length);
     expect(calls.length - yields.at(-1)!).toBeLessThan(20);
+    expect(answer.partial).toBe(false);
     // A rider with twenty backpacks: over a thousand swaps to try. The search stops at MAX_TRIALS and still answers.
     const packs = Array.from({ length: 20 }, (_, k) => bag(k + 1, 'pack', 15));
     const many = input({ goal: 'handling', bags: packs, nextUid: 21, trial: packer(items(12, 12, 12, 12), []) });
@@ -176,7 +225,9 @@ describe('slices (design §3.4: within a second, or in the background)', () => {
     expect(capped).toHaveLength(MAX_TRIALS);
     expect(out.answer.tried).toBe(MAX_TRIALS);
     expect(out.yields.at(-1)).toBe(MAX_TRIALS);
-    expect(['suggestions', 'already-good', 'nothing-helps']).toContain(out.answer.kind);
+    expect(['suggestions', 'already-good', 'cannot-reduce', 'nothing-helps']).toContain(out.answer.kind);
+    // A search cut short says so (review of PR 57, m5).
+    expect(out.answer.partial).toBe(true);
     // advise runs the same generator to the end.
     expect(advise({ ...many, trial: packer(items(12, 12, 12, 12)) })).toEqual(out.answer);
   });
