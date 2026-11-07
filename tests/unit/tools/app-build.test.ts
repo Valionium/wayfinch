@@ -277,9 +277,9 @@ test("[TB-TOOLS-LAZY] the Tools screen (bike line, tyre card) is not among the f
 });
 
 // Sub-project 12, group 1: Bike care is a chunk of its own, loaded by a dynamic import like the tyre tool; its words (en-care.ts, with the
-// content) are not in the first screen. 145,569 bytes is the first screen's figure at the branch point (42551e2, the head of PR 56); the
-// rule is that it may not rise above it.
-test("[BC-CHUNK] Bike care is a lazy chunk; en-care is not in the first screen's files, and the first screen is at or below the branch point's figure", () => {
+// content) are not in the first screen. 145,711 bytes is main's first screen (235535e, after PRs 64 and 65, which grew it from the 145,569 of the old branch point 42551e2); Bike care adds nothing to it; the
+// rule is that it may never rise above main's figure.
+test("[BC-CHUNK] Bike care is a lazy chunk; en-care is not in the first screen's files, and the first screen is at or below main's figure", () => {
   const figures = measure(on);
   const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
   for (const mark of ['care-filters', 'Roadside repairs come in the next version', 'Lube the chain, after every wash']) expect(first.includes(mark), mark).toBe(false);
@@ -291,7 +291,7 @@ test("[BC-CHUNK] Bike care is a lazy chunk; en-care is not in the first screen's
   expect(first).toContain(`/${chunk[0]!.replace(/^assets\//, '')}`.slice(1));
   expect(text(on, 'index.html')).not.toContain(chunk[0]!);
   console.log(`BC-CHUNK: first screen ${figures.firstJsGzip} bytes gzipped, lazy ${figures.lazyJsGzip}`);
-  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_569);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_711);
 });
 
 test('[BC-SOURCES-PRIVATE] the built Bike care chunk holds no "http": where each fact came from never ships', () => {

@@ -10,11 +10,11 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
       'https://manualmachine.com/shimano/xtr/19567146-service-instructions-manual',
       'https://www.parktool.com/en-us/blog/repair-help/mechanical-disc-brake-alignment',
     ],
-    note: 'Weekly: book p. 206 (was monthly). 1.5 mm and the grinding noise: book p. 120; lever step: book p. 121. Disagree: 0.5 mm in one Shimano manual, about 1 mm at Park Tool, 1.5 mm in the book, 3 mm incl. backing in an Avid guide; we use about 1.5 mm (book, more careful) and the pad maker\'s mark if given. The book does not say whether the 1.5 mm includes the metal backing; read as pad material (owner to confirm).',
+    note: "Weekly: book p. 206 (was monthly). 1.5 mm and the grinding noise: book p. 120; lever step: book p. 121. Disagree: 0.5 mm in one Shimano manual, about 1 mm at Park Tool, 1.5 mm in the book, 3 mm incl. backing in an Avid guide; we use about 1.5 mm (book, more careful) and the pad maker\\'s mark if given. The book does not say whether the 1.5 mm includes the metal backing; read as pad material (owner to confirm). Review of PR 67, I1 and I2: the pad pin or bolt is refitted to its printed torque (spec 3.4; book p. 213); never touch the disc or pads with fingers, clean gloves (book p. 120).",
   },
   'brakes-pads-rim': {
     urls: ['https://www.sheldonbrown.com/rim-brakes.html'],
-    note: 'Weekly: book p. 206 (was monthly). Wear mark and toe-in: book p. 211. Scraping noise, scoring in the rim: book p. 110; left/right and top marks: book p. 111.',
+    note: "Weekly: book p. 206 (was monthly). Wear mark and toe-in: book p. 211. Scraping noise, scoring in the rim: book p. 110; left/right and top marks: book p. 111. Review of PR 67, I1: after lining the pads up the pad bolt goes to the torque printed on the brake (spec 3.4; book pp. 111, 213).",
   },
   'wheels-spokes-check': {
     urls: [],
@@ -52,11 +52,11 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
   // ---- Care tasks (group 2) ----
   'brakes-lever-test': {
     urls: [],
-    note: "Source: book pp. 40, 207 (pull each brake before every ride; pad look p. 40); steps 2-3: no source found Book: p. 207: differs: book says check before every ride; added. Round 2: p. 40: agrees (pull each brake before riding, check the pad gap); differs: book adds a pad look on rim brakes; added Group 2: the draft's step 2 (check the bike slows evenly) had no source and is cut; step 3 (if a lever feels wrong, do not ride) stays as the careful direction.",
+    note: "Source: book pp. 40, 207 (pull each brake before every ride; pad look p. 40); steps 2-3: no source found Book: p. 207: differs: book says check before every ride; added. Round 2: p. 40: agrees (pull each brake before riding, check the pad gap); differs: book adds a pad look on rim brakes; added Group 2: the draft's step 2 (check the bike slows evenly) had no source and is cut; step 3 (if a lever feels wrong, do not ride) stays as the careful direction. Review of PR 67, I7: step 2 (\"if a lever feels wrong, do not ride\") has no source in the draft; it is kept as the cautious choice and is on the owner's O4 list. The sourced \"Do not ride until fixed\" is on brakes-spongy (Park Tool, book p. 213).",
   },
   'susp-wipe-stanchions': {
     urls: [],
-    note: "Source: book p. 207 (oil check); book p. 200 (keep the shock clean); wiping after every ride: no source found Book: p. 207: differs: book checks the fork tubes for oil monthly; draft kept (more often). Round 2: p. 200: agrees (keep the rear shock clean) Group 2 for the owner at O4: wiping after every ride has no source of its own. Kept because the book checks the fork tubes for oil monthly and asks to keep the shock clean, and the more frequent check is the more careful.",
+    note: "Source: book p. 207 (oil check); book p. 200 (keep the shock clean); wiping after every ride: no source found Book: p. 207: differs: book checks the fork tubes for oil monthly; draft kept (more often). Round 2: p. 200: agrees (keep the rear shock clean) Group 2 for the owner at O4: wiping after every ride has no source of its own. Kept because the book checks the fork tubes for oil monthly and asks to keep the shock clean, and the more frequent check is the more careful. O4 default (coordinator): moved from After every ride to Every month, as the book's monthly oil check on the fork tubes (p. 207) and keeping the shock clean (p. 200); the after-every-ride interval had no source.",
   },
   'ebike-charge-indoors': {
     urls: ['https://www.bosch-ebike.com/us/help-center/asset-ast-00046', 'https://www.ternbicycles.com/us/node/348455'],
@@ -84,7 +84,7 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
   },
   'ebike-dry-contacts': {
     urls: ['https://www.bosch-ebike.com/us/help-center/asset-ast-00046', 'https://www.ternbicycles.com/us/node/348455', 'https://www.ternbicycles.com/be/support/kb/349039/how-troubleshoot-bosch-ebike-system-tern-bikes', 'https://helpcenter.velo-de-ville.com/en/support/solutions/articles/80001185577-error-patterns-solutions-for-bosch-shimano'],
-    note: "Source: book pp. 206, 215 Book: pp. 206, 215: agrees (keep water out; clean contacts, dry fully before refitting). Round 2: not covered by the new pages",
+    note: "Source: book pp. 206, 215 Book: pp. 206, 215: agrees (keep water out; clean contacts, dry fully before refitting). Round 2: not covered by the new pages Review of PR 67, M5: the every-6-months contact clean moved from step 1 to the note.",
   },
   'tyres-pressure': {
     urls: ['https://www.schwalbe.com/en/technology-faq/tire-pressure/'],
@@ -112,7 +112,7 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
   },
   'tyres-sealant-check': {
     urls: ['https://www.bikeradar.com/advice/workshop/tubeless-tyre-maintenance/', 'https://www.slowtwitch.com/industry/tubeless-sealant-tips-and-strategy/'],
-    note: "Book: not covered (pp. 206-215). Round 2: pp. 86-87 cover fitting, not a check interval; not covered",
+    note: "Book: not covered (pp. 206-215). Round 2: pp. 86-87 cover fitting, not a check interval; not covered Review of PR 67, I6: let the air out before the core comes out, refit the core and pump up (the top-up task's own words).",
   },
   'belt-inspect': {
     urls: ['https://files.helpdocs.io/l3tsvrpr48/other/1597337518726/gates-carbon-drive-manual.pdf', 'https://gatescarbondrive.com/resources/faqs', 'https://www.bike-magazin.de/en/gearstick-or-drive/belt-drive-the-right-dental-care-for-the-gates-belt/'],
@@ -128,11 +128,11 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
   },
   'wheels-hubs-check': {
     urls: ['https://www.parktool.com/en-us/blog/repair-help/hub-overhaul-and-adjustment'],
-    note: "Source: book pp. 40-41, 207, 209 Book: p. 207: differs: book says monthly and adds oil spots; moved from Every 6 months. p. 209: agrees (adjust cone bearings so there is no side play). Round 2: pp. 40-41: agrees (push the top of the wheel sideways to feel hub play)",
+    note: "Source: book pp. 40-41, 207, 209 Book: p. 207: differs: book says monthly and adds oil spots; moved from Every 6 months. p. 209: agrees (adjust cone bearings so there is no side play). Round 2: pp. 40-41: agrees (push the top of the wheel sideways to feel hub play) Review of PR 67, I3: a refit step added, as before each ride (book p. 40; the wheel quick release check in frame-bolts-check).",
   },
   'brakes-rotor-thickness': {
     urls: ['https://emtbforums.com/threads/rear-disc-below-1-5mm-minimum.39079', 'https://bike.bikegremlin.com/20365/when-to-replace-bicycle-brake-discs-rotors'],
-    note: "Source: interval: book p. 207 Book: p. 207: differs: book says monthly, wear and alignment; moved from Every year. p. 213: agrees (replace a worn or badly bent disc). Round 2: p. 40: agrees (disc runs straight); fitting a new disc is candidate 56",
+    note: "Source: interval: book p. 207 Book: p. 207: differs: book says monthly, wear and alignment; moved from Every year. p. 213: agrees (replace a worn or badly bent disc). Round 2: p. 40: agrees (disc runs straight); fitting a new disc is candidate 56 Review of PR 67, I2 and M4: no fingers on disc or pads, clean gloves (book p. 120); \"a measuring caliper (not the brake caliper)\"; replace the disc at once if aluminium shows.",
   },
   'susp-lowers-service': {
     urls: ['https://support.rockshox.com/hc/en-us/articles/4412306753947-How-often-should-I-service-my-RockShox-product'],
@@ -144,7 +144,7 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
   },
   'susp-shock-service': {
     urls: ['https://support.rockshox.com/hc/en-us/articles/4412306753947-How-often-should-I-service-my-RockShox-product', 'https://worldwidecyclery.com/blogs/worldwide-cyclery-blog/ultimate-guide-suspension-service', 'https://flowmountainbike.com/features/flows-guide-to-understanding-suspension-service-intervals-and-upgrade-options/'],
-    note: "Source: Fox: book pp. 200, 207 Book: p. 207: differs: book says a shop check every 6 months; moved from Every year. Round 2: p. 200: differs: book says keep the shock clean and service it every 20 riding hours, and some models need a yearly shop check; 20 h added. Owner: the book does not say what the 20-hour service includes; decide whether it stays a rider task (clean and check) or a shop job Group 2: the owner's 7 November ruling: the 20-hour step is the rider's check and clean, the full service is at a shop. Fox: about 100 h, the shorter of 100 h and 125 h, as for the fork (decision 6).",
+    note: "Source: Fox: book pp. 200, 207 Book: p. 207: differs: book says a shop check every 6 months; moved from Every year. Round 2: p. 200: differs: book says keep the shock clean and service it every 20 riding hours, and some models need a yearly shop check; 20 h added. Owner: the book does not say what the 20-hour service includes; decide whether it stays a rider task (clean and check) or a shop job Group 2: the owner's 7 November ruling: the 20-hour step is the rider's check and clean, the full service is at a shop. Fox: about 100 h, the shorter of 100 h and 125 h, as for the fork (decision 6). O4 default (coordinator): the 20 h step says what to check (clean the shaft, look for oil at the seal; book pp. 200, 207); the task is the rider's check, a shop does the service.",
   },
   'ebike-service': {
     urls: ['https://help.bosch-ebike.com/us/help-center/ebw-care/asset-asf-00318', 'https://www.bosch-ebike.com/en/service/dealer-service'],
@@ -152,7 +152,7 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
   },
   'brakes-hydraulic-bleed': {
     urls: ['https://www.parktool.com/blog/repair-help/shimano-hydraulic-brake-service-and-adjustment'],
-    note: "Source: book p. 213 Book: p. 213: agrees (bleed when spongy; refill with the same fluid; mineral oil never mixed); the book gives no interval. Round 2: not covered by the new pages Group 2: the draft's interval (every 1-2 years) was its own guess and the book gives none, so the interval is cut: the task sits under When you notice, with its signs.",
+    note: "Source: book p. 213 Book: p. 213: agrees (bleed when spongy; refill with the same fluid; mineral oil never mixed); the book gives no interval. Round 2: not covered by the new pages Group 2: the draft's interval (every 1-2 years) was its own guess and the book gives none, so the interval is cut: the task sits under When you notice, with its signs. Review of PR 67, M8: \"fluid old\" is cut from the signs (it needs an interval).",
   },
   'brakes-cable-disc-service': {
     urls: ['https://www.parktool.com/en-us/blog/repair-help/mechanical-disc-brake-alignment'],
@@ -160,7 +160,7 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
   },
   'belt-tension': {
     urls: ['https://files.helpdocs.io/l3tsvrpr48/other/1597337518726/gates-carbon-drive-manual.pdf', 'https://gatescarbondrive.com/resources/faqs', 'https://www.bike-magazin.de/en/gearstick-or-drive/belt-drive-the-right-dental-care-for-the-gates-belt/'],
-    note: "Book: not covered (pp. 206-215). Round 2: not covered by the new pages",
+    note: "Book: not covered (pp. 206-215). Round 2: not covered by the new pages Review of PR 67, I4: the axle nuts are wheel bolts, so they go to the printed torque (torque rule, as frame-bolts-check step 6); the task is critical.",
   },
   'frame-torque-check': {
     urls: ['https://dedhambike.com/articles/torque-table-pg186.htm', 'https://www.cyclingnews.com/features/torque-wrenches-why-you-need-one-and-how-to-use-them'],
@@ -172,11 +172,11 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
   },
   'chain-deep-clean': {
     urls: ['https://www.parktool.com/en-us/product/chain-wear-indicator-cc-3-2'],
-    note: "Source: book pp. 44, 207, 215 Book: pp. 207, 215: agrees (clean a dirty chain, rings and front derailleur; lube after cleaning); no interval in the book. Round 2: p. 44: agrees (lube after every clean) Group 2 for the owner at O4: the book gives no interval for a deep clean; the yearly section is the draft's.",
+    note: "Source: book pp. 44, 207, 215 Book: pp. 207, 215: agrees (clean a dirty chain, rings and front derailleur; lube after cleaning); no interval in the book. Round 2: p. 44: agrees (lube after every clean) Group 2 for the owner at O4: the book gives no interval for a deep clean; the yearly section is the draft's. Review of PR 67, I5 and the O4 defaults: degreaser kept off discs, pads and rims (book p. 213; as chain-lube step 6); the quick link is rejoined and flexed as in the chain replacement (book p. 159); moved from Every year to When you notice (the book gives no interval; signs from book pp. 207, 215).",
   },
   'brakes-squeal': {
     urls: ['https://www.parktool.com/en-us/blog/repair-help/disc-brake-pad-removal-installation', 'https://www.sheldonbrown.com/rim-brakes.html'],
-    note: "Source: book pp. 211, 213 Book: pp. 211, 213: agrees on toe-in, cleaning and oily pads; differs: book adds loose caliper or disc bolts; added. Round 2: not covered by the new pages",
+    note: "Source: book pp. 211, 213 Book: pp. 211, 213: agrees on toe-in, cleaning and oily pads; differs: book adds loose caliper or disc bolts; added. Round 2: not covered by the new pages Review of PR 67, I1 and I2: cleaner on a rag, not on the pads (as brakes-rotor-wipe; book pp. 120, 213); the pad bolt goes to the printed torque after toe-in (spec 3.4; book p. 111); no fingers on disc or pads (book p. 120).",
   },
   'brakes-spongy': {
     urls: ['https://www.parktool.com/blog/repair-help/shimano-hydraulic-brake-service-and-adjustment'],
@@ -196,7 +196,7 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
   },
   'tyres-replace': {
     urls: [],
-    note: "Source: book pp. 84-85 Book: not covered (pp. 206-215). Round 2: pp. 84-85: gap filled (worn tread or cracked sidewalls mean a new tyre; fitting steps). The draft's \"cords showing, flat centre, repeated flats\" and \"wear marks\" had no source and are cut Group 2: the draft's steps 6 and 7 are joined so the task has six steps.",
+    note: "Source: book pp. 84-85 Book: not covered (pp. 206-215). Round 2: pp. 84-85: gap filled (worn tread or cracked sidewalls mean a new tyre; fitting steps). The draft's \"cords showing, flat centre, repeated flats\" and \"wear marks\" had no source and are cut Group 2: the draft's steps 6 and 7 are joined so the task has six steps. Review of PR 67, I3 and the O4 defaults: the first step (it repeated the signs) is cut, the draft's steps 6 and 7 are split again, and the last step refits the wheel and closes its quick release (book p. 40). 6 steps.",
   },
   'frame-creak': {
     urls: [],

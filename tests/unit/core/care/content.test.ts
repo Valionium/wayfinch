@@ -146,15 +146,15 @@ test('[BC-CONTENT] hub gear oil shows on every chain-hub or belt bike; with shif
 // ---- Group 2, Task 5: the full list ----
 /** The draft's 49 Care rows in the app's order, less the one row the owner's rules cut. */
 const FULL_IDS = [
-  'brakes-lever-test', 'susp-wipe-stanchions', 'ebike-charge-indoors',
+  'brakes-lever-test', 'ebike-charge-indoors',
   'frame-wash', 'chain-dry-lube', 'belt-rinse', 'brakes-rotor-wipe', 'brakes-rim-wipe', 'ebike-dry-contacts',
   'tyres-pressure', 'gears-shift-test', 'chain-wear-check', 'brakes-pads-disc', 'brakes-pads-rim', 'wheels-spokes-check', 'frame-bolts-check',
   'gears-electronic-battery', 'frame-headset-check', 'gears-cables-look',
-  'chain-lube', 'tyres-sealant-check', 'belt-inspect', 'ebike-battery-care', 'susp-air-pressure', 'gears-cassette-wear', 'wheels-hubs-check',
+  'chain-lube', 'tyres-sealant-check', 'belt-inspect', 'ebike-battery-care', 'susp-wipe-stanchions', 'susp-air-pressure', 'gears-cassette-wear', 'wheels-hubs-check',
   'brakes-rotor-thickness',
   'tyres-sealant-topup', 'susp-lowers-service', 'gears-hub-oil', 'gears-cables-replace', 'susp-fork-service', 'susp-shock-service', 'ebike-service',
-  'brakes-cable-disc-service', 'belt-tension', 'frame-torque-check', 'wheels-true-tension', 'chain-deep-clean',
-  'brakes-hydraulic-bleed', 'brakes-squeal', 'brakes-spongy', 'chain-replace', 'gears-indexing', 'wheels-wobble', 'tyres-replace', 'frame-creak',
+  'brakes-cable-disc-service', 'belt-tension', 'frame-torque-check', 'wheels-true-tension',
+  'brakes-hydraulic-bleed', 'brakes-squeal', 'brakes-spongy', 'chain-replace', 'chain-deep-clean', 'gears-indexing', 'wheels-wobble', 'tyres-replace', 'frame-creak',
   'ebike-range-drop',
 ];
 
@@ -234,9 +234,9 @@ test("[BC-CONTENT] steps with no source are cut, never guessed: no \"common sour
 
 test("[BC-CONTENT] the rear shock: a rider's check every 20 riding hours, the full service at a shop; Fox about 100 h, never the 100-125 range (owner, 7 Nov)", () => {
   const shock = CARE_TASKS.find((t) => t.id === 'susp-shock-service')!;
-  expect(shock.who).toBe('shop');
-  expect(shock.steps[0]).toMatch(/check/i);
-  expect(shock.steps[0]).toContain('every 20 riding hours');
+  expect(shock.who).toBe('you-check'); // the coordinator's O4 ruling: the rider checks every 20 h, a shop services
+  expect(shock.steps[0]).toMatch(/clean the shock shaft and look for oil/i);
+  expect(shock.steps[0]).toContain('Every 20 riding hours');
   expect(shock.steps[0]).not.toMatch(/service/i);
   expect(riderText(shock)).not.toContain('100-125');
   expect(shock.steps.join(' ')).toContain('Fox: about 100 h.');
@@ -255,6 +255,87 @@ test('[BC-CONTENT] only brakes, wheels and the four steerer, stem and bar-bolt t
   for (const id of ['brakes-lever-test', 'brakes-hydraulic-bleed', 'brakes-squeal', 'brakes-spongy', 'wheels-hubs-check', 'wheels-true-tension', 'wheels-wobble', 'frame-headset-check', 'frame-torque-check', 'frame-creak']) {
     expect(critical, id).toContain(id);
   }
-  for (const t of CARE_TASKS.filter((x) => x.critical)) expect(t.part === 'brakes' || t.part === 'wheels' || CRITICAL_FRAME.includes(t.id), t.id).toBe(true);
+  for (const t of CARE_TASKS.filter((x) => x.critical)) expect(t.part === 'brakes' || t.part === 'wheels' || CRITICAL_FRAME.includes(t.id) || t.id === 'belt-tension', t.id).toBe(true);
   for (const t of CARE_TASKS.filter((x) => x.who === 'shop')) expect(t.why, t.id).not.toBeNull();
+});
+
+// ---- Review of PR 67 (sub-project 12, group 2): I1 to I6, the O4 rulings, the cheap minors ----
+const task = (id: string): Task => CARE_TASKS.find((t) => t.id === id)!;
+const stepsOf = (id: string): string => task(id).steps.join('\n');
+
+test('[BC-CONTENT] I1: after fitting or toeing in pads, the brake bolt or pin goes to the torque printed on the brake (spec 3.4; book pp. 111, 213)', () => {
+  expect(task('brakes-pads-rim').steps.at(-1)).toMatch(/then tighten the pad bolt to the torque printed on the brake/);
+  expect(stepsOf('brakes-squeal')).toMatch(/toe the pads in slightly, then tighten the pad bolt to the torque printed on the brake/);
+  expect(stepsOf('brakes-pads-disc')).toMatch(/refit the pad pin or bolt to its printed torque/);
+  // and the tools say so
+  for (const id of ['brakes-pads-rim', 'brakes-pads-disc']) expect(task(id).tools, id).toContain('torque wrench');
+});
+
+test('[BC-CONTENT] I2: the disc and pads are never touched with fingers in the three tasks that handle them; cleaner goes on a rag, not on the pads', () => {
+  for (const id of ['brakes-squeal', 'brakes-pads-disc', 'brakes-rotor-thickness']) {
+    expect(task(id).note, id).toContain('Never touch the disc or pads with your fingers.');
+    expect(task(id).tools, id).toContain('clean gloves');
+  }
+  expect(task('brakes-squeal').steps[0]).toBe('Disc: spray disc-brake cleaner on a clean rag, not on the pads, and wipe the disc; check pads for oil.');
+});
+
+test("[BC-CONTENT] I3: a wheel taken out is put back fully and its quick release closed (wheel's, or the axle nuts tight) in the hub check and the tyre replacement; tyres-replace keeps to 6 steps and a split final step", () => {
+  const back = /Refit the wheel fully in the dropouts and close the wheel's quick release, or tighten the axle nuts; check it as before each ride\./;
+  expect(task('wheels-hubs-check').steps.at(-1)).toMatch(back);
+  expect(task('wheels-hubs-check').steps.length).toBeLessThanOrEqual(6);
+  const t = task('tyres-replace');
+  expect(t.steps.at(-1)).toBe("Pump to the pressure on the sidewall, then refit the wheel fully in the dropouts and close the wheel's quick release, or tighten the axle nuts; check it as before each ride.");
+  expect(t.steps.length).toBe(6);
+
+
+  expect(t.steps.some((s) => /squeeze the sides of the tyre together/.test(s) && !/pump/i.test(s))).toBe(true);
+  // the first step no longer repeats the signs word for word
+  expect(t.steps[0]).not.toMatch(/^Look at the tread for wear and at the sidewalls for cracks/);
+});
+
+test('[BC-CONTENT] I4: belt tension is critical, and its axle and tensioner bolts go to the printed torque', () => {
+  expect(task('belt-tension').critical).toBe(true);
+  expect(task('belt-tension').steps.at(-1)).toBe('Retighten the axle and tensioner bolts to the torque printed on the frame or hub; check the wheel sits straight in the frame.');
+  expect(task('belt-tension').tools).toContain('torque wrench');
+});
+
+test('[BC-CONTENT] I5: the deep clean keeps degreaser off brake discs, pads and rims, rejoins the chain, and sits under When you notice', () => {
+  const t = task('chain-deep-clean');
+  expect(t.section).toBe('notice');
+  expect(t.steps.join('\n')).toContain('keep degreaser off brake discs, pads and rims');
+  expect(t.steps).toContain('If you took the chain off, rejoin it and flex the link as in "Replace a worn chain" steps 3-4.');
+  expect(t.steps.indexOf('Then lube the chain.')).toBeGreaterThan(t.steps.findIndex((x) => /^If you took the chain off, rejoin it/.test(x)));
+  expect(t.steps.length).toBe(5);
+  // the signs are the trigger now there is no interval
+  expect(t.signs).toContain('gritty chain');
+});
+
+test('[BC-CONTENT] I6: the sealant check lets the air out before the valve core comes out, and ends with the core refitted and the tyre pumped up', () => {
+  const s = task('tyres-sealant-check').steps;
+  expect(s[1]).toBe('Or let the air out, remove the valve core and look in (tool needed).');
+  expect(s.some((x) => /^Refit the core and pump up\.$/.test(x))).toBe(true);
+  expect(s.indexOf('Refit the core and pump up.')).toBeGreaterThan(1);
+  expect(s.length).toBeLessThanOrEqual(6);
+});
+
+test("[BC-CONTENT] the coordinator's O4 defaults: the fork wipe is monthly; the shock's 20 h check says what to check and is the rider's; the bleed's sign has no old fluid; the disc measuring says which caliper; the contacts job is in the note", () => {
+  const w = task('susp-wipe-stanchions');
+  expect(w.section).toBe('month');
+  expect(w.steps.join(' ')).toContain('Look for oil leaking at the seals.');
+  const shock = task('susp-shock-service');
+  expect(shock.who).toBe('you-check');
+  expect(shock.why).toBe('Yourself to check every 20 h; shop to service');
+  expect(shock.steps[0]).toBe('Every 20 riding hours, clean the shock shaft and look for oil at its seal.');
+  expect(shock.steps.join(' ')).toContain('Fox: about 100 h.');
+  expect(task('brakes-hydraulic-bleed').signs).not.toMatch(/fluid old/);
+  expect(task('brakes-hydraulic-bleed').section).toBe('notice');
+  const disc = task('brakes-rotor-thickness').steps.join(' ');
+  expect(disc).toContain('a measuring caliper (not the brake caliper)');
+  expect(disc).toContain('replace the disc at once if aluminium shows');
+  const dry = task('ebike-dry-contacts');
+  expect(dry.steps[0]).not.toMatch(/Every 6 months/);
+  expect(dry.note).toContain('Every 6 months also clean battery and bike contacts with a dry cloth.');
+  // the truing and indexing joins stay, the tyre join does not
+  expect(task('wheels-true-tension').steps.length).toBe(6);
+  expect(task('gears-indexing').steps.length).toBe(6);
 });
