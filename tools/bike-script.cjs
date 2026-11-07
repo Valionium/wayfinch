@@ -28,8 +28,8 @@ const photoOptions={...options,stdin:{...options.stdin,
   sourcefile:'bike-photo-entry.ts'}};
 // The Gear advisor's search (sub-project 13): /tools/bags/advisor.js, loaded only when the advisor opens; window.WayfinchAdvisor.
 const advisorOptions={...options,stdin:{...options.stdin,
-  contents:"import { advise, adviseSteps } from './src/core/advisor/search.ts';\nimport { SIZE_RANGES, WEIGHTS } from './src/core/advisor/table.ts';\n"
-    +'window.WayfinchAdvisor = Object.freeze({ adviseSteps, advise, WEIGHTS, SIZE_RANGES });\n',
+  contents:"import { advise, adviseSteps } from './src/core/advisor/search.ts';\nimport { MIN_GAIN_BACK_L, SIZE_RANGES, WEIGHTS } from './src/core/advisor/table.ts';\n"
+    +'window.WayfinchAdvisor = Object.freeze({ adviseSteps, advise, WEIGHTS, SIZE_RANGES, MIN_GAIN_BACK_L });\n',
   sourcefile:'advisor-entry.ts'}};
 let cached=null,cachedAdvisor=null;
 /** The script's text, built once per process (the QA suites build many pages). */
