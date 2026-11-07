@@ -82,7 +82,7 @@ async function gravel(page: Page): Promise<void> {
     applyTripKitDefaults();`);
 }
 
-test('[GA-PROGRESS] a search longer than 300 ms shows "Trying N options…", and a tap during it is handled at once', async ({ page }) => {
+test('[GA-PROGRESS] a search longer than 300 ms shows "Trying N options…", and a tap during it starts the search again', async ({ page }) => {
   await planner(page);
   await tourer(page);
   // every trial a little slower, so the search runs well past 300 ms on any machine
@@ -94,15 +94,43 @@ test('[GA-PROGRESS] a search longer than 300 ms shows "Trying N options…", and
   await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
   await expect(page.locator('#advisorProgress')).toBeVisible();
   await expect(page.locator('#advisorProgress')).toHaveText(/^Trying \d+ options…$/);
-  // a tap while it runs: the other goal is taken at once, and the search starts again for it
-  const t0 = Date.now();
+  // a tap while it runs: the other goal is taken, and the search starts again for it (how fast: the test below)
   await box.locator('label.adv-choice', { hasText: 'Get the backpack off' }).click();
   await expect(box.locator('input[name="advGoal"][value="backpack"]')).toBeChecked();
   expect(await page.evaluate('ADVISOR.goal')).toBe('backpack');
-  expect(Date.now() - t0).toBeLessThan(5000);
   await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
   await expect(page.locator('#advisorProgress')).toBeHidden();
   expect(await page.evaluate('ADVISOR.input.goal')).toBe('backpack');
+});
+
+test('[GA-PROGRESS] the real R3 search hands the page back after every 20 trials at most, and a tap during it gets its response within 1 s (phone stand-in included; review of PR 60, I3)', async ({ page }) => {
+  await planner(page);
+  await tourer(page);
+  // counted in the page: trials run, the trial count at each hand-back (a zero-delay timer), long tasks, and a tap's wait
+  await page.evaluate(`window.__adv = { trials: 0, yields: [], longest: 0, tap: null };
+    advisorTrial = ((f) => (...a) => { window.__adv.trials++; return f(...a); })(advisorTrial);
+    window.setTimeout = ((st) => (fn, ms, ...a) => { if (!ms && ADVISOR_RUN > 0) window.__adv.yields.push(window.__adv.trials); return st(fn, ms, ...a); })(window.setTimeout);
+    new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__adv.longest = Math.max(window.__adv.longest, e.duration); }).observe({ type: 'longtask', buffered: false });
+    document.addEventListener('pointerdown', (e) => { window.__adv.down = e.timeStamp; }, true);
+    document.getElementById('advisorBox').addEventListener('change', (e) => { if (e.target.name === 'advGoal' && window.__adv.down) window.__adv.tap = performance.now() - window.__adv.down; });`);
+  await page.evaluate("openAdvisor(document.getElementById('rigBikeDetails'))");
+  const box = page.locator('#advisorBox');
+  await box.locator('label.adv-choice', { hasText: 'With a rack and panniers' }).click();
+  await page.evaluate('window.__adv.trials = 0; window.__adv.yields = []; window.__adv.down = 0');
+  await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
+  await expect.poll(() => page.evaluate('window.__adv.trials')).toBeGreaterThan(25);
+  await box.locator('label.adv-choice', { hasText: 'Get the backpack off' }).click();
+  await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
+  const r = await page.evaluate('window.__adv') as { trials: number; yields: number[]; longest: number; tap: number | null };
+  const gaps = r.yields.map((y, i) => y - (i ? r.yields[i - 1]! : 0)).filter((g) => g > 0);
+  const note = `tap ${r.tap?.toFixed(0)} ms, longest task ${r.longest.toFixed(0)} ms, largest gap ${Math.max(...gaps)} trials`;
+  test.info().annotations.push({ type: 'GA-PROGRESS', description: note });
+  console.log(`GA-PROGRESS ${test.info().project.name}: ${note}`);
+  expect(gaps.length).toBeGreaterThan(1);
+  expect(Math.max(...gaps), 'trials between two hand-backs').toBeLessThanOrEqual(20);
+  expect(r.tap, 'the tap was handled').not.toBeNull();
+  expect(r.tap!, 'a tap during the search waits under a second').toBeLessThan(1000);
+  expect(r.longest, 'no stretch of the search holds the page a second or more').toBeLessThan(1000);
 });
 
 test('[GA-SCREEN] at this window size and theme, offline: the steps are headings, every choice 44 px or more, no sideways scroll, and the keyboard reaches every choice and suggestion', async ({ page }) => {

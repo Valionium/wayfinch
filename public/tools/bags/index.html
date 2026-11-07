@@ -2202,7 +2202,8 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <div class="adv-bike" id="advisorBike"></div>
       <div id="advisorSteps"></div>
       <p class="adv-progress hidden" id="advisorProgress" role="status" aria-live="polite"></p>
-      <section class="adv-answer" id="advisorAnswer" aria-live="polite"></section>
+      <p class="sr-only" id="advisorStatus" role="status" aria-live="polite"></p>
+      <section class="adv-answer" id="advisorAnswer"></section>
     </div>
   </section>
 </div>
@@ -5424,11 +5425,16 @@ function planDiff(a, b){
 /* ---- The Gear advisor (sub-project 13), the page's half: its search is /tools/bags/advisor.js (window.WayfinchAdvisor), handed the
    planner's own bagSpec and a trial over planWith, so the frozen selection is only ever called (decision 1). Nothing here writes S or
    storage: every reading runs on planWith's copies. ---- */
-// The plan these bags and decks would give, on top of `base` (the questionnaire's trip and kit), as the advisor reads it.
-function advisorTrial(bags, decks, base = {}){
-  const clean = bags.map(({ hand, ...b }) => ({ ...b }));
-  return planWith({ ...base, bags:clean, decks:{ bar:!!decks.bar, rack:!!decks.rack } }, advisorResult);
+// The inputs of one trial: these bags and decks on top of `base` (the questionnaire's trip and kit), always a fresh re-plan
+// (placements:null), so the plan as it stands and every candidate go the same way and a kept plan that has drifted since (a trip
+// changed after the last keep) never credits a re-plan's gain to a suggested bag (review of PR 60, I1). Hand placements (S.pinned) stay.
+function advisorChanges(bags, decks, base = {}){
+  return { ...base, bags:bags.map(({ hand, ...b }) => ({ ...b })), decks:{ bar:!!decks.bar, rack:!!decks.rack }, placements:null };
 }
+// The plan these bags and decks would give, as the advisor reads it.
+function advisorTrial(bags, decks, base = {}){ return planWith(advisorChanges(bags, decks, base), advisorResult); }
+// The whole plan of a trial, for the view's moves.
+function advisorPlan(bags, decks, input){ return planWith(advisorChanges(bags, decks, input.context)); }
 // Read while the trial's inputs are in place: the kit on the rack deck rides there, so its kilos count as the deck's.
 function advisorResult(plan){
   const kgByPos = { ...plan.byPositionKg };
@@ -5496,14 +5502,18 @@ const ADVISOR_WORDING = {
   carry:{text:'You carry'}, carryLight:{text:'Light'}, carryAverage:{text:'Average'}, carryLot:{text:'A lot'},
   bike:{text:'Bike'}, noBike:{text:'No bike chosen: the planner assumes a frame with the usual mounts.'}, forBike:{text:'For {name}'},
   needAll:{text:'Choose all three steps to see what to get.'},
+  statusSome:{text:'{n} suggestions, best first.'}, statusOne:{text:'1 suggestion.'}, statusNothing:{text:'Nothing helps within this style.'},
+  statusCannot:{text:'No bag takes more off your back.'}, statusPartial:{text:'This search stopped early.'},
   answerTitle:{text:'What to get'},
   trying:{text:'Trying {n} options…'},
+  drawnWith:{text:'Your bike with {what}'},
   whyTitle:{text:'Why it helps:'}, movesTitle:{text:'Where your things move'},
   backAll:{text:'Takes the {l} L off your back.'}, backSome:{text:'Takes {l} L off your back; {left} L stay there.'},
   movesKg:{text:'Moves {kg} kg from {from} to {to}.'}, fitsOver:{text:'Fits everything that was left over.'},
   lower:{text:'Puts the weight lower and nearer the middle of the bike.'},
   alreadyGood:{text:'Your bags already suit this; nothing to add.'},
-  cannotReduce:{text:'No bag here takes more off your back: {l} L stay on your back.'},
+  // the search answers cannot-reduce when nothing takes MIN_GAIN_BACK_L (decision 6, 0.5 L) or more off the back
+  cannotReduce:{text:'No bag within this style takes 0.5 L or more off your back: {l} L stay on your back.'},
   nothing:{text:'Nothing helps: no single bag, swap or pair of bags fits everything within this style.'},
   closest:{text:'Closest: {what}.'}, stillOver:{text:'Still left over: {what}.'}, closestNone:{text:'No bag can be added to this bike within this style.'},
   partial:{text:'This search stopped early, after {n} options, so a better one may be missing.'},
@@ -5581,7 +5591,7 @@ function advisorBase(input){
 function advisorTrialBags(s, input){ return [...advisorBase(input).bags.filter(b => b.uid !== s.remove), ...s.add].map(({ hand, ...b }) => ({ ...b })); }
 // The trial's bags in Contract 1's shape, for bike.js: planBagView, read on the trial's copies as on a finished plan.
 function advisorBagView(bags, decks, input){
-  return withInputs({ ...input.context, bags:bags.map(({ hand, ...b }) => ({ ...b })), decks:{ bar:!!decks.bar, rack:!!decks.rack } }, () => {
+  return withInputs(advisorChanges(bags, decks, input.context), () => {
     const step = S.step; S.step = 4;
     try { return planBagView(); } finally { S.step = step; }
   });
@@ -5589,7 +5599,7 @@ function advisorBagView(bags, decks, input){
 // Where things move, in the planner's own words for the bags (planDiff between the compared plan and the trial).
 function advisorMoves(s, input){
   const base = advisorBase(input), bags = advisorTrialBags(s, input);
-  const a = planWith({ ...input.context, bags:base.bags, decks:base.decks }), b = planWith({ ...input.context, bags, decks:s.decks });
+  const a = advisorPlan(base.bags, base.decks, input), b = advisorPlan(bags, s.decks, input);
   const diff = planDiff(a, b), name = id => (kitById(id) || { name:id }).name;
   const where = (keys, list) => {
     const labels = [...new Set(String(keys).split(',').filter(Boolean).map(k => {
@@ -5626,7 +5636,7 @@ function advisorSuggestionHtml(s, input, i){
   const moves = advisorMoves(s, input), shown = moves.slice(0, 8);
   if(moves.length > shown.length) shown.push(advisorWord('moreMoves', { n:moves.length - shown.length }));
   return `<li class="adv-sugg"><article class="adv-card" tabindex="0" aria-labelledby="advS${i}"><h4 id="advS${i}">${htmlEsc(advisorWhat(s, input))}</h4>${tags}`
-    + `<div class="adv-drawing">${art ? art.svg : ''}</div>`
+    + `<div class="adv-drawing" role="img" aria-label="${htmlEsc(advisorWord('drawnWith', { what:advisorWhat(s, input).replace(/^./, c => c.toLowerCase()) }))}">${art ? art.svg : ''}</div>`
     + `<p class="adv-why"><strong>${advisorWord('whyTitle')}</strong> ${advisorWhy(s, input).map(htmlEsc).join(' ')}</p>`
     + (shown.length ? `<p class="adv-sub">${advisorWord('movesTitle')}</p><ul class="adv-moves">${shown.map(l => `<li>${htmlEsc(l)}</li>`).join('')}</ul>` : '')
     + '</article></li>';
@@ -5698,11 +5708,20 @@ function advisorBikeHtml(){
   return `<label class="adv-bike-line" for="advisorBikeSelect">${advisorWord('bike')}<select id="advisorBikeSelect">${own}`
     + BIKE_PROFILES.map(b => `<option value="${htmlEsc(b.id)}"${cur && cur.id === b.id ? ' selected' : ''}>${htmlEsc(b.name)}</option>`).join('') + '</select></label>';
 }
+// The answer is not a live region: one short status line says what changed (review of PR 60, m3), so a screen reader does not read
+// every card again after each tap.
+function advisorStatus(answer){
+  const head = answer.kind === 'suggestions' ? (answer.items.length === 1 ? advisorWord('statusOne') : advisorWord('statusSome', { n:answer.items.length }))
+    : answer.kind === 'already-good' ? advisorWord('alreadyGood') : answer.kind === 'cannot-reduce' ? advisorWord('statusCannot') : advisorWord('statusNothing');
+  return answer.partial ? head + ' ' + advisorWord('statusPartial') : head;
+}
 function renderAdvisorAnswer(){
   const box = $('advisorAnswer'); if(!box) return;
   box.innerHTML = ADVISOR.error ? `<p class="adv-note">${htmlEsc(ADVISOR.error)}</p>`
     : !advisorComplete() ? `<p class="adv-hint">${advisorWord('needAll')}</p>`
     : ADVISOR.answer ? advisorAnswerHtml(ADVISOR.answer, ADVISOR.input) : '';
+  const status = $('advisorStatus');
+  if(status) status.textContent = ADVISOR.error || (!advisorComplete() ? advisorWord('needAll') : ADVISOR.answer ? advisorStatus(ADVISOR.answer) : '');
 }
 // Re-drawn on every choice; the focused control is found again by its name and value (radios) or id, so the keyboard keeps its place.
 function renderAdvisor(){
