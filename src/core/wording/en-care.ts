@@ -77,7 +77,8 @@ export const CARE_TASKS: CareTask[] = [
     signs: 'squeal, grinding noise, weak braking, lever pulls far, about 1.5 mm of pad left',
     steps: [
       'Look into the caliper with a torch.',
-      'Pad material about 1.5 mm or thinner: replace both pads.',
+      // The draft's settled limit (review of PR 58, I1): about 1.5 mm, and the pad maker's mark if given.
+      "Pad material about 1.5 mm or thinner, or at the pad maker's mark if given: replace both pads.",
       'A grinding noise when braking means the pads are worn: replace them.',
       'Squeal, a hard lever or dark, smeary pads can mean oil on them: find the source and replace the pads.',
       'After fitting, hydraulic: pump the lever until pads touch; cable: re-align the caliper; squeeze the lever several times before riding.',
@@ -169,7 +170,8 @@ export const CARE_TASKS: CareTask[] = [
       'To find a leak, hold the tyre in soapy water for 10-20 seconds; rising bubbles show where air escapes.',
     ],
     tools: 'sealant, valve core tool, pump, bucket of soapy water', minutes: [15, 15], who: 'you', why: null,
-    note: 'Every 3-6 months (sources say 2-12; shorter in heat). Take the tyre off once a year to inspect and remove dried lumps.',
+    // The draft's settled interval (draft section 5; review of PR 58, I2): 3-6 months, 1-2 months in hot weather.
+    note: 'Every 3-6 months, 1-2 months in hot weather (sources say 2-12). Take the tyre off once a year to inspect and remove dried lumps.',
     words: ['sealant', 'tubeless', 'dry', 'top up', 'goo', 'loses air'], applies: { tyres: ['tubeless'] }, critical: false,
   },
   {
@@ -183,7 +185,8 @@ export const CARE_TASKS: CareTask[] = [
     ],
     tools: "maker's oil kit", minutes: [30, 30], who: 'you', why: "Yourself with the maker's kit, or a shop (wrong oil or overfill can damage the hub)",
     note: null,
-    words: ['internal hub', 'alfine', 'nexus', 'oil change', 'hub gears', 'slipping'], applies: { gears: ['hub'] }, critical: false,
+    // Hub gears with a shifter: a single speed (stored as chain-hub or belt, shifting none) has no hub gear oil (review of PR 58, M2).
+    words: ['internal hub', 'alfine', 'nexus', 'oil change', 'hub gears', 'slipping'], applies: { gears: ['hub'], shifting: ['cable', 'electronic'] }, critical: false,
   },
   {
     id: 'susp-fork-service', name: 'Full fork service', part: 'suspension', section: 'half-year', alsoWet: false,
@@ -191,7 +194,8 @@ export const CARE_TASKS: CareTask[] = [
     steps: [
       'Have the suspension checked at a shop every 6 months.',
       'RockShox: lower legs about 50 h; spring and damper about 100-200 h by model year.',
-      'Fox: about 100-125 h.',
+      // The shorter of Fox's 100 h and 125 h (decision 6; coordinator's ruling on review of PR 58, I3).
+      'Fox: about 100 h.',
       "Check the maker's chart for your model; whichever comes first.",
     ],
     tools: 'shop tools', minutes: null, who: 'shop', why: 'Shop (needs tools, oil and seal kits)',

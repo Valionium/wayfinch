@@ -6,7 +6,10 @@ import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 import { SOURCES } from '../../../../src/core/care/sources.ts';
 import type { CareKey, CareValue } from '../../../../src/core/care/types.ts';
-import { CARE_TASKS, PARTS, SECTIONS } from '../../../../src/core/wording/en-care.ts';
+import { careDetails, fitted } from '../../../../src/core/care/fit.ts';
+import { normaliseBike } from '../../../../src/core/bike/normalise.ts';
+import { C, CARE_TASKS, PARTS, SECTIONS, WHO_LABEL } from '../../../../src/core/wording/en-care.ts';
+import { DRAFT_FIGURES, SETTLED_RANGES } from './draft-figures.ts';
 
 const REPO = fileURLToPath(new URL('../../../../', import.meta.url));
 /** The Frame & bolts tasks on the steerer, stem or bar bolts (design 3.5: "if unsure, a shop"), from the content draft's ids. */
@@ -82,4 +85,31 @@ test('[BC-SOURCES-PRIVATE] no file under src/tools or src/ui imports src/core/ca
   expect(all.length).toBeGreaterThan(50);
   for (const f of all) expect(readFileSync(join(REPO, f), 'utf8'), f).not.toMatch(/care\/sources(\.ts)?['"]/);
   expect(all.filter((f) => f.startsWith('src/tools/care/')).length).toBeGreaterThan(0);
+});
+
+/** Everything a rider can read of a task once it is open. */
+const riderText = (t: (typeof CARE_TASKS)[number]): string => [
+  t.name, t.signs, ...t.steps, t.tools, t.minutes ? C.careTime(t.minutes[0], t.minutes[1]) : '', t.note ?? '', t.why ?? WHO_LABEL[t.who],
+].join('\n').toLowerCase();
+
+test("[BC-CONTENT] every task's rider-visible text holds each key sentence and figure of its draft row; a settled range never shows (review of PR 58, I1-I3)", () => {
+  for (const t of CARE_TASKS) {
+    const want = DRAFT_FIGURES[t.id];
+    expect(want, `${t.id} has no draft figures`).toBeDefined();
+    const text = riderText(t);
+    for (const fact of want!) expect(text, `${t.id}: ${fact}`).toContain(fact.toLowerCase());
+    for (const range of SETTLED_RANGES[t.id] ?? []) expect(text, `${t.id}: ${range}`).not.toContain(range);
+  }
+});
+
+test('[BC-CONTENT] a single speed (chain-hub or belt, no shifting) gets no hub gear oil task; hub gears on a cable or electronic shifter do (review of PR 58, M2)', () => {
+  const ids = (extra: Record<string, unknown>) => fitted(CARE_TASKS, careDetails(normaliseBike({ id: 'b1', ...extra }))).map((t) => t.id);
+  expect(ids({ drive: 'chain-hub', shifting: 'none' })).not.toContain('gears-hub-oil');
+  expect(ids({ drive: 'belt', shifting: 'none' })).not.toContain('gears-hub-oil');
+  expect(ids({ drive: 'chain-hub', shifting: 'cable' })).toContain('gears-hub-oil');
+  expect(ids({ drive: 'belt', shifting: 'electronic' })).toContain('gears-hub-oil');
+  expect(ids({ drive: 'derailleur', shifting: 'cable' })).not.toContain('gears-hub-oil');
+  // shifting Not sure: shown, tagged
+  const unsure = fitted(CARE_TASKS, careDetails(normaliseBike({ id: 'b1', drive: 'chain-hub' }))).find((t) => t.id === 'gears-hub-oil');
+  expect(unsure?.tags).toEqual(['shifting']);
 });

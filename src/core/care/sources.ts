@@ -46,6 +46,6 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
       'https://worldwidecyclery.com/blogs/worldwide-cyclery-blog/ultimate-guide-suspension-service',
       'https://flowmountainbike.com/features/flows-guide-to-understanding-suspension-service-intervals-and-upgrade-options/',
     ],
-    note: 'A shop check every 6 months: book p. 207 (was yearly). Disagree: Fox 100 h vs 125 h (secondary sources); the draft says use 100. Search summaries only.',
+    note: 'A shop check every 6 months: book p. 207 (was yearly). Disagree: Fox 100 h vs 125 h (secondary sources); the app shows about 100 h, the shorter (decision 6; the coordinator ruled so in the review of PR 58, I3). Search summaries only.',
   },
 };
