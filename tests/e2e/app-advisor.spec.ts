@@ -308,3 +308,60 @@ test('[GA-SCREEN] combinations side by side at this size and theme: the row of s
   await page.keyboard.press('Enter');
   await expect.poll(() => page.evaluate('document.activeElement.getAttribute("aria-labelledby")')).toBe(target);
 });
+
+// ---- Trial bags (sub-project 13, group 3; decision 7) ----
+
+/** The bag planner's own saved values a trial may never touch: the draft, the bikes and the setups. */
+const saved = (page: Page) => page.evaluate(() => Object.fromEntries(['loadcheck:draft', 'loadcheck:bikeProfiles', 'loadcheck:setups'].map((k) => [k, localStorage.getItem(k)])));
+
+test('[GA-TRY] [GA-TRIAL-NO-TRACE] [GA-KEEP] [GA-REMOVE] in the browser: Try in Bag planner shows the plan with the trial bag and its line; a reload keeps nothing of it; Remove it and Keep it from the line', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page);
+  await gravel(page);
+  // the packing check's one-time question about the bike's maximum weight was asked before
+  await page.evaluate('S.bikeProfile.maxWeightAsked = true; flushDraft()');
+  // the plan as the page reads it back from storage
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY');
+  const before = await saved(page);
+  const bagsBefore = await page.evaluate('JSON.stringify(S.bags)');
+  const box = page.locator('#advisorBox');
+  const tryFirst = async (choose: boolean): Promise<void> => {
+    await page.evaluate("location.hash = '#gear-advisor'");
+    await expect(box).toBeVisible();
+    if (choose) await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
+    const button = box.getByRole('button', { name: 'Try in Bag planner' }).first();
+    await expect(button).toBeVisible({ timeout: 30_000 });
+    await button.click();
+    await expect(box).toBeHidden();
+    await expect(page.locator('#trialBar')).toBeVisible();
+    await expect(page.locator('#trialText')).toHaveText(/^Trying: .+\. Not saved until you keep it$/);
+    await expect(page.locator('#s4')).toBeVisible();
+    expect(await page.evaluate('JSON.stringify(S.bags)')).not.toBe(bagsBefore);
+  };
+  await tryFirst(true);
+  // Save setup waits with the line
+  await page.locator('#quickSave').click();
+  await expect(page.locator('#quickSaveMsg')).toHaveText(/^Trying: /);
+  // a reload keeps nothing of it
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY');
+  await expect(page.locator('#trialBar')).toBeHidden();
+  expect(await page.evaluate('JSON.stringify(S.bags)')).toBe(bagsBefore);
+  expect(await saved(page)).toEqual(before);
+  // Remove it
+  await tryFirst(true);
+  await page.getByRole('button', { name: 'Remove it' }).click();
+  await expect(page.locator('#trialBar')).toBeHidden();
+  expect(await page.evaluate('JSON.stringify(S.bags)')).toBe(bagsBefore);
+  await page.waitForTimeout(500);
+  expect(await saved(page)).toEqual(before);
+  // Keep it: the trial's bags are saved
+  await tryFirst(false);
+  const kept = await page.evaluate('JSON.stringify(S.bags)');
+  await page.getByRole('button', { name: 'Keep it' }).click();
+  await expect(page.locator('#trialBar')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem('loadcheck:draft')!).bags))).toBe(kept);
+  expect(errors).toEqual([]);
+});

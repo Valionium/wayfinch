@@ -1838,6 +1838,11 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <span id="tabText"></span>
     <button class="linky hidden" id="tabLoad">Load the newer plan</button>
   </div>
+  <div class="draftbar hidden" id="trialBar" role="status">
+    <span id="trialText"></span>
+    <button class="kitact" id="trialKeep" type="button"></button>
+    <button class="linky" id="trialRemove" type="button"></button>
+  </div>
 
   <div class="planner-cols" id="plannerCols">
   <div class="rig" id="rigBox">
@@ -5546,6 +5551,11 @@ const ADVISOR_WORDING = {
   typeTop:{text:'Top tube bag'}, typeFrame:{text:'Frame bag'}, typeFork:{text:'Fork cages'}, typeBar:{text:'Handlebar roll'},
   typeSeat:{text:'Seat pack'}, typeRack:{text:'Panniers'}, typePack:{text:'Backpack'}, typeBottle:{text:'Bottle cage'},
   typeForkOne:{text:'Fork cage'}, typeRackOne:{text:'Pannier'},
+  // trial bags (decision 7)
+  tryIn:{text:'Try in Bag planner'}, trialTrying:{text:'Trying: {bag}. Not saved until you keep it'},
+  trialKeep:{text:'Keep it'}, trialRemove:{text:'Remove it'},
+  trialFirst:{text:'Keep or remove the bag you are trying first.'},
+  tryNeedsPlan:{text:'To try a bag in the Bag planner, use your own packing: add your bags there first.'},
 };
 const advisorWord = (key, values = {}) => ADVISOR_WORDING[key].text.replace(/\{(\w+)\}/g, (m, k) => values[k] ?? m);
 const ADVISOR_TYPES = { top:'typeTop', frame:'typeFrame', fork:'typeFork', bar:'typeBar', seat:'typeSeat', rack:'typeRack', pack:'typePack', bottle:'typeBottle', bottleU:'typeBottle' };
@@ -5713,6 +5723,8 @@ function advisorCardHtml(s, input, i, shown0 = advisorShown(s, input)){
     + `<div class="adv-drawing" role="img" aria-label="${htmlEsc(advisorDrawnName(s, input))}">${art ? art.svg.replace(/^<svg\b/, '<svg aria-hidden="true"') : ''}</div>`
     + `<p class="adv-why"><strong>${advisorWord('whyTitle')}</strong> ${advisorWhy(s, input).map(htmlEsc).join(' ')}</p>`
     + (shown.length ? `<p class="adv-sub">${advisorWord('movesTitle')}</p><ul class="adv-moves">${shown.map(l => `<li>${htmlEsc(l)}</li>`).join('')}</ul>` : '')
+    // Try in Bag planner, on the rider's own packing and with no trial on already (decision 7)
+    + (!input.fromQuestionnaire && !TRIAL ? `<button type="button" class="kitact adv-try" data-try="${i}" aria-describedby="advS${i}">${advisorWord('tryIn')}</button>` : '')
     + '</article>';
 }
 function advisorSuggestionHtml(s, input, i, shown){ return `<li class="adv-sugg">${advisorCardHtml(s, input, i, shown)}</li>`; }
@@ -5751,6 +5763,7 @@ function advisorAnswerHtml(answer, input){
   if(advisorNoMounts() && advisorRackFitted(input)) notes.push(advisorWord('rackKept'));
   if(answer.frameReason) notes.push(advisorWord('frameNone', { reason:answer.frameReason }));
   if(answer.partial) notes.push(advisorWord('partial', { n:answer.tried }));
+  if(answer.kind === 'suggestions') notes.push(...(input.fromQuestionnaire ? [advisorWord('tryNeedsPlan')] : TRIAL ? [advisorWord('trialFirst')] : []));
   let body = '';
   if(answer.kind === 'suggestions') body = advisorTwoKindsHtml(answer, input);
   else if(answer.kind === 'already-good') body = `<p class="adv-plain">${advisorWord('alreadyGood')}</p>`;
@@ -5956,6 +5969,8 @@ function initialiseAdvisor(){
     const combo = event.target.closest?.('.adv-combo');
     const card = combo && $(combo.dataset.card)?.closest('.adv-card');
     if(card){ card.scrollIntoView({ block:'start', behavior:'smooth' }); card.focus({ preventScroll:true }); }
+    const tryIt = event.target.closest?.('.adv-try');
+    if(tryIt) startTrial(advisorCards(ADVISOR.answer)[+tryIt.dataset.try]);
   });
   box.addEventListener('change', event => {
     const t = event.target;
@@ -5968,7 +5983,87 @@ function initialiseAdvisor(){
     }
   });
   window.addEventListener('hashchange', () => { if(DRAFT_READY) openAdvisorFromLink(); });
+  $('trialKeep').onclick = () => keepTrial();
+  $('trialRemove').onclick = () => removeTrial();
 }
+
+/* ---- Trial bags (sub-project 13, Task 7; decision 7): Try in Bag planner puts a suggestion's bags into the plan as a trial. While it
+   is on, draft saves wait, Save setup and Export wait with the trial's line, and every reading of the draft (a hidden or closing tab's
+   save, an export, the comparison with another tab) is the plan without the trial bag. Keep saves once; Remove puts back the bags,
+   decks, kept placements and next bag number of before, and saves the rider's other changes; a page closed or reloaded keeps nothing
+   of it, since the trial lives in memory only. A plan restored over it (another tab's, a setup, an import) ends it. ---- */
+// { before:{ bags, decks, placements, nextUid, step }, label, uids (the trial's new bags), pendingOther } or null
+let TRIAL = null;
+// The cards of an answer, in the order their indexes run: Minimal's, then Looking ahead's set and its alternatives.
+const advisorCards = answer => !answer || answer.kind !== 'suggestions' ? [] : [...answer.items, ...(answer.ahead ? [answer.ahead, ...(answer.aheadAlts || [])] : [])];
+const trialLine = () => TRIAL ? advisorWord('trialTrying', { bag:TRIAL.label }) : '';
+// A hand placement into one of the trial's new bags (S.pinned names its unit, "<uid>-<half>").
+const trialPin = key => !!TRIAL && TRIAL.uids.includes(+String(key).split('-')[0]);
+// `work` run on the plan without the trial: the inputs of before swapped in on copies, as planWith does, and put back after.
+function withoutTrial(work){
+  if(!TRIAL) return work();
+  const b = TRIAL.before, pinned = Object.fromEntries(Object.entries(S.pinned || {}).filter(([, key]) => !trialPin(key)));
+  return withInputs({ bags:JSON.parse(JSON.stringify(b.bags)), decks:{ ...b.decks }, placements:b.placements, pinned }, () => {
+    const uid = S.nextUid, step = S.step;
+    S.nextUid = b.nextUid; S.step = b.step;
+    try { return work(); } finally { S.nextUid = uid; S.step = step; }
+  });
+}
+function renderTrialBar(){
+  const bar = $('trialBar'); if(!bar) return;
+  $('trialText').textContent = trialLine();
+  $('trialKeep').textContent = advisorWord('trialKeep');
+  $('trialRemove').textContent = advisorWord('trialRemove');
+  bar.classList.toggle('hidden', !TRIAL);
+}
+// Save setup and Export during a trial: nothing is written, and the trial's line says why. True when they wait.
+function trialWaits(where){
+  if(!TRIAL) return false;
+  const line = trialLine();
+  if(where === 'export'){ if($('impMsg')) $('impMsg').textContent = line; }
+  else { SAVE_MESSAGE = line; if($('saveMsg')) $('saveMsg').textContent = line; draftStatus(line); }
+  return true;
+}
+function exportPlanFile(){ return trialWaits('export') ? false : downloadAll(); }
+// Try in Bag planner: the plan as the advisor tried it (the suggestion's bags and decks, a fresh plan), at the packing check.
+function startTrial(s, input = ADVISOR.input){
+  if(TRIAL || !s || !input || input.fromQuestionnaire) return false;
+  currentPlan();   // the kept plan as it stands, so the one put back is the one the rider had
+  const before = { bags:JSON.parse(JSON.stringify(S.bags)), decks:{ ...S.decks }, placements:S.placements, nextUid:S.nextUid, step:S.step };
+  const bags = advisorTrialBags(s, input), had = new Set(before.bags.map(b => b.uid));
+  TRIAL = { before, label:advisorWhat(s, input), uids:bags.filter(b => !had.has(b.uid)).map(b => b.uid), pendingOther:false };
+  S.bags = bags;
+  S.decks = { ...S.decks, bar:!!s.decks.bar, rack:!!s.decks.rack };
+  S.nextUid = Math.max(S.nextUid, ...bags.map(b => b.uid + 1));
+  S.placements = null;
+  ADVISOR.back = null;   // the planner stays: Try never goes back to Wayfinch
+  closeAdvisor();
+  renderTrialBar();
+  go(4);
+  return true;
+}
+// Keep it: the trial's bags are the rider's now; the plan is saved once.
+function keepTrial(){
+  if(!TRIAL) return false;
+  TRIAL = null; renderTrialBar();
+  flushDraft();
+  return true;
+}
+// Remove it: the bags, decks, kept placements and next bag number of before, byte for byte; a hand placement into a trial bag goes with
+// it; back at the step the rider was on; the rider's other changes are saved.
+function removeTrial(){
+  if(!TRIAL) return false;
+  const b = TRIAL.before;
+  Object.keys(S.pinned || {}).forEach(id => { if(trialPin(S.pinned[id])) delete S.pinned[id]; });
+  TRIAL = null;
+  S.bags = b.bags; S.decks = b.decks; S.placements = b.placements; S.nextUid = b.nextUid;
+  renderTrialBar();
+  go(b.step);
+  flushDraft();
+  return true;
+}
+// A plan restored over a trial (another tab's, a saved setup, an import, Undo of a route) ends it, keeping nothing of it.
+function endTrial(){ if(TRIAL){ TRIAL = null; renderTrialBar(); } }
 
 // Keep centilitres until the final display so small overflows never read as a fit.
 function packingSummary(A){
@@ -10345,7 +10440,7 @@ function renderResult(){
     if(ok) renderResult();
     else $('bagsOwnStatus').textContent = 'Enter a weight from 0 to 50 kg. The last valid value was kept.';
   };
-  if($('dlAll')) $('dlAll').onclick = downloadAll;
+  if($('dlAll')) $('dlAll').onclick = exportPlanFile;
   if($('impAll')) $('impAll').onclick = () => $('impFile').click();
   if($('impFile')) $('impFile').onchange = e => {
     const f = e.target.files[0]; if(!f) return;
@@ -11003,9 +11098,10 @@ function capturePlan(){
       L:k.L, kg:k.kg, rigid:k.rigid || 0, comfort:!!k.comfort })),
   };
 }
+// During a trial (decision 7) the draft is the plan without the trial bag, wherever it is read: a save, an export, another tab's check.
 function captureDraft(){
-  return { ...capturePlan(), settings:draftSettings(),
-    pendingSaveName:S.pendingSaveName, pendingSaveNote:S.pendingSaveNote };
+  return withoutTrial(() => ({ ...capturePlan(), settings:draftSettings(),
+    pendingSaveName:S.pendingSaveName, pendingSaveNote:S.pendingSaveNote }));
 }
 // The theme belongs to a plan only once the rider has chosen one; following the system is not a choice, so it neither counts as a change nor locks the app to that theme.
 let THEME_CHOSEN = false;
@@ -11403,6 +11499,7 @@ function restorePlan(p, draft, restoreSettings=true){
   const savedPlacements=dataObject(p) ? p.placements : undefined;
   p=normalisePlan(p);
   if(!p) return false;
+  endTrial();
   cancelGPXLoad();
   if(typeof invalidateTripPreview === 'function') invalidateTripPreview();
   if(GEO_CANCEL[1]) GEO_CANCEL[1]();
@@ -11551,9 +11648,12 @@ function saveDraftInBrowser(value){
     return {saved:false,kind:'memory'};
   }
 }
-function persistDraft(serial){
+// Every draft write passes here. During a trial a queued save waits (decision 7); a hidden or closing tab (flushDraft) still saves, the
+// plan without the trial bag (captureDraft), so the rider's other changes are kept and nothing of the trial is.
+function persistDraft(serial, flushing = false){
   DRAFT_LATEST_SERIAL=serial;
   if(DRAFT_FROZEN || deletedSinceLoad()) return DRAFT_WRITES;
+  if(TRIAL && !flushing){ TRIAL.pendingOther = serial !== DRAFT_SIGNATURE; return DRAFT_WRITES; }
   // Nothing unsaved: a hidden or closing tab writes nothing, and instead notices a newer draft.
   if(serial === DRAFT_SIGNATURE && DRAFT_SAVE_STATUS.state === 'saved' && !DRAFT_PENDING_SERIAL){
     if(!window.storage){ const other=foreignDraft(); if(other) handleForeignDraft(other); }
@@ -11606,7 +11706,7 @@ function queueDraftSave(){
 function flushDraft(){
   if(!DRAFT_READY) return DRAFT_WRITES;
   clearTimeout(DRAFT_TIMER); DRAFT_TIMER = null;
-  return persistDraft(JSON.stringify(captureDraft()));
+  return persistDraft(JSON.stringify(captureDraft()), true);
 }
 /* ---- Two open tabs (design 8.5) ---- */
 function draftVersionOf(value){ return value && typeof value === 'object' && typeof value.updatedAt === 'string' ? value.updatedAt : null; }
@@ -11952,6 +12052,7 @@ function snapshotSetup(name, note){
   };
 }
 async function saveSetup(name, note){
+  if(trialWaits('setup')) return false;
   if(SETUPS.length >= MAX_SAVED_SETUPS){
     SAVE_MESSAGE = `You have ${SETUPS.length} saved setups. Export them, then delete one before saving another.`;
     if($('saveMsg')) $('saveMsg').textContent = SAVE_MESSAGE;
@@ -12084,6 +12185,7 @@ function renderSetupCompare(){
 }
 function startSetupAction(id,kind){
   const s=SETUPS.find(setup => setup.id === id); if(!s) return false;
+  if(kind !== 'rename' && trialWaits('setup')){ renderResult(); return false; }   // a setup is never updated with a trial bag
   SETUP_ACTION=kind === 'rename' ? {kind,id,name:s.name} : {kind:'update',id,snapshot:snapshotSetup(s.name,s.note)};
   renderResult();
   const target=kind === 'rename' ? $('renameSetupName') : $('resultBox').querySelector('[data-confirm-update="'+id+'"]');
@@ -12108,6 +12210,7 @@ async function duplicateSetup(id){
 async function confirmSetupUpdate(id){
   const index=SETUPS.findIndex(s => s.id === id);
   if(index < 0 || !SETUP_ACTION || SETUP_ACTION.kind !== 'update' || SETUP_ACTION.id !== id) return false;
+  if(trialWaits('setup')){ renderResult(); return false; }
   const original=SETUPS[index],reviewed=normaliseSetup(SETUP_ACTION.snapshot); if(!reviewed) return false;
   // Reports are self-contained measurements of the previous prediction. Keep
   // their sent/pending state and detach them from the new packing outcome.
