@@ -1,6 +1,6 @@
 // The Gear advisor's search (design §3.1–3.3; plan Task 3). Pure: the planner's packing comes in as `input.trial`, so the same search
 // runs in Vitest with a stand-in and in the bag planner with its own, frozen planWith.
-import { candidates } from './candidates.ts';
+import { candidates, planAsStyled } from './candidates.ts';
 import { compareFor, handlingScore, isValid, overflows, sizeRange } from './rank.ts';
 import { MAX_TRIALS, MIN_GAIN_BACK_L, MIN_GAIN_SCORE, SIZE_RANGES, type SizedPos } from './table.ts';
 import type { AdvisorAnswer, AdvisorInput, BagIn, Candidate, Suggestion } from './types.ts';
@@ -23,7 +23,9 @@ function bagsFor(input: AdvisorInput, c: Candidate): BagIn[] {
  * added bag; then, for Better handling, every swap; two added bags only when neither gave an answer. It stops at MAX_TRIALS (the base
  * trial included) and answers from what it tried.
  */
-export function* adviseSteps(input: AdvisorInput): Generator<number, AdvisorAnswer> {
+export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnswer> {
+  // The base and every candidate run on the plan as the style reads it: without a rack, nothing on a rack (R1).
+  const input = planAsStyled(given);
   const frameReason = input.frameReason;
   let trials = 0;
   const base = input.trial(input.bags, input.decks);

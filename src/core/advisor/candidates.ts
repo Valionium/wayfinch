@@ -83,9 +83,19 @@ function litresOf(bags: BagIn[]): number {
   return Math.round(bags.reduce((n, b) => n + b.L * (b.pair ? 2 : 1), 0) * 100) / 100;
 }
 
-/** Panniers put the rack deck on when the trip camps; without a rack the rider's own rack deck is off (DECIDED.rackDeckWithoutRack). */
+/**
+ * The rider's plan as the chosen style reads it (re-check of PR 57, R1; DECIDED.rackWithoutRack, pending the owner's O1): without a
+ * rack, nothing is on a rack, so the rider's own panniers and rack deck leave the plan. The search runs its base trial and every
+ * candidate on this, so the answer compares against the rackless plan.
+ */
+export function planAsStyled(input: AdvisorInput): AdvisorInput {
+  if (!styleWithoutRack(input) || DECIDED.rackWithoutRack !== 'off') return input;
+  if (!input.decks.rack && !input.bags.some((b) => b.pos === 'rack')) return input; // nothing on a rack: the plan as given
+  return { ...input, bags: input.bags.filter((b) => b.pos !== 'rack'), decks: { ...input.decks, rack: false } };
+}
+
+/** Panniers put the rack deck on when the trip camps. */
 function decksFor(input: AdvisorInput, add: BagIn[]): Decks {
-  if (styleWithoutRack(input) && DECIDED.rackDeckWithoutRack === 'off') return { ...input.decks, rack: false };
   return input.camping && add.some((b) => b.pos === 'rack') ? { ...input.decks, rack: true } : { ...input.decks };
 }
 
@@ -103,7 +113,8 @@ const sameBag = (a: Omit<BagIn, 'uid'>, b: BagIn) =>
  * handling only: one of the rider's bags out (never one holding a hand placement, never a bottle), one in at any position then free.
  * `add-two`: two new bags at two different free positions, their sizes in lock step from each range's low end.
  */
-export function candidates(input: AdvisorInput, phase: 'add' | 'swap' | 'add-two'): Candidate[] {
+export function candidates(given: AdvisorInput, phase: 'add' | 'swap' | 'add-two'): Candidate[] {
+  const input = planAsStyled(given);
   const out: Candidate[] = [];
   if (phase === 'add') {
     for (const { pos, slot } of freePositions(input, input.bags, null)) {

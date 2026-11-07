@@ -206,6 +206,44 @@ describe('the answer (design §2, §3.3)', () => {
   });
 });
 
+describe('without a rack: nothing on a rack, the base included (re-check of PR 57, R1; pending the owner\'s O1)', () => {
+  test('[GA-STYLE] a plan that fits only with the rider\'s rack deck, nothing addable, is never already good under Without a rack: the base runs without the deck', () => {
+    // 12 L in the bar roll, 10 L in the seat pack, 5 L on the rider's 8 L rack deck.
+    const plan = { goal: 'handling' as const, bags: [bag(1, 'bar', 12), bag(2, 'seat', 10)], decks: { rack: true, bar: false }, nextUid: 3,
+      usable: () => ({ ok: false, reason: 'NO_MOUNT' }), trial: packer(items(12, 10, 5)) };
+    expect(advise(input({ ...plan, style: 'either' })).kind).toBe('already-good'); // with a rack it does fit
+    for (const over of [{ style: 'no-rack' as const }, { style: 'either' as const, noPanniers: true }]) {
+      const answer = advise(input({ ...plan, ...over }));
+      expect(answer.kind, JSON.stringify(over)).toBe('nothing-helps');
+      // A bag that takes the 5 L is a full fix.
+      const fixed = advise(input({ ...plan, ...over, usable: (b) => ({ ok: b.pos === 'frame', reason: null }) }));
+      expect(fixed.kind).toBe('suggestions');
+      if (fixed.kind === 'suggestions') expect(fixed.items[0]!.add[0]!.pos).toBe('frame');
+    }
+  });
+
+  test('[GA-STYLE] the rider\'s own panniers are in no trial under Without a rack, the base included, and no swap takes them out', () => {
+    for (const over of [{ style: 'no-rack' as const }, { style: 'either' as const, noPanniers: true }]) {
+      const seen: { bags: BagIn[]; decks: Decks }[] = [];
+      const inner = packer([{ id: 'a', L: 8, kg: 3 }, { id: 'b', L: 8, kg: 3 }, { id: 'c', L: 8, kg: 3 }]);
+      const i = input({ ...over, goal: 'handling', camping: true, bags: [bag(1, 'seat', 10), bag(2, 'rack', 20, { pair: true })], decks: { rack: true, bar: false }, nextUid: 3,
+        trial: (bags, decks) => { seen.push({ bags, decks }); return inner(bags, decks); } });
+      const answer = advise(i);
+      expect(seen.length, JSON.stringify(over)).toBeGreaterThan(20);
+      for (const t of seen) {
+        expect(t.bags.some((b) => b.pos === 'rack')).toBe(false);
+        expect(t.decks.rack).toBe(false);
+      }
+      expect((['add', 'swap', 'add-two'] as const).flatMap((p) => candidates(i, p)).some((c) => c.remove === 2)).toBe(false);
+      if (answer.kind === 'suggestions') for (const s of answer.items) expect(s.remove).not.toBe(2);
+    }
+    // With a rack, the panniers and the deck stay in every trial.
+    const kept: BagIn[][] = [];
+    advise(input({ goal: 'handling', bags: [bag(1, 'seat', 10), bag(2, 'rack', 20, { pair: true })], decks: { rack: true, bar: false }, nextUid: 3, trial: packer(items(8, 8, 8), kept) }));
+    expect(kept[0]!.some((b) => b.pos === 'rack')).toBe(true);
+  });
+});
+
 describe('slices (design §3.4: within a second, or in the background)', () => {
   test('[GA-SLICES] the generator yields every 20 trials and never exceeds MAX_TRIALS', () => {
     const calls: BagIn[][] = [];

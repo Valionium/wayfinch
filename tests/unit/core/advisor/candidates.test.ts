@@ -30,7 +30,7 @@ describe('the tables (decisions 2, 3, 6; the plan\'s tables)', () => {
       noPanniersUnder: ['either', 'rack'], // decision 5 (review m3: also under With a rack)
       seatUnlikely: 'drop',                // decision 9
       seatTight: 'tag',                    // decision 9
-      rackDeckWithoutRack: 'off',          // review I3 (design §4)
+      rackWithoutRack: 'off',              // review I3, re-check R1 (design §4): no deck, no panniers
       rangeUpToL: 2,                       // design §3.3
       rangeHalfLitres: true,               // decision 3 (review m2: +0.5 and +1.5 L for the top tube)
     });
