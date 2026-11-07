@@ -196,7 +196,7 @@ function MeasuredFields({ value, onCommit }: { value: Details['measured']; onCom
   };
   return (
     <>
-      <p class="muted">{W.tyreMeasuredHelp}</p>
+      <p class="muted">{T.tyreMeasuredHelp}</p>
       <NumberInput id="tyre-mfront" label={W.tyreMeasuredFrontLabel} value={front} onCommit={(n) => commit(n, rear)} unit="kg" />
       <NumberInput id="tyre-mrear" label={W.tyreMeasuredRearLabel} value={rear} onCommit={(n) => commit(front, n)} unit="kg" />
     </>
@@ -379,7 +379,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
     <div class="tyre">
       <p><a class="btn" href="#/tools">{W.tyreBack}</a></p>
       <h2 class="tyre-title">{W.tyreTitle}</h2>
-      <p class="muted">{W.tyreIntro}</p>
+      <p class="muted">{T.tyreIntro}</p>
 
       <label class="tyre-input" for="tyre-bike">
         <span class="tyre-label">{W.tyreBikeLabel}</span>

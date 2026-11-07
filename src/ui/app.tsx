@@ -25,6 +25,8 @@ import './wide/wide.css';
 const tyreServices = browserServices(riderKg);
 // The tyre tool's screen is its own chunk: it is not a first screen.
 const TyreScreen = lazy(() => import('../tools/tyre/ui.tsx').then((m) => m.TyreScreen));
+// Bike care is its own chunk too (sub-project 12): its content and words load only when it opens.
+const CareScreen = lazy(() => import('../tools/care/ui.tsx').then((m) => m.CareScreen));
 // You is its own chunk too (spec section 3.5): the first screen does not carry its form, export or import.
 // Tools is its own chunk too (sub-project 11): its bike line and tyre card are not a first screen. The bag card is, shown while it loads
 // (bag-card.tsx), so the bike is drawn when the page is revealed and glides back from the bag planner (LC-GLIDE).
@@ -89,6 +91,7 @@ function Screen({ name }: { name: ScreenName }) {
       {name === 'tools' ? <ToolsScreen services={tyreServices} /> : null}
       {tab === 'you' ? <YouHost /> : null}
       {name === 'tools/tyre' ? <TyreScreen services={tyreServices} /> : null}
+      {name === 'tools/care' ? <CareScreen services={tyreServices} /> : null}
     </main>
   );
 }

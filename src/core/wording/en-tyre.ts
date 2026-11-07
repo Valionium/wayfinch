@@ -18,4 +18,7 @@ export const T = {
   // Moved from en.ts (6 Nov 2026), shown only on this screen: the first screen no longer carries them.
   tyreHeatIntro: 'Warm air and a high pass raise the pressure after you pump. Enter where and when you pump and the worst the trip can bring, to see how high to pump.',
   tyreCaliperHelp: 'A calipered tyre width replaces the effective width in the pressure calculation. The hookless limits and the rim check still use the printed width.',
+  // Moved from en.ts (7 Nov 2026, sub-project 12): they pay for Bike care's entry in the first screen.
+  tyreIntro: 'An estimate for your setup, worked out on this phone from published tyre-drop data. It never goes above a limit you enter, and it sends nothing.',
+  tyreMeasuredHelp: 'Wheel loads: with your gear on, ride-ready, put one wheel on a bathroom scale and the other on a block of the same height, then swap. Enter both.',
 };
