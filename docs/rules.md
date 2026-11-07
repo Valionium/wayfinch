@@ -91,7 +91,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - A failing check saves a regression file and can be replayed (§11.1) [HON-SIM-FAIL]
 - One seed always gives the same run (§11.1) [HON-SIM-SEED]
 - Every property test runs on the fixed seed and run count, or the ones FC_SEED and FC_RUNS give, through @fast-check/vitest too (§11.1) [HON-PROP-SEED]
-- A scheduled run of every property test on a random seed, which prints its seed, so the fixed seed of pull requests doesn't hide a counterexample for good (§11.1, §11.8) [HON-PROP-SWEEP]
+- A scheduled run of every property test on a random seed, which prints its seed, so the fixed seed of pull requests doesn't hide a counterexample for good (§11.1, §11.8) (after the first version: owner, 7 Nov 2026) [HON-PROP-SWEEP]
 - One screen on a long route builds within the time budget (§4.5) [HON-BUDGET]
 
 ## Contracts
@@ -607,7 +607,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - All lazy chunks together ≤ 200 KB gzipped; bag planner excluded (§4.5) [PERF-JS-LAZY]
 - One bike with bags drawn ≤ 20 ms (§4.5) [PERF-BIKE]
 - Heidelberg → Strasbourg places: the fixture pack's size, ≤ 3 MB, is checked on every pull request (§4.5) [PERF-PACK]
-- Heidelberg → Strasbourg places on a live pack: ≤ 3 MB and ≤ 30 s on the stand-in's network, on the owner's Run workflow only, because a pull request must not depend on outside data; no test or workflow step exists yet (§4.5) [PERF-PACK-LIVE]
+- Heidelberg → Strasbourg places on a live pack: ≤ 3 MB and ≤ 30 s on the stand-in's network, on the owner's Run workflow only, because a pull request must not depend on outside data; no test or workflow step exists yet; checked by hand on the release checklist, last on 3 Nov 2026 (§4.5) [PERF-PACK-LIVE]
 - Boundary file ≤ 150 KB gzipped (§4.5) [PERF-BOUNDARY]
 
 ## App: Vite, Preact and the switch
@@ -618,6 +618,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - name and short name "Wayfinch", id and start_url /, scope /, standalone, en; icons 192, 512 and maskable; shortcuts /tools/bags/, /#/tools/tyre; description contains "trip planning, not health advice" [APP-MANIFEST]
 - a file under src/ui/ahead/ importing src/store or calling fetch fails lint (fixture run of ESLint) [APP-AHEAD-LINT]
 - a production build's JS contains no __wf [APP-NO-HOOK]
+- the app's files carry only the fields of build.config.json the app reads (weatherMode, dataOrigin): a build with only the launch switch or the deploy settings changed writes every file byte for byte the same, under the same name (review of PR 63, C1; after the launch, 7 Nov 2026) [APP-LAUNCH-BYTES]
 - the shell registers /offline-worker.js with { scope: '/', updateViaCache: 'none' } and no module type, once, after its first render; no second registration [APP-REGISTER]
 - a waiting worker shows "Update ready — apply now"; the tap saves first, sends WF_APPLY, and reloads only on controllerchange; update checks at launch and on return to the foreground, at most hourly; the page never reloads by itself [APP-UPDATE-PROMPT]
 - every screen name the shell knows renders content of its own, never only its heading; #/you/legal shows You with its legal links in view, in You's own wide layout and drop zone on a computer (owner's device check, 5 Nov 2026) [APP-SCREENS-FULL]
@@ -767,7 +768,8 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Share progress: editable preview of shareText, the map-link choice switches to shareMapText and is kept in copilot:share-progress; no share sheet: SMS and Copy; nothing sent by the app (log) [AH-SHARE]
 - in every state, no position included: 112, the fallback line, coordinates when there are any; opening it sends nothing; reachable offline [AH-EMERGENCY]
 - no tel: link is ever the first tap, in either app (the iPhone's home-screen app dials one at once): every call button (112, the mountain-rescue and other emergency numbers, a place's Call) opens a confirmation in its own place with the number as dialled and who it is, a large "Call N now" that is the exact tel: link, and Cancel; Cancel and Escape change nothing, a scroll or a tap beside it never closes it; no loading or request, offline too; 44 px at 360 px, Call N now at least 56 px; the call link never lies under any part of the button that opened it (320 to 1280 px, either theme, text up to 200 %) and ignores activation for 400 ms after the question opens, so a double tap or Enter, Tab, Enter never dials; the number reads as shown and digit by digit to a screen reader, the link dials its exact digits; every page carries format-detection telephone=no; an sms: link only opens the messaging app with editable words, so it stays (owner's iPhone check, 6 Nov 2026) [AH-CALL-CONFIRM]
-- Emergency always has its own Update position, with or without a route, online or offline, asked for only on its tap: with a route it is Ahead's own (kept on the route, and Emergency shows that same position); with none, the fix shows its coordinates, time and age for this page only and is never stored (positions belong to a route); denied, no fix, the 45 s timeout and an unusable fix (0, 0) each say what to do instead; it never waits on Ahead's which-pass question: Emergency shows the fix as it came at once (owner's iPhone check and review of PR 53, 6 Nov 2026) [AH-EMERGENCY-POSITION]
+- Emergency always has its own Update position, with or without a route, online or offline, asked for only on its tap: with a route it is Ahead's own (kept on the route, and Emergency shows that same position); with none, the fix shows its coordinates, time and age for this page only and is never stored (positions belong to a route); denied, no fix, the 45 s timeout and an unusable fix (0, 0) each say what to do instead; it never waits on Ahead's which-pass question: Emergency shows the fix as it came at once (owner's iPhone check and review of PR 53, 6 Nov 2026), and its notes that signs or settlements far from the route are not stored show only when that fix lies far from the route (review of PR 53, N1; after the launch, 7 Nov 2026); Emergency shows the fix and the tap is free again before the question's own words have loaded, so their load failing or hanging loses nothing (review of PR 65, I1) [AH-EMERGENCY-POSITION]
+- while Ahead asks which pass, its notes never say "No position yet": they say a position was found and that, until the rider chooses the pass, the answers count from the route start; the help chips say the same in place of "No position yet: measured from km …" (review of PR 65, M1); once a pass is chosen neither shows; the question's words are their own chunk, loaded with the tap, not in the first screen (after the launch, 7 Nov 2026) [AH-ASK-NOTE]
 - Update weather runs refreshWeather('tap'); messages as Task 11; offline message [AH-WEATHER-UPDATE]
 - the button appears when offersPlanTomorrow, and Back to today undoes it [AH-PLAN-TOMORROW]
 - a stored flatKph out of range (old data): every affected card reads "can't be worked out", no thrown error, Emergency stands; shell shows the settings link [AH-BAD-SPEED]
@@ -821,12 +823,13 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 ## App: You and the legal pages
 
 - weight, flat speed, thirst, e-bike, units saved; empty is allowed everywhere [YOU-RIDER]
+- You's settings say: "On Android, install with Chrome (⋮ → Install app); other browsers may be blocked by Play Protect." (Samsung Internet's installed app is; owner, 7 Nov 2026); not in the first screen [YOU-INSTALL-ANDROID]
 - with a summary, bottle capacity shown beside the field [YOU-CAPACITY]
 - export downloads a file; import shows what arrives; a bad file writes nothing; afterwards Trip asks for Get ready on a new route [YOU-EXPORT-UI]
 - asks first naming what goes; "Also delete bag planner data" stores copilot:delete-request:v1 and opens /tools/bags/#copilot-delete=<id>; until applied, "Bag planner data will be deleted the next time it opens" [YOU-DELETE-UI]
 - the post-ride report (hours, drink, warmth, feel, optional weighing) is logged and moves the factors; calibration status shown; drinkingAdvice and overDrinking reach the screen: ruling of group 8, the loss it is compared with is the sweat-rate model on flat ground at the chosen warmth [YOU-WATER-LEARN]
 - each post-ride report carries one tap, "Flat or hilly?" (flat by default); a hilly report is kept on the phone but moves no factor (k, the evidence, k_drink, the weighed count), is shown apart from the flat count, never travels in the export (the file's format is unchanged), and stays on the phone through an import (owner's ruling "small", 3 November) [YOU-TERRAIN]
-- the terrain of a post-ride report is taken from the route the rider rode, the stored route's climb over the ridden stretch, with the tap asked only when the ride had no route; factors per terrain class (the owner's full ruling, not built) [YOU-TERRAIN-ROUTE]
+- the terrain of a post-ride report is taken from the route the rider rode, the stored route's climb over the ridden stretch, with the tap asked only when the ride had no route; factors per terrain class (the owner's full ruling, not built) (after the first version: owner, 7 Nov 2026; the "Flat or hilly?" tap stays) [YOU-TERRAIN-ROUTE]
 - imprint, privacy and licences within two taps from every tab (plain pages at /legal/<name>/, a folder each because the host redirects *.html) [PRIV-LEGAL-REACH]
 - all open in flight mode [PRIV-LEGAL-OFFLINE]
 - hash of the imprint's text equals the hash of the page's block; nothing printed [PRIV-IMPRINT-SAME]
@@ -948,7 +951,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Load Check's parseGPX, gpxProfileFrom, realAscent, planRoute, stageEffortIndex and nightStops against the ports, on the six fixture routes and 200 generated GPX files: identical (§11.4) [DF-01]
 - Contracts 1-3: values generated from the schemas round-trip byte-identically through both sides (§11.4) [DF-04]
 - over generated plans and bikes: without frame details bikeFit gives today's values and the plan is byte-identical; a bag the frame can't take is never used and never dropped; a typed size never changes; each other value comes from the first available source (§15 row 6) [LC-FIT-PROPS]
-- a GPX in several sections plans the same stages in both apps: Load Check smooths heights and counts climbing within each section, resetting at a gap; the port's route keeps no section breaks, so a height jump across a gap counts as climbing there and the stage ends differ. Needs the break in the route's points, which the route hash encodes (Contract 5): the coordinator's and owner's call (§11.4) [DF-01-SECTIONS]
+- a GPX in several sections plans the same stages in both apps: Load Check smooths heights and counts climbing within each section, resetting at a gap; the port's route keeps no section breaks, so a height jump across a gap counts as climbing there and the stage ends differ. Needs the break in the route's points, which the route hash encodes (Contract 5): the coordinator's and owner's call (§11.4) (after the first version: owner, 7 Nov 2026) [DF-01-SECTIONS]
 
 ## Launch paths and wide layout (sub-project 6, group 4)
 
@@ -976,6 +979,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - the Tools screen (its bike line and tyre card) is its own chunk, not among the first screen's files, and the first screen does not rise above main's figure at the branch point (§4.5); its bag card with the bike drawing stays in the first screen and shows while the chunk loads, so the bike is drawn when the page is revealed and glides back from the bag planner (LC-GLIDE) [TB-TOOLS-LAZY]
 - Wayfinch's export holds settings.toolBike; importing it makes it the choice; a file without it, or with a bad id, imports and falls back [TB-EXPORT]
 - the Tools bike line and tyre card are drawn again when the bag planner's bikes or plan change in another tab (storage events for its keys), when a page restored from the cache shows again, and when the page becomes visible, so a removed bike is never offered and the card follows the plan's bike [TB-TOOLS-FOLLOW]
+- the Bag planner card on Tools draws the chosen bike at once when the rider picks a saved bike in the bike line (or anywhere else), before the bag planner opens; the plan itself moves only at its next open, with its Undo line (decision 3); No bike and a plan-only bike keep the plan's bike, as the bag planner does (owner, 7 Nov 2026) [TB-CARD-BIKE]
 - a choice made elsewhere while the tyre tool is open: untouched (the rider has neither picked nor typed there), it follows silently; otherwise it never switches and never drops an answer, and one quiet line says where it was chosen ("<name> was chosen in Tools", or "in the bag planner" when the bag planner's record is the newer) with a Switch button that moves it [TB-ELSEWHERE]
 - no way of choosing a bike (the Tools line, the tyre box, a ?bike= address, an import, a choice made while the tool is open) writes or changes any loadcheck:* entry [TB-NO-LC-WRITE]
 - at 320 and 360 px, in both themes, the Tools bike select is at least 44 px tall, stays inside the screen with a 100-character bike name, and the page has no sideways scroll [TB-LINE-FIT]

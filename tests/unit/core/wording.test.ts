@@ -35,8 +35,6 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   appAbName: [['Heidelberg', 'Strasbourg']],
   appAbChange: [['Start']],
   // Ahead (sub-project 5, group 6).
-  appAheadAsk: [['32', '118']],
-  appAheadAskKm: [['32']],
   appAheadManualStripValue: [['80', '165']],
   appAheadManualTownOption: [['Rastatt', '112']],
   appAheadManualBadKm: [['165']],

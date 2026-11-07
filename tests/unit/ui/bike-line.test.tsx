@@ -12,6 +12,7 @@ import type { TyreServices } from '../../../src/tools/tyre/ui.tsx';
 import { go } from '../../../src/ui/nav.ts';
 import { BIKE_CHOICE_KEY, noteBikeChoice } from '../../../src/ui/tools/bike-choice.ts';
 import { ToolsScreen } from '../../../src/ui/tools/tools.tsx';
+import { refreshBikeSource } from '../../../src/ui/bike/live.ts';
 
 const NOW = new Date('2026-11-07T10:00:00Z');
 const host = document.createElement('div');
@@ -298,5 +299,44 @@ describe('Tools loads as its own chunk', () => {
     render(null, root);
     root.remove();
     localStorage.clear();
+  });
+});
+
+describe('the Bag planner card draws the chosen bike (owner, 7 Nov 2026)', () => {
+  // The drawings read the bag planner's records from the page's own storage, so this world lives there.
+  const page: KeyValueStore = { getItem: (k) => localStorage.getItem(k), setItem: (k, v) => localStorage.setItem(k, v) };
+  const paint = (b: ReturnType<typeof mk>, colour: string) => ({ ...b, look: { ...b.look, colour } });
+  const PINK = paint(mk('bike_pink', 'Pink Roadie'), '#d6619b');
+  const RED = paint(mk('bike_red', 'Red Tourer'), '#c62f2a');
+  const cardLabel = (): string => {
+    const card = [...host.querySelectorAll('section')].find((s) => s.querySelector('h2')?.textContent === W.tyreBagCardTitle);
+    return card?.querySelector('svg')?.getAttribute('aria-label') ?? '';
+  };
+  const planKeys = (): string => JSON.stringify(Object.keys(localStorage).filter((k) => k.startsWith('loadcheck:')).sort().map((k) => [k, localStorage.getItem(k)]));
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem('loadcheck:summary:v1', summary('bike_pink'));
+    localStorage.setItem('loadcheck:bikeProfiles', JSON.stringify([PINK, RED]));
+    localStorage.setItem('loadcheck:bikeProfile', JSON.stringify(PINK));
+    refreshBikeSource();
+  });
+  afterEach(() => { localStorage.clear(); refreshBikeSource(); });
+
+  test('[TB-CARD-BIKE] switching pink to red in the bike line draws red on the card at once, before the bag planner opens; the plan stays pink', async () => {
+    await act(() => { render(<ToolsScreen services={{ host: () => readHost(page, () => null), storage: page, now: () => NOW }} />, host); });
+    expect(cardLabel()).toContain('pink frame');
+    const plan = planKeys();
+    await pickIn(lineSelect()!, 'bike_red');
+    expect(cardLabel()).toContain('red frame');
+    expect(cardLabel()).not.toContain('pink');
+    // The plan itself moves only when the bag planner next opens, with its Undo line (decision 3): nothing of it was written.
+    expect(planKeys()).toBe(plan);
+    // A remount (Tools opened again) draws the chosen bike too.
+    render(null, host);
+    await act(() => { render(<ToolsScreen services={{ host: () => readHost(page, () => null), storage: page, now: () => NOW }} />, host); });
+    expect(cardLabel()).toContain('red frame');
+    // "No bike" changes nothing in the bag planner (TB-PAGE-FOLLOWS), so the card keeps the plan's bike.
+    await pickIn(lineSelect()!, 'default');
+    expect(cardLabel()).toContain('pink frame');
   });
 });

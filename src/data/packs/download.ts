@@ -1,7 +1,8 @@
 // Getting a route's tiles (spec sections 5, 5a and 9.4): chunked, resumable, and verified against the manifest the run began
 // with. Only coarse tile numbers leave the phone. Each batch is saved whole, so a tab killed at any moment leaves whole
 // batches, and the next run asks only for what isn't saved.
-import config from '../../../build.config.json';
+// Only the one field: the whole file would put the launch switch into the app's bytes (review of PR 63, C1, APP-LAUNCH-BYTES).
+import { dataOrigin } from '../../../build.config.json';
 import type { LatLng } from '../../core/geo/haversine.ts';
 import { CORRIDOR_KM, corridorTiles, tileKey } from '../../core/places/tiles.ts';
 import type { ManifestTile, PackManifest, TileContent, TileId } from '../../core/places/types.ts';
@@ -62,7 +63,7 @@ type Got = { kind: 'ok'; tile: ManifestTile; content: TileContent; text: string 
 const idOf = (t: TileId): TileId => ({ z: t.z, x: t.x, y: t.y });
 
 export async function downloadTiles(route: { points: LatLng[] }, deps: DownloadDeps): Promise<TileReport> {
-  const origin = deps.origin ?? config.dataOrigin;
+  const origin = deps.origin ?? dataOrigin;
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const timeoutMs = deps.timeoutMs ?? TILE_WAIT_MS;
   const { store } = deps;
