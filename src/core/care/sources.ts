@@ -87,7 +87,7 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
       'https://www.parktool.com/en-us/blog/repair-help/mechanical-disc-brake-alignment',
       'https://www.parktool.com/en-int/blog/repair-help/hydraulic-disc-brake-alignment',
     ],
-    note: 'Book p. 213: bent disc, caliper not centred, pads too close; p. 121: loosen, centre, tighten, squeeze the lever several times.',
+    note: 'Book p. 213: bent disc, caliper not centred, pads too close; p. 121: loosen, centre, tighten, squeeze the lever several times. The draft\'s "snug the bolts" is replaced by the printed torque, or even tightening until the caliper no longer moves, and a brake test (the coordinator\'s ruling on PR 59, 7 Nov).',
   },
   'brake-weak-rim': {
     urls: ['https://www.sheldonbrown.com/rim-brakes.html'],
