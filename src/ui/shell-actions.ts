@@ -268,8 +268,9 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       pendingKm = null;
       const alone = view.peek().kind !== 'trip';
       const words = alone ? import('../core/wording/en-here.ts').then((m) => m.H, () => null) : null;
-      // With a route, the which-pass question's words load meanwhile, from the phone itself: the first screen does not carry them.
-      const ask = alone ? null : import('../core/wording/en-ask.ts').then((m) => m.A, () => null);
+      // The which-pass question's words load meanwhile, from the phone itself: the first screen does not carry them. Also with no
+      // route on screen, since one may be added in another window while the phone is looking.
+      const ask = import('../core/wording/en-ask.ts').then((m) => m.A, () => null);
       say({ kind: 'watching' });
       const fix = await watchBest(ROUTINE, deps.geolocation());
       if (isFailure(fix)) {
