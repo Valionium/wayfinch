@@ -597,6 +597,44 @@ test('[GA-SCREEN] combinations that reach about the same result sit side by side
   });
 });
 
+test('[GA-ANSWER] every shape of suggestion reads cleanly, what to get and the drawing\'s name: one bag, two bags, a rack, a rack with panniers, two bags with a rack to fit, a swap, a swap set, the deck of a rack fitted; never "plus with", a doubled word or a dangling comma (re-check of PR 61, R1)',()=>{
+  const res={overL:0,spillIds:[],backL:0,backKg:0,outOfReach:0,kgByPos:{},items:{}};
+  const sg=(kind,add,remove,o={})=>({kind,add,remove,decks:{bar:false,rack:false},newBags:add.length,litres:0,deck:false,tags:[],rangeL:add[0] ? [add[0].L,add[0].L] : [0,0],result:res,score:0,...o});
+  const deckOn={decks:{bar:false,rack:true}};
+  // a camper with no rack (a rack to fit), and one with panniers on a rack (the deck of a rack fitted)
+  const noRack=page({bike:FULL,setup:PACK30});
+  const fitted=page({bike:FULL,setup:TENT_IN_PACK+"S.bags=[{uid:1,pos:'rack',pair:true,L:10},{uid:2,pos:'pack',L:20}];S.decks={bar:false,rack:false};"});
+  const shapes=[
+    [noRack,'one bag',sg('add',[{uid:9,pos:'seat',L:12}],null,{rangeL:[12,14]})],
+    [noRack,'two bags',sg('add-two',[{uid:9,pos:'seat',L:12},{uid:10,pos:'bar',L:10}],null)],
+    [noRack,'a rack',sg('deck',[],null,{...deckOn,deck:true})],
+    [noRack,'a rack with panniers',sg('add',[{uid:9,pos:'rack',pair:true,L:15}],null,deckOn)],
+    [noRack,'two bags with a rack to fit',sg('ahead',[{uid:9,pos:'frame',shape:0,L:6},{uid:10,pos:'rack',L:23}],null,deckOn)],
+    [noRack,'a rack to fit beside a bag',sg('ahead',[{uid:9,pos:'seat',L:12}],null,{...deckOn,deck:true})],
+    [noRack,'a swap to panniers on a rack to fit',sg('swap',[{uid:9,pos:'rack',L:21}],1,{...deckOn,rangeL:[21,23]})],
+    [noRack,'a swap set',sg('ahead',[{uid:9,pos:'seat',L:12},{uid:10,pos:'fork',L:3}],1)],
+    [fitted,'the deck of a rack fitted',sg('deck',[],null,{...deckOn,deck:true})],
+    [fitted,'a bag beside the deck of a rack fitted',sg('ahead',[{uid:9,pos:'seat',L:8}],null,{...deckOn,deck:true})],
+  ];
+  const bad=t=>[/plus with/i.test(t) && 'plus with',/\b(\w+)\s+\1\b/i.test(t) && 'a doubled word',/,\s*,|,\s*$|^\s*,|,\s*plus\s*,/.test(t) && 'a dangling comma'].filter(Boolean);
+  for(const [p,name,s] of shapes){
+    p.context.qaS=JSON.stringify(s);
+    const input="advisorInput('bags-first','backpack')";
+    for(const [kind,text] of [['what',p.json(`advisorWhat(JSON.parse(qaS),${input})`)],['drawn',p.json(`advisorDrawnName(JSON.parse(qaS),${input})`)]]){
+      assert.ok(text && text.length>5,`${name} ${kind}: some words`);
+      assert.deepEqual(bad(text),[],`${name} ${kind}: ${text}`);
+      assert.ok((text.match(/\brack\b/gi)||[]).length<=1,`${name} ${kind}: one rack: ${text}`);
+    }
+  }
+  // the reviewer's case, word for word
+  {
+    const p=noRack;
+    p.context.qaS=JSON.stringify(shapes[4][2]);
+    assert.equal(p.json("advisorWhat(JSON.parse(qaS),advisorInput('bags-first','backpack'))"),
+      'Frame bag, full triangle, 6 L, plus rack and pannier, 23 L, with the sleeping mat and tent on its top deck');
+  }
+});
+
 (async()=>{
   for(const [name,fn] of tests){await fn();passed++;console.log('ok',name);}
   console.log(`${passed} advisor tests passed`);

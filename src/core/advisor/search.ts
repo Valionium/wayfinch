@@ -173,8 +173,9 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
   const bestValue = Math.min(...items.map(value));
   const near = items.map((x, k) => (value(x) - bestValue <= within + EPS ? k : -1)).filter((k) => k >= 0);
   const minimalSame = near.length >= 2 ? near : [];
-  const combo = (x: Suggestion) => [...x.add.map((b) => b.pos + (b.pair ? '×2' : '')), ...(x.deck ? ['deck'] : [])].sort().join('+')
-    + (x.remove === null ? '' : '-' + x.remove);
+  // the bags a set adds; a bag taken out does not make another combination (re-check of PR 61, n6: the same panniers, with or without
+  // the backpack left at home, are one)
+  const combo = (x: Suggestion) => [...x.add.map((b) => b.pos + (b.pair ? '×2' : '')), ...(x.deck ? ['deck'] : [])].sort().join('+');
   const aheadAlts: Suggestion[] = [];
   if (ahead) {
     const seen = new Set([combo(ahead)]);

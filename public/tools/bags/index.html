@@ -5538,6 +5538,7 @@ const ADVISOR_WORDING = {
   comboTitle:{text:'About the same result, with other bags. Tap one for its details.'},
   howMore:{text:'{first}, and {n} more'}, howNone:{text:'Your things stay where they are.'},
   rackAnd:{text:'Rack and {type}'}, rackDeckWith:{text:'with the {items} on its top deck'},
+  withDeck:{text:'{what}, {deck}'},
   loadFailed:{text:'The Gear advisor could not load. Open the bag planner once while online, then try again.'},
   replace:{text:'Replace your {old} with {new}'}, two:{text:'{a}, plus {b}'}, pairOf:{text:'2 × {size}'},
   moveLine:{text:'{item}: {from} → {to}'}, leftOver:{text:'left over'}, moreMoves:{text:'and {n} more'},
@@ -5624,8 +5625,9 @@ function advisorRackDeck(s, input){
 }
 // What to get, in a line (design §2). Two bags, and Looking ahead's set, give each bag at its own size, then the rack deck.
 function advisorWhat(s, input){
-  const deck = advisorRackDeck(s, input);
-  return deck ? advisorWord('two', { a:advisorWhatBags(s, input), b:deck }).replace(', plus ', ', ') : advisorWhatBags(s, input);
+  // built from its parts, the bags first, then what rides on the rack's top deck (re-check of PR 61, R1)
+  const deck = advisorRackDeck(s, input), bags = advisorWhatBags(s, input);
+  return deck ? advisorWord('withDeck', { what:bags, deck }) : bags;
 }
 function advisorWhatBags(s, input){
   const own = b => advisorBagText(b, [b.L, b.L], input);

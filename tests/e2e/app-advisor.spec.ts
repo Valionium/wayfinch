@@ -148,8 +148,9 @@ async function heavy(page: Page): Promise<void> {
 test('[GA-PROGRESS] the heavy plan (many bags, five nights, a lot; Panniers are fine, Better handling): the search hands the page back within about 50 ms of trials, no task reaches 600 ms on the phone stand-in, and the progress line never counts more options than were tried (review of PR 61, I4)', async ({ page }) => {
   await planner(page);
   await heavy(page);
-  await page.evaluate(`window.__adv = { trials: 0, longest: 0, shown: [], honest: true };
+  await page.evaluate(`window.__adv = { trials: 0, longest: 0, shown: [], honest: true, backs: [] };
     advisorTrial = ((f) => (...a) => { window.__adv.trials++; return f(...a); })(advisorTrial);
+    window.setTimeout = ((st) => (fn, ms, ...a) => { if (!ms && ADVISOR_RUN > 0 && window.__adv.trials > 0) window.__adv.backs.push(performance.now()); return st(fn, ms, ...a); })(window.setTimeout);
     new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__adv.longest = Math.max(window.__adv.longest, e.duration); }).observe({ type: 'longtask', buffered: false });
     new MutationObserver(() => { const m = /^Trying ([0-9]+) options…$/.exec(document.getElementById('advisorProgress').textContent || '');
       if (m) { window.__adv.shown.push(+m[1]); if (+m[1] > window.__adv.trials) window.__adv.honest = false; } })
@@ -157,11 +158,12 @@ test('[GA-PROGRESS] the heavy plan (many bags, five nights, a lot; Panniers are 
   await page.evaluate("openAdvisor(document.getElementById('rigBikeDetails'))");
   const box = page.locator('#advisorBox');
   await box.locator('label.adv-choice', { hasText: 'Panniers are fine' }).click();
-  await page.evaluate('window.__adv.trials = 0; window.__adv.longest = 0; window.__adv.shown = []');
+  await page.evaluate('window.__adv.trials = 0; window.__adv.longest = 0; window.__adv.shown = []; window.__adv.backs = []');
   await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
   await expect(page.locator('#advisorAnswer h4').first()).toBeVisible({ timeout: 60_000 });
-  const r = await page.evaluate('window.__adv') as { trials: number; longest: number; shown: number[]; honest: boolean };
-  const note = `${r.trials} trials, longest task ${r.longest.toFixed(0)} ms, progress shown ${r.shown.length} times`;
+  const r = await page.evaluate('window.__adv') as { trials: number; longest: number; shown: number[]; honest: boolean; backs: number[] };
+  const gap = Math.max(...r.backs.slice(1).map((t, k) => t - r.backs[k]!));
+  const note = `${r.trials} trials, longest task ${r.longest.toFixed(0)} ms, progress shown ${r.shown.length} times, ${r.backs.length} hand-backs at most ${gap.toFixed(0)} ms apart`;
   test.info().annotations.push({ type: 'GA-PROGRESS heavy', description: note });
   console.log(`GA-PROGRESS heavy ${test.info().project.name}: ${note}`);
   expect(r.trials).toBeGreaterThan(100);
@@ -169,6 +171,9 @@ test('[GA-PROGRESS] the heavy plan (many bags, five nights, a lot; Panniers are 
   expect(r.honest, 'the progress line never counts more options than were tried').toBe(true);
   expect(r.shown.every((n, k) => k === 0 || n >= r.shown[k - 1]!), 'the count only grows').toBe(true);
   expect(r.longest, 'no stretch of the search holds the page 600 ms or more').toBeLessThan(600);
+  // the hand-backs themselves: a slice of about 50 ms, never 20 heavy trials in a row (re-check of PR 61, n7)
+  expect(r.backs.length).toBeGreaterThan(5);
+  expect(gap, 'two hand-backs at most 250 ms apart').toBeLessThan(250);
 });
 
 test('[GA-SCREEN] advisor.js still loading: a setup tapped before it arrives is kept, the view is not drawn again under the rider\'s focus, and no second search starts when it loads (review of PR 61, m4)', async ({ page }) => {

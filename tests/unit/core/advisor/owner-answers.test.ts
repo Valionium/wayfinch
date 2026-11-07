@@ -283,3 +283,19 @@ describe('the owner\'s rulings on PR 61 (7 Nov)', () => {
     expect(none.kind === 'suggestions' && none.aheadAlts).toEqual([]);
   });
 });
+
+describe('the re-check of PR 61', () => {
+  test('[GA-AHEAD] aheadAlts never holds the same bags as Looking ahead but for a bag taken out (n6)', () => {
+    const bagsOf = (s: Suggestion) => s.add.map((b) => b.pos + (b.pair ? '×2' : '')).sort().join('+') + (s.deck ? '+deck' : '');
+    let checked = 0;
+    for (const goal of ['handling', 'backpack'] as const) {
+      for (const its of [items(5, 5), items(8, 6, 4), items(10, 10, 4)]) {
+        const answer = advise(input({ goal, style: 'panniers', bags: [bag(1, 'pack', 30)], nextUid: 2, usable: onlyAt('rack', 'seat', 'bar'), trial: packer(its) }));
+        if (answer.kind !== 'suggestions' || !answer.ahead) continue;
+        checked++;
+        for (const alt of answer.aheadAlts) expect(bagsOf(alt), `${goal}: ${bagsOf(answer.ahead)} beside ${bagsOf(alt)}`).not.toBe(bagsOf(answer.ahead));
+      }
+    }
+    expect(checked).toBeGreaterThan(2);
+  });
+});
