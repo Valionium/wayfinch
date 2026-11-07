@@ -133,7 +133,9 @@ test('[TB-PAGE-FOLLOWS] the same bike, an older record, an unknown id, No bike o
     const before=p.run('JSON.stringify([S.bikeProfile,S.kit])');
     p.run('followBikeChoice()');await p.settle();
     assert.equal(p.run('JSON.stringify([S.bikeProfile,S.kit])'),before,name+': the plan as it was');
-    assert.equal(p.writes.length,0,name+': nothing written');
+    // the same bike: the record counts as seen, so its followed stamp (and that key's C-DELETE stamp) is written; nothing else (re-check N1)
+    const allowed=name==='the same bike' ? ['loadcheck:bikeFollowed:v1','loadcheck:saved-at:v1'] : [];
+    assert.deepEqual(p.writes.filter(k=>!allowed.includes(k)),[],name+': nothing written');
     assert.ok(!p.shown('bikeFollowBar'),name+': no line');
   }
 });
@@ -289,6 +291,27 @@ test('[TB-PAGE-FOLLOWS] a Wayfinch record is followed at most once: the stamp ac
   theirs(again,'bike_c',Date.now());
   again.run('followBikeChoice()');await again.settle();
   assert.equal(plan(again),'bike_c');
+});
+
+// Re-check of PR 56, N1 (coordinator's ruling): a Wayfinch record naming the plan's own bike counts as seen too.
+test('[TB-PAGE-FOLLOWS] N1: a Wayfinch record naming the plan\'s own bike counts as seen: an older tab\'s later move to another bike is never undone by it',async()=>{
+  const storage=sharedStore();
+  const p=page({storage});
+  const at=Date.now()-24*HOUR;
+  p.values.set(KEY,record('load-check','bike_a',at-HOUR));   // the page's own record, older
+  theirs(p,'bike_a',at);                                      // Tools picked A yesterday, while the plan was on A
+  p.run('followBikeChoice()');await p.settle();
+  assert.equal(plan(p),'bike_a');
+  const seen=p.values.get('loadcheck:bikeFollowed:v1');
+  assert.ok(seen && JSON.parse(seen).at===new Date(at).toISOString(),'seen: the followed stamp is that record\'s');
+  assert.ok(!p.shown('bikeFollowBar'));
+  assert.deepEqual(p.writes.filter(k=>!['loadcheck:bikeFollowed:v1','loadcheck:saved-at:v1'].includes(k)),[],'nothing else written');
+  // an older tab moves the plan to the saved bike B and writes no record; the page opens again
+  const again=page({storage,plan:B});
+  again.run('followBikeChoice()');await again.settle();
+  assert.equal(plan(again),'bike_b','the plan stays on B');
+  assert.ok(!again.shown('bikeFollowBar'),'no line');
+  assert.equal(again.writes.length,0,'nothing written');
 });
 
 test('[TB-PAGE-FOLLOWS] P4: a plan-only bike is never lost by a follow, and survives a reload',async()=>{
