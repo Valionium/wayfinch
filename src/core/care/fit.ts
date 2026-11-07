@@ -1,7 +1,7 @@
 // Which Care tasks fit a bike (sub-project 12; design 3.3). The bike's stored details become Bike care's details by sub-project 11
 // decision 1's table.
 import type { BikeRecord } from '../bike/normalise.ts';
-import type { CareDetails } from './types.ts';
+import type { CareDetails, CareKey, Conditions, Fitted } from './types.ts';
 
 /** Bike care's details of a bike; with no bike, every detail is Not sure (null). */
 export function careDetails(bike: BikeRecord | null): CareDetails {
@@ -16,4 +16,30 @@ export function careDetails(bike: BikeRecord | null): CareDetails {
     suspension: bike.suspension ?? (bike.fit?.style === 'full-suspension' ? 'full' : null),
     ebike: ebike === true ? 'yes' : ebike === false ? 'no' : null,
   };
+}
+
+const KEYS: readonly CareKey[] = ['brakes', 'tyres', 'drive', 'gears', 'shifting', 'suspension', 'ebike'];
+
+/**
+ * Design 3.3 and decision 4: for each key a task depends on, a Not sure detail tags it, a value in the list passes, and any other value,
+ * 'other' included, hides the task. No key: it shows with no tags.
+ */
+export function fitOf(applies: Conditions, d: CareDetails): { show: boolean; tags: CareKey[] } {
+  const tags: CareKey[] = [];
+  for (const key of KEYS) {
+    const allowed = applies[key] as readonly string[] | undefined;
+    if (!allowed) continue;
+    const value = d[key];
+    if (value === null) tags.push(key);
+    else if (!allowed.includes(value)) return { show: false, tags: [] };
+  }
+  return { show: true, tags };
+}
+
+/** The items that fit, in the list's order, each with its tags. */
+export function fitted<T extends { applies: Conditions }>(list: readonly T[], d: CareDetails): Fitted<T>[] {
+  return list.flatMap((item) => {
+    const f = fitOf(item.applies, d);
+    return f.show ? [{ ...item, tags: f.tags }] : [];
+  });
 }
