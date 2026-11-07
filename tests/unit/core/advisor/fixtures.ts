@@ -14,7 +14,7 @@ export function bag(uid: number, pos: BagIn['pos'], L: number, extra: Partial<Ba
 
 export function input(over: Partial<AdvisorInput> = {}): AdvisorInput {
   return {
-    style: 'either', goal: 'handling', noPanniers: false,
+    style: 'panniers', goal: 'handling',
     bags: [], decks: { rack: false, bar: false }, camping: false, nextUid: 10,
     frameShapes: SHAPES, frameReason: null, topSlotsFree: ['front', 'rear'],
     rackMounts: 'yes', frameSize: 'M', seatGapCm: null,

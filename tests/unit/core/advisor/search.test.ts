@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { candidates } from '../../../../src/core/advisor/candidates.ts';
-import { compareFor } from '../../../../src/core/advisor/rank.ts';
+import { candidates, extensions } from '../../../../src/core/advisor/candidates.ts';
+import { compareMinimal } from '../../../../src/core/advisor/rank.ts';
 import { advise, adviseSteps } from '../../../../src/core/advisor/search.ts';
 import { MAX_TRIALS } from '../../../../src/core/advisor/table.ts';
 import type { AdvisorAnswer, AdvisorInput, BagIn, Decks, Pos, TrialResult } from '../../../../src/core/advisor/types.ts';
@@ -51,9 +51,12 @@ describe('the search order (design §3.1)', () => {
     const base = [bag(1, 'pack', 15), bag(2, 'bar', 5)];
     for (const goal of ['backpack', 'handling'] as const) {
       const calls: BagIn[][] = [];
-      const answer = advise(input({ goal, bags: base, nextUid: 3, trial: packer(items(3, 3, 2), calls) }));
+      const i = input({ goal, bags: base, nextUid: 3, trial: packer(items(3, 3, 2), calls) });
+      const answer = advise(i);
       expect(answer.kind, goal).toBe('suggestions');
-      expect(calls.some((bags) => addedCount(base, bags) === 2), goal).toBe(false);
+      // Two added bags only in Looking ahead (owner, 7 Nov): Minimal's first plus one more, as many trials as it has extensions.
+      const first = answer.kind === 'suggestions' ? answer.items[0]! : null;
+      expect(calls.filter((bags) => addedCount(base, bags) === 2).length, goal).toBe(extensions(i, first!).filter((c) => c.add.length === 2).length);
       expect(calls.some((bags) => removedAny(base, bags)), goal).toBe(goal === 'handling');
     }
   });
@@ -62,16 +65,20 @@ describe('the search order (design §3.1)', () => {
     // Two 14 L items and nothing that holds both: one new bag leaves one over, two new bags take both.
     const base = [bag(1, 'top', 1, { slot: 'front' })];
     const calls: BagIn[][] = [];
-    const i = input({ goal: 'handling', style: 'no-rack', bags: base, topSlotsFree: ['rear'], nextUid: 2, trial: packer(items(14, 14), calls) });
+    const i = input({ goal: 'handling', style: 'bags', bags: base, topSlotsFree: ['rear'], nextUid: 2, trial: packer(items(14, 14), calls) });
     const answer = advise(i);
-    const phase = (bags: BagIn[]) => (bags === base ? 'base' : removedAny(base, bags) ? 'swap' : addedCount(base, bags) === 2 ? 'add-two' : 'add');
+    // Looking ahead (owner, 7 Nov) comes last: Minimal's first, here two bags, plus one more.
+    const phase = (bags: BagIn[]) => (bags === base ? 'base' : removedAny(base, bags) ? 'swap' : addedCount(base, bags) === 3 ? 'ahead' : addedCount(base, bags) === 2 ? 'add-two' : 'add');
     const seen = calls.map(phase);
     expect(seen[0]).toBe('base');
     const firstSwap = seen.indexOf('swap');
     const firstTwo = seen.indexOf('add-two');
+    const firstAhead = seen.indexOf('ahead');
     expect(seen.slice(1, firstSwap).every((p) => p === 'add')).toBe(true);
     expect(seen.slice(firstSwap, firstTwo).every((p) => p === 'swap')).toBe(true);
-    expect(seen.slice(firstTwo).every((p) => p === 'add-two')).toBe(true);
+    expect(firstAhead).toBeGreaterThan(firstTwo);
+    expect(seen.slice(firstTwo, firstAhead).every((p) => p === 'add-two')).toBe(true);
+    expect(seen.slice(firstAhead).every((p) => p === 'ahead')).toBe(true);
     expect(seen.filter((p) => p === 'add')).toHaveLength(candidates(i, 'add').length);
     expect(seen.filter((p) => p === 'swap')).toHaveLength(candidates(i, 'swap').length);
     expect(answer.kind).toBe('suggestions');
@@ -81,21 +88,22 @@ describe('the search order (design §3.1)', () => {
 
 describe('the answer (design §2, §3.3)', () => {
   test('[GA-THREE] at most three suggestions, best first, each a different type or position (the best size of each)', () => {
-    const answer = advise(input({ goal: 'backpack', bags: [bag(1, 'pack', 15)], nextUid: 2, trial: packer(items(3, 3, 2)) }));
+    const answer = advise(input({ goal: 'backpack', bags: [bag(1, 'pack', 15)], nextUid: 2, trial: packer(items(3, 2)) }));
     expect(answer.kind).toBe('suggestions');
     if (answer.kind !== 'suggestions') return;
     expect(answer.items).toHaveLength(3);
-    expect([...answer.items].sort(compareFor('backpack'))).toEqual(answer.items);
-    // Each takes all 8 L off the back at its smallest size: a pair of 4 L fork cages, an 8 L bar roll, an 8 L seat pack (8 L each, a
-    // tie, in the order of the search); the 2 x 10 L panniers also do, but come fourth.
-    expect(answer.items.map((s) => [s.add[0]!.pos, s.add[0]!.L, s.result.backL])).toEqual([['fork', 4, 0], ['bar', 8, 0], ['seat', 8, 0]]);
-    expect(answer.items.map((s) => s.rangeL)).toEqual([[4, 5], [8, 10], [8, 10]]);
+    // Minimal (owner, 7 Nov): one new bag each that takes all 5 L off, in the owner's order: the 6 L frame bag, then a seat pack, then
+    // a bar roll, each at its smallest size; a 5 L fork-cage bag also does, but comes fourth.
+    expect([...answer.items].sort(compareMinimal('backpack'))).toEqual(answer.items);
+    expect(answer.items.map((s) => [s.add[0]!.pos, s.add[0]!.L, s.result.backL])).toEqual([['frame', 6, 0], ['seat', 5, 0], ['bar', 5, 0]]);
+    expect(answer.items.map((s) => s.rangeL)).toEqual([[6, 6], [5, 7], [5, 7]]);
     expect(answer.items.every((s) => s.add[0]!.uid === 2)).toBe(true);
-    // Better handling: the best of each bag to get, a swap only where it beats the add of the same bag.
+    // Better handling: the best of each bag to get, a swap only where it beats the add of the same bag; one new bag each (a single
+    // fork-cage bag), in the owner's order; a pannier brings a rack to fit, two new things, so it is not Minimal (the owner, 7 Nov).
     const handling = advise(input({ goal: 'handling', bags: [bag(1, 'seat', 14), bag(2, 'bar', 12)], nextUid: 3, trial: packer([{ id: 'a', L: 4, kg: 3 }, { id: 'b', L: 4, kg: 3 }]) }));
     expect(handling.kind).toBe('suggestions');
     if (handling.kind !== 'suggestions') return;
-    expect(handling.items.map((s) => [s.kind, s.add[0]!.pos, s.add[0]!.L, s.score])).toEqual([['add', 'fork', 4, 9], ['add', 'frame', 4.5, 9.6], ['add', 'rack', 10, 10.8]]);
+    expect(handling.items.map((s) => [s.kind, s.add[0]!.pos, s.add[0]!.L, s.score])).toEqual([['add', 'frame', 4.5, 9.6], ['add', 'fork', 4, 11.1]]);
   });
 
   test('[GA-THREE] an add and a swap of the same bag never both show: a swap of the seat pack for a frame bag that beats adding the frame bag is the one frame suggestion (review of PR 57, m1)', () => {
@@ -118,7 +126,7 @@ describe('the answer (design §2, §3.3)', () => {
     const frame = answer.items.find((s) => s.add[0]!.pos === 'frame')!;
     expect(frame.rangeL).toEqual([frame.add[0]!.L, frame.add[0]!.L]);
     expect(frame.add[0]!.L).toBe(3); // every shape takes it; the smallest wins the tie
-    expect(answer.items.find((s) => s.add[0]!.pos === 'fork')!.rangeL).toEqual([2, 4]);
+    expect(answer.items.find((s) => s.add[0]!.pos === 'fork')!.rangeL).toEqual([3, 5]); // one fork-cage bag: 2 L is too small (owner, 7 Nov)
   });
 
   test('[GA-RANGE] the range comes from the same suggestion\'s own valid sizes: an add valid only at 6 L shows "6 L", though a swap of that bag is valid at 6–8 L (review of PR 57, m4)', () => {
@@ -164,7 +172,7 @@ describe('the answer (design §2, §3.3)', () => {
 
   test('[GA-NOTHING] when no candidate is valid: nothing-helps with the candidate of least overL as closest', () => {
     // 48 L in four 12 L items, without a rack: one new bag takes one item, two take two; never all four.
-    const answer = advise(input({ goal: 'handling', style: 'no-rack', trial: packer(items(12, 12, 12, 12)) }));
+    const answer = advise(input({ goal: 'handling', style: 'bags', trial: packer(items(12, 12, 12, 12)) }));
     expect(answer.kind).toBe('nothing-helps');
     if (answer.kind !== 'nothing-helps') return;
     const closest = answer.closest!;
@@ -175,7 +183,7 @@ describe('the answer (design §2, §3.3)', () => {
     expect(closest.add.map((b) => [b.pos, b.L]).sort()).toEqual([['bar', 13], ['seat', 12]]);
     expect(closest.rangeL).toEqual([closest.add[0]!.L, closest.add[0]!.L]);
     // Only full fixes count: a base that overflows is helped by a bag that takes it all, whatever its score.
-    const fixed = advise(input({ goal: 'handling', style: 'no-rack', trial: packer(items(12)) }));
+    const fixed = advise(input({ goal: 'handling', style: 'bags', trial: packer(items(12)) }));
     expect(fixed.kind).toBe('suggestions');
     if (fixed.kind === 'suggestions') for (const s of fixed.items) expect(s.result.overL).toBe(0);
     // Nothing that can be added at all: nothing helps, with no closest option.
@@ -206,38 +214,28 @@ describe('the answer (design §2, §3.3)', () => {
   });
 });
 
-describe('without a rack: nothing on a rack, the base included (re-check of PR 57, R1; pending the owner\'s O1)', () => {
-  test('[GA-STYLE] a plan that fits only with the rider\'s rack deck, nothing addable, is never already good under Without a rack: the base runs without the deck', () => {
+describe('Bikepacking bags only: the rider\'s panniers leave the plan, the base included; the rack and its deck stay (the owner\'s ruling of 7 Nov)', () => {
+  test('[GA-STYLE] a plan whose rider\'s rack deck carries what the bags cannot: under Bikepacking bags only the deck still carries it, so nothing to add is already good', () => {
     // 12 L in the bar roll, 10 L in the seat pack, 5 L on the rider's 8 L rack deck.
     const plan = { goal: 'handling' as const, bags: [bag(1, 'bar', 12), bag(2, 'seat', 10)], decks: { rack: true, bar: false }, nextUid: 3,
       usable: () => ({ ok: false, reason: 'NO_MOUNT' }), trial: packer(items(12, 10, 5)) };
-    expect(advise(input({ ...plan, style: 'either' })).kind).toBe('already-good'); // with a rack it does fit
-    for (const over of [{ style: 'no-rack' as const }, { style: 'either' as const, noPanniers: true }]) {
-      const answer = advise(input({ ...plan, ...over }));
-      expect(answer.kind, JSON.stringify(over)).toBe('nothing-helps');
-      // A bag that takes the 5 L is a full fix.
-      const fixed = advise(input({ ...plan, ...over, usable: (b) => ({ ok: b.pos === 'frame', reason: null }) }));
-      expect(fixed.kind).toBe('suggestions');
-      if (fixed.kind === 'suggestions') expect(fixed.items[0]!.add[0]!.pos).toBe('frame');
-    }
+    for (const style of ['bags', 'bags-first', 'panniers'] as const) expect(advise(input({ ...plan, style })).kind, style).toBe('already-good');
   });
 
-  test('[GA-STYLE] the rider\'s own panniers are in no trial under Without a rack, the base included, and no swap takes them out', () => {
-    for (const over of [{ style: 'no-rack' as const }, { style: 'either' as const, noPanniers: true }]) {
-      const seen: { bags: BagIn[]; decks: Decks }[] = [];
-      const inner = packer([{ id: 'a', L: 8, kg: 3 }, { id: 'b', L: 8, kg: 3 }, { id: 'c', L: 8, kg: 3 }]);
-      const i = input({ ...over, goal: 'handling', camping: true, bags: [bag(1, 'seat', 10), bag(2, 'rack', 20, { pair: true })], decks: { rack: true, bar: false }, nextUid: 3,
-        trial: (bags, decks) => { seen.push({ bags, decks }); return inner(bags, decks); } });
-      const answer = advise(i);
-      expect(seen.length, JSON.stringify(over)).toBeGreaterThan(20);
-      for (const t of seen) {
-        expect(t.bags.some((b) => b.pos === 'rack')).toBe(false);
-        expect(t.decks.rack).toBe(false);
-      }
-      expect((['add', 'swap', 'add-two'] as const).flatMap((p) => candidates(i, p)).some((c) => c.remove === 2)).toBe(false);
-      if (answer.kind === 'suggestions') for (const s of answer.items) expect(s.remove).not.toBe(2);
+  test('[GA-STYLE] the rider\'s own panniers are in no trial under Bikepacking bags only, the base included, and no swap takes them out; the deck stays as the rider has it', () => {
+    const seen: { bags: BagIn[]; decks: Decks }[] = [];
+    const inner = packer([{ id: 'a', L: 8, kg: 3 }, { id: 'b', L: 8, kg: 3 }, { id: 'c', L: 8, kg: 3 }]);
+    const i = input({ style: 'bags', goal: 'handling', camping: true, bags: [bag(1, 'seat', 10), bag(2, 'rack', 20, { pair: true })], decks: { rack: true, bar: false }, nextUid: 3,
+      trial: (bags, decks) => { seen.push({ bags, decks }); return inner(bags, decks); } });
+    const answer = advise(i);
+    expect(seen.length).toBeGreaterThan(20);
+    for (const t of seen) {
+      expect(t.bags.some((b) => b.pos === 'rack')).toBe(false);
+      expect(t.decks.rack).toBe(true);
     }
-    // With a rack, the panniers and the deck stay in every trial.
+    expect((['add', 'swap', 'add-two'] as const).flatMap((p) => candidates(i, p)).some((c) => c.remove === 2)).toBe(false);
+    if (answer.kind === 'suggestions') for (const s of answer.items) expect(s.remove).not.toBe(2);
+    // Panniers are fine: the panniers and the deck stay in every trial.
     const kept: BagIn[][] = [];
     advise(input({ goal: 'handling', bags: [bag(1, 'seat', 10), bag(2, 'rack', 20, { pair: true })], decks: { rack: true, bar: false }, nextUid: 3, trial: packer(items(8, 8, 8), kept) }));
     expect(kept[0]!.some((b) => b.pos === 'rack')).toBe(true);
@@ -247,7 +245,7 @@ describe('without a rack: nothing on a rack, the base included (re-check of PR 5
 describe('slices (design §3.4: within a second, or in the background)', () => {
   test('[GA-SLICES] the generator yields every 20 trials and never exceeds MAX_TRIALS', () => {
     const calls: BagIn[][] = [];
-    const { answer, yields } = run(input({ goal: 'handling', style: 'no-rack', trial: packer(items(12, 12, 12, 12), calls) }));
+    const { answer, yields } = run(input({ goal: 'handling', style: 'bags', trial: packer(items(12, 12, 12, 12), calls) }));
     expect(yields.length).toBeGreaterThan(3);
     expect(yields).toEqual(yields.map((_, k) => 20 * (k + 1)));
     expect(answer.tried).toBe(calls.length);

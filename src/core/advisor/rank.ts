@@ -26,7 +26,7 @@ export function handlingScore(r: TrialResult): number {
   return round2(sum);
 }
 
-const KIND_ORDER: Record<Candidate['kind'], number> = { add: 0, 'add-two': 0, swap: 1 };
+const KIND_ORDER: Record<Candidate['kind'], number> = { add: 0, 'add-two': 0, deck: 0, ahead: 0, swap: 1 };
 const byNumber = (a: number, b: number) => round2(a) - round2(b);
 
 /**
@@ -41,6 +41,28 @@ export function compareFor(goal: AdvisorInput['goal']): (a: Suggestion, b: Sugge
       : byNumber(a.score, b.score);
     return onGoal || a.newBags - b.newBags || byNumber(a.litres, b.litres) || KIND_ORDER[a.kind] - KIND_ORDER[b.kind];
   };
+}
+
+/** The owner's order of what a suggestion adds (DECIDED.addOrder), lowest first: the bags' positions and the rack deck. */
+function orderOf(c: Candidate): number[] {
+  const order = DECIDED.addOrder as Readonly<Record<string, number>>;
+  return [...c.add.map((b) => order[b.pos] ?? 99), ...(c.deck ? [order.deck ?? 99] : [])].sort((a, b) => a - b);
+}
+
+/** The owner's order of two suggestions: the first place their orders differ; a shorter one first when one leads the other. */
+export function byOwnerOrder(a: Candidate, b: Candidate): number {
+  const x = orderOf(a), y = orderOf(b);
+  for (let i = 0; i < Math.min(x.length, y.length); i++) if (x[i] !== y[i]) return x[i]! - y[i]!;
+  return x.length - y.length;
+}
+
+/**
+ * Minimal's order (owner, 7 Nov): the fewest new bags first, then the owner's order (top tube and frame bag, then seat pack, then
+ * handlebar bag, then fork cages), then the goal's order.
+ */
+export function compareMinimal(goal: AdvisorInput['goal']): (a: Suggestion, b: Suggestion) => number {
+  const onGoal = compareFor(goal);
+  return (a, b) => a.newBags - b.newBags || byOwnerOrder(a, b) || onGoal(a, b);
 }
 
 /**

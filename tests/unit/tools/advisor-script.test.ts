@@ -6,14 +6,14 @@ import { gzipSync } from 'node:zlib';
 import { afterAll, expect, test, vi } from 'vitest';
 import { buildDist } from '../../../tools/build.mjs';
 import { advise } from '../../../src/core/advisor/search.ts';
-import { MIN_GAIN_BACK_L, SIZE_RANGES, WEIGHTS } from '../../../src/core/advisor/table.ts';
+import { DECIDED, MIN_GAIN_BACK_L, SIZE_RANGES, WEIGHTS } from '../../../src/core/advisor/table.ts';
 
 const tmpRoot = mkdtempSync(join(tmpdir(), 'wf-advisor-js-'));
 afterAll(() => rmSync(tmpRoot, { recursive: true, force: true }));
 
 // A tiny rider for both realms: a 15 L backpack holding 6 L; any bike bag of 6 L or more takes it all.
 const RIDER = `({
-  style: 'either', goal: 'backpack', noPanniers: false, bags: [{ uid: 1, pos: 'pack', L: 15 }], decks: { rack: false, bar: false },
+  style: 'panniers', goal: 'backpack', bags: [{ uid: 1, pos: 'pack', L: 15 }], decks: { rack: false, bar: false },
   camping: false, nextUid: 2, frameShapes: [{ shape: 0, L: 6, source: 'measured' }], frameReason: null, topSlotsFree: ['front'],
   rackMounts: 'yes', usable: () => ({ ok: true, reason: null }),
   trial: (bags) => { const room = bags.filter((b) => b.pos !== 'pack').reduce((n, b) => n + b.L * (b.pair ? 2 : 1), 0);
@@ -31,9 +31,11 @@ test('[GA-SIZE] advisor.js builds, sets window.WayfinchAdvisor, and is under 20 
   const context = { window: {} as Record<string, unknown> };
   runInNewContext(source, context);
   const api = context.window.WayfinchAdvisor as Record<string, unknown>;
-  // MIN_GAIN_BACK_L too: the page's cannot-reduce sentence reads it (re-check of PR 60)
-  expect(Object.keys(api).sort()).toEqual(['MIN_GAIN_BACK_L', 'SIZE_RANGES', 'WEIGHTS', 'advise', 'adviseSteps']);
+  // MIN_GAIN_BACK_L too: the page's cannot-reduce sentence reads it (re-check of PR 60); DECIDED: the page's setup step reads its
+  // default and the questionnaire's mapping (the owner's ruling of 7 Nov)
+  expect(Object.keys(api).sort()).toEqual(['DECIDED', 'MIN_GAIN_BACK_L', 'SIZE_RANGES', 'WEIGHTS', 'advise', 'adviseSteps']);
   expect(api.MIN_GAIN_BACK_L).toBe(MIN_GAIN_BACK_L);
+  expect(JSON.parse(JSON.stringify(api.DECIDED))).toEqual(DECIDED);
   expect(Object.isFrozen(api)).toBe(true);
   expect(JSON.parse(JSON.stringify(api.WEIGHTS))).toEqual(WEIGHTS);
   expect(JSON.parse(JSON.stringify(api.SIZE_RANGES))).toEqual(SIZE_RANGES);

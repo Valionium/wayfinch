@@ -25,39 +25,52 @@ describe('the tables (decisions 2, 3, 6; the plan\'s tables)', () => {
 
   test('[GA-CANDIDATES] every decided value is in table.ts, as the plan\'s decisions (and the review of PR 57) have them', () => {
     expect(DECIDED).toEqual({
-      pairIsOneBag: true,                  // decision 4
+      pairIsOneBag: false,                 // decision 4; the owner, 7 Nov: a pair is two bags, a single one
       forkNeedsMountsTag: true,            // decision 4
-      noPanniersUnder: ['either', 'rack'], // decision 5 (review m3: also under With a rack)
       seatUnlikely: 'drop',                // decision 9
       seatTight: 'tag',                    // decision 9
-      rackWithoutRack: 'off',              // review I3, re-check R1 (design §4): no deck, no panniers
       rangeUpToL: 2,                       // design §3.3
       rangeHalfLitres: true,               // decision 3 (review m2: +0.5 and +1.5 L for the top tube)
+      // the owner's ruling of 7 Nov on the rack: the setup step, its default, the questionnaire's mapping
+      setups: ['bags', 'bags-first', 'panniers'],
+      defaultSetup: 'bags-first',
+      ridingSetup: { touring: 'panniers', road: 'bags', gravel: 'bags', mtb: 'bags', everyday: 'bags-first' },
+      ownPanniersUnderBagsOnly: 'off',     // Bikepacking bags only: the rider's panniers leave, the rack and its deck stay
+      newRackCounts: 1,                    // a rack to fit is one new thing
+      backpackWholeFirst: true,            // Get the backpack off: Minimal empties the back when anything tried does
+      addOrder: { deck: 0, top: 1, frame: 1, seat: 2, bar: 3, fork: 4, rack: 5 }, // the owner, 7 Nov: Minimal's order
     });
     expect(Object.isFrozen(DECIDED)).toBe(true);
   });
 });
 
 describe('candidates', () => {
-  test('[GA-CANDIDATES] on a bike with every position free: the add phase holds each type at each size of SIZE_RANGES (frame: the given shapes), fork and rack as pairs; taken positions are skipped; the top tube\'s second slot is offered when the first is taken', () => {
+  test('[GA-CANDIDATES] on a bike with every position free: the add phase holds each type at each size of SIZE_RANGES (frame: the given shapes), fork and rack as singles and as pairs (owner, 7 Nov); taken positions are skipped; the top tube\'s second slot is offered when the first is taken', () => {
     const adds = candidates(input(), 'add');
     for (const c of adds) {
       expect(c.kind).toBe('add');
       expect(c.remove).toBeNull();
-      expect(c.newBags).toBe(1);
+      // a pair is two bags; panniers on a bike with no rack fitted bring a rack to fit, one more (the owner, 7 Nov)
+      expect(c.newBags).toBe((c.add[0]!.pair ? 2 : 1) + (c.add[0]!.pos === 'rack' ? 1 : 0));
       expect(c.add).toHaveLength(1);
       expect(c.add[0]!.uid).toBe(10);
       expect(c.decks).toEqual({ rack: false, bar: false });
       expect(c.litres).toBe(c.add[0]!.L * (c.add[0]!.pair ? 2 : 1));
     }
     expect(new Set(adds.map((c) => c.add[0]!.pos))).toEqual(new Set(['frame', 'top', 'fork', 'rack', 'bar', 'seat']));
-    for (const [pos, sizes] of Object.entries(TABLE_SIZES)) expect(sizesAt(adds, pos).sort((a, b) => a - b), pos).toEqual(sizes);
+    for (const [pos, sizes] of Object.entries(TABLE_SIZES)) {
+      const twice = ['fork', 'rack'].includes(pos) ? [...sizes, ...sizes] : sizes; // a single and a pair at each size
+      expect(sizesAt(adds, pos).sort((a, b) => a - b), pos).toEqual([...twice].sort((a, b) => a - b));
+    }
     const frames = adds.filter((c) => c.add[0]!.pos === 'frame');
     expect(frames.map((c) => [c.add[0]!.shape, c.add[0]!.L]).sort()).toEqual(SHAPES.map((s) => [s.shape, s.L]).sort());
-    for (const c of adds.filter((x) => ['fork', 'rack'].includes(x.add[0]!.pos))) expect(c.add[0]!.pair).toBe(true);
+    for (const pos of ['fork', 'rack']) {
+      expect(adds.filter((x) => x.add[0]!.pos === pos && x.add[0]!.pair === true)).toHaveLength(TABLE_SIZES[pos as 'fork' | 'rack'].length);
+      expect(adds.filter((x) => x.add[0]!.pos === pos && x.add[0]!.pair === undefined)).toHaveLength(TABLE_SIZES[pos as 'fork' | 'rack'].length);
+    }
     for (const c of adds.filter((x) => !['fork', 'rack'].includes(x.add[0]!.pos))) expect(c.add[0]!.pair).toBeUndefined();
     for (const c of adds.filter((x) => x.add[0]!.pos === 'top')) expect(c.add[0]!.slot).toBe('front');
-    expect(adds).toHaveLength(4 + 3 + 4 + 16 + 11 + 13);
+    expect(adds).toHaveLength(4 + 3 + 2 * 4 + 2 * 16 + 11 + 13);
 
     // Taken positions are skipped; the second top-tube slot is offered when the first is taken.
     const taken = candidates(input({ bags: [bag(1, 'seat', 10), bag(2, 'top', 1, { slot: 'front' }), bag(3, 'fork', 3, { pair: true })], topSlotsFree: ['rear'], nextUid: 4 }), 'add');
@@ -110,7 +123,8 @@ describe('candidates', () => {
 
   test('[GA-CANDIDATES] panniers put the rack deck on when the trip camps; fork cages say they need mounts; frame litres not measured say estimate', () => {
     const camping = candidates(input({ camping: true }), 'add');
-    for (const c of camping) expect(c.decks.rack, c.add[0]!.pos).toBe(c.add[0]!.pos === 'rack');
+    // a rack with its deck alone (the owner, 7 Nov: a rack does the job) has no bag and puts the deck on too
+    for (const c of camping) expect(c.decks.rack, c.add[0]?.pos ?? 'deck').toBe(c.deck || c.add[0]!.pos === 'rack');
     for (const c of candidates(input(), 'add')) {
       const b = c.add[0]!;
       expect(c.tags.includes(GA.advisorTagForkMounts), b.pos).toBe(b.pos === 'fork');
@@ -123,7 +137,7 @@ describe('candidates', () => {
     const swaps = candidates(i, 'swap');
     for (const c of swaps) {
       expect(c.kind).toBe('swap');
-      expect(c.newBags).toBe(1);
+      expect(c.newBags).toBe((c.add[0]!.pair ? 2 : 1) + (c.add[0]!.pos === 'rack' ? 1 : 0)); // a pair is two; a rack to fit, one (owner, 7 Nov)
       expect([1, 2]).toContain(c.remove);
       expect(c.add[0]!.uid).toBe(3);
       // The bag in goes to a free position or to the one just freed.
@@ -140,7 +154,7 @@ describe('candidates', () => {
     for (const c of twos) {
       expect(c.kind).toBe('add-two');
       expect(c.remove).toBeNull();
-      expect(c.newBags).toBe(2);
+      expect(c.newBags).toBe(c.add.reduce((n, b) => n + (b.pair ? 2 : 1), 0) + (c.add.some((b) => b.pos === 'rack') ? 1 : 0)); // owner, 7 Nov
       expect(c.add.map((b) => b.uid)).toEqual([3, 4]);
       expect(c.add[0]!.pos).not.toBe(c.add[1]!.pos);
       expect(c.add.some((b) => b.pos === 'seat' || b.pos === 'bar')).toBe(false);
@@ -150,63 +164,61 @@ describe('candidates', () => {
     const frameTop = twos.filter((c) => c.add.some((b) => b.pos === 'frame') && c.add.some((b) => b.pos === 'top'))
       .map((c) => [c.add.find((b) => b.pos === 'frame')!.L, c.add.find((b) => b.pos === 'top')!.L]);
     expect(frameTop).toEqual([[3, 0.5], [6, 1], [6, 1.5], [6, 2]]);
-    // Fork (2–5) with rack (10–25): 16 steps.
-    expect(twos.filter((c) => c.add.some((b) => b.pos === 'fork') && c.add.some((b) => b.pos === 'rack'))).toHaveLength(16);
+    // Fork (2–5) with rack (10–25): 16 steps, for each of single and pair at either (owner, 7 Nov).
+    expect(twos.filter((c) => c.add.some((b) => b.pos === 'fork') && c.add.some((b) => b.pos === 'rack'))).toHaveLength(4 * 16);
   });
 });
 
-describe('the style and the rack mounts (design §2, §4)', () => {
+describe('the setup and the rack (the owner\'s ruling of 7 Nov: the setup is a choice; a rack fitted and the rack mounts are facts)', () => {
   const withBags = (over: Partial<AdvisorInput>) => input({ bags: [bag(1, 'seat', 14), bag(2, 'bar', 12), bag(3, 'pack', 15)], nextUid: 4, camping: true, ...over });
-  const rackish = (c: Candidate) => c.add.some((b) => b.pos === 'rack') || c.decks.rack;
+  const panniersIn = (c: Candidate) => c.add.some((b) => b.pos === 'rack');
+  const rackish = (c: Candidate) => panniersIn(c) || c.decks.rack;
 
-  test('[GA-STYLE] style no-rack: no candidate in any phase has pos \'rack\' or decks.rack true; noPanniers: the same under \'either\'', () => {
-    expect(all(withBags({ style: 'either' })).some(rackish)).toBe(true);
-    expect(all(withBags({ style: 'rack' })).some(rackish)).toBe(true);
-    const noRack = all(withBags({ style: 'no-rack' }));
-    expect(noRack.length).toBeGreaterThan(50);
-    expect(noRack.some(rackish)).toBe(false);
-    const trails = all(withBags({ style: 'either', noPanniers: true }));
-    expect(trails.length).toBe(noRack.length);
-    expect(trails.some(rackish)).toBe(false);
+  test('[GA-STYLE] Bikepacking bags only: no candidate in any phase is a pannier or a rack to fit; Bags first and Panniers are fine offer both (the search decides when, search.ts)', () => {
+    for (const style of ['bags-first', 'panniers'] as const) {
+      expect(all(withBags({ style })).some(panniersIn), style).toBe(true);
+      expect(all(withBags({ style })).some((c) => c.deck), style).toBe(true);
+    }
+    const bagsOnly = all(withBags({ style: 'bags' }));
+    expect(bagsOnly.length).toBeGreaterThan(50);
+    expect(bagsOnly.some(rackish)).toBe(false);
   });
 
-  test('[GA-NO-MOUNTS] rackMounts \'no\': no rack candidate under any style; \'unknown\': rack candidates carry the tag \'if your bike has rack mounts\'', () => {
-    for (const style of ['rack', 'no-rack', 'either'] as const) {
+  test('[GA-NO-MOUNTS] rack mounts no and no rack fitted: never a rack or panniers; Not sure: a rack or panniers carry "if your bike has rack mounts"; a missing field is Not sure (review of PR 57, I1)', () => {
+    for (const style of ['bags', 'bags-first', 'panniers'] as const) {
       expect(all(withBags({ style, rackMounts: 'no' })).some(rackish), style).toBe(false);
     }
     expect(GA.advisorTagRackMounts).toBe('if your bike has rack mounts');
-    const unknown = all(withBags({ rackMounts: 'unknown' }));
-    expect(unknown.some(rackish)).toBe(true);
-    for (const c of unknown) expect(c.tags.includes(GA.advisorTagRackMounts)).toBe(c.add.some((b) => b.pos === 'rack'));
-    for (const c of all(withBags({ rackMounts: 'yes' }))) expect(c.tags.includes(GA.advisorTagRackMounts)).toBe(false);
-  });
-
-  test('[GA-NO-MOUNTS] a missing rackMounts is Not sure, never Yes: undefined, null and \'unknown\' tag every pannier; \'yes\' tags none; \'no\' offers none (review of PR 57, I1)', () => {
-    // Sub-project 11 stores Not sure as an absent field; the page may hand the classic script undefined or null.
     for (const rackMounts of [undefined, null, 'unknown', 'maybe'] as unknown as AdvisorInput['rackMounts'][]) {
       const list = all(withBags({ rackMounts }));
-      const racks = list.filter((c) => c.add.some((b) => b.pos === 'rack'));
-      expect(racks.length, String(rackMounts)).toBeGreaterThan(15);
-      for (const c of list) expect(c.tags.includes(GA.advisorTagRackMounts), String(rackMounts)).toBe(c.add.some((b) => b.pos === 'rack'));
+      expect(list.filter(panniersIn).length, String(rackMounts)).toBeGreaterThan(15);
+      for (const c of list) expect(c.tags.includes(GA.advisorTagRackMounts), String(rackMounts)).toBe(panniersIn(c) || c.deck);
     }
     const yes = all(withBags({ rackMounts: 'yes' }));
-    expect(yes.some((c) => c.add.some((b) => b.pos === 'rack'))).toBe(true);
+    expect(yes.some(panniersIn)).toBe(true);
     expect(yes.some((c) => c.tags.includes(GA.advisorTagRackMounts))).toBe(false);
-    expect(all(withBags({ rackMounts: 'no' })).some(rackish)).toBe(false);
   });
 
-  test('[GA-STYLE] a rack deck the rider already has is off in every candidate without a rack (style no-rack, or the trails answer), and kept otherwise (review of PR 57, I3)', () => {
-    const decks = { rack: true, bar: true };
-    for (const over of [{ style: 'no-rack' as const }, { style: 'either' as const, noPanniers: true }]) {
-      const list = all(withBags({ ...over, decks }));
-      expect(list.length, JSON.stringify(over)).toBeGreaterThan(50);
-      expect(list.some(rackish), JSON.stringify(over)).toBe(false);
-      for (const c of list) expect(c.decks.bar).toBe(true); // only the rack deck goes
+  test('[GA-NO-MOUNTS] a rack already fitted is a fact: with rack mounts no or Not sure it is kept, its deck and panniers on it are offered (under the setups that allow panniers) without the mounts word', () => {
+    const fitted = (over: Partial<AdvisorInput>) => withBags({ bags: [bag(1, 'seat', 14), bag(2, 'rack', 15), bag(3, 'pack', 15)], ...over });
+    for (const rackMounts of ['no', 'unknown'] as const) {
+      const list = all(fitted({ rackMounts }));
+      expect(list.some((c) => c.deck), rackMounts).toBe(true);   // use the rack you have
+      for (const c of list) expect(c.tags).not.toContain(GA.advisorTagRackMounts);
+      for (const c of list.filter((x) => x.kind === 'deck')) expect(c.newBags).toBe(0);
+      expect(list.filter((c) => c.remove === null).some(panniersIn), 'the rack is taken: no second set of panniers').toBe(false);
     }
-    for (const style of ['either', 'rack'] as const) {
-      for (const c of all(withBags({ style, decks }))) expect(c.decks, style).toEqual(decks);
+  });
+
+  test('[GA-STYLE] Bikepacking bags only: the rider\'s own panniers leave every candidate\'s plan; the rack they hung from stays, its deck as the rider has it, and its deck is offered when off', () => {
+    for (const decks of [{ rack: false, bar: true }, { rack: true, bar: true }]) {
+      const i = withBags({ style: 'bags', bags: [bag(1, 'seat', 14), bag(2, 'rack', 20, { pair: true })], decks, nextUid: 3 });
+      const list = all(i);
+      expect(list.length).toBeGreaterThan(50);
+      expect(list.some((c) => c.remove === 2), 'no swap takes out panniers that are not in the plan').toBe(false);
+      for (const c of list.filter((x) => !x.deck)) expect(c.decks).toEqual(decks);
+      expect(list.some((c) => c.deck), JSON.stringify(decks)).toBe(!decks.rack);
+      for (const c of list.filter((x) => x.kind === 'deck')) { expect(c.newBags).toBe(0); expect(c.decks.rack).toBe(true); }
     }
-    // No rack mounts stops new panniers, not the rider's own deck.
-    for (const c of all(withBags({ rackMounts: 'no', decks }))) expect(c.decks).toEqual(decks);
   });
 });

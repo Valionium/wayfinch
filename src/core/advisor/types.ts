@@ -16,13 +16,19 @@ export type TrialResult = {
 
 export type Decks = { rack: boolean; bar: boolean };
 
+export type Setup = 'bags' | 'bags-first' | 'panniers';
+
 export type Usable = { ok: boolean; reason: string | null; band?: 'likely' | 'tight' | 'unlikely' };
 
 export type AdvisorInput = {
-  style: 'rack' | 'no-rack' | 'either'; goal: 'handling' | 'backpack';
-  /** The questionnaire's mountain bike trails answer: no panniers even under Either (decision 5). */
-  noPanniers: boolean;
+  /**
+   * The setup the rider wants (the owner's ruling of 7 Nov): `bags` Bikepacking bags only (never panniers; a rack already fitted still
+   * carries things on its deck), `bags-first` Bags first, panniers only if needed (the default), `panniers` Panniers are fine.
+   */
+  style: Setup; goal: 'handling' | 'backpack';
   bags: BagIn[]; decks: Decks; camping: boolean; nextUid: number;
+  /** Whether a rack is fitted, read from the plan before the setup applies (candidates.ts sets it; the page need not). */
+  rackFitted?: boolean;
   /** The bike's own frame bag shapes (`bikeFit(bike).frameBag.shapes`), at their real litres; empty when it takes none. */
   frameShapes: { shape: number; L: number; source: string }[];
   /** Why the bike takes no frame bag, in the planner's own code (`NO_MOUNT`, `NO_ROOM`), or null. */
@@ -37,8 +43,14 @@ export type AdvisorInput = {
   trial: (bags: BagIn[], decks: Decks) => TrialResult; // the page's planWith
 };
 
+/**
+ * `deck`: the rack deck alone, no bag: on the rack the plan has (no new bag), or on a rack to fit; the planner's own deck placement decides
+ * what rides there. `ahead`: Looking ahead, Minimal's first suggestion as it stands plus one more thing (owner, 7 Nov).
+ */
 export type Candidate = {
-  kind: 'add' | 'swap' | 'add-two'; add: BagIn[]; remove: number | null; decks: Decks; newBags: number; litres: number;
+  kind: 'add' | 'swap' | 'add-two' | 'deck' | 'ahead'; add: BagIn[]; remove: number | null; decks: Decks; newBags: number; litres: number;
+  /** True when the candidate itself puts the rack deck on (not panniers bringing it, not a deck the rider has). */
+  deck: boolean;
   /** Words shown with the suggestion (src/core/wording/en-advisor.ts): rack or fork mounts, a tight seat pack, an estimated frame. */
   tags: string[];
 };
@@ -48,7 +60,8 @@ export type Suggestion = Candidate & { result: TrialResult; score: number; range
 /** `partial`: the search stopped at MAX_TRIALS, so the answer covers only what was tried. */
 type AnswerCommon = { tried: number; frameReason: string | null; partial: boolean };
 export type AdvisorAnswer =
-  | ({ kind: 'suggestions'; items: Suggestion[] } & AnswerCommon)   // 1 to 3, best first
+  /** `items`: Minimal, 1 to 3, best first; `ahead`: Looking ahead, a set that covers more, or null (owner, 7 Nov). */
+  | ({ kind: 'suggestions'; items: Suggestion[]; ahead: Suggestion | null } & AnswerCommon)
   | ({ kind: 'already-good' } & AnswerCommon)
   /** Get the backpack off only: litres stay on the back (backL) and nothing takes MIN_GAIN_BACK_L more off it. */
   | ({ kind: 'cannot-reduce'; backL: number } & AnswerCommon)
