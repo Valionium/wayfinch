@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { W } from '../../../src/core/wording/en.ts';
 import { T } from '../../../src/core/wording/en-tyre.ts';
 import { readHost } from '../../../src/tools/tyre/host.ts';
@@ -160,5 +160,32 @@ describe('the choice follows the rider between the tools', () => {
     await act(() => { window.dispatchEvent(new StorageEvent('storage', { key: 'loadcheck:bikeProfiles' })); });
     expect(tyreSelect().value).toBe('bike_c');
     expect(empty.data.has(BIKE_CHOICE_KEY)).toBe(false);
+  });
+});
+
+describe('Tools loads as its own chunk', () => {
+  test('[TB-TOOLS-LAZY] the bag card with the bike drawing is there at the first render (the bike glides back from the bag planner); the line and the tyre card follow when the chunk has loaded', async () => {
+    const { App } = await import('../../../src/ui/app.tsx');
+    localStorage.clear();
+    localStorage.setItem('loadcheck:bikeProfiles', JSON.stringify([A, B]));
+    localStorage.setItem('loadcheck:bikeProfile', JSON.stringify(A));
+    const { refreshBikeSource } = await import('../../../src/ui/bike/live.ts');
+    refreshBikeSource();
+    go('tools');
+    const root = document.createElement('div');
+    document.body.append(root);
+    await act(() => { render(<App />, root); });
+    // The very first frame: the bag card and a place kept for the line (nothing moves later); no tyre card yet.
+    const cards = () => root.querySelectorAll('main[data-screen="tools"] > .card');
+    expect(cards().length).toBeGreaterThanOrEqual(1);
+    expect(root.querySelector('main[data-screen="tools"] .bike-large svg')).not.toBeNull();
+    expect(root.querySelector('.bike-line')).not.toBeNull();
+    // Then the whole screen: the line, both cards.
+    await vi.waitFor(() => expect(cards().length).toBe(2));
+    expect(root.querySelector('.bike-line select')).not.toBeNull();
+    expect(root.querySelectorAll('.bike-line').length).toBe(1);
+    render(null, root);
+    root.remove();
+    localStorage.clear();
   });
 });

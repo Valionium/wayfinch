@@ -4,7 +4,8 @@ import type { FunctionComponent } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { W } from '../core/wording/en.ts';
 
-export function lazy<P extends object>(load: () => Promise<FunctionComponent<P>>): FunctionComponent<P> {
+/** `Fallback`: what shows while it loads, and if it can't, instead of the loading line (a first part of the screen that is complete alone). */
+export function lazy<P extends object>(load: () => Promise<FunctionComponent<P>>, Fallback?: FunctionComponent<P>): FunctionComponent<P> {
   let loaded: FunctionComponent<P> | null = null;
   let loading: Promise<FunctionComponent<P>> | null = null;
   return function Lazy(props: P) {
@@ -18,6 +19,7 @@ export function lazy<P extends object>(load: () => Promise<FunctionComponent<P>>
       return () => { alive = false; };
     }, [Component]);
     if (Component) return <Component {...props} />;
+    if (Fallback) return <Fallback {...props} />;
     return failed ? <p class="notice" role="status">{W.appLazyFailed}</p> : <p class="muted" aria-busy="true">{W.appLazyLoading}</p>;
   };
 }

@@ -125,6 +125,8 @@ test('[WIDE-PANES] Ahead: position, strip and chips in the main pane, the six ca
 
   await page.goto(`${app!.origin}/#/tools`);
   const cards = page.locator('main[data-screen="tools"] > .card');
+  // Tools is a chunk of its own (TB-TOOLS-LAZY): its bag card shows at once, the tyre card when the chunk has loaded.
+  await expect(cards).toHaveCount(2);
   expect(await cards.count()).toBe(2);
   const [a, b] = [await box(cards.nth(0)), await box(cards.nth(1))];
   expect(Math.abs(a.y - b.y)).toBeLessThan(2);

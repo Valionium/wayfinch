@@ -969,5 +969,5 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - a plan bike that is not in the saved list is never offered or chosen, as PR 51 rules for a removed bike (the plan's text, which offered it marked "in your plan, not saved", gives way to TY-UI-BIKEBOX) [TB-LINE-UNSAVED]
 - choosing a bike in the tyre tool is the line's bike in Tools after a remount and after a reload; the tyre tool opens on that bike's own details [TB-SWITCH]
 - #/tools/tyre?bike=<id> chooses that saved bike once and leaves #/tools/tyre; an unknown id chooses nothing [TB-LINK]
-- the Tools screen is its own chunk, not among the first screen's files, and the first screen does not grow (§4.5) [TB-TOOLS-LAZY]
+- the Tools screen (its bike line and tyre card) is its own chunk, not among the first screen's files, and the first screen does not rise above main's figure at the branch point (§4.5); its bag card with the bike drawing stays in the first screen and shows while the chunk loads, so the bike is drawn when the page is revealed and glides back from the bag planner (LC-GLIDE) [TB-TOOLS-LAZY]
 - Wayfinch's export holds settings.toolBike; importing it makes it the choice; a file without it, or with a bad id, imports and falls back [TB-EXPORT]

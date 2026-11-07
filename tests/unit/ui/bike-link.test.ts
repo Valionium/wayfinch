@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { screenFromHash, toolHref, toolLinkBike } from '../../../src/ui/nav.ts';
+import { screenFromHash } from '../../../src/ui/nav.ts';
+import { toolHref, toolLinkBike } from '../../../src/ui/tools/bike-link.ts';
 
 const bike = (id: string) => ({ id, name: id, look: { colour: null, bars: 'drop', ebike: null }, tyres: 'tubeless', frontTyre: '30-622', rearTyre: '30-622', pressure: { wheel: '700c' } });
 

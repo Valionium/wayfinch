@@ -52,3 +52,6 @@
 .bike-caption { margin: 4px 0 0; }
 .bike-caption a { display: inline-flex; align-items: center; min-height: 44px; color: var(--blaze); font-weight: 600; }
 .bike-marker { display: inline-flex; align-items: center; }
+/* The bike line at the top of Tools (sub-project 11): its room is kept while Tools loads, so nothing moves when it arrives. */
+.bike-line { margin: 0 0 8px; min-height: 2.75rem; display: flex; align-items: center; }
+.bike-line label { display: inline-flex; align-items: center; gap: 8px; }

@@ -47,7 +47,7 @@ const CHECKS: { [K in keyof Settings]: (value: unknown) => string | null } = {
   flatKph: (x) => (goodFlatKph(x) ? null : W.appStoreFlatKphRange),
   stay: (x) => (isIn(x, STAYS) ? null : W.appStoreStayChoice),
   campWaterL: (x) => (inRange(x, 0, 5) ? null : W.appStoreCampWaterRange),
-  toolBike: (x) => (x === null || (typeof x === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(x)) ? null : W.appStoreBikeChoice),
+  toolBike: (x) => (x === null || (typeof x === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(x)) ? null : W.appStoreNotKept),
 };
 
 export const settingProblem = <K extends keyof Settings>(field: K, value: unknown): string | null => CHECKS[field](value);

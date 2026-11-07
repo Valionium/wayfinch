@@ -11,10 +11,10 @@ import { movedCardDue } from './moved-due.ts';
 import { riderKg } from './rider-kg.ts';
 import { Degraded } from './card.tsx';
 import { degradedSignal, kindsOnScreen } from './degraded.ts';
-import { bikeSource } from './bike/live.ts';
-import { screenSignal, tabOf, toolLinkBike } from './nav.ts';
+import { screenSignal, tabOf } from './nav.ts';
 import type { ScreenName, TabName } from './nav.ts';
 import type { Updater } from './update.ts';
+import { ToolsFirst } from './tools/bag-card.tsx';
 import { browserTripServices } from './trip/services.ts';
 import { TripScreen } from './trip/trip.tsx';
 import { installDrop } from './wide/drop.ts';
@@ -25,21 +25,17 @@ import './wide/wide.css';
 const tyreServices = browserServices(riderKg);
 // The tyre tool's screen is its own chunk: it is not a first screen.
 const TyreScreen = lazy(() => import('../tools/tyre/ui.tsx').then((m) => m.TyreScreen));
-// Tools is its own chunk too (sub-project 11): its bike line and cards are not a first screen; it is precached like the rest.
-const ToolsScreen = lazy(() => import('./tools/tools.tsx').then((m) => m.ToolsScreen));
 // You is its own chunk too (spec section 3.5): the first screen does not carry its form, export or import.
+// Tools is its own chunk too (sub-project 11): its bike line and tyre card are not a first screen. The bag card is, shown while it loads
+// (bag-card.tsx), so the bike is drawn when the page is revealed and glides back from the bag planner (LC-GLIDE).
+const ToolsScreen = lazy(() => import('./tools/tools.tsx').then((m) => m.ToolsScreen), ToolsFirst);
 const YouHost = lazy(() => import('./you/host.tsx').then((m) => m.YouHost));
 const tripServices = browserTripServices();
 
-// A tool address with ?bike=<id> (toolHref) chooses that saved bike once, then leaves the plain address. An id no saved bike has chooses
-// nothing. The choice code is a chunk of its own, loaded only for such an address.
-function takeBikeLink(): void {
-  if (!/\?bike=/.test(location.hash)) return;
-  const id = toolLinkBike(location.hash);
-  history.replaceState(null, '', `${location.pathname}${location.search}${location.hash.replace(/\?.*$/, '')}`);
-  if (id && bikeSource.value.bikes.some((b) => b.id === id)) import('./tools/bike-choice.ts').then((m) => m.noteBikeChoice(id), () => undefined);
-}
+// A tool address with ?bike=<id> chooses that saved bike once, then leaves the plain address (bike-link.ts, a chunk of its own).
+const takeBikeLink = (): void => { if (/\?bike=/.test(location.hash)) void import('./tools/bike-link.ts').then((m) => m.takeBikeLink(), () => undefined); };
 export const aheadShell = browserAhead();
+
 
 // A file dropped on the window never opens or downloads; on Trip and You it goes to the screen's own file input (spec 3.8).
 // Between 600 and 839 px the bottom bar never covers the focused element. Both live as long as the page, so no effect owns them.

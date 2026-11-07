@@ -811,7 +811,6 @@ export const W = {
   appStoreStartTimeRange: 'Daily start time goes from 04:00 to 14:00.',
   appStoreNightsRange: 'Nights go from 0 to 30.',
   appStoreCampWaterRange: 'Camp water per night goes from 0 to 5 L.',
-  appStoreBikeChoice: 'Choose a bike from your list.',
   appStoreWaterRange: 'Water goes from 0 to 20 L.',
   appStorePaceChoice: 'Pace is steady, sporting or hard.',
   appStoreStayChoice: 'Stay type is camping, mixed or accommodation.',
