@@ -223,6 +223,8 @@ body{
 .draftbar{border:1px solid var(--amber);background:var(--panel);padding:10px 12px;margin-bottom:16px;font-size:13px;color:var(--ink)}
 .draftbar.hidden{display:none}
 .draftbar .linky{margin-left:auto}
+.draftbar.quiet{border-color:var(--line)}
+#bikeFollowUndo{min-height:44px;margin-left:0}
 .result-save{margin:0 0 15px}
 .result-save span,.save-message{font-size:12px;color:var(--muted);line-height:1.45}
 .save-message{display:block;margin-top:8px;color:var(--amber)}
@@ -1602,6 +1604,46 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 .packing-disclosure>summary em{font-family:var(--mono);font-size:12px;font-style:normal;color:var(--muted);text-align:right}
 .packing-disclosure[open]>summary{border-bottom:1px solid var(--line-soft);padding-bottom:10px;margin-bottom:12px}
 @media(max-width:480px){.info-box{padding:8px}.info-card{max-height:min(560px,calc(100vh - 16px));max-height:min(560px,calc(100dvh - 16px))}.packing-disclosure>summary{grid-template-columns:minmax(0,1fr) 20px;gap:4px 10px}.packing-disclosure>summary b{grid-column:1;grid-row:1;font-size:22px}.packing-disclosure>summary em{grid-column:1;grid-row:2;text-align:left}.packing-disclosure>summary:after{grid-column:2;grid-row:1 / span 2}}
+/* The Gear advisor (sub-project 13): a view of the bag planner, built like Bike details; every choice a labelled radio of 44 px or more. */
+.advisor-box .bike-dialog-card{max-width:760px}
+.adv-bike{margin:0 0 12px}
+.adv-bike-line{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
+.adv-bike-line select{min-height:44px;max-width:100%;min-width:0;flex:1 1 180px}
+.adv-step{margin:0 0 16px}
+.adv-choices{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.adv-choice{position:relative;display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:14px;min-width:0}
+.adv-choice input{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+.adv-choice:has(input:checked){outline:2px solid var(--blaze);outline-offset:1px}
+.adv-choice:has(input:focus-visible){outline:2px solid var(--ink);outline-offset:2px}
+.adv-choice:has(input:disabled){opacity:.5;cursor:not-allowed}
+.adv-choice.adv-has-pic{flex-direction:column;justify-content:center;text-align:center}
+.adv-pic svg{display:block;width:100%;max-width:150px;height:auto}
+.adv-note,.adv-hint,.adv-start,.adv-using{font-size:14px;line-height:1.5;color:var(--muted);margin:6px 0}
+.adv-plain{font-size:15px;line-height:1.5;color:var(--ink);margin:6px 0}
+.adv-sub{font-weight:600;font-size:14px;margin:10px 0 4px}
+.adv-switch{min-height:44px}
+.adv-nights{display:flex;align-items:center;gap:8px;margin:10px 0 0;font-weight:600;font-size:14px}
+.adv-nights input{width:6em;min-height:44px}
+.adv-progress{margin:8px 0;font-size:14px;color:var(--ink)}
+.adv-list{list-style:none;display:grid;gap:12px;margin:8px 0 0}
+.adv-card{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--panel);min-width:0}
+.adv-card:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.bike-dialog-body .adv-card h5{font-size:17px;margin:0 0 4px}
+.adv-kind{margin:12px 0 0}
+.bike-dialog-body .adv-kind>h4{font-size:16px;margin:14px 0 2px}
+/* combinations side by side: a row that wraps into its own scroll at 360 px, never the page */
+.adv-combos{list-style:none;display:flex;gap:8px;margin:4px 0 10px;padding:0 0 4px;overflow-x:auto;max-width:100%;min-width:0}
+.adv-combos>li{flex:1 0 140px;max-width:240px;min-width:0}
+.adv-combo{display:flex;flex-direction:column;gap:2px;width:100%;min-height:44px;padding:6px 8px;text-align:left;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;cursor:pointer}
+.adv-combo:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.adv-combo svg{display:block;width:100%;height:auto}
+.adv-combo-what{font-weight:600;font-size:13px;line-height:1.3}
+.adv-combo-why,.adv-combo-how{font-size:12px;line-height:1.35;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.adv-tags{font-size:13px;color:var(--amber);margin:0 0 4px}
+.adv-drawing svg{display:block;width:100%;max-width:420px;height:auto;margin:6px auto}
+.adv-why{font-size:14px;line-height:1.5;margin:6px 0}
+.adv-moves{margin:0 0 0 18px;font-size:14px;line-height:1.5}
+#advisorBack.hidden{display:none}
 @media(max-width:480px){.bike-dialog-box{padding:8px}.bike-dialog-card{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px)}.bike-dialog-head,.bike-dialog-body{padding:12px}.guide-launch-row{gap:12px}}
 .walkthrough-tip{margin-top:14px;border-left:3px solid var(--sage);padding-left:10px;font-size:14px;line-height:1.6;color:var(--muted)}
 .walkthrough-actions{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;margin-top:22px}
@@ -1787,6 +1829,10 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <span id="offlineAgainText">Your offline copy is no longer on this device. Tap Make available offline to keep the bag planner with you again.</span>
     <button class="kitact" id="offlineAgainSave" type="button">Make available offline</button>
     <button class="linky" id="offlineAgainLater" type="button">Not now</button>
+  </div>
+  <div class="draftbar quiet hidden" id="bikeFollowBar" role="status">
+    <span id="bikeFollowText"></span>
+    <button class="linky hidden" id="bikeFollowUndo" type="button"></button>
   </div>
   <div class="draftbar hidden" id="tabBar" role="status">
     <span id="tabText"></span>
@@ -2128,6 +2174,8 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
           <label for="bikePads">Brake pad / block reference<input id="bikePads" type="text" maxlength="120" placeholder="Exact part or model; note front/rear if different"></label>
           <label for="bikeDrive">Drivetrain<select id="bikeDrive"><option value="unknown">Not set</option><option value="derailleur">Chain + derailleur</option><option value="chain-hub">Chain + hub gears / single speed</option><option value="belt">Belt drive</option></select></label>
           <label for="bikeShifting">Shifting<select id="bikeShifting"><option value="unknown">Not set</option><option value="cable">Cable operated</option><option value="electronic">Electronic</option><option value="none">No external shifting cable</option></select></label>
+          <label for="bikeSuspension">Suspension<select id="bikeSuspension"><option value="unknown">Not sure</option><option value="none">None</option><option value="front">Front fork</option><option value="full">Full suspension</option></select></label>
+          <div class="bike-profile-field"><label for="bikeRackMounts">Rack mounts<select id="bikeRackMounts" aria-describedby="bikeRackMountsHint"><option value="unknown">Not sure</option><option value="yes">Yes</option><option value="no">No</option></select></label><p class="hint" id="bikeRackMountsHint">Small threaded holes near the rear axle and on the seat stays, for a rack.</p></div>
           <label id="bikeChainField" for="bikeChain">Chain / quick-link reference<input id="bikeChain" type="text" maxlength="120" placeholder="Brand, chain family and speed / part number"></label>
           <label id="bikeHangerField" for="bikeHanger">Derailleur hanger reference<input id="bikeHanger" type="text" maxlength="120" placeholder="Frame-specific part or hanger type"></label>
           <label class="bike-profile-wide" for="bikeNotes">Bike notes <span class="hint">optional</span><textarea id="bikeNotes" rows="3" maxlength="1000" placeholder="e.g. valve length, spare battery or unusual tools"></textarea></label>
@@ -2154,6 +2202,18 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <p class="hint">Find it on the frame sticker, in the manual or on the maker's website. Your own weight is not asked.</p>
       <p id="mwMessage" role="status" aria-live="polite"></p>
       <div class="bike-profile-actions"><button class="go small" id="mwSave" type="button">Save</button><button class="linky" id="mwSkip" type="button">Skip</button></div>
+    </div>
+  </section>
+</div>
+<div id="advisorBox" class="bike-dialog-box bike-details-box advisor-box hidden" role="dialog" aria-modal="true" aria-labelledby="advisorTitle">
+  <section class="bike-dialog-card">
+    <header class="bike-dialog-head"><div><h2 id="advisorTitle" tabindex="-1">Gear advisor</h2><p>Which bag to get next, for your riding and your bike: types and sizes, never brands.</p><a class="linky hidden" id="advisorBack" href="/#/tools"></a></div><button type="button" id="advisorClose" aria-label="Close the Gear advisor">×</button></header>
+    <div class="bike-dialog-body" id="advisorBody">
+      <div class="adv-bike" id="advisorBike"></div>
+      <div id="advisorSteps"></div>
+      <p class="adv-progress hidden" id="advisorProgress" role="status" aria-live="polite"></p>
+      <p class="sr-only" id="advisorStatus" role="status" aria-live="polite"></p>
+      <section class="adv-answer" id="advisorAnswer"></section>
     </div>
   </section>
 </div>
@@ -2670,7 +2730,10 @@ const BIKE_PROFILE_LABELS={
   brakes:{unknown:'Not set','hydraulic-disc':'Hydraulic disc','cable-disc':'Cable disc',rim:'Rim brakes',other:'Other'},
   drive:{unknown:'Not set',derailleur:'Chain + derailleur','chain-hub':'Chain + hub gears / single speed',belt:'Belt drive'},
   shifting:{unknown:'Not set',cable:'Cable operated',electronic:'Electronic',none:'No external shifting cable'},
+  suspension:{unknown:'Not sure',none:'None',front:'Front fork',full:'Full suspension'},
+  rackMounts:{unknown:'Not sure',yes:'Yes',no:'No'},
 };
+const BIKE_PROFILE_ANSWERS=['suspension','rackMounts'];
 const BIKE_PROFILE_TEXT={name:100,frontTyre:120,rearTyre:120,padType:120,chainType:120,hangerType:120,notes:1000};
 function normalisePressureBike(value){
   const p=dataObject(value) ? value : {};
@@ -2707,8 +2770,11 @@ function normaliseBikeProfile(value){
   const profile={id:value.id};
   for(const [key,max] of Object.entries(BIKE_PROFILE_TEXT))profile[key]=dataText(value[key],max).trim();
   profile.name=profile.name || 'My bike';
-  for(const [key,labels] of Object.entries(BIKE_PROFILE_LABELS))
-    profile[key]=typeof value[key]==='string' && Object.hasOwn(labels,value[key]) ? value[key] : 'unknown';
+  for(const [key,labels] of Object.entries(BIKE_PROFILE_LABELS)){
+    const v=typeof value[key]==='string' && Object.hasOwn(labels,value[key]) ? value[key] : 'unknown';
+    // suspension and rack mounts (sub-project 11) are stored only as an answer: no field is Not sure, so a bike from before keeps its bytes
+    if(v!=='unknown' || !BIKE_PROFILE_ANSWERS.includes(key))profile[key]=v;
+  }
   profile.pressure=normalisePressureBike(value.pressure);
   profile.fit=normaliseFit(value.fit);
   profile.maxWeight=normaliseMaxWeight(value.maxWeight);
@@ -2867,7 +2933,7 @@ function persistBikeProfileSelection(){
 }
 const BIKE_PROFILE_INPUTS={name:'bikeName',tyres:'bikeTyres',frontTyre:'bikeFrontTyre',rearTyre:'bikeRearTyre',
   valve:'bikeValve',brakes:'bikeBrakes',padType:'bikePads',drive:'bikeDrive',shifting:'bikeShifting',
-  chainType:'bikeChain',hangerType:'bikeHanger',notes:'bikeNotes'};
+  suspension:'bikeSuspension',rackMounts:'bikeRackMounts',chainType:'bikeChain',hangerType:'bikeHanger',notes:'bikeNotes'};
 // Of the tyre fields only the bike's weight is edited here (spec 7.1 item 3); the rest of bikeProfile.pressure is kept as it was saved.
 const BIKE_WEIGHT_INPUT='bikeBaseKg';
 function bikeProfileFieldVisibility(){
@@ -2921,7 +2987,13 @@ const BIKE_WORDING={
   swapUndone:{text:'{name} is back in this plan, as it was.'},
   useShown:{text:'Use this bike for this plan'},
   usingShown:{text:'Using {name} for this plan.'},
-  backTrip:{text:'Back to Trip'},backTools:{text:'Back to Tools'},backYou:{text:'Back to You'},backTyre:{text:'Back to Tyre pressure'}
+  backTrip:{text:'Back to Trip'},backTools:{text:'Back to Tools'},backYou:{text:'Back to You'},backTyre:{text:'Back to Tyre pressure'},
+  backCare:{text:'Back to Bike care'},backAdvisor:{text:'Back to the Gear advisor'},
+  // A bike chosen in Wayfinch's Tools moves the plan to it when this page opens (sub-project 11, decision 3): one quiet line and Undo.
+  followNote:{text:'Now planning for {name}, chosen in Tools ·'},
+  followUndo:{text:'Undo'},
+  followUndone:{text:'Back to planning for {name}.'},
+  followUndoneNone:{text:'Back to planning without a bike.'}
 };
 const bikeWord=(key,values={})=>BIKE_WORDING[key].text.replace(/\{(\w+)\}/g,(m,k)=>values[k]??m);
 const FIT_STYLE_NAMES={unknown:'Not sure','diamond-level':'Diamond, level top tube','diamond-sloping':'Diamond, sloping top tube',compact:'Compact',trapeze:'Trapeze',mixte:'Mixte','step-through':'Step-through','full-suspension':'Full suspension'};
@@ -3066,7 +3138,7 @@ function fillBikeProfileForm(value){
   BIKE_PROFILE_EDITOR_ID=p?.id || '';
   let newName='My bike',suffix=2;
   while(BIKE_PROFILES.some(b=>b.name===newName))newName='My bike '+suffix++;
-  for(const [key,id] of Object.entries(BIKE_PROFILE_INPUTS))$(id).value=p ? p[key] : key==='name' ? newName : BIKE_PROFILE_LABELS[key] ? 'unknown' : '';
+  for(const [key,id] of Object.entries(BIKE_PROFILE_INPUTS))$(id).value=p ? p[key] ?? 'unknown' : key==='name' ? newName : BIKE_PROFILE_LABELS[key] ? 'unknown' : '';
   $(BIKE_WEIGHT_INPUT).value=normalisePressureBike(p?.pressure).bikeKg ?? '';
   fillFitFields(p);
   BIKE_PROFILE_FORM_READY=true;
@@ -3147,23 +3219,32 @@ function renderBikeProfiles(force=false){
   $('bikeClear').disabled=!ready || !S.bikeProfile;
   ['bikeRemoveConfirm','bikeRemoveCancel'].forEach(id=>$(id).disabled=!ready);
   $('bikeProfileStatus').textContent=BIKE_PROFILE_MESSAGE;
-  const swap=liveBikeSwap();
-  $('bikeSwapNote').textContent=swap ? bikeWord('swapNote',{name:swap.prev.name}) : '';
+  const swap=liveBikeSwap(),follow=!!swap && swap.from==='tools';
+  $('bikeSwapNote').textContent=follow ? bikeWord('followNote',{name:S.bikeProfile.name}) : swap ? bikeWord('swapNote',{name:swap.prev.name}) : '';
   $('bikeSwapNote').classList.toggle('hidden',!swap);
-  $('bikeSwapUndo').textContent=swap ? bikeWord('swapUndo',{name:swap.prev.name}) : '';
+  $('bikeSwapUndo').textContent=follow ? bikeWord('followUndo') : swap ? bikeWord('swapUndo',{name:swap.prev.name}) : '';
   $('bikeSwapUndo').classList.toggle('hidden',!swap);
+  $('bikeFollowText').textContent=follow ? bikeWord('followNote',{name:S.bikeProfile.name}) : BIKE_FOLLOW_MESSAGE;
+  $('bikeFollowUndo').textContent=bikeWord('followUndo');
+  $('bikeFollowUndo').classList.toggle('hidden',!follow);
+  $('bikeFollowUndo').disabled=!ready;
+  $('bikeFollowBar').classList.toggle('hidden',!follow && !BIKE_FOLLOW_MESSAGE);
   $('bikeUseShown').textContent=bikeWord('useShown');
   $('bikeUseShown').classList.toggle('hidden',!linkHoldsBike() || !BIKE_PROFILE_EDITOR_ID);
   $('bikeUseShown').disabled=!ready;
   renderBikeKitSummary();
 }
-function useBikeProfile(value){
-  // A plan bike that is in no saved list would be gone for good: keep it, with the kit choices it set, so Undo brings it back.
+function useBikeProfile(value,how={}){
+  // A plan bike that is in no saved list would be gone for good: keep it, with the kit choices it set, so Undo brings it back. A move to
+  // the bike chosen in Wayfinch (how.follow) is not the rider's tap here: Undo is offered for any bike it replaced, or for no bike.
   const was=S.bikeProfile ? normaliseBikeProfile(S.bikeProfile) : null,next=normaliseBikeProfile(value);
-  if(was && (!next || next.id!==was.id) && !BIKE_PROFILES.some(b=>b.id===was.id)){
-    BIKE_SWAPS.push({prev:was,kit:{...S.kit},touched:{...(S.kitTouched||{})},newId:next ? next.id : null});BIKE_SWAPS.splice(0,Math.max(0,BIKE_SWAPS.length-5));
+  const wasId=was ? was.id : null,nextId=next ? next.id : null;
+  if(how.follow ? wasId!==nextId : was && wasId!==nextId && !BIKE_PROFILES.some(b=>b.id===was.id)){
+    BIKE_SWAPS.push({prev:was,kit:{...S.kit},touched:{...(S.kitTouched||{})},newId:nextId,from:how.follow ? 'tools' : null});BIKE_SWAPS.splice(0,Math.max(0,BIKE_SWAPS.length-5));
   }
+  if(!how.follow)BIKE_FOLLOW_MESSAGE='';
   S.bikeProfile=next;
+  if(!how.follow)planBikeChosen(wasId);   // never when following Wayfinch's
   applyTripKitDefaults();
   const swap=BIKE_SWAPS[BIKE_SWAPS.length-1];
   if(swap && !swap.after && swap.newId===(next ? next.id : null))swap.after={...S.kit};   // what the swap's starting choices set
@@ -3259,6 +3340,7 @@ function initialiseBikeProfiles(){
   $('bikeRemove').onclick=()=>{const p=BIKE_PROFILES.find(b=>b.id===$('bikeSavedSelect').value);if(!p)return;$('bikeRemoveQuestion').textContent=`Remove ${p.name} from saved bikes? Plans using it keep their own copy.`;$('bikeRemovePrompt').classList.remove('hidden');};
   $('bikeRemoveCancel').onclick=()=>{$('bikeRemovePrompt').classList.add('hidden');$('bikeRemove').focus({preventScroll:true});};
   $('bikeRemoveConfirm').onclick=removeSavedBike;
+  $('bikeFollowUndo').onclick=()=>{undoBikeSwap();$('stepTitle'+S.step)?.focus?.({preventScroll:true});};
   renderBikeProfiles(true);
 }
 /* ---- Look (spec 7.4 "Look", 3.7): colour, handlebar and e-bike. One tap each, shown at once on the drawing above and, for the
@@ -3266,6 +3348,7 @@ function initialiseBikeProfiles(){
 let LOOK_OPENING=null,LOOK_CHANGED=false,LOOK_NEW=null,LOOK_MESSAGE='',LOOK_PICKER_TIMER=null,LOOK_RETRY=null,LOOK_CREATING=false;
 // LINK_BIKE: Bike details was opened from the co-pilot. BIKE_SWAPS: plan bikes in no saved list that a tap replaced, newest last.
 let LINK_BIKE=false;const BIKE_SWAPS=[];
+let BIKE_FOLLOW_MESSAGE='';   // what the line at the top says after its Undo; gone with the rider's next change of the plan's bike
 // A bike opened from the co-pilot (#bike-details=...) is that bike only while it is not the plan's: no tap in it changes the plan's bike.
 function linkHoldsBike(){return LINK_BIKE && !(BIKE_PROFILE_EDITOR_ID && S.bikeProfile && S.bikeProfile.id===BIKE_PROFILE_EDITOR_ID);}
 // The replaced bike Undo can bring back: only while the plan still uses the bike that replaced it.
@@ -3283,7 +3366,9 @@ function undoBikeSwap(){
   const after=s.after || {},touched=S.kitTouched || {},riderSince=id=>!!touched[id] && !s.touched[id];
   for(const [id,before] of Object.entries(s.kit))if(Object.hasOwn(after,id) && after[id]!==before && S.kit[id]===after[id] && !riderSince(id))S.kit[id]=before;
   queueDraftSave();persistBikeProfileSelection();
-  BIKE_PROFILE_MESSAGE=bikeWord('swapUndone',{name:s.prev.name});
+  noteBikeChoicePage(S.bikeProfile ? S.bikeProfile.id : null);
+  BIKE_PROFILE_MESSAGE=s.from!=='tools' ? bikeWord('swapUndone',{name:s.prev.name}) : s.prev ? bikeWord('followUndone',{name:s.prev.name}) : bikeWord('followUndoneNone');
+  if(s.from==='tools')BIKE_FOLLOW_MESSAGE=BIKE_PROFILE_MESSAGE;
   renderBikeProfiles(true);renderKit();if(S.step===4)renderResult();drawRig();
   rememberLookOpening();renderLook();
   return true;
@@ -3702,6 +3787,7 @@ function setWayfinchBack(href){ const a=$('backToWayfinch'); if(a) a.href=href; 
 // window, that place is one step back in the history: going there leaves no extra step, so the phone's own Back never brings the
 // bag planner up again. Opened any other way (a new window, a saved link), the screen the link named takes this page's place.
 // Saves still under way finish first (a second at most); leaving the page saves the working plan (pagehide).
+function inThisPage(href){ try { return new URL(href,location.origin).pathname===location.pathname; } catch(e){ return false; } }
 function cameFromWayfinch(){
   try { const r=new URL(document.referrer); return r.origin===location.origin && r.pathname==='/' && history.length>1; } catch(e){ return false; }
 }
@@ -3710,7 +3796,9 @@ function returnToWayfinch(href,started=Date.now()){
   if(LEAVING) return;
   if(BIKE_PROFILE_BUSY && Date.now()-started<1000){ setTimeout(()=>returnToWayfinch(href,started),30); return; }
   LEAVING=true;
-  try { if(cameFromWayfinch()) history.back(); else location.replace(href); } catch(e){}
+  // a place in this page (the Gear advisor) is never one step back in Wayfinch's history; the page stays, so a later way back still goes
+  try { if(cameFromWayfinch() && !inThisPage(href)) history.back(); else location.replace(href); } catch(e){}
+  if(inThisPage(href)) LEAVING=false;
 }
 function backLinkTap(event){
   if(event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;   // a new tab or window: the link's own way
@@ -3720,7 +3808,8 @@ function backLinkTap(event){
   returnToWayfinch(href);
 }
 /* ---- Opening a bike from the co-pilot (spec 7.1 "Bikes"): #bike-details=<id>&back=<screen>[&section=look] ---- */
-const BIKE_BACKS={trip:['/#/trip','backTrip'],tools:['/#/tools','backTools'],you:['/#/you','backYou'],tyre:['/#/tools/tyre','backTyre']};
+const BIKE_BACKS={trip:['/#/trip','backTrip'],tools:['/#/tools','backTools'],you:['/#/you','backYou'],tyre:['/#/tools/tyre','backTyre'],
+  care:['/#/tools/care','backCare'],advisor:['/tools/bags/#gear-advisor','backAdvisor']};
 function bikeDetailsLink(hash){
   const m=/^#bike-details=([^&]*)((?:&[a-z]+=[^&]*)*)$/.exec(String(hash||''));
   if(!m)return null;
@@ -3736,7 +3825,7 @@ function openBikeDetailsFromLink(hash=location.hash){
   try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
   const saved=BIKE_PROFILES.find(b=>b.id===link.id),plan=S.bikeProfile && S.bikeProfile.id===link.id ? S.bikeProfile : null;
   const [href,key]=BIKE_BACKS[link.back];
-  setWayfinchBack(href);
+  if(!inThisPage(href))setWayfinchBack(href);   // the Gear advisor is in this page: Back to Wayfinch keeps going to Wayfinch
   $('bikeDetailsBack').href=href;$('bikeDetailsBack').textContent=bikeWord(key);$('bikeDetailsBack').classList.remove('hidden');
   openBikeDetails($('rigBikeDetails'),link.section==='look' ? 'look' : 'frame');
   LINK_BIKE=true;
@@ -4856,6 +4945,7 @@ async function rememberMaxWeight(change){
     try{ await persistBikeProfileSelection(); }catch(e){}
   } else if(change.maxWeight){
     S.bikeProfile = normaliseBikeProfile({ id:newBikeProfileId(), name:'My bike', ...change });   // this plan only, not a saved bike
+    planBikeChosen(null);
   } else {
     MAX_WEIGHT_SKIPPED = true;
     try{ await store.set(MAX_WEIGHT_SKIPPED_KEY, true); }catch(e){}
@@ -5340,6 +5430,544 @@ function planDiff(a, b){
   const wasOver = new Set(a.overflow.map(o => o.id));
   const placedFromOverflow = [...wasOver].filter(id => !isFood(id) && b.items[id] && !b.overflow.some(o => o.id === id));
   return { moved, placedFromOverflow };
+}
+
+/* ---- The Gear advisor (sub-project 13), the page's half: its search is /tools/bags/advisor.js (window.WayfinchAdvisor), handed the
+   planner's own bagSpec and a trial over planWith, so the frozen selection is only ever called (decision 1). Nothing here writes S or
+   storage: every reading runs on planWith's copies. ---- */
+// The inputs of one trial: these bags and decks on top of `base` (the questionnaire's trip and kit), always a fresh re-plan
+// (placements:null), so the plan as it stands and every candidate go the same way and a kept plan that has drifted since (a trip
+// changed after the last keep) never credits a re-plan's gain to a suggested bag (review of PR 60, I1). Hand placements (S.pinned) stay.
+function advisorChanges(bags, decks, base = {}){
+  return { ...base, bags:bags.map(({ hand, ...b }) => ({ ...b })), decks:{ bar:!!decks.bar, rack:!!decks.rack }, placements:null };
+}
+// The plan these bags and decks would give, as the advisor reads it.
+function advisorTrial(bags, decks, base = {}){ return planWith(advisorChanges(bags, decks, base), advisorResult); }
+// The whole plan of a trial, for the view's moves.
+function advisorPlan(bags, decks, input){ return planWith(advisorChanges(bags, decks, input.context)); }
+// Read while the trial's inputs are in place: the kit on the rack deck rides there, so its kilos count as the deck's.
+function advisorResult(plan){
+  const kgByPos = { ...plan.byPositionKg };
+  const deckKg = +deckedIds().reduce((n, id) => n + itemKg(kitById(id)), 0).toFixed(2);
+  if(deckKg > 0) kgByPos.deck = deckKg;
+  return { overL:plan.summary.overL, spillIds:[...new Set(plan.spill.map(k => k.id))], backL:backOf(plan), backKg:plan.byPositionKg.pack || 0,
+    outOfReach:plan.reach.outOfReach.length, kgByPos, items:plan.items };
+}
+// A bag holding a hand placement (S.pinned names its unit, "<uid>-<half>") is never taken out by a swap.
+function advisorHolds(b){ return Object.values(S.pinned || {}).some(key => String(key).split('-')[0] === String(b.uid)); }
+// The search's input from the plan (or the questionnaire's starting packing) and the plan's bike. `usable` is bagSpec and `trial` is
+// advisorTrial, both run with these bags in place, so the cage count and the frame floor are the ones the planner would use.
+function advisorInput(style, goal, opts = {}){
+  const q = opts.questionnaire ? advisorQuestionnaire(opts.questionnaire) : null;
+  const base = q ? q.base : {};
+  const bags = q ? q.bags : JSON.parse(JSON.stringify(S.bags)).map(b => ({ ...b, hand:advisorHolds(b) }));
+  const decks = q ? { bar:false, rack:false } : { bar:!!S.decks.bar, rack:!!S.decks.rack };
+  const seen = { base:null };
+  const inPlan = work => withInputs({ ...base, bags:bags.map(({ hand, ...b }) => ({ ...b })), decks:{ ...decks } }, work);
+  return inPlan(() => {
+    const fit = bikeFit(S.bikeProfile);
+    const reason = fit.frameBag.none || (inTriangleCount() > fit.frameBag.cageLimit ? NO_ROOM : null), floor = minShapeIdx();
+    return { style, goal, bags, decks, camping:camping(), nextUid:q ? q.nextUid : S.nextUid,
+      frameShapes:reason ? [] : fit.frameBag.shapes.filter(s => s.shape >= floor).map(s => ({ shape:s.shape, L:s.L, source:s.source })),
+      frameReason:reason,
+      topSlotsFree:TOP_ORDER.filter(s => !bags.some(b => b.pos === 'top' && (b.slot || 'front') === s)),
+      rackMounts:S.bikeProfile ? S.bikeProfile.rackMounts : undefined,   // Not sure is no field (sub-project 11)
+      frameSize:fit.size, seatGapCm:fit.seatGapCm,
+      usable:bag => inPlan(() => { const r = bagSpec(bag); return { ok:r.usable, reason:r.reason, ...(r.band ? { band:r.band } : {}) }; }),
+      // the search's first trial is its base, the plan as the chosen style reads it: kept for the view's moves and reasons
+      trial:(b, d) => { const r = advisorTrial(b, d, base); if(!seen.base) seen.base = { bags:b.map(({ hand, ...x }) => ({ ...x })), decks:{ bar:!!d.bar, rack:!!d.rack }, result:r }; return r; },
+      context:base, fromQuestionnaire:!!q, seen };
+  });
+}
+// The questionnaire, for a rider with no bags in the plan (decision 5): a 15 L backpack (the planner's default) holding what it can, the
+// trip's nights and sleep, tripKitDefaults' kit; light is Lightweight with each item's lightest tier, average Comfortable with the
+// default kit, a lot Comfortable with the bulkiest tier. The riding picks step 1's setup by DECIDED.ridingSetup (advisor.js).
+function advisorQuestionnaire(a){
+  const nights = Math.max(0, Math.min(30, Math.round(+a.nights || 0))), sleep = a.sleep === 'indoor' ? 'indoor' : 'camp';
+  const pick = a.carry === 'light' ? (t => [...t].sort((x, y) => x.kg - y.kg || x.L - y.L)[0])
+    : a.carry === 'lot' ? (t => [...t].sort((x, y) => y.L - x.L || y.kg - x.kg)[0]) : null;
+  const custom = {};
+  if(pick) KIT.forEach(k => { if(k.tiers && k.tiers.length){ const t = pick(k.tiers); custom[k.id] = { L:t.L, kg:t.kg, rigid:t.rigid }; } });
+  return { bags:[{ uid:1, pos:'pack', L:POSITIONS.pack.defL }], nextUid:2,
+    base:{ kit:tripKitDefaults(nights, sleep, S.bikeProfile), nights, sleep, mode:a.carry === 'light' ? 'light' : 'comfort', custom,
+      qty:{}, pinned:{}, placements:null, carried:{} } };
+}
+
+/* ---- The Gear advisor's view (#gear-advisor, design §2): the plan's bike, three steps and the answer. It reads the plan and never
+   changes it; the rider's choices here live in ADVISOR, for this visit only. ---- */
+const ADVISOR_WORDING = {
+  step1:{text:'1. What kind of setup do you want?'},
+  styleBags:{text:'Bikepacking bags only'}, styleBagsFirst:{text:'Bags first, panniers only if needed'}, stylePanniers:{text:'Panniers are fine'},
+  noMounts:{text:"Your bike has no rack mounts, so no rack or panniers are offered."},
+  rackKept:{text:'Your bike is set to no rack mounts, but your plan has a rack: it stays in these suggestions.'},
+  step2:{text:'2. What should get better'},
+  goalHandling:{text:'Better handling'}, goalBackpack:{text:'Get the backpack off'},
+  step3:{text:'3. What you carry'},
+  usingPlan:{text:'Using your packing: {n} items, {m} bags'},
+  toQuestionnaire:{text:'Answer a few questions instead'}, toPlan:{text:'Use my packing instead'},
+  start:{text:'Starting from a 15 L backpack, holding what it can.'},
+  riding:{text:'Riding'}, ridingRoad:{text:'Road'}, ridingGravel:{text:'Gravel'}, ridingMtb:{text:'Mountain bike trails'},
+  ridingTouring:{text:'Touring'}, ridingEveryday:{text:'Everyday'},
+  nights:{text:'Nights away'}, sleep:{text:'Nights spent'}, sleepCamp:{text:'Camping'}, sleepIndoor:{text:'Hotels'},
+  carry:{text:'You carry'}, carryLight:{text:'Light'}, carryAverage:{text:'Average'}, carryLot:{text:'A lot'},
+  bike:{text:'Bike'}, noBike:{text:'No bike chosen: the planner assumes a frame with the usual mounts.'}, forBike:{text:'For {name}'},
+  needAll:{text:'Choose all three steps to see what to get.'},
+  statusSome:{text:'{n} suggestions, best first.'}, statusOne:{text:'1 suggestion.'}, statusNothing:{text:'Nothing helps within this style.'},
+  statusCannot:{text:'No bag takes more off your back.'}, statusPartial:{text:'This search stopped early.'},
+  answerTitle:{text:'What to get'},
+  trying:{text:'Trying {n} options…'},
+  drawnWith:{text:'Your bike with {what}'}, drawnSwap:{text:'Your bike with {new} instead of your {old}'},
+  whyTitle:{text:'Why it helps:'}, movesTitle:{text:'Where your things move'},
+  backAll:{text:'Takes the {l} L off your back.'}, backSome:{text:'Takes {l} L off your back; {left} L stay there.'},
+  movesKg:{text:'Moves {kg} kg from {from} to {to}.'}, fitsOver:{text:'Fits everything that was left over.'},
+  lower:{text:'Puts the weight lower and nearer the middle of the bike.'},
+  alreadyGood:{text:'Your bags already suit this; nothing to add.'},
+  // the search answers cannot-reduce when nothing takes MIN_GAIN_BACK_L (table.ts, decision 6) or more off the back; {min} is read from it
+  cannotReduce:{text:'No bag within this style takes {min} L or more off your back: {l} L stay on your back.'},
+  nothing:{text:'Nothing helps: no single bag, swap or pair of bags fits everything within this style.'},
+  closest:{text:'Closest: {what}.'}, stillOver:{text:'Still left over: {what}.'}, closestNone:{text:'No bag can be added to this bike within this style.'},
+  partial:{text:'This search stopped early, after {n} options, so a better one may be missing.'},
+  frameNone:{text:"Frame bags aren't offered. {reason}."},
+  rackOut:{text:'With bikepacking bags only, your panniers are left out of these suggestions; your rack stays for its top deck.'},
+  minimal:{text:'Minimal'}, minimalIntro:{text:'The fewest new bags that do it.'},
+  ahead:{text:'Looking ahead'}, aheadIntro:{text:'A set that covers more, even if Minimal does it today.'},
+  aheadNone:{text:'No further bag would help much more than Minimal.'},
+  deckOwn:{text:'Put the {items} on your rack, no new bag needed'}, deckNew:{text:'A rack, with the {items} on its top deck'},
+  deckOwnBare:{text:"Use your rack's top deck, no new bag needed"}, deckNewBare:{text:'A rack with a top deck'},
+  deckOwnPlus:{text:"the {items} on your rack's top deck"}, deckOwnPlusBare:{text:"your rack's top deck"},
+  comboTitle:{text:'About the same result, with other bags. Tap one for its details.'},
+  howMore:{text:'{first}, and {n} more'}, howNone:{text:'Your things stay where they are.'},
+  rackAnd:{text:'Rack and {type}'}, rackDeckWith:{text:'with the {items} on its top deck'},
+  withDeck:{text:'{what}, {deck}'},
+  loadFailed:{text:'The Gear advisor could not load. Open the bag planner once while online, then try again.'},
+  replace:{text:'Replace your {old} with {new}'}, two:{text:'{a}, plus {b}'}, pairOf:{text:'2 × {size}'},
+  moveLine:{text:'{item}: {from} → {to}'}, leftOver:{text:'left over'}, moreMoves:{text:'and {n} more'},
+  gMiddle:{text:'the middle'}, gFork:{text:'the fork'}, gRack:{text:'the rack'}, gBar:{text:'the handlebar'}, gSeat:{text:'the seat pack'}, gBack:{text:'the back'},
+  typeTop:{text:'Top tube bag'}, typeFrame:{text:'Frame bag'}, typeFork:{text:'Fork cages'}, typeBar:{text:'Handlebar roll'},
+  typeSeat:{text:'Seat pack'}, typeRack:{text:'Panniers'}, typePack:{text:'Backpack'}, typeBottle:{text:'Bottle cage'},
+  typeForkOne:{text:'Fork cage'}, typeRackOne:{text:'Pannier'},
+};
+const advisorWord = (key, values = {}) => ADVISOR_WORDING[key].text.replace(/\{(\w+)\}/g, (m, k) => values[k] ?? m);
+const ADVISOR_TYPES = { top:'typeTop', frame:'typeFrame', fork:'typeFork', bar:'typeBar', seat:'typeSeat', rack:'typeRack', pack:'typePack', bottle:'typeBottle', bottleU:'typeBottle' };
+const ADVISOR_GROUPS = { frame:'gMiddle', top:'gMiddle', bottle:'gMiddle', bottleU:'gMiddle', fork:'gFork', rack:'gRack', deck:'gRack', bar:'gBar', seat:'gSeat', pack:'gBack' };
+// A search running longer than this shows "Trying N options…" (GA-PROGRESS).
+const ADVISOR_PROGRESS_MS = 300;
+// A slice of the search holds the page at most about this long before it hands it back (GA-PROGRESS).
+const ADVISOR_SLICE_MS = 50;
+// Kilos moved below this are not worth a line of their own.
+const ADVISOR_MOVES_KG = 0.5;
+const ADVISOR = { open:false, style:null, styleTouched:false, goal:null, source:null, q:null, answer:null, input:null, error:'', back:null };
+let ADVISOR_RUN = 0, ADVISOR_DONE = Promise.resolve(), ADVISOR_SCRIPT = null;
+
+function loadAdvisor(){
+  if(window.WayfinchAdvisor) return Promise.resolve(window.WayfinchAdvisor);
+  if(!ADVISOR_SCRIPT) ADVISOR_SCRIPT = new Promise((resolve, reject) => {
+    const script = document.createElement('script'); script.src = 'advisor.js';
+    script.onload = () => window.WayfinchAdvisor ? resolve(window.WayfinchAdvisor) : reject(Error('no advisor'));
+    script.onerror = () => { ADVISOR_SCRIPT = null; script.remove(); reject(Error('not loaded')); };
+    document.head.appendChild(script);
+  });
+  return ADVISOR_SCRIPT;
+}
+const advisorHasPlan = () => gearBags().length > 0;
+const advisorNoMounts = () => !!S.bikeProfile && S.bikeProfile.rackMounts === 'no';
+function advisorPlanCounts(){ return { n:activeKit().length, m:gearBags().reduce((t, b) => t + countOf(b), 0) }; }
+function advisorComplete(){
+  if(!ADVISOR.style || !ADVISOR.goal) return false;
+  return ADVISOR.source === 'plan' ? advisorHasPlan() : !!(ADVISOR.q && ADVISOR.q.riding && ADVISOR.q.carry);
+}
+const advisorList = xs => xs.length <= 1 ? (xs[0] || '') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1];
+const advisorRange = (a, b) => a === b ? `${a} L` : `${a}–${b} L`;
+const advisorAn = n => /^(8|11|18)(\D|$)/.test(String(n)) ? 'an' : 'a';
+function advisorShape(bag){ return bikeFit(S.bikeProfile).wedge ? 'wedge' : (FRAME_PRESETS[bag.shape] || FRAME_PRESETS[0]).label; }
+// A rack is fitted when the rider's plan has panniers or its rack deck on (advisor.js reads it the same way, before the setup applies).
+const advisorRackFitted = input => input.bags.some(b => b.pos === 'rack') || !!input.decks.rack;
+// One fork cage or one pannier is a single bag; two are a pair (the owner, 7 Nov).
+function advisorType(bag){ return advisorWord(bag.pos === 'fork' && !bag.pair ? 'typeForkOne' : bag.pos === 'rack' && !bag.pair ? 'typeRackOne' : ADVISOR_TYPES[bag.pos]); }
+// Panniers on a bike with no rack fitted come with a rack to fit (the owner's ruling of 7 Nov).
+const advisorNewRack = (bag, input) => bag.pos === 'rack' && !!input && !advisorRackFitted(input);
+// "Seat pack, 6–8 L", "Fork cages, 2 × 3–5 L", "Fork cage, 4–5 L", "Frame bag, half frame, 3 L", "Rack and panniers, 2 × 10–12 L"
+function advisorBagText(bag, range, input){
+  const type = advisorNewRack(bag, input) ? advisorWord('rackAnd', { type:advisorType(bag).toLowerCase() }) : advisorType(bag);
+  if(bag.pos === 'frame') return `${type}, ${advisorShape(bag)}, ${advisorRange(bag.L, bag.L)}`;
+  const size = advisorRange(range[0], range[1]);
+  return `${type}, ${bag.pair ? advisorWord('pairOf', { size }) : size}`;
+}
+// "a 6 L frame bag (full triangle)", "2 × 10–12 L panniers", "an 8–10 L handlebar roll", "a rack and a 10–12 L pannier"
+function advisorBagPhrase(bag, range, input){
+  const type = advisorType(bag).toLowerCase();
+  if(bag.pos === 'frame') return `${advisorAn(bag.L)} ${bag.L} L ${type} (${advisorShape(bag)})`;
+  const size = advisorRange(range[0], range[1]);
+  const phrase = bag.pair ? `${advisorWord('pairOf', { size })} ${type}` : `${advisorAn(range[0])} ${size} ${type}`;
+  return advisorNewRack(bag, input) ? 'a rack and ' + phrase : phrase;
+}
+// The rider's bag a swap takes out: "14 L seat pack", "2 × 20 L panniers".
+function advisorOldBag(s, input){
+  const old = input.bags.find(b => b.uid === s.remove);
+  return old ? `${old.pair ? '2 × ' : ''}${old.L} L ${advisorType(old).toLowerCase()}` : '';
+}
+// The rack deck, in the planner's own placement: what deckedIds puts there in this suggestion's plan. On the rack the plan has, no
+// new bag ("Put the tent on your rack, no new bag needed"); else a rack to fit. `inList`: the words inside a longer line.
+// What the planner's own deck placement puts on the rack deck with these bags and decks.
+function advisorDecked(bags, decks, input){ return withInputs(advisorChanges(bags, decks, input.context), () => deckedIds()); }
+const advisorDeckItems = (s, input) => advisorList(advisorDecked(advisorTrialBags(s, input), s.decks, input).map(id => (kitById(id) || { name:id }).name.toLowerCase()));
+function advisorDeckText(s, input, inList){
+  const items = advisorDeckItems(s, input), own = advisorRackFitted(input);
+  if(inList) return own ? (items ? advisorWord('deckOwnPlus', { items }) : advisorWord('deckOwnPlusBare')) : (items ? advisorWord('deckNew', { items }) : advisorWord('deckNewBare')).replace(/^./, c => c.toLowerCase());
+  return items ? advisorWord(own ? 'deckOwn' : 'deckNew', { items }) : advisorWord(own ? 'deckOwnBare' : 'deckNewBare');
+}
+const advisorLower = t => t.replace(/^./, c => c.toLowerCase());
+// Panniers on a rack to fit bring its top deck: what rides there, said once with that one rack (review of PR 61, I3).
+function advisorRackDeck(s, input){
+  if(!s.add.some(b => b.pos === 'rack') || advisorRackFitted(input) || !s.decks.rack) return '';
+  const items = advisorDeckItems(s, input);
+  return items ? advisorWord('rackDeckWith', { items }) : '';
+}
+// What to get, in a line (design §2). Two bags, and Looking ahead's set, give each bag at its own size, then the rack deck.
+function advisorWhat(s, input){
+  // built from its parts, the bags first, then what rides on the rack's top deck (re-check of PR 61, R1)
+  const deck = advisorRackDeck(s, input), bags = advisorWhatBags(s, input);
+  return deck ? advisorWord('withDeck', { what:bags, deck }) : bags;
+}
+function advisorWhatBags(s, input){
+  const own = b => advisorBagText(b, [b.L, b.L], input);
+  if(s.kind === 'deck') return advisorDeckText(s, input, false);
+  if(s.kind === 'swap') return advisorWord('replace', { old:advisorOldBag(s, input), new:advisorBagPhrase(s.add[0], s.rangeL, input) });
+  if(s.kind === 'add') return advisorBagText(s.add[0], s.rangeL, input);
+  const parts = s.remove !== null && s.remove !== undefined
+    ? [advisorWord('replace', { old:advisorOldBag(s, input), new:advisorBagPhrase(s.add[0], [s.add[0].L, s.add[0].L], input) }), ...s.add.slice(1).map(own)]
+    : s.add.map(own);
+  if(s.deck) parts.push(advisorDeckText(s, input, true));
+  return parts.reduce((a, b) => advisorWord('two', { a, b:advisorLower(b) }));
+}
+// The plan the search compared against: its first trial, the plan as the chosen style reads it (without a rack, no rack kit).
+function advisorBase(input){
+  if(!input.seen.base) input.seen.base = { bags:input.bags.map(({ hand, ...b }) => ({ ...b })), decks:{ ...input.decks }, result:input.trial(input.bags, input.decks) };
+  return input.seen.base;
+}
+function advisorTrialBags(s, input){ return [...advisorBase(input).bags.filter(b => b.uid !== s.remove), ...s.add].map(({ hand, ...b }) => ({ ...b })); }
+// The trial's bags in Contract 1's shape, for bike.js: planBagView, read on the trial's copies as on a finished plan.
+function advisorBagView(bags, decks, input){
+  return withInputs(advisorChanges(bags, decks, input.context), () => {
+    const step = S.step; S.step = 4;
+    try { return planBagView(); } finally { S.step = step; }
+  });
+}
+// Where things move, in the planner's own words for the bags (planDiff between the compared plan and the trial).
+function advisorMoves(s, input){
+  const base = advisorBase(input), bags = advisorTrialBags(s, input);
+  const a = advisorPlan(base.bags, base.decks, input), b = advisorPlan(bags, s.decks, input);
+  const diff = planDiff(a, b), name = id => (kitById(id) || { name:id }).name;
+  const where = (keys, list) => {
+    const labels = [...new Set(String(keys).split(',').filter(Boolean).map(k => {
+      const bag = list.find(x => String(x.uid) === k.split('-')[0]); return bag ? POSITIONS[bag.pos].label.toLowerCase() : null;
+    }).filter(Boolean))];
+    return labels.length ? advisorList(labels) : advisorWord('leftOver');
+  };
+  const lines = [];
+  // the kit the trial puts on the rack deck, which plan.items does not hold (review of PR 61, m1)
+  const was = new Set(advisorDecked(base.bags, base.decks, input)), deckTo = POSITIONS.rack.strapLabel.toLowerCase();
+  advisorDecked(bags, s.decks, input).filter(id => !was.has(id)).forEach(id =>
+    lines.push(advisorWord('moveLine', { item:name(id), from:where((a.items[id] || []).map(e => e[0]).join(','), base.bags), to:deckTo })));
+  diff.moved.forEach(m => { const from = where(m.from, base.bags), to = where(m.to, bags); if(from !== to) lines.push(advisorWord('moveLine', { item:name(m.id), from, to })); });
+  diff.placedFromOverflow.forEach(id => lines.push(advisorWord('moveLine', { item:name(id), from:advisorWord('leftOver'), to:where((b.items[id] || []).map(e => e[0]).join(','), bags) })));
+  return lines;
+}
+// Why it helps the goal, in one or two lines (design §2).
+function advisorWhy(s, input){
+  const base = advisorBase(input).result, r = s.result, out = [];
+  if(base.overL > 0 || base.spillIds.length) out.push(advisorWord('fitsOver'));
+  const off = +(base.backL - r.backL).toFixed(1);
+  const left = +r.backL.toFixed(1);   // litres that round to nothing are nothing on the back
+  if(off >= 0.1) out.push(left === 0 ? advisorWord('backAll', { l:off }) : advisorWord('backSome', { l:off, left }));
+  const d = {};
+  new Set([...Object.keys(base.kgByPos), ...Object.keys(r.kgByPos)]).forEach(p => {
+    const g = ADVISOR_GROUPS[p]; if(g) d[g] = (d[g] || 0) + (r.kgByPos[p] || 0) - (base.kgByPos[p] || 0);
+  });
+  const from = Object.entries(d).filter(([, v]) => v < -0.05).sort((x, y) => x[1] - y[1]);
+  const to = Object.entries(d).filter(([, v]) => v > 0.05).sort((x, y) => y[1] - x[1]);
+  const kg = +Math.min(to.reduce((n, [, v]) => n + v, 0), -from.reduce((n, [, v]) => n + v, 0)).toFixed(1);
+  if(from.length && to.length && kg >= ADVISOR_MOVES_KG) out.push(advisorWord('movesKg', { kg, from:advisorList(from.map(([g]) => advisorWord(g))), to:advisorList(to.map(([g]) => advisorWord(g))) }));
+  else if(input.goal === 'handling' && !out.length) out.push(advisorWord('lower'));
+  return out;
+}
+// "Your bike with fork cages, 2 × 5 L"; a swap: "Your bike with a 15 L handlebar roll instead of your 12 L handlebar roll"; the rack
+// deck: "Your bike with the tent and sleeping mat on your rack's top deck".
+function advisorDrawnName(s, input){
+  if(s.kind === 'deck') return advisorWord('drawnWith', { what:advisorDeckText(s, input, true) });
+  if(s.remove === null || s.remove === undefined) return advisorWord('drawnWith', { what:advisorLower(advisorWhat(s, input)) });
+  const news = s.add.map((b, i) => advisorBagPhrase(b, i === 0 && s.kind === 'swap' ? s.rangeL : [b.L, b.L], input));
+  if(s.deck) news.push(advisorDeckText(s, input, true));
+  return advisorWord('drawnSwap', { new:advisorList(news), old:advisorOldBag(s, input) });
+}
+// One suggestion's card: what to get, its tags, the bike drawn with it, why it helps and where things move.
+// What one suggestion shows, read once: its bike view (for the card and its sketch) and where things move.
+function advisorShown(s, input){ return { view:advisorBagView(advisorTrialBags(s, input), s.decks, input), moves:advisorMoves(s, input) }; }
+function advisorCardHtml(s, input, i, shown0 = advisorShown(s, input)){
+  const tags = s.tags.length ? `<p class="adv-tags">${s.tags.map(htmlEsc).join(' · ')}</p>` : '';
+  const art = bikeDrawing(S.bikeProfile, shown0.view, { theme:bikeTheme(), idPrefix:'adv' + i });
+  const moves = shown0.moves, shown = moves.slice(0, 8);
+  if(moves.length > shown.length) shown.push(advisorWord('moreMoves', { n:moves.length - shown.length }));
+  return `<article class="adv-card" tabindex="0" aria-labelledby="advS${i}"><h5 id="advS${i}">${htmlEsc(advisorWhat(s, input))}</h5>${tags}`
+    // the drawing is named by its bag; the bike image inside, which names only the bike, is hidden
+    + `<div class="adv-drawing" role="img" aria-label="${htmlEsc(advisorDrawnName(s, input))}">${art ? art.svg.replace(/^<svg\b/, '<svg aria-hidden="true"') : ''}</div>`
+    + `<p class="adv-why"><strong>${advisorWord('whyTitle')}</strong> ${advisorWhy(s, input).map(htmlEsc).join(' ')}</p>`
+    + (shown.length ? `<p class="adv-sub">${advisorWord('movesTitle')}</p><ul class="adv-moves">${shown.map(l => `<li>${htmlEsc(l)}</li>`).join('')}</ul>` : '')
+    + '</article>';
+}
+function advisorSuggestionHtml(s, input, i, shown){ return `<li class="adv-sugg">${advisorCardHtml(s, input, i, shown)}</li>`; }
+// Combinations that reach about the same result, side by side (the owner's ruling on PR 61): the planner's own bike drawing of each,
+// a button named by its bags, with one line on why and one on how; pressing it brings its card. `list`: [suggestion, card index, shown].
+function advisorCombosHtml(list, input, key){
+  return `<p class="adv-sub" id="advCombo${key}">${advisorWord('comboTitle')}</p><ul class="adv-combos" aria-labelledby="advCombo${key}">`
+    + list.map(([s, i, shown]) => {
+      const art = bikeDrawing(S.bikeProfile, shown.view, { theme:bikeTheme(), idPrefix:'advc' + i });
+      const why = advisorWhy(s, input)[0] || advisorWord('lower');
+      const how = shown.moves.length ? (shown.moves.length > 1 ? advisorWord('howMore', { first:shown.moves[0], n:shown.moves.length - 1 }) : shown.moves[0]) : advisorWord('howNone');
+      return `<li><button type="button" class="adv-combo" data-card="advS${i}" aria-label="${htmlEsc(advisorDrawnName(s, input))}" aria-describedby="advCw${i} advCh${i}">`
+        + (art ? art.svg.replace(/^<svg\b/, '<svg aria-hidden="true"') : '')
+        + `<span class="adv-combo-what" aria-hidden="true">${htmlEsc(advisorWhat(s, input))}</span>`
+        + `<span class="adv-combo-why" id="advCw${i}">${htmlEsc(why)}</span><span class="adv-combo-how" id="advCh${i}">${htmlEsc(how)}</span></button></li>`;
+    }).join('') + '</ul>';
+}
+// Two kinds of answer, each labelled (the owner, 7 Nov): Minimal, the fewest new bags that do it, and Looking ahead, a set that covers more.
+function advisorTwoKindsHtml(answer, input){
+  const n = answer.items.length, same = answer.minimalSame || [], alts = answer.ahead ? (answer.aheadAlts || []) : [];
+  const shown = answer.items.map(s => advisorShown(s, input));
+  const aheads = answer.ahead ? [answer.ahead, ...alts] : [], aheadShown = aheads.map(s => advisorShown(s, input));
+  return `<section class="adv-kind" aria-labelledby="advMinT"><h4 id="advMinT">${advisorWord('minimal')}</h4><p class="adv-note">${advisorWord('minimalIntro')}</p>`
+    + (same.length >= 2 ? advisorCombosHtml(same.map(i => [answer.items[i], i, shown[i]]), input, 'Min') : '')
+    + `<ol class="adv-list">${answer.items.map((s, i) => advisorSuggestionHtml(s, input, i, shown[i])).join('')}</ol></section>`
+    + `<section class="adv-kind" aria-labelledby="advAheadT"><h4 id="advAheadT">${advisorWord('ahead')}</h4>`
+    + (answer.ahead ? `<p class="adv-note">${advisorWord('aheadIntro')}</p>`
+      + (alts.length ? advisorCombosHtml(aheads.map((s, k) => [s, n + k, aheadShown[k]]), input, 'Ahead') : '')
+      + aheads.map((s, k) => `<div class="adv-sugg adv-ahead">${advisorCardHtml(s, input, n + k, aheadShown[k])}</div>`).join('')
+      : `<p class="adv-plain">${advisorWord('aheadNone')}</p>`) + '</section>';
+}
+function advisorAnswerHtml(answer, input){
+  const notes = [];
+  if(input.fromQuestionnaire) notes.push(advisorWord('start'));
+  if(input.style === 'bags' && input.bags.some(b => b.pos === 'rack')) notes.push(advisorWord('rackOut'));
+  if(advisorNoMounts() && advisorRackFitted(input)) notes.push(advisorWord('rackKept'));
+  if(answer.frameReason) notes.push(advisorWord('frameNone', { reason:answer.frameReason }));
+  if(answer.partial) notes.push(advisorWord('partial', { n:answer.tried }));
+  let body = '';
+  if(answer.kind === 'suggestions') body = advisorTwoKindsHtml(answer, input);
+  else if(answer.kind === 'already-good') body = `<p class="adv-plain">${advisorWord('alreadyGood')}</p>`;
+  else if(answer.kind === 'cannot-reduce') body = `<p class="adv-plain">${advisorWord('cannotReduce', { min:window.WayfinchAdvisor.MIN_GAIN_BACK_L, l:+answer.backL.toFixed(1) })}</p>`;
+  else {
+    const c = answer.closest, lines = [advisorWord('nothing')];
+    if(c){
+      const left = [c.result.overL > 0 ? `${+c.result.overL.toFixed(1)} L` : '', c.result.spillIds.map(id => (kitById(id) || { name:id }).name).join('; ')].filter(Boolean);
+      lines.push(advisorWord('closest', { what:advisorWhat(c, input) }));
+      if(left.length) lines.push(advisorWord('stillOver', { what:left.join(': ') }));
+    } else lines.push(advisorWord('closestNone'));
+    body = lines.map(l => `<p class="adv-plain">${htmlEsc(l)}</p>`).join('');
+  }
+  return `<h3 id="advisorAnswerTitle">${advisorWord('answerTitle')}</h3>${notes.map(n => `<p class="adv-note">${htmlEsc(n)}</p>`).join('')}${body}`;
+}
+
+function advisorChoice(name, value, label, checked, opts = {}){
+  return `<label class="adv-choice${opts.pic ? ' adv-has-pic' : ''}"><input type="radio" name="${name}" value="${value}"${checked ? ' checked' : ''}${opts.disabled ? ' disabled' : ''}>`
+    + `${opts.pic || ''}<span>${htmlEsc(label)}</span></label>`;
+}
+function advisorGroup(id, label, html){ return `<p class="adv-sub" id="${id}">${htmlEsc(label)}</p><div class="adv-choices" role="radiogroup" aria-labelledby="${id}">${html}</div>`; }
+// Step 1's small bikes: the rider's bike with bikepacking bags, with a frame bag and seat pack, and with a rack and panniers.
+function advisorStylePic(kind, i){
+  const items = kind === 'panniers' ? [{ pos:'rack', L:15, pair:true, fill:0 }]
+    : kind === 'bags' ? [{ pos:'frame', L:4.5, shape:1, fill:0 }, { pos:'seat', L:10, fill:0 }, { pos:'bar', L:10, fill:0 }]
+    : [{ pos:'frame', L:4.5, shape:1, fill:0 }, { pos:'seat', L:10, fill:0 }];
+  const art = bikeDrawing(S.bikeProfile, { items, decks:{ bar:null, rack:null }, bottles:[] }, { theme:bikeTheme(), idPrefix:'advp' + i });
+  return art ? `<span class="adv-pic" aria-hidden="true">${art.svg}</span>` : '';
+}
+function advisorStepsHtml(){
+  const A = ADVISOR, q = A.q;
+  // no rack mounts and no rack in the plan: no rack or panniers, and the line says why (a rack the plan has stays: rackKept)
+  const noMounts = advisorNoMounts() && !(A.source === 'plan' && advisorRackFitted({ bags:S.bags, decks:S.decks }));
+  const styles = [['bags', 'styleBags'], ['bags-first', 'styleBagsFirst'], ['panniers', 'stylePanniers']].map(([v, k], i) =>
+    advisorChoice('advStyle', v, advisorWord(k), A.style === v, { pic:advisorStylePic(v, i) })).join('');
+  const goals = [['handling', 'goalHandling'], ['backpack', 'goalBackpack']].map(([v, k]) => advisorChoice('advGoal', v, advisorWord(k), A.goal === v)).join('');
+  let carried;
+  if(A.source === 'plan'){
+    const c = advisorPlanCounts();
+    carried = `<p class="adv-using">${advisorWord('usingPlan', c)}</p><button type="button" class="linky adv-switch" id="advSource" data-source="questionnaire">${advisorWord('toQuestionnaire')}</button>`;
+  } else {
+    const radios = (name, list, value) => list.map(([v, k]) => advisorChoice(name, v, advisorWord(k), value === v)).join('');
+    carried = `<p class="adv-start">${advisorWord('start')}</p>`
+      + (advisorHasPlan() ? `<button type="button" class="linky adv-switch" id="advSource" data-source="plan">${advisorWord('toPlan')}</button>` : '')
+      + advisorGroup('advRidingT', advisorWord('riding'), radios('advRiding', [['road', 'ridingRoad'], ['gravel', 'ridingGravel'], ['mtb', 'ridingMtb'], ['touring', 'ridingTouring'], ['everyday', 'ridingEveryday']], q.riding))
+      + `<label class="adv-nights" for="advNights">${advisorWord('nights')}<input id="advNights" type="number" inputmode="numeric" min="0" max="30" step="1" value="${q.nights}"></label>`
+      + (q.nights > 0 ? advisorGroup('advSleepT', advisorWord('sleep'), radios('advSleep', [['camp', 'sleepCamp'], ['indoor', 'sleepIndoor']], q.sleep)) : '')
+      + advisorGroup('advCarryT', advisorWord('carry'), radios('advCarry', [['light', 'carryLight'], ['average', 'carryAverage'], ['lot', 'carryLot']], q.carry));
+  }
+  return `<section class="adv-step" aria-labelledby="advStep1"><h3 id="advStep1">${advisorWord('step1')}</h3>`
+    + `<div class="adv-choices adv-styles" role="radiogroup" aria-labelledby="advStep1">${styles}</div>`
+    + (noMounts ? `<p class="adv-note" id="advNoMounts">${advisorWord('noMounts')}</p>` : '') + '</section>'
+    + `<section class="adv-step" aria-labelledby="advStep2"><h3 id="advStep2">${advisorWord('step2')}</h3><div class="adv-choices" role="radiogroup" aria-labelledby="advStep2">${goals}</div></section>`
+    + `<section class="adv-step" aria-labelledby="advStep3"><h3 id="advStep3">${advisorWord('step3')}</h3>${carried}</section>`;
+}
+// The planner's own bike line: its saved bikes; a pick is the planner's chooseSavedBike, so the plan's bike changes as it does there.
+function advisorBikeHtml(){
+  const cur = S.bikeProfile;
+  if(!BIKE_PROFILES.length) return `<p class="adv-bike-line">${cur ? htmlEsc(advisorWord('forBike', { name:cur.name })) : advisorWord('noBike')}</p>`;
+  const own = cur && !BIKE_PROFILES.some(b => b.id === cur.id) ? `<option value="" selected>${htmlEsc(cur.name)}</option>` : !cur ? `<option value="" selected>—</option>` : '';
+  return `<label class="adv-bike-line" for="advisorBikeSelect">${advisorWord('bike')}<select id="advisorBikeSelect">${own}`
+    + BIKE_PROFILES.map(b => `<option value="${htmlEsc(b.id)}"${cur && cur.id === b.id ? ' selected' : ''}>${htmlEsc(b.name)}</option>`).join('') + '</select></label>';
+}
+// The answer is not a live region: one short status line says what changed (review of PR 60, m3), so a screen reader does not read
+// every card again after each tap.
+function advisorStatus(answer){
+  const head = answer.kind === 'suggestions' ? (answer.items.length === 1 ? advisorWord('statusOne') : advisorWord('statusSome', { n:answer.items.length }))
+    : answer.kind === 'already-good' ? advisorWord('alreadyGood') : answer.kind === 'cannot-reduce' ? advisorWord('statusCannot') : advisorWord('statusNothing');
+  return answer.partial ? head + ' ' + advisorWord('statusPartial') : head;
+}
+function renderAdvisorAnswer(){
+  const box = $('advisorAnswer'); if(!box) return;
+  box.innerHTML = ADVISOR.error ? `<p class="adv-note">${htmlEsc(ADVISOR.error)}</p>`
+    : !advisorComplete() ? `<p class="adv-hint">${advisorWord('needAll')}</p>`
+    : ADVISOR.answer ? advisorAnswerHtml(ADVISOR.answer, ADVISOR.input) : '';
+  const status = $('advisorStatus');
+  if(status) status.textContent = ADVISOR.error || (!advisorComplete() ? advisorWord('needAll') : ADVISOR.answer ? advisorStatus(ADVISOR.answer) : '');
+}
+// Re-drawn on every choice; the focused control is found again by its name and value (radios) or id, so the keyboard keeps its place.
+function renderAdvisor(){
+  if(!$('advisorSteps')) return;
+  const a = document.activeElement, box = $('advisorBox');
+  const keep = a && box.contains && box.contains(a) ? (a.name ? { name:a.name, value:a.value } : a.id ? { id:a.id } : null) : null;
+  $('advisorBike').innerHTML = advisorBikeHtml();
+  $('advisorSteps').innerHTML = advisorStepsHtml();
+  renderAdvisorAnswer();
+  if(!keep) return;
+  const el = keep.id ? $(keep.id) : [...box.querySelectorAll('input[type=radio]')].find(r => r.name === keep.name && r.value === keep.value);
+  el?.focus?.({ preventScroll:true });
+}
+function advisorProgress(n){
+  const p = $('advisorProgress'); if(!p) return;
+  p.textContent = n === null ? '' : advisorWord('trying', { n });
+  p.classList.toggle('hidden', n === null);
+}
+// One search at a time: a newer choice drops the one under way. The search hands the page back after every slice of 20 trials.
+async function runAdvisor(){
+  const id = ++ADVISOR_RUN;
+  ADVISOR.answer = null; ADVISOR.input = null; ADVISOR.error = '';
+  advisorProgress(null);
+  renderAdvisorAnswer();
+  if(!ADVISOR.open || !advisorComplete()) return;
+  let mod;
+  try { mod = await loadAdvisor(); } catch(e){ if(id === ADVISOR_RUN){ ADVISOR.error = advisorWord('loadFailed'); renderAdvisorAnswer(); } return; }
+  if(id !== ADVISOR_RUN) return;
+  const input = advisorInput(ADVISOR.style, ADVISOR.goal, ADVISOR.source === 'questionnaire' ? { questionnaire:ADVISOR.q } : {});
+  // the search hands the page back after 20 trials, or after ADVISOR_SLICE_MS of them, whichever comes first (review of PR 61, I4)
+  let sliceStart = Date.now();
+  input.handBack = () => Date.now() - sliceStart >= ADVISOR_SLICE_MS;
+  const steps = mod.adviseSteps(input), started = Date.now();
+  let answer;
+  for(;;){
+    const step = steps.next();
+    if(step.done){ answer = step.value; break; }
+    if(Date.now() - started >= ADVISOR_PROGRESS_MS) advisorProgress(step.value);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    sliceStart = Date.now();
+    if(id !== ADVISOR_RUN || !ADVISOR.open) return;
+  }
+  ADVISOR.answer = answer; ADVISOR.input = input;
+  advisorProgress(null);
+  renderAdvisorAnswer();
+}
+function setAdvisor(key, value){
+  const A = ADVISOR;
+  if(!A.q) A.q = { riding:null, nights:S.nights, sleep:S.sleep === 'indoor' ? 'indoor' : 'camp', carry:null };
+  if(key === 'style'){ A.style = value || null; A.styleTouched = !!value; }
+  else if(key === 'goal') A.goal = value || null;
+  else if(key === 'source') A.source = value === 'plan' && advisorHasPlan() ? 'plan' : 'questionnaire';
+  else if(key === 'riding'){ A.q.riding = value; if(!A.styleTouched) advisorDecided(d => { if(!A.styleTouched && A.q.riding === value) A.style = d.ridingSetup[value] || d.defaultSetup; }); }
+  else if(key === 'nights') A.q.nights = Math.max(0, Math.min(30, Math.round(+value || 0)));
+  else if(key === 'sleep') A.q.sleep = value === 'indoor' ? 'indoor' : 'camp';
+  else if(key === 'carry') A.q.carry = value;
+  renderAdvisor();
+  ADVISOR_DONE = runAdvisor();
+}
+// advisor.js's decided values (table.ts DECIDED): at once when it is loaded, else once it is, then the view is drawn again.
+// Only a change it made is drawn and searched (review of PR 61, m4): a setup the rider tapped meanwhile stays as it is.
+function advisorDecided(apply){
+  if(window.WayfinchAdvisor){ apply(window.WayfinchAdvisor.DECIDED); return; }
+  loadAdvisor().then(mod => {
+    if(!ADVISOR.open) return;
+    const before = ADVISOR.style;
+    apply(mod.DECIDED);
+    if(ADVISOR.style !== before){ renderAdvisor(); ADVISOR_DONE = runAdvisor(); }
+  }).catch(() => {});
+}
+function openAdvisor(opener = document.activeElement){
+  const A = ADVISOR, root = $('advisorBox');
+  A.open = true;
+  if(!A.q) A.q = { riding:null, nights:S.nights, sleep:S.sleep === 'indoor' ? 'indoor' : 'camp', carry:null };
+  if(!advisorHasPlan()) A.source = 'questionnaire'; else if(!A.source) A.source = 'plan';
+  if(!A.style) advisorDecided(d => { if(!A.style) A.style = d.defaultSetup; });   // Bags first, the default (the owner, 7 Nov)
+  if(root.classList.contains('hidden')){
+    closeBagPop();
+    if(!$('legalBox').classList.contains('hidden')) closeLegal();
+    if(!$('walkthroughBox').classList.contains('hidden')) closeWalkthrough();
+    root.classList.remove('hidden');
+    beginDialog(root, true, closeAdvisor, opener);
+  }
+  renderAdvisor();
+  $('advisorTitle').focus({ preventScroll:true });
+  ADVISOR_DONE = runAdvisor();
+}
+// Opened from Wayfinch (#gear-advisor&back=tools), closing it goes back there, as Bike details does.
+function closeAdvisor(){
+  ADVISOR.open = false; ADVISOR_RUN++; advisorProgress(null);
+  const root = $('advisorBox'), back = ADVISOR.back;
+  ADVISOR.back = null; $('advisorBack').classList.add('hidden');
+  if(root.classList.contains('hidden')) return;
+  root.classList.add('hidden'); endDialog(root);
+  if(back) returnToWayfinch(back);
+}
+function advisorLink(hash){
+  const m = /^#gear-advisor((?:&[a-z]+=[^&]*)*)$/.exec(String(hash || ''));
+  if(!m) return null;
+  const params = {}; for(const part of m[1].split('&').filter(Boolean)){ const [k, v] = part.split('='); params[k] = v; }
+  return { back:params.back !== 'advisor' && Object.hasOwn(BIKE_BACKS, params.back) ? params.back : null };
+}
+function openAdvisorFromLink(hash = location.hash){
+  const link = advisorLink(hash); if(!link) return false;
+  try { history.replaceState(null, '', location.pathname + location.search); } catch(e){}
+  if(link.back){
+    const [href, key] = BIKE_BACKS[link.back];
+    ADVISOR.back = href; setWayfinchBack(href);
+    $('advisorBack').href = href; $('advisorBack').textContent = bikeWord(key); $('advisorBack').classList.remove('hidden');
+  }
+  openAdvisor($('backToWayfinch'));
+  return true;
+}
+function initialiseAdvisor(){
+  const box = $('advisorBox');
+  $('advisorClose').onclick = closeAdvisor;
+  $('advisorBack').addEventListener('click', event => {
+    if(event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    const href = event.currentTarget.href; ADVISOR.back = null; closeAdvisor(); returnToWayfinch(href);
+  });
+  box.addEventListener('click', event => {
+    if(event.target === box){ closeAdvisor(); return; }
+    const sw = event.target.closest?.('#advSource'); if(sw) setAdvisor('source', sw.dataset.source);
+    // a combination's sketch brings its card, the details (the owner's ruling on PR 61)
+    const combo = event.target.closest?.('.adv-combo');
+    const card = combo && $(combo.dataset.card)?.closest('.adv-card');
+    if(card){ card.scrollIntoView({ block:'start', behavior:'smooth' }); card.focus({ preventScroll:true }); }
+  });
+  box.addEventListener('change', event => {
+    const t = event.target;
+    const keys = { advStyle:'style', advGoal:'goal', advRiding:'riding', advSleep:'sleep', advCarry:'carry' };
+    if(t.type === 'radio' && keys[t.name]) setAdvisor(keys[t.name], t.value);
+    else if(t.id === 'advNights') setAdvisor('nights', t.value);
+    else if(t.id === 'advisorBikeSelect' && t.value){
+      $('bikeSavedSelect').value = t.value;
+      Promise.resolve(chooseSavedBike()).catch(() => {}).then(() => { if(ADVISOR.open){ renderAdvisor(); ADVISOR_DONE = runAdvisor(); } });
+    }
+  });
+  window.addEventListener('hashchange', () => { if(DRAFT_READY) openAdvisorFromLink(); });
 }
 
 // Keep centilitres until the final display so small overflows never read as a fit.
@@ -9734,10 +10362,7 @@ function renderResult(){
   noteEl.oninput = () => { S.pendingSaveNote = noteEl.value; queueDraftSave(); };
   if($('saveSetup')) $('saveSetup').onclick = () => saveSetup(nameEl.value.trim(), noteEl.value.trim());
   if($('undoSetup')) $('undoSetup').onclick = undoDeleteSetup;
-  if($('useImportedDraft')) $('useImportedDraft').onclick = () => {
-    const draft = IMPORTED_DRAFT; IMPORTED_DRAFT = null;
-    restorePlan(draft, true, false); queueDraftSave();
-  };
+  if($('useImportedDraft')) $('useImportedDraft').onclick = useImportedDraft;
   if($('dismissImportedDraft')) $('dismissImportedDraft').onclick = () => {
     IMPORTED_DRAFT = null; renderResult();
   };
@@ -10342,6 +10967,11 @@ let DRAFT_LATEST_SERIAL = null, DRAFT_PENDING_SERIAL = null;
 let DRAFT_READ_KIND = 'memory';
 let DRAFT_SAVE_STATUS = {state:'loading',kind:'memory',serial:null};
 let IMPORTED_DRAFT = null, IMPORTED_SETTINGS = null, SAVE_MESSAGE = '';
+function useImportedDraft(){
+  const draft = IMPORTED_DRAFT; IMPORTED_DRAFT = null;
+  const was = S.bikeProfile ? S.bikeProfile.id : null;
+  restorePlan(draft, true, false); planBikeChosen(was); queueDraftSave();
+}
 let SETUP_ACTION = null, SETUP_COMPARE = ['', ''];
 const DELETED_SETUPS = [];
 // Keep file and parser limits identical; a full supported library fits in an export.
@@ -10424,6 +11054,65 @@ function followThemeChoice(stored){
 function noteThemeChoice(t){
   let other=null; try { other=themeRecordOf(k=>window.localStorage.getItem(k),'copilot:theme:v1','copilot'); } catch(e){}
   store.set(THEME_CHOICE_KEY,{app:'load-check',kind:'theme',v:1,theme:t,at:new Date(Math.max(Date.now(),other ? other.at+1 : 0)).toISOString()});
+}
+/* ---- One chosen bike for every tool (sub-project 11; AGENTS.md "One chosen bike for every tool"). Each app writes only its own
+   storage: this page loadcheck:bikeChoice:v1 with each change of the plan's bike a rider makes here (through store.set, so it is
+   stamped for C-DELETE), Wayfinch copilot:bikeChoice:v1; both {app, kind:'bike-choice', v:1, bikeId, at}, bikeId null for No bike.
+   The newer wins, at the same moment Wayfinch's (src/ui/tools/bike-choice.ts decides alike). In this page the chosen bike is the plan's:
+   a newer Wayfinch choice of a saved bike moves the plan to it when the page opens (start-up, a restore from the back/forward cache),
+   with one line and the bike-swap Undo (decision 3); never on a storage event, so the plan never changes under the rider's fingers. ---- */
+const BIKE_CHOICE_RECORD_KEY='loadcheck:bikeChoice:v1';
+function bikeChoiceOf(get,k,app){
+  let v=null; try { v=JSON.parse(get(k) ?? 'null'); } catch(e){ return null; }
+  if(!v || typeof v!=='object' || v.app!==app || v.kind!=='bike-choice' || v.v!==1) return null;
+  if(v.bikeId!==null && !(typeof v.bikeId==='string' && /^[a-zA-Z0-9_-]{1,100}$/.test(v.bikeId))) return null;
+  const at=typeof v.at==='string' ? Date.parse(v.at) : NaN;
+  return Number.isNaN(at) ? null : {app,bikeId:v.bikeId,at};
+}
+// The newer of the two records, Wayfinch's at the same moment; null with neither.
+function bikeChoiceNow(){
+  const get=k=>{
+    if(window.storage && k.startsWith('loadcheck:') && MEM[k]!==undefined) return JSON.stringify(MEM[k]);   // an embedding host keeps it
+    try { return window.localStorage.getItem(k); } catch(e){ return null; }
+  };
+  const theirs=bikeChoiceOf(get,'copilot:bikeChoice:v1','copilot'),mine=bikeChoiceOf(get,BIKE_CHOICE_RECORD_KEY,'load-check');
+  return theirs && mine ? (mine.at>theirs.at ? mine : theirs) : theirs || mine;
+}
+// Stamped just after Wayfinch's record when that one is dated later (a clock set wrong), so this change is the newest choice.
+function noteBikeChoicePage(bikeId){
+  let other=null; try { other=bikeChoiceOf(k=>window.localStorage.getItem(k),'copilot:bikeChoice:v1','copilot'); } catch(e){}
+  return store.set(BIKE_CHOICE_RECORD_KEY,{app:'load-check',kind:'bike-choice',v:1,bikeId,at:new Date(Math.max(Date.now(),other ? other.at+1 : 0)).toISOString()});
+}
+// Any change of the plan's bike made in this page, by any path (a pick, a setup loaded, an imported working plan, a plan-only bike,
+// Undo), is a choice made in the bag planner: written once, with the plan's bike id. The follow alone writes none.
+function planBikeChosen(wasId){
+  const id=S.bikeProfile ? S.bikeProfile.id : null,chosen=bikeChoiceNow();
+  if(wasId!==id || (chosen && chosen.bikeId!==id)) noteBikeChoicePage(id);
+}
+// The Wayfinch record this page last followed (its stamp), in the page's own key through store.set, so it is stamped for C-DELETE:
+// a record is followed at most once, so a change no record shows (an older tab) is never undone by an old choice.
+const BIKE_FOLLOWED_KEY='loadcheck:bikeFollowed:v1';
+function bikeFollowedAt(){
+  let v=null;
+  try { v=window.storage && MEM[BIKE_FOLLOWED_KEY]!==undefined ? MEM[BIKE_FOLLOWED_KEY] : JSON.parse(window.localStorage.getItem(BIKE_FOLLOWED_KEY) ?? 'null'); } catch(e){}
+  const at=dataObject(v) && v.app==='load-check' && v.kind==='bike-followed' && v.v===1 && typeof v.at==='string' ? Date.parse(v.at) : NaN;
+  return Number.isNaN(at) ? -Infinity : at;
+}
+// When the page opens (not through a Bike details link): a newer choice made in Wayfinch, of a bike saved here, not followed before,
+// becomes the plan's bike. Writes no record of its own. A plan-only bike stays: Undo lives in memory, so after a reload it would be gone.
+function followBikeChoice(){
+  if(!DRAFT_READY || DRAFT_FROZEN || BIKE_PROFILE_BUSY || DELETED_ELSEWHERE || !$('bikeDetailsBox').classList.contains('hidden')) return false;
+  const c=bikeChoiceNow();
+  if(!c || c.app!=='copilot' || c.bikeId===null || c.at<=bikeFollowedAt()) return false;
+  const seen=()=>store.set(BIKE_FOLLOWED_KEY,{app:'load-check',kind:'bike-followed',v:1,at:new Date(c.at).toISOString()});
+  // a record naming the plan's own bike is seen too: nothing moves, and a later change no record shows (an older tab) stays
+  if(S.bikeProfile && S.bikeProfile.id===c.bikeId){ seen(); return false; }
+  if(S.bikeProfile && !BIKE_PROFILES.some(b=>b.id===S.bikeProfile.id)) return false;
+  const bike=BIKE_PROFILES.find(b=>b.id===c.bikeId);if(!bike) return false;
+  useBikeProfile(bike,{follow:true});
+  persistBikeProfileSelection();
+  seen();
+  return true;
 }
 // What the working plan remembers: no theme until one was chosen (here, or in Wayfinch: the one theme). It is never applied from the
 // plan at start-up: the one theme is.
@@ -11012,7 +11701,7 @@ function followOtherTabs(event){
 window.addEventListener('storage', followOtherTabs);
 // A hidden, frozen or cached tab may never have received the storage event (rule 8).
 document.addEventListener('visibilitychange', () => { if(document.hidden) flushDraft(); else { checkOtherTabs(); followThemeChoice(); } });
-window.addEventListener('pageshow', () => { checkOtherTabs(); followThemeChoice(); });
+window.addEventListener('pageshow', event => { checkOtherTabs(); followThemeChoice(); if(event.persisted) followBikeChoice(); });
 window.addEventListener('pagehide', flushDraft);
 function showRecoveredDraft(){
   $('draftText').textContent = 'Your working plan was restored from this browser.';
@@ -11456,7 +12145,9 @@ function loadSetup(id){
   SAVE_MESSAGE=s.factor != null && Math.abs(s.factor-packEff()) > 0.0001
     ? 'Loaded '+s.name+'. This plan is recalculated with your current '+Math.round(packEff()*100)+'% packing factor; its saved prediction used '+Math.round(s.factor*100)+'%.'
     : '';
+  const was=S.bikeProfile ? S.bikeProfile.id : null;
   restorePlan(s, false);
+  planBikeChosen(was);
   queueDraftSave();
   const heading=$('stepTitle'+S.step);if(heading) heading.focus();
 }
@@ -12528,6 +13219,7 @@ function go(n){
 initialiseStableViewport();
 initialiseBikeProfiles();
 initialiseBikeDetails();
+initialiseAdvisor();
 initialiseLook();
 S.month = new Date().getMonth();   // a new plan starts in the month the rider is in, not always in June
 $('month').innerHTML = MONTHS.map((m,i) => `<option value="${i}"${i===S.month?' selected':''}>${m}</option>`).join('');
@@ -12716,12 +13408,17 @@ window.applyCalibration = applyCalibration;
   DRAFT_SIGNATURE = JSON.stringify(captureDraft());
   DRAFT_READY = true;
   writeLoadSummary(true);
+  // The bike chosen in Wayfinch, once the draft is restored and the bikes are loaded (decision 3); this page's own record as its store
+  // holds it. A move saves the plan, and with it a summary that differs.
+  if(window.storage) for(const k of [BIKE_CHOICE_RECORD_KEY,BIKE_FOLLOWED_KEY]){ const v=await store.get(k); if(v!==null) MEM[k]=v; }
   renderBikeProfiles(true);
   initialiseDraftSaveStatus();
   renderPackingChecklist();
   initialiseOfflinePacking();
   initialiseWalkthrough(recovered || SETUPS.length>0);
-  openBikeDetailsFromLink();
+  const linked=openBikeDetailsFromLink();
+  if(!linked) followBikeChoice();   // a visit through a Bike details link is a side trip: the plan keeps its bike
+  if(!linked) openAdvisorFromLink();   // #gear-advisor: the Gear advisor, on the plan as restored and its bike as followed
   receiveHandoff();
 })();
 

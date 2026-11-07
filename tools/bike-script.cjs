@@ -26,10 +26,20 @@ const options={
 const photoOptions={...options,stdin:{...options.stdin,
   contents:"import { openPicker } from './src/ui/bike-photo/picker.ts';\n"+'window.WayfinchBikePhoto = Object.freeze({ openPicker });\n',
   sourcefile:'bike-photo-entry.ts'}};
-let cached=null;
+// The Gear advisor's search (sub-project 13): /tools/bags/advisor.js, loaded only when the advisor opens; window.WayfinchAdvisor.
+const advisorOptions={...options,stdin:{...options.stdin,
+  contents:"import { advise, adviseSteps } from './src/core/advisor/search.ts';\nimport { DECIDED, MIN_GAIN_BACK_L, SIZE_RANGES, WEIGHTS } from './src/core/advisor/table.ts';\n"
+    +'window.WayfinchAdvisor = Object.freeze({ adviseSteps, advise, WEIGHTS, SIZE_RANGES, MIN_GAIN_BACK_L, DECIDED });\n',
+  sourcefile:'advisor-entry.ts'}};
+let cached=null,cachedAdvisor=null;
 /** The script's text, built once per process (the QA suites build many pages). */
 function bikeScriptSync(){
   if(cached===null)cached=Buffer.from(require('esbuild').buildSync(options).outputFiles[0].contents).toString('utf8');
   return cached;
 }
-module.exports={bikeScriptOptions:options,photoScriptOptions:photoOptions,bikeScriptSync};
+/** advisor.js's text, built once per process, for the QA suites' page VM (qa/app-vm.cjs). */
+function advisorScriptSync(){
+  if(cachedAdvisor===null)cachedAdvisor=Buffer.from(require('esbuild').buildSync(advisorOptions).outputFiles[0].contents).toString('utf8');
+  return cachedAdvisor;
+}
+module.exports={bikeScriptOptions:options,photoScriptOptions:photoOptions,advisorScriptOptions:advisorOptions,bikeScriptSync,advisorScriptSync};
