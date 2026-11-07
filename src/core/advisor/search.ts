@@ -30,7 +30,7 @@ export function* adviseSteps(input: AdvisorInput): Generator<number, AdvisorAnsw
   trials++;
   const baseOver = overflows(base);
   const baseScore = handlingScore(base);
-  if (input.goal === 'backpack' && !baseOver && base.backL <= NOTHING_ON_BACK_L) return { kind: 'already-good', tried: trials, frameReason };
+  if (input.goal === 'backpack' && !baseOver && base.backL <= NOTHING_ON_BACK_L) return { kind: 'already-good', tried: trials, frameReason, partial: false };
 
   const tried: Suggestion[] = [];
   const good: Suggestion[] = [];
@@ -55,10 +55,14 @@ export function* adviseSteps(input: AdvisorInput): Generator<number, AdvisorAnsw
   }
 
   const order = compareFor(input.goal);
+  const common = { tried: trials, frameReason, partial: stopped };
   if (good.length === 0) {
-    if (!baseOver) return { kind: 'already-good', tried: trials, frameReason };
+    if (!baseOver) {
+      // Get the backpack off never says "already good" while litres stay on the back (review of PR 57, I4).
+      return input.goal === 'backpack' ? { kind: 'cannot-reduce', backL: base.backL, ...common } : { kind: 'already-good', ...common };
+    }
     const closest = [...tried].sort((a, b) => a.result.overL - b.result.overL || a.result.spillIds.length - b.result.spillIds.length || order(a, b))[0] ?? null;
-    return { kind: 'nothing-helps', closest, tried: trials, frameReason };
+    return { kind: 'nothing-helps', closest, ...common };
   }
 
   const ranked = [...good].sort(order);
@@ -71,7 +75,7 @@ export function* adviseSteps(input: AdvisorInput): Generator<number, AdvisorAnsw
     items.push({ ...s, rangeL: rangeOf(s, good.filter((g) => keyOf(g) === key && g.kind === s.kind && g.remove === s.remove)) });
     if (items.length === 3) break;
   }
-  return { kind: 'suggestions', items, tried: trials, frameReason };
+  return { kind: 'suggestions', items, ...common };
 }
 
 /** The size range shown (§3.3): frame bags and two-bag suggestions at their own size; others from the valid sizes of the same suggestion. */

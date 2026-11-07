@@ -28,7 +28,11 @@ export type AdvisorInput = {
   /** Why the bike takes no frame bag, in the planner's own code (`NO_MOUNT`, `NO_ROOM`), or null. */
   frameReason: string | null;
   topSlotsFree: string[];
-  rackMounts: 'yes' | 'no' | 'unknown';
+  /** Anything but 'yes' or 'no' (sub-project 11 stores Not sure as an absent field) reads as Not sure. */
+  rackMounts: 'yes' | 'no' | 'unknown' | null | undefined;
+  /** `bikeFit(bike).size` and `.seatGapCm` (null when not measured): bagSpec's small-frame seat pack caution reads them. */
+  frameSize: string | null | undefined;
+  seatGapCm: number | null | undefined;
   usable: (bag: BagIn) => Usable;                    // the page's bagSpec
   trial: (bags: BagIn[], decks: Decks) => TrialResult; // the page's planWith
 };
@@ -41,7 +45,11 @@ export type Candidate = {
 
 export type Suggestion = Candidate & { result: TrialResult; score: number; rangeL: [number, number]; tags: string[] };
 
+/** `partial`: the search stopped at MAX_TRIALS, so the answer covers only what was tried. */
+type AnswerCommon = { tried: number; frameReason: string | null; partial: boolean };
 export type AdvisorAnswer =
-  | { kind: 'suggestions'; items: Suggestion[]; tried: number; frameReason: string | null }   // 1 to 3, best first
-  | { kind: 'already-good'; tried: number; frameReason: string | null }
-  | { kind: 'nothing-helps'; closest: Suggestion | null; tried: number; frameReason: string | null };
+  | ({ kind: 'suggestions'; items: Suggestion[] } & AnswerCommon)   // 1 to 3, best first
+  | ({ kind: 'already-good' } & AnswerCommon)
+  /** Get the backpack off only: litres stay on the back (backL) and nothing takes MIN_GAIN_BACK_L more off it. */
+  | ({ kind: 'cannot-reduce'; backL: number } & AnswerCommon)
+  | ({ kind: 'nothing-helps'; closest: Suggestion | null } & AnswerCommon);

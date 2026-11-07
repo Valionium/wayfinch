@@ -992,9 +992,9 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 
 ## Tool: Gear advisor, the search (sub-project 13, group 1)
 
-- the add phase holds each bag type at each size of SIZE_RANGES (frame bags: the bike's own shapes at their litres), fork cages and panniers as pairs (a pair is one new bag); taken positions are skipped; the top tube's second slot is offered when the first is taken; a size the planner's bagSpec refuses is dropped, and a seat pack size the seat gap calls unlikely is dropped (decision 9); new bags take uids from nextUid; panniers put the rack deck on when the trip camps [GA-CANDIDATES]
-- style without a rack: no candidate in any phase is a pannier or turns the rack deck on; the mountain bike trails answer (noPanniers) does the same under Either [GA-STYLE]
-- rack mounts no: no pannier candidate under any style; rack mounts not known: every pannier candidate carries the tag "if your bike has rack mounts" [GA-NO-MOUNTS]
+- the add phase holds each bag type at each size of SIZE_RANGES (frame bags: the bike's own shapes at their litres), fork cages and panniers as pairs (a pair is one new bag); taken positions are skipped; the top tube's second slot is offered when the first is taken; a size the planner's bagSpec refuses is dropped, and a seat pack size the seat gap calls unlikely is dropped (decision 9); new bags take uids from nextUid; panniers put the rack deck on when the trip camps; on an XS or S frame with no measured seat gap every seat pack carries the planner's own small-frame caution (bagSpec's seat note) [GA-CANDIDATES]
+- style without a rack: no candidate in any phase is a pannier or has the rack deck on, a deck the rider already has included (pending the owner's O1); the mountain bike trails answer (noPanniers) does the same under Either and With a rack [GA-STYLE]
+- rack mounts no: no pannier candidate under any style; rack mounts not known (anything but yes or no, a missing field included): every pannier candidate carries the tag "if your bike has rack mounts" [GA-NO-MOUNTS]
 - a candidate is valid only if nothing overflows (no litres and no item left over), the litres on the back do not rise by more than 0.005 L, and the must-reach items out of reach do not rise (design §3.2) [GA-VALID]
 - Get the backpack off ranks fewer litres on the back first, then fewer kilos on the back [GA-RANK-BACK]
 - Better handling ranks the lower weighted score first: the sum over every placed kilo of its position's weight in WEIGHTS (the plan's table), rounded to 0.01; 2 kg moved from the seat pack to a frame bag lowers it by 3.2 [GA-RANK-HANDLING]
@@ -1004,8 +1004,9 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - a bike that takes no frame bag (no shapes, with the planner's reason) gets no frame candidate, and the answer carries the reason [GA-FRAME-FIT]
 - the size table agrees with the real bagSpec on a bike with full details and on one with none [GA-RANGES-SPEC]
 - the search tries every single added bag, then for Better handling every swap, and two added bags only when neither gave an answer; Get the backpack off never tries a swap [GA-ORDER]
-- at most three suggestions, best first, each a different kind, position or bag taken out, at the best size of each [GA-THREE]
-- already good: for Get the backpack off when nothing is on the back, or nothing lowers its litres by at least 0.5 L; for Better handling when nothing lowers the score by at least 0.5 (decision 6) [GA-ALREADY]
+- at most three suggestions, best first, each a different bag or pair of bags to get (the positions added), at the best size of each: an add and a swap of the same bag never both show, the better one stays [GA-THREE]
+- already good: for Get the backpack off when nothing is on the back; for Better handling when the rider's things fit and nothing lowers the score by at least 0.5 (decision 6) [GA-ALREADY]
+- cannot reduce: for Get the backpack off, when the rider's things fit, litres stay on the back and nothing lowers them by at least 0.5 L, the answer says so with the litres left there, never already good [GA-CANNOT-REDUCE]
 - nothing helps: when the rider's things overflow and no candidate is valid, the answer is nothing-helps with the candidate leaving the fewest litres over as the closest [GA-NOTHING]
-- the search runs in slices: it yields the number of trials after every 20 and never runs more than MAX_TRIALS (1000) trials [GA-SLICES]
+- the search runs in slices: it yields the number of trials after every 20 and never runs more than MAX_TRIALS (1000) trials; an answer cut short there is marked partial [GA-SLICES]
 - /tools/bags/advisor.js builds as a classic script that sets window.WayfinchAdvisor, is not cached by the host, and is under 20 KB gzipped (decision 8) [GA-SIZE]

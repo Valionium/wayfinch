@@ -41,5 +41,29 @@ export function sizesOf(pos: SizedPos): number[] {
 export const MIN_GAIN_SCORE = 0.5;
 export const MIN_GAIN_BACK_L = 0.5;
 
-/** The search never runs more trials than this; it answers from what it tried. */
+/** The search never runs more trials than this; it answers from what it tried, marked partial. */
 export const MAX_TRIALS = 1000;
+
+/**
+ * The rest of the decided rules, pending the owner's O1, in one place: a different answer is an edit here.
+ * - pairIsOneBag (decision 4): fork cages and panniers, bought in pairs, count as one new bag in the ties.
+ * - forkNeedsMountsTag (decision 4): fork cages always say "needs cage mounts on the fork"; no bike field holds that.
+ * - noPanniersUnder (decision 5): the styles under which the mountain bike trails answer offers no panniers. The plan names Either;
+ *   With a rack is included too (review of PR 57, m3).
+ * - seatUnlikely / seatTight (decision 9): a seat pack size the measured seat gap calls unlikely is dropped (or 'tag': offered with
+ *   "unlikely to fit"); a tight one is offered with "tight" (or 'offer': without the word).
+ * - rackDeckWithoutRack (review of PR 57, I3; design §4 "never a pannier or rack deck"): without a rack (that style, or the trails
+ *   answer where it blocks panniers) the rider's own rack deck is 'off' in every candidate, or 'kept'.
+ * - rangeUpToL, rangeHalfLitres (design §3.3, decision 3): the range shown runs up to this many litres above the chosen size; with
+ *   rangeHalfLitres the top tube's +0.5 and +1.5 L count too (review m2), otherwise only + 1 and + 2 (the plan's literal rule).
+ */
+export const DECIDED = Object.freeze({
+  pairIsOneBag: true as boolean,
+  forkNeedsMountsTag: true as boolean,
+  noPanniersUnder: Object.freeze(['either', 'rack']) as readonly ('either' | 'rack')[],
+  seatUnlikely: 'drop' as 'drop' | 'tag',
+  seatTight: 'tag' as 'tag' | 'offer',
+  rackDeckWithoutRack: 'off' as 'off' | 'kept',
+  rangeUpToL: 2,
+  rangeHalfLitres: true as boolean,
+});
