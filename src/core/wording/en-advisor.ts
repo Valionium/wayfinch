@@ -14,6 +14,9 @@ export const GA = {
   // ---- an answer ----
   // Get the backpack off, when litres stay on the back and nothing takes 0.5 L more off it (review of PR 57, I4).
   advisorCannotReduce: 'No bag here takes more off your back.',
+  // ---- Tools' Gear advisor card (Task 9): in Tools' own lazy chunk, so the first screen carries none of it ----
+  advisorCardTitle: 'Gear advisor',
+  advisorCardLine: 'Which bag to get next, for your riding and your bike: types and sizes, never brands.',
   // ---- a size range: "6–8 L", or "6 L" when only one size is valid ----
   advisorRange: (from: number, to: number): string => (from === to ? `${from} L` : `${from}–${to} L`),
 } as const;
