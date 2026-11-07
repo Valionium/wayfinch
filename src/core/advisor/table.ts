@@ -1,5 +1,5 @@
 // The Gear advisor's fixed tables (sub-project 13 plan: decisions 2, 3, 6 and 8). The owner's changes go here only.
-import type { Pos } from './types.ts';
+import type { Pos, Setup } from './types.ts';
 
 /**
  * Better handling (decision 2; design §3.3): the weight of each placed kilo by its position. Lower is better. Kit strapped outside a
@@ -46,25 +46,38 @@ export const MAX_TRIALS = 1000;
 
 /**
  * The rest of the decided rules, pending the owner's O1, in one place: a different answer is an edit here.
- * - pairIsOneBag (decision 4): fork cages and panniers, bought in pairs, count as one new bag in the ties.
+ * - pairIsOneBag (decision 4; the owner, 7 Nov: false): a pair of fork cages or panniers is two bags, a single one; both are offered,
+ *   as separate suggestions.
  * - forkNeedsMountsTag (decision 4): fork cages always say "needs cage mounts on the fork"; no bike field holds that.
- * - noPanniersUnder (decision 5): the styles under which the mountain bike trails answer offers no panniers. The plan names Either;
- *   With a rack is included too (review of PR 57, m3).
  * - seatUnlikely / seatTight (decision 9): a seat pack size the measured seat gap calls unlikely is dropped (or 'tag': offered with
  *   "unlikely to fit"); a tight one is offered with "tight" (or 'offer': without the word).
- * - rackWithoutRack (review of PR 57, I3 and R1; design §4 "never a pannier or rack deck"): without a rack (that style, or the trails
- *   answer where it blocks panniers) nothing is on a rack: 'off' takes the rider's own panniers and rack deck out of the base trial and
- *   every candidate, so the answer compares against the rackless plan; 'kept' leaves the plan as it is.
+ * - setups, defaultSetup, ridingSetup (the owner's ruling of 7 Nov): step 1 asks "What kind of setup do you want?": Bikepacking bags
+ *   only, Bags first (panniers only if needed; the default), Panniers are fine. The questionnaire's riding picks one: touring Panniers
+ *   are fine; road, gravel and mountain bike trails Bikepacking bags only; everyday Bags first.
+ * - ownPanniersUnderBagsOnly: 'off' takes the rider's own panniers out of the plan under Bikepacking bags only, the rack they hung from
+ *   kept with its deck; 'kept' leaves them in.
+ * - backpackWholeFirst: for Get the backpack off, when one of the fewest new things that count takes everything off the back, Minimal
+ *   holds only such; otherwise all of the fewest that count by decision 6 (one bag that leaves some, and the pair that would empty the
+ *   back under Looking ahead).
+ * - newRackCounts: a rack to fit (for its deck, or for panniers when none is fitted) counts as this many new things.
  * - rangeUpToL, rangeHalfLitres (design §3.3, decision 3): the range shown runs up to this many litres above the chosen size; with
  *   rangeHalfLitres the top tube's +0.5 and +1.5 L count too (review m2), otherwise only + 1 and + 2 (the plan's literal rule).
+ * - addOrder (the owner, 7 Nov): Minimal, the fewest new things that do it, in this order, a lower number first: the rack deck (use the
+ *   rack you have; or a rack to fit, "a rack does the job"), then top tube and frame bag, then seat pack, then handlebar bag, then fork
+ *   cages, and panniers last.
  */
 export const DECIDED = Object.freeze({
-  pairIsOneBag: true as boolean,
+  pairIsOneBag: false as boolean,
   forkNeedsMountsTag: true as boolean,
-  noPanniersUnder: Object.freeze(['either', 'rack']) as readonly ('either' | 'rack')[],
   seatUnlikely: 'drop' as 'drop' | 'tag',
   seatTight: 'tag' as 'tag' | 'offer',
-  rackWithoutRack: 'off' as 'off' | 'kept',
+  setups: Object.freeze(['bags', 'bags-first', 'panniers']) as readonly Setup[],
+  defaultSetup: 'bags-first' as Setup,
+  ridingSetup: Object.freeze({ touring: 'panniers', road: 'bags', gravel: 'bags', mtb: 'bags', everyday: 'bags-first' }) as Readonly<Record<'touring' | 'road' | 'gravel' | 'mtb' | 'everyday', Setup>>,
+  ownPanniersUnderBagsOnly: 'off' as 'off' | 'kept',
+  newRackCounts: 1,
+  backpackWholeFirst: true as boolean,
   rangeUpToL: 2,
   rangeHalfLitres: true as boolean,
+  addOrder: Object.freeze({ deck: 0, top: 1, frame: 1, seat: 2, bar: 3, fork: 4, rack: 5 }) as Readonly<Record<'deck' | 'top' | 'frame' | 'seat' | 'bar' | 'fork' | 'rack', number>>,
 });

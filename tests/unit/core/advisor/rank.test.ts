@@ -12,7 +12,7 @@ function result(over: Partial<TrialResult> = {}): TrialResult {
 function suggestion(over: Partial<Suggestion> & { r?: Partial<TrialResult> } = {}): Suggestion {
   const { r, ...rest } = over;
   const res = result(r);
-  return { kind: 'add', add: [bag(10, 'seat', 8)], remove: null, decks: { rack: false, bar: false }, newBags: 1, litres: 8, tags: [],
+  return { kind: 'add', add: [bag(10, 'seat', 8)], remove: null, decks: { rack: false, bar: false }, newBags: 1, litres: 8, deck: false, tags: [],
     result: res, score: handlingScore(res), rangeL: [8, 8], ...rest };
 }
 
