@@ -38,6 +38,7 @@ describe('the tables (decisions 2, 3, 6; the plan\'s tables)', () => {
       ownPanniersUnderBagsOnly: 'off',     // Bikepacking bags only: the rider's panniers leave, the rack and its deck stay
       newRackCounts: 1,                    // a rack to fit is one new thing
       backpackWholeFirst: true,            // Get the backpack off: Minimal empties the back when anything tried does
+      backpackRealShare: 0.25,             // the owner on PR 61: Minimal only what takes a quarter of the back off, or all
       addOrder: { deck: 0, top: 1, frame: 1, seat: 2, bar: 3, fork: 4, rack: 5 }, // the owner, 7 Nov: Minimal's order
     });
     expect(Object.isFrozen(DECIDED)).toBe(true);

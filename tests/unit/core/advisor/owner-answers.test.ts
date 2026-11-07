@@ -246,3 +246,40 @@ describe('the review of PR 61', () => {
     expect(a.rangeL).toEqual([2, 4]);
   });
 });
+
+describe('the owner\'s rulings on PR 61 (7 Nov)', () => {
+  // 25.7 L on a 30 L backpack, the reviewer's case: a 2 L top tube bag takes 2 L, a 6 L frame bag 6 L, a seat pack or a bar roll 14 L.
+  const pack257 = (over: Partial<AdvisorInput> = {}) => input({ goal: 'backpack', style: 'bags', bags: [bag(1, 'pack', 30)], nextUid: 2, trial: packer(items(2, 6, 6, 6, 5.7)), ...over });
+
+  test('[GA-MINIMAL] Get the backpack off: Minimal holds only bags that take a real amount off, a quarter of the litres on the back or everything (DECIDED.backpackRealShare); the owner\'s order among those; a 2 L top tube bag never shows for 25.7 L', () => {
+    expect(DECIDED.backpackRealShare).toBe(0.25);
+    const answer = advise(pack257());
+    expect(suggestions(answer).map((s) => s.add[0]!.pos)).toEqual(['seat', 'bar']);
+    for (const s of suggestions(answer)) expect(25.7 - s.result.backL).toBeGreaterThanOrEqual(0.25 * 25.7);
+  });
+
+  test('[GA-MINIMAL] answer.minimalSame lists the Minimal suggestions reaching about the same result as the best of them (within decision 6), when two or more do; else none', () => {
+    const same = advise(pack257());
+    expect(same.kind === 'suggestions' && same.minimalSame).toEqual([0, 1]);
+    const three = advise(input({ goal: 'backpack', bags: [bag(1, 'pack', 15)], nextUid: 2, trial: packer(items(3)) }));
+    expect(three.kind === 'suggestions' && three.minimalSame).toEqual([0, 1, 2]);
+    // one suggestion: nothing side by side
+    const one = advise(input({ goal: 'backpack', bags: [bag(1, 'pack', 15)], nextUid: 2, usable: onlyAt('fork'), trial: packer(items(4)) }));
+    expect(one.kind === 'suggestions' && one.minimalSame).toEqual([]);
+  });
+
+  test('[GA-AHEAD] answer.aheadAlts: up to two more sets of other bags that reach about the same as Looking ahead, side by side with it', () => {
+    const answer = advise(input({ goal: 'backpack', style: 'bags', bags: [bag(1, 'pack', 15)], nextUid: 2, usable: onlyAt('seat', 'bar', 'fork'), trial: packer(items(8, 8, 6)) }));
+    expect(answer.kind).toBe('suggestions');
+    if (answer.kind !== 'suggestions') return;
+    const key = (s: Suggestion) => s.add.map((b) => b.pos + (b.pair ? '×2' : '')).sort().join('+');
+    expect(answer.aheadAlts.length).toBeGreaterThan(0);
+    expect(answer.aheadAlts.length).toBeLessThanOrEqual(2);
+    const keys = [answer.ahead!, ...answer.aheadAlts].map(key);
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const s of answer.aheadAlts) expect(Math.abs(s.result.backL - answer.ahead!.result.backL)).toBeLessThanOrEqual(MIN_GAIN_BACK_L);
+    // nothing to look ahead to: no alternatives either
+    const none = advise(input({ goal: 'backpack', bags: [bag(1, 'pack', 15)], nextUid: 2, trial: packer(items(3)) }));
+    expect(none.kind === 'suggestions' && none.aheadAlts).toEqual([]);
+  });
+});

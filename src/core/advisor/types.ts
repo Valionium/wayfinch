@@ -65,8 +65,12 @@ export type Suggestion = Candidate & { result: TrialResult; score: number; range
 /** `partial`: the search stopped at MAX_TRIALS, so the answer covers only what was tried. */
 type AnswerCommon = { tried: number; frameReason: string | null; partial: boolean };
 export type AdvisorAnswer =
-  /** `items`: Minimal, 1 to 3, best first; `ahead`: Looking ahead, a set that covers more, or null (owner, 7 Nov). */
-  | ({ kind: 'suggestions'; items: Suggestion[]; ahead: Suggestion | null } & AnswerCommon)
+  /**
+   * `items`: Minimal, 1 to 3, best first; `ahead`: Looking ahead, a set that covers more, or null (owner, 7 Nov). Side by side (the
+   * owner's rulings on PR 61): `minimalSame`, the indices of Minimal's suggestions that reach about the same result as the best of them
+   * (two or more, else none); `aheadAlts`, up to two more sets of other bags reaching about the same as Looking ahead.
+   */
+  | ({ kind: 'suggestions'; items: Suggestion[]; ahead: Suggestion | null; minimalSame: number[]; aheadAlts: Suggestion[] } & AnswerCommon)
   | ({ kind: 'already-good' } & AnswerCommon)
   /** Get the backpack off only: litres stay on the back (backL) and nothing takes MIN_GAIN_BACK_L more off it. */
   | ({ kind: 'cannot-reduce'; backL: number } & AnswerCommon)

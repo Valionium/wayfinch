@@ -266,3 +266,38 @@ test('[GA-STEPS] in the browser: each choice is a labelled radio of at least 44 
   await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
   await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
 });
+
+test('[GA-SCREEN] combinations side by side at this size and theme: the row of sketches never scrolls the page sideways, the keyboard reaches each sketch, each is named by its bags, and pressing one brings its card (the owner\'s ruling on PR 61)', async ({ page }) => {
+  await planner(page);
+  await gravel(page);
+  await page.evaluate("openAdvisor(document.getElementById('rigBikeDetails'))");
+  const box = page.locator('#advisorBox');
+  await box.locator('label.adv-choice', { hasText: 'Bikepacking bags only' }).click();
+  await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
+  const combos = box.locator('.adv-combos').first().locator('button.adv-combo');
+  await expect(combos.first()).toBeVisible({ timeout: 30_000 });
+  const n = await combos.count();
+  expect(n).toBeGreaterThanOrEqual(2);
+  expect(n).toBeLessThanOrEqual(3);
+  expect(await page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'no sideways page scroll').toBe(true);
+  expect(await page.evaluate('document.getElementById("advisorBody").scrollWidth <= document.getElementById("advisorBody").clientWidth'), 'nor in the dialog').toBe(true);
+  for (let k = 0; k < n; k++) {
+    const name = await combos.nth(k).getAttribute('aria-label');
+    expect(name, 'named by its bags').toMatch(/^Your bike with /);
+    expect((await combos.nth(k).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+  // the keyboard: Tab from the goal reaches each sketch
+  await box.locator('input[name="advGoal"][value="handling"]').focus();
+  const reached = new Set<string>();
+  for (let i = 0; i < 12 && reached.size < n; i++) {
+    await page.keyboard.press('Tab');
+    const card = await page.evaluate('document.activeElement.classList.contains("adv-combo") ? document.activeElement.dataset.card : ""') as string;
+    if (card) reached.add(card);
+  }
+  expect(reached.size, 'every sketch by Tab').toBe(n);
+  // Enter on a sketch brings its card, with the focus
+  const target = await combos.last().getAttribute('data-card');
+  await combos.last().focus();
+  await page.keyboard.press('Enter');
+  await expect.poll(() => page.evaluate('document.activeElement.getAttribute("aria-labelledby")')).toBe(target);
+});

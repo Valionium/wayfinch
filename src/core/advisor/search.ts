@@ -92,9 +92,15 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
   // Minimal: only the fewest new things that count (using what the rider has, the deck of a rack fitted, is none, and can be the whole
   // answer), in the owner's order, then the goal's. Get the backpack off is done when nothing stays on the back: when one of those
   // fewest does that, Minimal holds only such (DECIDED.backpackWholeFirst).
+  // Get the backpack off: only what takes a real amount off, a share of the litres on the back or everything (the owner's ruling on
+  // PR 61, I2; DECIDED.backpackRealShare); when nothing does, all that count.
   const whole = (x: Suggestion) => x.result.backL <= NOTHING_ON_BACK_L;
-  const fewest = Math.min(...good.map((g) => g.newBags));
-  const fewestGood = good.filter((g) => g.newBags === fewest);
+  const real = (x: Suggestion) => input.goal !== 'backpack' || base.backL <= NOTHING_ON_BACK_L || whole(x)
+    || base.backL - x.result.backL >= DECIDED.backpackRealShare * base.backL - EPS;
+  const realGood = good.filter(real);
+  const minimalPool = realGood.length > 0 ? realGood : good;
+  const fewest = Math.min(...minimalPool.map((g) => g.newBags));
+  const fewestGood = minimalPool.filter((g) => g.newBags === fewest);
   const wholeGood = input.goal === 'backpack' && DECIDED.backpackWholeFirst ? fewestGood.filter(whole) : [];
   const ranked = (wholeGood.length > 0 ? wholeGood : fewestGood).sort(compareMinimal(input.goal));
   const items: Suggestion[] = [];
@@ -156,10 +162,30 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
     }
   }
   // the range shown: a counting add or swap from the pool as Minimal shows one (review of PR 61, m3); a set at its own sizes
-  const ahead = best && { ...best, rangeL: best.kind === 'add' || best.kind === 'swap'
-    ? rangeOf(best, good.filter((g) => keyOf(g) === keyOf(best!) && g.kind === best!.kind && g.remove === best!.remove))
-    : [best.add[0]?.L ?? 0, best.add[0]?.L ?? 0] as [number, number] };
-  return { kind: 'suggestions', items, ahead, tried: trials, frameReason, partial: stopped };
+  const shown = (x: Suggestion): Suggestion => ({ ...x, rangeL: x.kind === 'add' || x.kind === 'swap'
+    ? rangeOf(x, good.filter((g) => keyOf(g) === keyOf(x) && g.kind === x.kind && g.remove === x.remove))
+    : [x.add[0]?.L ?? 0, x.add[0]?.L ?? 0] });
+  const ahead = best && shown(best);
+
+  // Side by side (the owner's rulings on PR 61): combinations reaching about the same result, within decision 6.
+  const value = (x: Suggestion) => (input.goal === 'backpack' ? x.result.backL : x.score);
+  const within = input.goal === 'backpack' ? MIN_GAIN_BACK_L : MIN_GAIN_SCORE;
+  const bestValue = Math.min(...items.map(value));
+  const near = items.map((x, k) => (value(x) - bestValue <= within + EPS ? k : -1)).filter((k) => k >= 0);
+  const minimalSame = near.length >= 2 ? near : [];
+  const combo = (x: Suggestion) => [...x.add.map((b) => b.pos + (b.pair ? '×2' : '')), ...(x.deck ? ['deck'] : [])].sort().join('+')
+    + (x.remove === null ? '' : '-' + x.remove);
+  const aheadAlts: Suggestion[] = [];
+  if (ahead) {
+    const seen = new Set([combo(ahead)]);
+    for (const x of [...pool].sort((a, b) => order(a, b) || byOwnerOrder(a, b))) {
+      if (aheadAlts.length === 2) break;
+      if (seen.has(combo(x)) || Math.abs(value(x) - value(ahead)) > within + EPS) continue;
+      seen.add(combo(x));
+      aheadAlts.push(shown(x));
+    }
+  }
+  return { kind: 'suggestions', items, ahead, minimalSame, aheadAlts, tried: trials, frameReason, partial: stopped };
 }
 
 function suggestion(c: Candidate, result: TrialResult): Suggestion {
