@@ -22,7 +22,7 @@ export const ROAD_FIGURES: Record<string, RoadFigure[]> = {
   'puncture-tubeless': [
     f('problem', 'Puncture (tubeless)'), f('checkFirst', 'Spin the hole to the bottom so sealant plugs it'), f('checkFirst', 'Is it still hissing?'),
     step(0, 'spin it to the bottom'), step(1, 'Pull out the thorn or glass'), step(2, 'Ream the hole'), step(3, 'Trim the plug'),
-    step(4, 'a few minutes'), step(5, 'fit a spare tube'), step(5, 'remove the valve core'), step(6, 'work loose'),
+    step(4, 'a few minutes'), step(5, 'fit a spare tube'), step(5, 'remove the tubeless valve'), step(6, 'work loose'),
     f('rideOn', 'Fine once it holds air'), f('rideOn', 'Stop if the sidewall is cut or the tyre bulges'),
   ],
   'chain-broken': [
@@ -33,17 +33,24 @@ export const ROAD_FIGURES: Record<string, RoadFigure[]> = {
   ],
   'spoke-snapped': [
     f('problem', 'Snapped spoke'), f('checkFirst', 'Is only one spoke gone, and does the rim still turn?'),
-    step(0, 'Wrap the broken spoke around a good neighbour or tape it'), step(1, 'Open the brake quick release if the rim rubs'),
-    step(2, 'Ride slowly to a shop'),
+    step(0, 'Wrap the broken spoke around a good neighbour or tape it'), step(1, "Rim brakes: if the rim rubs, open the brake's quick release"),
+    step(1, "the small lever on the brake, not the wheel's"),
+    step(1, 'Until you close it again, this brake works much less: ride slowly and use the other brake.'),
+    step(2, 'Disc brakes: check the wheel turns without touching the brake; if it rubs, ride slowly.'),
+    step(3, 'Ride slowly to a shop'), step(4, "Rim brakes: close the brake's quick release once the wheel is fixed."),
     f('rideOn', 'Fine for a slow ride home if only one spoke has gone and the rim turns'),
-    f('rideOn', 'Walk if the wheel is badly bent, or more than a few spokes are gone'), f('rideOn', 'Wheels are critical'),
+    f('rideOn', 'Walk if the wheel is badly bent, or more than one spoke has gone'),
+    f('rideOn', "With a brake's quick release open, that brake works much less"), f('rideOn', 'Wheels are critical'),
   ],
   'brake-rub-rim': [
     f('problem', 'Brake rubbing'), f('checkFirst', 'Is the wheel straight in the frame?'), f('checkFirst', 'Is the pad touching one side?'),
     f('checkFirst', 'Is the rim bent?'), f('checkFirst', 'Is the tyre bead seated?'),
-    step(0, 'tighten the quick release'), step(1, 'let the air out, seat it, pump up'), step(2, 'Squeeze the lever to centre the brake'),
-    step(2, 'tighten the arm bolt'), step(2, 'pads should sit parallel to the rim'), step(3, 'not touching the tyre or spokes'),
-    step(4, 'Open the quick release only if you must and ride slowly'),
+    step(0, "tighten the wheel's quick release"), step(1, 'let the air out, seat it, pump up'),
+    step(2, "Loosen the brake's mounting bolt"), step(2, 'squeeze the lever to hold the pads on the rim'), step(2, 'then tighten the bolt'),
+    step(2, 'pads should sit parallel to the rim'), step(3, 'not touching the tyre or spokes'),
+    step(4, "Open the brake's quick release only if you must and ride slowly"),
+    step(4, 'Until you close it again, this brake works much less: ride slowly and use the other brake.'),
+    step(5, "Close the brake's quick release once the wheel is fixed."),
     f('rideOn', 'Fine if light rub'), f('rideOn', 'Walk if the wheel is bent or the brake will not stop you'),
   ],
   'brake-rub-disc': [
@@ -54,9 +61,9 @@ export const ROAD_FIGURES: Record<string, RoadFigure[]> = {
     f('rideOn', 'Fine for light rub'), f('rideOn', 'Stop if the disc is bent hard or the brake feels odd'), f('rideOn', 'Brakes are critical'),
   ],
   'brake-weak-rim': [
-    f('problem', 'Brakes not biting'), f('checkFirst', 'Wet or dirty rim?'), f('checkFirst', 'Brake quick release open?'),
+    f('problem', 'Brakes not biting'), f('checkFirst', 'Wet or dirty rim?'), f('checkFirst', "Brake's quick release open?"),
     f('checkFirst', 'Pads worn or hitting the tyre?'),
-    step(0, 'Wipe the rim and pads'), step(1, 'brake quick release is closed'), step(2, 'barrel adjuster'), step(3, 'cable clamp is tight'),
+    step(0, 'Wipe the rim and pads'), step(1, "brake's quick release is closed"), step(2, 'barrel adjuster'), step(3, 'cable clamp is tight'),
     step(3, 'pads are tight on the arms'), step(3, 'sit square on the rim'), step(4, 'gone grooves or a scraping noise'),
     f('rideOn', 'Walk if the brakes will not stop you'), f('rideOn', 'Brakes are critical'),
   ],
@@ -64,7 +71,7 @@ export const ROAD_FIGURES: Record<string, RoadFigure[]> = {
     f('problem', 'Disc brakes not biting'), f('checkFirst', 'Oil on the pads?'), f('checkFirst', 'Worn pads (a grinding noise)?'),
     f('checkFirst', 'Lever pulling to the bar?'),
     step(0, 'squeal, hard lever, dark smeary pads'), step(0, 'pads soaked in oil cannot be saved'), step(0, 'A grinding noise means worn pads'),
-    step(1, 'replace oily or worn pads'), step(2, 'pad adjuster knobs'), step(3, 'pump the lever'), step(3, 'it needs a bleed'),
+    step(1, 'replace oily or worn pads'), step(1, 'Never touch the disc or pads with your fingers'), step(2, 'pad adjuster knobs'), step(3, 'pump the lever'), step(3, 'it needs a bleed'),
     step(4, 'Walk the hills'),
     f('rideOn', 'Walk if the lever hits the bar or the brakes will not stop you'), f('rideOn', 'Brakes are critical'),
     f('rideOn', 'a mistake can cause a crash'),
@@ -76,8 +83,10 @@ export const ROAD_FIGURES: Record<string, RoadFigure[]> = {
   ],
   'bolt-loose': [
     f('problem', 'Loose bolt or rattle'), f('checkFirst', 'Which part moves when you shake it?'),
-    step(1, 'until firm, not forced'), step(2, 'do not twist them to test'), step(2, 'torque printed on the part'),
-    step(2, 'set with a torque wrench'), step(2, 'if unsure, a shop'), step(3, 'Re-check after a short ride'),
+    step(0, 'do not twist them to test'), step(0, 'torque printed on the part'), step(0, 'set with a torque wrench'),
+    step(0, 'if unsure, a shop'), step(1, 'Find the bolt by feel'),
+    step(2, 'Tighten to the torque printed on the part'), step(2, 'Without a torque wrench, only snug it, and have it checked'),
+    step(3, 'Re-check after a short ride'),
     f('rideOn', 'Fine for most bolts once tight'), f('rideOn', 'Stop if a stem, bar or steerer bolt will not tighten'), f('rideOn', 'Critical'),
   ],
   'tyre-torn': [
@@ -96,7 +105,7 @@ export const ROAD_FIGURES: Record<string, RoadFigure[]> = {
 
 /** The draft's full step counts per card (so a step cannot be merged or cut unseen). */
 export const ROAD_STEP_COUNTS: Record<string, number> = {
-  'puncture-tube': 7, 'puncture-tubeless': 7, 'chain-broken': 6, 'spoke-snapped': 3, 'brake-rub-rim': 5, 'brake-rub-disc': 5,
+  'puncture-tube': 7, 'puncture-tubeless': 7, 'chain-broken': 6, 'spoke-snapped': 5, 'brake-rub-rim': 6, 'brake-rub-disc': 5,
   'brake-weak-rim': 5, 'brake-weak-disc': 5, 'gears-skipping': 4, 'bolt-loose': 4, 'tyre-torn': 4, 'ebike-no-power': 5,
 };
 
@@ -108,15 +117,15 @@ export const ROAD_CARRY: Record<string, string[]> = {
   'spoke-snapped': ['carry-zip-ties', 'carry-spoke-key', 'carry-multi-tool'],
   'brake-rub-rim': ['carry-multi-tool'],
   'brake-rub-disc': ['carry-multi-tool'],
-  'brake-weak-rim': ['carry-multi-tool'],
-  'brake-weak-disc': ['carry-multi-tool'],
+  'brake-weak-rim': ['carry-multi-tool', 'carry-cloth'],
+  'brake-weak-disc': ['carry-multi-tool', 'carry-cloth'],
   'gears-skipping': ['carry-multi-tool', 'carry-quick-link'],
   'bolt-loose': ['carry-multi-tool'],
   'tyre-torn': ['carry-tyre-boot', 'carry-spare-tube', 'carry-tyre-levers', 'carry-pump'],
-  'ebike-no-power': ['carry-charger'],
+  'ebike-no-power': ['carry-charger', 'carry-cloth'],
 };
 
-/** The draft's 14 carry items, in its order, with its words (the dry cloth is cut: "no source found", decision 6, so 13 ship). */
+/** The draft's 14 carry items, in its order, with its words; the cloth is back as "Clean cloth or rag" (the coordinator's ruling I3 on PR 59). */
 export const CARRY_NAMES: [string, string][] = [
   ['carry-spare-tube', 'Spare tube (right size and valve)'],
   ['carry-tyre-levers', 'Tyre levers'],
@@ -130,5 +139,6 @@ export const CARRY_NAMES: [string, string][] = [
   ['carry-multi-tool', 'Multi-tool (hex keys, screwdriver) that fits the bolts on your bike'],
   ['carry-zip-ties', 'Zip ties or tape'],
   ['carry-spoke-key', 'Spoke key'],
+  ['carry-cloth', 'Clean cloth or rag'],
   ['carry-charger', 'Charger (for long trips)'],
 ];

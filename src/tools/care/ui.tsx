@@ -184,6 +184,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
       <div role="tabpanel" id="care-panel-road" aria-labelledby="care-tab-road" hidden={tab !== 'road'}>
         {tab === 'road' ? (
           <>
+            <h3 class="visually-hidden">{C.careRoadHeading}</h3>
             {allCards.map((c) => <RoadItem key={c.id} card={c} details={details} />)}
             <section class="care-section">
               <h3>{C.careCarryTitle}</h3>

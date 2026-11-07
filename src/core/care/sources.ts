@@ -60,7 +60,7 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
   },
   'puncture-tubeless': {
     urls: ['https://www.wtb.com/blogs/wtb/how-to-plug-a-puncture-on-a-tubeless-bicycle-tire', 'https://theproscloset.com/blogs/news/how-to-tubeless-tire-plug'],
-    note: "Not covered by the owner's book pages.",
+    note: "Not covered by the owner's book pages. Step 6 says to remove the tubeless valve (ruling I2 on PR 59: the draft said only the valve core, which leaves the valve in the rim); no public page could be read for how, so no detail is added.",
   },
   'chain-broken': {
     urls: [
@@ -76,7 +76,7 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
       'https://www.roadbikerider.com/be-a-hero-on-rides-d3/',
       'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot',
     ],
-    note: "Book p. 49: tape the broken spoke or wrap it round a neighbour; pp. 208-209: broken spokes make the wheel wobble. Opening the brake quick release is the draft's step 2, kept as written: for the owner's O5 read.",
+    note: "Book p. 49: tape the broken spoke or wrap it round a neighbour; pp. 208-209: broken spokes make the wheel wobble. Opening the brake's quick release is the draft's step 2, now for rim brakes only, named as the brake's own lever, with the weaker-brake caution and a step to close it again (rulings C1 and I1 on PR 59); \"more than a few spokes\" became \"more than one spoke\" (M1).",
   },
   'brake-rub-rim': {
     urls: ['https://www.sheldonbrown.com/rim-brakes.html'],
@@ -106,7 +106,7 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
   },
   'bolt-loose': {
     urls: ['https://dedhambike.com/articles/torque-table-pg186.htm', 'https://www.cyclingnews.com/features/torque-wrenches-why-you-need-one-and-how-to-use-them'],
-    note: 'Book p. 40: carbon parts are checked with a torque wrench, not by twisting (book, more careful); p. 206: bar and stem bolts tight. Carbon bolt torque: 4-6 Nm general vs 5.4/6.2/8.8 Nm by maker, so the card says to follow the printed number.',
+    note: 'Book p. 40: carbon parts are checked with a torque wrench, not by twisting (book, more careful); p. 206: bar and stem bolts tight. The draft\'s "tighten by feel until firm" is unsourced (draft section 6) and is replaced by the printed torque, or only snug and have it checked (ruling I4 on PR 59). Carbon bolt torque: 4-6 Nm general vs 5.4/6.2/8.8 Nm by maker, so the card says to follow the printed number.',
   },
   'tyre-torn': {
     urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know', 'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot'],
@@ -151,5 +151,9 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
   },
   'carry-zip-ties': { urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know'], note: 'Book pp. 48-49: both are in the repair kit; tape for a broken spoke.' },
   'carry-spoke-key': { urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know'], note: 'Book p. 24: shown with the tools for the road.' },
+  'carry-cloth': {
+    urls: [],
+    note: "Added back by the coordinator's ruling I3 on PR 59: the cards' steps wipe the rim, the disc and the contacts (book p. 215: a cloth for the contacts; p. 120: touch the disc braking surfaces only with gloves). The draft's own standalone row had \"no source found\".",
+  },
   'carry-charger': { urls: ['https://www.bosch-ebike.com/us/help-center/asset-ast-00046', 'https://www.ternbicycles.com/us/node/348455'] },
 };
