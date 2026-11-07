@@ -54,6 +54,33 @@ describe("a bike as the bag planner stores it (spec section 7.1's table), read r
     }
   });
 
+  test("[TB-DETAILS-READ] suspension and rackMounts keep each listed answer; Not sure, anything else, a missing field or a wrong type is no field at all (Not sure); no other field changes", () => {
+    const base = normaliseBike(clone(full))!;
+    const rest = (b: Json): Json => { const others = { ...b }; delete others.suspension; delete others.rackMounts; return others; };
+    for (const suspension of ['none', 'front', 'full'] as const) {
+      const got = normaliseBike({ ...clone(full), suspension })!;
+      expect(got.suspension, suspension).toBe(suspension);
+      expect(rest(got), suspension).toEqual(rest(base));
+    }
+    for (const rackMounts of ['yes', 'no'] as const) {
+      const got = normaliseBike({ ...clone(full), rackMounts })!;
+      expect(got.rackMounts, rackMounts).toBe(rackMounts);
+      expect(rest(got), rackMounts).toEqual(rest(base));
+    }
+    for (const odd of [{ suspension: 'unknown', rackMounts: 'unknown' }, { suspension: 'Full' }, { suspension: true }, { suspension: 2 }, { suspension: null }, { rackMounts: true }, { rackMounts: 'maybe' }, { rackMounts: 'Yes' }, {}]) {
+      const bike: Json = clone(full);
+      delete bike.suspension; delete bike.rackMounts;
+      const got = normaliseBike({ ...bike, ...odd })!;
+      expect(got, JSON.stringify(odd)).not.toHaveProperty('suspension');
+      expect(got, JSON.stringify(odd)).not.toHaveProperty('rackMounts');
+      expect(rest(got), JSON.stringify(odd)).toEqual(rest(base));
+    }
+    // a bike stored before them gains no field, so it keeps its bytes when a page writes it again (LC-MOVE-PLANS)
+    const before = normaliseBike({ id: 'bike_bare', brakes: 'rim' })!;
+    expect(Object.keys(before)).not.toContain('suspension');
+    expect(JSON.stringify(normaliseBike(JSON.parse(JSON.stringify(before))))).toBe(JSON.stringify(before));
+  });
+
   test('[BK-NORMALISE] a block with nothing set is null; a colour is stored in lower case; numbers round as the page rounds', () => {
     const bike = clone(full) as Json;
     bike.look = { colour: '#2563B8', bars: null, ebike: null };

@@ -243,3 +243,35 @@ test('[ST-EXPORT] a stray field in a stored record does not leave the phone eith
   await db.put('meta', { ...(await readProfile()), litres: 2 }, 'profile');
   expect(hasKey(await exportAll(), FORBIDDEN)).toBeNull();
 });
+
+// Sub-project 11, group 2: the chosen bike travels in the settings, as the theme does.
+test('[TB-EXPORT] settings.toolBike is in the file; a stored one comes back; a file without it, or with a bad id, imports and reads null', async () => {
+  await fullPhone();
+  expect((await exportAll()).settings).toMatchObject({ toolBike: null });
+  await writeSettings({ toolBike: 'bike_b' });
+  const file = JSON.parse(JSON.stringify(await exportAll())) as ExportFile;
+  expect(file.settings).toMatchObject({ toolBike: 'bike_b', theme: 'dark' });
+  freshStore();
+  expect((await importAll(file)).ok).toBe(true);
+  expect((await readSettings()).toolBike).toBe('bike_b');
+  expect(JSON.stringify((await exportAll()).settings)).toBe(JSON.stringify(file.settings));
+  // An export from before this sub-project has no such field: it imports, and the choice is none.
+  const old = JSON.parse(JSON.stringify(file)) as { settings: Record<string, unknown> };
+  delete old.settings.toolBike;
+  freshStore();
+  expect((await importAll(old)).ok).toBe(true);
+  expect((await readSettings()).toolBike).toBeNull();
+  expect((await readSettings()).theme).toBe('dark');
+  // A bad id (wrong type, spaces, too long) is read as none; the rest of the file still comes in.
+  for (const bad of [7, 'a b', 'x'.repeat(101), '', {}]) {
+    freshStore();
+    const odd = JSON.parse(JSON.stringify(file)) as { settings: Record<string, unknown> };
+    odd.settings.toolBike = bad;
+    expect((await importAll(odd)).ok, String(bad)).toBe(true);
+    expect((await readSettings()).toolBike, String(bad)).toBeNull();
+    expect((await readSettings()).theme).toBe('dark');
+  }
+  // The writer refuses a bad one too.
+  await readSettings();
+  expect((await writeSettings({ toolBike: 'a b' })).reasons.toolBike).toBeTruthy();
+});

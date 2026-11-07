@@ -8,9 +8,9 @@ export type ScreenName = (typeof SCREEN_NAMES)[number];
 export type TabName = 'ahead' | 'trip' | 'tools' | 'you';
 export const tabOf = (name: ScreenName): TabName => name.split('/')[0] as TabName;
 
-/** `#/tools/tyre` gives 'tools/tyre'. Anything that is not a screen gives `fallback`. */
+/** `#/tools/tyre` gives 'tools/tyre'; a `?bike=` after it (toolHref) is not part of the name. Anything that is not a screen gives `fallback`. */
 export function screenFromHash(hash: string, fallback: ScreenName): ScreenName {
-  const name = hash.replace(/^#\/?/, '').replace(/\/+$/, '');
+  const name = hash.replace(/^#\/?/, '').replace(/\?.*$/, '').replace(/\/+$/, '');
   return (SCREEN_NAMES as readonly string[]).includes(name) ? (name as ScreenName) : fallback;
 }
 

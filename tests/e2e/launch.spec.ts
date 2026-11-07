@@ -345,6 +345,55 @@ for (const start of ['legacy', 'step-one'] as const) {
     expect(svg.includes('url(#') || svg.includes('bk-rimband')).toBe(false);
   });
 
+  test(`[BK-DETAILS-OLD-PAGE] known risk, not a guarantee: ${which} page re-saving a bike drops suspension and rackMounts from its bikes, draft and setups; every other field stays, format stays 2`, async ({ context, page }) => {
+    await phone(page, start);
+    await launch();
+    const { planner } = await plannerSaves(context);
+    // The bag planner sets the two new details (sub-project 11) and some older ones the old page knows.
+    await planner.evaluate(`(async () => {
+      const list = BIKE_PROFILES.map((b) => normaliseBikeProfile({ ...b, brakes: 'rim', drive: 'derailleur', shifting: 'cable', suspension: 'front', rackMounts: 'yes',
+        look: { colour: '#2563b8', bars: 'drop', ebike: false } }));
+      if (!(await bikeStoreSet(BIKE_PROFILE_KEY, list))) throw new Error('the planner could not save');
+    })()`);
+    type Bike = Record<string, unknown> & { id: string };
+    const before = JSON.parse((await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles')))!) as Bike[];
+    expect(before[0]).toMatchObject({ suspension: 'front', rackMounts: 'yes' });
+    await page.waitForFunction(() => (localStorage.getItem('loadcheck:bikeProfiles') ?? '').includes('"rackMounts":"yes"'));
+    // The old page reads the list as its own start-up does and saves it back, as its weight question or bike editor would.
+    expect(await page.evaluate(`(async () => {
+      BIKE_PROFILES = JSON.parse(localStorage.getItem(BIKE_PROFILE_KEY)).map(normaliseBikeProfile).filter(Boolean);
+      return bikeStoreSet(BIKE_PROFILE_KEY, BIKE_PROFILES);
+    })()`)).toBe(true);
+    await planner.waitForFunction(() => !(localStorage.getItem('loadcheck:bikeProfiles') ?? '"rackMounts"').includes('"rackMounts"'));
+    const after = JSON.parse((await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles')))!) as Bike[];
+    // the two are gone; every other field is as the bag planner stored it
+    const others = (b: Bike): Bike => { const o = { ...b }; delete o.suspension; delete o.rackMounts; return o; };
+    expect(after.map((b) => b.id)).toEqual(['bike-before']);
+    expect(after[0]).not.toHaveProperty('suspension');
+    expect(after[0]).not.toHaveProperty('rackMounts');
+    expect(after[0]).toEqual(others(before[0]!));
+    expect(await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfilesFormat'))).toBe('2');
+    // The same for the plan's bike in the draft and in a setup the old page writes: the two go, every other field stays.
+    const planBike = { id: 'bike-before', name: 'Before bike', brakes: 'rim', drive: 'derailleur', suspension: 'full', rackMounts: 'no', look: { colour: '#2563b8', bars: 'drop', ebike: false } };
+    const written = await page.evaluate(`(async () => {
+      S.bikeProfile = normaliseBikeProfile(${JSON.stringify(planBike)});
+      const draftBike = capturePlan().bikeProfile;
+      await saveSetup('Stale details', '');
+      const setup = JSON.parse(localStorage.getItem('loadcheck:setups')).find((s) => s.name === 'Stale details');
+      return { draftBike, setupBike: (setup.plan || setup).bikeProfile };
+    })()`) as { draftBike: Bike; setupBike: Bike };
+    for (const bike of [written.draftBike, written.setupBike]) {
+      expect(bike).not.toHaveProperty('suspension');
+      expect(bike).not.toHaveProperty('rackMounts');
+      expect(bike).toMatchObject({ id: 'bike-before', brakes: 'rim', drive: 'derailleur', look: { colour: '#2563b8', bars: 'drop', ebike: false } });
+    }
+    expect(written.setupBike).toEqual(written.draftBike);
+    // The bag planner reads what is left as Not sure, without a fault.
+    await planner.reload({ waitUntil: 'domcontentloaded' });
+    await draftReady(planner);
+    expect(await planner.evaluate("['suspension' in BIKE_PROFILES[0], 'rackMounts' in BIKE_PROFILES[0], BIKE_PROFILES[0].brakes]")).toEqual([false, false, 'rim']);
+  });
+
   test(`[SW-OLD-TAB-WRITES] a future bike format (3, which no page writes today) would block ${which} bike write, with its message`, async ({ context, page }) => {
     await phone(page, start);
     await launch();
