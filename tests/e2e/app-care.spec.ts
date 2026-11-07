@@ -139,7 +139,7 @@ test('[BC-SCREEN] Tab reaches every tab, filter, task and link; each task opens 
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('tab', { name: 'Roadside repairs' })).toBeFocused();
   await expect(page.getByRole('tab', { name: 'Roadside repairs' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByText('Roadside repairs come in the next version.')).toBeVisible();
+  await expect(page.locator('details.care-road').first()).toBeVisible();
 });
 
 test('[BC-SCREEN] Bike care opens offline after one visit, and works there', async ({ page }) => {
@@ -159,4 +159,97 @@ test('[BC-SCREEN] Bike care opens offline after one visit, and works there', asy
   await expect(page.getByText('Nothing matches.')).toBeVisible();
   await page.getByRole('button', { name: 'Clear search and filter' }).click();
   await expect(page.locator('details.care-task')).toHaveCount(6);
+  // the Roadside tab and the carry list work offline too
+  await page.getByRole('tab', { name: 'Roadside repairs' }).click();
+  await expect(page.locator('details.care-road[data-id="puncture-tubeless"]')).toBeVisible();
+  await expect(page.locator('.care-carry li[data-id="carry-plug-kit"]')).toBeVisible();
+});
+
+// ---- Roadside repairs and What to carry (sub-project 12, group 3) ----
+const card = (page: Page, id: string) => page.locator(`details.care-road[data-id="${id}"]`);
+const roadTab = (page: Page) => page.getByRole('tab', { name: 'Roadside repairs' });
+
+test('[BC-ROAD] the Roadside tab fits the chosen bike; every card open, at the project size and at 200% text: no sideways scroll; steps stay numbered; carry list at the bottom', async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [A, B, U], 'bike_a');
+  await roadTab(page).click();
+  await expect(card(page, 'puncture-tube')).toBeVisible();
+  await expect(card(page, 'puncture-tubeless')).toHaveCount(0);
+  await expect(card(page, 'brake-rub-rim')).toBeVisible();
+  await expect(card(page, 'brake-rub-disc')).toHaveCount(0);
+  await expect(page.locator('.care-carry li[data-id="carry-patch-kit"]')).toBeVisible();
+  await expect(page.locator('.care-carry li[data-id="carry-plug-kit"]')).toHaveCount(0);
+  // the screen's own bike line refits the Roadside tab at once
+  await page.selectOption('#tools-bike', 'bike_b');
+  await expect(card(page, 'puncture-tubeless')).toBeVisible();
+  await expect(card(page, 'brake-weak-disc')).toBeVisible();
+  await expect(card(page, 'puncture-tube')).toHaveCount(0);
+  await expect(page.locator('.care-carry li[data-id="carry-plug-kit"]')).toBeVisible();
+  await expect(page.locator('.care-carry li[data-id="carry-patch-kit"]')).toHaveCount(0);
+  // a bike with nothing told: every card, the conditioned ones tagged; the shop line only on brakes, wheels and bolts
+  await page.selectOption('#tools-bike', 'bike_u');
+  await expect(page.locator('details.care-road')).toHaveCount(12);
+  await expect(card(page, 'puncture-tube').locator('summary')).toContainText('if you have inner tubes');
+  for (const zoom of ['100%', '200%']) {
+    await page.evaluate((z) => { document.documentElement.style.fontSize = z; for (const d of document.querySelectorAll('details')) d.open = true; }, zoom);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), zoom).toBe(true);
+    for (const d of await page.locator('details.care-road').all()) {
+      const box = (await d.boundingBox())!;
+      expect(box.x + box.width, zoom).toBeLessThanOrEqual(page.viewportSize()!.width + 0.5);
+    }
+  }
+  expect(await page.locator('details.care-road ol > li').count()).toBeGreaterThan(50);
+  expect(await page.locator('details.care-road', { hasText: 'If unsure, a shop.' }).count()).toBe(6);
+  await expect(page.getByRole('heading', { name: 'What to carry', level: 3 })).toBeVisible();
+  expect(await page.locator('.care-carry li').count()).toBe(13);
+  const below = await page.evaluate(() => {
+    const cards = document.querySelectorAll('details.care-road');
+    const list = document.querySelector('.care-carry')!;
+    return !!(cards[cards.length - 1]!.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+  expect(below).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('[BC-ROAD-SEARCH] "puncture" in the Care tab lists the puncture cards under Roadside repairs; a tap opens the Roadside tab at that card, open and focused', async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [U], null);
+  await page.getByLabel('Search').fill('Punctures');
+  await expect(page.getByRole('heading', { name: 'Roadside repairs', level: 3 })).toBeVisible();
+  await expect(page.locator('.care-road-hit')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Puncture (tubeless)' }).click();
+  await expect(roadTab(page)).toHaveAttribute('aria-selected', 'true');
+  await expect(card(page, 'puncture-tubeless')).toHaveAttribute('open', '');
+  await expect(card(page, 'puncture-tubeless').locator('summary')).toBeFocused();
+  await expect(card(page, 'puncture-tube')).not.toHaveAttribute('open', '');
+  await expect(card(page, 'puncture-tubeless').getByText('Ride on?')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('[BC-ROAD] by keyboard: Tab reaches every card and the tabs; Enter and Space open a card', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [U], null);
+  await roadTab(page).click();
+  await roadTab(page).focus();
+  const reached: string[] = [];
+  for (let i = 0; i < 30; i += 1) {
+    await page.keyboard.press('Tab');
+    const here = await page.evaluate(() => {
+      const el = document.activeElement as HTMLElement | null;
+      const c = el?.closest('details.care-road') as HTMLElement | null;
+      return el && el.tagName === 'SUMMARY' && c ? c.dataset.id! : null;
+    });
+    if (here) reached.push(here);
+  }
+  const ids = await page.locator('details.care-road').evaluateAll((ds) => ds.map((d) => (d as HTMLElement).dataset.id!));
+  expect(ids.length).toBe(12);
+  for (const id of ids) expect(reached, id).toContain(id);
+  await card(page, ids[0]!).locator('summary').focus();
+  await page.keyboard.press('Enter');
+  await expect(card(page, ids[0]!)).toHaveAttribute('open', '');
+  await card(page, ids[1]!).locator('summary').focus();
+  await page.keyboard.press('Space');
+  await expect(card(page, ids[1]!)).toHaveAttribute('open', '');
 });
