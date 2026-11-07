@@ -297,6 +297,64 @@ test('[GA-ANSWER] the words of each answer: a swap, a pair, already good, cannot
   assert.ok(say({kind:'already-good',...common,frameReason:p.run('NO_MOUNT')}).includes("Frame bags aren't offered. No mount on this bike."),'the planner\'s own reason');
 });
 
+// ---- Task 6: the example riders ----
+
+const RIDERS=require('./fixtures/advisor/riders.json').riders;
+// Each item's lightest or bulkiest tier, as the questionnaire's light and a lot take them (decision 5).
+const CARRY={light:"S.mode='light';S.custom=Object.fromEntries(KIT.filter(k=>k.tiers).map(k=>{const t=[...k.tiers].sort((a,b)=>a.kg-b.kg||a.L-b.L)[0];return [k.id,{L:t.L,kg:t.kg,rigid:t.rigid}];}));",
+  average:"S.mode='comfort';S.custom={};",
+  lot:"S.mode='comfort';S.custom=Object.fromEntries(KIT.filter(k=>k.tiers).map(k=>{const t=[...k.tiers].sort((a,b)=>b.L-a.L||b.kg-a.kg)[0];return [k.id,{L:t.L,kg:t.kg,rigid:t.rigid}];}));"};
+async function rider(r,style=r.style){
+  const plan=r.plan;
+  const setup=plan
+    ? `S.bags=${JSON.stringify(plan.bags)};S.nextUid=${Math.max(...plan.bags.map(b=>b.uid))+1};S.decks=${JSON.stringify(plan.decks)};S.nights=${plan.nights};S.sleep='${plan.sleep}';applyTripKitDefaults();${CARRY[plan.carry]}`
+    : 'S.bags=[];S.nextUid=1;';
+  const p=page({bike:r.bike,setup});
+  p.run('openAdvisor()');
+  if(r.questionnaire)for(const [k,v] of Object.entries(r.questionnaire))p.run(`setAdvisor(${JSON.stringify(k)},${JSON.stringify(v)})`);
+  p.run(`setAdvisor('style',${JSON.stringify(style)});setAdvisor('goal',${JSON.stringify(r.goal)})`);
+  await p.run('ADVISOR_DONE');
+  return p;
+}
+// The answer as the fixture holds it: its kind, and each suggestion's kind, what to get (type and size range) and tags.
+const summary=p=>p.json(`(()=>{const a=ADVISOR.answer,i=ADVISOR.input,one=s=>({kind:s.kind,what:advisorWhat(s,i),tags:s.tags});
+  return {kind:a.kind,partial:a.partial,...(a.kind==='suggestions' ? {items:a.items.map(one)} : {}),
+    ...(a.kind==='nothing-helps' ? {closest:a.closest && {...one(a.closest),overL:a.closest.result.overL,spill:a.closest.result.spillIds}} : {}),
+    ...(a.kind==='cannot-reduce' ? {backL:a.backL} : {})};})()`);
+
+test('[GA-RIDERS] each example rider gives exactly its written answer (qa/fixtures/advisor/riders.json, read by the owner at O2)',async()=>{
+  const got={};
+  for(const r of RIDERS){
+    const p=await rider(r);
+    got[r.id]=summary(p);
+    // litres that round to nothing are nothing: never "0 L stay there"
+    assert.ok(!/\b0 L stay/.test(textOf(p.context.document.getElementById('advisorAnswer').innerHTML)),r.id+': no "0 L stay"');
+  }
+  const missing=RIDERS.filter(r=>!r.expect).map(r=>r.id);
+  assert.equal(missing.length,0,`riders with no written answer yet: ${missing}; computed: ${JSON.stringify(got)}`);
+  for(const r of RIDERS)assert.deepEqual(got[r.id],r.expect,r.id+' '+r.about);
+});
+
+test('[GA-STYLE-PAGE] R4 and every rider under Without a rack get no pannier and no rack deck; R4\'s step 1 shows the no-mounts line',async()=>{
+  const r4=RIDERS.find(r=>r.id==='R4');
+  for(const [r,style] of [[r4,r4.style],...RIDERS.map(r=>[r,'no-rack'])]){
+    const p=await rider(r,style);
+    const a=p.json('ADVISOR.answer');
+    const shown=a.kind==='suggestions' ? a.items : a.kind==='nothing-helps' && a.closest ? [a.closest] : [];
+    for(const s of shown){
+      assert.ok(!s.add.some(b=>b.pos==='rack'),`${r.id} ${style}: no pannier`);
+      assert.equal(s.decks.rack,false,`${r.id} ${style}: no rack deck`);
+      assert.ok(!/pannier/i.test(p.json(`advisorWhat(${JSON.stringify(s)},ADVISOR.input)`)),`${r.id} ${style}: none on screen`);
+    }
+    const text=textOf(p.context.document.getElementById('advisorAnswer').innerHTML);
+    // the lines saying why are the only place panniers are named
+    const why=["Without a rack, your panniers and rack deck are left out of these suggestions.","On mountain bike trails, panniers aren't offered."];
+    assert.ok(!/\bpanniers?\b/i.test(why.reduce((t,w)=>t.replace(w,''),text)),`${r.id} ${style}: no pannier in the answer's words`);
+    if(r===r4 && style==='either')assert.ok(text.includes(why[1]),'R4 under Either: the trails line says why');
+    if(r===r4)assert.ok(textOf(p.context.document.getElementById('advisorSteps').innerHTML).includes("Your bike has no rack mounts, so panniers aren't offered."),'R4: the line');
+  }
+});
+
 (async()=>{
   for(const [name,fn] of tests){await fn();passed++;console.log('ok',name);}
   console.log(`${passed} advisor tests passed`);

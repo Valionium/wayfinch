@@ -5607,7 +5607,8 @@ function advisorWhy(s, input){
   const base = advisorBase(input).result, r = s.result, out = [];
   if(base.overL > 0 || base.spillIds.length) out.push(advisorWord('fitsOver'));
   const off = +(base.backL - r.backL).toFixed(1);
-  if(off >= 0.1) out.push(r.backL <= 0.005 ? advisorWord('backAll', { l:off }) : advisorWord('backSome', { l:off, left:+r.backL.toFixed(1) }));
+  const left = +r.backL.toFixed(1);   // litres that round to nothing are nothing on the back
+  if(off >= 0.1) out.push(left === 0 ? advisorWord('backAll', { l:off }) : advisorWord('backSome', { l:off, left }));
   const d = {};
   new Set([...Object.keys(base.kgByPos), ...Object.keys(r.kgByPos)]).forEach(p => {
     const g = ADVISOR_GROUPS[p]; if(g) d[g] = (d[g] || 0) + (r.kgByPos[p] || 0) - (base.kgByPos[p] || 0);
