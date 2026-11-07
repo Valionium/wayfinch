@@ -52,8 +52,9 @@ function headersFile(launch) {
 /**
  * Vite builds the app's shell into `outDir`. Only a build with the launch switch on ever gets here (Task 1, APP-SWITCH-OFF).
  * `testHooks` adds `window.__wf` for the browser tests (plan Decision 8); without it the hook's code is not in the build at all.
+ * `plugins` are added to vite.config.ts's own: only tests pass any (APP-LAUNCH-BYTES builds with a stand-in build.config.json).
  */
-async function runVite(outDir, { testHooks = false } = {}) {
+export async function runVite(outDir, { testHooks = false, plugins = [] } = {}) {
   const { build } = await import('vite');
   await build({
     root: ROOT,
@@ -64,6 +65,7 @@ async function runVite(outDir, { testHooks = false } = {}) {
     mode: 'production',
     define: { __WF_TEST_HOOKS__: JSON.stringify(testHooks === true), 'process.env.NODE_ENV': JSON.stringify('production') },
     build: { outDir, emptyOutDir: true },
+    plugins,
   });
 }
 

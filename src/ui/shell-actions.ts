@@ -15,6 +15,7 @@ import { zoneLookupOf } from '../core/engines/tripday.ts';
 import { waterNow } from '../core/engines/water.ts';
 import { thunderNear } from '../core/engines/shelter.ts';
 import { buildScreen } from '../core/screen/screen.ts';
+import type { Screen } from '../core/screen/screen.ts';
 import type { Km, Position, Route, ScreenInputs } from '../core/types.ts';
 import { showKm, W } from '../core/wording/en.ts';
 import { checkConnectivity } from '../data/connectivity.ts';
@@ -64,13 +65,26 @@ const FAILURE_TEXT: Record<Failure['kind'], string> = {
   denied: W.appAheadDenied, unavailable: W.appAheadNoFix, timeout: W.appAheadNoFix, unsupported: W.appAheadNoGeo,
 };
 type HereWords = typeof import('../core/wording/en-here.ts').H;
+type AskWords = typeof import('../core/wording/en-ask.ts').A;
 /** With no route there is no setting it by hand: each says what to do instead (its words load on the tap, review of PR 53, M6). */
 const hereFailure = (h: HereWords, kind: Failure['kind']): string =>
   kind === 'denied' ? h.hereDenied : kind === 'timeout' ? h.hereTimeout : kind === 'unavailable' ? h.hereNoFix : W.appAheadNoGeo;
 /** A fix a phone can mean: on the globe, and not the 0, 0 it gives for none. */
 const usableFix = (f: Fix): boolean => Math.abs(f.lat) <= 90 && Math.abs(f.lon) <= 180 && !(Math.abs(f.lat) < 5e-6 && Math.abs(f.lon) < 5e-6);
-/** A fix as it came, measured on no route: Emergency's own view of it. */
-const asCame = (f: Fix): Position => ({ ...f, km: NaN, offRouteM: NaN, source: 'gps', approximate: !(f.accuracyM <= APPROXIMATE_HELP_M) });
+/** A fix as it came, on no route kilometre: Emergency's own view of it. With no route its distance off one is unknown (NaN). */
+const asCame = (f: Fix, offRouteM = NaN): Position => ({ ...f, km: NaN, offRouteM, source: 'gps', approximate: !(f.accuracyM <= APPROXIMATE_HELP_M) });
+
+const escaped = (t: string): string => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * While Ahead asks which pass, no line of the screen says "No position yet": a position was found and waits for the rider's answer
+ * (after the launch, 7 Nov 2026). The notes, and the help chips' "measured from km …" (review of PR 65, M1).
+ */
+function whileAsking(s: Screen, words: AskWords): void {
+  s.notes = s.notes.map((n) => (n === W.routeNoPositionFromStart ? words.askPassFromStart : n));
+  const [before, after] = W.helpFromNoPosition('\u0000').split('\u0000') as [string, string];
+  const said = new RegExp(`${escaped(before)}(.+?)${escaped(after)}(?= |$)`);
+  for (const chip of Object.values(s.chips)) chip.detail = chip.detail.replace(said, (_, km: string) => words.askPassMeasuredFrom(km));
+}
 
 /** The settlements the route passes, in route order: the manual picker's towns. */
 function townsOf(i: ScreenInputs): Town[] {
@@ -99,9 +113,15 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
   let weatherSay: string | null = null;
   let weatherBusy = false;
   let notice: string | null = null;
-  let pendingFix: Fix | null = null;
+  /**
+   * The fix Ahead asks about, as Emergency shows it: on no route kilometre, at its distance from the route, so Emergency's notes on
+   * what is not stored are true for it (review of PR 53, N1).
+   */
+  let pendingFix: Position | null = null;
   /** A pass of the route the pending fix may lie on: where its country and clock are read while Ahead asks which pass. */
   let pendingKm: Km | null = null;
+  /** The which-pass question's words, there whenever a fix is pending (they load with the tap: not on the first screen). */
+  let askWords: AskWords | null = null;
   let hooked = false;
   let reading = 0;
   // With no route: the fix Emergency's Update position found, for this page only. Positions are kept on a route, so it is not stored.
@@ -127,11 +147,12 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
         let dataDate = '';
         for (const q of i.places) if (typeof q.dataDate === 'string' && q.dataDate > dataDate) dataDate = q.dataDate;
         s.chips.emergency = emergencyCard({
-          position: asCame(pendingFix), now, country: z.country, timeZone: z.timeZone, dataDate, rescuePoints: i.rescuePoints,
+          position: pendingFix, now, country: z.country, timeZone: z.timeZone, dataDate, rescuePoints: i.rescuePoints,
           settlements: i.places.filter((q) => q.kind === 'settlement'), shelters: i.places.filter((q) => q.kind === 'shelter'),
           thunderNear: thunderNear(built.parts.stop),
         });
       } catch { /* the stored position's card stays */ }
+      if (askWords) whileAsking(s, askWords);
     }
     let stillAboutL: number | null = null;
     try {
@@ -259,6 +280,9 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       pendingKm = null;
       const alone = view.peek().kind !== 'trip';
       const words = alone ? import('../core/wording/en-here.ts').then((m) => m.H, () => null) : null;
+      // The which-pass question's words load meanwhile, from the phone itself: the first screen does not carry them. Also with no
+      // route on screen, since one may be added in another window while the phone is looking.
+      const ask = import('../core/wording/en-ask.ts').then((m) => m.A, () => null);
       say({ kind: 'watching' });
       const fix = await watchBest(ROUTINE, deps.geolocation());
       if (isFailure(fix)) {
@@ -284,10 +308,25 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
         return false;
       }
       if (found.kind === 'ask') {
-        pendingFix = fix;
+        // Its distance off is measured at the first pass offered: both lie within 200 m of the route's nearest point (locate.ts's
+        // band), and never nearer, so Emergency's notes can only err on the careful side. No pass to measure at reads as unknown.
         pendingKm = found.options[0] ?? null;
+        const mine = asCame(fix, onPass(fix, now.trip.route, found.options[0])?.offRouteM);
+        pendingFix = mine;
+        // Emergency first, and the tap free again: neither waits on the question's words, which may fail or hang on a page no
+        // service worker controls (review of PR 65, I1).
+        position = { kind: 'idle' };
+        present({ ...now, now: deps.now() });
+        const words = await ask;
+        // A newer tap, a pass chosen or a position set by hand meanwhile: this question is no longer the one to ask.
+        if (pendingFix !== mine) return false;
+        if (!words) {
+          say({ kind: 'said', text: W.appLazyFailed });
+          return false;
+        }
+        askWords = words;
         const [a, b] = found.options.map((km) => showKm(km)) as [string, string];
-        position = { kind: 'ask', question: W.appAheadAsk(a, b), options: found.options.map((km) => ({ km, text: W.appAheadAskKm(showKm(km)) })) };
+        position = { kind: 'ask', question: words.askPass(a, b), options: found.options.map((km) => ({ km, text: words.askPassKm(showKm(km)) })) };
         present({ ...now, now: deps.now() });
         return false;
       }

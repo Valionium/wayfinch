@@ -1013,8 +1013,7 @@ export const W = {
   appAheadNoGeo: "This browser can't give a position. Set your position by hand.",
   appAheadNoPosition: "That reading couldn't be used as a position. Try again, or set your position by hand.",
   appAheadNotKept: 'That position was not kept: the route changed, or it lies outside the route.',
-  appAheadAsk: (a: string, b: string): string => `Are you at km ${a} (way out) or km ${b} (way back)?`,
-  appAheadAskKm: (km: string): string => `km ${km}`,
+  // The which-pass question's words are in en-ask.ts, loaded with Update position's tap (after the launch, 7 Nov 2026).
   appAheadFirstUse: "Update your position, or set it by hand, to see what's ahead.",
   appAheadManualToggle: 'Set position by hand',
   appAheadManualTitle: 'Set your position by hand',

@@ -50,6 +50,7 @@ function SettingsCard({ services, snap, reload }: { services: YouServices; snap:
           </div>
         ) : null}
         {problem ? <p class="field-problem" role="alert">{problem}</p> : null}
+        <p class="muted" data-you-install>{Y.youInstallAndroid}</p>
       </div>
     </Card>
   );
