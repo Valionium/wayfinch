@@ -9,7 +9,8 @@ import { choiceVersion, noteBikeChoice } from './bike-choice.ts';
 
 const NONE = 'default';
 
-export function BikeLine({ services }: { services: TyreServices }) {
+// `tick` changes when the bikes or the plan were read again, so the line (which reads a signal, and so skips a redraw for equal props) follows.
+export function BikeLine({ services }: { services: TyreServices; tick?: number }) {
   // Reading the version here redraws the line when the choice changes in another window or the tyre tool.
   void choiceVersion.value;
   const host = services.host();

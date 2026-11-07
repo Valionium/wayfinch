@@ -23,12 +23,15 @@ test('[TB-LINK] a tool address with ?bike=<id> names the bike, and is still that
 });
 
 test('[TB-LINK] #/tools/tyre?bike=b2 chooses b2 and leaves #/tools/tyre; an unknown id chooses nothing and falls back', async () => {
+  const lcBefore = JSON.stringify(Object.entries(localStorage).filter(([k]) => k.startsWith('loadcheck:')).sort());
   history.replaceState(null, '', '/#/tools/tyre?bike=b2');
   vi.resetModules();
   await import('../../../src/ui/app.tsx');
   await vi.waitFor(() => expect(JSON.parse(localStorage.getItem('copilot:bikeChoice:v1')!)).toMatchObject({ app: 'copilot', kind: 'bike-choice', bikeId: 'b2' }));
   expect(location.hash).toBe('#/tools/tyre');
   expect(location.pathname).toBe('/');
+  // The link never writes a loadcheck:* key.
+  expect(JSON.stringify(Object.entries(localStorage).filter(([k]) => k.startsWith('loadcheck:')).sort())).toBe(lcBefore);
 
   // An unknown id: the address is cleaned, nothing is written.
   localStorage.removeItem('copilot:bikeChoice:v1');

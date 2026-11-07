@@ -231,6 +231,9 @@ export function TyreScreen({ services }: { services: TyreServices }) {
   const start = toolBike(services.storage, host, saved);
   // Set when the rider picks a bike or types in the tool: "Without a bike" that only meant "no bike was saved" is not a pick.
   const touched = useRef(start.picked);
+  // Set when the rider picks a bike or types here (not by a choice that was already there): a choice made elsewhere then only offers a switch.
+  const acted = useRef(false);
+  const [offer, setOffer] = useState<string | null>(null);
   const [gone, setGone] = useState<'next' | 'none' | null>(null);
   const load = (k: string): { key: string; details: Details } => {
     const r = readStore(services.storage);
@@ -243,7 +246,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
   const [kept, setKept] = useState(true);
   const [pending, setPending] = useState<Record<string, string>>({});
   const onPending = (id: string, label: string | null): void => {
-    if (label !== null) touched.current = true;
+    if (label !== null) { touched.current = true; acted.current = true; }
     setPending((p) => {
       if ((p[id] ?? null) === label) return p;
       const next = { ...p };
@@ -289,7 +292,11 @@ export function TyreScreen({ services }: { services: TyreServices }) {
       if (first) { first = false; return; }
       const next = read();
       const chosen = toolBike(services.storage, next.host, next.saved);
-      if (!chosen.picked || (chosen.id ?? DEFAULT_KEY) === latest.current) return;
+      if (!chosen.picked) return;
+      const target = chosen.id ?? DEFAULT_KEY;
+      if (target === latest.current) { setOffer(null); return; }
+      // The rider has picked or typed here: their answers stay, and one line offers the other bike.
+      if (acted.current) { setSnap((old) => (JSON.stringify(old) === JSON.stringify(next) ? old : next)); setOffer(target); return; }
       touched.current = true;
       setSnap((old) => (JSON.stringify(old) === JSON.stringify(next) ? old : next));
       setGone(null);
@@ -308,6 +315,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
 
   const change = (patch: Partial<Details>): void => {
     touched.current = true;
+    acted.current = true;
     const next = { ...details, ...patch };
     for (const k of Object.keys(next) as (keyof Details)[]) if (next[k] === undefined) delete next[k];
     setSession({ key, details: next });
@@ -374,11 +382,16 @@ export function TyreScreen({ services }: { services: TyreServices }) {
 
       <label class="tyre-input" for="tyre-bike">
         <span class="tyre-label">{W.tyreBikeLabel}</span>
-        <select id="tyre-bike" value={key} onChange={(e) => { const v = (e.currentTarget as HTMLSelectElement).value; touched.current = true; setGone(null); setPending({}); setSession(load(v)); noteBikeChoice(v === DEFAULT_KEY ? null : v, services.now(), services.storage); }}>
+        <select id="tyre-bike" value={key} onChange={(e) => { const v = (e.currentTarget as HTMLSelectElement).value; touched.current = true; acted.current = true; setOffer(null); setGone(null); setPending({}); setSession(load(v)); noteBikeChoice(v === DEFAULT_KEY ? null : v, services.now(), services.storage); }}>
           {host.bikes.filter((b) => saved.includes(b.id)).map((b) => <option key={b.id} value={b.id}>{b.name}{b.id === host.planBikeId ? W.tyreBikeInPlan : ''}</option>)}
           <option value={DEFAULT_KEY}>{saved.length ? T.tyreBikeWithout : W.tyreBikeNone}</option>
         </select>
       </label>
+      {offer && (offer === DEFAULT_KEY || host.bikes.some((b) => b.id === offer)) && offer !== key ? (
+        <Notice>{offer === DEFAULT_KEY ? T.tyreBikeWithout : host.bikes.find((b) => b.id === offer)?.name} {T.tyreChosenElsewhere}{' '}
+          <button type="button" class="btn" onClick={() => { touched.current = true; setOffer(null); setGone(null); setPending({}); setSession(load(offer)); }}>{T.tyreChosenSwitch}</button>
+        </Notice>
+      ) : null}
       {gone ? <Notice>{gone === 'next' ? T.tyreBikeGoneNext : T.tyreBikeGoneNone}</Notice> : null}
       {!kept ? <Notice>{W.tyreNotSaved}</Notice> : null}
       <p class="muted">{W.tyreSavedHere}</p>

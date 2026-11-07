@@ -73,15 +73,41 @@ describe('the choice, resolved', () => {
     expect(resolved(world([A, B], A))).toEqual({ id: 'bike_a', picked: false });
   });
 
-  test('[TB-CHOICE-FALLBACK] a bike deleted in the bag planner while Tools is open: the storage event redraws the line on the fallback', async () => {
+  test('[TB-CHOICE-FALLBACK] a bike deleted in the bag planner while Tools is open: the real storage event redraws the line on the fallback', async () => {
     const mem = world([A, B], A, choice('bike_b'));
     await mountTools(mem);
     expect(lineSelect()!.value).toBe('bike_b');
     mem.data.set('loadcheck:bikeProfiles', JSON.stringify([A]));
-    await act(() => { window.dispatchEvent(new StorageEvent('storage', { key: BIKE_CHOICE_KEY })); });
-    // One bike left, and it is the plan's: shown as text, nothing thrown.
+    await act(() => { window.dispatchEvent(new StorageEvent('storage', { key: 'loadcheck:bikeProfiles' })); });
+    // One bike left, and it is the plan's: shown as text, the removed bike gone, nothing thrown.
     expect(lineSelect()).toBeNull();
     expect(line()!.textContent).toBe(`${W.tyreBikeLabel}: Trail Bike`);
+    expect(host.textContent).not.toContain('Gravel');
+  });
+
+  test('[TB-CHOICE-FALLBACK] the line also catches up when the page shows again or becomes visible, after a change nobody announced', async () => {
+    const mem = world([A, B, C], A);
+    await mountTools(mem);
+    expect(options(lineSelect()!)).toContain('Commuter');
+    mem.data.set('loadcheck:bikeProfiles', JSON.stringify([A, B]));
+    await act(() => { window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); });
+    expect(options(lineSelect()!)).not.toContain('Commuter');
+    mem.data.set('loadcheck:bikeProfiles', JSON.stringify([A, B, C]));
+    await act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    expect(options(lineSelect()!)).toContain('Commuter');
+  });
+
+  test("[TB-TOOLS-FOLLOW] the Tools tyre card follows a change of the plan's bike made in another tab", async () => {
+    const mem = world([A, B], A);
+    const { saveEntry } = await import('../../../src/tools/tyre/storage.ts');
+    saveEntry(mem.kv, 'bike_a', { details: {}, last: { frontBar: 2.1, rearBar: 2.3, at: '2026-11-06T10:00:00Z', bike: 'Trail Bike' } }, NOW);
+    saveEntry(mem.kv, 'bike_b', { details: {}, last: { frontBar: 3.1, rearBar: 3.3, at: '2026-11-01T10:00:00Z', bike: 'Gravel' } }, NOW);
+    await mountTools(mem);
+    expect(host.textContent).toContain('front 2.1');
+    mem.data.set('loadcheck:summary:v1', summary('bike_b'));
+    mem.data.set('loadcheck:bikeProfile', JSON.stringify(B));
+    await act(() => { window.dispatchEvent(new StorageEvent('storage', { key: 'loadcheck:summary:v1' })); });
+    expect(host.textContent).toContain('front 3.1');
   });
 });
 
@@ -160,6 +186,70 @@ describe('the choice follows the rider between the tools', () => {
     await act(() => { window.dispatchEvent(new StorageEvent('storage', { key: 'loadcheck:bikeProfiles' })); });
     expect(tyreSelect().value).toBe('bike_c');
     expect(empty.data.has(BIKE_CHOICE_KEY)).toBe(false);
+  });
+});
+
+describe('a choice made elsewhere while the tyre tool is open', () => {
+  const status = () => [...host.querySelectorAll('[role="status"]')].map((e) => e.textContent ?? '').find((t) => t.includes(T.tyreChosenElsewhere)) ?? null;
+  const type = async (v: string) => { await act(() => { maxField().value = v; maxField().dispatchEvent(new Event('input', { bubbles: true })); }); };
+
+  test('[TB-ELSEWHERE] untouched: it follows silently, with no line', async () => {
+    const mem = world([A, B], A);
+    await mountTyre(mem);
+    await act(() => { noteBikeChoice('bike_b', NOW, mem.kv); });
+    expect(tyreSelect().value).toBe('bike_b');
+    expect(status()).toBeNull();
+  });
+
+  test('[TB-ELSEWHERE] after the rider typed: it never switches and never drops an answer; one quiet line offers Switch, and Switch moves it', async () => {
+    const mem = world([A, B], A);
+    await mountTyre(mem);
+    await type('6');
+    await act(() => { noteBikeChoice('bike_b', NOW, mem.kv); });
+    expect(tyreSelect().value).toBe('bike_a');
+    expect(maxField().value).toBe('6');
+    expect(status()).toContain('Gravel');
+    expect(status()).toContain(T.tyreChosenSwitch);
+    // A half-typed answer survives a second choice too.
+    await type('6.');
+    await act(() => { noteBikeChoice('bike_b', new Date(NOW.getTime() + 1000), mem.kv); });
+    expect(maxField().value).toBe('6.');
+    expect(tyreSelect().value).toBe('bike_a');
+    const sw = [...host.querySelectorAll('button')].find((b) => b.textContent === T.tyreChosenSwitch)!;
+    await act(() => { sw.click(); });
+    expect(tyreSelect().value).toBe('bike_b');
+    expect(status()).toBeNull();
+    await pickIn(tyreSelect(), 'bike_a');
+    expect(status()).toBeNull();
+  });
+
+  test('[TB-ELSEWHERE] a rider who picked a bike here is touched too; the choice coming back to what is shown withdraws the line', async () => {
+    const mem = world([A, B], A);
+    await mountTyre(mem);
+    await pickIn(tyreSelect(), 'bike_b');
+    await act(() => { noteBikeChoice('bike_a', NOW, mem.kv); });
+    expect(tyreSelect().value).toBe('bike_b');
+    expect(status()).toContain('Trail Bike');
+    await act(() => { noteBikeChoice('bike_b', new Date(NOW.getTime() + 1000), mem.kv); });
+    expect(status()).toBeNull();
+  });
+});
+
+describe('no choice path writes a loadcheck key', () => {
+  const lc = (mem: Mem) => JSON.stringify([...mem.data].filter(([k]) => k.startsWith('loadcheck:')).sort());
+
+  test('[TB-NO-LC-WRITE] the Tools line, the tyre box and a choice made while the tool is open leave every loadcheck:* entry as it was', async () => {
+    const mem = world([A, B, C], A);
+    const before = lc(mem);
+    await mountTools(mem);
+    await pickIn(lineSelect()!, 'bike_b');
+    await pickIn(lineSelect()!, 'default');
+    render(null, host);
+    await mountTyre(mem);
+    await pickIn(tyreSelect(), 'bike_c');
+    await act(() => { noteBikeChoice('bike_a', NOW, mem.kv); });
+    expect(mem.data.has(BIKE_CHOICE_KEY)).toBe(true);
+    expect(lc(mem)).toBe(before);
   });
 });
 

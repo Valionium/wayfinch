@@ -53,5 +53,8 @@
 .bike-caption a { display: inline-flex; align-items: center; min-height: 44px; color: var(--blaze); font-weight: 600; }
 .bike-marker { display: inline-flex; align-items: center; }
 /* The bike line at the top of Tools (sub-project 11): its room is kept while Tools loads, so nothing moves when it arrives. */
-.bike-line { margin: 0 0 8px; min-height: 2.75rem; display: flex; align-items: center; }
-.bike-line label { display: inline-flex; align-items: center; gap: 8px; }
+.bike-line { overflow-wrap: anywhere; margin: 0 0 8px; min-height: 2.75rem; display: flex; align-items: center; }
+.bike-line label { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; }
+.bike-line .tyre-label { flex: 0 0 auto; }
+.bike-line select { flex: 1 1 auto; min-width: 0; max-width: 100%; min-height: 44px; padding: 6px 10px; border: 1px solid var(--muted); border-radius: 8px; background: var(--ground); color: var(--ink); font: inherit; text-overflow: ellipsis; }
+.bike-line:not(:has(select)) { overflow-wrap: anywhere; }

@@ -11,15 +11,23 @@ export function lazy<P extends object>(load: () => Promise<FunctionComponent<P>>
   return function Lazy(props: P) {
     const [Component, setComponent] = useState<FunctionComponent<P> | null>(() => loaded);
     const [failed, setFailed] = useState(false);
+    const [attempt, setAttempt] = useState(0);
     useEffect(() => {
       if (Component) return;
       let alive = true;
       loading ??= load().then((c) => (loaded = c));
       loading.then((c) => { if (alive) setComponent(() => c); }, () => { loading = null; if (alive) setFailed(true); });
       return () => { alive = false; };
-    }, [Component]);
+    }, [Component, attempt]);
     if (Component) return <Component {...props} />;
-    if (Fallback) return <Fallback {...props} />;
+    if (Fallback) {
+      return (
+        <>
+          <Fallback {...props} />
+          {failed ? <p class="notice" role="status">{W.appLazyFailed} <button type="button" class="btn" onClick={() => { setFailed(false); setAttempt((n) => n + 1); }}>{W.appLazyRetry}</button></p> : null}
+        </>
+      );
+    }
     return failed ? <p class="notice" role="status">{W.appLazyFailed}</p> : <p class="muted" aria-busy="true">{W.appLazyLoading}</p>;
   };
 }
