@@ -15,6 +15,7 @@ export const C = {
   careTabsLabel: 'Bike care',
   careTabCare: 'Care',
   careTabRoad: 'Roadside repairs',
+  careRoadHeading: 'Fixes on the road',
   careRoadCheckFirst: 'Check first',
   careRideOn: 'Ride on?',
   careRoadCarry: 'What to carry for this',
@@ -212,9 +213,10 @@ export const CARE_TASKS: CareTask[] = [
 
 // ---- The Roadside repairs cards (group 3, Task 6) ----
 // The content draft's 12 cards (2026-11-06-bike-care-content-draft.md, section 2, after the owner's two book rounds), word for word apart
-// from: the draft's provenance marks ("(book, more careful)", "(book p. 120)"), which are in src/core/care/sources.ts; "If unsure, a
+// from the PR 59 review's rulings (each a correction to the draft, listed in the PR body: the brake's quick release named as such and closed
+// again, the tubeless valve, the clean cloth back, the bolt card's carbon warning first, spoke Ride on, the brake centring step), and from: the draft's provenance marks ("(book, more careful)", "(book p. 120)"), which are in src/core/care/sources.ts; "If unsure, a
 // shop.", which the screen adds from `critical` (decision 5); the step numbers (the screen numbers the list); and the brake-rub-rim
-// centring-screw aside, which the draft marks "no source found" (decision 6: unsourced facts are cut). "Ride on?" is the answer for each
+// centring-screw aside, which the draft marks "no source found" (decision 6: unsourced facts are cut), and the dry cloth row, now back as a clean cloth. "Ride on?" is the answer for each
 // card (decision 1: "safe" is a banned word). Nothing here is final until the owner's read (O5).
 export const ROAD_CARDS: RoadCard[] = [
   {
@@ -242,7 +244,7 @@ export const ROAD_CARDS: RoadCard[] = [
       'Ream the hole and push a plug in with the tool.',
       'Trim the plug; pump up.',
       'Wait a few minutes for the sealant.',
-      'Still leaking: fit a spare tube (remove the valve core).',
+      'Still leaking: fit a spare tube (remove the tubeless valve).',
       'A plug can work loose, so check it later.',
     ],
     rideOn: 'Fine once it holds air. Stop if the sidewall is cut or the tyre bulges.',
@@ -269,10 +271,12 @@ export const ROAD_CARDS: RoadCard[] = [
     checkFirst: 'Is only one spoke gone, and does the rim still turn?',
     steps: [
       'Wrap the broken spoke around a good neighbour or tape it.',
-      'Open the brake quick release if the rim rubs.',
+      "Rim brakes: if the rim rubs, open the brake's quick release (the small lever on the brake, not the wheel's). Until you close it again, this brake works much less: ride slowly and use the other brake.",
+      'Disc brakes: check the wheel turns without touching the brake; if it rubs, ride slowly.',
       'Ride slowly to a shop.',
+      "Rim brakes: close the brake's quick release once the wheel is fixed.",
     ],
-    rideOn: 'Fine for a slow ride home if only one spoke has gone and the rim turns. Walk if the wheel is badly bent, or more than a few spokes are gone. Wheels are critical.',
+    rideOn: "Fine for a slow ride home if only one spoke has gone and the rim turns. Walk if the wheel is badly bent, or more than one spoke has gone. With a brake's quick release open, that brake works much less. Wheels are critical.",
     carry: ['carry-zip-ties', 'carry-spoke-key', 'carry-multi-tool'],
     words: ['spoke', 'broken', 'wobbly wheel', 'wheel bent'], critical: true,
   },
@@ -280,11 +284,12 @@ export const ROAD_CARDS: RoadCard[] = [
     id: 'brake-rub-rim', problem: 'Brake rubbing', part: 'brakes', applies: { brakes: ['rim'] },
     checkFirst: 'Is the wheel straight in the frame? Is the pad touching one side? Is the rim bent? Is the tyre bead seated?',
     steps: [
-      'Re-seat the wheel in the dropouts and tighten the quick release.',
+      "Re-seat the wheel in the dropouts and tighten the wheel's quick release.",
       'Check the tyre bead sits evenly; if not, let the air out, seat it, pump up.',
-      'Squeeze the lever to centre the brake, then tighten the arm bolt; pads should sit parallel to the rim.',
+      "Loosen the brake's mounting bolt, squeeze the lever to hold the pads on the rim, then tighten the bolt; pads should sit parallel to the rim.",
       'Check the pad is not touching the tyre or spokes.',
-      'Open the quick release only if you must and ride slowly.',
+      "Open the brake's quick release only if you must and ride slowly. Until you close it again, this brake works much less: ride slowly and use the other brake.",
+      "Close the brake's quick release once the wheel is fixed.",
     ],
     rideOn: 'Fine if light rub. Walk if the wheel is bent or the brake will not stop you.',
     carry: ['carry-multi-tool'],
@@ -306,16 +311,16 @@ export const ROAD_CARDS: RoadCard[] = [
   },
   {
     id: 'brake-weak-rim', problem: 'Brakes not biting', part: 'brakes', applies: { brakes: ['rim'] },
-    checkFirst: 'Wet or dirty rim? Cable loose? Brake quick release open? Pads worn or hitting the tyre?',
+    checkFirst: "Wet or dirty rim? Cable loose? Brake's quick release open? Pads worn or hitting the tyre?",
     steps: [
       'Wipe the rim and pads.',
-      'Check the brake quick release is closed.',
+      "Check the brake's quick release is closed.",
       'Turn the barrel adjuster to pull the cable tighter.',
       'If still weak, check the cable clamp is tight, the pads are tight on the arms and sit square on the rim.',
       'Replace pads with gone grooves or a scraping noise.',
     ],
     rideOn: 'Walk if the brakes will not stop you. Brakes are critical.',
-    carry: ['carry-multi-tool'],
+    carry: ['carry-multi-tool', 'carry-cloth'],
     words: ['no brakes', 'weak', 'wet', 'brake cable'], critical: true,
   },
   {
@@ -323,13 +328,13 @@ export const ROAD_CARDS: RoadCard[] = [
     checkFirst: 'Oil on the pads? Worn pads (a grinding noise)? Lever pulling to the bar?',
     steps: [
       'Signs of oil: squeal, hard lever, dark smeary pads; pads soaked in oil cannot be saved. A grinding noise means worn pads.',
-      'Wipe the disc; replace oily or worn pads when you can.',
+      'Wipe the disc; replace oily or worn pads when you can. Never touch the disc or pads with your fingers.',
       'Cable: turn the pad adjuster knobs in a little.',
       'Hydraulic: pump the lever; if it stays soft it needs a bleed.',
       'Walk the hills.',
     ],
     rideOn: 'Walk if the lever hits the bar or the brakes will not stop you. Brakes are critical; a mistake can cause a crash.',
-    carry: ['carry-multi-tool'],
+    carry: ['carry-multi-tool', 'carry-cloth'],
     words: ['brakes fade', 'spongy', 'no brakes', 'oily', 'soft lever', 'grinding'], critical: true,
   },
   {
@@ -349,9 +354,9 @@ export const ROAD_CARDS: RoadCard[] = [
     id: 'bolt-loose', problem: 'Loose bolt or rattle', part: 'frame', applies: {},
     checkFirst: 'Which part moves when you shake it?',
     steps: [
-      'Find the bolt by feel.',
-      'Tighten it with the right key until firm, not forced.',
       'Carbon parts: do not twist them to test; their bolts take the torque printed on the part, set with a torque wrench. Without one, if unsure, a shop.',
+      'Find the bolt by feel.',
+      'Tighten to the torque printed on the part. Without a torque wrench, only snug it, and have it checked.',
       'Re-check after a short ride.',
     ],
     rideOn: 'Fine for most bolts once tight. Stop if a stem, bar or steerer bolt will not tighten. Critical.',
@@ -359,7 +364,7 @@ export const ROAD_CARDS: RoadCard[] = [
     words: ['loose', 'rattle', 'noise', 'bolt', 'carbon'], critical: true,
   },
   {
-    id: 'tyre-torn', problem: 'Torn tyre (needs a boot)', part: 'tyres', applies: {},
+    id: 'tyre-torn', problem: 'Torn tyre (needs a boot)', part: 'tyres', applies: { tyres: ['tubes', 'tubeless'] },
     checkFirst: 'How big is the cut? Is the tube bulging?',
     steps: [
       'Remove the wheel and tube.',
@@ -382,13 +387,14 @@ export const ROAD_CARDS: RoadCard[] = [
       'Try to power on again; note any error code.',
     ],
     rideOn: 'Ride unpowered if the bike pedals fine. Stop if the motor smells hot or the battery is damaged.',
-    carry: ['carry-charger'],
+    carry: ['carry-charger', 'carry-cloth'],
     words: ["won't turn on", 'dead', 'battery', 'no power', 'display'], critical: false,
   },
 ];
 
 // ---- What to carry (group 3, Task 7) ----
-// The draft's carry list in its order and words. The dry cloth is cut: its source cell reads "no source found" (decision 6).
+// The draft's carry list in its order and words. The draft's standalone "Dry cloth" row had "no source found"; the cloth is back as "Clean cloth or rag"
+// because three cards' steps wipe (the coordinator's ruling I3 on PR 59).
 export const CARRY: CarryItem[] = [
   { id: 'carry-spare-tube', name: 'Spare tube (right size and valve)', applies: { tyres: ['tubes', 'tubeless'] } },
   { id: 'carry-tyre-levers', name: 'Tyre levers', applies: {} },
@@ -402,5 +408,6 @@ export const CARRY: CarryItem[] = [
   { id: 'carry-multi-tool', name: 'Multi-tool (hex keys, screwdriver) that fits the bolts on your bike', applies: {} },
   { id: 'carry-zip-ties', name: 'Zip ties or tape', applies: {} },
   { id: 'carry-spoke-key', name: 'Spoke key', applies: {} },
+  { id: 'carry-cloth', name: 'Clean cloth or rag', applies: {} },
   { id: 'carry-charger', name: 'Charger (for long trips)', applies: { ebike: ['yes'] } },
 ];

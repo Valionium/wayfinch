@@ -287,7 +287,9 @@ test("[BC-CARRY] at the bottom of the Roadside tab, What to carry is a plain lis
   expect(carryIds()).toEqual(CARRY.map((c) => c.id));
   carry().forEach((li, i) => expect(li.textContent!.startsWith(CARRY[i]!.name), CARRY[i]!.id).toBe(true));
   const panel = host.querySelector('#care-panel-road')!;
-  expect([...panel.querySelectorAll('h3')].map((x) => x.textContent)).toEqual([C.careCarryTitle]);
+  expect([...panel.querySelectorAll('h3')].map((x) => x.textContent)).toEqual([C.careRoadHeading, C.careCarryTitle]);
+  // a heading comes before the first card (review of PR 59, M5)
+  expect(panel.querySelector('h3')!.compareDocumentPosition(road()[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   const list = host.querySelector('.care-carry')!;
   expect(list.tagName).toBe('UL');
   // below the cards
@@ -302,13 +304,13 @@ test("[BC-CARRY] at the bottom of the Roadside tab, What to carry is a plain lis
 test('[BC-CARRY] a tube bike lists a spare tube, levers and a patch kit and no plugs; a tubeless bike lists plugs and a knife and no patch kit; a motor adds the charger', async () => {
   await mount(world([bike('bike_a', 'Gravel', ANSWERED)]));
   await openRoad();
-  expect(carryIds()).toEqual(['carry-spare-tube', 'carry-tyre-levers', 'carry-pump', 'carry-patch-kit', 'carry-tyre-boot', 'carry-quick-link', 'carry-chain-tool', 'carry-multi-tool', 'carry-zip-ties', 'carry-spoke-key']);
+  expect(carryIds()).toEqual(['carry-spare-tube', 'carry-tyre-levers', 'carry-pump', 'carry-patch-kit', 'carry-tyre-boot', 'carry-quick-link', 'carry-chain-tool', 'carry-multi-tool', 'carry-zip-ties', 'carry-spoke-key', 'carry-cloth']);
   expect(carry().every((li) => li.querySelector('.muted') === null)).toBe(true);
   expect(roadIds()).toEqual(['puncture-tube', 'chain-broken', 'spoke-snapped', 'brake-rub-rim', 'brake-weak-rim', 'gears-skipping', 'bolt-loose', 'tyre-torn']);
   render(null, host);
   await mount(world([bike('bike_t', 'Trail', TRAIL)]));
   await openRoad();
-  expect(carryIds()).toEqual(['carry-spare-tube', 'carry-tyre-levers', 'carry-pump', 'carry-plug-kit', 'carry-knife', 'carry-tyre-boot', 'carry-quick-link', 'carry-chain-tool', 'carry-multi-tool', 'carry-zip-ties', 'carry-spoke-key', 'carry-charger']);
+  expect(carryIds()).toEqual(['carry-spare-tube', 'carry-tyre-levers', 'carry-pump', 'carry-plug-kit', 'carry-knife', 'carry-tyre-boot', 'carry-quick-link', 'carry-chain-tool', 'carry-multi-tool', 'carry-zip-ties', 'carry-spoke-key', 'carry-cloth', 'carry-charger']);
   expect(roadIds()).toEqual(['puncture-tubeless', 'chain-broken', 'spoke-snapped', 'brake-rub-disc', 'brake-weak-disc', 'gears-skipping', 'bolt-loose', 'tyre-torn', 'ebike-no-power']);
 });
 
@@ -395,4 +397,12 @@ test('[BC-ROAD] using the Roadside tab writes nothing: opening cards, switching 
   await click(tab(C.careTabCare));
   await openRoad();
   expect(mem.writes).toEqual([]);
+});
+
+test('[BC-ROAD-SEARCH] with no bike, each search hit carries its tag beside it: the tubeless hit says "if you have tubeless tyres" (review of PR 59, M4)', async () => {
+  await mount(world([]));
+  await type('puncture');
+  const line = (name: string) => hits().find((h) => h.textContent === name)!.closest('li')!;
+  expect(line('Puncture (tubeless)').querySelector('.muted')!.textContent).toBe('if you have tubeless tyres');
+  expect(line('Puncture (inner tube)').querySelector('.muted')!.textContent).toBe('if you have inner tubes');
 });

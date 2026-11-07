@@ -202,7 +202,7 @@ test('[BC-ROAD] the Roadside tab fits the chosen bike; every card open, at the p
   expect(await page.locator('details.care-road ol > li').count()).toBeGreaterThan(50);
   expect(await page.locator('details.care-road', { hasText: 'If unsure, a shop.' }).count()).toBe(6);
   await expect(page.getByRole('heading', { name: 'What to carry', level: 3 })).toBeVisible();
-  expect(await page.locator('.care-carry li').count()).toBe(13);
+  expect(await page.locator('.care-carry li').count()).toBe(14);
   const below = await page.evaluate(() => {
     const cards = document.querySelectorAll('details.care-road');
     const list = document.querySelector('.care-carry')!;

@@ -55,6 +55,7 @@ export function searchCare<T extends { id: string }>(query: string, items: reado
     const words = text(item).flatMap(normaliseQuery);
     const whole = new Set([...words, ...words.flatMap(wholeForms)]);
     const starts = (p: string): boolean => words.some((w) => w.startsWith(p));
-    return wanted.every((q) => starts(q) || startRoots(q).some(starts) || wholeForms(q).some((s) => whole.has(s)));
+    // A short word (one or two letters) that is not the one being typed must be a whole word: "no brakes" is not "noisy brakes".
+    return wanted.every((q, i) => (q.length <= 2 && i < wanted.length - 1 ? words.includes(q) : starts(q) || startRoots(q).some(starts)) || wholeForms(q).some((s) => whole.has(s)));
   });
 }
