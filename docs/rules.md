@@ -1010,3 +1010,9 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - nothing helps: when the rider's things overflow and no candidate is valid, the answer is nothing-helps with the candidate leaving the fewest litres over as the closest [GA-NOTHING]
 - the search runs in slices: it yields the number of trials after every 20 and never runs more than MAX_TRIALS (1000) trials; an answer cut short there is marked partial [GA-SLICES]
 - /tools/bags/advisor.js builds as a classic script that sets window.WayfinchAdvisor, is not cached by the host, and is under 20 KB gzipped (decision 8) [GA-SIZE]
+
+## Tool: Gear advisor, in the bag planner (sub-project 13, group 2)
+
+- the page's trial function advisorTrial(bags, decks) only calls planWith and reads its plan: with today's bags it is the current plan (the same items, overflow and back litres), with a bag added it is the plan after really adding that bag, the rack deck's kit counts as the deck's kilos, and S, the kept plan and storage are unchanged after any number of trials; advisorInput reads the plan, the plan's bike and the planner's own bagSpec, and marks a bag holding a hand placement [GA-TRIAL-FN]
+- LC-FREEZE-01 and the selection fixtures pass unchanged with the advisor in the page (run, never edited) [GA-FROZEN]
+- on the phone stand-in the median advisorTrial is recorded, and a full search on the example tourer (R3) finishes within 1 second or runs in slices of 20 trials, each within that second [GA-FAST]

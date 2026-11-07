@@ -5380,6 +5380,47 @@ function planDiff(a, b){
   return { moved, placedFromOverflow };
 }
 
+/* ---- The Gear advisor (sub-project 13), the page's half: its search is /tools/bags/advisor.js (window.WayfinchAdvisor), handed the
+   planner's own bagSpec and a trial over planWith, so the frozen selection is only ever called (decision 1). Nothing here writes S or
+   storage: every reading runs on planWith's copies. ---- */
+// The plan these bags and decks would give, on top of `base` (the questionnaire's trip and kit), as the advisor reads it.
+function advisorTrial(bags, decks, base = {}){
+  const clean = bags.map(({ hand, ...b }) => ({ ...b }));
+  return planWith({ ...base, bags:clean, decks:{ bar:!!decks.bar, rack:!!decks.rack } }, advisorResult);
+}
+// Read while the trial's inputs are in place: the kit on the rack deck rides there, so its kilos count as the deck's.
+function advisorResult(plan){
+  const kgByPos = { ...plan.byPositionKg };
+  const deckKg = +deckedIds().reduce((n, id) => n + itemKg(kitById(id)), 0).toFixed(2);
+  if(deckKg > 0) kgByPos.deck = deckKg;
+  return { overL:plan.summary.overL, spillIds:[...new Set(plan.spill.map(k => k.id))], backL:backOf(plan), backKg:plan.byPositionKg.pack || 0,
+    outOfReach:plan.reach.outOfReach.length, kgByPos, items:plan.items };
+}
+// A bag holding a hand placement (S.pinned names its unit, "<uid>-<half>") is never taken out by a swap.
+function advisorHolds(b){ return Object.values(S.pinned || {}).some(key => String(key).split('-')[0] === String(b.uid)); }
+// The search's input from the plan (or the questionnaire's starting packing) and the plan's bike. `usable` is bagSpec and `trial` is
+// advisorTrial, both run with these bags in place, so the cage count and the frame floor are the ones the planner would use.
+function advisorInput(style, goal, opts = {}){
+  const q = opts.questionnaire ? advisorQuestionnaire(opts.questionnaire) : null;
+  const base = q ? q.base : {};
+  const bags = q ? q.bags : JSON.parse(JSON.stringify(S.bags)).map(b => ({ ...b, hand:advisorHolds(b) }));
+  const decks = q ? { bar:false, rack:false } : { bar:!!S.decks.bar, rack:!!S.decks.rack };
+  const inPlan = work => withInputs({ ...base, bags:bags.map(({ hand, ...b }) => ({ ...b })), decks:{ ...decks } }, work);
+  return inPlan(() => {
+    const fit = bikeFit(S.bikeProfile);
+    const reason = fit.frameBag.none || (inTriangleCount() > fit.frameBag.cageLimit ? NO_ROOM : null), floor = minShapeIdx();
+    return { style, goal, noPanniers:!!(q ? q.noPanniers : opts.noPanniers), bags, decks, camping:camping(), nextUid:q ? q.nextUid : S.nextUid,
+      frameShapes:reason ? [] : fit.frameBag.shapes.filter(s => s.shape >= floor).map(s => ({ shape:s.shape, L:s.L, source:s.source })),
+      frameReason:reason,
+      topSlotsFree:TOP_ORDER.filter(s => !bags.some(b => b.pos === 'top' && (b.slot || 'front') === s)),
+      rackMounts:S.bikeProfile ? S.bikeProfile.rackMounts : undefined,   // Not sure is no field (sub-project 11)
+      frameSize:fit.size, seatGapCm:fit.seatGapCm,
+      usable:bag => inPlan(() => { const r = bagSpec(bag); return { ok:r.usable, reason:r.reason, ...(r.band ? { band:r.band } : {}) }; }),
+      trial:(b, d) => advisorTrial(b, d, base) };
+  });
+}
+function advisorQuestionnaire(){ return null; }
+
 // Keep centilitres until the final display so small overflows never read as a fit.
 function packingSummary(A){
   const mounted=+A.slots.reduce((n,s)=>n+s.cap,0).toFixed(2),kit=kitL();
