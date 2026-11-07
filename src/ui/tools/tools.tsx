@@ -2,6 +2,7 @@
 // with its last result. It reads Load Check's summary and bikes and the tyre tool's own storage, and writes nothing.
 import { useEffect, useState } from 'preact/hooks';
 import { W } from '../../core/wording/en.ts';
+import { savedBikeIds, toolBike } from '../../tools/tyre/choice.ts';
 import { readStore } from '../../tools/tyre/storage.ts';
 import type { LastResult } from '../../tools/tyre/storage.ts';
 import type { TyreServices } from '../../tools/tyre/services.ts';
@@ -9,6 +10,7 @@ import { bikeSource, refreshBikeSource } from '../bike/live.ts';
 import { Card } from '../card.tsx';
 import { BagCard } from './bag-card.tsx';
 import { BikeLine } from './bike-line.tsx';
+import { choiceVersion } from './bike-choice.ts';
 
 const trimBar = (n: number): string => String(Number(n.toFixed(2)));
 
@@ -16,7 +18,9 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
   // The bag planner's bikes and plan may change in another tab, or while the phone was elsewhere: read them again when told and when the
   // page shows again (as the tyre tool does), so a removed bike is never offered and the cards follow the plan.
   const [tick, redraw] = useState(0);
-  void bikeSource.value;
+  const source = bikeSource.value;
+  // Reading the version here draws the bag card again when the bike line (or another window) changes the choice.
+  void choiceVersion.value;
   useEffect(() => {
     const again = (): void => { refreshBikeSource(); redraw((n) => n + 1); };
     const onStorage = (e: Event): void => { const k = (e as StorageEvent).key; if (k === null || k.startsWith('loadcheck:')) again(); };
@@ -34,10 +38,16 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
   // The plan's bike first (the tool opens on it); otherwise the newest. The bike's name is on the card, so it never passes for another's.
   const pick = (host.planBikeId ? entries.find((e) => e.key === host.planBikeId) : undefined) ?? entries.sort((a, b) => b.last.at.localeCompare(a.last.at))[0];
   const last: LastResult | null = pick?.last ?? null;
+  // The bag card draws the chosen bike at once: a saved bike the rider picked, the plan moving to it at the bag planner's next open
+  // (owner, 7 Nov 2026). "No bike" and a plan-only bike change nothing there (TB-PAGE-FOLLOWS), so the card keeps the plan's bike.
+  const saved = savedBikeIds(services.storage);
+  const choice = toolBike(services.storage, host, saved);
+  const planOnly = source.bike !== null && !saved.includes(source.bike.id);
+  const chosen = choice.picked && choice.id !== null && !planOnly ? source.bikes.find((b) => b.id === choice.id) : undefined;
   return (
     <>
       <BikeLine services={services} tick={tick} />
-      <BagCard services={services} />
+      <BagCard services={services} chosen={chosen} />
       <Card title={W.tyreCardTitle}>
         <p class="tool-line">{last ? W.tyreCardLast(trimBar(last.frontBar), trimBar(last.rearBar)) : W.tyreCardNone}</p>
         {last?.bike ? <p class="muted">{W.tyreCardBike(last.bike)}</p> : null}

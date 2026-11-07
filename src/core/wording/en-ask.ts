@@ -8,4 +8,6 @@ export const A = {
   askPassKm: (km: string): string => `km ${km}`,
   // A position was found and waits for the rider's answer, so "No position yet" would not be true (after the launch, 7 Nov 2026).
   askPassFromStart: "Position found. Choose which pass you're on; until then the answers count from the route start (km 0).",
+  // The same for the help chips (bike shop, pharmacy, train, toilets), in place of "No position yet: measured from km …" (review of PR 65, M1).
+  askPassMeasuredFrom: (km: string): string => `Position found; until you choose the pass, measured from km ${km}.`,
 };

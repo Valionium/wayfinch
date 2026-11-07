@@ -242,6 +242,14 @@ test("[AH-ASK-NOTE] Ahead's which-pass words are their own chunk, loaded with th
   expect(lazy.filter((f) => text(on, f).includes('Choose which pass')).length).toBe(1);
 });
 
+test("[YOU-INSTALL-ANDROID] the Android install line is You's, never in the first screen's JavaScript", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  expect(first.includes('Play Protect')).toBe(false);
+  const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
+  expect(lazy.some((f) => text(on, f).includes('Play Protect'))).toBe(true);
+});
+
 test("[TY-UI-BIKEBOX] the tyre tool's bike-choice logic is in the tool's own chunk, not in the first screen's JavaScript", () => {
   const figures = measure(on);
   const first = figures.firstFiles.map((f) => text(on, f)).join('\n');

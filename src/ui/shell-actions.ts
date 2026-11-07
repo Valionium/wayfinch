@@ -15,6 +15,7 @@ import { zoneLookupOf } from '../core/engines/tripday.ts';
 import { waterNow } from '../core/engines/water.ts';
 import { thunderNear } from '../core/engines/shelter.ts';
 import { buildScreen } from '../core/screen/screen.ts';
+import type { Screen } from '../core/screen/screen.ts';
 import type { Km, Position, Route, ScreenInputs } from '../core/types.ts';
 import { showKm, W } from '../core/wording/en.ts';
 import { checkConnectivity } from '../data/connectivity.ts';
@@ -72,6 +73,18 @@ const hereFailure = (h: HereWords, kind: Failure['kind']): string =>
 const usableFix = (f: Fix): boolean => Math.abs(f.lat) <= 90 && Math.abs(f.lon) <= 180 && !(Math.abs(f.lat) < 5e-6 && Math.abs(f.lon) < 5e-6);
 /** A fix as it came, on no route kilometre: Emergency's own view of it. With no route its distance off one is unknown (NaN). */
 const asCame = (f: Fix, offRouteM = NaN): Position => ({ ...f, km: NaN, offRouteM, source: 'gps', approximate: !(f.accuracyM <= APPROXIMATE_HELP_M) });
+
+const escaped = (t: string): string => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * While Ahead asks which pass, no line of the screen says "No position yet": a position was found and waits for the rider's answer
+ * (after the launch, 7 Nov 2026). The notes, and the help chips' "measured from km …" (review of PR 65, M1).
+ */
+function whileAsking(s: Screen, words: AskWords): void {
+  s.notes = s.notes.map((n) => (n === W.routeNoPositionFromStart ? words.askPassFromStart : n));
+  const [before, after] = W.helpFromNoPosition('\u0000').split('\u0000') as [string, string];
+  const said = new RegExp(`${escaped(before)}(.+?)${escaped(after)}(?= |$)`);
+  for (const chip of Object.values(s.chips)) chip.detail = chip.detail.replace(said, (_, km: string) => words.askPassMeasuredFrom(km));
+}
 
 /** The settlements the route passes, in route order: the manual picker's towns. */
 function townsOf(i: ScreenInputs): Town[] {
@@ -139,8 +152,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
           thunderNear: thunderNear(built.parts.stop),
         });
       } catch { /* the stored position's card stays */ }
-      // A position was found and waits for the rider's answer: "No position yet" would not be true (after the launch, 7 Nov 2026).
-      s.notes = s.notes.map((n) => (n === W.routeNoPositionFromStart && askWords ? askWords.askPassFromStart : n));
+      if (askWords) whileAsking(s, askWords);
     }
     let stillAboutL: number | null = null;
     try {
@@ -296,16 +308,23 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
         return false;
       }
       if (found.kind === 'ask') {
+        // Its distance off is measured at the first pass offered: both lie within 200 m of the route's nearest point (locate.ts's
+        // band), and never nearer, so Emergency's notes can only err on the careful side. No pass to measure at reads as unknown.
+        pendingKm = found.options[0] ?? null;
+        const mine = asCame(fix, onPass(fix, now.trip.route, found.options[0])?.offRouteM);
+        pendingFix = mine;
+        // Emergency first, and the tap free again: neither waits on the question's words, which may fail or hang on a page no
+        // service worker controls (review of PR 65, I1).
+        position = { kind: 'idle' };
+        present({ ...now, now: deps.now() });
         const words = await ask;
+        // A newer tap, a pass chosen or a position set by hand meanwhile: this question is no longer the one to ask.
+        if (pendingFix !== mine) return false;
         if (!words) {
           say({ kind: 'said', text: W.appLazyFailed });
           return false;
         }
         askWords = words;
-        // Its distance off is measured at the first pass offered: both lie within 200 m of the route's nearest point (locate.ts's
-        // band), and never nearer, so Emergency's notes can only err on the careful side. No pass to measure at reads as unknown.
-        pendingKm = found.options[0] ?? null;
-        pendingFix = asCame(fix, onPass(fix, now.trip.route, found.options[0])?.offRouteM);
         const [a, b] = found.options.map((km) => showKm(km)) as [string, string];
         position = { kind: 'ask', question: words.askPass(a, b), options: found.options.map((km) => ({ km, text: words.askPassKm(showKm(km)) })) };
         present({ ...now, now: deps.now() });

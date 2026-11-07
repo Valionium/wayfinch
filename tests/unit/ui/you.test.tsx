@@ -319,6 +319,13 @@ describe('Settings (spec sections 3.5 and 6.6)', () => {
     expect(text()).not.toContain(W.weatherKeepFresh);
   });
 
+  test("[YOU-INSTALL-ANDROID] You's settings say how to install on Android: with Chrome, since other browsers' installed apps may be blocked by Play Protect (owner, 7 Nov 2026)", async () => {
+    await show(services());
+    const settings = host.querySelector('[data-you-settings]')!;
+    expect(settings.textContent).toContain(Y.youInstallAndroid);
+    expect(Y.youInstallAndroid).toBe('On Android, install with Chrome (⋮ → Install app); other browsers may be blocked by Play Protect.');
+  });
+
   test('[YOU-RIDER] the theme is kept and put on the page at once', async () => {
     await show();
     await click(radio('theme', 'light'));

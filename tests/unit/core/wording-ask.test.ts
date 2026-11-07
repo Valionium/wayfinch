@@ -6,6 +6,7 @@ import { bannedHits } from '../../fixtures/banned.ts';
 const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   askPass: [['32', '118']],
   askPassKm: [['32']],
+  askPassMeasuredFrom: [['0'], ['12.5']],
 };
 
 test('[HON-BANNED] no string of Ahead\'s which-pass question uses a banned word, and every key starts with "ask"', () => {
@@ -19,6 +20,6 @@ test('[HON-BANNED] no string of Ahead\'s which-pass question uses a banned word,
       for (const args of sets) strings.push({ key, text: (value as (...a: unknown[]) => string)(...args) });
     }
   }
-  expect(strings.length).toBe(3);
+  expect(strings.length).toBe(5);
   for (const { key, text } of strings) expect(bannedHits(text, false), `${key}: ${text}`).toEqual([]);
 });

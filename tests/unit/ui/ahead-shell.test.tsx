@@ -528,12 +528,18 @@ describe('Emergency\'s Update position never waits on a question (review of PR 5
     await act(async () => { render(<Live shell={shell} />, host); });
     const notes = (): string => host.querySelector('.ah-notes')?.textContent ?? '';
     expect(notes()).toContain(W.routeNoPositionFromStart);   // before the tap it is true: there is no position
+    const before = shell.view.value;
+    expect(before.kind === 'trip' && before.screen.chips.pharmacy.detail).toContain(W.helpFromNoPosition('0'));
     const tapped = shell.actions.updatePosition();
     await act(async () => { geo.emit(12, 32); await new Promise((r) => setTimeout(r, 0)); });
     expect(await tapped).toBe(false);
     await until(() => shell.view.value.kind === 'trip' && shell.view.value.position.kind === 'ask', 'the question on Ahead');
     await settle();
     expect(notes()).toContain(A.askPassFromStart);
+    // No line of the screen says it either: the bike shop, pharmacy, train and toilets chips say the same as the note (review of PR 65, M1).
+    const screenText = (): string => { const v = shell.view.value; return v.kind === 'trip' ? JSON.stringify(v.screen) : ''; };
+    expect(screenText()).not.toContain('No position yet');
+    expect(screenText()).toContain(A.askPassMeasuredFrom('0'));
     expect(notes()).not.toContain(W.routeNoPositionFromStart);
     // the page shown again reads the store and builds the screen again: still the same words while the question is open
     await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
