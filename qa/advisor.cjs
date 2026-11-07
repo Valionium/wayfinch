@@ -529,6 +529,34 @@ test('[GA-STYLE] a giant backpack holding the tent and the sleeping bag, no rack
   assert.deepEqual(offered,{bags:false,'bags-first':true,panniers:true});
 });
 
+// ---- The review of PR 61 ----
+
+test('[GA-ANSWER] a rack with panniers is one rack: Looking ahead beside "a rack" names the rack once, in what to get and in the drawing\'s name, and says what rides on its top deck (review of PR 61, I3)',async()=>{
+  // the reviewer's rider: a 30 L backpack holding the tent, two nights camping, no rack, Panniers are fine
+  const p=page({bike:FULL,setup:"S.nights=2;S.sleep='camp';applyTripKitDefaults();S.mode='comfort';S.bags=[{uid:1,pos:'pack',L:30}];S.nextUid=2;S.decks={bar:false,rack:false};"});
+  await ask(p,{style:'panniers',goal:'backpack'});
+  const a=p.json('ADVISOR.answer');
+  const shown=[...a.items.map((_,i)=>`ADVISOR.answer.items[${i}]`),...(a.ahead ? ['ADVISOR.answer.ahead'] : [])];
+  const racks=t=>(t.match(/\brack\b/gi)||[]).length;
+  let panniers=0;
+  for(const ref of shown){
+    const s=p.json(ref),what=p.json(`advisorWhat(${ref},ADVISOR.input)`),drawn=p.json(`advisorDrawnName(${ref},ADVISOR.input)`);
+    assert.ok(racks(what)<=1,'one rack in: '+what);
+    assert.ok(racks(drawn)<=1,'one rack in: '+drawn);
+    if(s.add.some(b=>b.pos==='rack')){panniers++;assert.ok(/on its top deck/.test(what),'the deck that comes with the rack is said: '+what);}
+  }
+  assert.ok(panniers>0,'a rack with panniers is among them');
+});
+
+test('[GA-DECK] the deck suggestion\'s moves include the tent and the sleeping mat going to the rack top deck (review of PR 61, m1)',async()=>{
+  const p=page({bike:FULL,setup:TENT_IN_PACK+"S.bags=[{uid:1,pos:'rack',pair:true,L:10},{uid:2,pos:'pack',L:20}];S.decks={bar:false,rack:false};"});
+  await ask(p,{style:'bags-first',goal:'backpack'});
+  const moves=p.json('advisorMoves(ADVISOR.answer.items[0],ADVISOR.input)');
+  assert.ok(moves.some(m=>/^Tent: .+ → rack top deck$/.test(m)),'the tent: '+JSON.stringify(moves));
+  assert.ok(moves.some(m=>/^Sleeping mat: .+ → rack top deck$/.test(m)),'the mat: '+JSON.stringify(moves));
+  assert.ok(textOf(view(p).answer).includes('→ rack top deck'),'on screen');
+});
+
 (async()=>{
   for(const [name,fn] of tests){await fn();passed++;console.log('ok',name);}
   console.log(`${passed} advisor tests passed`);

@@ -1,7 +1,7 @@
 // The owner's answers of 7 Nov (sub-project 13 plan, "Owner's answers, 7 Nov (morning)"): singles and pairs, and two kinds of
 // answer, Minimal and Looking ahead; and the owner's ruling on the rack (7 Nov): the setup step, a rack fitted, the rack mounts.
 import { describe, expect, test } from 'vitest';
-import { candidates } from '../../../../src/core/advisor/candidates.ts';
+import { candidates, extensions } from '../../../../src/core/advisor/candidates.ts';
 import { advise, adviseSteps } from '../../../../src/core/advisor/search.ts';
 import { DECIDED, MIN_GAIN_BACK_L, MIN_GAIN_SCORE } from '../../../../src/core/advisor/table.ts';
 import type { AdvisorAnswer, AdvisorInput, BagIn, Decks, Pos, Suggestion, TrialResult } from '../../../../src/core/advisor/types.ts';
@@ -93,8 +93,9 @@ describe('two kinds of answer: Minimal and Looking ahead (owner, 7 Nov)', () => 
     const a = answer.ahead!;
     expect(a.kind).toBe('ahead');
     expect(a.remove).toBeNull();
-    expect(a.add.map((b) => [b.pos, b.L])).toEqual([['seat', 16], ['bar', 6]]);
-    expect(a.add[0]).toEqual(answer.items[0]!.add[0]);
+    // the same two bags, sized so the larger is as small as it can be (review of PR 61, m2): not 16 + 6 but 14 + 8
+    expect(a.add.map((b) => [b.pos, b.L])).toEqual([['seat', 14], ['bar', 8]]);
+    expect(a.add[0]!.pos).toBe(answer.items[0]!.add[0]!.pos);
     expect(a.result.backL).toBe(0);
     expect(a.newBags).toBe(2);
     expect(answer.items[0]!.result.backL - a.result.backL).toBeGreaterThanOrEqual(MIN_GAIN_BACK_L);
@@ -186,5 +187,62 @@ describe('the rack (the owner\'s ruling of 7 Nov): use what you have, a rack doe
       advise(input({ style, rackMounts: 'no', goal: 'backpack', camping: true, bags: [bag(1, 'pack', 40)], nextUid: 2, trial: packer(items(10, 10, 9, 9, 6), calls) }));
       expect(calls.some((t) => t.decks.rack || t.bags.some((b) => b.pos === 'rack')), style).toBe(false);
     }
+  });
+});
+
+describe('the review of PR 61', () => {
+  test('[GA-AHEAD] one rack at most: panniers added beside "a rack" (its deck) bring that same rack; the suggestion never carries the deck as a second thing (I3)', () => {
+    const i = input({ style: 'panniers', goal: 'backpack', camping: true, bags: [bag(1, 'pack', 30)], nextUid: 2 });
+    const rackFirst = candidates(i, 'add').find((c) => c.kind === 'deck')!;
+    expect(rackFirst.newBags).toBe(1);
+    const withPanniers = extensions(i, rackFirst).filter((c) => c.add.some((b) => b.pos === 'rack'));
+    expect(withPanniers.length).toBeGreaterThan(10);
+    for (const c of withPanniers) {
+      expect(c.deck, 'the deck comes with the panniers, not as a second rack').toBe(false);
+      expect(c.decks.rack).toBe(true);
+      expect(c.newBags).toBe(1 + (c.add.find((b) => b.pos === 'rack')!.pair ? 2 : 1)); // one rack, then the pannier bags
+    }
+    // and in the owner's giant-backpack example, whatever the answer holds
+    const big = [{ id: 'tent', L: 6, kg: 1.3 }, { id: 'bag', L: 6, kg: 1 }, { id: 'a', L: 10, kg: 2 }, { id: 'b', L: 9, kg: 2 }, { id: 'c', L: 9, kg: 2 }];
+    for (const style of ['bags-first', 'panniers'] as const) {
+      const answer = advise(input({ style, goal: 'backpack', camping: true, bags: [bag(1, 'pack', 40)], nextUid: 2, usable: onlyAt('seat', 'bar', 'rack'), trial: packer(big) }));
+      for (const s of [...suggestions(answer), ...(ahead(answer) ? [ahead(answer)!] : [])]) expect(s.deck && s.add.some((b) => b.pos === 'rack'), style).toBe(false);
+    }
+  });
+
+  test('[GA-SLICES] the page may ask for a hand-back sooner (input.handBack, which holds the page\'s clock): the search yields whenever it says so, and still after 20 trials at most (I4)', () => {
+    let calls = 0;
+    const trialCalls: unknown[] = [];
+    const i = input({ goal: 'handling', style: 'bags', trial: packer(items(12, 12, 12, 12), trialCalls as { bags: BagIn[]; decks: Decks }[]),
+      handBack: () => (++calls % 7 === 0) });
+    const yields: number[] = [];
+    const gen = adviseSteps(i);
+    let answer: AdvisorAnswer;
+    for (;;) { const step = gen.next(); if (step.done) { answer = step.value; break; } yields.push(step.value); }
+    expect(yields.some((y) => y % 20 !== 0), 'some hand-backs came on the page\'s word').toBe(true);
+    const gaps = yields.map((y, k) => y - (k ? yields[k - 1]! : 0));
+    expect(Math.max(...gaps)).toBeLessThanOrEqual(20);
+    expect(answer.tried).toBe(trialCalls.length);
+    // without it, every 20 trials as before
+    expect([...adviseSteps(input({ goal: 'handling', style: 'bags', trial: packer(items(12, 12, 12, 12)) }))].every((y) => y % 20 === 0)).toBe(true);
+  });
+
+  test('[GA-AHEAD] Get the backpack off: Looking ahead\'s two bags are sized so the larger is as small as it can be while the back still empties (m2)', () => {
+    const answer = advise(input({ goal: 'backpack', style: 'bags', bags: [bag(1, 'pack', 15)], nextUid: 2, usable: onlyAt('seat', 'bar'), trial: packer(items(8, 8, 6)) }));
+    const a = ahead(answer)!;
+    expect(a.add.map((b) => [b.pos, b.L])).toEqual([['seat', 14], ['bar', 8]]);
+    expect(a.result.backL).toBe(0);
+    expect(a.kind).toBe('ahead');
+  });
+
+  test('[GA-AHEAD] a Looking ahead set taken from the counting suggestions, an add of one bag, shows its size range (m3)', () => {
+    // 3 L on the back; a 2 L top tube bag counts (2 L off) and is Minimal; only top tube bags (one slot) and fork-cage pairs fit this
+    // bike, so the pair (two bags) that takes it all is Looking ahead, with its range.
+    const usable = (b: BagIn) => ({ ok: b.pos === 'top' || (b.pos === 'fork' && b.pair === true), reason: null });
+    const answer = advise(input({ goal: 'backpack', style: 'bags', bags: [bag(1, 'pack', 15)], nextUid: 2, usable, topSlotsFree: ['front'], trial: packer([{ id: 'a', L: 2, kg: 1 }, { id: 'b', L: 1, kg: 1 }]) }));
+    expect(suggestions(answer).map((s) => [s.add[0]!.pos, s.result.backL])).toEqual([['top', 1]]);
+    const a = ahead(answer)!;
+    expect([a.kind, a.add[0]!.pos, a.add[0]!.pair]).toEqual(['add', 'fork', true]);
+    expect(a.rangeL).toEqual([2, 4]);
   });
 });

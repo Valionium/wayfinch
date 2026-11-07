@@ -1,6 +1,6 @@
 // The Gear advisor's search (design §3.1–3.3; plan Task 3). Pure: the planner's packing comes in as `input.trial`, so the same search
 // runs in Vitest with a stand-in and in the bag planner with its own, frozen planWith.
-import { candidates, extensions, panniersAllowed, planAsStyled } from './candidates.ts';
+import { candidates, extensions, panniersAllowed, planAsStyled, sizeOptions } from './candidates.ts';
 import { byOwnerOrder, compareFor, compareMinimal, handlingScore, isValid, overflows, sizeRange } from './rank.ts';
 import { DECIDED, MAX_TRIALS, MIN_GAIN_BACK_L, MIN_GAIN_SCORE, SIZE_RANGES, type SizedPos } from './table.ts';
 import type { AdvisorAnswer, AdvisorInput, BagIn, Candidate, Suggestion, TrialResult } from './types.ts';
@@ -49,6 +49,8 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
     : base.backL - s.result.backL >= MIN_GAIN_BACK_L - EPS);
 
   let stopped = false;
+  // a hand-back after every SLICE trials, or sooner when the page's clock asks for it (review of PR 61, I4)
+  const handBack = () => trials % SLICE === 0 || (input.handBack?.() ?? false);
   const phases: ('add' | 'swap' | 'add-two')[] = input.goal === 'handling' ? ['add', 'swap', 'add-two'] : ['add', 'add-two'];
   // One round of the phases. `onlyPanniers`: Bags first's second round, which tries only the candidates holding panniers.
   function* round(panniers: boolean, onlyPanniers: boolean): Generator<number, Suggestion[]> {
@@ -63,7 +65,7 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
         const s = suggestion(c, result);
         tried.push(s);
         if (isValid(base, result) && gains(s)) found.push(s);
-        if (trials % SLICE === 0) yield trials;
+        if (handBack()) yield trials;
       }
     }
     good.push(...found);
@@ -119,7 +121,7 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
       trials++;
       const s = suggestion(c, result);
       if (isValid(base, result) && better(s)) pool.push(s);
-      if (trials % SLICE === 0) yield trials;
+      if (handBack()) yield trials;
     }
   }
   // Bags first, the bags counted: panniers are still needed when nothing so far does the whole goal (Get the backpack off: nothing
@@ -128,8 +130,36 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
     later.push(...(yield* round(true, true)));
   }
   pool.push(...good.filter((g) => (g.newBags > first.newBags || later.includes(g)) && better(g)));
-  const best = [...pool].sort((a, b) => order(a, b) || byOwnerOrder(a, b))[0] ?? null;
-  return { kind: 'suggestions', items, ahead: best && { ...best, rangeL: [best.add[0]?.L ?? 0, best.add[0]?.L ?? 0] }, tried: trials, frameReason, partial: stopped };
+  let best = [...pool].sort((a, b) => order(a, b) || byOwnerOrder(a, b))[0] ?? null;
+
+  // Get the backpack off: Looking ahead's two bags resized so the larger is as small as it can be while the back stays as empty (review
+  // of PR 61, m2): Minimal's bag a size smaller each step, the other bag the smallest size that still does it.
+  const maxL = (x: Suggestion) => Math.max(...x.add.map((b) => b.L));
+  if (best && !stopped && input.goal === 'backpack' && best.kind === 'ahead' && best.remove === null && !best.deck && first.kind === 'add' && best.add.length === 2) {
+    const [p, x] = best.add as [BagIn, BagIn];
+    const smaller = sizeOptions(input, p).filter((o) => o.bag.L < p.L - EPS).reverse();
+    const larger = sizeOptions(input, x).filter((o) => o.bag.L >= x.L - EPS);
+    let j = 0;
+    outer: for (const po of smaller) {
+      for (; j < larger.length; j++) {
+        const xo = larger[j]!;
+        if (Math.max(po.bag.L, xo.bag.L) >= maxL(best) - EPS) break outer;
+        if (trials >= MAX_TRIALS) { stopped = true; break outer; }
+        const add = [{ uid: p.uid, ...po.bag }, { uid: x.uid, ...xo.bag }];
+        const c: Candidate = { ...best, add, litres: Math.round(add.reduce((n, b) => n + b.L * (b.pair ? 2 : 1), 0) * 100) / 100, tags: [...new Set([...po.tags, ...xo.tags])] };
+        const result = input.trial(bagsFor(input, c), c.decks);
+        trials++;
+        const ok = isValid(base, result) && result.backL <= best.result.backL + NOTHING_ON_BACK_L;
+        if (handBack()) yield trials;
+        if (ok) { best = suggestion(c, result); break; }
+      }
+    }
+  }
+  // the range shown: a counting add or swap from the pool as Minimal shows one (review of PR 61, m3); a set at its own sizes
+  const ahead = best && { ...best, rangeL: best.kind === 'add' || best.kind === 'swap'
+    ? rangeOf(best, good.filter((g) => keyOf(g) === keyOf(best!) && g.kind === best!.kind && g.remove === best!.remove))
+    : [best.add[0]?.L ?? 0, best.add[0]?.L ?? 0] as [number, number] };
+  return { kind: 'suggestions', items, ahead, tried: trials, frameReason, partial: stopped };
 }
 
 function suggestion(c: Candidate, result: TrialResult): Suggestion {
