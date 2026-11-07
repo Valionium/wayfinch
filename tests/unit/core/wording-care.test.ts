@@ -22,7 +22,7 @@ function everyString(): [string, string][] {
   for (const [k, v] of Object.entries(WHO_LABEL)) out.push([`WHO_LABEL.${k}`, v]);
   for (const key of Object.keys(VALUES) as CareKey[]) for (const s of subsets(VALUES[key] as string[])) out.push([`TAG_LABEL.${key}`, TAG_LABEL(key, s as never)]);
   for (const t of CARE_TASKS) {
-    for (const text of [t.name, t.signs, t.tools, t.why ?? '', t.note ?? '', ...t.steps, ...t.words]) out.push([t.id, text]);
+    for (const text of [t.name, t.signs, t.tools, t.why ?? '', t.note ?? '', t.soft?.tag ?? '', ...t.steps, ...t.words]) out.push([t.id, text]);
   }
   for (const r of ROAD_CARDS) for (const text of [r.problem, r.checkFirst, r.rideOn, ...r.steps, ...r.words]) out.push([r.id, text]);
   for (const c of CARRY) out.push([c.id, c.name]);

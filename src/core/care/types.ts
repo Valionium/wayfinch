@@ -23,6 +23,11 @@ export type CareTask = {
   id: string; name: string; part: Part; section: Section; alsoWet: boolean; signs: string;
   steps: string[]; tools: string; minutes: [number, number] | null; who: 'you' | 'shop' | 'you-check'; why: string | null;
   note: string | null; words: string[]; applies: Conditions; critical: boolean;
+  /**
+   * Conditions that never hide the task: while the bike does not meet them (a detail Not sure, or another answer), the task shows with
+   * `tag` (coordinator's ruling R3 on PR 58: a needed task missed is worse than one extra).
+   */
+  soft?: { applies: Conditions; tag: string };
 };
 export type RoadCard = { id: string; problem: string; applies: Conditions; checkFirst: string; steps: string[]; rideOn: string; carry: string[]; words: string[]; critical: boolean };
 export type CarryItem = { id: string; name: string; applies: Conditions };

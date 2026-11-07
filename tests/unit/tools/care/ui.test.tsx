@@ -240,3 +240,13 @@ test('[BC-SCREEN] every rendered task says "If unsure, a shop." exactly when it 
   }
   expect(CARE_TASKS.filter((t) => t.critical).length).toBeGreaterThanOrEqual(4);
 });
+
+test('[BC-TELL-US] a single-speed bike sees hub gear oil once, tagged "If your hub has gears"; a hub-gear bike on cables sees it untagged (coordinator\'s ruling R3)', async () => {
+  await mount(world([bike('bike_a', 'Fixie', { ...ANSWERED, drive: 'chain-hub', shifting: 'none' })]));
+  const oil = () => tasks().find((d) => d.dataset.id === 'gears-hub-oil');
+  expect(oil()!.querySelector('summary .muted')!.textContent).toBe('If your hub has gears');
+  render(null, host);
+  await mount(world([bike('bike_a', 'Town', { ...ANSWERED, drive: 'chain-hub', shifting: 'cable' })]));
+  expect(oil()).toBeDefined();
+  expect(oil()!.querySelector('summary .muted')).toBeNull();
+});

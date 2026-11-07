@@ -4,9 +4,9 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { normaliseBike } from '../../core/bike/normalise.ts';
 import type { BikeRecord } from '../../core/bike/normalise.ts';
-import { careDetails, fitted } from '../../core/care/fit.ts';
+import { careDetails, fitted, softTag } from '../../core/care/fit.ts';
 import { searchCare } from '../../core/care/search.ts';
-import type { CareKey, CareTask, Fitted, Part } from '../../core/care/types.ts';
+import type { CareDetails, CareKey, CareTask, Fitted, Part } from '../../core/care/types.ts';
 import { C, CARE_TASKS, PART_LABEL, PARTS, SECTION_LABEL, SECTIONS, TAG_LABEL, WHO_LABEL } from '../../core/wording/en-care.ts';
 import { bikeDetailsHref } from '../../ui/bike/link.ts';
 import { choiceVersion } from '../../ui/tools/bike-choice.ts';
@@ -35,15 +35,16 @@ function chosenBike(services: TyreServices): BikeRecord | null {
 
 const searchText = (t: CareTask): string[] => [t.name, PART_LABEL[t.part], ...t.words];
 
-function Tags({ task }: { task: Fitted<CareTask> }) {
-  if (task.tags.length === 0) return null;
-  return <span class="muted care-tags">{task.tags.map((k: CareKey) => TAG_LABEL(k, task.applies[k] as never)).join(' · ')}</span>;
+function Tags({ task, details }: { task: Fitted<CareTask>; details: CareDetails }) {
+  const soft = softTag(task, details);
+  const all = [...task.tags.map((k: CareKey) => TAG_LABEL(k, task.applies[k] as never)), ...(soft ? [soft] : [])];
+  return all.length === 0 ? null : <span class="muted care-tags">{all.join(' · ')}</span>;
 }
 
-function TaskItem({ task }: { task: Fitted<CareTask> }) {
+function TaskItem({ task, details }: { task: Fitted<CareTask>; details: CareDetails }) {
   return (
     <details class="care-task" data-id={task.id}>
-      <summary><span class="care-name">{task.name}</span> <Tags task={task} /></summary>
+      <summary><span class="care-name">{task.name}</span> <Tags task={task} details={details} /></summary>
       <div class="care-body">
         <p><strong>{C.careSigns}:</strong> {task.signs}</p>
         {task.alsoWet ? <p>{C.careAlsoWet}</p> : null}
@@ -126,7 +127,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
           return inSection.length === 0 ? null : (
             <section key={s} class="care-section">
               <h3>{SECTION_LABEL[s]}</h3>
-              {inSection.map((t) => <TaskItem key={t.id} task={t} />)}
+              {inSection.map((t) => <TaskItem key={t.id} task={t} details={details} />)}
             </section>
           );
         })}
