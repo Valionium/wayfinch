@@ -6,7 +6,7 @@ import { gzipSync } from 'node:zlib';
 import { afterAll, expect, test, vi } from 'vitest';
 import { buildDist } from '../../../tools/build.mjs';
 import { advise } from '../../../src/core/advisor/search.ts';
-import { SIZE_RANGES, WEIGHTS } from '../../../src/core/advisor/table.ts';
+import { MIN_GAIN_BACK_L, SIZE_RANGES, WEIGHTS } from '../../../src/core/advisor/table.ts';
 
 const tmpRoot = mkdtempSync(join(tmpdir(), 'wf-advisor-js-'));
 afterAll(() => rmSync(tmpRoot, { recursive: true, force: true }));
@@ -31,7 +31,9 @@ test('[GA-SIZE] advisor.js builds, sets window.WayfinchAdvisor, and is under 20 
   const context = { window: {} as Record<string, unknown> };
   runInNewContext(source, context);
   const api = context.window.WayfinchAdvisor as Record<string, unknown>;
-  expect(Object.keys(api).sort()).toEqual(['SIZE_RANGES', 'WEIGHTS', 'advise', 'adviseSteps']);
+  // MIN_GAIN_BACK_L too: the page's cannot-reduce sentence reads it (re-check of PR 60)
+  expect(Object.keys(api).sort()).toEqual(['MIN_GAIN_BACK_L', 'SIZE_RANGES', 'WEIGHTS', 'advise', 'adviseSteps']);
+  expect(api.MIN_GAIN_BACK_L).toBe(MIN_GAIN_BACK_L);
   expect(Object.isFrozen(api)).toBe(true);
   expect(JSON.parse(JSON.stringify(api.WEIGHTS))).toEqual(WEIGHTS);
   expect(JSON.parse(JSON.stringify(api.SIZE_RANGES))).toEqual(SIZE_RANGES);

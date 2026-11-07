@@ -5506,14 +5506,14 @@ const ADVISOR_WORDING = {
   statusCannot:{text:'No bag takes more off your back.'}, statusPartial:{text:'This search stopped early.'},
   answerTitle:{text:'What to get'},
   trying:{text:'Trying {n} options…'},
-  drawnWith:{text:'Your bike with {what}'},
+  drawnWith:{text:'Your bike with {what}'}, drawnSwap:{text:'Your bike with {new} instead of your {old}'},
   whyTitle:{text:'Why it helps:'}, movesTitle:{text:'Where your things move'},
   backAll:{text:'Takes the {l} L off your back.'}, backSome:{text:'Takes {l} L off your back; {left} L stay there.'},
   movesKg:{text:'Moves {kg} kg from {from} to {to}.'}, fitsOver:{text:'Fits everything that was left over.'},
   lower:{text:'Puts the weight lower and nearer the middle of the bike.'},
   alreadyGood:{text:'Your bags already suit this; nothing to add.'},
-  // the search answers cannot-reduce when nothing takes MIN_GAIN_BACK_L (decision 6, 0.5 L) or more off the back
-  cannotReduce:{text:'No bag within this style takes 0.5 L or more off your back: {l} L stay on your back.'},
+  // the search answers cannot-reduce when nothing takes MIN_GAIN_BACK_L (table.ts, decision 6) or more off the back; {min} is read from it
+  cannotReduce:{text:'No bag within this style takes {min} L or more off your back: {l} L stay on your back.'},
   nothing:{text:'Nothing helps: no single bag, swap or pair of bags fits everything within this style.'},
   closest:{text:'Closest: {what}.'}, stillOver:{text:'Still left over: {what}.'}, closestNone:{text:'No bag can be added to this bike within this style.'},
   partial:{text:'This search stopped early, after {n} options, so a better one may be missing.'},
@@ -5572,15 +5572,16 @@ function advisorBagPhrase(bag, range){
   const size = advisorRange(range[0], range[1]);
   return bag.pair ? `${advisorWord('pairOf', { size })} ${type}` : `${advisorAn(range[0])} ${size} ${type}`;
 }
+// The rider's bag a swap takes out: "14 L seat pack", "2 × 20 L panniers".
+function advisorOldBag(s, input){
+  const old = input.bags.find(b => b.uid === s.remove);
+  return old ? `${old.pair ? '2 × ' : ''}${old.L} L ${advisorWord(ADVISOR_TYPES[old.pos]).toLowerCase()}` : '';
+}
 // What to get, in a line (design §2).
 function advisorWhat(s, input){
   const bag = s.add[0];
   if(s.kind === 'add-two') return advisorWord('two', { a:advisorBagText(s.add[0], [s.add[0].L, s.add[0].L]), b:advisorBagText(s.add[1], [s.add[1].L, s.add[1].L]).replace(/^./, c => c.toLowerCase()) });
-  if(s.kind === 'swap'){
-    const old = input.bags.find(b => b.uid === s.remove);
-    const was = old ? `${old.pair ? '2 × ' : ''}${old.L} L ${advisorWord(ADVISOR_TYPES[old.pos]).toLowerCase()}` : '';
-    return advisorWord('replace', { old:was, new:advisorBagPhrase(bag, s.rangeL) });
-  }
+  if(s.kind === 'swap') return advisorWord('replace', { old:advisorOldBag(s, input), new:advisorBagPhrase(bag, s.rangeL) });
   return advisorBagText(bag, s.rangeL);
 }
 // The plan the search compared against: its first trial, the plan as the chosen style reads it (without a rack, no rack kit).
@@ -5630,13 +5631,19 @@ function advisorWhy(s, input){
   else if(input.goal === 'handling' && !out.length) out.push(advisorWord('lower'));
   return out;
 }
+// "Your bike with fork cages, 2 × 5 L"; a swap: "Your bike with a 15 L handlebar roll instead of your 12 L handlebar roll".
+function advisorDrawnName(s, input){
+  if(s.kind !== 'swap') return advisorWord('drawnWith', { what:advisorWhat(s, input).replace(/^./, c => c.toLowerCase()) });
+  return advisorWord('drawnSwap', { new:advisorBagPhrase(s.add[0], s.rangeL), old:advisorOldBag(s, input) });
+}
 function advisorSuggestionHtml(s, input, i){
   const tags = s.tags.length ? `<p class="adv-tags">${s.tags.map(htmlEsc).join(' · ')}</p>` : '';
   const art = bikeDrawing(S.bikeProfile, advisorBagView(advisorTrialBags(s, input), s.decks, input), { theme:bikeTheme(), idPrefix:'adv' + i });
   const moves = advisorMoves(s, input), shown = moves.slice(0, 8);
   if(moves.length > shown.length) shown.push(advisorWord('moreMoves', { n:moves.length - shown.length }));
   return `<li class="adv-sugg"><article class="adv-card" tabindex="0" aria-labelledby="advS${i}"><h4 id="advS${i}">${htmlEsc(advisorWhat(s, input))}</h4>${tags}`
-    + `<div class="adv-drawing" role="img" aria-label="${htmlEsc(advisorWord('drawnWith', { what:advisorWhat(s, input).replace(/^./, c => c.toLowerCase()) }))}">${art ? art.svg : ''}</div>`
+    // the drawing is named by its bag; the bike image inside, which names only the bike, is hidden
+    + `<div class="adv-drawing" role="img" aria-label="${htmlEsc(advisorDrawnName(s, input))}">${art ? art.svg.replace(/^<svg\b/, '<svg aria-hidden="true"') : ''}</div>`
     + `<p class="adv-why"><strong>${advisorWord('whyTitle')}</strong> ${advisorWhy(s, input).map(htmlEsc).join(' ')}</p>`
     + (shown.length ? `<p class="adv-sub">${advisorWord('movesTitle')}</p><ul class="adv-moves">${shown.map(l => `<li>${htmlEsc(l)}</li>`).join('')}</ul>` : '')
     + '</article></li>';
@@ -5651,7 +5658,7 @@ function advisorAnswerHtml(answer, input){
   let body = '';
   if(answer.kind === 'suggestions') body = `<ol class="adv-list">${answer.items.map((s, i) => advisorSuggestionHtml(s, input, i)).join('')}</ol>`;
   else if(answer.kind === 'already-good') body = `<p class="adv-plain">${advisorWord('alreadyGood')}</p>`;
-  else if(answer.kind === 'cannot-reduce') body = `<p class="adv-plain">${advisorWord('cannotReduce', { l:+answer.backL.toFixed(1) })}</p>`;
+  else if(answer.kind === 'cannot-reduce') body = `<p class="adv-plain">${advisorWord('cannotReduce', { min:window.WayfinchAdvisor.MIN_GAIN_BACK_L, l:+answer.backL.toFixed(1) })}</p>`;
   else {
     const c = answer.closest, lines = [advisorWord('nothing')];
     if(c){

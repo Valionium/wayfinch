@@ -293,8 +293,16 @@ test('[GA-ANSWER] each suggestion shows type and size range, the bike drawn with
   const names=items.map(it=>(/<div class="adv-drawing" role="img" aria-label="([^"]+)">/.exec(it)||[])[1]);
   a.items.forEach((s,i)=>{
     const what=p.json(`advisorWhat(ADVISOR.answer.items[${i}],ADVISOR.input)`);
-    assert.equal(names[i],p.run('htmlEsc')(`Your bike with ${what.replace(/^./,c=>c.toLowerCase())}`),'drawing '+(i+1)+' named by its bag');
+    // a swap reads as the new bag instead of the old one (re-check of PR 60)
+    const name=s.kind==='swap' ? null : `Your bike with ${what.replace(/^./,c=>c.toLowerCase())}`;
+    if(name)assert.equal(names[i],p.run('htmlEsc')(name),'drawing '+(i+1)+' named by its bag');
+    // the bike image inside is hidden: the card's drawing has one name, its own
+    assert.ok(/<div class="adv-drawing" role="img" aria-label="[^"]+"><svg aria-hidden="true"/.test(items[i]),'drawing '+(i+1)+': the inner bike image hidden');
   });
+  const swap=a.items.findIndex(s=>s.kind==='swap');
+  assert.ok(swap>=0,'R2 has a swap among its suggestions');
+  assert.equal(names[swap],'Your bike with a 15 L handlebar roll instead of your 12 L handlebar roll');
+  assert.ok(names.every(n=>!/with replace/i.test(n)),'never "with replace"');
   assert.equal(new Set(names).size,names.length,'no two drawings share a name');
 });
 
@@ -341,6 +349,10 @@ test('[GA-ANSWER] the words of each answer: a swap, a pair, already good, cannot
   assert.ok(say({kind:'cannot-reduce',backL:3,...common}).includes('3 L stay on your back'));
   // exact: the search answers cannot-reduce when nothing takes 0.5 L or more off (decision 6), so the sentence says so (PR 60, m2)
   assert.ok(say({kind:'cannot-reduce',backL:3,...common}).includes('No bag within this style takes 0.5 L or more off your back: 3 L stay on your back.'));
+  // the 0.5 L is table.ts's MIN_GAIN_BACK_L, as advisor.js hands it over, never typed into the page (re-check of PR 60)
+  assert.equal(p.json('window.WayfinchAdvisor.MIN_GAIN_BACK_L'),0.5);
+  p.run('window.WayfinchAdvisor={...window.WayfinchAdvisor,MIN_GAIN_BACK_L:0.7}');
+  assert.ok(say({kind:'cannot-reduce',backL:3,...common}).includes('takes 0.7 L or more off your back'),'the sentence follows the table');
   const none=say({kind:'nothing-helps',closest:{...sugg('add',[{uid:9,pos:'seat',L:16}],null),rangeL:[16,16],result:{overL:2.4,spillIds:['tent','stove'],backL:0,backKg:0,outOfReach:0,kgByPos:{},items:{}}},...common});
   assert.ok(none.includes('Nothing helps'),'says so plainly');
   assert.ok(/Closest: Seat pack, 16 L/.test(none),'the closest option');
