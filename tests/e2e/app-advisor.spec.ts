@@ -38,7 +38,7 @@ test('[GA-FAST] on the phone stand-in (run with the [PERF-* budgets): the median
     const times = [];
     for (let i = 0; i < 15; i++) { const t0 = performance.now(); advisorTrial(S.bags, S.decks); times.push(performance.now() - t0); }
     times.sort((a, b) => a - b);
-    const steps = window.WayfinchAdvisor.adviseSteps(advisorInput('rack', 'handling'));
+    const steps = window.WayfinchAdvisor.adviseSteps(advisorInput('panniers', 'handling'));
     const slices = [];
     const start = performance.now();
     let t = start, answer = null;
@@ -90,7 +90,7 @@ test('[GA-PROGRESS] a search longer than 300 ms shows "Trying N options…", and
   await page.evaluate("location.hash = '#gear-advisor'");
   const box = page.locator('#advisorBox');
   await expect(box).toBeVisible();
-  await box.locator('label.adv-choice', { hasText: 'With a rack and panniers' }).click();
+  await box.locator('label.adv-choice', { hasText: 'Panniers are fine' }).click();
   await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
   await expect(page.locator('#advisorProgress')).toBeVisible();
   await expect(page.locator('#advisorProgress')).toHaveText(/^Trying \d+ options…$/);
@@ -115,7 +115,7 @@ test('[GA-PROGRESS] the real R3 search hands the page back after every 20 trials
     document.getElementById('advisorBox').addEventListener('change', (e) => { if (e.target.name === 'advGoal' && window.__adv.down) window.__adv.tap = performance.now() - window.__adv.down; });`);
   await page.evaluate("openAdvisor(document.getElementById('rigBikeDetails'))");
   const box = page.locator('#advisorBox');
-  await box.locator('label.adv-choice', { hasText: 'With a rack and panniers' }).click();
+  await box.locator('label.adv-choice', { hasText: 'Panniers are fine' }).click();
   await page.evaluate('window.__adv.trials = 0; window.__adv.yields = []; window.__adv.down = 0');
   await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
   await expect.poll(() => page.evaluate('window.__adv.trials')).toBeGreaterThan(25);
@@ -143,18 +143,20 @@ test('[GA-SCREEN] at this window size and theme, offline: the steps are headings
   const box = page.locator('#advisorBox');
   await expect(box).toBeVisible();
   await expect(box.locator('#advisorSteps h3')).toHaveText([/^1\. /, /^2\. /, /^3\. /]);
-  // no rack mounts: the rack choice is closed, and the line says why
-  await expect(box.locator('input[name="advStyle"][value="rack"]')).toBeDisabled();
-  await expect(box.locator('#advNoMounts')).toHaveText("Your bike has no rack mounts, so panniers aren't offered.");
+  // no rack mounts and no rack in the plan: the line says no rack or panniers are offered; every setup stays open (the owner, 7 Nov)
+  await expect(box.locator('input[name="advStyle"][value="panniers"]')).toBeEnabled();
+  await expect(box.locator('#advNoMounts')).toHaveText('Your bike has no rack mounts, so no rack or panniers are offered.');
+  await expect(box.locator('input[name="advStyle"][value="bags-first"]')).toBeChecked();   // the default
   // the keyboard: from the dialog's close button, Tab into the styles, the arrow keys to choose
   await box.locator('#advisorClose').focus();
   for (let i = 0; i < 4 && (await page.evaluate('document.activeElement.name')) !== 'advStyle'; i++) await page.keyboard.press('Tab');
   expect(await page.evaluate('document.activeElement.name')).toBe('advStyle');
   await page.keyboard.press('ArrowRight');
-  await expect.poll(() => page.evaluate('ADVISOR.style')).toBe('either');
-  expect(await page.evaluate('document.activeElement.value'), 'focus stays on the choice after it is drawn again').toBe('either');
+  await expect.poll(() => page.evaluate('ADVISOR.style')).toBe('panniers');
+  expect(await page.evaluate('document.activeElement.value'), 'focus stays on the choice after it is drawn again').toBe('panniers');
   await page.keyboard.press('ArrowLeft');
-  await expect.poll(() => page.evaluate('ADVISOR.style')).toBe('no-rack');
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(() => page.evaluate('ADVISOR.style')).toBe('bags');
   await page.keyboard.press('Tab');
   expect(await page.evaluate('document.activeElement.name')).toBe('advGoal');
   await page.keyboard.press('ArrowRight');
@@ -195,12 +197,12 @@ test('[GA-STEPS] in the browser: each choice is a labelled radio of at least 44 
   await page.evaluate("openAdvisor(document.getElementById('rigBikeDetails'))");
   const box = page.locator('#advisorBox');
   await expect(box.locator('#advisorAnswer')).toHaveText('Choose all three steps to see what to get.');
-  for (const name of ['Without a rack: bikepacking', 'Either is fine', 'Better handling', 'Get the backpack off']) {
+  for (const name of ['Bikepacking bags only', 'Bags first, panniers only if needed', 'Panniers are fine', 'Better handling', 'Get the backpack off']) {
     await expect(box.getByRole('radio', { name })).toHaveCount(1);
     const h = await box.locator('label.adv-choice', { hasText: name }).evaluate((el) => el.getBoundingClientRect().height);
     expect(h, name).toBeGreaterThanOrEqual(44);
   }
-  await box.locator('label.adv-choice', { hasText: 'Without a rack: bikepacking' }).click();
+  await box.locator('label.adv-choice', { hasText: 'Bikepacking bags only' }).click();
   await expect(box.locator('#advisorAnswer')).toHaveText('Choose all three steps to see what to get.');
   await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
   await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });

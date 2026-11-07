@@ -85,18 +85,18 @@ test('[GA-TRIAL-FN] S, the kept plan and storage are unchanged after 100 trials,
 
 test('[GA-TRIAL-FN] advisorInput reads the plan, the bike and the planner\'s own bagSpec; a bag holding a hand placement is marked',()=>{
   const p=page({setup:BAGS+"currentPlan();S.pinned={rain:'2-0'};"});
-  const input=p.run("(()=>{const i=advisorInput('either','handling');return JSON.stringify({...i,usable:undefined,trial:undefined,"
+  const input=p.run("(()=>{const i=advisorInput('bags-first','handling');return JSON.stringify({...i,usable:undefined,trial:undefined,"
     +"seat:i.usable({uid:9,pos:'seat',L:16}),top:i.usable({uid:9,pos:'top',slot:'rear',L:2})});})()");
   const i=JSON.parse(input);
   assert.deepEqual(i.bags.map(b=>[b.uid,b.pos,!!b.hand]),[[1,'bar',false],[2,'top',true],[3,'pack',false],[4,'bottle',false]]);
-  assert.deepEqual([i.style,i.goal,i.noPanniers,i.camping,i.nextUid,i.rackMounts],['either','handling',false,true,5,'yes']);
+  assert.deepEqual([i.style,i.goal,i.camping,i.nextUid,i.rackMounts],['bags-first','handling',true,5,'yes']);
   assert.deepEqual(i.decks,{bar:false,rack:false});
   assert.deepEqual(i.topSlotsFree,['rear'],'the front slot is taken');
   assert.equal(i.frameReason,null);
   assert.equal(i.frameSize,'M');assert.equal(i.seatGapCm,30);
   assert.deepEqual(i.seat,{ok:true,reason:null,band:'likely'},'bagSpec\'s verdict and band');
   assert.equal(i.top.ok,true);
-  const sum=p.run("JSON.stringify(advisorInput('either','handling').trial(S.bags,S.decks).items)");
+  const sum=p.run("JSON.stringify(advisorInput('bags-first','handling').trial(S.bags,S.decks).items)");
   assert.equal(sum,p.run('JSON.stringify(currentPlan().items)'),'its trial is advisorTrial');
 });
 
@@ -107,7 +107,7 @@ test('[GA-TRIAL-FN] gains are measured against a fresh re-plan of the plan: a tr
   const score=r=>Math.round(Object.entries(r.kgByPos).reduce((n,[pos,kg])=>n+kg*W[pos],0)*100)/100;
   const kept=p.json('advisorResult(currentPlan())'),fresh=p.json('planWith({placements:null},advisorResult)');
   assert.ok(score(kept)-score(fresh)>=0.5,'this plan drifted: a re-plan alone gains 0.5 or more');
-  p.run('openAdvisor()');p.run("setAdvisor('style','either');setAdvisor('goal','handling')");await p.run('ADVISOR_DONE');
+  p.run('openAdvisor()');p.run("setAdvisor('style','bags-first');setAdvisor('goal','handling')");await p.run('ADVISOR_DONE');
   assert.equal(score(p.json('advisorBase(ADVISOR.input).result')),score(fresh),'the base is the fresh re-plan');
   const a=p.json('ADVISOR.answer');
   for(const s of a.kind==='suggestions' ? a.items : [])assert.ok(score(fresh)-s.score>=0.5-1e-9,`${p.json(`advisorWhat(${JSON.stringify(s)},ADVISOR.input)`)}: its own gain over the re-plan is ${(score(fresh)-s.score).toFixed(2)}`);
@@ -126,26 +126,26 @@ test('[GA-RANGES-SPEC] the size table agrees with the real bagSpec, on a bike wi
     for(const [pos,row] of Object.entries(A)){
       for(const L of [row.min,row.max]){
         const bag={uid:9,pos,L,...(row.pair ? {pair:true} : {}),...(pos==='top' ? {slot:'front'} : {})};
-        const v=q.json(`advisorInput('either','handling').usable(${JSON.stringify(bag)})`);
+        const v=q.json(`advisorInput('bags-first','handling').usable(${JSON.stringify(bag)})`);
         assert.equal(v.ok,true,`${bike.id}: ${pos} ${L} L is usable`);
         if(pos==='seat' && bike===FULL)assert.equal(v.band,'likely',`${bike.id}: seat ${L} L in a 30 cm gap`);
       }
     }
     // frame bags: the bike's own shapes at bikeFit's litres, never below the cage floor
-    const shapes=q.json("advisorInput('either','handling').frameShapes");
+    const shapes=q.json("advisorInput('bags-first','handling').frameShapes");
     const fit=q.json('bikeFit(S.bikeProfile).frameBag.shapes.map(s=>({shape:s.shape,L:s.L,source:s.source}))');
     assert.deepEqual(shapes,fit,bike.id+': the frame litres are bikeFit\'s');
-    for(const s of shapes)assert.equal(q.json(`advisorInput('either','handling').usable({uid:9,pos:'frame',shape:${s.shape},L:${s.L}})`).ok,true);
+    for(const s of shapes)assert.equal(q.json(`advisorInput('bags-first','handling').usable({uid:9,pos:'frame',shape:${s.shape},L:${s.L}})`).ok,true);
   }
-  assert.equal(page({bike:FULL}).json("advisorInput('either','handling').frameShapes.every(s=>s.source==='measured')"),true);
+  assert.equal(page({bike:FULL}).json("advisorInput('bags-first','handling').frameShapes.every(s=>s.source==='measured')"),true);
   // a cage inside the triangle raises the floor: the full shape is not offered
   const caged=page({setup:"S.bags=[{uid:1,pos:'bottle',slot:'st',L:0.75}];S.nextUid=2;"});
-  assert.deepEqual(caged.json("advisorInput('either','handling').frameShapes.map(s=>s.shape)"),[1,2]);
+  assert.deepEqual(caged.json("advisorInput('bags-first','handling').frameShapes.map(s=>s.shape)"),[1,2]);
   // step-through: NO_MOUNT; XS with two cages in the triangle: NO_ROOM; neither has a frame bag to offer
-  const step=page({bike:STEP}).json("(()=>{const i=advisorInput('either','handling');return [i.frameShapes,i.frameReason,NO_MOUNT];})()");
+  const step=page({bike:STEP}).json("(()=>{const i=advisorInput('bags-first','handling');return [i.frameShapes,i.frameReason,NO_MOUNT];})()");
   assert.deepEqual(step[0],[]);assert.equal(step[1],step[2]);
   const xs=page({bike:XS,setup:"S.bags=[{uid:1,pos:'bottle',slot:'st',L:0.75},{uid:2,pos:'bottle',slot:'dt',L:0.75}];S.nextUid=3;"})
-    .json("(()=>{const i=advisorInput('either','handling');return [i.frameShapes,i.frameReason,NO_ROOM,i.usable({uid:9,pos:'frame',shape:2,L:1.3}).reason];})()");
+    .json("(()=>{const i=advisorInput('bags-first','handling');return [i.frameShapes,i.frameReason,NO_ROOM,i.usable({uid:9,pos:'frame',shape:2,L:1.3}).reason];})()");
   assert.deepEqual(xs[0],[]);assert.equal(xs[1],xs[2]);assert.equal(xs[3],xs[2],'bagSpec says the same');
 });
 
@@ -181,29 +181,36 @@ test('[GA-STEPS] the three steps in order, as headings; each choice is a labelle
   const radios=[...html.matchAll(/<label class="adv-choice[^"]*"[^>]*>([\s\S]*?)<\/label>/g)];
   assert.ok(radios.length>=5,'style and goal choices at least');
   for(const [,inner] of radios){assert.ok(/<input type="radio" name="adv\w+" value="[^"]+"/.test(inner),'a radio');assert.ok(textOf(inner).length>2,'with words');}
-  for(const v of ['rack','no-rack','either'])assert.ok(html.includes(`name="advStyle" value="${v}"`),v);
+  // step 1, the owner's ruling of 7 Nov: What kind of setup do you want?
+  assert.ok(heads[0]==='1. What kind of setup do you want?');
+  for(const v of ['bags','bags-first','panniers'])assert.ok(html.includes(`name="advStyle" value="${v}"`),v);
+  for(const w of ['Bikepacking bags only','Bags first, panniers only if needed','Panniers are fine'])assert.ok(textOf(html).includes(w),w);
   for(const v of ['handling','backpack'])assert.ok(html.includes(`name="advGoal" value="${v}"`),v);
   // one or two steps chosen: no search, and the answer says what is missing
-  await ask(p,{style:'no-rack'});
+  // Bags first is chosen when the view opens (the default); the goal is still to choose
+  assert.equal(p.json('ADVISOR.style'),'bags-first','the default setup');
+  await ask(p,{style:'bags'});
   assert.equal(p.json('ADVISOR.answer'),null,'no answer with the goal missing');
   assert.ok(/Choose/.test(textOf(view(p).answer)));
-  p.run("setAdvisor('style',null)");await ask(p,{goal:'handling'});
+  // the view opens with Bags first chosen; a setup taken away again (in the open view) leaves no answer
+  p.run("setAdvisor('style',null);setAdvisor('goal','handling')");await p.run('ADVISOR_DONE');
   assert.equal(p.json('ADVISOR.answer'),null,'no answer with the style missing');
-  await ask(p,{style:'no-rack',goal:'handling'});
+  await ask(p,{style:'bags',goal:'handling'});
   assert.ok(p.json('ADVISOR.answer.kind'),'all three: an answer');
 });
 
-test('[GA-STEPS] with no rack mounts the rack choice is disabled and a line says why; Not sure and Yes leave it open',()=>{
+test('[GA-STEPS] with no rack mounts and no rack in the plan a line says no rack or panniers are offered; every setup stays open; Not sure, Yes or a rack fitted: no line (the owner, 7 Nov)',()=>{
   const p=page({setup:R2,bike:GRAVEL});
   p.run('openAdvisor()');
   const html=view(p).steps;
-  assert.ok(/name="advStyle" value="rack"[^>]*disabled/.test(html),'disabled');
-  assert.ok(textOf(html).includes("Your bike has no rack mounts, so panniers aren't offered."));
+  assert.ok(!/name="advStyle"[^>]*disabled/.test(html),'no setup is closed');
+  assert.ok(textOf(html).includes('Your bike has no rack mounts, so no rack or panniers are offered.'));
   for(const bike of [FULL,BARE]){
     const q=page({setup:R2,bike});q.run('openAdvisor()');
-    assert.ok(!/name="advStyle" value="rack"[^>]*disabled/.test(view(q).steps),bike.id+': open');
     assert.ok(!textOf(view(q).steps).includes('no rack mounts'),bike.id+': no line');
   }
+  const fitted=page({setup:R2+"S.bags.push({uid:6,pos:'rack',L:15});S.nextUid=7;",bike:GRAVEL});fitted.run('openAdvisor()');
+  assert.ok(!textOf(view(fitted).steps).includes('no rack mounts'),'a rack fitted: no line in step 1 (the answer says it stays)');
 });
 
 test('[GA-PLAN-INPUT] with a plan: N items and M bags are the plan\'s; the switch moves to the questionnaire and back without changing S',()=>{
@@ -226,17 +233,18 @@ test('[GA-QUESTIONNAIRE] each answer maps as decision 5: riding pre-selects the 
   const p=page({setup:'S.bags=[];S.nextUid=1;'});
   p.run('openAdvisor()');
   assert.equal(p.json('ADVISOR.source'),'questionnaire','no plan: the questionnaire');
-  for(const [riding,style] of [['touring','rack'],['road','no-rack'],['gravel','no-rack'],['mtb','no-rack'],['everyday','either']]){
+  // the riding picks the setup, by advisor.js's DECIDED.ridingSetup (the owner's ruling of 7 Nov)
+  assert.deepEqual(p.json('window.WayfinchAdvisor.DECIDED.ridingSetup'),{touring:'panniers',road:'bags',gravel:'bags',mtb:'bags',everyday:'bags-first'});
+  for(const [riding,style] of [['touring','panniers'],['road','bags'],['gravel','bags'],['mtb','bags'],['everyday','bags-first']]){
     p.run(`ADVISOR.style=null;ADVISOR.styleTouched=false;setAdvisor('riding','${riding}')`);
     assert.equal(p.json('ADVISOR.style'),style,riding+' pre-selects '+style);
   }
-  p.run("setAdvisor('style','either');setAdvisor('riding','road')");
-  assert.equal(p.json('ADVISOR.style'),'either','a style the rider chose stays');
+  p.run("setAdvisor('style','panniers');setAdvisor('riding','road')");
+  assert.equal(p.json('ADVISOR.style'),'panniers','a setup the rider chose stays');
   const q=a=>p.json(`(()=>{const q=advisorQuestionnaire(${JSON.stringify(a)});return {...q,base:{...q.base,kit:undefined},kitSame:JSON.stringify(q.base.kit)===JSON.stringify(tripKitDefaults(${a.nights},'${a.sleep}',S.bikeProfile))};})()`);
   const light=q({riding:'mtb',nights:1,sleep:'camp',carry:'light'});
   assert.deepEqual(light.bags,[{uid:1,pos:'pack',L:15}],'a 15 L backpack');
   assert.equal(light.nextUid,2);
-  assert.equal(light.noPanniers,true,'mountain bike trails: no panniers');
   assert.equal(light.kitSame,true,'the kit is tripKitDefaults(nights, sleep, bike)');
   assert.deepEqual([light.base.nights,light.base.sleep,light.base.mode],[1,'camp','light']);
   const tiers=p.json('Object.fromEntries(KIT.filter(k=>k.tiers).map(k=>[k.id,k.tiers]))');
@@ -248,7 +256,7 @@ test('[GA-QUESTIONNAIRE] each answer maps as decision 5: riding pre-selects the 
   }
   assert.equal(lot.base.mode,'comfort');
   const avg=q({riding:'touring',nights:4,sleep:'indoor',carry:'average'});
-  assert.deepEqual([avg.base.nights,avg.base.sleep,avg.base.mode,avg.noPanniers],[4,'indoor','comfort',false]);
+  assert.deepEqual([avg.base.nights,avg.base.sleep,avg.base.mode],[4,'indoor','comfort']);
   assert.deepEqual(avg.base.custom,{},'average: the default kit');
   assert.deepEqual([avg.base.qty,avg.base.pinned,avg.base.placements,avg.base.carried],[{},{},null,{}],'nothing of the plan carries over');
 });
@@ -268,7 +276,7 @@ test('[GA-QUESTIONNAIRE] the starting 15 L backpack is named; the plan, the draf
 test('[GA-ANSWER] each suggestion shows type and size range, the bike drawn with it, where things move and why; no brand word; the style rule on screen',async()=>{
   const brands=require('./fixtures/advisor/brands.json').brands;
   const p=page({setup:R2,bike:GRAVEL});
-  await ask(p,{style:'no-rack',goal:'handling'});
+  await ask(p,{style:'bags',goal:'handling'});
   const a=p.json('ADVISOR.answer');
   assert.equal(a.kind,'suggestions');
   const html=view(p).answer;
@@ -282,7 +290,7 @@ test('[GA-ANSWER] each suggestion shows type and size range, the bike drawn with
     assert.ok(/<svg[^>]*class="bk/.test(items[i]),'the bike, drawn');
     assert.ok(/Why it helps/.test(t),'why');
     for(const tag of s.tags)assert.ok(t.includes(tag),'its tags: '+tag);
-    assert.ok(!/pannier|rack/i.test(what),'no rack under Without a rack');
+    assert.ok(!/pannier|rack/i.test(what),'no rack under Bikepacking bags only');
   });
   assert.ok(/→/.test(textOf(html)),'where things move: from → to');
   for(const b of brands)assert.ok(!new RegExp(`\\b${b}\\b`).test(textOf(html)),'no brand: '+b);
@@ -312,7 +320,7 @@ test('[GA-SCREEN] the answer is not a live region: one short status line says wh
   const status=()=>p.context.document.getElementById('advisorStatus').textContent;
   p.run('openAdvisor()');
   assert.equal(status(),'Choose all three steps to see what to get.');
-  await ask(p,{style:'no-rack',goal:'handling'});
+  await ask(p,{style:'bags',goal:'handling'});
   const n=p.json('ADVISOR.answer.items.length');
   assert.equal(status(),`${n} suggestions, best first.`);
   const say=a=>{p.run(`ADVISOR.answer=${JSON.stringify(a)};renderAdvisorAnswer()`);return status();};
@@ -323,20 +331,20 @@ test('[GA-SCREEN] the answer is not a live region: one short status line says wh
   assert.equal(say({kind:'already-good',...common,partial:true}),'Your bags already suit this; nothing to add. This search stopped early.');
 });
 
-test('[GA-ANSWER] a bike whose rack mounts are Not sure (no field, as sub-project 11 stores it): every pannier shown says "if your bike has rack mounts"',async()=>{
-  const p=page({bike:BARE,setup:"S.bags=[{uid:1,pos:'pack',L:15}];S.nextUid=2;S.nights=0;applyTripKitDefaults();"});
-  assert.equal(p.json("advisorInput('either','backpack').rackMounts"),null,'no field');
-  await ask(p,{style:'either',goal:'backpack'});
+test('[GA-ANSWER] a bike whose rack mounts are Not sure (no field, as sub-project 11 stores it) and no rack fitted: every rack or pannier shown says "if your bike has rack mounts"',async()=>{
+  const p=page({bike:BARE,setup:"S.bags=[{uid:1,pos:'pack',L:15}];S.nextUid=2;S.nights=2;S.sleep='camp';applyTripKitDefaults();"});
+  assert.equal(p.json("advisorInput('bags-first','backpack').rackMounts"),null,'no field');
+  await ask(p,{style:'panniers',goal:'backpack'});
   const a=p.json('ADVISOR.answer');
-  const racks=a.items.filter(s=>s.add.some(b=>b.pos==='rack'));
-  assert.ok(racks.length>0,'panniers are among the suggestions');
+  const racks=[...a.items,...(a.ahead ? [a.ahead] : [])].filter(s=>s.deck || s.add.some(b=>b.pos==='rack'));
+  assert.ok(racks.length>0,'a rack is among the suggestions');
   for(const s of racks)assert.ok(s.tags.includes('if your bike has rack mounts'));
   assert.ok(textOf(view(p).answer).includes('if your bike has rack mounts'),'and the tag is on screen');
 });
 
 test('[GA-ANSWER] the words of each answer: a swap, a pair, already good, cannot reduce, nothing helps with what stays over, a search cut short',()=>{
   const p=page({setup:R2});
-  const input="advisorInput('either','handling')";
+  const input="advisorInput('bags-first','handling')";
   const sugg=(kind,add,remove)=>({kind,add,remove,decks:{bar:false,rack:false},newBags:add.length,litres:add.reduce((n,b)=>n+b.L,0),tags:[],
     result:{overL:0,spillIds:[],backL:0,backKg:0,outOfReach:0,kgByPos:{},items:{}},score:0,rangeL:[add[0].L,add[0].L+2]});
   p.context.qaSwap=JSON.stringify({...sugg('swap',[{uid:9,pos:'frame',shape:0,L:6}],1),rangeL:[6,6]});
@@ -361,6 +369,51 @@ test('[GA-ANSWER] the words of each answer: a swap, a pair, already good, cannot
   assert.ok(say({kind:'already-good',...common,frameReason:p.run('NO_MOUNT')}).includes("Frame bags aren't offered. No mount on this bike."),'the planner\'s own reason');
 });
 
+test('[GA-ANSWER] a single fork cage or pannier reads as one bag, a pair as 2 ×; Looking ahead reads as Minimal\'s first plus the bag it adds, a swap included (the owner, 7 Nov)',()=>{
+  const p=page({setup:R2});
+  const input="advisorInput('bags-first','handling')";
+  const what=s=>{p.context.qaS=JSON.stringify(s);return p.json(`advisorWhat(JSON.parse(qaS),${input})`);};
+  const drawn=s=>{p.context.qaS=JSON.stringify(s);return p.json(`advisorDrawnName(JSON.parse(qaS),${input})`);};
+  const s=(kind,add,remove,rangeL)=>({kind,add,remove,decks:{bar:false,rack:false},newBags:add.length,litres:0,tags:[],rangeL:rangeL||[add[0].L,add[0].L],
+    result:{overL:0,spillIds:[],backL:0,backKg:0,outOfReach:0,kgByPos:{},items:{}},score:0});
+  assert.equal(what(s('add',[{uid:9,pos:'fork',L:4}],null,[4,5])),'Fork cage, 4–5 L');
+  assert.equal(what(s('add',[{uid:9,pos:'fork',pair:true,L:4}],null,[4,5])),'Fork cages, 2 × 4–5 L');
+  // R2 has no rack fitted: panniers come with a rack to fit (the owner's ruling of 7 Nov)
+  assert.equal(what(s('add',[{uid:9,pos:'rack',L:10}],null,[10,12])),'Rack and pannier, 10–12 L');
+  assert.equal(what(s('add',[{uid:9,pos:'rack',pair:true,L:10}],null,[10,12])),'Rack and panniers, 2 × 10–12 L');
+  assert.equal(what(s('swap',[{uid:9,pos:'fork',L:4}],1,[4,5])),'Replace your 14 L seat pack with a 4–5 L fork cage');
+  const ahead=s('ahead',[{uid:9,pos:'seat',L:16},{uid:10,pos:'bar',L:6}],null);
+  assert.equal(what(ahead),'Seat pack, 16 L, plus handlebar roll, 6 L');
+  assert.equal(drawn(ahead),'Your bike with seat pack, 16 L, plus handlebar roll, 6 L');
+  const swapAhead=s('ahead',[{uid:9,pos:'frame',shape:0,L:6},{uid:10,pos:'fork',L:3}],2);
+  assert.equal(what(swapAhead),'Replace your 12 L handlebar roll with a 6 L frame bag (full triangle), plus fork cage, 3 L');
+  assert.equal(drawn(swapAhead),'Your bike with a 6 L frame bag (full triangle) and a 3 L fork cage instead of your 12 L handlebar roll');
+});
+
+test('[GA-ANSWER] two kinds of answer, each labelled: "Minimal" over the fewest bags that do it, "Looking ahead" over one set that covers more, or a line saying there is none (the owner, 7 Nov)',async()=>{
+  const p=page({setup:'S.bags=[];S.nextUid=1;'});
+  await ask(p,{riding:'mtb',nights:1,sleep:'camp',carry:'light',goal:'backpack'});
+  const a=p.json('ADVISOR.answer');
+  assert.equal(a.kind,'suggestions');
+  assert.ok(a.ahead,'R4-like: a set that covers more');
+  const html=view(p).answer;
+  const heads=[...html.matchAll(/<h4[^>]*>([\s\S]*?)<\/h4>/g)].map(m=>textOf(m[1]));
+  assert.deepEqual(heads,['Minimal','Looking ahead'],'two labelled parts, in that order');
+  const [minimal,later]=html.split(/<h4[^>]*>Looking ahead<\/h4>/);
+  assert.ok(textOf(minimal).includes('The fewest new bags that do it.'));
+  assert.equal(minimal.split('<li class="adv-sugg"').length-1,a.items.length,'Minimal holds the suggestions');
+  const aheadWhat=p.json('advisorWhat(ADVISOR.answer.ahead,ADVISOR.input)');
+  assert.ok(textOf(later).includes(aheadWhat),'Looking ahead holds its set: '+aheadWhat);
+  assert.ok(/, plus /.test(aheadWhat),'Minimal\'s first plus one more');
+  assert.ok(/<svg[^>]*class="bk/.test(later) && /Why it helps/.test(textOf(later)),'drawn, and why');
+  // its card is reached like the others, with an id of its own
+  const ids=[...html.matchAll(/aria-labelledby="(advS\d+)"/g)].map(m=>m[1]);
+  assert.equal(new Set(ids).size,a.items.length+1,'one card each, ids unique');
+  // with nothing better, the Looking ahead part says so
+  p.run('ADVISOR.answer={...ADVISOR.answer,ahead:null};renderAdvisorAnswer()');
+  assert.ok(textOf(view(p).answer).includes('No further bag would help much more than Minimal.'));
+});
+
 // ---- Task 6: the example riders ----
 
 const RIDERS=require('./fixtures/advisor/riders.json').riders;
@@ -380,9 +433,10 @@ async function rider(r,style=r.style){
   await p.run('ADVISOR_DONE');
   return p;
 }
-// The answer as the fixture holds it: its kind, and each suggestion's kind, what to get (type and size range) and tags.
+// The answer as the fixture holds it: its kind, and each suggestion's kind, what to get (type and size range) and tags: Minimal's
+// items and Looking ahead's set (the owner, 7 Nov).
 const summary=p=>p.json(`(()=>{const a=ADVISOR.answer,i=ADVISOR.input,one=s=>({kind:s.kind,what:advisorWhat(s,i),tags:s.tags});
-  return {kind:a.kind,partial:a.partial,...(a.kind==='suggestions' ? {items:a.items.map(one)} : {}),
+  return {kind:a.kind,partial:a.partial,...(a.kind==='suggestions' ? {items:a.items.map(one),ahead:a.ahead && one(a.ahead)} : {}),
     ...(a.kind==='nothing-helps' ? {closest:a.closest && {...one(a.closest),overL:a.closest.result.overL,spill:a.closest.result.spillIds}} : {}),
     ...(a.kind==='cannot-reduce' ? {backL:a.backL} : {})};})()`);
 
@@ -399,26 +453,80 @@ test('[GA-RIDERS] each example rider gives exactly its written answer (qa/fixtur
   for(const r of RIDERS)assert.deepEqual(got[r.id],r.expect,r.id+' '+r.about);
 });
 
-test('[GA-STYLE-PAGE] R4 and every rider under Without a rack get no pannier and no rack deck; R4\'s step 1 shows the no-mounts line',async()=>{
+test('[GA-STYLE-PAGE] under Bikepacking bags only no example rider gets panniers or a rack to fit, in the search and in the answer\'s words; R3\'s own panniers leave the plan, its rack stays, and the answer says so; R4 (no rack mounts) never gets a rack, and its step 1 shows the line',async()=>{
   const r4=RIDERS.find(r=>r.id==='R4');
-  for(const [r,style] of [[r4,r4.style],...RIDERS.map(r=>[r,'no-rack'])]){
+  for(const [r,style] of [[r4,'bags-first'],[r4,'panniers'],...RIDERS.map(r=>[r,'bags'])]){
     const p=await rider(r,style);
     const a=p.json('ADVISOR.answer');
-    const shown=a.kind==='suggestions' ? a.items : a.kind==='nothing-helps' && a.closest ? [a.closest] : [];
+    const fitted=p.json('advisorRackFitted(ADVISOR.input)');
+    const shown=a.kind==='suggestions' ? [...a.items,...(a.ahead ? [a.ahead] : [])] : a.kind==='nothing-helps' && a.closest ? [a.closest] : [];
     for(const s of shown){
-      assert.ok(!s.add.some(b=>b.pos==='rack'),`${r.id} ${style}: no pannier`);
-      assert.equal(s.decks.rack,false,`${r.id} ${style}: no rack deck`);
-      assert.ok(!/pannier/i.test(p.json(`advisorWhat(${JSON.stringify(s)},ADVISOR.input)`)),`${r.id} ${style}: none on screen`);
+      if(style==='bags')assert.ok(!s.add.some(b=>b.pos==='rack'),`${r.id} ${style}: no pannier`);
+      if(!fitted && (style==='bags' || r===r4))assert.ok(!s.deck && !s.add.some(b=>b.pos==='rack'),`${r.id} ${style}: no rack to fit`);
+      if(style==='bags')assert.ok(!/pannier/i.test(p.json(`advisorWhat(${JSON.stringify(s)},ADVISOR.input)`)),`${r.id} ${style}: none on screen`);
     }
     const text=textOf(p.context.document.getElementById('advisorAnswer').innerHTML);
-    // the lines saying why are the only place panniers are named
-    const why=["Without a rack, your panniers and rack deck are left out of these suggestions.","On mountain bike trails, panniers aren't offered."];
-    assert.ok(!/\bpanniers?\b/i.test(why.reduce((t,w)=>t.replace(w,''),text)),`${r.id} ${style}: no pannier in the answer's words`);
-    if(r===r4 && style==='either')assert.ok(text.includes(why[1]),'R4 under Either: the trails line says why');
-    // the tourer's own panniers and rack deck leave the plan under Without a rack (review of PR 57, R1), and the answer says so
-    if(r.id==='R3' && style==='no-rack')assert.ok(text.includes(why[0]),'R3 without a rack: the line says its rack kit is left out');
-    if(r===r4)assert.ok(textOf(p.context.document.getElementById('advisorSteps').innerHTML).includes("Your bike has no rack mounts, so panniers aren't offered."),'R4: the line');
+    const out='With bikepacking bags only, your panniers are left out of these suggestions; your rack stays for its top deck.';
+    if(style==='bags')assert.ok(!/\bpanniers?\b/i.test(text.replace(out,'')),`${r.id} ${style}: no pannier in the answer's words`);
+    if(r.id==='R3' && style==='bags')assert.ok(text.includes(out),'R3, bags only: the line says its panniers are left out and its rack stays');
+    if(r===r4)assert.ok(textOf(p.context.document.getElementById('advisorSteps').innerHTML).includes('Your bike has no rack mounts, so no rack or panniers are offered.'),'R4: the line');
   }
+});
+
+// ---- The rack, the owner's ruling of 7 Nov: use what you have, a rack does the job, new bags, panniers last ----
+
+// The owner's example: a tent in the backpack. A pair of panniers full of the rest, or none; two nights camping.
+const TENT_IN_PACK="S.nights=2;S.sleep='camp';applyTripKitDefaults();S.mode='comfort';S.nextUid=5;";
+test('[GA-DECK] a tent in the backpack, with a rack fitted: "Put the tent … on your rack, no new bag needed", the whole Minimal answer; with rack mounts no, the rack stays and a line says so',async()=>{
+  for(const bike of [FULL,GRAVEL]){
+    const p=page({bike,setup:TENT_IN_PACK+"S.bags=[{uid:1,pos:'rack',pair:true,L:10},{uid:2,pos:'pack',L:20}];S.decks={bar:false,rack:false};"});
+    const planned=p.json("(()=>{const a=currentPlan();return Object.keys(a.items).filter(id=>(a.items[id]||[]).some(e=>String(e[0]).split('-')[0]==='2'));})()");
+    assert.ok(planned.includes('tent'),bike.id+': the backpack holds the tent today');
+    await ask(p,{style:'bags-first',goal:'backpack'});
+    const a=p.json('ADVISOR.answer');
+    assert.equal(a.kind,'suggestions',bike.id);
+    assert.deepEqual(a.items.map(s=>[s.kind,s.newBags,s.add.length]),[['deck',0,0]],bike.id+': the rack deck, no new bag, alone');
+    const what=p.json('advisorWhat(ADVISOR.answer.items[0],ADVISOR.input)');
+    assert.ok(/^Put the .*tent.* on your rack, no new bag needed$/.test(what),what);
+    const text=textOf(view(p).answer);
+    assert.ok(text.includes(what));
+    assert.equal(text.includes('Your bike is set to no rack mounts, but your plan has a rack: it stays in these suggestions.'),bike===GRAVEL,bike.id+': the line when the mounts say no');
+  }
+});
+
+test('[GA-DECK] a tent in the backpack, no rack fitted, rack mounts yes: "a rack" comes first, one new thing; Not sure: tagged; never under Bikepacking bags only, nor with rack mounts no',async()=>{
+  const setup=TENT_IN_PACK+"S.bags=[{uid:1,pos:'seat',L:10},{uid:2,pos:'pack',L:15}];S.decks={bar:false,rack:false};";
+  for(const [bike,style] of [[FULL,'bags-first'],[FULL,'panniers'],[BARE,'bags-first']]){
+    const p=page({bike,setup});
+    await ask(p,{style,goal:'backpack'});
+    const first=p.json('ADVISOR.answer.items[0]');
+    assert.deepEqual([first.kind,first.newBags,first.decks.rack],['deck',1,true],`${bike.id} ${style}: a rack first`);
+    const what=p.json('advisorWhat(ADVISOR.answer.items[0],ADVISOR.input)');
+    assert.ok(/^A rack, with the .*tent.* on its top deck$/.test(what),what);
+    assert.equal(first.tags.includes('if your bike has rack mounts'),bike===BARE,bike.id+': tagged when Not sure');
+  }
+  for(const [bike,style] of [[FULL,'bags'],[GRAVEL,'panniers']]){
+    const p=page({bike,setup});
+    await ask(p,{style,goal:'backpack'});
+    const a=p.json('ADVISOR.answer');
+    const shown=a.kind==='suggestions' ? [...a.items,...(a.ahead ? [a.ahead] : [])] : [];
+    assert.ok(!shown.some(s=>s.deck || s.add.some(b=>b.pos==='rack')),`${bike.id} ${style}: no rack, no panniers`);
+  }
+});
+
+test('[GA-STYLE] a giant backpack holding the tent and the sleeping bag, no rack fitted: a rack with panniers is offered under Bags first and Panniers are fine, never under Bikepacking bags only',async()=>{
+  const setup="S.nights=4;S.sleep='camp';applyTripKitDefaults();"+CARRY.lot+"S.bags=[{uid:1,pos:'pack',L:50},{uid:2,pos:'seat',L:8}];S.nextUid=3;S.decks={bar:false,rack:false};";
+  const offered={};
+  for(const style of ['bags','bags-first','panniers']){
+    const p=page({bike:FULL,setup});
+    const inPack=p.json("(()=>{const a=currentPlan();return ['tent','quilt'].filter(id=>(a.items[id]||[]).some(e=>String(e[0]).split('-')[0]==='1'));})()");
+    assert.deepEqual(inPack,['tent','quilt'],'the backpack holds the tent and the sleeping bag');
+    await ask(p,{style,goal:'backpack'});
+    const a=p.json('ADVISOR.answer');
+    const shown=a.kind==='suggestions' ? [...a.items,...(a.ahead ? [a.ahead] : [])] : [];
+    offered[style]=shown.some(s=>s.add.some(b=>b.pos==='rack'));
+  }
+  assert.deepEqual(offered,{bags:false,'bags-first':true,panniers:true});
 });
 
 (async()=>{

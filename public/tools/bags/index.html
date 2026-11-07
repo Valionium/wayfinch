@@ -1628,7 +1628,9 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 .adv-list{list-style:none;display:grid;gap:12px;margin:8px 0 0}
 .adv-card{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--panel);min-width:0}
 .adv-card:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.bike-dialog-body .adv-card h4{font-size:17px;margin:0 0 4px}
+.bike-dialog-body .adv-card h5{font-size:17px;margin:0 0 4px}
+.adv-kind{margin:12px 0 0}
+.bike-dialog-body .adv-kind>h4{font-size:16px;margin:14px 0 2px}
 .adv-tags{font-size:13px;color:var(--amber);margin:0 0 4px}
 .adv-drawing svg{display:block;width:100%;max-width:420px;height:auto;margin:6px auto}
 .adv-why{font-size:14px;line-height:1.5;margin:6px 0}
@@ -5457,7 +5459,7 @@ function advisorInput(style, goal, opts = {}){
   return inPlan(() => {
     const fit = bikeFit(S.bikeProfile);
     const reason = fit.frameBag.none || (inTriangleCount() > fit.frameBag.cageLimit ? NO_ROOM : null), floor = minShapeIdx();
-    return { style, goal, noPanniers:!!(q ? q.noPanniers : opts.noPanniers), bags, decks, camping:camping(), nextUid:q ? q.nextUid : S.nextUid,
+    return { style, goal, bags, decks, camping:camping(), nextUid:q ? q.nextUid : S.nextUid,
       frameShapes:reason ? [] : fit.frameBag.shapes.filter(s => s.shape >= floor).map(s => ({ shape:s.shape, L:s.L, source:s.source })),
       frameReason:reason,
       topSlotsFree:TOP_ORDER.filter(s => !bags.some(b => b.pos === 'top' && (b.slot || 'front') === s)),
@@ -5471,15 +5473,14 @@ function advisorInput(style, goal, opts = {}){
 }
 // The questionnaire, for a rider with no bags in the plan (decision 5): a 15 L backpack (the planner's default) holding what it can, the
 // trip's nights and sleep, tripKitDefaults' kit; light is Lightweight with each item's lightest tier, average Comfortable with the
-// default kit, a lot Comfortable with the bulkiest tier. Mountain bike trails offer no panniers, even under Either.
-const ADVISOR_RIDING_STYLE = { touring:'rack', road:'no-rack', gravel:'no-rack', mtb:'no-rack', everyday:'either' };
+// default kit, a lot Comfortable with the bulkiest tier. The riding picks step 1's setup by DECIDED.ridingSetup (advisor.js).
 function advisorQuestionnaire(a){
   const nights = Math.max(0, Math.min(30, Math.round(+a.nights || 0))), sleep = a.sleep === 'indoor' ? 'indoor' : 'camp';
   const pick = a.carry === 'light' ? (t => [...t].sort((x, y) => x.kg - y.kg || x.L - y.L)[0])
     : a.carry === 'lot' ? (t => [...t].sort((x, y) => y.L - x.L || y.kg - x.kg)[0]) : null;
   const custom = {};
   if(pick) KIT.forEach(k => { if(k.tiers && k.tiers.length){ const t = pick(k.tiers); custom[k.id] = { L:t.L, kg:t.kg, rigid:t.rigid }; } });
-  return { bags:[{ uid:1, pos:'pack', L:POSITIONS.pack.defL }], nextUid:2, noPanniers:a.riding === 'mtb',
+  return { bags:[{ uid:1, pos:'pack', L:POSITIONS.pack.defL }], nextUid:2,
     base:{ kit:tripKitDefaults(nights, sleep, S.bikeProfile), nights, sleep, mode:a.carry === 'light' ? 'light' : 'comfort', custom,
       qty:{}, pinned:{}, placements:null, carried:{} } };
 }
@@ -5487,9 +5488,10 @@ function advisorQuestionnaire(a){
 /* ---- The Gear advisor's view (#gear-advisor, design §2): the plan's bike, three steps and the answer. It reads the plan and never
    changes it; the rider's choices here live in ADVISOR, for this visit only. ---- */
 const ADVISOR_WORDING = {
-  step1:{text:'1. How you like to carry'},
-  styleRack:{text:'With a rack and panniers'}, styleNoRack:{text:'Without a rack: bikepacking'}, styleEither:{text:'Either is fine'},
-  noMounts:{text:"Your bike has no rack mounts, so panniers aren't offered."},
+  step1:{text:'1. What kind of setup do you want?'},
+  styleBags:{text:'Bikepacking bags only'}, styleBagsFirst:{text:'Bags first, panniers only if needed'}, stylePanniers:{text:'Panniers are fine'},
+  noMounts:{text:"Your bike has no rack mounts, so no rack or panniers are offered."},
+  rackKept:{text:'Your bike is set to no rack mounts, but your plan has a rack: it stays in these suggestions.'},
   step2:{text:'2. What should get better'},
   goalHandling:{text:'Better handling'}, goalBackpack:{text:'Get the backpack off'},
   step3:{text:'3. What you carry'},
@@ -5518,14 +5520,21 @@ const ADVISOR_WORDING = {
   closest:{text:'Closest: {what}.'}, stillOver:{text:'Still left over: {what}.'}, closestNone:{text:'No bag can be added to this bike within this style.'},
   partial:{text:'This search stopped early, after {n} options, so a better one may be missing.'},
   frameNone:{text:"Frame bags aren't offered. {reason}."},
-  trails:{text:"On mountain bike trails, panniers aren't offered."},
-  rackOut:{text:'Without a rack, your panniers and rack deck are left out of these suggestions.'},
+  rackOut:{text:'With bikepacking bags only, your panniers are left out of these suggestions; your rack stays for its top deck.'},
+  minimal:{text:'Minimal'}, minimalIntro:{text:'The fewest new bags that do it.'},
+  ahead:{text:'Looking ahead'}, aheadIntro:{text:'A set that covers more, even if Minimal does it today.'},
+  aheadNone:{text:'No further bag would help much more than Minimal.'},
+  deckOwn:{text:'Put the {items} on your rack, no new bag needed'}, deckNew:{text:'A rack, with the {items} on its top deck'},
+  deckOwnBare:{text:"Use your rack's top deck, no new bag needed"}, deckNewBare:{text:'A rack with a top deck'},
+  deckOwnPlus:{text:"the {items} on your rack's top deck"}, deckOwnPlusBare:{text:"your rack's top deck"},
+  rackAnd:{text:'Rack and {type}'},
   loadFailed:{text:'The Gear advisor could not load. Open the bag planner once while online, then try again.'},
   replace:{text:'Replace your {old} with {new}'}, two:{text:'{a}, plus {b}'}, pairOf:{text:'2 × {size}'},
   moveLine:{text:'{item}: {from} → {to}'}, leftOver:{text:'left over'}, moreMoves:{text:'and {n} more'},
   gMiddle:{text:'the middle'}, gFork:{text:'the fork'}, gRack:{text:'the rack'}, gBar:{text:'the handlebar'}, gSeat:{text:'the seat pack'}, gBack:{text:'the back'},
   typeTop:{text:'Top tube bag'}, typeFrame:{text:'Frame bag'}, typeFork:{text:'Fork cages'}, typeBar:{text:'Handlebar roll'},
   typeSeat:{text:'Seat pack'}, typeRack:{text:'Panniers'}, typePack:{text:'Backpack'}, typeBottle:{text:'Bottle cage'},
+  typeForkOne:{text:'Fork cage'}, typeRackOne:{text:'Pannier'},
 };
 const advisorWord = (key, values = {}) => ADVISOR_WORDING[key].text.replace(/\{(\w+)\}/g, (m, k) => values[k] ?? m);
 const ADVISOR_TYPES = { top:'typeTop', frame:'typeFrame', fork:'typeFork', bar:'typeBar', seat:'typeSeat', rack:'typeRack', pack:'typePack', bottle:'typeBottle', bottleU:'typeBottle' };
@@ -5558,31 +5567,52 @@ const advisorList = xs => xs.length <= 1 ? (xs[0] || '') : xs.slice(0, -1).join(
 const advisorRange = (a, b) => a === b ? `${a} L` : `${a}–${b} L`;
 const advisorAn = n => /^(8|11|18)(\D|$)/.test(String(n)) ? 'an' : 'a';
 function advisorShape(bag){ return bikeFit(S.bikeProfile).wedge ? 'wedge' : (FRAME_PRESETS[bag.shape] || FRAME_PRESETS[0]).label; }
-// "Seat pack, 6–8 L", "Fork cages, 2 × 3–5 L", "Frame bag, half frame, 3 L"
-function advisorBagText(bag, range){
-  const type = advisorWord(ADVISOR_TYPES[bag.pos]);
+// A rack is fitted when the rider's plan has panniers or its rack deck on (advisor.js reads it the same way, before the setup applies).
+const advisorRackFitted = input => input.bags.some(b => b.pos === 'rack') || !!input.decks.rack;
+// One fork cage or one pannier is a single bag; two are a pair (the owner, 7 Nov).
+function advisorType(bag){ return advisorWord(bag.pos === 'fork' && !bag.pair ? 'typeForkOne' : bag.pos === 'rack' && !bag.pair ? 'typeRackOne' : ADVISOR_TYPES[bag.pos]); }
+// Panniers on a bike with no rack fitted come with a rack to fit (the owner's ruling of 7 Nov).
+const advisorNewRack = (bag, input) => bag.pos === 'rack' && !!input && !advisorRackFitted(input);
+// "Seat pack, 6–8 L", "Fork cages, 2 × 3–5 L", "Fork cage, 4–5 L", "Frame bag, half frame, 3 L", "Rack and panniers, 2 × 10–12 L"
+function advisorBagText(bag, range, input){
+  const type = advisorNewRack(bag, input) ? advisorWord('rackAnd', { type:advisorType(bag).toLowerCase() }) : advisorType(bag);
   if(bag.pos === 'frame') return `${type}, ${advisorShape(bag)}, ${advisorRange(bag.L, bag.L)}`;
   const size = advisorRange(range[0], range[1]);
   return `${type}, ${bag.pair ? advisorWord('pairOf', { size }) : size}`;
 }
-// "a 6 L frame bag (full triangle)", "2 × 10–12 L panniers", "an 8–10 L handlebar roll"
-function advisorBagPhrase(bag, range){
-  const type = advisorWord(ADVISOR_TYPES[bag.pos]).toLowerCase();
+// "a 6 L frame bag (full triangle)", "2 × 10–12 L panniers", "an 8–10 L handlebar roll", "a rack and a 10–12 L pannier"
+function advisorBagPhrase(bag, range, input){
+  const type = advisorType(bag).toLowerCase();
   if(bag.pos === 'frame') return `${advisorAn(bag.L)} ${bag.L} L ${type} (${advisorShape(bag)})`;
   const size = advisorRange(range[0], range[1]);
-  return bag.pair ? `${advisorWord('pairOf', { size })} ${type}` : `${advisorAn(range[0])} ${size} ${type}`;
+  const phrase = bag.pair ? `${advisorWord('pairOf', { size })} ${type}` : `${advisorAn(range[0])} ${size} ${type}`;
+  return advisorNewRack(bag, input) ? 'a rack and ' + phrase : phrase;
 }
 // The rider's bag a swap takes out: "14 L seat pack", "2 × 20 L panniers".
 function advisorOldBag(s, input){
   const old = input.bags.find(b => b.uid === s.remove);
-  return old ? `${old.pair ? '2 × ' : ''}${old.L} L ${advisorWord(ADVISOR_TYPES[old.pos]).toLowerCase()}` : '';
+  return old ? `${old.pair ? '2 × ' : ''}${old.L} L ${advisorType(old).toLowerCase()}` : '';
 }
-// What to get, in a line (design §2).
+// The rack deck, in the planner's own placement: what deckedIds puts there in this suggestion's plan. On the rack the plan has, no
+// new bag ("Put the tent on your rack, no new bag needed"); else a rack to fit. `inList`: the words inside a longer line.
+function advisorDeckText(s, input, inList){
+  const ids = withInputs(advisorChanges(advisorTrialBags(s, input), s.decks, input.context), () => deckedIds());
+  const items = advisorList(ids.map(id => (kitById(id) || { name:id }).name.toLowerCase())), own = advisorRackFitted(input);
+  if(inList) return own ? (items ? advisorWord('deckOwnPlus', { items }) : advisorWord('deckOwnPlusBare')) : (items ? advisorWord('deckNew', { items }) : advisorWord('deckNewBare')).replace(/^./, c => c.toLowerCase());
+  return items ? advisorWord(own ? 'deckOwn' : 'deckNew', { items }) : advisorWord(own ? 'deckOwnBare' : 'deckNewBare');
+}
+const advisorLower = t => t.replace(/^./, c => c.toLowerCase());
+// What to get, in a line (design §2). Two bags, and Looking ahead's set, give each bag at its own size, then the rack deck.
 function advisorWhat(s, input){
-  const bag = s.add[0];
-  if(s.kind === 'add-two') return advisorWord('two', { a:advisorBagText(s.add[0], [s.add[0].L, s.add[0].L]), b:advisorBagText(s.add[1], [s.add[1].L, s.add[1].L]).replace(/^./, c => c.toLowerCase()) });
-  if(s.kind === 'swap') return advisorWord('replace', { old:advisorOldBag(s, input), new:advisorBagPhrase(bag, s.rangeL) });
-  return advisorBagText(bag, s.rangeL);
+  const own = b => advisorBagText(b, [b.L, b.L], input);
+  if(s.kind === 'deck') return advisorDeckText(s, input, false);
+  if(s.kind === 'swap') return advisorWord('replace', { old:advisorOldBag(s, input), new:advisorBagPhrase(s.add[0], s.rangeL, input) });
+  if(s.kind === 'add') return advisorBagText(s.add[0], s.rangeL, input);
+  const parts = s.remove !== null && s.remove !== undefined
+    ? [advisorWord('replace', { old:advisorOldBag(s, input), new:advisorBagPhrase(s.add[0], [s.add[0].L, s.add[0].L], input) }), ...s.add.slice(1).map(own)]
+    : s.add.map(own);
+  if(s.deck) parts.push(advisorDeckText(s, input, true));
+  return parts.reduce((a, b) => advisorWord('two', { a, b:advisorLower(b) }));
 }
 // The plan the search compared against: its first trial, the plan as the chosen style reads it (without a rack, no rack kit).
 function advisorBase(input){
@@ -5631,32 +5661,47 @@ function advisorWhy(s, input){
   else if(input.goal === 'handling' && !out.length) out.push(advisorWord('lower'));
   return out;
 }
-// "Your bike with fork cages, 2 × 5 L"; a swap: "Your bike with a 15 L handlebar roll instead of your 12 L handlebar roll".
+// "Your bike with fork cages, 2 × 5 L"; a swap: "Your bike with a 15 L handlebar roll instead of your 12 L handlebar roll"; the rack
+// deck: "Your bike with the tent and sleeping mat on your rack's top deck".
 function advisorDrawnName(s, input){
-  if(s.kind !== 'swap') return advisorWord('drawnWith', { what:advisorWhat(s, input).replace(/^./, c => c.toLowerCase()) });
-  return advisorWord('drawnSwap', { new:advisorBagPhrase(s.add[0], s.rangeL), old:advisorOldBag(s, input) });
+  if(s.kind === 'deck') return advisorWord('drawnWith', { what:advisorDeckText(s, input, true) });
+  if(s.remove === null || s.remove === undefined) return advisorWord('drawnWith', { what:advisorLower(advisorWhat(s, input)) });
+  const news = s.add.map((b, i) => advisorBagPhrase(b, i === 0 && s.kind === 'swap' ? s.rangeL : [b.L, b.L], input));
+  if(s.deck) news.push(advisorDeckText(s, input, true));
+  return advisorWord('drawnSwap', { new:advisorList(news), old:advisorOldBag(s, input) });
 }
-function advisorSuggestionHtml(s, input, i){
+// One suggestion's card: what to get, its tags, the bike drawn with it, why it helps and where things move.
+function advisorCardHtml(s, input, i){
   const tags = s.tags.length ? `<p class="adv-tags">${s.tags.map(htmlEsc).join(' · ')}</p>` : '';
   const art = bikeDrawing(S.bikeProfile, advisorBagView(advisorTrialBags(s, input), s.decks, input), { theme:bikeTheme(), idPrefix:'adv' + i });
   const moves = advisorMoves(s, input), shown = moves.slice(0, 8);
   if(moves.length > shown.length) shown.push(advisorWord('moreMoves', { n:moves.length - shown.length }));
-  return `<li class="adv-sugg"><article class="adv-card" tabindex="0" aria-labelledby="advS${i}"><h4 id="advS${i}">${htmlEsc(advisorWhat(s, input))}</h4>${tags}`
+  return `<article class="adv-card" tabindex="0" aria-labelledby="advS${i}"><h5 id="advS${i}">${htmlEsc(advisorWhat(s, input))}</h5>${tags}`
     // the drawing is named by its bag; the bike image inside, which names only the bike, is hidden
     + `<div class="adv-drawing" role="img" aria-label="${htmlEsc(advisorDrawnName(s, input))}">${art ? art.svg.replace(/^<svg\b/, '<svg aria-hidden="true"') : ''}</div>`
     + `<p class="adv-why"><strong>${advisorWord('whyTitle')}</strong> ${advisorWhy(s, input).map(htmlEsc).join(' ')}</p>`
     + (shown.length ? `<p class="adv-sub">${advisorWord('movesTitle')}</p><ul class="adv-moves">${shown.map(l => `<li>${htmlEsc(l)}</li>`).join('')}</ul>` : '')
-    + '</article></li>';
+    + '</article>';
+}
+function advisorSuggestionHtml(s, input, i){ return `<li class="adv-sugg">${advisorCardHtml(s, input, i)}</li>`; }
+// Two kinds of answer, each labelled (the owner, 7 Nov): Minimal, the fewest new bags that do it, and Looking ahead, a set that covers more.
+function advisorTwoKindsHtml(answer, input){
+  const n = answer.items.length;
+  return `<section class="adv-kind" aria-labelledby="advMinT"><h4 id="advMinT">${advisorWord('minimal')}</h4><p class="adv-note">${advisorWord('minimalIntro')}</p>`
+    + `<ol class="adv-list">${answer.items.map((s, i) => advisorSuggestionHtml(s, input, i)).join('')}</ol></section>`
+    + `<section class="adv-kind" aria-labelledby="advAheadT"><h4 id="advAheadT">${advisorWord('ahead')}</h4>`
+    + (answer.ahead ? `<p class="adv-note">${advisorWord('aheadIntro')}</p><div class="adv-sugg adv-ahead">${advisorCardHtml(answer.ahead, input, n)}</div>`
+      : `<p class="adv-plain">${advisorWord('aheadNone')}</p>`) + '</section>';
 }
 function advisorAnswerHtml(answer, input){
-  const notes = [], base = advisorBase(input);
+  const notes = [];
   if(input.fromQuestionnaire) notes.push(advisorWord('start'));
-  if(base.bags.length !== input.bags.length || (input.decks.rack && !base.decks.rack)) notes.push(advisorWord('rackOut'));
-  if(input.noPanniers && input.style !== 'no-rack') notes.push(advisorWord('trails'));
+  if(input.style === 'bags' && input.bags.some(b => b.pos === 'rack')) notes.push(advisorWord('rackOut'));
+  if(advisorNoMounts() && advisorRackFitted(input)) notes.push(advisorWord('rackKept'));
   if(answer.frameReason) notes.push(advisorWord('frameNone', { reason:answer.frameReason }));
   if(answer.partial) notes.push(advisorWord('partial', { n:answer.tried }));
   let body = '';
-  if(answer.kind === 'suggestions') body = `<ol class="adv-list">${answer.items.map((s, i) => advisorSuggestionHtml(s, input, i)).join('')}</ol>`;
+  if(answer.kind === 'suggestions') body = advisorTwoKindsHtml(answer, input);
   else if(answer.kind === 'already-good') body = `<p class="adv-plain">${advisorWord('alreadyGood')}</p>`;
   else if(answer.kind === 'cannot-reduce') body = `<p class="adv-plain">${advisorWord('cannotReduce', { min:window.WayfinchAdvisor.MIN_GAIN_BACK_L, l:+answer.backL.toFixed(1) })}</p>`;
   else {
@@ -5676,17 +5721,20 @@ function advisorChoice(name, value, label, checked, opts = {}){
     + `${opts.pic || ''}<span>${htmlEsc(label)}</span></label>`;
 }
 function advisorGroup(id, label, html){ return `<p class="adv-sub" id="${id}">${htmlEsc(label)}</p><div class="adv-choices" role="radiogroup" aria-labelledby="${id}">${html}</div>`; }
-// Step 1's small bikes: the rider's bike with a rack and panniers, with bikepacking bags, and plain.
+// Step 1's small bikes: the rider's bike with bikepacking bags, with a frame bag and seat pack, and with a rack and panniers.
 function advisorStylePic(kind, i){
-  const items = kind === 'rack' ? [{ pos:'rack', L:15, pair:true, fill:0 }]
-    : kind === 'no-rack' ? [{ pos:'frame', L:4.5, shape:1, fill:0 }, { pos:'seat', L:10, fill:0 }, { pos:'bar', L:10, fill:0 }] : [];
+  const items = kind === 'panniers' ? [{ pos:'rack', L:15, pair:true, fill:0 }]
+    : kind === 'bags' ? [{ pos:'frame', L:4.5, shape:1, fill:0 }, { pos:'seat', L:10, fill:0 }, { pos:'bar', L:10, fill:0 }]
+    : [{ pos:'frame', L:4.5, shape:1, fill:0 }, { pos:'seat', L:10, fill:0 }];
   const art = bikeDrawing(S.bikeProfile, { items, decks:{ bar:null, rack:null }, bottles:[] }, { theme:bikeTheme(), idPrefix:'advp' + i });
   return art ? `<span class="adv-pic" aria-hidden="true">${art.svg}</span>` : '';
 }
 function advisorStepsHtml(){
-  const A = ADVISOR, noMounts = advisorNoMounts(), q = A.q;
-  const styles = [['rack', 'styleRack'], ['no-rack', 'styleNoRack'], ['either', 'styleEither']].map(([v, k], i) =>
-    advisorChoice('advStyle', v, advisorWord(k), A.style === v, { disabled:v === 'rack' && noMounts, pic:advisorStylePic(v, i) })).join('');
+  const A = ADVISOR, q = A.q;
+  // no rack mounts and no rack in the plan: no rack or panniers, and the line says why (a rack the plan has stays: rackKept)
+  const noMounts = advisorNoMounts() && !(A.source === 'plan' && advisorRackFitted({ bags:S.bags, decks:S.decks }));
+  const styles = [['bags', 'styleBags'], ['bags-first', 'styleBagsFirst'], ['panniers', 'stylePanniers']].map(([v, k], i) =>
+    advisorChoice('advStyle', v, advisorWord(k), A.style === v, { pic:advisorStylePic(v, i) })).join('');
   const goals = [['handling', 'goalHandling'], ['backpack', 'goalBackpack']].map(([v, k]) => advisorChoice('advGoal', v, advisorWord(k), A.goal === v)).join('');
   let carried;
   if(A.source === 'plan'){
@@ -5777,20 +5825,24 @@ function setAdvisor(key, value){
   if(key === 'style'){ A.style = value || null; A.styleTouched = !!value; }
   else if(key === 'goal') A.goal = value || null;
   else if(key === 'source') A.source = value === 'plan' && advisorHasPlan() ? 'plan' : 'questionnaire';
-  else if(key === 'riding'){ A.q.riding = value; if(!A.styleTouched) A.style = ADVISOR_RIDING_STYLE[value] || null; }
+  else if(key === 'riding'){ A.q.riding = value; if(!A.styleTouched) advisorDecided(d => { if(!A.styleTouched && A.q.riding === value) A.style = d.ridingSetup[value] || d.defaultSetup; }); }
   else if(key === 'nights') A.q.nights = Math.max(0, Math.min(30, Math.round(+value || 0)));
   else if(key === 'sleep') A.q.sleep = value === 'indoor' ? 'indoor' : 'camp';
   else if(key === 'carry') A.q.carry = value;
-  if(A.style === 'rack' && advisorNoMounts()) A.style = null;   // no rack mounts: the rack choice is closed
   renderAdvisor();
   ADVISOR_DONE = runAdvisor();
+}
+// advisor.js's decided values (table.ts DECIDED): at once when it is loaded, else once it is, then the view is drawn again.
+function advisorDecided(apply){
+  if(window.WayfinchAdvisor){ apply(window.WayfinchAdvisor.DECIDED); return; }
+  loadAdvisor().then(mod => { if(!ADVISOR.open) return; apply(mod.DECIDED); renderAdvisor(); ADVISOR_DONE = runAdvisor(); }).catch(() => {});
 }
 function openAdvisor(opener = document.activeElement){
   const A = ADVISOR, root = $('advisorBox');
   A.open = true;
   if(!A.q) A.q = { riding:null, nights:S.nights, sleep:S.sleep === 'indoor' ? 'indoor' : 'camp', carry:null };
   if(!advisorHasPlan()) A.source = 'questionnaire'; else if(!A.source) A.source = 'plan';
-  if(A.style === 'rack' && advisorNoMounts()) A.style = null;
+  if(!A.style) advisorDecided(d => { if(!A.style) A.style = d.defaultSetup; });   // Bags first, the default (the owner, 7 Nov)
   if(root.classList.contains('hidden')){
     closeBagPop();
     if(!$('legalBox').classList.contains('hidden')) closeLegal();
