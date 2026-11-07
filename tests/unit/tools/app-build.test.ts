@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -50,14 +50,14 @@ test('[APP-SWITCH-OFF] with the switch off no Vite step runs, and the build is w
   expect(text(out, 'offline-worker.js')).toContain(buildId);
 }, 60_000);
 
-test('[APP-SWITCH-OFF] the default build (no switch given) reads build.config.json, which says off', async () => {
+test('[APP-SWITCH-ON] the default build (no switch given) reads build.config.json, which says on since the launch (owner, 7 Nov 2026)', async () => {
   const config = JSON.parse(readFileSync(join(REPO, 'build.config.json'), 'utf8')) as { launch: boolean };
-  expect(config.launch).toBe(false);
-  const vite = vi.fn(() => Promise.resolve());
+  expect(config.launch).toBe(true);
+  const vite = vi.fn(async (dir: string) => { writeFileSync(join(dir, 'index.html'), '<!doctype html><div id="app"></div>'); });
   const out = join(tmpRoot, 'default');
   await buildDist({ out, vite });
-  expect(vite).not.toHaveBeenCalled();
-  expect(files(out)).toEqual(['_headers', 'build.json', 'index.html', 'offline-worker.js']);
+  expect(vite).toHaveBeenCalledTimes(1);
+  expect(files(out)).toContain('manifest.webmanifest');
 }, 60_000);
 
 let on = '';

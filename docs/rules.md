@@ -91,7 +91,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - A failing check saves a regression file and can be replayed (§11.1) [HON-SIM-FAIL]
 - One seed always gives the same run (§11.1) [HON-SIM-SEED]
 - Every property test runs on the fixed seed and run count, or the ones FC_SEED and FC_RUNS give, through @fast-check/vitest too (§11.1) [HON-PROP-SEED]
-- A scheduled run of every property test on a random seed, which prints its seed, so the fixed seed of pull requests doesn't hide a counterexample for good (§11.1, §11.8) [HON-PROP-SWEEP]
+- A scheduled run of every property test on a random seed, which prints its seed, so the fixed seed of pull requests doesn't hide a counterexample for good (§11.1, §11.8) (after the first version: owner, 7 Nov 2026) [HON-PROP-SWEEP]
 - One screen on a long route builds within the time budget (§4.5) [HON-BUDGET]
 
 ## Contracts
@@ -607,7 +607,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - All lazy chunks together ≤ 200 KB gzipped; bag planner excluded (§4.5) [PERF-JS-LAZY]
 - One bike with bags drawn ≤ 20 ms (§4.5) [PERF-BIKE]
 - Heidelberg → Strasbourg places: the fixture pack's size, ≤ 3 MB, is checked on every pull request (§4.5) [PERF-PACK]
-- Heidelberg → Strasbourg places on a live pack: ≤ 3 MB and ≤ 30 s on the stand-in's network, on the owner's Run workflow only, because a pull request must not depend on outside data; no test or workflow step exists yet (§4.5) [PERF-PACK-LIVE]
+- Heidelberg → Strasbourg places on a live pack: ≤ 3 MB and ≤ 30 s on the stand-in's network, on the owner's Run workflow only, because a pull request must not depend on outside data; no test or workflow step exists yet; checked by hand on the release checklist, last on 3 Nov 2026 (§4.5) [PERF-PACK-LIVE]
 - Boundary file ≤ 150 KB gzipped (§4.5) [PERF-BOUNDARY]
 
 ## App: Vite, Preact and the switch
@@ -826,7 +826,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - asks first naming what goes; "Also delete bag planner data" stores copilot:delete-request:v1 and opens /tools/bags/#copilot-delete=<id>; until applied, "Bag planner data will be deleted the next time it opens" [YOU-DELETE-UI]
 - the post-ride report (hours, drink, warmth, feel, optional weighing) is logged and moves the factors; calibration status shown; drinkingAdvice and overDrinking reach the screen: ruling of group 8, the loss it is compared with is the sweat-rate model on flat ground at the chosen warmth [YOU-WATER-LEARN]
 - each post-ride report carries one tap, "Flat or hilly?" (flat by default); a hilly report is kept on the phone but moves no factor (k, the evidence, k_drink, the weighed count), is shown apart from the flat count, never travels in the export (the file's format is unchanged), and stays on the phone through an import (owner's ruling "small", 3 November) [YOU-TERRAIN]
-- the terrain of a post-ride report is taken from the route the rider rode, the stored route's climb over the ridden stretch, with the tap asked only when the ride had no route; factors per terrain class (the owner's full ruling, not built) [YOU-TERRAIN-ROUTE]
+- the terrain of a post-ride report is taken from the route the rider rode, the stored route's climb over the ridden stretch, with the tap asked only when the ride had no route; factors per terrain class (the owner's full ruling, not built) (after the first version: owner, 7 Nov 2026; the "Flat or hilly?" tap stays) [YOU-TERRAIN-ROUTE]
 - imprint, privacy and licences within two taps from every tab (plain pages at /legal/<name>/, a folder each because the host redirects *.html) [PRIV-LEGAL-REACH]
 - all open in flight mode [PRIV-LEGAL-OFFLINE]
 - hash of the imprint's text equals the hash of the page's block; nothing printed [PRIV-IMPRINT-SAME]
@@ -919,6 +919,10 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - one theme for both apps (owner's try-out, 5 Nov 2026): each app writes only its own record of a choice ({app, kind: 'theme', v: 1, theme, at}: copilot:theme:v1, loadcheck:theme:v1); both show the most recent, at the same moment Wayfinch's; with neither, Wayfinch's own light or dark, else the bag planner's older choice, else automatic; the page and the app decide alike on every mix [THEME-ONE]
 - a theme chosen in either app shows in the other at once in an open tab, on the way back, and in a tab when it shows again or comes out of the back-forward cache; Wayfinch's export carries the one theme, and an import's settings (either app's) count as a choice [THEME-SYNC]
 - From a photo, Front, back and fork: three taps set a front-to-back fade and the fork's own colour; the photo never leaves the phone [LC-PHOTO-THREE]
+- suspension (None, Front fork, Full) and rack mounts (Yes, No), top-level beside brakes and shifting, never inside fit (sub-project 11, decisions 1 and 2): each answer reads back; Not sure, anything else, a missing field or a wrong type is stored as no field at all, so a bike from before keeps its bytes (LC-MOVE-PLANS); no other field changes; both readers alike, the bike format stays 2 [TB-DETAILS-READ]
+- More details asks Suspension and Rack mounts, each a labelled select defaulting to Not sure, placed after Shifting; Rack mounts carries its one-line hint [TB-DETAILS-FORM]
+- a choice saved in More details is on the saved bike and on loadcheck:bikeProfile when it is the plan's bike, after a reload too; back to Not sure stores no field [TB-DETAILS-SAVE]
+- known risk, pinned: the tagged old page re-saving a bike drops suspension and rackMounts, every other field kept (as BK-PAINT-OLD-PAGE) [BK-DETAILS-OLD-PAGE]
 
 ## Bag planner: separation and contracts (sub-project 6, group 2)
 
@@ -944,7 +948,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Load Check's parseGPX, gpxProfileFrom, realAscent, planRoute, stageEffortIndex and nightStops against the ports, on the six fixture routes and 200 generated GPX files: identical (§11.4) [DF-01]
 - Contracts 1-3: values generated from the schemas round-trip byte-identically through both sides (§11.4) [DF-04]
 - over generated plans and bikes: without frame details bikeFit gives today's values and the plan is byte-identical; a bag the frame can't take is never used and never dropped; a typed size never changes; each other value comes from the first available source (§15 row 6) [LC-FIT-PROPS]
-- a GPX in several sections plans the same stages in both apps: Load Check smooths heights and counts climbing within each section, resetting at a gap; the port's route keeps no section breaks, so a height jump across a gap counts as climbing there and the stage ends differ. Needs the break in the route's points, which the route hash encodes (Contract 5): the coordinator's and owner's call (§11.4) [DF-01-SECTIONS]
+- a GPX in several sections plans the same stages in both apps: Load Check smooths heights and counts climbing within each section, resetting at a gap; the port's route keeps no section breaks, so a height jump across a gap counts as climbing there and the stage ends differ. Needs the break in the route's points, which the route hash encodes (Contract 5): the coordinator's and owner's call (§11.4) (after the first version: owner, 7 Nov 2026) [DF-01-SECTIONS]
 
 ## Launch paths and wide layout (sub-project 6, group 4)
 
