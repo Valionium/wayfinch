@@ -6,8 +6,8 @@ import { normaliseBike } from '../../core/bike/normalise.ts';
 import type { BikeRecord } from '../../core/bike/normalise.ts';
 import { careDetails, fitted, softTag } from '../../core/care/fit.ts';
 import { searchCare } from '../../core/care/search.ts';
-import type { CareDetails, CareKey, CareTask, Fitted, Part } from '../../core/care/types.ts';
-import { C, CARE_TASKS, PART_LABEL, PARTS, SECTION_LABEL, SECTIONS, TAG_LABEL, WHO_LABEL } from '../../core/wording/en-care.ts';
+import type { CareDetails, CareKey, CareTask, Conditions, Fitted, Part, RoadCard } from '../../core/care/types.ts';
+import { C, CARE_TASKS, CARRY, PART_LABEL, PARTS, ROAD_CARDS, SECTION_LABEL, SECTIONS, TAG_LABEL, WHO_LABEL } from '../../core/wording/en-care.ts';
 import { bikeDetailsHref } from '../../ui/bike/link.ts';
 import { choiceVersion } from '../../ui/tools/bike-choice.ts';
 import { BikeLine } from '../../ui/tools/bike-line.tsx';
@@ -35,16 +35,35 @@ function chosenBike(services: TyreServices): BikeRecord | null {
 
 const searchText = (t: CareTask): string[] => [t.name, PART_LABEL[t.part], ...t.words];
 
-function Tags({ task, details }: { task: Fitted<CareTask>; details: CareDetails }) {
-  const soft = softTag(task, details);
-  const all = [...task.tags.map((k: CareKey) => TAG_LABEL(k, task.applies[k] as never)), ...(soft ? [soft] : [])];
+const cardText = (c: RoadCard): string[] => [c.problem, PART_LABEL[c.part], ...c.words];
+
+/** The tags of a Not sure detail (and a task's soft tag): "if you have disc brakes". Tasks, cards and carry items alike. */
+function Tags({ item, details }: { item: { tags: CareKey[]; applies: Conditions; soft?: CareTask['soft'] }; details: CareDetails }) {
+  const soft = softTag(item, details);
+  const all = [...item.tags.map((k: CareKey) => TAG_LABEL(k, item.applies[k] as never)), ...(soft ? [soft] : [])];
   return all.length === 0 ? null : <span class="muted care-tags">{all.join(' · ')}</span>;
+}
+
+function RoadItem({ card, details }: { card: Fitted<RoadCard>; details: CareDetails }) {
+  return (
+    <details class="care-road" data-id={card.id}>
+      <summary><span class="care-name">{card.problem}</span> <Tags item={card} details={details} /></summary>
+      <div class="care-body">
+        <p><strong>{C.careRoadCheckFirst}:</strong> {card.checkFirst}</p>
+        <p class="care-label"><strong>{C.careSteps}</strong></p>
+        <ol>{card.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+        <p><strong>{C.careRideOn}</strong> {card.rideOn}</p>
+        <p><strong>{C.careRoadCarry}:</strong> {card.carry.map((id) => CARRY.find((c) => c.id === id)?.name).filter(Boolean).join('; ')}</p>
+        {card.critical ? <p class="care-unsure"><strong>{C.careUnsure}</strong></p> : null}
+      </div>
+    </details>
+  );
 }
 
 function TaskItem({ task, details }: { task: Fitted<CareTask>; details: CareDetails }) {
   return (
     <details class="care-task" data-id={task.id}>
-      <summary><span class="care-name">{task.name}</span> <Tags task={task} details={details} /></summary>
+      <summary><span class="care-name">{task.name}</span> <Tags item={task} details={details} /></summary>
       <div class="care-body">
         <p><strong>{C.careSigns}:</strong> {task.signs}</p>
         {task.alsoWet ? <p>{C.careAlsoWet}</p> : null}
@@ -78,6 +97,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
   const [tab, setTab] = useState<Tab>('care');
   const [query, setQuery] = useState('');
   const [part, setPart] = useState<Part | null>(null);
+  const [openCard, setOpenCard] = useState<string | null>(null);
   const searchBox = useRef<HTMLInputElement>(null);
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ care: null, road: null });
 
@@ -86,6 +106,22 @@ export function CareScreen({ services }: { services: TyreServices }) {
   const unsure = bike !== null && Object.values(details).some((v) => v === null);
   const fit = fitted(CARE_TASKS, details);
   const shown = searchCare(query, part ? fit.filter((t) => t.part === part) : fit, searchText);
+  // The Care search also finds Roadside cards (decision 2): only while something is typed, as the bike and the part filter allow.
+  const allCards = fitted(ROAD_CARDS, details);
+  const cardHits = query.trim() === '' ? [] : searchCare(query, part ? allCards.filter((c) => c.part === part) : allCards, cardText);
+  const carryList = fitted(CARRY, details);
+
+  // A tap on a card in the Care results: the Roadside tab at that card, open and focused.
+  useEffect(() => {
+    if (tab !== 'road' || openCard === null) return;
+    const card = document.querySelector<HTMLDetailsElement>(`details.care-road[data-id="${openCard}"]`);
+    if (card) {
+      card.open = true;
+      card.querySelector('summary')?.focus();
+      card.scrollIntoView?.({ block: 'nearest' });
+    }
+    setOpenCard(null);
+  }, [tab, openCard]);
 
   const choose = (next: Tab): void => { setTab(next); tabRefs.current[next]?.focus(); };
   const onTabKey = (e: KeyboardEvent, at: number): void => {
@@ -119,10 +155,11 @@ export function CareScreen({ services }: { services: TyreServices }) {
           ))}
         </div>
         {unsure && bike ? <p class="muted care-tell"><a href={bikeDetailsHref(bike.id, 'care')}>{C.careTellUs}</a></p> : null}
-        <p class="visually-hidden" role="status">{C.careFound(shown.length)}</p>
-        {shown.length === 0 ? (
+        <p class="visually-hidden" role="status">{cardHits.length > 0 ? C.careFoundBoth(shown.length, cardHits.length) : C.careFound(shown.length)}</p>
+        {shown.length === 0 && cardHits.length === 0 ? (
           <p class="care-none">{C.careNothing} <button type="button" class="btn" onClick={clearBoth}>{C.careClear}</button></p>
-        ) : SECTIONS.map((s) => {
+        ) : null}
+        {SECTIONS.map((s) => {
           const inSection = shown.filter((t) => t.section === s);
           return inSection.length === 0 ? null : (
             <section key={s} class="care-section">
@@ -131,9 +168,33 @@ export function CareScreen({ services }: { services: TyreServices }) {
             </section>
           );
         })}
+        {cardHits.length > 0 ? (
+          <section class="care-section care-road-results">
+            <h3>{C.careTabRoad}</h3>
+            <ul class="care-hits">
+              {cardHits.map((c) => (
+                <li key={c.id}>
+                  <button type="button" class="btn care-road-hit" onClick={() => { setOpenCard(c.id); setTab('road'); }}>{c.problem}</button> <Tags item={c} details={details} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </div>
       <div role="tabpanel" id="care-panel-road" aria-labelledby="care-tab-road" hidden={tab !== 'road'}>
-        <p class="muted">{C.careRoadLater}</p>
+        {tab === 'road' ? (
+          <>
+            {allCards.map((c) => <RoadItem key={c.id} card={c} details={details} />)}
+            <section class="care-section">
+              <h3>{C.careCarryTitle}</h3>
+              <ul class="care-carry">
+                {carryList.map((c) => (
+                  <li key={c.id} data-id={c.id}>{c.name} <Tags item={c} details={details} /></li>
+                ))}
+              </ul>
+            </section>
+          </>
+        ) : null}
       </div>
     </div>
   );

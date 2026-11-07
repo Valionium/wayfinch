@@ -29,7 +29,8 @@ export type CareTask = {
    */
   soft?: { applies: Conditions; tag: string };
 };
-export type RoadCard = { id: string; problem: string; applies: Conditions; checkFirst: string; steps: string[]; rideOn: string; carry: string[]; words: string[]; critical: boolean };
+/** `part` is the part filter the card belongs to (group 3's ruling: the Care search's filters limit the cards too). */
+export type RoadCard = { id: string; problem: string; part: Part; applies: Conditions; checkFirst: string; steps: string[]; rideOn: string; carry: string[]; words: string[]; critical: boolean };
 export type CarryItem = { id: string; name: string; applies: Conditions };
 /** The keys a task depends on that are Not sure. */
 export type Fitted<T> = T & { tags: CareKey[] };

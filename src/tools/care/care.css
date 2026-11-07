@@ -17,9 +17,9 @@
 .care-tell { margin: 0 0 12px; }
 .care-tell a { color: inherit; }
 .care-section h3 { margin: 20px 0 8px; }
-.care-task { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); margin: 0 0 8px; }
-.care-task summary { min-height: 44px; padding: 10px 12px; cursor: pointer; display: list-item; }
-.care-task summary .care-name { font-weight: 600; }
+.care-task, .care-road { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); margin: 0 0 8px; }
+.care-task summary, .care-road summary { min-height: 44px; padding: 10px 12px; cursor: pointer; display: list-item; }
+.care-task summary .care-name, .care-road summary .care-name { font-weight: 600; }
 .care-tags { font-size: 0.9375rem; }
 .care-body { padding: 0 12px 12px; }
 .care-body ol { padding-left: 1.5em; margin: 4px 0 8px; }
@@ -27,3 +27,7 @@
 .care-label { margin: 8px 0 0; }
 .care-unsure { color: var(--amber); }
 .care-none { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.care-hits { list-style: none; padding: 0; margin: 0; }
+.care-hits li { margin: 0 0 8px; }
+.care-carry { padding-left: 1.25em; margin: 4px 0 16px; }
+.care-carry li { margin: 0 0 6px; }

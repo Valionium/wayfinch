@@ -8,7 +8,7 @@ import { SOURCES } from '../../../../src/core/care/sources.ts';
 import type { CareKey, CareValue } from '../../../../src/core/care/types.ts';
 import { careDetails, fitted, softTag } from '../../../../src/core/care/fit.ts';
 import { normaliseBike } from '../../../../src/core/bike/normalise.ts';
-import { C, CARE_TASKS, PARTS, SECTIONS, WHO_LABEL } from '../../../../src/core/wording/en-care.ts';
+import { C, CARE_TASKS, PARTS, ROAD_CARDS, SECTIONS, WHO_LABEL } from '../../../../src/core/wording/en-care.ts';
 import { DRAFT_FIGURES, SETTLED_RANGES } from './draft-figures.ts';
 import type { Figure } from './draft-figures.ts';
 
@@ -19,6 +19,7 @@ const VALUES: { [K in CareKey]: readonly CareValue[K][] } = {
   brakes: ['rim', 'cable-disc', 'hydraulic-disc'], tyres: ['tubes', 'tubeless'], drive: ['chain', 'belt'], gears: ['derailleur', 'hub'],
   shifting: ['cable', 'electronic'], suspension: ['none', 'front', 'full'], ebike: ['yes', 'no'],
 };
+const ROAD_IDS = ROAD_CARDS.map((c) => c.id);
 const filled = (s: unknown): boolean => typeof s === 'string' && s.trim().length > 0 && s.trim() === s;
 
 test('[BC-CONTENT] every task has every field of design 3.2 filled; 3 to 6 steps; minutes low <= high; ids unique; parts and sections valid', () => {
@@ -73,7 +74,8 @@ test('[BC-CONTENT] every task has a sources entry, with a link or a note, and no
     expect(entry!.urls.length > 0 || filled(entry!.note), t.id).toBe(true);
     for (const url of entry!.urls) expect(url, t.id).toMatch(/^https:\/\/[^\s]+$/);
   }
-  expect(Object.keys(SOURCES).sort()).toEqual(CARE_TASKS.map((t) => t.id).sort());
+  // the cards and carry items (sub-project 12 group 3) have entries too: road-content.test.ts pins them
+  expect(Object.keys(SOURCES).filter((k) => !k.startsWith('carry-') && !ROAD_IDS.includes(k)).sort()).toEqual(CARE_TASKS.map((t) => t.id).sort());
 });
 
 const sourceFiles = (dir: string): string[] =>

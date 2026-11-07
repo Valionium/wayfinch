@@ -1,6 +1,6 @@
 // Where each Bike care fact came from (design 3.5, ruling 4): for maintainers and the owner's read, never shipped. Only tests import
 // this file (BC-SOURCES-PRIVATE); the app never does, so no link below reaches a build. "book p. N" is the owner's maintenance book
-// (German), from the photos the owner sent (content draft, 7 November 2026, two rounds); the rule used where the book and other sources
+// (German), from the photos the owner sent (content draft, 7 November 2026, two rounds); group 3 adds the Roadside cards and the carry items; the rule used where the book and other sources
 // differ: the more careful value ships (decision 6).
 
 export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
@@ -48,4 +48,108 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
     ],
     note: 'A shop check every 6 months: book p. 207 (was yearly). Disagree: Fox 100 h vs 125 h (secondary sources); the app shows about 100 h, the shorter (decision 6; the coordinator ruled so in the review of PR 58, I3). Search summaries only.',
   },
+
+  // ---- Roadside repairs cards (group 3) ----
+  'puncture-tube': {
+    urls: [
+      'https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know',
+      'https://www.roadbikerider.com/be-a-hero-on-rides-d3/',
+      'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot',
+    ],
+    note: 'Book pp. 48-49 and 84-85: the order of work, how to find the hole, pinch-flat slits, patch glue timing, a second check of tyre and rim, the pinched-tube check (book, more careful); p. 209: patch or replace the tube.',
+  },
+  'puncture-tubeless': {
+    urls: ['https://www.wtb.com/blogs/wtb/how-to-plug-a-puncture-on-a-tubeless-bicycle-tire', 'https://theproscloset.com/blogs/news/how-to-tubeless-tire-plug'],
+    note: "Not covered by the owner's book pages.",
+  },
+  'chain-broken': {
+    urls: [
+      'https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know',
+      'https://www.roadbikerider.com/be-a-hero-on-rides-d3/',
+      'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot',
+    ],
+    note: 'Book p. 159: join with a link or pin, then flex the joined link sideways to find a stiff one (book, more careful); p. 215: twisted links and a damaged chain are replaced; p. 48: the repair kit has a chain tool.',
+  },
+  'spoke-snapped': {
+    urls: [
+      'https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know',
+      'https://www.roadbikerider.com/be-a-hero-on-rides-d3/',
+      'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot',
+    ],
+    note: "Book p. 49: tape the broken spoke or wrap it round a neighbour; pp. 208-209: broken spokes make the wheel wobble. Opening the brake quick release is the draft's step 2, kept as written: for the owner's O5 read.",
+  },
+  'brake-rub-rim': {
+    urls: ['https://www.sheldonbrown.com/rim-brakes.html'],
+    note: "Book p. 209: re-seat the wheel, the tyre bead (book, more careful), centre the brake. The draft's centring-screw aside had \"no source found\" and is cut (decision 6); the centring itself is the book's.",
+  },
+  'brake-rub-disc': {
+    urls: [
+      'https://www.parktool.com/en-us/blog/repair-help/mechanical-disc-brake-alignment',
+      'https://www.parktool.com/en-int/blog/repair-help/hydraulic-disc-brake-alignment',
+    ],
+    note: 'Book p. 213: bent disc, caliper not centred, pads too close; p. 121: loosen, centre, tighten, squeeze the lever several times.',
+  },
+  'brake-weak-rim': {
+    urls: ['https://www.sheldonbrown.com/rim-brakes.html'],
+    note: 'Book p. 211: cleaning, cable and pads; the brake quick release and loose pads (book, more careful); p. 110: a scraping noise means worn pads.',
+  },
+  'brake-weak-disc': {
+    urls: [
+      'https://www.parktool.com/en-us/blog/repair-help/disc-brake-pad-removal-installation',
+      'https://www.parktool.com/en-us/blog/repair-help/mechanical-disc-brake-alignment',
+    ],
+    note: 'Book p. 213: oil, worn pads, air in the system (pumping firms the lever when air is in it); p. 120: a grinding noise as the worn-pad sign (book, more careful).',
+  },
+  'gears-skipping': {
+    urls: ['https://www.parktool.com/en-us/product/chain-wear-indicator-cc-3-2'],
+    note: 'Book pp. 214-215: stiff links (flex them sideways), worn parts, bent cage or derailleur, dirty chain; pp. 148 and 159: wrong cable tension makes the chain rattle or slip, a stiff link jumps on the rear gears.',
+  },
+  'bolt-loose': {
+    urls: ['https://dedhambike.com/articles/torque-table-pg186.htm', 'https://www.cyclingnews.com/features/torque-wrenches-why-you-need-one-and-how-to-use-them'],
+    note: 'Book p. 40: carbon parts are checked with a torque wrench, not by twisting (book, more careful); p. 206: bar and stem bolts tight. Carbon bolt torque: 4-6 Nm general vs 5.4/6.2/8.8 Nm by maker, so the card says to follow the printed number.',
+  },
+  'tyre-torn': {
+    urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know', 'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot'],
+    note: 'Book p. 48: the repair kit carries a piece of old tyre, about 5 square cm, as a boot.',
+  },
+  'ebike-no-power': {
+    urls: [
+      'https://www.ternbicycles.com/be/support/kb/349039/how-troubleshoot-bosch-ebike-system-tern-bikes',
+      'https://helpcenter.velo-de-ville.com/en/support/solutions/articles/80001185577-error-patterns-solutions-for-bosch-shimano',
+    ],
+    note: 'Book p. 215: charge, battery and plugs seated, dirty contacts; the book cleans with a damp cloth and dries fully.',
+  },
+
+  // ---- What to carry (group 3) ----
+  'carry-spare-tube': {
+    urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know', 'https://www.roadbikerider.com/be-a-hero-on-rides-d3/'],
+    note: "Book pp. 24 and 48: tubes come in many sizes and valve types; a tube goes in the saddle bag. Tubeless riders carry one too (the tubeless card's step 6).",
+  },
+  'carry-tyre-levers': { urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know'], note: 'Book pp. 24 and 48: always carry tyre levers.' },
+  'carry-pump': {
+    urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know'],
+    note: 'Book p. 24: mini pump, frame pump, CO2 inflator and cartridges; only some pumps fit each valve type; "fits your valves" added (book, more careful).',
+  },
+  'carry-patch-kit': {
+    urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know'],
+    note: 'Book pp. 24 and 48: always carry a patch kit; its contents from p. 48.',
+  },
+  'carry-plug-kit': { urls: ['https://www.wtb.com/blogs/wtb/how-to-plug-a-puncture-on-a-tubeless-bicycle-tire', 'https://theproscloset.com/blogs/news/how-to-tubeless-tire-plug'] },
+  'carry-knife': { urls: ['https://www.wtb.com/blogs/wtb/how-to-plug-a-puncture-on-a-tubeless-bicycle-tire', 'https://theproscloset.com/blogs/news/how-to-tubeless-tire-plug'] },
+  'carry-tyre-boot': {
+    urls: ['https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot'],
+    note: 'Book p. 48: a piece of old tyre, about 5 square cm.',
+  },
+  'carry-quick-link': {
+    urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know'],
+    note: "Book p. 159: links that open without tools exist and join by hand; the book's repair kit lists a chain tool, not a link.",
+  },
+  'carry-chain-tool': { urls: [], note: 'Book pp. 24 and 48: a chain tool is in the repair kit.' },
+  'carry-multi-tool': {
+    urls: [],
+    note: "Book p. 24: a multi-tool, tyre levers and a patch kit are the basic puncture kit; the tool must fit the bike's bolts (\"fits the bolts\" added, book, more careful).",
+  },
+  'carry-zip-ties': { urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know'], note: 'Book pp. 48-49: both are in the repair kit; tape for a broken spoke.' },
+  'carry-spoke-key': { urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know'], note: 'Book p. 24: shown with the tools for the road.' },
+  'carry-charger': { urls: ['https://www.bosch-ebike.com/us/help-center/asset-ast-00046', 'https://www.ternbicycles.com/us/node/348455'] },
 };
