@@ -99,21 +99,21 @@ test('[BC-SCREEN] every task open, at the project size and at 200% text: no side
   }
   expect(await page.locator('details.care-task ol > li').count()).toBeGreaterThan(30);
   // every task shows, the conditioned ones tagged, and the quiet line leads to the bike's details
-  await expect(page.locator('details.care-task')).toHaveCount(9);
+  await expect(page.locator('details.care-task')).toHaveCount(48);
   await expect(page.getByRole('link', { name: "Tell us your brakes, tyres… to hide what doesn't apply" })).toHaveAttribute('href', '/tools/bags/#bike-details=bike_u&back=care');
   // the tablist and the filters have names
   await expect(page.getByRole('tablist', { name: 'Bike care' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Parts' })).toBeVisible();
-  await expect(page.getByRole('heading', { level: 3 })).toHaveCount(3);
+  await expect(page.getByRole('heading', { level: 3 })).toHaveCount(7);
 });
 
 test('[BC-SCREEN] Tab reaches every tab, filter, task and link; each task opens with Enter and Space', async ({ page }) => {
   app = await loadApp(page, { launch: true, path: '/#/tools/care' });
   await seed(page, [U], null);
-  await expect(page.locator('details.care-task')).toHaveCount(9);
+  await expect(page.locator('details.care-task')).toHaveCount(48);
   await page.getByRole('link', { name: 'Tools', exact: true }).first().focus();
   const reached: string[] = [];
-  for (let i = 0; i < 40; i += 1) {
+  for (let i = 0; i < 90; i += 1) {
     await page.keyboard.press('Tab');
     const here = await page.evaluate(() => {
       const el = document.activeElement as HTMLElement | null;
@@ -154,11 +154,11 @@ test('[BC-SCREEN] Bike care opens offline after one visit, and works there', asy
   await expect(page.getByRole('heading', { name: 'Bike care', level: 2 })).toBeVisible();
   await expect(task(page, 'brakes-pads-disc')).toBeVisible();
   await page.getByRole('button', { name: 'Brakes' }).click();
-  await expect(page.locator('details.care-task')).toHaveCount(1);
+  await expect(page.locator('details.care-task')).toHaveCount(7);
   await page.getByLabel('Search').fill('lube');
   await expect(page.getByText('Nothing matches.')).toBeVisible();
   await page.getByRole('button', { name: 'Clear search and filter' }).click();
-  await expect(page.locator('details.care-task')).toHaveCount(6);
+  await expect(page.locator('details.care-task')).toHaveCount(35);
   // the Roadside tab and the carry list work offline too
   await page.getByRole('tab', { name: 'Roadside repairs' }).click();
   await expect(page.locator('details.care-road[data-id="puncture-tubeless"]')).toBeVisible();

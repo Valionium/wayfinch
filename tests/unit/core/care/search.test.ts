@@ -8,14 +8,17 @@ import { CARE_TASKS, PART_LABEL } from '../../../../src/core/wording/en-care.ts'
 const text = (t: CareTask): string[] => [t.name, PART_LABEL[t.part], ...t.words];
 const find = (q: string): string[] => searchCare(q, CARE_TASKS, text).map((t) => t.id);
 const has = (id: string) => CARE_TASKS.some((t) => t.id === id);
-/** The full list's expectation, cut to the tasks the sample holds (until group 2 brings the full list, Task 5). */
+/** The full list is in (group 2, Task 5): every task the design names is held. */
 const held = (ids: string[]) => ids.filter(has);
 
 test('[BC-SEARCH-WORDS] "squeak" finds the chain lube and the brake pad tasks; "bleed" the hydraulic bleed; "chain" every Chain task; "zzz" none', () => {
   const squeak = find('squeak');
   for (const id of held(['chain-lube', 'brakes-pads-disc', 'brakes-pads-rim'])) expect(squeak, id).toContain(id);
+  expect(squeak).toEqual(['chain-dry-lube', 'brakes-pads-disc', 'brakes-pads-rim', 'chain-lube', 'brakes-squeal']);
   expect(held(['chain-lube', 'brakes-pads-disc', 'brakes-pads-rim']).length).toBe(3);
-  expect(find('bleed')).toEqual(held(['brakes-hydraulic-bleed']));
+  // the bleed itself, and the spongy-brake task that sends the rider to it
+  expect(held(['brakes-hydraulic-bleed', 'brakes-spongy']).length).toBe(2);
+  expect(find('bleed')).toEqual(['brakes-hydraulic-bleed', 'brakes-spongy']);
   const chain = find('chain');
   const chainTasks = CARE_TASKS.filter((t) => t.part === 'chain').map((t) => t.id);
   expect(chainTasks.length).toBeGreaterThan(0);
@@ -42,7 +45,7 @@ test('[BC-SEARCH-FORMS] "Squeaking", "  SQUEAK ", "squeaks" give the same result
   expect(find('spokes')).toEqual(find('spoke'));
   expect(find('brakes')).toEqual(find('brake'));
   expect(find('oiling')).toContain('chain-lube');
-  expect(find('Spoké,  wobble')).toEqual(['wheels-spokes-check']);
+  expect(find('Spoké,  wobble')).toEqual(['wheels-spokes-check', 'wheels-true-tension', 'wheels-wobble']);
 });
 
 test('[BC-SEARCH-FORMS] "Bremse" finds nothing and does not throw; odd input never throws', () => {
@@ -55,7 +58,7 @@ test('[BC-SEARCH-FORMS] "Bremse" finds nothing and does not throw; odd input nev
 
 test('[BC-SEARCH-FORMS] "-ies" plurals meet their "-y" word; an ending is only taken off to meet a whole word, so "spring" never meets "sprocket" (review of PR 58, M3)', () => {
   expect(find('batteries')).toEqual(find('battery'));
-  expect(find('battery')).toEqual(['ebike-battery-care']);
+  expect(find('battery')).toEqual(['ebike-charge-indoors', 'ebike-dry-contacts', 'gears-electronic-battery', 'ebike-battery-care', 'ebike-service', 'ebike-range-drop']);
   const items = [
     { id: 'sprocket', words: ['sprocket'] }, { id: 'stretched', words: ['stretched chain'] }, { id: 'shock', words: ['shock'] },
     { id: 'spec', words: ['spectacles'] }, { id: 'spring', words: ['springs'] }, { id: 'pump', words: ['pumping'] },
@@ -89,9 +92,9 @@ test('[BC-SEARCH-FORMS] each typed form finds exactly what its plain word finds,
     expect(find(base).length, base).toBeGreaterThan(0);
     expect(find(form), `${form} vs ${base}`).toEqual(find(base));
   }
-  expect(find('charging')).toEqual(['ebike-battery-care']);
+  expect(find('charging')).toEqual(['ebike-charge-indoors', 'gears-electronic-battery', 'ebike-battery-care']);
   expect(find('storing')).toEqual(['ebike-battery-care']);
-  expect(find('slips')).toEqual(['gears-hub-oil']);
+  expect(find('slips')).toEqual(['chain-wear-check', 'gears-hub-oil']);
 });
 
 test('[BC-SEARCH-FORMS] the false hits stay gone with the forms back: spring, string, shoes, speed (re-check of PR 58, R1)', () => {
@@ -107,4 +110,14 @@ test('[BC-SEARCH-FORMS] filler words are skipped on the tasks too: "my chain squ
   expect(find('my chain squeaks')).toEqual(find('chain squeaks'));
   expect(find('the brake is squeaking')).toEqual(find('brake squeaking'));
   expect(find('brake squeaking').length).toBeGreaterThan(0);
+});
+
+test('[BC-SEARCH-WORDS] on the full list: "spring" never meets the rear gears, "rohloff" finds the hub gear oil task, "puncture" and "creak" find what the words name (review of PR 58, M3 and M4)', () => {
+  expect(find('spring')).not.toContain('gears-cassette-wear');
+  expect(find('rohloff')).toEqual(['gears-hub-oil']);
+  expect(find('creak')).toEqual(['frame-bolts-check', 'frame-torque-check', 'frame-creak']);
+  expect(find('hydraulic')).toContain('brakes-hydraulic-bleed');
+  expect(find('punctur')).toEqual([]);
+  // every task is found by its own name, typed whole
+  for (const t of CARE_TASKS) expect(find(t.name), t.id).toContain(t.id);
 });
