@@ -5527,7 +5527,7 @@ const ADVISOR_WORDING = {
   deckOwn:{text:'Put the {items} on your rack, no new bag needed'}, deckNew:{text:'A rack, with the {items} on its top deck'},
   deckOwnBare:{text:"Use your rack's top deck, no new bag needed"}, deckNewBare:{text:'A rack with a top deck'},
   deckOwnPlus:{text:"the {items} on your rack's top deck"}, deckOwnPlusBare:{text:"your rack's top deck"},
-  rackAnd:{text:'Rack and {type}'},
+  rackAnd:{text:'Rack and {type}'}, rackDeckWith:{text:'with the {items} on its top deck'},
   loadFailed:{text:'The Gear advisor could not load. Open the bag planner once while online, then try again.'},
   replace:{text:'Replace your {old} with {new}'}, two:{text:'{a}, plus {b}'}, pairOf:{text:'2 × {size}'},
   moveLine:{text:'{item}: {from} → {to}'}, leftOver:{text:'left over'}, moreMoves:{text:'and {n} more'},
@@ -5541,6 +5541,8 @@ const ADVISOR_TYPES = { top:'typeTop', frame:'typeFrame', fork:'typeFork', bar:'
 const ADVISOR_GROUPS = { frame:'gMiddle', top:'gMiddle', bottle:'gMiddle', bottleU:'gMiddle', fork:'gFork', rack:'gRack', deck:'gRack', bar:'gBar', seat:'gSeat', pack:'gBack' };
 // A search running longer than this shows "Trying N options…" (GA-PROGRESS).
 const ADVISOR_PROGRESS_MS = 300;
+// A slice of the search holds the page at most about this long before it hands it back (GA-PROGRESS).
+const ADVISOR_SLICE_MS = 50;
 // Kilos moved below this are not worth a line of their own.
 const ADVISOR_MOVES_KG = 0.5;
 const ADVISOR = { open:false, style:null, styleTouched:false, goal:null, source:null, q:null, answer:null, input:null, error:'', back:null };
@@ -5595,15 +5597,27 @@ function advisorOldBag(s, input){
 }
 // The rack deck, in the planner's own placement: what deckedIds puts there in this suggestion's plan. On the rack the plan has, no
 // new bag ("Put the tent on your rack, no new bag needed"); else a rack to fit. `inList`: the words inside a longer line.
+// What the planner's own deck placement puts on the rack deck with these bags and decks.
+function advisorDecked(bags, decks, input){ return withInputs(advisorChanges(bags, decks, input.context), () => deckedIds()); }
+const advisorDeckItems = (s, input) => advisorList(advisorDecked(advisorTrialBags(s, input), s.decks, input).map(id => (kitById(id) || { name:id }).name.toLowerCase()));
 function advisorDeckText(s, input, inList){
-  const ids = withInputs(advisorChanges(advisorTrialBags(s, input), s.decks, input.context), () => deckedIds());
-  const items = advisorList(ids.map(id => (kitById(id) || { name:id }).name.toLowerCase())), own = advisorRackFitted(input);
+  const items = advisorDeckItems(s, input), own = advisorRackFitted(input);
   if(inList) return own ? (items ? advisorWord('deckOwnPlus', { items }) : advisorWord('deckOwnPlusBare')) : (items ? advisorWord('deckNew', { items }) : advisorWord('deckNewBare')).replace(/^./, c => c.toLowerCase());
   return items ? advisorWord(own ? 'deckOwn' : 'deckNew', { items }) : advisorWord(own ? 'deckOwnBare' : 'deckNewBare');
 }
 const advisorLower = t => t.replace(/^./, c => c.toLowerCase());
+// Panniers on a rack to fit bring its top deck: what rides there, said once with that one rack (review of PR 61, I3).
+function advisorRackDeck(s, input){
+  if(!s.add.some(b => b.pos === 'rack') || advisorRackFitted(input) || !s.decks.rack) return '';
+  const items = advisorDeckItems(s, input);
+  return items ? advisorWord('rackDeckWith', { items }) : '';
+}
 // What to get, in a line (design §2). Two bags, and Looking ahead's set, give each bag at its own size, then the rack deck.
 function advisorWhat(s, input){
+  const deck = advisorRackDeck(s, input);
+  return deck ? advisorWord('two', { a:advisorWhatBags(s, input), b:deck }).replace(', plus ', ', ') : advisorWhatBags(s, input);
+}
+function advisorWhatBags(s, input){
   const own = b => advisorBagText(b, [b.L, b.L], input);
   if(s.kind === 'deck') return advisorDeckText(s, input, false);
   if(s.kind === 'swap') return advisorWord('replace', { old:advisorOldBag(s, input), new:advisorBagPhrase(s.add[0], s.rangeL, input) });
@@ -5639,6 +5653,10 @@ function advisorMoves(s, input){
     return labels.length ? advisorList(labels) : advisorWord('leftOver');
   };
   const lines = [];
+  // the kit the trial puts on the rack deck, which plan.items does not hold (review of PR 61, m1)
+  const was = new Set(advisorDecked(base.bags, base.decks, input)), deckTo = POSITIONS.rack.strapLabel.toLowerCase();
+  advisorDecked(bags, s.decks, input).filter(id => !was.has(id)).forEach(id =>
+    lines.push(advisorWord('moveLine', { item:name(id), from:where((a.items[id] || []).map(e => e[0]).join(','), base.bags), to:deckTo })));
   diff.moved.forEach(m => { const from = where(m.from, base.bags), to = where(m.to, bags); if(from !== to) lines.push(advisorWord('moveLine', { item:name(m.id), from, to })); });
   diff.placedFromOverflow.forEach(id => lines.push(advisorWord('moveLine', { item:name(id), from:advisorWord('leftOver'), to:where((b.items[id] || []).map(e => e[0]).join(','), bags) })));
   return lines;
@@ -5806,6 +5824,9 @@ async function runAdvisor(){
   try { mod = await loadAdvisor(); } catch(e){ if(id === ADVISOR_RUN){ ADVISOR.error = advisorWord('loadFailed'); renderAdvisorAnswer(); } return; }
   if(id !== ADVISOR_RUN) return;
   const input = advisorInput(ADVISOR.style, ADVISOR.goal, ADVISOR.source === 'questionnaire' ? { questionnaire:ADVISOR.q } : {});
+  // the search hands the page back after 20 trials, or after ADVISOR_SLICE_MS of them, whichever comes first (review of PR 61, I4)
+  let sliceStart = Date.now();
+  input.handBack = () => Date.now() - sliceStart >= ADVISOR_SLICE_MS;
   const steps = mod.adviseSteps(input), started = Date.now();
   let answer;
   for(;;){
@@ -5813,6 +5834,7 @@ async function runAdvisor(){
     if(step.done){ answer = step.value; break; }
     if(Date.now() - started >= ADVISOR_PROGRESS_MS) advisorProgress(step.value);
     await new Promise(resolve => setTimeout(resolve, 0));
+    sliceStart = Date.now();
     if(id !== ADVISOR_RUN || !ADVISOR.open) return;
   }
   ADVISOR.answer = answer; ADVISOR.input = input;
@@ -5833,9 +5855,15 @@ function setAdvisor(key, value){
   ADVISOR_DONE = runAdvisor();
 }
 // advisor.js's decided values (table.ts DECIDED): at once when it is loaded, else once it is, then the view is drawn again.
+// Only a change it made is drawn and searched (review of PR 61, m4): a setup the rider tapped meanwhile stays as it is.
 function advisorDecided(apply){
   if(window.WayfinchAdvisor){ apply(window.WayfinchAdvisor.DECIDED); return; }
-  loadAdvisor().then(mod => { if(!ADVISOR.open) return; apply(mod.DECIDED); renderAdvisor(); ADVISOR_DONE = runAdvisor(); }).catch(() => {});
+  loadAdvisor().then(mod => {
+    if(!ADVISOR.open) return;
+    const before = ADVISOR.style;
+    apply(mod.DECIDED);
+    if(ADVISOR.style !== before){ renderAdvisor(); ADVISOR_DONE = runAdvisor(); }
+  }).catch(() => {});
 }
 function openAdvisor(opener = document.activeElement){
   const A = ADVISOR, root = $('advisorBox');

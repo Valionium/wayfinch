@@ -116,7 +116,8 @@ test('[GA-PROGRESS] the real R3 search hands the page back after every 20 trials
   await page.evaluate("openAdvisor(document.getElementById('rigBikeDetails'))");
   const box = page.locator('#advisorBox');
   await box.locator('label.adv-choice', { hasText: 'Panniers are fine' }).click();
-  await page.evaluate('window.__adv.trials = 0; window.__adv.yields = []; window.__adv.down = 0');
+  // the bound measures the search alone, not the dialog's opening (review of PR 61, I4)
+  await page.evaluate('window.__adv.trials = 0; window.__adv.yields = []; window.__adv.down = 0; window.__adv.longest = 0');
   await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
   await expect.poll(() => page.evaluate('window.__adv.trials')).toBeGreaterThan(25);
   await box.locator('label.adv-choice', { hasText: 'Get the backpack off' }).click();
@@ -131,6 +132,64 @@ test('[GA-PROGRESS] the real R3 search hands the page back after every 20 trials
   expect(r.tap, 'the tap was handled').not.toBeNull();
   expect(r.tap!, 'a tap during the search waits under a second').toBeLessThan(1000);
   expect(r.longest, 'no stretch of the search holds the page a second or more').toBeLessThan(1000);
+});
+
+/** The reviewer's heavy plan (review of PR 61, I4): top 1, bar 12, seat 14, a half frame bag, a pair of fork cages, a 15 L backpack, five
+ *  nights camping, carrying a lot. */
+async function heavy(page: Page): Promise<void> {
+  await page.evaluate(`S.bikeProfile = normaliseBikeProfile(${JSON.stringify(R3_BIKE)});
+    Object.assign(S, { nights: 5, sleep: 'camp', mode: 'comfort', decks: { bar: false, rack: false }, nextUid: 7,
+      bags: [{ uid: 1, pos: 'top', slot: 'front', L: 1 }, { uid: 2, pos: 'bar', L: 12 }, { uid: 3, pos: 'seat', L: 14 }, { uid: 4, pos: 'frame', shape: 2, L: 3 },
+        { uid: 5, pos: 'fork', pair: true, L: 3 }, { uid: 6, pos: 'pack', L: 15 }] });
+    applyTripKitDefaults();
+    S.custom = Object.fromEntries(KIT.filter(k => k.tiers).map(k => { const t = [...k.tiers].sort((a, b) => b.L - a.L)[0]; return [k.id, { L: t.L, kg: t.kg, rigid: t.rigid }]; }));`);
+}
+
+test('[GA-PROGRESS] the heavy plan (many bags, five nights, a lot; Panniers are fine, Better handling): the search hands the page back within about 50 ms of trials, no task reaches 600 ms on the phone stand-in, and the progress line never counts more options than were tried (review of PR 61, I4)', async ({ page }) => {
+  await planner(page);
+  await heavy(page);
+  await page.evaluate(`window.__adv = { trials: 0, longest: 0, shown: [], honest: true };
+    advisorTrial = ((f) => (...a) => { window.__adv.trials++; return f(...a); })(advisorTrial);
+    new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__adv.longest = Math.max(window.__adv.longest, e.duration); }).observe({ type: 'longtask', buffered: false });
+    new MutationObserver(() => { const m = /^Trying ([0-9]+) options…$/.exec(document.getElementById('advisorProgress').textContent || '');
+      if (m) { window.__adv.shown.push(+m[1]); if (+m[1] > window.__adv.trials) window.__adv.honest = false; } })
+      .observe(document.getElementById('advisorProgress'), { childList: true, characterData: true, subtree: true });`);
+  await page.evaluate("openAdvisor(document.getElementById('rigBikeDetails'))");
+  const box = page.locator('#advisorBox');
+  await box.locator('label.adv-choice', { hasText: 'Panniers are fine' }).click();
+  await page.evaluate('window.__adv.trials = 0; window.__adv.longest = 0; window.__adv.shown = []');
+  await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
+  await expect(page.locator('#advisorAnswer h4').first()).toBeVisible({ timeout: 60_000 });
+  const r = await page.evaluate('window.__adv') as { trials: number; longest: number; shown: number[]; honest: boolean };
+  const note = `${r.trials} trials, longest task ${r.longest.toFixed(0)} ms, progress shown ${r.shown.length} times`;
+  test.info().annotations.push({ type: 'GA-PROGRESS heavy', description: note });
+  console.log(`GA-PROGRESS heavy ${test.info().project.name}: ${note}`);
+  expect(r.trials).toBeGreaterThan(100);
+  expect(r.shown.length, 'the progress line showed').toBeGreaterThan(0);
+  expect(r.honest, 'the progress line never counts more options than were tried').toBe(true);
+  expect(r.shown.every((n, k) => k === 0 || n >= r.shown[k - 1]!), 'the count only grows').toBe(true);
+  expect(r.longest, 'no stretch of the search holds the page 600 ms or more').toBeLessThan(600);
+});
+
+test('[GA-SCREEN] advisor.js still loading: a setup tapped before it arrives is kept, the view is not drawn again under the rider\'s focus, and no second search starts when it loads (review of PR 61, m4)', async ({ page }) => {
+  await planner(page);
+  await gravel(page);
+  let release: () => void = () => {};
+  const held = new Promise<void>((res) => { release = res; });
+  await page.route('**/tools/bags/advisor.js', async (route) => { await held; await route.continue(); });
+  await page.evaluate("openAdvisor(document.getElementById('rigBikeDetails'))");
+  const box = page.locator('#advisorBox');
+  await box.locator('label.adv-choice', { hasText: 'Bikepacking bags only' }).click();
+  await expect(box.locator('input[name="advStyle"][value="bags"]')).toBeFocused();
+  const before = await page.evaluate(`(() => { window.__mark = document.getElementById('advisorSteps').firstElementChild; return ADVISOR_RUN; })()`) as number;
+  release();
+  await page.waitForFunction('!!window.WayfinchAdvisor');
+  await page.waitForTimeout(200);
+  const after = await page.evaluate(`({ run: ADVISOR_RUN, style: ADVISOR.style, same: document.getElementById('advisorSteps').firstElementChild === window.__mark })`) as { run: number; style: string; same: boolean };
+  expect(after.style).toBe('bags');
+  expect(after.run, 'no second search').toBe(before);
+  expect(after.same, 'the steps were not drawn again').toBe(true);
+  await expect(box.locator('input[name="advStyle"][value="bags"]')).toBeFocused();
 });
 
 test('[GA-SCREEN] at this window size and theme, offline: the steps are headings, every choice 44 px or more, no sideways scroll, and the keyboard reaches every choice and suggestion', async ({ page }) => {

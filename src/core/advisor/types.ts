@@ -39,6 +39,11 @@ export type AdvisorInput = {
   /** `bikeFit(bike).size` and `.seatGapCm` (null when not measured): bagSpec's small-frame seat pack caution reads them. */
   frameSize: string | null | undefined;
   seatGapCm: number | null | undefined;
+  /**
+   * The page's clock, kept out of the pure search (review of PR 61, I4): asked after each trial, true when the page wants its hand back
+   * now (a slice of about 50 ms); the search also hands back after every 20 trials.
+   */
+  handBack?: () => boolean;
   usable: (bag: BagIn) => Usable;                    // the page's bagSpec
   trial: (bags: BagIn[], decks: Decks) => TrialResult; // the page's planWith
 };

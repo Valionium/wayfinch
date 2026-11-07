@@ -199,6 +199,16 @@ export function candidates(given: AdvisorInput, phase: 'add' | 'swap' | 'add-two
 }
 
 /**
+ * The sizes the planner accepts for a bag at its own spot (same position, top-tube slot, single or pair), smallest first, with their
+ * tags: Looking ahead resizes its two bags with them (review of PR 61, m2). None for a frame bag (its sizes are the bike's shapes).
+ */
+export function sizeOptions(given: AdvisorInput, bag: BagIn): { bag: Omit<BagIn, 'uid'>; tags: string[] }[] {
+  if (bag.pos === 'frame' || !(bag.pos in SIZE_RANGES)) return [];
+  const spot: Spot = { pos: bag.pos as NewPos, slot: bag.pos === 'top' ? (bag.slot ?? 'front') : null, pair: !!bag.pair };
+  return options(planAsStyled(given), spot).flatMap((o) => (o.bag ? [{ bag: o.bag, tags: o.tags }] : []));
+}
+
+/**
  * Looking ahead (owner, 7 Nov): Minimal's first suggestion as it stands (its removal too) plus one more thing at a spot then free: a bag,
  * a single or a pair, or the rack deck; panniers only when `panniers`, and on a rack fitted or suggested. Each has kind 'ahead'; the new
  * bag's uid follows the first's.
@@ -212,7 +222,9 @@ export function extensions(given: AdvisorInput, first: Candidate, panniers = tru
     for (const o of options(input, spot)) {
       const extra = o.bag ? [{ uid: input.nextUid + first.add.length, ...o.bag }] : [];
       const add = [...first.add, ...extra];
-      const deck = first.deck || o.bag === null;
+      // one rack at most (review of PR 61, I3): panniers beside "a rack" hang from that rack and bring its deck, so the suggestion is the
+      // rack with panniers, never the rack's deck as a second thing
+      const deck = (first.deck || o.bag === null) && !add.some((b) => b.pos === 'rack');
       out.push({ kind: 'ahead', add, remove: first.remove, decks: decksFor(input, first.decks, extra, o.bag === null), deck,
         newBags: countNew(input, add, deck), litres: litresOf(add), tags: [...new Set([...first.tags, ...o.tags])] });
     }
