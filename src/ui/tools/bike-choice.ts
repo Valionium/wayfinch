@@ -35,6 +35,13 @@ export function newerChoice(get: (key: string) => string | null): { bikeId: stri
   return win ? { bikeId: win[1] } : null;
 }
 
+/** Which app made the newer choice, by the same rule: 'load-check' when the bag planner's record wins, else 'copilot'; null with neither. */
+export function choiceMadeIn(get: (key: string) => string | null): 'copilot' | 'load-check' | null {
+  const mine = choiceRecord(get, BIKE_CHOICE_KEY, 'copilot');
+  const theirs = choiceRecord(get, PAGE_BIKE_CHOICE_KEY, 'load-check');
+  return theirs && !(mine && mine[0] >= theirs[0]) ? 'load-check' : mine ? 'copilot' : null;
+}
+
 /**
  * What the rider chose among the saved bikes: `{id}` for a saved bike or for No bike (null), null when no record chose anything usable
  * (none, or a bike no saved bike has). Only a saved bike counts, as in the tyre tool's rule: a removed bike is never chosen.

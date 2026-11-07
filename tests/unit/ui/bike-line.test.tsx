@@ -223,6 +223,26 @@ describe('a choice made elsewhere while the tyre tool is open', () => {
     expect(status()).toBeNull();
   });
 
+  // Review of PR 55, Minor: the line names where the choice was made. A choice made in the bag planner (its own record, newer) is not
+  // "chosen in Tools".
+  test('[TB-ELSEWHERE] a choice made in the bag planner says so: "was chosen in the bag planner", never "in Tools"', async () => {
+    const mem = world([A, B], A);
+    await mountTyre(mem);
+    await type('6');
+    mem.data.set('loadcheck:bikeChoice:v1', JSON.stringify({ app: 'load-check', kind: 'bike-choice', v: 1, bikeId: 'bike_b', at: '2026-11-07T10:00:01.000Z' }));
+    await act(() => { window.dispatchEvent(new StorageEvent('storage', { key: 'loadcheck:bikeChoice:v1' })); });
+    const offer = () => [...host.querySelectorAll('[role="status"]')].map((e) => e.textContent ?? '').find((t) => t.includes(T.tyreChosenSwitch)) ?? '';
+    expect(tyreSelect().value).toBe('bike_a');
+    expect(offer()).toContain('Gravel');
+    expect(offer()).toContain(T.tyreChosenInPlanner);
+    expect(offer()).not.toContain(T.tyreChosenElsewhere);
+    // A later choice in Tools (Wayfinch's own record, newer) says Tools again.
+    await act(() => { noteBikeChoice(null, new Date(NOW.getTime() + 5000), mem.kv); });
+    expect(offer()).toContain(T.tyreBikeWithout);
+    expect(offer()).toContain(T.tyreChosenElsewhere);
+    expect(offer()).not.toContain(T.tyreChosenInPlanner);
+  });
+
   test('[TB-ELSEWHERE] a rider who picked a bike here is touched too; the choice coming back to what is shown withdraws the line', async () => {
     const mem = world([A, B], A);
     await mountTyre(mem);
