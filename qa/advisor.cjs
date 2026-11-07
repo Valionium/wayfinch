@@ -100,6 +100,21 @@ test('[GA-TRIAL-FN] advisorInput reads the plan, the bike and the planner\'s own
   assert.equal(sum,p.run('JSON.stringify(currentPlan().items)'),'its trial is advisorTrial');
 });
 
+test('[GA-TRIAL-FN] gains are measured against a fresh re-plan of the plan: a trip cut from 3 nights to 0 after the plan was kept never credits the re-plan\'s gain to a suggested bag (review of PR 60, I1)',async()=>{
+  const p=page({setup:"S.bags=[{uid:1,pos:'frame',shape:0,L:6},{uid:2,pos:'bar',L:12},{uid:3,pos:'seat',L:14},{uid:4,pos:'top',slot:'front',L:1}];S.nextUid=5;"
+    +"S.nights=3;S.sleep='camp';applyTripKitDefaults();currentPlan();S.nights=0;applyTripKitDefaults();"});
+  const W=p.json('window.WayfinchAdvisor.WEIGHTS');
+  const score=r=>Math.round(Object.entries(r.kgByPos).reduce((n,[pos,kg])=>n+kg*W[pos],0)*100)/100;
+  const kept=p.json('advisorResult(currentPlan())'),fresh=p.json('planWith({placements:null},advisorResult)');
+  assert.ok(score(kept)-score(fresh)>=0.5,'this plan drifted: a re-plan alone gains 0.5 or more');
+  p.run('openAdvisor()');p.run("setAdvisor('style','either');setAdvisor('goal','handling')");await p.run('ADVISOR_DONE');
+  assert.equal(score(p.json('advisorBase(ADVISOR.input).result')),score(fresh),'the base is the fresh re-plan');
+  const a=p.json('ADVISOR.answer');
+  for(const s of a.kind==='suggestions' ? a.items : [])assert.ok(score(fresh)-s.score>=0.5-1e-9,`${p.json(`advisorWhat(${JSON.stringify(s)},ADVISOR.input)`)}: its own gain over the re-plan is ${(score(fresh)-s.score).toFixed(2)}`);
+  // the moves and the drawing read the same fresh plan
+  assert.equal(p.run('JSON.stringify(advisorPlan(advisorBase(ADVISOR.input).bags,advisorBase(ADVISOR.input).decks,ADVISOR.input).items)'),JSON.stringify(fresh.items));
+});
+
 test('[GA-RANGES-SPEC] the size table agrees with the real bagSpec, on a bike with full details and on one with none',()=>{
   const p=page();
   const A=p.json('window.WayfinchAdvisor.SIZE_RANGES');
@@ -274,6 +289,30 @@ test('[GA-ANSWER] each suggestion shows type and size range, the bike drawn with
   // the drawing has the new bag: the first suggestion's position is in the drawn view
   const drawn=p.json('advisorBagView(advisorTrialBags(ADVISOR.answer.items[0],ADVISOR.input),ADVISOR.answer.items[0].decks,ADVISOR.input)');
   for(const bag of a.items[0].add)assert.ok(drawn.items.some(x=>x.pos===bag.pos),'drawn with the '+bag.pos);
+  // each card's drawing is named by its bag, the bike's own name hidden inside it (review of PR 60, m4)
+  const names=items.map(it=>(/<div class="adv-drawing" role="img" aria-label="([^"]+)">/.exec(it)||[])[1]);
+  a.items.forEach((s,i)=>{
+    const what=p.json(`advisorWhat(ADVISOR.answer.items[${i}],ADVISOR.input)`);
+    assert.equal(names[i],p.run('htmlEsc')(`Your bike with ${what.replace(/^./,c=>c.toLowerCase())}`),'drawing '+(i+1)+' named by its bag');
+  });
+  assert.equal(new Set(names).size,names.length,'no two drawings share a name');
+});
+
+test('[GA-SCREEN] the answer is not a live region: one short status line says what changed, so a screen reader does not read every card again (review of PR 60, m3)',async()=>{
+  assert.ok(!/id="advisorAnswer"[^>]*aria-live/.test(page().html.slice(page().html.indexOf('id="advisorBox"'))),'#advisorAnswer is not aria-live');
+  const p=page({setup:R2,bike:GRAVEL});
+  const status=()=>p.context.document.getElementById('advisorStatus').textContent;
+  p.run('openAdvisor()');
+  assert.equal(status(),'Choose all three steps to see what to get.');
+  await ask(p,{style:'no-rack',goal:'handling'});
+  const n=p.json('ADVISOR.answer.items.length');
+  assert.equal(status(),`${n} suggestions, best first.`);
+  const say=a=>{p.run(`ADVISOR.answer=${JSON.stringify(a)};renderAdvisorAnswer()`);return status();};
+  const common={tried:40,frameReason:null,partial:false};
+  assert.equal(say({kind:'already-good',...common}),'Your bags already suit this; nothing to add.');
+  assert.equal(say({kind:'nothing-helps',closest:null,...common}),'Nothing helps within this style.');
+  assert.equal(say({kind:'cannot-reduce',backL:3,...common}),'No bag takes more off your back.');
+  assert.equal(say({kind:'already-good',...common,partial:true}),'Your bags already suit this; nothing to add. This search stopped early.');
 });
 
 test('[GA-ANSWER] a bike whose rack mounts are Not sure (no field, as sub-project 11 stores it): every pannier shown says "if your bike has rack mounts"',async()=>{
@@ -300,6 +339,8 @@ test('[GA-ANSWER] the words of each answer: a swap, a pair, already good, cannot
   const common={tried:40,frameReason:null,partial:false};
   assert.ok(say({kind:'already-good',...common}).includes('Your bags already suit this; nothing to add.'));
   assert.ok(say({kind:'cannot-reduce',backL:3,...common}).includes('3 L stay on your back'));
+  // exact: the search answers cannot-reduce when nothing takes 0.5 L or more off (decision 6), so the sentence says so (PR 60, m2)
+  assert.ok(say({kind:'cannot-reduce',backL:3,...common}).includes('No bag within this style takes 0.5 L or more off your back: 3 L stay on your back.'));
   const none=say({kind:'nothing-helps',closest:{...sugg('add',[{uid:9,pos:'seat',L:16}],null),rangeL:[16,16],result:{overL:2.4,spillIds:['tent','stove'],backL:0,backKg:0,outOfReach:0,kgByPos:{},items:{}}},...common});
   assert.ok(none.includes('Nothing helps'),'says so plainly');
   assert.ok(/Closest: Seat pack, 16 L/.test(none),'the closest option');
