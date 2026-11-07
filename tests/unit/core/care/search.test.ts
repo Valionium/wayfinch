@@ -102,3 +102,9 @@ test('[BC-SEARCH-FORMS] the false hits stay gone with the forms back: spring, st
   const look = (q: string) => searchCare(q, items, (i) => i.words).map((i) => i.id);
   for (const q of ['spring', 'string', 'shoes', 'speed', 'springs', 'strings', 'sped']) expect(look(q), q).toEqual([]);
 });
+
+test('[BC-SEARCH-FORMS] filler words are skipped on the tasks too: "my chain squeaks", "the brake is squeaking" (re-check of PR 59, R6)', () => {
+  expect(find('my chain squeaks')).toEqual(find('chain squeaks'));
+  expect(find('the brake is squeaking')).toEqual(find('brake squeaking'));
+  expect(find('brake squeaking').length).toBeGreaterThan(0);
+});

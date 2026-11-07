@@ -12,6 +12,8 @@
 
 const ENDINGS: readonly [string, string][] = [['ies', 'y'], ['ing', ''], ['ed', ''], ['es', ''], ['s', '']];
 const VOWELS = /[aeiou]/;
+/** Words that carry no meaning in a search ("my chain is squeaking"); skipped unless they are the word being typed. */
+const FILLER = new Set(['is', 'my', 'the', 'a', 'it', 'of']);
 
 /** Lower case, accents removed (NFKD, marks dropped), punctuation to spaces, split into words. */
 export function normaliseQuery(q: string): string[] {
@@ -49,7 +51,8 @@ function wholeForms(word: string): string[] {
 
 /** The items whose text holds every query word, in the list's order; an empty query gives them all. */
 export function searchCare<T extends { id: string }>(query: string, items: readonly T[], text: (t: T) => string[]): T[] {
-  const wanted = normaliseQuery(query);
+  const typed = normaliseQuery(query);
+  const wanted = typed.filter((w, i) => i === typed.length - 1 || !FILLER.has(w));
   if (wanted.length === 0) return [...items];
   return items.filter((item) => {
     const words = text(item).flatMap(normaliseQuery);

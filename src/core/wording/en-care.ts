@@ -271,7 +271,7 @@ export const ROAD_CARDS: RoadCard[] = [
     checkFirst: 'Is only one spoke gone, and does the rim still turn?',
     steps: [
       'Wrap the broken spoke around a good neighbour or tape it.',
-      "Rim brakes: if the rim rubs, open the brake's quick release (the small lever on the brake, not the wheel's). Until you close it again, this brake works much less: ride slowly and use the other brake.",
+      "Rim brakes: if the rim rubs, open the brake's quick release (on rim brakes), not the wheel's. Until you close it again, this brake works much less: ride slowly and use the other brake.",
       'Disc brakes: check the wheel turns without touching the brake; if it rubs, ride slowly.',
       'Ride slowly to a shop.',
       "Rim brakes: close the brake's quick release once the wheel is fixed.",
@@ -286,8 +286,8 @@ export const ROAD_CARDS: RoadCard[] = [
     steps: [
       "Re-seat the wheel in the dropouts and tighten the wheel's quick release.",
       'Check the tyre bead sits evenly; if not, let the air out, seat it, pump up.',
-      "If it still rubs, ride on gently and have the brake centred at a shop.",
       'Check the pad is not touching the tyre or spokes.',
+      'If it still rubs, ride on gently and have the brake centred at a shop.',
       "Open the brake's quick release only if you must and ride slowly. Until you close it again, this brake works much less: ride slowly and use the other brake.",
       "Close the brake's quick release once the wheel is fixed.",
     ],
@@ -356,10 +356,10 @@ export const ROAD_CARDS: RoadCard[] = [
     steps: [
       'Carbon parts: do not twist them to test; their bolts take the torque printed on the part, set with a torque wrench. Without one, if unsure, a shop.',
       'Find the bolt by feel.',
-      'Tighten to the torque printed on the part. Without a torque wrench, only snug it, and have it checked.',
+      'Tighten to the torque printed on the part, with a torque wrench. Without one, tighten the bolts evenly, a little at a time, until the part no longer moves in the twist test. Carbon parts: never without a torque wrench.',
       'Re-check after a short ride.',
     ],
-    rideOn: 'Fine for most bolts once tight. Stop if a stem, bar or steerer bolt will not tighten. Critical.',
+    rideOn: 'Only once the part no longer moves in the twist test. Have the torque checked at the next shop. A carbon part you could not torque: ride gently to a shop, or walk if it still moves. Stop if a stem, bar or steerer bolt will not tighten. Critical.',
     carry: ['carry-multi-tool'],
     words: ['loose', 'rattle', 'noise', 'bolt', 'carbon'], critical: true,
   },

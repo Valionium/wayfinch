@@ -159,6 +159,14 @@ test('[BC-ROAD] bolt-loose puts the carbon warning first, and tightens only to t
   expect(carbon).toBe(0);
   expect(carbon).toBeLessThan(tighten);
   expect(steps.join(' ')).not.toMatch(/until firm|not forced/i);
+  // R1 (re-check of PR 59): the book's twist test is the check; "snug" is nowhere on the card, and the Ride on agrees with the steps
+  const card = ROAD_CARDS.find((c) => c.id === 'bolt-loose')!;
+  expect([card.checkFirst, ...card.steps, card.rideOn, ...card.words].join(' ')).not.toMatch(/snug/i);
+  expect(card.steps[2]).toContain('until the part no longer moves in the twist test');
+  expect(card.rideOn).toMatch(/^Only once the part no longer moves in the twist test\./);
+  expect(card.rideOn).not.toMatch(/fine/i);
+  expect(SOURCES['bolt-loose']!.note).toMatch(/p\. 40.*twist test|twist test.*p\. 40/);
+  expect(SOURCES['bolt-loose']!.note).not.toMatch(/snug/i);
   expect(ROAD_CARDS.find((c) => c.id === 'brake-rub-rim')!.steps.join(' ')).not.toMatch(/mounting bolt|loosen/i);
 });
 
@@ -181,6 +189,22 @@ test("[BC-ROAD] the torn-tyre card is hidden on tubular bikes, and each fitted c
     }
   }
   expect(checked).toBeGreaterThan(1000);
+});
+
+test('[BC-ROAD] brake-rub-rim checks the pad against the tyre before it says to ride on (re-check of PR 59, R4)', () => {
+  const steps = ROAD_CARDS.find((c) => c.id === 'brake-rub-rim')!.steps;
+  const tyre = steps.findIndex((s) => /pad is not touching the tyre/i.test(s));
+  const ride = steps.findIndex((s) => /ride on/i.test(s));
+  expect(tyre).toBeGreaterThanOrEqual(0);
+  expect(tyre).toBeLessThan(ride);
+});
+
+test('[BC-ROAD] the spoke card names the brake\'s release "(on rim brakes)" and has no "small lever" aside (R3); each ruled sentence has its page in the sources note (R5)', () => {
+  const spoke = ROAD_CARDS.find((c) => c.id === 'spoke-snapped')!;
+  expect(spoke.steps.join(' ')).toContain("the brake's quick release (on rim brakes)");
+  expect(ROAD_CARDS.map((c) => allText(c).join(' ')).join(' ')).not.toMatch(/small lever/i);
+  expect(SOURCES['brake-weak-disc']!.note).toMatch(/fingers.*p\. 120|p\. 120.*fingers/);
+  expect(SOURCES['spoke-snapped']!.note).toMatch(/disc/i);
 });
 
 test('[BC-ROAD] every card and carry item has a sources entry (a link or a note); the entries are the tasks, the cards and the items, nothing else', () => {
@@ -213,6 +237,14 @@ test('[BC-ROAD-SEARCH] "no brakes" lists the brake-failure cards first, in the c
   expect(find('noi')).toContain('brake-rub-disc');
   expect(find('no')).toContain('brake-weak-rim');
   expect(find('brakes')[0]).toBe('brake-rub-rim');
+});
+
+test('[BC-ROAD-SEARCH] filler words ("is", "my", "a", "the") are skipped: "brake is rubbing", "my chain broke", "tyre is flat" (re-check of PR 59, R6)', () => {
+  const pairs: [string, string][] = [['brake is rubbing', 'brake rubbing'], ['my chain broke', 'chain broke'], ['tyre is flat', 'tyre flat'], ['a flat', 'flat'], ['the spoke is broken', 'spoke broken']];
+  for (const [q, plain] of pairs) {
+    expect(find(plain).length, plain).toBeGreaterThan(0);
+    expect(find(q), q).toEqual(find(plain));
+  }
 });
 
 test('[BC-ROAD-SEARCH] every form of a word finds what its plain word finds on the cards (review of PR 58, R1)', () => {
