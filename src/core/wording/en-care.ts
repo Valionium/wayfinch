@@ -15,7 +15,10 @@ export const C = {
   careTabsLabel: 'Bike care',
   careTabCare: 'Care',
   careTabRoad: 'Roadside repairs',
-  careRoadLater: 'Roadside repairs come in the next version.',
+  careRoadCheckFirst: 'Check first',
+  careRideOn: 'Ride on?',
+  careRoadCarry: 'What to carry for this',
+  careCarryTitle: 'What to carry',
   careSearchLabel: 'Search',
   careSearchHint: 'For example squeak, chain or bleed',
   careFiltersLabel: 'Parts',
@@ -31,6 +34,7 @@ export const C = {
   careUnsure: 'If unsure, a shop.',
   careTagIf: 'if you have',
   careFound: (n: number): string => (n === 1 ? '1 task' : `${n} tasks`),
+  careFoundBoth: (tasks: number, cards: number): string => `${tasks === 1 ? '1 task' : `${tasks} tasks`}, ${cards === 1 ? '1 roadside repair' : `${cards} roadside repairs`}`,
 };
 
 export const PART_LABEL: Record<Part, string> = {
@@ -206,7 +210,197 @@ export const CARE_TASKS: CareTask[] = [
   },
 ];
 
-/** The Roadside repairs cards: group 3 (Task 6). */
-export const ROAD_CARDS: RoadCard[] = [];
-/** What to carry: group 3 (Task 7). */
-export const CARRY: CarryItem[] = [];
+// ---- The Roadside repairs cards (group 3, Task 6) ----
+// The content draft's 12 cards (2026-11-06-bike-care-content-draft.md, section 2, after the owner's two book rounds), word for word apart
+// from: the draft's provenance marks ("(book, more careful)", "(book p. 120)"), which are in src/core/care/sources.ts; "If unsure, a
+// shop.", which the screen adds from `critical` (decision 5); the step numbers (the screen numbers the list); and the brake-rub-rim
+// centring-screw aside, which the draft marks "no source found" (decision 6: unsourced facts are cut). "Ride on?" is the answer for each
+// card (decision 1: "safe" is a banned word). Nothing here is final until the owner's read (O5).
+export const ROAD_CARDS: RoadCard[] = [
+  {
+    id: 'puncture-tube', problem: 'Puncture (inner tube)', part: 'tyres', applies: { tyres: ['tubes'] },
+    checkFirst: 'Is the tyre flat or only soft? Find the hole in the tyre.',
+    steps: [
+      'Take the wheel off; let out remaining air.',
+      'Pry one tyre bead off with levers: hook the first lever on a spoke, then run a second lever round the rim. Do not catch the tube.',
+      'Pull the tube out and find the hole: pump it up and listen; for a tiny hole, hold the tube near your lips to feel the air.',
+      'Feel inside the tyre for the thorn or glass and remove it; look at the matching spot on the tube. Two side-by-side slits mean the tube was pinched against the rim.',
+      "To patch: roughen an area a bit bigger than the patch with the sandpaper, spread glue and wait about 30-60 seconds until it is tacky, not wet; press the patch on from the middle outwards; dust it with the kit's chalk.",
+      'Before refitting, run your fingers round the inside of the tyre and the rim again and remove any grit or small stones.',
+      'Fit the new or patched tube with a little air in it, valve straight through the rim; seat the tyre, squeeze its sides to check no tube is caught under the bead, pump up.',
+    ],
+    rideOn: 'Fine if it holds air. Stop if the tyre has a cut or bulge.',
+    carry: ['carry-spare-tube', 'carry-tyre-levers', 'carry-pump', 'carry-patch-kit'],
+    words: ['flat', 'puncture', 'tube', 'slow leak', 'thorn', 'patch', 'pinch flat'], critical: false,
+  },
+  {
+    id: 'puncture-tubeless', problem: 'Puncture (tubeless)', part: 'tyres', applies: { tyres: ['tubeless'] },
+    checkFirst: 'Spin the hole to the bottom so sealant plugs it. Is it still hissing?',
+    steps: [
+      'Find the hole; spin it to the bottom.',
+      'Pull out the thorn or glass.',
+      'Ream the hole and push a plug in with the tool.',
+      'Trim the plug; pump up.',
+      'Wait a few minutes for the sealant.',
+      'Still leaking: fit a spare tube (remove the valve core).',
+      'A plug can work loose, so check it later.',
+    ],
+    rideOn: 'Fine once it holds air. Stop if the sidewall is cut or the tyre bulges.',
+    carry: ['carry-plug-kit', 'carry-spare-tube', 'carry-pump', 'carry-tyre-levers', 'carry-multi-tool', 'carry-knife'],
+    words: ['tubeless', 'plug', 'sealant', 'flat', 'hissing'], critical: false,
+  },
+  {
+    id: 'chain-broken', problem: 'Broken chain', part: 'chain', applies: { drive: ['chain'] },
+    checkFirst: 'Where did it break? Is a link twisted or missing?',
+    steps: [
+      'Remove the damaged links with a chain tool.',
+      'Join the ends with a quick link of the same speed count.',
+      'Stand on the pedal or squeeze the link until it clicks.',
+      'Flex the joined link sideways; if it is stiff, work it until it moves freely, or it will jump on the rear gears.',
+      'Test a gentle pedal turn.',
+      'Shift gently.',
+    ],
+    rideOn: 'Fine on easy gears with gentle power. Walk if it keeps skipping. Get it replaced soon.',
+    carry: ['carry-quick-link', 'carry-chain-tool'],
+    words: ['chain', 'snapped', 'broke', 'quick link', 'master link'], critical: false,
+  },
+  {
+    id: 'spoke-snapped', problem: 'Snapped spoke', part: 'wheels', applies: {},
+    checkFirst: 'Is only one spoke gone, and does the rim still turn?',
+    steps: [
+      'Wrap the broken spoke around a good neighbour or tape it.',
+      'Open the brake quick release if the rim rubs.',
+      'Ride slowly to a shop.',
+    ],
+    rideOn: 'Fine for a slow ride home if only one spoke has gone and the rim turns. Walk if the wheel is badly bent, or more than a few spokes are gone. Wheels are critical.',
+    carry: ['carry-zip-ties', 'carry-spoke-key', 'carry-multi-tool'],
+    words: ['spoke', 'broken', 'wobbly wheel', 'wheel bent'], critical: true,
+  },
+  {
+    id: 'brake-rub-rim', problem: 'Brake rubbing', part: 'brakes', applies: { brakes: ['rim'] },
+    checkFirst: 'Is the wheel straight in the frame? Is the pad touching one side? Is the rim bent? Is the tyre bead seated?',
+    steps: [
+      'Re-seat the wheel in the dropouts and tighten the quick release.',
+      'Check the tyre bead sits evenly; if not, let the air out, seat it, pump up.',
+      'Squeeze the lever to centre the brake, then tighten the arm bolt; pads should sit parallel to the rim.',
+      'Check the pad is not touching the tyre or spokes.',
+      'Open the quick release only if you must and ride slowly.',
+    ],
+    rideOn: 'Fine if light rub. Walk if the wheel is bent or the brake will not stop you.',
+    carry: ['carry-multi-tool'],
+    words: ['brake rub', 'rubbing', 'scraping', 'rim brake'], critical: true,
+  },
+  {
+    id: 'brake-rub-disc', problem: 'Disc brake rubbing', part: 'brakes', applies: { brakes: ['cable-disc', 'hydraulic-disc'] },
+    checkFirst: 'Is the wheel seated all the way? Is the disc bent or loose? Any play in the hub?',
+    steps: [
+      'Loosen the axle, push the wheel down into the dropouts, retighten.',
+      'Spin the wheel and look at the pad gaps.',
+      'Loosen both caliper bolts, squeeze the lever, hold it, snug the bolts.',
+      'Release, spin; if it still rubs, nudge the caliper away from the rub.',
+      'Cable brakes: turn the pad adjuster on the rubbing side a quarter turn.',
+    ],
+    rideOn: 'Fine for light rub. Stop if the disc is bent hard or the brake feels odd. Brakes are critical.',
+    carry: ['carry-multi-tool'],
+    words: ['rubbing', 'scraping', 'disc', 'noisy brakes'], critical: true,
+  },
+  {
+    id: 'brake-weak-rim', problem: 'Brakes not biting', part: 'brakes', applies: { brakes: ['rim'] },
+    checkFirst: 'Wet or dirty rim? Cable loose? Brake quick release open? Pads worn or hitting the tyre?',
+    steps: [
+      'Wipe the rim and pads.',
+      'Check the brake quick release is closed.',
+      'Turn the barrel adjuster to pull the cable tighter.',
+      'If still weak, check the cable clamp is tight, the pads are tight on the arms and sit square on the rim.',
+      'Replace pads with gone grooves or a scraping noise.',
+    ],
+    rideOn: 'Walk if the brakes will not stop you. Brakes are critical.',
+    carry: ['carry-multi-tool'],
+    words: ['no brakes', 'weak', 'wet', 'brake cable'], critical: true,
+  },
+  {
+    id: 'brake-weak-disc', problem: 'Disc brakes not biting', part: 'brakes', applies: { brakes: ['cable-disc', 'hydraulic-disc'] },
+    checkFirst: 'Oil on the pads? Worn pads (a grinding noise)? Lever pulling to the bar?',
+    steps: [
+      'Signs of oil: squeal, hard lever, dark smeary pads; pads soaked in oil cannot be saved. A grinding noise means worn pads.',
+      'Wipe the disc; replace oily or worn pads when you can.',
+      'Cable: turn the pad adjuster knobs in a little.',
+      'Hydraulic: pump the lever; if it stays soft it needs a bleed.',
+      'Walk the hills.',
+    ],
+    rideOn: 'Walk if the lever hits the bar or the brakes will not stop you. Brakes are critical; a mistake can cause a crash.',
+    carry: ['carry-multi-tool'],
+    words: ['brakes fade', 'spongy', 'no brakes', 'oily', 'soft lever', 'grinding'], critical: true,
+  },
+  {
+    id: 'gears-skipping', problem: 'Gears skipping', part: 'gears', applies: { gears: ['derailleur'] },
+    checkFirst: 'Chain worn or stiff link? Bent hanger? Cable loose?',
+    steps: [
+      'Look for a stiff link and wiggle it free.',
+      'Turn the barrel adjuster a click at a time.',
+      'Pick a gear where it holds.',
+      'Stay in that gear and go home.',
+    ],
+    rideOn: 'Fine in a gear that holds. Walk if it slips under load.',
+    carry: ['carry-multi-tool', 'carry-quick-link'],
+    words: ['skipping', 'slipping', 'jump', 'chain jumps'], critical: false,
+  },
+  {
+    id: 'bolt-loose', problem: 'Loose bolt or rattle', part: 'frame', applies: {},
+    checkFirst: 'Which part moves when you shake it?',
+    steps: [
+      'Find the bolt by feel.',
+      'Tighten it with the right key until firm, not forced.',
+      'Carbon parts: do not twist them to test; their bolts take the torque printed on the part, set with a torque wrench. Without one, if unsure, a shop.',
+      'Re-check after a short ride.',
+    ],
+    rideOn: 'Fine for most bolts once tight. Stop if a stem, bar or steerer bolt will not tighten. Critical.',
+    carry: ['carry-multi-tool'],
+    words: ['loose', 'rattle', 'noise', 'bolt', 'carbon'], critical: true,
+  },
+  {
+    id: 'tyre-torn', problem: 'Torn tyre (needs a boot)', part: 'tyres', applies: {},
+    checkFirst: 'How big is the cut? Is the tube bulging?',
+    steps: [
+      'Remove the wheel and tube.',
+      'Put a boot (or a strong patch) inside, covering the cut.',
+      'Fit a tube and pump to low pressure first.',
+      'Check for bulging, then pump to a lower pressure than normal.',
+    ],
+    rideOn: 'Fine to ride slowly if the boot holds. Walk if the tyre bulges.',
+    carry: ['carry-tyre-boot', 'carry-spare-tube', 'carry-tyre-levers', 'carry-pump'],
+    words: ['cut tyre', 'sidewall', 'hole', 'boot', 'bulge'], critical: false,
+  },
+  {
+    id: 'ebike-no-power', problem: "E-bike won't power on", part: 'ebike', applies: { ebike: ['yes'] },
+    checkFirst: 'Battery charged? Battery seated and clicked in?',
+    steps: [
+      'Remove the battery and refit it until it clicks.',
+      'Wipe the contacts with a dry cloth.',
+      'Press the power button on the battery.',
+      'Check display, remote and motor plugs are tight.',
+      'Try to power on again; note any error code.',
+    ],
+    rideOn: 'Ride unpowered if the bike pedals fine. Stop if the motor smells hot or the battery is damaged.',
+    carry: ['carry-charger'],
+    words: ["won't turn on", 'dead', 'battery', 'no power', 'display'], critical: false,
+  },
+];
+
+// ---- What to carry (group 3, Task 7) ----
+// The draft's carry list in its order and words. The dry cloth is cut: its source cell reads "no source found" (decision 6).
+export const CARRY: CarryItem[] = [
+  { id: 'carry-spare-tube', name: 'Spare tube (right size and valve)', applies: { tyres: ['tubes', 'tubeless'] } },
+  { id: 'carry-tyre-levers', name: 'Tyre levers', applies: {} },
+  { id: 'carry-pump', name: 'Pump or gas inflator (one that fits your valves)', applies: {} },
+  { id: 'carry-patch-kit', name: 'Patch kit (patches, glue, sandpaper, chalk)', applies: { tyres: ['tubes'] } },
+  { id: 'carry-plug-kit', name: 'Tubeless plug kit', applies: { tyres: ['tubeless'] } },
+  { id: 'carry-knife', name: 'Small knife or scissors', applies: { tyres: ['tubeless'] } },
+  { id: 'carry-tyre-boot', name: 'Tyre boot (or a piece of old tyre)', applies: {} },
+  { id: 'carry-quick-link', name: 'Quick link (right speed)', applies: { drive: ['chain'] } },
+  { id: 'carry-chain-tool', name: 'Chain tool (or multi-tool with one)', applies: { drive: ['chain'] } },
+  { id: 'carry-multi-tool', name: 'Multi-tool (hex keys, screwdriver) that fits the bolts on your bike', applies: {} },
+  { id: 'carry-zip-ties', name: 'Zip ties or tape', applies: {} },
+  { id: 'carry-spoke-key', name: 'Spoke key', applies: {} },
+  { id: 'carry-charger', name: 'Charger (for long trips)', applies: { ebike: ['yes'] } },
+];

@@ -4,7 +4,7 @@
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import { C, CARE_TASKS, PART_LABEL, SECTION_LABEL, SECTIONS } from '../../../../src/core/wording/en-care.ts';
+import { C, CARE_TASKS, CARRY, PART_LABEL, ROAD_CARDS, SECTION_LABEL, SECTIONS } from '../../../../src/core/wording/en-care.ts';
 import { CareScreen } from '../../../../src/tools/care/ui.tsx';
 import { readHost } from '../../../../src/tools/tyre/host.ts';
 import type { TyreServices } from '../../../../src/tools/tyre/services.ts';
@@ -63,7 +63,7 @@ test('[BC-TABS] two tabs, Care and Roadside repairs, in a named tablist; one sel
   expect(tab(C.careTabRoad).getAttribute('aria-selected')).toBe('true');
   expect(document.activeElement).toBe(tab(C.careTabRoad));
   expect(panel(tab(C.careTabCare)).hidden).toBe(true);
-  expect(panel(tab(C.careTabRoad)).textContent).toContain(C.careRoadLater);
+  expect(panel(tab(C.careTabRoad)).querySelectorAll('details.care-road').length).toBe(ROAD_CARDS.length);
   await key(tab(C.careTabRoad), 'ArrowRight'); // wraps
   expect(tab(C.careTabCare).getAttribute('aria-selected')).toBe('true');
   await key(tab(C.careTabCare), 'End');
@@ -249,4 +249,150 @@ test('[BC-TELL-US] a single-speed bike sees hub gear oil once, tagged "If your h
   await mount(world([bike('bike_a', 'Town', { ...ANSWERED, drive: 'chain-hub', shifting: 'cable' })]));
   expect(oil()).toBeDefined();
   expect(oil()!.querySelector('summary .muted')).toBeNull();
+});
+
+// ---- Roadside repairs and What to carry (sub-project 12, group 3: Tasks 6 and 7) ----
+const road = () => [...host.querySelectorAll<HTMLElement>('details.care-road')] as HTMLDetailsElement[];
+const roadIds = () => road().map((d) => d.dataset.id!);
+const carry = () => [...host.querySelectorAll<HTMLElement>('.care-carry li')];
+const carryIds = () => carry().map((li) => li.dataset.id!);
+const hits = () => [...host.querySelectorAll<HTMLButtonElement>('.care-road-hit')];
+const openRoad = async () => { await click(tab(C.careTabRoad)); };
+/** A bike on tubeless tyres, hydraulic discs, a motor and a derailleur on cables. */
+const TRAIL = { ...ANSWERED, brakes: 'hydraulic-disc', tyres: 'tubeless', suspension: 'full', look: { colour: null, bars: 'flat', ebike: true } };
+
+test("[BC-ROAD] with no bike the Roadside tab lists every card in the draft's order, each with Check first, numbered steps, Ride on?, what to carry, and the shop line only on a critical card", async () => {
+  await mount(world([]));
+  await openRoad();
+  expect(roadIds()).toEqual(ROAD_CARDS.map((c) => c.id));
+  for (const d of road()) {
+    const c = ROAD_CARDS.find((x) => x.id === d.dataset.id)!;
+    expect(d.querySelector('summary')!.textContent, c.id).toContain(c.problem);
+    const body = d.textContent!;
+    expect(body, c.id).toContain(`${C.careRoadCheckFirst}: ${c.checkFirst}`);
+    expect([...d.querySelectorAll('ol > li')].map((li) => li.textContent), c.id).toEqual(c.steps);
+    expect(body, c.id).toContain(C.careRideOn);
+    expect(body, c.id).toContain(c.rideOn);
+    expect(body, c.id).toContain(C.careRoadCarry);
+    for (const id of c.carry) expect(body, `${c.id} ${id}`).toContain(CARRY.find((x) => x.id === id)!.name);
+    expect(body.includes(C.careUnsure), c.id).toBe(c.critical);
+  }
+  // the first tab's tasks are not in this panel
+  expect(host.querySelectorAll('#care-panel-road details.care-task').length).toBe(0);
+});
+
+test("[BC-CARRY] at the bottom of the Roadside tab, What to carry is a plain list of every item with no bike, in the content's order, tagged when it depends on a Not sure detail; no ticks", async () => {
+  await mount(world([]));
+  await openRoad();
+  expect(carryIds()).toEqual(CARRY.map((c) => c.id));
+  carry().forEach((li, i) => expect(li.textContent!.startsWith(CARRY[i]!.name), CARRY[i]!.id).toBe(true));
+  const panel = host.querySelector('#care-panel-road')!;
+  expect([...panel.querySelectorAll('h3')].map((x) => x.textContent)).toEqual([C.careCarryTitle]);
+  const list = host.querySelector('.care-carry')!;
+  expect(list.tagName).toBe('UL');
+  // below the cards
+  expect(road().at(-1)!.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(host.querySelectorAll('.care-carry input, .care-carry button').length).toBe(0);
+  // each conditioned item is tagged with its Not sure details
+  expect(carry().find((li) => li.dataset.id === 'carry-plug-kit')!.querySelector('.muted')!.textContent).toBe('if you have tubeless tyres');
+  expect(carry().find((li) => li.dataset.id === 'carry-spare-tube')!.querySelector('.muted')!.textContent).toBe('if you have inner tubes or tubeless tyres');
+  expect(carry().find((li) => li.dataset.id === 'carry-tyre-levers')!.querySelector('.muted')).toBeNull();
+});
+
+test('[BC-CARRY] a tube bike lists a spare tube, levers and a patch kit and no plugs; a tubeless bike lists plugs and a knife and no patch kit; a motor adds the charger', async () => {
+  await mount(world([bike('bike_a', 'Gravel', ANSWERED)]));
+  await openRoad();
+  expect(carryIds()).toEqual(['carry-spare-tube', 'carry-tyre-levers', 'carry-pump', 'carry-patch-kit', 'carry-tyre-boot', 'carry-quick-link', 'carry-chain-tool', 'carry-multi-tool', 'carry-zip-ties', 'carry-spoke-key']);
+  expect(carry().every((li) => li.querySelector('.muted') === null)).toBe(true);
+  expect(roadIds()).toEqual(['puncture-tube', 'chain-broken', 'spoke-snapped', 'brake-rub-rim', 'brake-weak-rim', 'gears-skipping', 'bolt-loose', 'tyre-torn']);
+  render(null, host);
+  await mount(world([bike('bike_t', 'Trail', TRAIL)]));
+  await openRoad();
+  expect(carryIds()).toEqual(['carry-spare-tube', 'carry-tyre-levers', 'carry-pump', 'carry-plug-kit', 'carry-knife', 'carry-tyre-boot', 'carry-quick-link', 'carry-chain-tool', 'carry-multi-tool', 'carry-zip-ties', 'carry-spoke-key', 'carry-charger']);
+  expect(roadIds()).toEqual(['puncture-tubeless', 'chain-broken', 'spoke-snapped', 'brake-rub-disc', 'brake-weak-disc', 'gears-skipping', 'bolt-loose', 'tyre-torn', 'ebike-no-power']);
+});
+
+test("[BC-ROAD] a card that depends on a Not sure detail carries its tag; the screen's own bike line refits the cards and the carry list at once", async () => {
+  const a = bike('bike_a', 'Gravel', ANSWERED);
+  const b = bike('bike_b', 'Trail', TRAIL);
+  const mem = world([a, b, bike('bike_u', 'Old one', {})], { [BIKE_CHOICE_KEY]: choice('bike_a') });
+  await mount(mem);
+  await openRoad();
+  expect(roadIds()).toContain('puncture-tube');
+  expect(roadIds()).not.toContain('puncture-tubeless');
+  const select = host.querySelector<HTMLSelectElement>('#tools-bike')!;
+  await act(() => { select.value = 'bike_b'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  expect(roadIds()).toContain('puncture-tubeless');
+  expect(roadIds()).not.toContain('puncture-tube');
+  expect(carryIds()).toContain('carry-plug-kit');
+  expect(carryIds()).not.toContain('carry-patch-kit');
+  expect(roadIds()).toContain('ebike-no-power');
+  // an old bike with nothing told: every card, each conditioned one tagged
+  await act(() => { select.value = 'bike_u'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  expect(roadIds()).toEqual(ROAD_CARDS.map((c) => c.id));
+  expect(road().find((d) => d.dataset.id === 'puncture-tube')!.querySelector('summary .muted')!.textContent).toBe('if you have inner tubes');
+  expect(road().find((d) => d.dataset.id === 'bolt-loose')!.querySelector('summary .muted')).toBeNull();
+  expect(road().find((d) => d.dataset.id === 'brake-rub-disc')!.querySelector('summary .muted')!.textContent).toBe('if you have disc brakes');
+});
+
+test('[BC-ROAD-SEARCH] "puncture" in the Care tab lists both puncture cards under "Roadside repairs", below the Care results; with no query no cards show', async () => {
+  await mount(world([]));
+  expect(hits().length).toBe(0);
+  expect(headings()).not.toContain(C.careTabRoad);
+  await type('puncture');
+  expect(hits().map((h) => h.textContent)).toEqual(['Puncture (inner tube)', 'Puncture (tubeless)']);
+  expect(headings().at(-1)).toBe(C.careTabRoad);
+  expect(host.querySelector('.care-road-results h3')!.textContent).toBe(C.careTabRoad);
+  expect(host.querySelector('[role="status"]')!.textContent).toBe(C.careFoundBoth(taskIds().length, 2));
+  // the card list follows the bike: a tube bike finds only its own card
+  render(null, host);
+  await mount(world([bike('bike_a', 'Gravel', ANSWERED)]));
+  await type('puncture');
+  expect(hits().map((h) => h.textContent)).toEqual(['Puncture (inner tube)']);
+});
+
+test('[BC-ROAD-SEARCH] every form of a word finds the same cards as the plain word on the screen: "punctures", "Punctured", "  PUNCTURE "', async () => {
+  await mount(world([]));
+  await type('puncture');
+  const plain = hits().map((h) => h.textContent);
+  expect(plain.length).toBe(2);
+  for (const q of ['punctures', 'Punctured', '  PUNCTURE ', 'puncturé']) {
+    await type(q);
+    expect(hits().map((h) => h.textContent), q).toEqual(plain);
+  }
+});
+
+test('[BC-ROAD-SEARCH] the part filter limits the cards too; a filter and a search that match nothing say "Nothing matches" once, and cards alone are not "Nothing"', async () => {
+  await mount(world([]));
+  await type('puncture');
+  await click(filter(PART_LABEL.tyres));
+  expect(hits().length).toBe(2);
+  expect(host.textContent).not.toContain(C.careNothing);
+  await click(filter(PART_LABEL.brakes));
+  expect(hits().length).toBe(0);
+  expect(host.textContent).toContain(C.careNothing);
+  expect([...host.querySelectorAll('button')].filter((b) => b.textContent === C.careClear).length).toBe(1);
+});
+
+test('[BC-ROAD-SEARCH] a tap on a card in the Care results opens the Roadside tab at that card, open and focused', async () => {
+  await mount(world([]));
+  await type('puncture');
+  await click(hits().find((h) => h.textContent === 'Puncture (tubeless)')!);
+  expect(tab(C.careTabRoad).getAttribute('aria-selected')).toBe('true');
+  const card = road().find((d) => d.dataset.id === 'puncture-tubeless')!;
+  expect(card.open).toBe(true);
+  expect(document.activeElement).toBe(card.querySelector('summary'));
+  // the other cards stay closed
+  expect(road().filter((d) => d.open).map((d) => d.dataset.id)).toEqual(['puncture-tubeless']);
+});
+
+test('[BC-ROAD] using the Roadside tab writes nothing: opening cards, switching tabs, searching for a card', async () => {
+  const mem = world([bike('bike_a', 'Gravel')]);
+  await mount(mem);
+  await type('puncture');
+  await click(hits()[0]!);
+  await click(road()[0]!.querySelector('summary')!);
+  await click(tab(C.careTabCare));
+  await openRoad();
+  expect(mem.writes).toEqual([]);
 });

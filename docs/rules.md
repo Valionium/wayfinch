@@ -1004,3 +1004,9 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - the chosen bike deleted in another tab: the list refits to the fallback bike, with no error [BC-BIKE-GONE]
 - at 360 x 640 and 1280 x 720, both themes and 200% text, Bike care has no sideways scroll; it opens offline after one visit; Tab reaches every tab, filter, task and link; each task opens with Enter and Space; the tablist and the filters have names [BC-SCREEN]
 - Bike care is a lazy chunk; its words (en-care) are not in the first screen's files [BC-CHUNK]
+
+## Tool: Bike care, Roadside repairs and What to carry (sub-project 12, group 3)
+
+- the Roadside tab lists the cards that fit the bike, in the content's order, each a problem with Check first, its steps as a numbered list, Ride on?, what to carry for it and, on a brakes, wheels or bolt card, "If unsure, a shop."; a card that depends on a Not sure detail carries its tag; every card has every field filled, 3 to 7 steps, existing carry ids and a source, and the draft's figures stay in their own fields [BC-ROAD]
+- the Care search also finds Roadside cards, in every form of a word as the plain word ("punctures", "Punctured"): they show under their own heading "Roadside repairs" below the Care results, only while something is typed, limited by the bike and the part filter; a tap opens the Roadside tab at that card, open and focused [BC-ROAD-SEARCH]
+- at the bottom of the Roadside tab, What to carry is a plain list, not ticks, of the carry items that fit the bike in the content's order, each tagged when it depends on a Not sure detail: a tubeless bike lists plugs and a knife, a tube bike a spare tube, levers and a patch kit [BC-CARRY]
