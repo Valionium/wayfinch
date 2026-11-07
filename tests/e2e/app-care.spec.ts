@@ -73,6 +73,18 @@ test('[BC-BIKE-GONE] the chosen bike deleted in another tab: the list refits to 
   expect(errors).toEqual([]);
 });
 
+test("[BC-BIKE-GONE] switching bike on the Care screen's own bike line refits the list at once (review of PR 58, I4)", async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [A, B], 'bike_a');
+  await expect(task(page, 'brakes-pads-rim')).toBeVisible();
+  await expect(task(page, 'brakes-pads-disc')).toHaveCount(0);
+  await page.selectOption('#tools-bike', 'bike_b');
+  await expect(task(page, 'brakes-pads-disc')).toBeVisible();
+  await expect(task(page, 'brakes-pads-rim')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('[BC-SCREEN] every task open, at the project size and at 200% text: no sideways scroll; steps stay a numbered list', async ({ page }) => {
   app = await loadApp(page, { launch: true, path: '/#/tools/care' });
   await seed(page, [U], null);

@@ -52,3 +52,21 @@ test('[BC-SEARCH-FORMS] "Bremse" finds nothing and does not throw; odd input nev
   expect(normaliseQuery('Pédale')).toEqual(['pedale']);
   expect(normaliseQuery('')).toEqual([]);
 });
+
+test('[BC-SEARCH-FORMS] "-ies" plurals meet their "-y" word; an ending is only taken off to meet a whole word, so "spring" never meets "sprocket" (review of PR 58, M3)', () => {
+  expect(find('batteries')).toEqual(find('battery'));
+  expect(find('battery')).toEqual(['ebike-battery-care']);
+  const items = [
+    { id: 'sprocket', words: ['sprocket'] }, { id: 'stretched', words: ['stretched chain'] }, { id: 'shock', words: ['shock'] },
+    { id: 'spec', words: ['spectacles'] }, { id: 'spring', words: ['springs'] }, { id: 'pump', words: ['pumping'] },
+  ];
+  const look = (q: string) => searchCare(q, items, (i) => i.words).map((i) => i.id);
+  expect(look('spring')).toEqual(['spring']);
+  expect(look('string')).toEqual([]);
+  expect(look('shoes')).toEqual([]);
+  expect(look('speed')).toEqual([]);
+  expect(look('pumped')).toEqual(['pump']);
+  expect(look('pumps')).toEqual(['pump']);
+  // typing a word part way still finds it
+  expect(look('sproc')).toEqual(['sprocket']);
+});

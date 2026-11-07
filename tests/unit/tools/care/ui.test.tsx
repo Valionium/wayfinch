@@ -212,3 +212,31 @@ test('[BC-FROM-YOU] #/tools/care is a screen (a ?bike= after it too); Tools has 
   expect(links.map((a) => a.getAttribute('href'))).toEqual([toolHref('tools/care', 'bike_a'), toolHref('tools/care', 'bike_b')]);
   expect(links[1]!.textContent).toBe(`${CL.careForBike} Trail`);
 });
+
+test('[BC-BIKE-GONE] switching bike on the screen\'s own bike line refits the list at once, rim to disc and back (review of PR 58, I4)', async () => {
+  const a = bike('bike_a', 'Gravel', ANSWERED);
+  const b = bike('bike_b', 'Trail', { ...ANSWERED, brakes: 'hydraulic-disc' });
+  const mem = world([a, b], { [BIKE_CHOICE_KEY]: choice('bike_a') });
+  await mount(mem);
+  expect(taskIds()).toContain('brakes-pads-rim');
+  expect(taskIds()).not.toContain('brakes-pads-disc');
+  const select = host.querySelector<HTMLSelectElement>('#tools-bike')!;
+  await act(() => { select.value = 'bike_b'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  expect(taskIds()).toContain('brakes-pads-disc');
+  expect(taskIds()).not.toContain('brakes-pads-rim');
+  await act(() => { select.value = 'bike_a'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  expect(taskIds()).toContain('brakes-pads-rim');
+  expect(taskIds()).not.toContain('brakes-pads-disc');
+  // the one write is Wayfinch's own choice record
+  expect([...new Set(mem.writes)]).toEqual([BIKE_CHOICE_KEY]);
+});
+
+test('[BC-SCREEN] every rendered task says "If unsure, a shop." exactly when it is critical (review of PR 58, M1)', async () => {
+  await mount(world([]));
+  expect(tasks().length).toBe(CARE_TASKS.length);
+  for (const d of tasks()) {
+    const t = CARE_TASKS.find((x) => x.id === d.dataset.id)!;
+    expect(d.textContent!.includes(C.careUnsure), t.id).toBe(t.critical);
+  }
+  expect(CARE_TASKS.filter((t) => t.critical).length).toBeGreaterThanOrEqual(4);
+});
