@@ -2128,6 +2128,8 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
           <label for="bikePads">Brake pad / block reference<input id="bikePads" type="text" maxlength="120" placeholder="Exact part or model; note front/rear if different"></label>
           <label for="bikeDrive">Drivetrain<select id="bikeDrive"><option value="unknown">Not set</option><option value="derailleur">Chain + derailleur</option><option value="chain-hub">Chain + hub gears / single speed</option><option value="belt">Belt drive</option></select></label>
           <label for="bikeShifting">Shifting<select id="bikeShifting"><option value="unknown">Not set</option><option value="cable">Cable operated</option><option value="electronic">Electronic</option><option value="none">No external shifting cable</option></select></label>
+          <label for="bikeSuspension">Suspension<select id="bikeSuspension"><option value="unknown">Not sure</option><option value="none">None</option><option value="front">Front fork</option><option value="full">Full suspension</option></select></label>
+          <div class="bike-profile-field"><label for="bikeRackMounts">Rack mounts<select id="bikeRackMounts" aria-describedby="bikeRackMountsHint"><option value="unknown">Not sure</option><option value="yes">Yes</option><option value="no">No</option></select></label><p class="hint" id="bikeRackMountsHint">Small threaded holes near the rear axle and on the seat stays, for a rack.</p></div>
           <label id="bikeChainField" for="bikeChain">Chain / quick-link reference<input id="bikeChain" type="text" maxlength="120" placeholder="Brand, chain family and speed / part number"></label>
           <label id="bikeHangerField" for="bikeHanger">Derailleur hanger reference<input id="bikeHanger" type="text" maxlength="120" placeholder="Frame-specific part or hanger type"></label>
           <label class="bike-profile-wide" for="bikeNotes">Bike notes <span class="hint">optional</span><textarea id="bikeNotes" rows="3" maxlength="1000" placeholder="e.g. valve length, spare battery or unusual tools"></textarea></label>
@@ -2670,7 +2672,10 @@ const BIKE_PROFILE_LABELS={
   brakes:{unknown:'Not set','hydraulic-disc':'Hydraulic disc','cable-disc':'Cable disc',rim:'Rim brakes',other:'Other'},
   drive:{unknown:'Not set',derailleur:'Chain + derailleur','chain-hub':'Chain + hub gears / single speed',belt:'Belt drive'},
   shifting:{unknown:'Not set',cable:'Cable operated',electronic:'Electronic',none:'No external shifting cable'},
+  suspension:{unknown:'Not sure',none:'None',front:'Front fork',full:'Full suspension'},
+  rackMounts:{unknown:'Not sure',yes:'Yes',no:'No'},
 };
+const BIKE_PROFILE_ANSWERS=['suspension','rackMounts'];
 const BIKE_PROFILE_TEXT={name:100,frontTyre:120,rearTyre:120,padType:120,chainType:120,hangerType:120,notes:1000};
 function normalisePressureBike(value){
   const p=dataObject(value) ? value : {};
@@ -2707,8 +2712,11 @@ function normaliseBikeProfile(value){
   const profile={id:value.id};
   for(const [key,max] of Object.entries(BIKE_PROFILE_TEXT))profile[key]=dataText(value[key],max).trim();
   profile.name=profile.name || 'My bike';
-  for(const [key,labels] of Object.entries(BIKE_PROFILE_LABELS))
-    profile[key]=typeof value[key]==='string' && Object.hasOwn(labels,value[key]) ? value[key] : 'unknown';
+  for(const [key,labels] of Object.entries(BIKE_PROFILE_LABELS)){
+    const v=typeof value[key]==='string' && Object.hasOwn(labels,value[key]) ? value[key] : 'unknown';
+    // suspension and rack mounts (sub-project 11) are stored only as an answer: no field is Not sure, so a bike from before keeps its bytes
+    if(v!=='unknown' || !BIKE_PROFILE_ANSWERS.includes(key))profile[key]=v;
+  }
   profile.pressure=normalisePressureBike(value.pressure);
   profile.fit=normaliseFit(value.fit);
   profile.maxWeight=normaliseMaxWeight(value.maxWeight);
@@ -2867,7 +2875,7 @@ function persistBikeProfileSelection(){
 }
 const BIKE_PROFILE_INPUTS={name:'bikeName',tyres:'bikeTyres',frontTyre:'bikeFrontTyre',rearTyre:'bikeRearTyre',
   valve:'bikeValve',brakes:'bikeBrakes',padType:'bikePads',drive:'bikeDrive',shifting:'bikeShifting',
-  chainType:'bikeChain',hangerType:'bikeHanger',notes:'bikeNotes'};
+  suspension:'bikeSuspension',rackMounts:'bikeRackMounts',chainType:'bikeChain',hangerType:'bikeHanger',notes:'bikeNotes'};
 // Of the tyre fields only the bike's weight is edited here (spec 7.1 item 3); the rest of bikeProfile.pressure is kept as it was saved.
 const BIKE_WEIGHT_INPUT='bikeBaseKg';
 function bikeProfileFieldVisibility(){
@@ -3066,7 +3074,7 @@ function fillBikeProfileForm(value){
   BIKE_PROFILE_EDITOR_ID=p?.id || '';
   let newName='My bike',suffix=2;
   while(BIKE_PROFILES.some(b=>b.name===newName))newName='My bike '+suffix++;
-  for(const [key,id] of Object.entries(BIKE_PROFILE_INPUTS))$(id).value=p ? p[key] : key==='name' ? newName : BIKE_PROFILE_LABELS[key] ? 'unknown' : '';
+  for(const [key,id] of Object.entries(BIKE_PROFILE_INPUTS))$(id).value=p ? p[key] ?? 'unknown' : key==='name' ? newName : BIKE_PROFILE_LABELS[key] ? 'unknown' : '';
   $(BIKE_WEIGHT_INPUT).value=normalisePressureBike(p?.pressure).bikeKg ?? '';
   fillFitFields(p);
   BIKE_PROFILE_FORM_READY=true;

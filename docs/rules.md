@@ -919,6 +919,10 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - one theme for both apps (owner's try-out, 5 Nov 2026): each app writes only its own record of a choice ({app, kind: 'theme', v: 1, theme, at}: copilot:theme:v1, loadcheck:theme:v1); both show the most recent, at the same moment Wayfinch's; with neither, Wayfinch's own light or dark, else the bag planner's older choice, else automatic; the page and the app decide alike on every mix [THEME-ONE]
 - a theme chosen in either app shows in the other at once in an open tab, on the way back, and in a tab when it shows again or comes out of the back-forward cache; Wayfinch's export carries the one theme, and an import's settings (either app's) count as a choice [THEME-SYNC]
 - From a photo, Front, back and fork: three taps set a front-to-back fade and the fork's own colour; the photo never leaves the phone [LC-PHOTO-THREE]
+- suspension (None, Front fork, Full) and rack mounts (Yes, No), top-level beside brakes and shifting, never inside fit (sub-project 11, decisions 1 and 2): each answer reads back; Not sure, anything else, a missing field or a wrong type is stored as no field at all, so a bike from before keeps its bytes (LC-MOVE-PLANS); no other field changes; both readers alike, the bike format stays 2 [TB-DETAILS-READ]
+- More details asks Suspension and Rack mounts, each a labelled select defaulting to Not sure, placed after Shifting; Rack mounts carries its one-line hint [TB-DETAILS-FORM]
+- a choice saved in More details is on the saved bike and on loadcheck:bikeProfile when it is the plan's bike, after a reload too; back to Not sure stores no field [TB-DETAILS-SAVE]
+- known risk, pinned: the tagged old page re-saving a bike drops suspension and rackMounts, every other field kept (as BK-PAINT-OLD-PAGE) [BK-DETAILS-OLD-PAGE]
 
 ## Bag planner: separation and contracts (sub-project 6, group 2)
 
