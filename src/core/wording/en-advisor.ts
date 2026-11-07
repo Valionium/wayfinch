@@ -8,4 +8,6 @@ export const GA = {
   advisorTagForkMounts: 'needs cage mounts on the fork',
   advisorTagTight: 'tight',
   advisorTagEstimate: 'estimate',
+  // ---- a size range: "6–8 L", or "6 L" when only one size is valid ----
+  advisorRange: (from: number, to: number): string => (from === to ? `${from} L` : `${from}–${to} L`),
 } as const;
