@@ -226,3 +226,30 @@ test("[TB-TOOLS-LAZY] the Tools screen (bike line, tyre card) is not among the f
   console.log(`TB-TOOLS-LAZY: first screen ${figures.firstJsGzip} bytes gzipped`);
   expect(figures.firstJsGzip).toBeLessThanOrEqual(149_774);
 });
+
+// Sub-project 12, group 1: Bike care is a chunk of its own, loaded by a dynamic import like the tyre tool; its words (en-care.ts, with the
+// content) are not in the first screen. 145,569 bytes is the first screen's figure at the branch point (42551e2, the head of PR 56); the
+// rule is that it may not rise above it.
+test("[BC-CHUNK] Bike care is a lazy chunk; en-care is not in the first screen's files, and the first screen is at or below the branch point's figure", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  for (const mark of ['care-filters', 'Roadside repairs come in the next version', 'Lube the chain, after every wash']) expect(first.includes(mark), mark).toBe(false);
+  const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
+  const chunk = lazy.filter((f) => text(on, f).includes('care-filters'));
+  expect(chunk.length).toBe(1);
+  expect(text(on, chunk[0]!)).toContain('Lube the chain, after every wash');
+  // loaded by a dynamic import from the first screen, never a static one or a preload
+  expect(first).toContain(`/${chunk[0]!.replace(/^assets\//, '')}`.slice(1));
+  expect(text(on, 'index.html')).not.toContain(chunk[0]!);
+  console.log(`BC-CHUNK: first screen ${figures.firstJsGzip} bytes gzipped, lazy ${figures.lazyJsGzip}`);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_569);
+});
+
+test('[BC-SOURCES-PRIVATE] the built Bike care chunk holds no "http": where each fact came from never ships', () => {
+  const figures = measure(on);
+  const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
+  const care = lazy.filter((f) => text(on, f).includes('care-filters') || text(on, f).includes('Lube the chain, after every wash'));
+  expect(care.length).toBeGreaterThan(0);
+  for (const f of care) expect(text(on, f).includes('http'), f).toBe(false);
+  for (const f of files(on).filter((x) => x.endsWith('.js'))) expect(text(on, f).includes('parktool.com'), f).toBe(false);
+});

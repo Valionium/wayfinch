@@ -4,6 +4,7 @@ import { normaliseBike } from '../../../../src/core/bike/normalise.ts';
 import type { BikeRecord } from '../../../../src/core/bike/normalise.ts';
 import { careDetails, fitOf, fitted } from '../../../../src/core/care/fit.ts';
 import type { CareDetails, CareKey, CareValue, Conditions } from '../../../../src/core/care/types.ts';
+import { CARE_TASKS, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
 import { FIT_CASES } from './fit-cases.ts';
 
 const bike = (extra: Record<string, unknown>): BikeRecord => normaliseBike({ id: 'bike_1', name: 'Test', ...extra })!;
@@ -85,6 +86,8 @@ const storedBike = (s: Stored): BikeRecord => bike({
 const sameSet = (a: readonly string[], b: readonly string[], what = '') => expect([...a].sort(), what).toEqual([...b].sort());
 const LISTS: { name: string; list: { id: string; applies: Conditions }[] }[] = [
   { name: 'test cases', list: FIT_CASES },
+  { name: 'CARE_TASKS', list: CARE_TASKS },
+  { name: 'ROAD_CARDS', list: ROAD_CARDS },
 ];
 
 test('[BC-FIT-EVERY] over every combination of the stored details, each task shows exactly when the oracle says, tagged with exactly its Not sure keys', () => {
