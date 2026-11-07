@@ -134,7 +134,7 @@ reset();
   check(get('bikeSuspension').value==='unknown' && get('bikeRackMounts').value==='unknown','[TB-DETAILS-FORM] a bike from before shows Not sure');
   app.run('fillBikeProfileForm(null)');
 }
-// Saving them: on the saved bike and the plan's bike, after a reload too; back to Not sure stores 'unknown'.
+// Saving them: on the saved bike and the plan's bike, after a reload too; back to Not sure stores no field.
 async function detailsSave(){
   const {appVM:tab,sharedStore}=require('./app-vm.cjs');
   const store=sharedStore();

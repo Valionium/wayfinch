@@ -345,7 +345,7 @@ for (const start of ['legacy', 'step-one'] as const) {
     expect(svg.includes('url(#') || svg.includes('bk-rimband')).toBe(false);
   });
 
-  test(`[BK-DETAILS-OLD-PAGE] known risk, not a guarantee: ${which} page re-saving a bike drops suspension and rackMounts; every other field stays, format stays 2`, async ({ context, page }) => {
+  test(`[BK-DETAILS-OLD-PAGE] known risk, not a guarantee: ${which} page re-saving a bike drops suspension and rackMounts from its bikes, draft and setups; every other field stays, format stays 2`, async ({ context, page }) => {
     await phone(page, start);
     await launch();
     const { planner } = await plannerSaves(context);
@@ -373,6 +373,21 @@ for (const start of ['legacy', 'step-one'] as const) {
     expect(after[0]).not.toHaveProperty('rackMounts');
     expect(after[0]).toEqual(others(before[0]!));
     expect(await planner.evaluate(() => localStorage.getItem('loadcheck:bikeProfilesFormat'))).toBe('2');
+    // The same for the plan's bike in the draft and in a setup the old page writes: the two go, every other field stays.
+    const planBike = { id: 'bike-before', name: 'Before bike', brakes: 'rim', drive: 'derailleur', suspension: 'full', rackMounts: 'no', look: { colour: '#2563b8', bars: 'drop', ebike: false } };
+    const written = await page.evaluate(`(async () => {
+      S.bikeProfile = normaliseBikeProfile(${JSON.stringify(planBike)});
+      const draftBike = capturePlan().bikeProfile;
+      await saveSetup('Stale details', '');
+      const setup = JSON.parse(localStorage.getItem('loadcheck:setups')).find((s) => s.name === 'Stale details');
+      return { draftBike, setupBike: (setup.plan || setup).bikeProfile };
+    })()`) as { draftBike: Bike; setupBike: Bike };
+    for (const bike of [written.draftBike, written.setupBike]) {
+      expect(bike).not.toHaveProperty('suspension');
+      expect(bike).not.toHaveProperty('rackMounts');
+      expect(bike).toMatchObject({ id: 'bike-before', brakes: 'rim', drive: 'derailleur', look: { colour: '#2563b8', bars: 'drop', ebike: false } });
+    }
+    expect(written.setupBike).toEqual(written.draftBike);
     // The bag planner reads what is left as Not sure, without a fault.
     await planner.reload({ waitUntil: 'domcontentloaded' });
     await draftReady(planner);
