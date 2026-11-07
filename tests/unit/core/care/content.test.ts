@@ -6,10 +6,11 @@ import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 import { SOURCES } from '../../../../src/core/care/sources.ts';
 import type { CareKey, CareValue } from '../../../../src/core/care/types.ts';
-import { careDetails, fitted } from '../../../../src/core/care/fit.ts';
+import { careDetails, fitted, softTag } from '../../../../src/core/care/fit.ts';
 import { normaliseBike } from '../../../../src/core/bike/normalise.ts';
 import { C, CARE_TASKS, PARTS, SECTIONS, WHO_LABEL } from '../../../../src/core/wording/en-care.ts';
 import { DRAFT_FIGURES, SETTLED_RANGES } from './draft-figures.ts';
+import type { Figure } from './draft-figures.ts';
 
 const REPO = fileURLToPath(new URL('../../../../', import.meta.url));
 /** The Frame & bolts tasks on the steerer, stem or bar bolts (design 3.5: "if unsure, a shop"), from the content draft's ids. */
@@ -88,28 +89,54 @@ test('[BC-SOURCES-PRIVATE] no file under src/tools or src/ui imports src/core/ca
 });
 
 /** Everything a rider can read of a task once it is open. */
-const riderText = (t: (typeof CARE_TASKS)[number]): string => [
-  t.name, t.signs, ...t.steps, t.tools, t.minutes ? C.careTime(t.minutes[0], t.minutes[1]) : '', t.note ?? '', t.why ?? WHO_LABEL[t.who],
-].join('\n').toLowerCase();
+type Task = (typeof CARE_TASKS)[number];
+const fieldText = (t: Task, fig: Figure): string => {
+  switch (fig.field) {
+    case 'name': return t.name;
+    case 'signs': return t.signs;
+    case 'step': return t.steps[fig.index!] ?? '';
+    case 'tools': return t.tools;
+    case 'time': return t.minutes ? C.careTime(t.minutes[0], t.minutes[1]) : '';
+    case 'note': return t.note ?? '';
+    case 'who': return t.why ?? WHO_LABEL[t.who];
+  }
+};
+const riderText = (t: Task): string => [t.name, t.signs, ...t.steps, t.tools, t.minutes ? C.careTime(t.minutes[0], t.minutes[1]) : '', t.note ?? '', t.why ?? WHO_LABEL[t.who]].join('\n').toLowerCase();
+/** The draft's figures a task does not show in their own field, and the settled ranges it shows anywhere. */
+const missing = (t: Task): string[] => [
+  ...(DRAFT_FIGURES[t.id] ?? []).filter((fig) => !fieldText(t, fig).toLowerCase().includes(fig.text.toLowerCase())).map((fig) => `${fig.field}${fig.index ?? ''}: ${fig.text}`),
+  ...(SETTLED_RANGES[t.id] ?? []).filter((r) => riderText(t).includes(r)).map((r) => `range: ${r}`),
+];
 
-test("[BC-CONTENT] every task's rider-visible text holds each key sentence and figure of its draft row; a settled range never shows (review of PR 58, I1-I3)", () => {
+test("[BC-CONTENT] every task's rider-visible text holds each key sentence and figure of its draft row, in the field it belongs to; a settled range never shows (review of PR 58, I1-I3, R2)", () => {
   for (const t of CARE_TASKS) {
-    const want = DRAFT_FIGURES[t.id];
-    expect(want, `${t.id} has no draft figures`).toBeDefined();
-    const text = riderText(t);
-    for (const fact of want!) expect(text, `${t.id}: ${fact}`).toContain(fact.toLowerCase());
-    for (const range of SETTLED_RANGES[t.id] ?? []) expect(text, `${t.id}: ${range}`).not.toContain(range);
+    expect(DRAFT_FIGURES[t.id], `${t.id} has no draft figures`).toBeDefined();
+    expect(missing(t), t.id).toEqual([]);
   }
 });
 
-test('[BC-CONTENT] a single speed (chain-hub or belt, no shifting) gets no hub gear oil task; hub gears on a cable or electronic shifter do (review of PR 58, M2)', () => {
-  const ids = (extra: Record<string, unknown>) => fitted(CARE_TASKS, careDetails(normaliseBike({ id: 'b1', ...extra }))).map((t) => t.id);
-  expect(ids({ drive: 'chain-hub', shifting: 'none' })).not.toContain('gears-hub-oil');
-  expect(ids({ drive: 'belt', shifting: 'none' })).not.toContain('gears-hub-oil');
-  expect(ids({ drive: 'chain-hub', shifting: 'cable' })).toContain('gears-hub-oil');
-  expect(ids({ drive: 'belt', shifting: 'electronic' })).toContain('gears-hub-oil');
-  expect(ids({ drive: 'derailleur', shifting: 'cable' })).not.toContain('gears-hub-oil');
-  // shifting Not sure: shown, tagged
-  const unsure = fitted(CARE_TASKS, careDetails(normaliseBike({ id: 'b1', drive: 'chain-hub' }))).find((t) => t.id === 'gears-hub-oil');
-  expect(unsure?.tags).toEqual(['shifting']);
+test('[BC-CONTENT] the figure check is pinned to its field: a step changed to "about 1 mm" fails though the signs still say 1.5 mm; a settled range fails anywhere', () => {
+  const disc = CARE_TASKS.find((t) => t.id === 'brakes-pads-disc')!;
+  const changed = { ...disc, steps: disc.steps.map((s, i) => (i === 1 ? s.replace('about 1.5 mm', 'about 1 mm') : s)) };
+  expect(changed.signs).toContain('about 1.5 mm');
+  expect(missing(changed)).toEqual(['step1: about 1.5 mm']);
+  const fork = CARE_TASKS.find((t) => t.id === 'susp-fork-service')!;
+  expect(missing({ ...fork, note: 'Several hours (some say 100-125 h).' })).toEqual(['range: 100-125']);
+});
+
+test('[BC-CONTENT] hub gear oil shows on every chain-hub or belt bike; with shifting none or Not sure it is tagged "If your hub has gears" (the coordinator ruled R3)', () => {
+  const hub = (extra: Record<string, unknown>) => {
+    const d = careDetails(normaliseBike({ id: 'b1', ...extra }));
+    const t = fitted(CARE_TASKS, d).find((x) => x.id === 'gears-hub-oil');
+    return t ? { tags: t.tags, soft: softTag(t, d) } : null;
+  };
+  expect(hub({ drive: 'chain-hub', shifting: 'none' })).toEqual({ tags: [], soft: 'If your hub has gears' });
+  expect(hub({ drive: 'belt', shifting: 'none' })).toEqual({ tags: [], soft: 'If your hub has gears' });
+  expect(hub({ drive: 'chain-hub' })).toEqual({ tags: [], soft: 'If your hub has gears' });
+  expect(hub({ drive: 'chain-hub', shifting: 'cable' })).toEqual({ tags: [], soft: null });
+  expect(hub({ drive: 'belt', shifting: 'electronic' })).toEqual({ tags: [], soft: null });
+  expect(hub({ drive: 'derailleur', shifting: 'cable' })).toBeNull();
+  expect(hub({ drive: 'derailleur', shifting: 'none' })).toBeNull();
+  // every other sample task has no soft tag, whatever the bike
+  for (const t of CARE_TASKS.filter((x) => x.id !== 'gears-hub-oil')) expect(softTag(t, careDetails(null)), t.id).toBeNull();
 });

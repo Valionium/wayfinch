@@ -36,6 +36,18 @@ export function fitOf(applies: Conditions, d: CareDetails): { show: boolean; tag
   return { show: true, tags };
 }
 
+/** A task's soft tag (CareTask.soft): shown while the bike does not meet the soft conditions; null when it does, or with none. */
+export function softTag(task: { soft?: { applies: Conditions; tag: string } }, d: CareDetails): string | null {
+  if (!task.soft) return null;
+  for (const key of KEYS) {
+    const allowed = task.soft.applies[key] as readonly string[] | undefined;
+    if (!allowed) continue;
+    const value = d[key];
+    if (value === null || !allowed.includes(value)) return task.soft.tag;
+  }
+  return null;
+}
+
 /** The items that fit, in the list's order, each with its tags. */
 export function fitted<T extends { applies: Conditions }>(list: readonly T[], d: CareDetails): Fitted<T>[] {
   return list.flatMap((item) => {

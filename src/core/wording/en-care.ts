@@ -185,8 +185,10 @@ export const CARE_TASKS: CareTask[] = [
     ],
     tools: "maker's oil kit", minutes: [30, 30], who: 'you', why: "Yourself with the maker's kit, or a shop (wrong oil or overfill can damage the hub)",
     note: null,
-    // Hub gears with a shifter: a single speed (stored as chain-hub or belt, shifting none) has no hub gear oil (review of PR 58, M2).
-    words: ['internal hub', 'alfine', 'nexus', 'oil change', 'hub gears', 'slipping'], applies: { gears: ['hub'], shifting: ['cable', 'electronic'] }, critical: false,
+    // On every chain-hub or belt bike; a single speed is stored the same way, so without a known shifter it is tagged (coordinator's
+    // ruling R3 on PR 58: a hub-gear rider never loses it, a single-speed rider sees one tagged task).
+    words: ['internal hub', 'alfine', 'nexus', 'oil change', 'hub gears', 'slipping'], applies: { gears: ['hub'] }, critical: false,
+    soft: { applies: { shifting: ['cable', 'electronic'] }, tag: 'If your hub has gears' },
   },
   {
     id: 'susp-fork-service', name: 'Full fork service', part: 'suspension', section: 'half-year', alsoWet: false,

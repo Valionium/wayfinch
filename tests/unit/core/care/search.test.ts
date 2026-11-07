@@ -70,3 +70,35 @@ test('[BC-SEARCH-FORMS] "-ies" plurals meet their "-y" word; an ending is only t
   // typing a word part way still finds it
   expect(look('sproc')).toEqual(['sprocket']);
 });
+
+// Re-check of PR 58, R1: the whole-word guard must not lose the forms people type. Each form finds exactly what its plain word finds:
+// -ing, -ed, -s, -ies, a doubled consonant (slipping) and a silent e (lube, wobble, store, service, charge, rattle).
+const FORMS: [string, string][] = [
+  ['charging', 'charge'], ['charged', 'charge'], ['charges', 'charge'],
+  ['lubing', 'lube'], ['lubed', 'lube'], ['lubes', 'lube'],
+  ['servicing', 'service'], ['serviced', 'service'],
+  ['wobbling', 'wobble'], ['wobbled', 'wobble'], ['rattling', 'rattle'], ['rattles', 'rattle'],
+  ['storing', 'store'], ['stored', 'store'],
+  ['slips', 'slip'], ['slipping', 'slip'], ['slipped', 'slip'],
+  ['squeaking', 'squeak'], ['squeaked', 'squeak'], ['squeaks', 'squeak'],
+  ['batteries', 'battery'], ['spokes', 'spoke'], ['brakes', 'brake'], ['oiling', 'oil'], ['creaking', 'creak'],
+];
+
+test('[BC-SEARCH-FORMS] each typed form finds exactly what its plain word finds, and the plain word finds something (re-check of PR 58, R1)', () => {
+  for (const [form, base] of FORMS) {
+    expect(find(base).length, base).toBeGreaterThan(0);
+    expect(find(form), `${form} vs ${base}`).toEqual(find(base));
+  }
+  expect(find('charging')).toEqual(['ebike-battery-care']);
+  expect(find('storing')).toEqual(['ebike-battery-care']);
+  expect(find('slips')).toEqual(['gears-hub-oil']);
+});
+
+test('[BC-SEARCH-FORMS] the false hits stay gone with the forms back: spring, string, shoes, speed (re-check of PR 58, R1)', () => {
+  const items = [
+    { id: 'sprocket', words: ['sprocket'] }, { id: 'stretched', words: ['stretched chain'] }, { id: 'shock', words: ['shock'] },
+    { id: 'spec', words: ['spectacles'] }, { id: 'spread', words: ['spreader'] }, { id: 'stream', words: ['streamer'] },
+  ];
+  const look = (q: string) => searchCare(q, items, (i) => i.words).map((i) => i.id);
+  for (const q of ['spring', 'string', 'shoes', 'speed', 'springs', 'strings', 'sped']) expect(look(q), q).toEqual([]);
+});
