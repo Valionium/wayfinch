@@ -59,6 +59,8 @@ export const MAX_TRIALS = 1000;
  * - backpackWholeFirst: for Get the backpack off, when one of the fewest new things that count takes everything off the back, Minimal
  *   holds only such; otherwise all of the fewest that count by decision 6 (one bag that leaves some, and the pair that would empty the
  *   back under Looking ahead).
+ * - backpackRealShare (the owner's ruling on PR 61, I2): for Get the backpack off, Minimal holds only what takes at least this share of the
+ *   litres on the back off, or everything; among those the owner's order decides (when nothing does, all that count).
  * - newRackCounts: a rack to fit (for its deck, or for panniers when none is fitted) counts as this many new things.
  * - rangeUpToL, rangeHalfLitres (design §3.3, decision 3): the range shown runs up to this many litres above the chosen size; with
  *   rangeHalfLitres the top tube's +0.5 and +1.5 L count too (review m2), otherwise only + 1 and + 2 (the plan's literal rule).
@@ -77,6 +79,7 @@ export const DECIDED = Object.freeze({
   ownPanniersUnderBagsOnly: 'off' as 'off' | 'kept',
   newRackCounts: 1,
   backpackWholeFirst: true as boolean,
+  backpackRealShare: 0.25,
   rangeUpToL: 2,
   rangeHalfLitres: true as boolean,
   addOrder: Object.freeze({ deck: 0, top: 1, frame: 1, seat: 2, bar: 3, fork: 4, rack: 5 }) as Readonly<Record<'deck' | 'top' | 'frame' | 'seat' | 'bar' | 'fork' | 'rack', number>>,

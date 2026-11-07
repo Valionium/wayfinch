@@ -408,7 +408,8 @@ test('[GA-ANSWER] two kinds of answer, each labelled: "Minimal" over the fewest 
   assert.ok(/<svg[^>]*class="bk/.test(later) && /Why it helps/.test(textOf(later)),'drawn, and why');
   // its card is reached like the others, with an id of its own
   const ids=[...html.matchAll(/aria-labelledby="(advS\d+)"/g)].map(m=>m[1]);
-  assert.equal(new Set(ids).size,a.items.length+1,'one card each, ids unique');
+  // Looking ahead's set and its alternatives side by side (the owner's ruling on PR 61)
+  assert.equal(new Set(ids).size,a.items.length+1+a.aheadAlts.length,'one card each, ids unique');
   // with nothing better, the Looking ahead part says so
   p.run('ADVISOR.answer={...ADVISOR.answer,ahead:null};renderAdvisorAnswer()');
   assert.ok(textOf(view(p).answer).includes('No further bag would help much more than Minimal.'));
@@ -436,7 +437,7 @@ async function rider(r,style=r.style){
 // The answer as the fixture holds it: its kind, and each suggestion's kind, what to get (type and size range) and tags: Minimal's
 // items and Looking ahead's set (the owner, 7 Nov).
 const summary=p=>p.json(`(()=>{const a=ADVISOR.answer,i=ADVISOR.input,one=s=>({kind:s.kind,what:advisorWhat(s,i),tags:s.tags});
-  return {kind:a.kind,partial:a.partial,...(a.kind==='suggestions' ? {items:a.items.map(one),ahead:a.ahead && one(a.ahead)} : {}),
+  return {kind:a.kind,partial:a.partial,...(a.kind==='suggestions' ? {items:a.items.map(one),ahead:a.ahead && one(a.ahead),minimalSame:a.minimalSame,aheadAlts:a.aheadAlts.map(one)} : {}),
     ...(a.kind==='nothing-helps' ? {closest:a.closest && {...one(a.closest),overL:a.closest.result.overL,spill:a.closest.result.spillIds}} : {}),
     ...(a.kind==='cannot-reduce' ? {backL:a.backL} : {})};})()`);
 
@@ -555,6 +556,45 @@ test('[GA-DECK] the deck suggestion\'s moves include the tent and the sleeping m
   assert.ok(moves.some(m=>/^Tent: .+ → rack top deck$/.test(m)),'the tent: '+JSON.stringify(moves));
   assert.ok(moves.some(m=>/^Sleeping mat: .+ → rack top deck$/.test(m)),'the mat: '+JSON.stringify(moves));
   assert.ok(textOf(view(p).answer).includes('→ rack top deck'),'on screen');
+});
+
+// ---- The owner's rulings on PR 61 (7 Nov) ----
+
+// The reviewer's rider: a 30 L backpack holding about 25.7 L, two nights camping, no rack, Bags first.
+const PACK30="S.nights=2;S.sleep='camp';applyTripKitDefaults();S.mode='comfort';S.bags=[{uid:1,pos:'pack',L:30}];S.nextUid=2;S.decks={bar:false,rack:false};";
+test('[GA-MINIMAL] Get the backpack off, about 25.7 L on the back: Minimal shows only what takes a quarter or more off, so never a 2 L top tube bag, and the seat pack is there (the owner\'s ruling on PR 61, I2)',async()=>{
+  const p=page({bike:FULL,setup:PACK30});
+  await ask(p,{style:'bags-first',goal:'backpack'});
+  const back=p.json('advisorBase(ADVISOR.input).result.backL');
+  assert.ok(back>20,'a lot on the back: '+back);
+  const items=p.json('ADVISOR.answer.items');
+  assert.ok(!items.some(s=>s.add.some(b=>b.pos==='top')),'no top tube bag');
+  assert.ok(items.some(s=>s.add.some(b=>b.pos==='seat')),'the seat pack');
+  for(const s of items)assert.ok(back-s.result.backL>=0.25*back-1e-9,'each takes a quarter or more off');
+});
+
+test('[GA-SCREEN] combinations that reach about the same result sit side by side: a row of 2–3 bike sketches, each a button named by its bags, with a one-line why and a one-line how, pointing at its card (the owner\'s ruling on PR 61)',async()=>{
+  // R2, the gravel bikepacker: a half frame bag (19.73) and one fork cage (19.38) do about the same for handling
+  const p=page({bike:GRAVEL,setup:R2});
+  await ask(p,{style:'bags',goal:'handling'});
+  const a=p.json('ADVISOR.answer');
+  assert.ok(a.minimalSame.length>=2,'this rider has combinations side by side: '+JSON.stringify(a.minimalSame));
+  const html=view(p).answer;
+  const rows=html.split('<ul class="adv-combos"').slice(1).map(r=>r.slice(0,r.indexOf('</ul>')));
+  assert.equal(rows.length,(a.minimalSame.length>=2 ? 1 : 0)+(a.ahead && a.aheadAlts.length ? 1 : 0),'one row per part that has combinations');
+  const first=rows[0];
+  const buttons=[...first.matchAll(/<button type="button" class="adv-combo" data-card="(advS\d+)" aria-label="([^"]+)" aria-describedby="([^"]+)">([\s\S]*?)<\/button>/g)];
+  assert.equal(buttons.length,a.minimalSame.length,'one sketch per combination');
+  buttons.forEach(([,card,label,described,inner],k)=>{
+    const i=a.minimalSame[k];
+    assert.equal(card,'advS'+i,'points at its card');
+    assert.equal(label,p.run('htmlEsc')(p.json(`advisorDrawnName(ADVISOR.answer.items[${i}],ADVISOR.input)`)),'named by its bags');
+    assert.ok(/<svg aria-hidden="true"[^>]*class="bk/.test(inner),'the planner\'s own bike drawing');
+    const why=(/<span class="adv-combo-why" id="([^"]+)">([^<]+)<\/span>/.exec(inner)||[]),how=(/<span class="adv-combo-how" id="([^"]+)">([^<]+)<\/span>/.exec(inner)||[]);
+    assert.ok(why[2] && how[2],'a why and a how');
+    assert.deepEqual(described.split(' '),[why[1],how[1]],'described by them');
+    assert.ok(html.includes(`<h5 id="advS${i}">`),'its card is there');
+  });
 });
 
 (async()=>{
