@@ -214,6 +214,8 @@ test('[TB-PAGE-BACKS] back=care returns to /#/tools/care, back=advisor to the Ge
     const link=p.context.document.getElementById('bikeDetailsBack');
     assert.equal(link.href,href,back);
     assert.equal(link.textContent,words,back);
+    // "← Back to Wayfinch" at the top goes to Wayfinch: the screen named, or Tools (its default) when the way back is in this page
+    assert.equal(p.context.document.getElementById('backToWayfinch').href??'',back==='advisor' ? '' : href,back+': the top link');
   }
   // The advisor is in this page: its way back never steps back into Wayfinch's history, even when Wayfinch opened the page.
   const p=page();
