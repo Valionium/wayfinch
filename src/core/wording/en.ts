@@ -592,6 +592,7 @@ export const W = {
   appListMore: (n: number): string => `Show ${n} more`,
   appListFewer: 'Show fewer',
   appLazyLoading: 'Opening…',
+  appLazyRetry: 'Try again',
   appLazyFailed: "This part of the app couldn't be opened. Reload to try again.",
   appNoRoute: "Add a route to see what's ahead",
   appStorageBlocked: "This browser is not keeping Wayfinch's data. The app works for this visit only. Export what you need before you close it.",

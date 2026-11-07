@@ -134,5 +134,26 @@ const check=(value,message)=>{assert.ok(value,message);checks++;};
     check(run('S.bikeProfile.fit.size')===null && run('bikeFit(S.bikeProfile).frameBag.shapes[0].L')===4.5 && run('currentPlan().inUse.length')===0,'BK-STORE-05 a fit.size of 500 falls back for that field and the plan still opens');
     check(run('bikeFit({id:"x",fit:"junk"}).frameBag.shapes.length')===3 && run('bikeFit(undefined).frameBag.shapes.length')===3,'BK-STORE-05 bikeFit never throws on junk');
   }
+  // Sub-project 11: suspension and rack mounts, top-level beside brakes and shifting, never inside fit
+  {
+    const read=raw=>JSON.parse(run(`JSON.stringify(normaliseBikeProfile(${JSON.stringify(raw)}))`));
+    for(const suspension of ['none','front','full'])check(read({id:'s',suspension}).suspension===suspension,'[TB-DETAILS-READ] suspension '+suspension+' reads back');
+    for(const rackMounts of ['yes','no'])check(read({id:'r',rackMounts}).rackMounts===rackMounts,'[TB-DETAILS-READ] rack mounts '+rackMounts+' read back');
+    for(const odd of [{suspension:'unknown',rackMounts:'unknown'},{suspension:'Full'},{suspension:7},{suspension:true},{rackMounts:true},{rackMounts:'maybe'},{}]){
+      const got=read({id:'o',...odd});
+      check(!('suspension' in got) && !('rackMounts' in got),'[TB-DETAILS-READ] '+JSON.stringify(odd)+' is no field: Not sure');
+    }
+    const plain=read({id:'p',name:'P',tyres:'tubes',fit:{style:'compact'}}),both=read({id:'p',name:'P',tyres:'tubes',fit:{style:'compact'},suspension:'full',rackMounts:'no'});
+    const rest={...both};delete rest.suspension;delete rest.rackMounts;
+    check(JSON.stringify(rest)===JSON.stringify(plain),'[TB-DETAILS-READ] no other field changes');
+    check(run(`JSON.stringify(normaliseBikeProfile(JSON.parse(${JSON.stringify(JSON.stringify(plain))})))`)===JSON.stringify(plain),'[TB-DETAILS-READ] a bike from before keeps its bytes when written again');
+    check(!('suspension' in both.fit) && !('rackMounts' in both.fit) && JSON.stringify(run(`bikeFit(normaliseBikeProfile(${JSON.stringify(both)}))`))===JSON.stringify(run(`bikeFit(normaliseBikeProfile(${JSON.stringify(plain)}))`)),'[TB-DETAILS-READ] the two are not in fit, and bikeFit sees no difference');
+    run(`renderBikeProfiles=()=>{};SETUPS=[];S.bikeProfile=normaliseBikeProfile(${JSON.stringify(both)});BIKE_PROFILES=[S.bikeProfile];`);
+    const exported=JSON.parse(run('exportAll()'));
+    check(exported.bikeProfiles[0].suspension==='full' && exported.bikeProfiles[0].rackMounts==='no' && exported.draft.bikeProfile.suspension==='full','[TB-DETAILS-READ] export carries both');
+    run('BIKE_PROFILES=[];SETUPS=[];');
+    await run(`importAll(${JSON.stringify(JSON.stringify(exported))})`);
+    check(run('BIKE_PROFILES[0].suspension==="full" && BIKE_PROFILES[0].rackMounts==="no"'),'[TB-DETAILS-READ] import keeps both');
+  }
   console.log(JSON.stringify({suite:'bike-profile-storage',checks}));
 })().catch(error=>{console.error(error);process.exitCode=1;});

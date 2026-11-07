@@ -1,6 +1,7 @@
 // Which bike the tyre tool opens on, and which bikes may be chosen. Only the tyre screen imports this, so it is in the tool's own chunk
 // and the first screen does not carry it. Only bikes in the bag planner's saved list count: it keeps its current-bike record and the
 // plan's bike id after a bike is removed ("Plans using it keep their own copy"), and a removed bike is never offered or preselected.
+import { choiceAmong } from '../../ui/tools/bike-choice.ts';
 import type { HostData, ReadOnlyStore } from './host.ts';
 
 // Nothing is imported from host.ts at run time: its names would join the first screen's export list. A bike record is read by id only,
@@ -40,4 +41,14 @@ export function bikeInUse(kv: ReadOnlyStore, host: HostData, saved: string[]): s
   const current = idOf(json(kv, CURRENT_BIKE_KEY));
   if (current && saved.includes(current)) return current;
   return saved[saved.length - 1] ?? null;
+}
+
+/**
+ * The one chosen bike (sub-project 11): what the rider chose in either app, if that bike is still saved, else the bike in use. `picked` is
+ * true when a record chose it, "No bike" (id null) included; "No bike" that only meant "no bike was saved" is never a pick. Also the bike
+ * line in Tools, so both read it one way.
+ */
+export function toolBike(kv: ReadOnlyStore, host: HostData, saved: string[]): { id: string | null; picked: boolean } {
+  const c = choiceAmong((k) => kv.getItem(k), saved);
+  return c ? { id: c.id, picked: true } : { id: bikeInUse(kv, host, saved), picked: false };
 }

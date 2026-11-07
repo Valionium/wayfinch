@@ -13,7 +13,7 @@ test("[LC-PAGE-LIVE] the page's hash is the one recorded", () => {
   // The tag load-check-zip-2026-10-30 holds the page as it was live (aa086001…). Since then: the top-tube wording and the update prompt.
   // Sub-project 6 changes the bag planner behind the launch switch (bike.js, the rig, Look); riders keep releases/load-check-root.html
   // (LC-ROOT-FROZEN), so each change here is on purpose and recorded.
-  const recorded = '4fcb49345cc8911a79a44ff30b4c366423990216b4ed81a94cb5eb91fc65c626';   // + format-detection and the GPX picker with no accept (iPhone, 6 Nov 2026)
+  const recorded = 'e97bb9c4ce3ae5c1f5656481c3a095d005b82c11ced2a501d465b17c01d49828';   // + the chosen bike: the page's record, the follow and its line (sub-project 11, group 3)
   expect(createHash('sha256').update(readFileSync(PAGE)).digest('hex')).toBe(recorded);
 });
 
@@ -35,6 +35,8 @@ const KEPT = [
   'walkthrough-fixes', 'fix-findings', 'release-offline.test', 'offline-redirect', 'tyre-pressure-storage',
   // not in the plan's table: sub-project 4's update prompt, group 1's bike suites, group 2's contracts and fit properties
   'update-prompt', 'bike-contract', 'look', 'rig', 'contracts', 'fit-props',
+  // sub-project 11, group 3: the chosen bike, the bag planner's half
+  'bike-choice',
 ].map((n) => `${n}.cjs`).sort();
 const RETIRED = ['tyre-pressure', 'pressure-tool-markup', 'pressure-tool', 'ui-pressure-layout'];
 

@@ -48,9 +48,10 @@ const tripOf = (t: Trip): Trip => ({
   route: routeOf(t.route), departureDate: t.departureDate, startTime: t.startTime, flatKph: t.flatKph, stay: t.stay, campWaterL: t.campWaterL,
   ...(t.pace === undefined ? {} : { pace: t.pace }),
 });
+// The chosen bike is read leniently: an export from before it, or a bad id, comes in as none and never stops the file.
 const settingsOf = (s: Settings): Settings => {
   const out = {} as Record<string, unknown>;
-  for (const field of Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]) out[field] = s[field];
+  for (const field of Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]) out[field] = field === 'toolBike' && settingProblem(field, s[field]) !== null ? null : (s[field] ?? DEFAULT_SETTINGS[field]);
   return out as Settings;
 };
 const profileOf = (p: Profile): Profile => {
@@ -95,7 +96,7 @@ const profileReads = (p: unknown): boolean => {
   return Object.keys(profileOf(usableProfile({}))).every((k) => p[k] === usable[k]);
 };
 const settingsRead = (s: unknown): boolean => isObject(s) && goodStamp(s.updatedAt)
-  && (Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]).every((k) => settingProblem(k, s[k]) === null);
+  && (Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]).every((k) => k === 'toolBike' || settingProblem(k, s[k]) === null);
 const tripReads = (t: unknown): boolean => t === null || (isObject(t) && goodStamp(t.updatedAt) && tripProblem(t as unknown as Trip) === null);
 const finiteOrMissing = (x: unknown): boolean => x === undefined || (typeof x === 'number' && Number.isFinite(x));
 const rideReads = (r: unknown): boolean => isObject(r) && typeof r.at === 'string' && Number.isFinite(Date.parse(r.at))

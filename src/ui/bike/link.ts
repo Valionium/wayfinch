@@ -1,8 +1,8 @@
 // Into the bag planner's Bike details (spec sections 3.7 and 7.1): the one place a bike is edited. The co-pilot only builds the address.
 
 /** The screen the bag planner goes back to. Anything else means You (section 7.1). */
-export type BackScreen = 'trip' | 'tools' | 'you' | 'tyre';
-const BACKS: readonly BackScreen[] = ['trip', 'tools', 'you', 'tyre'];
+export type BackScreen = 'trip' | 'tools' | 'you' | 'tyre' | 'care' | 'advisor';
+const BACKS: readonly BackScreen[] = ['trip', 'tools', 'you', 'tyre', 'care', 'advisor'];
 
 /** `/tools/bags/#bike-details=<bikeId>&back=<screen>&section=look`, or `bike-details=new` for a rider with no bike. */
 export function bikeDetailsHref(bikeId: string, back: BackScreen, section?: 'look'): string {
