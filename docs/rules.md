@@ -989,3 +989,22 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - a bike opened from Wayfinch with back=care returns to /#/tools/care, back=advisor to the Gear advisor in the bag planner (/tools/bags/#gear-advisor); any other value still means You [TB-PAGE-BACKS]
 - both apps, end to end (launch build): a bike chosen in Tools is the Bag planner's plan bike at its next open, with the line; a bike chosen there is the line's bike in Tools and the tyre tool's, after a reload too; a chosen bike deleted in the bag planner gives Tools' fallback [TB-TWO-APPS]
 - the same with the network off after the first visit [TB-OFFLINE]
+
+## Tool: Bike care (sub-project 12, group 1)
+
+- a bike's stored details map to Bike care's details as sub-project 11 decision 1's table: brakes and tyres as stored, other as other, unknown as Not sure; drive derailleur or chain-hub is a chain, belt a belt; gears derailleur is a derailleur, chain-hub or belt hub gears; shifting none is other; suspension as stored, or full for a full-suspension frame with none stored, else Not sure; e-bike from Look; no bike: every detail Not sure [BC-DETAILS]
+- over every combination of the stored details, a task shows exactly when each detail it depends on is in its list or Not sure; a real answer outside the list, other included, hides it; it is tagged with exactly the Not sure details it depends on (decision 4) [BC-FIT-EVERY]
+- with every detail Not sure, or no bike, every task shows, each conditioned one with its tags [BC-FIT-ALL-UNSURE]
+- answering one Not sure detail only removes tasks, keeps the order, and changes no other tag but that detail's [BC-FIT-ONLY-REMOVES]
+- the search matches the start of words in a task's name, part and everyday words: "squeak" finds the chain lube and the brake pad tasks, "bleed" the hydraulic bleed, "chain" every Chain task, "zzz" nothing [BC-SEARCH-WORDS]
+- the search forgives capitals, extra spaces, accents and simple endings (s, es, ing, ed): "Squeaking", "  SQUEAK ", "squeaks" find what "squeak" finds; a word in another language finds nothing and never throws [BC-SEARCH-FORMS]
+- every Care task has every field of design 3.2 filled, 3 to 6 steps, minutes low at most high, a unique id, a valid part and section, the critical flag on every brakes and wheels task and each steerer, stem and bar-bolt task, and an entry in sources.ts [BC-CONTENT]
+- no file under src/tools or src/ui imports src/core/care/sources.ts, and the built Bike care chunk holds no http [BC-SOURCES-PRIVATE]
+- Bike care has two tabs, Care and Roadside repairs, as a named tablist: one selected, the arrow keys, Home and End move between them, only the selected panel shows [BC-TABS]
+- one part filter at a time, as pressed buttons in a named group: it keeps the section order and shows only that part's tasks; a second tap clears it (decision 3) [BC-FILTER]
+- a filter and a search together show only tasks matching both; with none, "Nothing matches" and one button that clears both [BC-NONE-MATCH]
+- the quiet line "Tell us your brakes, tyres… to hide what doesn't apply" shows when the chosen bike has a Not sure detail and leads to its Bike details with back=care; hidden when every detail is answered and with no bike [BC-TELL-US]
+- Care for this bike in You opens Bike care with that bike chosen, even when another was chosen [BC-FROM-YOU]
+- the chosen bike deleted in another tab: the list refits to the fallback bike, with no error [BC-BIKE-GONE]
+- at 360 x 640 and 1280 x 720, both themes and 200% text, Bike care has no sideways scroll; it opens offline after one visit; Tab reaches every tab, filter, task and link; each task opens with Enter and Space; the tablist and the filters have names [BC-SCREEN]
+- Bike care is a lazy chunk; its words (en-care) are not in the first screen's files [BC-CHUNK]
