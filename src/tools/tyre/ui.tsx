@@ -6,7 +6,7 @@ import type { ComponentChildren } from 'preact';
 import { T } from '../../core/wording/en-tyre.ts';
 import { W, shortMapDate } from '../../core/wording/en.ts';
 import { Card, Notice } from '../../ui/card.tsx';
-import { choiceVersion, noteBikeChoice } from '../../ui/tools/bike-choice.ts';
+import { choiceMadeIn, choiceVersion, noteBikeChoice } from '../../ui/tools/bike-choice.ts';
 import { checkLimit, tyreEstimate } from './core.ts';
 import type { Bars, Casing, Limit, RimType, Setup, Surface, Unit, Wheel } from './core.ts';
 import { resolve } from './model.ts';
@@ -234,6 +234,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
   // Set when the rider picks a bike or types here (not by a choice that was already there): a choice made elsewhere then only offers a switch.
   const acted = useRef(false);
   const [offer, setOffer] = useState<string | null>(null);
+  const [offerFrom, setOfferFrom] = useState<'copilot' | 'load-check' | null>(null);   // where the offered bike was chosen, for its words
   const [gone, setGone] = useState<'next' | 'none' | null>(null);
   const load = (k: string): { key: string; details: Details } => {
     const r = readStore(services.storage);
@@ -296,7 +297,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
       const target = chosen.id ?? DEFAULT_KEY;
       if (target === latest.current) { setOffer(null); return; }
       // The rider has picked or typed here: their answers stay, and one line offers the other bike.
-      if (acted.current) { setSnap((old) => (JSON.stringify(old) === JSON.stringify(next) ? old : next)); setOffer(target); return; }
+      if (acted.current) { setSnap((old) => (JSON.stringify(old) === JSON.stringify(next) ? old : next)); setOffer(target); setOfferFrom(choiceMadeIn((k) => services.storage.getItem(k))); return; }
       touched.current = true;
       setSnap((old) => (JSON.stringify(old) === JSON.stringify(next) ? old : next));
       setGone(null);
@@ -388,7 +389,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         </select>
       </label>
       {offer && (offer === DEFAULT_KEY || host.bikes.some((b) => b.id === offer)) && offer !== key ? (
-        <Notice>{offer === DEFAULT_KEY ? T.tyreBikeWithout : host.bikes.find((b) => b.id === offer)?.name} {T.tyreChosenElsewhere}{' '}
+        <Notice>{offer === DEFAULT_KEY ? T.tyreBikeWithout : host.bikes.find((b) => b.id === offer)?.name} {offerFrom === 'load-check' ? T.tyreChosenInPlanner : T.tyreChosenElsewhere}{' '}
           <button type="button" class="btn" onClick={() => { touched.current = true; setOffer(null); setGone(null); setPending({}); setSession(load(offer)); }}>{T.tyreChosenSwitch}</button>
         </Notice>
       ) : null}
