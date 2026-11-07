@@ -142,6 +142,161 @@ test('[GA-FROZEN] LC-FREEZE-01 and the selection fixtures pass unchanged (run, n
   assert.ok(/"status":"passed"/.test(r.stdout));
 });
 
+// ---- Task 5: the advisor's view ----
+
+// The view's text without its markup, for reading what the rider sees.
+const textOf=html=>String(html).replace(/<svg[\s\S]*?<\/svg>/g,' ').replace(/<[^>]+>/g,' ').replace(/&amp;/g,'&').replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/\s+/g,' ').trim();
+const view=p=>({steps:p.context.document.getElementById('advisorSteps').innerHTML,answer:p.context.document.getElementById('advisorAnswer').innerHTML,
+  bike:p.context.document.getElementById('advisorBike').innerHTML,progress:p.context.document.getElementById('advisorProgress').textContent});
+const R2="S.bags=[{uid:1,pos:'seat',L:14},{uid:2,pos:'bar',L:12},{uid:3,pos:'top',slot:'front',L:1},{uid:4,pos:'bottle',slot:'dt',L:0.75},{uid:5,pos:'bottle',slot:'st',L:0.75}];S.nextUid=6;S.nights=2;S.sleep='camp';S.mode='comfort';applyTripKitDefaults();";
+const GRAVEL={id:'gravel',name:'Gravel',fit:{style:'diamond-sloping',size:{kind:'letter',value:'M'},bolts:{st:'yes',dt:'yes'}},rackMounts:'no'};
+async function ask(p,choices){
+  p.run('openAdvisor()');
+  for(const [k,v] of Object.entries(choices))p.run(`setAdvisor(${JSON.stringify(k)},${JSON.stringify(v)})`);
+  await p.run('ADVISOR_DONE');
+}
+
+test('[GA-STEPS] the three steps in order, as headings; each choice is a labelled radio; the answer needs all three',async()=>{
+  const p=page({setup:R2,bike:GRAVEL});
+  p.run('openAdvisor()');
+  const html=view(p).steps;
+  const heads=[...html.matchAll(/<h3[^>]*>([\s\S]*?)<\/h3>/g)].map(m=>textOf(m[1]));
+  assert.deepEqual(heads.map(h=>h.slice(0,2)),['1.','2.','3.'],'three steps, in order, each a heading');
+  // every choice: a radio inside its own label, with words
+  const radios=[...html.matchAll(/<label class="adv-choice[^"]*"[^>]*>([\s\S]*?)<\/label>/g)];
+  assert.ok(radios.length>=5,'style and goal choices at least');
+  for(const [,inner] of radios){assert.ok(/<input type="radio" name="adv\w+" value="[^"]+"/.test(inner),'a radio');assert.ok(textOf(inner).length>2,'with words');}
+  for(const v of ['rack','no-rack','either'])assert.ok(html.includes(`name="advStyle" value="${v}"`),v);
+  for(const v of ['handling','backpack'])assert.ok(html.includes(`name="advGoal" value="${v}"`),v);
+  // one or two steps chosen: no search, and the answer says what is missing
+  await ask(p,{style:'no-rack'});
+  assert.equal(p.json('ADVISOR.answer'),null,'no answer with the goal missing');
+  assert.ok(/Choose/.test(textOf(view(p).answer)));
+  p.run("setAdvisor('style',null)");await ask(p,{goal:'handling'});
+  assert.equal(p.json('ADVISOR.answer'),null,'no answer with the style missing');
+  await ask(p,{style:'no-rack',goal:'handling'});
+  assert.ok(p.json('ADVISOR.answer.kind'),'all three: an answer');
+});
+
+test('[GA-STEPS] with no rack mounts the rack choice is disabled and a line says why; Not sure and Yes leave it open',()=>{
+  const p=page({setup:R2,bike:GRAVEL});
+  p.run('openAdvisor()');
+  const html=view(p).steps;
+  assert.ok(/name="advStyle" value="rack"[^>]*disabled/.test(html),'disabled');
+  assert.ok(textOf(html).includes("Your bike has no rack mounts, so panniers aren't offered."));
+  for(const bike of [FULL,BARE]){
+    const q=page({setup:R2,bike});q.run('openAdvisor()');
+    assert.ok(!/name="advStyle" value="rack"[^>]*disabled/.test(view(q).steps),bike.id+': open');
+    assert.ok(!textOf(view(q).steps).includes('no rack mounts'),bike.id+': no line');
+  }
+});
+
+test('[GA-PLAN-INPUT] with a plan: N items and M bags are the plan\'s; the switch moves to the questionnaire and back without changing S',()=>{
+  const p=page({setup:R2+"S.bags.push({uid:6,pos:'fork',pair:true,L:3});S.nextUid=7;"});
+  const before=snapshot(p);
+  p.run('openAdvisor()');
+  const n=p.json('activeKit().length'),m=p.json('gearBags().reduce((t,b)=>t+countOf(b),0)');
+  assert.equal(m,5,'seat, bar, top tube and two fork cages; the bottles are not bags');
+  assert.ok(textOf(view(p).steps).includes(`Using your packing: ${n} items, ${m} bags`));
+  p.run("setAdvisor('source','questionnaire')");
+  assert.ok(textOf(view(p).steps).includes('Starting from a 15 L backpack'),'the questionnaire');
+  assert.ok(view(p).steps.includes('name="advRiding"'));
+  p.run("setAdvisor('source','plan')");
+  assert.ok(textOf(view(p).steps).includes('Using your packing'));
+  p.run('closeAdvisor()');
+  assert.equal(snapshot(p),before,'S as it was');assert.deepEqual(p.writes,[],'nothing written');
+});
+
+test('[GA-QUESTIONNAIRE] each answer maps as decision 5: riding pre-selects the style, nights and sleep go to the trip, the kit is tripKitDefaults, light / average / a lot',()=>{
+  const p=page({setup:'S.bags=[];S.nextUid=1;'});
+  p.run('openAdvisor()');
+  assert.equal(p.json('ADVISOR.source'),'questionnaire','no plan: the questionnaire');
+  for(const [riding,style] of [['touring','rack'],['road','no-rack'],['gravel','no-rack'],['mtb','no-rack'],['everyday','either']]){
+    p.run(`ADVISOR.style=null;ADVISOR.styleTouched=false;setAdvisor('riding','${riding}')`);
+    assert.equal(p.json('ADVISOR.style'),style,riding+' pre-selects '+style);
+  }
+  p.run("setAdvisor('style','either');setAdvisor('riding','road')");
+  assert.equal(p.json('ADVISOR.style'),'either','a style the rider chose stays');
+  const q=a=>p.json(`(()=>{const q=advisorQuestionnaire(${JSON.stringify(a)});return {...q,base:{...q.base,kit:undefined},kitSame:JSON.stringify(q.base.kit)===JSON.stringify(tripKitDefaults(${a.nights},'${a.sleep}',S.bikeProfile))};})()`);
+  const light=q({riding:'mtb',nights:1,sleep:'camp',carry:'light'});
+  assert.deepEqual(light.bags,[{uid:1,pos:'pack',L:15}],'a 15 L backpack');
+  assert.equal(light.nextUid,2);
+  assert.equal(light.noPanniers,true,'mountain bike trails: no panniers');
+  assert.equal(light.kitSame,true,'the kit is tripKitDefaults(nights, sleep, bike)');
+  assert.deepEqual([light.base.nights,light.base.sleep,light.base.mode],[1,'camp','light']);
+  const tiers=p.json('Object.fromEntries(KIT.filter(k=>k.tiers).map(k=>[k.id,k.tiers]))');
+  const lot=q({riding:'touring',nights:4,sleep:'indoor',carry:'lot'});
+  for(const [id,list] of Object.entries(tiers)){
+    const lightest=[...list].sort((a,b)=>a.kg-b.kg||a.L-b.L)[0],bulkiest=[...list].sort((a,b)=>b.L-a.L||b.kg-a.kg)[0];
+    assert.deepEqual([light.base.custom[id].L,light.base.custom[id].kg],[lightest.L,lightest.kg],id+': light takes the lightest tier');
+    assert.deepEqual([lot.base.custom[id].L,lot.base.custom[id].kg],[bulkiest.L,bulkiest.kg],id+': a lot takes the bulkiest tier');
+  }
+  assert.equal(lot.base.mode,'comfort');
+  const avg=q({riding:'touring',nights:4,sleep:'indoor',carry:'average'});
+  assert.deepEqual([avg.base.nights,avg.base.sleep,avg.base.mode,avg.noPanniers],[4,'indoor','comfort',false]);
+  assert.deepEqual(avg.base.custom,{},'average: the default kit');
+  assert.deepEqual([avg.base.qty,avg.base.pinned,avg.base.placements,avg.base.carried],[{},{},null,{}],'nothing of the plan carries over');
+});
+
+test('[GA-QUESTIONNAIRE] the starting 15 L backpack is named; the plan, the draft and S are unchanged after the answer',async()=>{
+  const p=page({setup:'S.bags=[];S.nextUid=1;'});
+  const before=snapshot(p);
+  await ask(p,{riding:'gravel',nights:2,sleep:'camp',carry:'average',goal:'backpack'});
+  assert.ok(p.json('ADVISOR.answer.kind'));
+  assert.ok(textOf(view(p).steps).includes('Starting from a 15 L backpack'));
+  assert.ok(textOf(view(p).answer).includes('Starting from a 15 L backpack'),'named with the answer too');
+  p.run('closeAdvisor()');
+  assert.equal(snapshot(p),before,'S, the kept plan and storage as they were');
+  assert.deepEqual(p.writes,[],'nothing written: no draft, no summary');
+});
+
+test('[GA-ANSWER] each suggestion shows type and size range, the bike drawn with it, where things move and why; no brand word; the style rule on screen',async()=>{
+  const brands=require('./fixtures/advisor/brands.json').brands;
+  const p=page({setup:R2,bike:GRAVEL});
+  await ask(p,{style:'no-rack',goal:'handling'});
+  const a=p.json('ADVISOR.answer');
+  assert.equal(a.kind,'suggestions');
+  const html=view(p).answer;
+  const items=html.split('<li class="adv-sugg"').slice(1);
+  assert.equal(items.length,a.items.length,'one entry per suggestion');
+  a.items.forEach((s,i)=>{
+    const t=textOf(items[i]);
+    const what=p.json(`advisorWhat(ADVISOR.answer.items[${i}],ADVISOR.input)`);
+    assert.ok(t.includes(what),'what to get: '+what);
+    assert.ok(/\d L/.test(what),'with its size');
+    assert.ok(/<svg[^>]*class="bk/.test(items[i]),'the bike, drawn');
+    assert.ok(/Why it helps/.test(t),'why');
+    for(const tag of s.tags)assert.ok(t.includes(tag),'its tags: '+tag);
+    assert.ok(!/pannier|rack/i.test(what),'no rack under Without a rack');
+  });
+  assert.ok(/→/.test(textOf(html)),'where things move: from → to');
+  for(const b of brands)assert.ok(!new RegExp(`\\b${b}\\b`).test(textOf(html)),'no brand: '+b);
+  // the drawing has the new bag: the first suggestion's position is in the drawn view
+  const drawn=p.json('advisorBagView(advisorTrialBags(ADVISOR.answer.items[0],ADVISOR.input),ADVISOR.answer.items[0].decks,ADVISOR.input)');
+  for(const bag of a.items[0].add)assert.ok(drawn.items.some(x=>x.pos===bag.pos),'drawn with the '+bag.pos);
+});
+
+test('[GA-ANSWER] the words of each answer: a swap, a pair, already good, cannot reduce, nothing helps with what stays over, a search cut short',()=>{
+  const p=page({setup:R2});
+  const input="advisorInput('either','handling')";
+  const sugg=(kind,add,remove)=>({kind,add,remove,decks:{bar:false,rack:false},newBags:add.length,litres:add.reduce((n,b)=>n+b.L,0),tags:[],
+    result:{overL:0,spillIds:[],backL:0,backKg:0,outOfReach:0,kgByPos:{},items:{}},score:0,rangeL:[add[0].L,add[0].L+2]});
+  p.context.qaSwap=JSON.stringify({...sugg('swap',[{uid:9,pos:'frame',shape:0,L:6}],1),rangeL:[6,6]});
+  assert.equal(p.json(`advisorWhat(JSON.parse(qaSwap),${input})`),'Replace your 14 L seat pack with a 6 L frame bag (full triangle)');
+  p.context.qaAdd=JSON.stringify(sugg('add',[{uid:9,pos:'fork',pair:true,L:3}],null));
+  assert.equal(p.json(`advisorWhat(JSON.parse(qaAdd),${input})`),'Fork cages, 2 × 3–5 L');
+  const say=a=>textOf(p.run(`advisorAnswerHtml(${JSON.stringify(a)},${input})`));
+  const common={tried:40,frameReason:null,partial:false};
+  assert.ok(say({kind:'already-good',...common}).includes('Your bags already suit this; nothing to add.'));
+  assert.ok(say({kind:'cannot-reduce',backL:3,...common}).includes('3 L stay on your back'));
+  const none=say({kind:'nothing-helps',closest:{...sugg('add',[{uid:9,pos:'seat',L:16}],null),rangeL:[16,16],result:{overL:2.4,spillIds:['tent','stove'],backL:0,backKg:0,outOfReach:0,kgByPos:{},items:{}}},...common});
+  assert.ok(none.includes('Nothing helps'),'says so plainly');
+  assert.ok(/Closest: Seat pack, 16 L/.test(none),'the closest option');
+  assert.ok(none.includes('2.4 L') && none.includes('Tent') && none.includes('Stove and gas'),'what would still be left over');
+  assert.ok(say({kind:'already-good',...common,partial:true}).includes('This search stopped early'),'a search cut short says so');
+  assert.ok(say({kind:'already-good',...common,frameReason:p.run('NO_MOUNT')}).includes("Frame bags aren't offered. No mount on this bike."),'the planner\'s own reason');
+});
+
 (async()=>{
   for(const [name,fn] of tests){await fn();passed++;console.log('ok',name);}
   console.log(`${passed} advisor tests passed`);
