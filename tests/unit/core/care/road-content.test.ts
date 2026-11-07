@@ -7,7 +7,7 @@ import { normaliseBike } from '../../../../src/core/bike/normalise.ts';
 import { searchCare } from '../../../../src/core/care/search.ts';
 import { SOURCES } from '../../../../src/core/care/sources.ts';
 import type { CareKey, CareValue, RoadCard } from '../../../../src/core/care/types.ts';
-import { CARE_TASKS, CARRY, PART_LABEL, PARTS, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
+import { C, CARE_TASKS, CARRY, PART_LABEL, PARTS, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
 import { CARRY_NAMES, ROAD_CARRY, ROAD_FIGURES, ROAD_STEP_COUNTS } from './road-figures.ts';
 import type { RoadFigure } from './road-figures.ts';
 
@@ -205,6 +205,18 @@ test('[BC-ROAD] the spoke card names the brake\'s release "(on rim brakes)" and 
   expect(ROAD_CARDS.map((c) => allText(c).join(' ')).join(' ')).not.toMatch(/small lever/i);
   expect(SOURCES['brake-weak-disc']!.note).toMatch(/fingers.*p\. 120|p\. 120.*fingers/);
   expect(SOURCES['spoke-snapped']!.note).toMatch(/disc/i);
+});
+
+test('[BC-ROAD] "snug" appears nowhere in the care content: no card, task, carry item or screen string leaves a bolt only snug; the disc caliper goes to its printed torque (coordinator, 7 Nov)', () => {
+  const everything = [
+    ...ROAD_CARDS.flatMap((c) => [c.problem, c.checkFirst, c.rideOn, ...c.steps, ...c.words]),
+    ...CARE_TASKS.flatMap((t) => [t.name, t.signs, t.tools, t.why ?? '', t.note ?? '', ...t.steps, ...t.words]),
+    ...CARRY.map((c) => c.name), ...Object.values(C).filter((v): v is string => typeof v === 'string'),
+  ];
+  expect(everything.length).toBeGreaterThan(200);
+  for (const text of everything) expect(text).not.toMatch(/snug/i);
+  const disc = ROAD_CARDS.find((c) => c.id === 'brake-rub-disc')!;
+  expect(disc.steps[2]).toBe('Loosen both caliper bolts a little, squeeze the lever and hold it, then tighten the bolts to the torque printed on the caliper. Without a torque wrench, tighten them evenly until the caliper no longer moves. Test the brake before riding.');
 });
 
 test('[BC-ROAD] every card and carry item has a sources entry (a link or a note); the entries are the tasks, the cards and the items, nothing else', () => {

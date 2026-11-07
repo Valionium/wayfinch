@@ -57,7 +57,9 @@ export const ROAD_FIGURES: Record<string, RoadFigure[]> = {
     f('problem', 'Disc brake rubbing'), f('checkFirst', 'Is the wheel seated all the way?'), f('checkFirst', 'Is the disc bent or loose?'),
     f('checkFirst', 'Any play in the hub?'),
     step(0, 'push the wheel down into the dropouts'), step(1, 'look at the pad gaps'), step(2, 'Loosen both caliper bolts'),
-    step(2, 'squeeze the lever, hold it, snug the bolts'), step(3, 'nudge the caliper away from the rub'), step(4, 'a quarter turn'),
+    step(2, 'squeeze the lever and hold it'),
+    step(2, 'tighten the bolts to the torque printed on the caliper'), step(2, 'Without a torque wrench, tighten them evenly until the caliper no longer moves'),
+    step(2, 'Test the brake before riding'), step(3, 'nudge the caliper away from the rub'), step(4, 'a quarter turn'),
     f('rideOn', 'Fine for light rub'), f('rideOn', 'Stop if the disc is bent hard or the brake feels odd'), f('rideOn', 'Brakes are critical'),
   ],
   'brake-weak-rim': [

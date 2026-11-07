@@ -301,7 +301,7 @@ export const ROAD_CARDS: RoadCard[] = [
     steps: [
       'Loosen the axle, push the wheel down into the dropouts, retighten.',
       'Spin the wheel and look at the pad gaps.',
-      'Loosen both caliper bolts, squeeze the lever, hold it, snug the bolts.',
+      'Loosen both caliper bolts a little, squeeze the lever and hold it, then tighten the bolts to the torque printed on the caliper. Without a torque wrench, tighten them evenly until the caliper no longer moves. Test the brake before riding.',
       'Release, spin; if it still rubs, nudge the caliper away from the rub.',
       'Cable brakes: turn the pad adjuster on the rubbing side a quarter turn.',
     ],
