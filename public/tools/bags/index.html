@@ -10513,12 +10513,15 @@ function bikeFollowedAt(){
 function followBikeChoice(){
   if(!DRAFT_READY || DRAFT_FROZEN || BIKE_PROFILE_BUSY || DELETED_ELSEWHERE || !$('bikeDetailsBox').classList.contains('hidden')) return false;
   const c=bikeChoiceNow();
-  if(!c || c.app!=='copilot' || c.bikeId===null || c.at<=bikeFollowedAt() || (S.bikeProfile && S.bikeProfile.id===c.bikeId)) return false;
+  if(!c || c.app!=='copilot' || c.bikeId===null || c.at<=bikeFollowedAt()) return false;
+  const seen=()=>store.set(BIKE_FOLLOWED_KEY,{app:'load-check',kind:'bike-followed',v:1,at:new Date(c.at).toISOString()});
+  // a record naming the plan's own bike is seen too: nothing moves, and a later change no record shows (an older tab) stays
+  if(S.bikeProfile && S.bikeProfile.id===c.bikeId){ seen(); return false; }
   if(S.bikeProfile && !BIKE_PROFILES.some(b=>b.id===S.bikeProfile.id)) return false;
   const bike=BIKE_PROFILES.find(b=>b.id===c.bikeId);if(!bike) return false;
   useBikeProfile(bike,{follow:true});
   persistBikeProfileSelection();
-  store.set(BIKE_FOLLOWED_KEY,{app:'load-check',kind:'bike-followed',v:1,at:new Date(c.at).toISOString()});
+  seen();
   return true;
 }
 // What the working plan remembers: no theme until one was chosen (here, or in Wayfinch: the one theme). It is never applied from the
