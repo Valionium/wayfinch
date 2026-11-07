@@ -132,3 +132,25 @@ test('[TB-CHOICE-FALLBACK] in a real browser: the chosen bike removed in the bag
   await expect(page.locator('.bike-line').first()).toContainText('Trail Bike');
   await expect(page.locator('#tools-bike')).toHaveCount(0);
 });
+
+// Review of PR 56, I3: a visit through a Bike details link from Wayfinch is a side trip; the plan keeps its bike, and the next plain open
+// follows, with the line and Undo.
+test('[TB-PAGE-FOLLOWS] a Bike details link from Wayfinch leaves the plan alone; the next plain open follows, with the line and Undo', async ({ page, context }) => {
+  await rider(page, context, false);
+  await page.locator('#tools-bike').selectOption('bike_b');
+  await expect.poll(() => read(page, 'copilot:bikeChoice:v1').then((r) => r?.bikeId)).toBe('bike_b');
+  await page.goto(`${app!.origin}/tools/bags/#bike-details=bike_a&back=you`, { waitUntil: 'load' });
+  await draftReady(page);
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  expect(await page.evaluate('S.bikeProfile.id')).toBe('bike_a');
+  await expect(page.locator('#bikeFollowBar')).toBeHidden();
+  await expect(page.locator('#bikeSwapNote')).toBeHidden();
+  await page.locator('#bikeDetailsClose').click();
+  await page.waitForURL((u) => u.pathname === '/');
+  expect(await read(page, 'loadcheck:bikeProfile').then((b) => b?.id)).toBe('bike_a');
+  await page.goto(`${app!.origin}/#/tools`, { waitUntil: 'load' });
+  await openPlanner(page);
+  expect(await page.evaluate('S.bikeProfile.id')).toBe('bike_b');
+  await expect(page.locator('#bikeFollowText')).toHaveText('Now planning for Gravel, chosen in Tools ·');
+  await expect(page.locator('#bikeFollowUndo')).toBeVisible();
+});

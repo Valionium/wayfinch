@@ -226,6 +226,101 @@ test('[TB-PAGE-BACKS] back=care returns to /#/tools/care, back=advisor to the Ge
   q.context.document.referrer='https://example.test/';q.context.history.length=3;
   q.run("returnToWayfinch('/#/tools/care')");
   assert.deepEqual(q.nav,['back'],'Bike care is in Wayfinch: one step back, as for the other screens');
+  // Review of PR 56, I2: the page stays after the advisor's way back, so a later way back still goes (Back to Wayfinch, another link)
+  p.run("returnToWayfinch('/#/tools')");
+  assert.deepEqual(p.nav,['replace:/tools/bags/#gear-advisor','back'],'a later way back to Wayfinch still navigates');
+});
+
+// ---- Review of PR 56 (coordinator's ruling on I1, I3, M1): every change of the plan's bike made here writes the page's record; a Wayfinch
+// record is followed at most once; a plan-only bike is never lost; a Bike details link and a frozen draft never follow. ----
+const setupFor=(p,bike,id)=>p.run(`(()=>{const keep=S.bikeProfile;S.bikeProfile=normaliseBikeProfile(${JSON.stringify(bike)});
+  SETUPS=[...SETUPS,{...capturePlan(),id:${JSON.stringify(id)},name:'Setup '+${JSON.stringify(id)}}];S.bikeProfile=keep;})()`);
+
+test('[TB-PAGE-WRITES] every other way the plan\'s bike changes here writes the page\'s record: a saved setup loaded, an imported working plan, a plan-only "My bike"',async()=>{
+  const p=page({plan:B});
+  setupFor(p,A,'st_a');
+  p.run("loadSetup('st_a')");await p.settle();
+  assert.equal(plan(p),'bike_a');
+  assert.equal(p.mine()?.bikeId,'bike_a','a setup loaded for another bike');
+  p.run(`IMPORTED_DRAFT={...captureDraft(),bikeProfile:normaliseBikeProfile(${JSON.stringify(C)})};useImportedDraft()`);await p.settle();
+  assert.equal(plan(p),'bike_c');
+  assert.equal(p.mine()?.bikeId,'bike_c','an imported working plan');
+  const q=page({plan:null});
+  await q.run("rememberMaxWeight({maxWeight:{v:120,u:'kg',includes:'bike'},maxWeightAsked:true})");await q.settle();
+  const mine=plan(q);
+  assert.ok(mine && !['bike_a','bike_b','bike_c'].includes(mine),'a plan-only bike');
+  assert.equal(q.mine()?.bikeId,mine,'its id is the page\'s choice');
+  assert.equal(p.writes.filter(k=>k.startsWith('copilot:')).length+q.writes.filter(k=>k.startsWith('copilot:')).length,0);
+});
+
+test('[TB-PAGE-FOLLOWS] P1: a day-old Tools choice, followed once, does not move the plan again after a setup for another bike is loaded and the page reopens',async()=>{
+  const storage=sharedStore();
+  const p=page({storage});
+  theirs(p,'bike_b',Date.now()-24*HOUR);
+  p.run('followBikeChoice()');await p.settle();
+  assert.equal(plan(p),'bike_b','followed once');
+  setupFor(p,A,'st_alps');
+  p.run("loadSetup('st_alps')");await p.settle();
+  assert.equal(plan(p),'bike_a');
+  // the page opens again, on the plan as it was saved
+  const again=page({storage,plan:A});
+  const kit=again.run('JSON.stringify(S.kit)');
+  again.run('followBikeChoice()');await again.settle();
+  assert.equal(plan(again),'bike_a','the plan stays on the setup\'s bike');
+  assert.equal(again.run('JSON.stringify(S.kit)'),kit,'its kit unchanged');
+  assert.ok(!again.shown('bikeFollowBar'),'no line');
+});
+
+test('[TB-PAGE-FOLLOWS] a Wayfinch record is followed at most once: the stamp acted on is remembered (stamped for C-DELETE), so a change no record shows (an older tab) is never undone by it',async()=>{
+  const storage=sharedStore();
+  const p=page({storage});
+  const at=Date.now()-24*HOUR;
+  theirs(p,'bike_b',at);
+  p.run('followBikeChoice()');await p.settle();
+  assert.equal(plan(p),'bike_b');
+  const seen=p.values.get('loadcheck:bikeFollowed:v1');
+  assert.ok(seen && JSON.parse(seen).at===new Date(at).toISOString(),'the stamp it acted on, in the page\'s own key');
+  assert.ok(JSON.parse(p.stored('loadcheck:saved-at:v1')).keys['loadcheck:bikeFollowed:v1'],'stamped for C-DELETE');
+  // an older tab, which writes no record, put the plan back on A; the page opens again
+  const again=page({storage,plan:A});
+  again.run('followBikeChoice()');await again.settle();
+  assert.equal(plan(again),'bike_a','the same record never moves the plan twice');
+  // a newer choice in Tools is followed again
+  theirs(again,'bike_c',Date.now());
+  again.run('followBikeChoice()');await again.settle();
+  assert.equal(plan(again),'bike_c');
+});
+
+test('[TB-PAGE-FOLLOWS] P4: a plan-only bike is never lost by a follow, and survives a reload',async()=>{
+  const storage=sharedStore();
+  const MINE={id:'bike_mine',name:'My bike',maxWeight:{v:120,u:'kg',includes:'bike'},maxWeightAsked:true};
+  const p=page({storage,plan:MINE});
+  theirs(p,'bike_b',Date.now()-24*HOUR);
+  p.run('followBikeChoice()');await p.settle();
+  assert.equal(plan(p),'bike_mine','the plan keeps its own bike');
+  assert.ok(!p.shown('bikeFollowBar'));
+  const again=page({storage,plan:JSON.parse(p.stored('loadcheck:bikeProfile'))});
+  again.run('followBikeChoice()');await again.settle();
+  assert.equal(plan(again),'bike_mine','after a reload too');
+});
+
+test('[TB-PAGE-FOLLOWS] M1: never while the draft is frozen by another tab\'s change; nothing written',async()=>{
+  const p=page();
+  theirs(p,'bike_b');
+  p.run('DRAFT_FROZEN=true');
+  assert.equal(p.run('followBikeChoice()'),false);
+  await p.settle();
+  assert.equal(plan(p),'bike_a');
+  assert.equal(p.writes.length,0);
+});
+
+test('[TB-PAGE-FOLLOWS] I3: a visit through a Bike details link never follows; start-up follows only when no link was opened',()=>{
+  const p=page();
+  const init=p.html.slice(p.html.indexOf('/* ==== 95-init.js ==== */'));
+  const start=init.indexOf('(async () => {');
+  const link=init.indexOf('openBikeDetailsFromLink()',start),follow=init.indexOf('followBikeChoice()',start);
+  assert.ok(link>start && follow>link,'the link is handled first');
+  assert.ok(/if\(\s*!\s*(\w+)\s*\)\s*followBikeChoice\(\)/.test(init.slice(link,follow+20)),'and the follow runs only when it opened nothing');
 });
 
 (async()=>{

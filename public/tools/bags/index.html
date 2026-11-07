@@ -3186,13 +3186,13 @@ function useBikeProfile(value,how={}){
   // A plan bike that is in no saved list would be gone for good: keep it, with the kit choices it set, so Undo brings it back. A move to
   // the bike chosen in Wayfinch (how.follow) is not the rider's tap here: Undo is offered for any bike it replaced, or for no bike.
   const was=S.bikeProfile ? normaliseBikeProfile(S.bikeProfile) : null,next=normaliseBikeProfile(value);
-  const wasId=was ? was.id : null,nextId=next ? next.id : null,chosen=how.follow ? null : bikeChoiceNow();
+  const wasId=was ? was.id : null,nextId=next ? next.id : null;
   if(how.follow ? wasId!==nextId : was && wasId!==nextId && !BIKE_PROFILES.some(b=>b.id===was.id)){
     BIKE_SWAPS.push({prev:was,kit:{...S.kit},touched:{...(S.kitTouched||{})},newId:nextId,from:how.follow ? 'tools' : null});BIKE_SWAPS.splice(0,Math.max(0,BIKE_SWAPS.length-5));
   }
-  // The rider's own change of the plan's bike is the chosen bike for every tool: written once, and never when following Wayfinch's.
-  if(!how.follow){ BIKE_FOLLOW_MESSAGE=''; if(wasId!==nextId || (chosen && chosen.bikeId!==nextId)) noteBikeChoicePage(nextId); }
+  if(!how.follow)BIKE_FOLLOW_MESSAGE='';
   S.bikeProfile=next;
+  if(!how.follow)planBikeChosen(wasId);   // never when following Wayfinch's
   applyTripKitDefaults();
   const swap=BIKE_SWAPS[BIKE_SWAPS.length-1];
   if(swap && !swap.after && swap.newId===(next ? next.id : null))swap.after={...S.kit};   // what the swap's starting choices set
@@ -3744,8 +3744,9 @@ function returnToWayfinch(href,started=Date.now()){
   if(LEAVING) return;
   if(BIKE_PROFILE_BUSY && Date.now()-started<1000){ setTimeout(()=>returnToWayfinch(href,started),30); return; }
   LEAVING=true;
-  // a place in this page (the Gear advisor) is never one step back in Wayfinch's history
+  // a place in this page (the Gear advisor) is never one step back in Wayfinch's history; the page stays, so a later way back still goes
   try { if(cameFromWayfinch() && !inThisPage(href)) history.back(); else location.replace(href); } catch(e){}
+  if(inThisPage(href)) LEAVING=false;
 }
 function backLinkTap(event){
   if(event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;   // a new tab or window: the link's own way
@@ -4892,6 +4893,7 @@ async function rememberMaxWeight(change){
     try{ await persistBikeProfileSelection(); }catch(e){}
   } else if(change.maxWeight){
     S.bikeProfile = normaliseBikeProfile({ id:newBikeProfileId(), name:'My bike', ...change });   // this plan only, not a saved bike
+    planBikeChosen(null);
   } else {
     MAX_WEIGHT_SKIPPED = true;
     try{ await store.set(MAX_WEIGHT_SKIPPED_KEY, true); }catch(e){}
@@ -9770,10 +9772,7 @@ function renderResult(){
   noteEl.oninput = () => { S.pendingSaveNote = noteEl.value; queueDraftSave(); };
   if($('saveSetup')) $('saveSetup').onclick = () => saveSetup(nameEl.value.trim(), noteEl.value.trim());
   if($('undoSetup')) $('undoSetup').onclick = undoDeleteSetup;
-  if($('useImportedDraft')) $('useImportedDraft').onclick = () => {
-    const draft = IMPORTED_DRAFT; IMPORTED_DRAFT = null;
-    restorePlan(draft, true, false); queueDraftSave();
-  };
+  if($('useImportedDraft')) $('useImportedDraft').onclick = useImportedDraft;
   if($('dismissImportedDraft')) $('dismissImportedDraft').onclick = () => {
     IMPORTED_DRAFT = null; renderResult();
   };
@@ -10378,6 +10377,11 @@ let DRAFT_LATEST_SERIAL = null, DRAFT_PENDING_SERIAL = null;
 let DRAFT_READ_KIND = 'memory';
 let DRAFT_SAVE_STATUS = {state:'loading',kind:'memory',serial:null};
 let IMPORTED_DRAFT = null, IMPORTED_SETTINGS = null, SAVE_MESSAGE = '';
+function useImportedDraft(){
+  const draft = IMPORTED_DRAFT; IMPORTED_DRAFT = null;
+  const was = S.bikeProfile ? S.bikeProfile.id : null;
+  restorePlan(draft, true, false); planBikeChosen(was); queueDraftSave();
+}
 let SETUP_ACTION = null, SETUP_COMPARE = ['', ''];
 const DELETED_SETUPS = [];
 // Keep file and parser limits identical; a full supported library fits in an export.
@@ -10489,14 +10493,32 @@ function noteBikeChoicePage(bikeId){
   let other=null; try { other=bikeChoiceOf(k=>window.localStorage.getItem(k),'copilot:bikeChoice:v1','copilot'); } catch(e){}
   return store.set(BIKE_CHOICE_RECORD_KEY,{app:'load-check',kind:'bike-choice',v:1,bikeId,at:new Date(Math.max(Date.now(),other ? other.at+1 : 0)).toISOString()});
 }
-// When the page opens: a newer choice made in Wayfinch, of a bike saved here, becomes the plan's bike. Writes no record of its own.
+// Any change of the plan's bike made in this page, by any path (a pick, a setup loaded, an imported working plan, a plan-only bike,
+// Undo), is a choice made in the bag planner: written once, with the plan's bike id. The follow alone writes none.
+function planBikeChosen(wasId){
+  const id=S.bikeProfile ? S.bikeProfile.id : null,chosen=bikeChoiceNow();
+  if(wasId!==id || (chosen && chosen.bikeId!==id)) noteBikeChoicePage(id);
+}
+// The Wayfinch record this page last followed (its stamp), in the page's own key through store.set, so it is stamped for C-DELETE:
+// a record is followed at most once, so a change no record shows (an older tab) is never undone by an old choice.
+const BIKE_FOLLOWED_KEY='loadcheck:bikeFollowed:v1';
+function bikeFollowedAt(){
+  let v=null;
+  try { v=window.storage && MEM[BIKE_FOLLOWED_KEY]!==undefined ? MEM[BIKE_FOLLOWED_KEY] : JSON.parse(window.localStorage.getItem(BIKE_FOLLOWED_KEY) ?? 'null'); } catch(e){}
+  const at=dataObject(v) && v.app==='load-check' && v.kind==='bike-followed' && v.v===1 && typeof v.at==='string' ? Date.parse(v.at) : NaN;
+  return Number.isNaN(at) ? -Infinity : at;
+}
+// When the page opens (not through a Bike details link): a newer choice made in Wayfinch, of a bike saved here, not followed before,
+// becomes the plan's bike. Writes no record of its own. A plan-only bike stays: Undo lives in memory, so after a reload it would be gone.
 function followBikeChoice(){
-  if(!DRAFT_READY || BIKE_PROFILE_BUSY || DELETED_ELSEWHERE || !$('bikeDetailsBox').classList.contains('hidden')) return false;
+  if(!DRAFT_READY || DRAFT_FROZEN || BIKE_PROFILE_BUSY || DELETED_ELSEWHERE || !$('bikeDetailsBox').classList.contains('hidden')) return false;
   const c=bikeChoiceNow();
-  if(!c || c.app!=='copilot' || c.bikeId===null || (S.bikeProfile && S.bikeProfile.id===c.bikeId)) return false;
+  if(!c || c.app!=='copilot' || c.bikeId===null || c.at<=bikeFollowedAt() || (S.bikeProfile && S.bikeProfile.id===c.bikeId)) return false;
+  if(S.bikeProfile && !BIKE_PROFILES.some(b=>b.id===S.bikeProfile.id)) return false;
   const bike=BIKE_PROFILES.find(b=>b.id===c.bikeId);if(!bike) return false;
   useBikeProfile(bike,{follow:true});
   persistBikeProfileSelection();
+  store.set(BIKE_FOLLOWED_KEY,{app:'load-check',kind:'bike-followed',v:1,at:new Date(c.at).toISOString()});
   return true;
 }
 // What the working plan remembers: no theme until one was chosen (here, or in Wayfinch: the one theme). It is never applied from the
@@ -11530,7 +11552,9 @@ function loadSetup(id){
   SAVE_MESSAGE=s.factor != null && Math.abs(s.factor-packEff()) > 0.0001
     ? 'Loaded '+s.name+'. This plan is recalculated with your current '+Math.round(packEff()*100)+'% packing factor; its saved prediction used '+Math.round(s.factor*100)+'%.'
     : '';
+  const was=S.bikeProfile ? S.bikeProfile.id : null;
   restorePlan(s, false);
+  planBikeChosen(was);
   queueDraftSave();
   const heading=$('stepTitle'+S.step);if(heading) heading.focus();
 }
@@ -12792,14 +12816,14 @@ window.applyCalibration = applyCalibration;
   writeLoadSummary(true);
   // The bike chosen in Wayfinch, once the draft is restored and the bikes are loaded (decision 3); this page's own record as its store
   // holds it. A move saves the plan, and with it a summary that differs.
-  if(window.storage){ const choice=await store.get(BIKE_CHOICE_RECORD_KEY); if(choice!==null) MEM[BIKE_CHOICE_RECORD_KEY]=choice; }
-  followBikeChoice();
+  if(window.storage) for(const k of [BIKE_CHOICE_RECORD_KEY,BIKE_FOLLOWED_KEY]){ const v=await store.get(k); if(v!==null) MEM[k]=v; }
   renderBikeProfiles(true);
   initialiseDraftSaveStatus();
   renderPackingChecklist();
   initialiseOfflinePacking();
   initialiseWalkthrough(recovered || SETUPS.length>0);
-  openBikeDetailsFromLink();
+  const linked=openBikeDetailsFromLink();
+  if(!linked) followBikeChoice();   // a visit through a Bike details link is a side trip: the plan keeps its bike
   receiveHandoff();
 })();
 
