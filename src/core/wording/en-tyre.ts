@@ -8,6 +8,11 @@ export const T = {
   tyreNeededIntro: 'Start with these three: the maximum pressure printed on your tyre, your tyre width and your rim type. Everything further down is optional.',
   tyreNeededTag: 'needed',
   tyreBikeWithout: 'Without a bike',
+  // A choice made in Tools, or in the bag planner, while this is open and the rider has already picked or typed here: one line naming
+  // where it was made, never a switch.
+  tyreChosenElsewhere: 'was chosen in Tools ·',
+  tyreChosenInPlanner: 'was chosen in the bag planner ·',
+  tyreChosenSwitch: 'Switch',
   tyreBikeGoneNext: 'The bike you chose is no longer saved in the bag planner. This now shows the bike in use.',
   tyreBikeGoneNone: 'The bike you chose is no longer saved in the bag planner. This now shows no bike.',
   // Moved from en.ts (6 Nov 2026), shown only on this screen: the first screen no longer carries them.
