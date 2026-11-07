@@ -23,7 +23,8 @@ function page({bike=FULL,setup='',storage=sharedStore()}={}){
   const set=q.localStorage.setItem;
   q.localStorage.setItem=(k,v)=>{writes.push(k);set(k,v);};
   q.context.qaBike=JSON.stringify(bike);
-  q.run(`renderKit=()=>{};drawRig=()=>{};renderBags=()=>{};closeBagPop=()=>{};
+  // go(n), the step change, is in the page's start-up part, which the VM leaves out: here it only sets the step
+  q.run(`renderKit=()=>{};drawRig=()=>{};renderBags=()=>{};closeBagPop=()=>{};go=n=>{S.step=n;};
     S.bikeProfile=normaliseBikeProfile(JSON.parse(qaBike));applyTripKitDefaults();DRAFT_READY=true;${setup}`);
   writes.length=0;
   const json=code=>JSON.parse(q.run(`JSON.stringify(${code})`)??'null');
@@ -635,7 +636,171 @@ test('[GA-ANSWER] every shape of suggestion reads cleanly, what to get and the d
   }
 });
 
+// ---- Task 7: trial bags (decision 7) ----
+
+// Every loadcheck:* value in storage.
+const stored=p=>Object.fromEntries([...p.values].filter(([k])=>k.startsWith('loadcheck:')).sort(([a],[b])=>a<b?-1:1));
+// An export with its own times set aside (`exported`, the draft's `updatedAt`): what it carries of the plan, the bikes and the setups.
+const exported=p=>{const x=JSON.parse(p.run('exportAll()'));delete x.exported;delete x.draft.updatedAt;return JSON.stringify(x);};
+// The plan's inputs a trial may touch, and the kept plan, as the draft holds them.
+const planState=p=>p.json('({bags:S.bags,decks:S.decks,placements:(currentPlan(),S.placements),nextUid:S.nextUid,pinned:S.pinned,step:S.step})');
+const draftWrites=p=>p.writes.filter(k=>k==='loadcheck:draft').length;
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+// A rider whose plan is saved, as after start-up and a first save: R2 on the gravel bike, a saved setup and a saved bike.
+function saved(setup=R2,bike=GRAVEL){
+  const p=page({bike,setup:setup+`buildThumb=()=>'';S.step=2;SETUPS=[snapshotSetup('Last summer','')];BIKE_PROFILES=[normaliseBikeProfile(JSON.parse(qaBike))];`});
+  p.run(`store.set(SETUP_KEY,SETUPS);store.set(BIKE_PROFILE_KEY,BIKE_PROFILES);flushDraft();`);
+  return p;
+}
+const cards="[...ADVISOR.answer.items,...(ADVISOR.answer.ahead?[ADVISOR.answer.ahead,...ADVISOR.answer.aheadAlts]:[])]";
+
+test('[GA-TRY] Try in Bag planner closes the advisor and shows the plan with the suggestion\'s bags at the packing check, with the line of decision 7, Keep it and Remove it',async()=>{
+  const p=saved();
+  await ask(p,{style:'bags-first',goal:'handling'});
+  const html=view(p).answer;
+  const n=p.json(`${cards}.length`);
+  assert.ok(n>=2,'some suggestions');
+  for(let i=0;i<n;i++)assert.ok(new RegExp(`<button type="button" class="[^"]*adv-try[^"]*" data-try="${i}"[^>]*>Try in Bag planner</button>`).test(html),'a Try button on card '+i);
+  const what=p.json(`advisorWhat(${cards}[0],ADVISOR.input)`),bags=p.json(`advisorTrialBags(${cards}[0],ADVISOR.input)`);
+  p.run(`startTrial(${cards}[0])`);
+  assert.equal(p.json('ADVISOR.open'),false,'the advisor is closed');
+  assert.equal(p.json('S.step'),4,'the packing check');
+  assert.deepEqual(p.json('S.bags'),bags,'the plan holds the suggestion\'s bags');
+  assert.equal(p.context.document.getElementById('trialText').textContent,`Trying: ${what}. Not saved until you keep it`);
+  assert.equal(p.context.document.getElementById('trialKeep').textContent,'Keep it');
+  assert.equal(p.context.document.getElementById('trialRemove').textContent,'Remove it');
+  // while it is on, a suggestion says to keep or remove it first; and an answer from the questionnaire offers no Try
+  await ask(p,{style:'panniers',goal:'handling'});
+  assert.equal(p.json('ADVISOR.answer.kind'),'suggestions');
+  assert.ok(!/data-try=/.test(view(p).answer),'no second trial on top of one');
+  assert.ok(textOf(view(p).answer).includes('Keep or remove the bag you are trying first.'));
+  p.run('closeAdvisor();removeTrial()');
+  await ask(p,{source:'questionnaire',riding:'gravel',carry:'average',style:'bags-first',goal:'handling'});
+  assert.equal(p.json('ADVISOR.input.fromQuestionnaire'),true);
+  assert.ok(!/data-try=/.test(view(p).answer),'no Try from the questionnaire');
+  assert.ok(textOf(view(p).answer).includes('To try a bag in the Bag planner, use your own packing'),'and it says why');
+  assert.equal(p.json('startTrial(ADVISOR.answer.items[0])'),false,'nor by hand');
+});
+
+test('[GA-KEEP] Keep it makes the trial\'s bags ordinary bags and saves the plan once',async()=>{
+  const p=saved();
+  await ask(p,{style:'bags-first',goal:'handling'});
+  const bags=p.json(`advisorTrialBags(${cards}[0],ADVISOR.input)`);
+  p.writes.length=0;
+  p.run(`startTrial(${cards}[0])`);
+  p.run('queueDraftSave()');await wait(400);
+  assert.equal(draftWrites(p),0,'nothing saved during the trial');
+  p.run('keepTrial()');
+  assert.equal(p.json('TRIAL'),null);
+  assert.equal(draftWrites(p),1,'saved once');
+  assert.deepEqual(JSON.parse(p.values.get('loadcheck:draft')).bags,bags,'the kept bags are the plan\'s');
+  p.run('queueDraftSave()');await wait(400);
+  assert.equal(draftWrites(p),1,'and only once');
+});
+
+test('[GA-REMOVE] Remove it restores the bags, decks, kept placements and next bag number byte for byte, returns to the step, and saves the other changes made during the trial',async()=>{
+  const p=saved(R2+"S.pinned={tent:'1-0'};");
+  const before=planState(p);
+  await ask(p,{style:'bags-first',goal:'handling'});
+  p.run(`startTrial(${cards}[0])`);
+  const uid=p.json('TRIAL.uids[0]');
+  p.writes.length=0;
+  // the rider changes the trip and puts something by hand into the trial bag meanwhile
+  p.run(`S.nights=3;applyTripKitDefaults();S.pinned.stove='${uid}-0';queueDraftSave();`);await wait(400);
+  assert.equal(draftWrites(p),0,'draft saves wait during the trial');
+  p.writes.length=0;
+  p.run('removeTrial()');
+  const after=planState(p);
+  for(const k of ['bags','decks','nextUid','step'])assert.deepEqual(after[k],before[k],k);
+  assert.deepEqual(after.pinned,{tent:'1-0'},'the hand placement into the trial bag goes with it; the rider\'s own stays');
+  assert.equal(p.json('TRIAL'),null);
+  assert.equal(draftWrites(p),1,'the other changes are saved, once');
+  const draft=JSON.parse(p.values.get('loadcheck:draft'));
+  assert.equal(draft.trip.nights,3,'with the new nights');
+  assert.deepEqual(draft.bags,before.bags,'and the bags of before');
+  // with no other change, the kept plan comes back byte for byte
+  const q=saved();const was=planState(q);
+  await ask(q,{style:'bags-first',goal:'handling'});
+  q.run(`startTrial(${cards}[0]);removeTrial()`);
+  assert.deepEqual(planState(q),was,'byte for byte');
+});
+
+test('[GA-TRIAL-NO-TRACE] Try then Remove, Try then reload, Try then closing or hiding the tab: the draft, the bikes, the setups, the summary and every loadcheck:* key are as before; an export too',async()=>{
+  for(const leave of ['remove','reload','close']){
+    const p=saved();
+    const keys=stored(p),out=exported(p),plan=planState(p);
+    await ask(p,{style:'panniers',goal:'handling'});
+    const n=p.json(`${cards}.length`);
+    for(let i=0;i<n;i++){
+      p.run(`startTrial(${cards}[${i}])`);
+      assert.notDeepEqual(p.json('S.bags'),plan.bags,'a trial changes the plan');
+      assert.equal(exported(p),out,leave+': an export during a trial carries no trial bag');
+      if(leave!=='remove'){
+        // the tab is hidden or closed (pagehide flushes the draft), then the page is opened again from storage
+        p.run('flushDraft()');
+        assert.deepEqual(stored(p),keys,leave+' '+i+': storage as before');
+        if(leave==='reload'){
+          // on a copy of the storage, as the reopened page finds it (its own start-up writes stay out of the comparison)
+          const q=page({storage:{values:new Map(p.values),vms:new Set()},bike:GRAVEL});
+          q.run('restorePlan(JSON.parse(window.localStorage.getItem(DRAFT_KEY)),true)');
+          assert.deepEqual(planState(q),plan,'the reopened plan is the one of before');
+        }
+      }
+      p.run('removeTrial()');
+      await wait(350);
+      assert.deepEqual(stored(p),keys,leave+' '+i+': every loadcheck:* key as before');
+      assert.equal(exported(p),out,leave+' '+i+': the export as before');
+      assert.deepEqual(planState(p),plan,leave+' '+i+': the plan as before');
+      if(i<n-1)await ask(p,{style:'panniers',goal:'handling'});
+    }
+  }
+});
+
+test('[GA-TRIAL-NO-TRACE] during a trial Save setup and Export wait with the trial\'s line; a hidden tab saves the rider\'s other changes without the trial bag',async()=>{
+  const p=saved();
+  await ask(p,{style:'bags-first',goal:'handling'});
+  const what=p.json(`advisorWhat(${cards}[0],ADVISOR.input)`),bags=p.json('S.bags'),setups=p.values.get('loadcheck:setups');
+  p.run(`startTrial(${cards}[0])`);
+  const line=`Trying: ${what}. Not saved until you keep it`;
+  assert.equal(await p.run("saveSetup('With the trial','')"),false,'Save setup waits');
+  assert.equal(p.values.get('loadcheck:setups'),setups,'no setup saved');
+  assert.equal(p.json('SETUPS.length'),1);
+  assert.equal(p.json('SAVE_MESSAGE'),line,'with the line');
+  assert.equal(await p.run("saveSetup('','')"),false,'Save this plan too');
+  assert.equal(p.json('exportPlanFile()'),false,'Export waits');
+  assert.equal(p.context.document.getElementById('impMsg').textContent,line,'with the line');
+  p.run('S.nights=4;applyTripKitDefaults();queueDraftSave();');
+  p.writes.length=0;
+  p.run('flushDraft()');
+  assert.equal(draftWrites(p),1,'a hidden tab saves the other change');
+  const draft=JSON.parse(p.values.get('loadcheck:draft'));
+  assert.equal(draft.trip.nights,4);
+  assert.deepEqual(draft.bags,bags,'without the trial bag');
+  p.run('keepTrial()');
+  assert.equal(await p.run("saveSetup('Kept','')"),true,'once kept, Save setup saves');
+});
+
+test('[GA-TRIAL-NO-TRACE] a plan another tab saved during a trial is taken: the trial ends, the other tab\'s plan stays as it saved it',async()=>{
+  const store=sharedStore();
+  const p=page({storage:store,bike:GRAVEL,setup:R2});p.run('flushDraft()');
+  const q=page({storage:store,bike:GRAVEL,setup:R2});
+  q.run('DRAFT_VERSION=JSON.parse(window.localStorage.getItem(DRAFT_KEY)).updatedAt;DRAFT_SIGNATURE=JSON.stringify(captureDraft());DRAFT_SAVE_STATUS={state:"saved",kind:"browser",serial:DRAFT_SIGNATURE};');
+  await ask(p,{style:'bags-first',goal:'handling'});
+  p.run(`startTrial(${cards}[0])`);
+  q.run('S.nights=5;applyTripKitDefaults();flushDraft();');
+  const theirs=p.values.get('loadcheck:draft');
+  assert.equal(p.json('TRIAL'),null,'the trial ends');
+  assert.equal(p.json('S.nights'),5,'the other tab\'s plan is taken');
+  assert.ok(!p.json('S.bags').some(b=>b.uid>=6),'no trial bag');
+  p.run('flushDraft()');
+  assert.equal(p.values.get('loadcheck:draft'),theirs,'and stays as that tab saved it');
+});
+
+// The heart of decision 7 over 200 generated riders (GA-TRY-SAME) is tests/unit/tools/advisor-trial.test.ts: its real searches take
+// about a minute and a half, and this suite runs inside LC-QA-ALL's time.
+
 (async()=>{
-  for(const [name,fn] of tests){await fn();passed++;console.log('ok',name);}
+  // GA_ONLY=<text> runs only the tests whose name holds it (for watching one fail)
+  for(const [name,fn] of tests){if(process.env.GA_ONLY && !name.includes(process.env.GA_ONLY))continue;await fn();passed++;console.log('ok',name);}
   console.log(`${passed} advisor tests passed`);
 })().catch(e=>{console.error(e);process.exit(1);});
