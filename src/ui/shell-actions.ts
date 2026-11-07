@@ -69,8 +69,8 @@ const hereFailure = (h: HereWords, kind: Failure['kind']): string =>
   kind === 'denied' ? h.hereDenied : kind === 'timeout' ? h.hereTimeout : kind === 'unavailable' ? h.hereNoFix : W.appAheadNoGeo;
 /** A fix a phone can mean: on the globe, and not the 0, 0 it gives for none. */
 const usableFix = (f: Fix): boolean => Math.abs(f.lat) <= 90 && Math.abs(f.lon) <= 180 && !(Math.abs(f.lat) < 5e-6 && Math.abs(f.lon) < 5e-6);
-/** A fix as it came, measured on no route: Emergency's own view of it. */
-const asCame = (f: Fix): Position => ({ ...f, km: NaN, offRouteM: NaN, source: 'gps', approximate: !(f.accuracyM <= APPROXIMATE_HELP_M) });
+/** A fix as it came, on no route kilometre: Emergency's own view of it. With no route its distance off one is unknown (NaN). */
+const asCame = (f: Fix, offRouteM = NaN): Position => ({ ...f, km: NaN, offRouteM, source: 'gps', approximate: !(f.accuracyM <= APPROXIMATE_HELP_M) });
 
 /** The settlements the route passes, in route order: the manual picker's towns. */
 function townsOf(i: ScreenInputs): Town[] {
@@ -102,6 +102,11 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
   let pendingFix: Fix | null = null;
   /** A pass of the route the pending fix may lie on: where its country and clock are read while Ahead asks which pass. */
   let pendingKm: Km | null = null;
+  /**
+   * How far the pending fix lies from the route: the nearer of the passes asked about (both are its own projections). Emergency's
+   * notes on what is not stored read it, so a fix on the route gets none of them (review of PR 53, N1). NaN when unknown.
+   */
+  let pendingOffM = NaN;
   let hooked = false;
   let reading = 0;
   // With no route: the fix Emergency's Update position found, for this page only. Positions are kept on a route, so it is not stored.
@@ -127,11 +132,13 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
         let dataDate = '';
         for (const q of i.places) if (typeof q.dataDate === 'string' && q.dataDate > dataDate) dataDate = q.dataDate;
         s.chips.emergency = emergencyCard({
-          position: asCame(pendingFix), now, country: z.country, timeZone: z.timeZone, dataDate, rescuePoints: i.rescuePoints,
+          position: asCame(pendingFix, pendingOffM), now, country: z.country, timeZone: z.timeZone, dataDate, rescuePoints: i.rescuePoints,
           settlements: i.places.filter((q) => q.kind === 'settlement'), shelters: i.places.filter((q) => q.kind === 'shelter'),
           thunderNear: thunderNear(built.parts.stop),
         });
       } catch { /* the stored position's card stays */ }
+      // A position was found and waits for the rider's answer: "No position yet" would not be true (after the launch, 7 Nov 2026).
+      s.notes = s.notes.map((n) => (n === W.routeNoPositionFromStart ? W.routeAskPassFromStart : n));
     }
     let stillAboutL: number | null = null;
     try {
@@ -257,6 +264,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       if (position.kind === 'watching') return false;
       pendingFix = null;
       pendingKm = null;
+      pendingOffM = NaN;
       const alone = view.peek().kind !== 'trip';
       const words = alone ? import('../core/wording/en-here.ts').then((m) => m.H, () => null) : null;
       say({ kind: 'watching' });
@@ -286,6 +294,8 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       if (found.kind === 'ask') {
         pendingFix = fix;
         pendingKm = found.options[0] ?? null;
+        const offs = found.options.map((km) => onPass(fix, now.trip.route, km)?.offRouteM ?? NaN).filter((m) => Number.isFinite(m) && m >= 0);
+        pendingOffM = offs.length > 0 ? Math.min(...offs) : NaN;
         const [a, b] = found.options.map((km) => showKm(km)) as [string, string];
         position = { kind: 'ask', question: W.appAheadAsk(a, b), options: found.options.map((km) => ({ km, text: W.appAheadAskKm(showKm(km)) })) };
         present({ ...now, now: deps.now() });
@@ -298,6 +308,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       const fix = pendingFix;
       pendingFix = null;
       pendingKm = null;
+      pendingOffM = NaN;
       const now = await routeNow();
       const p = fix && now ? onPass(fix, now.trip.route, km) : null;
       if (!p || !now) {
@@ -310,6 +321,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     async setManual(at) {
       pendingFix = null;
       pendingKm = null;
+      pendingOffM = NaN;
       const now = await routeNow();
       if (!now) {
         say({ kind: 'said', text: W.appAheadNotKept });

@@ -55,6 +55,8 @@ export const W = {
   routeNoDateNote: 'No departure date yet, so the answers give distances only. Set it in Trip.',
   routeStampHere: 'here',
   routeNoPositionFromStart: 'No position yet: these answers count from the route start (km 0). Update position for answers from where you are.',
+  // While Ahead asks which pass (an out-and-back route), a position was found and waits for the rider's answer (after the launch, 7 Nov 2026).
+  routeAskPassFromStart: "Position found. Choose which pass you're on; until then the answers count from the route start (km 0).",
   routeStripDayOne: 'Day 1',
   routeStripToday: 'Today',
   routeStripTomorrow: (day: string): string => (day === '' ? 'Tomorrow' : `Tomorrow, ${day}`),
