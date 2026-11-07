@@ -592,6 +592,7 @@ export const W = {
   appListMore: (n: number): string => `Show ${n} more`,
   appListFewer: 'Show fewer',
   appLazyLoading: 'Opening…',
+  appLazyRetry: 'Try again',
   appLazyFailed: "This part of the app couldn't be opened. Reload to try again.",
   appNoRoute: "Add a route to see what's ahead",
   appStorageBlocked: "This browser is not keeping Wayfinch's data. The app works for this visit only. Export what you need before you close it.",
@@ -669,7 +670,6 @@ export const W = {
   // Tyre pressure: the screen and the Tools cards.
   tyreTitle: 'Tyre pressure',
   tyreBack: 'Tools',
-  tyreIntro: 'An estimate for your setup, worked out on this phone from published tyre-drop data. It never goes above a limit you enter, and it sends nothing.',
   tyreBikeLabel: 'Bike',
   tyreBikeNone: 'No saved bike',
   tyreBikeInPlan: ' (in your plan)',
@@ -778,7 +778,6 @@ export const W = {
   tyreHighestLabel: 'Highest point of the trip (m)',
   tyreHeatFits: 'The heat and height you entered do not push these pressures over a limit.',
   tyreSectionMeasured: 'Measured values (optional)',
-  tyreMeasuredHelp: 'Wheel loads: with your gear on, ride-ready, put one wheel on a bathroom scale and the other on a block of the same height, then swap. Enter both.',
   tyreMeasuredFrontLabel: 'Front wheel load (kg)',
   tyreMeasuredRearLabel: 'Rear wheel load (kg)',
   tyreCaliperFrontLabel: 'Front tyre width, calipered (mm)',

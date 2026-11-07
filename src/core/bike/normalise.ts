@@ -40,6 +40,8 @@ export type BikeRecord = {
   tyres: 'unknown' | 'tubes' | 'tubeless' | 'other'; valve: 'unknown' | 'presta' | 'schrader' | 'dunlop' | 'other';
   brakes: 'unknown' | 'hydraulic-disc' | 'cable-disc' | 'rim' | 'other'; drive: 'unknown' | 'derailleur' | 'chain-hub' | 'belt';
   shifting: 'unknown' | 'cable' | 'electronic' | 'none';
+  /** Sub-project 11: only an answer is stored; no field is Not sure, so a bike from before keeps its bytes. */
+  suspension?: 'none' | 'front' | 'full'; rackMounts?: 'yes' | 'no';
   pressure: PressureBike; fit: Fit | null; maxWeight: MaxWeight | null; maxWeightAsked: boolean; look: Look | null; geometry: Geometry | null;
 };
 
@@ -50,7 +52,11 @@ const CHOICES = {
   brakes: ['unknown', 'hydraulic-disc', 'cable-disc', 'rim', 'other'],
   drive: ['unknown', 'derailleur', 'chain-hub', 'belt'],
   shifting: ['unknown', 'cable', 'electronic', 'none'],
+  // the last two are stored only as an answer (see BikeRecord)
+  suspension: ['unknown', 'none', 'front', 'full'],
+  rackMounts: ['unknown', 'yes', 'no'],
 } as const;
+type Choices = { [K in Exclude<keyof typeof CHOICES, 'suspension' | 'rackMounts'>]: (typeof CHOICES)[K][number] };
 const FIT_STYLES: readonly FitStyle[] = ['unknown', 'diamond-level', 'diamond-sloping', 'compact', 'trapeze', 'mixte', 'step-through', 'full-suspension'];
 const FIT_SIZES: readonly SizeLetter[] = ['XS', 'S', 'M', 'L', 'XL'];
 const WHEELS: readonly WheelWord[] = ['700c', '650b', '650c', '29', '27.5', '26'];
@@ -83,17 +89,18 @@ function date(v: unknown): string | null {
     && Number.isFinite(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v.slice(0, 10) ? v : null;
 }
 const round1 = (n: number): number => Math.round(n * 10) / 10;
-const oneOf = <T extends string>(v: unknown, values: readonly T[], fallback: T): T => (values.includes(v as T) ? (v as T) : fallback);
+/** v if it is one of values, else the fallback, 'unknown' unless named. */
+const oneOf = <T extends string>(v: unknown, values: readonly T[], fallback = 'unknown' as T): T => (values.includes(v as T) ? (v as T) : fallback);
 
 function pressureOf(value: unknown): PressureBike {
   const p = isObject(value) ? value : {};
   const casing = ['unknown', 'thin', 'standard', 'reinforced'] as const;
   return {
     bikeKg: num(p.bikeKg, 3, 100),
-    wheel: oneOf(p.wheel, ['unknown', ...WHEELS] as const, 'unknown'),
-    rim: oneOf(p.rim, ['unknown', 'tube-crochet', 'tubular', 'tubeless-crochet', 'hookless'] as const, 'unknown'),
+    wheel: oneOf(p.wheel, ['unknown', ...WHEELS] as const),
+    rim: oneOf(p.rim, ['unknown', 'tube-crochet', 'tubular', 'tubeless-crochet', 'hookless'] as const),
     rimMm: num(p.rimMm, 5, 100), frontMm: num(p.frontMm, 10, 150), rearMm: num(p.rearMm, 10, 150),
-    frontCasing: oneOf(p.frontCasing, casing, 'unknown'), rearCasing: oneOf(p.rearCasing, casing, 'unknown'),
+    frontCasing: oneOf(p.frontCasing, casing), rearCasing: oneOf(p.rearCasing, casing),
     frontMinBar: num(p.frontMinBar, 0, 15), frontMaxBar: num(p.frontMaxBar, 0, 15),
     rearMinBar: num(p.rearMinBar, 0, 15), rearMaxBar: num(p.rearMaxBar, 0, 15),
   };
@@ -109,7 +116,7 @@ function sizeOf(v: unknown): FitSize | null {
 
 function fitOf(value: unknown): Fit | null {
   if (!isObject(value)) return null;
-  const yn = (v: unknown): YesNo => (v === 'yes' || v === 'no' ? v : 'unknown');
+  const yn = (v: unknown): YesNo => oneOf<YesNo>(v, ['yes', 'no']);
   const b = isObject(value.bolts) ? value.bolts : {};
   const t = isObject(value.triangleCm) ? value.triangleCm : null;
   let triangleCm: Fit['triangleCm'] = null;
@@ -123,7 +130,7 @@ function fitOf(value: unknown): Fit | null {
   const gap = num(value.seatGapCm, 3, 60);
   const bar = num(value.barWidthCm, 10, 80);
   const fit: Fit = {
-    style: oneOf(value.style, FIT_STYLES, 'unknown'), size: sizeOf(value.size), bolts: { st: yn(b.st), dt: yn(b.dt), un: yn(b.un) },
+    style: oneOf(value.style, FIT_STYLES), size: sizeOf(value.size), bolts: { st: yn(b.st), dt: yn(b.dt), un: yn(b.un) },
     topTubeBag: yn(value.topTubeBag), triangleCm, seatGapCm: gap === null ? null : round1(gap), barWidthCm: bar === null ? null : round1(bar),
   };
   const empty = fit.style === 'unknown' && !fit.size && fit.bolts.st === 'unknown' && fit.bolts.dt === 'unknown' && fit.bolts.un === 'unknown'
@@ -192,9 +199,9 @@ export function normaliseBike(raw: unknown): BikeRecord | null {
   const t = Object.fromEntries(Object.entries(TEXT).map(([key, max]) => [key, text(raw[key], max).trim()])) as Record<keyof typeof TEXT, string>;
   return {
     id: raw.id, ...t, name: t.name || 'My bike',
-    tyres: oneOf(raw.tyres, CHOICES.tyres, 'unknown'), valve: oneOf(raw.valve, CHOICES.valve, 'unknown'),
-    brakes: oneOf(raw.brakes, CHOICES.brakes, 'unknown'), drive: oneOf(raw.drive, CHOICES.drive, 'unknown'),
-    shifting: oneOf(raw.shifting, CHOICES.shifting, 'unknown'),
+    // each choice in CHOICES' order, which is the page's
+    ...Object.fromEntries(Object.entries(CHOICES).map(([key, values]) => [key, oneOf(raw[key], values as readonly string[])])
+      .filter(([, value], i) => i < 5 || value !== 'unknown')) as Choices,
     pressure: pressureOf(raw.pressure), fit: fitOf(raw.fit), maxWeight: maxWeightOf(raw.maxWeight), maxWeightAsked: raw.maxWeightAsked === true,
     look: lookOf(raw.look), geometry: geometryOf(raw.geometry),
   };

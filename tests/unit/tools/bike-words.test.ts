@@ -28,6 +28,15 @@ test('[LC-WORDS] no word of §8\'s list nor of the bag planner\'s own stricter l
   const dialog = html.slice(html.indexOf('id="bikeDetailsBox"'), html.indexOf('id="maxWeightBox"')).replace(/<[^>]+>/g, ' ');
   expect(bannedHits(dialog)).toEqual([]);
   expect(dialog.match(own)).toBeNull();
+  // the bike's labels, Suspension and Rack mounts (sub-project 11) among them, are in the dialog and pass too
+  const labels = JSON.parse(page.run('JSON.stringify(BIKE_PROFILE_LABELS)') as string) as Record<string, Record<string, string>>;
+  for (const key of ['suspension', 'rackMounts']) expect(Object.keys(labels), key).toContain(key);
+  const labelText = Object.values(labels).flatMap((l) => Object.values(l)).join(' ');
+  expect(bannedHits(labelText)).toEqual([]);
+  expect(labelText.match(own)).toBeNull();
+  for (const words of ['Suspension', 'Rack mounts', 'Front fork', 'Full suspension', 'Small threaded holes near the rear axle and on the seat stays, for a rack.']) {
+    expect(dialog, words).toContain(words);
+  }
   // and the swatch names the picker shows
   const swatches = page.run('window.WayfinchBike.SWATCHES.map(s=>s.name).join(" ")') as string;
   expect(bannedHits(swatches)).toEqual([]);

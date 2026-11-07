@@ -21,6 +21,7 @@ import type { ProfileField, ProfileWrite } from '../../store/you.ts';
 import { forgetRiderKg, loadRiderKg } from '../rider-kg.ts';
 import { applyTheme } from '../theme-apply.ts';
 import { noteThemeChoice, themeNow } from '../theme-choice.ts';
+import { newerChoice, noteBikeChoice } from '../tools/bike-choice.ts';
 import { browserTripServices } from '../trip/services.ts';
 import type { SettingsOutcome } from '../trip/services.ts';
 
@@ -206,7 +207,9 @@ export function browserYouServices(now: () => Date = () => new Date(), navigate:
     exportFile: async () => {
       // The one theme both apps show, which may be the bag planner's newer choice (theme-choice.ts)
       const stored = await exportAll();
-      const file = { ...stored, settings: { ...stored.settings, theme: themeNow() } };
+      // and the bike every tool starts with: the newer choice of either app, else what an import brought
+      const bike = newerChoice((k) => { try { return localStorage.getItem(k); } catch { return null; } });
+      const file = { ...stored, settings: { ...stored.settings, theme: themeNow(), toolBike: bike ? bike.bikeId : stored.settings.toolBike } };
       return { name: `wayfinch-data-${now().toISOString().slice(0, 10)}.json`, text: `${JSON.stringify(file, null, 2)}\n` };
     },
     save: (name, text) => {
@@ -233,7 +236,12 @@ export function browserYouServices(now: () => Date = () => new Date(), navigate:
       const before = localStorage.getItem(SETTINGS_KEY);
       const result = await importAll(file);
       // Settings that came with the file are a choice made now: the bag planner shows their theme too.
-      if (result.ok && localStorage.getItem(SETTINGS_KEY) !== before) noteThemeChoice(readLocalSettings().settings.theme);
+      if (result.ok && localStorage.getItem(SETTINGS_KEY) !== before) {
+        const { theme, toolBike } = readLocalSettings().settings;
+        noteThemeChoice(theme);
+        // The bike comes with them as a choice made now; a file without one leaves the choice as it is. Another phone's bike this phone lacks falls back.
+        if (toolBike !== null) noteBikeChoice(toolBike);
+      }
       await loadRiderKg();
       applyTheme(themeNow());
       return result;

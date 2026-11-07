@@ -114,6 +114,28 @@ test('[C-DELETE] a plan, setup, bike and report saved after the request, before 
   assert.deepEqual(Object.keys(ledger.items['loadcheck:setups']),['st_new']);
 });
 
+// Sub-project 11, group 3: the page's record of the chosen bike is one more loadcheck:* key, written through store.set, so stamped.
+test('[C-DELETE] Also delete bag planner data removes loadcheck:bikeChoice:v1 with the rest; a bike chosen after the request stays',async()=>{
+  const storage=sharedStore();
+  const p=page({storage});
+  oldData(p);
+  p.values.set('loadcheck:bikeChoice:v1',JSON.stringify({app:'load-check',kind:'bike-choice',v:1,bikeId:'bike_old',at:iso(OLD)}));
+  p.values.set('copilot:bikeChoice:v1',JSON.stringify({app:'copilot',kind:'bike-choice',v:1,bikeId:'bike_old',at:iso(OLD)}));
+  p.values.set('copilot:delete-request:v1',request(iso(ASKED)));
+  assert.equal(p.run('applyDeleteRequest()'),true);
+  assert.equal(p.stored('loadcheck:bikeChoice:v1'),null,'chosen before the request: gone');
+  assert.notEqual(p.stored('copilot:bikeChoice:v1'),null,'Wayfinch\'s own record is Wayfinch\'s to delete');
+  // a second request, after a bike was chosen here since the first
+  const later=page({storage});
+  await later.run("noteBikeChoicePage('bike_new')");
+  const chosen=later.stored('loadcheck:bikeChoice:v1');
+  assert.ok(chosen && JSON.parse(chosen).bikeId==='bike_new');
+  later.values.set('copilot:delete-request:v1',request(new Date(Date.now()-60e3).toISOString(),'fedcba9876543210fedcba9876543210'));
+  const fresh=page({storage});
+  assert.equal(fresh.run('applyDeleteRequest()'),true);
+  assert.equal(fresh.stored('loadcheck:bikeChoice:v1'),chosen,'chosen after the request: kept, byte for byte');
+});
+
 test('[C-DELETE] applied at most once: a second load keeps a newly saved plan',async()=>{
   const storage=sharedStore();
   const p=page({storage});
