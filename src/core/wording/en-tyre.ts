@@ -8,9 +8,17 @@ export const T = {
   tyreNeededIntro: 'Start with these three: the maximum pressure printed on your tyre, your tyre width and your rim type. Everything further down is optional.',
   tyreNeededTag: 'needed',
   tyreBikeWithout: 'Without a bike',
+  // A choice made in Tools, or in the bag planner, while this is open and the rider has already picked or typed here: one line naming
+  // where it was made, never a switch.
+  tyreChosenElsewhere: 'was chosen in Tools ·',
+  tyreChosenInPlanner: 'was chosen in the bag planner ·',
+  tyreChosenSwitch: 'Switch',
   tyreBikeGoneNext: 'The bike you chose is no longer saved in the bag planner. This now shows the bike in use.',
   tyreBikeGoneNone: 'The bike you chose is no longer saved in the bag planner. This now shows no bike.',
   // Moved from en.ts (6 Nov 2026), shown only on this screen: the first screen no longer carries them.
   tyreHeatIntro: 'Warm air and a high pass raise the pressure after you pump. Enter where and when you pump and the worst the trip can bring, to see how high to pump.',
   tyreCaliperHelp: 'A calipered tyre width replaces the effective width in the pressure calculation. The hookless limits and the rim check still use the printed width.',
+  // Moved from en.ts (7 Nov 2026, sub-project 12): they pay for Bike care's entry in the first screen.
+  tyreIntro: 'An estimate for your setup, worked out on this phone from published tyre-drop data. It never goes above a limit you enter, and it sends nothing.',
+  tyreMeasuredHelp: 'Wheel loads: with your gear on, ride-ready, put one wheel on a bathroom scale and the other on a block of the same height, then swap. Enter both.',
 };

@@ -1,16 +1,16 @@
 // The shell's one piece of navigation state: which screen shows, mirrored to location.hash (spec section 3.1).
 import { signal } from '@preact/signals';
 
-export const SCREEN_NAMES = ['ahead', 'trip', 'tools', 'tools/tyre', 'you', 'you/legal'] as const;
+export const SCREEN_NAMES = ['ahead', 'trip', 'tools', 'tools/tyre', 'tools/care', 'you', 'you/legal'] as const;
 export type ScreenName = (typeof SCREEN_NAMES)[number];
 
 /** The four tabs; a screen below a tab lights that tab. */
 export type TabName = 'ahead' | 'trip' | 'tools' | 'you';
 export const tabOf = (name: ScreenName): TabName => name.split('/')[0] as TabName;
 
-/** `#/tools/tyre` gives 'tools/tyre'. Anything that is not a screen gives `fallback`. */
+/** `#/tools/tyre` gives 'tools/tyre'; a `?bike=` after it (toolHref) is not part of the name. Anything that is not a screen gives `fallback`. */
 export function screenFromHash(hash: string, fallback: ScreenName): ScreenName {
-  const name = hash.replace(/^#\/?/, '').replace(/\/+$/, '');
+  const name = hash.replace(/^#\/?/, '').replace(/\?.*$/, '').replace(/\/+$/, '');
   return (SCREEN_NAMES as readonly string[]).includes(name) ? (name as ScreenName) : fallback;
 }
 

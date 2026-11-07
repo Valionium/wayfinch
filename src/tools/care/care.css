@@ -1,0 +1,29 @@
+/* Bike care (sub-project 12): its own chunk's styles. Theme colours only, so both themes follow. Nothing scrolls sideways at 360 px. */
+.care { overflow-wrap: anywhere; max-width: 48rem; }
+.care-title { margin: 8px 0 4px; }
+.care-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 12px 0; }
+.care-tab {
+  min-height: 44px; padding: 8px 16px; border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0;
+  background: transparent; color: var(--ink); font: inherit; cursor: pointer;
+}
+.care-tab[aria-selected='true'] { background: var(--panel); border-color: var(--line); font-weight: 600; box-shadow: inset 0 -3px 0 var(--blaze); }
+.care-search-label { display: block; font-weight: 600; margin: 0 0 4px; }
+.care-search {
+  box-sizing: border-box; width: 100%; max-width: 100%; min-height: 44px; padding: 6px 10px;
+  border: 1px solid var(--muted); border-radius: 8px; background: var(--ground); color: var(--ink); font: inherit;
+}
+.care-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.care-filter[aria-pressed='true'] { background: var(--blaze); border-color: var(--blaze); color: var(--ground); font-weight: 600; }
+.care-tell { margin: 0 0 12px; }
+.care-tell a { color: inherit; }
+.care-section h3 { margin: 20px 0 8px; }
+.care-task { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); margin: 0 0 8px; }
+.care-task summary { min-height: 44px; padding: 10px 12px; cursor: pointer; display: list-item; }
+.care-task summary .care-name { font-weight: 600; }
+.care-tags { font-size: 0.9375rem; }
+.care-body { padding: 0 12px 12px; }
+.care-body ol { padding-left: 1.5em; margin: 4px 0 8px; }
+.care-body li { margin: 0 0 4px; }
+.care-label { margin: 8px 0 0; }
+.care-unsure { color: var(--amber); }
+.care-none { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
