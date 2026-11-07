@@ -47,6 +47,10 @@ const search = () => host.querySelector<HTMLInputElement>('#care-search')!;
 const type = async (text: string) => { await act(() => { search().value = text; search().dispatchEvent(new Event('input', { bubbles: true })); }); };
 const click = async (el: HTMLElement) => { await act(() => { el.click(); }); };
 const key = async (el: HTMLElement, k: string) => { await act(() => { el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })); }); };
+/** The tasks a bike's details show, from the content's own conditions: a Not sure (null) detail keeps a task, a value in its list keeps it, anything else hides it. Written here, not a call to fit.ts. */
+const oracle = (d: Record<string, string | null>): string[] => CARE_TASKS.filter((t) => Object.entries(t.applies).every(([k, vals]) => d[k] === null || (vals as string[]).includes(d[k]!))).map((t) => t.id);
+const ANSWERED_DETAILS = { brakes: 'rim', tyres: 'tubes', drive: 'chain', gears: 'derailleur', shifting: 'cable', suspension: 'none', ebike: 'no' };
+const TRAIL_DETAILS = { brakes: 'hydraulic-disc', tyres: 'tubeless', drive: 'chain', gears: 'derailleur', shifting: 'cable', suspension: 'full', ebike: 'no' };
 const tellUs = () => [...host.querySelectorAll('a')].find((a) => a.textContent === C.careTellUs) ?? null;
 
 test('[BC-TABS] two tabs, Care and Roadside repairs, in a named tablist; one selected, arrows, Home and End move; only its panel shows', async () => {
@@ -76,7 +80,7 @@ test('[BC-TABS] two tabs, Care and Roadside repairs, in a named tablist; one sel
   expect(panel(tab(C.careTabCare)).hidden).toBe(false);
 });
 
-test('[BC-TABS] with no bike every sample task shows, each an h3 section in design order, a task a details with its name and tags', async () => {
+test('[BC-TABS] with no bike every task shows, each an h3 section in design order, a task a details with its name and tags', async () => {
   await mount(world([]));
   expect(taskIds()).toEqual(CARE_TASKS.map((t) => t.id));
   const order = SECTIONS.filter((s) => CARE_TASKS.some((t) => t.section === s)).map((s) => SECTION_LABEL[s]);
@@ -105,10 +109,12 @@ test('[BC-FILTER] a filter keeps the section order and shows only that part; one
   await click(filter(PART_LABEL.brakes));
   expect(filter(PART_LABEL.brakes).getAttribute('aria-pressed')).toBe('true');
   expect(taskIds()).toEqual(CARE_TASKS.filter((t) => t.part === 'brakes').map((t) => t.id));
-  expect(headings()).toEqual([SECTION_LABEL.week]);
+  const brakeSections = SECTIONS.filter((x) => CARE_TASKS.some((t) => t.part === 'brakes' && t.section === x)).map((x) => SECTION_LABEL[x]);
+  expect(brakeSections.length).toBeGreaterThan(3);
+  expect(headings()).toEqual(brakeSections);
   await click(filter(PART_LABEL.tyres));
   expect(filter(PART_LABEL.brakes).getAttribute('aria-pressed')).toBe('false');
-  expect(taskIds()).toEqual(['tyres-sealant-topup']);
+  expect(taskIds()).toEqual(['tyres-pressure', 'tyres-sealant-check', 'tyres-sealant-topup', 'tyres-replace']);
   await click(filter(PART_LABEL.tyres));
   expect(filter(PART_LABEL.tyres).getAttribute('aria-pressed')).toBe('false');
   expect(taskIds()).toEqual(CARE_TASKS.map((t) => t.id));
@@ -118,7 +124,7 @@ test('[BC-NONE-MATCH] a filter and a search together show only tasks matching bo
   await mount(world([]));
   await click(filter(PART_LABEL.brakes));
   await type('squeak');
-  expect(taskIds()).toEqual(['brakes-pads-disc', 'brakes-pads-rim']);
+  expect(taskIds()).toEqual(['brakes-pads-disc', 'brakes-pads-rim', 'brakes-squeal']);
   await type('lube');
   expect(taskIds()).toEqual([]);
   expect(host.textContent).toContain(C.careNothing);
@@ -144,7 +150,9 @@ test('[BC-TELL-US] shown with a Not sure detail, leading to the bike\'s details 
   await mount(world([bike('bike_a', 'Gravel', ANSWERED)]));
   expect(tellUs()).toBeNull();
   // fitted: rim brakes, tubes, a derailleur, no suspension, no motor
-  expect(taskIds()).toEqual(['brakes-pads-rim', 'wheels-spokes-check', 'frame-bolts-check', 'chain-lube']);
+  expect(taskIds()).toEqual(oracle(ANSWERED_DETAILS));
+  for (const id of ['brakes-pads-rim', 'brakes-rim-wipe', 'chain-lube', 'gears-cables-look', 'gears-indexing', 'tyres-pressure']) expect(taskIds(), id).toContain(id);
+  for (const id of ['brakes-pads-disc', 'brakes-hydraulic-bleed', 'tyres-sealant-topup', 'belt-inspect', 'gears-hub-oil', 'susp-fork-service', 'ebike-service', 'gears-electronic-battery']) expect(taskIds(), id).not.toContain(id);
   expect(host.querySelectorAll('summary .muted').length).toBe(0);
   render(null, host);
   await mount(world([]));
@@ -160,7 +168,9 @@ test('[BC-TELL-US] the list fits the chosen bike, not the first one', async () =
   const a = bike('bike_a', 'Gravel', ANSWERED);
   const b = bike('bike_b', 'Trail', { brakes: 'hydraulic-disc', tyres: 'tubeless', suspension: 'full', drive: 'derailleur', shifting: 'cable', look: { colour: null, bars: 'flat', ebike: false } });
   await mount(world([a, b], { [BIKE_CHOICE_KEY]: choice('bike_b') }));
-  expect(taskIds()).toEqual(['brakes-pads-disc', 'wheels-spokes-check', 'frame-bolts-check', 'chain-lube', 'tyres-sealant-topup', 'susp-fork-service']);
+  expect(taskIds()).toEqual(oracle(TRAIL_DETAILS));
+  for (const id of ['brakes-pads-disc', 'brakes-hydraulic-bleed', 'tyres-sealant-topup', 'susp-shock-service', 'susp-fork-service']) expect(taskIds(), id).toContain(id);
+  for (const id of ['brakes-pads-rim', 'brakes-cable-disc-service', 'belt-tension']) expect(taskIds(), id).not.toContain(id);
   expect(host.querySelector<HTMLSelectElement>('#tools-bike')!.value).toBe('bike_b');
 });
 
@@ -173,7 +183,8 @@ test('[BC-BIKE-GONE] the chosen bike deleted in another tab: the list refits to 
   // the bag planner, in another tab, deletes Trail
   mem.data.set('loadcheck:bikeProfiles', JSON.stringify([a]));
   await act(() => { window.dispatchEvent(new StorageEvent('storage', { key: 'loadcheck:bikeProfiles' })); });
-  expect(taskIds()).toEqual(['brakes-pads-rim', 'wheels-spokes-check', 'frame-bolts-check', 'chain-lube']);
+  expect(taskIds()).toEqual(oracle(ANSWERED_DETAILS));
+  expect(taskIds()).not.toContain('brakes-hydraulic-bleed');
   expect(mem.writes).toEqual([]);
 });
 

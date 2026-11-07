@@ -995,6 +995,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - the search matches the start of words in a task's name, part and everyday words: "squeak" finds the chain lube and the brake pad tasks, "bleed" the hydraulic bleed, "chain" every Chain task, "zzz" nothing [BC-SEARCH-WORDS]
 - the search forgives capitals, extra spaces, accents and simple endings (s, es, ing, ed): "Squeaking", "  SQUEAK ", "squeaks" find what "squeak" finds; a word in another language finds nothing and never throws [BC-SEARCH-FORMS]
 - every Care task has every field of design 3.2 filled, 3 to 6 steps, minutes low at most high, a unique id, a valid part and section, the critical flag on every brakes and wheels task and each steerer, stem and bar-bolt task, and an entry in sources.ts [BC-CONTENT]
+- every part filter has at least one Care task, and every section has at least one [BC-PARTS]
 - no file under src/tools or src/ui imports src/core/care/sources.ts, and the built Bike care chunk holds no http [BC-SOURCES-PRIVATE]
 - Bike care has two tabs, Care and Roadside repairs, as a named tablist: one selected, the arrow keys, Home and End move between them, only the selected panel shows [BC-TABS]
 - one part filter at a time, as pressed buttons in a named group: it keeps the section order and shows only that part's tasks; a second tap clears it (decision 3) [BC-FILTER]

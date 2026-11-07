@@ -1,4 +1,4 @@
-// Bike care's content (sub-project 12, Task 4 on the sample; Task 5 on the full list): every field of design 3.2, the critical flag, a
+// Bike care's content (sub-project 12, Task 4 and Task 5, the full list): every field of design 3.2, the critical flag, a
 // source for every task, and the sources kept out of the app.
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -23,7 +23,7 @@ const ROAD_IDS = ROAD_CARDS.map((c) => c.id);
 const filled = (s: unknown): boolean => typeof s === 'string' && s.trim().length > 0 && s.trim() === s;
 
 test('[BC-CONTENT] every task has every field of design 3.2 filled; 3 to 6 steps; minutes low <= high; ids unique; parts and sections valid', () => {
-  expect(CARE_TASKS.length).toBeGreaterThanOrEqual(9);
+  expect(CARE_TASKS.length).toBe(48);
   const ids = CARE_TASKS.map((t) => t.id);
   expect(new Set(ids).size).toBe(ids.length);
   for (const t of CARE_TASKS) {
@@ -139,6 +139,122 @@ test('[BC-CONTENT] hub gear oil shows on every chain-hub or belt bike; with shif
   expect(hub({ drive: 'belt', shifting: 'electronic' })).toEqual({ tags: [], soft: null });
   expect(hub({ drive: 'derailleur', shifting: 'cable' })).toBeNull();
   expect(hub({ drive: 'derailleur', shifting: 'none' })).toBeNull();
-  // every other sample task has no soft tag, whatever the bike
+  // every other task has no soft tag, whatever the bike
   for (const t of CARE_TASKS.filter((x) => x.id !== 'gears-hub-oil')) expect(softTag(t, careDetails(null)), t.id).toBeNull();
+});
+
+// ---- Group 2, Task 5: the full list ----
+/** The draft's 49 Care rows in the app's order, less the one row the owner's rules cut. */
+const FULL_IDS = [
+  'brakes-lever-test', 'susp-wipe-stanchions', 'ebike-charge-indoors',
+  'frame-wash', 'chain-dry-lube', 'belt-rinse', 'brakes-rotor-wipe', 'brakes-rim-wipe', 'ebike-dry-contacts',
+  'tyres-pressure', 'gears-shift-test', 'chain-wear-check', 'brakes-pads-disc', 'brakes-pads-rim', 'wheels-spokes-check', 'frame-bolts-check',
+  'gears-electronic-battery', 'frame-headset-check', 'gears-cables-look',
+  'chain-lube', 'tyres-sealant-check', 'belt-inspect', 'ebike-battery-care', 'susp-air-pressure', 'gears-cassette-wear', 'wheels-hubs-check',
+  'brakes-rotor-thickness',
+  'tyres-sealant-topup', 'susp-lowers-service', 'gears-hub-oil', 'gears-cables-replace', 'susp-fork-service', 'susp-shock-service', 'ebike-service',
+  'brakes-cable-disc-service', 'belt-tension', 'frame-torque-check', 'wheels-true-tension', 'chain-deep-clean',
+  'brakes-hydraulic-bleed', 'brakes-squeal', 'brakes-spongy', 'chain-replace', 'gears-indexing', 'wheels-wobble', 'tyres-replace', 'frame-creak',
+  'ebike-range-drop',
+];
+
+test("[BC-CONTENT] the full list holds the draft's Care tasks in its order, 48 of the 49: chain-wipe is cut (owner, 7 Nov: no source for a wipe after every ride)", () => {
+  expect(CARE_TASKS.map((t) => t.id)).toEqual(FULL_IDS);
+  expect(CARE_TASKS.map((t) => t.id)).not.toContain('chain-wipe');
+  // the list is sorted by section, as the screen shows it
+  const order = CARE_TASKS.map((t) => SECTIONS.indexOf(t.section));
+  expect(order).toEqual([...order].sort((a, b) => a - b));
+  for (const t of CARE_TASKS) {
+    expect(DRAFT_FIGURES[t.id], `${t.id} has figures`).toBeDefined();
+    expect(DRAFT_FIGURES[t.id]!.length, `${t.id} pins at least one figure`).toBeGreaterThan(0);
+  }
+  expect(Object.keys(DRAFT_FIGURES).sort()).toEqual([...FULL_IDS].sort());
+});
+
+test('[BC-PARTS] every part filter has at least one task, and every section has at least one task', () => {
+  for (const p of PARTS) expect(CARE_TASKS.some((t) => t.part === p), p).toBe(true);
+  for (const s of SECTIONS) expect(CARE_TASKS.some((t) => t.section === s), s).toBe(true);
+});
+
+/** Everything a rider reads of a task. */
+const readable = (t: Task): string[] => [t.name, t.signs, t.tools, t.why ?? '', t.note ?? '', ...t.steps, t.soft?.tag ?? ''];
+
+test('[BC-CONTENT] the word "snug" appears nowhere in a task, its words or its sources (owner, 7 Nov)', () => {
+  for (const t of CARE_TASKS) {
+    expect([...readable(t), ...t.words].join(' '), t.id).not.toMatch(/snug/i);
+    expect(JSON.stringify(SOURCES[t.id]), t.id).not.toMatch(/snug/i);
+  }
+});
+
+test("[BC-CONTENT] every quick release is named the brake's or the wheel's (a \"wheel quick release\" counts as the wheel's)", () => {
+  let seen = 0;
+  for (const t of CARE_TASKS) for (const text of readable(t)) {
+    for (const m of text.matchAll(/quick releases?/gi)) {
+      seen += 1;
+      expect(text.slice(Math.max(0, m.index! - 8), m.index!), `${t.id}: ${text}`).toMatch(/(brake's |wheel's |wheel )$/i);
+    }
+  }
+  expect(seen).toBeGreaterThanOrEqual(2);
+});
+
+test('[BC-CONTENT] bolts on brakes, steerer, stem and bar use the torque rule or the twist test; carbon parts never go without a torque wrench (book p. 40)', () => {
+  const rule = /torque|twist test|no longer moves/i;
+  let seen = 0;
+  for (const t of CARE_TASKS) {
+    for (const step of t.steps) {
+      // a step that tightens or re-torques a brake, steerer, stem, bar or seatpost bolt
+      if (/(tighten|torque|re-torque)/i.test(step) && /(brake|caliper|steerer|stem|handlebar|\bbar\b|seatpost)/i.test(step)) {
+        seen += 1;
+        expect(step, `${t.id}: ${step}`).toMatch(rule);
+      }
+      // carbon: a torque wrench is named wherever bolts or twisting come up
+      if (/carbon/i.test(step) && /(bolt|torque|twist|wrench)/i.test(step)) expect(step, `${t.id}: ${step}`).toMatch(/torque wrench/i);
+    }
+  }
+  expect(seen).toBeGreaterThanOrEqual(4);
+  // the cable disc brake's caliper goes to its printed torque, as the roadside card's does
+  const cable = CARE_TASKS.find((t) => t.id === 'brakes-cable-disc-service')!;
+  expect(cable.steps.join(' ')).toContain('tighten the bolts to the torque printed on the caliper. Without a torque wrench, tighten them evenly until the caliper no longer moves.');
+  expect(cable.tools).toContain('torque wrench');
+  for (const id of ['frame-torque-check', 'frame-creak']) {
+    expect(CARE_TASKS.find((t) => t.id === id)!.steps.join(' '), id).toMatch(/Carbon parts: never without a torque wrench/);
+  }
+});
+
+test("[BC-CONTENT] steps with no source are cut, never guessed: no \"common sources\" claim on the creak, no yearly interval on the bleed, no evenness check on the brake test (owner's rules, 7 Nov)", () => {
+  const creak = CARE_TASKS.find((t) => t.id === 'frame-creak')!;
+  expect(readable(creak).join(' ')).not.toMatch(/common source/i);
+  const bleed = CARE_TASKS.find((t) => t.id === 'brakes-hydraulic-bleed')!;
+  expect(bleed.section).toBe('notice');
+  expect(readable(bleed).join(' ')).not.toMatch(/1-2 years|every year|yearly/i);
+  const lever = CARE_TASKS.find((t) => t.id === 'brakes-lever-test')!;
+  expect(lever.steps.join(' ')).not.toMatch(/slows evenly/i);
+  expect(lever.steps.length).toBeGreaterThanOrEqual(3);
+});
+
+test("[BC-CONTENT] the rear shock: a rider's check every 20 riding hours, the full service at a shop; Fox about 100 h, never the 100-125 range (owner, 7 Nov)", () => {
+  const shock = CARE_TASKS.find((t) => t.id === 'susp-shock-service')!;
+  expect(shock.who).toBe('shop');
+  expect(shock.steps[0]).toMatch(/check/i);
+  expect(shock.steps[0]).toContain('every 20 riding hours');
+  expect(shock.steps[0]).not.toMatch(/service/i);
+  expect(riderText(shock)).not.toContain('100-125');
+  expect(shock.steps.join(' ')).toContain('Fox: about 100 h.');
+});
+
+test('[BC-CONTENT] the cable tasks follow decision 4: shifting "none" hides them, Not sure tags them (R3 of the PR 58 re-check, pinned)', () => {
+  const ids = (extra: Record<string, unknown>) => fitted(CARE_TASKS, careDetails(normaliseBike({ id: 'b1', ...extra }))).map((t) => t.id);
+  expect(ids({ drive: 'derailleur', shifting: 'cable' })).toEqual(expect.arrayContaining(['gears-cables-look', 'gears-cables-replace', 'gears-indexing']));
+  for (const id of ['gears-cables-look', 'gears-cables-replace', 'gears-indexing']) expect(ids({ drive: 'derailleur', shifting: 'none' }), id).not.toContain(id);
+  expect(fitted(CARE_TASKS, careDetails(null)).find((t) => t.id === 'gears-cables-look')!.tags).toEqual(['shifting']);
+  expect(ids({ drive: 'derailleur', shifting: 'electronic' })).not.toContain('gears-cables-look');
+});
+
+test('[BC-CONTENT] only brakes, wheels and the four steerer, stem and bar-bolt tasks are critical; every shop task gives its reason', () => {
+  const critical = CARE_TASKS.filter((t) => t.critical).map((t) => t.id);
+  for (const id of ['brakes-lever-test', 'brakes-hydraulic-bleed', 'brakes-squeal', 'brakes-spongy', 'wheels-hubs-check', 'wheels-true-tension', 'wheels-wobble', 'frame-headset-check', 'frame-torque-check', 'frame-creak']) {
+    expect(critical, id).toContain(id);
+  }
+  for (const t of CARE_TASKS.filter((x) => x.critical)) expect(t.part === 'brakes' || t.part === 'wheels' || CRITICAL_FRAME.includes(t.id), t.id).toBe(true);
+  for (const t of CARE_TASKS.filter((x) => x.who === 'shop')) expect(t.why, t.id).not.toBeNull();
 });

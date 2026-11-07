@@ -1,6 +1,6 @@
 // Where each Bike care fact came from (design 3.5, ruling 4): for maintainers and the owner's read, never shipped. Only tests import
 // this file (BC-SOURCES-PRIVATE); the app never does, so no link below reaches a build. "book p. N" is the owner's maintenance book
-// (German), from the photos the owner sent (content draft, 7 November 2026, two rounds); group 3 adds the Roadside cards and the carry items; the rule used where the book and other sources
+// (German), from the photos the owner sent (content draft, 7 November 2026, two rounds); group 2 adds the other Care tasks (chain-wipe, the draft's 49th row, is cut: no source for a wipe after every ride); group 3 adds the Roadside cards and the carry items; the rule used where the book and other sources
 // differ: the more careful value ships (decision 6).
 
 export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
@@ -47,6 +47,164 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
       'https://flowmountainbike.com/features/flows-guide-to-understanding-suspension-service-intervals-and-upgrade-options/',
     ],
     note: 'A shop check every 6 months: book p. 207 (was yearly). Disagree: Fox 100 h vs 125 h (secondary sources); the app shows about 100 h, the shorter (decision 6; the coordinator ruled so in the review of PR 58, I3). Search summaries only.',
+  },
+
+  // ---- Care tasks (group 2) ----
+  'brakes-lever-test': {
+    urls: [],
+    note: "Source: book pp. 40, 207 (pull each brake before every ride; pad look p. 40); steps 2-3: no source found Book: p. 207: differs: book says check before every ride; added. Round 2: p. 40: agrees (pull each brake before riding, check the pad gap); differs: book adds a pad look on rim brakes; added Group 2: the draft's step 2 (check the bike slows evenly) had no source and is cut; step 3 (if a lever feels wrong, do not ride) stays as the careful direction.",
+  },
+  'susp-wipe-stanchions': {
+    urls: [],
+    note: "Source: book p. 207 (oil check); book p. 200 (keep the shock clean); wiping after every ride: no source found Book: p. 207: differs: book checks the fork tubes for oil monthly; draft kept (more often). Round 2: p. 200: agrees (keep the rear shock clean) Group 2 for the owner at O4: wiping after every ride has no source of its own. Kept because the book checks the fork tubes for oil monthly and asks to keep the shock clean, and the more frequent check is the more careful.",
+  },
+  'ebike-charge-indoors': {
+    urls: ['https://www.bosch-ebike.com/us/help-center/asset-ast-00046', 'https://www.ternbicycles.com/us/node/348455'],
+    note: "Book: p. 206: differs: book says keep the battery charged, weekly; draft kept (more often). Round 2: not covered by the new pages",
+  },
+  'frame-wash': {
+    urls: ['https://files.helpdocs.io/l3tsvrpr48/other/1597337518726/gates-carbon-drive-manual.pdf', 'https://gatescarbondrive.com/resources/faqs', 'https://www.bike-magazin.de/en/gearstick-or-drive/belt-drive-the-right-dental-care-for-the-gates-belt/'],
+    note: "Source: book pp. 44, 206-207 Book: pp. 206-207: agrees (clean the bike, keep water out of the electrics, lube after each clean). Round 2: p. 44: agrees (lube after every clean)",
+  },
+  'chain-dry-lube': {
+    urls: ['https://www.parktool.com/en-us/product/chain-wear-indicator-cc-3-2'],
+    note: "Source: after rain: book p. 206; steps: book pp. 44-45 Book: p. 206: agrees on oiling after every rain ride; differs: book adds the jockey wheels; added. Round 2: pp. 44-45: steps now from the book (oil in front of the derailleur, wipe the outer plates, shift through all gears, derailleur pivots and springs, use little oil); added",
+  },
+  'belt-rinse': {
+    urls: ['https://files.helpdocs.io/l3tsvrpr48/other/1597337518726/gates-carbon-drive-manual.pdf', 'https://gatescarbondrive.com/resources/faqs', 'https://www.bike-magazin.de/en/gearstick-or-drive/belt-drive-the-right-dental-care-for-the-gates-belt/'],
+    note: "Book: not covered (pp. 206-215). Round 2: not covered by the new pages",
+  },
+  'brakes-rotor-wipe': {
+    urls: ['https://manualmachine.com/shimano/xtr/19567146-service-instructions-manual'],
+    note: "Source: book pp. 120, 213; Book: p. 213: agrees (oil or cleaner on disc or pads causes squeal and weak braking; clean the disc). Round 2: p. 120: differs: book handles the braking surface only with gloves; added",
+  },
+  'brakes-rim-wipe': {
+    urls: [],
+    note: "Source: book pp. 110-111, 211 Book: p. 211: differs: book adds degreaser for hardened pad residue; added. Round 2: pp. 110-111: agrees (pads wear fastest in cold, wet weather; wiping wet pads makes them last longer)",
+  },
+  'ebike-dry-contacts': {
+    urls: ['https://www.bosch-ebike.com/us/help-center/asset-ast-00046', 'https://www.ternbicycles.com/us/node/348455', 'https://www.ternbicycles.com/be/support/kb/349039/how-troubleshoot-bosch-ebike-system-tern-bikes', 'https://helpcenter.velo-de-ville.com/en/support/solutions/articles/80001185577-error-patterns-solutions-for-bosch-shimano'],
+    note: "Source: book pp. 206, 215 Book: pp. 206, 215: agrees (keep water out; clean contacts, dry fully before refitting). Round 2: not covered by the new pages",
+  },
+  'tyres-pressure': {
+    urls: ['https://www.schwalbe.com/en/technology-faq/tire-pressure/'],
+    note: "Source: book pp. 40, 84, 209 Book: p. 209: agrees (soft tyres make the bike unsteady; pump to the maker's pressure); the schedule has no tyre line. Round 2: p. 40: differs: book squeezes the tyres before every ride and checks the tyre sits on the rim with no tube showing; added. p. 84: worn tread or cracked sidewalls mean a new tyre; added. p. 85: agrees (pressure is on the sidewall)",
+  },
+  'gears-shift-test': {
+    urls: [],
+    note: "Source: book pp. 41, 206 Book: p. 206: agrees (weekly: gears shift cleanly). Round 2: p. 41: agrees (shift through all gears to see the derailleur is set right) Group 2: the note names the task \"Fix gears that shift badly\" (gears-indexing).",
+  },
+  'chain-wear-check': {
+    urls: ['https://www.parktool.com/en-us/product/chain-wear-indicator-cc-3-2'],
+    note: "Source: interval: book p. 206; wear signs: book pp. 41, 158 Book: p. 206: differs: book says weekly; moved from Every month. Round 2: pp. 41, 158: agrees (check stretch with a gauge, smallest ring and sprocket, replace when the gauge sinks in or the chain slips); gap filled: the signs of a worn chain",
+  },
+  'gears-electronic-battery': {
+    urls: ['https://www.competitivecyclist.com/bulletin/electronic-shifting-axs-di2-faq', 'https://ridereview.com/questions/how-to-check-shimano-di2-battery'],
+    note: "Source: interval: book p. 206 Book: p. 206: differs: book says make sure the battery is charged weekly; moved from Every month. Round 2: not covered by the new pages",
+  },
+  'frame-headset-check': {
+    urls: ['https://www.parktool.com/en-int/blog/repair-help/how-to-adjust-a-threadless-headset'],
+    note: "Source: book pp. 40, 206, 209 Book: p. 206: differs: book says weekly (steering turns easily); moved from Every 6 months. p. 209: agrees (too tight, loose or worn headset). Round 2: p. 40: agrees (brake on, push forward; play means loose bearings; the book turns the bar 90 degrees first, added to step 1)",
+  },
+  'gears-cables-look': {
+    urls: ['https://www.parktool.com/en-us/blog/repair-help/shift-cable-replacement-trigger-shifters'],
+    note: "Source: book pp. 41, 206 Book: p. 206: differs: book says weekly (casing cracks and wear, cable fraying); moved from Every 6 months. Round 2: p. 41: differs: book points to wear where casing and hoses touch the frame; added",
+  },
+  'tyres-sealant-check': {
+    urls: ['https://www.bikeradar.com/advice/workshop/tubeless-tyre-maintenance/', 'https://www.slowtwitch.com/industry/tubeless-sealant-tips-and-strategy/'],
+    note: "Book: not covered (pp. 206-215). Round 2: pp. 86-87 cover fitting, not a check interval; not covered",
+  },
+  'belt-inspect': {
+    urls: ['https://files.helpdocs.io/l3tsvrpr48/other/1597337518726/gates-carbon-drive-manual.pdf', 'https://gatescarbondrive.com/resources/faqs', 'https://www.bike-magazin.de/en/gearstick-or-drive/belt-drive-the-right-dental-care-for-the-gates-belt/'],
+    note: "Book: not covered (pp. 206-215). Round 2: not covered by the new pages",
+  },
+  'susp-air-pressure': {
+    urls: ['https://support.rockshox.com/hc/en-us/articles/4412294430107-How-much-air-should-I-put-in-my-RockShox-fork-for-my-rider-weight'],
+    note: "Source: monthly interval: book p. 207; book p. 200 Book: p. 207: agrees (sag on all shocks, monthly). Round 2: p. 200: agrees (air goes in or out through the shock valve to set sag)",
+  },
+  'gears-cassette-wear': {
+    urls: ['https://www.parktool.com/en-us/blog/repair-help/rear-derailleur-advanced-troubleshooting'],
+    note: "Source: book pp. 41, 207, 215; worn-teeth look: book p. 41 (the book names worn teeth but does not describe the shape) Book: p. 207: differs: book says monthly and includes chainrings; moved from Every 6 months. p. 215: agrees (slipping in only some gears = worn sprockets or rings). Round 2: p. 41: gap partly filled (look for worn teeth on the sprockets); differs: book adds straight rings, tight ring bolts and free links; added",
+  },
+  'wheels-hubs-check': {
+    urls: ['https://www.parktool.com/en-us/blog/repair-help/hub-overhaul-and-adjustment'],
+    note: "Source: book pp. 40-41, 207, 209 Book: p. 207: differs: book says monthly and adds oil spots; moved from Every 6 months. p. 209: agrees (adjust cone bearings so there is no side play). Round 2: pp. 40-41: agrees (push the top of the wheel sideways to feel hub play)",
+  },
+  'brakes-rotor-thickness': {
+    urls: ['https://emtbforums.com/threads/rear-disc-below-1-5mm-minimum.39079', 'https://bike.bikegremlin.com/20365/when-to-replace-bicycle-brake-discs-rotors'],
+    note: "Source: interval: book p. 207 Book: p. 207: differs: book says monthly, wear and alignment; moved from Every year. p. 213: agrees (replace a worn or badly bent disc). Round 2: p. 40: agrees (disc runs straight); fitting a new disc is candidate 56",
+  },
+  'susp-lowers-service': {
+    urls: ['https://support.rockshox.com/hc/en-us/articles/4412306753947-How-often-should-I-service-my-RockShox-product'],
+    note: "Source: book p. 207 Book: p. 207: agrees (change the fork oil every 6 months). Round 2: not covered; the book's home fork-oiling tip (p. 45) is candidate 53, not applied",
+  },
+  'gears-cables-replace': {
+    urls: ['https://www.parktool.com/en-us/blog/repair-help/shift-cable-replacement-trigger-shifters'],
+    note: "Source: interval: book p. 207; book p. 148 Book: p. 207: differs: book says replace cables and casing every 6 months; the draft's yearly guess is replaced; moved from Every year. Round 2: p. 148: agrees (replace a worn cable before setting up the gears)",
+  },
+  'susp-shock-service': {
+    urls: ['https://support.rockshox.com/hc/en-us/articles/4412306753947-How-often-should-I-service-my-RockShox-product', 'https://worldwidecyclery.com/blogs/worldwide-cyclery-blog/ultimate-guide-suspension-service', 'https://flowmountainbike.com/features/flows-guide-to-understanding-suspension-service-intervals-and-upgrade-options/'],
+    note: "Source: Fox: book pp. 200, 207 Book: p. 207: differs: book says a shop check every 6 months; moved from Every year. Round 2: p. 200: differs: book says keep the shock clean and service it every 20 riding hours, and some models need a yearly shop check; 20 h added. Owner: the book does not say what the 20-hour service includes; decide whether it stays a rider task (clean and check) or a shop job Group 2: the owner's 7 November ruling: the 20-hour step is the rider's check and clean, the full service is at a shop. Fox: about 100 h, the shorter of 100 h and 125 h, as for the fork (decision 6).",
+  },
+  'ebike-service': {
+    urls: ['https://help.bosch-ebike.com/us/help-center/ebw-care/asset-asf-00318', 'https://www.bosch-ebike.com/en/service/dealer-service'],
+    note: "Source: software interval: book p. 207; other fixed interval: no source found Book: p. 207: differs: book says software updates every 6 months; the draft's yearly guess is replaced; moved from Every year. Round 2: not covered by the new pages",
+  },
+  'brakes-hydraulic-bleed': {
+    urls: ['https://www.parktool.com/blog/repair-help/shimano-hydraulic-brake-service-and-adjustment'],
+    note: "Source: book p. 213 Book: p. 213: agrees (bleed when spongy; refill with the same fluid; mineral oil never mixed); the book gives no interval. Round 2: not covered by the new pages Group 2: the draft's interval (every 1-2 years) was its own guess and the book gives none, so the interval is cut: the task sits under When you notice, with its signs.",
+  },
+  'brakes-cable-disc-service': {
+    urls: ['https://www.parktool.com/en-us/blog/repair-help/mechanical-disc-brake-alignment'],
+    note: "Source: book pp. 121, 213 Book: p. 213: agrees (centre the caliper; set each pad on its own; clean or replace cable and casing). Round 2: p. 121: agrees (loosen the caliper bolts, centre so the wheel turns freely, tighten, squeeze the lever several times) Group 2: step 3 follows the roadside disc card's wording (the caliper bolts go to the torque printed on the caliper; without a torque wrench evenly until the caliper no longer moves; test the brake), as the owner's 7 November rule for brake bolts asks; torque wrench added to the tools.",
+  },
+  'belt-tension': {
+    urls: ['https://files.helpdocs.io/l3tsvrpr48/other/1597337518726/gates-carbon-drive-manual.pdf', 'https://gatescarbondrive.com/resources/faqs', 'https://www.bike-magazin.de/en/gearstick-or-drive/belt-drive-the-right-dental-care-for-the-gates-belt/'],
+    note: "Book: not covered (pp. 206-215). Round 2: not covered by the new pages",
+  },
+  'frame-torque-check': {
+    urls: ['https://dedhambike.com/articles/torque-table-pg186.htm', 'https://www.cyclingnews.com/features/torque-wrenches-why-you-need-one-and-how-to-use-them'],
+    note: "Source: book pp. 40, 120, 213 Book: p. 213: agrees (caliper and disc bolts to the stated torque); the weekly bolt check of p. 206 is in frame-bolts-check. Round 2: p. 40: agrees (carbon parts: check with a torque wrench). p. 120: differs: book tightens disc bolts loosely first, then crosswise to torque; added Group 2: step 3 now says carbon parts are never tightened without a torque wrench (owner's 7 November rule; book p. 40); the draft's 4-6 Nm stays as a guide with 'follow the part'.",
+  },
+  'wheels-true-tension': {
+    urls: ['https://www.parktool.com/en-us/blog/repair-help/wheel-and-rim-truing'],
+    note: "Source: book pp. 88-89, 209 Book: p. 209: agrees (true by spoke tension at the bent part; broken spokes or a badly bent wheel: replace). Round 2: pp. 88-89: agrees (small steps, both sides, marker at the brake); differs: book adds two or three spokes at a time and care because spokes break easily; added. The book treats truing as a home job; the draft keeps \"shop\" (more careful) Group 2: the draft's steps 5 and 6 (the wobble limits and the tension meter) are joined so the task has six steps.",
+  },
+  'chain-deep-clean': {
+    urls: ['https://www.parktool.com/en-us/product/chain-wear-indicator-cc-3-2'],
+    note: "Source: book pp. 44, 207, 215 Book: pp. 207, 215: agrees (clean a dirty chain, rings and front derailleur; lube after cleaning); no interval in the book. Round 2: p. 44: agrees (lube after every clean) Group 2 for the owner at O4: the book gives no interval for a deep clean; the yearly section is the draft's.",
+  },
+  'brakes-squeal': {
+    urls: ['https://www.parktool.com/en-us/blog/repair-help/disc-brake-pad-removal-installation', 'https://www.sheldonbrown.com/rim-brakes.html'],
+    note: "Source: book pp. 211, 213 Book: pp. 211, 213: agrees on toe-in, cleaning and oily pads; differs: book adds loose caliper or disc bolts; added. Round 2: not covered by the new pages",
+  },
+  'brakes-spongy': {
+    urls: ['https://www.parktool.com/blog/repair-help/shimano-hydraulic-brake-service-and-adjustment'],
+    note: "Source: book p. 213 Book: p. 213: agrees (air, leaks at the hose joints, overheated fluid; bleed). Round 2: not covered by the new pages",
+  },
+  'chain-replace': {
+    urls: ['https://www.parktool.com/en-us/product/chain-wear-indicator-cc-3-2'],
+    note: "Source: book pp. 158-159, 215 Book: p. 215: agrees (right width and make; long enough for the biggest ring and sprocket). Round 2: pp. 158-159: agrees (length, routing, joining); differs: book adds the stiff-link check and the Shimano pin; added",
+  },
+  'gears-indexing': {
+    urls: [],
+    note: "Source: book pp. 148-149, 214-215 Book: pp. 214-215: agrees on cable and hanger; differs: book adds casing type, lockring, limit screws, worn pivots; added. Round 2: pp. 148-149: agrees (cable tension causes rattling, slipping and missed shifts); adds barrel adjuster direction, limit screw and angle screw settings; added Group 2: the draft's steps 1 and 2 are joined so the task has six steps.",
+  },
+  'wheels-wobble': {
+    urls: ['https://www.parktool.com/en-us/blog/repair-help/wheel-and-rim-truing'],
+    note: "Source: book pp. 88, 209 Book: p. 209: agrees on dropouts and spokes; differs: book adds the tyre bead; added. Round 2: p. 88: agrees (check the wheel is centred in the fork; loose spokes bend the wheel); the book's roadside straightening (p. 49) is candidate 61, not applied",
+  },
+  'tyres-replace': {
+    urls: [],
+    note: "Source: book pp. 84-85 Book: not covered (pp. 206-215). Round 2: pp. 84-85: gap filled (worn tread or cracked sidewalls mean a new tyre; fitting steps). The draft's \"cords showing, flat centre, repeated flats\" and \"wear marks\" had no source and are cut Group 2: the draft's steps 6 and 7 are joined so the task has six steps.",
+  },
+  'frame-creak': {
+    urls: [],
+    note: "Source: partly: book pp. 41 (pedal and crank play), 45 (grease the seatpost and seat tube; carbon paste for carbon parts); \"common sources of creaks\": no source found Book: not covered (pp. 206-215). Round 2: pp. 41, 45: gap partly filled (the checks and the grease or carbon paste); differs: book adds carbon paste for carbon parts; added. The book does not tie these to creaks Group 2: the draft's claim that pedals, cranks and seatpost \"are common sources\" had no source and is cut; the checks are book p. 41, the grease and carbon paste book p. 45; re-torque follows the torque rule (carbon never without a torque wrench).",
+  },
+  'ebike-range-drop': {
+    urls: ['https://www.bosch-ebike.com/us/help-center/asset-ast-00046', 'https://www.ternbicycles.com/us/node/348455', 'https://www.ternbicycles.com/be/support/kb/349039/how-troubleshoot-bosch-ebike-system-tern-bikes', 'https://helpcenter.velo-de-ville.com/en/support/solutions/articles/80001185577-error-patterns-solutions-for-bosch-shimano'],
+    note: "Book: not covered (pp. 206-215). Round 2: not covered by the new pages",
   },
 
   // ---- Roadside repairs cards (group 3) ----

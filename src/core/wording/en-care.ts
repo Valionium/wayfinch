@@ -2,10 +2,14 @@
 // with the Bike care screen, so neither the first screen nor Tools carries it. Under the banned-words test
 // (tests/unit/core/wording-care.test.ts), with the general list only (bannedHits(text, false)), so "dry" is allowed here.
 //
-// Group 1 ships a short SAMPLE of the content draft's Care rows (2026-11-06-bike-care-content-draft.md, after the owner's two book
-// rounds), word for word apart from: the draft's provenance marks ("(book, more careful)", "(book)") and its "Disagree:" lines, which
-// are in src/core/care/sources.ts; "If unsure, a shop.", which the screen adds from `critical` (decision 5); the time, which is in
-// `minutes`. Group 2 replaces the sample with the full list after the owner's read (O4). Nothing here is final until then.
+// Group 2 holds the content draft's Care rows (2026-11-06-bike-care-content-draft.md, after the owner's two book rounds), word for word
+// apart from: the draft's provenance marks ("(book, more careful)", "(book)") and its "Disagree:" lines, which are in
+// src/core/care/sources.ts; "If unsure, a shop.", which the screen adds from `critical` (decision 5); the time, which is in `minutes`
+// (or, for a shop job of hours, in the note); and the owner's rules of 7 November: facts with no source are cut, never guessed (the
+// chain wipe after every ride is cut; the bleed has no yearly interval and sits under When you notice; the brake test has no evenness
+// check; the creak has no claim about common sources), the careful value ships, brake, steerer, stem and bar bolts use the torque rule
+// or the twist test, carbon parts never go without a torque wrench, each quick release is the brake's or the wheel's. Nothing here is
+// final until the owner's read (O4).
 import type { CareKey, CareTask, CareValue, CarryItem, Part, RoadCard, Section } from '../care/types.ts';
 
 export const C = {
@@ -75,8 +79,164 @@ export function TAG_LABEL<K extends CareKey>(key: K, values: readonly CareValue[
   return `${C.careTagIf} ${joined}`;
 }
 
-// ---- The sample (group 1) ----
+// ---- Care tasks (group 2: the draft's 49 rows less the one the owner's rules cut, 48) ----
 export const CARE_TASKS: CareTask[] = [
+  {
+    id: 'brakes-lever-test', name: 'Test both brakes', part: 'brakes', section: 'ride', alsoWet: false,
+    signs: 'lever feels soft, pulls to the bars, or noise',
+    steps: [
+      'Roll the bike and squeeze each lever.',
+      'If a lever feels wrong, do not ride; see the brake tasks.',
+      'Do this before you set off too.',
+      'Rim brakes: also look that the pads are not worn and meet the rim squarely.',
+    ],
+    tools: 'none', minutes: [1, 1], who: 'you-check', why: 'Yourself to check; shop if it feels wrong (brakes are critical; a mistake can cause a crash)',
+    note: null,
+    words: ['brake', 'squeeze', 'spongy', 'weak', 'stop'], applies: {}, critical: true,
+  },
+  {
+    id: 'susp-wipe-stanchions', name: 'Wipe the fork legs and shock shaft', part: 'suspension', section: 'ride', alsoWet: false,
+    signs: 'dust or mud on the shiny tubes',
+    steps: [
+      'Wipe the shiny fork tubes with a clean rag.',
+      'On a full-suspension bike, wipe the shock shaft too.',
+      'Look for oil leaking at the seals.',
+    ],
+    tools: 'rag', minutes: [2, 2], who: 'you', why: null,
+    note: null,
+    words: ['fork', 'dirty fork', 'shock', 'seal', 'leak', 'dust'], applies: { suspension: ['front', 'full'] }, critical: false,
+  },
+  {
+    id: 'ebike-charge-indoors', name: 'Charge the battery indoors', part: 'ebike', section: 'ride', alsoWet: false,
+    signs: 'battery low; cold or hot from the ride',
+    steps: [
+      'Let the battery come to room temperature.',
+      'Charge it indoors, dry, away from things that burn.',
+      'Charging only works between 0 and 40 C.',
+      'Unplug when full if you can.',
+    ],
+    tools: 'charger', minutes: null, who: 'you', why: null,
+    note: null,
+    words: ['battery', 'charge', 'ebike', 'cold', 'winter'], applies: { ebike: ['yes'] }, critical: false,
+  },
+  {
+    id: 'frame-wash', name: 'Rinse the bike and dry it', part: 'frame', section: 'wet', alsoWet: false,
+    signs: 'mud, grit or salt on the bike',
+    steps: [
+      'Rinse with a low-pressure hose or bucket.',
+      'Brush off grit; keep jets away from bearings.',
+      'Dry it with a rag.',
+      'Wheel it to dry; lube the chain after.',
+    ],
+    tools: 'bucket, brush, rag', minutes: [15, 15], who: 'you', why: null,
+    note: null,
+    words: ['wash', 'mud', 'dirty', 'salt', 'rust', 'hose'], applies: {}, critical: false,
+  },
+  {
+    id: 'chain-dry-lube', name: 'Dry and re-oil the chain', part: 'chain', section: 'wet', alsoWet: false,
+    signs: 'rust spots, squeaks, grit paste',
+    steps: [
+      'Wipe the chain dry with a rag.',
+      'Hold the chain oil over the chain just in front of the rear derailleur and drip it on sparingly while you turn the pedals.',
+      'Wipe the oil off the outer plates.',
+      'Lift the rear wheel and shift through all the gears so the oil reaches the rear gears and chainrings.',
+      'Put a drop on the derailleur pivots, springs and jockey wheels.',
+      'Wipe off extra oil; keep it off brake discs and rims.',
+    ],
+    tools: 'rag, chain oil', minutes: [5, 5], who: 'you', why: null,
+    note: null,
+    words: ['squeak', 'rust', 'wet chain', 'noisy', 'lube'], applies: { drive: ['chain'] }, critical: false,
+  },
+  {
+    id: 'belt-rinse', name: 'Rinse the belt', part: 'chain', section: 'wet', alsoWet: false,
+    signs: 'mud or grit stuck in the belt or sprockets',
+    steps: [
+      'Rinse with plain water and a soft brush.',
+      'Do not use soap, oil or lube.',
+      'Let it dry.',
+    ],
+    tools: 'bucket, soft brush', minutes: [5, 5], who: 'you', why: null,
+    note: null,
+    words: ['belt', 'mud', 'noisy belt', 'clean'], applies: { drive: ['belt'] }, critical: false,
+  },
+  {
+    id: 'brakes-rotor-wipe', name: 'Wipe the brake discs', part: 'brakes', section: 'wet', alsoWet: false,
+    signs: 'squeal or weak brakes after wet or muddy rides',
+    steps: [
+      'Spray disc-brake cleaner on a clean rag, not on the pads.',
+      'Wipe both sides of each disc.',
+      'Test the brakes before riding.',
+    ],
+    tools: 'brake cleaner, clean rag, clean gloves', minutes: [5, 5], who: 'you', why: null,
+    note: 'Never touch the braking surface with bare or oily hands.',
+    words: ['squeal', 'wet brakes', 'noisy brakes', 'disc', 'contamination'], applies: { brakes: ['cable-disc', 'hydraulic-disc'] }, critical: true,
+  },
+  {
+    id: 'brakes-rim-wipe', name: 'Wipe the rims', part: 'brakes', section: 'wet', alsoWet: false,
+    signs: 'gritty braking noise or grabby brakes after wet rides',
+    steps: [
+      'Wipe rim braking surfaces with a damp rag.',
+      'Check the pads for stuck grit and pick it out.',
+      'If it still squeals, clean the rims with degreaser to lift old pad residue, then rinse with water.',
+      'Test the brakes before riding.',
+    ],
+    tools: 'rag, degreaser', minutes: [5, 5], who: 'you', why: null,
+    note: null,
+    words: ['rim brake', 'squeal', 'grit', 'wet brakes'], applies: { brakes: ['rim'] }, critical: true,
+  },
+  {
+    id: 'ebike-dry-contacts', name: 'Dry the battery and plugs', part: 'ebike', section: 'wet', alsoWet: false,
+    signs: 'water on battery contacts or display',
+    steps: [
+      'Every 6 months also clean battery and bike contacts with a dry cloth.',
+      'Do not use a pressure washer on the motor or battery.',
+      'Wipe the battery and its contacts dry.',
+      'Store the bike indoors.',
+    ],
+    tools: 'rag', minutes: [5, 5], who: 'you', why: null,
+    note: null,
+    words: ['ebike', 'wet', 'rain', 'battery', 'wash'], applies: { ebike: ['yes'] }, critical: false,
+  },
+  {
+    id: 'tyres-pressure', name: 'Check the tyre pressure and look the tyres over', part: 'tyres', section: 'week', alsoWet: false,
+    signs: 'tyre feels soft; pressure outside the range on the sidewall; glass, cuts or bulges; worn tread or cracked sidewalls',
+    steps: [
+      'Before each ride, squeeze each tyre for a quick check.',
+      'Weekly, find the pressure range printed on the tyre sidewall.',
+      'Use a gauge on the pump; squeezing does not give a number.',
+      'Pump to a number inside that range; heavier load means more air.',
+      'Spin the wheel and look for glass, cuts, bulges, worn tread and cracked sidewalls.',
+      'Check the tyre sits evenly on the rim with no tube showing.',
+    ],
+    tools: 'pump with gauge', minutes: [3, 3], who: 'you', why: null,
+    note: 'At least monthly; weekly is better (tubes lose about 1 bar a month; latex tubes lose faster, so check before each ride). Tubeless on hookless rims: use the lower maximum for those tyres. Worn tread or cracked sidewalls: see "Replace worn tyres".',
+    words: ['pump', 'pressure', 'soft tyre', 'flat', 'psi', 'bar', 'cut', 'glass', 'thorn', 'worn tyre', 'crack'], applies: {}, critical: false,
+  },
+  {
+    id: 'gears-shift-test', name: 'Test the gears', part: 'gears', section: 'week', alsoWet: false,
+    signs: 'slow shifts, jumps or noise',
+    steps: [
+      'Lift the rear wheel (or ride gently).',
+      'Shift up and down through all gears.',
+      'Note any gear that skips or rubs.',
+    ],
+    tools: 'none', minutes: [2, 2], who: 'you', why: null,
+    note: 'See "Fix gears that shift badly" if it fails.',
+    words: ['skip', 'jump', 'noisy gears', 'shifting', 'ghost shift'], applies: { gears: ['derailleur'] }, critical: false,
+  },
+  {
+    id: 'chain-wear-check', name: 'Check the chain for wear', part: 'chain', section: 'week', alsoWet: false,
+    signs: 'gears skip or the chain slips under load; chain looks long',
+    steps: [
+      'Shift to the smallest chainring and the smallest rear gear so the chain is slack.',
+      'Hook a chain wear gauge into the chain.',
+      'Replace when the gauge drops fully into the chain, or at its limit: about 0.5% (11-12 speed) or 0.75% (5-10 speed).',
+      'A chain that slips under load also needs replacing.',
+    ],
+    tools: 'chain wear gauge', minutes: [3, 3], who: 'you-check', why: 'Yourself to check; replace yourself or a shop',
+    note: null,
+    words: ['worn chain', 'stretched', 'skipping', 'slipping', 'gauge', 'chain checker'], applies: { drive: ['chain'] }, critical: false,
+  },
   {
     id: 'brakes-pads-disc', name: 'Check the disc brake pads and replace if worn', part: 'brakes', section: 'week', alsoWet: false,
     signs: 'squeal, grinding noise, weak braking, lever pulls far, about 1.5 mm of pad left',
@@ -139,6 +299,43 @@ export const CARE_TASKS: CareTask[] = [
     words: ['loose bolt', 'rattle', 'creak', 'handlebar loose', 'torque', 'bar end', 'pedal', 'crank'], applies: {}, critical: true,
   },
   {
+    id: 'gears-electronic-battery', name: 'Check the shifting battery', part: 'gears', section: 'week', alsoWet: false,
+    signs: 'lights flash red, slow shifting, or shifting stops',
+    steps: [
+      'Press the button or hold a shift button briefly to see the battery light.',
+      "Charge with the maker's charger when low.",
+      'Do not wait until it dies; a flat system stops shifting.',
+    ],
+    tools: 'charger', minutes: [5, 5], who: 'you', why: null,
+    note: 'Charging takes extra time.',
+    words: ['battery', 'di2', 'axs', 'wireless', 'electronic shifting', 'charge'], applies: { shifting: ['electronic'] }, critical: false,
+  },
+  {
+    id: 'frame-headset-check', name: 'Check the headset and steering', part: 'frame', section: 'week', alsoWet: false,
+    signs: 'knock or play in the steering; rough, notchy or stiff turn',
+    steps: [
+      'Hold the front brake, turn the bar 90 degrees, rest a hand on the headset and rock the bike back and forth.',
+      'Any clunk at the headset means it is loose (rule out brake and fork-leg play first).',
+      'Turn the bars; they should turn easily and smoothly, not notchy.',
+      'If loose or stiff, take it to a shop.',
+    ],
+    tools: 'none to check', minutes: [3, 3], who: 'shop', why: 'Shop to adjust (steerer and stem bolts are critical; a mistake can cause a crash); you can check play yourself',
+    note: 'Steerer and stem bolts are critical; if too loose or too tight a crash can result.',
+    words: ['headset', 'knock', 'play', 'loose steering', 'rattle'], applies: {}, critical: true,
+  },
+  {
+    id: 'gears-cables-look', name: 'Look at the gear cables', part: 'gears', section: 'week', alsoWet: false,
+    signs: 'frayed, rusty or kinked cable; cracked casing; slow, stiff or missing shifts',
+    steps: [
+      'Look along cable and casing for rust, fraying, cracks, kinks and dirt; look hardest where the casing (and any brake hose) rubs on the frame.',
+      'Check the ends are capped.',
+      'If it drags or shifting is slow, replace cable and casing.',
+    ],
+    tools: 'none', minutes: [5, 5], who: 'you', why: null,
+    note: null,
+    words: ['cable', 'stiff shift', 'sticky', 'rust', 'frayed'], applies: { shifting: ['cable'] }, critical: false,
+  },
+  {
     id: 'chain-lube', name: 'Lube the chain, after every wash and always after rain or mud', part: 'chain', section: 'month', alsoWet: true,
     signs: 'squeaks, looks dry or rusty',
     steps: [
@@ -154,6 +351,30 @@ export const CARE_TASKS: CareTask[] = [
     words: ['squeak', 'noisy', 'dry chain', 'lube', 'oil', 'rust'], applies: { drive: ['chain'] }, critical: false,
   },
   {
+    id: 'tyres-sealant-check', name: 'Check the sealant', part: 'tyres', section: 'month', alsoWet: false,
+    signs: 'tyre loses air overnight; no sloshing sound when shaken',
+    steps: [
+      'Shake the wheel next to your ear for a slosh.',
+      'Or open the valve core and look in (tool needed).',
+      'If dry or lumpy, top up (see "Top up the sealant").',
+    ],
+    tools: 'valve core tool', minutes: [5, 5], who: 'you', why: null,
+    note: 'Check monthly; hot, dry weather dries it faster.',
+    words: ['sealant', 'tubeless', 'loses air', 'slosh', 'goo'], applies: { tyres: ['tubeless'] }, critical: false,
+  },
+  {
+    id: 'belt-inspect', name: 'Inspect the belt', part: 'chain', section: 'month', alsoWet: false,
+    signs: 'missing or cracked teeth, frayed edge, jumping, noise',
+    steps: [
+      'Look along the belt for cracks, frayed cords and worn teeth.',
+      'Check sprockets for bends and damage.',
+      'Noise with no damage: clean with water; check alignment.',
+    ],
+    tools: 'none', minutes: [5, 5], who: 'you-check', why: 'Yourself to check; shop to replace',
+    note: 'Never oil or lube. Fading belt colour alone is not wear.',
+    words: ['belt', 'jumping', 'noisy belt', 'tooth', 'skip'], applies: { drive: ['belt'] }, critical: false,
+  },
+  {
     id: 'ebike-battery-care', name: 'Look after the battery', part: 'ebike', section: 'month', alsoWet: false,
     signs: 'range is falling; battery warm or swollen; long storage coming',
     steps: [
@@ -164,6 +385,60 @@ export const CARE_TASKS: CareTask[] = [
     tools: 'none', minutes: null, who: 'you', why: null,
     note: 'Never leave it fully charged or fully empty for long.',
     words: ['ebike battery', 'storage', 'winter', 'range', 'charge level'], applies: { ebike: ['yes'] }, critical: false,
+  },
+  {
+    id: 'susp-air-pressure', name: 'Check the suspension air pressure', part: 'suspension', section: 'month', alsoWet: false,
+    signs: 'fork or shock sinks too much, bottoms out, or feels hard',
+    steps: [
+      'Use a suspension pump, not a normal one; never use a compressor.',
+      "Start from the maker's chart (on the fork or in the maker's app) for your weight.",
+      'Squeeze the fork down through at least half its travel a few times to even out the air.',
+      "Sit on the bike in gear, check sag; add air for less sag, let air out for more. Rough guide: about 25% for a rear shock; follow the maker's range.",
+      'Do not squeeze the suspension with the pump on.',
+    ],
+    tools: 'suspension pump', minutes: [10, 10], who: 'you', why: null,
+    note: "Rear shocks: start from the frame maker's chart.",
+    words: ['fork', 'shock', 'air', 'sag', 'bouncy', 'too soft'], applies: { suspension: ['front', 'full'] }, critical: false,
+  },
+  {
+    id: 'gears-cassette-wear', name: 'Check the rear gears and chainrings for wear', part: 'gears', section: 'month', alsoWet: false,
+    signs: 'chain skips under load in your usual gears, even with a new chain',
+    steps: [
+      'Skipping in favourite gears under load points to worn gears and/or a worn chain.',
+      'Check the chain first with a gauge.',
+      'Look at the teeth of the rear gears for wear, and at the chainrings too.',
+      'Back-pedal slowly: the chainrings should run straight, their bolts be tight and every chain link move freely.',
+      'If a new chain still skips, replace the rear gears; badly worn chain, rings and rear gears are replaced together.',
+    ],
+    tools: 'chain wear gauge; chain whip and lockring tool to change', minutes: [10, 10], who: 'you', why: 'Yourself or shop',
+    note: null,
+    words: ['cassette', 'sprocket', 'skip', 'worn', 'shark teeth'], applies: { gears: ['derailleur'] }, critical: false,
+  },
+  {
+    id: 'wheels-hubs-check', name: 'Check the wheel hubs for play', part: 'wheels', section: 'month', alsoWet: false,
+    signs: 'rough or grinding wheel, side play at the axle, oil spots at the hub',
+    steps: [
+      'With the wheel in the bike, pull the rim side to side and feel for a knock.',
+      'Take the wheel out; rock the axle up and down. A little play out of the bike with none in the frame is normal on adjustable hubs.',
+      'Spin the axle and feel for roughness.',
+      'Look for oil spots at the hub.',
+    ],
+    tools: 'none', minutes: [5, 5], who: 'you-check', why: 'Yourself to check; shop to adjust or service (cup-and-cone hubs are adjustable; sealed cartridge hubs are replaced)',
+    note: 'Wheels are critical.',
+    words: ['hub', 'bearing', 'grinding', 'play', 'rough', 'wheel wobble'], applies: {}, critical: true,
+  },
+  {
+    id: 'brakes-rotor-thickness', name: 'Check the discs for wear and wobble', part: 'brakes', section: 'month', alsoWet: false,
+    signs: 'grooves, blue marks, thin edge, wobble',
+    steps: [
+      'Spin the wheel and check the disc runs straight.',
+      'Measure with a rotor gauge or a caliper.',
+      'Replace at the minimum printed on the disc (often 1.5 mm for Shimano).',
+      'Stop if aluminium shows (two-layer discs).',
+    ],
+    tools: 'gauge, hex keys', minutes: [10, 10], who: 'you-check', why: 'Yourself to check; shop to replace',
+    note: 'Brakes are critical.',
+    words: ['rotor', 'disc', 'thin', 'worn disc', 'wobble'], applies: { brakes: ['cable-disc', 'hydraulic-disc'] }, critical: true,
   },
   {
     id: 'tyres-sealant-topup', name: 'Top up the sealant', part: 'tyres', section: 'half-year', alsoWet: false,
@@ -180,6 +455,18 @@ export const CARE_TASKS: CareTask[] = [
     words: ['sealant', 'tubeless', 'dry', 'top up', 'goo', 'loses air'], applies: { tyres: ['tubeless'] }, critical: false,
   },
   {
+    id: 'susp-lowers-service', name: 'Service the fork lower legs', part: 'suspension', section: 'half-year', alsoWet: false,
+    signs: 'fork feels gritty, leaks oil, or has 50+ hours',
+    steps: [
+      'Wipe the legs; check for oil leaks.',
+      'Lower-leg service: new oil and seals, usually at a shop.',
+      'RockShox: about every 50 riding hours. Fox: see the full fork service.',
+    ],
+    tools: 'shop tools', minutes: null, who: 'shop', why: 'Shop (needs fork tools, correct oil and seals)',
+    note: 'About 1-2 hours.',
+    words: ['fork', 'lowers', 'leaking', 'gritty', 'service'], applies: { suspension: ['front', 'full'] }, critical: false,
+  },
+  {
     id: 'gears-hub-oil', name: 'Service the hub gear oil', part: 'gears', section: 'half-year', alsoWet: false,
     signs: 'gears slip, stiff shifting, or the interval is up',
     steps: [
@@ -192,8 +479,21 @@ export const CARE_TASKS: CareTask[] = [
     note: null,
     // On every chain-hub or belt bike; a single speed is stored the same way, so without a known shifter it is tagged (coordinator's
     // ruling R3 on PR 58: a hub-gear rider never loses it, a single-speed rider sees one tagged task).
-    words: ['internal hub', 'alfine', 'nexus', 'oil change', 'hub gears', 'slipping'], applies: { gears: ['hub'] }, critical: false,
+    words: ['internal hub', 'alfine', 'nexus', 'rohloff', 'oil change', 'hub gears', 'slipping'], applies: { gears: ['hub'] }, critical: false,
     soft: { applies: { shifting: ['cable', 'electronic'] }, tag: 'If your hub has gears' },
+  },
+  {
+    id: 'gears-cables-replace', name: 'Replace the gear cables and casing', part: 'gears', section: 'half-year', alsoWet: false,
+    signs: 'sticky shifting that cleaning does not fix; rust or fraying',
+    steps: [
+      'Shift to the smallest gears and free the old cable at the derailleur.',
+      'Remove the old cable from the shifter (the access differs by brand).',
+      'Fit the new cable and casing; tighten the clamp bolt firmly (about 5 Nm).',
+      'Cut the end to about 3 cm, cap it, then set the limit screws and indexing.',
+    ],
+    tools: 'cable cutters, hex keys, new cable and casing', minutes: [40, 40], who: 'you', why: 'Yourself or shop',
+    note: 'Replace the casing with the cable.',
+    words: ['cable', 'replace', 'stiff', 'sticky shift'], applies: { shifting: ['cable'] }, critical: false,
   },
   {
     id: 'susp-fork-service', name: 'Full fork service', part: 'suspension', section: 'half-year', alsoWet: false,
@@ -208,6 +508,220 @@ export const CARE_TASKS: CareTask[] = [
     tools: 'shop tools', minutes: null, who: 'shop', why: 'Shop (needs tools, oil and seal kits)',
     note: 'Several hours.',
     words: ['fork service', 'rockshox', 'fox', 'suspension'], applies: { suspension: ['front', 'full'] }, critical: false,
+  },
+  {
+    id: 'susp-shock-service', name: 'Full shock service', part: 'suspension', section: 'half-year', alsoWet: false,
+    signs: '20 riding hours, 50-200 riding hours by part, or 6 months',
+    steps: [
+      'Keep the shock clean and check it yourself every 20 riding hours.',
+      'Have the suspension checked at a shop every 6 months.',
+      'RockShox: air can about 50 h; full damper service about 200 h by model.',
+      'Fox: about 100 h.',
+      "Check the maker's chart; whichever comes first.",
+    ],
+    tools: 'shop tools', minutes: null, who: 'shop', why: 'Shop (needs tools and correct oil)',
+    note: 'About 1-2 hours.',
+    words: ['shock', 'rear shock', 'rockshox', 'fox', 'service'], applies: { suspension: ['full'] }, critical: false,
+  },
+  {
+    id: 'ebike-service', name: 'Motor, software and battery service', part: 'ebike', section: 'half-year', alsoWet: false,
+    signs: "error codes, range drop, or the dealer's date has come",
+    steps: [
+      'First dealer check about 4 weeks or 300 km after purchase.',
+      "Get the maker's software updates every 6 months.",
+      'Other dealer checks: the dealer sets the date by distance and/or time.',
+      'The dealer runs diagnostics and updates software for all parts.',
+      'Keep the charger and plugs dry.',
+    ],
+    tools: 'dealer software', minutes: null, who: 'shop', why: 'Shop (needs maker software; do not open the motor or battery)',
+    note: 'About 1 hour.',
+    words: ['ebike service', 'motor', 'update', 'diagnostic', 'battery test'], applies: { ebike: ['yes'] }, critical: false,
+  },
+  {
+    id: 'brakes-cable-disc-service', name: 'Adjust and re-align the cable disc brakes', part: 'brakes', section: 'year', alsoWet: false,
+    signs: 'lever pulls far, rubbing, weak braking',
+    steps: [
+      'Check cable and casing for rust, dirt and fraying; replace if worn.',
+      'As pads wear, turn the pad adjuster knobs, not the barrel adjuster.',
+      'Loosen the caliper bolts, squeeze the lever and hold it, then tighten the bolts to the torque printed on the caliper. Without a torque wrench, tighten them evenly until the caliper no longer moves. Test the brake before riding.',
+      'Spin the wheel; tweak the adjusters a quarter turn until no rub.',
+    ],
+    tools: 'hex keys, cable cutters, torque wrench', minutes: [30, 30], who: 'you', why: 'Yourself or shop',
+    note: 'Brakes are critical; a mistake can cause a crash.',
+    words: ['cable brake', 'mechanical disc', 'rubbing', 'weak', 'adjust'], applies: { brakes: ['cable-disc'] }, critical: true,
+  },
+  {
+    id: 'belt-tension', name: 'Check belt tension', part: 'chain', section: 'year', alsoWet: false,
+    signs: 'belt skips or hums, wheel or tensioner was moved',
+    steps: [
+      "Use the maker's tension gauge or app.",
+      'Adjust to the green zone.',
+      'Retighten axle and tensioner bolts.',
+    ],
+    tools: 'tension gauge, hex keys', minutes: [15, 15], who: 'you', why: 'Yourself with gauge or shop',
+    note: 'A belt does not stretch like a chain, so re-tension only after a change. Yearly or before long trips.',
+    words: ['belt', 'tension', 'skipping', 'krikit', 'hum'], applies: { drive: ['belt'] }, critical: false,
+  },
+  {
+    id: 'frame-torque-check', name: 'Re-torque the key bolts', part: 'frame', section: 'year', alsoWet: false,
+    signs: 'after a crash or a year; creaks',
+    steps: [
+      'Look up the number printed on each part.',
+      'Torque stem, handlebar, seatpost, brake and wheel bolts.',
+      'Carbon parts: never without a torque wrench, at the number printed on the part (often about 4-6 Nm, but follow the part).',
+      'Disc bolts: first turn them all in loosely, then tighten them to the torque in a star pattern, across the disc, so the disc is not damaged.',
+    ],
+    tools: 'torque wrench', minutes: [20, 20], who: 'you', why: 'Yourself with a torque wrench, or a shop',
+    note: 'Stem, handlebar and steerer bolts are critical.',
+    words: ['torque', 'bolts', 'creak', 'carbon', 'stem'], applies: {}, critical: true,
+  },
+  {
+    id: 'wheels-true-tension', name: 'True the wheels and check spoke tension', part: 'wheels', section: 'year', alsoWet: false,
+    signs: 'wobble, pulsing brakes, loose spokes',
+    steps: [
+      'Check the wheel sits centred in the fork or frame first.',
+      'Spin the wheel past a fixed pointer held still at the brake (a rubber band or zip tie holds it) and chalk-mark where the rim touches.',
+      'Loose spokes near the mark flex more than the others; spokes on the other side pull against them, so adjust both sides.',
+      'Adjust spokes in quarter turns or less, two or three at a time so the tension stays even; tighten rather than loosen where you can. Spokes break easily, so turn the nipples with care.',
+      'Aim for side-to-side wobble about 0.5 mm or less and up-and-down about 1 mm or less; check spoke tension with a tension meter.',
+      'A bent rim or repeatedly breaking spokes: new rim or wheel.',
+    ],
+    tools: 'spoke key that fits the nipples, truing stand, chalk, tension meter', minutes: [30, 30], who: 'shop', why: 'Shop (needs a stand and tension meter; wheels are critical)',
+    note: 'Wheels are critical; a bad job can cause a crash.',
+    words: ['wheel true', 'wobble', 'wobbly', 'spoke', 'tension', 'bent rim'], applies: {}, critical: true,
+  },
+  {
+    id: 'chain-deep-clean', name: 'Deep-clean the drivetrain', part: 'chain', section: 'year', alsoWet: false,
+    signs: 'gritty chain, rear gears caked, sticky shifting',
+    steps: [
+      'Remove the chain with a quick link, or clean it in place.',
+      'Scrub chain, gears and chainrings with degreaser and brush.',
+      'Rinse, dry fully, then lube the chain.',
+    ],
+    tools: 'degreaser, brush, quick link pliers', minutes: [30, 30], who: 'you', why: null,
+    note: null,
+    words: ['clean chain', 'degrease', 'gritty', 'dirty drivetrain'], applies: { drive: ['chain'] }, critical: false,
+  },
+  {
+    id: 'brakes-hydraulic-bleed', name: 'Bleed the hydraulic brakes', part: 'brakes', section: 'notice', alsoWet: false,
+    signs: 'spongy lever, lever pulls to the bar, fluid old',
+    steps: [
+      'Use the fluid named on the lever or caliper.',
+      'Shimano uses mineral oil, SRAM uses DOT fluid; never mix.',
+      'Fit the bleed block and bleed with the right kit.',
+    ],
+    tools: 'bleed kit, fluid, gloves', minutes: [45, 45], who: 'shop', why: 'Shop (needs a bleed kit; brakes are critical, a mistake can cause a crash)',
+    note: 'The time is for one brake.',
+    words: ['bleed', 'spongy', 'soft brake', 'brake fluid', 'air in brake'], applies: { brakes: ['hydraulic-disc'] }, critical: true,
+  },
+  {
+    id: 'brakes-squeal', name: 'Fix squealing brakes', part: 'brakes', section: 'notice', alsoWet: false,
+    signs: 'squeal or screech when braking',
+    steps: [
+      'Disc: wipe the disc with brake cleaner; check pads for oil.',
+      'Oily pads: replace them.',
+      'Disc: check the caliper and disc bolts are tight to the stated torque; loose bolts cause squeal and judder.',
+      'Rim: wipe rim and pads, toe the pads in slightly.',
+      'Test before riding.',
+    ],
+    tools: 'brake cleaner, hex keys, torque wrench', minutes: [15, 15], who: 'you', why: 'Yourself or shop',
+    note: 'Brakes are critical.',
+    words: ['squeal', 'screech', 'noisy brakes', 'squeak'], applies: { brakes: ['rim', 'cable-disc', 'hydraulic-disc'] }, critical: true,
+  },
+  {
+    id: 'brakes-spongy', name: 'Fix a spongy brake', part: 'brakes', section: 'notice', alsoWet: false,
+    signs: 'lever feels soft and goes to the bar',
+    steps: [
+      'Check pads are not worn out.',
+      'Check for fluid leaks.',
+      'Bleed the brake, or take it to a shop.',
+    ],
+    tools: 'bleed kit', minutes: null, who: 'shop', why: 'Shop (needs a bleed kit; brakes are critical, a mistake can cause a crash)',
+    note: 'Do not ride until fixed.',
+    words: ['spongy', 'soft lever', 'air', 'bleed'], applies: { brakes: ['hydraulic-disc'] }, critical: true,
+  },
+  {
+    id: 'chain-replace', name: 'Replace a worn chain', part: 'chain', section: 'notice', alsoWet: false,
+    signs: 'gauge says worn, or the chain slips',
+    steps: [
+      'Note the chain length and path; it must reach round the biggest chainring and biggest rear gear. A chain that is too long can jump off the chainring.',
+      'Remove the old chain; thread the new one through the front derailleur, over a chainring, onto the smallest rear gear and through the rear derailleur, round the top jockey wheel one way and the bottom one the other.',
+      "Join it with a quick link, or with the maker's joining pin and a chain tool; Shimano chains need their own hardened pin.",
+      'Flex the joined link sideways: a stiff link makes the chain jump on the rear gears; lube and flex it until it moves freely.',
+      'Replace with the same speed count.',
+    ],
+    tools: 'chain tool, quick link pliers', minutes: [20, 20], who: 'you', why: 'Yourself or shop',
+    note: 'Change the chain on time to save the gears.',
+    words: ['new chain', 'skip', 'worn', 'stretch'], applies: { drive: ['chain'] }, critical: false,
+  },
+  {
+    id: 'gears-indexing', name: 'Fix gears that shift badly', part: 'gears', section: 'notice', alsoWet: false,
+    signs: 'slow shift, noise, skips between gears',
+    steps: [
+      'Shift to the smallest rear gear. Turn the barrel adjuster in small clicks while you test every gear: if the chain jumps past a gear, turn it clockwise; if it shifts too slowly, anticlockwise.',
+      'Check the hanger is straight.',
+      'Check for dirt or a stuck cable; casing must be gear casing, not brake casing, with all end caps. A worn cable is replaced before adjusting.',
+      'Check the cassette lockring is tight and the limit screws are set: the H screw puts the top jockey wheel right under the smallest rear gear, the L screw right under the biggest, so the derailleur cannot go past it.',
+      'On the biggest rear gear, the top jockey wheel sits close to the gears but does not touch them; the angle screw sets this.',
+      'Worn derailleur pivots or a broken shifter: replace.',
+    ],
+    tools: 'hex keys, small screwdriver', minutes: [15, 15], who: 'you', why: 'Yourself or shop',
+    note: 'A bent hanger needs a shop.',
+    words: ['skip', 'ghost shift', 'noisy gears', 'adjust gears', 'hanger', 'limit screw'], applies: { gears: ['derailleur'], shifting: ['cable'] }, critical: false,
+  },
+  {
+    id: 'wheels-wobble', name: 'Fix a wobbly wheel', part: 'wheels', section: 'notice', alsoWet: false,
+    signs: 'rim hits the brake or frame; wheel is bent',
+    steps: [
+      'Check the wheel is fitted straight in the dropouts.',
+      'Check the tyre bead sits evenly on the rim; if not, let the air out, seat it, pump up.',
+      'Look for a loose or broken spoke.',
+      'Do not ride if the rim rubs hard.',
+      'If spoke tweaks do not remove the wobble, the rim is probably bent: new rim.',
+    ],
+    tools: 'spoke key', minutes: null, who: 'shop', why: 'Shop (wheels are critical; needs a stand and spoke feel)',
+    note: 'Wheels are critical; a failure can cause a crash.',
+    words: ['wobble', 'bent rim', 'loose spoke', 'true'], applies: {}, critical: true,
+  },
+  {
+    id: 'tyres-replace', name: 'Replace worn tyres', part: 'tyres', section: 'notice', alsoWet: false,
+    signs: 'tread worn down, cracks in the sidewalls',
+    steps: [
+      'Look at the tread for wear and at the sidewalls for cracks.',
+      'Buy the same tyre size; check the tube is undamaged and the valve straight, and the rim tape covers every spoke hole (replace it if not).',
+      "Fit one side of the tyre onto the rim, pushing the bead into the rim's centre well all round.",
+      'Put a little air in the tube so it holds its shape; push the valve straight through the rim hole and tuck the tube in, working away from the valve both ways, with no twists or kinks.',
+      'Push the second side on, starting at the valve and finishing opposite it, without pinching the tube; use levers only if needed.',
+      'Let the air out, squeeze the sides of the tyre together all round and look that no tube is caught under the bead; then pump to the pressure on the sidewall and refit the wheel.',
+    ],
+    tools: 'tyre levers, pump, rim tape if needed', minutes: [20, 20], who: 'you', why: null,
+    note: null,
+    words: ['worn tyre', 'cracked', 'bald', 'tread', 'flats', 'rim tape'], applies: {}, critical: false,
+  },
+  {
+    id: 'frame-creak', name: 'Find a creak', part: 'frame', section: 'notice', alsoWet: false,
+    signs: 'creaks when pedalling or standing',
+    steps: [
+      'Check the pedals, the crank bolts and the seatpost.',
+      'Clean and grease threads and the seatpost; on a carbon post or frame use carbon assembly paste instead of grease.',
+      'Re-torque with a wrench at the number printed on each part. Carbon parts: never without a torque wrench.',
+    ],
+    tools: 'grease or carbon assembly paste, hex keys, torque wrench', minutes: [30, 30], who: 'you', why: 'Yourself or shop',
+    note: 'Stem and bar bolts are critical.',
+    words: ['creak', 'click', 'noise', 'crunch', 'pedalling'], applies: {}, critical: true,
+  },
+  {
+    id: 'ebike-range-drop', name: 'Investigate lost range', part: 'ebike', section: 'notice', alsoWet: false,
+    signs: 'range falls, power cuts, or battery warm',
+    steps: [
+      'Check tyre pressure and brake rub.',
+      'Check battery contacts and charge fully.',
+      'Try a full charge from room temperature.',
+      'Still low: book a battery test.',
+    ],
+    tools: 'charger', minutes: null, who: 'shop', why: 'Shop (battery test needs maker tools)',
+    note: null,
+    words: ['range', 'battery', 'ebike', 'power', 'weak'], applies: { ebike: ['yes'] }, critical: false,
   },
 ];
 
