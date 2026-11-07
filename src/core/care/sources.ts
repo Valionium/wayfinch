@@ -80,7 +80,7 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
   },
   'brake-rub-rim': {
     urls: ['https://www.sheldonbrown.com/rim-brakes.html'],
-    note: "Book p. 209: re-seat the wheel, the tyre bead (book, more careful), centre the brake. The draft's centring-screw aside had \"no source found\" and is cut (decision 6); the centring itself is the book's.",
+    note: "Book p. 209: re-seat the wheel, the tyre bead (book, more careful). The draft's centring step and its centring-screw aside had no source and are cut (decision 6); the card sends the rider to a shop to have the brake centred (ruling on PR 59, M6).",
   },
   'brake-rub-disc': {
     urls: [

@@ -286,7 +286,7 @@ export const ROAD_CARDS: RoadCard[] = [
     steps: [
       "Re-seat the wheel in the dropouts and tighten the wheel's quick release.",
       'Check the tyre bead sits evenly; if not, let the air out, seat it, pump up.',
-      "Loosen the brake's mounting bolt, squeeze the lever to hold the pads on the rim, then tighten the bolt; pads should sit parallel to the rim.",
+      "If it still rubs, ride on gently and have the brake centred at a shop.",
       'Check the pad is not touching the tyre or spokes.',
       "Open the brake's quick release only if you must and ride slowly. Until you close it again, this brake works much less: ride slowly and use the other brake.",
       "Close the brake's quick release once the wheel is fixed.",

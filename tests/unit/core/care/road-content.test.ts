@@ -159,6 +159,7 @@ test('[BC-ROAD] bolt-loose puts the carbon warning first, and tightens only to t
   expect(carbon).toBe(0);
   expect(carbon).toBeLessThan(tighten);
   expect(steps.join(' ')).not.toMatch(/until firm|not forced/i);
+  expect(ROAD_CARDS.find((c) => c.id === 'brake-rub-rim')!.steps.join(' ')).not.toMatch(/mounting bolt|loosen/i);
 });
 
 test("[BC-ROAD] a tubeless tyre's spare tube needs the whole tubeless valve out, not only its core (review of PR 59, I2)", () => {
