@@ -799,6 +799,27 @@ test('[GA-TRIAL-NO-TRACE] a plan another tab saved during a trial is taken: the 
 // The heart of decision 7 over 200 generated riders (GA-TRY-SAME) is tests/unit/tools/advisor-trial.test.ts: its real searches take
 // about a minute and a half, and this suite runs inside LC-QA-ALL's time.
 
+// ---- Task 8: from the Bag planner ----
+
+test('[GA-LINK-PLANNER] the bags step ends with "Not happy with your bags? Ask the Gear advisor", which opens the advisor on the current plan',async()=>{
+  const p=page({setup:R2,bike:GRAVEL});
+  const html=p.html;
+  const s2=html.slice(html.indexOf('<section id="s2"'),html.indexOf('<!-- STEP 3 -->'));
+  const link=/<p class="adv-ask"[^>]*>Not happy with your bags\? <button type="button" class="linky" id="advisorAsk" aria-haspopup="dialog" aria-controls="advisorBox">Ask the Gear advisor<\/button><\/p>/;
+  assert.ok(link.test(s2),'the line and its button, in the bags step');
+  // its end: after the bag list and its buttons, before only the feedback slot and the step's way on
+  const rest=s2.slice(s2.search(link)).replace(link,'');
+  assert.ok(!/id="(bagList|addBag|addBottle|quickPick)"/.test(rest),'nothing of the bags comes after it');
+  assert.ok(/<div class="nav">/.test(rest),'the way on follows');
+  // a tap opens the advisor on the plan as it stands, even when the questionnaire was used last time
+  p.run(`initialiseAdvisor();ADVISOR.source='questionnaire';`);
+  p.run(`document.getElementById('advisorAsk').onclick()`);
+  await p.run('ADVISOR_DONE');
+  assert.equal(p.json('ADVISOR.open'),true,'the advisor is open');
+  assert.equal(p.json('ADVISOR.source'),'plan','on the current plan');
+  assert.ok(textOf(view(p).steps).includes('Using your packing: '),'the plan\'s packing');
+});
+
 (async()=>{
   // GA_ONLY=<text> runs only the tests whose name holds it (for watching one fail)
   for(const [name,fn] of tests){if(process.env.GA_ONLY && !name.includes(process.env.GA_ONLY))continue;await fn();passed++;console.log('ok',name);}

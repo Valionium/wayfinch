@@ -1622,6 +1622,10 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 .adv-plain{font-size:15px;line-height:1.5;color:var(--ink);margin:6px 0}
 .adv-sub{font-weight:600;font-size:14px;margin:10px 0 4px}
 .adv-switch{min-height:44px}
+/* trial bags and the way in (sub-project 13, group 3) */
+.adv-try{display:block;margin-top:10px;min-height:44px}
+.adv-ask{font-size:14px;line-height:1.5;color:var(--muted);margin:12px 0}
+.adv-ask .linky,#trialBar button{min-height:44px}
 .adv-nights{display:flex;align-items:center;gap:8px;margin:10px 0 0;font-weight:600;font-size:14px}
 .adv-nights input{width:6em;min-height:44px}
 .adv-progress{margin:8px 0;font-size:14px;color:var(--ink)}
@@ -1975,6 +1979,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <button class="addbag" id="addBag">+ Add a bag</button><button class="addbag" id="addBottle">+ Bottle cage</button>
       <span id="bagTotal"></span>
     </div>
+    <p class="adv-ask" id="advisorAskLine">Not happy with your bags? <button type="button" class="linky" id="advisorAsk" aria-haspopup="dialog" aria-controls="advisorBox">Ask the Gear advisor</button></p>
     <div class="fbslot" data-fb="2"></div>
     <div class="nav">
       <button class="back" data-to="1">Back</button>
@@ -5983,6 +5988,8 @@ function initialiseAdvisor(){
     }
   });
   window.addEventListener('hashchange', () => { if(DRAFT_READY) openAdvisorFromLink(); });
+  // the bags step's way in (Task 8): the advisor on the plan as it stands
+  $('advisorAsk').onclick = () => { ADVISOR.source = advisorHasPlan() ? 'plan' : 'questionnaire'; openAdvisor($('advisorAsk')); };
   $('trialKeep').onclick = () => keepTrial();
   $('trialRemove').onclick = () => removeTrial();
 }
