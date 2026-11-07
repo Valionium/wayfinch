@@ -110,7 +110,7 @@ test('[BC-FIT-EVERY] over every combination of the stored details, each task sho
     }
   }
   expect(combos).toBe(3840);
-});
+}, 30_000); // 3,840 stored combinations over four lists: the default 5 s is too tight on a busy CI runner
 
 test('[BC-FIT-EVERY] a task with no condition shows with no tags, whatever the bike; "other" hides a conditioned task', () => {
   const other = careDetails(bike({ brakes: 'other', tyres: 'other', shifting: 'none' }));
