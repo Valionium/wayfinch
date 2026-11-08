@@ -1050,6 +1050,12 @@ export const W = {
   /** Beside a picker that holds what the rider typed, once a newer position is shown: Use would set the typed one. */
   appAheadManualNewer: (km: string): string => `Newer position: km ${km}`,
   appAheadToTrip: 'Open Trip',
+  // Ahead before Get ready offline (guided Trip design §2.3).
+  appAheadNeedTitle: 'Ahead needs Get ready offline',
+  appAheadNeedBody: 'Water, food, sleep places and weather come from what it saves on this phone.',
+  appAheadNeedUntil: 'Until then Ahead shows only what the route itself tells.',
+  appAheadAfterReady: 'After Get ready offline',
+  appAheadStopsAfter: 'Stops appear after Get ready offline.',
   appAheadUnreadable: "Your trip couldn't be read on this phone just now. Try again; if it keeps failing, reload the app.",
   appAheadRetry: 'Try again',
   appAheadChoiceNotKept: "This browser didn't keep that choice, so the plan is unchanged. Try again.",

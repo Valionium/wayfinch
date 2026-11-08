@@ -13,8 +13,12 @@ import type { ChipKey } from './chips.tsx';
 import { PositionControls, PositionLine } from './position-line.tsx';
 import { ShareSheet } from './share-sheet.tsx';
 import { RouteStrip } from './strip.tsx';
+import { lazy } from '../lazy.tsx';
 import { railSignal } from '../wide/wide.ts';
 import './ahead.css';
+
+// The top card's button and progress before Get ready offline: a chunk only a rider without it loads (AH-BEFORE-READY).
+const NeedReady = lazy(() => import('./need-ready.tsx').then((m) => m.NeedReady));
 
 function focusLater(id: string): void {
   // After the render that opens it, so the element exists.
@@ -83,6 +87,13 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
   return (
     <div class="ahead" data-ahead={v.answers ? 'answers' : 'first-use'} onKeyDown={onKeyDown}>
       <div class="ah-main">
+        {v.beforeReady ? (
+          <section class="card ah-need" data-need-ready aria-labelledby="ah-need-title">
+            <h2 id="ah-need-title" class="ah-need-title">{W.appAheadNeedTitle}</h2>
+            <p>{W.appAheadNeedBody}</p>
+            <NeedReady actions={actions} />
+          </section>
+        ) : null}
         {v.notice ? <p class="notice" role="status">{v.notice}</p> : null}
         {v.answers ? <PositionLine v={v} onShare={() => { actions.freshen(); setSharing(true); }} /> : <p>{W.appAheadFirstUse}</p>}
         {sharing && s.shareText !== null ? (
@@ -96,18 +107,23 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
           <>
             {s.notes.length > 0 ? <ul class="ah-notes notice">{s.notes.map((n, i) => <li key={i}>{n}</li>)}</ul> : null}
             {v.badSpeed ? <p class="notice"><a href="#/trip">{W.appAheadSpeedLink}</a></p> : null}
-            <RouteStrip strip={s.strip} bike={v.bike} onOpen={openCard} onSetPosition={rail ? (km) => void actions.setManual(km) : undefined} />
+            <RouteStrip strip={s.strip} bike={v.bike} onOpen={openCard} onSetPosition={rail ? (km) => void actions.setManual(km) : undefined} stopsLater={v.beforeReady} />
           </>
         ) : null}
       </div>
-      {v.answers ? <TopicCards screen={s} open={open} onToggle={toggle} v={v} actions={actions} onShelter={() => openChip('shelter')} /> : null}
+      {v.answers ? <TopicCards screen={s} open={open} onToggle={toggle} v={v} actions={actions} onShelter={() => openChip('shelter')} later={v.beforeReady ? AFTER_READY : NONE} /> : null}
       <div class="ah-below">
-        <ChipRow shown={v.answers ? CHIP_ORDER : ['emergency']} open={chip} onOpen={openChip} />
+        {/* Before Get ready offline only Emergency: the other chips answer from saved places too (AH-BEFORE-READY). */}
+        <ChipRow shown={v.answers && !v.beforeReady ? CHIP_ORDER : ['emergency']} open={chip} onOpen={openChip} />
         {chip ? <ChipPanel chip={chip} screen={s} canShare={v.canShare} actions={actions} onClose={() => setChip(null)} position={v.position} /> : null}
       </div>
     </div>
   );
 }
+
+/** The cards that need what Get ready offline saves; Daylight and Climbing are worked out from the route alone. */
+const AFTER_READY: ReadonlySet<CardName> = new Set(['water', 'food', 'weather', 'sleep']);
+const NONE: ReadonlySet<CardName> = new Set();
 
 export function AheadScreen({ view, actions }: { view: AheadView; actions: AheadActions }) {
   if (view.kind === 'loading') return <div class="ahead" aria-busy="true" />;

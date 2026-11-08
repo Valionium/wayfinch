@@ -133,10 +133,12 @@ function Ruler({ strip, onSet }: { strip: Strip; onSet: (km: number) => void }) 
   );
 }
 
-export function RouteStrip({ strip, bike, onOpen, onSetPosition }: {
+export function RouteStrip({ strip, bike, onOpen, onSetPosition, stopsLater = false }: {
   strip: Strip; bike: BikeRecord | null; onOpen: (card: CardName) => void;
   /** Given only on a computer: the ruler, with the keys along the strip (spec 3.8). */
   onSetPosition?: (km: number) => void;
+  /** Before Get ready offline: the line and the bike, no icons, and why (AH-BEFORE-READY). */
+  stopsLater?: boolean;
 }) {
   // The track's width decides which icons share a row; before it is measured, a phone's width is assumed.
   const track = useRef<HTMLDivElement>(null);
@@ -147,7 +149,7 @@ export function RouteStrip({ strip, bike, onOpen, onSetPosition }: {
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
   }, []);
-  const slots = slotsOf(strip.icons, strip, trackPx);
+  const slots = stopsLater ? [] : slotsOf(strip.icons, strip, trackPx);
   return (
     <section class="ah-strip" aria-label={W.appAheadStripLabel(strip.label, showKm(strip.startKm), showKm(strip.endKm))} data-strip>
       <div class="ah-strip-head">
@@ -191,6 +193,7 @@ export function RouteStrip({ strip, bike, onOpen, onSetPosition }: {
         </div>
       </div>
       {strip.bands.length > 0 ? <p class="muted ah-strip-key">{W.appAheadStripKey}</p> : null}
+      {stopsLater ? <p class="muted ah-strip-key">{W.appAheadStopsAfter}</p> : null}
     </section>
   );
 }

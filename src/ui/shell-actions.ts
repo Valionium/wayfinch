@@ -32,6 +32,7 @@ import { isFailure, locateFix, manualAt, onPass, ROUTINE, watchBest } from './po
 import type { Failure } from './position.ts';
 import { agoText } from './trip/model.ts';
 import { whileVisible } from './screen-clock.ts';
+import type { Prepare } from './trip/run.tsx';
 
 const APPROXIMATE_HELP_M = 1000; // section 9.2: worse than about 1 km usually means approximate location only
 const SHARE_OLD_MS = 30 * 60_000; // section 6.14
@@ -46,9 +47,11 @@ export type AheadDeps = {
   fetch: typeof fetch;
   share: ((data: { text: string }) => Promise<void>) | null;
   writeClipboard: ((text: string) => Promise<void>) | null;
+  /** Get ready offline, as Trip runs it (src/ui/trip/services.ts); absent, Ahead's button reports that nothing was saved. */
+  prepare?: Prepare;
 };
 
-function browserDeps(): AheadDeps {
+export function browserDeps(): AheadDeps {
   const nav = typeof navigator === 'undefined' ? undefined : navigator;
   return {
     now: () => new Date(),
@@ -163,6 +166,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       bike: bikeSource.peek().bike, stillAboutL, badSpeed: !usableFlatKph(i.trip.flatKph),
       approximateHelp: p !== null && p.source === 'gps' && !(p.accuracyM <= APPROXIMATE_HELP_M),
       shareOld, mapLink: readMapLink(), canShare: deps.share !== null, position, weatherSay, weatherBusy, notice,
+      beforeReady: i.places.length === 0 && i.savedKm.length === 0 && i.forecast === null,
     };
     view.value = next;
     noteRoute(true);
@@ -433,6 +437,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     // No recipient: the rider picks one in the SMS app. "?&body=" is the form both iPhone and Android open.
     smsHref: (text) => `sms:?&body=${encodeURIComponent(text)}`,
     freshen,
+    getReady: (onProgress, onNotice) => (deps.prepare ? deps.prepare(onProgress, onNotice) : Promise.reject(new Error('no Get ready offline here'))),
   };
 
   return {
