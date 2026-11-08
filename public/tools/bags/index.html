@@ -3702,7 +3702,7 @@ function keepLookFocusInView(e){
     if(!r.height)return;
     // the fork close-up, while it is stuck under the drawing, is part of the panel the ring must clear
     const zoom=$('lookForkZoom'),pb=preview.getBoundingClientRect().bottom,zr=zoom && !zoom.classList.contains('hidden') ? zoom.getBoundingClientRect() : null;
-    const top=(zr && zr.height && zr.top<=pb+3 ? zr.bottom : pb)+2,bottom=b.top+body.clientTop+body.clientHeight-2;
+    const top=(zr && zr.height && zr.top<=pb+3 ? Math.max(pb,zr.bottom) : pb)+2,bottom=b.top+body.clientTop+body.clientHeight-2;
     if(r.top-4<top)body.scrollTop-=top-(r.top-4);
     else if(r.bottom+4>bottom)body.scrollTop+=Math.min(r.bottom+4-bottom,r.top-4-top);
   };
