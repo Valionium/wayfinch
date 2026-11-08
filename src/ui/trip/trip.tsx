@@ -4,26 +4,22 @@
 import type { ComponentChildren } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { localIsoDate } from '../../core/answers/time.ts';
-import { GPX_MAX_BYTES, GpxError } from '../../core/route/gpx.ts';
-import type { Route } from '../../core/types.ts';
-import { showKm, W } from '../../core/wording/en.ts';
+import { W } from '../../core/wording/en.ts';
 import { onChanged } from '../../store/changed.ts';
-import { sameLine } from '../../store/trip.ts';
 import { BikeDrawing } from '../bike/drawing.tsx';
 import { bikeSource } from '../bike/live.ts';
 import { degradedSignal, noteTripFacts } from '../degraded.ts';
 import { installOffer, promptInstall } from '../install.ts';
+import { runningSignal } from './run-state.ts';
 import { savedLine } from './saved-line.ts';
-import { lineKey, routeDoneLine, routeFromGpx, tripLineOf } from './model.ts';
+import { lineKey, routeDoneLine, tripLineOf } from './model.ts';
 import { lazy } from '../lazy.tsx';
-import { reasonOf } from './services.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
 import './trip.css';
 
-type Found = { route: Route; hadHeights: boolean };
-
-// Plan from A to B is its own chunk: Trip's first look is the bike, the route and Get ready.
-const PlanAB = lazy(() => import('./plan.tsx').then((m) => m.PlanAB));
+// Add a route (the file picker, the replace question, Plan from A to B) is a chunk of its own, with the GPX reading: it shows only in
+// the open Route step (TRIP-GUIDED-FIRST).
+const AddRoute = lazy(() => import('./add-route.tsx').then((m) => m.AddRoute));
 // The departure date, the nights and the trip details are a chunk too: they show only in the open Route step or Trip details, so
 // the guided Trip adds nothing to the first screen (TRIP-GUIDED-FIRST).
 const TripSettings = lazy(() => import('./settings.tsx').then((m) => m.TripSettings));
@@ -31,89 +27,6 @@ const TripSettings = lazy(() => import('./settings.tsx').then((m) => m.TripSetti
 const GetReady = lazy(() => import('./getready.tsx').then((m) => m.GetReady));
 // The route's summary, with its profile and the stops on it, is its own chunk as well.
 const RouteSummary = lazy(() => import('./summary.tsx').then((m) => m.RouteSummary));
-
-/** `onAdded`: a route was added or replaced, with the message that goes on to the next step (owner's item 2). */
-function AddRoute({ services, snap, reload, onAdded }: { services: TripServices; snap: TripSnapshot | null; reload: () => Promise<void>; onAdded: (said: string) => void }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [said, setSaid] = useState<string | null>(null);
-  const [pending, setPending] = useState<Found | null>(null);
-  const [round, setRound] = useState(0);
-  const asking = useRef<HTMLHeadingElement>(null);
-  const old = snap?.trip ?? null;
-  useEffect(() => { if (pending) asking.current?.focus(); }, [pending]);
-
-  const refused = (message: string): void => setError(old ? `${message} ${W.appTripUnchanged}` : message);
-
-  const commit = async (found: Found): Promise<void> => {
-    setBusy(true);
-    setPending(null);
-    try {
-      const out = await services.addRoute(found, old?.route ?? null);
-      setRound((n) => n + 1);
-      if (out.kind === 'same') setSaid(W.appTripSameRoute);
-      else onAdded(`${out.kind === 'added' ? W.appTripAdded(out.name) : out.dateNotSaved ? W.appTripReplacedNoDate(out.name) : W.appTripReplaced(out.name)} ${W.appTripNextGetReady}`);
-      await reload();
-    } catch (e) {
-      refused(reasonOf(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onFile = async (input: HTMLInputElement): Promise<void> => {
-    const file = input.files?.[0];
-    setError(null);
-    setSaid(null);
-    if (!file) return;
-    setBusy(true);
-    try {
-      if (file.size > GPX_MAX_BYTES) throw new GpxError('too-large', W.routeGpxTooLarge);
-      const found = await routeFromGpx(await file.text(), file.name, services.parseXml);
-      // A file that cannot be used leaves an open question as it was; one that can replaces it.
-      setPending(null);
-      if (old && sameLine(old.route, found.route)) setSaid(W.appTripSameRoute);
-      else if (old) setPending(found);
-      else {
-        setBusy(false);
-        await commit(found);
-      }
-    } catch (e) {
-      refused(e instanceof GpxError ? e.message : W.appTripFileFailed);
-    } finally {
-      setBusy(false);
-      try { input.value = ''; } catch { /* a file input that won't be cleared */ }
-    }
-  };
-
-  return (
-    <section aria-label={old ? W.appTripReplaceHeading : W.appTripAddTitle}>
-      <div data-add-route>
-        <label class="btn btn-primary file-pick">
-          {W.appTripPickGpx}
-          {/* No accept list (owner's iPhone check, 6 Nov 2026): iOS turns it into its own file types, has none for .gpx and greys
-              every GPX file out. Any file can be chosen; routeFromGpx refuses what is not a GPX, in words. */}
-          <input type="file" onChange={(e) => void onFile(e.currentTarget)} />
-        </label>
-        <p class="muted">{W.appTripGpxHint}</p>
-        {busy ? <p role="status">{W.appTripReading}</p> : null}
-        {error ? <p class="notice" role="alert">{error}</p> : null}
-        {said ? <p role="status">{said}</p> : null}
-        {pending && old ? (
-          <div class="notice" role="alertdialog" aria-labelledby="trip-replace-title" data-replace>
-            <h3 id="trip-replace-title" tabIndex={-1} ref={asking}>{W.appTripReplaceTitle}</h3>
-            <p>{W.appTripReplaceBody(old.route.name, pending.route.name, showKm(pending.route.lengthKm))}</p>
-            <div class="row">
-              <button type="button" class="btn btn-primary" onClick={() => void commit(pending)}>{W.appTripReplaceYes}</button>
-              <button type="button" class="btn" onClick={() => setPending(null)}>{W.appTripReplaceCancel}</button>
-            </div>
-          </div>
-        ) : null}
-        <PlanAB key={round} services={services} onRoute={async (found) => { if (old) setPending(found); else await commit(found); }} />
-      </div>
-    </section>
-  );
-}
 
 /** Contract 2: hands the route and the trip's settings to the bag planner, which asks before it changes anything. */
 function PlanBags({ handOff }: { handOff: NonNullable<TripServices['handOff']> }) {
@@ -151,8 +64,9 @@ function Step({ name, n, title, state, open, line, change, canOpen, onOpen, chil
       <span class="trip-dot" aria-hidden="true">{state === 'done' ? '✓' : n}</span>
       <div class="trip-step-body">
         <div class="trip-step-head">
+          {/* Opened from its title or Change, the step's heading takes the focus (review of PR 73, I4). */}
           {open || state === 'done' || !canOpen
-            ? <h2>{no}{title}</h2>
+            ? <h2 tabIndex={-1}>{no}{title}</h2>
             : <h2>{no}<button type="button" class="trip-step-open" onClick={onOpen}>{title}</button></h2>}
           {!open && state === 'done' ? <button type="button" class="trip-step-change" aria-label={`${word}: ${title}`} onClick={onOpen}>{word}</button> : null}
         </div>
@@ -187,6 +101,23 @@ export function TripScreen({ services }: { services: TripServices }) {
   const [chosen, setChosen] = useState<StepName | null>(null);
   // The message after a route was added, which goes on to Get ready offline.
   const [added, setAdded] = useState<string | null>(null);
+  // A GPX dropped anywhere on Trip (spec 3.8) goes to the Route step, which asks before it replaces a route (review of PR 73, I3).
+  const [dropped, setDropped] = useState<File | null>(null);
+  // The step the rider opened by a tap, whose heading takes the focus once it shows.
+  const focusTo = useRef<StepName | null>(null);
+  const list = useRef<HTMLOListElement>(null);
+  const zone = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = zone.current;
+    const take = (e: Event): void => { const f = (e as CustomEvent<File>).detail; if (f) { setChosen('route'); setDropped(f); } };
+    el?.addEventListener('filedrop', take);
+    return () => el?.removeEventListener('filedrop', take);
+  }, []);
+  useEffect(() => {
+    if (!focusTo.current) return;
+    list.current?.querySelector<HTMLElement>(`[data-step="${focusTo.current}"] h2`)?.focus();
+    focusTo.current = null;
+  });
   const alive = useRef(true);
   const latest = useRef(0);
   const reload = useCallback(async (): Promise<void> => {
@@ -214,10 +145,10 @@ export function TripScreen({ services }: { services: TripServices }) {
   // Only Get ready offline and Bags need a route (design §2.2).
   const openStep: StepName = chosen !== null && (trip !== null || chosen === 'route' || chosen === 'go') ? chosen : suggested;
   const stateOf = (name: StepName, done: boolean): StepState => (done ? 'done' : name === suggested ? 'next' : 'later');
-  const choose = (name: StepName) => () => setChosen(name);
+  const choose = (name: StepName) => () => { focusTo.current = name; setChosen(name); };
   const line = snap ? tripLineOf(trip, localIsoDate(snap.now, snap.zone)) : null;
   return (
-    <div class="trip" data-trip-loaded={snap ? 'true' : undefined}>
+    <div class="trip" data-trip-loaded={snap ? 'true' : undefined} data-trip-drop ref={zone}>
       {/* Two panes on a wide screen: the bike, the trip line and the steps; then the route's summary (design §2.2). */}
       <div class="trip-main">
         <div class="trip-bike">
@@ -226,17 +157,17 @@ export function TripScreen({ services }: { services: TripServices }) {
         {line ? <p class="trip-line" data-trip-line><strong>{line.name}</strong>{line.when ? <span>{line.when}</span> : null}</p> : null}
         {/* The shell says it already when the browser refuses storage outright; once is enough. */}
         {snap && !snap.available && !degradedSignal.value.includes('storageBlocked') ? <p class="notice" role="status">{W.appStorageBlocked}</p> : null}
-        <ol class="trip-steps-list" aria-label={W.appTripStepsLabel}>
+        <ol class="trip-steps-list" aria-label={W.appTripStepsLabel} ref={list}>
           <Step
             name="route" n={1} title={W.appTripStepRoute} state={stateOf('route', trip !== null)} open={openStep === 'route'} canOpen onOpen={choose('route')}
             line={trip ? routeDoneLine(trip) : null} below={snap ? <TripDetails services={services} snap={snap} reload={reload} /> : null}
           >
-            <AddRoute services={services} snap={snap} reload={reload} onAdded={(said) => { setAdded(said); setChosen(null); }} />
+            <AddRoute services={services} snap={snap} reload={reload} dropped={dropped} onAdded={(said) => { setAdded(said); setDropped(null); setChosen(null); }} />
             {snap?.trip ? <TripSettings services={services} snap={snap} reload={reload} part="when" /> : null}
           </Step>
           <Step
             name="getready" n={2} title={W.appTripGetReadyTitle} state={stateOf('getready', readyDone)} open={openStep === 'getready'} canOpen={trip !== null}
-            onOpen={choose('getready')} change={W.appTripUpdateButton} line={readyDone && snap ? savedLine(snap) : W.appTripGetReadyLater}
+            onOpen={choose('getready')} change={W.appTripUpdateButton} line={runningSignal.value ? W.appTripWorking : readyDone && snap ? savedLine(snap) : W.appTripGetReadyLater}
           >
             {snap?.trip ? (
               <GetReady

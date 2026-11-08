@@ -2,7 +2,7 @@
 // here calls the trip ready, safe or complete (Decision 2). One fixed line asks the rider to test it in flight mode.
 import { W } from '../../core/wording/en.ts';
 import { askForHomeScreen } from '../install.ts';
-import { labelOf, RunProgress, usePrepareRun } from './run.tsx';
+import { labelOf, NotSaved, RunProgress, usePrepareRun } from './run.tsx';
 import { savedLine } from './saved-line.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
 
@@ -15,6 +15,7 @@ export function GetReady({ services, snap, reload, lead = null, onRun }: {
 }) {
   const run = usePrepareRun(services.prepare, reload);
   const { progress, reports } = run;
+  // While a run is going (started here, on Ahead, or before the step was folded), a tap joins it: never a second run.
   const go = (): void => { onRun?.(); void run.go(); };
 
   const steps = reports ?? snap.prepared?.steps ?? null;
@@ -36,13 +37,7 @@ export function GetReady({ services, snap, reload, lead = null, onRun }: {
       {snap.storageMb !== null ? <p class="muted">{W.appTripStorage(String(snap.storageMb))}</p> : null}
       {leading ? null : button}
       <RunProgress run={run} />
-      {!progress && failed.length > 0 ? (
-        <>
-          <h3>{W.appTripMissingHeading}</h3>
-          <ul class="trip-steps">{failed.map((s) => <li key={s.step}><strong>{labelOf(s.step)}</strong> {s.note ?? ''}</li>)}</ul>
-          <p>{W.appTripPartial}</p>
-        </>
-      ) : null}
+      {progress ? null : <NotSaved failed={failed} />}
       {!progress && saved.length > 0 ? <p class="muted">{W.appTripStepsOk}: {saved.map((s) => labelOf(s.step)).join(', ')}.</p> : null}
       <p class="tool-line">{W.appTripFlightMode}</p>
     </div>

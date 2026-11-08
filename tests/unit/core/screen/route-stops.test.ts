@@ -4,7 +4,7 @@ import { instantAt } from '../../../../src/core/answers/time.ts';
 import { buildScreen } from '../../../../src/core/screen/screen.ts';
 import { routeStops } from '../../../../src/core/screen/route-stops.ts';
 import type { ScreenInputs } from '../../../../src/core/types.ts';
-import { cafe, pos, tap } from '../../../fixtures/build.ts';
+import { cafe, lodging, pos, tap } from '../../../fixtures/build.ts';
 import { FRI, RAINY_SPOTS, rainyStop, SAT } from '../../ui/ahead-fixture.ts';
 
 /** The 165 km rainy fixture in two days (km 0 to 70, 70 to 165), with places on both days. */
@@ -44,5 +44,15 @@ describe('routeStops', () => {
     expect(routeStops({ ...i, trip: { ...i.trip, departureDate: null } }).length).toBeGreaterThan(0);
     expect(routeStops({ ...i, places: [], matches: [], hours: [], savedKm: [], forecast: null, roofs: [] })).toEqual([]);
     expect(routeStops({ ...i, trip: { ...i.trip, route: { ...i.trip.route, stages: [] } } }).length).toBeGreaterThan(0);
+  });
+
+  test('[TRIP-STOPS] a stop’s name is the name of that stop: a tap and a hotel matched at the same km each keep their own', () => {
+    const i = rainyStop({
+      now: '2026-10-14 18:00', positions: [],
+      spots: [...RAINY_SPOTS, { b: lodging({ name: 'Hotel Krone' }), km: 22 }, { b: tap({ name: 'Brunnen Wiesloch' }), km: 22 }],
+    });
+    const stops = routeStops(i);
+    expect(stops.find((s) => s.kind === 'water' && s.km === 22)?.label).toBe('Brunnen Wiesloch');
+    for (const s of stops.filter((x) => x.km === 22 && x.kind !== 'sleep')) expect(s.label).not.toBe('Hotel Krone');
   });
 });

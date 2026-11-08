@@ -45,6 +45,8 @@ export type AheadTrip = {
   notice: string | null;
   /** The route is there but nothing Get ready offline saves: no places, no saved stretch, no forecast (AH-BEFORE-READY). */
   beforeReady: boolean;
+  /** The steps the last Get ready offline did not save, with their reasons: the top card names them (review of PR 73, I2). */
+  failedSteps: { step: string; ok: boolean; note: string | null }[];
 };
 
 /** With no route there is no screen, but the Emergency card stands: 112 and the fallback line (section 6.9). */

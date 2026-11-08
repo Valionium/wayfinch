@@ -87,11 +87,11 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
   return (
     <div class="ahead" data-ahead={v.answers ? 'answers' : 'first-use'} onKeyDown={onKeyDown}>
       <div class="ah-main">
-        {v.beforeReady ? (
-          <section class="card ah-need" data-need-ready aria-labelledby="ah-need-title">
-            <h2 id="ah-need-title" class="ah-need-title">{W.appAheadNeedTitle}</h2>
-            <p>{W.appAheadNeedBody}</p>
-            <NeedReady actions={actions} />
+        {/* Before Get ready offline, and after one with a step missing, which it names with Try again (review of PR 73, I2). */}
+        {v.beforeReady || v.failedSteps.length > 0 ? (
+          <section class="card ah-need" data-need-ready aria-label={v.beforeReady ? W.appAheadNeedTitle : W.appTripMissingHeading}>
+            {v.beforeReady ? <><h2 class="ah-need-title">{W.appAheadNeedTitle}</h2><p>{W.appAheadNeedBody}</p></> : null}
+            <NeedReady actions={actions} failed={v.failedSteps} before={v.beforeReady} />
           </section>
         ) : null}
         {v.notice ? <p class="notice" role="status">{v.notice}</p> : null}

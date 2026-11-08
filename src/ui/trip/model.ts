@@ -1,10 +1,7 @@
 // What Trip shows of a route, as plain data (spec sections 3.1 and 3.3). Nothing here works out an answer: the days are the stage
 // model's, the leave-by time comes from the engines through the services, and the words are the wording file's.
 import { addDaysIso } from '../../core/answers/time.ts';
-import { parseGpx } from '../../core/route/gpx.ts';
-import type { RawPoint, XmlDocLike } from '../../core/route/gpx.ts';
 import { sampleGrid } from '../../core/route/grid.ts';
-import { buildRoute } from '../../core/route/profile.ts';
 import { planStages, shownAscentM } from '../../core/route/stages.ts';
 import type { Pace } from '../../core/route/stages.ts';
 import type { Route, Trip } from '../../core/types.ts';
@@ -12,22 +9,6 @@ import { shortIsoDay, shortMapDate, showKm, W } from '../../core/wording/en.ts';
 
 /** 1214 as "1,214". */
 export const thousands = (n: number): string => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-
-const stem = (fileName: string): string => fileName.replace(/^.*[\\/]/, '').replace(/\.[^.]*$/, '').trim().slice(0, 60);
-
-/**
- * A GPX file as a route with no days yet. Throws GpxError with the reason's own plain message for a file that can't be used.
- * `hadHeights` is whether every point came with a height; if not, Get ready offline looks them up.
- */
-export async function routeFromGpx(text: string, fileName: string, parseXml: (s: string) => XmlDocLike): Promise<{ route: Route; hadHeights: boolean }> {
-  const parsed = parseGpx(text, parseXml);
-  const raw: RawPoint[] = parsed.points;
-  const route = await buildRoute(raw, parsed.name || stem(fileName) || W.appTripUnnamed, 'gpx');
-  return { route, hadHeights: route.points.every((p) => p.ele !== null) };
-}
-
-/** A router's line as a route: the very building a GPX file goes through, with all its points. */
-export const routeFromPoints = (raw: RawPoint[], name: string): Promise<Route> => buildRoute(raw, name, 'planned');
 
 export type PlanSettings = { flatKph: number; pace: Pace; nights: number | null };
 
@@ -43,8 +24,8 @@ const PROFILE_W = 300;
 const PROFILE_H = 72;
 const PROFILE_POINTS = 120;
 
-/** The heights along the route as a line in a 300 x 72 box; null while any height is unknown. */
-export function profileOf(route: Route): Profile | null {
+/** The points the profile draws (at most about 120) and its height scale; null while any height is unknown. */
+function drawnPoints(route: Route): { picked: Route['points']; lo: number; hi: number; y: (ele: number) => number } | null {
   const pts = route.points;
   if (pts.length < 2 || route.lengthKm <= 0 || pts.some((p) => p.ele === null)) return null;
   const heights = pts.map((p) => p.ele!);
@@ -53,28 +34,32 @@ export function profileOf(route: Route): Profile | null {
   const span = Math.max(hi - lo, 20);
   const step = Math.max(1, Math.ceil(pts.length / PROFILE_POINTS));
   const picked = pts.filter((_, i) => i % step === 0 || i === pts.length - 1);
-  const path = picked
-    .map((p, i) => `${i === 0 ? 'M' : 'L'}${((p.km / route.lengthKm) * PROFILE_W).toFixed(1)},${(PROFILE_H - ((p.ele! - lo) / span) * (PROFILE_H - 4) - 2).toFixed(1)}`)
+  return { picked, lo, hi, y: (ele) => PROFILE_H - ((ele - lo) / span) * (PROFILE_H - 4) - 2 };
+}
+
+/** The heights along the route as a line in a 300 x 72 box; null while any height is unknown. */
+export function profileOf(route: Route): Profile | null {
+  const d = drawnPoints(route);
+  if (!d) return null;
+  const path = d.picked
+    .map((p, i) => `${i === 0 ? 'M' : 'L'}${((p.km / route.lengthKm) * PROFILE_W).toFixed(1)},${d.y(p.ele!).toFixed(1)}`)
     .join('');
-  return { path, minM: Math.round(lo), maxM: Math.round(hi) };
+  return { path, minM: Math.round(d.lo), maxM: Math.round(d.hi) };
 }
 
 /**
- * Where the profile line is at a kilometre, in the profile's 300 x 72 box (the same scale as profileOf's path), from the route's
- * own heights between the points either side; null while any height is unknown. A stop's icon sits there (TRIP-STOPS).
+ * Where the drawn profile line is at a kilometre, in the profile's 300 x 72 box: between the very points the path is drawn
+ * through, so a stop's icon sits on the line as drawn (TRIP-STOPS; review of PR 73, M1). Null while any height is unknown.
  */
 export function profileY(route: Route, km: number): number | null {
-  const pts = route.points;
-  if (pts.length < 2 || route.lengthKm <= 0 || pts.some((p) => p.ele === null)) return null;
-  const heights = pts.map((p) => p.ele!);
-  const lo = Math.min(...heights);
-  const span = Math.max(Math.max(...heights) - lo, 20);
+  const d = drawnPoints(route);
+  if (!d) return null;
+  const pts = d.picked;
   let after = pts.findIndex((p) => p.km >= km);
   if (after <= 0) after = after === 0 ? 1 : pts.length - 1;
   const [a, b] = [pts[after - 1]!, pts[after]!];
   const t = b.km > a.km ? Math.max(0, Math.min(1, (km - a.km) / (b.km - a.km))) : 0;
-  const ele = a.ele! + (b.ele! - a.ele!) * t;
-  return PROFILE_H - ((ele - lo) / span) * (PROFILE_H - 4) - 2;
+  return d.y(a.ele! + (b.ele! - a.ele!) * t);
 }
 
 /** Which line a route follows: it stays the same when looked-up heights change the route's own id. */

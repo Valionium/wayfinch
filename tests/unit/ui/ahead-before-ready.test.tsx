@@ -5,6 +5,8 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { W } from '../../../src/core/wording/en.ts';
+import type { StepReport } from '../../../src/data/prepare.ts';
+import { browserAhead } from '../../../src/ui/shell-actions.ts';
 import type { AheadActions, AheadTrip } from '../../../src/ui/ahead/actions.ts';
 import { bannedHits } from '../../fixtures/banned.ts';
 import { rainyStop, FRI } from './ahead-fixture.ts';
@@ -80,5 +82,52 @@ describe('Ahead before Get ready offline', () => {
     finish();
     await until(() => calls.some(([n]) => n === 'retry'), 'the read after it');
     expect(calls.filter(([n]) => n === 'getReady')).toHaveLength(1);
+  });
+});
+
+describe('What the review of PR 73 found', () => {
+  const noSignal = (): StepReport[] => [
+    { step: 'heights', ok: true, note: null },
+    { step: 'places', ok: false, note: W.appPrepNoConnection },
+    { step: 'hours', ok: false, note: W.appPrepNoConnection },
+    { step: 'weather', ok: false, note: W.appPrepNoConnection },
+    { step: 'baseline', ok: false, note: W.appPrepNoConnection },
+  ];
+
+  test('[AH-BEFORE-READY] a run without signal names the steps not saved, says so plainly, and offers Try again', async () => {
+    const { actions } = fakeActions();
+    await show(trip(viewOf(bare())), { ...actions, getReady: async () => noSignal() });
+    await until(() => host.querySelector('[data-need-ready] button') !== null, 'the card');
+    await click(buttonNamed(W.appTripGetReadyButton, host.querySelector('[data-need-ready]')!));
+    await until(() => text().includes(W.appTripMissingHeading), 'the steps not saved');
+    const card = host.querySelector('[data-need-ready]')!;
+    expect(card.textContent).toContain(W.appTripStepPlaces);
+    expect(card.textContent).toContain(W.appPrepNoConnection);
+    expect(card.textContent).toContain(W.appPrepNoSignal);
+    expect(buttonNamed(W.appTripRetryButton, card)).toBeDefined();
+  });
+
+  test('[AH-BEFORE-READY] after a run with a step missing (Ahead no longer "before"), the top card still names it, with Try again', async () => {
+    const v: AheadTrip = { ...trip(viewOf(rainyStop({ now: `${FRI} 07:30`, positions: [] }))), failedSteps: [{ step: 'places', ok: false, note: W.appPrepStorageFull(6, 14) }] };
+    expect(v.beforeReady).toBe(false);
+    await show(v, fakeActions().actions);
+    await until(() => host.querySelector('[data-need-ready] button') !== null, 'the card');
+    const card = host.querySelector('[data-need-ready]')!;
+    expect(card.textContent).toContain(W.appTripMissingHeading);
+    expect(card.textContent).toContain(W.appPrepStorageFull(6, 14));
+    expect(card.textContent).not.toContain(W.appAheadNeedTitle);
+    expect(buttonNamed(W.appTripRetryButton, card)).toBeDefined();
+    // The cards answer as usual: only the steps missing are named.
+    expect(host.querySelector('[data-card="water"] .ah-toggle')).not.toBeNull();
+  });
+
+  test('[AH-BEFORE-READY] Ahead\'s Get ready offline is the prepare it was given: the same callbacks reach it', async () => {
+    const seen: unknown[] = [];
+    const prepare: AheadActions['getReady'] = async (a, b) => { seen.push(a, b); return []; };
+    const shell = browserAhead({ now: () => new Date(), geolocation: () => undefined, online: () => false, fetch: () => Promise.reject(new Error('no')), share: null, writeClipboard: null, prepare });
+    const onProgress = () => undefined;
+    const onNotice = () => undefined;
+    await shell.actions.getReady(onProgress, onNotice);
+    expect(seen).toEqual([onProgress, onNotice]);
   });
 });

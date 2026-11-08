@@ -15,7 +15,8 @@ import { readInputs } from '../../../src/store/inputs.ts';
 import { savePrepared } from '../../../src/store/prepared.ts';
 import { preparedStore } from '../../../src/store/prepared.ts';
 import { readTrip } from '../../../src/store/trip.ts';
-import { planned, routeFromGpx } from '../../../src/ui/trip/model.ts';
+import { planned } from '../../../src/ui/trip/model.ts';
+import { routeFromGpx } from '../../../src/ui/trip/read-gpx.ts';
 import { askForHomeScreen, installOffer } from '../../../src/ui/install.ts';
 import { refreshBikeSource } from '../../../src/ui/bike/live.ts';
 import { TripScreen } from '../../../src/ui/trip/trip.tsx';
@@ -58,6 +59,8 @@ async function show(svc: TripServices = services()): Promise<TripServices> {
   act(() => render(null, host));
   await act(async () => { render(<TripScreen services={svc} />, host); });
   await until(() => host.querySelector('[data-trip-loaded]') !== null, 'Trip to load');
+  // Add a route is a chunk of its own, in the open Route step.
+  await until(() => host.querySelector('[data-step="route"][data-open]') === null || host.querySelector('[data-add-route]') !== null, 'Add a route');
   return svc;
 }
 
@@ -79,8 +82,9 @@ async function openDetails(): Promise<void> {
 
 async function pick(content: string, name = 'ride.gpx'): Promise<void> {
   // With a route, the file picker is in the Route step, opened by its Change.
-  if (!host.querySelector('input[type=file]')) await openStep('route');
-  const input = host.querySelector<HTMLInputElement>('input[type=file]')!;
+  if (!host.querySelector('[data-add-route] input[type=file]')) await openStep('route');
+  await until(() => host.querySelector('[data-add-route] input[type=file]') !== null, 'the file picker');
+  const input = host.querySelector<HTMLInputElement>('[data-add-route] input[type=file]')!;
   Object.defineProperty(input, 'files', { value: [new File([content], name, { type: 'application/gpx+xml' })], configurable: true });
   await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); });
 }
@@ -128,7 +132,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
 
   test('[TRIP-GPX-BAD] a file that cannot be read at all is told in words, with nothing thrown at the rider', async () => {
     await show();
-    const input = host.querySelector<HTMLInputElement>('input[type=file]')!;
+    const input = host.querySelector<HTMLInputElement>('[data-add-route] input[type=file]')!;
     const broken = { name: 'a.gpx', size: 10, text: () => Promise.reject(new Error('boom')) };
     Object.defineProperty(input, 'files', { value: [broken], configurable: true });
     await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); });
@@ -620,7 +624,7 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     await click(button(W.appAbPlan));
     await until(() => text().includes(W.appAbNone), 'the sentence');
     expect(await readTrip()).toBeNull();
-    expect(host.querySelector('input[type=file]')).not.toBeNull();
+    expect(host.querySelector('[data-add-route] input[type=file]')).not.toBeNull();
     expect(net.urls.some((u) => /routed-(foot|car)|project-osrm|profile=(car|foot)/.test(u))).toBe(false);
   });
 

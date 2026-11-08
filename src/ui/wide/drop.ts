@@ -6,7 +6,9 @@ import type { ScreenName } from '../nav.ts';
 
 /** Where a file dropped on a screen goes: that screen's own file input, which does the reading and the saying. */
 const ZONES: Partial<Record<string, string>> = {
-  trip: '[data-add-route] input[type="file"]',
+  // Trip itself, whatever step is open: it opens the Route step with the file, which asks before it replaces a route (review of
+  // PR 73, I3). It takes the file as a `filedrop` event, not into an input of its own.
+  trip: '[data-trip-drop]',
   // also on #/you/legal, which is You at its legal links (review M4 of PR 45): the screen's tab decides
   you: 'main[data-screen^="you"] input[type="file"]',
 };
@@ -21,10 +23,10 @@ export function pickInto(input: HTMLInputElement, file: File): void {
   input.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-/** The file input a drop on this screen goes to, or null where the screen takes no drops. */
-export function zoneInput(root: ParentNode, screen: ScreenName): HTMLInputElement | null {
+/** The file input (or Trip's zone) a drop on this screen goes to, or null where the screen takes no drops. */
+export function zoneInput(root: ParentNode, screen: ScreenName): HTMLElement | null {
   const selector = ZONES[tabOf(screen)];
-  return selector ? root.querySelector<HTMLInputElement>(selector) : null;
+  return selector ? root.querySelector<HTMLElement>(selector) : null;
 }
 
 /** Window-level listeners. `screen` says which screen shows now. Returns the way to take them off again. */
@@ -49,7 +51,9 @@ export function installDrop(target: Window, root: ParentNode, screen: () => Scre
     hint(false);
     const input = zoneInput(root, screen());
     const file = e.dataTransfer?.files?.[0];
-    if (input && file) pickInto(input, file);
+    if (!input || !file) return;
+    if (input instanceof HTMLInputElement) pickInto(input, file);
+    else input.dispatchEvent(new CustomEvent('filedrop', { detail: file }));
   };
   const leave = (e: DragEvent): void => { if (e.relatedTarget === null) hint(false); };
   target.addEventListener('dragenter', over);

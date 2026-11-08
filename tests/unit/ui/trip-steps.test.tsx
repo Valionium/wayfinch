@@ -78,11 +78,14 @@ async function show(svc: TripServices = services()): Promise<TripServices> {
   act(() => render(null, host));
   await act(async () => { render(<TripScreen services={svc} />, host); });
   await until(() => host.querySelector('[data-trip-loaded]') !== null, 'Trip to load');
+  // Add a route is a chunk of its own, in the open Route step.
+  await until(() => host.querySelector('[data-step="route"][data-open]') === null || host.querySelector('[data-add-route]') !== null, 'Add a route');
   return svc;
 }
 
 async function pick(content: string): Promise<void> {
-  const input = host.querySelector<HTMLInputElement>('input[type=file]')!;
+  await until(() => host.querySelector('[data-add-route] input[type=file]') !== null, 'the file picker');
+  const input = host.querySelector<HTMLInputElement>('[data-add-route] input[type=file]')!;
   Object.defineProperty(input, 'files', { value: [new File([content], 'ride.gpx', { type: 'application/gpx+xml' })], configurable: true });
   await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); });
 }
@@ -91,6 +94,8 @@ async function withRoute(svc?: TripServices): Promise<TripServices> {
   const s = await show(svc);
   await pick(await fixtureGpx('heidelberg-strasbourg'));
   await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
+  // Get ready offline's body is a chunk of its own: it opens with its step.
+  await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
   return s;
 }
 
@@ -100,7 +105,7 @@ describe('Trip as four steps (guided Trip design §2.2)', () => {
     const names = [...host.querySelectorAll<HTMLElement>('[data-step]')].map((e) => e.dataset.step);
     expect(names).toEqual(['route', 'getready', 'bags', 'go']);
     expect(openSteps()).toEqual(['route']);
-    expect(step('route').querySelector('input[type=file]')).not.toBeNull();
+    expect(step('route').querySelector('[data-add-route] input[type=file]')).not.toBeNull();
     expect(step('getready').dataset.state).toBe('later');
     expect(step('getready').textContent).toContain(W.appTripGetReadyLater);
     expect(step('bags').textContent).toContain(W.appTripBagsLater);
@@ -129,7 +134,7 @@ describe('Trip as four steps (guided Trip design §2.2)', () => {
     expect(openSteps()).toEqual(['route']);
     await until(() => step('route').querySelector('#trip-date') !== null, 'the date in the Route step');
     expect(step('route').querySelector('#trip-nights')).not.toBeNull();
-    expect(step('route').querySelector('input[type=file]')).not.toBeNull();
+    await until(() => step('route').querySelector('[data-add-route] input[type=file]') !== null, 'the file picker in the Route step');
     // Go is one tap away too, with the flight-mode line and Open Ahead.
     await click(buttonIn(step('go'), W.appTripStepGo));
     expect(openSteps()).toEqual(['go']);
@@ -272,5 +277,115 @@ describe('The stops on the height profile (guided Trip design §6)', () => {
   test('[TRIP-STOPS] the real services read the stops from the store: none for a route with nothing saved, and nothing throws', async () => {
     const svc = await withRoute();
     await expect(svc.stops()).resolves.toEqual([]);
+  });
+});
+
+describe('What the review of PR 73 found', () => {
+  /** A Get ready offline held at its places step until `release`, counting its calls. */
+  function gated(): { svc: Partial<TripServices>; calls: () => number; release: () => void } {
+    let n = 0;
+    let open: () => void = () => undefined;
+    const held = new Promise<void>((r) => { open = r; });
+    const done = preparing();
+    return {
+      calls: () => n,
+      release: () => open(),
+      svc: {
+        prepare: async (onProgress, onNotice) => {
+          n += 1;
+          onProgress('places', 3, 14);
+          await held;
+          return done.prepare!(onProgress, onNotice);
+        },
+      },
+    };
+  }
+
+  test('[TRIP-GETREADY] one run at a time: folding the step mid-run, reopening it and tapping again shows the running progress and starts nothing new', async () => {
+    const g = gated();
+    await withRoute(services(g.svc));
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes(W.appTripProgress(2, 6, W.appTripStepPlaces)), 'the progress');
+    await click(buttonIn(step('bags'), W.appTripStepBags));
+    expect(openSteps()).toEqual(['bags']);
+    // Folded, the step says it is working, not what it will do.
+    expect(step('getready').textContent).toContain(W.appTripWorking);
+    await click(buttonIn(step('getready'), W.appTripGetReadyTitle));
+    await until(() => step('getready').querySelector('[data-getready]') !== null, 'the step again');
+    expect(step('getready').textContent).toContain(W.appTripProgress(2, 6, W.appTripStepPlaces));
+    for (const b of [...step('getready').querySelectorAll('button')].filter((x) => x.getAttribute('aria-busy') === 'true')) await click(b);
+    g.release();
+    await until(() => text().includes('12 places'), 'the result');
+    expect(g.calls()).toBe(1);
+  });
+
+  test('[AH-BEFORE-READY] Trip and Ahead share the one run: started on Trip, Ahead\'s card shows its progress and its button starts nothing new', async () => {
+    const g = gated();
+    const svc = await withRoute(services(g.svc));
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes(W.appTripProgress(2, 6, W.appTripStepPlaces)), 'the progress');
+    const { NeedReady } = await import('../../../src/ui/ahead/need-ready.tsx');
+    const other = document.createElement('div');
+    document.body.append(other);
+    let retried = 0;
+    const actions = { getReady: svc.prepare, retry: async () => { retried += 1; } } as unknown as Parameters<typeof NeedReady>[0]['actions'];
+    await act(async () => { render(<NeedReady actions={actions} failed={[]} />, other); });
+    expect(other.textContent).toContain(W.appTripProgress(2, 6, W.appTripStepPlaces));
+    await click(other.querySelector('button')!);
+    g.release();
+    await until(() => text().includes('12 places'), 'the result');
+    expect(g.calls()).toBe(1);
+    await until(() => retried > 0, 'Ahead reads again');
+    act(() => render(null, other));
+    other.remove();
+  });
+
+  test('[WIDE-DROP] a GPX dropped on Trip goes to the Route step whatever step is open, and asks before it replaces the route', async () => {
+    await withRoute();
+    expect(openSteps()).toEqual(['getready']);
+    const before = (await readTrip())!.route.id;
+    // What src/ui/wide/drop.ts does with a file dropped on Trip.
+    const zone = host.querySelector<HTMLElement>('[data-trip-drop]')!;
+    const file = new File([await fixtureGpx('loop')], 'loop.gpx');
+    await act(async () => { zone.dispatchEvent(new CustomEvent('filedrop', { detail: file })); });
+    await until(() => host.querySelector('[data-replace]') !== null, 'the question');
+    expect(openSteps()).toEqual(['route']);
+    expect(step('route').contains(host.querySelector('[data-replace]'))).toBe(true);
+    expect((await readTrip())!.route.id).toBe(before);
+  });
+
+  test('[TRIP-STEPS] a step opened from the keyboard takes the focus to its heading, for Bags\' title and for Change on Route', async () => {
+    await withRoute();
+    const bags = buttonIn(step('bags'), W.appTripStepBags);
+    bags.focus();
+    await click(bags);
+    await settle(10);
+    expect(step('bags').contains(document.activeElement)).toBe(true);
+    expect(document.activeElement!.tagName).toBe('H2');
+    const change = buttonIn(step('route'), W.appTripStepChange);
+    change.focus();
+    await click(change);
+    await settle(10);
+    expect(step('route').contains(document.activeElement)).toBe(true);
+  });
+
+  test('[TRIP-STOPS] the stops are read again after Update weather: a newer forecast can move the cover icons', async () => {
+    const svc = await withRoute(services(preparing()));
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes('12 places'), 'the result');
+    const { RouteSummary } = await import('../../../src/ui/trip/summary.tsx');
+    const snap = await svc.load();
+    let asked = 0;
+    const stops = async (): Promise<RouteStop[]> => { asked += 1; return []; };
+    const other = document.createElement('div');
+    document.body.append(other);
+    await act(async () => { render(<RouteSummary snap={snap} stops={stops} />, other); });
+    await settle(10);
+    expect(asked).toBe(1);
+    await act(async () => { render(<RouteSummary snap={{ ...snap, forecastFetchedAt: new Date(NOW.getTime() + 3_600_000) }} stops={stops} />, other); });
+    await settle(10);
+    expect(asked).toBe(2);
+    act(() => render(null, other));
+    other.remove();
   });
 });

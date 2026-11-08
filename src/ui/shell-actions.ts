@@ -24,6 +24,7 @@ import { announceHere, onChanged } from '../store/changed.ts';
 import { keepAfterScreen, readInputs } from '../store/inputs.ts';
 import { addPosition, backToToday, confirmWater, setPlanTomorrow } from '../store/positions.ts';
 import { readMapLink, writeMapLink } from '../store/share-choice.ts';
+import { readPrepared } from '../store/prepared.ts';
 import { weatherStore } from '../store/weather.ts';
 import type { AheadActions, AheadTrip, AheadView, PositionState, Town } from './ahead/actions.ts';
 import { bikeSource } from './bike/live.ts';
@@ -116,6 +117,8 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
   let reading = 0;
   // With no route: the fix Emergency's Update position found, for this page only. Positions are kept on a route, so it is not stored.
   let here: Position | null = null;
+  // What the last Get ready offline did not save, read with the inputs.
+  let failedSteps: AheadTrip['failedSteps'] = [];
 
   // One write at a time, as on Trip: the store refuses a write over a version this window has not read.
   let queue: Promise<unknown> = Promise.resolve();
@@ -166,7 +169,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       bike: bikeSource.peek().bike, stillAboutL, badSpeed: !usableFlatKph(i.trip.flatKph),
       approximateHelp: p !== null && p.source === 'gps' && !(p.accuracyM <= APPROXIMATE_HELP_M),
       shareOld, mapLink: readMapLink(), canShare: deps.share !== null, position, weatherSay, weatherBusy, notice,
-      beforeReady: i.places.length === 0 && i.savedKm.length === 0 && i.forecast === null,
+      beforeReady: i.places.length === 0 && i.savedKm.length === 0 && i.forecast === null, failedSteps,
     };
     view.value = next;
     noteRoute(true);
@@ -214,6 +217,8 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     try {
       // A read never makes the database: with none (a fresh phone, or just deleted) there is no trip.
       read = await readInputs(at);
+      // Only once there is a trip (and so a database): a read never makes one.
+      failedSteps = read ? ((await readPrepared().catch(() => null))?.steps.filter((s) => !s.ok) ?? []) : [];
     } catch {
       read = null;
       failed = true;

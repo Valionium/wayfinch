@@ -3,7 +3,8 @@ import { planStages } from '../../../src/core/route/stages.ts';
 import { GpxError } from '../../../src/core/route/gpx.ts';
 import { buildRoute } from '../../../src/core/route/profile.ts';
 import { W } from '../../../src/core/wording/en.ts';
-import { planned, profileOf, profileY, routeDoneLine, routeFromGpx, summaryOf, tripLineOf, tripRuns } from '../../../src/ui/trip/model.ts';
+import { planned, profileOf, profileY, routeDoneLine, summaryOf, tripLineOf, tripRuns } from '../../../src/ui/trip/model.ts';
+import { routeFromGpx } from '../../../src/ui/trip/read-gpx.ts';
 import type { Trip } from '../../../src/core/types.ts';
 import { fixtureGpx, gpxText } from '../../fixtures/gpx.ts';
 import { loadFixtureRoute } from '../../fixtures/packs/index.ts';
@@ -156,9 +157,30 @@ describe('The stops on the height profile (guided Trip design §6)', () => {
     const box = profileOf(route)!;
     const top = route.points.reduce((a, b) => (b.ele! > a.ele! ? b : a));
     const low = route.points.reduce((a, b) => (b.ele! < a.ele! ? b : a));
-    expect(profileY(route, top.km)).toBeCloseTo(2, 0);
-    expect(profileY(route, low.km)).toBeCloseTo(70, 0);
+    // The line is drawn through about 120 of the points (review of PR 73, M1: the icon sits on the line as drawn), so the very top
+    // and bottom points can fall between two drawn ones: the icon is then at most at the box's edges.
+    expect(profileY(route, top.km)).toBeGreaterThanOrEqual(2);
+    expect(profileY(route, top.km)).toBeLessThan(10);
+    expect(profileY(route, low.km)).toBeLessThanOrEqual(70);
+    expect(profileY(route, low.km)).toBeGreaterThan(62);
     expect(box.maxM).toBe(Math.round(top.ele!));
     expect(profileY({ ...route, points: route.points.map((p) => ({ ...p, ele: null })) }, 3)).toBeNull();
+  });
+});
+
+describe('What the review of PR 73 found', () => {
+  test('[TRIP-STOPS] the icon’s height is the drawn line’s: within half a unit of the path at 400 kilometres on each fixture', async () => {
+    for (const id of ['heidelberg-strasbourg', 'multi-day-800', 'alpine-pass'] as const) {
+      const { route } = await routeFromGpx(await fixtureGpx(id), 'ride.gpx', parseXml);
+      const pts = [...profileOf(route)!.path.matchAll(/[ML]([\d.]+),([\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])] as const);
+      for (let n = 0; n <= 400; n++) {
+        const km = (route.lengthKm * n) / 400;
+        const x = (km / route.lengthKm) * 300;
+        const k = Math.max(1, pts.findIndex(([px]) => px >= x));
+        const [a, b] = [pts[k - 1]!, pts[k]!];
+        const drawn = b[0] > a[0] ? a[1] + ((b[1] - a[1]) * (x - a[0])) / (b[0] - a[0]) : a[1];
+        expect(Math.abs(profileY(route, km)! - drawn), `${id} at km ${km.toFixed(1)}`).toBeLessThan(0.5);
+      }
+    }
   });
 });

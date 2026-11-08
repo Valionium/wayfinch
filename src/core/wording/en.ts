@@ -852,6 +852,7 @@ export const W = {
   appPrepHeightsNotice: 'To work out the climbing, sampled points of this route go to the Open-Meteo elevation service, rounded to about 100 m.',
   appPrepHeightsFailed: "Heights couldn't be looked up, so climbing reads unknown and stages split by distance.",
   appPrepNoConnection: 'No connection, so this was not updated.',
+  appPrepNoSignal: 'No signal, so nothing new could be fetched. Try again when you have signal.',
   appPrepPacksNoAnswer: "The map data service didn't answer, so no places were saved.",
   appPrepPacksRestarted: 'The map data was updated while this was unfinished, so it started again on the new data.',
   appPrepTilesFailed: (n: number): string => `Map data for ${n === 1 ? 'one part' : `${n} parts`} of the route wasn't saved. Get ready offline picks up where it stopped.`,

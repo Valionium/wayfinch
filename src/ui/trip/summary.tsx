@@ -39,7 +39,7 @@ function ProfileStops({ route, stops }: { route: Route; stops: RouteStop[] }) {
           return (
             <button
               key={n} type="button" class={`ah-icon ah-icon-${one!.kind}${more && ' ah-icon-more'}`} style={{ left: `${(x * 100).toFixed(2)}%`, top: `${(ROOM_PX + y - 22).toFixed(1)}px` }}
-              aria-label={more ? `${stopWords(one!)}, ${more}: ${rest.map(stopWords).join(', ')}` : stopWords(one!)} aria-expanded={picked === n} aria-controls="trip-stop-list"
+              aria-label={more ? `${stopWords(one!)}, ${more}: ${rest.map(stopWords).join(', ')}` : stopWords(one!)} aria-expanded={picked === n} aria-controls={picked === n ? 'trip-stop-list' : undefined}
               onClick={() => setPicked(picked === n ? null : n)}
             >
               <Glyph kind={one!.kind} />
@@ -56,9 +56,10 @@ function ProfileStops({ route, stops }: { route: Route; stops: RouteStop[] }) {
 
 export function RouteSummary({ snap, stops }: { snap: TripSnapshot; stops: TripServices['stops'] }) {
   const { trip } = snap;
-  // The stops come once Get ready offline has saved places: read again when the route, its days, its date or what was saved change.
+  // The stops come once Get ready offline has saved places: read again when the route, its days, its date, what was saved or the
+  // forecast (Update weather moves the cover icons: review of PR 73, M2) change.
   const ready = trip !== null && (snap.prepared !== null || snap.places > 0);
-  const key = ready ? [trip.route.id, trip.route.stages.length, trip.departureDate, trip.startTime, snap.places, snap.prepared?.at?.getTime?.()].join('|') : '';
+  const key = ready ? [trip.route.id, trip.route.stages.length, trip.departureDate, trip.startTime, snap.places, snap.prepared?.at?.getTime?.(), snap.forecastFetchedAt?.getTime()].join('|') : '';
   const [found, setFound] = useState<RouteStop[] | null>(null);
   useEffect(() => {
     setFound(null);

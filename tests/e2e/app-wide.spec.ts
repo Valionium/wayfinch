@@ -266,6 +266,25 @@ test('[WIDE-DROP] a GPX file dropped anywhere on Trip becomes the route; the fil
   await expect(page.locator('[data-summary]')).toContainText('km');
 });
 
+// Review of PR 73, I3: with a route there (Go is the open step on the trip's day), a GPX dropped on Trip opens the Route step, which
+// asks before it replaces the route, as its Change does.
+test('[WIDE-DROP] with a route already there, a GPX dropped anywhere on Trip asks before it replaces it, whatever step is open', async ({ page }) => {
+  await open(page, 1280, 720, 'trip');
+  await expect(page.locator('[data-step="go"][data-open]')).toBeVisible();
+  await expect(page.locator('[data-summary]')).toContainText('Heidelberg');
+  const gpx = await fixtureGpx('loop', { heights: true });
+  const data = await page.evaluateHandle((text) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([text], 'loop.gpx', { type: 'application/gpx+xml' }));
+    return dt;
+  }, gpx);
+  await page.dispatchEvent('.trip-side', 'drop', { dataTransfer: data });
+  await expect(page.locator('[data-step="route"] [data-replace]')).toContainText('Replace your route?');
+  await expect(page.locator('[data-summary]')).toContainText('Heidelberg');
+  await page.locator('[data-replace]').getByRole('button', { name: 'Replace route' }).click();
+  await expect(page.locator('[data-summary]')).toContainText('Heilbronn loop');
+});
+
 test('[WIDE-STRAY] a file dropped where there is no zone is cancelled at window level: nothing opens or downloads', async ({ page }) => {
   await open(page, 1280, 720);
   const url = page.url();

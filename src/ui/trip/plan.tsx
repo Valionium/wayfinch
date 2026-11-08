@@ -7,7 +7,7 @@ import { W } from '../../core/wording/en.ts';
 import { planRoute, searchPlace } from '../../data/routing.ts';
 import type { FoundPlace } from '../../data/routing.ts';
 import { GeoNamesCredit, OsmCredit } from './credit.tsx';
-import { routeFromPoints } from './model.ts';
+import { routeFromPoints } from './read-gpx.ts';
 import type { TripServices } from './services.ts';
 
 type Slot = 'from' | 'to';
