@@ -13,7 +13,7 @@ test("[LC-PAGE-LIVE] the page's hash is the one recorded", () => {
   // The tag load-check-zip-2026-10-30 holds the page as it was live (aa086001…). Since then: the top-tube wording and the update prompt.
   // Sub-project 6 changes the bag planner behind the launch switch (bike.js, the rig, Look); riders keep releases/load-check-root.html
   // (LC-ROOT-FROZEN), so each change here is on purpose and recorded.
-  const recorded = 'd7c5d3c855cac2983a9d6cc6b6658d238b69d9bf6621715a95c9b5a3971db79b';   // + after the launch, part 3: the fork close-up stays under the drawing, the short pair-shade label
+  const recorded = 'bf63576111b10f575e15c66496fb18eadb312350169249213507003c0c2d53c1';   // + the Gear advisor (sub-project 13, groups 1-3: trial bags and the way in, review of PR 68 fixed) merged with main's after the launch, part 3 (the fork close-up stays under the drawing, the short pair-shade label)
   expect(createHash('sha256').update(readFileSync(PAGE)).digest('hex')).toBe(recorded);
 });
 
@@ -37,6 +37,8 @@ const KEPT = [
   'update-prompt', 'bike-contract', 'look', 'rig', 'contracts', 'fit-props',
   // sub-project 11, group 3: the chosen bike, the bag planner's half
   'bike-choice',
+  // sub-project 13, group 2: the Gear advisor in the bag planner
+  'advisor',
 ].map((n) => `${n}.cjs`).sort();
 const RETIRED = ['tyre-pressure', 'pressure-tool-markup', 'pressure-tool', 'ui-pressure-layout'];
 

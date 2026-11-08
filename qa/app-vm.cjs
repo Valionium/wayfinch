@@ -32,6 +32,8 @@ function appVM(options={}){
     fetch(){throw Error('Network requests are disabled in this test');}});
   // The bike module the page loads before its own script (/tools/bags/bike.js), built from src/core/bike as the build does.
   if(options.bike!==false)vm.runInContext(require('../tools/bike-script.cjs').bikeScriptSync(),context,{filename:'bike.js'});
+  // The Gear advisor's search (/tools/bags/advisor.js), which the page loads when the advisor opens; here it is there from the start.
+  if(options.advisor!==false)vm.runInContext(require('../tools/bike-script.cjs').advisorScriptSync(),context,{filename:'advisor.js'});
   vm.runInContext(script.slice(0,script.indexOf('/* ==== 95-init.js ==== */')),context,{filename:'index.html'});
   const run=code=>vm.runInContext(code,context);
   // Rendering is tested separately through the markup-producing functions.
