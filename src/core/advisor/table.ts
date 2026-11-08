@@ -1,19 +1,9 @@
-// The Gear advisor's fixed tables (sub-project 13 plan: decisions 2, 3, 6 and 8). The owner's changes go here only.
-import type { Pos, Setup } from './types.ts';
+// The Gear advisor's fixed tables (sub-project 13 plan: decisions 2, 3, 6 and 8). The owner's changes go here only (Better handling's weights: handling.ts).
+import { HANDLING_WEIGHTS } from './handling.ts';
+import type { Setup } from './types.ts';
 
-/**
- * Better handling (decision 2; design §3.3): the weight of each placed kilo by its position. Lower is better. Kit strapped outside a
- * bag counts at the position it is strapped to; `deck` is the rack deck.
- */
-export const WEIGHTS: Readonly<Record<Pos, number>> = Object.freeze({
-  frame: 1.0, bottle: 1.0, bottleU: 1.0, // 1 frame, low and central
-  top: 1.2,                              // 2 top tube
-  fork: 1.5,                             // 3 fork cages
-  rack: 1.8, deck: 1.8,                  // 4 panniers on a rack, and kit on the rack deck
-  bar: 2.2,                              // 5 bar roll
-  seat: 2.6,                             // 6 seat pack
-  pack: 3.5,                             // 7 the back
-});
+/** Better handling (decision 2; design §3.3): the one table in handling.ts, shared with the bag planner's weight map. */
+export const WEIGHTS = HANDLING_WEIGHTS;
 
 export type SizedPos = 'top' | 'fork' | 'bar' | 'seat' | 'rack';
 
