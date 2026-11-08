@@ -29,6 +29,8 @@
   --ground:#1B2018;
   --panel:#242B20;
   --panel-hi:#2E3729;
+  /* the weight map (design of 8 Nov 2026): lightness always one way, brighter as it gets heavier */
+  --wm0:#2c4f94;--wm1:#8c4fa3;--wm2:#ff6a45;--wmneg:#3fb7c4;--wmpos:#f0a03a;--wmzero:#2E3729;
   --line:#3E4A36;
   --line-soft:#333D2C;
   --ink:#EFEDE0;
@@ -394,6 +396,38 @@ button.go.small{font-size:15px;padding:9px 16px;flex:0 0 auto}
 .bag-shell{fill:var(--panel-hi);stroke:var(--muted-dim);stroke-width:1.2}
 .bag-shell.active{stroke:var(--blaze);stroke-width:1.6}
 .bag-fill{opacity:.62}
+/* real bag shapes (design of 8 Nov 2026): the inside lines are decoration; the silhouette carries the state */
+.bk-detail{fill:none;stroke:var(--muted);stroke-width:.7;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+.bk-detail .bk-zip{stroke-dasharray:1.2 1}
+.bk-onbody .bk-detail,.bagg.onbody .bk-detail{stroke:var(--amber)}
+.bk-far{opacity:.62}
+.bagg.ghost .bk-detail{display:none}
+/* the weight map, under the rig once the kit is chosen */
+.wm-show,.wm-diff{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--muted-dim);border-radius:8px;padding:8px 12px;min-height:44px;margin-top:10px;cursor:pointer}
+.wm-show:focus-visible,.wm-diff:focus-visible{outline:2px solid var(--blaze);outline-offset:2px}
+.rig-wm{margin-top:10px}
+.wm-maps{display:grid;gap:10px;grid-template-columns:1fr}
+@media (min-width:700px){
+  .wm-maps{grid-template-columns:1fr 1fr}
+  /* side by side, heading, map and sentence share rows, so the two maps stand level when one heading wraps */
+  .wm-card{display:grid;grid-template-rows:subgrid;grid-row:span 3;row-gap:0}
+}
+.wm-card{margin:0;background:var(--panel);border:1px solid var(--line-soft);border-radius:10px;padding:8px}
+.wm-card figcaption{font-size:13px;margin-bottom:6px}
+.wm-card figcaption span,.wm-cap,.wm-key{color:var(--muted)}
+.wm-wrap{position:relative;aspect-ratio:262/132;border-radius:8px;overflow:hidden;background:var(--panel-hi);--line:var(--ink)}
+.wm-wrap canvas,.wm-wrap svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.wm-wrap .bk-tyre,.wm-wrap .bk-rim{opacity:.75}
+.wm-wrap .bk-spokes{opacity:.25}
+.wm-bag{fill:none;stroke:var(--ink);stroke-width:1;opacity:.85}
+.wm-back{stroke-dasharray:3 2}
+.wm-label{font-size:6px;fill:var(--ink)}
+.wm-sum{font-size:13px;margin:6px 0 0}
+.wm-cap{font-size:13px;margin:0 0 8px}
+.wm-key{font-size:12.5px;margin-top:8px}
+.wm-key p{margin:4px 0}
+.wm-bar{height:10px;border-radius:5px;border:1px solid var(--muted-dim);background:linear-gradient(90deg,var(--wm0),var(--wm1) 50%,var(--wm2))}
+.wm-bar-diff{margin-top:8px;background:linear-gradient(90deg,var(--wmneg),var(--wmzero) 50%,var(--wmpos))}
 .bagg.onbody .bag-shell{stroke-dasharray:none;stroke:var(--amber)}
 .strapline{stroke:var(--blaze);stroke-width:1;opacity:.7;fill:none}
 .bag-tag{font-family:var(--mono);font-size:7.5px;letter-spacing:.1em;fill:var(--muted-dim)}
@@ -1231,6 +1265,8 @@ button.back:hover{color:var(--ink);border-color:var(--muted-dim)}
   --ground:#F4F2E8;
   --panel:#FBFAF3;
   --panel-hi:#EBE8DA;
+  /* the weight map: darker as it gets heavier */
+  --wm0:#a8c8f0;--wm1:#8a63b0;--wm2:#c0301c;--wmneg:#2a8f9d;--wmpos:#c46a0c;--wmzero:#EBE8DA;
   --line:#C7C4B1;
   --line-soft:#DCD9C9;
   --ink:#22271D;
@@ -1880,6 +1916,11 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
   </div>
 
   <main id="planMain">
+  <!-- the weight map (design of 8 Nov 2026): right under the drawing on a phone, beside it when wide; outside the rig, which must fit the window to stay in view -->
+  <div class="wm-block">
+    <button type="button" class="wm-show" id="rigWeightMap" aria-expanded="false" aria-controls="weightMap" hidden>Show weight map</button>
+    <div class="rig-wm" id="weightMap" hidden></div>
+  </div>
   <!-- STEP 1 -->
   <section id="s1" aria-labelledby="stepTitle1">
     <div class="eyebrow">Step one</div>
@@ -4256,7 +4297,8 @@ function safeDataThumb(markup){
   const numeric = new Set(['x','y','x1','y1','x2','y2','cx','cy','r','rx','ry','width','height','opacity','fill-opacity','stroke-opacity','stroke-width']);
   const drawingClasses = new Set(['bk','bk-tyre','bk-rim','bk-spokes','bk-hub','bk-bb','bk-casing','bk-casing-ink','bk-casing-panel','bk-casing-ground',
     'bk-paint','bk-frame','bk-stays','bk-fork','bk-ring','bk-cog','bk-hubgear','bk-rotor','bk-chain','bk-belt','bk-mech','bk-rack','bk-caliper',
-    'bk-crank','bk-post','bk-bar','bk-grip','bk-saddle','bk-hood','bk-motor','bk-battery','bk-shock','bk-seal','bg-wheel','bg-line','bagg','owned','packed','idle','onbody','deck','deck-empty','bag-shell','active','bag-fill','bag-tag','deck-tag','strapline','btl','cage','bottle','bottle-cap','leftbehind','seg','levelline','brimline']);
+    'bk-crank','bk-post','bk-bar','bk-grip','bk-saddle','bk-hood','bk-motor','bk-battery','bk-shock','bk-seal','bg-wheel','bg-line','bagg','owned','packed','idle','onbody','deck','deck-empty','bag-shell','active','bag-fill','bag-tag','deck-tag','strapline','btl','cage','bottle','bottle-cap','leftbehind','seg','levelline','brimline',
+    'bk-bag','bk-shell','bk-fill','bk-far','bk-onbody','bk-detail','bk-strap','bk-zip','bk-roll','bk-hook','bk-end','bk-harness','bk-post-strap']);
   const prefix = 'thumb' + (++thumbRenderId) + '_';
   const idMap = new Map();
   for(const el of doc.querySelectorAll('[id]')){
@@ -5768,7 +5810,7 @@ function advisorDrawnName(s, input){
 function advisorShown(s, input){ return { view:advisorBagView(advisorTrialBags(s, input), s.decks, input), moves:advisorMoves(s, input) }; }
 function advisorCardHtml(s, input, i, shown0 = advisorShown(s, input)){
   const tags = s.tags.length ? `<p class="adv-tags">${s.tags.map(htmlEsc).join(' · ')}</p>` : '';
-  const art = bikeDrawing(S.bikeProfile, shown0.view, { theme:bikeTheme(), idPrefix:'adv' + i });
+  const art = bikeDrawing(S.bikeProfile, shown0.view, { theme:bikeTheme(), idPrefix:'adv' + i }, true);
   const moves = shown0.moves, shown = moves.slice(0, 8);
   if(moves.length > shown.length) shown.push(advisorWord('moreMoves', { n:moves.length - shown.length }));
   return `<article class="adv-card" tabindex="0" aria-labelledby="advS${i}"><h5 id="advS${i}">${htmlEsc(advisorWhat(s, input))}</h5>${tags}`
@@ -5786,7 +5828,7 @@ function advisorSuggestionHtml(s, input, i, shown){ return `<li class="adv-sugg"
 function advisorCombosHtml(list, input, key){
   return `<p class="adv-sub" id="advCombo${key}">${advisorWord('comboTitle')}</p><ul class="adv-combos" aria-labelledby="advCombo${key}">`
     + list.map(([s, i, shown]) => {
-      const art = bikeDrawing(S.bikeProfile, shown.view, { theme:bikeTheme(), idPrefix:'advc' + i });
+      const art = bikeDrawing(S.bikeProfile, shown.view, { theme:bikeTheme(), idPrefix:'advc' + i }, true);
       const why = advisorWhy(s, input)[0] || advisorWord('lower');
       const how = shown.moves.length ? (shown.moves.length > 1 ? advisorWord('howMore', { first:shown.moves[0], n:shown.moves.length - 1 }) : shown.moves[0]) : advisorWord('howNone');
       return `<li><button type="button" class="adv-combo" data-card="advS${i}" aria-label="${htmlEsc(advisorDrawnName(s, input))}" aria-describedby="advCw${i} advCh${i}">`
@@ -5843,7 +5885,7 @@ function advisorStylePic(kind, i){
   const items = kind === 'panniers' ? [{ pos:'rack', L:15, pair:true, fill:0 }]
     : kind === 'bags' ? [{ pos:'frame', L:4.5, shape:1, fill:0 }, { pos:'seat', L:10, fill:0 }, { pos:'bar', L:10, fill:0 }]
     : [{ pos:'frame', L:4.5, shape:1, fill:0 }, { pos:'seat', L:10, fill:0 }];
-  const art = bikeDrawing(S.bikeProfile, { items, decks:{ bar:null, rack:null }, bottles:[] }, { theme:bikeTheme(), idPrefix:'advp' + i });
+  const art = bikeDrawing(S.bikeProfile, { items, decks:{ bar:null, rack:null }, bottles:[] }, { theme:bikeTheme(), idPrefix:'advp' + i }, true);
   return art ? `<span class="adv-pic" aria-hidden="true">${art.svg}</span>` : '';
 }
 function advisorStepsHtml(){
@@ -8202,11 +8244,12 @@ function nightsNote(from, to){
 // (RIG_FALLBACK below), so every bag, spot and tap target is still there.
 function bikeModule(){ return window.WayfinchBike || null; }
 function bikeTheme(){ return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; }
-// One bike with a plan's bags in Contract 1's shape ({items, decks, bottles}, or null), as the app draws it.
-function bikeDrawing(profile, view, options){
+// One bike with a plan's bags in Contract 1's shape ({items, decks, bottles}, or null), as the app draws it; `shaped` draws the bags as
+// their real shapes instead (bike.js's shapedArt, design of 8 Nov 2026): the Gear advisor's sketches.
+function bikeDrawing(profile, view, options, shaped){
   const B = bikeModule(); if(!B) return null;
   const bike = B.normaliseBike(profile), spec = B.resolveBikeSpec(bike, view || null);
-  return { ...B.bikeArt(spec, view || null, options || { theme:bikeTheme() }, bike && bike.look && bike.look.paint || null), spec };
+  return { ...B[shaped && B.shapedArt ? 'shapedArt' : 'bikeArt'](spec, view || null, options || { theme:bikeTheme() }, bike && bike.look && bike.look.paint || null), spec };
 }
 
 function inspectMap(){ return INSPECT; }
@@ -8357,18 +8400,19 @@ const r2 = n => Math.round(n * 100) / 100;
 // so the fill still rises level from the bottom and the inspector reads it like a frame bag.
 function rigShape(p, rx){
   if(!p) return null;
-  if(!p.rot) return { kind:'rect', x:r2(p.x), y:r2(p.y), w:r2(p.w), h:r2(p.h), rx };
+  if(!p.rot) return { kind:'rect', x:r2(p.x), y:r2(p.y), w:r2(p.w), h:r2(p.h), rx, p };
   const cx = p.x + p.w / 2, cy = p.y + p.h / 2, a = p.rot * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
   const pts = [[p.x, p.y], [p.x + p.w, p.y], [p.x + p.w, p.y + p.h], [p.x, p.y + p.h]]
     .map(([x, y]) => [cx + (x - cx) * c - (y - cy) * s, cy + (x - cx) * s + (y - cy) * c]);
   const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]), x0 = Math.min(...xs), y0 = Math.min(...ys);
   return { kind:'poly', pts:pts.map(q => r2(q[0]) + ',' + r2(q[1])).join(' '),
-    box:{ x:r2(x0), y:r2(y0), w:r2(Math.max(...xs) - x0), h:r2(Math.max(...ys) - y0) } };
+    box:{ x:r2(x0), y:r2(y0), w:r2(Math.max(...xs) - x0), h:r2(Math.max(...ys) - y0) }, p };
 }
 function shiftShape(L, dx, dy){
   if(!L || (!dx && !dy)) return L;
-  if(L.kind === 'rect') return { ...L, x:r2(L.x + dx), y:r2(L.y + dy) };
-  return { kind:'poly', box:{ ...L.box, x:r2(L.box.x + dx), y:r2(L.box.y + dy) },
+  const p = L.p && { ...L.p, x:L.p.x + dx, y:L.p.y + dy };
+  if(L.kind === 'rect') return { ...L, x:r2(L.x + dx), y:r2(L.y + dy), p };
+  return { kind:'poly', p, box:{ ...L.box, x:r2(L.box.x + dx), y:r2(L.box.y + dy) },
     pts:L.pts.split(' ').map(q => q.split(',').map(Number)).map(([x, y]) => r2(x + dx) + ',' + r2(y + dy)).join(' ') };
 }
 // Bags stacked on one place climb as far as the view allows, as bike.js stacks them.
@@ -8395,6 +8439,22 @@ function shellPoly(pts,box,pct){
     art:`<polygon class="bag-shell active" points="${pts}"/>`+
         `<rect class="bag-fill" fill="${fillColour(pct)}" clip-path="url(#${id})" x="${box.x}" y="${r2(box.y+box.h-fh)}" width="${box.w}" height="${r2(fh)}"/>` };
 }
+// A real bag shape from bike.js (design of 8 Nov 2026): the silhouette (the only part that takes state), the fill rising level from
+// its bottom, clipped to it, and the inside lines (decoration, none on an empty spot). Without bike.js the boxes above stay.
+function bagShapeOf(pos, L, litres, slot){
+  const B = bikeModule();
+  return B && B.bagShape && L && L.p ? B.bagShape(pos, L.p, litres, { slot:slot || null, frame:pos === 'frame' ? L.pts : undefined }) : null;
+}
+const shapeTurn = s => s.rot ? ` transform="rotate(${r2(s.rot)} ${r2(s.c[0])} ${r2(s.c[1])})"` : '';
+function shellShape(s, pct, bare){
+  const id = 'cl'+(clipN++), b = s.box, fh = Math.max(0, (b.h + 2) * pct);
+  return { def:`<clipPath id="${id}"><path d="${s.d}"/></clipPath>`,
+    art:`<g${shapeTurn(s)}><path class="bag-shell active" d="${s.d}"/>` +
+        (fh > 0 ? `<rect class="bag-fill" fill="${fillColour(pct)}" clip-path="url(#${id})" x="${r2(b.x-1)}" y="${r2(b.y+b.h+1-fh)}" width="${r2(b.w+2)}" height="${r2(fh)}"/>` : '') +
+        (bare ? '' : `<g class="bk-detail" aria-hidden="true">${s.detail}</g>`) + `</g>` };
+}
+// The far bag of a pair sits behind and up-left (bike.js's offsets: the pannier's behind and a little lower, on the same rail).
+const pairOffset = pos => ((bikeModule() || {}).PAIR_OFFSET || { rack:[-7,-7], fork:[-5,-5] })[pos] || [-4,-4];
 // where each bag of a position sits, given how many of them there are, from the bike's anchors
 
 function layout(pos, i, n, frameSmall, slot, a = rigAnchors()){
@@ -8402,7 +8462,7 @@ function layout(pos, i, n, frameSmall, slot, a = rigAnchors()){
   switch(pos){
     case 'top': return rigShape(a.top[slot] || a.top.front, 2);
     case 'bar': { const s = stackStep(a.bar.y, a.bar.h, 2, n); return rigShape({ ...a.bar, y:a.bar.y - i * s }, 3); }
-    case 'frame': return a.frame ? { kind:'poly', pts:a.frame.shapes[frameSmall], box:a.frame.boxes[frameSmall] } : null;
+    case 'frame': return a.frame ? { kind:'poly', pts:a.frame.shapes[frameSmall], box:a.frame.boxes[frameSmall], p:{ ...a.frame.boxes[frameSmall], rot:0 } } : null;
     case 'seat': { const s = stackStep(a.seat.y, a.seat.h, 2, n); return rigShape({ ...a.seat, y:a.seat.y - i * s }, 4); }
     case 'fork': return rigShape(a.fork, 2);        // pair offset applied by the caller
     case 'rack': return rigShape(a.rack, 2);        // pair offset applied by the caller
@@ -8467,6 +8527,54 @@ function frameShapeGlyph(b){
   </svg>`;
 }
 
+/* ---- The weight map (design of 8 Nov 2026): /tools/bags/weightmap.js (window.WayfinchWeightMap), loaded on the first press of Show
+   weight map, never before. A view of the plan, not data: nothing of it is saved. It reads each bag where the rig draws it. ---- */
+const WEIGHT_MAP = { on:false, diff:false, drawn:'' };
+let WEIGHT_MAP_SCRIPT = null, RIG_OUTLINES = {};
+function loadWeightMap(){
+  if(window.WayfinchWeightMap) return Promise.resolve(window.WayfinchWeightMap);
+  if(!WEIGHT_MAP_SCRIPT) WEIGHT_MAP_SCRIPT = new Promise((resolve, reject) => {
+    const script = document.createElement('script'); script.src = 'weightmap.js';
+    script.onload = () => window.WayfinchWeightMap ? resolve(window.WayfinchWeightMap) : reject(Error('no weight map'));
+    script.onerror = () => { WEIGHT_MAP_SCRIPT = null; script.remove(); reject(Error('not loaded')); };
+    document.head.appendChild(script);
+  });
+  return WEIGHT_MAP_SCRIPT;
+}
+// Each packed bag, bottle and the rack deck's load with its kilos and its outline as drawn; the ideal's fixed profile needs to know
+// whether a rack is fitted (panniers or the rack deck in the plan), a frame bag fits and the top tube takes a bag.
+function weightMapInput(){
+  const B = bikeModule(), a = rigAnchors(); if(!B || !B.bagShape || !a) return null;
+  const items = [], fit = bikeFit(S.bikeProfile);
+  currentPlan().slots.forEach(s => { const o = RIG_OUTLINES[s.key], kg = (s.items || []).reduce((t, k) => t + placedKg(k), 0);
+    if(o && kg > 0) items.push({ pos:o.pos, kg, outline:o.outline }); });
+  const deck = deckClaims().reduce((t, k) => t + itemKg(k), 0), d = a.rackTop;
+  if(deck > 0) items.push({ pos:'deck', kg:deck, outline:[[d.x, d.y], [d.x + d.w, d.y], [d.x + d.w, d.y + d.h], [d.x, d.y + d.h]] });
+  const art = rigArt();
+  return { items, anchors:a, shape:B.bagShape, pairOffset:B.PAIR_OFFSET, diff:WEIGHT_MAP.diff,
+    // panniers in the ideal when a rack is fitted or the bike has pannier mounts (the coordinator's ruling of 8 Nov, review of PR 71, I1)
+    ideal:{ rack:S.bags.some(b => b.pos === 'rack') || hasDeck('rack') || !!S.bikeProfile && S.bikeProfile.rackMounts === 'yes', frame:!fit.frameBag.none, top:!!(fit.topMounts.front || fit.topMounts.rear) },
+    bike:art ? art.svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '') : '',
+    onDiff:on => { WEIGHT_MAP.diff = on; drawWeightMap(); } };
+}
+function drawWeightMap(){
+  const button = $('rigWeightMap'), box = $('weightMap'); if(!button || !box) return;
+  const offered = S.step >= 3 && !!bikeModule(), on = offered && WEIGHT_MAP.on;
+  button.hidden = !offered;
+  button.setAttribute('aria-expanded', on ? 'true' : 'false');
+  button.textContent = on ? 'Hide weight map' : 'Show weight map';
+  button.onclick = () => { WEIGHT_MAP.on = !WEIGHT_MAP.on; WEIGHT_MAP.drawn = ''; drawWeightMap(); };
+  box.hidden = !on;
+  if(!on) return;
+  const input = weightMapInput(); if(!input) return;
+  // drawn again only when the plan, the theme or the difference changed
+  const key = JSON.stringify([input.items, input.ideal, input.diff, bikeTheme(), input.bike]);
+  if(key === WEIGHT_MAP.drawn) return;
+  WEIGHT_MAP.drawn = key;
+  loadWeightMap().then(M => { if(WEIGHT_MAP.on && WEIGHT_MAP.drawn === key) M.render(box, input); })
+    .catch(() => { WEIGHT_MAP.drawn = ''; box.textContent = 'The weight map could not be loaded. Check the connection and press Show weight map again.'; });
+}
+
 // The bike at the back of the rig, redrawn on its own when only the look or the theme changed.
 function paintRigBike(art = rigArt()){
   const holder = $('rigBike'); if(!holder) return;
@@ -8479,7 +8587,7 @@ function drawRig(){
   const showFill = stage >= 3;
   const A=currentPlan(), { slots } = A;
   const loadedRackDeck=showFill && deckClaims().length>0;
-  clipN = 0;
+  clipN = 0; RIG_OUTLINES = {};
   const defs = [], art = [], tags = [];
   const fb = S.bags.find(b => b.pos === 'frame');
   const frameSmall = frameShapeIdx(fb);
@@ -8502,7 +8610,8 @@ function drawRig(){
   const TAGS = anchors ? anchors.tags : {};
   const tagAt = (pos, text, active) => { const t = TAGS[pos]; if(!t) return '';
     return `<text class="bag-tag${active?' active':''}" x="${r2(t[0])}" y="${r2(t[1])}" text-anchor="${pos==='fork'?'start':'middle'}">${text}</text>`; };
-  const shellOf = (L, pct) => L.kind === 'poly' ? shellPoly(L.pts, L.box, pct) : shellRect(L.x, L.y, L.w, L.h, pct, L.rx);
+  const shellOf = (L, pct, pos, litres, slot, bare) => { const s = bagShapeOf(pos, L, litres, slot);
+    return s ? shellShape(s, pct, bare) : L.kind === 'poly' ? shellPoly(L.pts, L.box, pct) : shellRect(L.x, L.y, L.w, L.h, pct, L.rx); };
 
   POS_ORDER.filter(p => !isBottle(p)).forEach(pos => {
     const allMine = stage === 1 ? [] : S.bags.filter(b => b.pos === pos);
@@ -8516,7 +8625,7 @@ function drawRig(){
         : (allMine.length || (pos === 'frame' && bikeFit(S.bikeProfile).frameBag.none) ? [] : [{ slot:null, key:pos }]);
       empties.forEach(e => {
         const L = layout(pos, 0, 1, frameSmall, e.slot, anchors); if(!L) return;
-        const sh = shellOf(L, 0);
+        const sh = shellOf(L, 0, pos, Infinity, e.slot, true);   // an empty spot: the shape at its full size, dashed, no inside lines
         defs.push(sh.def);
         art.push(`<g class="bagg ghost${editing && !removing ? ' addable' : ''}"${
           editing && !removing ? ` data-add="${e.key}"` : ''}>${sh.art}${
@@ -8531,15 +8640,15 @@ function drawRig(){
 
     // one of a pair mounted: show where the other would go
     if(editing && !removing && POSITIONS[pos].pairable && mine.length === 1 && !mine[0].pair){
-      const PO = { rack:[-7,-7], fork:[-5,-5] }[pos] || [-4,-4];
-      const G = shiftShape(layout(pos, 0, 1, frameSmall, null, anchors), PO[0], PO[1]);
+      const PO = pairOffset(pos);
+      const G = shiftShape(layout(pos, 0, 1, frameSmall, null, anchors), PO[0], PO[1]), GS = bagShapeOf(pos, G, mine[0].L, null);
       if(G){
         // badge on the outer corner — the middle of the ghost is hidden behind
         // the bag in front, which left a stray stub of the old centred plus
         const gb = G.kind === 'rect' ? G : G.box;
         const bx = r2(gb.x + 0.5), by = r2(gb.y + 0.5), a = 2.4;
         art.push(`<g class="bagg pairghost addable" data-bump="${mine[0].uid}">
-          ${G.kind === 'rect' ? `<rect class="bag-shell" x="${G.x}" y="${G.y}" width="${G.w}" height="${G.h}" rx="${G.rx||2}"/>` : `<polygon class="bag-shell" points="${G.pts}"/>`}
+          ${GS ? `<g${shapeTurn(GS)}><path class="bag-shell" d="${GS.d}"/></g>` : G.kind === 'rect' ? `<rect class="bag-shell" x="${G.x}" y="${G.y}" width="${G.w}" height="${G.h}" rx="${G.rx||2}"/>` : `<polygon class="bag-shell" points="${G.pts}"/>`}
           <circle class="plusdot" cx="${bx}" cy="${by}" r="4.4"/>
           <path class="plus" d="M${r2(bx-a)},${by} h${a*2} M${bx},${r2(by-a)} v${a*2}"/>
           ${hitFor(pos)}</g>`);
@@ -8547,15 +8656,17 @@ function drawRig(){
     }
     const units = mine.flatMap(physical);
     // the second of a pair goes behind and up-left, so both stay reachable
-    const PAIR_OFF = { rack:[-7,-7], fork:[-5,-5] }[pos] || [-4,-4];
+    const PAIR_OFF = pairOffset(pos);
     const order = units.length > 1 && !slots_ ? units.slice().reverse() : units;
     order.forEach((b,i) => {
       const s = slots.find(x => x.key === b.key);
       const pct = showFill && s && s.cap > 0 ? Math.min(1, (s.cap - s.left) / s.cap) : 0;
       let L = layout(pos, b.idx, units.length, frameSmall, b.slot, anchors); if(!L) return;
       if(b.idx > 0 && !slots_) L = shiftShape(L, PAIR_OFF[0], PAIR_OFF[1]);
-      const sh = shellOf(L, pct);
+      const sh = shellOf(L, pct, pos, +b.L, b.slot);
       defs.push(sh.def);
+      const shp = s && bagShapeOf(pos, L, +b.L, b.slot);
+      if(shp) RIG_OUTLINES[s.key] = { pos, outline:shp.outline };
       const canBump = !removing && (POSITIONS[pos].pairable && !b.pair || pos === 'frame');
       // 1 / 2 / 3 sit inside even the smallest frame bag, so they never
       // fall outside the shape whichever one is selected
@@ -8624,6 +8735,8 @@ function drawRig(){
     if(!spot || own && !bagSpec(own).usable){
       // a cage this bike does not have: the bottle waits in the cupboard, nothing is drawn
     } else if(own){
+      { const a = spot.rot * Math.PI / 180, c = Math.cos(a), n = Math.sin(a);   // the bottle's outline, for the weight map
+        RIG_OUTLINES[own.uid + '-0'] = { pos:own.pos, outline:[[-4.8,-15],[4.8,-15],[4.8,15],[-4.8,15]].map(([x, y]) => [spot.cx + x*c - y*n, spot.cy + x*n + y*c]) }; }
       bart.push(bottleArt(spot, false, +own.L || 0.75, false,
         removing ? ` data-del="${own.uid}"` : (inspecting ? ` data-bottle="${own.uid}"` : ''),
         removing ? 'removable' : (inspecting ? 'inspectable' : '')));
@@ -8636,6 +8749,7 @@ function drawRig(){
   $('rigDefs').innerHTML = defs.join('');
   $('bagLayer').innerHTML = art.join('') + tags.join('');
   $('bottleLayer').innerHTML = bart.join('');
+  drawWeightMap();
 
   /* ---- footer says only what is known at this point ---- */
   const c = tripClimate();

@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest';
-import { W } from '../../../src/core/wording/en.ts';
+import { W as APP } from '../../../src/core/wording/en.ts';
+import { WB } from '../../../src/core/wording/en-bike.ts';
+
+// The bike's words live in en-bike.ts (so the bag planner's bike.js carries only them); every check here covers them as part of W.
+const W = { ...APP, ...WB };
 import { bannedHits } from '../../fixtures/banned.ts';
 
 // Every key starts with the area it belongs to. Weather and stop strings get the stricter list of banned words.

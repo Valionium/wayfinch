@@ -317,3 +317,84 @@ test('[LC-PHOTO-OFFLINE] bike-photo.js loads only on the first tap, is precached
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfile')!).look.colour as string)).toMatch(RED);
   await context.setOffline(false);
 });
+
+test('[BK-SHAPES-PAGE] a tap on the middle of each drawn bag shape reaches that bag: Remove takes off the very bag tapped', async ({ page }) => {
+  await planner(page);
+  await page.evaluate("S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:12 }, { uid:3, pos:'top', L:1, slot:'front' }, { uid:4, pos:'fork', L:3, pair:true }, { uid:5, pos:'rack', L:20, pair:true }, { uid:6, pos:'pack', L:15 }, { uid:7, pos:'frame', L:6 }]; S.nextUid = 8; S.decks = { bar:false, rack:false }; go(2); S.editMode = 'remove'; drawRig()");
+  // one bag of a pair goes at a time, as before: count the bags on the bike, a pair as two
+  const units = (uid?: number) => page.evaluate(`S.bags.filter(b => ${uid ?? 'b.uid'} === b.uid).reduce((n, b) => n + (b.pair ? 2 : 1), 0)`) as Promise<number>;
+  for (let left = 9; left > 0; left--) {
+    const group = page.locator('#rigSvg g.bagg.removable:has(path.bag-shell)').last();
+    const uid = Number(await group.getAttribute('data-del'));
+    const before = await units(uid);
+    const box = (await group.locator('path.bag-shell').last().boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    expect(await units(uid), `bag ${uid}`).toBe(before - 1);
+    expect(await units()).toBe(left - 1);
+  }
+});
+
+test('[WM-PAGE] Show weight map: off by default, weightmap.js only on the first press, yours over the ideal on a phone, the difference opt-in, the backpack on your back', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  const loads: string[] = [];
+  page.on('request', (r) => { if (r.url().endsWith('/weightmap.js')) loads.push(r.url()); });
+  await planner(page);
+  // small bike bags, so the backpack carries some of the kit
+  await page.evaluate("S.bags = [{ uid:1, pos:'seat', L:5 }, { uid:2, pos:'bar', L:5 }, { uid:3, pos:'pack', L:30 }]; S.nextUid = 4; S.decks = { bar:false, rack:false }; go(2)");
+  const show = page.locator('#rigWeightMap');
+  await expect(show).toBeHidden(); // not before the kit is chosen
+  await page.evaluate('go(3)');
+  await expect(show).toBeVisible();
+  await expect(show).toHaveText('Show weight map');
+  await expect(show).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#weightMap')).toBeHidden();
+  expect(loads).toHaveLength(0);
+  await show.click();
+  const cards = page.locator('#weightMap .wm-card');
+  await expect(cards).toHaveCount(2);
+  await expect(show).toHaveAttribute('aria-expanded', 'true');
+  expect(loads).toHaveLength(1);
+  await expect(page.locator('#weightMap .wm-cap')).toContainText('weighted kilos');
+  await expect(cards.nth(0).locator('.wm-sum')).toContainText('Of the weighted load:');
+  await expect(cards.nth(0).locator('svg')).toHaveAttribute('aria-label', /^Your weight\. Of the weighted load: /);
+  await expect(cards.nth(0).locator('canvas')).toHaveAttribute('aria-hidden', 'true');
+  // the backpack is its own patch, labelled; the ideal carries nothing on the back
+  await expect(cards.nth(0).locator('.wm-label')).toHaveText(['on your back']);
+  await expect(cards.nth(1).locator('.wm-sum')).toContainText(' 0% on your back');
+  // painted: the canvas holds the map
+  const painted = await cards.nth(0).locator('canvas').evaluate((c: HTMLCanvasElement) => c.width > 0 && c.getContext('2d')!.getImageData(c.width / 2, c.height / 2, 1, 1).data[3] === 255);
+  expect(painted).toBe(true);
+  // a phone stacks yours over the ideal; a wide window puts them side by side
+  const [a, b] = await cards.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON() as DOMRect));
+  if ((page.viewportSize()?.width ?? 0) < 700) expect(b!.top).toBeGreaterThanOrEqual(a!.bottom - 1);
+  else {
+    expect(Math.abs(b!.top - a!.top)).toBeLessThan(2);
+    // side by side, the two maps stand level even when one heading wraps (review of PR 71, M2)
+    const [wa, wb] = await cards.locator('.wm-wrap').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().top));
+    expect(Math.abs(wb! - wa!)).toBeLessThanOrEqual(1);
+  }
+  // each sentence is read once: the picture's name carries it, the paragraph under it is for the eye (review of PR 71, M3)
+  await expect(cards.nth(0).locator('.wm-sum')).toHaveAttribute('aria-hidden', 'true');
+  // the difference is opt-in; from the keyboard, focus stays on its button (review of PR 71, I2)
+  const diff = page.locator('#weightMap .wm-diff');
+  await diff.focus();
+  await page.keyboard.press('Enter');
+  await expect(cards).toHaveCount(3);
+  await expect(cards.nth(2).locator('.wm-sum')).toContainText(/points|Close to the ideal/);
+  await expect(diff).toHaveText('Hide where yours differs');
+  await expect(diff).not.toHaveAttribute('aria-pressed');
+  expect(await page.evaluate(() => document.activeElement?.classList.contains('wm-diff'))).toBe(true);
+  await page.keyboard.press('Enter');
+  await expect(cards).toHaveCount(2);
+  expect(await page.evaluate(() => document.activeElement?.classList.contains('wm-diff'))).toBe(true);
+  await page.keyboard.press('Enter');
+  await expect(cards).toHaveCount(3);
+  // hidden and shown again: nothing downloads a second time
+  await show.click();
+  await expect(page.locator('#weightMap')).toBeHidden();
+  await show.click();
+  await expect(cards).toHaveCount(3);
+  expect(loads).toHaveLength(1);
+  expect(errors).toEqual([]);
+});

@@ -1045,6 +1045,18 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Wayfinch's Tools shows a Gear advisor card, in Tools' own lazy chunk (its words in en-advisor.ts, so the first screen does not carry them), linking /tools/bags/#gear-advisor&back=tools [GA-TOOLS-CARD]
 - the advisor opened from Tools goes back to Tools when closed; Bike details opened with back=advisor returns to the Gear advisor [GA-BACK]
 
+## Bag planner: real bag shapes and the weight map (design of 8 November 2026)
+- the seven bag shapes (frame, top tube, fork cages, bar roll, seat pack, panniers, backpack) are a silhouette plus inside lines (decoration, hidden from screen readers; none on an empty spot), sized by the cube root of the litres (0.55 to 1 of the anchor box, frame bags by the frame's own shape), and every outline stays inside its anchor box for every bike of the drawing set; the bag planner's bike.js draws the plan's bags as these shapes, the co-pilot's own drawing keeps its boxes [BK-SHAPES]
+- panniers hang from the rack rail on two hooks (owner, 8 Nov 2026), their feet above the axle; the far one sits 6 left and 1.5 lower [BK-PANNIER-RAIL]
+- the seat pack and the rear top tube bag each have their own outline, attached the way they mount (owner's drawing note): neither is the front top tube bag turned round [BK-SEAT-OWN]
+- the bag planner's rig draws its bags, empty spots and pair ghosts as the shapes, and every tap target still adds, bumps, removes or inspects the bag it covers [BK-SHAPES-PAGE]
+- the weight map's field: each packed bag's kilos times its handling weight (HANDLING_WEIGHTS, the advisor's table) spread over its outline and blurred; the total is kept, the scale is fixed (full colour at 0.8 weighted kg per 10 by 10 cm) [WM-FIELD]
+- the ideal for the same kilos: 50% frame bag, 5% top tube, 12% fork cages, 33% panniers (no rack: a seat pack; no frame bag: top tube and fork), nothing on the back; the shares add to 100% [WM-IDEAL]
+- one sentence under each map from the same numbers ("Of the weighted load: …% on your back, …"), and the difference in points ("32 points less in the middle"); plain words, the banned-words test over them [WM-SENTENCE]
+- weightmap.js is its own script, at most 4 KB gzipped, loaded only on the first press of "Show weight map"; nothing downloads before [WM-SIZE]
+- the bag planner shows "Show weight map" under the drawing once the kit is chosen, off by default: Your weight over Ideal (stacked on a phone, side by side when wide), Where yours differs opt-in, the backpack its own patch labelled "on your back", the caption saying the warmth is weighted kilos [WM-PAGE]
+- the weight map paints in 50 ms or less a map on the phone stand-in: yours and the ideal together in 100 ms at most (median of five) [PERF-WM]
+
 ## App: The guided Trip, part 1 (guided Trip design of 8 Nov 2026, owner's answers of 8 Nov)
 
 - Trip is four steps in this order: Route, Get ready offline, Bags, Go. Exactly one step is open; a done step folds to one line with its summary and a Change button (Get ready's says Update), a later step is one grey line saying what it will do, and tapping a folded step opens it and folds the others. The order is a suggestion, never a lock: Bags opens before Get ready; only Get ready and Bags need a route. With no route the Route step is open; with a route, the first step not done; during the trip (the running trip of §3.1) every step is folded and Go is open (design §2.2) [TRIP-STEPS]

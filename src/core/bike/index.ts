@@ -1,6 +1,6 @@
 // Your bike (spec sections 3.7 and 7.4): the one module both pages draw the bike with. Pure: no DOM, no storage, no requests.
 import type { LoadSummary } from '../types.ts';
-import { W } from '../wording/en.ts';
+import { WB as W } from '../wording/en-bike.ts';
 import type { BikeRecord } from './normalise.ts';
 import type { BagView, BikeSpec, PlanView } from './spec.ts';
 import { parseTyre } from './tyres.ts';

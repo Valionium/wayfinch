@@ -5,8 +5,8 @@ const path=require('node:path');
 const ROOT=path.join(__dirname,'..');
 const options={
   stdin:{
-    contents:"import { bikeArt, DEFAULT_COLOURS, FADES, colourName, forkColours, nearestSwatchName, normaliseBike, oklabMedian, PAINT_WORDS, pairFor, PATTERN_LIST, resolveBikeSpec, SWATCHES } from './src/core/bike/planner.ts';\n"
-      +'window.WayfinchBike = Object.freeze({ bikeArt, resolveBikeSpec, SWATCHES, nearestSwatchName, normaliseBike, oklabMedian, PATTERN_LIST, FADES, DEFAULT_COLOURS, PAINT_WORDS, forkColours, pairFor, colourName });\n',
+    contents:"import { bagShape, bikeArt, shapedArt, DEFAULT_COLOURS, FADES, colourName, forkColours, nearestSwatchName, normaliseBike, oklabMedian, PAINT_WORDS, PAIR_OFFSET, pairFor, PATTERN_LIST, resolveBikeSpec, SWATCHES } from './src/core/bike/planner.ts';\n"
+      +'window.WayfinchBike = Object.freeze({ bikeArt, resolveBikeSpec, SWATCHES, nearestSwatchName, normaliseBike, oklabMedian, PATTERN_LIST, FADES, DEFAULT_COLOURS, PAINT_WORDS, forkColours, pairFor, colourName, bagShape, PAIR_OFFSET, shapedArt });\n',
     resolveDir:ROOT,
     sourcefile:'bike-entry.ts',
     loader:'ts',
@@ -31,7 +31,16 @@ const advisorOptions={...options,stdin:{...options.stdin,
   contents:"import { advise, adviseSteps } from './src/core/advisor/search.ts';\nimport { DECIDED, MIN_GAIN_BACK_L, SIZE_RANGES, WEIGHTS } from './src/core/advisor/table.ts';\n"
     +'window.WayfinchAdvisor = Object.freeze({ adviseSteps, advise, WEIGHTS, SIZE_RANGES, MIN_GAIN_BACK_L, DECIDED });\n',
   sourcefile:'advisor-entry.ts'}};
-let cached=null,cachedAdvisor=null;
+// The weight map (design of 8 Nov 2026): /tools/bags/weightmap.js, loaded on the first press of Show weight map; window.WayfinchWeightMap.
+const weightMapOptions={...options,stdin:{...options.stdin,
+  contents:"import { render } from './src/ui/weight-map/view.ts';\n"+'window.WayfinchWeightMap = Object.freeze({ render });\n',
+  sourcefile:'weightmap-entry.ts'}};
+let cached=null,cachedAdvisor=null,cachedMap=null;
+/** weightmap.js's text, built once per process, for the QA suites' page VM. */
+function weightMapScriptSync(){
+  if(cachedMap===null)cachedMap=Buffer.from(require('esbuild').buildSync(weightMapOptions).outputFiles[0].contents).toString('utf8');
+  return cachedMap;
+}
 /** The script's text, built once per process (the QA suites build many pages). */
 function bikeScriptSync(){
   if(cached===null)cached=Buffer.from(require('esbuild').buildSync(options).outputFiles[0].contents).toString('utf8');
@@ -42,4 +51,4 @@ function advisorScriptSync(){
   if(cachedAdvisor===null)cachedAdvisor=Buffer.from(require('esbuild').buildSync(advisorOptions).outputFiles[0].contents).toString('utf8');
   return cachedAdvisor;
 }
-module.exports={bikeScriptOptions:options,photoScriptOptions:photoOptions,advisorScriptOptions:advisorOptions,bikeScriptSync,advisorScriptSync};
+module.exports={bikeScriptOptions:options,photoScriptOptions:photoOptions,advisorScriptOptions:advisorOptions,weightMapOptions,bikeScriptSync,advisorScriptSync,weightMapScriptSync};
