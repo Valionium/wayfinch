@@ -80,7 +80,7 @@ export const Y = {
   // ---- Settings ----
   youSettingsTitle: 'Settings',
   // Samsung Internet's installed app is blocked by Play Protect: that browser builds an old-Android package (owner, 7 Nov 2026).
-  youInstallAndroid: 'On Android, install with Chrome (⋮ → Install app); other browsers may be blocked by Play Protect.',
+  youInstallAndroid: 'On Android, install with Chrome (⋮ → Install app, or Add to home screen); other browsers may be blocked by Play Protect.',
   youThemeLegend: 'Theme',
   youThemeAuto: 'Automatic',
   youThemeLight: 'Light',

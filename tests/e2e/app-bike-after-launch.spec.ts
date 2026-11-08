@@ -117,3 +117,30 @@ test('[TB-PAGE-NO-BIKE] "Without a bike" in Tools: the Tools card shows the grey
   await expect.poll(() => read(page, 'loadcheck:bikeChoice:v1').then((r) => r?.bikeId)).toBe('bike_b');
   expect(errors).toEqual([]);
 });
+
+// Re-check of PR 65, R3: back on Tools from a side trip into Bike details, the drawing the bike glides onto (the first screen's, there when
+// the page is revealed) is the chosen bike, not the plan's first and the chosen one a moment later.
+test('[TB-CARD-BIKE] a bike chosen in Tools, its drawing tapped, Bike details closed: the card the page is revealed with draws the chosen bike', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.addEventListener('pagereveal', () => {
+      const svg = document.querySelector('main[data-screen="tools"] .bike-large .bike-art svg');
+      if (location.pathname === '/') sessionStorage.setItem('wf:first-label', svg?.getAttribute('aria-label') ?? 'none');
+    });
+  });
+  await rider(page, '/#/tools');
+  await page.evaluate(() => localStorage.setItem('loadcheck:bikeProfile', localStorage.getItem('loadcheck:bikeProfiles')!.replace(/^\[(\{.*?\}),\{.*$/, '$1')));
+  await page.reload({ waitUntil: 'load' });
+  await expect(page.locator('#tools-bike')).toHaveValue('bike_a');
+  await page.locator('#tools-bike').selectOption('bike_b');
+  const card = page.locator('main[data-screen="tools"] .card').first();
+  await expect(card.locator('.bike-art svg')).toHaveAttribute('aria-label', /red frame/);
+  await card.locator('.bike-tap').click();
+  await page.waitForURL(/\/tools\/bags\//);
+  await draftReady(page);
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  expect(await page.evaluate('S.bikeProfile.id')).toBe('bike_a');   // a side trip: the plan keeps its bike
+  await page.locator('#bikeDetailsClose').click();
+  await page.waitForURL(`${app!.origin}/#/tools`);
+  await expect(card.locator('.bike-art svg')).toHaveAttribute('aria-label', /red frame/);
+  expect(await page.evaluate(() => sessionStorage.getItem('wf:first-label'))).toMatch(/red frame/);
+});

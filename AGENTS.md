@@ -18,7 +18,7 @@ src/core/      pure TypeScript, no DOM, fully unit-tested
   engines/     the answer engines: one pace, one trip day, one hours check
   hours/       prepared opening hours; only spans.ts reaches the library
   screen/      screen(inputs): the whole stop screen, never throws
-  wording/     every user-facing string (en.ts; words only a lazy part needs in en-*.ts, such as en-ask.ts, Ahead's which-pass question, loaded with Update position's tap)
+  wording/     every user-facing string (en.ts; words only a lazy part needs in en-*.ts, such as en-ask.ts, Ahead's which-pass question, loaded with Update position's tap through src/ui/ask-swap.ts, which also swaps the screen's words while it asks)
   route/       rounded form, GPX reading, stages, climbs, sample grid, hash, zones.ts (routeZones and zoneAt over the bundled boundary file)
   bike/        your bike: tyre sizes (one reader, the tyre tool's too), the bike normaliser, resolveBikeSpec, frame templates, bikeArt and markerArt, swatches and OKLab, the caption
 src/ui/        the app's shell in Preact; src/ui/you/ is You (its own lazy chunk; its words are in src/core/wording/en-you.ts, not en.ts, so the first screen does not carry them), src/ui/legal/ the links to the legal pages (public/legal/<name>/index.html; the imprint is built from the bag planner's own block by tools/build-legal.mjs and never retyped) (app, nav, theme.css, update prompt, shared card and status pieces); Ahead's components go in src/ui/ahead/ and may not import store or data

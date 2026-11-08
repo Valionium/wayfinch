@@ -242,6 +242,18 @@ test("[AH-ASK-NOTE] Ahead's which-pass words are their own chunk, loaded with th
   expect(lazy.filter((f) => text(on, f).includes('Choose which pass')).length).toBe(1);
 });
 
+// Re-check of PR 65, R2: the swap of the screen's words while Ahead asks (its regular expression, ending in "(?= |$)") is in that chunk
+// too, so the first screen carries none of it.
+test("[AH-ASK-NOTE] the swap of the screen's words while Ahead asks is in the question's chunk, not in the first screen's JavaScript", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  expect(first.includes('(?= |$)')).toBe(false);
+  const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
+  const chunk = lazy.filter((f) => text(on, f).includes('Choose which pass'));
+  expect(chunk.length).toBe(1);
+  expect(text(on, chunk[0]!)).toContain('(?= |$)');
+});
+
 test("[YOU-INSTALL-ANDROID] the Android install line is You's, never in the first screen's JavaScript", () => {
   const figures = measure(on);
   const first = figures.firstFiles.map((f) => text(on, f)).join('\n');

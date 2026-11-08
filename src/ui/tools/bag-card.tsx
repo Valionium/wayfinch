@@ -29,12 +29,27 @@ export function BagCard({ services, chosen, note }: { services: TyreServices; ch
   );
 }
 
+/** [the bike the full Tools screen drew, the plan's bike beside it], in this tab: written by tools.tsx, read while its chunk loads. */
+export const DRAWN_KEY = 'wf:toolsBike';
+/**
+ * The bike the full screen drew last in this tab, while the plan is still the one it was drawn beside: the bike glides back from the bag
+ * planner onto it, with no plan's bike first (re-check of PR 65, R3). Anything else (none, broken, a bike gone, the plan moved): undefined.
+ */
+function drawnLast(): BikeRecord | null | undefined {
+  try {
+    const [id, plan] = JSON.parse(sessionStorage.getItem(DRAWN_KEY) ?? '0') as [string | null, string | null];
+    const b = bikeSource.value;
+    if (plan === (b.bike?.id ?? null)) return id === null ? null : b.bikes.find((x) => x.id === id);
+  } catch { /* the plan's bike */ }
+  return undefined;
+}
+
 /** Tools while its chunk loads: the bag card, and room for the bike line when the rider has a saved bike, so nothing moves when it arrives. */
 export function ToolsFirst({ services }: { services: TyreServices }) {
   return (
     <>
       {bikeSource.value.bikes.length > 0 ? <p class="bike-line" aria-hidden="true" /> : null}
-      <BagCard services={services} />
+      <BagCard services={services} chosen={drawnLast()} />
     </>
   );
 }
