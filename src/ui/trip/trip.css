@@ -50,7 +50,7 @@ progress { width: 100%; accent-color: var(--blaze); }
 .trip-step-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 44px; }
 .trip-step-head h2 { font-family: var(--font-display); font-size: 1.25rem; margin: 0; }
 .trip-step-later .trip-step-head h2 { color: var(--muted); }
-.trip-step-open, .trip-step-change { min-height: 44px; padding: 0 4px; background: none; border: 0; font: inherit; cursor: pointer; }
+.trip-step-open, .trip-step-change { min-height: 44px; min-width: 44px; padding: 0 4px; background: none; border: 0; font: inherit; cursor: pointer; }
 .trip-step-open { color: inherit; text-align: left; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
 .trip-step-change { color: var(--blaze); font-weight: 600; font-family: var(--font-body); font-size: 0.9375rem; white-space: nowrap; }
 .trip-step-line { margin: 0; overflow-wrap: anywhere; }

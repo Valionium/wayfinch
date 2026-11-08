@@ -121,6 +121,8 @@ test('[TRIP-GPX-BAD] a bad file is refused in words and the route stays; a secon
   app = await loadApp(page);
   await page.locator('input[type=file]').setInputFiles(await gpx('loop'));
   await expect(page.locator('[data-summary]')).toContainText('Heilbronn loop');
+  // With a route, the file picker is in the Route step, which its Change opens (TRIP-STEPS).
+  await page.locator('[data-step="route"]').getByRole('button', { name: 'Change: Route' }).click();
   await page.locator('input[type=file]').setInputFiles({ name: 'notes.gpx', mimeType: 'application/gpx+xml', buffer: Buffer.from('<gpx><oops') });
   await expect(page.getByRole('alert').filter({ hasText: 'did not read as a GPX' })).toContainText('Your current route is unchanged.');
   await expect(page.locator('[data-summary]')).toContainText('Heilbronn loop');

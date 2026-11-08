@@ -118,10 +118,11 @@ test('[WIDE-PANES] Ahead: position, strip and chips in the main pane, the six ca
 
   await page.goto(`${app!.origin}/#/trip`);
   await page.locator('[data-trip-loaded]').waitFor();
-  const summary = await box(page.locator('[data-summary]'));
-  const settings = await box(page.locator('.trip-side .card').first());
-  expect(settings.x).toBeGreaterThan(summary.x + summary.width - 1);
-  expect((await box(page.locator('[data-add-route]'))).x).toBeLessThan(settings.x);
+  // The guided Trip (design of 8 Nov 2026, §2.2): the steps in the main pane, the route's summary in the supporting one.
+  const steps = await box(page.locator('.trip-steps-list'));
+  const summary = await box(page.locator('.trip-side [data-summary]'));
+  expect(summary.x).toBeGreaterThan(steps.x + steps.width - 1);
+  expect((await box(page.locator('.trip-main [data-step="route"]'))).x).toBeLessThan(summary.x);
 
   await page.goto(`${app!.origin}/#/tools`);
   const cards = page.locator('main[data-screen="tools"] > .card');

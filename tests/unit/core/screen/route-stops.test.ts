@@ -31,8 +31,12 @@ describe('routeStops', () => {
     const joined = [...day1.icons, ...day2.icons.filter((x) => !day1.icons.some((y) => y.kind === x.kind && y.km === x.km))];
     expect(kindKm(stops)).toEqual(kindKm(joined));
     expect(stops.map((s) => s.km)).toEqual([...stops.map((s) => s.km)].sort((a, b) => a - b));
-    // What the card names at that kilometre is the stop's name.
-    expect(stops.find((s) => s.kind === 'food' && s.km === 47)?.label).toContain('Café Sonne');
+    // The name of the place at that kilometre is the stop's name: the name alone, not the card's line about it.
+    expect(stops.find((s) => s.kind === 'food' && s.km === 47)?.label).toBe('Café Sonne');
+    expect(stops.find((s) => s.kind === 'water' && s.km === 22)?.label).toBe('Brunnen Wiesloch');
+    const names = new Set(i.places.map((p) => p.name));
+    for (const s of stops) expect(s.label === null || names.has(s.label), `${s.kind} at ${s.km}: ${s.label}`).toBe(true);
+    expect(stops.filter((s) => s.label !== null).length).toBeGreaterThan(2);
   });
 
   test('[TRIP-STOPS] a trip with no date plans from today; a route with nothing saved has no stops; nothing throws', () => {

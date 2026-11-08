@@ -39,7 +39,7 @@ function ProfileStops({ route, stops }: { route: Route; stops: RouteStop[] }) {
           return (
             <button
               key={n} type="button" class={`ah-icon ah-icon-${one!.kind}${more && ' ah-icon-more'}`} style={{ left: `${(x * 100).toFixed(2)}%`, top: `${(ROOM_PX + y - 22).toFixed(1)}px` }}
-              aria-label={[one!, ...rest].map(stopWords).join(', ')} aria-expanded={picked === n} aria-controls="trip-stop-list"
+              aria-label={more ? `${stopWords(one!)}, ${more}: ${rest.map(stopWords).join(', ')}` : stopWords(one!)} aria-expanded={picked === n} aria-controls="trip-stop-list"
               onClick={() => setPicked(picked === n ? null : n)}
             >
               <Glyph kind={one!.kind} />
