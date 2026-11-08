@@ -7,7 +7,7 @@ import type { BikeRecord } from '../../core/bike/normalise.ts';
 import { careDetails, fitted, softTag } from '../../core/care/fit.ts';
 import { searchCare } from '../../core/care/search.ts';
 import type { CareDetails, CareKey, CareTask, Conditions, Fitted, Part, RoadCard } from '../../core/care/types.ts';
-import { C, CARE_TASKS, CARRY, PART_LABEL, PARTS, ROAD_CARDS, SECTION_LABEL, SECTIONS, TAG_LABEL, WHO_LABEL } from '../../core/wording/en-care.ts';
+import { C, CARE_TASKS, CARRY, PART_LABEL, PARTS, ROAD_CARDS, SECTION_LABEL, SECTIONS, TAG_LABEL } from '../../core/wording/en-care.ts';
 import { bikeDetailsHref } from '../../ui/bike/link.ts';
 import { choiceVersion } from '../../ui/tools/bike-choice.ts';
 import { BikeLine } from '../../ui/tools/bike-line.tsx';
@@ -46,45 +46,29 @@ function Tags({ item, details }: { item: { tags: CareKey[]; applies: Conditions;
   return all.length === 0 ? null : <span class="muted care-tags">{all.join(' · ')}</span>;
 }
 
-/** Opens the full-screen step view (care pictures design 2.1); the card or task also stays readable as a whole where it is. */
+/**
+ * A card or task in the list is one button: a tap opens its full-screen step view at once (the owner's wish of 7 November, care pictures
+ * design 2.1; review of PR 72, I4). Its words live in the step view, whose All steps shows them on one page for screen readers.
+ */
 type OnSteps = (source: StepSource, opener: HTMLButtonElement) => void;
-const StepsButton = ({ onOpen }: { onOpen: (opener: HTMLButtonElement) => void }) => (
-  <p><button type="button" class="btn btn-primary care-steps-open" onClick={(e) => onOpen(e.currentTarget)}>{C.careStepByStep}</button></p>
-);
 
 function RoadItem({ card, details, onSteps }: { card: Fitted<RoadCard>; details: CareDetails; onSteps: OnSteps }) {
   return (
-    <details class="care-road" data-id={card.id}>
-      <summary><span class="care-name">{card.problem}</span> <Tags item={card} details={details} /></summary>
-      <div class="care-body">
-        <StepsButton onOpen={(b) => onSteps({ kind: 'road', item: card }, b)} />
-        <p><strong>{C.careRoadCheckFirst}:</strong> {card.checkFirst}</p>
-        <p class="care-label"><strong>{C.careSteps}</strong></p>
-        <ol>{card.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
-        <p><strong>{C.careRideOn}</strong> {card.rideOn}</p>
-        <p><strong>{C.careRoadCarry}:</strong> {card.carry.map((id) => CARRY.find((c) => c.id === id)?.name).filter(Boolean).join('; ')}</p>
-        {card.critical ? <p class="care-unsure"><strong>{C.careUnsure}</strong></p> : null}
-      </div>
-    </details>
+    <div class="care-road" data-id={card.id}>
+      <button type="button" class="care-open" aria-haspopup="dialog" onClick={(e) => onSteps({ kind: 'road', item: card }, e.currentTarget)}>
+        <span class="care-name">{card.problem}</span> <Tags item={card} details={details} />
+      </button>
+    </div>
   );
 }
 
 function TaskItem({ task, details, onSteps }: { task: Fitted<CareTask>; details: CareDetails; onSteps: OnSteps }) {
   return (
-    <details class="care-task" data-id={task.id}>
-      <summary><span class="care-name">{task.name}</span> <Tags item={task} details={details} /></summary>
-      <div class="care-body">
-        <StepsButton onOpen={(b) => onSteps({ kind: 'task', item: task }, b)} />
-        <p><strong>{C.careSigns}:</strong> {task.signs}</p>
-        {task.alsoWet ? <p>{C.careAlsoWet}</p> : null}
-        <p class="care-label"><strong>{C.careSteps}</strong></p>
-        <ol>{task.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
-        <p><strong>{C.careTools}:</strong> {task.tools}{task.minutes ? ` · ${C.careTime(task.minutes[0], task.minutes[1])}` : ''}</p>
-        {task.note ? <p>{task.note}</p> : null}
-        <p><strong>{C.careWho}:</strong> {task.why ?? WHO_LABEL[task.who]}</p>
-        {task.critical ? <p class="care-unsure"><strong>{C.careUnsure}</strong></p> : null}
-      </div>
-    </details>
+    <div class="care-task" data-id={task.id}>
+      <button type="button" class="care-open" aria-haspopup="dialog" onClick={(e) => onSteps({ kind: 'task', item: task }, e.currentTarget)}>
+        <span class="care-name">{task.name}</span> <Tags item={task} details={details} />
+      </button>
+    </div>
   );
 }
 
@@ -126,14 +110,14 @@ export function CareScreen({ services }: { services: TyreServices }) {
   const cardHits = query.trim() === '' ? [] : searchCare(query, part ? allCards.filter((c) => c.part === part) : allCards, cardText);
   const carryList = fitted(CARRY, details);
 
-  // A tap on a card in the Care results: the Roadside tab at that card, open and focused.
+  // A tap on a card in the Care results: the Roadside tab, and that card's step view; closed, focus is on the card there.
   useEffect(() => {
     if (tab !== 'road' || openCard === null) return;
-    const card = document.querySelector<HTMLDetailsElement>(`details.care-road[data-id="${openCard}"]`);
-    if (card) {
-      card.open = true;
-      card.querySelector('summary')?.focus();
-      card.scrollIntoView?.({ block: 'nearest' });
+    const button = document.querySelector<HTMLButtonElement>(`.care-road[data-id="${openCard}"] .care-open`);
+    const card = allCards.find((c) => c.id === openCard);
+    if (button && card) {
+      button.scrollIntoView?.({ block: 'nearest' });
+      openSteps({ kind: 'road', item: card }, button);
     }
     setOpenCard(null);
   }, [tab, openCard]);
@@ -212,7 +196,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
           </>
         ) : null}
       </div>
-      {steps ? <StepView key={steps.item.id} source={steps} onClose={() => setSteps(null)} /> : null}
+      {steps ? <StepView key={steps.item.id} source={steps} bars={bike?.look?.bars ?? null} onClose={() => setSteps(null)} /> : null}
     </div>
   );
 }

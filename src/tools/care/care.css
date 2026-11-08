@@ -18,25 +18,24 @@
 .care-tell a { color: inherit; }
 .care-section h3 { margin: 20px 0 8px; }
 .care-task, .care-road { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); margin: 0 0 8px; }
-.care-task summary, .care-road summary { min-height: 44px; padding: 10px 12px; cursor: pointer; display: list-item; }
-.care-task summary .care-name, .care-road summary .care-name { font-weight: 600; }
+.care-open {
+  display: block; box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px 12px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer;
+}
+.care-open:focus-visible { outline: 2px solid var(--blaze); outline-offset: 2px; }
+.care-open .care-name { font-weight: 600; }
 .care-tags { font-size: 0.9375rem; }
-.care-body { padding: 0 12px 12px; }
-.care-body ol { padding-left: 1.5em; margin: 4px 0 8px; }
-.care-body li { margin: 0 0 4px; }
-.care-label { margin: 8px 0 0; }
 .care-unsure { color: var(--amber); }
 .care-none { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .care-hits { list-style: none; padding: 0; margin: 0; }
 .care-hits li { margin: 0 0 8px; }
 .care-carry { padding-left: 1.25em; margin: 4px 0 16px; }
 .care-carry li { margin: 0 0 6px; }
-.care-steps-open { margin: 4px 0 0; }
 
 /* The step view (care pictures design 2.2 and 2.3): full screen over Bike care; picture above the text on a phone, beside it from 720 px. */
 dialog.care-steps {
   box-sizing: border-box; position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0;
-  border: 0; background: var(--ground); color: var(--ink); overflow-wrap: anywhere;
+  border: 0; background: var(--ground); color: var(--ink); overflow-wrap: break-word;
 }
 dialog.care-steps[open] { display: flex; flex-direction: column; }
 dialog.care-steps::backdrop { background: var(--ground); }
@@ -61,6 +60,8 @@ dialog.care-steps::backdrop { background: var(--ground); }
 .care-step-t, .care-step-words p { font-size: 1.0625rem; }
 .care-step-list h3 { font-size: 1rem; margin: 20px 0 4px; }
 .care-pic { margin: 12px 0 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.care-pics-two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.care-pics-two .care-pic { margin-top: 12px; }
 .care-pic-art svg { display: block; width: 100%; height: auto; max-height: 45vh; }
 .care-pic figcaption { font-size: 0.9375rem; padding: 4px 10px 8px; }
 .care-steps-nav {

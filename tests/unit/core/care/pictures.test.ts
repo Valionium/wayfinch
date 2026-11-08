@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { expect, test } from 'vitest';
-import { STEP_PICTURES } from '../../../../src/core/care/pictures.ts';
+import { idsOf, STEP_PICTURES } from '../../../../src/core/care/pictures.ts';
 import { PICTURE_WORDS } from '../../../../src/core/wording/en-care-pictures.ts';
 import { CARE_TASKS, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
 import { bannedHits } from '../../../fixtures/banned.ts';
@@ -14,7 +14,7 @@ const DIR = fileURLToPath(new URL('../../../../src/tools/care/pictures/', import
 const CSS = readFileSync(fileURLToPath(new URL('../../../../src/tools/care/pictures.css', import.meta.url)), 'utf8');
 const files = readdirSync(DIR).filter((f) => f.endsWith('.svg')).map((f) => f.slice(0, -4)).sort();
 const svg = (id: string): string => readFileSync(join(DIR, `${id}.svg`), 'utf8');
-const used = [...new Set(Object.values(STEP_PICTURES).flat().filter((p): p is string => p !== null))].sort();
+const used = [...new Set(Object.values(STEP_PICTURES).flat().flatMap(idsOf))].sort();
 /** The classes the shared stylesheet gives, and the font size of each text class. */
 const classes = new Set([...CSS.matchAll(/\.(cp(?:-[a-z]+)?)\b/g)].map((m) => m[1]!));
 const COLOUR = /#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(|\b(?:black|white|red|orange|blue|green|grey|gray|yellow)\b/i;

@@ -4,7 +4,9 @@
 // Labels drawn inside a picture are repeated here.
 export type PictureWords = { name: string; description: string; caption?: string };
 
-const QR_CAPTION = 'Seen from behind the brake, as you stand over the bike: the lever is on your left.';
+// Front or rear: the steps that show these name no wheel (review of PR 72, I3). Drawn from behind, the lever on the bike's left (owner, 8 Nov).
+const QR_CAPTION = "Front or rear wheel, seen from behind the brake: the lever is on the bike's left.";
+const V_CAPTION = "Front or rear wheel, seen from behind the brake: the curved tube sits on the bike's left.";
 
 export const PICTURE_WORDS: Readonly<Record<string, PictureWords>> = {
   'tyre-levers': {
@@ -13,7 +15,7 @@ export const PICTURE_WORDS: Readonly<Record<string, PictureWords>> = {
   },
   'pinch-slits': {
     name: 'A pinched tube: two slits side by side.',
-    description: 'A length of inner tube laid flat, with its valve at one end. In the middle are two short slits next to each other, both running along the tube, marked "two slits side by side". This is the mark a tube gets when it is pinched against the rim.',
+    description: 'A length of inner tube laid flat, with its valve at one end on the side that faces the rim. In the middle are two short slits next to each other, both running along the tube, marked "two slits side by side". This is the mark a tube gets when it is pinched against the rim.',
   },
   'patch-press': {
     name: 'Pressing a patch onto the tube from the middle outwards.',
@@ -37,21 +39,31 @@ export const PICTURE_WORDS: Readonly<Record<string, PictureWords>> = {
   },
   'brake-qr-open': {
     name: "Opening the brake's quick release: the small lever flips from down to up.",
-    description: "A close-up of a rim brake at the top of the front wheel, with the brake's arms reaching down either side of the tyre to the pads. A small lever sits on the left side of the brake, beside where the cable comes in. It points down, labelled \"closed\"; a dashed outline shows it pointing up, labelled \"open\", and a curved arrow shows the flip from down to up. A small picture in the corner shows the whole wheel and where this view is.",
+    description: "A road rim brake at the top of a wheel, seen from behind, with the fork or frame in front of the brake's middle and the brake's arms reaching down either side of the tyre to the pads. A small lever sticks out on the bike's left, labelled \"bike's left\". It points down, labelled \"closed\"; a dashed outline shows it pointing up, labelled \"open\", and a curved arrow shows the flip from down to up. A small picture in the corner shows the whole wheel and where this view is.",
     caption: QR_CAPTION,
   },
   'brake-qr-close': {
     name: "Closing the brake's quick release: the small lever flips from up to down.",
-    description: "A close-up of a rim brake at the top of the front wheel, with the brake's arms reaching down either side of the tyre to the pads. A small lever on the left side of the brake points up, labelled \"open\"; a dashed outline shows it pointing down, labelled \"closed\", and a curved arrow shows the flip from up to down. A small picture in the corner shows the whole wheel and where this view is.",
+    description: "A road rim brake at the top of a wheel, seen from behind, with the fork or frame in front of the brake's middle and the brake's arms reaching down either side of the tyre to the pads. A small lever on the bike's left, labelled \"bike's left\", points up, labelled \"open\"; a dashed outline shows it pointing down, labelled \"closed\", and a curved arrow shows the flip from up to down. A small picture in the corner shows the whole wheel and where this view is.",
     caption: QR_CAPTION,
+  },
+  'vbrake-open': {
+    name: "Opening a V-brake: squeeze the arms and lift the curved tube out.",
+    description: "A V-brake at the top of a wheel, seen from behind: two tall arms stand either side of the tyre, joined at the top by the cable. On the left arm the cable runs through a short curved metal tube, labelled \"curved tube\", which sits in a holder. An arrow labelled \"squeeze\" pushes the arms together, and a second arrow labelled \"lift out\" shows the curved tube coming up out of its holder, where a dashed outline shows it. A small picture in the corner shows the whole wheel and where this view is.",
+    caption: V_CAPTION,
+  },
+  'vbrake-close': {
+    name: "Closing a V-brake: squeeze the arms and put the curved tube back.",
+    description: "A V-brake at the top of a wheel, seen from behind: two tall arms stand either side of the tyre, joined at the top by the cable. The short curved metal tube, labelled \"curved tube\", is out of its holder on the left arm; a dashed outline shows it seated. An arrow labelled \"squeeze\" pushes the arms together, and a second arrow labelled \"put back\" shows the tube going back into its holder. A small picture in the corner shows the whole wheel and where this view is.",
+    caption: V_CAPTION,
   },
   'disc-bolts': {
     name: 'The two bolts that hold the disc brake caliper.',
-    description: 'The front wheel\'s brake disc seen from the left side of the bike, with the fork leg running up from the wheel\'s centre. The caliper, the brake\'s body, sits over the edge of the disc behind the fork leg, with the brake hose running up from it. The two bolts at either end of the caliper are marked "caliper bolts".',
+    description: 'A brake disc, labelled "disc", seen from the left side of the bike, on the front or the rear wheel, as the line under it says. The caliper, the brake\'s body, sits over the edge of the disc on its mount, with the brake hose running from it. The two bolts at either end of the caliper are marked "caliper bolts".',
   },
   'barrel-adjuster': {
-    name: 'The barrel adjuster: unscrewing it a little pulls the cable tighter.',
-    description: 'A close-up where the cable\'s outer casing meets the part it works. The casing ends in a ridged barrel, labelled "barrel adjuster", which is screwed into the part. A curved arrow shows the barrel being turned, and a dashed outline shows it a little further out, labelled "unscrew a little: cable tighter".',
+    name: 'The barrel adjuster, turned to pull the cable tighter.',
+    description: 'A close-up where the cable\'s outer casing meets the part it works. The casing ends in a ridged barrel, labelled "barrel adjuster", which is screwed into the part. A curved arrow shows the barrel being turned, labelled "turn to pull the cable tighter".',
   },
   'twist-test': {
     name: 'The twist test on the stem and the handlebar.',
@@ -60,6 +72,6 @@ export const PICTURE_WORDS: Readonly<Record<string, PictureWords>> = {
   },
   'tyre-boot': {
     name: 'A boot inside the tyre, covering the cut.',
-    description: 'The wheel cut through, showing the tyre, the inner tube inside it and the rim below. The tyre has a cut in its side, labelled "cut". On the inside of the tyre, between the tyre and the tube, a strip covers the cut, labelled "boot".',
+    description: 'The wheel cut through, showing the tyre, the inner tube inside it and the rim below. The tyre has a slit through its side wall, labelled "cut". On the inside of the tyre, between the tyre and the tube, a strip covers the cut, labelled "boot".',
   },
 };

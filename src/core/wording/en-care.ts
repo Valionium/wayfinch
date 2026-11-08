@@ -41,7 +41,6 @@ export const C = {
   careFound: (n: number): string => (n === 1 ? '1 task' : `${n} tasks`),
   careFoundBoth: (tasks: number, cards: number): string => `${tasks === 1 ? '1 task' : `${tasks} tasks`}, ${cards === 1 ? '1 roadside repair' : `${cards} roadside repairs`}`,
   // The step view (care pictures design of 7 November 2026, section 2)
-  careStepByStep: 'Step by step',
   careStepsClose: 'Close',
   careStepsAll: 'All steps',
   careStepsBack: 'Back',

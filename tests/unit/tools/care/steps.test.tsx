@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { STEP_PICTURES } from '../../../../src/core/care/pictures.ts';
+import { idsOf, STEP_PICTURES } from '../../../../src/core/care/pictures.ts';
 import { PICTURE_WORDS } from '../../../../src/core/wording/en-care-pictures.ts';
 import { C, CARE_TASKS, CARRY, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
 import { ALL_STEPS_KEY } from '../../../../src/tools/care/steps.tsx';
@@ -20,7 +20,7 @@ const host = document.createElement('div');
 document.body.append(host);
 
 /** A stand-in for the phone's screen wake lock: what was asked for and what was let go. */
-const lock: { asked: number; released: number; held: boolean; current: { released: boolean } | null } = { asked: 0, released: 0, held: false, current: null };
+const lock: { asked: number; released: number; held: boolean; current: { released: boolean } | null; late: boolean; waiting: (() => void)[] } = { asked: 0, released: 0, held: false, current: null, late: false, waiting: [] };
 function fakeWakeLock(): void {
   Object.defineProperty(navigator, 'wakeLock', {
     configurable: true,
@@ -31,7 +31,8 @@ function fakeWakeLock(): void {
         lock.held = true;
         const sentinel = { released: false, release: vi.fn(() => { lock.released += 1; lock.held = false; sentinel.released = true; return Promise.resolve(); }) };
         lock.current = sentinel;
-        return Promise.resolve(sentinel);
+        // late: the phone answers only when the test says so (lock.waiting)
+        return lock.late ? new Promise((r) => { lock.waiting.push(() => r(sentinel)); }) : Promise.resolve(sentinel);
       }),
     },
   });
@@ -51,13 +52,13 @@ beforeEach(async () => {
   // Close takes its history entry back; here that is only counted, so no late popstate reaches the next test.
   vi.spyOn(history, 'back').mockImplementation(() => {});
   localStorage.clear();
-  Object.assign(lock, { asked: 0, released: 0, held: false, current: null });
+  Object.assign(lock, { asked: 0, released: 0, held: false, current: null, late: false, waiting: [] });
   fakeWakeLock();
 });
 afterEach(() => { render(null, host); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-const memory = () => {
-  const data = new Map<string, string>();
+const memory = (initial: Record<string, string> = {}) => {
+  const data = new Map(Object.entries(initial));
   const writes: string[] = [];
   const kv: KeyValueStore = { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => { writes.push(k); data.set(k, v); } };
   return { kv, writes };
@@ -65,7 +66,7 @@ const memory = () => {
 const services = (kv: KeyValueStore): TyreServices => ({ host: () => readHost(kv, () => null), storage: kv, now: () => NOW });
 const mount = async (kv = memory().kv) => { await act(() => { render(<CareScreen services={services(kv)} />, host); }); };
 const click = async (el: Element) => { await act(() => { (el as HTMLElement).click(); }); };
-const key = async (k: string) => { await act(() => { dialog()!.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })); }); };
+const key = async (k: string, mods: KeyboardEventInit = {}) => { await act(() => { dialog()!.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...mods })); }); };
 /** Lets the picture files the view asked for arrive (each is its own module). */
 const settle = async () => { for (let i = 0; i < 5; i += 1) await act(async () => { await new Promise((r) => setTimeout(r, 10)); }); };
 /** Waits until `n` pictures show in the step view (the first load of a module can take a moment in the test runner). */
@@ -77,20 +78,16 @@ const heading = () => dialog()!.querySelector<HTMLElement>('.care-step-h')!;
 const counter = () => dialog()!.querySelector('.care-steps-count')!.textContent;
 const page = () => dialog()!.querySelector('.care-step')!.textContent!;
 const roadTab = () => [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((t) => t.textContent === C.careTabRoad)!;
+/** A tap on the card in the list: the step view opens at once (the owner's wish of 7 November, review of PR 72, I4). */
 async function openCard(id: string): Promise<HTMLButtonElement> {
   await click(roadTab());
-  const card = host.querySelector<HTMLDetailsElement>(`details.care-road[data-id="${id}"]`)!;
-  await act(() => { card.open = true; });
-  const opener = card.querySelector<HTMLButtonElement>('.care-steps-open')!;
-  expect(opener.textContent).toBe(C.careStepByStep);
+  const opener = host.querySelector<HTMLButtonElement>(`.care-road[data-id="${id}"] .care-open`)!;
   await click(opener);
   await settle();
   return opener;
 }
 async function openTask(id: string): Promise<HTMLButtonElement> {
-  const task = host.querySelector<HTMLDetailsElement>(`details.care-task[data-id="${id}"]`)!;
-  await act(() => { task.open = true; });
-  const opener = task.querySelector<HTMLButtonElement>('.care-steps-open')!;
+  const opener = host.querySelector<HTMLButtonElement>(`.care-task[data-id="${id}"] .care-open`)!;
   await click(opener);
   await settle();
   return opener;
@@ -211,7 +208,7 @@ test('[BC-STEPS-BACK] opening adds one history entry, steps add none; the back g
   expect(dialog()).toBeNull();
   expect(back).not.toHaveBeenCalled();
   // opened again and closed with Close: the entry is taken back once
-  await click(host.querySelector('details.care-road[data-id="puncture-tube"] .care-steps-open')!);
+  await click(host.querySelector('.care-road[data-id="puncture-tube"] .care-open')!);
   await settle();
   expect(push).toHaveBeenCalledTimes(2);
   await click(button(C.careStepsClose)!);
@@ -226,7 +223,7 @@ test('[BC-STEPS-SR] focus moves to the heading on every page; a polite live regi
   // the first card with a picture, at its first picture
   const c = ROAD_CARDS.find((x) => (STEP_PICTURES[x.id] ?? []).some(Boolean))!;
   const at = STEP_PICTURES[c.id]!.findIndex(Boolean);
-  const words = PICTURE_WORDS[STEP_PICTURES[c.id]![at]!]!;
+  const words = PICTURE_WORDS[idsOf(STEP_PICTURES[c.id]![at]!)[0]!]!;
   await openCard(c.id);
   expect(document.activeElement).toBe(heading());
   for (let i = 0; i <= at; i += 1) {
@@ -280,7 +277,7 @@ test('[BC-STEPS-ALL] All steps shows every step on one page with its pictures; t
   expect(localStorage.getItem(ALL_STEPS_KEY)).toBe('1');
   // closed and opened again: still all steps
   await click(button(C.careStepsDone)!);
-  await click(host.querySelector('details.care-road[data-id="puncture-tube"] .care-steps-open')!);
+  await click(host.querySelector('.care-road[data-id="puncture-tube"] .care-open')!);
   await settle();
   expect(dialog()!.querySelectorAll('.care-step-all').length).toBe(c.steps.length);
   await click(button(C.careStepsAll)!);
@@ -330,4 +327,98 @@ test('[BC-SCREEN] the step view writes nothing to the bike store: opening, movin
   await click(button(C.careStepsAll)!);
   await click(button(C.careStepsDone)!);
   expect(mem.writes).toEqual([]);
+});
+
+// ---- Review of PR 72 ----
+test('[BC-STEPS-OPEN] a tap on a roadside card or a Care task in the list opens its step view at once; the list item is one button, its words only in the step view (I4)', async () => {
+  await mount();
+  const item = host.querySelector<HTMLElement>('.care-task[data-id="brakes-pads-disc"]')!;
+  expect(item.tagName).not.toBe('DETAILS');
+  const open = item.querySelector<HTMLButtonElement>('.care-open')!;
+  expect(open.getAttribute('aria-haspopup')).toBe('dialog');
+  expect(open.textContent).toContain('Check the disc brake pads and replace if worn');
+  expect(item.textContent).not.toContain(CARE_TASKS.find((t) => t.id === 'brakes-pads-disc')!.signs);
+  await click(open);
+  expect(dialog()).not.toBeNull();
+  expect(heading().textContent).toBe(C.careStepsBefore);
+  await click(button(C.careStepsClose)!);
+  expect(document.activeElement).toBe(open);
+  await click(roadTab());
+  await click(host.querySelector('.care-road[data-id="chain-broken"] .care-open')!);
+  expect(host.querySelector(`#${dialog()!.getAttribute('aria-labelledby')}`)!.textContent).toBe(card('chain-broken').problem);
+});
+
+/** A saved bike with rim brakes and the given bars (or none told), the bike in use. */
+const rimBike = (bars: string | null) => memory({
+  'loadcheck:bikeProfiles': JSON.stringify([{ id: 'bike_a', name: 'Mine', brakes: 'rim', ...(bars ? { look: { colour: null, bars, ebike: false } } : {}) }]),
+  'loadcheck:bikeProfile': JSON.stringify({ id: 'bike_a', name: 'Mine' }),
+}).kv;
+/** Brake rubbing, step 5 ("Open the brake's quick release"), for the bike in `kv`. */
+async function brakeStep5(kv: KeyValueStore): Promise<void> {
+  render(null, host);
+  await mount(kv);
+  await openCard('brake-rub-rim');
+  for (let i = 0; i < 5; i += 1) await click(button(C.careStepsNext)!);
+}
+const imgNames = () => [...dialog()!.querySelectorAll('.care-step [role="img"]')].map((i) => i.getAttribute('aria-label'));
+
+test("[BC-PIC-BARS] the brake's quick release: drop bars see the caliper lever, flat bars the V-brake's curved tube, other or untold bars both side by side, the caliper first (I1)", async () => {
+  const caliper = PICTURE_WORDS['brake-qr-open']!.name;
+  const vbrake = PICTURE_WORDS['vbrake-open']!.name;
+  await brakeStep5(rimBike('drop'));
+  await shown(1);
+  expect(imgNames()).toEqual([caliper]);
+  await brakeStep5(rimBike('flat'));
+  await shown(1);
+  expect(imgNames()).toEqual([vbrake]);
+  for (const bars of ['other', null]) {
+    await brakeStep5(rimBike(bars));
+    await shown(2);
+    expect(imgNames(), String(bars)).toEqual([caliper, vbrake]);
+  }
+  await brakeStep5(memory().kv); // no bike at all
+  await shown(2);
+  expect(imgNames()).toEqual([caliper, vbrake]);
+  // step 6 closes it again: the V-brake's own picture on flat bars
+  await brakeStep5(rimBike('flat'));
+  await click(button(C.careStepsNext)!);
+  await shown(1);
+  expect(imgNames()).toEqual([PICTURE_WORDS['vbrake-close']!.name]);
+});
+
+test("[BC-STEPS-KEYS] Alt or Ctrl with an arrow is the browser's own: the step view lets it pass", async () => {
+  await mount();
+  await openCard('chain-broken');
+  await key('ArrowRight');
+  await key('ArrowRight');
+  await key('ArrowLeft', { altKey: true });
+  await key('ArrowRight', { ctrlKey: true });
+  expect(counter()).toBe(C.careStepsCount(2, card('chain-broken').steps.length));
+});
+
+test('[BC-STEPS-AWAKE] the page showing again while the first ask is still open asks no second time, and the lock is let go on close; the back gesture lets go too', async () => {
+  lock.late = true;
+  await mount();
+  await openCard('bolt-loose');
+  expect(lock.asked).toBe(1);
+  await act(async () => { document.dispatchEvent(new Event('visibilitychange')); await Promise.resolve(); });
+  expect(lock.asked).toBe(1);
+  await click(button(C.careStepsClose)!);
+  // the phone answers after the card has closed
+  await act(async () => { for (const answer of lock.waiting.splice(0)) answer(); await new Promise((r) => setTimeout(r, 0)); });
+  // the one lock this card asked for came late, and was let go at once
+  expect(lock.asked).toBe(1);
+  expect(lock.current!.released).toBe(true);
+  expect(lock.held).toBe(false);
+  // the back gesture
+  lock.late = false;
+  await click(host.querySelector('.care-road[data-id="bolt-loose"] .care-open')!);
+  await settle();
+  expect(lock.held).toBe(true);
+  const state = vi.spyOn(history, 'state', 'get').mockReturnValue(null);
+  await act(() => { window.dispatchEvent(new PopStateEvent('popstate', { state: null })); });
+  state.mockRestore();
+  await settle();
+  expect(dialog()).toBeNull();
+  expect(lock.held).toBe(false);
 });

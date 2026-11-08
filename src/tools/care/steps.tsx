@@ -2,7 +2,8 @@
 // task full screen, one step at a time, each with its picture where one is drawn. Back and Next only, no swiping (answer 4). Opening it adds
 // one history entry, so the phone's back gesture closes it in one go. While a roadside card is open the screen is kept awake (answer 5).
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { pictureFor } from '../../core/care/pictures.ts';
+import type { Bars } from '../../core/bike/normalise.ts';
+import { picturesFor } from '../../core/care/pictures.ts';
 import type { CareTask, RoadCard } from '../../core/care/types.ts';
 import { C, CARRY, WHO_LABEL } from '../../core/wording/en-care.ts';
 import { loadPictures, Picture, pictureReady } from './picture.tsx';
@@ -26,13 +27,17 @@ function useAwake(on: boolean): void {
     if (!wake) return undefined;
     let alive = true;
     let held: Sentinel | null = null;
+    // An ask still open counts as held: the page showing again in that moment asks no second time (review of PR 72: a second lock
+    // would overwrite the first, which then was never let go).
+    let asking = false;
     const ask = async (): Promise<void> => {
-      if (document.visibilityState === 'hidden' || (held && !held.released)) return;
+      if (asking || document.visibilityState === 'hidden' || (held && !held.released)) return;
+      asking = true;
       try {
         const s = await wake.request('screen');
         if (alive) held = s;
-        else void s.release();
-      } catch { /* refused (battery saver, no permission): the steps work all the same */ }
+        else void s.release().catch(() => {});
+      } catch { /* refused (battery saver, no permission): the steps work all the same */ } finally { asking = false; }
     };
     const onVisible = (): void => { void ask(); };
     void ask();
@@ -66,6 +71,13 @@ function Before({ source }: { source: StepSource }) {
   );
 }
 
+/** A step's pictures, side by side when there are two (a choice by bars on a bike with other or untold bars); none until loaded. */
+function Pictures({ ids, view }: { ids: string[]; view: string }) {
+  const ready = ids.filter(pictureReady);
+  if (ready.length === 0) return null;
+  return <div class={`care-pics${ready.length > 1 ? ' care-pics-two' : ''}`}>{ready.map((id, k) => <Picture key={id} id={id} view={`${view}-${k}`} />)}</div>;
+}
+
 /** The end page's heading and words, or null where a task has nothing to add (its last step's Next then reads Done). */
 function endOf(source: StepSource): { title: string; body: preact.ComponentChildren } | null {
   const unsure = source.item.critical ? <p class="care-unsure"><strong>{C.careUnsure}</strong></p> : null;
@@ -74,7 +86,8 @@ function endOf(source: StepSource): { title: string; body: preact.ComponentChild
   return t.note || t.critical ? { title: C.careStepsEnd, body: <>{t.note ? <p>{t.note}</p> : null}{unsure}</> } : null;
 }
 
-export function StepView({ source, onClose }: { source: StepSource; onClose: () => void }) {
+/** `bars`: the chosen bike's bars, which pick a picture where the design draws one for each (3.6); null for Not sure or no bike. */
+export function StepView({ source, bars, onClose }: { source: StepSource; bars: Bars | null; onClose: () => void }) {
   const box = useRef<HTMLDialogElement>(null);
   const head = useRef<HTMLHeadingElement>(null);
   const [at, setAt] = useState(0);
@@ -85,7 +98,7 @@ export function StepView({ source, onClose }: { source: StepSource; onClose: () 
   const last = end ? steps.length + 1 : steps.length;
   const name = source.kind === 'road' ? source.item.problem : source.item.name;
   const titleId = `care-steps-title-${source.item.id}`;
-  const pictures = steps.map((_, i) => pictureFor(source.item.id, i));
+  const pictures = steps.map((_, i) => picturesFor(source.item.id, i, bars));
 
   const close = (fromBack: boolean): void => {
     if (!fromBack) history.back();
@@ -103,7 +116,7 @@ export function StepView({ source, onClose }: { source: StepSource; onClose: () 
     const onPop = (): void => { if ((history.state as { careSteps?: string } | null)?.careSteps !== source.item.id) closeRef.current(true); };
     window.addEventListener('popstate', onPop);
     let alive = true;
-    void loadPictures(pictures.filter((p): p is string => p !== null)).then(() => { if (alive) setReady((n) => n + 1); });
+    void loadPictures(pictures.flat()).then(() => { if (alive) setReady((n) => n + 1); });
     return () => { alive = false; window.removeEventListener('popstate', onPop); };
   }, []);
   useEffect(() => { head.current?.focus(); }, [at, all]);
@@ -112,7 +125,8 @@ export function StepView({ source, onClose }: { source: StepSource; onClose: () 
   const go = (to: number): void => { if (to >= 0 && to <= last) setAt(to); };
   const onKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape') { e.preventDefault(); close(false); return; }
-    if (all || (e.target as HTMLElement | null)?.tagName === 'INPUT') return;
+    // Alt or Ctrl with an arrow is the browser's own Back or Forward, and Shift or the Command key selects: let them pass.
+    if (all || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || (e.target as HTMLElement | null)?.tagName === 'INPUT') return;
     if (e.key === 'ArrowRight') { e.preventDefault(); go(at + 1); }
     if (e.key === 'ArrowLeft') { e.preventDefault(); go(at - 1); }
   };
@@ -128,7 +142,8 @@ export function StepView({ source, onClose }: { source: StepSource; onClose: () 
 
   const onStep = at >= 1 && at <= steps.length;
   const label = onStep ? C.careStepsCount(at, steps.length) : at === 0 ? C.careStepsBefore : end!.title;
-  const pic = onStep ? pictures[at - 1]! : null;
+  const pics = onStep ? pictures[at - 1]! : [];
+  const hasPic = pics.some(pictureReady);
 
   return (
     <dialog ref={box} class="care-steps" aria-labelledby={titleId}
@@ -154,7 +169,7 @@ export function StepView({ source, onClose }: { source: StepSource; onClose: () 
             <section class="care-step-before"><h3>{C.careStepsBefore}</h3><Before source={source} /></section>
             {steps.map((s, i) => (
               <section key={i} class="care-step-all">
-                {pictureReady(pictures[i]!) ? <Picture id={pictures[i]!} view={`a${i}`} /> : null}
+                <Pictures ids={pictures[i]!} view={`a${i}`} />
                 <h3>{C.careStepN(i + 1)}</h3>
                 <p class="care-step-t">{s}</p>
               </section>
@@ -162,8 +177,8 @@ export function StepView({ source, onClose }: { source: StepSource; onClose: () 
             {end ? <section class="care-step-end"><h3>{end.title}</h3>{end.body}</section> : null}
           </div>
         ) : (
-          <div key={at} class={`care-step${pictureReady(pic) ? ' care-step-pic' : ''}`}>
-            {pictureReady(pic) ? <Picture id={pic} view={`s${at}`} /> : null}
+          <div key={at} class={`care-step${hasPic ? ' care-step-pic' : ''}`}>
+            <Pictures ids={pics} view={`s${at}`} />
             <div class="care-step-words">
               <h2 ref={head} tabIndex={-1} class="care-step-h">{onStep ? C.careStepN(at) : label}</h2>
               {at === 0 ? <Before source={source} /> : onStep ? <p class="care-step-t">{steps[at - 1]}</p> : end!.body}
