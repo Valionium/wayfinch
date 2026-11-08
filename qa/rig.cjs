@@ -200,5 +200,59 @@ test('[LC-RIG-THUMB] safeDataThumb keeps the bk-* classes and a hex stroke, so a
   assert.ok(!list.includes("'hit'")&&!list.includes("'addable'"),'no tap or edit classes survive');
 });
 
+// The groups of the rig's markup with their silhouette, inside lines and tap target, each in the drawing's frame.
+function shapeGroups(svg){
+  const out=[];const stack=[];
+  for(const m of svg.matchAll(/<(\/?)(g|rect|circle|polygon|path|text)\b([^>]*?)(\/?)>/g)){
+    const [,close,tag,rest,self]=m;
+    if(close){if(tag==='g'){const g=stack.pop();if(g&&g.top)out.push(g);}continue;}
+    const attrs={};for(const a of rest.matchAll(/([a-zA-Z:-]+)="([^"]*)"/g))attrs[a[1]]=a[2];
+    if(tag==='g'&&!self){const top=/\bbagg\b/.test(attrs.class||'');const g={attrs,top,shells:[],details:0,hits:[],turn:attrs.transform||null};
+      if(!top&&stack.length){const owner=stack[stack.length-1];g.owner=owner.owner||owner;}stack.push(g);
+      if(/\bbk-detail\b/.test(attrs.class||'')){const o=g.owner;if(o)o.details++;}continue;}
+    const g=stack.length?(stack[stack.length-1].owner||stack[stack.length-1]):null;if(!g)continue;
+    const turn=stack.map(x=>x.turn).filter(Boolean)[0]||null;
+    if(/\bbag-shell\b/.test(attrs.class||''))g.shells.push({tag,attrs,turn});
+    if(/\bhit\b/.test(attrs.class||''))g.hits.push({tag,attrs});
+  }
+  return out;
+}
+const turnPt=([x,y],t)=>{const m=t&&/^rotate\(([-\d.]+) ([-\d.]+) ([-\d.]+)\)$/.exec(t);if(!m)return [x,y];
+  const a=Number(m[1])*Math.PI/180,cx=Number(m[2]),cy=Number(m[3]);return [cx+(x-cx)*Math.cos(a)-(y-cy)*Math.sin(a),cy+(x-cx)*Math.sin(a)+(y-cy)*Math.cos(a)];};
+const pathPts=d=>{const v=(d.match(/-?\d*\.?\d+/g)||[]).map(Number);const p=[];for(let i=0;i+1<v.length;i+=2)p.push([v[i],v[i+1]]);return p;};
+const inHit=(p,h)=>{const n=k=>Number(h.attrs[k]);
+  if(h.tag==='rect')return p[0]>=n('x')-0.01&&p[0]<=n('x')+n('width')+0.01&&p[1]>=n('y')-0.01&&p[1]<=n('y')+n('height')+0.01;
+  if(h.tag==='circle')return Math.hypot(p[0]-n('cx'),p[1]-n('cy'))<=n('r');
+  const q=h.attrs.points.split(/[\s,]+/).map(Number);let c=false;
+  for(let i=0,j=q.length-2;i<q.length;j=i,i+=2){if((q[i+1]>p[1])!==(q[j+1]>p[1])&&p[0]<(q[j]-q[i])*(p[1]-q[i+1])/(q[j+1]-q[i+1])+q[i])c=!c;}return c;};
+
+test('[BK-SHAPES-PAGE] the rig draws every bag, empty spot and pair ghost as its real shape, and the middle of each shape is inside its own tap target',()=>{
+  let groups=0;
+  for(const style of axes.styles)for(const size of ['XS','M','XL'])for(const tyre of TYRES)for(const [set,bags] of Object.entries(SETS)){
+    const bike=bikeOf(style,size,'drop',tyre);
+    for(const [step,mode] of [[2,'add'],[2,'remove'],[3,'add']]){
+      const where=`${style} ${size} ${tyre} ${set} step ${step} ${mode}`;
+      for(const g of shapeGroups(rig(bike,bags,step,{},mode))){
+        const cls=g.attrs.class;
+        if(/\b(deck|ghostdeck)\b/.test(cls))continue; // the decks keep their strap boxes
+        assert.equal(g.shells.length,1,`${where}: one silhouette in ${cls}`);
+        const sh=g.shells[0];
+        assert.equal(sh.tag,'path',`${where}: ${cls} is a shape, not a box`);
+        assert.equal(g.details,/\bowned\b/.test(cls)?1:0,`${where}: inside lines on owned bags only (${cls})`);
+        const pts=pathPts(sh.attrs.d).map(p=>turnPt(p,sh.turn));
+        const mid=[pts.reduce((s,p)=>s+p[0],0)/pts.length,pts.reduce((s,p)=>s+p[1],0)/pts.length];
+        if(g.hits.length){assert.ok(g.hits.some(h=>inHit(mid,h)),`${where}: the middle of ${cls} ${JSON.stringify(Object.fromEntries(Object.entries(g.attrs).filter(([k])=>k.startsWith('data-'))))} is on its tap target`);groups++;}
+      }
+    }
+  }
+  assert.ok(groups>500,`${groups} shapes with targets`);
+  // a saved thumbnail keeps the shapes' own classes
+  const src=fs.readFileSync(path.join(__dirname,'..','public','tools','bags','index.html'),'utf8');
+  const start=src.indexOf("const drawingClasses = new Set([");const list=src.slice(start,src.indexOf(']);',start));
+  const svg=rig(bikeOf('diamond-sloping','M','drop','47-584'),SETS.bikepacking,3,{},'add')+rig(bikeOf('diamond-sloping','M','drop','47-584'),SETS.touring,3,{},'add');
+  for(const c of new Set([...svg.matchAll(/class="([^"]*)"/g)].flatMap(m=>m[1].split(/\s+/))).values())
+    if(/^bk-/.test(c))assert.ok(list.includes(`'${c}'`),`thumbnails keep ${c}`);
+});
+
 for(const [name,fn] of tests){fn();passed++;console.log('ok',name);}
 console.log(`${passed} rig tests passed`);

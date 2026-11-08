@@ -394,6 +394,12 @@ button.go.small{font-size:15px;padding:9px 16px;flex:0 0 auto}
 .bag-shell{fill:var(--panel-hi);stroke:var(--muted-dim);stroke-width:1.2}
 .bag-shell.active{stroke:var(--blaze);stroke-width:1.6}
 .bag-fill{opacity:.62}
+/* real bag shapes (design of 8 Nov 2026): the inside lines are decoration; the silhouette carries the state */
+.bk-detail{fill:none;stroke:var(--muted);stroke-width:.7;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+.bk-detail .bk-zip{stroke-dasharray:1.2 1}
+.bk-onbody .bk-detail,.bagg.onbody .bk-detail{stroke:var(--amber)}
+.bk-far{opacity:.62}
+.bagg.ghost .bk-detail{display:none}
 .bagg.onbody .bag-shell{stroke-dasharray:none;stroke:var(--amber)}
 .strapline{stroke:var(--blaze);stroke-width:1;opacity:.7;fill:none}
 .bag-tag{font-family:var(--mono);font-size:7.5px;letter-spacing:.1em;fill:var(--muted-dim)}
@@ -4210,7 +4216,8 @@ function safeDataThumb(markup){
   const numeric = new Set(['x','y','x1','y1','x2','y2','cx','cy','r','rx','ry','width','height','opacity','fill-opacity','stroke-opacity','stroke-width']);
   const drawingClasses = new Set(['bk','bk-tyre','bk-rim','bk-spokes','bk-hub','bk-bb','bk-casing','bk-casing-ink','bk-casing-panel','bk-casing-ground',
     'bk-paint','bk-frame','bk-stays','bk-fork','bk-ring','bk-cog','bk-hubgear','bk-rotor','bk-chain','bk-belt','bk-mech','bk-rack','bk-caliper',
-    'bk-crank','bk-post','bk-bar','bk-grip','bk-saddle','bk-hood','bk-motor','bk-battery','bk-shock','bk-seal','bg-wheel','bg-line','bagg','owned','packed','idle','onbody','deck','deck-empty','bag-shell','active','bag-fill','bag-tag','deck-tag','strapline','btl','cage','bottle','bottle-cap','leftbehind','seg','levelline','brimline']);
+    'bk-crank','bk-post','bk-bar','bk-grip','bk-saddle','bk-hood','bk-motor','bk-battery','bk-shock','bk-seal','bg-wheel','bg-line','bagg','owned','packed','idle','onbody','deck','deck-empty','bag-shell','active','bag-fill','bag-tag','deck-tag','strapline','btl','cage','bottle','bottle-cap','leftbehind','seg','levelline','brimline',
+    'bk-bag','bk-shell','bk-fill','bk-far','bk-onbody','bk-detail','bk-strap','bk-zip','bk-roll','bk-hook','bk-end','bk-harness','bk-post-strap']);
   const prefix = 'thumb' + (++thumbRenderId) + '_';
   const idMap = new Map();
   for(const el of doc.querySelectorAll('[id]')){
@@ -8311,18 +8318,19 @@ const r2 = n => Math.round(n * 100) / 100;
 // so the fill still rises level from the bottom and the inspector reads it like a frame bag.
 function rigShape(p, rx){
   if(!p) return null;
-  if(!p.rot) return { kind:'rect', x:r2(p.x), y:r2(p.y), w:r2(p.w), h:r2(p.h), rx };
+  if(!p.rot) return { kind:'rect', x:r2(p.x), y:r2(p.y), w:r2(p.w), h:r2(p.h), rx, p };
   const cx = p.x + p.w / 2, cy = p.y + p.h / 2, a = p.rot * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
   const pts = [[p.x, p.y], [p.x + p.w, p.y], [p.x + p.w, p.y + p.h], [p.x, p.y + p.h]]
     .map(([x, y]) => [cx + (x - cx) * c - (y - cy) * s, cy + (x - cx) * s + (y - cy) * c]);
   const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]), x0 = Math.min(...xs), y0 = Math.min(...ys);
   return { kind:'poly', pts:pts.map(q => r2(q[0]) + ',' + r2(q[1])).join(' '),
-    box:{ x:r2(x0), y:r2(y0), w:r2(Math.max(...xs) - x0), h:r2(Math.max(...ys) - y0) } };
+    box:{ x:r2(x0), y:r2(y0), w:r2(Math.max(...xs) - x0), h:r2(Math.max(...ys) - y0) }, p };
 }
 function shiftShape(L, dx, dy){
   if(!L || (!dx && !dy)) return L;
-  if(L.kind === 'rect') return { ...L, x:r2(L.x + dx), y:r2(L.y + dy) };
-  return { kind:'poly', box:{ ...L.box, x:r2(L.box.x + dx), y:r2(L.box.y + dy) },
+  const p = L.p && { ...L.p, x:L.p.x + dx, y:L.p.y + dy };
+  if(L.kind === 'rect') return { ...L, x:r2(L.x + dx), y:r2(L.y + dy), p };
+  return { kind:'poly', p, box:{ ...L.box, x:r2(L.box.x + dx), y:r2(L.box.y + dy) },
     pts:L.pts.split(' ').map(q => q.split(',').map(Number)).map(([x, y]) => r2(x + dx) + ',' + r2(y + dy)).join(' ') };
 }
 // Bags stacked on one place climb as far as the view allows, as bike.js stacks them.
@@ -8349,6 +8357,22 @@ function shellPoly(pts,box,pct){
     art:`<polygon class="bag-shell active" points="${pts}"/>`+
         `<rect class="bag-fill" fill="${fillColour(pct)}" clip-path="url(#${id})" x="${box.x}" y="${r2(box.y+box.h-fh)}" width="${box.w}" height="${r2(fh)}"/>` };
 }
+// A real bag shape from bike.js (design of 8 Nov 2026): the silhouette (the only part that takes state), the fill rising level from
+// its bottom, clipped to it, and the inside lines (decoration, none on an empty spot). Without bike.js the boxes above stay.
+function bagShapeOf(pos, L, litres, slot){
+  const B = bikeModule();
+  return B && B.bagShape && L && L.p ? B.bagShape(pos, L.p, litres, { slot:slot || null, frame:pos === 'frame' ? L.pts : undefined }) : null;
+}
+const shapeTurn = s => s.rot ? ` transform="rotate(${r2(s.rot)} ${r2(s.c[0])} ${r2(s.c[1])})"` : '';
+function shellShape(s, pct, bare){
+  const id = 'cl'+(clipN++), b = s.box, fh = Math.max(0, (b.h + 2) * pct);
+  return { def:`<clipPath id="${id}"><path d="${s.d}"/></clipPath>`,
+    art:`<g${shapeTurn(s)}><path class="bag-shell active" d="${s.d}"/>` +
+        (fh > 0 ? `<rect class="bag-fill" fill="${fillColour(pct)}" clip-path="url(#${id})" x="${r2(b.x-1)}" y="${r2(b.y+b.h+1-fh)}" width="${r2(b.w+2)}" height="${r2(fh)}"/>` : '') +
+        (bare ? '' : `<g class="bk-detail" aria-hidden="true">${s.detail}</g>`) + `</g>` };
+}
+// The far bag of a pair sits behind and up-left (bike.js's offsets: the pannier's behind and a little lower, on the same rail).
+const pairOffset = pos => ((bikeModule() || {}).PAIR_OFFSET || { rack:[-7,-7], fork:[-5,-5] })[pos] || [-4,-4];
 // where each bag of a position sits, given how many of them there are, from the bike's anchors
 
 function layout(pos, i, n, frameSmall, slot, a = rigAnchors()){
@@ -8356,7 +8380,7 @@ function layout(pos, i, n, frameSmall, slot, a = rigAnchors()){
   switch(pos){
     case 'top': return rigShape(a.top[slot] || a.top.front, 2);
     case 'bar': { const s = stackStep(a.bar.y, a.bar.h, 2, n); return rigShape({ ...a.bar, y:a.bar.y - i * s }, 3); }
-    case 'frame': return a.frame ? { kind:'poly', pts:a.frame.shapes[frameSmall], box:a.frame.boxes[frameSmall] } : null;
+    case 'frame': return a.frame ? { kind:'poly', pts:a.frame.shapes[frameSmall], box:a.frame.boxes[frameSmall], p:{ ...a.frame.boxes[frameSmall], rot:0 } } : null;
     case 'seat': { const s = stackStep(a.seat.y, a.seat.h, 2, n); return rigShape({ ...a.seat, y:a.seat.y - i * s }, 4); }
     case 'fork': return rigShape(a.fork, 2);        // pair offset applied by the caller
     case 'rack': return rigShape(a.rack, 2);        // pair offset applied by the caller
@@ -8456,7 +8480,8 @@ function drawRig(){
   const TAGS = anchors ? anchors.tags : {};
   const tagAt = (pos, text, active) => { const t = TAGS[pos]; if(!t) return '';
     return `<text class="bag-tag${active?' active':''}" x="${r2(t[0])}" y="${r2(t[1])}" text-anchor="${pos==='fork'?'start':'middle'}">${text}</text>`; };
-  const shellOf = (L, pct) => L.kind === 'poly' ? shellPoly(L.pts, L.box, pct) : shellRect(L.x, L.y, L.w, L.h, pct, L.rx);
+  const shellOf = (L, pct, pos, litres, slot, bare) => { const s = bagShapeOf(pos, L, litres, slot);
+    return s ? shellShape(s, pct, bare) : L.kind === 'poly' ? shellPoly(L.pts, L.box, pct) : shellRect(L.x, L.y, L.w, L.h, pct, L.rx); };
 
   POS_ORDER.filter(p => !isBottle(p)).forEach(pos => {
     const allMine = stage === 1 ? [] : S.bags.filter(b => b.pos === pos);
@@ -8470,7 +8495,7 @@ function drawRig(){
         : (allMine.length || (pos === 'frame' && bikeFit(S.bikeProfile).frameBag.none) ? [] : [{ slot:null, key:pos }]);
       empties.forEach(e => {
         const L = layout(pos, 0, 1, frameSmall, e.slot, anchors); if(!L) return;
-        const sh = shellOf(L, 0);
+        const sh = shellOf(L, 0, pos, Infinity, e.slot, true);   // an empty spot: the shape at its full size, dashed, no inside lines
         defs.push(sh.def);
         art.push(`<g class="bagg ghost${editing && !removing ? ' addable' : ''}"${
           editing && !removing ? ` data-add="${e.key}"` : ''}>${sh.art}${
@@ -8485,15 +8510,15 @@ function drawRig(){
 
     // one of a pair mounted: show where the other would go
     if(editing && !removing && POSITIONS[pos].pairable && mine.length === 1 && !mine[0].pair){
-      const PO = { rack:[-7,-7], fork:[-5,-5] }[pos] || [-4,-4];
-      const G = shiftShape(layout(pos, 0, 1, frameSmall, null, anchors), PO[0], PO[1]);
+      const PO = pairOffset(pos);
+      const G = shiftShape(layout(pos, 0, 1, frameSmall, null, anchors), PO[0], PO[1]), GS = bagShapeOf(pos, G, mine[0].L, null);
       if(G){
         // badge on the outer corner — the middle of the ghost is hidden behind
         // the bag in front, which left a stray stub of the old centred plus
         const gb = G.kind === 'rect' ? G : G.box;
         const bx = r2(gb.x + 0.5), by = r2(gb.y + 0.5), a = 2.4;
         art.push(`<g class="bagg pairghost addable" data-bump="${mine[0].uid}">
-          ${G.kind === 'rect' ? `<rect class="bag-shell" x="${G.x}" y="${G.y}" width="${G.w}" height="${G.h}" rx="${G.rx||2}"/>` : `<polygon class="bag-shell" points="${G.pts}"/>`}
+          ${GS ? `<g${shapeTurn(GS)}><path class="bag-shell" d="${GS.d}"/></g>` : G.kind === 'rect' ? `<rect class="bag-shell" x="${G.x}" y="${G.y}" width="${G.w}" height="${G.h}" rx="${G.rx||2}"/>` : `<polygon class="bag-shell" points="${G.pts}"/>`}
           <circle class="plusdot" cx="${bx}" cy="${by}" r="4.4"/>
           <path class="plus" d="M${r2(bx-a)},${by} h${a*2} M${bx},${r2(by-a)} v${a*2}"/>
           ${hitFor(pos)}</g>`);
@@ -8501,14 +8526,14 @@ function drawRig(){
     }
     const units = mine.flatMap(physical);
     // the second of a pair goes behind and up-left, so both stay reachable
-    const PAIR_OFF = { rack:[-7,-7], fork:[-5,-5] }[pos] || [-4,-4];
+    const PAIR_OFF = pairOffset(pos);
     const order = units.length > 1 && !slots_ ? units.slice().reverse() : units;
     order.forEach((b,i) => {
       const s = slots.find(x => x.key === b.key);
       const pct = showFill && s && s.cap > 0 ? Math.min(1, (s.cap - s.left) / s.cap) : 0;
       let L = layout(pos, b.idx, units.length, frameSmall, b.slot, anchors); if(!L) return;
       if(b.idx > 0 && !slots_) L = shiftShape(L, PAIR_OFF[0], PAIR_OFF[1]);
-      const sh = shellOf(L, pct);
+      const sh = shellOf(L, pct, pos, +b.L, b.slot);
       defs.push(sh.def);
       const canBump = !removing && (POSITIONS[pos].pairable && !b.pair || pos === 'frame');
       // 1 / 2 / 3 sit inside even the smallest frame bag, so they never
