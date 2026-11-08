@@ -181,7 +181,12 @@ export function TripScreen({ services }: { services: TripServices }) {
             {services.handOff ? <PlanBags handOff={services.handOff} /> : null}
             <p><a class="btn" href="/tools/bags/">{W.appTripOpenBagPlanner}</a></p>
           </Step>
-          <Step name="go" n={4} title={W.appTripStepGo} state={stateOf('go', false)} open={openStep === 'go'} canOpen onOpen={choose('go')} line={W.appTripGoLater}>
+          {/* Once Get ready offline has saved every step, Open En route shows in Go at once, folded or open (item J). */}
+          <Step
+            name="go" n={4} title={W.appTripStepGo} state={stateOf('go', false)} open={openStep === 'go'} canOpen onOpen={choose('go')}
+            line={readyDone && trip ? null : W.appTripGoLater}
+            below={readyDone && trip && openStep !== 'go' ? <p class="trip-go-open"><a class="btn btn-primary" href="#/ahead">{W.appTripOpenAhead}</a></p> : null}
+          >
             <p>{W.appTripFlightMode}</p>
             <p><a class="btn btn-primary" href="#/ahead">{W.appTripOpenAhead}</a></p>
           </Step>

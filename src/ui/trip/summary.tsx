@@ -12,6 +12,14 @@ import type { TripServices, TripSnapshot } from './services.ts';
 
 /** Room above the line for the icons: the profile grows from 72 to 112 px (design §6). */
 const ROOM_PX = 40;
+/** An icon's tap target, and the "+N" badge's 2 px below it. */
+const ICON_PX = 44;
+const BADGE_PX = 2;
+/**
+ * Where an icon's target starts: standing on the line at its km, so it points down at it, and never outside the box of the room and
+ * the profile, so no icon or badge covers the text below (owner's preview check, 8 Nov 2026, item L).
+ */
+const iconTop = (y: number): number => Math.max(0, Math.min(ROOM_PX + PROFILE_BOX.h - ICON_PX - BADGE_PX, ROOM_PX + y - ICON_PX));
 const stopWords = (s: RouteStop): string => (s.label ? `${ICON_WORD[s.kind](showKm(s.km))} · ${s.label}` : ICON_WORD[s.kind](showKm(s.km)));
 
 /**
@@ -38,7 +46,7 @@ function ProfileStops({ route, stops }: { route: Route; stops: RouteStop[] }) {
           const more = rest.length ? W.appAheadIconMore(rest.length) : '';
           return (
             <button
-              key={n} type="button" class={`ah-icon ah-icon-${one!.kind}${more && ' ah-icon-more'}`} style={{ left: `${(x * 100).toFixed(2)}%`, top: `${(ROOM_PX + y - 22).toFixed(1)}px` }}
+              key={n} type="button" class={`ah-icon ah-icon-${one!.kind}${more && ' ah-icon-more'}`} style={{ left: `${(x * 100).toFixed(2)}%`, top: `${iconTop(y).toFixed(1)}px` }}
               aria-label={more ? `${stopWords(one!)}, ${more}: ${rest.map(stopWords).join(', ')}` : stopWords(one!)} aria-expanded={picked === n} aria-controls={picked === n ? 'trip-stop-list' : undefined}
               onClick={() => setPicked(picked === n ? null : n)}
             >

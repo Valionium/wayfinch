@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { GPX_MAX_BYTES, GpxError } from '../../core/route/gpx.ts';
 import type { Route } from '../../core/types.ts';
 import { showKm, W } from '../../core/wording/en.ts';
+import { TR } from '../../core/wording/en-trip.ts';
 import { sameLine } from '../../store/trip.ts';
 import { lazy } from '../lazy.tsx';
 import { routeFromGpx } from './read-gpx.ts';
@@ -39,7 +40,7 @@ export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken
       const out = await services.addRoute(found, old?.route ?? null);
       setRound((n) => n + 1);
       if (out.kind === 'same') setSaid(W.appTripSameRoute);
-      else onAdded(`${out.kind === 'added' ? W.appTripAdded(out.name) : out.dateNotSaved ? W.appTripReplacedNoDate(out.name) : W.appTripReplaced(out.name)} ${W.appTripNextGetReady}`);
+      else onAdded(`${out.kind === 'added' ? W.appTripAdded(out.name) : out.dateNotSaved ? TR.appTripReplacedNoDate(out.name) : W.appTripReplaced(out.name)} ${W.appTripNextGetReady}`);
       await reload();
     } catch (e) {
       refused(reasonOf(e));
@@ -94,7 +95,7 @@ export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken
         {pending && old ? (
           <div class="notice" role="alertdialog" aria-labelledby="trip-replace-title" data-replace>
             <h3 id="trip-replace-title" tabIndex={-1} ref={asking}>{W.appTripReplaceTitle}</h3>
-            <p>{W.appTripReplaceBody(old.route.name, pending.route.name, showKm(pending.route.lengthKm))}</p>
+            <p>{TR.appTripReplaceBody(old.route.name, pending.route.name, showKm(pending.route.lengthKm))}</p>
             <div class="row">
               <button type="button" class="btn btn-primary" onClick={() => void commit(pending)}>{W.appTripReplaceYes}</button>
               <button type="button" class="btn" onClick={() => setPending(null)}>{W.appTripReplaceCancel}</button>

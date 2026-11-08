@@ -310,3 +310,12 @@ test("[TRIP-GUIDED-FIRST] the guided Trip adds nothing to the first screen: at o
   console.log(`TRIP-GUIDED-FIRST: first screen ${figures.firstJsGzip} bytes gzipped`);
   expect(figures.firstJsGzip).toBeLessThanOrEqual(145_678);
 });
+
+// After the launch, part 4a (owner's preview check of 8 Nov 2026, items A, B, J, K, L, M): the new words and the Emergency link are
+// small, and the rest lives in the lazy chunks (Get ready's step, the profile's stops), so the first screen does not grow.
+// 145,378 bytes is the first screen's figure on main (5cd5c5c) at the branch point; the rule is that it may not rise above it.
+test("[APP-4A-FIRST] part 4a adds nothing to the first screen: at or below main's figure at the branch point", () => {
+  const figures = measure(on);
+  console.log(`APP-4A-FIRST: first screen ${figures.firstJsGzip} bytes gzipped`);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_378);
+});

@@ -1,6 +1,7 @@
 // Get ready offline on Trip (spec sections 3.3, 5 and 9.4). It reports what was done, step by step, and what was not: nothing
 // here calls the trip ready, safe or complete (Decision 2). One fixed line asks the rider to test it in flight mode.
 import { W } from '../../core/wording/en.ts';
+import { TR } from '../../core/wording/en-trip.ts';
 import { askForHomeScreen } from '../install.ts';
 import { labelOf, NotSaved, RunProgress, usePrepareRun } from './run.tsx';
 import { savedLine } from './saved-line.ts';
@@ -27,15 +28,21 @@ export function GetReady({ services, snap, reload, lead = null, onRun }: {
     && snap.prepared === null && snap.places === 0;
   const verb = snap.prepared === null && reports === null ? W.appTripGetReadyButton : failed.length > 0 ? W.appTripRetryButton : W.appTripUpdateButton;
   const button = <button type="button" class="btn btn-primary" onClick={go} aria-busy={progress ? 'true' : undefined}>{verb}</button>;
-  const leading = lead !== null && !progress && reports === null && run.failure === null;
+  // Until Get ready offline is done (every step saved), the step says that En route needs it and why, with its one button: not only
+  // once, in the message after a route was added (owner's preview check, 8 Nov 2026, item A).
+  const done = steps !== null && steps.length > 0 && failed.length === 0;
+  const noting = !progress && !done;
+  const leading = noting && lead !== null && reports === null && run.failure === null;
 
   return (
     <div data-getready>
-      {leading ? <p class="trip-added" role="status" data-added>{lead} {button}</p> : <p>{W.appTripGetReadyIntro}</p>}
-      {ask ? <p class="notice">{W.appTripIphoneAsk}</p> : null}
+      {leading ? <p class="trip-added" role="status" data-added data-ready-note>{lead} {button}</p>
+        : noting ? <p class="trip-added" data-ready-note>{W.appAheadNeedTitle}. {W.appAheadNeedBody} {button}</p>
+          : <p>{TR.appTripGetReadyIntro}</p>}
+      {ask ? <p class="notice">{TR.appTripIphoneAsk}</p> : null}
       {line ? <p class="tool-line">{line}</p> : <p class="muted">{W.appTripNothingSaved}</p>}
       {snap.storageMb !== null ? <p class="muted">{W.appTripStorage(String(snap.storageMb))}</p> : null}
-      {leading ? null : button}
+      {noting ? null : button}
       <RunProgress run={run} />
       {progress ? null : <NotSaved failed={failed} />}
       {!progress && saved.length > 0 ? <p class="muted">{W.appTripStepsOk}: {saved.map((s) => labelOf(s.step)).join(', ')}.</p> : null}

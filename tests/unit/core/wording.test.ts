@@ -17,10 +17,8 @@ const areaOf = (key: string): string | undefined =>
 
 // Test values for each template function. A new template without an entry here fails the test below.
 const TEMPLATE_ARGS: Record<string, unknown[][]> = {
-  appTripReplaceBody: [['Old loop', 'New loop', '165.2']],
   appTripAdded: [['Heidelberg to Strasbourg']],
   appTripReplaced: [['Heidelberg to Strasbourg']],
-  appTripReplacedNoDate: [['Heidelberg to Strasbourg']],
   appTripDistance: [['165.2']],
   appTripClimbing: [['1,240']],
   appTripDayRow: [[1, '78.4']],

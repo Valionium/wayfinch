@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { buildScreen } from '../../../src/core/screen/screen.ts';
 import { planStages } from '../../../src/core/route/stages.ts';
 import { W } from '../../../src/core/wording/en.ts';
+import { TR } from '../../../src/core/wording/en-trip.ts';
 import type { StepName, StepReport } from '../../../src/data/prepare.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
 import { closeDb, openDb } from '../../../src/store/db.ts';
@@ -427,7 +428,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     await until(() => text().includes(W.appPrepWeatherFailed), 'the failed step');
     expect(text()).toContain(W.appPrepStorageFull(6, 14));
     expect(text()).toContain(W.appTripMissingHeading);
-    expect(text()).toContain(W.appTripPartial);
+    expect(text()).toContain(TR.appTripPartial);
     expect(text()).toContain(W.appTripNoPlaces);
     const retry = button(W.appTripRetryButton);
     expect(retry.disabled).toBe(false);
@@ -490,17 +491,17 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     await show(iphone);
     await pick(await fixtureGpx('loop'));
     await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
-    expect(text()).toContain(W.appTripIphoneAsk);
+    expect(text()).toContain(TR.appTripIphoneAsk);
     expect(button(W.appTripGetReadyButton).disabled).toBe(false);
     // Once something is saved the ask is not repeated.
     render(null, host);
     await show(services({ env: { ...base.env, ...tab }, ...preparing(allOk, { places: 3 }) }));
     await click(button(W.appTripGetReadyButton));
     await until(() => text().includes('3 places'), 'the result');
-    expect(text()).not.toContain(W.appTripIphoneAsk);
+    expect(text()).not.toContain(TR.appTripIphoneAsk);
     render(null, host);
     await show(services({ env: { ...base.env, ...tab, standalone: true } }));
-    expect(text()).not.toContain(W.appTripIphoneAsk);
+    expect(text()).not.toContain(TR.appTripIphoneAsk);
   });
 
   test('[TRIP-INSTALL] Android\'s install offer gives an Install button that asks the browser; without an offer there is none', async () => {
@@ -622,7 +623,7 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     await choose('ab-from', 'Heidelberg');
     await choose('ab-to', 'Strasbourg');
     await click(button(W.appAbPlan));
-    await until(() => text().includes(W.appAbNone), 'the sentence');
+    await until(() => text().includes(TR.appAbNone), 'the sentence');
     expect(await readTrip()).toBeNull();
     expect(host.querySelector('[data-add-route] input[type=file]')).not.toBeNull();
     expect(net.urls.some((u) => /routed-(foot|car)|project-osrm|profile=(car|foot)/.test(u))).toBe(false);
@@ -803,7 +804,7 @@ describe('What the review of group 5 found', () => {
     }
     await click(button(W.appAbPlan));
     await until(() => text().includes(W.routeTrackTooLong), 'the reason');
-    expect(text()).not.toContain(W.appAbNone);
+    expect(text()).not.toContain(TR.appAbNone);
   });
 });
 
@@ -835,7 +836,7 @@ describe('Messages that must not be lost', () => {
     await pick(await fixtureGpx('alpine-pass'));
     await until(() => host.querySelector('[data-replace]') !== null, 'the question');
     await click(button(W.appTripReplaceYes));
-    await until(() => text().includes(W.appTripReplacedNoDate('Fixture: Altdorf over the Gotthard to Bellinzona')), 'the sentence');
+    await until(() => text().includes(TR.appTripReplacedNoDate('Fixture: Altdorf over the Gotthard to Bellinzona')), 'the sentence');
     expect(text()).not.toContain(W.appTripUnchanged);
   });
 });

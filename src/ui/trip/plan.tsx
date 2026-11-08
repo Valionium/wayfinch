@@ -4,6 +4,7 @@ import { useState } from 'preact/hooks';
 import { GpxError } from '../../core/route/gpx.ts';
 import type { Route } from '../../core/types.ts';
 import { W } from '../../core/wording/en.ts';
+import { TR } from '../../core/wording/en-trip.ts';
 import { planRoute, searchPlace } from '../../data/routing.ts';
 import type { FoundPlace } from '../../data/routing.ts';
 import { GeoNamesCredit, OsmCredit } from './credit.tsx';
@@ -103,12 +104,12 @@ export function PlanAB({ services, onRoute }: { services: TripServices; onRoute:
   return (
     <div data-plan-ab>
       <h3>{W.appAbTitle}</h3>
-      <p class="muted">{W.appAbNote}</p>
+      <p class="muted">{TR.appAbNote}</p>
       <PlaceChoice id="ab-from" label={W.appAbFrom} services={services} chosen={picked.from} onChoose={(p) => setPicked((s) => ({ ...s, from: p }))} />
       <PlaceChoice id="ab-to" label={W.appAbTo} services={services} chosen={picked.to} onChoose={(p) => setPicked((s) => ({ ...s, to: p }))} />
       {picked.from && picked.to ? <button type="button" class="btn btn-primary" onClick={() => void plan()}>{W.appAbPlan}</button> : null}
       {busy ? <p role="status">{W.appAbPlanning}</p> : null}
-      {none ? <p class="notice" role="alert">{W.appAbNone}</p> : null}
+      {none ? <p class="notice" role="alert">{TR.appAbNone}</p> : null}
       {problem ? <p class="notice" role="alert">{problem}</p> : null}
     </div>
   );

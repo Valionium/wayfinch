@@ -3,11 +3,13 @@
 // is added. On the real store (fake IndexedDB), with a fixed clock and a stand-in for Get ready offline's network work.
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import type { RouteStop } from '../../../src/core/screen/route-stops.ts';
-import { W } from '../../../src/core/wording/en.ts';
+import { showKm, W } from '../../../src/core/wording/en.ts';
 import type { StepName, StepReport } from '../../../src/data/prepare.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
 import { closeDb, openDb } from '../../../src/store/db.ts';
@@ -401,5 +403,109 @@ describe('What the review of PR 73 found', () => {
     expect(asked).toBe(2);
     act(() => render(null, other));
     other.remove();
+  });
+});
+
+describe('After the launch, part 4a (owner\'s preview check, 8 Nov 2026)', () => {
+  const note = () => step('getready').querySelector<HTMLElement>('[data-ready-note]');
+  /** A Get ready offline whose places step is not saved: the record says so, as the real one would. */
+  function partly(): Partial<TripServices> {
+    const reports = (): StepReport[] => stepNames.map((s) => ({ step: s, ok: s !== 'places', note: s === 'places' ? W.appPrepNoConnection : null }));
+    return {
+      prepare: async () => {
+        const trip = (await readTrip())!;
+        await savePrepared(trip.route.id, { at: NOW, steps: reports(), build: null, forecastFetchedAt: null, baselineYears: null });
+        return reports();
+      },
+    };
+  }
+
+  test('[TRIP-READY-NOTE] the note that En route needs Get ready offline stays in step 2 until it is done, not only once after the upload', async () => {
+    const svc = await withRoute(services(preparing()));
+    // Right after the upload: the message names the next step and why, with the one button.
+    expect(note()).not.toBeNull();
+    expect(note()!.textContent).toContain(W.appTripNextGetReady);
+    // Trip opened again later (another tab and back): no "Added" message any more, but the note is still there, with the button.
+    await show(svc);
+    await until(() => step('getready').querySelector('[data-getready]') !== null, 'Get ready offline');
+    expect(host.querySelector('[data-added]')).toBeNull();
+    expect(note()).not.toBeNull();
+    expect(note()!.textContent).toContain(W.appAheadNeedTitle);
+    expect(note()!.textContent).toContain(W.appAheadNeedBody);
+    expect(buttonIn(note()!, W.appTripGetReadyButton)).toBeDefined();
+    expect([...step('getready').querySelectorAll('button')].filter((b) => b.textContent === W.appTripGetReadyButton)).toHaveLength(1);
+    // Folded and opened again: still there.
+    await click(buttonIn(step('bags'), W.appTripStepBags));
+    await click(buttonIn(step('getready'), W.appTripGetReadyTitle));
+    await until(() => note() !== null, 'the note again');
+    // Done: the note goes.
+    await click(buttonIn(note()!, W.appTripGetReadyButton));
+    await until(() => text().includes('12 places'), 'the result');
+    expect(note()).toBeNull();
+    await show(svc);
+    await click(buttonIn(step('getready'), W.appTripUpdateButton));
+    await until(() => step('getready').querySelector('[data-getready]') !== null, 'Get ready offline');
+    expect(note()).toBeNull();
+  });
+
+  test('[TRIP-READY-NOTE] with a step not saved Get ready offline is not done: the note stays, with Try again', async () => {
+    await withRoute(services(partly()));
+    await click(buttonIn(note()!, W.appTripGetReadyButton));
+    await until(() => text().includes(W.appTripMissingHeading), 'what was not saved');
+    expect(note()).not.toBeNull();
+    expect(buttonIn(note()!, W.appTripRetryButton)).toBeDefined();
+  });
+
+  test('[TRIP-GO-AFTER-READY] once Get ready offline has saved every step, Open En route shows straight away, without leaving Trip', async () => {
+    await withRoute(services(preparing()));
+    const openLink = () => [...host.querySelectorAll('a')].find((a) => a.textContent === W.appTripOpenAhead) ?? null;
+    expect(openLink()).toBeNull();
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes('12 places'), 'the result');
+    // The result stays in sight, and step 4 carries Open En route at once.
+    expect(openSteps()).toEqual(['getready']);
+    const link = openLink()!;
+    expect(link).not.toBeNull();
+    expect(step('go').contains(link)).toBe(true);
+    expect(link.getAttribute('href')).toBe('#/ahead');
+  });
+
+  test('[TRIP-GO-AFTER-READY] a run with a step missing does not offer it folded: Go still says what it will do', async () => {
+    await withRoute(services(partly()));
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes(W.appTripMissingHeading), 'what was not saved');
+    expect(step('go').querySelector('a')).toBeNull();
+    expect(step('go').textContent).toContain(W.appTripGoLater);
+  });
+
+  test('[TRIP-STOPS-ROOM] every stop icon, its "+N" badge included, stays inside the profile\'s own box, at the top of a climb and at the lowest point', async () => {
+    const svc = await withRoute(services(preparing()));
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes('12 places'), 'the result');
+    const route = (await readTrip())!.route;
+    const heights = route.points.map((p) => p.ele!);
+    const lowKm = route.points[heights.indexOf(Math.min(...heights))]!.km;
+    const highKm = route.points[heights.indexOf(Math.max(...heights))]!.km;
+    const kms = [0, lowKm, highKm, route.lengthKm, ...Array.from({ length: 12 }, (_, n) => (route.lengthKm * n) / 12)];
+    const stops: RouteStop[] = kms.map((km, n) => ({ kind: (['water', 'food', 'sleep', 'cover'] as const)[n % 4]!, km, opens: 'water', label: null }));
+    await show({ ...svc, stops: async () => stops });
+    await until(() => host.querySelectorAll('[data-profile-stops] button').length > 0, 'the icons');
+    const box = host.querySelector<HTMLElement>('.trip-profile-box')!;
+    expect(box.classList.contains('trip-profile-room')).toBe(true);
+    // The box is the 40 px of room above the 72 px profile; an icon's target is 44 px, its badge 2 px below that.
+    const BOX_PX = 40 + 72;
+    for (const b of [...host.querySelectorAll<HTMLButtonElement>('[data-profile-stops] button')]) {
+      const top = parseFloat(b.style.top);
+      expect(top, b.getAttribute('aria-label')!).toBeGreaterThanOrEqual(0);
+      expect(top + 44 + 2, b.getAttribute('aria-label')!).toBeLessThanOrEqual(BOX_PX);
+    }
+    // Above the line, never below it: the icon at the lowest point ends at or above the line there.
+    const low = [...host.querySelectorAll<HTMLButtonElement>('[data-profile-stops] button')].find((b) => b.getAttribute('aria-label')!.startsWith(W.appAheadIconFood(showKm(lowKm))))
+      ?? [...host.querySelectorAll<HTMLButtonElement>('[data-profile-stops] button')][1]!;
+    expect(parseFloat(low.style.top) + 44).toBeLessThanOrEqual(BOX_PX);
+    // The box keeps its room in the stylesheet, so the text below starts after it.
+    const css = readFileSync(join(process.cwd(), 'src/ui/trip/trip.css'), 'utf8');
+    expect(css).toMatch(/\.trip-profile-room\s*\{[^}]*padding-top:\s*40px/);
+    expect(css).toMatch(/\.trip-profile\s*\{[^}]*height:\s*72px/);
   });
 });
