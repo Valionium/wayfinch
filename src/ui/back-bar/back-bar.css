@@ -1,0 +1,16 @@
+/* The one top bar "← Back to Wayfinch" (owner's list of 7 Nov 2026, items 8 and 9), shared by Wayfinch's tools, the bag planner and the
+   legal pages: back-bar.ts sets wf-bar-away while the rider scrolls down. Only the sliding is here; each page keeps its own look, except
+   Wayfinch's own screens (wf-bar-app, below). A sticky bar moves with `top` only while it sticks, so at its own place it never moves. */
+.wf-bar { position: sticky; top: 0; transition: top 0.2s ease-out; }
+.wf-bar-away:not(:focus-within) { top: calc(-2px - var(--wf-bar-h, 8rem)); }
+@media (prefers-reduced-motion: reduce) { .wf-bar { transition: none; } }
+
+/* Wayfinch's tools (the tyre tool, Bike care): a solid bar clear of the notch, a 44 px link; a jump or a focused field lands below it. */
+html:has(.wf-bar-app) { scroll-padding-top: calc(var(--wf-bar-h, 3.5rem) + 8px); }
+/* Across the whole screen, with the screen's own side padding inside it, so nothing scrolls past beside it. */
+.wf-bar-app {
+  z-index: 5; margin: 0 -16px 12px; padding: env(safe-area-inset-top) calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left));
+  background: var(--ground); border-bottom: 1px solid var(--line);
+}
+@media (min-width: 840px) { .wf-bar-app { margin-inline: -32px; padding-inline: 32px; } }
+.wf-bar-app a { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 8px 0 0; color: var(--ink); font-weight: 600; text-underline-offset: 3px; }

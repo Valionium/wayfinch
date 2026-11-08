@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build as esbuild } from 'esbuild';
-import { writeImprint } from './build-legal.mjs';
+import { writeBackBar, writeImprint } from './build-legal.mjs';
 import bikeScript from './bike-script.cjs';
 
 const { bikeScriptOptions, photoScriptOptions, advisorScriptOptions, weightMapOptions } = bikeScript;
@@ -125,6 +125,8 @@ export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = 
     // The imprint is the bag planner's own block, taken at build time. If it can't be taken, the launch build fails (a site without its
     // imprint must not go out); nothing of the block is printed. The off build never gets here.
     writeImprint(target);
+    // The one top bar of the bag planner and the legal pages (src/ui/back-bar/): /back-bar.js and /back-bar.css, precached with the rest.
+    writeBackBar(target);
     mkdirSync(join(target, 'tools', 'bags'), { recursive: true });
     writeFileSync(join(target, 'tools', 'bags', 'bike.js'), await compileBikeScript());
     // The photo colour picker, loaded only when a rider taps From a photo; precached like every other file.
