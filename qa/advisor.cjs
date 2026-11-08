@@ -178,10 +178,10 @@ test('[GA-STEPS] the three steps in order, as headings; each choice is a labelle
   const html=view(p).steps;
   const heads=[...html.matchAll(/<h3[^>]*>([\s\S]*?)<\/h3>/g)].map(m=>textOf(m[1]));
   assert.deepEqual(heads.map(h=>h.slice(0,2)),['1.','2.','3.'],'three steps, in order, each a heading');
-  // every choice: a radio inside its own label, with words
+  // every choice: a radio inside its own label, with words; the goals checkboxes, either or both (the owner, 8 Nov)
   const radios=[...html.matchAll(/<label class="adv-choice[^"]*"[^>]*>([\s\S]*?)<\/label>/g)];
   assert.ok(radios.length>=5,'style and goal choices at least');
-  for(const [,inner] of radios){assert.ok(/<input type="radio" name="adv\w+" value="[^"]+"/.test(inner),'a radio');assert.ok(textOf(inner).length>2,'with words');}
+  for(const [,inner] of radios){assert.ok(/<input type="radio" name="adv\w+" value="[^"]+"/.test(inner) || /<input type="checkbox" name="advGoal" value="[^"]+"/.test(inner),'a radio, or a goal\'s checkbox');assert.ok(textOf(inner).length>2,'with words');}
   // step 1, the owner's ruling of 7 Nov: What kind of setup do you want?
   assert.ok(heads[0]==='1. What kind of setup do you want?');
   for(const v of ['bags','bags-first','panniers'])assert.ok(html.includes(`name="advStyle" value="${v}"`),v);
@@ -805,7 +805,7 @@ test('[GA-LINK-PLANNER] the bags step ends with "Not happy with your bags? Ask t
   const p=page({setup:R2,bike:GRAVEL});
   const html=p.html;
   const s2=html.slice(html.indexOf('<section id="s2"'),html.indexOf('<!-- STEP 3 -->'));
-  const link=/<p class="adv-ask"[^>]*>Not happy with your bags\? <button type="button" class="linky" id="advisorAsk" aria-haspopup="dialog" aria-controls="advisorBox">Ask the Gear advisor<\/button><\/p>/;
+  const link=/<p class="adv-ask"[^>]*>Not happy with your bags\? <button type="button" class="linky" id="advisorAsk" aria-controls="advisorBox">Ask the Gear advisor<\/button><\/p>/;
   assert.ok(link.test(s2),'the line and its button, in the bags step');
   // its end: after the bag list and its buttons, before only the feedback slot and the step's way on
   const rest=s2.slice(s2.search(link)).replace(link,'');
@@ -903,6 +903,173 @@ test('[GA-TRIAL-NO-TRACE] no bike follow while a trial is on: the follow waits f
   // the next open, a return from the back/forward cache: the follow comes now
   assert.equal(p.json('followBikeChoice()'),true);
   assert.equal(p.json('S.bikeProfile.id'),'tourer','followed at the next open');
+});
+
+// ---- After the launch, part 4b: the owner's preview check of 8 Nov (C, D, E, F, I; M's part) ----
+
+// The page's markup from the advisor's element to the next one after it.
+const advisorMarkup=html=>html.slice(html.indexOf('id="advisorBox"'),html.indexOf('id="legalBox"'));
+test('[GA-PAGE] the advisor is a page of its own, not a dialog: no backdrop box, no close button, no header box; its heading is "Gear advisor"; the plan\'s bike is drawn at its top; the page\'s one top bar holds its way back',async()=>{
+  const p=page({setup:R2,bike:GRAVEL});
+  const html=p.html,box=advisorMarkup(html);
+  const open=html.slice(html.lastIndexOf('<',html.indexOf('id="advisorBox"')),html.indexOf('>',html.indexOf('id="advisorBox"'))+1);
+  assert.ok(!/role="dialog"|aria-modal|bike-dialog-box/.test(open),'not a dialog');
+  assert.ok(/^<main\b/.test(open),'a page\'s main part');
+  assert.ok(!/id="advisorClose"/.test(html),'no close button');
+  assert.ok(!/Which bag to get next/.test(box),'no header box with its line');
+  assert.ok(/<h1 id="advisorTitle" tabindex="-1">Gear advisor<\/h1>/.test(box),'the heading');
+  assert.ok(/id="advisorRig"/.test(box),'a place for the plan\'s bike');
+  // one bar on the page, and the advisor's way back is in it
+  assert.equal((html.match(/class="[^"]*\bwf-bar\b/g)||[]).length,1,'one top bar');
+  const bar=html.slice(html.indexOf('wf-bar"'),html.indexOf('</div>',html.indexOf('wf-bar"')));
+  assert.ok(/<a class="back-wayfinch" id="advisorBack" href="[^"]*"><\/a>/.test(bar),'the way back in the bar');
+  assert.ok(bar.indexOf('id="backToWayfinch"')<bar.indexOf('id="advisorBack"'),'Back to Wayfinch stays the bar\'s first link');
+  // the Ask button opens a page now, not a dialog
+  assert.ok(!/id="advisorAsk"[^>]*aria-haspopup/.test(html));
+  // opened: the plan's bike with its bags, the 320 x 150 drawing, named for a screen reader
+  p.run('openAdvisor()');
+  const rig=p.context.document.getElementById('advisorRig').innerHTML;
+  assert.ok(/<svg[^>]*viewBox="0 0 320 150"/.test(rig),'the plan\'s bike drawn');
+  assert.ok(/role="img" aria-label="Your bike with the bags of your plan"/.test(rig),'named');
+  assert.equal((rig.match(/<svg\b/g)||[]).length,1,'one drawing');
+  assert.equal(p.json('ADVISOR.open'),true);
+  // the glide lands on it: named while the advisor shows, the rig not (inside the motion query)
+  const at=html.indexOf('@view-transition{navigation:auto}');
+  const css=html.slice(at,html.indexOf('}\n}',at)+3);
+  assert.ok(/html\.adv-page #rigSvg\{view-transition-name:none\}/.test(css),'the rig not named on the advisor page');
+  assert.ok(/html\.adv-page #advisorRig\{view-transition-name:wf-bike\}/.test(css),'the advisor\'s drawing named');
+  assert.ok(/:root:has\(#bikeDetailsBox:not\(\.hidden\)\) #advisorRig\{view-transition-name:none\}/.test(css),'never two at once');
+  // from the first frame: a link to the advisor makes the page the advisor's before anything of the planner is drawn
+  const first=html.slice(html.indexOf('<body>'),html.indexOf('<div class="wrap">'));
+  assert.ok(/<script data-advisor-first>if\(\/\^#gear-advisor\(&\|\$\)\/\.test\(location\.hash\)\)document\.documentElement\.classList\.add\('adv-page'\);<\/script>/.test(first),'the first thing in the page');
+  assert.ok(/html\.adv-page \.advisor-page\.hidden\{display:block\}/.test(html),'the advisor\'s page shows from then');
+  // and the first frame waits for the drawing's place in the markup, nothing more (no script, no file)
+  const head=html.slice(0,html.indexOf('</head>'));
+  assert.deepEqual([...head.matchAll(/<link rel="expect"[^>]*>/g)].map(m=>m[0]),['<link rel="expect" href="#advisorRig" blocking="render">']);
+  assert.ok(html.indexOf('id="advisorRig"')<html.indexOf('<script src="bike.js">'),'before any script of the page\'s');
+});
+
+test('[GA-PAGE] its way back: "← Back to Tools" when it came from Tools, "← Back to the Bag planner" when opened in the planner, which shows the planner again; Escape does the same',async()=>{
+  const p=page({setup:R2,bike:GRAVEL});
+  p.run('initialiseAdvisor()');
+  const back=p.context.document.getElementById('advisorBack');
+  p.run("openAdvisorFromLink('#gear-advisor&back=tools')");
+  assert.equal(back.textContent,'← Back to Tools');
+  assert.equal(back.href,'/#/tools');
+  assert.equal(p.json('ADVISOR.back'),'/#/tools');
+  p.run('hideAdvisor()');
+  p.run("document.getElementById('advisorAsk').onclick()");
+  assert.equal(back.textContent,'← Back to the Bag planner','Ask is the planner\'s own way in');
+  assert.equal(back.href,'/tools/bags/');
+  assert.equal(p.json('ADVISOR.back'),null);
+  assert.equal(p.json('ADVISOR.open'),true);
+  // the back link and Escape, in the planner: the advisor closes, nothing of the plan changes
+  const before=snapshot(p);
+  p.run('advisorGoBack()');
+  assert.equal(p.json('ADVISOR.open'),false);
+  assert.equal(snapshot(p),before,'nothing of the plan changed');
+  p.run("document.getElementById('advisorAsk').onclick()");
+  p.run("advisorKey({key:'Escape',preventDefault(){},defaultPrevented:false})");
+  assert.equal(p.json('ADVISOR.open'),false,'Escape');
+  // Escape while a dialog sits over the advisor is that dialog's
+  p.run("document.getElementById('advisorAsk').onclick();DIALOGS.push({});advisorKey({key:'Escape',preventDefault(){},defaultPrevented:false});DIALOGS.pop()");
+  assert.equal(p.json('ADVISOR.open'),true,'a dialog over it keeps its Escape');
+});
+
+test('[GA-GOAL-BOTH] in the page: the goals are two checkboxes, either or both; both are searched together, and the answer says how much stays on the back when it is for handling',async()=>{
+  const p=page({setup:R2,bike:GRAVEL});
+  p.run('openAdvisor()');
+  const steps=view(p).steps;
+  for(const v of ['handling','backpack'])assert.ok(new RegExp(`<label class="adv-choice"><input type="checkbox" name="advGoal" value="${v}">`).test(steps),v+': a checkbox');
+  p.run("advisorToggleGoal('handling',true)");assert.equal(p.json('ADVISOR.goal'),'handling');
+  p.run("advisorToggleGoal('backpack',true)");assert.equal(p.json('ADVISOR.goal'),'both');
+  assert.equal((view(p).steps.match(/name="advGoal" value="\w+" checked/g)||[]).length,2,'both shown chosen');
+  p.run("advisorToggleGoal('handling',false)");assert.equal(p.json('ADVISOR.goal'),'backpack');
+  p.run("advisorToggleGoal('backpack',false)");assert.equal(p.json('ADVISOR.goal'),null);
+  await p.run('ADVISOR_DONE');
+  assert.ok(/Choose/.test(textOf(view(p).answer)),'no goal: the answer waits');
+  await ask(p,{style:'bags-first',goal:'both'});
+  assert.equal(p.json('ADVISOR.input.goal'),'both');
+  const a=p.json('ADVISOR.answer');
+  const again=p.json('window.WayfinchAdvisor.advise(advisorInput(ADVISOR.style,"both"))');
+  assert.deepEqual(again.kind,a.kind,'the search\'s answer for both');
+  // for handling, with litres left on the back: the line
+  p.run("ADVISOR.answer={kind:'suggestions',items:ADVISOR.answer.items||[],ahead:null,minimalSame:[],aheadAlts:[],tried:1,frameReason:null,partial:false,backStays:3.2};renderAdvisorAnswer()");
+  assert.ok(textOf(view(p).answer).includes('Nothing within this setup takes 0.5 L or more off your back: 3.2 L stay there. These are for better handling.'));
+});
+
+test('[GA-BIGGER] in the page: when nothing else helps, a bigger change, searched after the answer, under its own heading with the line saying it goes beyond the setup chosen, with Try like any other',async()=>{
+  // five nights camping, carrying a lot, every bag position of the bike taken and a full backpack; the bike takes a rack; under
+  // Bikepacking bags only no bag is left to add
+  const p=saved(TENT_IN_PACK+"S.nights=5;applyTripKitDefaults();"+CARRY.lot+"S.bags=[{uid:1,pos:'seat',L:16},{uid:2,pos:'bar',L:15},{uid:3,pos:'top',slot:'front',L:2},{uid:4,pos:'top',slot:'rear',L:2},{uid:5,pos:'fork',pair:true,L:5},{uid:6,pos:'pack',L:30}];S.nextUid=7;addBag('frame');S.decks={bar:false,rack:false};",
+    {id:'tr',name:'Tourer',fit:{style:'diamond-level',size:{kind:'letter',value:'L'},bolts:{st:'yes',dt:'yes'}},rackMounts:'yes'});
+  let found=null;
+  for(const goal of ['backpack','handling','both']){
+    await ask(p,{style:'bags',goal});
+    const theirs=p.json('(()=>{const g=window.WayfinchAdvisor.biggerSteps(ADVISOR.input,ADVISOR.answer);for(;;){const s=g.next();if(s.done)return s.value;}})()');
+    assert.deepEqual(p.json('ADVISOR.bigger'),theirs,goal+': the search\'s own bigger change');
+    if(!theirs){assert.ok(!/A bigger change/.test(view(p).answer),goal);continue;}
+    found=goal;
+    assert.ok(theirs.add.some(b=>b.pos==='rack') || theirs.deck,'beyond the setup');
+    const text=textOf(view(p).answer);
+    assert.ok(text.includes('A bigger change'),'its heading');
+    assert.ok(text.includes('This goes beyond the setup you chose (Bikepacking bags only).'),'its line');
+    assert.ok(text.includes(p.json('advisorWhat(ADVISOR.bigger,ADVISOR.input)')),'what to get');
+    const n=p.json('advisorCards(ADVISOR.answer).length');
+    assert.ok(new RegExp(`data-try="${n-1}"`).test(view(p).answer),'Try on it');
+    assert.deepEqual(p.json(`advisorCards(ADVISOR.answer)[${n-1}]`),theirs,'its card is the last');
+  }
+  assert.ok(found,'this rider gets a bigger change under Bikepacking bags only: '+JSON.stringify(p.json('(()=>{const a=ADVISOR.answer;return {kind:a.kind,ahead:a.ahead&&advisorWhat(a.ahead,ADVISOR.input),items:(a.items||[]).map(s=>advisorWhat(s,ADVISOR.input)),back:ADVISOR.input.seen.base.result.backL,over:ADVISOR.input.seen.base.result.overL,partial:a.partial,tried:a.tried};})()')));
+  // none under Panniers are fine
+  await ask(p,{style:'panniers',goal:'backpack'});
+  assert.equal(p.json('ADVISOR.bigger'),null);
+  assert.ok(!/A bigger change/.test(view(p).answer));
+});
+
+test('[GA-TRY-BACK] after Try, "Back to the Gear advisor" removes the trial bag as Remove it does and shows the advisor again with its choices, its answer and its way back as they were',async()=>{
+  const p=saved();
+  p.run('initialiseAdvisor()');
+  p.run("openAdvisorFromLink('#gear-advisor&back=tools')");
+  await ask(p,{style:'bags-first',goal:'handling'});
+  const before=planState(p),answer=p.json('ADVISOR.answer'),html=view(p).answer;
+  const bar=p.html.slice(p.html.indexOf('id="trialBar"'),p.html.indexOf('</div>',p.html.indexOf('id="trialBar"')));
+  assert.ok(/<button class="linky" id="trialAdvisor" type="button"><\/button>/.test(bar),'its button in the trial\'s line');
+  p.run(`startTrial(${cards}[0])`);
+  assert.equal(p.context.document.getElementById('trialAdvisor').textContent,'Back to the Gear advisor');
+  assert.equal(p.json('ADVISOR.open'),false);
+  const runs=p.json('ADVISOR_RUN');
+  p.run('trialBackToAdvisor()');
+  assert.equal(p.json('TRIAL'),null,'the trial is gone');
+  assert.deepEqual(planState(p),before,'the plan of before, as Remove it gives it');
+  assert.equal(p.json('ADVISOR.open'),true,'the advisor shows');
+  assert.deepEqual(p.json('ADVISOR.answer'),answer,'its answer as it was');
+  assert.equal(p.json('ADVISOR_RUN'),runs,'not searched again');
+  assert.equal(view(p).answer,html,'drawn as it was');
+  assert.deepEqual(p.json('[ADVISOR.style,ADVISOR.goal,ADVISOR.source]'),['bags-first','handling','plan']);
+  assert.equal(p.json('ADVISOR.back'),'/#/tools','its way back as it was');
+  assert.equal(p.context.document.getElementById('advisorBack').textContent,'← Back to Tools');
+  // the plan changed during the trial: searched again, the choices kept
+  p.run(`startTrial(${cards}[0]);S.nights=S.nights+2;applyTripKitDefaults();`);
+  p.run('trialBackToAdvisor()');
+  await p.run('ADVISOR_DONE');
+  assert.ok(p.json('ADVISOR_RUN')>runs,'searched again on the changed plan');
+  assert.deepEqual(p.json('[ADVISOR.style,ADVISOR.goal]'),['bags-first','handling']);
+  // with no trial on, it does nothing
+  assert.equal(p.json('trialBackToAdvisor()'),false);
+});
+
+test('[LC-EN-ROUTE-PAGE] the bag planner page never names Wayfinch\'s tab "Ahead" where a rider reads it: its text, its words and the advisor\'s answer (the Gear advisor\'s own "Looking ahead" aside)',async()=>{
+  const p=page({setup:R2,bike:GRAVEL});
+  const html=p.html;
+  const body=html.slice(html.indexOf('<body>'),html.indexOf('<script>',html.indexOf('<body>')));
+  assert.ok(!/\bAhead\b/.test(textOf(body)),'the page\'s markup');
+  // every quoted string of the page's own script (comments aside): no "Ahead" as a word, but for an id's part
+  const script=html.slice(html.indexOf('<script>',html.indexOf('<body>'))).replace(/\/\*[\s\S]*?\*\//g,'').replace(/(^|[^:'"`\\])\/\/[^\n]*/g,'$1');
+  const strings=[...script.matchAll(/'((?:[^'\\\n]|\\.)*)'|`((?:[^`\\]|\\.)*)`|"((?:[^"\\\n]|\\.)*)"/g)].map(m=>m[1]??m[2]??m[3]);
+  const hits=strings.filter(t=>/\bAhead\b/.test(t) && t!=='Ahead');
+  assert.deepEqual(hits,[],'no rider-visible "Ahead"');
+  await ask(p,{style:'bags-first',goal:'handling'});
+  assert.ok(!/\bAhead\b/.test(textOf(view(p).answer)),'the answer');
 });
 
 (async()=>{

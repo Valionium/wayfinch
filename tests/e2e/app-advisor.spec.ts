@@ -94,13 +94,14 @@ test('[GA-PROGRESS] a search longer than 300 ms shows "Trying N options…", and
   await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
   await expect(page.locator('#advisorProgress')).toBeVisible();
   await expect(page.locator('#advisorProgress')).toHaveText(/^Trying \d+ options…$/);
-  // a tap while it runs: the other goal is taken, and the search starts again for it (how fast: the test below)
+  // a tap while it runs: the other goal is taken too (both together, the owner's ruling of 8 Nov), and the search starts again for
+  // them (how fast: the test below)
   await box.locator('label.adv-choice', { hasText: 'Get the backpack off' }).click();
   await expect(box.locator('input[name="advGoal"][value="backpack"]')).toBeChecked();
-  expect(await page.evaluate('ADVISOR.goal')).toBe('backpack');
+  expect(await page.evaluate('ADVISOR.goal')).toBe('both');
   await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
   await expect(page.locator('#advisorProgress')).toBeHidden();
-  expect(await page.evaluate('ADVISOR.input.goal')).toBe('backpack');
+  expect(await page.evaluate('ADVISOR.input.goal')).toBe('both');
 });
 
 test('[GA-PROGRESS] the real R3 search hands the page back after every 20 trials at most, and a tap during it gets its response within 1 s (phone stand-in included; review of PR 60, I3)', async ({ page }) => {
@@ -213,9 +214,9 @@ test('[GA-SCREEN] at this window size and theme, offline: the steps are headings
   await expect(box.locator('input[name="advStyle"][value="panniers"]')).toBeEnabled();
   await expect(box.locator('#advNoMounts')).toHaveText('Your bike has no rack mounts, so no rack or panniers are offered.');
   await expect(box.locator('input[name="advStyle"][value="bags-first"]')).toBeChecked();   // the default
-  // the keyboard: from the dialog's close button, Tab into the styles, the arrow keys to choose
-  await box.locator('#advisorClose').focus();
-  for (let i = 0; i < 4 && (await page.evaluate('document.activeElement.name')) !== 'advStyle'; i++) await page.keyboard.press('Tab');
+  // the keyboard: from the page's way back in the top bar (the owner's finding C), Tab into the styles, the arrow keys to choose
+  await page.locator('#advisorBack').focus();
+  for (let i = 0; i < 6 && (await page.evaluate('document.activeElement.name')) !== 'advStyle'; i++) await page.keyboard.press('Tab');
   expect(await page.evaluate('document.activeElement.name')).toBe('advStyle');
   await page.keyboard.press('ArrowRight');
   await expect.poll(() => page.evaluate('ADVISOR.style')).toBe('panniers');
@@ -223,15 +224,16 @@ test('[GA-SCREEN] at this window size and theme, offline: the steps are headings
   await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('ArrowLeft');
   await expect.poll(() => page.evaluate('ADVISOR.style')).toBe('bags');
+  // the goals are checkboxes (either or both, the owner's ruling of 8 Nov): Space takes one
   await page.keyboard.press('Tab');
   expect(await page.evaluate('document.activeElement.name')).toBe('advGoal');
-  await page.keyboard.press('ArrowRight');
-  await page.keyboard.press('ArrowLeft');
+  expect(await page.evaluate('document.activeElement.value')).toBe('handling');
+  await page.keyboard.press('Space');
   await expect.poll(() => page.evaluate('ADVISOR.goal')).toBe('handling');
   await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
   const cards = await box.locator('.adv-card').count();
   expect(cards).toBeGreaterThan(0);
-  // Tab on through the rest of the dialog: the switch, then each suggestion
+  // Tab on through the rest of the page: the other goal, the switch, then each suggestion
   const reached = new Set<string>();
   for (let i = 0; i < 20 && reached.size < cards + 1; i++) {
     await page.keyboard.press('Tab');
@@ -249,7 +251,7 @@ test('[GA-SCREEN] at this window size and theme, offline: the steps are headings
   expect(await page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth')).toBe(true);
   // the suggestions drew the bike, offline (advisor.js from the worker's cache)
   await expect(box.locator('.adv-card svg.bk').first()).toBeVisible();
-  // Escape closes it, and nothing of the plan changed
+  // Escape is its way back, here to the planner, and nothing of the plan changed
   await page.keyboard.press('Escape');
   await expect(box).toBeHidden();
   expect(await page.evaluate('S.bags.length')).toBe(5);
@@ -257,14 +259,15 @@ test('[GA-SCREEN] at this window size and theme, offline: the steps are headings
   await page.context().setOffline(false);
 });
 
-test('[GA-STEPS] in the browser: each choice is a labelled radio of at least 44 px, and the answer needs all three steps', async ({ page }) => {
+test('[GA-STEPS] in the browser: each choice is a labelled radio (the goals: checkboxes) of at least 44 px, and the answer needs all three steps', async ({ page }) => {
   await planner(page);
   await gravel(page);
   await page.evaluate("openAdvisor(document.getElementById('rigBikeDetails'))");
   const box = page.locator('#advisorBox');
   await expect(box.locator('#advisorAnswer')).toHaveText('Choose all three steps to see what to get.');
+  // the goals are checkboxes, either or both (the owner's ruling of 8 Nov)
   for (const name of ['Bikepacking bags only', 'Bags first, panniers only if needed', 'Panniers are fine', 'Better handling', 'Get the backpack off']) {
-    await expect(box.getByRole('radio', { name })).toHaveCount(1);
+    await expect(box.getByRole(/^(Better|Get)/.test(name) ? 'checkbox' : 'radio', { name })).toHaveCount(1);
     const h = await box.locator('label.adv-choice', { hasText: name }).evaluate((el) => el.getBoundingClientRect().height);
     expect(h, name).toBeGreaterThanOrEqual(44);
   }
@@ -375,7 +378,7 @@ test('[GA-TRY] [GA-TRIAL-NO-TRACE] [GA-KEEP] [GA-REMOVE] in the browser: Try in 
 
 // ---- The way in from Tools, and back (sub-project 13, group 3, Task 9) ----
 
-test('[GA-TOOLS-CARD] [GA-BACK] Tools\' Gear advisor card opens the advisor in the bag planner; closing it lands on Tools', async ({ page }) => {
+test('[GA-TOOLS-CARD] [GA-BACK] [GA-PAGE] Tools\' Gear advisor card opens the advisor in the bag planner; its way back in the top bar lands on Tools', async ({ page }) => {
   app = await loadApp(page, { launch: true, path: '/#/tools' });
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'load' });
@@ -385,7 +388,8 @@ test('[GA-TOOLS-CARD] [GA-BACK] Tools\' Gear advisor card opens the advisor in t
   await page.waitForURL(/\/tools\/bags\//);
   await expect(page.locator('#advisorBox')).toBeVisible();
   await expect(page.locator('#advisorBack')).toBeVisible();
-  await page.locator('#advisorClose').click();
+  await expect(page.locator('#advisorBack')).toHaveText('← Back to Tools');
+  await page.locator('#advisorBack').click();
   await page.waitForURL((u) => u.pathname === '/' && u.hash === '#/tools');
   await expect(page.getByRole('link', { name: 'Open Gear advisor' })).toBeVisible();
 });
@@ -401,4 +405,81 @@ test('[GA-BACK] Bike details opened with back=advisor returns to the Gear adviso
   await expect(page.locator('#bikeDetailsBox')).toBeHidden();
   await expect(page.locator('#advisorBox')).toBeVisible();
   expect(new URL(page.url()).pathname).toBe('/tools/bags/');
+});
+
+// ---- After the launch, part 4b: the owner's preview check of 8 Nov (C, D, E, I) ----
+
+test('[GA-PAGE] the advisor is its own page: from the planner\'s Ask, nothing of the planner shows around it, not a dialog, the one top bar says "← Back to the Bag planner", which shows the planner again where the rider was', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page);
+  await gravel(page);
+  await page.evaluate('go(2)');
+  const ask = page.locator('#advisorAsk');
+  await ask.scrollIntoViewIfNeeded();
+  const y = await page.evaluate('scrollY') as number;
+  await ask.click();
+  const box = page.locator('#advisorBox');
+  await expect(box).toBeVisible();
+  await expect(page.locator('#advisorTitle')).toHaveText('Gear advisor');
+  // nothing of the planner: its title, its steps, the rig, its footer
+  for (const sel of ['.mast', '#plannerCols', '#rigBox', '#s2', '.sitefoot']) await expect(page.locator(sel).first(), sel).toBeHidden();
+  // a page, not a dialog: no role, no backdrop, the page's own scrolling
+  expect(await box.evaluate((el) => [el.tagName, el.getAttribute('role'), el.getAttribute('aria-modal')])).toEqual(['MAIN', null, null]);
+  expect(await page.evaluate(() => [getComputedStyle(document.getElementById('advisorBox')!).position, getComputedStyle(document.getElementById('advisorBody')!).overflowY, document.body.style.overflow])).toEqual(['static', 'visible', '']);
+  // the one top bar, its link the way back
+  await expect(page.locator('.wf-bar')).toHaveCount(1);
+  await expect(page.locator('.wf-bar')).toBeVisible();
+  await expect(page.locator('#advisorBack')).toBeVisible();
+  await expect(page.locator('#advisorBack')).toHaveText('← Back to the Bag planner');
+  await expect(page.locator('#backToWayfinch')).toBeHidden();
+  await expect(page.locator('#walkthroughOpen')).toBeHidden();
+  expect((await page.locator('#advisorBack').boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // the plan's bike at its top
+  await expect(page.locator('#advisorRig svg.bk')).toBeVisible();
+  expect(await page.locator('#advisorRig svg').getAttribute('viewBox')).toBe('0 0 320 150');
+  expect(await page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'no sideways scroll').toBe(true);
+  // back: the planner where the rider was, the focus on the Ask button
+  await page.locator('#advisorBack').click();
+  await expect(box).toBeHidden();
+  await expect(page.locator('#plannerCols')).toBeVisible();
+  await expect(page.locator('#backToWayfinch')).toBeVisible();
+  expect(Math.abs((await page.evaluate('scrollY') as number) - y), 'where the rider was').toBeLessThanOrEqual(2);
+  await expect(ask).toBeFocused();
+  expect(new URL(page.url()).pathname).toBe('/tools/bags/');
+  expect(errors).toEqual([]);
+});
+
+test('[GA-GOAL-BOTH] [GA-TRY-BACK] in the browser: both goals together give an answer; after Try in Bag planner, Back to the Gear advisor takes the trial bag away and shows the advisor as it was', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page);
+  await gravel(page);
+  await page.evaluate('S.bikeProfile.maxWeightAsked = true; flushDraft()');
+  const bagsBefore = await page.evaluate('JSON.stringify(S.bags)');
+  await page.evaluate("location.hash = '#gear-advisor'");
+  const box = page.locator('#advisorBox');
+  await expect(box).toBeVisible();
+  await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
+  await box.locator('label.adv-choice', { hasText: 'Get the backpack off' }).click();
+  await expect(box.locator('input[name="advGoal"]:checked')).toHaveCount(2);
+  await expect.poll(() => page.evaluate('ADVISOR.goal')).toBe('both');
+  await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
+  await page.waitForFunction('ADVISOR.done', null, { timeout: 30_000 });
+  const answer = await page.locator('#advisorAnswer').innerText();
+  const tryIt = box.getByRole('button', { name: 'Try in Bag planner' }).first();
+  await tryIt.click();
+  await expect(box).toBeHidden();
+  await expect(page.locator('#trialBar')).toBeVisible();
+  const back = page.getByRole('button', { name: 'Back to the Gear advisor' });
+  await expect(back).toBeVisible();
+  expect((await back.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await back.click();
+  await expect(box).toBeVisible();
+  await expect(page.locator('#trialBar')).toBeHidden();
+  expect(await page.evaluate('JSON.stringify(S.bags)')).toBe(bagsBefore);
+  await expect(box.locator('input[name="advGoal"]:checked')).toHaveCount(2);
+  expect(await page.locator('#advisorAnswer').innerText()).toBe(answer);
+  await expect(page.locator('#advisorBack')).toHaveText('← Back to the Bag planner');
+  expect(errors).toEqual([]);
 });

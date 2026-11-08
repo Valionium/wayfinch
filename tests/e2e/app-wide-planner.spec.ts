@@ -324,6 +324,41 @@ test('[LC-GLIDE] Chromium: both apps opt in under no-preference only; one wf-bik
   expect(errors).toEqual([]);
 });
 
+test('[GA-PAGE] [LC-GLIDE] Chromium: from Tools\' Gear advisor card the bike glides onto the advisor\'s own drawing, the one named when its page is revealed, the rig not; its way back glides back to Tools (the owner\'s finding I)', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'cross-document view transitions: Chromium');
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await watchReveal(page);
+  // where the named drawing sits when the page is revealed: inside which element with an id
+  await page.addInitScript(() => {
+    window.addEventListener('pagereveal', () => {
+      const el = [...document.querySelectorAll('*')].find((x) => getComputedStyle(x).getPropertyValue('view-transition-name') === 'wf-bike');
+      sessionStorage.setItem('wf:vt-where', el ? (el.id || el.closest('[id]')?.id || '?') : '');
+    });
+  });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  app = await loadApp(page, { launch: true, path: '/#/tools' });
+  await page.evaluate((b) => { localStorage.setItem('loadcheck:bikeProfiles', b); localStorage.setItem('loadcheck:bikeProfile', JSON.stringify(JSON.parse(b)[0])); }, BIKES);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
+  await page.getByRole('link', { name: 'Open Gear advisor' }).click();
+  await page.waitForURL(/\/tools\/bags\//);
+  await ready(page);
+  await expect(page.locator('#advisorBox')).toBeVisible();
+  expect(await revealed(page)).toBe('true');
+  expect(await namedAtReveal(page)).toBe('1');
+  expect(await page.evaluate(() => sessionStorage.getItem('wf:vt-where')), 'the advisor\'s drawing, when the page is revealed').toBe('advisorRig');
+  expect((await named(page)).map((n) => n.viewBox)).toEqual(['0 0 320 150']);
+  expect(await page.evaluate(() => getComputedStyle(document.getElementById('rigSvg')!).getPropertyValue('view-transition-name'))).toBe('none');
+  // its way back: Tools again, the bike named there when it is revealed
+  await page.locator('#advisorBack').click();
+  await page.waitForURL(`${app.origin}/#/tools`);
+  await expect(page.locator('main[data-screen="tools"] .bike-large svg')).toBeVisible();
+  expect(await revealed(page)).toBe('true');
+  expect(await namedAtReveal(page)).toBe('1');
+  expect(errors).toEqual([]);
+});
+
 test('[LC-GLIDE-OFF] with reduced motion, and in browsers without the transition, pages switch normally and at once', async ({ page, browserName }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));

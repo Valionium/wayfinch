@@ -1457,11 +1457,15 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 @media screen and (min-width:1100px) and (prefers-reduced-motion:reduce){.planner-cols>.rig.rig-fits{transition:none}}
 .dropzone-over{outline:2px dashed var(--blaze);outline-offset:4px}
 /* The bike glides from Wayfinch into the bag planner and back (spec 9.8): a cross-document view transition where motion is allowed
-   and the browser has it. One drawing is named: the rig, or the Look preview while Bike details is open. Nothing depends on it. */
+   and the browser has it. One drawing is named: the rig, the Gear advisor's drawing while the advisor shows (the owner's finding I,
+   8 Nov 2026), or the Look preview while Bike details is open. Nothing depends on it. */
 @media (prefers-reduced-motion:no-preference){
   @view-transition{navigation:auto}
   #rigSvg{view-transition-name:wf-bike}
   :root:has(#bikeDetailsBox:not(.hidden)) #rigSvg{view-transition-name:none}
+  html.adv-page #rigSvg{view-transition-name:none}
+  html.adv-page #advisorRig{view-transition-name:wf-bike}
+  :root:has(#bikeDetailsBox:not(.hidden)) #advisorRig{view-transition-name:none}
   #bikeDetailsBox:not(.hidden) #lookPreview svg{view-transition-name:wf-bike}
 }
 /* Packing checklist: one checkbox means the complete named quantity. */
@@ -1649,8 +1653,22 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 .packing-disclosure>summary em{font-family:var(--mono);font-size:12px;font-style:normal;color:var(--muted);text-align:right}
 .packing-disclosure[open]>summary{border-bottom:1px solid var(--line-soft);padding-bottom:10px;margin-bottom:12px}
 @media(max-width:480px){.info-box{padding:8px}.info-card{max-height:min(560px,calc(100vh - 16px));max-height:min(560px,calc(100dvh - 16px))}.packing-disclosure>summary{grid-template-columns:minmax(0,1fr) 20px;gap:4px 10px}.packing-disclosure>summary b{grid-column:1;grid-row:1;font-size:22px}.packing-disclosure>summary em{grid-column:1;grid-row:2;text-align:left}.packing-disclosure>summary:after{grid-column:2;grid-row:1 / span 2}}
-/* The Gear advisor (sub-project 13): a view of the bag planner, built like Bike details; every choice a labelled radio of 44 px or more. */
-.advisor-box .bike-dialog-card{max-width:760px}
+/* The Gear advisor (sub-project 13): its own page in the bag planner (the owner's findings C and I, 8 Nov 2026): while it shows
+   (html.adv-page), nothing of the planner shows around it but the one top bar, whose link is its way back; every choice a labelled
+   radio or checkbox of 44 px or more. */
+html.adv-page .wrap>:not(.wf-bar):not(#updateBar):not(#tabBar){display:none!important}
+html.adv-page .guide-launch-row{margin-top:0}
+#advisorBack,html.adv-page #backToWayfinch,html.adv-page #walkthroughOpen{display:none}
+html.adv-page #advisorBack{display:inline-flex}
+.advisor-page{max-width:760px;margin:0 auto;padding:4px 18px 40px}
+.advisor-page.hidden{display:none}
+html.adv-page .advisor-page.hidden{display:block}
+.advisor-page h1{font-family:var(--disp);font-size:28px;line-height:1.2;color:var(--ink);margin:0 0 10px}
+.advisor-page h1:focus{outline:none}
+.adv-body h3{font-size:18px;color:var(--ink);margin:12px 0 8px}.adv-body h4{font-size:15px;color:var(--ink);margin:10px 0}
+/* the drawing's room is kept from the first frame (320 x 150), so the gliding bike has its place before it is drawn */
+.adv-rig{max-width:420px;margin:0 auto 8px;aspect-ratio:320/150}
+.adv-rig svg{display:block;width:100%;height:auto}
 .adv-bike{margin:0 0 12px}
 .adv-bike-line{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
 .adv-bike-line select{min-height:44px;max-width:100%;min-width:0;flex:1 1 180px}
@@ -1677,9 +1695,10 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 .adv-list{list-style:none;display:grid;gap:12px;margin:8px 0 0}
 .adv-card{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--panel);min-width:0}
 .adv-card:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.bike-dialog-body .adv-card h5{font-size:17px;margin:0 0 4px}
+.adv-body .adv-card h5{font-size:17px;margin:0 0 4px}
 .adv-kind{margin:12px 0 0}
-.bike-dialog-body .adv-kind>h4{font-size:16px;margin:14px 0 2px}
+.adv-body .adv-kind>h4{font-size:16px;margin:14px 0 2px}
+.adv-bigger{border-top:1px solid var(--line);margin-top:16px;padding-top:4px}
 /* combinations side by side: a row that wraps into its own scroll at 360 px, never the page */
 .adv-combos{list-style:none;display:flex;gap:8px;margin:4px 0 10px;padding:0 0 4px;overflow-x:auto;max-width:100%;min-width:0}
 .adv-combos>li{flex:1 0 140px;max-width:240px;min-width:0}
@@ -1692,7 +1711,6 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 .adv-drawing svg{display:block;width:100%;max-width:420px;height:auto;margin:6px auto}
 .adv-why{font-size:14px;line-height:1.5;margin:6px 0}
 .adv-moves{margin:0 0 0 18px;font-size:14px;line-height:1.5}
-#advisorBack.hidden{display:none}
 @media(max-width:480px){.bike-dialog-box{padding:8px}.bike-dialog-card{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px)}.bike-dialog-head,.bike-dialog-body{padding:12px}.guide-launch-row{gap:12px}}
 .walkthrough-tip{margin-top:14px;border-left:3px solid var(--sage);padding-left:10px;font-size:14px;line-height:1.6;color:var(--muted)}
 .walkthrough-actions{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;margin-top:22px}
@@ -1840,8 +1858,15 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 </style>
 <!-- a number in the text never becomes a call on the first tap (owner's iPhone check, 6 Nov 2026) -->
 <meta name="format-detection" content="telephone=no">
+<!-- The first frame waits until the page's markup has reached the Gear advisor's drawing (a few lines, never a script or a file), so
+     when the advisor is opened by a link, the bike gliding in from Tools finds its place on the advisor's page (the owner's finding I,
+     8 Nov 2026). A browser that does not know it shows the page as before. -->
+<link rel="expect" href="#advisorRig" blocking="render">
 </head>
 <body>
+<!-- The Gear advisor opened by a link (#gear-advisor…) is its own page from the first frame, so the bike gliding in from Tools lands on
+     its drawing, never on the planner (the owner's finding I, 8 Nov 2026); the page's own script then opens it and draws the bike. -->
+<script data-advisor-first>if(/^#gear-advisor(&|$)/.test(location.hash))document.documentElement.classList.add('adv-page');</script>
 <div class="wrap">
   <header class="mast">
     <div>
@@ -1855,7 +1880,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
   </header>
   <!-- The one top bar of every tool (owner, 7 Nov 2026): it slides away while scrolling down and comes back on any scroll up. -->
   <link rel="stylesheet" href="/back-bar.css"><script src="/back-bar.js" defer></script>
-  <div class="guide-launch-row wf-bar"><a class="back-wayfinch" id="backToWayfinch" href="/#/tools">← Back to Wayfinch</a><button class="linky" id="walkthroughOpen" type="button" aria-haspopup="dialog" aria-controls="walkthroughBox">Quick walkthrough</button></div>
+  <div class="guide-launch-row wf-bar"><a class="back-wayfinch" id="backToWayfinch" href="/#/tools">← Back to Wayfinch</a><a class="back-wayfinch" id="advisorBack" href="/tools/bags/"></a><button class="linky" id="walkthroughOpen" type="button" aria-haspopup="dialog" aria-controls="walkthroughBox">Quick walkthrough</button></div>
   <aside class="guide-invite hidden" id="walkthroughInvite" aria-labelledby="walkthroughInviteTitle">
     <div><b id="walkthroughInviteTitle">First time here?</b><p>A short guide to Trip, Bags, Kit and Check.</p></div>
     <button class="kitact" id="walkthroughStart" type="button" aria-haspopup="dialog" aria-controls="walkthroughBox">Show me around</button>
@@ -1893,6 +1918,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <span id="trialText"></span>
     <button class="kitact" id="trialKeep" type="button"></button>
     <button class="linky" id="trialRemove" type="button"></button>
+    <button class="linky" id="trialAdvisor" type="button"></button>
   </div>
 
   <div class="planner-cols" id="plannerCols">
@@ -2031,7 +2057,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <button class="addbag" id="addBag">+ Add a bag</button><button class="addbag" id="addBottle">+ Bottle cage</button>
       <span id="bagTotal"></span>
     </div>
-    <p class="adv-ask" id="advisorAskLine">Not happy with your bags? <button type="button" class="linky" id="advisorAsk" aria-haspopup="dialog" aria-controls="advisorBox">Ask the Gear advisor</button></p>
+    <p class="adv-ask" id="advisorAskLine">Not happy with your bags? <button type="button" class="linky" id="advisorAsk" aria-controls="advisorBox">Ask the Gear advisor</button></p>
     <div class="fbslot" data-fb="2"></div>
     <div class="nav">
       <button class="back" data-to="1">Back</button>
@@ -2269,10 +2295,11 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     </div>
   </section>
 </div>
-<div id="advisorBox" class="bike-dialog-box bike-details-box advisor-box hidden" role="dialog" aria-modal="true" aria-labelledby="advisorTitle">
-  <section class="bike-dialog-card">
-    <header class="bike-dialog-head"><div><h2 id="advisorTitle" tabindex="-1">Gear advisor</h2><p>Which bag to get next, for your riding and your bike: types and sizes, never brands.</p><a class="linky hidden" id="advisorBack" href="/#/tools"></a></div><button type="button" id="advisorClose" aria-label="Close the Gear advisor">×</button></header>
-    <div class="bike-dialog-body" id="advisorBody">
+<main id="advisorBox" class="advisor-page hidden" aria-labelledby="advisorTitle">
+  <section>
+    <h1 id="advisorTitle" tabindex="-1">Gear advisor</h1>
+    <div class="adv-body" id="advisorBody">
+      <div class="adv-rig" id="advisorRig"></div>
       <div class="adv-bike" id="advisorBike"></div>
       <div id="advisorSteps"></div>
       <p class="adv-progress hidden" id="advisorProgress" role="status" aria-live="polite"></p>
@@ -2280,7 +2307,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <section class="adv-answer" id="advisorAnswer"></section>
     </div>
   </section>
-</div>
+</main>
 <div id="legalBox" class="legalbox hidden"></div>
 <div id="walkthroughBox" class="walkthrough-box hidden" aria-labelledby="walkthroughTitle" aria-describedby="walkthroughCopy"></div>
 <div id="calculationInfoBox" class="info-box hidden" aria-labelledby="calculationInfoTitle">
@@ -5651,6 +5678,14 @@ const ADVISOR_WORDING = {
   trialConflict:{text:'Not kept yet: this plan was changed in another tab, so this tab is not saving.'},
   trialUpdate:{text:'Keep or remove the bag you are trying first, then apply the update.'},
   tryNeedsPlan:{text:'To try a bag in the Bag planner, use your own packing: add your bags there first.'},
+  // the owner's preview check of 8 Nov: its own page (C, I), both goals (D), the way back from a trial (E), a bigger change (F)
+  backPlanner:{text:'← Back to the Bag planner'},
+  rigName:{text:'Your bike with the bags of your plan'},
+  bothBackStays:{text:'Nothing within this setup takes {min} L or more off your back: {l} L stay there. These are for better handling.'},
+  biggerTitle:{text:'A bigger change'},
+  biggerIntro:{text:'This goes beyond the setup you chose ({setup}). Nothing within that setup helps more.'},
+  statusBigger:{text:'A bigger change is shown too.'},
+  trialBack:{text:'Back to the Gear advisor'},
 };
 const advisorWord = (key, values = {}) => ADVISOR_WORDING[key].text.replace(/\{(\w+)\}/g, (m, k) => values[k] ?? m);
 const ADVISOR_TYPES = { top:'typeTop', frame:'typeFrame', fork:'typeFork', bar:'typeBar', seat:'typeSeat', rack:'typeRack', pack:'typePack', bottle:'typeBottle', bottleU:'typeBottle' };
@@ -5661,7 +5696,12 @@ const ADVISOR_PROGRESS_MS = 300;
 const ADVISOR_SLICE_MS = 50;
 // Kilos moved below this are not worth a line of their own.
 const ADVISOR_MOVES_KG = 0.5;
-const ADVISOR = { open:false, style:null, styleTouched:false, goal:null, source:null, q:null, answer:null, input:null, error:'', back:null };
+// goal: 'handling', 'backpack' or 'both' (the owner, 8 Nov). bigger: the bigger change after the answer (F). back, backKey: the way back
+// to Wayfinch, or null for the planner (C). sig and done: the plan the answer was found on, and whether its whole search finished, so
+// the way back from a trial shows it again as it was (E). trialBack: the way back the advisor had when Try was pressed.
+const ADVISOR = { open:false, style:null, styleTouched:false, goal:null, source:null, q:null, answer:null, input:null, error:'', back:null,
+  backKey:null, bigger:null, sig:null, done:false, trialBack:null, opener:null, scrollY:0, rigSig:null };
+const ADVISOR_STYLES = { bags:'styleBags', 'bags-first':'styleBagsFirst', panniers:'stylePanniers' };
 let ADVISOR_RUN = 0, ADVISOR_DONE = Promise.resolve(), ADVISOR_SCRIPT = null;
 
 function loadAdvisor(){
@@ -5793,7 +5833,7 @@ function advisorWhy(s, input){
   const to = Object.entries(d).filter(([, v]) => v > 0.05).sort((x, y) => y[1] - x[1]);
   const kg = +Math.min(to.reduce((n, [, v]) => n + v, 0), -from.reduce((n, [, v]) => n + v, 0)).toFixed(1);
   if(from.length && to.length && kg >= ADVISOR_MOVES_KG) out.push(advisorWord('movesKg', { kg, from:advisorList(from.map(([g]) => advisorWord(g))), to:advisorList(to.map(([g]) => advisorWord(g))) }));
-  else if(input.goal === 'handling' && !out.length) out.push(advisorWord('lower'));
+  else if(input.goal !== 'backpack' && !out.length) out.push(advisorWord('lower'));
   return out;
 }
 // "Your bike with fork cages, 2 × 5 L"; a swap: "Your bike with a 15 L handlebar roll instead of your 12 L handlebar roll"; the rack
@@ -5858,6 +5898,9 @@ function advisorAnswerHtml(answer, input){
   if(advisorNoMounts() && advisorRackFitted(input)) notes.push(advisorWord('rackKept'));
   if(answer.frameReason) notes.push(advisorWord('frameNone', { reason:answer.frameReason }));
   if(answer.partial) notes.push(advisorWord('partial', { n:answer.tried }));
+  // both goals, nothing takes more off the back: these are Better handling's, and the line says what stays (the owner, 8 Nov)
+  if(answer.kind === 'suggestions' && answer.backStays > 0)
+    notes.push(advisorWord('bothBackStays', { min:window.WayfinchAdvisor.MIN_GAIN_BACK_L, l:+answer.backStays.toFixed(1) }));
   if(answer.kind === 'suggestions') notes.push(...(input.fromQuestionnaire ? [advisorWord('tryNeedsPlan')] : TRIAL ? [advisorWord('trialFirst')] : []));
   let body = '';
   if(answer.kind === 'suggestions') body = advisorTwoKindsHtml(answer, input);
@@ -5872,11 +5915,16 @@ function advisorAnswerHtml(answer, input){
     } else lines.push(advisorWord('closestNone'));
     body = lines.map(l => `<p class="adv-plain">${htmlEsc(l)}</p>`).join('');
   }
+  // a bigger change (the owner's finding F, 8 Nov): under its own heading, clearly beyond the setup chosen; its card is the last
+  const big = answer === ADVISOR.answer ? ADVISOR.bigger : null;
+  if(big) body += `<section class="adv-kind adv-bigger" aria-labelledby="advBigT"><h4 id="advBigT">${advisorWord('biggerTitle')}</h4>`
+    + `<p class="adv-note">${htmlEsc(advisorWord('biggerIntro', { setup:advisorWord(ADVISOR_STYLES[input.style]) }))}</p>`
+    + `<div class="adv-sugg">${advisorCardHtml(big, input, advisorCards(answer).length - 1)}</div></section>`;
   return `<h3 id="advisorAnswerTitle">${advisorWord('answerTitle')}</h3>${notes.map(n => `<p class="adv-note">${htmlEsc(n)}</p>`).join('')}${body}`;
 }
 
 function advisorChoice(name, value, label, checked, opts = {}){
-  return `<label class="adv-choice${opts.pic ? ' adv-has-pic' : ''}"><input type="radio" name="${name}" value="${value}"${checked ? ' checked' : ''}${opts.disabled ? ' disabled' : ''}>`
+  return `<label class="adv-choice${opts.pic ? ' adv-has-pic' : ''}"><input type="${opts.type || 'radio'}" name="${name}" value="${value}"${checked ? ' checked' : ''}${opts.disabled ? ' disabled' : ''}>`
     + `${opts.pic || ''}<span>${htmlEsc(label)}</span></label>`;
 }
 function advisorGroup(id, label, html){ return `<p class="adv-sub" id="${id}">${htmlEsc(label)}</p><div class="adv-choices" role="radiogroup" aria-labelledby="${id}">${html}</div>`; }
@@ -5894,7 +5942,9 @@ function advisorStepsHtml(){
   const noMounts = advisorNoMounts() && !(A.source === 'plan' && advisorRackFitted({ bags:S.bags, decks:S.decks }));
   const styles = [['bags', 'styleBags'], ['bags-first', 'styleBagsFirst'], ['panniers', 'stylePanniers']].map(([v, k], i) =>
     advisorChoice('advStyle', v, advisorWord(k), A.style === v, { pic:advisorStylePic(v, i) })).join('');
-  const goals = [['handling', 'goalHandling'], ['backpack', 'goalBackpack']].map(([v, k]) => advisorChoice('advGoal', v, advisorWord(k), A.goal === v)).join('');
+  // two checkboxes: either goal, or both together (the owner, 8 Nov)
+  const goals = [['handling', 'goalHandling'], ['backpack', 'goalBackpack']].map(([v, k]) =>
+    advisorChoice('advGoal', v, advisorWord(k), A.goal === v || A.goal === 'both', { type:'checkbox' })).join('');
   let carried;
   if(A.source === 'plan'){
     const c = advisorPlanCounts();
@@ -5911,7 +5961,7 @@ function advisorStepsHtml(){
   return `<section class="adv-step" aria-labelledby="advStep1"><h3 id="advStep1">${advisorWord('step1')}</h3>`
     + `<div class="adv-choices adv-styles" role="radiogroup" aria-labelledby="advStep1">${styles}</div>`
     + (noMounts ? `<p class="adv-note" id="advNoMounts">${advisorWord('noMounts')}</p>` : '') + '</section>'
-    + `<section class="adv-step" aria-labelledby="advStep2"><h3 id="advStep2">${advisorWord('step2')}</h3><div class="adv-choices" role="radiogroup" aria-labelledby="advStep2">${goals}</div></section>`
+    + `<section class="adv-step" aria-labelledby="advStep2"><h3 id="advStep2">${advisorWord('step2')}</h3><div class="adv-choices" role="group" aria-labelledby="advStep2">${goals}</div></section>`
     + `<section class="adv-step" aria-labelledby="advStep3"><h3 id="advStep3">${advisorWord('step3')}</h3>${carried}</section>`;
 }
 // The planner's own bike line: its saved bikes; a pick is the planner's chooseSavedBike, so the plan's bike changes as it does there.
@@ -5927,7 +5977,8 @@ function advisorBikeHtml(){
 function advisorStatus(answer){
   const head = answer.kind === 'suggestions' ? (answer.items.length === 1 ? advisorWord('statusOne') : advisorWord('statusSome', { n:answer.items.length }))
     : answer.kind === 'already-good' ? advisorWord('alreadyGood') : answer.kind === 'cannot-reduce' ? advisorWord('statusCannot') : advisorWord('statusNothing');
-  return answer.partial ? head + ' ' + advisorWord('statusPartial') : head;
+  const line = answer.partial ? head + ' ' + advisorWord('statusPartial') : head;
+  return answer === ADVISOR.answer && ADVISOR.bigger ? line + ' ' + advisorWord('statusBigger') : line;
 }
 function renderAdvisorAnswer(){
   const box = $('advisorAnswer'); if(!box) return;
@@ -5937,16 +5988,28 @@ function renderAdvisorAnswer(){
   const status = $('advisorStatus');
   if(status) status.textContent = ADVISOR.error || (!advisorComplete() ? advisorWord('needAll') : ADVISOR.answer ? advisorStatus(ADVISOR.answer) : '');
 }
+// The plan's bike with its bags, at the advisor's top: the drawing the bike from Tools glides onto (the owner's finding I, 8 Nov). Drawn
+// on the plan's copies, read as a finished plan; drawn again only when the plan or the theme changed.
+function renderAdvisorRig(){
+  const box = $('advisorRig'); if(!box) return;
+  const sig = planSignature() + bikeTheme();
+  if(sig === ADVISOR.rigSig && box.innerHTML) return;
+  ADVISOR.rigSig = sig;
+  const view = withInputs({ bags:JSON.parse(JSON.stringify(S.bags)) }, () => { const step = S.step; S.step = 4; try { return planBagView(); } finally { S.step = step; } });
+  const art = bikeDrawing(S.bikeProfile, view, { theme:bikeTheme(), idPrefix:'advr' }, true);
+  box.innerHTML = art ? `<div role="img" aria-label="${htmlEsc(advisorWord('rigName'))}">${art.svg.replace(/^<svg\b/, '<svg aria-hidden="true"')}</div>` : '';
+}
 // Re-drawn on every choice; the focused control is found again by its name and value (radios) or id, so the keyboard keeps its place.
 function renderAdvisor(){
   if(!$('advisorSteps')) return;
   const a = document.activeElement, box = $('advisorBox');
   const keep = a && box.contains && box.contains(a) ? (a.name ? { name:a.name, value:a.value } : a.id ? { id:a.id } : null) : null;
+  renderAdvisorRig();
   $('advisorBike').innerHTML = advisorBikeHtml();
   $('advisorSteps').innerHTML = advisorStepsHtml();
   renderAdvisorAnswer();
   if(!keep) return;
-  const el = keep.id ? $(keep.id) : [...box.querySelectorAll('input[type=radio]')].find(r => r.name === keep.name && r.value === keep.value);
+  const el = keep.id ? $(keep.id) : [...box.querySelectorAll('input[type=radio],input[type=checkbox]')].find(r => r.name === keep.name && r.value === keep.value);
   el?.focus?.({ preventScroll:true });
 }
 function advisorProgress(n){
@@ -5957,7 +6020,7 @@ function advisorProgress(n){
 // One search at a time: a newer choice drops the one under way. The search hands the page back after every slice of 20 trials.
 async function runAdvisor(){
   const id = ++ADVISOR_RUN;
-  ADVISOR.answer = null; ADVISOR.input = null; ADVISOR.error = '';
+  ADVISOR.answer = null; ADVISOR.input = null; ADVISOR.error = ''; ADVISOR.bigger = null; ADVISOR.done = false; ADVISOR.sig = null;
   advisorProgress(null);
   renderAdvisorAnswer();
   if(!ADVISOR.open || !advisorComplete()) return;
@@ -5978,9 +6041,22 @@ async function runAdvisor(){
     sliceStart = Date.now();
     if(id !== ADVISOR_RUN || !ADVISOR.open) return;
   }
-  ADVISOR.answer = answer; ADVISOR.input = input;
+  ADVISOR.answer = answer; ADVISOR.input = input; ADVISOR.sig = planSignature();
   advisorProgress(null);
   renderAdvisorAnswer();
+  // then, when nothing else helps, a bigger change of its own (the owner's finding F, 8 Nov), in slices as the search; drawn below the
+  // answer once found
+  const more = mod.biggerSteps ? mod.biggerSteps(input, answer) : null;
+  let bigger = null;
+  for(;more;){
+    const step = more.next();
+    if(step.done){ bigger = step.value; break; }
+    await new Promise(resolve => setTimeout(resolve, 0));
+    sliceStart = Date.now();
+    if(id !== ADVISOR_RUN || !ADVISOR.open) return;
+  }
+  ADVISOR.done = true;
+  if(bigger){ ADVISOR.bigger = bigger; renderAdvisorAnswer(); }
 }
 function setAdvisor(key, value){
   const A = ADVISOR;
@@ -6006,7 +6082,9 @@ function advisorDecided(apply){
     if(ADVISOR.style !== before){ renderAdvisor(); ADVISOR_DONE = runAdvisor(); }
   }).catch(() => {});
 }
-function openAdvisor(opener = document.activeElement){
+// The advisor is a page of its own (the owner's findings C and I, 8 Nov): html.adv-page shows it alone under the page's one top bar,
+// whose link (#advisorBack) is its way back. `opts.keep`: shown again with the answer it has, not searched again (E).
+function openAdvisor(opener = document.activeElement, opts = {}){
   const A = ADVISOR, root = $('advisorBox');
   A.open = true;
   if(!A.q) A.q = { riding:null, nights:S.nights, sleep:S.sleep === 'indoor' ? 'indoor' : 'camp', carry:null };
@@ -6016,21 +6094,45 @@ function openAdvisor(opener = document.activeElement){
     closeBagPop();
     if(!$('legalBox').classList.contains('hidden')) closeLegal();
     if(!$('walkthroughBox').classList.contains('hidden')) closeWalkthrough();
+    A.opener = opener; A.scrollY = window.scrollY || 0;   // the planner comes back where the rider was
     root.classList.remove('hidden');
-    beginDialog(root, true, closeAdvisor, opener);
+    document.documentElement.classList.add('adv-page');
+    try { window.scrollTo(0, 0); } catch(e){}
   }
+  advisorBackLink();
   renderAdvisor();
   $('advisorTitle').focus({ preventScroll:true });
-  ADVISOR_DONE = runAdvisor();
+  if(!opts.keep) ADVISOR_DONE = runAdvisor();
 }
-// Opened from Wayfinch (#gear-advisor&back=tools), closing it goes back there, as Bike details does.
-function closeAdvisor(){
+// The bar's way back: to the Wayfinch screen it came from, or to the planner (C).
+function advisorBackLink(){
+  const a = $('advisorBack');
+  a.href = ADVISOR.back || '/tools/bags/';
+  a.textContent = ADVISOR.back ? '← ' + bikeWord(ADVISOR.backKey || 'backTools') : advisorWord('backPlanner');
+}
+// The planner again, as it was; nothing of the plan changes. `restore`: back to where the rider was in it.
+function hideAdvisor(restore = true){
   ADVISOR.open = false; ADVISOR_RUN++; advisorProgress(null);
-  const root = $('advisorBox'), back = ADVISOR.back;
-  ADVISOR.back = null; $('advisorBack').classList.add('hidden');
+  const root = $('advisorBox');
   if(root.classList.contains('hidden')) return;
-  root.classList.add('hidden'); endDialog(root);
-  if(back) returnToWayfinch(back);
+  root.classList.add('hidden');
+  document.documentElement.classList.remove('adv-page');
+  if(!restore) return;
+  try { window.scrollTo(0, ADVISOR.scrollY || 0); } catch(e){}
+  ADVISOR.opener?.focus?.({ preventScroll:true });
+}
+// Its way back: opened from Wayfinch (#gear-advisor&back=tools), back there, as Bike details does; the page stays as it is meanwhile,
+// so the bike glides back from the advisor's drawing. Opened in the planner: the planner again.
+function closeAdvisor(){
+  if(ADVISOR.back){ returnToWayfinch(ADVISOR.back); return; }
+  hideAdvisor(true);
+}
+const advisorGoBack = () => closeAdvisor();
+// Escape on the advisor's page is its way back, unless a dialog over it (Bike details) takes it.
+function advisorKey(e){
+  if(e.key !== 'Escape' || e.defaultPrevented || DIALOGS.length || !ADVISOR.open || $('advisorBox').classList.contains('hidden')) return;
+  e.preventDefault();
+  closeAdvisor();
 }
 function advisorLink(hash){
   const m = /^#gear-advisor((?:&[a-z]+=[^&]*)*)$/.exec(String(hash || ''));
@@ -6043,22 +6145,25 @@ function openAdvisorFromLink(hash = location.hash){
   try { history.replaceState(null, '', location.pathname + location.search); } catch(e){}
   if(link.back){
     const [href, key] = BIKE_BACKS[link.back];
-    ADVISOR.back = href; setWayfinchBack(href);
-    $('advisorBack').href = href; $('advisorBack').textContent = bikeWord(key); $('advisorBack').classList.remove('hidden');
-  }
+    ADVISOR.back = href; ADVISOR.backKey = key; setWayfinchBack(href);
+  } else { ADVISOR.back = null; ADVISOR.backKey = null; }
   openAdvisor($('backToWayfinch'));
   return true;
 }
+// Both goals can be chosen together (the owner, 8 Nov): a checkbox turned on or off, and the goal that leaves.
+function advisorToggleGoal(value, on){
+  const goals = new Set(ADVISOR.goal === 'both' ? ['handling', 'backpack'] : ADVISOR.goal ? [ADVISOR.goal] : []);
+  if(on) goals.add(value); else goals.delete(value);
+  setAdvisor('goal', goals.size === 2 ? 'both' : [...goals][0] || null);
+}
 function initialiseAdvisor(){
   const box = $('advisorBox');
-  $('advisorClose').onclick = closeAdvisor;
   $('advisorBack').addEventListener('click', event => {
     if(event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
-    const href = event.currentTarget.href; ADVISOR.back = null; closeAdvisor(); returnToWayfinch(href);
+    closeAdvisor();
   });
   box.addEventListener('click', event => {
-    if(event.target === box){ closeAdvisor(); return; }
     const sw = event.target.closest?.('#advSource'); if(sw) setAdvisor('source', sw.dataset.source);
     // a combination's sketch brings its card, the details (the owner's ruling on PR 61)
     const combo = event.target.closest?.('.adv-combo');
@@ -6070,7 +6175,8 @@ function initialiseAdvisor(){
   box.addEventListener('change', event => {
     const t = event.target;
     const keys = { advStyle:'style', advGoal:'goal', advRiding:'riding', advSleep:'sleep', advCarry:'carry' };
-    if(t.type === 'radio' && keys[t.name]) setAdvisor(keys[t.name], t.value);
+    if(t.type === 'checkbox' && t.name === 'advGoal') advisorToggleGoal(t.value, t.checked);
+    else if(t.type === 'radio' && keys[t.name]) setAdvisor(keys[t.name], t.value);
     else if(t.id === 'advNights') setAdvisor('nights', t.value);
     else if(t.id === 'advisorBikeSelect' && t.value){
       $('bikeSavedSelect').value = t.value;
@@ -6078,10 +6184,13 @@ function initialiseAdvisor(){
     }
   });
   window.addEventListener('hashchange', () => { if(DRAFT_READY) openAdvisorFromLink(); });
+  document.addEventListener('keydown', advisorKey);
   // the bags step's way in (Task 8): the advisor on the plan as it stands
-  $('advisorAsk').onclick = () => { ADVISOR.source = advisorHasPlan() ? 'plan' : 'questionnaire'; openAdvisor($('advisorAsk')); };
+  // its way back is then the planner, whatever an earlier visit from Wayfinch had (C)
+  $('advisorAsk').onclick = () => { ADVISOR.back = null; ADVISOR.backKey = null; ADVISOR.source = advisorHasPlan() ? 'plan' : 'questionnaire'; openAdvisor($('advisorAsk')); };
   $('trialKeep').onclick = () => keepTrial();
   $('trialRemove').onclick = () => removeTrial();
+  $('trialAdvisor').onclick = () => trialBackToAdvisor();
 }
 
 /* ---- Trial bags (sub-project 13, Task 7; decision 7): Try in Bag planner puts a suggestion's bags into the plan as a trial. While it
@@ -6092,7 +6201,9 @@ function initialiseAdvisor(){
 // { before:{ bags, decks, placements, nextUid, step, baseNights }, label, uids (the trial's new bags), pendingOther } or null
 let TRIAL = null;
 // The cards of an answer, in the order their indexes run: Minimal's, then Looking ahead's set and its alternatives.
-const advisorCards = answer => !answer || answer.kind !== 'suggestions' ? [] : [...answer.items, ...(answer.ahead ? [answer.ahead, ...(answer.aheadAlts || [])] : [])];
+// The bigger change, when there is one for this answer, comes last (the owner's finding F, 8 Nov).
+const advisorCards = answer => !answer ? [] : [...(answer.kind !== 'suggestions' ? [] : [...answer.items, ...(answer.ahead ? [answer.ahead, ...(answer.aheadAlts || [])] : [])]),
+  ...(answer === ADVISOR.answer && ADVISOR.bigger ? [ADVISOR.bigger] : [])];
 const trialLine = () => TRIAL ? advisorWord('trialTrying', { bag:TRIAL.label }) : '';
 // A hand placement into a bag the plan of before does not have: one of the trial's, or one added during it (S.pinned names its unit,
 // "<uid>-<half>"); it goes with that bag (review of PR 68, M2).
@@ -6112,6 +6223,7 @@ function renderTrialBar(){
   $('trialText').textContent = trialLine();
   $('trialKeep').textContent = advisorWord('trialKeep');
   $('trialRemove').textContent = advisorWord('trialRemove');
+  $('trialAdvisor').textContent = advisorWord('trialBack');
   bar.classList.toggle('hidden', !TRIAL);
 }
 // Save setup and Export during a trial: nothing is written, and the trial's line says why. True when they wait.
@@ -6135,10 +6247,23 @@ function startTrial(s, input = ADVISOR.input){
   S.decks = { ...S.decks, bar:!!s.decks.bar, rack:!!s.decks.rack };
   S.nextUid = Math.max(S.nextUid, ...bags.map(b => b.uid + 1));
   S.placements = null;
-  ADVISOR.back = null;   // the planner stays: Try never goes back to Wayfinch
-  closeAdvisor();
+  // the planner stays: Try never goes back to Wayfinch; the advisor's way back is kept for Back to the Gear advisor (E)
+  ADVISOR.trialBack = { href:ADVISOR.back, key:ADVISOR.backKey };
+  hideAdvisor(false);
   renderTrialBar();
   go(4);
+  return true;
+}
+// Back to the Gear advisor, from the trial's line (the owner's finding E, 8 Nov): the trial bag goes as Remove it takes it, and the
+// advisor shows again with its choices, its answer and its way back as they were; searched again only when the plan changed meanwhile
+// (or its search had not finished).
+function trialBackToAdvisor(){
+  if(!TRIAL) return false;
+  const back = ADVISOR.trialBack || { href:null, key:null };
+  removeTrial();
+  ADVISOR.back = back.href; ADVISOR.backKey = back.key; ADVISOR.trialBack = null;
+  const same = !!ADVISOR.answer && ADVISOR.done && ADVISOR.sig === planSignature();
+  openAdvisor($('advisorAsk'), { keep:same });
   return true;
 }
 // Keep it: the trial's bags are the rider's now; the plan is saved once.
