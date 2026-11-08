@@ -305,12 +305,13 @@ test("[BC-PIC-LAZY] no picture is in the first screen's files, Bike care's chunk
   const listed = Object.keys(buildJson(on).files);
   for (const p of pictures) {
     const bytes = readFileSync(join(dir, p));
-    const where = all.filter((f) => readFileSync(join(on, f)).includes(bytes.subarray(40, 120)));
+    const where = all.filter((f) => readFileSync(join(on, f)).equals(bytes));
     expect(where.length, p).toBe(1);
     expect(where[0], p).toMatch(/^assets\/.+\.svg$/);
     expect(listed, p).toContain(`/${where[0]}`);
     expect(figures.firstFiles, p).not.toContain(where[0]);
   }
+  // and no script carries a drawing's own markup
   expect(all.filter((f) => f.endsWith('.js') && text(on, f).includes('class="cp-')), 'a drawing in a script').toEqual([]);
   expect(figures.firstJsGzip).toBeLessThanOrEqual(145_700);
 });
