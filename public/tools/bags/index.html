@@ -5560,6 +5560,8 @@ const ADVISOR_WORDING = {
   tryIn:{text:'Try in Bag planner'}, trialTrying:{text:'Trying: {bag}. Not saved until you keep it'},
   trialKeep:{text:'Keep it'}, trialRemove:{text:'Remove it'},
   trialFirst:{text:'Keep or remove the bag you are trying first.'},
+  trialConflict:{text:'Not kept yet: this plan was changed in another tab, so this tab is not saving.'},
+  trialUpdate:{text:'Keep or remove the bag you are trying first, then apply the update.'},
   tryNeedsPlan:{text:'To try a bag in the Bag planner, use your own packing: add your bags there first.'},
 };
 const advisorWord = (key, values = {}) => ADVISOR_WORDING[key].text.replace(/\{(\w+)\}/g, (m, k) => values[k] ?? m);
@@ -5999,21 +6001,22 @@ function initialiseAdvisor(){
    save, an export, the comparison with another tab) is the plan without the trial bag. Keep saves once; Remove puts back the bags,
    decks, kept placements and next bag number of before, and saves the rider's other changes; a page closed or reloaded keeps nothing
    of it, since the trial lives in memory only. A plan restored over it (another tab's, a setup, an import) ends it. ---- */
-// { before:{ bags, decks, placements, nextUid, step }, label, uids (the trial's new bags), pendingOther } or null
+// { before:{ bags, decks, placements, nextUid, step, baseNights }, label, uids (the trial's new bags), pendingOther } or null
 let TRIAL = null;
 // The cards of an answer, in the order their indexes run: Minimal's, then Looking ahead's set and its alternatives.
 const advisorCards = answer => !answer || answer.kind !== 'suggestions' ? [] : [...answer.items, ...(answer.ahead ? [answer.ahead, ...(answer.aheadAlts || [])] : [])];
 const trialLine = () => TRIAL ? advisorWord('trialTrying', { bag:TRIAL.label }) : '';
-// A hand placement into one of the trial's new bags (S.pinned names its unit, "<uid>-<half>").
-const trialPin = key => !!TRIAL && TRIAL.uids.includes(+String(key).split('-')[0]);
+// A hand placement into a bag the plan of before does not have: one of the trial's, or one added during it (S.pinned names its unit,
+// "<uid>-<half>"); it goes with that bag (review of PR 68, M2).
+const trialPin = key => !!TRIAL && !TRIAL.before.bags.some(b => String(b.uid) === String(key).split('-')[0]);
 // `work` run on the plan without the trial: the inputs of before swapped in on copies, as planWith does, and put back after.
 function withoutTrial(work){
   if(!TRIAL) return work();
   const b = TRIAL.before, pinned = Object.fromEntries(Object.entries(S.pinned || {}).filter(([, key]) => !trialPin(key)));
   return withInputs({ bags:JSON.parse(JSON.stringify(b.bags)), decks:{ ...b.decks }, placements:b.placements, pinned }, () => {
-    const uid = S.nextUid, step = S.step;
-    S.nextUid = b.nextUid; S.step = b.step;
-    try { return work(); } finally { S.nextUid = uid; S.step = step; }
+    const uid = S.nextUid, step = S.step, base = S.baseNights;
+    S.nextUid = b.nextUid; S.step = b.step; S.baseNights = b.baseNights;
+    try { return work(); } finally { S.nextUid = uid; S.step = step; S.baseNights = base; }
   });
 }
 function renderTrialBar(){
@@ -6036,7 +6039,8 @@ function exportPlanFile(){ return trialWaits('export') ? false : downloadAll(); 
 function startTrial(s, input = ADVISOR.input){
   if(TRIAL || !s || !input || input.fromQuestionnaire) return false;
   currentPlan();   // the kept plan as it stands, so the one put back is the one the rider had
-  const before = { bags:JSON.parse(JSON.stringify(S.bags)), decks:{ ...S.decks }, placements:S.placements, nextUid:S.nextUid, step:S.step };
+  const before = { bags:JSON.parse(JSON.stringify(S.bags)), decks:{ ...S.decks }, placements:S.placements, nextUid:S.nextUid, step:S.step, stepPrev:S.step_prev, baseNights:S.baseNights,
+    cache:PLAN_CACHE };   // the plan as the page held it: put back as it was when nothing else changed (a re-read of a kept plan can split a pair's load otherwise)
   const bags = advisorTrialBags(s, input), had = new Set(before.bags.map(b => b.uid));
   TRIAL = { before, label:advisorWhat(s, input), uids:bags.filter(b => !had.has(b.uid)).map(b => b.uid), pendingOther:false };
   S.bags = bags;
@@ -6050,8 +6054,11 @@ function startTrial(s, input = ADVISOR.input){
   return true;
 }
 // Keep it: the trial's bags are the rider's now; the plan is saved once.
+// While another tab's change has stopped this tab saving (or a delete is under way), nothing is kept: the line says so and the trial
+// stays on (review of PR 68, M3).
 function keepTrial(){
   if(!TRIAL) return false;
+  if(DRAFT_FROZEN || deletedSinceLoad()){ $('trialText').textContent = trialLine() + ' ' + advisorWord('trialConflict'); return false; }
   TRIAL = null; renderTrialBar();
   flushDraft();
   return true;
@@ -6066,7 +6073,13 @@ function removeTrial(){
   S.bags = b.bags; S.decks = b.decks; S.placements = b.placements; S.nextUid = b.nextUid;
   renderTrialBar();
   go(b.step);
+  // the packing check Try entered took the nights as its base; the rider's base of before comes back (review of PR 68, M1), and the
+  // step left with it. The kept plan of before too, which the step's drawing may have read again: when nothing else changed, the plan
+  // the page held, as it held it (a kept plan read again can split a pair's load another way).
+  S.baseNights = b.baseNights; S.step_prev = b.stepPrev; S.placements = b.placements;
+  if(b.cache.placements === b.placements && b.cache.sig === planSignature()) PLAN_CACHE = b.cache;
   flushDraft();
+  writeLoadSummary();   // Wayfinch's summary from the plan as it is now, written whenever it says something else (review of PR 68, C1)
   return true;
 }
 // A plan restored over a trial (another tab's, a saved setup, an import, Undo of a route) ends it, keeping nothing of it.
@@ -8247,7 +8260,8 @@ function loadSummary(now = new Date()){
 // The stored summary, unless it says the same as this one; true when written.
 function writeLoadSummary(always = false){
   if(!DRAFT_READY || deletedSinceLoad()) return false;
-  let next; try { next = loadSummary(); } catch(e){ return false; }
+  // during a trial, the plan without the trial bag (decision 7; review of PR 68, C1): Wayfinch reads this summary in Tools, the tyre tool and Ahead
+  let next; try { next = withoutTrial(() => loadSummary()); } catch(e){ return false; }
   const stored = readLocalJson(SUMMARY_KEY), bare = x => JSON.stringify({ ...x, at:null, planUpdatedAt:null });
   if(!always && dataObject(stored) && bare(stored) === bare(next)) return false;
   try { window.localStorage.setItem(SUMMARY_KEY, JSON.stringify(next)); return true; } catch(e){ return false; }
@@ -11204,7 +11218,9 @@ function bikeFollowedAt(){
 // When the page opens (not through a Bike details link): a newer choice made in Wayfinch, of a bike saved here, not followed before,
 // becomes the plan's bike. Writes no record of its own. A plan-only bike stays: Undo lives in memory, so after a reload it would be gone.
 function followBikeChoice(){
-  if(!DRAFT_READY || DRAFT_FROZEN || BIKE_PROFILE_BUSY || DELETED_ELSEWHERE || !$('bikeDetailsBox').classList.contains('hidden')) return false;
+  // nor while a trial bag is tried (review of PR 68, M4): the record is not marked seen, so the follow waits for the page's next open after
+  // Keep or Remove (TB-PAGE-FOLLOWS: only at start-up and on a return from the back/forward cache, never under the rider's fingers)
+  if(!DRAFT_READY || DRAFT_FROZEN || TRIAL || BIKE_PROFILE_BUSY || DELETED_ELSEWHERE || !$('bikeDetailsBox').classList.contains('hidden')) return false;
   const c=bikeChoiceNow();
   if(!c || c.app!=='copilot' || c.bikeId===null || c.at<=bikeFollowedAt()) return false;
   const seen=()=>store.set(BIKE_FOLLOWED_KEY,{app:'load-check',kind:'bike-followed',v:1,at:new Date(c.at).toISOString()});
@@ -13013,6 +13029,8 @@ async function checkForUpdate(){
 }
 async function applyUpdate(){
   if(UPDATE_STATE.applying || !UPDATE_STATE.registration?.waiting){showUpdateReady();return;}
+  // an update reloads the page, which would drop a trial without a word: it waits for Keep or Remove (review of PR 68, M3)
+  if(TRIAL){UPDATE_STATE.note=advisorWord('trialUpdate');showUpdateReady();return;}
   UPDATE_STATE.applying=true;UPDATE_STATE.note='';showUpdateReady();
   const finish=note=>{UPDATE_STATE.applying=false;UPDATE_STATE.note=note;showUpdateReady();};
   let saved=false;

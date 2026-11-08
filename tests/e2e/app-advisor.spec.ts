@@ -311,8 +311,15 @@ test('[GA-SCREEN] combinations side by side at this size and theme: the row of s
 
 // ---- Trial bags (sub-project 13, group 3; decision 7) ----
 
-/** The bag planner's own saved values a trial may never touch: the draft, the bikes and the setups. */
-const saved = (page: Page) => page.evaluate(() => Object.fromEntries(['loadcheck:draft', 'loadcheck:bikeProfiles', 'loadcheck:setups'].map((k) => [k, localStorage.getItem(k)])));
+/** The bag planner's own saved values a trial may never touch: the draft, the bikes, the setups, and the summary Wayfinch reads (review of
+ *  PR 68, C1). */
+const saved = (page: Page) => page.evaluate(() => {
+  const keys = Object.fromEntries(['loadcheck:draft', 'loadcheck:bikeProfiles', 'loadcheck:setups'].map((k) => [k, localStorage.getItem(k)]));
+  // the summary as Wayfinch reads it, its times aside (each start-up of the page writes it again)
+  const { at, planUpdatedAt, ...summary } = JSON.parse(localStorage.getItem('loadcheck:summary:v1') ?? '{}') as Record<string, unknown>;
+  void at; void planUpdatedAt;
+  return { ...keys, summary: JSON.stringify(summary) };
+});
 
 test('[GA-TRY] [GA-TRIAL-NO-TRACE] [GA-KEEP] [GA-REMOVE] in the browser: Try in Bag planner shows the plan with the trial bag and its line; a reload keeps nothing of it; Remove it and Keep it from the line', async ({ page }) => {
   const errors: string[] = [];
