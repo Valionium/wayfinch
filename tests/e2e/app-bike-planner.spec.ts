@@ -368,12 +368,28 @@ test('[WM-PAGE] Show weight map: off by default, weightmap.js only on the first 
   // a phone stacks yours over the ideal; a wide window puts them side by side
   const [a, b] = await cards.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON() as DOMRect));
   if ((page.viewportSize()?.width ?? 0) < 700) expect(b!.top).toBeGreaterThanOrEqual(a!.bottom - 1);
-  else expect(Math.abs(b!.top - a!.top)).toBeLessThan(2);
-  // the difference is opt-in
-  await page.locator('#weightMap .wm-diff').click();
+  else {
+    expect(Math.abs(b!.top - a!.top)).toBeLessThan(2);
+    // side by side, the two maps stand level even when one heading wraps (review of PR 71, M2)
+    const [wa, wb] = await cards.locator('.wm-wrap').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().top));
+    expect(Math.abs(wb! - wa!)).toBeLessThanOrEqual(1);
+  }
+  // each sentence is read once: the picture's name carries it, the paragraph under it is for the eye (review of PR 71, M3)
+  await expect(cards.nth(0).locator('.wm-sum')).toHaveAttribute('aria-hidden', 'true');
+  // the difference is opt-in; from the keyboard, focus stays on its button (review of PR 71, I2)
+  const diff = page.locator('#weightMap .wm-diff');
+  await diff.focus();
+  await page.keyboard.press('Enter');
   await expect(cards).toHaveCount(3);
   await expect(cards.nth(2).locator('.wm-sum')).toContainText(/points|Close to the ideal/);
-  await expect(page.locator('#weightMap .wm-diff')).toHaveAttribute('aria-pressed', 'true');
+  await expect(diff).toHaveText('Hide where yours differs');
+  await expect(diff).not.toHaveAttribute('aria-pressed');
+  expect(await page.evaluate(() => document.activeElement?.classList.contains('wm-diff'))).toBe(true);
+  await page.keyboard.press('Enter');
+  await expect(cards).toHaveCount(2);
+  expect(await page.evaluate(() => document.activeElement?.classList.contains('wm-diff'))).toBe(true);
+  await page.keyboard.press('Enter');
+  await expect(cards).toHaveCount(3);
   // hidden and shown again: nothing downloads a second time
   await show.click();
   await expect(page.locator('#weightMap')).toBeHidden();

@@ -69,9 +69,12 @@ export function blur(m: Float32Array): Float32Array {
   return pass(pass(m, GW, GH, (y, x) => y * GW + x), GH, GW, (x, y) => y * GW + x);
 }
 
-/** The ideal's shares (design 1.3, the owner's answer 1): a fixed profile, the same for everyone. Nothing on the back. */
+/**
+ * The ideal's shares (design 1.3, the owner's answer 1): a fixed profile, the same for everyone. Nothing on the back. Without panniers
+ * (no rack fitted and no pannier mounts; the coordinator's ruling of 8 Nov) their 33% goes to the other positions, in proportion.
+ */
 export function idealShares(o: { rack: boolean; frame: boolean; top: boolean }): Record<string, number> {
-  const s: Record<string, number> = { frame: 0.5, top: 0.05, fork: 0.12, [o.rack ? 'rack' : 'seat']: 0.33 };
+  const s: Record<string, number> = { frame: 0.5, top: 0.05, fork: 0.12, rack: 0.33 };
   if (!o.top) {
     if (o.frame) s.frame! += s.top!;
     else s.fork! += s.top!;
@@ -83,6 +86,12 @@ export function idealShares(o: { rack: boolean; frame: boolean; top: boolean }):
     delete s.frame;
     if (s.top !== undefined) s.top = t + (f * t) / (t + k);
     s.fork = k + (f * k) / (t + k);
+  }
+  if (!o.rack) {
+    const r = s.rack!;
+    delete s.rack;
+    const rest = Object.values(s).reduce((x, y) => x + y, 0);
+    for (const key of Object.keys(s)) s[key] = s[key]! + (r * s[key]!) / rest;
   }
   return s;
 }
@@ -106,7 +115,6 @@ export function idealItems(totalKg: number, a: Anchors, o: { rack: boolean; fram
   if (s.top && topBox) add('top', topBox, 1.5, s.top, { slot: a.top.front ? 'front' : 'rear' });
   pair('fork', a.fork, 4);
   if (s.rack) pair('rack', a.rack, 20);
-  if (s.seat) add('seat', a.seat, 16, s.seat);
   return out;
 }
 

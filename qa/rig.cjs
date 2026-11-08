@@ -278,9 +278,14 @@ test('[WM-PAGE] the weight map reads the plan as the rig draws it: each packed b
     assert.equal(got.shape,'function');
     if(set==='touring'){assert.equal(got.ideal.rack,true,'a plan with panniers has a rack');assert.ok(got.items.length>=3,'the packed bags are on the map');}
   }
-  // a plan without a rack, deck or panniers: the ideal hangs its 33% in a seat pack
-  rig(bike,SETS.bikepacking,3,{});
-  assert.equal(json('weightMapInput().ideal.rack'),false);
+  // the ideal has panniers when a rack is fitted or the bike has pannier mounts (coordinator's ruling, 8 Nov): a seat-pack rider
+  // whose bike says Yes is compared with panniers; with No or Not sure, and no rack in the plan, the ideal has none
+  for(const [mounts,want] of [['yes',true],['no',false],[undefined,false]]){
+    rig({...bike,...(mounts?{rackMounts:mounts}:{})},SETS.bikepacking,3,{});
+    assert.equal(json('weightMapInput().ideal.rack'),want,`rack mounts ${mounts}`);
+  }
+  rig({...bike,rackMounts:'no'},SETS.touring,3,{rack:true});
+  assert.equal(json('weightMapInput().ideal.rack'),true,'a fitted rack counts whatever the bike says');
 });
 
 for(const [name,fn] of tests){fn();passed++;console.log('ok',name);}

@@ -44,11 +44,16 @@ describe('the weight map (design section 1)', () => {
     expect(at(one)).toBeGreaterThan(0);
   });
 
-  test('[WM-IDEAL] the fixed profile: 50% frame, 5% top tube, 12% fork cages, 33% panniers; no rack gives the 33% to a seat pack, no frame bag shares its 50% between top tube and fork', () => {
+  test('[WM-IDEAL] the fixed profile: 50% frame, 5% top tube, 12% fork cages, 33% panniers; without panniers (the coordinator ruling of 8 Nov) their 33% goes to the others in proportion, no frame bag shares its 50% between top tube and fork', () => {
     const add = (s: Record<string, number>) => Object.values(s).reduce((a, b) => a + b, 0);
     const full = idealShares({ rack: true, frame: true, top: true });
     expect(full).toEqual({ frame: 0.5, top: 0.05, fork: 0.12, rack: 0.33 });
-    expect(idealShares({ rack: false, frame: true, top: true })).toEqual({ frame: 0.5, top: 0.05, fork: 0.12, seat: 0.33 });
+    // no rack and no pannier mounts: the panniers' 33% to the frame bag, top tube and fork cages, in proportion; nothing in a seat pack
+    const noRack = idealShares({ rack: false, frame: true, top: true });
+    expect(Object.keys(noRack).sort()).toEqual(['fork', 'frame', 'top']);
+    expect(noRack.frame!).toBeCloseTo(0.5 / 0.67, 9);
+    expect(noRack.top!).toBeCloseTo(0.05 / 0.67, 9);
+    expect(noRack.fork!).toBeCloseTo(0.12 / 0.67, 9);
     const noFrame = idealShares({ rack: true, frame: false, top: true });
     expect(noFrame.frame ?? 0).toBe(0);
     expect(noFrame.top! / noFrame.fork!).toBeCloseTo(5 / 12, 9);

@@ -1,5 +1,5 @@
 // The bike's words (sections 3.7 and 7.4): its accessible name and its caption. Warm and true; a guess is never a fault. Their own file,
-// so the bag planner's /tools/bags/bike.js carries these words and not the whole of en.ts. Checked by tests/unit/core/wording-bike.test.ts.
+// so the bag planner's /tools/bags/bike.js carries these words and not the whole of en.ts. Checked with W's own words by tests/unit/core/wording.test.ts.
 export const WB = {
   bikeLabel: (parts: string[]): string => `Your bike: ${parts.join(', ')}.`,
   bikeTypeRoad: 'road', bikeTypeGravel: 'gravel', bikeTypeTouring: 'touring', bikeTypeTrekking: 'trekking', bikeTypeMtb: 'mountain', bikeTypeFat: 'fat',

@@ -6,6 +6,7 @@ import type { Anchors, P, Placed } from '../../../../src/core/bike/art.ts';
 import { bagShape, LARGEST, PAIR_OFFSET, sizeFactor } from '../../../../src/core/bike/shapes.ts';
 import { resolveBikeSpec } from '../../../../src/core/bike/spec.ts';
 import { bikeArt as plannerBikeArt, shapedArt as plannerArt } from '../../../../src/core/bike/planner.ts';
+import { targetsOf } from '../../../../src/core/bike/targets.ts';
 import { boundsOf, drawingSet, elements } from './drawing-set.ts';
 
 /** The point turned back by -rot about the box's centre, so it can be compared with the unturned box. */
@@ -143,4 +144,30 @@ describe("the bag planner's drawing (bike.js)", () => {
       expect(plannerBikeArt(resolveBikeSpec(e.bike, e.bags), e.bags).svg, e.name).toBe(bikeArt(resolveBikeSpec(e.bike, e.bags), e.bags).svg);
     }
   }, 60_000);
+});
+
+describe('the tags around the bags', () => {
+  test('[BK-PANNIER-RAIL] the RACK tag sits clear of the pannier pair and of the chainstay (review of PR 71, M1)', () => {
+    const seen = new Set<string>();
+    for (const e of drawingSet()) {
+      const key = e.name.replace(/ \S+$/, '');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const a = bikeArt(resolveBikeSpec(e.bike, null), null).anchors;
+      const [x, y] = targetsOf(a).tags.rack!;
+      // the text "RACK ×2" at 5.6 units: about 30 wide, 5 tall above its baseline, centred on x
+      const box = { x0: x - 15, x1: x + 15, y0: y - 5, y1: y + 0.5 };
+      const off = PAIR_OFFSET.rack!;
+      for (const p of [a.rack, { ...a.rack, x: a.rack.x + off[0], y: a.rack.y + off[1] }]) {
+        const foot = Math.max(...bagShape('rack', p, 20).outline.map((q) => q[1]));
+        expect(box.y0, `${e.name}: under the pannier`).toBeGreaterThan(foot + 1);
+      }
+      // the chainstay, from the rear axle to the bottom bracket, never crosses the text
+      const [r, b] = [a.points.rear, a.points.bb];
+      for (let t = 0; t <= 1; t += 0.02) {
+        const [cx, cy] = [r[0] + (b[0] - r[0]) * t, r[1] + (b[1] - r[1]) * t];
+        expect(cx >= box.x0 && cx <= box.x1 && cy >= box.y0 - 1 && cy <= box.y1 + 1, `${e.name}: chainstay at ${cx.toFixed(1)}, ${cy.toFixed(1)}`).toBe(false);
+      }
+    }
+  });
 });

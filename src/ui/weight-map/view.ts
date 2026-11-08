@@ -100,16 +100,21 @@ export function render(host: HTMLElement, input: MapInput): void {
   }).join('');
   const panel = (id: string, title: string, sub: string, line: string, art: string) =>
     `<figure class="wm-card"><figcaption><b>${esc(title)}</b> <span>${esc(sub)}</span></figcaption><div class="wm-wrap"><canvas data-wm="${id}" aria-hidden="true"></canvas>`
-    + `<svg viewBox="${VB}" role="img" aria-label="${esc(`${title}. ${line}`)}">${input.bike}${art}</svg></div><p class="wm-sum">${esc(line)}</p></figure>`;
+    + `<svg viewBox="${VB}" role="img" aria-label="${esc(`${title}. ${line}`)}">${input.bike}${art}</svg></div><p class="wm-sum" aria-hidden="true">${esc(line)}</p></figure>`;
+  // a press of the difference's button redraws the whole map: the button keeps the keyboard's focus
+  const focused = !!document.activeElement?.classList.contains('wm-diff') && host.contains(document.activeElement);
   host.innerHTML = `<p class="wm-cap">${esc(WM.caption)}</p><div class="wm-maps">`
     + panel('y', WM.yours, WM.yoursSub(total.toFixed(1)), shareLine(zy), outline(items) + backs)
     + panel('i', WM.ideal, WM.idealSub, shareLine(zi), outline(ideal))
     + (input.diff ? panel('d', WM.diff, WM.diffSub, diffLine(zy, zi), '') : '')
-    + `</div><button type="button" class="wm-diff" aria-pressed="${input.diff}">${esc(input.diff ? WM.diffHide : WM.diffShow)}</button>`
+    + `</div><button type="button" class="wm-diff">${esc(input.diff ? WM.diffHide : WM.diffShow)}</button>`
     + `<div class="wm-key"><div class="wm-bar" aria-hidden="true"></div><p>${esc(WM.key)}</p><p>${esc(WM.keyNote)}</p>`
     + (input.diff ? `<div class="wm-bar wm-bar-diff" aria-hidden="true"></div><p>${esc(WM.diffKey)}</p>` : '') + '</div>';
   const fields: Record<string, [Float32Array, boolean]> = { y: [Fy, false], i: [Fi, false], d: [Fy.map((v, n) => v - Fi[n]!), true] };
   host.querySelectorAll<HTMLCanvasElement>('canvas[data-wm]').forEach((c) => { const f = fields[c.dataset.wm!]!; paint(c, f[0], f[1], colours); });
   const button = host.querySelector<HTMLButtonElement>('.wm-diff');
-  if (button) button.onclick = () => input.onDiff(!input.diff);
+  if (button) {
+    button.onclick = () => input.onDiff(!input.diff);
+    if (focused) button.focus();
+  }
 }

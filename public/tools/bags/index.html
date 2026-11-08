@@ -407,7 +407,11 @@ button.go.small{font-size:15px;padding:9px 16px;flex:0 0 auto}
 .wm-show:focus-visible,.wm-diff:focus-visible{outline:2px solid var(--blaze);outline-offset:2px}
 .rig-wm{margin-top:10px}
 .wm-maps{display:grid;gap:10px;grid-template-columns:1fr}
-@media (min-width:700px){.wm-maps{grid-template-columns:1fr 1fr}}
+@media (min-width:700px){
+  .wm-maps{grid-template-columns:1fr 1fr}
+  /* side by side, heading, map and sentence share rows, so the two maps stand level when one heading wraps */
+  .wm-card{display:grid;grid-template-rows:subgrid;grid-row:span 3;row-gap:0}
+}
 .wm-card{margin:0;background:var(--panel);border:1px solid var(--line-soft);border-radius:10px;padding:8px}
 .wm-card figcaption{font-size:13px;margin-bottom:6px}
 .wm-card figcaption span,.wm-cap,.wm-key{color:var(--muted)}
@@ -8532,7 +8536,8 @@ function weightMapInput(){
   if(deck > 0) items.push({ pos:'deck', kg:deck, outline:[[d.x, d.y], [d.x + d.w, d.y], [d.x + d.w, d.y + d.h], [d.x, d.y + d.h]] });
   const art = rigArt();
   return { items, anchors:a, shape:B.bagShape, pairOffset:B.PAIR_OFFSET, diff:WEIGHT_MAP.diff,
-    ideal:{ rack:S.bags.some(b => b.pos === 'rack') || hasDeck('rack'), frame:!fit.frameBag.none, top:!!(fit.topMounts.front || fit.topMounts.rear) },
+    // panniers in the ideal when a rack is fitted or the bike has pannier mounts (the coordinator's ruling of 8 Nov, review of PR 71, I1)
+    ideal:{ rack:S.bags.some(b => b.pos === 'rack') || hasDeck('rack') || !!S.bikeProfile && S.bikeProfile.rackMounts === 'yes', frame:!fit.frameBag.none, top:!!(fit.topMounts.front || fit.topMounts.rear) },
     bike:art ? art.svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '') : '',
     onDiff:on => { WEIGHT_MAP.diff = on; drawWeightMap(); } };
 }
