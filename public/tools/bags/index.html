@@ -1524,8 +1524,10 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .look-preview{position:sticky;top:-16px;z-index:2;background:var(--panel);padding:6px 6px 4px;margin:0 -6px 6px;border-bottom:1px solid var(--line)}
 .look-preview svg{display:block;width:100%;max-width:420px;height:auto;margin:0 auto}
 /* The fork close-up (owner, 7 Nov 2026): the preview's drawing cut to the fork, 2.5 times as large (its width is set from the cut) */
-.look-fork-zoom{max-width:100%;margin:8px 0 4px;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+/* It stays in view just below the drawing (whose height --look-preview-h carries, less the drawing's -16px) to the end of the Fork part, the fieldset that holds it. */
+.look-fork-zoom{position:sticky;top:calc(var(--look-preview-h,0px) - 15px);z-index:1;max-width:100%;margin:8px 0 4px;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .look-fork-zoom svg{display:block;width:100%;height:auto}
+.look-fork-end{height:var(--look-zoom-h,0px)}
 .look-guess{margin:0 0 8px;color:var(--muted);font-size:13px;min-height:1.2em}
 .bike-look fieldset{border:0;padding:0;margin:0 0 10px}
 .bike-look legend{font-weight:600;margin:0 0 4px}
@@ -2071,6 +2073,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
             <p class="lx-sub" id="lookForkPairTitle"></p><div class="look-swatches" id="lookForkPair" role="radiogroup" aria-labelledby="lookForkPairTitle"></div></div>
           <div class="lx-box" id="lookForkTwoBox"><div class="lx-box" id="lookForkFromRow"><p class="lx-sub" id="lookForkFromTitle"></p><div class="look-swatches" id="lookForkFrom" role="radiogroup" aria-labelledby="lookForkFromTitle"></div></div>
             <div class="lx-box" id="lookForkToRow"><p class="lx-sub" id="lookForkToTitle"></p><div class="look-swatches" id="lookForkTo" role="radiogroup" aria-labelledby="lookForkToTitle"></div></div></div>
+          <div class="look-fork-end" aria-hidden="true"></div>
         </fieldset>
         <fieldset id="lookRimSet"><legend id="lookRimTitle">Rims</legend><div class="lx-rim" id="lookRimBox"></div></fieldset>
         <fieldset><legend id="lookBarsTitle">Handlebar</legend><div class="look-chips" id="lookBars" role="radiogroup" aria-labelledby="lookBarsTitle"></div></fieldset>
@@ -3491,7 +3494,7 @@ function syncLookExtras(look){
   for(const [row,c] of [['lookForkFrom',from],['lookForkTo',to]]){
     const shade=c!==null && !B.SWATCHES.some(w=>w.hex===c),chip=$(row+'Own');   // the rows are built once bike.js is in
     if(chip)chip.classList.toggle('hidden',!shade);
-    if(chip && shade){$(row+'OwnInput').value=c;$(row+'OwnDot').style.background=c;$(row+'OwnName').textContent=P.paintForkPairShade(B.colourName(c));}
+    if(chip && shade){$(row+'OwnInput').value=c;$(row+'OwnDot').style.background=c;$(row+'OwnName').textContent=P.paintForkPairShort(B.colourName(c));$(row+'OwnInput').setAttribute('aria-label',P.paintForkPairShade(B.colourName(c)));}   // short to see (it wrapped to five lines), the colour in full to hear
     check(row,c);
   }
   const rim=$('lookRim');
@@ -3592,16 +3595,26 @@ function renderLook(){
 // size, in Look's Fork part, so each tap on its colours shows where it lands. A second picture of the bike: hidden from screen readers, and
 // never named for the glide (the preview is).
 const FORK_ZOOM=2.5;
+// The drawing's height (where the close-up sticks) and the close-up's own, kept free at the end of the Fork part: a sticky box rests
+// inside its section, so without that room it would lie over the last colours instead of below them.
+function syncLookPreviewHeight(){
+  const look=$('bikeLook'),preview=$('lookPreview'),zoom=$('lookForkZoom');
+  if(!look || !look.style || !look.style.setProperty)return;
+  if(preview && preview.offsetHeight)look.style.setProperty('--look-preview-h',preview.offsetHeight+'px');
+  look.style.setProperty('--look-zoom-h',zoom && zoom.offsetHeight ? zoom.offsetHeight+12+'px' : '0px');
+}
 function renderForkZoom(bike,view,art){
   const box=$('lookForkZoom');if(!box)return;
+  syncLookPreviewHeight();
   const show=!!lookPaint().fork && !!art && !!art.anchors;
   box.classList.toggle('hidden',!show);
-  if(!show){box.innerHTML='';return;}
+  if(!show){box.innerHTML='';syncLookPreviewHeight();return;}
   const p=art.anchors.points,x=Math.max(0,p.headBottom[0]-22),y=Math.max(0,p.headTop[1]-6);
   const w=Math.min(320-x,p.front[0]-p.headBottom[0]+40),h=Math.min(150-y,p.front[1]-p.headTop[1]+14);
   const zoom=bikeDrawing(bike,view,{theme:bikeTheme(),idPrefix:'bkz'});if(!zoom){box.innerHTML='';return;}
   box.style.width=`calc(min(100%, 420px) * ${r2(w*FORK_ZOOM/320)})`;
   box.innerHTML=zoom.svg.replace(/viewBox="[^"]*"/,`viewBox="${r2(x)} ${r2(y)} ${r2(w)} ${r2(h)}"`).replace(/ role="img" aria-label="[^"]*"/,' focusable="false"');
+  syncLookPreviewHeight();
 }
 // One write chain with the plan's bike, so a burst of taps lands in the order it was tapped, under the format guard.
 function persistSavedBikes(){
@@ -3687,7 +3700,9 @@ function keepLookFocusInView(e){
     // the ring is the option's: on its label (Look's own swatches and chips, and the extras' .lx-swatch and .lx-chip; review of PR 50, I3)
     const r=(el.closest('label') || el).getBoundingClientRect(),b=body.getBoundingClientRect();
     if(!r.height)return;
-    const top=preview.getBoundingClientRect().bottom+2,bottom=b.top+body.clientTop+body.clientHeight-2;
+    // the fork close-up, while it is stuck under the drawing, is part of the panel the ring must clear
+    const zoom=$('lookForkZoom'),pb=preview.getBoundingClientRect().bottom,zr=zoom && !zoom.classList.contains('hidden') ? zoom.getBoundingClientRect() : null;
+    const top=(zr && zr.height && zr.top<=pb+3 ? Math.max(pb,zr.bottom) : pb)+2,bottom=b.top+body.clientTop+body.clientHeight-2;
     if(r.top-4<top)body.scrollTop-=top-(r.top-4);
     else if(r.bottom+4>bottom)body.scrollTop+=Math.min(r.bottom+4-bottom,r.top-4-top);
   };
@@ -3696,6 +3711,7 @@ function keepLookFocusInView(e){
 }
 function initialiseLook(){
   if(!$('bikeLook'))return;
+  if(window.ResizeObserver && $('lookPreview')){const ro=new ResizeObserver(syncLookPreviewHeight);ro.observe($('lookPreview'));if($('lookForkZoom'))ro.observe($('lookForkZoom'));}
   renderLookChoices();
   $('lookSwatches').addEventListener('change',e=>{if(e.target.name==='lookColour')setLook({colour:e.target.value || null});});
   $('lookBars').addEventListener('change',e=>{if(e.target.name==='lookBars')setLook({bars:e.target.value || null});});

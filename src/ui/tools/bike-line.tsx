@@ -1,6 +1,6 @@
 // "Bike: <name>" at the top of Tools (sub-project 11): the one bike every tool starts with. Only saved bikes are offered, as in the
-// tyre tool (a removed bike is never chosen). One saved bike chosen is plain text; otherwise a labelled select with each saved bike (the
-// plan's marked) and No bike. A change is Wayfinch's own record (bike-choice.ts), which the tyre tool and Bike care read too.
+// tyre tool (a removed bike is never chosen). With at least one saved bike, always a labelled select with each saved bike (the
+// plan's marked) and No bike, so a lone bike can still be set aside. A change is Wayfinch's own record (bike-choice.ts), which the tyre tool and Bike care read too.
 import { T } from '../../core/wording/en-tyre.ts';
 import { W } from '../../core/wording/en.ts';
 import { savedBikeIds, toolBike } from '../../tools/tyre/choice.ts';
@@ -19,7 +19,6 @@ export function BikeLine({ services }: { services: TyreServices; tick?: number }
   if (bikes.length === 0) return null;
   const { id } = toolBike(services.storage, host, saved);
   const current = bikes.find((b) => b.id === id);
-  if (bikes.length === 1 && current) return <p class="tool-line bike-line">{W.tyreBikeLabel}: {current.name}</p>;
   return (
     <p class="bike-line">
       <label for="tools-bike">

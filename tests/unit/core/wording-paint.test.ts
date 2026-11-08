@@ -7,6 +7,7 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   paintRimValue: [[15], [30], [60]],
   paintPairName: [['Red', 'Yellow'], ['Navy', 'Pink']],
   paintForkPairShade: [['Blue'], ['Silver']],
+  paintForkPairShort: [['Blue'], ['Silver']],
   paintFrameLabel: [[['Blue', 'Purple'], 'Fade, front to back']],
   paintForkColourLabel: [['Red']],
   paintForkFadeName: [['Blue to purple']],
@@ -41,5 +42,13 @@ describe("the look extras' wording (owner's wish, 5 November 2026)", () => {
 
   test('[BK-PAINT-PATTERNS] rim depth reads as the try-out: low alloy under 25 mm, mid carbon under 40, deep carbon from 40', () => {
     expect([15, 24, 25, 39, 40, 60].map(PT.paintRimValue)).toEqual(['15 mm · low alloy', '24 mm · low alloy', '25 mm · mid carbon', '39 mm · mid carbon', '40 mm · deep carbon', '60 mm · deep carbon']);
+  });
+});
+
+describe("the fork pair's own shade chip (owner, 8 Nov 2026)", () => {
+  test('[LC-LOOK-FORK] it shows a short label and keeps the full colour name for screen readers', () => {
+    const short = (PT as unknown as Record<string, (n: string) => string>).paintForkPairShort;
+    expect(short?.('Teal')).toBe('Teal (pair)');
+    expect(PT.paintForkPairShade('Teal')).toBe("Teal, the pair's own shade");
   });
 });
