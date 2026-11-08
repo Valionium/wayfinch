@@ -438,7 +438,7 @@ for (const [name, range, what] of [['wider than the icon', [100, 137], 'Cover'],
 
 // Review of PR 73, M3: Ahead's own Get ready offline button is wired to Trip's very prepare, not a stand-in: on the fixture route
 // with nothing saved it saves the places, and the cards that waited for them answer.
-test('[AH-BEFORE-READY] on the real site, Ahead's Get ready offline saves the places and the waiting cards answer', async ({ page }) => {
+test('[AH-BEFORE-READY] on the real site, Ahead’s Get ready offline saves the places and the waiting cards answer', async ({ page }) => {
   app = await loadApp(page);
   const later = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10);
   await preparedTrip(page, 'heidelberg-strasbourg', { departureDate: later });
