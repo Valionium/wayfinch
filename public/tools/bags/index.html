@@ -1898,11 +1898,14 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <div class="rig-trip hidden" id="rigTrip"></div>
     <div class="rig-foot" id="rigFoot"></div>
     <div class="rig-legend" id="rigLegend"></div>
-    <button type="button" class="wm-show" id="rigWeightMap" aria-expanded="false" aria-controls="weightMap" hidden>Show weight map</button>
-    <div class="rig-wm" id="weightMap" hidden></div>
   </div>
 
   <main id="planMain">
+  <!-- the weight map (design of 8 Nov 2026): right under the drawing on a phone, beside it when wide; outside the rig, which must fit the window to stay in view -->
+  <div class="wm-block">
+    <button type="button" class="wm-show" id="rigWeightMap" aria-expanded="false" aria-controls="weightMap" hidden>Show weight map</button>
+    <div class="rig-wm" id="weightMap" hidden></div>
+  </div>
   <!-- STEP 1 -->
   <section id="s1" aria-labelledby="stepTitle1">
     <div class="eyebrow">Step one</div>
