@@ -2,6 +2,7 @@
 // bikeArt's anchors. Only the bag planner's /tools/bags/bike.js uses them, so the co-pilot's first screen does not carry them.
 import { boxOf, corners } from './art.ts';
 import type { Anchors, Box, Circle, P } from './art.ts';
+import { PAIR_OFFSET } from './shapes.ts';
 
 export type Hit = { key: string; kind: 'rect' | 'poly' | 'circle'; box: Box; circle?: Circle; pts?: string };
 export type Targets = { hits: Hit[]; tags: Record<string, P> };
@@ -26,7 +27,7 @@ export function hitsOf(a: Anchors): Hit[] {
   const rectHit = (key: string, b: Box) => hits.push({ key, kind: 'rect', box: clampBox(b) });
   rectHit('pack', pad(packAll, 5));
   rectHit('seat', pad(seatAll, 4));
-  rectHit('rack', pad(union(rack, { ...rack, x: rack.x - 7, y: rack.y - 7 }), 4));
+  rectHit('rack', pad(union(rack, { ...rack, x: rack.x + PAIR_OFFSET.rack![0], y: rack.y + PAIR_OFFSET.rack![1] }), 4));
   rectHit('rackTop', pad(rackTop, 3));
   rectHit('bar', pad(barAll, 4));
   rectHit('barDeck', pad(barDeck, 3));

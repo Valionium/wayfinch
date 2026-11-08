@@ -4,7 +4,7 @@
 // a bike without extras is bikeArt's drawing byte for byte. The co-pilot loads this module only for a bike that has extras; the bag
 // planner has it in /tools/bags/bike.js.
 import { PT } from '../wording/en-paint.ts';
-import { W } from '../wording/en.ts';
+import { WB as W } from '../wording/en-bike.ts';
 import { bikeArt } from './art.ts';
 import type { Anchors, ArtOptions, P } from './art.ts';
 import { CASING_MIN_CONTRAST, CASINGS, casingFor, contrastRatio, darkCasing, hexToOklab, nearestSwatchName } from './colour.ts';
