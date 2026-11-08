@@ -1414,7 +1414,11 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
   .rig svg{max-height:none}
   .route-map-host{height:min(600px,calc(100vh - 160px))}
   .planner-cols>.rig.rig-fits{position:sticky;top:var(--planner-top,56px);z-index:5;background:var(--ground)}
+  /* Back to Wayfinch's bar slides away while scrolling down (/back-bar.css): the rig moves up with it, and back down when it returns */
+  .planner-cols>.rig.rig-fits{transition:top .2s ease-out}
+  :root:has(.wf-bar-away:not(:focus-within)) .planner-cols>.rig.rig-fits{top:8px}
 }
+@media screen and (min-width:1100px) and (prefers-reduced-motion:reduce){.planner-cols>.rig.rig-fits{transition:none}}
 .dropzone-over{outline:2px dashed var(--blaze);outline-offset:4px}
 /* The bike glides from Wayfinch into the bag planner and back (spec 9.8): a cross-document view transition where motion is allowed
    and the browser has it. One drawing is named: the rig, or the Look preview while Bike details is open. Nothing depends on it. */
@@ -1519,6 +1523,9 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
    (owner's try-out, 5 Nov 2026). The dialog's body has 12-16 px of room on each side. */
 .look-preview{position:sticky;top:-16px;z-index:2;background:var(--panel);padding:6px 6px 4px;margin:0 -6px 6px;border-bottom:1px solid var(--line)}
 .look-preview svg{display:block;width:100%;max-width:420px;height:auto;margin:0 auto}
+/* The fork close-up (owner, 7 Nov 2026): the preview's drawing cut to the fork, 2.5 times as large (its width is set from the cut) */
+.look-fork-zoom{max-width:100%;margin:8px 0 4px;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.look-fork-zoom svg{display:block;width:100%;height:auto}
 .look-guess{margin:0 0 8px;color:var(--muted);font-size:13px;min-height:1.2em}
 .bike-look fieldset{border:0;padding:0;margin:0 0 10px}
 .bike-look legend{font-weight:600;margin:0 0 4px}
@@ -1764,7 +1771,9 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <button data-to="1">Trip</button><button data-to="2">Bags</button><button data-to="3">Kit</button><button data-to="4">Check</button>
     </nav>
   </header>
-  <div class="guide-launch-row"><a class="back-wayfinch" id="backToWayfinch" href="/#/tools">← Back to Wayfinch</a><button class="linky" id="walkthroughOpen" type="button" aria-haspopup="dialog" aria-controls="walkthroughBox">Quick walkthrough</button></div>
+  <!-- The one top bar of every tool (owner, 7 Nov 2026): it slides away while scrolling down and comes back on any scroll up. -->
+  <link rel="stylesheet" href="/back-bar.css"><script src="/back-bar.js" defer></script>
+  <div class="guide-launch-row wf-bar"><a class="back-wayfinch" id="backToWayfinch" href="/#/tools">← Back to Wayfinch</a><button class="linky" id="walkthroughOpen" type="button" aria-haspopup="dialog" aria-controls="walkthroughBox">Quick walkthrough</button></div>
   <aside class="guide-invite hidden" id="walkthroughInvite" aria-labelledby="walkthroughInviteTitle">
     <div><b id="walkthroughInviteTitle">First time here?</b><p>A short guide to Trip, Bags, Kit and Check.</p></div>
     <button class="kitact" id="walkthroughStart" type="button" aria-haspopup="dialog" aria-controls="walkthroughBox">Show me around</button>
@@ -2055,6 +2064,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         </fieldset>
         <fieldset id="lookForkSet"><legend id="lookForkTitle">Fork</legend>
           <div class="look-chips" id="lookFork" role="radiogroup" aria-labelledby="lookForkTitle"></div>
+          <div class="look-fork-zoom hidden" id="lookForkZoom" aria-hidden="true"></div>
           <div class="lx-box" id="lookForkOwnBox"><p class="lx-sub" id="lookForkColourTitle"></p><div class="look-swatches" id="lookForkColour" role="radiogroup" aria-labelledby="lookForkColourTitle"></div></div>
           <div class="lx-box" id="lookForkFadeBox"><p class="lx-sub" id="lookForkFadeTitle"></p><div class="look-swatches" id="lookForkFade" role="radiogroup" aria-labelledby="lookForkFadeTitle"></div></div>
           <div class="lx-box" id="lookForkPatternBox"><p class="lx-sub" id="lookForkPatternTitle"></p><div class="look-chips" id="lookForkPattern" role="radiogroup" aria-labelledby="lookForkPatternTitle"></div>
@@ -3569,6 +3579,7 @@ function renderLook(){
   check('lookBars',look.bars||'');
   check('lookEbike',look.ebike===null ? '' : String(look.ebike));
   syncLookExtras(look);
+  renderForkZoom(bike,view,art);
   $('lookPickerChip').classList.toggle('on',!!look.colour && !swatch);
   if(look.colour && document.activeElement!==$('lookPicker'))$('lookPicker').value=look.colour;
   const ready=typeof DRAFT_READY!=='undefined' && DRAFT_READY;
@@ -3576,6 +3587,21 @@ function renderLook(){
   const swap=liveBikeSwap();
   $('lookUndo').classList.toggle('hidden',!LOOK_CHANGED && !(swap && BIKE_PROFILE_EDITOR_ID===swap.newId));
   $('lookStatus').textContent=LOOK_MESSAGE;
+}
+// The fork close-up (owner, 7 Nov 2026): while the fork has colours of its own, the same drawing cut to the fork, 2.5 times the preview's
+// size, in Look's Fork part, so each tap on its colours shows where it lands. A second picture of the bike: hidden from screen readers, and
+// never named for the glide (the preview is).
+const FORK_ZOOM=2.5;
+function renderForkZoom(bike,view,art){
+  const box=$('lookForkZoom');if(!box)return;
+  const show=!!lookPaint().fork && !!art && !!art.anchors;
+  box.classList.toggle('hidden',!show);
+  if(!show){box.innerHTML='';return;}
+  const p=art.anchors.points,x=Math.max(0,p.headBottom[0]-22),y=Math.max(0,p.headTop[1]-6);
+  const w=Math.min(320-x,p.front[0]-p.headBottom[0]+40),h=Math.min(150-y,p.front[1]-p.headTop[1]+14);
+  const zoom=bikeDrawing(bike,view,{theme:bikeTheme(),idPrefix:'bkz'});if(!zoom){box.innerHTML='';return;}
+  box.style.width=`calc(min(100%, 420px) * ${r2(w*FORK_ZOOM/320)})`;
+  box.innerHTML=zoom.svg.replace(/viewBox="[^"]*"/,`viewBox="${r2(x)} ${r2(y)} ${r2(w)} ${r2(h)}"`).replace(/ role="img" aria-label="[^"]*"/,' focusable="false"');
 }
 // One write chain with the plan's bike, so a burst of taps lands in the order it was tapped, under the format guard.
 function persistSavedBikes(){

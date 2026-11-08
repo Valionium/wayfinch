@@ -144,3 +144,65 @@ test('[TB-CARD-BIKE] a bike chosen in Tools, its drawing tapped, Bike details cl
   await expect(card.locator('.bike-art svg')).toHaveAttribute('aria-label', /red frame/);
   expect(await page.evaluate(() => sessionStorage.getItem('wf:first-label'))).toMatch(/red frame/);
 });
+
+// The fork close-up (owner, 7 Nov 2026): while the rider chooses the fork's colours in Look, the same drawing at 2 to 3 times, cut to the
+// fork, inside Look's Fork part; Look opened from Wayfinch (the Tools card) and inside the bag planner alike; no sideways scroll.
+/** The close-up's zoom against the preview's, and whether everything fits across. */
+const forkZoom = (page: Page) => page.evaluate(() => {
+  const zoom = document.querySelector('#lookForkZoom svg');
+  const preview = document.querySelector('#lookPreview svg');
+  if (!zoom || !preview) return null;
+  const vb = zoom.getAttribute('viewBox')!.split(' ').map(Number);
+  const z = zoom.getBoundingClientRect(), p = preview.getBoundingClientRect(), body = document.getElementById('bikeDetailsBody')!;
+  return {
+    times: (z.width / vb[2]!) / (p.width / 320),
+    inside: z.left >= body.getBoundingClientRect().left - 1 && z.right <= body.getBoundingClientRect().right + 1,
+    across: body.scrollWidth <= body.clientWidth && document.documentElement.scrollWidth <= innerWidth,
+    named: getComputedStyle(zoom).getPropertyValue('view-transition-name'),
+    hidden: zoom.closest('[aria-hidden="true"]') !== null,
+    html: zoom.outerHTML,
+  };
+});
+async function chooseForkColours(page: Page): Promise<void> {
+  await expect(page.locator('#lookForkSet')).toBeVisible();
+  await expect(page.locator('#lookForkZoom')).toBeHidden();   // the fork as the frame: nothing to choose, no close-up
+  await page.locator('#lookFork label:has(input[value="own"])').click();
+  await expect(page.locator('#lookForkZoom')).toBeVisible();
+  await expect(page.locator('#lookForkZoom svg')).toBeVisible();
+  const z = (await forkZoom(page))!;
+  expect(z.times).toBeGreaterThanOrEqual(2);
+  expect(z.times).toBeLessThanOrEqual(3);
+  expect(z.inside).toBe(true);
+  expect(z.across).toBe(true);
+  expect(z.named).not.toBe('wf-bike');   // the preview stays the one drawing that glides
+  expect(z.hidden).toBe(true);           // a second picture of the same bike: the preview says it in words
+  // each tap on the fork's colour shows in the close-up at once
+  const swatch = page.locator('#lookForkColour label').nth(2);
+  const hex = await swatch.locator('input').getAttribute('value');
+  await swatch.click();
+  await expect.poll(() => forkZoom(page).then((r) => r?.html.includes(`"${hex}"`))).toBe(true);
+  // back to the frame's colours: no close-up
+  await page.locator('#lookFork label:has(input[value="frame"])').click();
+  await expect(page.locator('#lookForkZoom')).toBeHidden();
+}
+
+test('[BK-FORK-ZOOM] Look opened from Wayfinch\'s Tools card: choosing the fork\'s colours shows the fork enlarged 2 to 3 times, inside the dialog', async ({ page }) => {
+  await rider(page, '/#/tools');
+  await page.reload({ waitUntil: 'load' });
+  await page.locator('main[data-screen="tools"] .card .bike-tap').first().click();
+  await page.waitForURL(/\/tools\/bags\//);
+  await draftReady(page);
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await chooseForkColours(page);
+});
+
+test('[BK-FORK-ZOOM] Look inside the bag planner: the same close-up', async ({ page }) => {
+  await rider(page, '/tools/bags/');
+  await page.reload({ waitUntil: 'load' });
+  await draftReady(page);
+  await page.locator('#s1 button[data-to="2"]').click();
+  await page.locator('#bikeDetailsOpen').click();
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await page.locator('#bikeLookTitle').scrollIntoViewIfNeeded();
+  await chooseForkColours(page);
+});

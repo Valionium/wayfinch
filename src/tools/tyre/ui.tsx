@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { T } from '../../core/wording/en-tyre.ts';
 import { W, shortMapDate } from '../../core/wording/en.ts';
+import { BackBar } from '../../ui/back-bar/back-bar.tsx';
 import { Card, Notice } from '../../ui/card.tsx';
 import { choiceMadeIn, choiceVersion, noteBikeChoice } from '../../ui/tools/bike-choice.ts';
 import { checkLimit, tyreEstimate } from './core.ts';
@@ -377,7 +378,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
 
   return (
     <div class="tyre">
-      <p><a class="btn" href="#/tools">{W.tyreBack}</a></p>
+      <BackBar href="#/tools" />
       <h2 class="tyre-title">{W.tyreTitle}</h2>
       <p class="muted">{W.tyreIntro}</p>
 

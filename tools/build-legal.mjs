@@ -11,6 +11,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildSync } from 'esbuild';
 import { JSDOM } from 'jsdom';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -80,11 +81,14 @@ const page = (block) => `<!doctype html>
 <meta name="format-detection" content="telephone=no">
 <link rel="stylesheet" href="/legal/legal.css">
 <script src="/legal/theme.js"></script>
+<!-- The one top bar of every tool (owner, 7 Nov 2026): it slides away while scrolling down and comes back on any scroll up. -->
+<link rel="stylesheet" href="/back-bar.css">
+<script src="/back-bar.js" defer></script>
 <!-- Opted in to the cross-document view transition as Wayfinch is: a page that is not drops the transition coming in from Wayfinch with an error. -->
 <style>@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }</style>
 </head>
 <body>
-<header class="lg-top"><a class="lg-back" href="/#/you">&larr; Wayfinch</a></header>
+<header class="lg-top wf-bar"><a class="lg-back" href="/#/you">&larr; Back to Wayfinch</a></header>
 <main class="lg-main">
 <p class="lg-draft">Drafted by an AI from the project's spec. Not legal advice.</p>
 <h1>Impressum · Imprint</h1>
@@ -106,4 +110,15 @@ export function writeImprint(outDir, pagePath = PAGE) {
   mkdirSync(join(outDir, 'legal', 'imprint'), { recursive: true });
   writeFileSync(join(outDir, 'legal', 'imprint', 'index.html'), page(block.html));
   return block.hash;
+}
+
+/**
+ * Writes `back-bar.js` and `back-bar.css` into a built site: the one top bar "← Back to Wayfinch" (src/ui/back-bar/) for the pages that
+ * are not Wayfinch's app, the legal pages and the bag planner. A plain script, no module syntax, like bike.js. Launch build only.
+ */
+export function writeBackBar(outDir) {
+  buildSync({
+    entryPoints: { 'back-bar': join(ROOT, 'src', 'ui', 'back-bar', 'page.ts') },
+    outdir: outDir, bundle: true, format: 'iife', minify: true, target: 'es2020', platform: 'browser', legalComments: 'none', logLevel: 'silent',
+  });
 }
