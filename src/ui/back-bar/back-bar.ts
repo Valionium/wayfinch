@@ -34,9 +34,18 @@ export function watchBar(bar: HTMLElement, win: BarWindow = window): () => void 
   const onFocus = (): void => { bar.classList.remove(BAR_AWAY); };
   measure();
   win.addEventListener('scroll', onScroll, { passive: true });
+  // Its height can change without a scroll (the phone turned, larger text, a font arriving): measured again then too (review of PR 70, M4).
+  win.addEventListener('resize', measure);
+  win.addEventListener('orientationchange', measure);
+  let watch: ResizeObserver | null = null;
+  try { if (typeof ResizeObserver === 'function') { watch = new ResizeObserver(measure); watch.observe(bar); } } catch { watch = null; }
+  try { void (win.document as Document).fonts?.ready.then(measure, () => undefined); } catch { /* no font loading to wait for */ }
   bar.addEventListener('focusin', onFocus);
   return () => {
     win.removeEventListener('scroll', onScroll);
+    win.removeEventListener('resize', measure);
+    win.removeEventListener('orientationchange', measure);
+    watch?.disconnect();
     bar.removeEventListener('focusin', onFocus);
     bar.classList.remove(BAR_AWAY);
   };

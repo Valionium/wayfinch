@@ -18,23 +18,26 @@ afterEach(() => { render(null, host); });
 /** A page 3000 px tall in a 640 px window, scrolled by hand; the bar 48 px tall. */
 function world() {
   const listeners: (() => void)[] = [];
+  const others: (() => void)[] = [];
   const root = document.createElement('html');
   Object.defineProperty(root, 'scrollHeight', { value: 3000 });
   const doc = { documentElement: root, activeElement: null as Element | null };
   const win = {
     scrollY: 0, innerHeight: 640, document: doc,
-    addEventListener: (type: string, fn: () => void) => { if (type === 'scroll') listeners.push(fn); },
-    removeEventListener: (type: string, fn: () => void) => { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); },
+    addEventListener: (type: string, fn: () => void) => { (type === 'scroll' ? listeners : others).push(fn); },
+    removeEventListener: (type: string, fn: () => void) => { for (const l of [listeners, others]) { const i = l.indexOf(fn); if (i >= 0) l.splice(i, 1); } },
   };
   const bar = document.createElement('div');
+  let barHeight = 48;
   const link = document.createElement('a');
   link.href = '#/tools';
   bar.append(link);
   document.body.append(bar);
-  Object.defineProperty(bar, 'offsetHeight', { value: 48 });
+  Object.defineProperty(bar, 'offsetHeight', { get: () => barHeight });
   const scroll = (y: number): void => { win.scrollY = y; for (const fn of [...listeners]) fn(); };
   const away = (): boolean => bar.classList.contains(BAR_AWAY);
-  return { win: win as unknown as BarWindow, doc, root, bar, link, scroll, away, listeners };
+  const resize = (h: number): void => { barHeight = h; for (const fn of [...others]) fn(); };
+  return { win: win as unknown as BarWindow, doc, root, bar, link, scroll, away, listeners, resize };
 }
 
 test('[WF-BAR] away while the page scrolls down, back at once on any scroll up; never away near the top or at the end of the page', () => {
@@ -57,6 +60,18 @@ test('[WF-BAR] away while the page scrolls down, back at once on any scroll up; 
   expect(w.away()).toBe(false);
   stop();
   expect(w.listeners.length).toBe(0);
+});
+
+// Review of PR 70, M4: an away bar whose height grows without a scroll (the phone turned, larger text, a font arriving) slides far enough.
+test('[WF-BAR] the bar measures its height again when the window changes size, not only on scroll', () => {
+  const w = world();
+  const stop = watchBar(w.bar, w.win);
+  w.scroll(400);
+  w.scroll(800);
+  expect(w.away()).toBe(true);
+  w.resize(80);
+  expect(w.root.style.getPropertyValue('--wf-bar-h')).toBe('80px');
+  stop();
 });
 
 test('[WF-BAR] keyboard and screen readers: the bar is never taken out of the page, and it comes back while it holds the focus', () => {

@@ -3,13 +3,15 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { TL } from '../../core/wording/en-tools.ts';
 import { watchBar } from './back-bar.ts';
-import './back-bar.css';
+// The style comes with this chunk, never in the first screen's stylesheet (the app's CSS is one file: review of PR 70, M2).
+import css from './back-bar.css?inline';
 
 export function BackBar({ href }: { href: string }) {
   const bar = useRef<HTMLDivElement>(null);
   useEffect(() => (bar.current ? watchBar(bar.current) : undefined), []);
   return (
     <div class="wf-bar wf-bar-app" ref={bar}>
+      <style>{css}</style>
       <a href={href}>{TL.toolsBack}</a>
     </div>
   );

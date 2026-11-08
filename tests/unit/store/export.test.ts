@@ -203,6 +203,16 @@ test('[ST-DELETE] delete removes every copilot key and the database, and no load
   expect((await indexedDB.databases()).map((d) => d.name)).not.toContain(DB_NAME);
 });
 
+// Review of PR 70, M3: the bike Tools drew for this tab (wf:toolsBike, sessionStorage) holds bike ids and would draw a deleted choice.
+test("[ST-DELETE] delete also removes Wayfinch's own keys of this tab (wf:*), and no other", async () => {
+  sessionStorage.setItem('wf:toolsBike', JSON.stringify(['bike_red', 'bike_pink']));
+  sessionStorage.setItem('someone-else', 'x');
+  await deleteCopilotData();
+  expect(sessionStorage.getItem('wf:toolsBike')).toBeNull();
+  expect(sessionStorage.getItem('someone-else')).toBe('x');
+  sessionStorage.clear();
+});
+
 test('[ST-DELETE] the other windows let go, are told, and can not bring old data back', async () => {
   await saveTrip(trip());
   const other = await anotherWindow();
