@@ -24,6 +24,7 @@ import { announceHere, onChanged } from '../store/changed.ts';
 import { keepAfterScreen, readInputs } from '../store/inputs.ts';
 import { addPosition, backToToday, confirmWater, setPlanTomorrow } from '../store/positions.ts';
 import { readMapLink, writeMapLink } from '../store/share-choice.ts';
+import { readPrepared } from '../store/prepared.ts';
 import { weatherStore } from '../store/weather.ts';
 import type { AheadActions, AheadTrip, AheadView, PositionState, Town } from './ahead/actions.ts';
 import { bikeSource } from './bike/live.ts';
@@ -32,6 +33,7 @@ import { isFailure, locateFix, manualAt, onPass, ROUTINE, watchBest } from './po
 import type { Failure } from './position.ts';
 import { agoText } from './trip/model.ts';
 import { whileVisible } from './screen-clock.ts';
+import type { Prepare } from './trip/run.tsx';
 
 const APPROXIMATE_HELP_M = 1000; // section 9.2: worse than about 1 km usually means approximate location only
 const SHARE_OLD_MS = 30 * 60_000; // section 6.14
@@ -46,9 +48,11 @@ export type AheadDeps = {
   fetch: typeof fetch;
   share: ((data: { text: string }) => Promise<void>) | null;
   writeClipboard: ((text: string) => Promise<void>) | null;
+  /** Get ready offline, as Trip runs it (src/ui/trip/services.ts); absent, Ahead's button reports that nothing was saved. */
+  prepare?: Prepare;
 };
 
-function browserDeps(): AheadDeps {
+export function browserDeps(): AheadDeps {
   const nav = typeof navigator === 'undefined' ? undefined : navigator;
   return {
     now: () => new Date(),
@@ -113,6 +117,8 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
   let reading = 0;
   // With no route: the fix Emergency's Update position found, for this page only. Positions are kept on a route, so it is not stored.
   let here: Position | null = null;
+  // What the last Get ready offline did not save, read with the inputs.
+  let failedSteps: AheadTrip['failedSteps'] = [];
 
   // One write at a time, as on Trip: the store refuses a write over a version this window has not read.
   let queue: Promise<unknown> = Promise.resolve();
@@ -163,6 +169,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       bike: bikeSource.peek().bike, stillAboutL, badSpeed: !usableFlatKph(i.trip.flatKph),
       approximateHelp: p !== null && p.source === 'gps' && !(p.accuracyM <= APPROXIMATE_HELP_M),
       shareOld, mapLink: readMapLink(), canShare: deps.share !== null, position, weatherSay, weatherBusy, notice,
+      beforeReady: i.places.length === 0 && i.savedKm.length === 0 && i.forecast === null, failedSteps,
     };
     view.value = next;
     noteRoute(true);
@@ -210,6 +217,8 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     try {
       // A read never makes the database: with none (a fresh phone, or just deleted) there is no trip.
       read = await readInputs(at);
+      // Only once there is a trip (and so a database): a read never makes one.
+      failedSteps = read ? ((await readPrepared().catch(() => null))?.steps.filter((s) => !s.ok) ?? []) : [];
     } catch {
       read = null;
       failed = true;
@@ -433,6 +442,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     // No recipient: the rider picks one in the SMS app. "?&body=" is the form both iPhone and Android open.
     smsHref: (text) => `sms:?&body=${encodeURIComponent(text)}`,
     freshen,
+    getReady: (onProgress, onNotice) => (deps.prepare ? deps.prepare(onProgress, onNotice) : Promise.reject(new Error('no Get ready offline here'))),
   };
 
   return {

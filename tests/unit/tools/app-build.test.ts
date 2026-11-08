@@ -298,3 +298,15 @@ test("[TB-TOOLS-LAZY] the Tools screen (bike line, tyre card) is not among the f
   console.log(`TB-TOOLS-LAZY: first screen ${figures.firstJsGzip} bytes gzipped`);
   expect(figures.firstJsGzip).toBeLessThanOrEqual(149_774);
 });
+
+// The guided Trip, part 1 (design of 8 Nov 2026): the steps, the trip line and Ahead before Get ready offline come with chunks of
+// their own (the trip details and the departure date, the stops on the profile), so the first screen does not grow.
+// 145,678 bytes is the first screen's figure on main (a62695c) at the branch point; the rule is that it may not rise above it.
+test("[TRIP-GUIDED-FIRST] the guided Trip adds nothing to the first screen: at or below main's figure at the branch point", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  // The trip details' fields are not in it: they load with the Route step or Trip details.
+  expect(first.includes('trip-kph')).toBe(false);
+  console.log(`TRIP-GUIDED-FIRST: first screen ${figures.firstJsGzip} bytes gzipped`);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_678);
+});

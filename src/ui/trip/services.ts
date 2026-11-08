@@ -17,6 +17,7 @@ import type { WeatherMode } from '../../data/weather-mode.ts';
 import { NewerDataError, RefusedError } from '../../store/changed.ts';
 import { inExistingTx, inTx, openExisting } from '../../store/db.ts';
 import type { HandoffOutcome } from './handoff.ts';
+import type { RouteStop } from '../../core/screen/route-stops.ts';
 import type { Place } from '../../core/places/types.ts';
 import { readInputs } from '../../store/inputs.ts';
 import { readPrepared, readStoredZones } from '../../store/prepared.ts';
@@ -77,6 +78,8 @@ export type TripServices = {
   writeSettings: (partial: Partial<Record<keyof Settings, unknown>>) => Promise<SettingsOutcome>;
   setDeparture: (date: string | null) => Promise<string | null>;
   prepare: (onProgress: (step: StepName, done: number, total: number) => void, onNotice: (text: string) => void) => Promise<StepReport[]>;
+  /** The stops on the height profile (TRIP-STOPS): Ahead's strip rule for each day, from what is stored; a chunk of its own. */
+  stops: () => Promise<RouteStop[]>;
   /** Contract 2: the trip to the bag planner, which then opens. Absent where there is no bag planner to open. */
   handOff?: () => Promise<HandoffOutcome>;
 };
@@ -325,6 +328,8 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
       await cleanupHandoff(deps);
       return handOffTrip(trip, settings, deps);
     }),
+
+    stops: () => import('./stops.ts').then((m) => m.readStops(now())),
 
     prepare(onProgress, onNotice) {
       return prepareTrip({
