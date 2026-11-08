@@ -1,6 +1,7 @@
 // The Tools tab (spec section 3.4): the bag planner, with the rider's bike and its bags (section 3.7), and the tyre calculator, each
 // with its last result. It reads Load Check's summary and bikes and the tyre tool's own storage, and writes nothing.
 import { useEffect, useState } from 'preact/hooks';
+import { T } from '../../core/wording/en-tyre.ts';
 import { W } from '../../core/wording/en.ts';
 import { savedBikeIds, toolBike } from '../../tools/tyre/choice.ts';
 import { readStore } from '../../tools/tyre/storage.ts';
@@ -39,15 +40,16 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
   const pick = (host.planBikeId ? entries.find((e) => e.key === host.planBikeId) : undefined) ?? entries.sort((a, b) => b.last.at.localeCompare(a.last.at))[0];
   const last: LastResult | null = pick?.last ?? null;
   // The bag card draws the chosen bike at once: a saved bike the rider picked, the plan moving to it at the bag planner's next open
-  // (owner, 7 Nov 2026). "No bike" and a plan-only bike change nothing there (TB-PAGE-FOLLOWS), so the card keeps the plan's bike.
+  // (owner, 7 Nov 2026). "Without a bike" moves the plan to the standard bike there (TB-PAGE-NO-BIKE): the card draws it grey, and says
+  // so. A plan-only bike changes nothing there (TB-PAGE-FOLLOWS), so the card keeps the plan's bike.
   const saved = savedBikeIds(services.storage);
   const choice = toolBike(services.storage, host, saved);
   const planOnly = source.bike !== null && !saved.includes(source.bike.id);
-  const chosen = choice.picked && choice.id !== null && !planOnly ? source.bikes.find((b) => b.id === choice.id) : undefined;
+  const chosen = choice.picked && !planOnly ? (choice.id === null ? null : source.bikes.find((b) => b.id === choice.id)) : undefined;
   return (
     <>
       <BikeLine services={services} tick={tick} />
-      <BagCard services={services} chosen={chosen} />
+      <BagCard services={services} chosen={chosen} note={chosen === null ? T.toolsNoBike : undefined} />
       <Card title={W.tyreCardTitle}>
         <p class="tool-line">{last ? W.tyreCardLast(trimBar(last.frontBar), trimBar(last.rearBar)) : W.tyreCardNone}</p>
         {last?.bike ? <p class="muted">{W.tyreCardBike(last.bike)}</p> : null}

@@ -8,6 +8,8 @@ export const T = {
   tyreNeededIntro: 'Start with these three: the maximum pressure printed on your tyre, your tyre width and your rim type. Everything further down is optional.',
   tyreNeededTag: 'needed',
   tyreBikeWithout: 'Without a bike',
+  // Tools' Bag planner card after "Without a bike" (owner, 7 Nov 2026): the Bag planner moves to its standard bike at its next open.
+  toolsNoBike: 'No bike chosen. The Bag planner uses a standard bike.',
   // A choice made in Tools, or in the bag planner, while this is open and the rider has already picked or typed here: one line naming
   // where it was made, never a switch.
   tyreChosenElsewhere: 'was chosen in Tools ·',

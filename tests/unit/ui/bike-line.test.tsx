@@ -334,8 +334,36 @@ describe('the Bag planner card draws the chosen bike (owner, 7 Nov 2026)', () =>
     render(null, host);
     await act(() => { render(<ToolsScreen services={{ host: () => readHost(page, () => null), storage: page, now: () => NOW }} />, host); });
     expect(cardLabel()).toContain('red frame');
-    // "No bike" changes nothing in the bag planner (TB-PAGE-FOLLOWS), so the card keeps the plan's bike.
-    await pickIn(lineSelect()!, 'default');
+    // "Without a bike" (owner, 7 Nov 2026) is followed by the bag planner too (TB-PAGE-NO-BIKE): the card shows the grey standard bike, so
+    // it has its own test below.
+  });
+
+  const cardOf = () => [...host.querySelectorAll('section')].find((s) => s.querySelector('h2')?.textContent === W.tyreBagCardTitle)!;
+  test('[TB-PAGE-NO-BIKE] "Without a bike" in the bike line: the card draws the grey standard bike and says the Bag planner uses it; nothing of the plan is written', async () => {
+    await act(() => { render(<ToolsScreen services={{ host: () => readHost(page, () => null), storage: page, now: () => NOW }} />, host); });
     expect(cardLabel()).toContain('pink frame');
+    expect(cardOf().querySelector('.tools-no-bike')).toBeNull();
+    const plan = planKeys();
+    await pickIn(lineSelect()!, 'default');
+    expect(cardLabel()).not.toContain('pink');
+    expect(cardOf().querySelector('.bike-art')!.innerHTML).not.toMatch(/stroke="#(d6619b|c62f2a)"/);
+    expect(cardOf().querySelector('.tools-no-bike')?.textContent).toBe(T.toolsNoBike);
+    expect(T.toolsNoBike).toBe('No bike chosen. The Bag planner uses a standard bike.');
+    expect(planKeys()).toBe(plan);
+    // a saved bike picked again: its drawing, and the line is gone
+    await pickIn(lineSelect()!, 'bike_red');
+    expect(cardLabel()).toContain('red frame');
+    expect(cardOf().querySelector('.tools-no-bike')).toBeNull();
+  });
+
+  test("[TB-PAGE-NO-BIKE] a plan-only bike is never replaced by the bag planner, so with it the card keeps the plan's bike and says nothing", async () => {
+    const MINE = paint(mk('bike_mine', 'My bike'), '#d6619b');
+    localStorage.setItem('loadcheck:bikeProfile', JSON.stringify(MINE));
+    localStorage.setItem('loadcheck:summary:v1', summary('bike_mine'));
+    localStorage.setItem(BIKE_CHOICE_KEY, JSON.stringify({ app: 'copilot', kind: 'bike-choice', v: 1, bikeId: null, at: '2026-11-07T09:00:00.000Z' }));
+    refreshBikeSource();
+    await act(() => { render(<ToolsScreen services={{ host: () => readHost(page, () => null), storage: page, now: () => NOW }} />, host); });
+    expect(cardLabel()).toContain('pink frame');
+    expect(cardOf().querySelector('.tools-no-bike')).toBeNull();
   });
 });

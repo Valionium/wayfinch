@@ -2941,7 +2941,9 @@ const BIKE_WORDING={
   followNote:{text:'Now planning for {name}, chosen in Tools ·'},
   followUndo:{text:'Undo'},
   followUndone:{text:'Back to planning for {name}.'},
-  followUndoneNone:{text:'Back to planning without a bike.'}
+  followUndoneNone:{text:'Back to planning without a bike.'},
+  // "Without a bike" chosen in Tools (owner, 7 Nov 2026): the plan moves to the standard bike, with the same Undo.
+  followNoteNone:{text:'Now planning without a saved bike ·'}
 };
 const bikeWord=(key,values={})=>BIKE_WORDING[key].text.replace(/\{(\w+)\}/g,(m,k)=>values[k]??m);
 const FIT_STYLE_NAMES={unknown:'Not sure','diamond-level':'Diamond, level top tube','diamond-sloping':'Diamond, sloping top tube',compact:'Compact',trapeze:'Trapeze',mixte:'Mixte','step-through':'Step-through','full-suspension':'Full suspension'};
@@ -3168,11 +3170,11 @@ function renderBikeProfiles(force=false){
   ['bikeRemoveConfirm','bikeRemoveCancel'].forEach(id=>$(id).disabled=!ready);
   $('bikeProfileStatus').textContent=BIKE_PROFILE_MESSAGE;
   const swap=liveBikeSwap(),follow=!!swap && swap.from==='tools';
-  $('bikeSwapNote').textContent=follow ? bikeWord('followNote',{name:S.bikeProfile.name}) : swap ? bikeWord('swapNote',{name:swap.prev.name}) : '';
+  $('bikeSwapNote').textContent=follow ? followLine() : swap ? bikeWord('swapNote',{name:swap.prev.name}) : '';
   $('bikeSwapNote').classList.toggle('hidden',!swap);
   $('bikeSwapUndo').textContent=follow ? bikeWord('followUndo') : swap ? bikeWord('swapUndo',{name:swap.prev.name}) : '';
   $('bikeSwapUndo').classList.toggle('hidden',!swap);
-  $('bikeFollowText').textContent=follow ? bikeWord('followNote',{name:S.bikeProfile.name}) : BIKE_FOLLOW_MESSAGE;
+  $('bikeFollowText').textContent=follow ? followLine() : BIKE_FOLLOW_MESSAGE;
   $('bikeFollowUndo').textContent=bikeWord('followUndo');
   $('bikeFollowUndo').classList.toggle('hidden',!follow);
   $('bikeFollowUndo').disabled=!ready;
@@ -3182,6 +3184,8 @@ function renderBikeProfiles(force=false){
   $('bikeUseShown').disabled=!ready;
   renderBikeKitSummary();
 }
+// The line after a move to the bike chosen in Tools; "Without a bike" moves the plan to no bike, the standard bike.
+function followLine(){return S.bikeProfile ? bikeWord('followNote',{name:S.bikeProfile.name}) : bikeWord('followNoteNone');}
 function useBikeProfile(value,how={}){
   // A plan bike that is in no saved list would be gone for good: keep it, with the kit choices it set, so Undo brings it back. A move to
   // the bike chosen in Wayfinch (how.follow) is not the rider's tap here: Undo is offered for any bike it replaced, or for no bike.
@@ -10513,12 +10517,14 @@ function bikeFollowedAt(){
 function followBikeChoice(){
   if(!DRAFT_READY || DRAFT_FROZEN || BIKE_PROFILE_BUSY || DELETED_ELSEWHERE || !$('bikeDetailsBox').classList.contains('hidden')) return false;
   const c=bikeChoiceNow();
-  if(!c || c.app!=='copilot' || c.bikeId===null || c.at<=bikeFollowedAt()) return false;
+  if(!c || c.app!=='copilot' || c.at<=bikeFollowedAt()) return false;
   const seen=()=>store.set(BIKE_FOLLOWED_KEY,{app:'load-check',kind:'bike-followed',v:1,at:new Date(c.at).toISOString()});
   // a record naming the plan's own bike is seen too: nothing moves, and a later change no record shows (an older tab) stays
-  if(S.bikeProfile && S.bikeProfile.id===c.bikeId){ seen(); return false; }
+  // (No bike, "Without a bike" in Tools, when the plan has none already: owner, 7 Nov 2026)
+  if((S.bikeProfile ? S.bikeProfile.id : null)===c.bikeId){ seen(); return false; }
   if(S.bikeProfile && !BIKE_PROFILES.some(b=>b.id===S.bikeProfile.id)) return false;
-  const bike=BIKE_PROFILES.find(b=>b.id===c.bikeId);if(!bike) return false;
+  // No bike moves the plan to the standard bike, with the same line and Undo (owner, 7 Nov 2026)
+  const bike=c.bikeId===null ? null : BIKE_PROFILES.find(b=>b.id===c.bikeId);if(bike===undefined) return false;
   useBikeProfile(bike,{follow:true});
   persistBikeProfileSelection();
   seen();
@@ -11049,7 +11055,9 @@ function showTabNotice(text, canLoad){
 }
 function adoptDraft(other){
   clearTimeout(DRAFT_TIMER); DRAFT_TIMER=null; DRAFT_PENDING_SERIAL=null;
-  const restored=other.value === null ? restorePlan(JSON.parse(DRAFT_BASELINE),true,false) : restorePlan(other.value,true,false);
+  // A plan cleared in another tab keeps the selected bike, as Start a new plan there says (found 7 Nov 2026): the empty plan is the
+  // baseline with this tab's bike, so restorePlan never stores "no bike" over it.
+  const restored=other.value === null ? restorePlan({...JSON.parse(DRAFT_BASELINE),bikeProfile:S.bikeProfile},true,false) : restorePlan(other.value,true,false);
   DRAFT_VERSION=other.version; DRAFT_FROZEN=false;
   DRAFT_SIGNATURE=JSON.stringify(captureDraft()); DRAFT_LATEST_SERIAL=DRAFT_SIGNATURE;
   setDraftSaveStatus('saved','browser',DRAFT_SIGNATURE);
@@ -12813,7 +12821,10 @@ window.applyCalibration = applyCalibration;
   if(recovered){
     restorePlan(savedDraft, true);
     showRecoveredDraft();
-  } else if(S.step === 4) renderResult();
+  } else {
+    if(S.step === 4) renderResult();
+    drawRig();   // the first drawing came before the bike was read: draw the plan's bike now (found 7 Nov 2026)
+  }
   DRAFT_SIGNATURE = JSON.stringify(captureDraft());
   DRAFT_READY = true;
   writeLoadSummary(true);
