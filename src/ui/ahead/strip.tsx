@@ -8,7 +8,7 @@ import type { CardName, Strip, StripBand, StripIcon } from '../../core/screen/sc
 import { showKm, W } from '../../core/wording/en.ts';
 import { BikeMarker } from '../bike/marker.tsx';
 
-const ICON_WORD: Record<StripIcon['kind'], (km: string) => string> = {
+export const ICON_WORD: Record<StripIcon['kind'], (km: string) => string> = {
   water: W.appAheadIconWater, food: W.appAheadIconFood, sleep: W.appAheadIconSleep, cover: W.appAheadIconCover,
 };
 const BAND_WORD: Record<StripBand['kind'], (from: string, to: string) => string> = {
@@ -36,7 +36,7 @@ const ICON_PATH: Record<StripIcon['kind'], string> = {
   cover: 'M3 12 12 4l9 8M6 10v10M18 10v10',
 };
 
-function Glyph({ kind }: { kind: StripIcon['kind'] }) {
+export function Glyph({ kind }: { kind: StripIcon['kind'] }) {
   return (
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
       <path d={ICON_PATH[kind]} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -53,7 +53,7 @@ function Bolt() {
 }
 
 /** How far along the strip a kilometre lies, from 0 to 1. A strip of no length puts everything at its start. */
-const along = (km: number, s: Strip): number => {
+const along = (km: number, s: Pick<Strip, 'startKm' | 'endKm'>): number => {
   const span = s.endKm - s.startKm;
   if (!(span > 0) || !Number.isFinite(km)) return 0;
   return Math.max(0, Math.min(1, (km - s.startKm) / span));
@@ -67,12 +67,13 @@ const pct = (x: number): string => `${(x * 100).toFixed(2)}%`;
  * sleep place shown first; so a group is never placed far from any icon in it.
  */
 const ICON_PX = 46;
-type Slot = { x: number; icons: StripIcon[] };
-function slotsOf(icons: StripIcon[], s: Strip, trackPx: number): Slot[] {
+type Slot<T extends StripIcon> = { x: number; icons: T[] };
+/** Shared with the stops on Trip's height profile (TRIP-STOPS): the same grouping, along a strip of the whole route. */
+export function slotsOf<T extends StripIcon>(icons: T[], s: Pick<Strip, 'startKm' | 'endKm'>, trackPx: number): Slot<T>[] {
   const gap = ICON_PX / Math.max(trackPx, ICON_PX);
   const end = icons.some((i) => along(i.km, s) >= 1) ? 1 - gap : 2;
-  const slots: Slot[] = [];
-  const last: StripIcon[] = [];
+  const slots: Slot<T>[] = [];
+  const last: T[] = [];
   for (const icon of icons) {
     const x = along(icon.km, s);
     const prev = slots[slots.length - 1];

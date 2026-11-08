@@ -258,7 +258,7 @@ export function TripScreen({ services }: { services: TripServices }) {
         {offer ? <button type="button" class="btn" onClick={() => void promptInstall()}>{W.appTripInstall}</button> : null}
       </div>
       <div class="trip-side">
-        {snap ? <RouteSummary snap={snap} /> : null}
+        {snap ? <RouteSummary snap={snap} stops={services.stops} /> : null}
       </div>
     </div>
   );

@@ -59,6 +59,24 @@ export function profileOf(route: Route): Profile | null {
   return { path, minM: Math.round(lo), maxM: Math.round(hi) };
 }
 
+/**
+ * Where the profile line is at a kilometre, in the profile's 300 x 72 box (the same scale as profileOf's path), from the route's
+ * own heights between the points either side; null while any height is unknown. A stop's icon sits there (TRIP-STOPS).
+ */
+export function profileY(route: Route, km: number): number | null {
+  const pts = route.points;
+  if (pts.length < 2 || route.lengthKm <= 0 || pts.some((p) => p.ele === null)) return null;
+  const heights = pts.map((p) => p.ele!);
+  const lo = Math.min(...heights);
+  const span = Math.max(Math.max(...heights) - lo, 20);
+  let after = pts.findIndex((p) => p.km >= km);
+  if (after <= 0) after = after === 0 ? 1 : pts.length - 1;
+  const [a, b] = [pts[after - 1]!, pts[after]!];
+  const t = b.km > a.km ? Math.max(0, Math.min(1, (km - a.km) / (b.km - a.km))) : 0;
+  const ele = a.ele! + (b.ele! - a.ele!) * t;
+  return PROFILE_H - ((ele - lo) / span) * (PROFILE_H - 4) - 2;
+}
+
 /** Which line a route follows: it stays the same when looked-up heights change the route's own id. */
 export const lineKey = (route: Route): string => {
   const first = route.points[0]!;

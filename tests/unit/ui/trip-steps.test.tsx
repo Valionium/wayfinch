@@ -6,6 +6,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import type { RouteStop } from '../../../src/core/screen/route-stops.ts';
 import { W } from '../../../src/core/wording/en.ts';
 import type { StepName, StepReport } from '../../../src/data/prepare.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
@@ -222,5 +223,54 @@ describe('The message after a route is added (owner\'s item 2)', () => {
     const name = (await readTrip())!.route.name;
     expect(host.querySelector('[data-added]')!.textContent).toContain(`${W.appTripReplaced(name)} ${W.appTripNextGetReady}`);
     expect(openSteps()).toEqual(['getready']);
+  });
+});
+
+describe('The stops on the height profile (guided Trip design §6)', () => {
+  const STOPS: RouteStop[] = [
+    { kind: 'water', km: 20, opens: 'water', label: 'Brunnen Wiesloch' },
+    { kind: 'food', km: 20.5, opens: 'food', label: 'Café Sonne' },
+    { kind: 'sleep', km: 80, opens: 'sleep', label: null },
+  ];
+
+  test('[TRIP-STOPS] before Get ready offline the profile has no icons and says when they come', async () => {
+    let asked = 0;
+    await withRoute(services({ stops: async () => { asked += 1; return STOPS; } }));
+    const summary = host.querySelector('[data-summary]')!;
+    expect(summary.querySelectorAll('[data-profile-stops] button')).toHaveLength(0);
+    expect(summary.textContent).toContain(W.appAheadStopsAfter);
+    expect(asked).toBe(0);
+  });
+
+  test('[TRIP-STOPS] after it, each stop sits on the profile at its km; close ones share a "+N" button; a tap lists them under the profile and opens no card', async () => {
+    const svc = await withRoute(services({ ...preparing(), stops: async () => STOPS }));
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes('12 places'), 'the result');
+    await until(() => host.querySelectorAll('[data-profile-stops] button').length > 0, 'the icons');
+    const length = (await readTrip())!.route.lengthKm;
+    const buttons = [...host.querySelectorAll<HTMLButtonElement>('[data-profile-stops] button')];
+    expect(buttons).toHaveLength(2);
+    const [pair, sleep] = buttons as [HTMLButtonElement, HTMLButtonElement];
+    expect(pair.textContent).toContain(W.appAheadIconMore(1));
+    expect(pair.className).toContain('ah-icon-water');
+    expect(sleep.className).toContain('ah-icon-sleep');
+    expect(parseFloat(sleep.style.left)).toBeCloseTo((80 / length) * 100, 1);
+    expect(host.querySelector('[data-stop-list]')).toBeNull();
+    const hash = location.hash;
+    await click(pair);
+    const list = host.querySelector('[data-stop-list]')!;
+    expect([...list.querySelectorAll('li')].map((li) => li.textContent)).toEqual([
+      `${W.appAheadIconWater('20')} · Brunnen Wiesloch`, `${W.appAheadIconFood('20.5')} · Café Sonne`,
+    ]);
+    expect(location.hash).toBe(hash);
+    // For screen readers, one list of every stop after the profile, in the strip's own words.
+    const all = host.querySelector('[data-stops-all]')!;
+    expect([...all.querySelectorAll('li')].map((li) => li.textContent)).toEqual([W.appAheadIconWater('20'), W.appAheadIconFood('20.5'), W.appAheadIconSleep('80')].map((w, n) => (STOPS[n]!.label ? `${w} · ${STOPS[n]!.label}` : w)));
+    void svc;
+  });
+
+  test('[TRIP-STOPS] the real services read the stops from the store: none for a route with nothing saved, and nothing throws', async () => {
+    const svc = await withRoute();
+    await expect(svc.stops()).resolves.toEqual([]);
   });
 });

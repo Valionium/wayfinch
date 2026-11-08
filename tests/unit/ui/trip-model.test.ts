@@ -3,7 +3,7 @@ import { planStages } from '../../../src/core/route/stages.ts';
 import { GpxError } from '../../../src/core/route/gpx.ts';
 import { buildRoute } from '../../../src/core/route/profile.ts';
 import { W } from '../../../src/core/wording/en.ts';
-import { planned, profileOf, routeDoneLine, routeFromGpx, summaryOf, tripLineOf, tripRuns } from '../../../src/ui/trip/model.ts';
+import { planned, profileOf, profileY, routeDoneLine, routeFromGpx, summaryOf, tripLineOf, tripRuns } from '../../../src/ui/trip/model.ts';
 import type { Trip } from '../../../src/core/types.ts';
 import { fixtureGpx, gpxText } from '../../fixtures/gpx.ts';
 import { loadFixtureRoute } from '../../fixtures/packs/index.ts';
@@ -147,5 +147,18 @@ describe('The guided Trip (design of 8 Nov 2026)', () => {
     const line = routeDoneLine(tripOf(route));
     expect(line).toBe(`${Math.round(route.lengthKm * 10) / 10} km · ${String(route.ascentM).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} m up · 3 days`);
     expect(routeDoneLine(tripOf({ ...route, ascentM: null, stages: route.stages.slice(0, 1) }))).toMatch(/ km · climbing unknown · 1 day$/);
+  });
+});
+
+describe('The stops on the height profile (guided Trip design §6)', () => {
+  test('[TRIP-STOPS] an icon sits on the profile line: at its km, at the height there, in the profile\'s own box', async () => {
+    const { route } = await routeFromGpx(await fixtureGpx('alpine-pass'), 'ride.gpx', parseXml);
+    const box = profileOf(route)!;
+    const top = route.points.reduce((a, b) => (b.ele! > a.ele! ? b : a));
+    const low = route.points.reduce((a, b) => (b.ele! < a.ele! ? b : a));
+    expect(profileY(route, top.km)).toBeCloseTo(2, 0);
+    expect(profileY(route, low.km)).toBeCloseTo(70, 0);
+    expect(box.maxM).toBe(Math.round(top.ele!));
+    expect(profileY({ ...route, points: route.points.map((p) => ({ ...p, ele: null })) }, 3)).toBeNull();
   });
 });

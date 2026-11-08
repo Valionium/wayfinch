@@ -1056,6 +1056,7 @@ export const W = {
   appAheadNeedUntil: 'Until then Ahead shows only what the route itself tells.',
   appAheadAfterReady: 'After Get ready offline',
   appAheadStopsAfter: 'Stops appear after Get ready offline.',
+  appTripStopsLabel: 'Stops along the route',
   appAheadUnreadable: "Your trip couldn't be read on this phone just now. Try again; if it keeps failing, reload the app.",
   appAheadRetry: 'Try again',
   appAheadChoiceNotKept: "This browser didn't keep that choice, so the plan is unchanged. Try again.",
