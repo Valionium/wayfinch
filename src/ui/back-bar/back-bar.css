@@ -7,8 +7,10 @@
 
 /* Wayfinch's tools (the tyre tool, Bike care): a solid bar clear of the notch, a 44 px link; a jump or a focused field lands below it. */
 html:has(.wf-bar-app) { scroll-padding-top: calc(var(--wf-bar-h, 3.5rem) + 8px); }
+/* Across the whole screen, with the screen's own side padding inside it, so nothing scrolls past beside it. */
 .wf-bar-app {
-  z-index: 5; margin: 0 0 12px; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  z-index: 5; margin: 0 -16px 12px; padding: env(safe-area-inset-top) calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left));
   background: var(--ground); border-bottom: 1px solid var(--line);
 }
+@media (min-width: 840px) { .wf-bar-app { margin-inline: -32px; padding-inline: 32px; } }
 .wf-bar-app a { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 8px 0 0; color: var(--ink); font-weight: 600; text-underline-offset: 3px; }
