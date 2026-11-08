@@ -82,9 +82,8 @@ describe('the choice, resolved', () => {
     expect(lineSelect()!.value).toBe('bike_b');
     mem.data.set('loadcheck:bikeProfiles', JSON.stringify([A]));
     await act(() => { window.dispatchEvent(new StorageEvent('storage', { key: 'loadcheck:bikeProfiles' })); });
-    // One bike left, and it is the plan's: shown as text, the removed bike gone, nothing thrown.
-    expect(lineSelect()).toBeNull();
-    expect(line()!.textContent).toBe(`${W.tyreBikeLabel}: Trail Bike`);
+    // One bike left, and it is the plan's: still a select (with Without a bike), the removed bike gone, nothing thrown.
+    expect(options(lineSelect()!)).toEqual(['Trail Bike' + W.tyreBikeInPlan, T.tyreBikeWithout]);
     expect(host.textContent).not.toContain('Gravel');
   });
 
@@ -115,13 +114,17 @@ describe('the choice, resolved', () => {
 });
 
 describe('the bike line in Tools', () => {
-  test('[TB-LINE] no bike: no line; one: its name as text; three: a select labelled Bike with three bikes and No bike, the current one selected', async () => {
+  test('[TB-LINE] no bike: no line; one: the select too, so Without a bike can be picked; three: a select labelled Bike with three bikes and No bike, the current one selected', async () => {
     await mountTools(world([], null));
     expect(line()).toBeNull();
     render(null, host);
     await mountTools(world([A], A));
-    expect(line()!.textContent).toBe(`${W.tyreBikeLabel}: Trail Bike`);
-    expect(lineSelect()).toBeNull();
+    expect(options(lineSelect()!)).toEqual(['Trail Bike' + W.tyreBikeInPlan, T.tyreBikeWithout]);
+    expect(lineSelect()!.value).toBe('bike_a');
+    await pickIn(lineSelect()!, 'default');
+    expect(lineSelect()!.value).toBe('default');
+    await pickIn(lineSelect()!, 'bike_a');
+    expect(lineSelect()!.value).toBe('bike_a');
     render(null, host);
     const mem = world([A, B, C], A, choice('bike_c'));
     await mountTools(mem);

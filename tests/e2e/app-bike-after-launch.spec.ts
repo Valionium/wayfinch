@@ -163,6 +163,29 @@ const forkZoom = (page: Page) => page.evaluate(() => {
     html: zoom.outerHTML,
   };
 });
+/** After scrolling down through the fork's colours (and by keyboard to the last), the close-up is still in view just below the drawing, and the last chip (and its focus) is shown whole below it. */
+async function forkCloseUpStays(page: Page): Promise<void> {
+  const state = () => page.evaluate(() => {
+    const body = document.getElementById('bikeDetailsBody')!, zoom = document.getElementById('lookForkZoom')!, prev = document.getElementById('lookPreview')!;
+    const chips = [...document.querySelectorAll('#lookForkColour label')] as HTMLElement[];
+    const last = chips[chips.length - 1]!, b = body.getBoundingClientRect(), z = zoom.getBoundingClientRect(), p = prev.getBoundingClientRect();
+    const l = last.getBoundingClientRect();
+    return { inView: z.height > 0 && z.top >= p.bottom - 1 && z.bottom <= b.bottom + 1, lastShown: l.top >= z.bottom - 1 && l.bottom <= b.bottom + 1, across: document.documentElement.scrollWidth <= innerWidth };
+  });
+  // scrolling: the last chip brought to the dialog's lower edge
+  await page.evaluate(() => {
+    const body = document.getElementById('bikeDetailsBody')!;
+    const chips = [...document.querySelectorAll('#lookForkColour label')] as HTMLElement[];
+    const l = chips[chips.length - 1]!.getBoundingClientRect(), b = body.getBoundingClientRect();
+    body.scrollTop += l.bottom - (b.bottom - 4);
+  });
+  expect(await state()).toEqual({ inView: true, lastShown: true, across: true });
+  // keyboard: the last chip taken, and its focus ring shows whole below the close-up
+  await page.evaluate(() => { document.getElementById('bikeDetailsBody')!.scrollTop = 0; });
+  await page.keyboard.press('Tab');
+  await page.locator('#lookForkColour label').last().locator('input').focus();
+  await expect.poll(state).toEqual({ inView: true, lastShown: true, across: true });
+}
 async function chooseForkColours(page: Page): Promise<void> {
   await expect(page.locator('#lookForkSet')).toBeVisible();
   await expect(page.locator('#lookForkZoom')).toBeHidden();   // the fork as the frame: nothing to choose, no close-up
@@ -176,6 +199,7 @@ async function chooseForkColours(page: Page): Promise<void> {
   expect(z.across).toBe(true);
   expect(z.named).not.toBe('wf-bike');   // the preview stays the one drawing that glides
   expect(z.hidden).toBe(true);           // a second picture of the same bike: the preview says it in words
+  await forkCloseUpStays(page);
   // each tap on the fork's colour shows in the close-up at once
   const swatch = page.locator('#lookForkColour label').nth(2);
   const hex = await swatch.locator('input').getAttribute('value');
@@ -205,4 +229,25 @@ test('[BK-FORK-ZOOM] Look inside the bag planner: the same close-up', async ({ p
   await expect(page.locator('#bikeDetailsBox')).toBeVisible();
   await page.locator('#bikeLookTitle').scrollIntoViewIfNeeded();
   await chooseForkColours(page);
+});
+
+test.describe('at 320 px', () => {
+  test.use({ viewport: { width: 320, height: 640 } });
+
+  test('[BK-FORK-ZOOM] [TB-LINE] 320 px: the close-up stays below the drawing to the last fork colour; the line with one saved bike is a 44 px select with no sideways scroll', async ({ page }) => {
+    await rider(page, '/#/tools');
+    await page.evaluate((e) => { for (const [k, v] of Object.entries(e)) localStorage.setItem(k, v); }, { 'loadcheck:bikeProfiles': JSON.stringify([A]), 'loadcheck:bikeProfile': JSON.stringify(A) });
+    await page.reload({ waitUntil: 'load' });
+    const sel = page.locator('.bike-line select');
+    await expect(sel).toBeVisible();
+    expect(await sel.evaluate((el) => ({ h: el.getBoundingClientRect().height, across: document.documentElement.scrollWidth <= innerWidth }))).toMatchObject({ across: true });
+    expect(await sel.evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+    expect(await sel.locator('option').allTextContents()).toHaveLength(2);
+    await page.locator('main[data-screen="tools"] .card .bike-tap').first().click();
+    await page.waitForURL(/\/tools\/bags\//);
+    await draftReady(page);
+    await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+    await page.locator('#lookFork label:has(input[value="own"])').click();
+    await forkCloseUpStays(page);
+  });
 });

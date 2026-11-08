@@ -118,8 +118,11 @@ test('[LC-LOOK-FORK] the fork\'s first and second colour: the frame\'s swatches,
   const names = (group: Locator) => group.getByRole('radio').evaluateAll((els) => els.map((el) => (el as HTMLInputElement).labels![0]!.textContent!.trim()));
   const chosen = (group: Locator) => group.locator('label:has(input:checked)').evaluateAll((els) => els.map((el) => el.textContent!.trim()));
   // Blue to purple's own two shades are not swatches: each row shows its shade first, chosen (review of PR 50, M2)
-  for (const [group, shade] of [[first, 'Blue, the pair\'s own shade'], [second, 'Purple, the pair\'s own shade']] as const) {
+  for (const [group, shade] of [[first, 'Blue (pair)'], [second, 'Purple (pair)']] as const) {
     await expect(group).toBeVisible();
+    // shown short (it wrapped to five lines), spoken in full
+    expect(await group.locator('label').first().evaluate((el) => el.getBoundingClientRect().height), shade).toBeLessThan(60);
+    await expect(group.getByRole('radio', { name: `${shade.split(' ')[0]}, the pair's own shade`, exact: true })).toBeChecked();
     expect(await names(group)).toEqual([shade, ...SWATCH_NAMES]);
     expect(await chosen(group)).toEqual([shade]);
     for (const box of await group.locator('label').evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return { w: r.width, h: r.height, text: el.textContent!.trim() }; }))) {
@@ -138,7 +141,7 @@ test('[LC-LOOK-FORK] the fork\'s first and second colour: the frame\'s swatches,
   await expect(first.getByRole('radio', { name: 'Red' })).toBeChecked();
   expect(await presets.locator('input:checked').count()).toBe(0);
   expect(await names(first)).toEqual(SWATCH_NAMES);   // the shade goes with the preset's colour
-  expect(await chosen(second)).toEqual(['Purple, the pair\'s own shade']);
+  expect(await chosen(second)).toEqual(['Purple (pair)']);
   await expect(page.locator('#lookPreview svg')).toHaveAttribute('aria-label', /fork fading red to purple/);
   // after each preset, each row shows one colour chosen: the preset's, a swatch or its own shade
   for (const preset of ['Teal to blue', 'Orange to red', 'Silver to black', 'Olive to sand', 'Blue to purple']) {
@@ -150,7 +153,7 @@ test('[LC-LOOK-FORK] the fork\'s first and second colour: the frame\'s swatches,
   }
   // a swatch for one end, then the pair's own shade at the other still chosen; the preset comes back with its tap (above)
   await first.locator('label', { hasText: /^Red$/ }).click();
-  expect(await chosen(second)).toEqual(['Purple, the pair\'s own shade']);
+  expect(await chosen(second)).toEqual(['Purple (pair)']);
   // by keyboard: the arrows move along the second colour and each step draws, with the two colours named
   await second.locator('label', { hasText: /^Black$/ }).click();
   await second.getByRole('radio', { name: 'Black' }).focus();
