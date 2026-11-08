@@ -35,3 +35,26 @@
 .trip-steps { margin: 4px 0 8px; padding-left: 1.25rem; }
 progress { width: 100%; accent-color: var(--blaze); }
 .card h3 { font-family: var(--font-display); font-size: 1.125rem; margin: 12px 0 4px; }
+
+/* The guided Trip (design of 8 Nov 2026): the trip line, then the four steps on one line of dots. */
+.trip-line { display: flex; flex-direction: column; gap: 2px; margin: 0 0 12px; }
+.trip-line strong { font-family: var(--font-display); font-size: 1.375rem; line-height: 1.15; overflow-wrap: anywhere; }
+.trip-steps-list { list-style: none; margin: 0 0 12px; padding: 0; }
+.trip-step { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 0 10px; position: relative; }
+.trip-step::before { content: ''; position: absolute; left: 13px; top: 30px; bottom: 0; width: 2px; background: var(--line); }
+.trip-step:last-child::before { display: none; }
+.trip-dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; border: 2px solid var(--line); background: var(--ground); color: var(--muted); position: relative; z-index: 1; box-sizing: border-box; margin-top: 8px; }
+.trip-step-done .trip-dot { background: var(--sage); border-color: var(--sage); color: var(--panel); }
+.trip-step-next .trip-dot { background: var(--blaze); border-color: var(--blaze); color: var(--panel); }
+.trip-step-body { min-width: 0; padding: 0 0 12px; }
+.trip-step-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 44px; }
+.trip-step-head h2 { font-family: var(--font-display); font-size: 1.25rem; margin: 0; }
+.trip-step-later .trip-step-head h2 { color: var(--muted); }
+.trip-step-open, .trip-step-change { min-height: 44px; padding: 0 4px; background: none; border: 0; font: inherit; cursor: pointer; }
+.trip-step-open { color: inherit; text-align: left; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.trip-step-change { color: var(--blaze); font-weight: 600; font-family: var(--font-body); font-size: 0.9375rem; white-space: nowrap; }
+.trip-step-line { margin: 0; overflow-wrap: anywhere; }
+.trip-details { border-top: 1px solid var(--line); margin: 8px 0 0; padding: 4px 0 0; }
+.trip-details-line { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0 8px; margin: 0; font-size: 0.9375rem; }
+.trip-added { font-weight: 600; }
+.trip-added .btn { margin-top: 8px; display: flex; }

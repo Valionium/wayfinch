@@ -4,7 +4,6 @@ import { useRef, useState } from 'preact/hooks';
 import { W } from '../../core/wording/en.ts';
 import { keepFreshOffered } from '../../data/refresh.ts';
 import type { Settings } from '../../store/rules.ts';
-import { Card } from '../card.tsx';
 import { useFollowing } from '../follow.ts';
 import { suggestedNights } from './model.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
@@ -50,7 +49,11 @@ export function Choice({ name, legend, value, options, onPick }: { name: string;
   );
 }
 
-export function TripSettings({ services, snap, reload }: { services: TripServices; snap: TripSnapshot; reload: () => Promise<void> }) {
+/**
+ * `when`: the departure date and the nights, which stay in the Route step; `details`: the trip details folded under it (guided Trip
+ * design §2.2): start time, pace, flat speed, stay type, camp water and keep fresh.
+ */
+export function TripSettings({ services, snap, reload, part }: { services: TripServices; snap: TripSnapshot; reload: () => Promise<void>; part: 'when' | 'details' }) {
   const { settings, trip } = snap;
   const [problems, setProblems] = useState<Partial<Record<string, string>>>({});
   const [startDraft, setStartDraft] = useFollowing(settings.startTime);
@@ -75,9 +78,9 @@ export function TripSettings({ services, snap, reload }: { services: TripService
   };
   const problem = (f: string): string | null => problems[f] || null;
 
-  return (
-    <Card title={W.appTripSettingsTitle}>
-      <div data-settings>
+  if (part === 'when') {
+    return (
+      <div data-settings="when">
         {trip ? (
           <div class="field">
             <label for="trip-date">{W.appTripDeparture}</label>
@@ -114,7 +117,20 @@ export function TripSettings({ services, snap, reload }: { services: TripService
             {problem('date') ? <p class="field-problem" role="alert">{problem('date')}</p> : null}
           </div>
         ) : null}
+        <NumberField
+          id="trip-nights" label={W.appTripNights} value={settings.nights} step="1" min={0} max={30}
+          placeholder={trip ? String(suggestedNights(trip)) : undefined} onCommit={(v) => save('nights', v)} problem={problem('nights')}
+        />
+        {trip ? <p class="muted">{W.appTripNightsSuggested(suggestedNights(trip))}</p> : null}
+        {settings.nights !== null ? <button type="button" class="btn" onClick={() => void save('nights', null)}>{W.appTripNightsUseSuggested}</button> : null}
 
+        {trip ? <p class="muted">{W.appTripSettingsStageNote}</p> : null}
+      </div>
+    );
+  }
+
+  return (
+    <div data-settings="details">
         <div class="field">
           <label for="trip-start">{W.appTripStartTime}</label>
           <input
@@ -123,13 +139,6 @@ export function TripSettings({ services, snap, reload }: { services: TripService
           />
           {problem('startTime') ? <p class="field-problem" role="alert">{problem('startTime')}</p> : null}
         </div>
-
-        <NumberField
-          id="trip-nights" label={W.appTripNights} value={settings.nights} step="1" min={0} max={30}
-          placeholder={trip ? String(suggestedNights(trip)) : undefined} onCommit={(v) => save('nights', v)} problem={problem('nights')}
-        />
-        {trip ? <p class="muted">{W.appTripNightsSuggested(suggestedNights(trip))}</p> : null}
-        {settings.nights !== null ? <button type="button" class="btn" onClick={() => void save('nights', null)}>{W.appTripNightsUseSuggested}</button> : null}
 
         <Choice
           name="pace" legend={W.appTripPace} value={settings.pace} onPick={(v) => save('pace', v)}
@@ -156,8 +165,6 @@ export function TripSettings({ services, snap, reload }: { services: TripService
             <p class="muted">{W.appTripKeepFreshWhy}</p>
           </div>
         ) : null}
-        {trip ? <p class="muted">{W.appTripSettingsStageNote}</p> : null}
-      </div>
-    </Card>
+    </div>
   );
 }

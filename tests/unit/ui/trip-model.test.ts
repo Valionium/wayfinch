@@ -3,7 +3,7 @@ import { planStages } from '../../../src/core/route/stages.ts';
 import { GpxError } from '../../../src/core/route/gpx.ts';
 import { buildRoute } from '../../../src/core/route/profile.ts';
 import { W } from '../../../src/core/wording/en.ts';
-import { planned, profileOf, routeFromGpx, summaryOf, tripRuns } from '../../../src/ui/trip/model.ts';
+import { planned, profileOf, routeDoneLine, routeFromGpx, summaryOf, tripLineOf, tripRuns } from '../../../src/ui/trip/model.ts';
 import type { Trip } from '../../../src/core/types.ts';
 import { fixtureGpx, gpxText } from '../../fixtures/gpx.ts';
 import { loadFixtureRoute } from '../../fixtures/packs/index.ts';
@@ -119,5 +119,33 @@ describe('Which screen the app opens on (spec section 3.1)', () => {
     expect(tripRuns(outside)).toBe(false);
     expect(tripRuns({ ...outside, lastPositionAt: new Date(base.now.getTime() - 23 * 3_600_000) })).toBe(true);
     expect(tripRuns({ ...outside, lastPositionAt: new Date(base.now.getTime() - 25 * 3_600_000) })).toBe(false);
+  });
+});
+
+describe('The guided Trip (design of 8 Nov 2026)', () => {
+  const twoDays = async (): Promise<Trip['route']> => {
+    const { route } = await routeFromGpx(await fixtureGpx('heidelberg-strasbourg'), 'ride.gpx', parseXml);
+    return planned(route, { flatKph: 25, pace: 'sporting', nights: 2 });
+  };
+
+  test('[TRIP-LINE] the trip line says where the rider is in time: before, on each day, after the last day, without a date, without a trip', async () => {
+    const route = await twoDays();
+    expect(route.stages).toHaveLength(3);
+    const at = (departureDate: string | null, today: string) => tripLineOf(tripOf(route, { departureDate }), today);
+    expect(at('2026-11-14', '2026-11-08')).toEqual({ name: route.name, when: 'Starts Sat 14 Nov, in 6 days' });
+    expect(at('2026-11-14', '2026-11-13').when).toBe('Starts tomorrow, Sat 14 Nov');
+    expect(at('2026-11-14', '2026-11-14').when).toBe('Starts today');
+    expect(at('2026-11-14', '2026-11-15').when).toBe('Day 2 of 3');
+    expect(at('2026-11-14', '2026-11-16').when).toBe('Day 3 of 3');
+    expect(at('2026-11-14', '2026-11-17').when).toBe('Ended on Mon 16 Nov');
+    expect(at(null, '2026-11-08').when).toBe(W.appTripLineNoDate);
+    expect(tripLineOf(null, '2026-11-08')).toEqual({ name: W.appTripNoTrip, when: null });
+  });
+
+  test('[TRIP-STEPS] the Route step folds to "165 km · 1,240 m up · 2 days": the distance, the climbing and the stage model\'s days', async () => {
+    const route = await twoDays();
+    const line = routeDoneLine(tripOf(route));
+    expect(line).toBe(`${Math.round(route.lengthKm * 10) / 10} km · ${String(route.ascentM).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} m up · 3 days`);
+    expect(routeDoneLine(tripOf({ ...route, ascentM: null, stages: route.stages.slice(0, 1) }))).toMatch(/ km · climbing unknown · 1 day$/);
   });
 });

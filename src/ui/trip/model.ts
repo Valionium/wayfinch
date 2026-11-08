@@ -8,7 +8,7 @@ import { buildRoute } from '../../core/route/profile.ts';
 import { planStages, shownAscentM } from '../../core/route/stages.ts';
 import type { Pace } from '../../core/route/stages.ts';
 import type { Route, Trip } from '../../core/types.ts';
-import { shortMapDate, showKm, W } from '../../core/wording/en.ts';
+import { shortIsoDay, shortMapDate, showKm, W } from '../../core/wording/en.ts';
 
 /** 1214 as "1,214". */
 export const thousands = (n: number): string => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -137,3 +137,27 @@ export function packDate(build: { builtAt: string; countries: Record<string, str
   const shown = shortMapDate(newest ?? build.builtAt);
   return shown === null ? null : { date: shown, fromSource: newest !== undefined };
 }
+
+const daysApart = (from: string, to: string): number => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
+
+/**
+ * The trip line at the top of Trip (guided Trip design, §2.1): the route's name and where the rider is in time. `today` is the date
+ * in the route's start zone; the days are the stored stage plan's.
+ */
+export function tripLineOf(trip: Trip | null, today: string): { name: string; when: string | null } {
+  if (!trip) return { name: W.appTripNoTrip, when: null };
+  const { departureDate } = trip;
+  if (departureDate === null) return { name: trip.route.name, when: W.appTripLineNoDate };
+  const days = Math.max(1, trip.route.stages.length);
+  const apart = daysApart(today, departureDate);
+  const lastDay = addDaysIso(departureDate, days - 1);
+  const when = apart >= 0 ? W.appTripLineStarts(shortIsoDay(departureDate) ?? departureDate, apart)
+    : today <= lastDay ? W.appTripLineDay(1 - apart, days)
+      : W.appTripLineEnded(shortIsoDay(lastDay) ?? lastDay);
+  return { name: trip.route.name, when };
+}
+
+/** The Route step's folded line: "165 km · 1,240 m up · 2 days". */
+export const routeDoneLine = (trip: Trip): string => W.appTripRouteDone(
+  showKm(trip.route.lengthKm), trip.route.ascentM === null ? null : thousands(trip.route.ascentM), Math.max(1, trip.route.stages.length),
+);
