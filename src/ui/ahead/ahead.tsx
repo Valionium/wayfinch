@@ -84,16 +84,18 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
     (card.querySelector('.ah-toggle') as HTMLElement | null)?.focus();
   };
 
+  // Before Get ready offline the card is at the top; after one with a step missing it names those steps with Try again (review
+  // of PR 73, I2) under the strip, so the position line, the strip and the first card stay in view (WIDE-FOLD).
+  const need = v.beforeReady || v.failedSteps.length > 0 ? (
+    <section class="card ah-need" data-need-ready aria-label={v.beforeReady ? W.appAheadNeedTitle : W.appTripMissingHeading}>
+      {v.beforeReady ? <><h2 class="ah-need-title">{W.appAheadNeedTitle}</h2><p>{W.appAheadNeedBody}</p></> : <h2 class="ah-need-title">{W.appTripMissingHeading}</h2>}
+      <NeedReady actions={actions} failed={v.failedSteps} before={v.beforeReady} />
+    </section>
+  ) : null;
   return (
     <div class="ahead" data-ahead={v.answers ? 'answers' : 'first-use'} onKeyDown={onKeyDown}>
       <div class="ah-main">
-        {/* Before Get ready offline, and after one with a step missing, which it names with Try again (review of PR 73, I2). */}
-        {v.beforeReady || v.failedSteps.length > 0 ? (
-          <section class="card ah-need" data-need-ready aria-label={v.beforeReady ? W.appAheadNeedTitle : W.appTripMissingHeading}>
-            {v.beforeReady ? <><h2 class="ah-need-title">{W.appAheadNeedTitle}</h2><p>{W.appAheadNeedBody}</p></> : <h2 class="ah-need-title">{W.appTripMissingHeading}</h2>}
-            <NeedReady actions={actions} failed={v.failedSteps} before={v.beforeReady} />
-          </section>
-        ) : null}
+        {v.beforeReady ? need : null}
         {v.notice ? <p class="notice" role="status">{v.notice}</p> : null}
         {v.answers ? <PositionLine v={v} onShare={() => { actions.freshen(); setSharing(true); }} /> : <p>{W.appAheadFirstUse}</p>}
         {sharing && s.shareText !== null ? (
@@ -110,6 +112,7 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
             <RouteStrip strip={s.strip} bike={v.bike} onOpen={openCard} onSetPosition={rail ? (km) => void actions.setManual(km) : undefined} stopsLater={v.beforeReady} />
           </>
         ) : null}
+        {v.beforeReady ? null : need}
       </div>
       {v.answers ? <TopicCards screen={s} open={open} onToggle={toggle} v={v} actions={actions} onShelter={() => openChip('shelter')} later={v.beforeReady ? AFTER_READY : NONE} /> : null}
       <div class="ah-below">
