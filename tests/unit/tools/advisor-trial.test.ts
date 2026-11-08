@@ -77,7 +77,10 @@ test('[GA-TRY-SAME] [GA-TRIAL-NO-TRACE] [GA-KEEP] [GA-REMOVE] over 200 generated
   type SumBag = { pos: string; L: number; fill?: number | number[] };
   const sumBags = (raw: string | undefined) => (JSON.parse(raw ?? 'null')?.bags?.items as SumBag[] | undefined ?? [])
     .map((b) => ({ ...b, fill: Array.isArray(b.fill) ? +b.fill.reduce((n, x) => n + x, 0).toFixed(2) : b.fill }));
-  const keysOf = (q: Page) => { const x = stored(q); return timeless({ ...x, 'loadcheck:summary:v1': { ...JSON.parse(x['loadcheck:summary:v1'] ?? '{}'), bags: sumBags(x['loadcheck:summary:v1']) } }); };
+  // The whole summary (bags, decks, weights, water, every field), its times aside and a pair's fill as one figure.
+  const summaryOf = (raw: string | undefined) => { const x = JSON.parse(raw ?? '{}') as Record<string, unknown>;
+    return { ...x, at: 0, planUpdatedAt: 0, ...(x.bags ? { bags: { ...(x.bags as object), items: sumBags(raw) } } : {}) }; };
+  const keysOf = (q: Page) => { const x = stored(q); return timeless({ ...x, 'loadcheck:summary:v1': summaryOf(x['loadcheck:summary:v1']) }); };
   // a fresh start for one rider: no storage, nothing saved yet
   const start = (q: Page, r: Rider) => {
     q.values.clear();
@@ -130,7 +133,8 @@ test('[GA-TRY-SAME] [GA-TRIAL-NO-TRACE] [GA-KEEP] [GA-REMOVE] over 200 generated
     if (r.others.length) withOthers++;
     for (const o of r.others) {
       p.run(OTHER[o]!); twin.run(OTHER[o]!);
-      expect(sumBags(p.values.get('loadcheck:summary:v1')), `${what}, ${o}: the summary holds no trial bag`).toEqual(sumBags(twin.values.get('loadcheck:summary:v1')));
+      // the whole summary at every step, not only its bags: decks and weights would show a trial too (re-check of PR 68, N1)
+      expect(timeless(summaryOf(p.values.get('loadcheck:summary:v1'))), `${what}, ${o}: the summary is the twin's, no trial in it`).toBe(timeless(summaryOf(twin.values.get('loadcheck:summary:v1'))));
     }
     if (r.end === 'remove') {
       p.run('removeTrial()'); twin.run('flushDraft()');
