@@ -29,6 +29,8 @@
   --ground:#1B2018;
   --panel:#242B20;
   --panel-hi:#2E3729;
+  /* the weight map (design of 8 Nov 2026): lightness always one way, brighter as it gets heavier */
+  --wm0:#2c4f94;--wm1:#8c4fa3;--wm2:#ff6a45;--wmneg:#3fb7c4;--wmpos:#f0a03a;--wmzero:#2E3729;
   --line:#3E4A36;
   --line-soft:#333D2C;
   --ink:#EFEDE0;
@@ -400,6 +402,28 @@ button.go.small{font-size:15px;padding:9px 16px;flex:0 0 auto}
 .bk-onbody .bk-detail,.bagg.onbody .bk-detail{stroke:var(--amber)}
 .bk-far{opacity:.62}
 .bagg.ghost .bk-detail{display:none}
+/* the weight map, under the rig once the kit is chosen */
+.wm-show,.wm-diff{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--muted-dim);border-radius:8px;padding:8px 12px;min-height:44px;margin-top:10px;cursor:pointer}
+.wm-show:focus-visible,.wm-diff:focus-visible{outline:2px solid var(--blaze);outline-offset:2px}
+.rig-wm{margin-top:10px}
+.wm-maps{display:grid;gap:10px;grid-template-columns:1fr}
+@media (min-width:700px){.wm-maps{grid-template-columns:1fr 1fr}}
+.wm-card{margin:0;background:var(--panel);border:1px solid var(--line-soft);border-radius:10px;padding:8px}
+.wm-card figcaption{font-size:13px;margin-bottom:6px}
+.wm-card figcaption span,.wm-cap,.wm-key{color:var(--muted)}
+.wm-wrap{position:relative;aspect-ratio:262/132;border-radius:8px;overflow:hidden;background:var(--panel-hi);--line:var(--ink)}
+.wm-wrap canvas,.wm-wrap svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.wm-wrap .bk-tyre,.wm-wrap .bk-rim{opacity:.75}
+.wm-wrap .bk-spokes{opacity:.25}
+.wm-bag{fill:none;stroke:var(--ink);stroke-width:1;opacity:.85}
+.wm-back{stroke-dasharray:3 2}
+.wm-label{font-size:6px;fill:var(--ink)}
+.wm-sum{font-size:13px;margin:6px 0 0}
+.wm-cap{font-size:13px;margin:0 0 8px}
+.wm-key{font-size:12.5px;margin-top:8px}
+.wm-key p{margin:4px 0}
+.wm-bar{height:10px;border-radius:5px;border:1px solid var(--muted-dim);background:linear-gradient(90deg,var(--wm0),var(--wm1) 50%,var(--wm2))}
+.wm-bar-diff{margin-top:8px;background:linear-gradient(90deg,var(--wmneg),var(--wmzero) 50%,var(--wmpos))}
 .bagg.onbody .bag-shell{stroke-dasharray:none;stroke:var(--amber)}
 .strapline{stroke:var(--blaze);stroke-width:1;opacity:.7;fill:none}
 .bag-tag{font-family:var(--mono);font-size:7.5px;letter-spacing:.1em;fill:var(--muted-dim)}
@@ -1237,6 +1261,8 @@ button.back:hover{color:var(--ink);border-color:var(--muted-dim)}
   --ground:#F4F2E8;
   --panel:#FBFAF3;
   --panel-hi:#EBE8DA;
+  /* the weight map: darker as it gets heavier */
+  --wm0:#a8c8f0;--wm1:#8a63b0;--wm2:#c0301c;--wmneg:#2a8f9d;--wmpos:#c46a0c;--wmzero:#EBE8DA;
   --line:#C7C4B1;
   --line-soft:#DCD9C9;
   --ink:#22271D;
@@ -1872,6 +1898,8 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <div class="rig-trip hidden" id="rigTrip"></div>
     <div class="rig-foot" id="rigFoot"></div>
     <div class="rig-legend" id="rigLegend"></div>
+    <button type="button" class="wm-show" id="rigWeightMap" aria-expanded="false" aria-controls="weightMap" hidden>Show weight map</button>
+    <div class="rig-wm" id="weightMap" hidden></div>
   </div>
 
   <main id="planMain">
@@ -8446,6 +8474,53 @@ function frameShapeGlyph(b){
   </svg>`;
 }
 
+/* ---- The weight map (design of 8 Nov 2026): /tools/bags/weightmap.js (window.WayfinchWeightMap), loaded on the first press of Show
+   weight map, never before. A view of the plan, not data: nothing of it is saved. It reads each bag where the rig draws it. ---- */
+const WEIGHT_MAP = { on:false, diff:false, drawn:'' };
+let WEIGHT_MAP_SCRIPT = null, RIG_OUTLINES = {};
+function loadWeightMap(){
+  if(window.WayfinchWeightMap) return Promise.resolve(window.WayfinchWeightMap);
+  if(!WEIGHT_MAP_SCRIPT) WEIGHT_MAP_SCRIPT = new Promise((resolve, reject) => {
+    const script = document.createElement('script'); script.src = 'weightmap.js';
+    script.onload = () => window.WayfinchWeightMap ? resolve(window.WayfinchWeightMap) : reject(Error('no weight map'));
+    script.onerror = () => { WEIGHT_MAP_SCRIPT = null; script.remove(); reject(Error('not loaded')); };
+    document.head.appendChild(script);
+  });
+  return WEIGHT_MAP_SCRIPT;
+}
+// Each packed bag, bottle and the rack deck's load with its kilos and its outline as drawn; the ideal's fixed profile needs to know
+// whether a rack is fitted (panniers or the rack deck in the plan), a frame bag fits and the top tube takes a bag.
+function weightMapInput(){
+  const B = bikeModule(), a = rigAnchors(); if(!B || !B.bagShape || !a) return null;
+  const items = [], fit = bikeFit(S.bikeProfile);
+  currentPlan().slots.forEach(s => { const o = RIG_OUTLINES[s.key], kg = (s.items || []).reduce((t, k) => t + placedKg(k), 0);
+    if(o && kg > 0) items.push({ pos:o.pos, kg, outline:o.outline }); });
+  const deck = deckClaims().reduce((t, k) => t + itemKg(k), 0), d = a.rackTop;
+  if(deck > 0) items.push({ pos:'deck', kg:deck, outline:[[d.x, d.y], [d.x + d.w, d.y], [d.x + d.w, d.y + d.h], [d.x, d.y + d.h]] });
+  const art = rigArt();
+  return { items, anchors:a, shape:B.bagShape, pairOffset:B.PAIR_OFFSET, diff:WEIGHT_MAP.diff,
+    ideal:{ rack:S.bags.some(b => b.pos === 'rack') || hasDeck('rack'), frame:!fit.frameBag.none, top:!!(fit.topMounts.front || fit.topMounts.rear) },
+    bike:art ? art.svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '') : '',
+    onDiff:on => { WEIGHT_MAP.diff = on; drawWeightMap(); } };
+}
+function drawWeightMap(){
+  const button = $('rigWeightMap'), box = $('weightMap'); if(!button || !box) return;
+  const offered = S.step >= 3 && !!bikeModule(), on = offered && WEIGHT_MAP.on;
+  button.hidden = !offered;
+  button.setAttribute('aria-expanded', on ? 'true' : 'false');
+  button.textContent = on ? 'Hide weight map' : 'Show weight map';
+  button.onclick = () => { WEIGHT_MAP.on = !WEIGHT_MAP.on; WEIGHT_MAP.drawn = ''; drawWeightMap(); };
+  box.hidden = !on;
+  if(!on) return;
+  const input = weightMapInput(); if(!input) return;
+  // drawn again only when the plan, the theme or the difference changed
+  const key = JSON.stringify([input.items, input.ideal, input.diff, bikeTheme(), input.bike.length]);
+  if(key === WEIGHT_MAP.drawn) return;
+  WEIGHT_MAP.drawn = key;
+  loadWeightMap().then(M => { if(WEIGHT_MAP.on && WEIGHT_MAP.drawn === key) M.render(box, input); })
+    .catch(() => { WEIGHT_MAP.drawn = ''; box.textContent = 'The weight map could not be loaded. Check the connection and press Show weight map again.'; });
+}
+
 // The bike at the back of the rig, redrawn on its own when only the look or the theme changed.
 function paintRigBike(art = rigArt()){
   const holder = $('rigBike'); if(!holder) return;
@@ -8458,7 +8533,7 @@ function drawRig(){
   const showFill = stage >= 3;
   const A=currentPlan(), { slots } = A;
   const loadedRackDeck=showFill && deckClaims().length>0;
-  clipN = 0;
+  clipN = 0; RIG_OUTLINES = {};
   const defs = [], art = [], tags = [];
   const fb = S.bags.find(b => b.pos === 'frame');
   const frameSmall = frameShapeIdx(fb);
@@ -8536,6 +8611,8 @@ function drawRig(){
       if(b.idx > 0 && !slots_) L = shiftShape(L, PAIR_OFF[0], PAIR_OFF[1]);
       const sh = shellOf(L, pct, pos, +b.L, b.slot);
       defs.push(sh.def);
+      const shp = s && bagShapeOf(pos, L, +b.L, b.slot);
+      if(shp) RIG_OUTLINES[s.key] = { pos, outline:shp.outline };
       const canBump = !removing && (POSITIONS[pos].pairable && !b.pair || pos === 'frame');
       // 1 / 2 / 3 sit inside even the smallest frame bag, so they never
       // fall outside the shape whichever one is selected
@@ -8604,6 +8681,8 @@ function drawRig(){
     if(!spot || own && !bagSpec(own).usable){
       // a cage this bike does not have: the bottle waits in the cupboard, nothing is drawn
     } else if(own){
+      { const a = spot.rot * Math.PI / 180, c = Math.cos(a), n = Math.sin(a);   // the bottle's outline, for the weight map
+        RIG_OUTLINES[own.uid + '-0'] = { pos:own.pos, outline:[[-4.8,-15],[4.8,-15],[4.8,15],[-4.8,15]].map(([x, y]) => [spot.cx + x*c - y*n, spot.cy + x*n + y*c]) }; }
       bart.push(bottleArt(spot, false, +own.L || 0.75, false,
         removing ? ` data-del="${own.uid}"` : (inspecting ? ` data-bottle="${own.uid}"` : ''),
         removing ? 'removable' : (inspecting ? 'inspectable' : '')));
@@ -8616,6 +8695,7 @@ function drawRig(){
   $('rigDefs').innerHTML = defs.join('');
   $('bagLayer').innerHTML = art.join('') + tags.join('');
   $('bottleLayer').innerHTML = bart.join('');
+  drawWeightMap();
 
   /* ---- footer says only what is known at this point ---- */
   const c = tripClimate();

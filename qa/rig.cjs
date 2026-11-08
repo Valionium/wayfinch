@@ -261,5 +261,27 @@ test('[BK-SHAPES-PAGE] the rig draws every bag, empty spot and pair ghost as its
     if(/^bk-/.test(c))assert.ok(list.includes(`'${c}'`),`thumbnails keep ${c}`);
 });
 
+test('[WM-PAGE] the weight map reads the plan as the rig draws it: each packed bag, bottle and the rack deck with its kilos and drawn outline, nothing lost; the button only once the kit is chosen, off by default',()=>{
+  const bike=bikeOf('diamond-sloping','M','drop','47-584');
+  rig(bike,SETS.touring,2,{rack:true});
+  assert.equal(nodes.get('rigWeightMap').hidden,true,'no button before the kit is chosen');
+  for(const [set,bags] of Object.entries(SETS)){
+    rig(bike,bags,3,{rack:true});
+    assert.equal(nodes.get('rigWeightMap').hidden,false,`${set}: the button once the kit is chosen`);
+    assert.equal(nodes.get('weightMap').hidden,true,`${set}: off by default`);
+    const got=json(`(()=>{const i=weightMapInput();const A=currentPlan();
+      const packed=A.slots.reduce((t,s)=>t+(s.items||[]).reduce((u,k)=>u+placedKg(k),0),0)+deckClaims().reduce((t,k)=>t+itemKg(k),0);
+      return {packed,items:i.items.map(x=>({pos:x.pos,kg:x.kg,n:x.outline.length})),ideal:i.ideal,shape:typeof i.shape};})()`);
+    const kg=got.items.reduce((t,x)=>t+x.kg,0);
+    assert.ok(Math.abs(kg-got.packed)<1e-6,`${set}: ${kg} kg on the map, ${got.packed} kg packed`);
+    for(const x of got.items)assert.ok(x.n>=3&&x.kg>0,`${set}: ${x.pos} has an outline and kilos`);
+    assert.equal(got.shape,'function');
+    if(set==='touring'){assert.equal(got.ideal.rack,true,'a plan with panniers has a rack');assert.ok(got.items.length>=3,'the packed bags are on the map');}
+  }
+  // a plan without a rack, deck or panniers: the ideal hangs its 33% in a seat pack
+  rig(bike,SETS.bikepacking,3,{});
+  assert.equal(json('weightMapInput().ideal.rack'),false);
+});
+
 for(const [name,fn] of tests){fn();passed++;console.log('ok',name);}
 console.log(`${passed} rig tests passed`);
