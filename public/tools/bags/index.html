@@ -5729,7 +5729,7 @@ function advisorDrawnName(s, input){
 function advisorShown(s, input){ return { view:advisorBagView(advisorTrialBags(s, input), s.decks, input), moves:advisorMoves(s, input) }; }
 function advisorCardHtml(s, input, i, shown0 = advisorShown(s, input)){
   const tags = s.tags.length ? `<p class="adv-tags">${s.tags.map(htmlEsc).join(' · ')}</p>` : '';
-  const art = bikeDrawing(S.bikeProfile, shown0.view, { theme:bikeTheme(), idPrefix:'adv' + i });
+  const art = bikeDrawing(S.bikeProfile, shown0.view, { theme:bikeTheme(), idPrefix:'adv' + i }, true);
   const moves = shown0.moves, shown = moves.slice(0, 8);
   if(moves.length > shown.length) shown.push(advisorWord('moreMoves', { n:moves.length - shown.length }));
   return `<article class="adv-card" tabindex="0" aria-labelledby="advS${i}"><h5 id="advS${i}">${htmlEsc(advisorWhat(s, input))}</h5>${tags}`
@@ -5747,7 +5747,7 @@ function advisorSuggestionHtml(s, input, i, shown){ return `<li class="adv-sugg"
 function advisorCombosHtml(list, input, key){
   return `<p class="adv-sub" id="advCombo${key}">${advisorWord('comboTitle')}</p><ul class="adv-combos" aria-labelledby="advCombo${key}">`
     + list.map(([s, i, shown]) => {
-      const art = bikeDrawing(S.bikeProfile, shown.view, { theme:bikeTheme(), idPrefix:'advc' + i });
+      const art = bikeDrawing(S.bikeProfile, shown.view, { theme:bikeTheme(), idPrefix:'advc' + i }, true);
       const why = advisorWhy(s, input)[0] || advisorWord('lower');
       const how = shown.moves.length ? (shown.moves.length > 1 ? advisorWord('howMore', { first:shown.moves[0], n:shown.moves.length - 1 }) : shown.moves[0]) : advisorWord('howNone');
       return `<li><button type="button" class="adv-combo" data-card="advS${i}" aria-label="${htmlEsc(advisorDrawnName(s, input))}" aria-describedby="advCw${i} advCh${i}">`
@@ -5804,7 +5804,7 @@ function advisorStylePic(kind, i){
   const items = kind === 'panniers' ? [{ pos:'rack', L:15, pair:true, fill:0 }]
     : kind === 'bags' ? [{ pos:'frame', L:4.5, shape:1, fill:0 }, { pos:'seat', L:10, fill:0 }, { pos:'bar', L:10, fill:0 }]
     : [{ pos:'frame', L:4.5, shape:1, fill:0 }, { pos:'seat', L:10, fill:0 }];
-  const art = bikeDrawing(S.bikeProfile, { items, decks:{ bar:null, rack:null }, bottles:[] }, { theme:bikeTheme(), idPrefix:'advp' + i });
+  const art = bikeDrawing(S.bikeProfile, { items, decks:{ bar:null, rack:null }, bottles:[] }, { theme:bikeTheme(), idPrefix:'advp' + i }, true);
   return art ? `<span class="adv-pic" aria-hidden="true">${art.svg}</span>` : '';
 }
 function advisorStepsHtml(){
@@ -8163,11 +8163,12 @@ function nightsNote(from, to){
 // (RIG_FALLBACK below), so every bag, spot and tap target is still there.
 function bikeModule(){ return window.WayfinchBike || null; }
 function bikeTheme(){ return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; }
-// One bike with a plan's bags in Contract 1's shape ({items, decks, bottles}, or null), as the app draws it.
-function bikeDrawing(profile, view, options){
+// One bike with a plan's bags in Contract 1's shape ({items, decks, bottles}, or null), as the app draws it; `shaped` draws the bags as
+// their real shapes instead (bike.js's shapedArt, design of 8 Nov 2026): the Gear advisor's sketches.
+function bikeDrawing(profile, view, options, shaped){
   const B = bikeModule(); if(!B) return null;
   const bike = B.normaliseBike(profile), spec = B.resolveBikeSpec(bike, view || null);
-  return { ...B.bikeArt(spec, view || null, options || { theme:bikeTheme() }, bike && bike.look && bike.look.paint || null), spec };
+  return { ...B[shaped && B.shapedArt ? 'shapedArt' : 'bikeArt'](spec, view || null, options || { theme:bikeTheme() }, bike && bike.look && bike.look.paint || null), spec };
 }
 
 function inspectMap(){ return INSPECT; }

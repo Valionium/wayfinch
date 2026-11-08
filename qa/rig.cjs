@@ -246,6 +246,13 @@ test('[BK-SHAPES-PAGE] the rig draws every bag, empty spot and pair ghost as its
     }
   }
   assert.ok(groups>500,`${groups} shapes with targets`);
+  // the Gear advisor's sketches draw the bags as shapes too; bikeDrawing without `shaped` stays the app's drawing (C-DRAWING-SET)
+  const view={items:[{pos:'seat',L:12,fill:.5},{pos:'rack',L:20,pair:true,fill:[.5,.5]}],decks:{bar:null,rack:null},bottles:[]};
+  const prof=JSON.stringify(bikeOf('diamond-sloping','M','drop','47-584'));
+  assert.match(run(`bikeDrawing(${prof},${JSON.stringify(view)},{theme:'dark',idPrefix:'q'},true).svg`),/<g class="bk-detail"/);
+  assert.doesNotMatch(run(`bikeDrawing(${prof},${JSON.stringify(view)},{theme:'dark',idPrefix:'q'}).svg`),/bk-detail/);
+  const sketches=(fs.readFileSync(path.join(__dirname,'..','public','tools','bags','index.html'),'utf8').match(/bikeDrawing\(S\.bikeProfile,[^\n]*/g)||[]);
+  assert.ok(sketches.length>=3&&sketches.every(l=>/, true\);/.test(l)),'every advisor sketch asks for the shapes');
   // a saved thumbnail keeps the shapes' own classes
   const src=fs.readFileSync(path.join(__dirname,'..','public','tools','bags','index.html'),'utf8');
   const start=src.indexOf("const drawingClasses = new Set([");const list=src.slice(start,src.indexOf(']);',start));

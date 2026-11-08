@@ -5,7 +5,7 @@ import { bikeArt } from '../../../../src/core/bike/art.ts';
 import type { Anchors, P, Placed } from '../../../../src/core/bike/art.ts';
 import { bagShape, LARGEST, PAIR_OFFSET, sizeFactor } from '../../../../src/core/bike/shapes.ts';
 import { resolveBikeSpec } from '../../../../src/core/bike/spec.ts';
-import { bikeArt as plannerArt } from '../../../../src/core/bike/planner.ts';
+import { bikeArt as plannerBikeArt, shapedArt as plannerArt } from '../../../../src/core/bike/planner.ts';
 import { boundsOf, drawingSet, elements } from './drawing-set.ts';
 
 /** The point turned back by -rot about the box's centre, so it can be compared with the unturned box. */
@@ -138,8 +138,9 @@ describe("the bag planner's drawing (bike.js)", () => {
         const b = el.tag === 'clipPath' ? null : boundsOf(el);
         if (b && el.tag !== 'path') { expect(b.x0, e.name).toBeGreaterThanOrEqual(-0.01); expect(b.x1, e.name).toBeLessThanOrEqual(320.01); }
       }
-      // the co-pilot's own drawing keeps its plain boxes: its first screen does not carry the shapes
+      // the co-pilot's own drawing, and bike.js's bikeArt with it (C-DRAWING-SET), keep their boxes: its first screen does not carry the shapes
       expect(bikeArt(resolveBikeSpec(e.bike, e.bags), e.bags).svg, e.name).not.toMatch(/bk-detail/);
+      expect(plannerBikeArt(resolveBikeSpec(e.bike, e.bags), e.bags).svg, e.name).toBe(bikeArt(resolveBikeSpec(e.bike, e.bags), e.bags).svg);
     }
   }, 60_000);
 });

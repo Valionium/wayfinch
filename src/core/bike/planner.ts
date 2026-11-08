@@ -22,12 +22,19 @@ export function withTargets(a: Anchors): PlannerAnchors {
 
 /** The drawing with the bike's look extras, if any (`look.paint` of a normalised bike); without them, bikeArt's own. */
 export function bikeArt(spec: BikeSpec, bags: BagView | null, options: ArtOptions = {}, paint: Paint | null = null): { svg: string; anchors: PlannerAnchors; label: string } {
-  // The bike without its bags, then the plan's bags as their real shapes (bag-art.ts) on top, where bikeArt drew its boxes.
-  const art = paintedArt(spec, bags && { items: [], decks: { bar: null, rack: null }, bottles: [] }, options, paint);
-  const anchors = withTargets(art.anchors);
-  if (!bags) return { ...art, anchors };
+  const art = paintedArt(spec, bags, options, paint);
+  return { ...art, anchors: withTargets(art.anchors) };
+}
+
+/**
+ * The same drawing with the plan's bags as their real shapes (bag-art.ts) where bikeArt draws its boxes: the bag planner's own
+ * sketches (the Gear advisor's). bikeArt stays the co-pilot's drawing byte for byte (C-DRAWING-SET), so its first screen keeps its size.
+ */
+export function shapedArt(spec: BikeSpec, bags: BagView | null, options: ArtOptions = {}, paint: Paint | null = null): { svg: string; anchors: PlannerAnchors; label: string } {
+  const art = bikeArt(spec, bags && { items: [], decks: { bar: null, rack: null }, bottles: [] }, options, paint);
+  if (!bags) return art;
   const end = art.svg.lastIndexOf('</svg>');
-  return { ...art, svg: art.svg.slice(0, end) + bagLayer(bags, anchors, options.theme ?? 'dark', options.idPrefix ?? 'bk') + art.svg.slice(end), anchors };
+  return { ...art, svg: art.svg.slice(0, end) + bagLayer(bags, art.anchors, options.theme ?? 'dark', options.idPrefix ?? 'bk') + art.svg.slice(end) };
 }
 
 export { SWATCHES, nearestSwatchName, oklabMedian } from './colour.ts';
