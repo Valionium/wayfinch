@@ -354,6 +354,20 @@ describe('What the review of PR 73 found', () => {
     expect((await readTrip())!.route.id).toBe(before);
   });
 
+  test('[WIDE-DROP] a dropped GPX whose replace was cancelled is let go: Change on Route later does not ask again', async () => {
+    await withRoute();
+    const zone = host.querySelector<HTMLElement>('[data-trip-drop]')!;
+    const file = new File([await fixtureGpx('loop')], 'loop.gpx');
+    await act(async () => { zone.dispatchEvent(new CustomEvent('filedrop', { detail: file })); });
+    await until(() => host.querySelector('[data-replace]') !== null, 'the question');
+    await click(buttonIn(host.querySelector('[data-replace]')!, W.appTripReplaceCancel));
+    await click(buttonIn(step('bags'), W.appTripStepBags));
+    await click(buttonIn(step('route'), W.appTripStepChange));
+    await until(() => step('route').querySelector('[data-add-route]') !== null, 'Add a route');
+    await settle(100);
+    expect(host.querySelector('[data-replace]')).toBeNull();
+  });
+
   test('[TRIP-STEPS] a step opened from the keyboard takes the focus to its heading, for Bags\' title and for Change on Route', async () => {
     await withRoute();
     const bags = buttonIn(step('bags'), W.appTripStepBags);

@@ -153,16 +153,17 @@ describe('The guided Trip (design of 8 Nov 2026)', () => {
 
 describe('The stops on the height profile (guided Trip design §6)', () => {
   test('[TRIP-STOPS] an icon sits on the profile line: at its km, at the height there, in the profile\'s own box', async () => {
-    const { route } = await routeFromGpx(await fixtureGpx('alpine-pass'), 'ride.gpx', parseXml);
+    const { route: full } = await routeFromGpx(await fixtureGpx('alpine-pass'), 'ride.gpx', parseXml);
+    // At most 120 points, so the line is drawn through every one of them (the drawn line is what an icon sits on: review of PR 73,
+    // M1) and the highest and lowest points are on it: exactly 2 and 70 in the 72 box.
+    const every = Math.ceil(full.points.length / 120);
+    const route = { ...full, points: full.points.filter((_, i) => i % every === 0 || i === full.points.length - 1) };
+    expect(route.points.length).toBeLessThanOrEqual(120);
     const box = profileOf(route)!;
     const top = route.points.reduce((a, b) => (b.ele! > a.ele! ? b : a));
     const low = route.points.reduce((a, b) => (b.ele! < a.ele! ? b : a));
-    // The line is drawn through about 120 of the points (review of PR 73, M1: the icon sits on the line as drawn), so the very top
-    // and bottom points can fall between two drawn ones: the icon is then at most at the box's edges.
-    expect(profileY(route, top.km)).toBeGreaterThanOrEqual(2);
-    expect(profileY(route, top.km)).toBeLessThan(10);
-    expect(profileY(route, low.km)).toBeLessThanOrEqual(70);
-    expect(profileY(route, low.km)).toBeGreaterThan(62);
+    expect(profileY(route, top.km)).toBeCloseTo(2, 0);
+    expect(profileY(route, low.km)).toBeCloseTo(70, 0);
     expect(box.maxM).toBe(Math.round(top.ele!));
     expect(profileY({ ...route, points: route.points.map((p) => ({ ...p, ele: null })) }, 3)).toBeNull();
   });

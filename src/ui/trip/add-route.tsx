@@ -16,10 +16,10 @@ type Found = { route: Route; hadHeights: boolean };
 const PlanAB = lazy(() => import('./plan.tsx').then((m) => m.PlanAB));
 
 /** `onAdded`: a route was added or replaced, with the message that goes on to the next step (owner's item 2). */
-export function AddRoute({ services, snap, reload, onAdded, dropped }: {
+export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken }: {
   services: TripServices; snap: TripSnapshot | null; reload: () => Promise<void>; onAdded: (said: string) => void;
-  /** A file dropped anywhere on Trip (spec 3.8), read as if it had been chosen here. */
-  dropped: File | null;
+  /** A file dropped anywhere on Trip (spec 3.8), read as if it had been chosen here, once: `onDropTaken` lets it go. */
+  dropped: File | null; onDropTaken: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +52,8 @@ export function AddRoute({ services, snap, reload, onAdded, dropped }: {
     await read(input.files?.[0]);
     try { input.value = ''; } catch { /* a file input that won't be cleared */ }
   };
-  useEffect(() => { if (dropped) void read(dropped); }, [dropped]);
+  // Taken once: a replace cancelled now does not come back with the next Change.
+  useEffect(() => { if (dropped) { onDropTaken(); void read(dropped); } }, [dropped]);
 
   const read = async (file: File | undefined): Promise<void> => {
     setError(null);

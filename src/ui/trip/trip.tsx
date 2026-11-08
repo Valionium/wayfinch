@@ -162,7 +162,7 @@ export function TripScreen({ services }: { services: TripServices }) {
             name="route" n={1} title={W.appTripStepRoute} state={stateOf('route', trip !== null)} open={openStep === 'route'} canOpen onOpen={choose('route')}
             line={trip ? routeDoneLine(trip) : null} below={snap ? <TripDetails services={services} snap={snap} reload={reload} /> : null}
           >
-            <AddRoute services={services} snap={snap} reload={reload} dropped={dropped} onAdded={(said) => { setAdded(said); setDropped(null); setChosen(null); }} />
+            <AddRoute services={services} snap={snap} reload={reload} dropped={dropped} onDropTaken={() => setDropped(null)} onAdded={(said) => { setAdded(said); setChosen(null); }} />
             {snap?.trip ? <TripSettings services={services} snap={snap} reload={reload} part="when" /> : null}
           </Step>
           <Step
