@@ -15,7 +15,6 @@ import { zoneLookupOf } from '../core/engines/tripday.ts';
 import { waterNow } from '../core/engines/water.ts';
 import { thunderNear } from '../core/engines/shelter.ts';
 import { buildScreen } from '../core/screen/screen.ts';
-import type { Screen } from '../core/screen/screen.ts';
 import type { Km, Position, Route, ScreenInputs } from '../core/types.ts';
 import { showKm, W } from '../core/wording/en.ts';
 import { checkConnectivity } from '../data/connectivity.ts';
@@ -25,6 +24,7 @@ import { announceHere, onChanged } from '../store/changed.ts';
 import { keepAfterScreen, readInputs } from '../store/inputs.ts';
 import { addPosition, backToToday, confirmWater, setPlanTomorrow } from '../store/positions.ts';
 import { readMapLink, writeMapLink } from '../store/share-choice.ts';
+import { readPrepared } from '../store/prepared.ts';
 import { weatherStore } from '../store/weather.ts';
 import type { AheadActions, AheadTrip, AheadView, PositionState, Town } from './ahead/actions.ts';
 import { bikeSource } from './bike/live.ts';
@@ -33,6 +33,7 @@ import { isFailure, locateFix, manualAt, onPass, ROUTINE, watchBest } from './po
 import type { Failure } from './position.ts';
 import { agoText } from './trip/model.ts';
 import { whileVisible } from './screen-clock.ts';
+import type { Prepare } from './trip/run.tsx';
 
 const APPROXIMATE_HELP_M = 1000; // section 9.2: worse than about 1 km usually means approximate location only
 const SHARE_OLD_MS = 30 * 60_000; // section 6.14
@@ -47,9 +48,11 @@ export type AheadDeps = {
   fetch: typeof fetch;
   share: ((data: { text: string }) => Promise<void>) | null;
   writeClipboard: ((text: string) => Promise<void>) | null;
+  /** Get ready offline, as Trip runs it (src/ui/trip/services.ts); absent, Ahead's button reports that nothing was saved. */
+  prepare?: Prepare;
 };
 
-function browserDeps(): AheadDeps {
+export function browserDeps(): AheadDeps {
   const nav = typeof navigator === 'undefined' ? undefined : navigator;
   return {
     now: () => new Date(),
@@ -65,7 +68,7 @@ const FAILURE_TEXT: Record<Failure['kind'], string> = {
   denied: W.appAheadDenied, unavailable: W.appAheadNoFix, timeout: W.appAheadNoFix, unsupported: W.appAheadNoGeo,
 };
 type HereWords = typeof import('../core/wording/en-here.ts').H;
-type AskWords = typeof import('../core/wording/en-ask.ts').A;
+type AskWords = typeof import('./ask-swap.ts');
 /** With no route there is no setting it by hand: each says what to do instead (its words load on the tap, review of PR 53, M6). */
 const hereFailure = (h: HereWords, kind: Failure['kind']): string =>
   kind === 'denied' ? h.hereDenied : kind === 'timeout' ? h.hereTimeout : kind === 'unavailable' ? h.hereNoFix : W.appAheadNoGeo;
@@ -73,18 +76,6 @@ const hereFailure = (h: HereWords, kind: Failure['kind']): string =>
 const usableFix = (f: Fix): boolean => Math.abs(f.lat) <= 90 && Math.abs(f.lon) <= 180 && !(Math.abs(f.lat) < 5e-6 && Math.abs(f.lon) < 5e-6);
 /** A fix as it came, on no route kilometre: Emergency's own view of it. With no route its distance off one is unknown (NaN). */
 const asCame = (f: Fix, offRouteM = NaN): Position => ({ ...f, km: NaN, offRouteM, source: 'gps', approximate: !(f.accuracyM <= APPROXIMATE_HELP_M) });
-
-const escaped = (t: string): string => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-/**
- * While Ahead asks which pass, no line of the screen says "No position yet": a position was found and waits for the rider's answer
- * (after the launch, 7 Nov 2026). The notes, and the help chips' "measured from km …" (review of PR 65, M1).
- */
-function whileAsking(s: Screen, words: AskWords): void {
-  s.notes = s.notes.map((n) => (n === W.routeNoPositionFromStart ? words.askPassFromStart : n));
-  const [before, after] = W.helpFromNoPosition('\u0000').split('\u0000') as [string, string];
-  const said = new RegExp(`${escaped(before)}(.+?)${escaped(after)}(?= |$)`);
-  for (const chip of Object.values(s.chips)) chip.detail = chip.detail.replace(said, (_, km: string) => words.askPassMeasuredFrom(km));
-}
 
 /** The settlements the route passes, in route order: the manual picker's towns. */
 function townsOf(i: ScreenInputs): Town[] {
@@ -126,6 +117,8 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
   let reading = 0;
   // With no route: the fix Emergency's Update position found, for this page only. Positions are kept on a route, so it is not stored.
   let here: Position | null = null;
+  // What the last Get ready offline did not save, read with the inputs.
+  let failedSteps: AheadTrip['failedSteps'] = [];
 
   // One write at a time, as on Trip: the store refuses a write over a version this window has not read.
   let queue: Promise<unknown> = Promise.resolve();
@@ -152,7 +145,8 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
           thunderNear: thunderNear(built.parts.stop),
         });
       } catch { /* the stored position's card stays */ }
-      if (askWords) whileAsking(s, askWords);
+      // While Ahead asks which pass, no line of the screen says "No position yet" (ask-swap.ts, loaded with the tap).
+      if (askWords) askWords.whileAsking(s);
     }
     let stillAboutL: number | null = null;
     try {
@@ -175,6 +169,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       bike: bikeSource.peek().bike, stillAboutL, badSpeed: !usableFlatKph(i.trip.flatKph),
       approximateHelp: p !== null && p.source === 'gps' && !(p.accuracyM <= APPROXIMATE_HELP_M),
       shareOld, mapLink: readMapLink(), canShare: deps.share !== null, position, weatherSay, weatherBusy, notice,
+      beforeReady: i.places.length === 0 && i.savedKm.length === 0 && i.forecast === null, failedSteps,
     };
     view.value = next;
     noteRoute(true);
@@ -222,6 +217,8 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     try {
       // A read never makes the database: with none (a fresh phone, or just deleted) there is no trip.
       read = await readInputs(at);
+      // Only once there is a trip (and so a database): a read never makes one.
+      failedSteps = read ? ((await readPrepared().catch(() => null))?.steps.filter((s) => !s.ok) ?? []) : [];
     } catch {
       read = null;
       failed = true;
@@ -276,14 +273,17 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
   const actions: AheadActions = {
     async updatePosition() {
       if (position.kind === 'watching') return false;
+      // A question still open goes with this tap, and the screen built with its words at once (re-check of PR 65, R1).
+      const asking = pendingFix !== null;
       pendingFix = null;
       pendingKm = null;
       const alone = view.peek().kind !== 'trip';
       const words = alone ? import('../core/wording/en-here.ts').then((m) => m.H, () => null) : null;
       // The which-pass question's words load meanwhile, from the phone itself: the first screen does not carry them. Also with no
       // route on screen, since one may be added in another window while the phone is looking.
-      const ask = import('../core/wording/en-ask.ts').then((m) => m.A, () => null);
+      const ask = import('./ask-swap.ts').then((m) => m, () => null);
       say({ kind: 'watching' });
+      if (asking) freshen();
       const fix = await watchBest(ROUTINE, deps.geolocation());
       if (isFailure(fix)) {
         const h = await words;
@@ -326,7 +326,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
         }
         askWords = words;
         const [a, b] = found.options.map((km) => showKm(km)) as [string, string];
-        position = { kind: 'ask', question: words.askPass(a, b), options: found.options.map((km) => ({ km, text: words.askPassKm(showKm(km)) })) };
+        position = { kind: 'ask', question: words.A.askPass(a, b), options: found.options.map((km) => ({ km, text: words.A.askPassKm(showKm(km)) })) };
         present({ ...now, now: deps.now() });
         return false;
       }
@@ -442,6 +442,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     // No recipient: the rider picks one in the SMS app. "?&body=" is the form both iPhone and Android open.
     smsHref: (text) => `sms:?&body=${encodeURIComponent(text)}`,
     freshen,
+    getReady: (onProgress, onNotice) => (deps.prepare ? deps.prepare(onProgress, onNotice) : Promise.reject(new Error('no Get ready offline here'))),
   };
 
   return {

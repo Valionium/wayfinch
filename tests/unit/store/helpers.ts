@@ -21,6 +21,7 @@ class MemoryStorage {
   clear(): void { this.items.clear(); }
 }
 globalThis.localStorage = new MemoryStorage() as unknown as Storage;
+globalThis.sessionStorage = new MemoryStorage() as unknown as Storage;
 
 /** Every key and value, in key order. */
 export function dumpStorage(): string {

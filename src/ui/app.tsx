@@ -4,7 +4,7 @@ import { useEffect, useState } from 'preact/hooks';
 import type { FunctionComponent } from 'preact';
 import { W } from '../core/wording/en.ts';
 import { AheadScreen } from './ahead/ahead.tsx';
-import { browserAhead } from './shell-actions.ts';
+import { browserAhead, browserDeps } from './shell-actions.ts';
 import { browserServices } from '../tools/tyre/services.ts';
 import { lazy } from './lazy.tsx';
 import { movedCardDue } from './moved-due.ts';
@@ -30,11 +30,12 @@ const TyreScreen = lazy(() => import('../tools/tyre/ui.tsx').then((m) => m.TyreS
 // (bag-card.tsx), so the bike is drawn when the page is revealed and glides back from the bag planner (LC-GLIDE).
 const ToolsScreen = lazy(() => import('./tools/tools.tsx').then((m) => m.ToolsScreen), ToolsFirst);
 const YouHost = lazy(() => import('./you/host.tsx').then((m) => m.YouHost));
-const tripServices = browserTripServices();
 
 // A tool address with ?bike=<id> chooses that saved bike once, then leaves the plain address (bike-link.ts, a chunk of its own).
 const takeBikeLink = (): void => { if (/\?bike=/.test(location.hash)) void import('./tools/bike-link.ts').then((m) => m.takeBikeLink(), () => undefined); };
-export const aheadShell = browserAhead();
+const tripServices = browserTripServices();
+// Ahead's Get ready offline is Trip's very own (AH-BEFORE-READY).
+export const aheadShell = browserAhead({ ...browserDeps(), prepare: (onProgress, onNotice) => tripServices.prepare(onProgress, onNotice) });
 
 
 // A file dropped on the window never opens or downloads; on Trip and You it goes to the screen's own file input (spec 3.8).

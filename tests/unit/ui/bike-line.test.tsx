@@ -4,6 +4,7 @@ import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { W } from '../../../src/core/wording/en.ts';
 import { T } from '../../../src/core/wording/en-tyre.ts';
+import { TL } from '../../../src/core/wording/en-tools.ts';
 import { readHost } from '../../../src/tools/tyre/host.ts';
 import { savedBikeIds, toolBike } from '../../../src/tools/tyre/choice.ts';
 import type { KeyValueStore } from '../../../src/tools/tyre/storage.ts';
@@ -12,6 +13,7 @@ import type { TyreServices } from '../../../src/tools/tyre/ui.tsx';
 import { go } from '../../../src/ui/nav.ts';
 import { BIKE_CHOICE_KEY, noteBikeChoice } from '../../../src/ui/tools/bike-choice.ts';
 import { ToolsScreen } from '../../../src/ui/tools/tools.tsx';
+import { ToolsFirst } from '../../../src/ui/tools/bag-card.tsx';
 import { refreshBikeSource } from '../../../src/ui/bike/live.ts';
 
 const NOW = new Date('2026-11-07T10:00:00Z');
@@ -80,9 +82,8 @@ describe('the choice, resolved', () => {
     expect(lineSelect()!.value).toBe('bike_b');
     mem.data.set('loadcheck:bikeProfiles', JSON.stringify([A]));
     await act(() => { window.dispatchEvent(new StorageEvent('storage', { key: 'loadcheck:bikeProfiles' })); });
-    // One bike left, and it is the plan's: shown as text, the removed bike gone, nothing thrown.
-    expect(lineSelect()).toBeNull();
-    expect(line()!.textContent).toBe(`${W.tyreBikeLabel}: Trail Bike`);
+    // One bike left, and it is the plan's: still a select (with Without a bike), the removed bike gone, nothing thrown.
+    expect(options(lineSelect()!)).toEqual(['Trail Bike' + W.tyreBikeInPlan, T.tyreBikeWithout]);
     expect(host.textContent).not.toContain('Gravel');
   });
 
@@ -113,13 +114,17 @@ describe('the choice, resolved', () => {
 });
 
 describe('the bike line in Tools', () => {
-  test('[TB-LINE] no bike: no line; one: its name as text; three: a select labelled Bike with three bikes and No bike, the current one selected', async () => {
+  test('[TB-LINE] no bike: no line; one: the select too, so Without a bike can be picked; three: a select labelled Bike with three bikes and No bike, the current one selected', async () => {
     await mountTools(world([], null));
     expect(line()).toBeNull();
     render(null, host);
     await mountTools(world([A], A));
-    expect(line()!.textContent).toBe(`${W.tyreBikeLabel}: Trail Bike`);
-    expect(lineSelect()).toBeNull();
+    expect(options(lineSelect()!)).toEqual(['Trail Bike' + W.tyreBikeInPlan, T.tyreBikeWithout]);
+    expect(lineSelect()!.value).toBe('bike_a');
+    await pickIn(lineSelect()!, 'default');
+    expect(lineSelect()!.value).toBe('default');
+    await pickIn(lineSelect()!, 'bike_a');
+    expect(lineSelect()!.value).toBe('bike_a');
     render(null, host);
     const mem = world([A, B, C], A, choice('bike_c'));
     await mountTools(mem);
@@ -335,8 +340,70 @@ describe('the Bag planner card draws the chosen bike (owner, 7 Nov 2026)', () =>
     render(null, host);
     await act(() => { render(<ToolsScreen services={{ host: () => readHost(page, () => null), storage: page, now: () => NOW }} />, host); });
     expect(cardLabel()).toContain('red frame');
-    // "No bike" changes nothing in the bag planner (TB-PAGE-FOLLOWS), so the card keeps the plan's bike.
-    await pickIn(lineSelect()!, 'default');
+    // "Without a bike" (owner, 7 Nov 2026) is followed by the bag planner too (TB-PAGE-NO-BIKE): the card shows the grey standard bike, so
+    // it has its own test below.
+  });
+
+  // Re-check of PR 65, R3: the first screen's card (shown while the Tools chunk loads, the drawing the bike glides back onto) draws the bike
+  // the full screen drew last in this tab, while the plan is still the one it was drawn beside: no pink first, then red.
+  test("[TB-CARD-BIKE] back on Tools, the first screen's card draws the chosen bike the full screen drew last, not the plan's; once the plan has changed, the plan's", async () => {
+    const svc = { host: () => readHost(page, () => null), storage: page, now: () => NOW };
+    await act(() => { render(<ToolsScreen services={svc} />, host); });
+    await pickIn(lineSelect()!, 'bike_red');
+    expect(cardLabel()).toContain('red frame');
+    // the page again (the way back from the bag planner): the first screen alone, before the chunk
+    render(null, host);
+    refreshBikeSource();
+    await act(() => { render(<ToolsFirst services={svc} />, host); });
+    expect(cardLabel()).toContain('red frame');
+    // the plan moved meanwhile (the bag planner followed, or the rider chose there): the plan's bike, as before
+    render(null, host);
+    localStorage.setItem('loadcheck:bikeProfile', JSON.stringify(RED));
+    refreshBikeSource();
+    await act(() => { render(<ToolsFirst services={svc} />, host); });
+    expect(cardLabel()).toContain('red frame');
+    render(null, host);
+    localStorage.setItem('loadcheck:bikeProfile', JSON.stringify(PINK));
+    sessionStorage.setItem('wf:toolsBike', JSON.stringify(['bike_red', 'bike_red']));
+    refreshBikeSource();
+    await act(() => { render(<ToolsFirst services={svc} />, host); });
     expect(cardLabel()).toContain('pink frame');
+    // a broken value, or a bike no longer saved: the plan's bike
+    for (const v of ['{', '"x"', JSON.stringify(['bike_gone', 'bike_pink'])]) {
+      render(null, host);
+      sessionStorage.setItem('wf:toolsBike', v);
+      await act(() => { render(<ToolsFirst services={svc} />, host); });
+      expect(cardLabel(), v).toContain('pink frame');
+    }
+    sessionStorage.clear();
+  });
+
+  const cardOf = () => [...host.querySelectorAll('section')].find((s) => s.querySelector('h2')?.textContent === W.tyreBagCardTitle)!;
+  test('[TB-PAGE-NO-BIKE] "Without a bike" in the bike line: the card draws the grey standard bike and says the Bag planner uses it; nothing of the plan is written', async () => {
+    await act(() => { render(<ToolsScreen services={{ host: () => readHost(page, () => null), storage: page, now: () => NOW }} />, host); });
+    expect(cardLabel()).toContain('pink frame');
+    expect(cardOf().querySelector('.tools-no-bike')).toBeNull();
+    const plan = planKeys();
+    await pickIn(lineSelect()!, 'default');
+    expect(cardLabel()).not.toContain('pink');
+    expect(cardOf().querySelector('.bike-art')!.innerHTML).not.toMatch(/stroke="#(d6619b|c62f2a)"/);
+    expect(cardOf().querySelector('.tools-no-bike')?.textContent).toBe(TL.toolsNoBike);
+    expect(TL.toolsNoBike).toBe('No bike chosen. The Bag planner uses a standard bike.');
+    expect(planKeys()).toBe(plan);
+    // a saved bike picked again: its drawing, and the line is gone
+    await pickIn(lineSelect()!, 'bike_red');
+    expect(cardLabel()).toContain('red frame');
+    expect(cardOf().querySelector('.tools-no-bike')).toBeNull();
+  });
+
+  test("[TB-PAGE-NO-BIKE] a plan-only bike is never replaced by the bag planner, so with it the card keeps the plan's bike and says nothing", async () => {
+    const MINE = paint(mk('bike_mine', 'My bike'), '#d6619b');
+    localStorage.setItem('loadcheck:bikeProfile', JSON.stringify(MINE));
+    localStorage.setItem('loadcheck:summary:v1', summary('bike_mine'));
+    localStorage.setItem(BIKE_CHOICE_KEY, JSON.stringify({ app: 'copilot', kind: 'bike-choice', v: 1, bikeId: null, at: '2026-11-07T09:00:00.000Z' }));
+    refreshBikeSource();
+    await act(() => { render(<ToolsScreen services={{ host: () => readHost(page, () => null), storage: page, now: () => NOW }} />, host); });
+    expect(cardLabel()).toContain('pink frame');
+    expect(cardOf().querySelector('.tools-no-bike')).toBeNull();
   });
 });

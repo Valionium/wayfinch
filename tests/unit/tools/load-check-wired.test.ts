@@ -13,7 +13,7 @@ test("[LC-PAGE-LIVE] the page's hash is the one recorded", () => {
   // The tag load-check-zip-2026-10-30 holds the page as it was live (aa086001…). Since then: the top-tube wording and the update prompt.
   // Sub-project 6 changes the bag planner behind the launch switch (bike.js, the rig, Look); riders keep releases/load-check-root.html
   // (LC-ROOT-FROZEN), so each change here is on purpose and recorded.
-  const recorded = 'a071cbde3e8b89ade35157911fac34cfbc6dfa62d29a701ae7ab1008936def7b';   // + trial bags and the way in (sub-project 13, group 3; review of PR 68 fixed), merged with main's chosen bike (sub-project 11, group 3); before them the Gear advisor: the owner's answers of 7 Nov (setup step, Minimal and Looking ahead, singles and pairs, the rack deck)
+  const recorded = 'bf63576111b10f575e15c66496fb18eadb312350169249213507003c0c2d53c1';   // + the Gear advisor (sub-project 13, groups 1-3: trial bags and the way in, review of PR 68 fixed) merged with main's after the launch, part 3 (the fork close-up stays under the drawing, the short pair-shade label)
   expect(createHash('sha256').update(readFileSync(PAGE)).digest('hex')).toBe(recorded);
 });
 

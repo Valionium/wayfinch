@@ -504,10 +504,10 @@ test('[LC-LOOK-FORK] a preset\'s colours that are not swatches show in each row 
   open(p);
   const own=row=>({value:p.run(`document.getElementById('${row}OwnInput').value`),name:p.run(`document.getElementById('${row}OwnName').textContent`)});
   p.run('renderLookChoices()');
-  const named=hex=>({'#5f8fd0':"Blue, the pair's own shade",'#7a4fb0':"Purple, the pair's own shade"})[hex];
+  const named=hex=>({'#5f8fd0':{name:'Blue (pair)'},'#7a4fb0':{name:'Purple (pair)'}})[hex];   // owner, 8 Nov: short to see (the full name is the input's aria-label, tested in the e2e)
   p.run("lookForkChange('lookFork','fade')");
-  assert.deepEqual(own('lookForkFrom'),{value:'#5f8fd0',name:named('#5f8fd0')},'Blue to purple: its first colour');
-  assert.deepEqual(own('lookForkTo'),{value:'#7a4fb0',name:named('#7a4fb0')},'and its second');
+  assert.deepEqual(own('lookForkFrom'),{value:'#5f8fd0',...named('#5f8fd0')},'Blue to purple: its first colour');
+  assert.deepEqual(own('lookForkTo'),{value:'#7a4fb0',...named('#7a4fb0')},'and its second');
   assert.match(p.html,/id="lookForkFrom" role="radiogroup"/);
   for(const row of ['lookForkFrom','lookForkTo']){
     const html=p.run(`document.getElementById('${row}').innerHTML`);

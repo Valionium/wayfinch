@@ -49,16 +49,17 @@ test('[WIDE-DROP] [APP-SCREENS-FULL] on #/you/legal a dropped file goes to You\'
   expect(zoneInput(document, 'you/legal')).toBe(document.getElementById('you'));
 });
 
-test('[WIDE-DROP] a file dropped on You goes to the screen\'s file input, on Trip to Add a route\'s, and on Ahead nowhere', () => {
-  document.body.innerHTML = '<main class="screen" data-screen="you"><input type="file" id="you"></main><div data-add-route><input type="file" id="trip"></div>';
+test('[WIDE-DROP] a file dropped on You goes to the screen\'s file input, on Trip to Trip itself, which opens the Route step with it, and on Ahead nowhere', () => {
+  document.body.innerHTML = '<main class="screen" data-screen="you"><input type="file" id="you"></main><div class="trip" id="trip" data-trip-drop></div>';
   const you = document.getElementById('you') as HTMLInputElement;
-  const trip = document.getElementById('trip') as HTMLInputElement;
+  const trip = document.getElementById('trip') as HTMLElement;
   const got: string[] = [];
   vi.stubGlobal('DataTransfer', class { items = { add: (f: File) => { got.push(f.name); } }; files = []; });
-  for (const input of [you, trip]) Object.defineProperty(input, 'files', { configurable: true, set: () => undefined });
+  Object.defineProperty(you, 'files', { configurable: true, set: () => undefined });
   const change = vi.fn();
   you.addEventListener('change', change);
-  trip.addEventListener('change', change);
+  // Trip takes the file as a filedrop event, which opens its Route step (review of PR 73, I3).
+  trip.addEventListener('filedrop', (e) => { got.push((e as CustomEvent<File>).detail.name); change(); });
   let screen: 'you' | 'trip' | 'ahead' = 'you';
   expect(zoneInput(document, 'you')).toBe(you);
   expect(zoneInput(document, 'trip')).toBe(trip);
