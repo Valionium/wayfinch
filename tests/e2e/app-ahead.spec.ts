@@ -448,7 +448,7 @@ test('[AH-BEFORE-READY] on the real site, Ahead’s Get ready offline saves the 
   await servePack(page, 'heidelberg-strasbourg');
   await page.goto(`${app.origin}/#/ahead`);
   const card = page.locator('[data-need-ready]');
-  await expect(card).toContainText('Ahead needs Get ready offline');
+  await expect(card).toContainText('En route needs Get ready offline');
   await expect(page.locator('[data-card="water"]')).toContainText('After Get ready offline');
   await card.getByRole('button', { name: 'Get ready offline' }).click();
   await expect(page.locator('[data-card="water"] .ah-toggle')).toBeVisible({ timeout: 120_000 });

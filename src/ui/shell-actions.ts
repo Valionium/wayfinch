@@ -163,9 +163,10 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
         shareOld = null;
       }
     }
-    const dayOne = i.trip.departureDate === null || s.phase === 'before-trip' || (s.ride.date === i.trip.departureDate && s.ride.startKm === 0);
     const next: AheadTrip = {
-      kind: 'trip', screen: s, answers: s.positionLine !== null || dayOne, lengthKm: i.trip.route.lengthKm, towns: townsOf(i),
+      // With no position the answers show all the same, from where screen() plans (owner's preview check, 8 Nov 2026, item K: no
+      // position choice is needed just to see the route); the strip's bike says the position is not confirmed.
+      kind: 'trip', screen: s, answers: true, lengthKm: i.trip.route.lengthKm, towns: townsOf(i),
       bike: bikeSource.peek().bike, stillAboutL, badSpeed: !usableFlatKph(i.trip.flatKph),
       approximateHelp: p !== null && p.source === 'gps' && !(p.accuracyM <= APPROXIMATE_HELP_M),
       shareOld, mapLink: readMapLink(), canShare: deps.share !== null, position, weatherSay, weatherBusy, notice,

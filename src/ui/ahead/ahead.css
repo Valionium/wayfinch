@@ -102,3 +102,10 @@
 .ah-need-title { font-family: var(--font-display); font-size: 1.25rem; margin: 0 0 4px; }
 .ah-later { border-left-color: var(--line); border-style: dashed; border-left-style: solid; padding-top: 8px; padding-bottom: 8px; }
 .ah-later p { margin: 0; }
+/* The Emergency link at the top (owner's preview check, 8 Nov 2026, item B): a 44 px target in Emergency's own colour, to the right. */
+.ah-emergency-jump { display: flex; justify-content: flex-end; margin: 0 0 8px; }
+.ah-emergency-top { min-height: 44px; padding: 0 14px; border: 1px solid var(--red); border-radius: 22px; background: var(--ground); color: var(--red); font: inherit; font-weight: 600; cursor: pointer; }
+/* No position kept yet (item K): the bike at the strip's start, faded and grey, until the rider confirms where they are. */
+.bike-marker-unconfirmed { opacity: 0.45; filter: grayscale(1); }
+/* With no route (item M): what the tab will show, and the way to a route. */
+.ah-empty { max-width: 34rem; }

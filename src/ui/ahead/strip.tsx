@@ -134,12 +134,14 @@ function Ruler({ strip, onSet }: { strip: Strip; onSet: (km: number) => void }) 
   );
 }
 
-export function RouteStrip({ strip, bike, onOpen, onSetPosition, stopsLater = false }: {
+export function RouteStrip({ strip, bike, onOpen, onSetPosition, stopsLater = false, unconfirmed = false }: {
   strip: Strip; bike: BikeRecord | null; onOpen: (card: CardName) => void;
   /** Given only on a computer: the ruler, with the keys along the strip (spec 3.8). */
   onSetPosition?: (km: number) => void;
   /** Before Get ready offline: the line and the bike, no icons, and why (AH-BEFORE-READY). */
   stopsLater?: boolean;
+  /** No position is kept yet: the bike is drawn faded, and says so in words, until the rider confirms one (item K). */
+  unconfirmed?: boolean;
 }) {
   // The track's width decides which icons share a row; before it is measured, a phone's width is assumed.
   const track = useRef<HTMLDivElement>(null);
@@ -158,7 +160,8 @@ export function RouteStrip({ strip, bike, onOpen, onSetPosition, stopsLater = fa
         <span class="ah-strip-end">{strip.endText}</span>
       </div>
       <div class="ah-strip-body">
-        <BikeMarker bike={bike} />
+        <BikeMarker bike={bike} unconfirmed={unconfirmed} />
+        {unconfirmed ? <span class="visually-hidden">{W.appAheadBikeUnconfirmed}</span> : null}
         <div class="ah-strip-track" ref={track}>
           <div class="ah-strip-line" />
           <div class="ah-strip-bands">

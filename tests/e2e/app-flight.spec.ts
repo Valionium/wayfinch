@@ -68,7 +68,7 @@ async function riderPrepares(page: Page): Promise<void> {
 }
 
 const SCREENS = [
-  { hash: '#/trip', h1: 'Trip' }, { hash: '#/ahead', h1: 'Ahead' }, { hash: '#/tools', h1: 'Tools' },
+  { hash: '#/trip', h1: 'Trip' }, { hash: '#/ahead', h1: 'En route' }, { hash: '#/tools', h1: 'Tools' },
   { hash: '#/tools/tyre', h1: 'Tools' }, { hash: '#/you', h1: 'You' },
 ] as const;
 
@@ -130,7 +130,7 @@ test('[FLOW-INSTALL-OFFLINE] as an installed app (standalone), offline: every ta
   await goOffline(page);
   await page.reload({ waitUntil: 'domcontentloaded' });
   const origin = new URL(app!.origin).origin;
-  for (const tab of ['Ahead', 'Trip', 'Tools', 'You']) {
+  for (const tab of ['En route', 'Trip', 'Tools', 'You']) {
     await page.locator('nav.tabs').getByRole('link', { name: tab }).click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(tab);
     // A link of the site stays in this window; one to anywhere else opens outside the app, never in its place.

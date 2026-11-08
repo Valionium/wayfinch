@@ -57,7 +57,7 @@ test('[TRIP-FIRST] with a running trip (prepared, departing today) the app opens
     await db.put('meta', { at: new Date(), steps: [], build: null, forecastFetchedAt: null, baselineYears: null }, 'route:preparedSteps');
   });
   await page.goto(`${app.origin}/`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Ahead');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('En route');
   await page.goto(`${app.origin}/#/trip`, { waitUntil: 'domcontentloaded' });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Trip');

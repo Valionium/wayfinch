@@ -20,7 +20,7 @@ export type Town = { name: string; km: Km };
 export type AheadTrip = {
   kind: 'trip';
   screen: Screen;
-  /** False only while no position exists and no day-1 plan applies (AH-FIRST-USE): then only the button and the picker. */
+  /** True for every trip since the owner's item K (8 Nov 2026): with no position the answers show from where screen() plans. */
   answers: boolean;
   lengthKm: Km;
   towns: Town[];

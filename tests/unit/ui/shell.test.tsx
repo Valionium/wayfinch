@@ -168,7 +168,8 @@ test('the shell opens on Trip with no trip, shows four labelled tabs, and follow
   render(<App />, host);
   expect(host.querySelector('h1')?.textContent).toBe('Trip');
   const tabs = [...host.querySelectorAll('nav.tabs a')].map((a) => a.textContent);
-  expect(tabs).toEqual(['Ahead', 'Trip', 'Tools', 'You']);
+  // The first tab is called En route (owner, 8 Nov 2026, item M); its address stays #/ahead.
+  expect(tabs).toEqual(['En route', 'Trip', 'Tools', 'You']);
   expect(host.querySelector('nav.tabs a[aria-current="page"]')?.textContent).toBe('Trip');
   await act(async () => { go('tools/tyre'); });
   expect(host.querySelector('nav.tabs a[aria-current="page"]')?.textContent).toBe('Tools');

@@ -72,6 +72,9 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
     setChip(c);
     if (c) focusLater(`chip-${c}`);
   };
+  // The Emergency link at the top (owner's preview check, 8 Nov 2026, item B) jumps to the Emergency chip at the bottom and opens
+  // it; a second tap keeps it open: it is a way there, not a switch.
+  const jump = <EmergencyJump onJump={() => openChip('emergency')} />;
 
   // Esc collapses the card the focus is in, and puts the focus on its title (spec 3.8).
   const onKeyDown = (e: KeyboardEvent): void => {
@@ -95,6 +98,7 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
   return (
     <div class="ahead" data-ahead={v.answers ? 'answers' : 'first-use'} onKeyDown={onKeyDown}>
       <div class="ah-main">
+        {jump}
         {v.beforeReady ? need : null}
         {v.notice ? <p class="notice" role="status">{v.notice}</p> : null}
         {v.answers ? <PositionLine v={v} onShare={() => { actions.freshen(); setSharing(true); }} /> : <p>{W.appAheadFirstUse}</p>}
@@ -109,7 +113,10 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
           <>
             {s.notes.length > 0 ? <ul class="ah-notes notice">{s.notes.map((n, i) => <li key={i}>{n}</li>)}</ul> : null}
             {v.badSpeed ? <p class="notice"><a href="#/trip">{W.appAheadSpeedLink}</a></p> : null}
-            <RouteStrip strip={s.strip} bike={v.bike} onOpen={openCard} onSetPosition={rail ? (km) => void actions.setManual(km) : undefined} stopsLater={v.beforeReady} />
+            <RouteStrip
+              strip={s.strip} bike={v.bike} onOpen={openCard} onSetPosition={rail ? (km) => void actions.setManual(km) : undefined} stopsLater={v.beforeReady}
+              unconfirmed={s.positionLine === null}
+            />
           </>
         ) : null}
         {v.beforeReady ? null : need}
@@ -124,13 +131,25 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
   );
 }
 
+/** The link at the top of En route that opens Emergency at the bottom (item B). Not an address: the tabs own the hash. */
+function EmergencyJump({ onJump }: { onJump: () => void }) {
+  return (
+    <p class="ah-emergency-jump">
+      <button type="button" class="ah-emergency-top" data-emergency-top aria-controls="chip-emergency" onClick={onJump}>
+        {W.appAheadEmergencyTop}<span aria-hidden="true"> ↓</span>
+      </button>
+    </p>
+  );
+}
+
 /** The cards that need what Get ready offline saves; Daylight and Climbing are worked out from the route alone. */
 const AFTER_READY: ReadonlySet<CardName> = new Set(['water', 'food', 'weather', 'sleep']);
 const NONE: ReadonlySet<CardName> = new Set();
 
 export function AheadScreen({ view, actions }: { view: AheadView; actions: AheadActions }) {
   if (view.kind === 'loading') return <div class="ahead" aria-busy="true" />;
-  // With no route the shell's notice says "Add a route to see what's ahead"; there is no demo in the first version.
+  // With no route the shell's notice says "Add a route to see what's ahead", and the empty state what En route will show; there is
+  // no demo in the first version.
   if (view.kind === 'no-route' || view.kind === 'unreadable') return <NoRoute view={view} actions={actions} />;
   return <TripAhead v={view} actions={actions} />;
 }
@@ -144,7 +163,13 @@ function NoRoute({ view, actions }: { view: Extract<AheadView, { kind: 'no-route
           <p class="notice" role="alert">{W.appAheadUnreadable}</p>
           <p><button type="button" class="btn btn-primary" onClick={() => void actions.retry()}>{W.appAheadRetry}</button></p>
         </>
-      ) : <p><a class="btn btn-primary" href="#/trip">{W.appAheadToTrip}</a></p>}
+      ) : (
+        // With no route the tab says what it will show, and where a route comes from (owner, 8 Nov 2026, item M).
+        <div class="ah-empty" data-ahead-empty>
+          <p>{W.appAheadEmptyBody}</p>
+          <p><a class="btn btn-primary" href="#/trip">{W.appAheadToTrip}</a></p>
+        </div>
+      )}
       <ChipRow shown={['emergency']} open={open ? 'emergency' : null} onOpen={(c) => setOpen(c !== null)} />
       {open ? (
         <section class="card ah-chip-panel ah-large" id="chip-emergency" aria-label={W.appAheadChipEmergency}>

@@ -210,7 +210,8 @@ describe('the legal pages on a phone: only markup and style changed', () => {
   // Taken from the files as they were on 6 November 2026, before the phone fixes (body text, whitespace single-spaced). The three
   // pages' wording must not change by a character in that work. When the owner edits the wording, replace the hash with the new one.
   const TEXT_HASH: Record<string, string> = {
-    privacy: '09607ea939ef9aa629b545fcae1b2e696d8471f0f1eac9d4199a9d1f11358840',
+    // The owner renamed Ahead to En route (8 Nov 2026, item M): "(Trip, En route, Tools, You)", every other character as it was.
+    privacy: '71bcaac59e52918f792a2e2194f723f506e9888f80c0e6297765d0c499af6551',
     licences: '90e677bd3eb82d551718df50a184d85aed348b4fc5c763af67683ed6cd1c2e9a',
     imprint: '600d647d43c99cc6ad200f4e0f65adaadbcd723980b9b947d2a87df61e9cc064',
   };

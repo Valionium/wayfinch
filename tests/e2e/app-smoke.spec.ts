@@ -13,7 +13,7 @@ test.setTimeout(180_000);
 test('[APP-SWITCH-ON] smoke: the shell opens on Trip with its four tabs, and each tab opens', async ({ page }) => {
   app = await loadApp(page);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Trip');
-  for (const tab of ['Ahead', 'Tools', 'You', 'Trip']) {
+  for (const tab of ['En route', 'Tools', 'You', 'Trip']) {
     await page.locator('nav.tabs').getByRole('link', { name: tab }).click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(tab);
   }

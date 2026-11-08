@@ -36,7 +36,9 @@ describe('Ahead before Get ready offline', () => {
     await show(v, fakeActions().actions);
     await until(() => host.querySelector('[data-need-ready] button') !== null, 'the card');
     const need = host.querySelector<HTMLElement>('[data-need-ready]')!;
-    expect(host.querySelector('.ah-main')!.firstElementChild).toBe(need);
+    // At the top: only the Emergency link comes before it (owner's preview check, 8 Nov 2026, item B).
+    expect(host.querySelector('.ah-main')!.firstElementChild!.querySelector('[data-emergency-top]')).not.toBeNull();
+    expect(host.querySelector('.ah-main')!.firstElementChild!.nextElementSibling).toBe(need);
     expect(need.textContent).toContain(W.appAheadNeedTitle);
     expect(need.textContent).toContain(W.appAheadNeedBody);
     expect(need.textContent).toContain(W.appAheadNeedUntil);

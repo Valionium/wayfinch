@@ -230,19 +230,18 @@ describe('cards', () => {
     expect(kmField()).toBeNull(); // closed by the rider
   });
 
-  test('[AH-FIRST-USE] on a phone the picker of first use closes when answers first show, unless the rider has started using it', async () => {
+  // Owner's preview check, 8 Nov 2026, item K: with no position the answers show from where screen() plans, so the picker no longer
+  // opens by itself on a phone; opened by the rider and typed into, a fix arriving still leaves it and the typing alone.
+  test('[AH-FIRST-USE] on a phone with no position the picker waits for the rider\'s tap; being typed into, a fix arriving leaves it alone', async () => {
     const { actions } = fakeActions();
     const none = trip(viewOf(rainyStop({ now: `${SAT} 09:00`, positions: [] })));
     const found = trip(viewOf(rainyStop({ now: `${SAT} 09:00`, positions: [pos({ km: 3, at: `${SAT} 09:00` })] })));
-    expect([none.answers, found.answers]).toEqual([false, true]);
+    expect([none.answers, found.answers]).toEqual([true, true]);
     const kmField = () => host.querySelector<HTMLInputElement>('#ah-picker input[type=number]');
-    // Untouched: a position closes it, as section 3.2's returning screen has it.
     await show(none, actions);
-    expect(kmField()).not.toBeNull();
-    await act(async () => { render(<AheadScreen view={found} actions={actions} />, host); });
     expect(kmField()).toBeNull();
-    // Being typed into: a fix arriving then leaves the picker and the typing alone.
-    await show(none, actions);
+    await click(buttonNamed('Set position by hand'));
+    expect(kmField()).not.toBeNull();
     kmField()!.focus();
     await typeInto(kmField()!, '4');
     await act(async () => { render(<AheadScreen view={found} actions={actions} />, host); });
@@ -625,16 +624,18 @@ describe('degraded', () => {
     expect(await dialled(buttonNamed(W.emergencyCall, card))).toBe('tel:112');
   });
 
-  test('[AH-FIRST-USE] no position on a trip day after day 1: only Update position and the picker, no answers; before the trip, day 1\'s answers show', async () => {
+  // Owner's preview check, 8 Nov 2026, item K: no position choice is needed just to see the route, so a trip day after day 1 with no
+  // position shows its answers too (from where screen() plans, its note naming it), with Update position one tap away.
+  test('[AH-FIRST-USE] no position on a trip day after day 1: the answers, Update position and Set position by hand; before the trip, day 1\'s answers show', async () => {
     const day2 = trip(viewOf(rainyStop({ now: `${SAT} 09:00`, positions: [] })));
-    expect(day2.answers).toBe(false);
+    expect(day2.answers).toBe(true);
     await show(day2, fakeActions().actions);
-    expect(host.querySelector('[data-ahead="first-use"]')).not.toBeNull();
-    expect(host.querySelectorAll('[data-card]')).toHaveLength(0);
-    expect(host.querySelector('[data-strip]')).toBeNull();
+    expect(host.querySelector('[data-ahead="answers"]')).not.toBeNull();
+    expect(host.querySelectorAll('[data-card]')).toHaveLength(6);
+    expect(host.querySelector('[data-strip]')).not.toBeNull();
     expect(host.querySelector('[data-update-position]')).not.toBeNull();
-    expect(host.querySelector('#ah-picker')).not.toBeNull();
-    expect(text()).toContain(W.appAheadFirstUse);
+    expect(buttonNamed('Set position by hand')).toBeDefined();
+    expect(text()).not.toContain(W.appAheadFirstUse);
 
     const before = trip(viewOf(rainyStop({ now: '2026-10-15 18:00', positions: [] })));
     expect(before.screen.phase).toBe('before-trip');
