@@ -95,12 +95,12 @@ export function RunProgress({ run }: { run: Run }) {
  * The steps that were not saved, with their reasons (design §2.2: each step says what was done and what was not); without signal
  * it says so plainly. Trip's step and Ahead's card both show it.
  */
-export function NotSaved({ failed }: { failed: { step: string; note: string | null }[] }) {
+export function NotSaved({ failed, head = true }: { failed: { step: string; note: string | null }[]; head?: boolean }) {
   if (failed.length === 0) return null;
   const noSignal = failed.every((s) => s.note === W.appPrepNoConnection);
   return (
     <>
-      <h3>{W.appTripMissingHeading}</h3>
+      {head ? <h3>{W.appTripMissingHeading}</h3> : null}
       <ul class="trip-steps">{failed.map((s) => <li key={s.step}><strong>{labelOf(s.step)}</strong> {s.note ?? ''}</li>)}</ul>
       <p>{noSignal ? W.appPrepNoSignal : W.appTripPartial}</p>
     </>

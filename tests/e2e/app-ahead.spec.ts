@@ -30,6 +30,9 @@ async function ahead(page: Page): Promise<void> {
   await page.goto(`${app.origin}/#/ahead`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-ahead="answers"]')).toBeVisible();
   await expect(page.locator('[data-card]')).toHaveCount(6);
+  // The fixture's Get ready offline had no weather service, so the top card names that step (review of PR 73, I2); its button is a
+  // chunk of its own, loaded here, before a test watches what the page sends.
+  if ((await page.locator('[data-need-ready]').count()) > 0) await expect(page.locator('[data-need-ready] button')).toBeVisible();
 }
 
 async function openEverything(page: Page): Promise<void> {

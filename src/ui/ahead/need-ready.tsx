@@ -18,7 +18,8 @@ export function NeedReady({ actions, failed, before = true }: { actions: AheadAc
         </button>
       </p>
       <RunProgress run={run} />
-      {run.progress ? null : <NotSaved failed={missing} />}
+      {/* Without the card's own title (no longer before Get ready), "Not saved" is its title, in ahead.tsx. */}
+      {run.progress ? null : <NotSaved failed={missing} head={before} />}
       {before ? <p class="muted">{W.appAheadNeedUntil}</p> : null}
     </>
   );
