@@ -128,9 +128,10 @@ test('[TB-CHOICE-FALLBACK] in a real browser: the chosen bike removed in the bag
   await expect.poll(() => read(page, 'loadcheck:bikeProfiles').then((l) => l.map((b: { id: string }) => b.id))).toEqual(['bike_a']);
   await page.locator('#bikeDetailsClose').click();
   await page.goto(`${app!.origin}/#/tools`, { waitUntil: 'load' });
-  // one saved bike left: the line names it as text, and the removed one is never offered
-  await expect(page.locator('.bike-line').first()).toContainText('Trail Bike');
-  await expect(page.locator('#tools-bike')).toHaveCount(0);
+  // one saved bike left: still a select (that bike and Without a bike, owner 8 Nov), and the removed one is never offered
+  await expect(page.locator('#tools-bike option')).toHaveCount(2);
+  await expect(page.locator('#tools-bike')).toContainText('Trail Bike');
+  await expect(page.locator('#tools-bike')).not.toContainText('Gravel');
 });
 
 // Review of PR 56, I3: a visit through a Bike details link from Wayfinch is a side trip; the plan keeps its bike, and the next plain open
