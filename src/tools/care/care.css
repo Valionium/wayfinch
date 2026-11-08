@@ -31,3 +31,48 @@
 .care-hits li { margin: 0 0 8px; }
 .care-carry { padding-left: 1.25em; margin: 4px 0 16px; }
 .care-carry li { margin: 0 0 6px; }
+.care-steps-open { margin: 4px 0 0; }
+
+/* The step view (care pictures design 2.2 and 2.3): full screen over Bike care; picture above the text on a phone, beside it from 720 px. */
+dialog.care-steps {
+  box-sizing: border-box; position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0;
+  border: 0; background: var(--ground); color: var(--ink); overflow-wrap: anywhere;
+}
+dialog.care-steps[open] { display: flex; flex-direction: column; }
+dialog.care-steps::backdrop { background: var(--ground); }
+.care-steps-top { display: flex; align-items: center; gap: 8px; padding: 8px 8px 4px; background: var(--panel); }
+.care-steps-icon {
+  min-width: 44px; min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: inherit; font-size: 1.1rem;
+  cursor: pointer;
+}
+.care-steps-where { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.care-steps-name { font-weight: 600; }
+.care-steps-count { color: var(--muted); font-size: 0.875rem; }
+.care-steps-all { flex: none; }
+.care-steps-all[aria-pressed='true'] { background: var(--blaze); border-color: var(--blaze); color: var(--ground); font-weight: 600; }
+.care-steps-progress { display: flex; gap: 4px; padding: 0 16px 10px; background: var(--panel); }
+.care-steps-progress span { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
+.care-steps-progress span.on { background: var(--blaze); }
+.care-steps-body { flex: 1; overflow-y: auto; padding: 0 16px 16px; }
+.care-step { max-width: 72rem; margin: 0 auto; animation: care-fade 150ms ease-out; }
+.care-step-h { font-size: 1rem; color: var(--muted); font-weight: 600; margin: 14px 0 2px; }
+.care-step-h:focus { outline: none; }
+.care-step-h:focus-visible { outline: 2px solid var(--blaze); outline-offset: 2px; }
+.care-step-t, .care-step-words p { font-size: 1.0625rem; }
+.care-step-list h3 { font-size: 1rem; margin: 20px 0 4px; }
+.care-pic { margin: 12px 0 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.care-pic-art svg { display: block; width: 100%; height: auto; max-height: 45vh; }
+.care-pic figcaption { font-size: 0.9375rem; padding: 4px 10px 8px; }
+.care-steps-nav {
+  display: flex; justify-content: flex-end; gap: 12px; padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--panel); border-top: 1px solid var(--line);
+}
+.care-steps-nav .btn { flex: 1 1 0; max-width: calc(50% - 6px); min-height: 48px; font-weight: 600; }
+.care-steps-back { background: transparent; border-color: var(--muted); }
+@media (min-width: 720px) {
+  .care-step-pic { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: 24px; align-items: start; }
+  .care-step-pic .care-pic-art svg { max-height: 70vh; }
+  .care-steps-nav .btn { max-width: 220px; }
+}
+@keyframes care-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .care-step { animation: none; } }

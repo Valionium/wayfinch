@@ -253,3 +253,78 @@ test('[BC-ROAD] by keyboard: Tab reaches every card and the tabs; Enter and Spac
   await page.keyboard.press('Space');
   await expect(card(page, ids[1]!)).toHaveAttribute('open', '');
 });
+
+// ---- The step view and its pictures (care pictures design of 7 November 2026, part 1) ----
+const openSteps = async (page: Page, id: string) => {
+  await roadTab(page).click();
+  await card(page, id).locator('summary').click();
+  await card(page, id).getByRole('button', { name: 'Step by step' }).click();
+  await expect(page.getByRole('dialog', { name: 'Puncture (inner tube)' })).toBeVisible();
+};
+
+test('[BC-STEPS-LAYOUT] the step view fills the screen; on a phone the picture sits above the text, from 720 px beside it; the bottom bar never covers the text; no sideways scroll at 200% text', async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [U], null);
+  await openSteps(page, 'puncture-tube');
+  const dialog = page.getByRole('dialog');
+  const box = (await dialog.boundingBox())!;
+  const view = page.viewportSize()!;
+  expect(Math.round(box.width)).toBe(view.width);
+  expect(Math.round(box.height)).toBe(view.height);
+  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(dialog.locator('.care-steps-count')).toHaveText('Step 2 of 7');
+  const img = dialog.getByRole('img', { name: 'Prying the tyre off the rim with two tyre levers.' });
+  await expect(img).toBeVisible();
+  const pic = (await img.boundingBox())!;
+  const words = (await dialog.locator('.care-step-t').boundingBox())!;
+  if (view.width < 720) {
+    expect(pic.y + pic.height).toBeLessThanOrEqual(words.y);
+    expect(pic.width).toBeGreaterThan(view.width - 48);
+    expect(pic.height).toBeLessThanOrEqual(view.height * 0.45 + 1);
+  } else {
+    expect(pic.x + pic.width).toBeLessThanOrEqual(words.x);
+    expect(Math.abs(pic.y - words.y)).toBeLessThan(80);
+  }
+  for (const zoom of ['100%', '200%']) {
+    await page.evaluate((z) => { document.documentElement.style.fontSize = z; }, zoom);
+    expect(await page.evaluate(() => document.querySelector('.care-steps-body')!.scrollWidth <= window.innerWidth), zoom).toBe(true);
+    // the text ends above the bottom bar once scrolled to the end
+    await dialog.locator('.care-steps-body').evaluate((b) => { b.scrollTop = b.scrollHeight; });
+    const text = (await dialog.locator('.care-step-t').boundingBox())!;
+    const bar = (await dialog.locator('.care-steps-nav').boundingBox())!;
+    expect(text.y + text.height, zoom).toBeLessThanOrEqual(bar.y + 0.5);
+    for (const b of await dialog.locator('.care-steps-nav button').all()) expect((await b.boundingBox())!.height, zoom).toBeGreaterThanOrEqual(48);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('[BC-STEPS-BACK] in a real browser the back gesture closes the step view in one go and Bike care stays; the picture loads offline after one visit', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [U], null);
+  await expect.poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBe(1);
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+  await goOffline(page);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await openSteps(page, 'puncture-tube');
+  for (let i = 0; i < 4; i += 1) await page.getByRole('button', { name: 'Next' }).click();
+  await page.goBack();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/tools\/care$/);
+  await expect(page.getByRole('heading', { name: 'Bike care', level: 2 })).toBeVisible();
+  await expect(card(page, 'puncture-tube').getByRole('button', { name: 'Step by step' })).toBeFocused();
+  // offline, the drawing still comes
+  await card(page, 'puncture-tube').getByRole('button', { name: 'Step by step' }).click();
+  await expect(page.locator('.care-step-h')).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.care-steps-count')).toHaveText('Step 1 of 7');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.care-steps-count')).toHaveText('Step 2 of 7');
+  await expect(page.getByRole('dialog').getByRole('img', { name: 'Prying the tyre off the rim with two tyre levers.' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/tools\/care$/);
+});

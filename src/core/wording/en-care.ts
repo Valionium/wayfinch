@@ -40,6 +40,17 @@ export const C = {
   careTagIf: 'if you have',
   careFound: (n: number): string => (n === 1 ? '1 task' : `${n} tasks`),
   careFoundBoth: (tasks: number, cards: number): string => `${tasks === 1 ? '1 task' : `${tasks} tasks`}, ${cards === 1 ? '1 roadside repair' : `${cards} roadside repairs`}`,
+  // The step view (care pictures design of 7 November 2026, section 2)
+  careStepByStep: 'Step by step',
+  careStepsClose: 'Close',
+  careStepsAll: 'All steps',
+  careStepsBack: 'Back',
+  careStepsNext: 'Next',
+  careStepsDone: 'Done',
+  careStepsBefore: 'Before you start',
+  careStepsEnd: 'At the end',
+  careStepN: (n: number): string => `Step ${n}`,
+  careStepsCount: (n: number, of: number): string => `Step ${n} of ${of}`,
 };
 
 export const PART_LABEL: Record<Part, string> = {

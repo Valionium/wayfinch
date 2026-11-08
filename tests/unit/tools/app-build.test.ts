@@ -294,6 +294,27 @@ test("[BC-CHUNK] Bike care is a lazy chunk; en-care is not in the first screen's
   expect(figures.firstJsGzip).toBeLessThanOrEqual(145_711);
 });
 
+// Care pictures, part 1 (design of 7 November 2026, section 5): each drawing is a file of its own, fetched when its step view opens; none is
+// in the first screen's files, in Bike care's chunk or in any JavaScript, and each is precached for offline use.
+test("[BC-PIC-LAZY] no picture is in the first screen's files, Bike care's chunk or any script; each is a precached file of its own, and the first screen stays at its figure", () => {
+  const figures = measure(on);
+  const dir = join(REPO, 'src', 'tools', 'care', 'pictures');
+  const pictures = readdirSync(dir).filter((f) => f.endsWith('.svg'));
+  expect(pictures.length).toBeGreaterThan(0);
+  const all = files(on);
+  const listed = Object.keys(buildJson(on).files);
+  for (const p of pictures) {
+    const bytes = readFileSync(join(dir, p));
+    const where = all.filter((f) => readFileSync(join(on, f)).includes(bytes.subarray(40, 120)));
+    expect(where.length, p).toBe(1);
+    expect(where[0], p).toMatch(/^assets\/.+\.svg$/);
+    expect(listed, p).toContain(`/${where[0]}`);
+    expect(figures.firstFiles, p).not.toContain(where[0]);
+  }
+  expect(all.filter((f) => f.endsWith('.js') && text(on, f).includes('class="cp-')), 'a drawing in a script').toEqual([]);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_700);
+});
+
 test('[BC-SOURCES-PRIVATE] the built Bike care chunk holds no "http": where each fact came from never ships', () => {
   const figures = measure(on);
   const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));

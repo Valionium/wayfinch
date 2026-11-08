@@ -1,0 +1,26 @@
+/* Bike care's drawings (care pictures design of 7 November 2026, section 3): the one stylesheet that maps a picture's classes to the
+   theme's tokens, so both themes follow with one file and no colour is written into a drawing. Blaze is the one "look here" colour. */
+.cp { display: block; width: 100%; height: auto; }
+.cp-ctx { fill: none; stroke: var(--muted); stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; }
+.cp-thin { fill: none; stroke: var(--muted); stroke-width: 0.9; stroke-linecap: round; }
+.cp-obj { fill: var(--panel); stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.cp-objline { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.cp-fine { fill: none; stroke: var(--ink); stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+.cp-dark { fill: var(--ink); stroke: none; }
+.cp-rubber { fill: var(--line); stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
+.cp-body { fill: var(--panel); stroke: var(--muted); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.cp-hand { fill: var(--panel); stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.cp-hi { fill: var(--panel); stroke: var(--blaze); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.cp-hiline { fill: none; stroke: var(--blaze); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.cp-ghost { fill: none; stroke: var(--blaze); stroke-width: 1.6; stroke-dasharray: 3 3; stroke-linecap: round; stroke-linejoin: round; }
+.cp-halo { fill: var(--blaze); opacity: 0.16; stroke: none; }
+.cp-halostroke { fill: var(--blaze); stroke: var(--blaze); stroke-width: 10; stroke-linejoin: round; opacity: 0.16; }
+.cp-arrow { fill: none; stroke: var(--blaze); stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; }
+.cp-head { fill: var(--blaze); stroke: none; }
+.cp-frame { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; }
+.cp-armfill { fill: none; stroke: var(--panel); stroke-linecap: round; stroke-linejoin: round; }
+.cp-t { font-family: var(--font-body); font-weight: 600; font-size: 12.5px; fill: var(--ink); }
+.cp-tm { font-family: var(--font-body); font-weight: 400; font-size: 12px; fill: var(--muted); }
+.cp-th { font-family: var(--font-body); font-weight: 600; font-size: 12.5px; fill: var(--blaze); }
+.cp-badge { fill: var(--ink); }
+.cp-badget { font-family: var(--font-body); font-weight: 600; font-size: 11.5px; fill: var(--panel); }

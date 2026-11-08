@@ -14,6 +14,8 @@ import { BikeLine } from '../../ui/tools/bike-line.tsx';
 import { savedBikeIds, toolBike } from '../tyre/choice.ts';
 import type { ReadOnlyStore } from '../tyre/host.ts';
 import type { TyreServices } from '../tyre/services.ts';
+import { StepView } from './steps.tsx';
+import type { StepSource } from './steps.tsx';
 import './care.css';
 
 type Tab = 'care' | 'road';
@@ -44,11 +46,18 @@ function Tags({ item, details }: { item: { tags: CareKey[]; applies: Conditions;
   return all.length === 0 ? null : <span class="muted care-tags">{all.join(' · ')}</span>;
 }
 
-function RoadItem({ card, details }: { card: Fitted<RoadCard>; details: CareDetails }) {
+/** Opens the full-screen step view (care pictures design 2.1); the card or task also stays readable as a whole where it is. */
+type OnSteps = (source: StepSource, opener: HTMLButtonElement) => void;
+const StepsButton = ({ onOpen }: { onOpen: (opener: HTMLButtonElement) => void }) => (
+  <p><button type="button" class="btn btn-primary care-steps-open" onClick={(e) => onOpen(e.currentTarget)}>{C.careStepByStep}</button></p>
+);
+
+function RoadItem({ card, details, onSteps }: { card: Fitted<RoadCard>; details: CareDetails; onSteps: OnSteps }) {
   return (
     <details class="care-road" data-id={card.id}>
       <summary><span class="care-name">{card.problem}</span> <Tags item={card} details={details} /></summary>
       <div class="care-body">
+        <StepsButton onOpen={(b) => onSteps({ kind: 'road', item: card }, b)} />
         <p><strong>{C.careRoadCheckFirst}:</strong> {card.checkFirst}</p>
         <p class="care-label"><strong>{C.careSteps}</strong></p>
         <ol>{card.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
@@ -60,11 +69,12 @@ function RoadItem({ card, details }: { card: Fitted<RoadCard>; details: CareDeta
   );
 }
 
-function TaskItem({ task, details }: { task: Fitted<CareTask>; details: CareDetails }) {
+function TaskItem({ task, details, onSteps }: { task: Fitted<CareTask>; details: CareDetails; onSteps: OnSteps }) {
   return (
     <details class="care-task" data-id={task.id}>
       <summary><span class="care-name">{task.name}</span> <Tags item={task} details={details} /></summary>
       <div class="care-body">
+        <StepsButton onOpen={(b) => onSteps({ kind: 'task', item: task }, b)} />
         <p><strong>{C.careSigns}:</strong> {task.signs}</p>
         {task.alsoWet ? <p>{C.careAlsoWet}</p> : null}
         <p class="care-label"><strong>{C.careSteps}</strong></p>
@@ -99,6 +109,11 @@ export function CareScreen({ services }: { services: TyreServices }) {
   const [part, setPart] = useState<Part | null>(null);
   const [openCard, setOpenCard] = useState<string | null>(null);
   const searchBox = useRef<HTMLInputElement>(null);
+  const [steps, setSteps] = useState<StepSource | null>(null);
+  const opener = useRef<HTMLButtonElement | null>(null);
+  const openSteps: OnSteps = (source, from) => { opener.current = from; setSteps(source); };
+  // Closed: focus goes back to the button that opened it.
+  useEffect(() => { if (steps === null && opener.current) { opener.current.focus(); opener.current = null; } }, [steps]);
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ care: null, road: null });
 
   const bike = chosenBike(services);
@@ -164,7 +179,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
           return inSection.length === 0 ? null : (
             <section key={s} class="care-section">
               <h3>{SECTION_LABEL[s]}</h3>
-              {inSection.map((t) => <TaskItem key={t.id} task={t} details={details} />)}
+              {inSection.map((t) => <TaskItem key={t.id} task={t} details={details} onSteps={openSteps} />)}
             </section>
           );
         })}
@@ -185,7 +200,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
         {tab === 'road' ? (
           <>
             <h3 class="visually-hidden">{C.careRoadHeading}</h3>
-            {allCards.map((c) => <RoadItem key={c.id} card={c} details={details} />)}
+            {allCards.map((c) => <RoadItem key={c.id} card={c} details={details} onSteps={openSteps} />)}
             <section class="care-section">
               <h3>{C.careCarryTitle}</h3>
               <ul class="care-carry">
@@ -197,6 +212,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
           </>
         ) : null}
       </div>
+      {steps ? <StepView key={steps.item.id} source={steps} onClose={() => setSteps(null)} /> : null}
     </div>
   );
 }

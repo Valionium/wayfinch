@@ -1015,3 +1015,16 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - the Roadside tab lists the cards that fit the bike, in the content's order, each a problem with Check first, its steps as a numbered list, Ride on?, what to carry for it and, on a brakes, wheels or bolt card, "If unsure, a shop."; a card that depends on a Not sure detail carries its tag; every card has every field filled, 3 to 7 steps, existing carry ids and a source, and the draft's figures stay in their own fields [BC-ROAD]
 - the Care search also finds Roadside cards, in every form of a word as the plain word ("punctures", "Punctured"): they show under their own heading "Roadside repairs" below the Care results, only while something is typed, limited by the bike and the part filter; a tap opens the Roadside tab at that card, open and focused [BC-ROAD-SEARCH]
 - at the bottom of the Roadside tab, What to carry is a plain list, not ticks, of the carry items that fit the bike in the content's order, each tagged when it depends on a Not sure detail: a tubeless bike lists plugs and a knife, a tube bike a spare tube, levers and a patch kit [BC-CARRY]
+
+## Tool: Bike care, the step view and its pictures (care pictures design of 7 November 2026, part 1)
+
+- an opened roadside card or Care task has a Step by step button; it opens the full-screen step view, a modal dialog named by the card or task: Before you start, one step per page with "Step n of m", then the end (Ride on? for a card; the note and, when critical, "If unsure, a shop." for a task); Back and Next only, no swiping; Back hidden on the first page, Next reads Done on the last; Done and Close end it and focus returns to the button (design 2.1, 2.2) [BC-STEPS-OPEN]
+- in the step view the Right and Left arrow keys are Next and Back, and Escape closes it (design 2.4) [BC-STEPS-KEYS]
+- opening the step view adds one history entry and moving between steps adds none; the phone's back gesture closes it in one go (design 2.4) [BC-STEPS-BACK]
+- All steps, a pressed button in the top bar, shows every step on one page, each with its picture; the choice is remembered on the phone in copilot:careAllSteps:v1 (design 2.4) [BC-STEPS-ALL]
+- on each step change focus moves to the step's heading and a polite live region says "Step n of m"; each picture is one image with a short name and a description from the wording (design 2.5) [BC-STEPS-SR]
+- while a roadside card's step view is open the screen is kept awake, asked again when the page shows again, and released when it closes; a Care task never asks (owner's answer 5) [BC-STEPS-AWAKE]
+- at 360 px the picture sits above the step's text, from 720 px beside it; the bottom bar never covers the text; no sideways scroll at 200% text (design 2.2, 2.3) [BC-STEPS-LAYOUT]
+- a step with no picture shows its text alone, with no empty frame (design 2.1) [BC-PIC-NONE]
+- every picture file is used by a step and every step's picture has a file; each has a name and a description in the wording, under the banned-words test; it uses theme classes only (no colour value, no style block, no http), labels at least 11.5 units, at most two arrows, and at most 3 KB gzipped (design 3 and 5) [BC-PIC-FILES]
+- no picture is in the first screen's files or in Bike care's own chunk: each loads on its own when its step view opens (design 5) [BC-PIC-LAZY]
