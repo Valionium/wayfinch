@@ -228,7 +228,7 @@ describe('the legal pages on a phone: only markup and style changed', () => {
 // The one top bar of every tool (owner's list of 7 Nov 2026, items 8 and 9): one source, src/ui/back-bar/, built for the pages that are not
 // the app as /back-bar.js and /back-bar.css; the legal pages and the bag planner load both, and the worker holds them for offline.
 describe('the one top bar on the pages that are not the app', () => {
-  test('[WF-BAR] the launch build serves /back-bar.js (a plain script) and /back-bar.css, precached; the imprint, privacy, licences and the bag planner load both and mark their bar', () => {
+  test('[WF-BAR] the launch build serves /back-bar.js (a plain script) and /back-bar.css, precached; the imprint, privacy, licences (through legal.css) and the bag planner load both and mark their bar', () => {
     const build = JSON.parse(readFileSync(join(site, 'build.json'), 'utf8')) as { files: Record<string, string> };
     expect(Object.keys(build.files)).toEqual(expect.arrayContaining(['/back-bar.js', '/back-bar.css']));
     const js = readFileSync(join(site, 'back-bar.js'), 'utf8');
@@ -238,7 +238,9 @@ describe('the one top bar on the pages that are not the app', () => {
     for (const page of ['legal/imprint/index.html', 'legal/privacy/index.html', 'legal/licences/index.html', 'tools/bags/index.html']) {
       const doc = docOf(readFileSync(join(site, page), 'utf8'));
       expect(doc.querySelector('script[src="/back-bar.js"][defer]'), page).not.toBeNull();
-      expect(doc.querySelector('link[rel="stylesheet"][href="/back-bar.css"]'), page).not.toBeNull();
+      // the bag planner links the bar's stylesheet; the legal pages keep their one stylesheet, which imports it
+      if (page.startsWith('legal/')) expect(readFileSync(join(site, 'legal', 'legal.css'), 'utf8')).toContain("@import url('/back-bar.css');");
+      else expect(doc.querySelector('link[rel="stylesheet"][href="/back-bar.css"]'), page).not.toBeNull();
       const bars = doc.querySelectorAll('.wf-bar');
       expect(bars.length, page).toBe(1);
       expect(bars[0]!.querySelector('a')!.textContent, page).toBe(TL.toolsBack);
