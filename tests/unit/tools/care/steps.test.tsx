@@ -48,6 +48,8 @@ beforeEach(async () => {
   vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve({ ok: true, text: () => Promise.resolve(body(url)) })));
   go('tools/care');
   await new Promise((r) => setTimeout(r, 0)); // the hash change's own popstate comes and goes first
+  // Close takes its history entry back; here that is only counted, so no late popstate reaches the next test.
+  vi.spyOn(history, 'back').mockImplementation(() => {});
   localStorage.clear();
   Object.assign(lock, { asked: 0, released: 0, held: false, current: null });
   fakeWakeLock();

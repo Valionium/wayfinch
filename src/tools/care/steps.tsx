@@ -116,6 +116,14 @@ export function StepView({ source, onClose }: { source: StepSource; onClose: () 
     if (e.key === 'ArrowRight') { e.preventDefault(); go(at + 1); }
     if (e.key === 'ArrowLeft') { e.preventDefault(); go(at - 1); }
   };
+  // On the document, not the dialog: as a step changes, its heading is replaced, and a key pressed in that moment would land outside.
+  const keyRef = useRef(onKey);
+  keyRef.current = onKey;
+  useEffect(() => {
+    const listen = (e: KeyboardEvent): void => { keyRef.current(e); };
+    document.addEventListener('keydown', listen);
+    return () => { document.removeEventListener('keydown', listen); };
+  }, []);
   const toggleAll = (): void => { writeAll(!all); setAll(!all); setAt(0); };
 
   const onStep = at >= 1 && at <= steps.length;
@@ -123,7 +131,7 @@ export function StepView({ source, onClose }: { source: StepSource; onClose: () 
   const pic = onStep ? pictures[at - 1]! : null;
 
   return (
-    <dialog ref={box} class="care-steps" aria-labelledby={titleId} onKeyDown={onKey as never}
+    <dialog ref={box} class="care-steps" aria-labelledby={titleId}
       onCancel={(e) => { e.preventDefault(); close(false); }}>
       <div class="care-steps-top">
         <button type="button" class="care-steps-icon" aria-label={C.careStepsClose} onClick={() => close(false)}>✕</button>
