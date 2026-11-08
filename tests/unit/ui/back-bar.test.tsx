@@ -13,7 +13,9 @@ import type { BarWindow } from '../../../src/ui/back-bar/back-bar.ts';
 
 const host = document.createElement('div');
 document.body.append(host);
-afterEach(() => { render(null, host); });
+// Inside act: Preact runs an unmounted component's effect cleanups after the next frame (a 35 ms timer and a requestAnimationFrame), which
+// outside act could fire after jsdom has gone and throw for its missing cancelAnimationFrame; act runs them before it returns.
+afterEach(() => { act(() => { render(null, host); }); });
 
 /** A page 3000 px tall in a 640 px window, scrolled by hand; the bar 48 px tall. */
 function world() {

@@ -172,6 +172,10 @@ async function forkCloseUpStays(page: Page): Promise<void> {
     const l = last.getBoundingClientRect();
     return { inView: z.height > 0 && z.top >= p.bottom - 1 && z.bottom <= b.bottom + 1, lastShown: l.top >= z.bottom - 1 && l.bottom <= b.bottom + 1, across: document.documentElement.scrollWidth <= innerWidth };
   });
+  // The tap that chose the fork's colours focused its chip, and the page brings a focused control's ring into view once at once and
+  // once more in the next frame (keepLookFocusInView). Wait for that frame, or its second scroll lands after ours and undoes it: our
+  // callback runs after the page's, which was asked for first.
+  await page.evaluate(() => new Promise<void>((done) => { requestAnimationFrame(() => { done(); }); }));
   // scrolling: the last chip brought to the dialog's lower edge
   await page.evaluate(() => {
     const body = document.getElementById('bikeDetailsBody')!;
