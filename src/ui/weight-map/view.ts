@@ -20,41 +20,55 @@ export type MapInput = {
   onDiff: (on: boolean) => void;
 };
 
-const PX = 3;
+const PX = 2;
 const VB = `${GRID.x} ${GRID.y} ${GRID.w * GRID.cell} ${GRID.h * GRID.cell}`;
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const pts = (o: P[]) => o.map((p) => `${r1(p[0])},${r1(p[1])}`).join(' ');
 const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
-/** The value at (x, y) in drawing units, read between the four cells around it. */
-function sample(F: Float32Array, x: number, y: number): number {
-  const gx = Math.max(0, Math.min(GRID.w - 1.001, (x - GRID.x) / GRID.cell - 0.5));
-  const gy = Math.max(0, Math.min(GRID.h - 1.001, (y - GRID.y) / GRID.cell - 0.5));
-  const [x0, y0] = [gx | 0, gy | 0];
-  const [fx, fy] = [gx - x0, gy - y0];
-  const g = (i: number, j: number) => F[j * GRID.w + i]!;
-  return (g(x0, y0) * (1 - fx) + g(x0 + 1, y0) * fx) * (1 - fy) + (g(x0, y0 + 1) * (1 - fx) + g(x0 + 1, y0 + 1) * fx) * fy;
+/** For each pixel along one axis: the cell before it and how far towards the next (the field is read between the four cells around). */
+function axis(px: number, cells: number): [Int32Array, Float32Array] {
+  const i = new Int32Array(px);
+  const f = new Float32Array(px);
+  for (let p = 0; p < px; p++) {
+    const g = Math.max(0, Math.min(cells - 1.001, (p + 0.5) / PX / GRID.cell - 0.5));
+    i[p] = g | 0;
+    f[p] = g - (g | 0);
+  }
+  return [i, f];
 }
 
 /** Paints one map: the theme's three-step ramp (lightness always one way), or the difference's teal, grey and orange; contour lines. */
-export function paint(canvas: HTMLCanvasElement, F: Float32Array, diff: boolean): void {
+export function paint(canvas: HTMLCanvasElement, F: Float32Array, diff: boolean, colours: number[][]): void {
   const ctx = canvas.getContext?.('2d');
   if (!ctx) return;
   const [W, H] = [GRID.w * GRID.cell * PX, GRID.h * GRID.cell * PX];
   canvas.width = W;
   canvas.height = H;
-  const style = getComputedStyle(canvas);
-  const css = (n: string) => { const s = style.getPropertyValue(n).trim(); return [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16) || 0); };
-  const [c0, c1, c2, cn, cp, cz, ink] = ['--wm0', '--wm1', '--wm2', '--wmneg', '--wmpos', '--wmzero', '--ink'].map(css) as number[][];
+  const [c0, c1, c2, cn, cp, cz, ink] = colours;
   const mix = (a: number[], b: number[], t: number) => a.map((v, i) => v + (b[i]! - v) * t);
+  // the colours, worked out once: 256 steps from the low end to full (and from -full to +full on the difference)
+  const lut = new Uint8ClampedArray(256 * 3);
+  for (let n = 0; n < 256; n++) {
+    const t = n / 255;
+    const u = Math.min(1, Math.abs(2 * t - 1) / 0.6);
+    lut.set(diff ? mix(cz!, t < 0.5 ? cn! : cp!, u) : t < 0.5 ? mix(c0!, c1!, t * 2) : mix(c1!, c2!, (t - 0.5) * 2), n * 3);
+  }
   const img = ctx.createImageData(W, H);
+  const data = img.data;
   const band = new Int8Array(W * H);
+  const [cx, fx] = axis(W, GRID.w);
+  const [cy, fy] = axis(H, GRID.h);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const v = sample(F, GRID.x + (x + 0.5) / PX, GRID.y + (y + 0.5) / PX) / FULL;
-    const t = Math.max(0, Math.min(1, diff ? Math.abs(v) / 0.6 : v));
-    band[y * W + x] = diff ? (v < -0.2 ? -2 : v < -0.04 ? -1 : v > 0.2 ? 2 : v > 0.04 ? 1 : 0) : Math.floor(Math.min(0.999, t) * 4);
-    const c = diff ? mix(cz!, v < 0 ? cn! : cp!, t) : t < 0.5 ? mix(c0!, c1!, t * 2) : mix(c1!, c2!, (t - 0.5) * 2);
-    img.data.set([c[0]!, c[1]!, c[2]!, 255], (y * W + x) * 4);
+    const [r, a, b] = [cy[y]! * GRID.w + cx[x]!, fx[x]!, fy[y]!];
+    const v = ((F[r]! * (1 - a) + F[r + 1]! * a) * (1 - b) + (F[r + GRID.w]! * (1 - a) + F[r + GRID.w + 1]! * a) * b) / FULL;
+    const i = y * W + x;
+    band[i] = diff ? (v < -0.2 ? -2 : v < -0.04 ? -1 : v > 0.2 ? 2 : v > 0.04 ? 1 : 0) : Math.floor(Math.max(0, Math.min(0.999, v)) * 4);
+    const n = 3 * Math.round(255 * Math.max(0, Math.min(1, diff ? (v + 1) / 2 : v)));
+    data[i * 4] = lut[n]!;
+    data[i * 4 + 1] = lut[n + 1]!;
+    data[i * 4 + 2] = lut[n + 2]!;
+    data[i * 4 + 3] = 255;
   }
   // the contour lines: where the band changes, half towards the text colour
   for (let y = 0; y < H - 1; y++) for (let x = 0; x < W - 1; x++) {
@@ -73,6 +87,12 @@ export function render(host: HTMLElement, input: MapInput): void {
   const Fy = blur(splat(items, a.scale));
   const Fi = blur(splat(ideal, a.scale));
   const [zy, zi] = [zoneShares(items), zoneShares(ideal)];
+  // the theme's colours, read once (before the markup changes, so the page's style is worked out at most once)
+  const style = getComputedStyle(host);
+  const colours = ['--wm0', '--wm1', '--wm2', '--wmneg', '--wmpos', '--wmzero', '--ink'].map((n) => {
+    const v = style.getPropertyValue(n).trim();
+    return [1, 3, 5].map((i) => parseInt(v.slice(i, i + 2), 16) || 0);
+  });
   const outline = (list: MapItem[]) => list.map((i) => `<polygon class="wm-bag${i.pos === 'pack' ? ' wm-back' : ''}" points="${pts(i.outline)}"/>`).join('');
   const backs = items.filter((i) => i.pos === 'pack').map((i) => {
     const xs = i.outline.map((p) => p[0]);
@@ -89,7 +109,7 @@ export function render(host: HTMLElement, input: MapInput): void {
     + `<div class="wm-key"><div class="wm-bar" aria-hidden="true"></div><p>${esc(WM.key)}</p><p>${esc(WM.keyNote)}</p>`
     + (input.diff ? `<div class="wm-bar wm-bar-diff" aria-hidden="true"></div><p>${esc(WM.diffKey)}</p>` : '') + '</div>';
   const fields: Record<string, [Float32Array, boolean]> = { y: [Fy, false], i: [Fi, false], d: [Fy.map((v, n) => v - Fi[n]!), true] };
-  host.querySelectorAll<HTMLCanvasElement>('canvas[data-wm]').forEach((c) => { const f = fields[c.dataset.wm!]!; paint(c, f[0], f[1]); });
+  host.querySelectorAll<HTMLCanvasElement>('canvas[data-wm]').forEach((c) => { const f = fields[c.dataset.wm!]!; paint(c, f[0], f[1], colours); });
   const button = host.querySelector<HTMLButtonElement>('.wm-diff');
   if (button) button.onclick = () => input.onDiff(!input.diff);
 }

@@ -171,3 +171,18 @@ test('[PERF-BIKE] [PERF-SCREEN] the phone stand-in really is slowed: the same wo
   report('PERF-STAND-IN', [median(plain), median(slowed)]);
   expect(median(slowed) / median(plain)).toBeGreaterThanOrEqual(2.5);
 });
+
+test('[PERF-WM] the weight map paints in 50 ms or less a map on the phone stand-in: yours and the ideal together in 100 ms', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/tools/bags/' });
+  await page.evaluate("S.bags = [{ uid:1, pos:'rack', L:20, pair:true }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'pack', L:12 }, { uid:4, pos:'seat', L:10 }, { uid:5, pos:'frame', L:6 }]; S.nextUid = 6; S.decks = { bar:false, rack:true }; go(2); go(3)");
+  await page.locator('#rigWeightMap').click();
+  await expect(page.locator('#weightMap .wm-card')).toHaveCount(2);
+  const times = await page.evaluate(() => {
+    const w = window as unknown as { WayfinchWeightMap: { render: (h: HTMLElement, i: unknown) => void }; weightMapInput: () => unknown };
+    const box = document.getElementById('weightMap')!;
+    const input = w.weightMapInput();
+    return Array.from({ length: 5 }, () => { const t = performance.now(); w.WayfinchWeightMap.render(box, input); return performance.now() - t; });
+  });
+  report('PERF-WM', times);
+  expect(median(times)).toBeLessThanOrEqual(100);
+});

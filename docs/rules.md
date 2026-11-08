@@ -1050,3 +1050,4 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - one sentence under each map from the same numbers ("Of the weighted load: …% on your back, …"), and the difference in points ("32 points less in the middle"); plain words, the banned-words test over them [WM-SENTENCE]
 - weightmap.js is its own script, at most 4 KB gzipped, loaded only on the first press of "Show weight map"; nothing downloads before [WM-SIZE]
 - the bag planner shows "Show weight map" under the drawing once the kit is chosen, off by default: Your weight over Ideal (stacked on a phone, side by side when wide), Where yours differs opt-in, the backpack its own patch labelled "on your back", the caption saying the warmth is weighted kilos [WM-PAGE]
+- the weight map paints in 50 ms or less a map on the phone stand-in: yours and the ideal together in 100 ms at most (median of five) [PERF-WM]

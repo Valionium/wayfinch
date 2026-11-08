@@ -57,13 +57,12 @@ export function blur(m: Float32Array): Float32Array {
   const k = Array.from({ length: 2 * r + 1 }, (_, i) => Math.exp(-((i - r) ** 2) / (2 * s * s)));
   const pass = (src: Float32Array, n: number, lines: number, at: (line: number, i: number) => number) => {
     const out = new Float32Array(src.length);
+    // how much of the kernel falls inside the grid from each cell: what that cell's value is shared by
+    const totals = Array.from({ length: n }, (_, i) => k.reduce((t, v, j) => (i + j - r >= 0 && i + j - r < n ? t + v : t), 0));
     for (let l = 0; l < lines; l++) for (let i = 0; i < n; i++) {
-      const v = src[at(l, i)]!;
+      const v = src[at(l, i)]! / totals[i]!;
       if (!v) continue;
-      const [lo, hi] = [Math.max(0, i - r), Math.min(n - 1, i + r)];
-      let total = 0;
-      for (let j = lo; j <= hi; j++) total += k[j - i + r]!;
-      for (let j = lo; j <= hi; j++) out[at(l, j)]! += (v * k[j - i + r]!) / total;
+      for (let j = Math.max(0, i - r); j <= Math.min(n - 1, i + r); j++) out[at(l, j)]! += v * k[j - i + r]!;
     }
     return out;
   };

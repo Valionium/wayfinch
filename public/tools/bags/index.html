@@ -8514,7 +8514,7 @@ function drawWeightMap(){
   if(!on) return;
   const input = weightMapInput(); if(!input) return;
   // drawn again only when the plan, the theme or the difference changed
-  const key = JSON.stringify([input.items, input.ideal, input.diff, bikeTheme(), input.bike.length]);
+  const key = JSON.stringify([input.items, input.ideal, input.diff, bikeTheme(), input.bike]);
   if(key === WEIGHT_MAP.drawn) return;
   WEIGHT_MAP.drawn = key;
   loadWeightMap().then(M => { if(WEIGHT_MAP.on && WEIGHT_MAP.drawn === key) M.render(box, input); })
