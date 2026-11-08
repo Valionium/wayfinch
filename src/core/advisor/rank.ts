@@ -31,14 +31,16 @@ const byNumber = (a: number, b: number) => round2(a) - round2(b);
 
 /**
  * The order of suggestions for a goal, best first. Get the backpack off: fewer litres on the back, then fewer kilos there. Better
- * handling: the lower score. Ties (§3.3): fewer new bags, then fewer litres, then an addition before a swap. Values are compared to the
+ * handling: the lower score. Both together (the owner, 8 Nov): fewer litres on the back, then the lower score, then fewer kilos there. Ties (§3.3): fewer new bags, then fewer litres, then an addition before a swap. Values are compared to the
  * hundredth.
  */
 export function compareFor(goal: AdvisorInput['goal']): (a: Suggestion, b: Suggestion) => number {
   return (a, b) => {
     const onGoal = goal === 'backpack'
       ? byNumber(a.result.backL, b.result.backL) || byNumber(a.result.backKg, b.result.backKg)
-      : byNumber(a.score, b.score);
+      : goal === 'both'
+        ? byNumber(a.result.backL, b.result.backL) || byNumber(a.score, b.score) || byNumber(a.result.backKg, b.result.backKg)
+        : byNumber(a.score, b.score);
     return onGoal || a.newBags - b.newBags || byNumber(a.litres, b.litres) || KIND_ORDER[a.kind] - KIND_ORDER[b.kind];
   };
 }

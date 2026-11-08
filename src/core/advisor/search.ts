@@ -1,6 +1,6 @@
 // The Gear advisor's search (design §3.1–3.3; plan Task 3). Pure: the planner's packing comes in as `input.trial`, so the same search
 // runs in Vitest with a stand-in and in the bag planner with its own, frozen planWith.
-import { candidates, extensions, panniersAllowed, planAsStyled, sizeOptions } from './candidates.ts';
+import { candidates, extensions, panniersAllowed, planAsStyled, rackFitted, sizeOptions } from './candidates.ts';
 import { byOwnerOrder, compareFor, compareMinimal, handlingScore, isValid, overflows, sizeRange } from './rank.ts';
 import { DECIDED, MAX_TRIALS, MIN_GAIN_BACK_L, MIN_GAIN_SCORE, SIZE_RANGES, type SizedPos } from './table.ts';
 import type { AdvisorAnswer, AdvisorInput, BagIn, Candidate, Suggestion, TrialResult } from './types.ts';
@@ -31,15 +31,28 @@ function bagsFor(input: AdvisorInput, c: Candidate): BagIn[] {
  * answers from what it tried.
  */
 export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnswer> {
+  if (given.goal !== 'both') return yield* oneGoal(given, 0);
+  // Both goals together (the owner, 8 Nov): the back first, as Get the backpack off, handling breaking its ties. With nothing on the
+  // back that is Better handling; when nothing takes more off the back, the suggestions are Better handling's, saying how much stays.
+  const back = yield* oneGoal(given, 0);
+  if (back.kind === 'suggestions' || back.partial || back.tried >= MAX_TRIALS) return back;
+  const handling = yield* oneGoal({ ...given, goal: 'handling' }, back.tried);
+  if (handling.kind === 'suggestions') return back.kind === 'cannot-reduce' ? { ...handling, backStays: back.backL } : handling;
+  return back.kind === 'already-good' ? handling : { ...back, tried: handling.tried };
+}
+
+/** One goal's search; 'both' reads as Get the backpack off with its own order. `used`: the trials run before, counted on from. */
+function* oneGoal(given: AdvisorInput, used: number): Generator<number, AdvisorAnswer> {
   // The base and every candidate run on the plan as the setup reads it: under Bikepacking bags only, without the rider's panniers.
   const input = planAsStyled(given);
   const frameReason = input.frameReason;
-  let trials = 0;
+  const onBack = input.goal !== 'handling';
+  let trials = used;
   const base = input.trial(input.bags, input.decks);
   trials++;
   const baseOver = overflows(base);
   const baseScore = handlingScore(base);
-  if (input.goal === 'backpack' && !baseOver && base.backL <= NOTHING_ON_BACK_L) return { kind: 'already-good', tried: trials, frameReason, partial: false };
+  if (onBack && !baseOver && base.backL <= NOTHING_ON_BACK_L) return { kind: 'already-good', tried: trials, frameReason, partial: false };
 
   const tried: Suggestion[] = [];
   const good: Suggestion[] = [];
@@ -83,7 +96,7 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
     const common = { tried: trials, frameReason, partial: stopped };
     if (!baseOver) {
       // Get the backpack off never says "already good" while litres stay on the back (review of PR 57, I4).
-      return input.goal === 'backpack' ? { kind: 'cannot-reduce', backL: base.backL, ...common } : { kind: 'already-good', ...common };
+      return onBack ? { kind: 'cannot-reduce', backL: base.backL, ...common } : { kind: 'already-good', ...common };
     }
     const closest = [...tried].sort((a, b) => a.result.overL - b.result.overL || a.result.spillIds.length - b.result.spillIds.length || order(a, b))[0] ?? null;
     return { kind: 'nothing-helps', closest, ...common };
@@ -95,13 +108,13 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
   // Get the backpack off: only what takes a real amount off, a share of the litres on the back or everything (the owner's ruling on
   // PR 61, I2; DECIDED.backpackRealShare); when nothing does, all that count.
   const whole = (x: Suggestion) => x.result.backL <= NOTHING_ON_BACK_L;
-  const real = (x: Suggestion) => input.goal !== 'backpack' || base.backL <= NOTHING_ON_BACK_L || whole(x)
+  const real = (x: Suggestion) => !onBack || base.backL <= NOTHING_ON_BACK_L || whole(x)
     || base.backL - x.result.backL >= DECIDED.backpackRealShare * base.backL - EPS;
   const realGood = good.filter(real);
   const minimalPool = realGood.length > 0 ? realGood : good;
   const fewest = Math.min(...minimalPool.map((g) => g.newBags));
   const fewestGood = minimalPool.filter((g) => g.newBags === fewest);
-  const wholeGood = input.goal === 'backpack' && DECIDED.backpackWholeFirst ? fewestGood.filter(whole) : [];
+  const wholeGood = onBack && DECIDED.backpackWholeFirst ? fewestGood.filter(whole) : [];
   const ranked = (wholeGood.length > 0 ? wholeGood : fewestGood).sort(compareMinimal(input.goal));
   const items: Suggestion[] = [];
   const seen = new Set<string>();
@@ -132,7 +145,7 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
   }
   // Bags first, the bags counted: panniers are still needed when nothing so far does the whole goal (Get the backpack off: nothing
   // takes everything off the back; Better handling: the bags counted, so they are not).
-  if (secondRound && !panniers && !stopped && input.goal === 'backpack' && ![...good, ...pool].some(whole)) {
+  if (secondRound && !panniers && !stopped && onBack && ![...good, ...pool].some(whole)) {
     later.push(...(yield* round(true, true)));
   }
   pool.push(...good.filter((g) => (g.newBags > first.newBags || later.includes(g)) && better(g)));
@@ -141,7 +154,7 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
   // Get the backpack off: Looking ahead's two bags resized so the larger is as small as it can be while the back stays as empty (review
   // of PR 61, m2): Minimal's bag a size smaller each step, the other bag the smallest size that still does it.
   const maxL = (x: Suggestion) => Math.max(...x.add.map((b) => b.L));
-  if (best && !stopped && input.goal === 'backpack' && best.kind === 'ahead' && best.remove === null && !best.deck && first.kind === 'add' && best.add.length === 2) {
+  if (best && !stopped && onBack && best.kind === 'ahead' && best.remove === null && !best.deck && first.kind === 'add' && best.add.length === 2) {
     const [p, x] = best.add as [BagIn, BagIn];
     const smaller = sizeOptions(input, p).filter((o) => o.bag.L < p.L - EPS).reverse();
     const larger = sizeOptions(input, x).filter((o) => o.bag.L >= x.L - EPS);
@@ -168,8 +181,8 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
   const ahead = best && shown(best);
 
   // Side by side (the owner's rulings on PR 61): combinations reaching about the same result, within decision 6.
-  const value = (x: Suggestion) => (input.goal === 'backpack' ? x.result.backL : x.score);
-  const within = input.goal === 'backpack' ? MIN_GAIN_BACK_L : MIN_GAIN_SCORE;
+  const value = (x: Suggestion) => (onBack ? x.result.backL : x.score);
+  const within = onBack ? MIN_GAIN_BACK_L : MIN_GAIN_SCORE;
   const bestValue = Math.min(...items.map(value));
   const near = items.map((x, k) => (value(x) - bestValue <= within + EPS ? k : -1)).filter((k) => k >= 0);
   const minimalSame = near.length >= 2 ? near : [];
@@ -201,6 +214,70 @@ function rangeOf(s: Suggestion, same: Suggestion[]): [number, number] {
   if (s.kind !== 'add' && s.kind !== 'swap') return [bag.L, bag.L];
   if (bag.pos === 'frame' || !(bag.pos in SIZE_RANGES)) return [bag.L, bag.L];
   return sizeRange(same.map((g) => g.add[0]!.L), bag.L, SIZE_RANGES[bag.pos as SizedPos].max);
+}
+
+/**
+ * What the chosen setup left out (the owner's finding F, 8 Nov): panniers, and under Bikepacking bags only also a rack to fit for its
+ * deck. A rack the rider has, and its deck, are no bigger change.
+ */
+function beyondSetup(given: AdvisorInput, c: Candidate): boolean {
+  return c.add.some((b) => b.pos === 'rack') || (given.style === 'bags' && c.deck && !rackFitted(given));
+}
+
+/** Whether the answer leaves room for a bigger change: nothing else helps (no Looking ahead, cannot reduce, nothing helps). */
+function wantsBigger(answer: AdvisorAnswer): boolean {
+  if (answer.partial || answer.tried >= MAX_TRIALS) return false;
+  return answer.kind === 'suggestions' ? answer.ahead === null : answer.kind === 'cannot-reduce' || answer.kind === 'nothing-helps';
+}
+
+/**
+ * A bigger change (the owner's finding F, 8 Nov): when the answer can only say that nothing else would help, one suggestion that goes
+ * beyond the setup the rider chose (panniers, or a rack to fit under Bikepacking bags only), clearly its own, tried with the same packing.
+ * It must be valid and better on the goal than Minimal's first (or, with no suggestion, than the plan as it is) by decision 6. Its own
+ * search, after the answer, so the answer's search is as it was; it counts on from the answer's trials and never passes MAX_TRIALS.
+ * None under Panniers are fine (nothing is left out), with the rider's own panniers (their rack is taken), with no rack possible, or for
+ * an answer cut short.
+ */
+export function* biggerSteps(given: AdvisorInput, answer: AdvisorAnswer): Generator<number, Suggestion | null> {
+  if (given.style === 'panniers' || !wantsBigger(answer) || given.bags.some((b) => b.pos === 'rack')) return null;
+  const input = planAsStyled({ ...given, style: 'panniers' });
+  if (!panniersAllowed(input)) return null;
+  let trials = answer.tried;
+  const base = input.trial(input.bags, input.decks);
+  trials++;
+  const ref = answer.kind === 'suggestions' ? answer.items[0]! : { result: base, score: handlingScore(base) };
+  const goal = given.goal;
+  const backGain = (s: Suggestion) => ref.result.backL - s.result.backL >= MIN_GAIN_BACK_L - EPS;
+  const scoreGain = (s: Suggestion) => ref.score - s.score >= MIN_GAIN_SCORE - EPS;
+  const better = (s: Suggestion) => overflows(ref.result) || (goal === 'handling' ? scoreGain(s) : goal === 'backpack' ? backGain(s)
+    : backGain(s) || (s.result.backL <= ref.result.backL + NOTHING_ON_BACK_L && scoreGain(s)));
+  const handBack = () => trials % SLICE === 0 || (input.handBack?.() ?? false);
+  const found: Suggestion[] = [];
+  const phases: ('add' | 'swap' | 'add-two')[] = goal === 'handling' ? ['add', 'swap', 'add-two'] : ['add', 'add-two'];
+  outer: for (const phase of phases) {
+    if (phase === 'add-two' && found.length > 0) break;   // two at once only when one would not do
+    for (const c of candidates(input, phase, true)) {
+      if (!beyondSetup(given, c)) continue;
+      if (trials >= MAX_TRIALS) break outer;
+      const result = input.trial(bagsFor(input, c), c.decks);
+      trials++;
+      const s = suggestion(c, result);
+      if (isValid(base, result) && better(s)) found.push(s);
+      if (handBack()) yield trials;
+    }
+  }
+  const best = [...found].sort((a, b) => compareFor(goal)(a, b) || byOwnerOrder(a, b))[0];
+  if (!best) return null;
+  return { ...best, rangeL: rangeOf(best, found.filter((g) => keyOf(g) === keyOf(best) && g.kind === best.kind && g.remove === best.remove)) };
+}
+
+/** The bigger change at once. */
+export function bigger(given: AdvisorInput, answer: AdvisorAnswer): Suggestion | null {
+  const steps = biggerSteps(given, answer);
+  for (;;) {
+    const step = steps.next();
+    if (step.done) return step.value;
+  }
 }
 
 /** The whole search at once. */

@@ -25,7 +25,9 @@ export type AdvisorInput = {
    * The setup the rider wants (the owner's ruling of 7 Nov): `bags` Bikepacking bags only (never panniers; a rack already fitted still
    * carries things on its deck), `bags-first` Bags first, panniers only if needed (the default), `panniers` Panniers are fine.
    */
-  style: Setup; goal: 'handling' | 'backpack';
+  style: Setup;
+  /** Better handling, Get the backpack off, or both together (the owner, 8 Nov): the back first, handling breaking its ties. */
+  goal: 'handling' | 'backpack' | 'both';
   bags: BagIn[]; decks: Decks; camping: boolean; nextUid: number;
   /** Whether a rack is fitted, read from the plan before the setup applies (candidates.ts sets it; the page need not). */
   rackFitted?: boolean;
@@ -70,7 +72,9 @@ export type AdvisorAnswer =
    * owner's rulings on PR 61): `minimalSame`, the indices of Minimal's suggestions that reach about the same result as the best of them
    * (two or more, else none); `aheadAlts`, up to two more sets of other bags reaching about the same as Looking ahead.
    */
-  | ({ kind: 'suggestions'; items: Suggestion[]; ahead: Suggestion | null; minimalSame: number[]; aheadAlts: Suggestion[] } & AnswerCommon)
+  | ({ kind: 'suggestions'; items: Suggestion[]; ahead: Suggestion | null; minimalSame: number[]; aheadAlts: Suggestion[];
+    /** Both goals, when nothing takes more off the back: the litres that stay there, and these suggestions are for handling (owner, 8 Nov). */
+    backStays?: number } & AnswerCommon)
   | ({ kind: 'already-good' } & AnswerCommon)
   /** Get the backpack off only: litres stay on the back (backL) and nothing takes MIN_GAIN_BACK_L more off it. */
   | ({ kind: 'cannot-reduce'; backL: number } & AnswerCommon)
