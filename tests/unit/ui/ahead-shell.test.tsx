@@ -556,6 +556,39 @@ describe('Emergency\'s Update position never waits on a question (review of PR 5
     stop();
   });
 
+  // Re-check of PR 65, R1: a second tap clears the question; the screen built with the question's words goes with it at once, so a tap
+  // that then fails never leaves "Position found. Choose which pass…" up with no choice to make.
+  test('[AH-ASK-NOTE] a second Update position that fails: the screen is built again at once, "No position yet" again, and no "Position found" anywhere', async () => {
+    const i = rainyStop({ positions: [] });
+    await seed({ ...i, trip: { ...i.trip, route: outAndBack(), departureDate: SAT } });
+    const geo = fakeGeo();
+    const shell = browserAhead(deps({ now: () => i.now, geolocation: () => geo }));
+    const stop = shell.start();
+    await until(() => shell.view.value.kind === 'trip', 'the screen');
+    await act(async () => { render(<Live shell={shell} />, host); });
+    const notes = (): string => host.querySelector('.ah-notes')?.textContent ?? '';
+    const screenText = (): string => { const v = shell.view.value; return v.kind === 'trip' ? JSON.stringify(v.screen) : ''; };
+    const first = shell.actions.updatePosition();
+    await act(async () => { geo.emit(12, 32); await new Promise((r) => setTimeout(r, 0)); });
+    await first;
+    await until(() => shell.view.value.kind === 'trip' && shell.view.value.position.kind === 'ask', 'the question on Ahead');
+    await settle();
+    expect(notes()).toContain(A.askPassFromStart);
+    // the second tap: while the phone looks, the question is gone, and so are its words
+    const second = shell.actions.updatePosition();
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(screenText()).not.toContain(A.askPassFromStart);
+    expect(screenText()).not.toContain('Position found');
+    await act(async () => { geo.fail(1); await new Promise((r) => setTimeout(r, 0)); });
+    expect(await second).toBe(false);
+    await settle();
+    expect(shell.view.value.kind === 'trip' && shell.view.value.position.kind).toBe('said');
+    expect(notes()).toContain(W.routeNoPositionFromStart);
+    expect(screenText()).not.toContain('Position found');
+    expect(screenText()).toContain(W.helpFromNoPosition('0'));
+    stop();
+  });
+
   test('[AH-EMERGENCY-POSITION] while Ahead asks which pass, Emergency adds no "not stored" note for a fix that lies on the route: the rescue line shows without it', async () => {
     const i = rainyStop({ positions: [], rescuePoints: [{ ...rescue('KA-032').atKm(32, { off: 600 }), kms: [32, 118] }] });
     await seed({ ...i, trip: { ...i.trip, route: outAndBack() } });

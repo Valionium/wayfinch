@@ -1,3 +1,5 @@
+/* The one top bar of every tool (owner, 7 Nov 2026), shared with the bag planner and the app: src/ui/back-bar/back-bar.css. */
+@import url('/back-bar.css');
 /* The legal pages of Wayfinch: plain pages of the site, no script, no outside font. Colours as in the app (section 3.6). */
 :root { color-scheme: light dark; --ground: #F4F2E8; --panel: #FBFAF3; --ink: #22271D; --muted: #57604A; --blaze: #B43A08; --line: #C7C4B1; }
 @media (prefers-color-scheme: dark) {

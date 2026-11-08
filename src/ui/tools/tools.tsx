@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'preact/hooks';
 import { W } from '../../core/wording/en.ts';
 import { savedBikeIds, toolBike } from '../../tools/tyre/choice.ts';
+import { TL } from '../../core/wording/en-tools.ts';
 import { readStore } from '../../tools/tyre/storage.ts';
 import type { LastResult } from '../../tools/tyre/storage.ts';
 import type { TyreServices } from '../../tools/tyre/services.ts';
 import { bikeSource, refreshBikeSource } from '../bike/live.ts';
 import { Card } from '../card.tsx';
-import { BagCard } from './bag-card.tsx';
+import { BagCard, DRAWN_KEY } from './bag-card.tsx';
 import { BikeLine } from './bike-line.tsx';
 import { choiceVersion } from './bike-choice.ts';
 
@@ -39,15 +40,23 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
   const pick = (host.planBikeId ? entries.find((e) => e.key === host.planBikeId) : undefined) ?? entries.sort((a, b) => b.last.at.localeCompare(a.last.at))[0];
   const last: LastResult | null = pick?.last ?? null;
   // The bag card draws the chosen bike at once: a saved bike the rider picked, the plan moving to it at the bag planner's next open
-  // (owner, 7 Nov 2026). "No bike" and a plan-only bike change nothing there (TB-PAGE-FOLLOWS), so the card keeps the plan's bike.
+  // (owner, 7 Nov 2026). "Without a bike" moves the plan to the standard bike there (TB-PAGE-NO-BIKE): the card draws it grey, and says
+  // so. A plan-only bike changes nothing there (TB-PAGE-FOLLOWS), so the card keeps the plan's bike.
   const saved = savedBikeIds(services.storage);
   const choice = toolBike(services.storage, host, saved);
   const planOnly = source.bike !== null && !saved.includes(source.bike.id);
-  const chosen = choice.picked && choice.id !== null && !planOnly ? source.bikes.find((b) => b.id === choice.id) : undefined;
+  const chosen = choice.picked && !planOnly ? (choice.id === null ? null : source.bikes.find((b) => b.id === choice.id)) : undefined;
+  // Kept for this tab, so the first screen draws it too when the rider comes back (re-check of PR 65, R3).
+  useEffect(() => {
+    try {
+      if (chosen === undefined) sessionStorage.removeItem(DRAWN_KEY);
+      else sessionStorage.setItem(DRAWN_KEY, JSON.stringify([chosen?.id ?? null, source.bike?.id ?? null]));
+    } catch { /* the plan's bike is drawn first then, as before */ }
+  });
   return (
     <>
       <BikeLine services={services} tick={tick} />
-      <BagCard services={services} chosen={chosen} />
+      <BagCard services={services} chosen={chosen} note={chosen === null ? TL.toolsNoBike : undefined} />
       <Card title={W.tyreCardTitle}>
         <p class="tool-line">{last ? W.tyreCardLast(trimBar(last.frontBar), trimBar(last.rearBar)) : W.tyreCardNone}</p>
         {last?.bike ? <p class="muted">{W.tyreCardBike(last.bike)}</p> : null}
