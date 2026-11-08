@@ -820,6 +820,91 @@ test('[GA-LINK-PLANNER] the bags step ends with "Not happy with your bags? Ask t
   assert.ok(textOf(view(p).steps).includes('Using your packing: '),'the plan\'s packing');
 });
 
+// ---- Review of PR 68 ----
+
+const summaryOf=p=>p.values.get('loadcheck:summary:v1');
+const summaryBags=p=>JSON.parse(summaryOf(p)).bags;
+// go(n) as the page's own: entering the packing check takes the nights as its base (the "Nights changed" note)
+const realGo="go=n=>{S.step_prev=S.step;S.step=n;if(n===4&&S.step_prev!==4)S.baseNights=S.nights;};";
+
+test('[GA-TRIAL-NO-TRACE] the summary Wayfinch reads never holds a trial bag: after a packed tick, a hidden tab and a bike follow during a trial it says what it said before Try, and after Remove it is byte for byte the one of before (review of PR 68, C1)',async()=>{
+  const TOURER={id:'tourer',name:'Tourer',fit:{style:'diamond-level',size:{kind:'letter',value:'L'}},rackMounts:'yes'};
+  const p=saved();
+  p.run(`BIKE_PROFILES=[...BIKE_PROFILES,normaliseBikeProfile(${JSON.stringify(TOURER)})];store.set(BIKE_PROFILE_KEY,BIKE_PROFILES);writeLoadSummary(true);`);
+  p.context.document.getElementById('bikeDetailsBox').classList.contains=()=>true;   // Bike details closed
+  const before=summaryOf(p),bags=summaryBags(p);
+  await ask(p,{style:'bags-first',goal:'handling'});
+  p.run(`startTrial(${cards}[0])`);
+  // a packed tick, the natural next tap on the packing check (it saves the draft at once)
+  p.run('setPackedItem(getChecklistModel().items[0].id,true)');
+  assert.deepEqual(summaryBags(p),bags,'after a packed tick: no trial bag');
+  // a hidden tab with another change unsaved
+  p.run("S.pendingSaveName='Alps';flushDraft();");
+  assert.deepEqual(summaryBags(p),bags,'after a hidden tab: no trial bag');
+  // the bike chosen in Tools, on a return from the back/forward cache
+  p.values.set('copilot:bikeChoice:v1',JSON.stringify({app:'copilot',kind:'bike-choice',v:1,bikeId:'tourer',at:new Date(Date.now()+1000).toISOString()}));
+  p.run('followBikeChoice();flushDraft();');
+  assert.deepEqual(summaryBags(p),bags,'after a bike follow: no trial bag');
+  p.run('removeTrial()');
+  assert.equal(summaryOf(p),before,'after Remove: the summary of before, byte for byte');
+});
+
+test('[GA-REMOVE] Remove gives the draft back its base nights: Try enters the packing check, which takes the nights as its base; Remove puts back the base of before (review of PR 68, M1)',async()=>{
+  const p=saved(R2+'S.baseNights=2;');
+  p.run(realGo+'S.nights=3;S.step=2;flushDraft();');
+  assert.equal(JSON.parse(p.values.get('loadcheck:draft')).baseNights,2);
+  await ask(p,{style:'bags-first',goal:'handling'});
+  p.run(`startTrial(${cards}[0])`);
+  assert.equal(p.json('S.baseNights'),3,'the packing check took 3 as its base');
+  assert.equal(p.json('captureDraft().baseNights'),2,'the draft during the trial keeps 2');
+  p.run('removeTrial()');
+  assert.equal(p.json('S.baseNights'),2,'Remove puts back 2');
+  assert.equal(JSON.parse(p.values.get('loadcheck:draft')).baseNights,2,'and the draft keeps it');
+});
+
+test('[GA-REMOVE] a bag added during a trial goes with Remove, and so does a hand placement into it: no pin is left on a bag that is not there (review of PR 68, M2)',async()=>{
+  const p=saved();
+  await ask(p,{style:'bags-first',goal:'handling'});
+  p.run(`startTrial(${cards}[0])`);
+  p.run("addBag('pack');S.pinned.stove=S.bags[S.bags.length-1].uid+'-0';");
+  p.run('removeTrial()');
+  const left=p.json("Object.entries(S.pinned).filter(([,k])=>!S.bags.some(b=>String(b.uid)===String(k).split('-')[0]))");
+  assert.deepEqual(left,[],'no orphan pin');
+  assert.deepEqual(JSON.parse(p.values.get('loadcheck:draft')).pinned,p.json('S.pinned'),'nor in the draft');
+});
+
+test('[GA-KEEP] Keep during a two-tab conflict, and an update during a trial, never drop the trial silently: one line says so and the trial stays on (review of PR 68, M3)',async()=>{
+  const p=saved();
+  await ask(p,{style:'bags-first',goal:'handling'});
+  p.run(`startTrial(${cards}[0])`);
+  p.run('DRAFT_FROZEN=true;');
+  assert.equal(p.json('keepTrial()'),false,'not kept');
+  assert.ok(p.json('TRIAL!==null'),'the trial stays on');
+  assert.ok(p.context.document.getElementById('trialText').textContent.includes('changed in another tab'),'and the line says why');
+  p.run('DRAFT_FROZEN=false;');
+  await p.run("UPDATE_STATE.registration={waiting:{postMessage(){throw Error('no update during a trial');}}};applyUpdate()");
+  assert.ok(p.json('TRIAL!==null'),'an update leaves the trial on');
+  assert.equal(p.json('UPDATE_STATE.note'),'Keep or remove the bag you are trying first, then apply the update.');
+  assert.equal(p.json('keepTrial()'),true,'once the conflict is gone, Keep keeps');
+});
+
+test('[GA-TRIAL-NO-TRACE] no bike follow while a trial is on: the follow waits for the page\'s next open after Keep or Remove (review of PR 68, M4; TB-PAGE-FOLLOWS)',async()=>{
+  const TOURER={id:'tourer',name:'Tourer',fit:{style:'diamond-level',size:{kind:'letter',value:'L'}},rackMounts:'yes'};
+  const p=saved();
+  p.run(`BIKE_PROFILES=[...BIKE_PROFILES,normaliseBikeProfile(${JSON.stringify(TOURER)})];store.set(BIKE_PROFILE_KEY,BIKE_PROFILES);`);
+  p.context.document.getElementById('bikeDetailsBox').classList.contains=()=>true;
+  await ask(p,{style:'bags-first',goal:'handling'});
+  p.run(`startTrial(${cards}[0])`);
+  p.values.set('copilot:bikeChoice:v1',JSON.stringify({app:'copilot',kind:'bike-choice',v:1,bikeId:'tourer',at:new Date(Date.now()+1000).toISOString()}));
+  assert.equal(p.json('followBikeChoice()'),false,'no follow during the trial');
+  assert.equal(p.json('S.bikeProfile.id'),'gravel');
+  p.run('removeTrial()');
+  assert.equal(p.json('S.bikeProfile.id'),'gravel','Remove moves no bike under the rider\'s fingers');
+  // the next open, a return from the back/forward cache: the follow comes now
+  assert.equal(p.json('followBikeChoice()'),true);
+  assert.equal(p.json('S.bikeProfile.id'),'tourer','followed at the next open');
+});
+
 (async()=>{
   // GA_ONLY=<text> runs only the tests whose name holds it (for watching one fail)
   for(const [name,fn] of tests){if(process.env.GA_ONLY && !name.includes(process.env.GA_ONLY))continue;await fn();passed++;console.log('ok',name);}
