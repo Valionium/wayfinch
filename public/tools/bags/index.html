@@ -1658,6 +1658,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
    radio or checkbox of 44 px or more. */
 html.adv-page .wrap>:not(.wf-bar):not(#updateBar):not(#tabBar){display:none!important}
 html.adv-page .guide-launch-row{margin-top:0}
+html.adv-page .wrap{max-width:760px}   /* the bar over the advisor's own column, also where the planner has two */
 #advisorBack,html.adv-page #backToWayfinch,html.adv-page #walkthroughOpen{display:none}
 html.adv-page #advisorBack{display:inline-flex}
 .advisor-page{max-width:760px;margin:0 auto;padding:4px 18px 40px}
@@ -5625,7 +5626,7 @@ const ADVISOR_WORDING = {
   styleBags:{text:'Bikepacking bags only'}, styleBagsFirst:{text:'Bags first, panniers only if needed'}, stylePanniers:{text:'Panniers are fine'},
   noMounts:{text:"Your bike has no rack mounts, so no rack or panniers are offered."},
   rackKept:{text:'Your bike is set to no rack mounts, but your plan has a rack: it stays in these suggestions.'},
-  step2:{text:'2. What should get better'},
+  step2:{text:'2. What should get better (one or both)'},
   goalHandling:{text:'Better handling'}, goalBackpack:{text:'Get the backpack off'},
   step3:{text:'3. What you carry'},
   usingPlan:{text:'Using your packing: {n} items, {m} bags'},
