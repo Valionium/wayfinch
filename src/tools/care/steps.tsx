@@ -102,6 +102,9 @@ export function StepView({ source, bars, onClose }: { source: StepSource; bars: 
 
   const close = (fromBack: boolean): void => {
     if (!fromBack) history.back();
+    // Closed before it leaves the page: a modal dialog removed while open can take focus with it after the card has been given it back.
+    const d = box.current;
+    if (d?.open && typeof d.close === 'function') d.close();
     onClose();
   };
   const closeRef = useRef(close);
