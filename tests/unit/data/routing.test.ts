@@ -4,7 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { buildRoute } from '../../../src/core/route/profile.ts';
 import { ROUTERS, planRoute, searchPlace } from '../../../src/data/routing.ts';
 import type { Router } from '../../../src/data/routing.ts';
-import { routeFromPoints } from '../../../src/ui/trip/model.ts';
+import { routeFromPoints } from '../../../src/ui/trip/read-gpx.ts';
 
 const A = { lat: 49.4, lon: 8.69 };
 const B = { lat: 48.58, lon: 7.75 };

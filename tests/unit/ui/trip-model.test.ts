@@ -3,7 +3,8 @@ import { planStages } from '../../../src/core/route/stages.ts';
 import { GpxError } from '../../../src/core/route/gpx.ts';
 import { buildRoute } from '../../../src/core/route/profile.ts';
 import { W } from '../../../src/core/wording/en.ts';
-import { planned, profileOf, routeFromGpx, summaryOf, tripRuns } from '../../../src/ui/trip/model.ts';
+import { planned, profileOf, profileY, routeDoneLine, summaryOf, tripLineOf, tripRuns } from '../../../src/ui/trip/model.ts';
+import { routeFromGpx } from '../../../src/ui/trip/read-gpx.ts';
 import type { Trip } from '../../../src/core/types.ts';
 import { fixtureGpx, gpxText } from '../../fixtures/gpx.ts';
 import { loadFixtureRoute } from '../../fixtures/packs/index.ts';
@@ -119,5 +120,68 @@ describe('Which screen the app opens on (spec section 3.1)', () => {
     expect(tripRuns(outside)).toBe(false);
     expect(tripRuns({ ...outside, lastPositionAt: new Date(base.now.getTime() - 23 * 3_600_000) })).toBe(true);
     expect(tripRuns({ ...outside, lastPositionAt: new Date(base.now.getTime() - 25 * 3_600_000) })).toBe(false);
+  });
+});
+
+describe('The guided Trip (design of 8 Nov 2026)', () => {
+  const twoDays = async (): Promise<Trip['route']> => {
+    const { route } = await routeFromGpx(await fixtureGpx('heidelberg-strasbourg'), 'ride.gpx', parseXml);
+    return planned(route, { flatKph: 25, pace: 'sporting', nights: 2 });
+  };
+
+  test('[TRIP-LINE] the trip line says where the rider is in time: before, on each day, after the last day, without a date, without a trip', async () => {
+    const route = await twoDays();
+    expect(route.stages).toHaveLength(3);
+    const at = (departureDate: string | null, today: string) => tripLineOf(tripOf(route, { departureDate }), today);
+    expect(at('2026-11-14', '2026-11-08')).toEqual({ name: route.name, when: 'Starts Sat 14 Nov, in 6 days' });
+    expect(at('2026-11-14', '2026-11-13').when).toBe('Starts tomorrow, Sat 14 Nov');
+    expect(at('2026-11-14', '2026-11-14').when).toBe('Starts today');
+    expect(at('2026-11-14', '2026-11-15').when).toBe('Day 2 of 3');
+    expect(at('2026-11-14', '2026-11-16').when).toBe('Day 3 of 3');
+    expect(at('2026-11-14', '2026-11-17').when).toBe('Ended on Mon 16 Nov');
+    expect(at(null, '2026-11-08').when).toBe(W.appTripLineNoDate);
+    expect(tripLineOf(null, '2026-11-08')).toEqual({ name: W.appTripNoTrip, when: null });
+  });
+
+  test('[TRIP-STEPS] the Route step folds to "165 km · 1,240 m up · 2 days": the distance, the climbing and the stage model\'s days', async () => {
+    const route = await twoDays();
+    const line = routeDoneLine(tripOf(route));
+    expect(line).toBe(`${Math.round(route.lengthKm * 10) / 10} km · ${String(route.ascentM).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} m up · 3 days`);
+    expect(routeDoneLine(tripOf({ ...route, ascentM: null, stages: route.stages.slice(0, 1) }))).toMatch(/ km · climbing unknown · 1 day$/);
+  });
+});
+
+describe('The stops on the height profile (guided Trip design §6)', () => {
+  test('[TRIP-STOPS] an icon sits on the profile line: at its km, at the height there, in the profile\'s own box', async () => {
+    const { route: full } = await routeFromGpx(await fixtureGpx('alpine-pass'), 'ride.gpx', parseXml);
+    // At most 120 points, so the line is drawn through every one of them (the drawn line is what an icon sits on: review of PR 73,
+    // M1) and the highest and lowest points are on it: exactly 2 and 70 in the 72 box.
+    const every = Math.ceil(full.points.length / 120);
+    const route = { ...full, points: full.points.filter((_, i) => i % every === 0 || i === full.points.length - 1) };
+    expect(route.points.length).toBeLessThanOrEqual(120);
+    const box = profileOf(route)!;
+    const top = route.points.reduce((a, b) => (b.ele! > a.ele! ? b : a));
+    const low = route.points.reduce((a, b) => (b.ele! < a.ele! ? b : a));
+    expect(profileY(route, top.km)).toBeCloseTo(2, 0);
+    expect(profileY(route, low.km)).toBeCloseTo(70, 0);
+    expect(box.maxM).toBe(Math.round(top.ele!));
+    expect(profileY({ ...route, points: route.points.map((p) => ({ ...p, ele: null })) }, 3)).toBeNull();
+  });
+});
+
+describe('What the review of PR 73 found', () => {
+  test('[TRIP-STOPS] the icon’s height is the drawn line’s: within half a unit of the path at 400 kilometres on each fixture', async () => {
+    for (const id of ['heidelberg-strasbourg', 'multi-day-800', 'alpine-pass'] as const) {
+      const { route } = await routeFromGpx(await fixtureGpx(id), 'ride.gpx', parseXml);
+      const pts = [...profileOf(route)!.path.matchAll(/[ML]([\d.]+),([\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])] as const);
+      for (let n = 0; n <= 400; n++) {
+        const km = (route.lengthKm * n) / 400;
+        const x = (km / route.lengthKm) * 300;
+        const k = Math.max(1, pts.findIndex(([px]) => px >= x));
+        const [a, b] = [pts[k - 1]!, pts[k]!];
+        const drawn = b[0] > a[0] ? a[1] + ((b[1] - a[1]) * (x - a[0])) / (b[0] - a[0]) : a[1];
+        expect(Math.abs(profileY(route, km)! - drawn), `${id} at km ${km.toFixed(1)}`).toBeLessThan(0.5);
+      }
+    }
   });
 });
