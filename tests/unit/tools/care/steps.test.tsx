@@ -36,10 +36,16 @@ function fakeWakeLock(): void {
     },
   });
 }
-/** The pictures' addresses are the source files' in the test runner; fetch reads them from the repository, as the built site serves them. */
+/**
+ * In the test runner a picture's address is its source file's, or a data address for a small one (the build never inlines: it ships each
+ * as a file of its own, BC-PIC-LAZY); fetch reads either, as the built site serves them.
+ */
 const REPO = process.cwd(); // vitest runs from the repository's root
+const body = (url: string): string => (url.startsWith('data:')
+  ? Buffer.from(url.slice(url.indexOf(',') + 1), 'base64').toString('utf8')
+  : readFileSync(join(REPO, url.replace(/\?.*$/, '')), 'utf8'));
 beforeEach(async () => {
-  vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve({ ok: true, text: () => Promise.resolve(readFileSync(join(REPO, url.replace(/\?.*$/, '')), 'utf8')) })));
+  vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve({ ok: true, text: () => Promise.resolve(body(url)) })));
   go('tools/care');
   await new Promise((r) => setTimeout(r, 0)); // the hash change's own popstate comes and goes first
   localStorage.clear();
