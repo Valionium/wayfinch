@@ -95,7 +95,8 @@ describe('an Emergency link at the top (item B)', () => {
     const top = host.querySelector<HTMLButtonElement>('[data-emergency-top]')!;
     expect(top).not.toBeNull();
     expect(top.textContent).toContain(W.appAheadChipEmergency);
-    expect(top.getAttribute('aria-controls')).toBe('chip-emergency');
+    // It names the panel it controls once the panel is there, never an id that names nothing.
+    expect(top.getAttribute('aria-controls')).toBeNull();
     // It comes first: before the position line and the strip.
     expect(top.compareDocumentPosition(host.querySelector('[data-position-line]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(host.querySelector('#chip-emergency')).toBeNull();
@@ -112,6 +113,7 @@ describe('an Emergency link at the top (item B)', () => {
     expect(panel.closest('.ah-below')).not.toBeNull();
     expect(scrolled).toBe(panel);
     expect(panel.textContent).toContain(W.emergencyCall);
+    expect(top.getAttribute('aria-controls')).toBe('chip-emergency');
     // The chip at the bottom shows it open; a second tap on the link keeps it open (it is a jump, not a toggle).
     expect(buttonNamed(W.appAheadChipEmergency, host.querySelector('.ah-chips')!).getAttribute('aria-expanded')).toBe('true');
     await click(top);

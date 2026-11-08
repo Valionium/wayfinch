@@ -74,7 +74,7 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
   };
   // The Emergency link at the top (owner's preview check, 8 Nov 2026, item B) jumps to the Emergency chip at the bottom and opens
   // it; a second tap keeps it open: it is a way there, not a switch.
-  const jump = <EmergencyJump onJump={() => openChip('emergency')} />;
+  const jump = <EmergencyJump open={chip === 'emergency'} onJump={() => openChip('emergency')} />;
 
   // Esc collapses the card the focus is in, and puts the focus on its title (spec 3.8).
   const onKeyDown = (e: KeyboardEvent): void => {
@@ -131,11 +131,14 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
   );
 }
 
-/** The link at the top of En route that opens Emergency at the bottom (item B). Not an address: the tabs own the hash. */
-function EmergencyJump({ onJump }: { onJump: () => void }) {
+/**
+ * The link at the top of En route that opens Emergency at the bottom (item B). Not an address: the tabs own the hash. It names the
+ * panel it controls only while the panel is there (an id that names nothing fails the accessibility check).
+ */
+function EmergencyJump({ open, onJump }: { open: boolean; onJump: () => void }) {
   return (
     <p class="ah-emergency-jump">
-      <button type="button" class="ah-emergency-top" data-emergency-top aria-controls="chip-emergency" onClick={onJump}>
+      <button type="button" class="ah-emergency-top" data-emergency-top aria-controls={open ? 'chip-emergency' : undefined} onClick={onJump}>
         {W.appAheadEmergencyTop}<span aria-hidden="true"> ↓</span>
       </button>
     </p>
