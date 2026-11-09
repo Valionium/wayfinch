@@ -137,7 +137,13 @@ export function confirmWater(litres: number, now: Date): Promise<{ ok: boolean; 
 
 async function confirming(litres: number, now: Date): Promise<{ ok: boolean; reason: string | null }> {
   if (typeof litres !== 'number' || !(litres >= 0 && litres <= MAX_WATER_L) || !validDate(now)) return { ok: false, reason: W.appStoreWaterRange };
-  await inTx(['waterLeft'], 'readwrite', (tx) => tx.objectStore('waterLeft').put({ litres, at: now, confirmed: true }, CURRENT));
+  // Only with a trip: water left is the trip's, and a tap that comes after the trip was removed keeps nothing.
+  const kept = await inTx(['trip', 'waterLeft'], 'readwrite', async (tx) => {
+    if (!(await tx.objectStore('trip').get(CURRENT))) return false;
+    await tx.objectStore('waterLeft').put({ litres, at: now, confirmed: true }, CURRENT);
+    return true;
+  });
+  if (!kept) return { ok: false, reason: W.appStoreNotKept };
   markChanged('water');
   return { ok: true, reason: null };
 }

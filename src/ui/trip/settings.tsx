@@ -3,13 +3,18 @@
 import { useRef, useState } from 'preact/hooks';
 import { W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
+import { TF } from '../../core/wording/en-trip-fields.ts';
 import { keepFreshOffered } from '../../data/refresh.ts';
 import type { Settings } from '../../store/rules.ts';
 import { useFollowing } from '../follow.ts';
+import { lazy } from '../lazy.tsx';
 import { suggestedNights } from './model.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
 
 type Save = (field: keyof Settings, value: unknown) => Promise<boolean>;
+
+// Remove this trip, last in the Route step: a chunk of its own, with its confirm step and its words (owner's wish, 9 Nov 2026).
+const RemoveTrip = lazy(() => import('./remove.tsx').then((m) => m.RemoveTrip));
 
 export function NumberField({ id, label, value, step, min, max, placeholder, onCommit, problem }: {
   id: string; label: string; value: number | null; step: string; min: number; max: number; placeholder?: string;
@@ -84,7 +89,7 @@ export function TripSettings({ services, snap, reload, part }: { services: TripS
       <div data-settings="when">
         {trip ? (
           <div class="field">
-            <label for="trip-date">{W.appTripDeparture}</label>
+            <label for="trip-date">{TF.appTripDeparture}</label>
             <input
               id="trip-date" type="date" value={dateDraft}
               onChange={(e) => {
@@ -119,13 +124,14 @@ export function TripSettings({ services, snap, reload, part }: { services: TripS
           </div>
         ) : null}
         <NumberField
-          id="trip-nights" label={W.appTripNights} value={settings.nights} step="1" min={0} max={30}
+          id="trip-nights" label={TF.appTripNights} value={settings.nights} step="1" min={0} max={30}
           placeholder={trip ? String(suggestedNights(trip)) : undefined} onCommit={(v) => save('nights', v)} problem={problem('nights')}
         />
-        {trip ? <p class="muted">{W.appTripNightsSuggested(suggestedNights(trip))}</p> : null}
+        {trip ? <p class="muted">{TF.appTripNightsSuggested(suggestedNights(trip))}</p> : null}
         {settings.nights !== null ? <button type="button" class="btn" onClick={() => void save('nights', null)}>{W.appTripNightsUseSuggested}</button> : null}
 
         {trip ? <p class="muted">{TR.appTripSettingsStageNote}</p> : null}
+        {trip ? <RemoveTrip snap={snap} reload={reload} /> : null}
       </div>
     );
   }
@@ -133,7 +139,7 @@ export function TripSettings({ services, snap, reload, part }: { services: TripS
   return (
     <div data-settings="details">
       <div class="field">
-        <label for="trip-start">{W.appTripStartTime}</label>
+        <label for="trip-start">{TF.appTripStartTime}</label>
         <input
           id="trip-start" type="time" min="04:00" max="14:00" value={startDraft} onInput={(e) => setStartDraft(e.currentTarget.value)}
           onChange={async (e) => { if (!(await save('startTime', e.currentTarget.value))) setStartDraft(settings.startTime); }}
@@ -142,20 +148,20 @@ export function TripSettings({ services, snap, reload, part }: { services: TripS
       </div>
 
       <Choice
-        name="pace" legend={W.appTripPace} value={settings.pace} onPick={(v) => save('pace', v)}
+        name="pace" legend={TF.appTripPace} value={settings.pace} onPick={(v) => save('pace', v)}
         options={[['steady', W.appTripPaceSteady], ['sporting', W.appTripPaceSporting], ['hard', W.appTripPaceHard]]}
       />
       {problem('pace') ? <p class="field-problem" role="alert">{problem('pace')}</p> : null}
 
-      <NumberField id="trip-kph" label={W.appTripFlatKph} value={settings.flatKph} step="0.5" min={15} max={40} onCommit={(v) => save('flatKph', v ?? Number.NaN)} problem={problem('flatKph')} />
+      <NumberField id="trip-kph" label={TF.appTripFlatKph} value={settings.flatKph} step="0.5" min={15} max={40} onCommit={(v) => save('flatKph', v ?? Number.NaN)} problem={problem('flatKph')} />
 
       <Choice
-        name="stay" legend={W.appTripStay} value={settings.stay} onPick={(v) => save('stay', v)}
+        name="stay" legend={TF.appTripStay} value={settings.stay} onPick={(v) => save('stay', v)}
         options={[['camping', W.appTripStayCamping], ['mixed', W.appTripStayMixed], ['accommodation', W.appTripStayAccommodation]]}
       />
       {problem('stay') ? <p class="field-problem" role="alert">{problem('stay')}</p> : null}
 
-      <NumberField id="trip-camp" label={W.appTripCampWater} value={settings.campWaterL} step="0.1" min={0} max={5} onCommit={(v) => save('campWaterL', v ?? Number.NaN)} problem={problem('campWaterL')} />
+      <NumberField id="trip-camp" label={TF.appTripCampWater} value={settings.campWaterL} step="0.1" min={0} max={5} onCommit={(v) => save('campWaterL', v ?? Number.NaN)} problem={problem('campWaterL')} />
 
       {keepFreshOffered(services.env.weatherMode) ? (
         <div class="field">

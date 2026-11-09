@@ -86,7 +86,7 @@ export type TripServices = {
   handOff?: () => Promise<HandoffOutcome>;
 };
 
-const HEIGHTS_FLAG = 'copilot:heights-lookup';
+export const HEIGHTS_FLAG = 'copilot:heights-lookup';
 type Fingerprint = { n: number; a: [number, number]; b: [number, number] };
 
 const fingerprint = (route: Route): Fingerprint => {

@@ -366,3 +366,17 @@ test("[HINT-BYTES] the first-run card adds nothing to the first screen: at or be
   console.log(`HINT-BYTES: first screen ${figures.firstJsGzip} bytes gzipped`);
   expect(figures.firstJsGzip).toBeLessThanOrEqual(145_036);
 });
+
+// Remove this trip (owner's wish, 9 November 2026): its confirm step, its words and the store's removal are chunks of their own,
+// loaded with the Route step; En route's routine stopping when a trip goes is paid for in en.ts.
+// 145,036 bytes is the first screen's figure on main (d6f88eb), merged in after the review; the rule is that it may not rise above it.
+test("[TRIP-REMOVE-FIRST] Remove this trip adds nothing to the first screen: at or below main's figure", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  expect(first.includes('Remove this trip')).toBe(false);
+  expect(first.includes('copilot:heights-lookup') && first.includes('trip-remove-title')).toBe(false);
+  const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
+  expect(lazy.filter((f) => text(on, f).includes('trip-remove-title')).length).toBe(1);
+  console.log(`TRIP-REMOVE-FIRST: first screen ${figures.firstJsGzip} bytes gzipped`);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_036);
+});

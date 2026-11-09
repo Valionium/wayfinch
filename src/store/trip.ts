@@ -82,6 +82,7 @@ async function saving(trip: Trip): Promise<void> {
   const problem = tripProblem(trip);
   if (problem) throw new InvalidTripError(problem);
   let replaced = false;
+  let first = false;
   const stamp = await inTx(ROUTE_TX, 'readwrite', async (tx) => {
     const stored = await readStamp(tx, 'trip');
     if (!holdsCopy('trip', stored)) throw new NewerDataError('trip');
@@ -90,11 +91,14 @@ async function saving(trip: Trip): Promise<void> {
     if (!before || !sameLine(before.route, trip.route)) {
       await clearRouteData(tx);
       replaced = Boolean(before);
+      first = !before;
     }
     return putTrip(tx, trip, stored);
   });
   noteTrip(stamp);
   if (replaced) forgetRouteChoices();
+  // A plan for tomorrow kept while there was no trip (a late tap in a window that had not heard of a removal) is no plan for this one.
+  else if (first) forgetPlanTomorrow();
   markChanged('trip');
 }
 
