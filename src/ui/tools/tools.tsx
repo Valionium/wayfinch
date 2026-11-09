@@ -3,12 +3,15 @@
 import { useEffect, useState } from 'preact/hooks';
 import { CL } from '../../core/wording/en-care-link.ts';
 import { GA } from '../../core/wording/en-advisor.ts';
+import { HN } from '../../core/wording/en-hint.ts';
 import { W } from '../../core/wording/en.ts';
 import { savedBikeIds, toolBike } from '../../tools/tyre/choice.ts';
 import { TL } from '../../core/wording/en-tools.ts';
 import { readStore } from '../../tools/tyre/storage.ts';
 import type { LastResult } from '../../tools/tyre/storage.ts';
 import type { TyreServices } from '../../tools/tyre/services.ts';
+import { noteSeen } from '../bike/hint-seen.ts';
+import { bikeDetailsHref } from '../bike/link.ts';
 import { bikeSource, refreshBikeSource } from '../bike/live.ts';
 import { Card } from '../card.tsx';
 import { BagCard, DRAWN_KEY } from './bag-card.tsx';
@@ -26,6 +29,8 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
   const source = bikeSource.value;
   // Reading the version here draws the bag card again when the bike line (or another window) changes the choice.
   void choiceVersion.value;
+  // A place seen, for the first-run bike hint (wish 17).
+  useEffect(() => noteSeen('t'), []);
   useEffect(() => {
     const again = (): void => { refreshBikeSource(); redraw((n) => n + 1); };
     const onStorage = (e: Event): void => { const k = (e as StorageEvent).key; if (k === null || k.startsWith('loadcheck:')) again(); };
@@ -59,7 +64,10 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
   });
   return (
     <>
-      <BikeLine services={services} tick={tick} />
+      {/* With no bike at all, the typical bike's line in its place (wish 17); a plan-only bike keeps no line, as before. */}
+      <BikeLine services={services} tick={tick} none={source.bike ? null : (
+        <p class="bike-line" data-hint-line><span>{W.tyreBikeLabel}: {HN.hintToolsTypical} · <a href={bikeDetailsHref('new', 'tools')}>{HN.hintToolsAdd}</a></span></p>
+      )} />
       <BagCard services={services} chosen={chosen} note={chosen === null ? TL.toolsNoBike : undefined} />
       <Card title={W.tyreCardTitle}>
         <p class="tool-line">{last ? W.tyreCardLast(trimBar(last.frontBar), trimBar(last.rearBar)) : W.tyreCardNone}</p>
@@ -72,7 +80,7 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
       </Card>
       <Card title={GA.advisorCardTitle}>
         <p class="tool-line">{GA.advisorCardLine}</p>
-        <a class="btn btn-primary" href={ADVISOR_HREF}>{W.tyreCardOpen}<span class="visually-hidden"> {GA.advisorCardTitle}</span></a>
+        <a class="btn btn-primary" href={ADVISOR_HREF} onClick={() => noteSeen('g')}>{W.tyreCardOpen}<span class="visually-hidden"> {GA.advisorCardTitle}</span></a>
       </Card>
     </>
   );

@@ -1,9 +1,11 @@
 // Your bikes (spec sections 3.5 and 3.7): the bag planner owns the library, so this lists and links and writes nothing. The bike of
 // the current plan comes first, marked; each has a small drawing without bags.
+import { useEffect } from 'preact/hooks';
 import type { BikeRecord } from '../../core/bike/normalise.ts';
 import { CL } from '../../core/wording/en-care-link.ts';
 import { Y } from '../../core/wording/en-you.ts';
 import { BikeDrawing } from '../bike/drawing.tsx';
+import { noteSeen } from '../bike/hint-seen.ts';
 import { bikeDetailsHref } from '../bike/link.ts';
 import { bikeSource } from '../bike/live.ts';
 import { Card } from '../card.tsx';
@@ -36,11 +38,19 @@ function markBikes(event: MouseEvent): void {
 export function BikesCards() {
   const source = bikeSource.value;
   const rows = bikeRows(source.bike, source.bikes);
+  // A place seen, for the first-run bike hint (wish 17).
+  useEffect(() => noteSeen('y'), []);
   return (
     <>
       <Card title={Y.youBikesTitle}>
         <div data-bikes onClick={markBikes}>
-          {rows.length === 0 ? <p class="muted">{Y.youBikesNone}</p> : (
+          {/* No bike yet: the small grey typical bike beside what adding one changes (wish 17). */}
+          {rows.length === 0 ? (
+            <div class="you-bike you-bike-none">
+              <BikeDrawing bike={null} summary={null} size="small" back="you" caption={false} />
+              <p class="muted">{Y.youBikesNone}</p>
+            </div>
+          ) : (
             <ul class="you-bikes">
               {rows.map(({ bike, mark }) => (
                 <li key={bike.id} class="you-bike">

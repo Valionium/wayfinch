@@ -44,11 +44,11 @@ function drawnLast(): BikeRecord | null | undefined {
   return undefined;
 }
 
-/** Tools while its chunk loads: the bag card, and room for the bike line when the rider has a saved bike, so nothing moves when it arrives. */
+/** Tools while its chunk loads: the bag card, and room for the bike line (a saved bike's, or with no bike at all the typical bike's, wish 17), so nothing moves when it arrives. */
 export function ToolsFirst({ services }: { services: TyreServices }) {
   return (
     <>
-      {bikeSource.value.bikes.length > 0 ? <p class="bike-line" aria-hidden="true" /> : null}
+      {bikeSource.value.bikes.length > 0 || !bikeSource.value.bike ? <p class="bike-line" aria-hidden="true" /> : null}
       <BagCard services={services} chosen={drawnLast()} />
     </>
   );

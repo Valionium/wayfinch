@@ -217,6 +217,108 @@ test('[C-HANDOFF] a trip from Wayfinch in a real browser: the bar asks, Apply lo
   expect(errors).toEqual([]);
 });
 
+/** The co-pilot's handoff as it writes it (src/store/db.ts and src/ui/trip/handoff.ts): the GPX in its database, the envelope. */
+async function handOver(page: Page, gpx: string): Promise<void> {
+  await page.evaluate(async ({ gpx, id }) => {
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open('copilot', 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore('handoffs'); };
+      req.onsuccess = () => {
+        const tx = req.result.transaction('handoffs', 'readwrite');
+        tx.objectStore('handoffs').put({ id, gpx, createdAt: new Date().toISOString() }, id);
+        tx.oncomplete = () => { req.result.close(); resolve(); };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+    localStorage.setItem('copilot:handoff:v1', JSON.stringify({ app: 'copilot', kind: 'handoff', v: 1, id, createdAt: new Date().toISOString() }));
+  }, { gpx, id: ID });
+}
+const handoffFixture = () => readFileSync(join(process.cwd(), 'contracts', 'handoff', 'heidelberg-strasbourg.gpx'), 'utf8');
+
+test('[TRIP-BAGS-LONG] a 2-night trip from Wayfinch in a real browser: Plan bags for this trip opens Bags with a new trip setup and the plan before kept; Undo brings it all back', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await plannerWithPlan(page);
+  await handOver(page, handoffFixture());
+  const before = await page.evaluate('JSON.stringify(captureDraft())');
+  const setupsBefore = await page.evaluate('JSON.stringify(storedSetupsLocal())');   // the setups as the page reads its two lists
+  await openFresh(page, `/tools/bags/#copilot-handoff=${ID}`);
+  await ready(page);
+  await expect(page.locator('#handoffText')).toContainText('Plan bags for this trip?');
+  await expect(page.locator('#handoffApply')).toHaveText('Use only the route');
+  await page.locator('#handoffPlan').click();
+  await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('#handoffText')).toContainText('Planned for Heidelberg → Strasbourg');
+  await expect(page.locator('#handoffPlan')).toBeHidden();
+  await expect(page.locator('#s2')).toBeVisible();
+  expect(await page.evaluate('[S.step, S.nights, S.place && S.place.name]')).toEqual([2, 2, 'Heidelberg']);
+  const stored = await page.evaluate('storedSetupsLocal()') as Array<{ name: string; forRoute?: { hash: string } }>;
+  const [made, kept] = stored;
+  expect(made!.name).toBe('Heidelberg → Strasbourg, 12 Jun');
+  expect(made!.forRoute!.hash).toMatch(/^[0-9a-f]{64}$/);
+  expect(kept!.name).toMatch(/^Before Heidelberg → Strasbourg, /);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:handoff-done')!).outcome)).toBe('applied');
+  await expect(page.locator('#backToWayfinch')).toHaveAttribute('href', '/#/trip');
+  await page.locator('#handoffUndo').click();
+  await expect(page.locator('#handoffText')).toContainText('Undone');
+  expect(await page.evaluate('JSON.stringify(captureDraft())')).toBe(before);
+  expect(await page.evaluate('JSON.stringify(storedSetupsLocal())')).toBe(setupsBefore);
+  expect(errors).toEqual([]);
+});
+
+test('[TRIP-BAGS-LONG] in a real browser, Undo never deletes a setup the rider changed and never drops later work (review of PR 80, I2)', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await plannerWithPlan(page);
+  await handOver(page, handoffFixture());
+  await openFresh(page, `/tools/bags/#copilot-handoff=${ID}`);
+  await ready(page);
+  await page.locator('#handoffPlan').click();
+  await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
+  // the rider goes on: a bag made bigger at Bags, the new trip setup marked general with a note of the rider's own
+  await page.evaluate(`(async () => {
+    S.bags[0].L = 20; S.bags[0].userL = true; renderBags(); queueDraftSave();
+    await setSetupKind(SETUPS[0].id, 'general'); await saveSetupNote(SETUPS[0].id, 'Our own note');
+  })()`);
+  const work = await page.evaluate('JSON.stringify(captureDraft())');
+  const made = await page.evaluate('SETUPS[0].id');
+  await page.locator('#handoffUndo').click();
+  await expect(page.locator('#handoffText')).toContainText('Nothing is undone');
+  await expect(page.locator('#handoffUndo')).toBeHidden();
+  expect(await page.evaluate('JSON.stringify(captureDraft())')).toBe(work);
+  const stored = await page.evaluate('storedSetupsLocal()') as Array<{ id: string; kind?: string; note: string }>;
+  expect(stored.find((s) => s.id === made)).toMatchObject({ kind: 'general', note: 'Our own note' });
+  expect(errors).toEqual([]);
+});
+
+test('[TRIP-SMALL] a day ride from Wayfinch in a real browser: the small view shows the bike with its bags and what is in each bag, nothing else; the full planner is one tap away', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await plannerWithPlan(page);
+  await handOver(page, handoffFixture().replace('nights="2"', 'nights="0"'));
+  await openFresh(page, `/tools/bags/#copilot-handoff=${ID}`);
+  await ready(page);
+  await expect(page.locator('#handoffText')).toContainText('a day ride');
+  await page.locator('#handoffPlan').click();
+  await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('#smallHead')).toBeVisible();
+  await expect(page.locator('#smallTripLine')).toContainText('day ride');
+  await expect(page.locator('#rigSvg')).toBeVisible();
+  await expect(page.locator('#packingChecklist .packing-groups')).toBeVisible();
+  for (const hidden of ['#crumbs', '#resultBox', '#modeBar', '#verdictBox', '.nightsbar', '#rigTools', '#packingUnpackedOnly', '#printPackingChecklist', '#walkthroughOpen', '#draftBar'])
+    await expect(page.locator(hidden).first()).toBeHidden();
+  await expect(page.locator('.wf-bar')).toBeVisible();   // the one top bar stays
+  expect(await page.evaluate('[S.step, S.nights]')).toEqual([4, 0]);
+  const plan = await page.evaluate('JSON.stringify(currentPlan())');
+  await page.locator('#smallFull').click();
+  await expect(page.locator('#smallHead')).toBeHidden();
+  await expect(page.locator('#crumbs')).toBeVisible();
+  await expect(page.locator('#resultBox')).toBeVisible();
+  expect(await page.evaluate('JSON.stringify(currentPlan())')).toBe(plan);
+  expect(errors).toEqual([]);
+});
+
 test('[BK-FORK-SAVE] the trip handoff leaves the bike alone: a fork\'s own two colours stay in the plan\'s bike, its saved copy and the draft', async ({ page }) => {
   await plannerWithPlan(page);
   const FORK = { kind: 'pattern', pattern: 'camo', pair: 2, colours: ['#2f7d4f', '#f1c232'] };

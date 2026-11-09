@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { W } from '../../../src/core/wording/en.ts';
 import { T } from '../../../src/core/wording/en-tyre.ts';
 import { TL } from '../../../src/core/wording/en-tools.ts';
+import { HN } from '../../../src/core/wording/en-hint.ts';
 import { readHost } from '../../../src/tools/tyre/host.ts';
 import { savedBikeIds, toolBike } from '../../../src/tools/tyre/choice.ts';
 import type { KeyValueStore } from '../../../src/tools/tyre/storage.ts';
@@ -114,9 +115,11 @@ describe('the choice, resolved', () => {
 });
 
 describe('the bike line in Tools', () => {
-  test('[TB-LINE] no bike: no line; one: the select too, so Without a bike can be picked; three: a select labelled Bike with three bikes and No bike, the current one selected', async () => {
+  // No bike at all: the typical bike's line, with no select (wish 17, owner's answers of 9 Nov 2026; it was no line).
+  test('[TB-LINE] no bike: the typical bike line, no select; one: the select too, so Without a bike can be picked; three: a select labelled Bike with three bikes and No bike, the current one selected', async () => {
     await mountTools(world([], null));
-    expect(line()).toBeNull();
+    expect(line()!.textContent).toBe(`${W.tyreBikeLabel}: ${HN.hintToolsTypical} · ${HN.hintToolsAdd}`);
+    expect(lineSelect()).toBeNull();
     render(null, host);
     await mountTools(world([A], A));
     expect(options(lineSelect()!)).toEqual(['Trail Bike' + W.tyreBikeInPlan, T.tyreBikeWithout]);
