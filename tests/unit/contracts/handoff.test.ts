@@ -25,9 +25,10 @@ const parseXml = (s: string): XmlDocLike => new window.DOMParser().parseFromStri
 const ID = '0123456789abcdef0123456789abcdef';
 
 /** The co-pilot's side: a trip on a fixture route, as handOffTrip writes it. */
-async function handedOff(id: Parameters<typeof loadFixtureRoute>[0], settings: Partial<Settings> = {}, departureDate: string | null = null) {
+async function handedOff(id: Parameters<typeof loadFixtureRoute>[0], settings: Partial<Settings> = {}, departureDate: string | null = null, share = 1) {
   const fixture = await loadFixtureRoute(id);
-  const route = await buildRoute(fixture.points.map((p) => ({ lat: p.lat, lon: p.lon, ele: p.ele })), fixture.name, 'gpx');
+  const points = fixture.points.slice(0, Math.max(2, Math.round(fixture.points.length * share)));   // share < 1: the route's first part only
+  const route = await buildRoute(points.map((p) => ({ lat: p.lat, lon: p.lon, ele: p.ele })), fixture.name, 'gpx');
   const trip: Trip = { route, departureDate, startTime: '08:30', flatKph: 25, stay: 'camping', campWaterL: 2 };
   const all = { ...DEFAULT_SETTINGS, ...settings };
   return { trip, settings: all, gpx: handoffGpx(route, tripAttributes(trip, all, { start: 'Heidelberg', end: 'Strasbourg' })) };
@@ -542,5 +543,114 @@ describe('[TRIP-SMALL] a day ride: the small view of the same Bag planner', () =
     await long.page.run('receiveHandoff()');
     await long.page.run('planTripBags()');
     expect(long.json('[S.step,SMALL_VIEW]')).toEqual([2, false]);
+  });
+});
+
+// A day ride the owner tried on 9 Nov 2026 (about 40 km, a few hundred metres of climbing, 0 nights, no bike saved, a general setup
+// "November · 0 nights" with no bags): the plan came out with 0 L mounted and 8.82 L of kit over. A day ride's plan must be one to ride
+// with: the day's essentials, sized to the ride by the planner's own rules, and bags that hold them; the rider's setups never change.
+/** The bag planner with no bike and no bags, a handed-off day ride on part of the loop fixture (or another whole route), departing on `date`. */
+async function dayRide(date: string, opts: { route?: Parameters<typeof loadFixtureRoute>[0] } = {}) {
+  // the owner's kind of ride: the loop's first 40 km or so (the whole loop is about 100 km)
+  const { gpx } = await handedOff(opts.route ?? 'loop', { nights: 0 }, date, opts.route ? 1 : 0.4);
+  const p = longPlanner(gpx);
+  p.page.run(`S.bags=[];S.nextUid=1;S.bikeProfile=null;S.kit={};S.kitTouched={};S.custom={};S.qty={};S.packed={};S.pinned={};applyTripKitDefaults();`);
+  return p;
+}
+const ESSENTIALS = ['docs', 'cash', 'phone', 'snacks', 'tool', 'pump', 'levers', 'firstaid', 'rain'];
+describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (owner, 9 Nov 2026)', () => {
+  test('a general setup with no bags is never the foundation; the bar says why it was passed over, and that setup stays byte for byte', async () => {
+    const { page, json } = await dayRide('2026-11-15');
+    page.run(`SETUPS=[${qaSetup('g_empty', { kind: 'general', name: 'November · 0 nights' })}];`);
+    const setups = page.run('JSON.stringify(SETUPS)');
+    expect(json('(SETUPS[0].bags||[]).length')).toBe(0);
+    await page.run('receiveHandoff()');
+    expect(json('tripFoundation()')).toBeNull();
+    expect(String(page.nodes.get('handoffText')!.textContent)).not.toMatch(/from your general setup/);
+    expect(await page.run('planTripBags()')).toBe(true);
+    expect(json('"base" in SETUPS[0]')).toBe(false);
+    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/November · 0 nights has no bags/);
+    expect(page.run(`JSON.stringify(SETUPS.filter(s=>s.id==='g_empty'))`)).toBe(setups);
+  });
+
+  test('with no bags anywhere, it proposes the smallest setup the planner\'s own rules fill: the bike\'s bottle cages, a top tube bag and only what the kit needs; nothing is over', async () => {
+    const { page, json } = await dayRide('2026-11-15');
+    await page.run('receiveHandoff()');
+    expect(await page.run('planTripBags()')).toBe(true);
+    const bags = json<Array<{ pos: string; slot?: string; L: number }>>('S.bags');
+    // water: a cage on each in-frame mount the bike has (no bike saved: both, as the planner assumes)
+    expect(bags.filter((b) => b.pos === 'bottle').map((b) => b.slot).sort()).toEqual(['dt', 'st']);
+    expect(json<number>('waterL()')).toBeGreaterThan(1);
+    // a top tube bag, the owner's minimum
+    expect(bags.filter((b) => b.pos === 'top')).toHaveLength(1);
+    // the rest only from the planner's own typical setup (frame bag, seat pack, handlebar roll)
+    for (const b of bags) expect(['bottle', 'top', 'frame', 'seat', 'bar']).toContain(b.pos);
+    // nothing over, and the whole kit in bags
+    expect(json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+    expect(json<number>('capL()')).toBeGreaterThanOrEqual(json<number>('kitL()'));
+    // and everything that must be reached at the roadside within reach (the selection's own reach rule)
+    expect(json('currentPlan().reach.outOfReach')).toEqual([]);
+    // smallest: without any one of the added bags (not the cages or the top tube bag), something would be over or out of reach
+    const extras = bags.filter((b) => !['bottle', 'top'].includes(b.pos)).map((b) => b.pos);
+    for (const pos of extras)
+      expect(json<number>(`(p=>p.spill.length+p.reach.outOfReach.length)(freshPlan({bags:S.bags.filter(b=>b.pos!=='${pos}')}))`), `without the ${pos} bag`).toBeGreaterThan(0);
+    // the bar names what it proposed
+    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/top tube bag/i);
+    // the setup made for the trip holds the same bags
+    expect(json('SETUPS[0].bags')).toEqual(bags);
+  });
+
+  test('the day\'s kit is the essentials, sized to the riding time; layers and sun kit follow the packing check\'s own weather and season rules', async () => {
+    const nov = await dayRide('2026-11-15');
+    await nov.page.run('receiveHandoff()');
+    await nov.page.run('planTripBags()');
+    const on = (p: typeof nov, id: string) => p.json<boolean>(`carrying('${id}')`);
+    for (const id of ESSENTIALS) expect(on(nov, id), id).toBe(true);
+    expect(on(nov, 'tubes') || on(nov, 'plugs')).toBe(true);
+    // a short ride: no lock, no power bank, no day of meals (ride snacks instead), nothing for the night
+    for (const id of ['lock', 'bank', 'food', 'base1', 'socks', 'wash', 'teeth', 'cables', 'towel', 'quilt', 'tent'])
+      expect(on(nov, id), id).toBe(false);
+    expect(nov.json<number>('planRoute().hoursDay')).toBeLessThan(4);
+    // the packing check asks for nothing the start left out, and the layers are exactly what its rules ask for
+    expect(nov.json<string[]>('audit().miss.flatMap(m=>m.ids)')).toEqual([]);
+    const c = nov.json<{ nightCold: number | null }>('tripClimate()');
+    expect(c.nightCold).not.toBeNull();
+    expect(on(nov, 'puffy')).toBe(c.nightCold! < 11);
+    expect(on(nov, 'gloves')).toBe(c.nightCold! < 5);
+    expect([on(nov, 'shades'), on(nov, 'sun')]).toEqual([false, false]);   // November: no sun season
+    const jun = await dayRide('2026-06-20');
+    await jun.page.run('receiveHandoff()');
+    await jun.page.run('planTripBags()');
+    expect([on(jun, 'shades'), on(jun, 'sun')]).toEqual([true, true]);
+    expect(jun.json<string[]>('audit().miss.flatMap(m=>m.ids)')).toEqual([]);
+    // a long day in the saddle: a day of food and the power bank come along
+    const long = await dayRide('2026-06-20', { route: 'heidelberg-strasbourg' });
+    await long.page.run('receiveHandoff()');
+    await long.page.run('planTripBags()');
+    expect(long.json<number>('planRoute().hoursDay')).toBeGreaterThan(6);
+    expect([on(long, 'food'), on(long, 'bank')]).toEqual([true, true]);
+  });
+
+  test('the rider\'s own bags in the plan here are used, never replaced; Undo brings back the plan and the setups exactly', async () => {
+    const { page, json } = await dayRide('2026-11-15');
+    page.run(`S.bags=[{uid:1,pos:'frame',L:5},{uid:2,pos:'seat',L:8}];S.nextUid=3;SETUPS=[${qaSetup('t_mine')}];`);
+    await page.run('receiveHandoff()');
+    const before = page.run('JSON.stringify(captureDraft())'), setups = page.run('JSON.stringify(SETUPS)');
+    expect(await page.run('planTripBags()')).toBe(true);
+    expect(json('S.bags.map(b=>[b.uid,b.pos,b.L])')).toEqual([[1, 'frame', 5], [2, 'seat', 8]]);
+    expect(await page.run('undoTripBags()')).toBe(true);
+    expect(page.run('JSON.stringify(captureDraft())')).toBe(before);
+    expect(page.run('JSON.stringify(SETUPS)')).toBe(setups);
+  });
+
+  test('when even the whole typical setup cannot hold the kit, the small view says what is over and what to do, in one line', async () => {
+    const { page, json } = await dayRide('2026-11-15');
+    page.run(`S.kit.shoes=true;S.kitTouched.shoes=true;S.qty.shoes=6;`);
+    await page.run('receiveHandoff()');
+    expect(await page.run('planTripBags()')).toBe(true);
+    expect(json<number>('currentPlan().spill.length')).toBeGreaterThan(0);
+    const line = String(page.nodes.get('smallOver')!.textContent);
+    expect(line).toMatch(/Camp or spare shoes/);
+    expect(line).toMatch(/Open the full Bag planner/);
   });
 });
