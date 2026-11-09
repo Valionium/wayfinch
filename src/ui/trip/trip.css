@@ -89,3 +89,9 @@ progress { width: 100%; accent-color: var(--blaze); }
 .bike-hint-done { margin: 4px 0 0; font-size: 0.9375rem; }
 /* Kept in the page while its words load, so a screen reader says them when they arrive (review of PR 90, M1). */
 .bike-hint-done:empty { margin: 0; }
+
+/* Place search hits: one button each, name first, then street, kind, postcode and town; no sideways scroll at 320 px */
+.hits { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; }
+.hit { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-width: 0; text-align: left; overflow-wrap: anywhere; }
+.hit-name { font-weight: 600; }
+.hit-line { color: var(--muted); font-size: 0.9375rem; }
