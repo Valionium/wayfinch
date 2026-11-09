@@ -604,7 +604,7 @@ test('[BAL-STORED] a plan reopened at the packing check in the planner\'s own pa
   const line = page.locator('#weightLine');
   // the weight map's line has its answer (or none): never the rider's things for a gain the balancing can take itself
   await page.waitForFunction("IDEAL_CACHE.value !== null && IDEAL_CACHE.key === idealKey()", null, { timeout: 30_000 });
-  expect(await line.evaluate((el) => (el.hidden ? '' : el.textContent))).not.toMatch(/^Your (hand placement|must-reach thing)/);
+  expect(await line.evaluate((el) => ((el as HTMLElement).hidden ? '' : el.textContent))).not.toMatch(/^Your (hand placement|must-reach thing)/);
   expect(await page.evaluate("localStorage.getItem('loadcheck:draft')"), 'the opening changed nothing').toBe(stored);
   // the rider's first step at the packing check: a thing ticked as packed
   await page.evaluate("setPackedItem('tent', true)");
