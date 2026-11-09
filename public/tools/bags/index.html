@@ -4161,14 +4161,21 @@ function dayRideTemp(c){
 }
 // The temperature the insulated jacket and the long gloves are packed by: the riding hours' on a day ride, else the cold night's.
 function warmLayerTemp(c, nights = S.nights){ return nights === 0 ? dayRideTemp(c) : (c ? c.nightCold : null); }
-/* On a day ride the insulated jacket the day calls for is worn, not packed (owner, 9 Nov 2026: "Worn, one spare tube"): it is in no
-   bag and adds no litres; the small view says "Wear: insulated jacket." A night or more packs it as before. */
-function dayRideWearsJacket(){ const c=tripClimate(); return S.nights === 0 && c.nightCold != null && dayRideTemp(c) < 11; }
+/* On a day ride the insulated jacket is worn, not packed (owner, 9 Nov 2026: "Worn, one spare tube"), and only when the riding hours
+   are below 8 °C (owner, 9 Nov 2026: "Below 8 °C"); from 8 °C it is neither worn nor packed, the day kit's rain jacket being the light
+   layer. It is in no bag and adds no litres; the small view says "Wear: insulated jacket." A night or more packs it as before. */
+const DAY_JACKET_BELOW=8;
+function dayRideWearsJacket(){ const c=tripClimate(); return S.nights === 0 && c.nightCold != null && dayRideTemp(c) < DAY_JACKET_BELOW; }
 // A day ride's one spare tube (same ruling): the frozen KIT item is "Spare tubes ×2", so the day kit sizes it as one, half its litres
 // and weight, through the planner's own size of an item (S.custom), unless the rider set a size of their own.
 const DAY_TUBE={L:0.35,kg:0.18,rigid:0};
 const isDayTube=c => !!c && c.L === DAY_TUBE.L && c.kg === DAY_TUBE.kg && (c.rigid || 0) === 0;
 function oneSpareTube(){ if(S.nights === 0 && S.kit.tubes && !S.custom.tubes && qtyOf(kitById('tubes')) === 1) S.custom.tubes={...DAY_TUBE}; }
+// The day size is the planner's, not the rider's (review of PR 95, I1): while the trip is a day ride the item reads as one tube for a
+// day ride and carries no "yours"; once the trip has nights the size goes again (applyTripKitDefaults), two tubes under KIT's name.
+const dayTubeNow=() => S.nights === 0 && isDayTube(S.custom.tubes);
+function kitName(k){ return k && k.id === 'tubes' && dayTubeNow() ? 'Spare tube (one, for a day ride)' : k.name; }
+function kitSizeIsRiders(k){ return isTweaked(k) && !(k.id === 'tubes' && isDayTube(S.custom.tubes)); }
 /* Water without bottle cages (owner: "at least water"): when the plan will have no bottle, neither its own nor the cages the day ride's
    proposal adds on the bike's in-frame mounts (proposedTripBags), the day's water goes in a bag, placed by the frozen selection. */
 function dayRideNeedsBagWater(){
@@ -4189,6 +4196,7 @@ function applyTripKitDefaults(){
   const defaults=tripKitDefaults();
   S.kitTouched=S.kitTouched || {};
   for(const [id,selected] of Object.entries(defaults))if(!S.kitTouched[id])S.kit[id]=selected && !bikeRepairAlternative(id);
+  if(S.nights > 0 && isDayTube(S.custom.tubes)) delete S.custom.tubes;   // a day ride's one tube: two again with nights
 }
 function bikeRepairAlternative(id){
   if(!['brakecable','gearcable','shiftcharger'].includes(id))return null;
@@ -5903,7 +5911,7 @@ function advisorOldBag(s, input){
 // new bag ("Put the tent on your rack, no new bag needed"); else a rack to fit. `inList`: the words inside a longer line.
 // What the planner's own deck placement puts on the rack deck with these bags and decks.
 function advisorDecked(bags, decks, input){ return withInputs(advisorChanges(bags, decks, input.context), () => deckedIds()); }
-const advisorDeckItems = (s, input) => advisorList(advisorDecked(advisorTrialBags(s, input), s.decks, input).map(id => (kitById(id) || { name:id }).name.toLowerCase()));
+const advisorDeckItems = (s, input) => advisorList(advisorDecked(advisorTrialBags(s, input), s.decks, input).map(id => (kitById(id) ? kitName(kitById(id)) : id).toLowerCase()));
 function advisorDeckText(s, input, inList){
   const items = advisorDeckItems(s, input), own = advisorRackFitted(input);
   if(inList) return own ? (items ? advisorWord('deckOwnPlus', { items }) : advisorWord('deckOwnPlusBare')) : (items ? advisorWord('deckNew', { items }) : advisorWord('deckNewBare')).replace(/^./, c => c.toLowerCase());
@@ -5950,7 +5958,7 @@ function advisorBagView(bags, decks, input){
 function advisorMoves(s, input){
   const base = advisorBase(input), bags = advisorTrialBags(s, input);
   const a = advisorPlan(base.bags, base.decks, input), b = advisorPlan(bags, s.decks, input);
-  const diff = planDiff(a, b), name = id => (kitById(id) || { name:id }).name;
+  const diff = planDiff(a, b), name = id => (kitById(id) ? kitName(kitById(id)) : id);
   const where = (keys, list) => {
     const labels = [...new Set(String(keys).split(',').filter(Boolean).map(k => {
       const bag = list.find(x => String(x.uid) === k.split('-')[0]); return bag ? POSITIONS[bag.pos].label.toLowerCase() : null;
@@ -6075,7 +6083,7 @@ function advisorAnswerHtml(answer, input){
   else {
     const c = answer.closest, lines = [advisorWord('nothing')];
     if(c){
-      const left = [c.result.overL > 0 ? `${+c.result.overL.toFixed(1)} L` : '', c.result.spillIds.map(id => (kitById(id) || { name:id }).name).join('; ')].filter(Boolean);
+      const left = [c.result.overL > 0 ? `${+c.result.overL.toFixed(1)} L` : '', c.result.spillIds.map(id => kitById(id) ? kitName(kitById(id)) : id).join('; ')].filter(Boolean);
       lines.push(advisorWord('closest', { what:advisorWhat(c, input) }));
       if(left.length) lines.push(advisorWord('stillOver', { what:left.join(': ') }));
     } else lines.push(advisorWord('closestNone'));
@@ -6540,7 +6548,7 @@ function rainAccess(A){
   const selected=activeKit().filter(k=>k.rainkit);
   const unplaced=A.spill.filter(k=>k.rainkit),buried=[];
   A.slots.forEach(s=>{s.items.forEach(k=>{
-    if(k.rainkit&&!reachableFor(k,s.pos))buried.push({n:k.name,w:POSITIONS[s.pos].label.toLowerCase(),byHand:!!k.pinned});
+    if(k.rainkit&&!reachableFor(k,s.pos))buried.push({n:kitName(k),w:POSITIONS[s.pos].label.toLowerCase(),byHand:!!k.pinned});
   });});
   const ready=selected.length>0 && !unplaced.length && !buried.length && selected.every(k=>
     A.slots.some(s=>reachableFor(k,s.pos) && s.items.some(item=>item.id===k.id)));
@@ -6553,7 +6561,7 @@ function getChecklistModel(A=currentPlan()){
   const selected=activeKit(),byId=new Map(),groups=[],byGroup=new Map();
   selected.forEach(k=>{
     const quantity=k.perDay?foodDays():qtyOf(k);
-    byId.set(k.id,{id:k.id,name:k.name,category:k.cat,quantity,
+    byId.set(k.id,{id:k.id,name:kitName(k),category:k.cat,quantity,
       quantityLabel:k.perDay?`${quantity} riding day${quantity===1?'':'s'}`:quantity>1?`${quantity} ×`:'',
       packed:!!S.packed[k.id],L:itemL(k),kg:itemKg(k),rigidCm:rigidOf(k),placements:[],
       placementLabel:'',note:'',bikeReference:bikeRepairReference(k.id),status:'unassigned',tooLong:false});
@@ -6642,7 +6650,7 @@ function getChecklistModel(A=currentPlan()){
   return {tripLabel,tripDetails,bikeProfile:normaliseBikeProfile(S.bikeProfile),modeLabel:S.mode==='light'?'Lightweight kit':'Comfort kit',groups,items,
     totals:{items:items.length,packed,remaining:items.length-packed,L:+items.reduce((n,row)=>n+row.L,0).toFixed(2),
       kg:+items.reduce((n,row)=>n+row.kg,0).toFixed(3)},warnings,
-    leftAtHome:lightDroppedList().map(k=>({id:k.id,name:k.name})),
+    leftAtHome:lightDroppedList().map(k=>({id:k.id,name:kitName(k)})),
     bottles:liveBottles().map(b=>({label:bagLabel(b)+(b.slot && BOTTLE_SPOTS[b.slot]?` — ${BOTTLE_SPOTS[b.slot].name}`:''),L:b.L}))};
 }
 
@@ -6686,13 +6694,13 @@ function incomingFor(A, key){
       const full = kitById(k.id); if(!full || !fits(full)) return;
       const from=A.slots.filter(x=>x.key!==key && x.items.some(i=>i.id===k.id)).map(unitLabel);
       if(A.spill.some(x=>x.id===k.id))from.push('the overflow');
-      out.push({ id:k.id, name:k.name, vol:itemL(full), from:from.join(', ') });
+      out.push({ id:k.id, name:kitName(k), vol:itemL(full), from:from.join(', ') });
     });
   });
   A.spill.forEach(k => {
     if(k.part || out.some(x=>x.id===k.id)) return;
     const full = kitById(k.id); if(!full || !fits(full)) return;
-    out.push({ id:k.id, name:k.name, vol:itemL(full), from:'the overflow' });
+    out.push({ id:k.id, name:kitName(k), vol:itemL(full), from:'the overflow' });
   });
   return out.sort((a,b) => b.vol - a.vol).slice(0, 8);
 }
@@ -6706,7 +6714,7 @@ function strapOptions(res){
   const cand = [];
   res.slots.forEach(s => s.items.forEach(k => {
     if(!k.part && STRAPPABLE.includes(k.id) && k.vol > 0.2)
-      cand.push({ id:k.id, name:k.name, vol:k.vol, from:POSITIONS[s.pos].label.toLowerCase() });
+      cand.push({ id:k.id, name:kitName(k), vol:k.vol, from:POSITIONS[s.pos].label.toLowerCase() });
   }));
   cand.sort((a,b) => b.vol - a.vol);
   return { decks, cand };
@@ -6738,7 +6746,7 @@ function comfortFill(res){
       const spot = free.sort((a,b) => b.left - a.left).find(f => f.left >= L && fitsLength(k, f));
       if(!spot) return;
       spot.left = +(spot.left - L).toFixed(2);
-      picks.push({ id:k.id, name:k.name, L, where:POSITIONS[spot.pos].label.toLowerCase() });
+      picks.push({ id:k.id, name:kitName(k), L, where:POSITIONS[spot.pos].label.toLowerCase() });
     });
   return { picks, freeL, emptyBags, addedL:+picks.reduce((s,p)=>s+p.L,0).toFixed(1) };
 }
@@ -6806,7 +6814,7 @@ function fixSuggestion(){
     // Leaving something behind is a kept step, so no selection runs here.
     const r = planWith({ remove:[...drop.map(d => d.id), k.id] }), v = vol(r);
     if(v < over - 0.01){
-      drop.push({ id:k.id, name:k.name, L:itemL(k), kg:itemKg(k) });
+      drop.push({ id:k.id, name:kitName(k), L:itemL(k), kg:itemKg(k) });
       res = r; over = v;
     }
   }
@@ -8362,9 +8370,7 @@ function audit(){
   // a day ride: by the riding hours' temperature (owner, 9 Nov 2026); a night or more: by the cold night, as before
   const warm = warmLayerTemp(c, n);
   if(!has('puffy') && known && warm < 11 && n > 0)   // a day ride wears it (owner, 9 Nov 2026: "Worn, one spare tube")
-    M('Insulated jacket', n === 0
-      ? `Over the riding hours a cold day here is about ${warm}°C. An insulated jacket keeps you warm at a stop, or while a repair holds you up.`
-      : `Nights drop to about ${c.nightCold}°C on the cold end. Being cold in the evening is the single most common reason people cut a first tour short.`, ['puffy']);
+    M('Insulated jacket', `Nights drop to about ${c.nightCold}°C on the cold end. Being cold in the evening is the single most common reason people cut a first tour short.`, ['puffy']);
   if(!has('gloves') && known && warm < 5)
     M('Long gloves', n === 0 ? `Riding near ${warm}°C on a cold day. Cold hands stop you braking properly on descents.`
       : `Mornings near ${c.nightCold}°C. Cold hands stop you braking properly on descents.`, ['gloves']);
@@ -9054,7 +9060,7 @@ function weightMapIdeal(now = false){
 // balancing leaves where they are), nothing at all.
 const NOTE_ZONES = { front:'at the front', rear:'at the rear', centre:'in the middle', body:'on your back' };
 // a kit name with its first letter lowered unless it is a capital word ("ID, cards, insurance"); a thing the rider added as typed
-const kitWord = k => !k ? null : k.added ? k.name : k.name.replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase());
+const kitWord = k => !k ? null : k.added ? k.name : kitName(k).replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase());
 const noteList = names => names.length > 3 ? `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`
   : names.length < 2 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 function noteSentence(g){
@@ -9237,7 +9243,7 @@ function balanceLine(){
   if(last && samePlacements(last.placements, S.placements)){
     const A = currentPlan();
     // a kit name with its first letter lowered unless it is a capital word ("ID, cards, insurance"); a thing the rider added as typed
-    const named = k => !k ? null : k.added ? k.name : k.name.replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase());
+    const named = k => !k ? null : k.added ? k.name : kitName(k).replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase());
     const said = last.moves.map(m => { const k = kitById(m.id), s = A.slots.find(x => x.key === m.to);
       return (named(k) || m.id) + (s ? ' to the ' + unitLabel(s).toLowerCase() : ''); });
     const shown = said.length > 3 ? [...said.slice(0, 2), `${said.length - 2} more things`] : said;
@@ -10094,7 +10100,7 @@ function removingBag(b, remove){
   const ids = Object.keys(S.pinned).filter(id => gone.some(u => u.key === S.pinned[id]));
   ids.forEach(id => delete S.pinned[id]);
   bagMoveStatus(ids.length ? `Removing the ${unitLabel(gone[0]).toLowerCase()} also forgets where you put the ${
-    listOf(ids.map(id => (kitById(id) ? kitById(id).name : id).toLowerCase()))}.` : '');
+    listOf(ids.map(id => (kitById(id) ? kitName(kitById(id)) : id).toLowerCase()))}.` : '');
 }
 function removeBag(uid){
   const b = S.bags.find(x => x.uid === uid); if(!b) return;
@@ -10364,7 +10370,7 @@ function renderBags(){
   }
   const claims = deckClaims();
   if(claims.length) $('bagList').insertAdjacentHTML('beforeend',
-    `<div class="finding note" style="margin-top:10px"><b>The rack top takes ${htmlEsc(claims.map(k=>k.name.toLowerCase()).join(' and '))}</b>
+    `<div class="finding note" style="margin-top:10px"><b>The rack top takes ${htmlEsc(claims.map(k=>kitName(k).toLowerCase()).join(' and '))}</b>
      <p>${claims.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L strapped outside bags. ${infoHelp('How rack-top kit is counted','<p>Selected items that can be strapped to the rack top are counted as carried kit, but do not use space inside bags. Check that they are secured and protected from weather.</p>')}</p></div>`);
 
   $('bagList').querySelectorAll('.bagrow').forEach(r => {
@@ -10460,7 +10466,7 @@ function revealKitItem(id){
   S.onlyOn = false;
   $('kitFindOut').classList.add('hidden');
   $('kitFind').value = '';
-  $('kitFindStatus').textContent = `${k.name} is ${S.kit[id] ? 'selected' : 'not selected'}.${
+  $('kitFindStatus').textContent = `${kitName(k)} is ${S.kit[id] ? 'selected' : 'not selected'}.${
     k.camp && !camping() ? ' It is shown here, but camping kit is not counted for this accommodation trip.' : ' Use its checkbox to change what you are taking.'}`;
   renderKit();
   const row = Array.from($('kitList').querySelectorAll('.kititem')).find(el => el.dataset.k === id);
@@ -10546,7 +10552,7 @@ function renderFind(){
   const exact = names.has(q);
   out.classList.remove('hidden');
   out.innerHTML =
-    already.map(k => `<button class="findrow" data-find="${htmlEsc(k.id)}"><span>${htmlEsc(k.name)}</span><em>Already on your list · ${S.kit[k.id] ? 'selected' : 'not selected'} · show item</em></button>`).join('') +
+    already.map(k => `<button class="findrow" data-find="${htmlEsc(k.id)}"><span>${htmlEsc(kitName(k))}</span><em>Already on your list · ${S.kit[k.id] ? 'selected' : 'not selected'} · show item</em></button>`).join('') +
     hits.map(c => `<button class="findrow" data-add="${htmlEsc(encodeURIComponent(JSON.stringify(c)))}">
         <span>Add ${htmlEsc(c.n)}</span><em>${CAT_LABEL[c.c]} · typical ${c.L} L · ${c.kg} kg</em></button>`).join('') +
     (exact ? '' : `<button class="findrow custom" data-custom="1">
@@ -10604,20 +10610,20 @@ function renderKit(){
             <label>Volume <input type="number" inputmode="decimal" step="any" min="0" max="100" value="${baseL(k)}" data-num="${htmlEsc(k.id)}:L"> L</label>
             <label>Weight <input type="number" inputmode="decimal" step="any" min="0" max="100" value="${baseKg(k)}" data-num="${htmlEsc(k.id)}:kg"> kg</label>
             <label>Longest <input type="number" inputmode="decimal" step="any" min="0" max="200" value="${rigidOf(k)}" data-num="${htmlEsc(k.id)}:rigid"> cm</label>
-            ${isTweaked(k) ? `<button class="reset" data-reset="${htmlEsc(k.id)}">Reset to ${k.L} L${k.rigid?` · ${k.rigid} cm`:''}</button>` : `<span class="deflt">typical for this item</span>`}
+            ${isTweaked(k) ? `<button class="reset" data-reset="${htmlEsc(k.id)}">Reset to ${kitSizeIsRiders(k) ? '' : 'two tubes, '}${k.L} L${k.rigid?` · ${k.rigid} cm`:''}</button>` : `<span class="deflt">typical for this item</span>`}
           </div></div>` : '';
         return `<div class="kitwrap${S.adv&&on?' open':''}">
           <div class="kititem ${on?'on':'off'}" data-k="${htmlEsc(k.id)}">
             <button type="button" class="kit-toggle" data-toggle-kit="${htmlEsc(k.id)}" role="checkbox" aria-checked="${!!on}">
             <span class="kitbox" aria-hidden="true"></span>
-            <span class="kn">${htmlEsc(k.name)}${k.perDay?` <em class="dim">(${foodDays()} day${foodDays()>1?'s':''}${resupplying()?', then resupply':''})</em>`:''}${isTweaked(k)?' <em class="tag">yours</em>':''}${k.added?' <em class="atag">added</em>':k.comfort?' <em class="ctag">comfort</em>':''}</span>
+            <span class="kn">${htmlEsc(kitName(k))}${k.perDay?` <em class="dim">(${foodDays()} day${foodDays()>1?'s':''}${resupplying()?', then resupply':''})</em>`:''}${kitSizeIsRiders(k)?' <em class="tag">yours</em>':''}${k.added?' <em class="atag">added</em>':k.comfort?' <em class="ctag">comfort</em>':''}</span>
             </button>
             ${on && k.perDay ? `<span class="foodsel">${
               [[1,'1 day'],[2,'2 days'],['all','whole trip']].map(([v,lab]) =>
                 `<button data-fd="${v}" aria-pressed="${String(S.foodMode)===String(v)}">${lab}</button>`).join('')
             }</span>` : ''}
             ${on && k.qtyable && !k.perDay ? `<span class="qty" data-q="${htmlEsc(k.id)}">
-              <button data-qd="-1" aria-label="Fewer ${htmlEsc(k.name)}">−</button><b>×${qtyOf(k)}</b><button data-qd="1" aria-label="More ${htmlEsc(k.name)}">+</button>
+              <button data-qd="-1" aria-label="Fewer ${htmlEsc(kitName(k))}">−</button><b>×${qtyOf(k)}</b><button data-qd="1" aria-label="More ${htmlEsc(kitName(k))}">+</button>
             </span>` : ''}
             <span class="kv">${itemL(k)} L · ${itemKg(k)} kg${rigidOf(k)?` · ${rigidOf(k)} cm`:''}</span>
           </div>${on ? adv : ''}</div>`;
@@ -10831,7 +10837,7 @@ function renderResult(){
   const stripped = lightDroppedList();
   const strippedNote = stripped.length
     ? `<div class="finding cut"><b>Lightweight has left ${stripped.length} thing${stripped.length>1?'s':''} at home</b>
-       <p>${htmlEsc(listOf(stripped.map(k => k.name)))} — <b>${stripped.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L</b>
+       <p>${htmlEsc(listOf(stripped.map(k => kitName(k))))} — <b>${stripped.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L</b>
        and ${stripped.reduce((s,k)=>s+itemKg(k),0).toFixed(1)} kg. Switch to <b>Comfortable</b> to bring them back.
        ${infoHelp('How Lightweight changes the load','<p>Lightweight excludes eligible comfort items from the carried kit while leaving their checkboxes selected. Comfortable includes them again. Safety items are not removed by this mode.</p>')}</p></div>`
     : '';
@@ -11029,7 +11035,7 @@ function renderResult(){
 
   /* --- reach --- */
   const reachable = [], buried = [];
-  slots.forEach(s => s.items.forEach(k => { if(!k.part) (reachableFor(k, s.pos) ? reachable : buried).push(k.name); }));
+  slots.forEach(s => s.items.forEach(k => { if(!k.part) (reachableFor(k, s.pos) ? reachable : buried).push(kitName(k)); }));
   let reach = slots.length ? '' : `<div class="finding miss"><b>Nothing is mounted</b>
     <p>There are no bags on the bike, so there is nothing to reach for. Add some in step two and this becomes a real answer.</p></div>`;
   reach += `<div class="reachgrid">
@@ -11040,10 +11046,10 @@ function renderResult(){
   const opensWhere = opensHere.length > 1 ? opensHere.slice(0,-1).join(', ') + ' or ' + opensHere[opensHere.length-1] : opensHere[0];
   const noOpener = 'You have no bag that opens in place. A top tube bag is about 1 L and takes almost all of this — the cheapest upgrade on the list, and the only one worth buying before a bigger seat pack.';
   const tooLongToReach = k => opensHere.length > 0 && rigidOf(k) > 0 && !usableUnits().some(u => POSITIONS[u.pos].accessible && fitsLength(k, u));
-  const reachName = (k, byHand) => htmlEsc(k.name) + (tooLongToReach(k) ? ' (too long)' : '') + (byHand ? ' (you moved it there)' : '');
+  const reachName = (k, byHand) => htmlEsc(kitName(k)) + (tooLongToReach(k) ? ' (too long)' : '') + (byHand ? ' (you moved it there)' : '');
   const {unplaced:rainUnplaced,buried:rainBuried,ready:rainReady}=rainAccess(A);
   if(rainUnplaced.length) reach += `<div class="finding miss"><b>Some rain kit has no fitting bag</b>
-    <p>${htmlEsc([...new Set(rainUnplaced.map(k=>k.name))].join(', '))} still needs a place. Check the overflow in <b>Where it goes</b> and make room in an accessible bag.</p></div>`;
+    <p>${htmlEsc([...new Set(rainUnplaced.map(k=>kitName(k)))].join(', '))} still needs a place. Check the overflow in <b>Where it goes</b> and make room in an accessible bag.</p></div>`;
   if(rainBuried.length) reach += `<div class="finding miss"><b>Your rain kit is out of reach</b>
     <p>${rainBuried.map(r=>htmlEsc(r.n)+(r.byHand?' (you moved it there)':'')).join(', ')} — in the ${[...new Set(rainBuried.map(r=>r.w))].join(' and ')}. It takes a few minutes to unstrap and repack a ${rainBuried[0].w}, and in that time you are already soaked. ${opensHere.length ? `Rain shell, dry socks and overshoes belong in the ${opensWhere}, where you stop once and are moving again in thirty seconds.` : noOpener}</p></div>`;
   else if(rainReady) reach += `<div class="finding note"><b>Rain kit is where it should be</b>
@@ -11068,7 +11074,7 @@ function renderResult(){
       <p>You reach for this mid-ride, and that bag does not open without emptying it first. ${opensHere.length ? 'Move something dense out of a reachable bag to make room.' : noOpener}</p></div>`).join('');
   }
   const otherNoBag = A.reach.noBag.map(kitById).filter(k => !k.rainkit);
-  if(otherNoBag.length) reach += `<div class="finding miss"><b>${htmlEsc(listOf(otherNoBag.map(k=>k.name)).replace(/^./,c=>c.toUpperCase()))} ${otherNoBag.length>1?'have':'has'} no fitting bag</b>
+  if(otherNoBag.length) reach += `<div class="finding miss"><b>${htmlEsc(listOf(otherNoBag.map(k=>kitName(k))).replace(/^./,c=>c.toUpperCase()))} ${otherNoBag.length>1?'have':'has'} no fitting bag</b>
     <p>You reach for ${otherNoBag.length>1?'these':'this'} mid-ride. Check the overflow in <b>Where it goes</b>.</p></div>`;
 
   /* --- allocation --- */
@@ -11081,7 +11087,7 @@ function renderResult(){
   const movedByBag = {};
   (replanNote ? replanNote.movedPacked : []).forEach(id => {
     const key = (A.items[id] || [[null]])[0][0];
-    (movedByBag[key] = movedByBag[key] || []).push((kitById(id) || { name:id }).name.toLowerCase());
+    (movedByBag[key] = movedByBag[key] || []).push((kitById(id) ? kitName(kitById(id)) : id).toLowerCase());
   });
   const packedLines = Object.entries(movedByBag).map(([key, names]) => {
     const s = A.slots.find(x => x.key === key);
@@ -11092,7 +11098,7 @@ function renderResult(){
         <button class="linky" data-replan="1">Re-plan</button></div>` : '');
   // Hand placements that can't be kept are never silent (design 7.4).
   const notKeptHtml = A.hand.notKept.map(n => {
-    const k = kitById(n.id), name = k ? k.name : n.id, many = /s$| and |×/.test(name);
+    const k = kitById(n.id), name = k ? kitName(k) : n.id, many = /s$| and |×/.test(name);
     const unit = usableUnits().find(u => u.key === n.key), bag = unit ? 'the ' + unitLabel(unit).toLowerCase() : 'that bag';
     const now = A.slots.find(s => s.key === n.nowIn);
     const why = n.reason === 'too long' ? `${htmlEsc(name)} ${many ? 'are' : 'is'} too long for ${bag}.`
@@ -11108,8 +11114,8 @@ function renderResult(){
     const done = !!S.packed[k.id], isSeat = (slots.find(s => s.key === slotKey) || {}).pos === 'seat';
     return `<li class="${done?'packed':''}">
       <button class="tickbox${done?' on':''}" data-tick="${htmlEsc(k.id)}" aria-pressed="${done}"
-        aria-label="${htmlEsc((done?'Packed: ':'Not packed yet: ')+k.name+(k.part?' — complete item, including all shares':''))}"${!DRAFT_READY?' disabled':''}></button>
-      <span class="il">${htmlEsc(k.name)}${placedQuantity(k)?` <em class="dim">(${placedQuantity(k)})</em>`:''}${k.part?' <em class="dim">(split)</em>':''}${
+        aria-label="${htmlEsc((done?'Packed: ':'Not packed yet: ')+kitName(k)+(k.part?' — complete item, including all shares':''))}"${!DRAFT_READY?' disabled':''}></button>
+      <span class="il">${htmlEsc(kitName(k))}${placedQuantity(k)?` <em class="dim">(${placedQuantity(k)})</em>`:''}${k.part?' <em class="dim">(split)</em>':''}${
         k.pinned?' <em class="dim moved">moved</em>':''}${
         k.rainkit?' <em class="dim">pack last, so it is on top</em>':''}${
         isSeat && isHeavy(k)?` <em class="dim seatnote">${k.id==='bank'?BANK_SEAT_NOTE:HEAVY_SEAT_NOTE}</em>`:''}${
@@ -11124,7 +11130,7 @@ function renderResult(){
     if(open === 'out'){
       const rows = s.items.filter(k => !k.part).map(k => {
         const t = moveTargets(A, s.key, k.id);
-        return `<li><span class="il">${htmlEsc(k.name)} <em class="pv">${itemL(k)} L${qtyOf(k)>1?' · all '+qtyOf(k):''}</em></span>
+        return `<li><span class="il">${htmlEsc(kitName(k))} <em class="pv">${itemL(k)} L${qtyOf(k)>1?' · all '+qtyOf(k):''}</em></span>
           <span class="movers">${t.length
             ? t.map(x => `<button class="movechip" data-moveto="${htmlEsc(k.id)}|${htmlEsc(x.key)}">→ ${htmlEsc(x.label)}</button>`).join('')
             : '<em class="dim">nowhere else it fits</em>'}</span></li>`;
@@ -11168,7 +11174,7 @@ function renderResult(){
     if(!big) return;
     allocHtml += `<div class="pairnote" style="margin-top:-6px">
       ${POSITIONS[g[0].pos].label} pair sits at ${Math.round(f[0]*100)}% and ${Math.round(f[1]*100)}%.
-      ${infoHelp('How a bag pair is balanced',`<p><b>${htmlEsc(big.name)}</b> is ${big.vol} L in one piece. It cannot split, and no other swap improves this gap. An even split is only possible when the contents divide that way.</p>`)}</div>`;
+      ${infoHelp('How a bag pair is balanced',`<p><b>${htmlEsc(kitName(big))}</b> is ${big.vol} L in one piece. It cannot split, and no other swap improves this gap. An even split is only possible when the contents divide that way.</p>`)}</div>`;
   });
 
   if(spill.length) allocHtml += `<div class="alloc" style="border-color:var(--blaze)">
@@ -11182,13 +11188,13 @@ function renderResult(){
   slots.forEach(s => s.items.forEach(k => {
     if(k.part || !rigidOf(k)) return;
     const tighter = slots.filter(other => other.key !== s.key && bagMaxLength(other) && !fitsLength(k, other));
-    if(tighter.length) longPlaced.push({ name:k.name, cm:rigidOf(k), where:POSITIONS[s.pos].label.toLowerCase(),
+    if(tighter.length) longPlaced.push({ name:kitName(k), cm:rigidOf(k), where:POSITIONS[s.pos].label.toLowerCase(),
       blocked:tighter.map(other=>unitLabel(other).toLowerCase()) });
   }));
   const hasDeckAnywhere = hasDeck('bar') || hasDeck('rack');
   let lengthBody = activeKit().some(k => k.id === 'tent') ? `<div class="finding note"><p>${TENT_POLES_NOTE}</p></div>` : '';
   if(longSpill.length){
-    if(slots.length) lengthBody += longSpill.map(k => `<div class="finding miss"><b>${htmlEsc(k.name)} is ${rigidOf(k)} cm long and goes in none of your bags</b>
+    if(slots.length) lengthBody += longSpill.map(k => `<div class="finding miss"><b>${htmlEsc(kitName(k))} is ${rigidOf(k)} cm long and goes in none of your bags</b>
       <p>This is not a volume problem — there is room, but nothing you own is long enough inside. ${
         k.id === 'pad' ? 'A rolled foam mat is half a metre of unbendable cylinder. It was designed to be strapped on, not packed in.'
         : k.id === 'tent' ? 'It is the poles, not the fabric. Separate them from the body: the fabric squashes into any gap, and the poles ride along the top tube or down a fork leg.'
@@ -11249,14 +11255,14 @@ function renderResult(){
   if(so){
     const deckNames = so.decks.map(b => POSITIONS[b.pos].strapLabel.toLowerCase());
     if(claimed.length){
-      strapBody = `<div class="finding note"><b>Already up there: ${htmlEsc(claimed.map(k=>k.name.toLowerCase()).join(' and '))}</b>
+      strapBody = `<div class="finding note"><b>Already up there: ${htmlEsc(claimed.map(k=>kitName(k).toLowerCase()).join(' and '))}</b>
         <p>${claimed.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L carried outside. ${infoHelp('How strapped items are counted','<p>Items carried on the rack top or handlebar straps are excluded from the volume inside the bags. Only suitable items should be carried outside; protect them from rain and road spray and secure them clear of the wheels.</p>')}</p></div>`;
     }
     if(!so.cand.length && !claimed.length){
       strapBody = `<div class="emptyfind">You have ${deckNames.join(' and ')}, but nothing in your kit is suited to riding outside. Straps want things that shrug off rain and road spray — a mat, shoes, a towel, a tent body.</div>`;
     } else if(over && so.cand.length){
       const best = so.cand[0], trial = strapTrial(so.cand);
-      const strapNames = ids => listOf(ids.map(id => 'the ' + kitById(id).name.toLowerCase()));
+      const strapNames = ids => listOf(ids.map(id => 'the ' + kitName(kitById(id)).toLowerCase()));
       const bestClears = trial.bestOver <= 0;
       strapBody += `<div class="finding note"><b>Strap the ${htmlEsc(best.name.toLowerCase())} and ${bestClears ? 'it fits' : `you claw back ${best.vol} L — you would still be ${trial.bestOver} L over.`}</b>
         <p>It is in the ${best.from} right now. Moving it onto your ${deckNames[0]} frees that volume inside.
@@ -13640,7 +13646,7 @@ function setupComparisonRows(a,b){
   const kitValue=(s,id,k) => {
     if(!s.kit[id]) return 'Left at home';
     const c=s.custom[id] || k || {},q=s.qty[id] || 1;
-    let value=(k?.name || id)+' · '+(k?.cat || 'Custom item')+(q>1 ? ' ×'+q : '')+' · base '+c.L+' L each · base '+c.kg+' kg each'+(c.rigid ? ' · '+c.rigid+' cm long' : '');
+    let value=(id === 'tubes' && isDayTube(s.custom.tubes) && s.nights === 0 ? 'Spare tube (one, for a day ride)' : k?.name || id)+' · '+(k?.cat || 'Custom item')+(q>1 ? ' ×'+q : '')+' · base '+c.L+' L each · base '+c.kg+' kg each'+(c.rigid ? ' · '+c.rigid+' cm long' : '');
     if(s.pinned[id]){
       const bag=s.bags.flatMap(physical).find(unit => unit.key === s.pinned[id]);
       const owned=bag && (bag.bag || bag),label=owned && POSITIONS[owned.pos] ? POSITIONS[owned.pos].label : 'a bag';
@@ -13928,7 +13934,7 @@ async function recordNote(setupId, note){
 // The things most likely to be the culprit: whatever takes the most room.
 function bulkiest(n){
   return activeKit().filter(k => !k.perDay && itemL(k) >= 0.5)
-    .sort((a,b) => itemL(b) - itemL(a)).slice(0, n).map(k => k.name);
+    .sort((a,b) => itemL(b) - itemL(a)).slice(0, n).map(k => kitName(k));
 }
 
 async function recordFeedback(setupId, verdict, delta){
@@ -14632,8 +14638,8 @@ function openBagPop(key, fromButton=null){
       bagMaxLength(s) ? ' · inside length ' + bagMaxLength(s) + ' cm (' + (s.longestCm ? 'your measurement' : 'estimated') + ')' : ''}</em>`;
 
   const list = `<ul class="poplist">
-      ${solid.map(k => `<li><span>${htmlEsc(k.name)}${placedQuantity(k)?` <em class="ttag">${placedQuantity(k)}</em>`:''}${itemTag(k)}</span><span class="pv">${k.vol} L</span></li>`).join('')}
-      ${parts.map(k => `<li class="split"><span>${htmlEsc(k.name)} <em class="ttag">share</em></span><span class="pv">${k.vol} L</span></li>`).join('')}
+      ${solid.map(k => `<li><span>${htmlEsc(kitName(k))}${placedQuantity(k)?` <em class="ttag">${placedQuantity(k)}</em>`:''}${itemTag(k)}</span><span class="pv">${k.vol} L</span></li>`).join('')}
+      ${parts.map(k => `<li class="split"><span>${htmlEsc(kitName(k))} <em class="ttag">share</em></span><span class="pv">${k.vol} L</span></li>`).join('')}
       ${!s.items.length ? '<li><span class="dim">Empty — nothing needed to go in here</span></li>' : ''}
     </ul>
     <p class="popwhy">${P.takes}</p>`;
