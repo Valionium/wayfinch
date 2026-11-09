@@ -108,3 +108,22 @@ test('[HINT-LOCAL] Delete co-pilot data with a second window on Trip: that windo
   expect(await copilot()).toEqual([]);
   await other.close();
 });
+
+test('[HINT-LOCAL] Delete co-pilot data on You, then Tools, Tyre pressure, Bike care and Trip in the same window: no co-pilot key comes back', async ({ page }) => {
+  app = await loadApp(page);
+  await expect(page.getByRole('region', { name: 'Design your bike' })).toBeVisible();
+  await page.evaluate(() => { location.hash = '#/tools'; });
+  await expect(page.locator('[data-hint-line]')).toBeVisible();
+  await page.evaluate(() => { location.hash = '#/you'; });
+  await page.getByRole('button', { name: 'Delete co-pilot data' }).click();
+  await page.getByRole('button', { name: 'Delete now' }).click();
+  await expect(page.locator('[data-delete] [role=status]')).toBeVisible();
+  const copilot = () => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('copilot:')));
+  expect(await copilot()).toEqual([]);
+  for (const [hash, mark] of [['#/tools', '[data-hint-line]'], ['#/tools/tyre', '[data-fit-line]'], ['#/tools/care', '[data-fit-line]'], ['#/trip', '.trip-bike']] as const) {
+    await page.evaluate((h) => { location.hash = h; }, hash);
+    await expect(page.locator(mark).first()).toBeVisible();
+  }
+  await page.waitForTimeout(300);
+  expect(await copilot()).toEqual([]);
+});

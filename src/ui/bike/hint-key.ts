@@ -1,20 +1,18 @@
 // The first-run bike hint's one key (wish 17, design section 3.1): `copilot:bikeHint:v1`, on the phone only. The `copilot:` prefix means
-// Delete co-pilot data removes it; the export is built field by field and never carries it. Storage refused: the same rules hold for this
-// visit only, from memory.
+// Delete co-pilot data removes it, and no window writes it back after (../deleted.ts); the export is built field by field and never
+// carries it. Storage refused, or the key deleted under this page: the same rules hold for this visit only, from memory.
+import { isGone, noteKey } from '../deleted.ts';
+
 export const HINT_KEY = 'copilot:bikeHint:v1';
 
-// Set only while the browser refuses to keep the key; any write it keeps again ends it.
+// Set only while the browser refuses to keep the key, or after a delete; any write it keeps again ends it.
 let kept: string | null = null;
-// Another window removed the key (Delete co-pilot data, ST-DELETE): as with every co-pilot store a delete removed, this page never writes
-// it back; the hint follows its rules from memory until the next start.
-let deleted = false;
-if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (e) => { if (e.key === null || (e.key === HINT_KEY && e.newValue === null)) deleted = true; });
-}
 
 export function readHint(): string {
   try {
-    return kept ?? localStorage.getItem(HINT_KEY) ?? '';
+    const stored = localStorage.getItem(HINT_KEY);
+    noteKey(HINT_KEY, stored);
+    return kept ?? stored ?? '';
   } catch {
     return kept ?? '';
   }
@@ -22,8 +20,9 @@ export function readHint(): string {
 
 export function writeHint(key: string): void {
   try {
-    if (!deleted) {
+    if (!isGone(HINT_KEY)) {
       localStorage.setItem(HINT_KEY, key);
+      noteKey(HINT_KEY, key);
       kept = null;
       return;
     }
