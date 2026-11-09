@@ -680,7 +680,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - order heights → places → hours → weather → baseline → save; with weather failing, places and hours are saved and reported ok, weather's note is named; the trip is marked prepared either way, and Water's missing names what's absent [PREP-STEPS]
 - a route missing heights: the notice is given first, heights looked up, and stages, grid and baseline points fixed only after; failing: stages split by distance, climbing unknown, no climb points; route.hash set when final [PREP-HEIGHTS]
 - heights asked every 200 m and at most 400 points a route, evenly along it (the service counts each point as a call, 600 a minute, its day shared by all riders; 1,122 on Heidelberg to Cologne took the forecast down too: 9 Nov 2026); an 800 km route on a service limited like the real one ends with heights and weather saved [PREP-HEIGHTS-BUDGET]
-- heights that came are kept for the route when others did not, the route still without heights; Try again asks only for the missing ones; none kept for another route [PREP-HEIGHTS-RESUME]
+- heights that came are kept for the route when others did not, the route still without heights; Try again asks only for the missing ones; none kept for another route, and none once every height is in [PREP-HEIGHTS-RESUME]
 - spans cover the trip window with no holes, cached per (tag, holidayZone, timeZone, rule class) so one tag on many places runs once (spy); no call of opening_hours from screen() [PREP-HOURS]
 - a place with opening_hours:kitchen has spans under kitchenHoursId(id); Food uses them for a meal stop (via screen()) [PREP-KITCHEN]
 - rescue points carry kms, within 3 km of the route; roofs and places as §4.5, one match per pass [PREP-MATCHES]
@@ -699,7 +699,8 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - stored as the types say: 3.0 mm at 80% stamped 15:00 reads "from about 14:00" through screen() [WXR-STAMPS]
 - five years, stage ends and the high point, rounded; Baseline fields as types.ts [WXR-BASELINE]
 - sends 3 decimals, ≤ 100 per request; a failed batch leaves nulls, not zeros [WXR-ELEVATION]
-- a 429 stops the height batches; in Get ready offline a minute's limit is waited out (61 s) and the request sent once more, a server error or lost answer once more after 3 s, an hourly or daily limit never; a slow answer is no failure; Update weather keeps one request [WXR-POLITE]
+- a 429 stops the height batches; in Get ready offline a minute's limit is waited out (61 to 66 s, spread) and the request sent once more, a server error or lost answer once more after 3 s, an hourly or daily limit never; a slow answer is no failure; the archive stops asking after a 429; Update weather keeps one request [WXR-POLITE]
+- a minute's wait is said while it lasts, with the time it asks again, and the step's own notice comes back after; Try again within the weather turn asks nothing and says when it can try again (review of PR 98, I2) [PREP-WAIT]
 - 429, 500 or a bad body: stored forecast kept, its age shown, §8's sentence "The weather service didn't answer. Forecast fetched 07:10." [WXR-REFUSED]
 
 ## App: The refresh modes
@@ -727,7 +728,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - each GpxError reason: its own plain message; the old route stays [TRIP-GPX-BAD]
 - a second route asks first; Cancel keeps everything [TRIP-REPLACE-ASKS]
 - §3.3's example form; heights looked up credited to Copernicus [TRIP-SUMMARY]
-- after Get ready offline each day but the last names the saved sleep place (campsite, lodging, hut; never a lean-to or shelter) that suits its end best within a tenth of the day either side (3 to 10 km), the trip's stay first, a detour counted 1.3 times, with the town by it; with none, the nearest town or plainly none; before it, says it will; the days stay the stage model's (§6.2: custom overnight stops later; owner, 9 Nov 2026) [TRIP-DAY-BEDS]
+- after Get ready offline each day but the last names the saved sleep place (campsite, lodging, hut; never a lean-to or shelter; never one closed that night by its season or prepared hours, as the Sleep card judges it, review of PR 98, I1) that suits its end best within a tenth of the day either side (3 to 10 km), the trip's stay first, a detour counted 1.3 times, with the town by it; with none, the nearest town or plainly none; before it, says it will; the days stay the stage model's (§6.2: custom overnight stops later; owner, 9 Nov 2026) [TRIP-DAY-BEDS]
 - with no running trip, Trip opens first and the bike is the first thing, ≤ 120 px tall (a new rider's first-run card, HINT-NEW, is taller: wish 17, owner's answers of 9 Nov 2026); with a running trip, Ahead (§3.1's rules, month-only counts as running) [TRIP-FIRST]
 - the day before departure: "Day 1 · 78 km · leave by about 13:45"-form, the same time as the Daylight card [TRIP-DAY1-LEAVEBY]
 - the GPX pickers (Trip's and the bag planner's) name no file types: iOS turns an accept list into its own file types, has none for .gpx and greys every GPX out (owner's iPhone check, 6 Nov 2026); the reading refuses a JSON file, a photo and an empty file with "That did not read as a GPX track or route with valid coordinates.", and reads a GPX named .xml or with no extension; the JSON imports keep application/json,.json, which iOS knows [TRIP-GPX-IOS]

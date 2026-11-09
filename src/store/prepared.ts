@@ -111,6 +111,9 @@ export async function readKeptHeights(routeId: string): Promise<Map<string, numb
   return kept;
 }
 
+/** Once every height is in, none need keeping (review of PR 98, M5). The route's id has changed by then: no route check. */
+export const dropKeptHeights = (): Promise<void> => tracked(inTx(['meta'], 'readwrite', async (tx) => { await tx.objectStore('meta').delete(KEPT_HEIGHTS_META); }));
+
 export const keepHeights = (routeId: string, heights: Map<string, number>): Promise<void> =>
   guarded(routeId, ['meta'], async (tx) => { await tx.objectStore('meta').put({ routeId, heights: [...heights] }, KEPT_HEIGHTS_META); });
 
@@ -156,6 +159,6 @@ export const readHours = (): Promise<PlaceHours[]> =>
 /** The store as preparation sees it. Tests put a full disk in its place. */
 export const preparedStore = {
   readTrip, saveTrip, readRun: readPackRun, startRun: startPackRun, savedTileKeys, saveTiles, readStage, startStage, stagedTileKeys, stageTiles, swapIn, dropStage, bumpStage, readTileData, saveMatched,
-  saveZones, saveHolidays, saveHours, saveForecast, reserveWeather, saveBaseline, savePrepared, savePersist, readKeptHeights, keepHeights,
+  saveZones, saveHolidays, saveHours, saveForecast, reserveWeather, saveBaseline, savePrepared, savePersist, readKeptHeights, keepHeights, dropKeptHeights,
 };
 export type PreparedStore = typeof preparedStore;

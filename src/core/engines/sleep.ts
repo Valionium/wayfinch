@@ -129,7 +129,7 @@ const YES_NO = new Map<string, string>([['yes', 'yes'], ['no', 'no']]);
  * Open, closed or unknown for the night of `date` (the place's own calendar day). An open stretch anywhere on that day
  * means open, since reception hours are no check-in rule; stretches that are only unknown or possibly closed mean unknown.
  */
-function nightOf(place: Place, h: PlaceHours | undefined, date: string, tz: string): Night {
+export function nightOf(place: Place, h: PlaceHours | undefined, date: string, tz: string): Night {
   const window = seasonalWindow(place.seasonal);
   const label = window !== null && window !== 'year-round' ? window.label : null;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { state: 'unknown', why: null, unworked: false, season: label };

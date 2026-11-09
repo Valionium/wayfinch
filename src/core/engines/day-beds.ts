@@ -2,8 +2,10 @@
 // looking for towns or hotels where you could stop"). The days stay the stage model's: stage ends are the equal-effort split
 // points, the same as in the bag planner (spec §6.2, Stages), and every card reads them. This only names, for each day but the
 // last, the saved sleep place that suits the end best, and the town by it; with none near, the nearest town, or nothing.
+import { addDaysIso } from '../answers/time.ts';
 import { haversineKm } from '../geo/haversine.ts';
-import type { Km, Place, RouteMatch, Route, Stay } from '../types.ts';
+import type { Km, Place, PlaceHours, RouteMatch, Route, Stay } from '../types.ts';
+import { nightOf } from './sleep.ts';
 import { W } from '../wording/en.ts';
 
 /** At most this far before or after a day's planned end, along the route. */
@@ -46,7 +48,16 @@ function stayRank(kind: Place['kind'], stay: Stay): number {
 
 export const windowKm = (dayKm: Km): Km => Math.min(BED_WINDOW_KM, Math.max(MIN_WINDOW_KM, dayKm * WINDOW_SHARE));
 
-export function dayBeds(route: Route, places: Place[], matches: RouteMatch[], stay: Stay): DayBed[] {
+/**
+ * The night each day ends on, to judge its beds as the Sleep card judges them (review of PR 98, I1): a place closed that night,
+ * for the season or by its prepared hours, is no place to end the day. Unknown stays allowed, as on the card. No date: no judging.
+ */
+export type Nights = { departureDate: string | null; hours: PlaceHours[] };
+
+export function dayBeds(route: Route, places: Place[], matches: RouteMatch[], stay: Stay, nights: Nights = { departureDate: null, hours: [] }): DayBed[] {
+  const hoursOf = new Map(nights.hours.map((h) => [h.placeId, h]));
+  const openThatNight = (day: number) => (x: { place: Place }): boolean =>
+    nights.departureDate === null || nightOf(x.place, hoursOf.get(x.place.id), addDaysIso(nights.departureDate, day - 1), x.place.timeZone).state !== 'closed';
   const byId = new Map(places.map((p) => [p.id, p]));
   const passes = matches.flatMap((m) => {
     const place = byId.get(m.placeId);
@@ -60,8 +71,9 @@ export function dayBeds(route: Route, places: Place[], matches: RouteMatch[], st
     if (s.day === last) return { ...base, bed: null, town: null };
     const w = windowKm(s.endKm - s.startKm);
     const inWindow = <T extends { km: Km }>(list: T[]): T[] => list.filter((x) => Math.abs(x.km - s.endKm) <= w + 1e-9);
+    const open = openThatNight(s.day);
     const cost = (x: { km: Km; offRouteM: number }): number => Math.abs(x.km - s.endKm) + (DETOUR_FACTOR * x.offRouteM) / 1000;
-    const best = inWindow(beds).sort((a, b) => stayRank(a.place.kind, stay) - stayRank(b.place.kind, stay) || cost(a) - cost(b) || (a.place.id < b.place.id ? -1 : a.place.id > b.place.id ? 1 : 0))[0];
+    const best = inWindow(beds).filter(open).sort((a, b) => stayRank(a.place.kind, stay) - stayRank(b.place.kind, stay) || cost(a) - cost(b) || (a.place.id < b.place.id ? -1 : a.place.id > b.place.id ? 1 : 0))[0];
     if (best) {
       const near = towns
         .filter((t) => haversineKm(t.place, best.place) <= TOWN_NEAR_KM && named(t.place) !== named(best.place))

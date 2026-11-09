@@ -17,7 +17,7 @@ import type { PrepareDeps, StepReport } from '../../../src/data/prepare.ts';
 import { openDb } from '../../../src/store/db.ts';
 import { readInputs } from '../../../src/store/inputs.ts';
 import { readWeatherState } from '../../../src/store/weather.ts';
-import { preparedStore, PERSIST_META, readPrepared } from '../../../src/store/prepared.ts';
+import { keepHeights, KEPT_HEIGHTS_META, preparedStore, PERSIST_META, readKeptHeights, readPrepared } from '../../../src/store/prepared.ts';
 import { readTrip, replaceRoute, saveTrip } from '../../../src/store/trip.ts';
 import { readPackRun, readStage } from '../../../src/store/packs.ts';
 import { placeAt, rescueAt, roofAt } from '../../fixtures/places.ts';
@@ -314,6 +314,71 @@ describe('heights', () => {
   });
 });
 
+
+describe('review of PR 98: the wait is told, the turn is honest, kept heights go', () => {
+  async function heightless(): Promise<Trip> {
+    const base = await fixtureTrip('heidelberg-strasbourg');
+    const t: Trip = { ...base, route: await buildRoute(base.route.points.map((p) => ({ lat: p.lat, lon: p.lon, ele: null })), base.route.name, 'planned') };
+    await readTrip();
+    await saveTrip(t);
+    return t;
+  }
+  /** Open-Meteo refusing its first answer with the minute's limit (recorded), then answering. */
+  function refusingOnce(server: PackServer, order: string[]): Partial<PrepareDeps> {
+    const inner = depsFor(server).fetch;
+    let refused = false;
+    const fetcher: typeof fetch = async (input, init) => {
+      const url = String(input);
+      if (url.startsWith('https://api.open-meteo.com/v1/elevation')) {
+        order.push('elevation');
+        if (!refused) { refused = true; return json(recorded('limit-minutely-429'), 429); }
+        return json({ elevation: new URL(url).searchParams.get('latitude')!.split(',').map(() => 200) });
+      }
+      return inner(input, init);
+    };
+    return { fetch: fetcher, fetchElevation, onNotice: (t) => { order.push(`notice:${t}`); }, sleep: async (ms) => { order.push(`wait ${Math.round(ms / 1000)} s`); } };
+  }
+
+  test('[PREP-WAIT] a minute\'s wait is said, with the time it asks again, before it waits; then the step\'s own notice is back (I2)', async () => {
+    await heightless();
+    const order: string[] = [];
+    const reports = await prepareTrip(depsFor(new PackServer(fixtureBuild('heidelberg-strasbourg')), refusingOnce(new PackServer(fixtureBuild('heidelberg-strasbourg')), order)), () => undefined);
+    expect(step(reports, 'heights')).toMatchObject({ ok: true });
+    const waitAt = order.findIndex((x) => x.startsWith('wait'));
+    expect(order.slice(0, 2)).toEqual([`notice:${W.appPrepHeightsNotice}`, 'elevation']);
+    expect(order[waitAt - 1]).toMatch(/^notice:.*minute.*about \d\d:\d\d/);
+    expect(order[waitAt + 1]).toBe(`notice:${W.appPrepHeightsNotice}`);
+    expect(order[waitAt + 2]).toBe('elevation');
+  });
+
+  test('[PREP-WAIT] Try again within the weather turn (after a reload during its wait) asks nothing and says when it can try again', async () => {
+    const t = await onTrip();
+    expect(await preparedStore.reserveWeather(t.route.id, new Date(NOW.getTime() - 5 * 60_000), 30 * 60_000)).toBe(true);
+    const deps = depsFor(new PackServer(fixtureBuild('heidelberg-strasbourg')));
+    const reports = await prepareTrip(deps, () => undefined);
+    expect(deps.log).not.toContain('forecast');
+    // 07:55 UTC asked; the turn ends 30 minutes later: 08:25 UTC, 10:25 in Heidelberg in summer time
+    expect(step(reports, 'weather')).toEqual({ step: 'weather', ok: false, note: W.weatherSpaced(null, '10:25') });
+  });
+
+  test('[PREP-HEIGHTS-RESUME] once every height is in, none are kept any more (M5)', async () => {
+    await heightless();
+    await prepareTrip(depsFor(new PackServer(fixtureBuild('heidelberg-strasbourg')), {
+      fetchElevation: async (points) => points.map((_, i) => (i === 0 ? null : 200)),
+    }), () => undefined);
+    expect(await (await openDb()).get('meta', KEPT_HEIGHTS_META)).toBeDefined();
+    await prepareTrip(depsFor(new PackServer(fixtureBuild('heidelberg-strasbourg'))), () => undefined);
+    expect((await readTrip())!.route.ascentM).not.toBeNull();
+    expect(await (await openDb()).get('meta', KEPT_HEIGHTS_META)).toBeUndefined();
+  });
+
+  test('[PREP-HEIGHTS-RESUME] heights kept for one route are read for that route only (M6)', async () => {
+    const t = await heightless();
+    await keepHeights(t.route.id, new Map([['49.400,8.690', 120]]));
+    expect([...(await readKeptHeights(t.route.id))]).toEqual([['49.400,8.690', 120]]);
+    expect([...(await readKeptHeights('route-another0'))]).toEqual([]);
+  });
+});
 describe('long routes (9 Nov 2026: Heidelberg to Cologne, 269.8 km, ended without heights and weather)', () => {
   /** A fixture route with its heights taken away, as a planned route from a router that gives none. */
   async function withoutHeights(id: Parameters<typeof fixtureTrip>[0], km = Infinity): Promise<Trip> {

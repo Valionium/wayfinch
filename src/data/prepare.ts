@@ -1,7 +1,7 @@
 // Get ready offline (spec section 5): heights, places, hours, weather, baseline, save. Each step is reported on its own, and a
 // failed step never discards the others. Weather's requests come in as arguments; the grid, days and points are openmeteo.ts's
 // own, so a forecast asked for here is the very request Update weather sends.
-import { addDaysIso, localIsoDate } from '../core/answers/time.ts';
+import { addDaysIso, formatHm, localIsoDate } from '../core/answers/time.ts';
 import { modelsForRoute } from '../core/engines/weather-classes.ts';
 import { zoneLookupOf } from '../core/engines/tripday.ts';
 import { hoursWindowDates, ridingDaysOf } from '../core/hours/window.ts';
@@ -13,8 +13,6 @@ import { ruleClassOf } from '../core/hours/rules.ts';
 import { CORRIDOR_KM, savedKmRanges, tileHolds, tileKey } from '../core/places/tiles.ts';
 import type { ManifestTile } from '../core/places/types.ts';
 import { matchPlaces, matchRoofs, rescuePointsNear } from '../core/route/matches.ts';
-import { buildRoute } from '../core/route/profile.ts';
-import type { RawPoint } from '../core/route/gpx.ts';
 import { sampleGrid } from '../core/route/grid.ts';
 import { planStages } from '../core/route/stages.ts';
 import { routeZones } from '../core/route/zones.ts';
@@ -26,6 +24,7 @@ import { preparedStore, readBaselineYears, readForecastDate, readHeldHolidays, r
 import type { PreparedRecord, PreparedStore } from '../store/prepared.ts';
 import { readLocalSettings } from '../store/settings-local.ts';
 import { RouteGoneError, readTrip } from '../store/trip.ts';
+import { readWeatherState } from '../store/weather.ts';
 import { loadBoundaries } from './boundaries.ts';
 import { checkConnectivity } from './connectivity.ts';
 import { downloadTiles, isStorageFull, STORAGE_FULL } from './packs/download.ts';
@@ -67,18 +66,6 @@ const DAY_MS = 86_400_000;
 const HOURS_BATCH = 200;
 /** As Update weather's tap (refresh.ts): no second request within 30 minutes, whatever asks. */
 const WEATHER_GAP_MS = 30 * 60_000;
-/** Heights asked for no closer than this along the route; those between are interpolated (section 5). */
-const HEIGHT_STEP_KM = 0.2;
-/**
- * At most this many heights for one route (9 Nov 2026). The service counts each one as a call, refuses past 600 a minute and
- * shares its daily 10,000 among all riders: every 200 m of a 270 km route was 1,122, and the refusals took the forecast down
- * too. 400 keep 200 m up to 80 km and about 680 m on 270 km (measured on Heidelberg to Cologne: 370 m of climbing on its hilly
- * 60 km where 200 m gave 450 m), and leave the forecast and the archive room in the same minute.
- */
-export const MAX_HEIGHT_POINTS = 400;
-const waitMs = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-/** A height asked for, by the coordinates the request sends. */
-const heightKey = (p: LatLng): string => `${p.lat.toFixed(3)},${p.lon.toFixed(3)}`;
 const SHELTER_KINDS: readonly Place['kind'][] = ['settlement', 'shelter'];
 const STATION_NEAR_KM = 0.1;
 
@@ -88,66 +75,6 @@ const routeGone = (e: unknown): boolean => e instanceof RouteGoneError;
 const noteFor = (e: unknown, otherwise: string): string => (isStorageFull(e) ? W.appPrepStorageFullStep : otherwise);
 
 // ---- heights -----------------------------------------------------------------------------------------------------------
-
-/** The route's points as raw points, section breaks kept: a break shows as no distance between two different places. */
-function rawOf(route: Route, ele: (i: number) => number | null): RawPoint[] {
-  return route.points.map((p, i) => {
-    const before = route.points[i - 1];
-    const isBreak = before !== undefined && before.km === p.km && (before.lat !== p.lat || before.lon !== p.lon);
-    return { lat: p.lat, lon: p.lon, ele: ele(i), ...(isBreak ? { break: true } : {}) };
-  });
-}
-
-/**
- * Heights for every point from a sample of those missing them, or null when any sample stays unanswered. What did come is kept
- * for the route, so Try again asks only for the rest.
- */
-async function lookedUpHeights(route: Route, deps: PrepareDeps, store: PreparedStore): Promise<(number | null)[] | null> {
-  const pts = route.points;
-  const sampled: number[] = [];
-  const step = Math.max(HEIGHT_STEP_KM, route.lengthKm / (MAX_HEIGHT_POINTS - 2));
-  let lastKm = -Infinity;
-  pts.forEach((p, i) => {
-    if (p.ele !== null) return;
-    if (p.km - lastKm >= step || i === pts.length - 1) {
-      sampled.push(i);
-      lastKm = p.km;
-    }
-  });
-  const kept = await store.readKeptHeights(route.id);
-  const keys = sampled.map((i) => heightKey(pts[i]!));
-  const ask = [...new Set(keys.filter((k) => !kept.has(k)))];
-  if (ask.length > 0) {
-    const at = new Map(sampled.map((i, n) => [keys[n]!, pts[i]!] as const));
-    const answers = await deps.fetchElevation(ask.map((k) => ({ lat: at.get(k)!.lat, lon: at.get(k)!.lon })), deps.fetch, { sleep: deps.sleep ?? waitMs });
-    let more = false;
-    ask.forEach((k, n) => {
-      const h = answers[n];
-      if (typeof h === 'number' && Number.isFinite(h)) {
-        kept.set(k, h);
-        more = true;
-      }
-    });
-    if (more) await store.keepHeights(route.id, kept);
-  }
-  if (keys.some((k) => !kept.has(k))) return null;
-  const known = new Map<number, number>();
-  pts.forEach((p, i) => { if (p.ele !== null) known.set(i, p.ele); });
-  sampled.forEach((i, n) => known.set(i, kept.get(keys[n]!)!));
-  const anchors = [...known.keys()].sort((a, b) => a - b);
-  let a = 0;
-  return pts.map((p, i) => {
-    const direct = known.get(i);
-    if (direct !== undefined) return direct;
-    while (a + 1 < anchors.length && anchors[a + 1]! < i) a++;
-    const from = anchors[a]!;
-    const to = anchors[a + 1];
-    if (to === undefined || from > i) return known.get(from)!;
-    const span = pts[to]!.km - pts[from]!.km;
-    const f = span > 0 ? (p.km - pts[from]!.km) / span : 0;
-    return known.get(from)! + (known.get(to)! - known.get(from)!) * f;
-  });
-}
 
 function withPlan(trip: Trip, route: Route): Route {
   const local = readLocalSettings().settings;
@@ -165,13 +92,14 @@ async function heightsStep(deps: PrepareDeps, store: PreparedStore, online: bool
     if (!online) report = { step: 'heights', ok: false, note: W.appPrepNoConnection };
     else {
       deps.onNotice?.(W.appPrepHeightsNotice);
-      let heights: (number | null)[] | null = null;
+      let looked: Route | null = null;
       try {
-        heights = await lookedUpHeights(route, deps, store);
+        // Only a route without heights needs this: a chunk of its own, so the first screen does not carry it.
+        looked = await (await import('./heights.ts')).routeWithHeights(route, deps, store);
       } catch {
-        heights = null;
+        looked = null;
       }
-      if (heights) route = await buildRoute(rawOf(route, (i) => heights[i] ?? null), route.name, route.source);
+      if (looked) route = looked;
       else report = { step: 'heights', ok: false, note: W.appPrepHeightsFailed };
     }
   }
@@ -185,6 +113,13 @@ async function heightsStep(deps: PrepareDeps, store: PreparedStore, online: bool
   } catch (e) {
     // Another window changed the trip, or there's no room: the next steps go on with the route that is stored.
     return { report: { step: 'heights', ok: false, note: noteFor(e, W.appPrepSaveFailed) }, trip: current };
+  }
+  if (missing && report.ok) {
+    try {
+      await store.dropKeptHeights();
+    } catch {
+      /* never read again: the route's id has changed */
+    }
   }
   return { report, trip: { ...current, route: next.route } };
 }
@@ -408,14 +343,17 @@ async function weatherStep(deps: PrepareDeps, store: PreparedStore, online: bool
     if (grid.length === 0) return { step: 'weather', ok: false, note: W.appPrepWeatherFailed };
     // The turn to ask, held with Update weather's: a forecast fetched minutes ago stays, and no second request is sent.
     if (!(await store.reserveWeather(route.id, now, WEATHER_GAP_MS))) {
-      return (await readForecastDate()) ? { step: 'weather', ok: true, note: W.appPrepWeatherRecent } : { step: 'weather', ok: false, note: W.appPrepWeatherFailed };
+      if (await readForecastDate()) return { step: 'weather', ok: true, note: W.appPrepWeatherRecent };
+      // Asked minutes ago (a reload during its wait, say) and nothing saved: nothing is asked now, and it says when it can be.
+      const at = (await readWeatherState())?.lastAttemptAt;
+      return { step: 'weather', ok: false, note: at ? W.weatherSpaced(null, formatHm(new Date(at.getTime() + WEATHER_GAP_MS), startZoneOf(zones))) : W.appPrepWeatherFailed };
     }
     const runs = await runsFor(deps, route, zones);
     const today = localIsoDate(now, startZoneOf(zones));
     const forecast = await deps.fetchForecast(grid, {
       days: forecastDaysFor(route, trip.departureDate, today), with15: deps.with15 ?? WEATHER_MODE === 'auto', fetch: deps.fetch, now: () => now, runs,
       // Inside the turn reserved above: a minute's limit is waited out and the same request sent once more (9 Nov 2026).
-      retry: { sleep: deps.sleep ?? waitMs },
+      retry: (await import('./heights.ts')).toldRetry(deps, startZoneOf(zones), ''),
     });
     await store.saveForecast(route.id, runs.length > 0 && forecast.runs.length === 0 ? { ...forecast, runs } : forecast, now);
     return { step: 'weather', ok: true, note: null };
