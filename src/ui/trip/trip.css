@@ -57,7 +57,7 @@ progress { width: 100%; accent-color: var(--blaze); }
 .trip-details { border-top: 1px solid var(--line); margin: 8px 0 0; padding: 4px 0 0; }
 .trip-details-line { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0 8px; margin: 0; font-size: 0.9375rem; }
 .trip-added { font-weight: 600; }
-.trip-install { margin: 0 0 12px; }
+.trip-main > .gap { margin: 0 0 12px; }
 .trip-pick-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .trip-pick-row .trip-remove { flex: 0 1 auto; }
 /* The confirm step takes the whole row once it is asked. */
