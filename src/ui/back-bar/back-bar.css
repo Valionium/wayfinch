@@ -14,3 +14,7 @@ html:has(.wf-bar-app) { scroll-padding-top: calc(var(--wf-bar-h, 3.5rem) + 8px);
 }
 @media (min-width: 840px) { .wf-bar-app { margin-inline: -32px; padding-inline: 32px; } }
 .wf-bar-app a { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 8px 0 0; color: var(--ink); font-weight: 600; text-underline-offset: 3px; }
+
+/* While the update bar is up (44 px button, 8 px padding, 1 px edge) it sticks above this bar: this one sticks just below it. */
+html:has(.update-bar) .wf-bar { top: 61px; }
+html:has(.update-bar):has(.wf-bar-app) { scroll-padding-top: calc(61px + var(--wf-bar-h, 3.5rem) + 8px); }

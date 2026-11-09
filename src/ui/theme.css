@@ -136,7 +136,7 @@ button, a { font: inherit; }
 }
 .btn-primary { background: var(--blaze); border-color: var(--blaze); color: var(--ground); font-weight: 600; }
 
-/* Sticky, above the screen's own sticky back bar (which sits just below it, --wf-update-h), so the button is never scrolled away or covered. */
+/* Sticky, above the screen's own sticky back bar (which sits just below it, back-bar.css), so the button is never scrolled away or covered. */
 .update-bar { position: sticky; top: 0; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .update-bar p { margin: 0; color: var(--muted); }
 
