@@ -4,7 +4,7 @@
 import { describe, expect, test } from 'vitest';
 import { candidates } from '../../../../src/core/advisor/candidates.ts';
 import { bothScore, compareFor, handlingScore } from '../../../../src/core/advisor/rank.ts';
-import { advise } from '../../../../src/core/advisor/search.ts';
+import { advise, biggerOffered, biggerSteps } from '../../../../src/core/advisor/search.ts';
 import type { AdvisorInput, BagIn, Decks, Pos, Suggestion, TrialResult } from '../../../../src/core/advisor/types.ts';
 import { bag, input } from './fixtures.ts';
 
@@ -92,3 +92,51 @@ describe('both goals at once (the owner, 8 Nov: D)', () => {
     expect(advise(input({ ...over, bags: [bag(1, 'seat', 15)], goal: 'both' })).kind).toBe('already-good');
   });
 });
+
+describe('a bigger change (the owner, 8 Nov: F)', () => {
+  // a 6 L item on the back that only a pannier can take; the bike takes a 3 L frame bag (Minimal) and panniers
+  const usable = (b: BagIn) => ({ ok: (b.pos === 'frame' && b.L === 3) || b.pos === 'rack', reason: null });
+  const plan = { bags: [bag(1, 'pack', 20)], nextUid: 2, usable, rackMounts: 'yes' as const, goal: 'backpack' as const,
+    trial: packer([{ id: 'small', L: 3, kg: 1 }, { id: 'big', L: 6, kg: 2 }]) };
+
+  test('[GA-BIGGER] offered only where the setup ruled something out the bike can take: under Bikepacking bags only and Bags first, never under Panniers are fine, nor with no rack and rack mounts no', () => {
+    expect(biggerOffered(input({ ...plan, style: 'bags' }))).toBe(true);
+    expect(biggerOffered(input({ ...plan, style: 'bags-first' }))).toBe(true);
+    expect(biggerOffered(input({ ...plan, style: 'panniers' }))).toBe(false);
+    expect(biggerOffered(input({ ...plan, style: 'bags', rackMounts: 'no' }))).toBe(false);
+    // a rack the rider has stays a fact: with rack mounts no, its panniers are still a bigger change
+    expect(biggerOffered(input({ ...plan, style: 'bags', rackMounts: 'no', decks: { rack: true, bar: false }, camping: true }))).toBe(true);
+  });
+
+  test('[GA-BIGGER] under Bikepacking bags only, Looking ahead finds nothing; the bigger change is what the setup ruled out, panniers, and it does better than Minimal', () => {
+    const i = input({ ...plan, style: 'bags' });
+    const answer = advise(i);
+    expect(answer.kind).toBe('suggestions');
+    if (answer.kind !== 'suggestions') return;
+    expect(answer.items[0]!.add.map((b) => b.pos)).toEqual(['frame']);
+    expect(answer.ahead).toBeNull();
+    const out = runBigger(i, answer);
+    expect(out.overrides).toBe('bags');
+    expect(out.bigger).not.toBeNull();
+    expect(out.bigger!.add.some((b) => b.pos === 'rack')).toBe(true);
+    expect(out.bigger!.result.backL).toBeLessThan(answer.items[0]!.result.backL - 0.5);
+    expect(out.bigger!.result.overL).toBe(0);
+  });
+
+  test('[GA-BIGGER] nothing the setup ruled out helps more: no bigger change; nor does a bigger change ever hold only what the setup allowed', () => {
+    const none = input({ ...plan, style: 'bags', usable: (b: BagIn) => ({ ok: (b.pos === 'frame' && b.L === 3) || (b.pos === 'rack' && b.L <= 2), reason: null }) });
+    const answer = advise(none);
+    if (answer.kind !== 'suggestions') throw new Error(answer.kind);
+    expect(runBigger(none, answer).bigger).toBeNull();
+    const i = input({ ...plan, style: 'bags-first' });
+    const a = advise(i);
+    if (a.kind !== 'suggestions') throw new Error(a.kind);
+    const out = runBigger(i, a);
+    if (out.bigger) expect(out.bigger.add.some((b) => b.pos === 'rack')).toBe(true);
+  });
+});
+
+function runBigger(i: AdvisorInput, answer: Extract<ReturnType<typeof advise>, { kind: 'suggestions' }>) {
+  const gen = biggerSteps(i, answer);
+  for (;;) { const step = gen.next(); if (step.done) return step.value; }
+}

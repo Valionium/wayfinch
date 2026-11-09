@@ -1,9 +1,9 @@
 // The Gear advisor's search (design §3.1–3.3; plan Task 3). Pure: the planner's packing comes in as `input.trial`, so the same search
 // runs in Vitest with a stand-in and in the bag planner with its own, frozen planWith.
-import { candidates, extensions, panniersAllowed, planAsStyled, sizeOptions } from './candidates.ts';
+import { candidates, extensions, panniersAllowed, planAsStyled, rackFitted, sizeOptions } from './candidates.ts';
 import { bothScore, byOwnerOrder, compareFor, compareMinimal, handlingScore, isValid, overflows, sizeRange } from './rank.ts';
 import { DECIDED, MAX_TRIALS, MIN_GAIN_BACK_L, MIN_GAIN_SCORE, SIZE_RANGES, type SizedPos } from './table.ts';
-import type { AdvisorAnswer, AdvisorInput, BagIn, Candidate, Suggestion, TrialResult } from './types.ts';
+import type { AdvisorAnswer, AdvisorInput, BagIn, Candidate, Setup, Suggestion, TrialResult } from './types.ts';
 
 /** The search yields after every this many trials, so the page can show "Trying N options…" and stay responsive. */
 const SLICE = 20;
@@ -220,6 +220,51 @@ function rangeOf(s: Suggestion, same: Suggestion[]): [number, number] {
   if (s.kind !== 'add' && s.kind !== 'swap') return [bag.L, bag.L];
   if (bag.pos === 'frame' || !(bag.pos in SIZE_RANGES)) return [bag.L, bag.L];
   return sizeRange(same.map((g) => g.add[0]!.L), bag.L, SIZE_RANGES[bag.pos as SizedPos].max);
+}
+
+/**
+ * A bigger change (the owner's preview check of 8 Nov, F): offered where the setup choice ruled out something the bike can take. Under
+ * Bikepacking bags only, panniers or a rack to fit; under Bags first, panniers though bags do it. Never under Panniers are fine, and never
+ * with no rack fitted and rack mounts no (a fact, not a choice).
+ */
+export function biggerOffered(given: AdvisorInput): boolean {
+  if (given.style === 'panniers') return false;
+  return panniersAllowed({ ...planAsStyled(given), style: 'panniers' });
+}
+
+/** What a bigger change answers: its best suggestion or none, the setup choice it goes beyond, and the trials it ran. */
+export type BiggerAnswer = { bigger: Suggestion | null; overrides: Setup; tried: number; partial: boolean };
+
+/**
+ * The bigger change's search, in slices as adviseSteps: on the plan as the rider's setup reads it, with what that setup ruled out allowed
+ * (Panniers are fine), only the candidates holding it: Minimal's first plus panniers (or a rack to fit, under Bikepacking bags only), and
+ * those alone. One counts when it is valid and does better than Minimal's first by decision 6; the goal's order picks the best.
+ */
+export function* biggerSteps(given: AdvisorInput, answer: AdvisorAnswer): Generator<number, BiggerAnswer> {
+  const overrides = given.style;
+  if (!biggerOffered(given) || answer.kind !== 'suggestions' || !answer.items[0]) return { bigger: null, overrides, tried: 0, partial: false };
+  const input: AdvisorInput = { ...planAsStyled(given), style: 'panniers' };
+  const fitted = rackFitted(input);
+  const ruledOut = (c: Candidate) => c.add.some((b) => b.pos === 'rack') || (overrides === 'bags' && c.deck && !fitted);
+  const first = answer.items[0];
+  let trials = 0;
+  let partial = false;
+  const base = input.trial(input.bags, input.decks);
+  trials++;
+  const found: Suggestion[] = [];
+  const handBack = () => trials % SLICE === 0 || (input.handBack?.() ?? false);
+  for (const c of [...extensions(input, first, true), ...candidates(input, 'add', true)]) {
+    if (!ruledOut(c)) continue;
+    if (trials >= MAX_TRIALS) { partial = true; break; }
+    const result = input.trial(bagsFor(input, c), c.decks);
+    trials++;
+    const s = suggestion(c, result);
+    if (isValid(base, result) && betterThan(input.goal, base, first.result, result)) found.push(s);
+    if (handBack()) yield trials;
+  }
+  const order = compareFor(input.goal, base);
+  const best = found.sort((a, b) => order(a, b) || byOwnerOrder(a, b))[0] ?? null;
+  return { bigger: best && { ...best, rangeL: [best.add[0]?.L ?? 0, best.add[0]?.L ?? 0] }, overrides, tried: trials, partial };
 }
 
 /** The whole search at once. */
