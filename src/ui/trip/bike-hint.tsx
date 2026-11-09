@@ -20,9 +20,12 @@ const small = (): void => writeHint(withLetters(readHint(), 's'));
 export function TripBike({ bike, trip }: { bike: BikeSource; trip: boolean | null }) {
   const [said, setSaid] = useState('');
   const [, redo] = useState(0);
-  const at = useRef<{ used?: boolean; line?: boolean }>({}).current;
+  const at = useRef<{ used?: boolean; line?: boolean; had?: boolean }>({}).current;
   const box = useRef<HTMLDivElement>(null);
   const before = usedBefore() || bike.summary !== null;
+  // A trip removed in this visit (Remove this trip): Trip starts over, so the hint is settled again, as a fresh start would settle it.
+  if (trip === false && at.had) at.used = undefined;
+  at.had = !!trip;
   if (trip !== null) at.used ??= trip || before;
   const key = readHint();
   const h = bikeHint(bike.known.length > 0, at.used ?? before, key);

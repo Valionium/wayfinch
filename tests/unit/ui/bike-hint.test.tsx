@@ -161,6 +161,21 @@ describe('the card on Trip', () => {
     expect(card()).toBeNull();
   });
 
+  test('[HINT-SMALL] a trip removed in this visit (Remove this trip) settles it again, as a fresh start would: small, and it stays so', async () => {
+    await trip(NO_BIKE, false);
+    localStorage.setItem('copilot:changed', '{"at":1,"section":"trip"}');
+    await trip(NO_BIKE, true);
+    expect(card()).not.toBeNull();
+    // Trip starts over with no trip: what a phone with these keys shows when it opens, the small line.
+    await trip(NO_BIKE, false);
+    expect(card()).toBeNull();
+    expect(key()).toContain('s');
+    const shown = host.innerHTML;
+    render(null, host);
+    await trip(NO_BIKE, false);
+    expect(host.innerHTML).toBe(shown);
+  });
+
   test('[HINT-SMALL] two of Tools, You, Tyre pressure, Bike care and the Gear advisor make it small; one alone does not', async () => {
     await trip(NO_BIKE);
     render(null, host);
