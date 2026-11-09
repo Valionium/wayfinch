@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { buildScreen } from '../../../src/core/screen/screen.ts';
 import { planStages } from '../../../src/core/route/stages.ts';
 import { W } from '../../../src/core/wording/en.ts';
+import { TR } from '../../../src/core/wording/en-trip.ts';
 import type { StepName, StepReport } from '../../../src/data/prepare.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
 import { closeDb, openDb } from '../../../src/store/db.ts';
@@ -178,7 +179,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     await pick(await fixtureGpx('loop', { heights: false }));
     await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
     expect(text()).toContain(W.appTripClimbingUnknown);
-    expect(text()).toContain(W.appTripHeightsPending);
+    expect(text()).toContain(TR.appTripHeightsPending);
     expect(text()).not.toContain(W.appTripHeightsCredit);
     // What Get ready offline's heights step does: the same line with heights in it.
     const trip = (await readTrip())!;
@@ -188,7 +189,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     await saveTrip(withHeights);
     await show(services());
     expect(text()).toContain(W.appTripHeightsCredit);
-    expect(text()).not.toContain(W.appTripHeightsPending);
+    expect(text()).not.toContain(TR.appTripHeightsPending);
   });
 
   test('[TRIP-DAY1-LEAVEBY] the day before departure, Day 1 reads "Day 1 · N km · leave by about HH:MM", the very time of the Daylight card', async () => {
@@ -427,7 +428,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     await until(() => text().includes(W.appPrepWeatherFailed), 'the failed step');
     expect(text()).toContain(W.appPrepStorageFull(6, 14));
     expect(text()).toContain(W.appTripMissingHeading);
-    expect(text()).toContain(W.appTripPartial);
+    expect(text()).toContain(TR.appTripPartial);
     expect(text()).toContain(W.appTripNoPlaces);
     const retry = button(W.appTripRetryButton);
     expect(retry.disabled).toBe(false);
@@ -490,17 +491,17 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     await show(iphone);
     await pick(await fixtureGpx('loop'));
     await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
-    expect(text()).toContain(W.appTripIphoneAsk);
+    expect(text()).toContain(TR.appTripIphoneAsk);
     expect(button(W.appTripGetReadyButton).disabled).toBe(false);
     // Once something is saved the ask is not repeated.
     render(null, host);
     await show(services({ env: { ...base.env, ...tab }, ...preparing(allOk, { places: 3 }) }));
     await click(button(W.appTripGetReadyButton));
     await until(() => text().includes('3 places'), 'the result');
-    expect(text()).not.toContain(W.appTripIphoneAsk);
+    expect(text()).not.toContain(TR.appTripIphoneAsk);
     render(null, host);
     await show(services({ env: { ...base.env, ...tab, standalone: true } }));
-    expect(text()).not.toContain(W.appTripIphoneAsk);
+    expect(text()).not.toContain(TR.appTripIphoneAsk);
   });
 
   test('[TRIP-INSTALL] Android\'s install offer gives an Install button that asks the browser; without an offer there is none', async () => {
@@ -596,7 +597,7 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     expect(trip.route.name).toBe(W.appAbName('Heidelberg', 'Strasbourg'));
     expect(trip.route.source).toBe('planned');
     expect(trip.route.points).toHaveLength(400);
-    expect(text()).toContain(W.appTripHeightsPending);
+    expect(text()).toContain(TR.appTripHeightsPending);
   });
 
   test('[AB-FULL-GEOMETRY] with a route already stored, a planned one asks before it replaces it', async () => {
@@ -622,7 +623,7 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     await choose('ab-from', 'Heidelberg');
     await choose('ab-to', 'Strasbourg');
     await click(button(W.appAbPlan));
-    await until(() => text().includes(W.appAbNone), 'the sentence');
+    await until(() => text().includes(TR.appAbNone), 'the sentence');
     expect(await readTrip()).toBeNull();
     expect(host.querySelector('[data-add-route] input[type=file]')).not.toBeNull();
     expect(net.urls.some((u) => /routed-(foot|car)|project-osrm|profile=(car|foot)/.test(u))).toBe(false);
@@ -632,12 +633,12 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     const net = network(true);
     await show(services({ fetch: net.fetch }));
     await type('ab-from', 'Nowhereville');
-    await until(() => text().includes(W.appAbNoResults), 'no results');
+    await until(() => text().includes(TR.appAbNoResults), 'no results');
     const down = ((): Promise<Response> => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch;
     await show(services({ fetch: down }));
     await type('ab-from', 'Heidelberg');
-    await until(() => text().includes(W.appAbSearchFailed), 'the failure');
-    expect(text()).not.toContain(W.appAbNoResults);
+    await until(() => text().includes(TR.appAbSearchFailed), 'the failure');
+    expect(text()).not.toContain(TR.appAbNoResults);
   });
 });
 
@@ -803,7 +804,7 @@ describe('What the review of group 5 found', () => {
     }
     await click(button(W.appAbPlan));
     await until(() => text().includes(W.routeTrackTooLong), 'the reason');
-    expect(text()).not.toContain(W.appAbNone);
+    expect(text()).not.toContain(TR.appAbNone);
   });
 });
 

@@ -310,3 +310,16 @@ test("[TRIP-GUIDED-FIRST] the guided Trip adds nothing to the first screen: at o
   console.log(`TRIP-GUIDED-FIRST: first screen ${figures.firstJsGzip} bytes gzipped`);
   expect(figures.firstJsGzip).toBeLessThanOrEqual(145_678);
 });
+
+// After the launch, part 4 (the owner's preview check of 8 Nov 2026): the Emergency link, the answers from km 0, the empty state and
+// the rename come with room made in en.ts (Trip's chunk-only words moved to en-trip.ts), so the first screen does not grow.
+// 145,378 bytes is the first screen's figure on main (5cd5c5c) at the branch point; the rule is that it may not rise above it.
+test("[AH-P4-FIRST] En route's findings add nothing to the first screen: at or below main's figure at the branch point", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  // The empty state's lines and Trip's chunk-only words are not in it.
+  expect(first.includes('It works offline, from what Get ready offline saves')).toBe(false);
+  expect(first.includes('Plan from A to B')).toBe(false);
+  console.log(`AH-P4-FIRST: first screen ${figures.firstJsGzip} bytes gzipped`);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_378);
+});

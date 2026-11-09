@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { GPX_MAX_BYTES, GpxError } from '../../core/route/gpx.ts';
 import type { Route } from '../../core/types.ts';
 import { showKm, W } from '../../core/wording/en.ts';
+import { TR } from '../../core/wording/en-trip.ts';
 import { sameLine } from '../../store/trip.ts';
 import { lazy } from '../lazy.tsx';
 import { routeFromGpx } from './read-gpx.ts';
@@ -87,7 +88,7 @@ export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken
               every GPX file out. Any file can be chosen; routeFromGpx refuses what is not a GPX, in words. */}
           <input type="file" onChange={(e) => void onFile(e.currentTarget)} />
         </label>
-        <p class="muted">{W.appTripGpxHint}</p>
+        <p class="muted">{TR.appTripGpxHint}</p>
         {busy ? <p role="status">{W.appTripReading}</p> : null}
         {error ? <p class="notice" role="alert">{error}</p> : null}
         {said ? <p role="status">{said}</p> : null}

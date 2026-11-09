@@ -7,7 +7,7 @@
 // queue, so two taps in a row never write over each other.
 import { effect, signal, untracked } from '@preact/signals';
 import type { Signal } from '@preact/signals';
-import { formatHm, localIsoDate } from '../core/answers/time.ts';
+import { formatHm } from '../core/answers/time.ts';
 import { emergencyCard } from '../core/engines/emergency.ts';
 import type { Fix } from '../core/engines/locate.ts';
 import { usableFlatKph } from '../core/engines/pace.ts';
@@ -136,18 +136,13 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     const real = buildScreen(i);
     realScreen = real.screen;
     let built = real;
-    // No position to choose first (owner's finding K, 8 Nov 2026): with none to count from, the answers count from the route start
-    // (km 0), as on day 1 today, and say so; Emergency keeps the real day's card. Day 1, a trip with no date and before the trip
-    // already plan from km 0; the route's end and a planned tomorrow stay as they are.
+    // No position to choose first (owner's finding K, 8 Nov 2026): on a trip day with none to count from, the answers count from
+    // the route start (km 0), as on day 1, and say so; Emergency keeps the real day's card. After the day's ride the real screen
+    // stays (it plans tomorrow from tonight's stop and says there is no position).
     const r = real.screen;
-    const dayOne = i.trip.departureDate === null || r.phase === 'before-trip' || (r.ride.date === i.trip.departureDate && r.ride.startKm === 0);
-    if (r.positionLine === null && !dayOne && r.phase !== 'route-end' && i.planTomorrow === null) {
-      try {
-        const today = localIsoDate(now, zoneLookupOf(i.routeZones)(0).timeZone);
-        const fromStart = buildScreen({ ...i, trip: { ...i.trip, departureDate: today }, positions: [], dayStarts: [], routeEndDate: null });
-        fromStart.screen.chips.emergency = r.chips.emergency;
-        built = fromStart;
-      } catch { /* the real day's screen stays */ }
+    if (r.positionLine === null && r.phase === 'before-ride' && r.ride.startKm > 0) {
+      built = buildScreen({ ...i, trip: { ...i.trip, departureDate: r.ride.date }, positions: [], dayStarts: [] });
+      built.screen.chips.emergency = r.chips.emergency;
     }
     const s = built.screen;
     const p = real.parts.position;

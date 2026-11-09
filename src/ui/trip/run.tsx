@@ -4,6 +4,7 @@
 import { signal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { W } from '../../core/wording/en.ts';
+import { TR } from '../../core/wording/en-trip.ts';
 import type { StepName, StepReport } from '../../data/prepare.ts';
 import { runningSignal } from './run-state.ts';
 
@@ -102,7 +103,7 @@ export function NotSaved({ failed, head = true }: { failed: { step: string; note
     <>
       {head ? <h3>{W.appTripMissingHeading}</h3> : null}
       <ul class="trip-steps">{failed.map((s) => <li key={s.step}><strong>{labelOf(s.step)}</strong> {s.note ?? ''}</li>)}</ul>
-      <p>{noSignal ? W.appPrepNoSignal : W.appTripPartial}</p>
+      <p>{noSignal ? W.appPrepNoSignal : TR.appTripPartial}</p>
     </>
   );
 }

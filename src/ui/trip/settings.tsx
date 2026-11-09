@@ -2,6 +2,7 @@
 // named, and the field goes back to the last good value. Nothing here works out the days: the services re-plan them.
 import { useRef, useState } from 'preact/hooks';
 import { W } from '../../core/wording/en.ts';
+import { TR } from '../../core/wording/en-trip.ts';
 import { keepFreshOffered } from '../../data/refresh.ts';
 import type { Settings } from '../../store/rules.ts';
 import { useFollowing } from '../follow.ts';
@@ -124,7 +125,7 @@ export function TripSettings({ services, snap, reload, part }: { services: TripS
         {trip ? <p class="muted">{W.appTripNightsSuggested(suggestedNights(trip))}</p> : null}
         {settings.nights !== null ? <button type="button" class="btn" onClick={() => void save('nights', null)}>{W.appTripNightsUseSuggested}</button> : null}
 
-        {trip ? <p class="muted">{W.appTripSettingsStageNote}</p> : null}
+        {trip ? <p class="muted">{TR.appTripSettingsStageNote}</p> : null}
       </div>
     );
   }
@@ -162,7 +163,7 @@ export function TripSettings({ services, snap, reload, part }: { services: TripS
             <input type="checkbox" checked={fresh} onChange={async (e) => { const on = e.currentTarget.checked; setFresh(on); if (!(await save('keepFresh', on))) setFresh(settings.keepFresh); }} />
             <span>{W.weatherKeepFresh}</span>
           </label>
-          <p class="muted">{W.appTripKeepFreshWhy}</p>
+          <p class="muted">{TR.appTripKeepFreshWhy}</p>
         </div>
       ) : null}
     </div>

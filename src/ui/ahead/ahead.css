@@ -105,6 +105,5 @@
 /* The Emergency link at the top (AH-EMERGENCY-LINK) and the bike while no position is kept (AH-FROM-START). */
 .ah-emergency-top { margin: 0 0 8px; text-align: right; }
 .ah-emergency-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; color: var(--red); font-weight: 600; }
-.ah-bike-unconfirmed { display: contents; }
-.ah-bike-unconfirmed .bike-marker { opacity: 0.4; filter: grayscale(1); }
+.bike-faded { opacity: 0.4; filter: grayscale(1); }
 .ah-empty { margin: 0 0 12px; }

@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { RouteStop } from '../../core/screen/route-stops.ts';
 import type { Route } from '../../core/types.ts';
 import { showKm, W } from '../../core/wording/en.ts';
+import { TR } from '../../core/wording/en-trip.ts';
 import { Glyph, ICON_WORD, slotsOf } from '../ahead/strip.tsx';
 import { Card } from '../card.tsx';
 import { OsmCredit } from './credit.tsx';
@@ -83,7 +84,7 @@ export function RouteSummary({ snap, stops }: { snap: TripSnapshot; stops: TripS
             </svg>
             {found && found.length > 0 ? <ProfileStops route={trip.route} stops={found} /> : null}
           </div>
-        ) : <p class="muted">{W.appTripProfileNone}</p>}
+        ) : <p class="muted">{TR.appTripProfileNone}</p>}
         {ready ? null : <p class="muted">{W.appAheadStopsAfter}</p>}
         {s.note ? <p class="notice">{s.note}</p> : null}
         <ol class="trip-days">
@@ -94,7 +95,7 @@ export function RouteSummary({ snap, stops }: { snap: TripSnapshot; stops: TripS
             </li>
           ))}
         </ol>
-        {missingHeights ? <p class="muted">{W.appTripHeightsPending}</p> : snap.heightsLookedUp ? <p class="muted">{W.appTripHeightsCredit}</p> : null}
+        {missingHeights ? <p class="muted">{TR.appTripHeightsPending}</p> : snap.heightsLookedUp ? <p class="muted">{W.appTripHeightsCredit}</p> : null}
         {trip.route.source === 'planned' || snap.prepared?.build ? <OsmCredit lead={W.appTripOsmLead} date={packDate(snap.prepared?.build)} /> : null}
         <p class="muted"><a href="/legal/licences/">{W.appTripLicences}</a></p>
       </div>

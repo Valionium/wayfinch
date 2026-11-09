@@ -160,7 +160,7 @@ export function RouteStrip({ strip, bike, onOpen, onSetPosition, stopsLater = fa
         <span class="ah-strip-end">{strip.endText}</span>
       </div>
       <div class="ah-strip-body">
-        {unconfirmed ? <span class="ah-bike-unconfirmed" data-unconfirmed><BikeMarker bike={bike} /></span> : <BikeMarker bike={bike} />}
+        <BikeMarker bike={bike} faded={unconfirmed} />
         <div class="ah-strip-track" ref={track}>
           <div class="ah-strip-line" />
           <div class="ah-strip-bands">
