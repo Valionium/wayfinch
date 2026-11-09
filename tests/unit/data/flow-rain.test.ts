@@ -1,5 +1,5 @@
 // Criterion 9 on the fixtures (plan Task 23, FLOW-RAIN): the 165 km Heidelberg → Strasbourg and 800 km fixtures, each prepared by
-// the real Get ready offline with a rainy forecast in an hourly and in a 15-minute version, read back through the store; at moments
+// the real Prepare this route with a rainy forecast in an hourly and in a 15-minute version, read back through the store; at moments
 // along the ride, every rain plan's covers are reached 15-60 min of riding before m (or are the latest that counts) and are open,
 // and no thunderstorm plan lists a roof (the simulator's INV-06 and INV-07, on these screens). Then two refreshes on one day at
 // different kilometres send byte-identical requests.

@@ -18,9 +18,9 @@ test('[HON-BANNED] no string of Remove this trip uses a banned word; every key i
   }
 });
 
-test('[TRIP-NOT-READY-WORD] Remove this trip never calls the trip ready, safe or complete; "Get ready offline" is the only use of "ready"', () => {
+test('[TRIP-NOT-READY-WORD] Remove this trip never calls the trip ready, safe or complete; "Prepare this route" is the only use of "ready"', () => {
   for (const [key, s] of texts()) {
-    expect(/\b(ready|safe|complete|completed|done|finished)\b/i.test(s.replace(/Get ready offline/gi, '')), `${key}: ${s}`).toBe(false);
+    expect(/\b(ready|safe|complete|completed|done|finished)\b/i.test(s.replace(/Prepare this route/gi, '')), `${key}: ${s}`).toBe(false);
     expect(/\bprepared\b/i.test(s), `${key}: ${s}`).toBe(false);
   }
 });
@@ -28,7 +28,7 @@ test('[TRIP-NOT-READY-WORD] Remove this trip never calls the trip ready, safe or
 test('[TRIP-REMOVE-ASK] the confirm step names what goes and what stays, in plain short sentences', () => {
   const goes = RT.appTripRemoveGoes('Fixture: Heidelberg to Strasbourg');
   expect(goes).toContain('“Fixture: Heidelberg to Strasbourg”');
-  for (const part of ['route', 'date', 'nights', 'Get ready offline', 'places', 'opening hours', 'weather', 'map data', 'position', 'water', 'day plan', 'En route']) expect(goes).toContain(part);
+  for (const part of ['route', 'date', 'nights', 'Prepare this route', 'places', 'opening hours', 'weather', 'map data', 'position', 'water', 'day plan', 'En route']) expect(goes).toContain(part);
   for (const part of ['bikes', 'setups', 'Bag planner plans', 'rides', 'settings']) expect(RT.appTripRemoveStays).toContain(part);
   for (const [, s] of texts()) expect(s.split(/(?<=[.?:])\s/).every((sentence) => sentence.split(/\s+/).length <= 30), s).toBe(true);
 });

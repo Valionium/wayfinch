@@ -2,6 +2,7 @@
 // data, fitted as a power law. It never exceeds a limit, and it never takes a formula from SRAM, SILCA or Rene Herse.
 import { W } from '../../core/wording/en.ts';
 import { TN } from '../../core/wording/en-tyre-notes.ts';
+import { TW } from '../../core/wording/en-tyre-warn.ts';
 import {
   BAR_PER_PSI, DEFAULT_SPLIT, DESIGN_WIDTHS, ETRTO_MIN, FIT_MAX_MM, FIT_MIN_MM, HOOKLESS_CAPS, HOOKLESS_MAX_BAR, LEVER,
   LIMIT_BAR, LIMIT_PSI, P15_COEFFICIENT, P15_EXPONENT, PSI_PER_BAR, RIM_MAX_MM, RIM_MIN_MM, WHEELS, WIDTH_MAX_MM, WIDTH_MIN_MM,
@@ -402,8 +403,8 @@ export function tyreEstimate(input: TyreInput): TyreResult {
         const pumpToBar = Math.max(0, stepDown(Math.min(p1MaxBar, bar), 0.05));
         const pumpToPsi = Math.max(0, stepDown(Math.min(barToPsi(p1MaxBar), psi), 1));
         heat = { p1MaxBar, advise, pumpToBar, pumpToPsi };
-        if (advise) heatNotes.push(['heatPump', W.tyreWarnHeatPump(label, bar2(pumpToBar), String(pumpToPsi))]);
-        if (advise && floorB !== null && pumpToBar < floorB) heatNotes.push(['heatBelowFloor', W.tyreWarnHeatBelowFloor(label)]);
+        if (advise) heatNotes.push(['heatPump', TW.tyreWarnHeatPump(label, bar2(pumpToBar), String(pumpToPsi))]);
+        if (advise && floorB !== null && pumpToBar < floorB) heatNotes.push(['heatBelowFloor', TW.tyreWarnHeatBelowFloor(label)]);
       }
 
       const limit: LimitKind | null = capped ? cap.kind : raised ? floorKind : null;
@@ -448,8 +449,8 @@ export function tyreEstimate(input: TyreInput): TyreResult {
     if (min === null) flag('rimOutsideTable', TN.tyreWarnRimOutside);
     else {
       const below = wheels.filter((w) => w.tyre.printedMm < min);
-      if (below.length === 2) flag('belowEtrto', W.tyreWarnBelowEtrto('Tyre width', String(min)));
-      else if (below.length === 1) flag('belowEtrto', W.tyreWarnBelowEtrto(`${below[0]!.label} tyre width`, String(min)));
+      if (below.length === 2) flag('belowEtrto', TW.tyreWarnBelowEtrto('Tyre width', String(min)));
+      else if (below.length === 1) flag('belowEtrto', TW.tyreWarnBelowEtrto(`${below[0]!.label} tyre width`, String(min)));
     }
   }
   if (wheels.some((w) => w.wEff < FIT_MIN_MM || w.wEff > FIT_MAX_MM)) flag('extrapolated', TN.tyreWarnExtrapolated);
