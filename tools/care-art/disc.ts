@@ -211,7 +211,7 @@ export function padSpacer(): Pic {
   pic.path('cp-hi', poly([m(rot0 - g, -4), m(rot1 + g, -4), m(rot1 + g, 13), m(rot0 - g, 13)]), { name: 'spacer' });
   pic.path('cp-hi', rrect(...m(-3.5, 13), 9 * k, 5 * k, 3), { name: 'tab' });
   pic.path('cp-ctx', new Path().M(m(slot[0] - 5, -14)).Q(m(slot[0] - 6, -19), m(slot[0] - 12, -21)), { style: 'stroke-width:3' });
-  pic.label('cp-th', [306, 176], 'pad spacer', [262, 170], m(4, 15.5), 'end', 'leader-spacer');
+  pic.label('cp-th', [170, 184], 'pad spacer', [168, 180], m(4, 15.5), undefined, 'leader-spacer');
   pic.text('cp-tm', [8, 214], 'The wheel out: no disc in the slot');
   pic.text('cp-tm', m(slot[1] + 10.5, 2), 'wheel side \u2192');
   pic.facts.push(touches(pic, 'spacer', 'pad-o', 0.5), touches(pic, 'spacer', 'pad-i', 0.5), touches(pic, 'tab', 'spacer', 0.5), pointsAt(pic, 'leader-spacer', 'tab', 1));

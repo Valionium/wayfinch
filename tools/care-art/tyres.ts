@@ -76,7 +76,7 @@ export function wheelSection(mark: SectionMark): Pic {
     innerTube(pic, f, 'cp-body', [72, 134]);
     pic.path('cp-hi', boot, { name: 'boot' });
     pic.label('cp-th', [306, 190], 'boot', [292, 182], pol(c[0], c[1], f.mm(RI - 0.7), 116), 'end', 'leader-boot');
-    pic.label('cp-tm', [306, 96], 'cut', [292, 100], pol(c[0], c[1], f.mm(R + 0.5), 103), 'end', 'leader-cut');
+    pic.label('cp-tm', [244, 100], 'cut', [242, 96], pol(c[0], c[1], f.mm(R + 0.5), 103), undefined, 'leader-cut');
     pic.label('cp-tm', [14, 46], 'tube', [42, 52], pol(c[0], c[1], f.mm(RI - 0.5), 318), undefined, 'leader-tube');
     pic.facts.push(pointsAt(pic, 'leader-boot', 'boot', 1), pointsAt(pic, 'leader-cut', 'tyre-2', 8), pointsAt(pic, 'leader-tube', 'tube', 1));
     pic.facts.push(touches(pic, 'boot', 'tyre', 1), touches(pic, 'boot', 'tyre-2', 1), touches(pic, 'boot', 'tube', f.mm(0.8)));
@@ -85,7 +85,7 @@ export function wheelSection(mark: SectionMark): Pic {
     if (tubeIn) innerTube(pic, f, mark === 'tube' ? 'cp-hi' : 'cp-body');
   }
   beads(pic, f, mark === 'bead' ? 'cp-hi' : 'cp-dark');
-  if (mark === 'tyre') pic.label('cp-th', [306, 40], 'tyre', [290, 46], pol(...m(0, YC), f.mm(R - 1), 40), 'end', 'leader');
+  if (mark === 'tyre') pic.label('cp-th', [232, 40], 'tyre', [230, 36], pol(...m(0, YC), f.mm(R - 1), 40), undefined, 'leader');
   if (mark === 'tube') pic.label('cp-th', [222, 24], 'inner tube', [220, 22], pol(...m(0, YC), f.mm(RI - 0.5), 42), undefined, 'leader');
   if (mark === 'bead') pic.label('cp-th', [228, 150], 'bead', [226, 146], m(WI / 2 - 1.6, SEAT - 1.7), undefined, 'leader');
   if (mark === 'rim') pic.label('cp-th', [306, 200], 'rim', [292, 194], m(WI / 2 + WALL - 0.4, 8), 'end', 'leader');
@@ -122,7 +122,7 @@ export function tubelessValve(): Pic {
   pic.path('cp-obj', rrect(...m(-5.5, DEPTH - 0.4), f.mm(11), f.mm(3.2), 2), { name: 'nut' });
   pic.label('cp-th', [306, 24], 'tubeless valve', [262, 30], m(3.6, CH - 1.6), 'end', 'leader-valve');
   pic.label('cp-tm', [306, 176], 'nut', [292, 170], m(5.5, DEPTH + 1.2), 'end', 'leader-nut');
-  pic.label('cp-tm', [14, 60], 'rim', [36, 66], m(-WI / 2 - WALL, 6), undefined, 'leader-rim');
+  pic.label('cp-tm', [42, 60], 'rim', [44, 56], m(-WI / 2 - WALL, 6), 'end', 'leader-rim');
   pic.text('cp-tm', [14, 222], 'The rim cut through at the valve');
   pic.facts.push(touches(pic, 'valve', 'rim', f.mm(0.8)), touches(pic, 'nut', 'rim', 0.8), touches(pic, 'stem', 'nut', 0.5));
   pic.facts.push(pointsAt(pic, 'leader-valve', 'valve', 1), pointsAt(pic, 'leader-nut', 'nut', 1), pointsAt(pic, 'leader-rim', 'rim', 1));
