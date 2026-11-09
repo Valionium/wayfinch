@@ -149,13 +149,15 @@ test('[LC-LOOK-DEEP] #bike-details=<id>&back=trip&section=look opens at Look wit
   assert.equal(r.run('BIKE_PROFILE_EDITOR_ID'),BIKE.id,'the plan\'s own bike');
   assert.equal(r.run("document.getElementById('bikeDetailsBack').href"),'/#/tools/tyre');
   for(const bad of ['#bike-details','#dev','#bike-details=x y','','#bike-details=%E0%A4%A'])assert.equal(r.run(`bikeDetailsLink(${JSON.stringify(bad)})`),null,bad);
-  // a new bike from a link, with no bike in the plan: the first tap saves it to the saved bikes, shown at once; the plan stays as it is
+  // a new bike from a link, with no bike in the plan: the first tap saves it to the saved bikes, shown at once; since the owner's
+  // finding H (8 Nov 2026) it is also the plan's bike, so Tools no longer stays grey
   const n=page({plan:null,library:[]});
   n.run(`openBikeDetailsFromLink('#bike-details=new&back=trip&section=look');setLook({colour:'#6b3fa0'})`);
   assert.equal(stroke(n),'#6b3fa0');
   await n.settle();await new Promise(r=>setTimeout(r,5));await n.settle();
-  assert.equal(n.json('S.bikeProfile'),null);
-  assert.equal(JSON.parse(n.stored('loadcheck:bikeProfiles'))[0].look.colour,'#6b3fa0');
+  const added=JSON.parse(n.stored('loadcheck:bikeProfiles'))[0];
+  assert.equal(added.look.colour,'#6b3fa0');
+  assert.equal(n.json('S.bikeProfile.id'),added.id,'[BK-ADD-CHOSEN] the plan\'s bike');
 });
 
 test('[LC-LOOK-QUICK] the two-tap start passes unchanged, and Look sits below it',()=>{
@@ -171,30 +173,47 @@ const UNSAVED={id:'bike_plan_a',name:'Plan bike',frontTyre:'47-584',rearTyre:'47
 const draftOf=p=>p.run('JSON.stringify(captureDraft())');
 const settleAll=async p=>{for(let i=0;i<4;i++){await p.settle();await new Promise(r=>setTimeout(r,5));}};
 
-test('[LC-LOOK-DEEP] Add bike from the co-pilot (#bike-details=new): a tap saves a new bike to the library and never touches the plan\'s unsaved bike',async()=>{
+// The owner's finding H (8 Nov 2026) changes this one: a bike added from You is saved and becomes the chosen bike, the plan's, at
+// once; before, it went to the library only and needed "Use this bike for this plan", which is gone.
+test('[BK-ADD-CHOSEN] Add bike from the co-pilot (#bike-details=new): the first tap saves a new bike to the library and makes it the plan\'s bike; the unsaved one it replaces comes back with Undo',async()=>{
   const p=page({plan:UNSAVED,library:[]});
-  const plan=p.stored('loadcheck:bikeProfile'),draft=draftOf(p);
   p.run(`openBikeDetailsFromLink('#bike-details=new&back=you&section=look')`);
   p.run("setLook({colour:'#c62f2a'})");
   await settleAll(p);
-  assert.equal(p.json('S.bikeProfile.id'),UNSAVED.id,'the plan keeps its bike');
-  assert.equal(p.stored('loadcheck:bikeProfile'),plan,'and its stored copy');
-  assert.equal(draftOf(p),draft,'and the plan itself');
   const lib=JSON.parse(p.stored('loadcheck:bikeProfiles'));
   assert.equal(lib.length,1,'a new bike in the library');
   assert.equal(lib[0].look.colour,'#c62f2a');
+  assert.equal(p.json('S.bikeProfile.id'),lib[0].id,'the new bike is the plan\'s bike');
+  assert.equal(JSON.parse(p.stored('loadcheck:bikeProfile')).id,lib[0].id,'and its stored copy: Tools and You read it at once');
+  assert.equal(JSON.parse(p.stored('loadcheck:bikeChoice:v1')).bikeId,lib[0].id,'the chosen bike: the page\'s own record');
   assert.equal(p.run('BIKE_PROFILE_EDITOR_ID'),lib[0].id,'Bike details now shows that new bike');
   p.run("setLook({bars:'drop'});quickPickSize('L')");
   await settleAll(p);
   const again=JSON.parse(p.stored('loadcheck:bikeProfiles'));
-  assert.equal(again.length,1,'further taps change the same new bike');
-  assert.deepEqual([again[0].look.bars,again[0].fit.size.value],['drop','L']);
-  assert.equal(p.json('S.bikeProfile.id'),UNSAVED.id);
-  // it becomes the plan's bike only by the plain tap for that
-  assert.equal(p.run('linkHoldsBike()'),true,'Use this bike for this plan is offered');   // the fake page has no class list: the rule it follows
-  await p.run('useShownBike()');
+  assert.equal(again.length,1,'further taps change the same new bike, no second one');
+  assert.equal(again[0].look.bars,'drop');
+  assert.deepEqual([p.json('S.bikeProfile.id'),p.json('S.bikeProfile.look.bars'),p.json('S.bikeProfile.fit.size.value')],[lib[0].id,'drop','L']);
+  // no "Use this bike for this plan" any more
+  assert.equal(p.run("typeof useShownBike"),'undefined');
+  assert.ok(!p.html.includes('id="bikeUseShown"'),'no button for it');
+  // the unsaved plan bike it replaced is not lost
+  assert.equal(p.run('undoBikeSwap()'),true);
   await settleAll(p);
-  assert.equal(p.json('S.bikeProfile.id'),again[0].id);
+  assert.equal(p.json('S.bikeProfile.id'),UNSAVED.id,'Undo brings back the plan\'s own bike');
+});
+
+test('[BK-ADD-CHOSEN] Add bike from the co-pilot, named and saved with Save bike for next time: saved, and the plan\'s bike',async()=>{
+  const p=page({plan:BIKE,library:[BIKE,OTHER]});
+  p.run(`openBikeDetailsFromLink('#bike-details=new&back=you');document.getElementById('bikeName').value='Gravel'`);
+  await p.run('saveBikeProfile()');
+  await settleAll(p);
+  const lib=JSON.parse(p.stored('loadcheck:bikeProfiles'));
+  const added=lib.find(b=>b.name==='Gravel');
+  assert.ok(added,'saved');
+  assert.equal(lib.length,3);
+  assert.equal(p.json('S.bikeProfile.id'),added.id,'the plan\'s bike');
+  assert.equal(JSON.parse(p.stored('loadcheck:bikeProfile')).id,added.id);
+  assert.equal(JSON.parse(p.stored('loadcheck:bikeChoice:v1')).bikeId,added.id);
 });
 
 test('[LC-LOOK-DEEP] Edit from You: one size or frame-picture tap changes that saved bike only; the plan keeps its own',async()=>{
@@ -504,10 +523,10 @@ test('[LC-LOOK-FORK] a preset\'s colours that are not swatches show in each row 
   open(p);
   const own=row=>({value:p.run(`document.getElementById('${row}OwnInput').value`),name:p.run(`document.getElementById('${row}OwnName').textContent`)});
   p.run('renderLookChoices()');
-  const named=hex=>({'#5f8fd0':"Blue, the pair's own shade",'#7a4fb0':"Purple, the pair's own shade"})[hex];
+  const named=hex=>({'#5f8fd0':{name:'Blue (pair)'},'#7a4fb0':{name:'Purple (pair)'}})[hex];   // owner, 8 Nov: short to see (the full name is the input's aria-label, tested in the e2e)
   p.run("lookForkChange('lookFork','fade')");
-  assert.deepEqual(own('lookForkFrom'),{value:'#5f8fd0',name:named('#5f8fd0')},'Blue to purple: its first colour');
-  assert.deepEqual(own('lookForkTo'),{value:'#7a4fb0',name:named('#7a4fb0')},'and its second');
+  assert.deepEqual(own('lookForkFrom'),{value:'#5f8fd0',...named('#5f8fd0')},'Blue to purple: its first colour');
+  assert.deepEqual(own('lookForkTo'),{value:'#7a4fb0',...named('#7a4fb0')},'and its second');
   assert.match(p.html,/id="lookForkFrom" role="radiogroup"/);
   for(const row of ['lookForkFrom','lookForkTo']){
     const html=p.run(`document.getElementById('${row}').innerHTML`);

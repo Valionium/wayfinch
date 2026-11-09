@@ -91,17 +91,29 @@ function TopicCard({ name, answer, stamp, open, onToggle, v, actions, onShelter 
   );
 }
 
-export function TopicCards({ screen, open, onToggle, v, actions, onShelter }: {
+/** A card that waits for Get ready offline: its topic and one muted line, no status colour (AH-BEFORE-READY). */
+function LaterCard({ name }: { name: CardName }) {
+  return (
+    <section class="card ah-card ah-later" id={`card-${name}`} data-card={name}>
+      <p class="ah-topic">{TOPIC[name]}</p>
+      <p class="muted">{W.appAheadAfterReady}</p>
+    </section>
+  );
+}
+
+/** `later`: the cards shown as one muted line until Get ready offline has saved what they need. */
+export function TopicCards({ screen, open, onToggle, v, actions, onShelter, later }: {
   screen: Screen; open: ReadonlySet<CardName>; onToggle: (name: CardName) => void; v: AheadTrip; actions: AheadActions; onShelter: () => void;
+  later: ReadonlySet<CardName>;
 }) {
   return (
     <div class="ah-cards" aria-label={W.appAheadCardsLabel} role="group">
-      {CARD_ORDER.map((name) => (
+      {CARD_ORDER.map((name) => (later.has(name) ? <LaterCard key={name} name={name} /> : (
         <TopicCard
           key={name} name={name} answer={screen.cards[name]} stamp={screen.stamps[name]} open={open.has(name)} onToggle={() => onToggle(name)}
           v={v} actions={actions} onShelter={onShelter}
         />
-      ))}
+      )))}
     </div>
   );
 }

@@ -74,16 +74,18 @@ test('[TB-PAGE-WRITES] a saved bike chosen here writes the page\'s own record on
   assert.equal(p.writes.filter(k=>k.startsWith('copilot:')).length,0,'the page never writes a copilot:* key');
 });
 
-test('[TB-PAGE-WRITES] the shown bike used, a new bike and the bike cleared each write the record once with the new id; No bike is null',async()=>{
+// "Use this bike for this plan" is gone (the owner's finding H, 8 Nov 2026): a bike added from Wayfinch is the one that writes here.
+test('[TB-PAGE-WRITES] a bike added from Wayfinch, a new bike and the bike cleared each write the record once with the new id; No bike is null',async()=>{
   const p=page();
-  p.run("openBikeDetailsFromLink('#bike-details=bike_c&back=tools')");
-  await p.run('useShownBike()');await p.settle();
-  assert.equal(plan(p),'bike_c');
-  assert.equal(p.count(KEY),1);assert.equal(p.mine().bikeId,'bike_c','the shown bike used');
+  p.run("openBikeDetailsFromLink('#bike-details=new&back=you')");
+  p.run("setLook({colour:'#c62f2a'})");await p.settle();
+  const added=plan(p);
+  assert.ok(added && !['bike_a','bike_b','bike_c'].includes(added),'a bike added from Wayfinch is the plan\'s');
+  assert.equal(p.count(KEY),1);assert.equal(p.mine().bikeId,added,'the bike added');
   p.run("closeBikeDetails();openBikeDetails(null);startNewBike();document.getElementById('bikeName').value='Tourer'");
   await p.run('saveBikeProfile()');await p.settle();
   const fresh=plan(p);
-  assert.ok(fresh && !['bike_a','bike_b','bike_c'].includes(fresh),'a new bike is the plan\'s');
+  assert.ok(fresh && !['bike_a','bike_b','bike_c',added].includes(fresh),'a new bike is the plan\'s');
   assert.equal(p.count(KEY),2);assert.equal(p.mine().bikeId,fresh,'the new bike');
   await p.run('clearBikeProfile()');await p.settle();
   assert.equal(plan(p),null);
@@ -118,12 +120,12 @@ test('[TB-PAGE-FOLLOWS] opening with a newer Wayfinch choice of a saved bike tha
   assert.equal(p.json('qaUses'),1);
 });
 
-test('[TB-PAGE-FOLLOWS] the same bike, an older record, an unknown id, No bike or a broken record change nothing and write nothing',async()=>{
+// "Without a bike" chosen in Tools is followed too since the owner's ruling of 7 Nov 2026 (TB-PAGE-NO-BIKE, below); it left this list then.
+test('[TB-PAGE-FOLLOWS] the same bike, an older record, an unknown id or a broken record change nothing and write nothing',async()=>{
   const cases=[
     ['the same bike',p=>theirs(p,'bike_a')],
     ['an older record',p=>{theirs(p,'bike_b',Date.now()-HOUR);p.values.set(KEY,record('load-check','bike_a',Date.now()-1000));}],
     ['an unknown id',p=>theirs(p,'bike_zz')],
-    ['No bike',p=>theirs(p,null)],
     ['a broken record',p=>p.values.set(THEIRS,'{"app":"copilot","kind":"bike-choice","v":2,"bikeId":"bike_b","at":"2026-11-07T00:00:00.000Z"}')],
     ['the page\'s own record naming another bike',p=>p.values.set(KEY,record('load-check','bike_b',Date.now()))],
   ];
@@ -146,6 +148,65 @@ test('[TB-PAGE-FOLLOWS] a plan with no bike moves to the chosen one too',async()
   p.run('followBikeChoice()');await p.settle();
   assert.equal(plan(p),'bike_c');
   assert.equal(p.text('bikeFollowText'),'Now planning for Commuter, chosen in Tools ·');
+});
+
+// "Without a bike" (owner, 7 Nov 2026): a newer Wayfinch record of No bike moves the plan to the standard bike at the next open, with the
+// usual line and Undo; never silent, never for a plan-only bike or a frozen draft, and nothing when the plan has no bike already.
+test('[TB-PAGE-NO-BIKE] "Without a bike" chosen in Tools: the plan moves to the standard bike (no bike), with the line and Undo; following writes no record',async()=>{
+  const p=page();
+  theirs(p,null);
+  const kit=p.run('JSON.stringify(S.kit)'),stored=p.stored('loadcheck:bikeProfile');
+  assert.equal(p.run('followBikeChoice()'),true,'it moves');
+  await p.settle();
+  assert.equal(plan(p),null,'the plan has no bike: the standard bike is drawn');
+  assert.equal(p.stored('loadcheck:bikeProfile'),'null','stored, so a reload does not move it again');
+  assert.ok(p.shown('bikeFollowBar'),'never silent: the line shows');
+  assert.equal(p.text('bikeFollowText'),'Now planning without a saved bike ·');
+  assert.ok(p.shown('bikeFollowUndo'));
+  assert.equal(p.text('bikeFollowUndo'),'Undo');
+  assert.equal(p.count(KEY),0,'following writes no record');
+  assert.equal(p.writes.filter(k=>k.startsWith('copilot:')).length,0);
+  // opening again with the same record changes nothing more
+  assert.equal(p.run('followBikeChoice()'),false);
+  // Undo brings the bike back, with its kit, and the page's record names it
+  p.run('undoBikeSwap()');await p.settle();
+  assert.equal(plan(p),'bike_a');
+  assert.equal(p.run('JSON.stringify(S.kit)'),kit,'its kit choices, byte for byte');
+  assert.equal(p.stored('loadcheck:bikeProfile'),stored,'stored byte for byte');
+  assert.equal(p.mine().bikeId,'bike_a');
+  assert.equal(p.text('bikeFollowText'),'Back to planning for Trail Bike.');
+  assert.ok(!p.shown('bikeFollowUndo'));
+});
+
+test('[TB-PAGE-NO-BIKE] nothing moves for "Without a bike" when the plan has no bike already (seen), for a plan-only bike, or while the draft is frozen',async()=>{
+  const none=page({plan:null});
+  theirs(none,null);
+  assert.equal(none.run('followBikeChoice()'),false);await none.settle();
+  assert.equal(plan(none),null);
+  assert.ok(!none.shown('bikeFollowBar'),'no line: nothing changed');
+  assert.ok(none.values.get('loadcheck:bikeFollowed:v1'),'the record counts as seen');
+  const MINE={id:'bike_mine',name:'My bike',maxWeight:{v:120,u:'kg',includes:'bike'},maxWeightAsked:true};
+  const own=page({plan:MINE});
+  theirs(own,null);
+  assert.equal(own.run('followBikeChoice()'),false);await own.settle();
+  assert.equal(plan(own),'bike_mine','a plan-only bike is never replaced');
+  const frozen=page();
+  theirs(frozen,null);
+  frozen.run('DRAFT_FROZEN=true');
+  assert.equal(frozen.run('followBikeChoice()'),false);await frozen.settle();
+  assert.equal(plan(frozen),'bike_a');
+  assert.equal(frozen.writes.length,0,'nothing written');
+});
+
+// Two Bag planner tabs (found 7 Nov 2026): "Yes, clear this plan" in one tab keeps the selected bike (its own confirm text says so);
+// the other tab, adopting the cleared plan, must not write "no bike" over it.
+test('[LC-TABS-BIKE] a plan cleared in another tab: this tab adopts the empty plan and keeps the selected bike, in memory and stored',async()=>{
+  const storage=sharedStore();
+  const p=page({storage});
+  p.run("adoptDraft({value:null,version:new Date().toISOString()})");await p.settle();
+  assert.equal(plan(p),'bike_a','this tab keeps the bike');
+  assert.equal(JSON.parse(p.stored('loadcheck:bikeProfile')).id,'bike_a','and the stored selection is not written as no bike');
+  assert.equal(p.text('tabText'),'This plan was cleared in another tab, so this tab now shows an empty plan.');
 });
 
 test('[TB-PAGE-FOLLOWS] never on a storage event: a choice made in Wayfinch while the page is open moves nothing until it opens again',async()=>{

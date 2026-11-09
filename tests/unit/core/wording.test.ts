@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest';
-import { W } from '../../../src/core/wording/en.ts';
+import { W as APP } from '../../../src/core/wording/en.ts';
+import { WB } from '../../../src/core/wording/en-bike.ts';
+
+// The bike's words live in en-bike.ts (so the bag planner's bike.js carries only them); every check here covers them as part of W.
+const W = { ...APP, ...WB };
 import { bannedHits } from '../../fixtures/banned.ts';
 
 // Every key starts with the area it belongs to. Weather and stop strings get the stricter list of banned words.
@@ -20,6 +24,12 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   appTripDistance: [['165.2']],
   appTripClimbing: [['1,240']],
   appTripDayRow: [[1, '78.4']],
+  appTripLineStarts: [['Sat 14 Nov', 0], ['Sat 14 Nov', 1], ['Sat 14 Nov', 6]],
+  appTripLineDay: [[2, 3]],
+  appTripLineEnded: [['Sun 15 Nov']],
+  appTripRouteDone: [['165', '1,240', 2], ['82.4', null, 1]],
+  appTripStepNo: [[1]],
+  appTripDetailsLine: [['Sporting', '25', 'Camping', '08:30']],
   appTripDayLeaveBy: [['about 13:45']],
   appTripDayDetail: [['5.9', '1,130'], ['5.9', null]],
   appTripProfileLabel: [[112, 641]],

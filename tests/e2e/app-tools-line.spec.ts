@@ -26,10 +26,14 @@ for (const width of [320, 360]) {
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(width);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    // One saved bike with that name, as text: it wraps.
+    // One saved bike with that name: still the select (with Without a bike), 44 px and inside the screen.
     await page.evaluate((b) => { localStorage.setItem('loadcheck:bikeProfiles', JSON.stringify([b])); }, BIKES[0]);
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.locator('.bike-line').first()).toContainText('Bike:');
+    await expect(select).toBeVisible();
+    expect(await select.locator('option').count()).toBe(2);
+    const one = (await select.boundingBox())!;
+    expect(one.height).toBeGreaterThanOrEqual(44);
+    expect(one.x + one.width).toBeLessThanOrEqual(width);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 }

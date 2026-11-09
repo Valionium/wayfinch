@@ -120,7 +120,7 @@ test('[YOU-EXPORT-UI] Export downloads a JSON file named by the day, with the ri
 
 test('[PRIV-LEGAL-REACH] the imprint, the privacy notice and the licences are two taps from every tab: the tab, You, the link', async ({ page }) => {
   app = await loadApp(page);
-  for (const from of ['Ahead', 'Trip', 'Tools', 'You']) {
+  for (const from of ['En route', 'Trip', 'Tools', 'You']) {
     for (const [name, heading] of [['Imprint', /Impressum/], ['Privacy notice', /Privacy notice/], ['Licences and data', /Licences and data/]] as const) {
       await page.goto(`${app.origin}/`, { waitUntil: 'domcontentloaded' });
       await tab(page, from).click(); // tap 0: being on that tab
@@ -170,7 +170,7 @@ test('the legal pages have no automatic accessibility violations and no horizont
 test('[PRIV-NOTHING-SENT] opening the app without a prepared trip, and every tab of it, contacts only the app\'s own hosting', async ({ page }) => {
   app = await loadApp(page);
   const log = sent(page);
-  for (const name of ['Trip', 'Tools', 'You', 'Ahead']) await tab(page, name).click();
+  for (const name of ['Trip', 'Tools', 'You', 'En route']) await tab(page, name).click();
   await page.goto(`${app.origin}/#/you`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-you-loaded]')).toBeVisible();
   await page.reload({ waitUntil: 'domcontentloaded' });

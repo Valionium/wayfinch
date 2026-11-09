@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { buildScreen } from '../../../src/core/screen/screen.ts';
 import { planStages } from '../../../src/core/route/stages.ts';
 import { W } from '../../../src/core/wording/en.ts';
+import { TR } from '../../../src/core/wording/en-trip.ts';
 import type { StepName, StepReport } from '../../../src/data/prepare.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
 import { closeDb, openDb } from '../../../src/store/db.ts';
@@ -15,7 +16,8 @@ import { readInputs } from '../../../src/store/inputs.ts';
 import { savePrepared } from '../../../src/store/prepared.ts';
 import { preparedStore } from '../../../src/store/prepared.ts';
 import { readTrip } from '../../../src/store/trip.ts';
-import { planned, routeFromGpx } from '../../../src/ui/trip/model.ts';
+import { planned } from '../../../src/ui/trip/model.ts';
+import { routeFromGpx } from '../../../src/ui/trip/read-gpx.ts';
 import { askForHomeScreen, installOffer } from '../../../src/ui/install.ts';
 import { refreshBikeSource } from '../../../src/ui/bike/live.ts';
 import { TripScreen } from '../../../src/ui/trip/trip.tsx';
@@ -58,11 +60,32 @@ async function show(svc: TripServices = services()): Promise<TripServices> {
   act(() => render(null, host));
   await act(async () => { render(<TripScreen services={svc} />, host); });
   await until(() => host.querySelector('[data-trip-loaded]') !== null, 'Trip to load');
+  // Add a route is a chunk of its own, in the open Route step.
+  await until(() => host.querySelector('[data-step="route"][data-open]') === null || host.querySelector('[data-add-route]') !== null, 'Add a route');
   return svc;
 }
 
+/**
+ * The guided Trip (design of 8 Nov 2026) shows one step at a time: this opens one as the rider does, with its title, or its Change
+ * or Update once it is done.
+ */
+async function openStep(name: 'route' | 'getready' | 'bags' | 'go'): Promise<void> {
+  const li = host.querySelector(`[data-step="${name}"]`)!;
+  if (li.hasAttribute('data-open')) return;
+  await act(async () => { li.querySelector<HTMLButtonElement>('.trip-step-head button')!.click(); });
+}
+/** The trip details fold to one line under the Route step (TRIP-DETAILS): their fields show once Trip details is tapped. */
+async function openDetails(): Promise<void> {
+  const toggle = host.querySelector<HTMLButtonElement>('[data-trip-details] button')!;
+  if (toggle.getAttribute('aria-expanded') !== 'true') await act(async () => { toggle.click(); });
+  await until(() => host.querySelector('#trip-start') !== null, 'the trip details');
+}
+
 async function pick(content: string, name = 'ride.gpx'): Promise<void> {
-  const input = host.querySelector<HTMLInputElement>('input[type=file]')!;
+  // With a route, the file picker is in the Route step, opened by its Change.
+  if (!host.querySelector('[data-add-route] input[type=file]')) await openStep('route');
+  await until(() => host.querySelector('[data-add-route] input[type=file]') !== null, 'the file picker');
+  const input = host.querySelector<HTMLInputElement>('[data-add-route] input[type=file]')!;
   Object.defineProperty(input, 'files', { value: [new File([content], name, { type: 'application/gpx+xml' })], configurable: true });
   await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); });
 }
@@ -110,7 +133,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
 
   test('[TRIP-GPX-BAD] a file that cannot be read at all is told in words, with nothing thrown at the rider', async () => {
     await show();
-    const input = host.querySelector<HTMLInputElement>('input[type=file]')!;
+    const input = host.querySelector<HTMLInputElement>('[data-add-route] input[type=file]')!;
     const broken = { name: 'a.gpx', size: 10, text: () => Promise.reject(new Error('boom')) };
     Object.defineProperty(input, 'files', { value: [broken], configurable: true });
     await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); });
@@ -156,7 +179,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     await pick(await fixtureGpx('loop', { heights: false }));
     await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
     expect(text()).toContain(W.appTripClimbingUnknown);
-    expect(text()).toContain(W.appTripHeightsPending);
+    expect(text()).toContain(TR.appTripHeightsPending);
     expect(text()).not.toContain(W.appTripHeightsCredit);
     // What Get ready offline's heights step does: the same line with heights in it.
     const trip = (await readTrip())!;
@@ -166,7 +189,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     await saveTrip(withHeights);
     await show(services());
     expect(text()).toContain(W.appTripHeightsCredit);
-    expect(text()).not.toContain(W.appTripHeightsPending);
+    expect(text()).not.toContain(TR.appTripHeightsPending);
   });
 
   test('[TRIP-DAY1-LEAVEBY] the day before departure, Day 1 reads "Day 1 · N km · leave by about HH:MM", the very time of the Daylight card', async () => {
@@ -213,6 +236,7 @@ const allOk = (): StepReport[] => stepNames.map((step) => ({ step, ok: true, not
 describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
   test('[TRIP-SETTINGS] the defaults of the table show: 08:30, Sporting, Camping, 2.0 L; accommodation makes camp water 0 and camping gives 2 back', async () => {
     await withRoute();
+    await openDetails();
     expect(host.querySelector<HTMLInputElement>('#trip-start')!.value).toBe('08:30');
     expect(host.querySelector<HTMLInputElement>('input[name=pace]:checked')!.value).toBe('sporting');
     expect(host.querySelector<HTMLInputElement>('input[name=stay]:checked')!.value).toBe('camping');
@@ -233,6 +257,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     await show(svc);
     await pick(await fixtureGpx('heidelberg-strasbourg'));
     await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
+    await openDetails();
     slow = true;
     const input = host.querySelector<HTMLInputElement>('#trip-start')!;
     await act(async () => { input.value = '03:00'; input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); });
@@ -259,6 +284,9 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     let nights!: HTMLInputElement;
     try {
       loaded();
+      // The nights are in the Route step, opened by its Change (TRIP-STEPS): the field appears with that tap.
+      for (let i = 0; i < 5000 && !host.querySelector('[data-step="route"] .trip-step-head button'); i++) await new Promise<void>((r) => setTimeout(r, 0));
+      host.querySelector<HTMLButtonElement>('[data-step="route"] .trip-step-head button')!.click();
       for (let i = 0; i < 5000 && !host.querySelector('#trip-nights'); i++) await new Promise<void>((r) => setTimeout(r, 0));
       nights = host.querySelector<HTMLInputElement>('#trip-nights')!;
       nights.focus();
@@ -279,6 +307,8 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
 
   test('[TRIP-SETTINGS] a value out of range is refused with the range named, the last good value stays, and nothing is saved', async () => {
     await withRoute();
+    await openStep('route');
+    await openDetails();
     const set = async (id: string, value: string) => {
       const input = host.querySelector<HTMLInputElement>(`#${id}`)!;
       await act(async () => { input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); });
@@ -304,6 +334,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
 
   test('[TRIP-SETTINGS] pace, speed and nights change the days on screen and in the store together', async () => {
     await withRoute();
+    await openStep('route');
     const days = () => host.querySelectorAll('[data-summary] ol li').length;
     const before = days();
     const nights = host.querySelector<HTMLInputElement>('#trip-nights')!;
@@ -319,6 +350,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
 
   test('[TRIP-SETTINGS] the departure date starts as today, the day the route was added, as a value to change; it saves once typing has settled, and an empty date says what is lost', async () => {
     await withRoute();
+    await openStep('route');
     const date = () => host.querySelector<HTMLInputElement>('#trip-date')!;
     expect(date().value).toBe('2026-10-10');
     // The date starts as today, so there is no "Set to today"; "Clear the date" is a tap, not only the browser's own field.
@@ -336,6 +368,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
 
   test('[TRIP-SETTINGS] "Clear the date" takes the date away in one tap, also over a date still settling, and says what is lost', async () => {
     await withRoute();
+    await openStep('route');
     const date = () => host.querySelector<HTMLInputElement>('#trip-date')!;
     await act(async () => { date().value = '2026-10-17'; date().dispatchEvent(new Event('change', { bubbles: true })); });
     await click(button(W.appTripDateClear));
@@ -349,6 +382,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     const auto = services();
     expect(auto.env.weatherMode).toBe('auto');
     await show(auto);
+    await openDetails();
     expect(text()).toContain(W.weatherKeepFresh);
     const box = host.querySelector<HTMLInputElement>('input[type=checkbox]')!;
     expect(box.checked).toBe(true);
@@ -358,6 +392,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     render(null, host);
     const tap = services({ env: { ...auto.env, weatherMode: 'tap' } });
     await show(tap);
+    await openDetails();
     expect(text()).not.toContain(W.weatherKeepFresh);
   });
 
@@ -393,7 +428,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     await until(() => text().includes(W.appPrepWeatherFailed), 'the failed step');
     expect(text()).toContain(W.appPrepStorageFull(6, 14));
     expect(text()).toContain(W.appTripMissingHeading);
-    expect(text()).toContain(W.appTripPartial);
+    expect(text()).toContain(TR.appTripPartial);
     expect(text()).toContain(W.appTripNoPlaces);
     const retry = button(W.appTripRetryButton);
     expect(retry.disabled).toBe(false);
@@ -456,17 +491,17 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     await show(iphone);
     await pick(await fixtureGpx('loop'));
     await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
-    expect(text()).toContain(W.appTripIphoneAsk);
+    expect(text()).toContain(TR.appTripIphoneAsk);
     expect(button(W.appTripGetReadyButton).disabled).toBe(false);
     // Once something is saved the ask is not repeated.
     render(null, host);
     await show(services({ env: { ...base.env, ...tab }, ...preparing(allOk, { places: 3 }) }));
     await click(button(W.appTripGetReadyButton));
     await until(() => text().includes('3 places'), 'the result');
-    expect(text()).not.toContain(W.appTripIphoneAsk);
+    expect(text()).not.toContain(TR.appTripIphoneAsk);
     render(null, host);
     await show(services({ env: { ...base.env, ...tab, standalone: true } }));
-    expect(text()).not.toContain(W.appTripIphoneAsk);
+    expect(text()).not.toContain(TR.appTripIphoneAsk);
   });
 
   test('[TRIP-INSTALL] Android\'s install offer gives an Install button that asks the browser; without an offer there is none', async () => {
@@ -495,6 +530,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     expect(licences.getAttribute('href')).toBe('/legal/licences/');
     render(null, host);
     await show(services(preparing(allOk, { places: 2 })));
+    await openStep('getready');
     await click(button(/^(Update|Get ready offline)$/));
     await until(() => text().includes('map data from 28 Oct'), 'the build date');
     expect(text()).not.toContain('map data of');
@@ -561,7 +597,7 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     expect(trip.route.name).toBe(W.appAbName('Heidelberg', 'Strasbourg'));
     expect(trip.route.source).toBe('planned');
     expect(trip.route.points).toHaveLength(400);
-    expect(text()).toContain(W.appTripHeightsPending);
+    expect(text()).toContain(TR.appTripHeightsPending);
   });
 
   test('[AB-FULL-GEOMETRY] with a route already stored, a planned one asks before it replaces it', async () => {
@@ -570,6 +606,8 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     await pick(await fixtureGpx('loop'));
     await until(() => host.querySelector('[data-summary]') !== null, 'the first route');
     const before = (await readTrip())!.route.id;
+    await openStep('route');
+    await until(() => host.querySelector('#ab-from') !== null, 'Plan from A to B in the Route step');
     await choose('ab-from', 'Heidelberg');
     await choose('ab-to', 'Strasbourg');
     await click(button(W.appAbPlan));
@@ -585,9 +623,9 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     await choose('ab-from', 'Heidelberg');
     await choose('ab-to', 'Strasbourg');
     await click(button(W.appAbPlan));
-    await until(() => text().includes(W.appAbNone), 'the sentence');
+    await until(() => text().includes(TR.appAbNone), 'the sentence');
     expect(await readTrip()).toBeNull();
-    expect(host.querySelector('input[type=file]')).not.toBeNull();
+    expect(host.querySelector('[data-add-route] input[type=file]')).not.toBeNull();
     expect(net.urls.some((u) => /routed-(foot|car)|project-osrm|profile=(car|foot)/.test(u))).toBe(false);
   });
 
@@ -595,12 +633,12 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     const net = network(true);
     await show(services({ fetch: net.fetch }));
     await type('ab-from', 'Nowhereville');
-    await until(() => text().includes(W.appAbNoResults), 'no results');
+    await until(() => text().includes(TR.appAbNoResults), 'no results');
     const down = ((): Promise<Response> => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch;
     await show(services({ fetch: down }));
     await type('ab-from', 'Heidelberg');
-    await until(() => text().includes(W.appAbSearchFailed), 'the failure');
-    expect(text()).not.toContain(W.appAbNoResults);
+    await until(() => text().includes(TR.appAbSearchFailed), 'the failure');
+    expect(text()).not.toContain(TR.appAbNoResults);
   });
 });
 
@@ -639,6 +677,7 @@ describe('What the review of group 5 found', () => {
     await show(svc);
     await pick(await fixtureGpx('multi-day-800'));
     await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
+    await openDetails();
     const run = svc.prepare(() => undefined, () => undefined);
     await act(async () => { host.querySelector<HTMLInputElement>('input[name=pace][value=steady]')!.click(); });
     await settle(150);
@@ -765,7 +804,7 @@ describe('What the review of group 5 found', () => {
     }
     await click(button(W.appAbPlan));
     await until(() => text().includes(W.routeTrackTooLong), 'the reason');
-    expect(text()).not.toContain(W.appAbNone);
+    expect(text()).not.toContain(TR.appAbNone);
   });
 });
 
@@ -785,6 +824,7 @@ describe('Messages that must not be lost', () => {
     const real = services();
     const svc = { ...real, writeSettings: () => Promise.resolve({ ok: true, reasons: {}, note: W.appTripReplanFailed }) };
     await show(svc);
+    await openDetails();
     await click(host.querySelector<HTMLInputElement>('input[name=pace][value=hard]')!);
     await until(() => text().includes(W.appTripReplanFailed), 'the sentence');
   });
@@ -808,6 +848,8 @@ describe('Plan bags for this trip (Contract 2)', () => {
     await show(services({ handOff: async () => { calls += 1; return answer; } }));
     expect(host.querySelector('[data-handoff]')).toBeNull(); // no route, nothing to hand over
     await pick(await fixtureGpx('loop'));
+    await until(() => host.querySelector('[data-summary]') !== null, 'the route');
+    await openStep('bags');
     await until(() => host.querySelector('[data-handoff]') !== null, 'the button');
     expect(text()).toContain(W.appHandoffNote);
     await click(button(W.appHandoffButton));

@@ -5,6 +5,7 @@ import { bikeArt, markerArt } from '../../../../src/core/bike/art.ts';
 import { CASINGS, casingFor, contrastRatio, SWATCHES } from '../../../../src/core/bike/colour.ts';
 import type { Anchors, Box, Placed } from '../../../../src/core/bike/art.ts';
 import { targetsOf } from '../../../../src/core/bike/targets.ts';
+import { PAIR_OFFSET } from '../../../../src/core/bike/shapes.ts';
 import { normaliseBike } from '../../../../src/core/bike/normalise.ts';
 import { resolveBikeSpec } from '../../../../src/core/bike/spec.ts';
 import type { BagView } from '../../../../src/core/bike/spec.ts';
@@ -81,8 +82,9 @@ function checkAnchors(a: Anchors, name: string, mounts: { st: boolean; dt: boole
     const [cx, cy] = [p.x + p.w / 2, p.y + p.h / 2];
     expect(cx >= h.box.x - 0.01 && cx <= h.box.x + h.box.w + 0.01 && cy >= h.box.y - 0.01 && cy <= h.box.y + h.box.h + 0.01, `${name}: ${key} keeps its centre`).toBe(true);
   }
-  // Panniers hang below the rack-top deck, the one behind included (it sits 7 up and left of the one in front).
-  expect(a.rack.y - 7, `${name}: panniers under the deck`).toBeGreaterThan(a.rackTop.y + a.rackTop.h);
+  // Panniers hang below the rack-top deck, the one behind included (owner, 8 Nov 2026: both hang from the rail; the one behind sits
+  // 6 left and 1.5 lower than the one in front, so it is never above the one in front).
+  expect(a.rack.y + Math.min(0, PAIR_OFFSET.rack![1]), `${name}: panniers under the deck`).toBeGreaterThan(a.rackTop.y + a.rackTop.h);
   // The seat pack hangs behind the saddle, over the rear wheel.
   expect(a.seat.x + a.seat.w, `${name}: seat pack behind the saddle`).toBeLessThan(a.points.saddle[0]);
   void circleBox;

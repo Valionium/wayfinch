@@ -5,6 +5,7 @@ import type { BikeRecord } from '../../core/bike/normalise.ts';
 import type { EmergencyCard } from '../../core/engines/emergency.ts';
 import type { Km } from '../../core/types.ts';
 import type { Screen } from '../../core/screen/screen.ts';
+import type { Prepare } from '../trip/run.tsx';
 
 /** What the last tap on Update position (or the manual picker) led to. Texts are the wording file's, set by the shell. */
 export type PositionState =
@@ -19,8 +20,10 @@ export type Town = { name: string; km: Km };
 export type AheadTrip = {
   kind: 'trip';
   screen: Screen;
-  /** False only while no position exists and no day-1 plan applies (AH-FIRST-USE): then only the button and the picker. */
-  answers: boolean;
+  /** The answers always show, with or without a position: no position is needed to see the route (AH-FROM-START). */
+  answers: true;
+  /** A position is kept and shown: until then the bike on the strip shows as not confirmed (AH-FROM-START). */
+  confirmed: boolean;
   lengthKm: Km;
   towns: Town[];
   bike: BikeRecord | null;
@@ -42,6 +45,10 @@ export type AheadTrip = {
   weatherBusy: boolean;
   /** A tap the store refused, said once at the top (Plan tomorrow, Back to today). */
   notice: string | null;
+  /** The route is there but nothing Get ready offline saves: no places, no saved stretch, no forecast (AH-BEFORE-READY). */
+  beforeReady: boolean;
+  /** The steps the last Get ready offline did not save, with their reasons: the top card names them (review of PR 73, I2). */
+  failedSteps: { step: string; ok: boolean; note: string | null }[];
 };
 
 /** With no route there is no screen, but the Emergency card stands: 112 and the fallback line (section 6.9). */
@@ -74,4 +81,6 @@ export type AheadActions = {
   smsHref(text: string): string;
   /** The screen again for the time now, from what was read: when Emergency or the share sheet opens. Nothing is read or sent. */
   freshen(): void;
+  /** Get ready offline: the very prepare of Trip's step, with its progress (AH-BEFORE-READY). Ahead reads again with `retry`. */
+  getReady: Prepare;
 };

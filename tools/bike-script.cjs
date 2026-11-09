@@ -5,8 +5,8 @@ const path=require('node:path');
 const ROOT=path.join(__dirname,'..');
 const options={
   stdin:{
-    contents:"import { bikeArt, DEFAULT_COLOURS, FADES, colourName, forkColours, nearestSwatchName, normaliseBike, oklabMedian, PAINT_WORDS, pairFor, PATTERN_LIST, resolveBikeSpec, SWATCHES } from './src/core/bike/planner.ts';\n"
-      +'window.WayfinchBike = Object.freeze({ bikeArt, resolveBikeSpec, SWATCHES, nearestSwatchName, normaliseBike, oklabMedian, PATTERN_LIST, FADES, DEFAULT_COLOURS, PAINT_WORDS, forkColours, pairFor, colourName });\n',
+    contents:"import { bagShape, bikeArt, shapedArt, DEFAULT_COLOURS, FADES, colourName, forkColours, nearestSwatchName, normaliseBike, oklabMedian, PAINT_WORDS, PAIR_OFFSET, pairFor, PATTERN_LIST, resolveBikeSpec, SWATCHES } from './src/core/bike/planner.ts';\n"
+      +'window.WayfinchBike = Object.freeze({ bikeArt, resolveBikeSpec, SWATCHES, nearestSwatchName, normaliseBike, oklabMedian, PATTERN_LIST, FADES, DEFAULT_COLOURS, PAINT_WORDS, forkColours, pairFor, colourName, bagShape, PAIR_OFFSET, shapedArt });\n',
     resolveDir:ROOT,
     sourcefile:'bike-entry.ts',
     loader:'ts',
@@ -26,10 +26,29 @@ const options={
 const photoOptions={...options,stdin:{...options.stdin,
   contents:"import { openPicker } from './src/ui/bike-photo/picker.ts';\n"+'window.WayfinchBikePhoto = Object.freeze({ openPicker });\n',
   sourcefile:'bike-photo-entry.ts'}};
-let cached=null;
+// The Gear advisor's search (sub-project 13): /tools/bags/advisor.js, loaded only when the advisor opens; window.WayfinchAdvisor.
+const advisorOptions={...options,stdin:{...options.stdin,
+  contents:"import { advise, adviseSteps, biggerOffered, biggerSteps } from './src/core/advisor/search.ts';\nimport { autoBalance, balance } from './src/core/advisor/balance.ts';\nimport { DECIDED, MIN_GAIN_BACK_L, MIN_GAIN_SCORE, SIZE_RANGES, WEIGHTS } from './src/core/advisor/table.ts';\n"
+    +'window.WayfinchAdvisor = Object.freeze({ adviseSteps, advise, biggerOffered, biggerSteps, balance, autoBalance, WEIGHTS, SIZE_RANGES, MIN_GAIN_BACK_L, MIN_GAIN_SCORE, DECIDED });\n',
+  sourcefile:'advisor-entry.ts'}};
+// The weight map (design of 8 Nov 2026): /tools/bags/weightmap.js, loaded on the first press of Show weight map; window.WayfinchWeightMap.
+const weightMapOptions={...options,stdin:{...options.stdin,
+  contents:"import { render } from './src/ui/weight-map/view.ts';\n"+'window.WayfinchWeightMap = Object.freeze({ render });\n',
+  sourcefile:'weightmap-entry.ts'}};
+let cached=null,cachedAdvisor=null,cachedMap=null;
+/** weightmap.js's text, built once per process, for the QA suites' page VM. */
+function weightMapScriptSync(){
+  if(cachedMap===null)cachedMap=Buffer.from(require('esbuild').buildSync(weightMapOptions).outputFiles[0].contents).toString('utf8');
+  return cachedMap;
+}
 /** The script's text, built once per process (the QA suites build many pages). */
 function bikeScriptSync(){
   if(cached===null)cached=Buffer.from(require('esbuild').buildSync(options).outputFiles[0].contents).toString('utf8');
   return cached;
 }
-module.exports={bikeScriptOptions:options,photoScriptOptions:photoOptions,bikeScriptSync};
+/** advisor.js's text, built once per process, for the QA suites' page VM (qa/app-vm.cjs). */
+function advisorScriptSync(){
+  if(cachedAdvisor===null)cachedAdvisor=Buffer.from(require('esbuild').buildSync(advisorOptions).outputFiles[0].contents).toString('utf8');
+  return cachedAdvisor;
+}
+module.exports={bikeScriptOptions:options,photoScriptOptions:photoOptions,advisorScriptOptions:advisorOptions,weightMapOptions,bikeScriptSync,advisorScriptSync,weightMapScriptSync};
