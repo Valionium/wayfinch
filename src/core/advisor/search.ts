@@ -1,7 +1,7 @@
 // The Gear advisor's search (design §3.1–3.3; plan Task 3). Pure: the planner's packing comes in as `input.trial`, so the same search
 // runs in Vitest with a stand-in and in the bag planner with its own, frozen planWith.
 import { candidates, extensions, panniersAllowed, planAsStyled, sizeOptions } from './candidates.ts';
-import { byOwnerOrder, compareFor, compareMinimal, handlingScore, isValid, overflows, sizeRange } from './rank.ts';
+import { bothScore, byOwnerOrder, compareFor, compareMinimal, handlingScore, isValid, overflows, sizeRange } from './rank.ts';
 import { DECIDED, MAX_TRIALS, MIN_GAIN_BACK_L, MIN_GAIN_SCORE, SIZE_RANGES, type SizedPos } from './table.ts';
 import type { AdvisorAnswer, AdvisorInput, BagIn, Candidate, Suggestion, TrialResult } from './types.ts';
 
@@ -16,6 +16,24 @@ const NOTHING_ON_BACK_L = 0.005;
  * a different type or position").
  */
 const keyOf = (c: Candidate) => [...c.add.map((b) => b.pos + (b.pair ? '×2' : '')), ...(c.deck ? ['deck'] : [])].join('+');
+
+/**
+ * Whether `s` does better than `ref` by decision 6 on the goal: Better handling 0.5 off the score, Get the backpack off 0.5 L off the
+ * back; both goals at once (D): either of them, with the combined score lower too (`base`, the plan as it stands, sets its shares).
+ */
+function betterThan(goal: AdvisorInput['goal'], base: TrialResult, ref: TrialResult, s: TrialResult): boolean {
+  const hand = handlingScore(ref) - handlingScore(s) >= MIN_GAIN_SCORE - EPS;
+  const back = ref.backL - s.backL >= MIN_GAIN_BACK_L - EPS;
+  if (goal === 'handling') return hand;
+  if (goal === 'backpack') return back;
+  return (hand || back) && bothScore(base, s) < bothScore(base, ref) - EPS;
+}
+/** About the same result as `ref` (side by side, the owner's rulings on PR 61): within decision 6 on the goal; both goals, on each. */
+function aboutSame(goal: AdvisorInput['goal'], ref: Suggestion, x: Suggestion): boolean {
+  const hand = Math.abs(x.score - ref.score) <= MIN_GAIN_SCORE + EPS;
+  const back = Math.abs(x.result.backL - ref.result.backL) <= MIN_GAIN_BACK_L + EPS;
+  return goal === 'handling' ? hand : goal === 'backpack' ? back : hand && back;
+}
 
 function bagsFor(input: AdvisorInput, c: Candidate): BagIn[] {
   return [...input.bags.filter((b) => b.uid !== c.remove), ...c.add];
@@ -44,14 +62,16 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
   const tried: Suggestion[] = [];
   const good: Suggestion[] = [];
   // A candidate counts when it is valid and, unless the rider's things overflow now (then any full fix counts), gains enough (decision 6).
+  // Both goals (D): a gain on either counts.
   const gains = (s: Suggestion) => baseOver || (input.goal === 'handling'
     ? baseScore - s.score >= MIN_GAIN_SCORE - EPS
-    : base.backL - s.result.backL >= MIN_GAIN_BACK_L - EPS);
+    : input.goal === 'backpack' ? base.backL - s.result.backL >= MIN_GAIN_BACK_L - EPS
+      : baseScore - s.score >= MIN_GAIN_SCORE - EPS || base.backL - s.result.backL >= MIN_GAIN_BACK_L - EPS);
 
   let stopped = false;
   // a hand-back after every SLICE trials, or sooner when the page's clock asks for it (review of PR 61, I4)
   const handBack = () => trials % SLICE === 0 || (input.handBack?.() ?? false);
-  const phases: ('add' | 'swap' | 'add-two')[] = input.goal === 'handling' ? ['add', 'swap', 'add-two'] : ['add', 'add-two'];
+  const phases: ('add' | 'swap' | 'add-two')[] = input.goal !== 'backpack' ? ['add', 'swap', 'add-two'] : ['add', 'add-two'];
   // One round of the phases. `onlyPanniers`: Bags first's second round, which tries only the candidates holding panniers.
   function* round(panniers: boolean, onlyPanniers: boolean): Generator<number, Suggestion[]> {
     const found: Suggestion[] = [];
@@ -78,12 +98,14 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
   yield* round(panniers, false);
   if (secondRound && good.length === 0) { panniers = true; yield* round(true, true); }
 
-  const order = compareFor(input.goal);
+  const order = compareFor(input.goal, base);
   if (good.length === 0) {
     const common = { tried: trials, frameReason, partial: stopped };
     if (!baseOver) {
       // Get the backpack off never says "already good" while litres stay on the back (review of PR 57, I4).
-      return input.goal === 'backpack' ? { kind: 'cannot-reduce', backL: base.backL, ...common } : { kind: 'already-good', ...common };
+      // Both goals (D) the same, while litres stay on the back.
+      const backLeft = input.goal === 'backpack' || (input.goal === 'both' && base.backL > NOTHING_ON_BACK_L);
+      return backLeft ? { kind: 'cannot-reduce', backL: base.backL, ...common } : { kind: 'already-good', ...common };
     }
     const closest = [...tried].sort((a, b) => a.result.overL - b.result.overL || a.result.spillIds.length - b.result.spillIds.length || order(a, b))[0] ?? null;
     return { kind: 'nothing-helps', closest, ...common };
@@ -102,7 +124,7 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
   const fewest = Math.min(...minimalPool.map((g) => g.newBags));
   const fewestGood = minimalPool.filter((g) => g.newBags === fewest);
   const wholeGood = input.goal === 'backpack' && DECIDED.backpackWholeFirst ? fewestGood.filter(whole) : [];
-  const ranked = (wholeGood.length > 0 ? wholeGood : fewestGood).sort(compareMinimal(input.goal));
+  const ranked = (wholeGood.length > 0 ? wholeGood : fewestGood).sort(compareMinimal(input.goal, base));
   const items: Suggestion[] = [];
   const seen = new Set<string>();
   for (const s of ranked) {
@@ -116,9 +138,7 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
   // Looking ahead: a set that covers more, valid and better than Minimal's first on the goal by decision 6: Minimal's first as it stands
   // plus one more, or a counting suggestion with more new things (a rack with panniers, under Bags first from its second round).
   const first = items[0]!;
-  const better = (s: Suggestion) => (input.goal === 'handling'
-    ? first.score - s.score >= MIN_GAIN_SCORE - EPS
-    : first.result.backL - s.result.backL >= MIN_GAIN_BACK_L - EPS);
+  const better = (s: Suggestion) => betterThan(input.goal, base, first.result, s.result);
   const pool: Suggestion[] = [];
   if (!stopped) {
     for (const c of extensions(input, first, panniers)) {
@@ -132,7 +152,8 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
   }
   // Bags first, the bags counted: panniers are still needed when nothing so far does the whole goal (Get the backpack off: nothing
   // takes everything off the back; Better handling: the bags counted, so they are not).
-  if (secondRound && !panniers && !stopped && input.goal === 'backpack' && ![...good, ...pool].some(whole)) {
+  const backGoal = input.goal === 'backpack' || (input.goal === 'both' && base.backL > NOTHING_ON_BACK_L);
+  if (secondRound && !panniers && !stopped && backGoal && ![...good, ...pool].some(whole)) {
     later.push(...(yield* round(true, true)));
   }
   pool.push(...good.filter((g) => (g.newBags > first.newBags || later.includes(g)) && better(g)));
@@ -168,10 +189,8 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
   const ahead = best && shown(best);
 
   // Side by side (the owner's rulings on PR 61): combinations reaching about the same result, within decision 6.
-  const value = (x: Suggestion) => (input.goal === 'backpack' ? x.result.backL : x.score);
-  const within = input.goal === 'backpack' ? MIN_GAIN_BACK_L : MIN_GAIN_SCORE;
-  const bestValue = Math.min(...items.map(value));
-  const near = items.map((x, k) => (value(x) - bestValue <= within + EPS ? k : -1)).filter((k) => k >= 0);
+  const bestItem = [...items].sort(order)[0]!;
+  const near = items.map((x, k) => (aboutSame(input.goal, bestItem, x) ? k : -1)).filter((k) => k >= 0);
   const minimalSame = near.length >= 2 ? near : [];
   // the bags a set adds; a bag taken out does not make another combination (re-check of PR 61, n6: the same panniers, with or without
   // the backpack left at home, are one)
@@ -181,7 +200,7 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
     const seen = new Set([combo(ahead)]);
     for (const x of [...pool].sort((a, b) => order(a, b) || byOwnerOrder(a, b))) {
       if (aheadAlts.length === 2) break;
-      if (seen.has(combo(x)) || Math.abs(value(x) - value(ahead)) > within + EPS) continue;
+      if (seen.has(combo(x)) || !aboutSame(input.goal, ahead, x)) continue;
       seen.add(combo(x));
       aheadAlts.push(shown(x));
     }
