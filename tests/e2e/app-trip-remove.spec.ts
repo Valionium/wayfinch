@@ -1,5 +1,5 @@
 // Remove this trip in a real browser (owner's wish, 9 November 2026): Trip's Route step, its confirm step, the real store and the
-// real worker; in flight mode, with a second window, with Get ready offline under way; compared with a phone that never had the trip.
+// real worker; in flight mode, with a second window, with Prepare this route under way; compared with a phone that never had the trip.
 import { readFileSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
@@ -40,7 +40,7 @@ const today = (): string => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe
 
 const allLocal = (page: Page): Promise<Record<string, string>> => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).sort().map((k) => [k, localStorage.getItem(k)!])));
 
-/** The app with the bag planner's keys, a trip Get ready offline ran for, and what En route keeps: a position, water, a plan for tomorrow. */
+/** The app with the bag planner's keys, a trip Prepare this route ran for, and what En route keeps: a position, water, a plan for tomorrow. */
 async function tripPhone(page: Page, opts: { places?: boolean } = {}): Promise<LoadedApp> {
   const app = await loadApp(page);
   apps.push(app);
@@ -174,7 +174,7 @@ test('[TRIP-REMOVE-WINDOWS] a second window follows at once, and can not write t
   await other.close();
 });
 
-test('[TRIP-REMOVE-WINDOWS] Get ready offline under way stops at its next step: nothing of it is kept, and Trip shows no trip and no "Working"', async ({ page }) => {
+test('[TRIP-REMOVE-WINDOWS] Prepare this route under way stops at its next step: nothing of it is kept, and Trip shows no trip and no "Working"', async ({ page }) => {
   test.setTimeout(120_000);
   const app = await loadApp(page);
   apps.push(app);

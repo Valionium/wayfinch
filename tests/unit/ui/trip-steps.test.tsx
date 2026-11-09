@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // The guided Trip (design of 8 Nov 2026, part 1): four steps, the trip line, the folded trip details and the message after a route
-// is added. On the real store (fake IndexedDB), with a fixed clock and a stand-in for Get ready offline's network work.
+// is added. On the real store (fake IndexedDB), with a fixed clock and a stand-in for Prepare this route's network work.
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { render } from 'preact';
@@ -57,7 +57,7 @@ const buttonIn = (root: ParentNode, name: string): HTMLButtonElement => {
 const stepNames: StepName[] = ['heights', 'places', 'hours', 'weather', 'baseline', 'save'];
 const allOk = (): StepReport[] => stepNames.map((s) => ({ step: s, ok: true, note: null }));
 
-/** A Get ready offline that ends well and leaves what the real one would: places, a forecast and the steps' record. */
+/** A Prepare this route that ends well and leaves what the real one would: places, a forecast and the steps' record. */
 function preparing(seen: string[] = []): Partial<TripServices> {
   return {
     prepare: async (onProgress) => {
@@ -94,13 +94,13 @@ async function withRoute(svc?: TripServices): Promise<TripServices> {
   const s = await show(svc);
   await pick(await fixtureGpx('heidelberg-strasbourg'));
   await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
-  // Get ready offline's body is a chunk of its own: it opens with its step.
-  await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+  // Prepare this route's body is a chunk of its own: it opens with its step.
+  await until(() => host.querySelector('[data-getready]') !== null, 'Prepare this route');
   return s;
 }
 
 describe('Trip as four steps (guided Trip design §2.2)', () => {
-  test('[TRIP-STEPS] with no route: Route, Get ready offline, Bags, Go in this order; only Route is open, the others are one grey line each', async () => {
+  test('[TRIP-STEPS] with no route: Route, Prepare this route, Bags, Go in this order; only Route is open, the others are one grey line each', async () => {
     await show();
     const names = [...host.querySelectorAll<HTMLElement>('[data-step]')].map((e) => e.dataset.step);
     expect(names).toEqual(['route', 'getready', 'bags', 'go']);
@@ -122,7 +122,7 @@ describe('Trip as four steps (guided Trip design §2.2)', () => {
     expect(step('route').dataset.state).toBe('done');
     expect(step('route').textContent).toContain(routeDoneLine(trip));
     expect(openSteps()).toEqual(['getready']);
-    // The order is a suggestion: Bags opens before Get ready offline.
+    // The order is a suggestion: Bags opens before Prepare this route.
     await click(buttonIn(step('bags'), W.appTripStepBags));
     expect(openSteps()).toEqual(['bags']);
     expect(step('bags').textContent).toContain(W.appHandoffButton);
@@ -142,7 +142,7 @@ describe('Trip as four steps (guided Trip design §2.2)', () => {
     expect([...step('go').querySelectorAll('a')].find((a) => a.textContent === W.appTripOpenAhead)!.getAttribute('href')).toBe('#/ahead');
   });
 
-  test('[TRIP-STEPS] once Get ready offline has run, it folds to what was saved with Update, and Bags is the step that opens', async () => {
+  test('[TRIP-STEPS] once Prepare this route has run, it folds to what was saved with Update, and Bags is the step that opens', async () => {
     const svc = await withRoute(services(preparing()));
     await click(buttonIn(step('getready'), W.appTripGetReadyButton));
     await until(() => text().includes('12 places'), 'the result');
@@ -203,7 +203,7 @@ describe('The trip line and the trip details (guided Trip design §2.1, §2.2)',
 });
 
 describe('The message after a route is added (owner\'s item 2)', () => {
-  test('[TRIP-ADDED-NEXT] the message names Get ready offline, says Ahead needs it, and its button runs Get ready offline with its progress', async () => {
+  test('[TRIP-ADDED-NEXT] the message names Prepare this route, says Ahead needs it, and its button runs Prepare this route with its progress', async () => {
     const seen: string[] = [];
     await withRoute(services(preparing(seen)));
     const name = (await readTrip())!.route.name;
@@ -211,7 +211,7 @@ describe('The message after a route is added (owner\'s item 2)', () => {
     expect(said.textContent).toContain(W.appTripAdded(name));
     expect(said.textContent).toContain(W.appTripNextGetReady);
     expect(step('getready').contains(said)).toBe(true);
-    // The message's button is the step's one Get ready offline button, not a second one.
+    // The message's button is the step's one Prepare this route button, not a second one.
     expect([...step('getready').querySelectorAll('button')].filter((b) => b.textContent === W.appTripGetReadyButton)).toHaveLength(1);
     await click(buttonIn(said, W.appTripGetReadyButton));
     await until(() => text().includes('12 places'), 'the result');
@@ -238,7 +238,7 @@ describe('The stops on the height profile (guided Trip design §6)', () => {
     { kind: 'sleep', km: 80, opens: 'sleep', label: null },
   ];
 
-  test('[TRIP-STOPS] before Get ready offline the profile has no icons and says when they come', async () => {
+  test('[TRIP-STOPS] before Prepare this route the profile has no icons and says when they come', async () => {
     let asked = 0;
     await withRoute(services({ stops: async () => { asked += 1; return STOPS; } }));
     const summary = host.querySelector('[data-summary]')!;
@@ -281,7 +281,7 @@ describe('The stops on the height profile (guided Trip design §6)', () => {
 });
 
 describe('What the review of PR 73 found', () => {
-  /** A Get ready offline held at its places step until `release`, counting its calls. */
+  /** A Prepare this route held at its places step until `release`, counting its calls. */
   function gated(): { svc: Partial<TripServices>; calls: () => number; release: () => void } {
     let n = 0;
     let open: () => void = () => undefined;
@@ -407,13 +407,13 @@ describe('What the review of PR 73 found', () => {
 describe('After the launch, part 4 (the owner\'s preview check of 8 Nov 2026)', () => {
   const goLink = () => [...step('go').querySelectorAll('a')].find((a) => a.textContent === W.appTripOpenAhead) ?? null;
 
-  test('[TRIP-NEED-STEP] the Get ready offline step says En route needs it for as long as it is not done: open, folded, after a reload; then it goes', async () => {
-    expect(W.appAheadNeedTitle).toBe('En route needs Get ready offline');
+  test('[TRIP-NEED-STEP] the Prepare this route step says En route needs it for as long as it is not done: open, folded, after a reload; then it goes', async () => {
+    expect(W.appAheadNeedTitle).toBe('En route needs Prepare this route');
     const svc = await withRoute(services(preparing()));
     expect(step('getready').textContent).toContain(W.appAheadNeedTitle);
     // Not only in the message after the route was added: Trip shown again, without it, still says so.
     await show(svc);
-    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    await until(() => host.querySelector('[data-getready]') !== null, 'Prepare this route');
     expect(host.querySelector('[data-added]')).toBeNull();
     expect(step('getready').textContent).toContain(W.appAheadNeedTitle);
     // Folded under another open step too.
@@ -435,7 +435,7 @@ describe('After the launch, part 4 (the owner\'s preview check of 8 Nov 2026)', 
     expect(step('getready').textContent).not.toContain(W.appAheadNeedTitle);
   });
 
-  test('[TRIP-GO-LINK] Open En route shows on Go as soon as Get ready offline is done, in the same visit, with Get ready\'s result still open', async () => {
+  test('[TRIP-GO-LINK] Open En route shows on Go as soon as Prepare this route is done, in the same visit, with Get ready\'s result still open', async () => {
     expect(W.appTripOpenAhead).toBe('Open En route');
     await withRoute(services(preparing()));
     expect(goLink()).toBeNull();
@@ -452,7 +452,7 @@ describe('After the launch, part 4 (the owner\'s preview check of 8 Nov 2026)', 
 });
 
 describe('What the review of PR 82 found', () => {
-  test('[TRIP-NEED-STEP] after a Get ready offline that saved places but not the weather, Trip and En route agree that it is no longer needed first', async () => {
+  test('[TRIP-NEED-STEP] after a Prepare this route that saved places but not the weather, Trip and En route agree that it is no longer needed first', async () => {
     const { browserAhead } = await import('../../../src/ui/shell-actions.ts');
     const steps = (): StepReport[] => stepNames.map((s) => ({ step: s, ok: s !== 'weather', note: s === 'weather' ? W.appPrepNoConnection : null }));
     const partial: Partial<TripServices> = {
