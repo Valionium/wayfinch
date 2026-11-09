@@ -19,9 +19,11 @@ export const STEP_PICTURES: Readonly<Record<string, readonly StepPicture[]>> = {
   'brake-rub-rim': [null, null, null, null, QR_OPEN, QR_CLOSE],
   'brake-rub-disc': [null, null, 'disc-bolts', null, null],
   'brake-weak-rim': [null, QR_CLOSE, 'barrel-adjuster', null, null],
+  'brake-weak-disc': [null, null, 'disc-pad-adjust', null, null],
   'gears-skipping': ['stiff-link', null, null, null],
   'bolt-loose': [null, null, 'twist-test', null],
   'tyre-torn': [null, 'tyre-boot', null, null],
+  'ebike-no-power': ['battery-refit', 'battery-contacts', null, null, null],
 };
 
 /** Every picture id an entry can show. */

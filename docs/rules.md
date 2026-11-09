@@ -1035,6 +1035,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - the brake's quick release follows the bars: drop bars see the road caliper's lever, flat bars the V-brake's curved tube, other or Not sure bars and no bike both side by side, the caliper first (design 3.6, the owner's answer 1; review of PR 72) [BC-PIC-BARS]
 - every picture file is used by a step and every step's picture has a file; each has a name and a description in the wording, under the banned-words test; it uses theme classes only (no colour value, no style block, no http), labels at least 11.5 units, at most two arrows, and at most 3 KB gzipped (design 3 and 5) [BC-PIC-FILES]
 - no picture is in the first screen's files or in Bike care's own chunk: each loads on its own when its step view opens (design 5) [BC-PIC-LAZY]
+- every roadside card has at least one step with a picture: E-bike won't power on shows the battery refitted on the down tube and its contacts wiped (a caption says the mount differs by bike), Disc brakes not biting the cable brake's pad adjuster knobs (care pictures, part 2) [BC-PIC-ROAD]
 
 ## Tool: Gear advisor, the search (sub-project 13, group 1)
 

@@ -57,3 +57,12 @@ test('[BC-PIC-FILES] a picture uses the theme classes only: no colour value, no 
     expect(size, `${id}: ${size} bytes`).toBeLessThanOrEqual(3072);
   }
 });
+
+// Care pictures, part 2 (9 Nov): the two roadside cards that had none, "E-bike won't power on" and "Disc brakes not biting", get theirs, so
+// every roadside card shows at least one picture.
+test('[BC-PIC-ROAD] every roadside card has at least one step with a picture', () => {
+  for (const card of ROAD_CARDS) {
+    const steps = STEP_PICTURES[card.id] ?? [];
+    expect(steps.some((p) => p !== null), card.id).toBe(true);
+  }
+});

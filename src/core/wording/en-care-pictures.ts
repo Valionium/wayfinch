@@ -74,4 +74,17 @@ export const PICTURE_WORDS: Readonly<Record<string, PictureWords>> = {
     name: 'A boot inside the tyre, covering the cut.',
     description: 'The wheel cut through, showing the tyre, the inner tube inside it and the rim below. The tyre has a slit through its side wall, labelled "cut". On the inside of the tyre, between the tyre and the tube, a strip covers the cut, labelled "boot".',
   },
+  'disc-pad-adjust': {
+    name: "Turning a cable disc brake's pad adjuster knobs in a little.",
+    description: 'A cable disc brake seen from above: the disc runs across the picture, edge-on, and the body of the brake sits over it with a pad on each side of the disc. A knob on each face of the body is marked "pad adjuster knobs". Two arrows, labelled "turn in a little", point from the knobs towards the disc, and dashed outlines show each pad a little closer to it.',
+  },
+  'battery-refit': {
+    name: 'Refitting an e-bike battery on the down tube until it clicks.',
+    description: 'An e-bike battery on the down tube, seen from the side, labelled "battery". Its lower end sits in its holder by the motor, its upper end is tilted away from the tube, and a dashed outline shows it lying flat on the tube. A curved arrow tilts it in, and the lock at the upper end is labelled "until it clicks". A small picture in the corner shows the whole bike and the down tube.',
+    caption: 'One common mount, on the down tube. Yours may sit elsewhere and fit another way.',
+  },
+  'battery-contacts': {
+    name: "Wiping the battery's contacts with a dry cloth.",
+    description: 'The end of an e-bike battery, taken off the bike, with its metal contacts in a socket, labelled "contacts": two flat blades and a few small pins. Beside it is a cloth, labelled "dry cloth", and an arrow shows it moving onto the contacts.',
+  },
 };
