@@ -39,6 +39,9 @@ test('[TRIP-FIRST] with no trip the app opens on Trip, and the bike is the first
   const problems = watch(page);
   app = await loadApp(page);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Trip');
+  // A new rider gets the first-run card here (wish 17, owner's answers of 9 Nov 2026), as tall as HINT-NEW allows; Later gives today's
+  // line, which the 120 px hold for.
+  await page.getByRole('button', { name: 'Later: show this smaller' }).click();
   const first = page.locator('.trip-main').locator('> *').first();
   await expect(first).toHaveClass(/trip-bike/);
   await expect(first.locator('svg.bk')).toBeVisible();
