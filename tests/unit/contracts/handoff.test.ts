@@ -1063,7 +1063,7 @@ describe('[TRIP-DAY-POCKETS] a day ride counts the jersey and bib shorts pockets
     const p = await planned('2026-11-15');
     const places = p.json<Places>('pocketPlaces()');
     const box = p.page.nodes.get('smallPockets')!;
-    expect(box.hidden).toBe(false);
+    expect(p.json<boolean>(`$("smallPockets").hidden`)).toBe(false);
     // each thing by its short name (KIT's "ID, cards, insurance" would read as three things), joined with "and"
     const name = (id: string) => p.json<string>(`POCKET_NAMES['${id}']`);
     const and = (a: string[]) => (a.length < 2 ? a[0] : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`);
