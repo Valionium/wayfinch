@@ -3,7 +3,7 @@
 // frame's rear ends, its cable box outside the right one (Shimano Nexus and Alfine); spokes near the rim, crossed; and the fork from the
 // front: crown, legs either side of the tyre down to the axle, its tapered steerer hidden in the head tube (drawn dashed).
 import { boltHead } from './common.ts';
-import { add, at, clear, lerp, Path, Pic, pointsAt, pol, poly, rrect, sub, touches, tube, within, type Pt } from './kit.ts';
+import { at, clear, lerp, Path, Pic, pointsAt, pol, poly, rrect, touches, tube, within, type Pt } from './kit.ts';
 import { forkHub } from './wheel.ts';
 
 /** The front hub in the fork from behind, one part marked: the hub, the quick release, or the thru-axle. */
@@ -51,7 +51,7 @@ export function hubGears(): Pic {
   // the spokes, up and down from the flanges
   for (const x of [-39, 39]) for (const dx of [-1.5, 1.5]) {
     pic.line('cp-thin', m(x + dx, -50), m(x * 0.55 + dx, -80));
-    pic.line('cp-thin', m(x + dx, 50), m(x * 0.7 + dx, 62));
+    pic.line('cp-thin', m(x + dx, 50), m(x * 0.75 + dx, 58));
   }
   pic.path('cp-obj', poly([m(-86, -4.75), m(86, -4.75), m(86, 4.75), m(-86, 4.75)]), { name: 'axle' });
   // the right end cap from the shell to the frame's end, the sprocket on it; the left cap
@@ -68,7 +68,7 @@ export function hubGears(): Pic {
   pic.path('cp-obj', rrect(...m(half + 9, -6.5), 6.5 * k, 13 * k, 2), { name: 'nut-r' });
   pic.path('cp-obj', rrect(...m(half + 15.5, -17), 20 * k, 34 * k, 5 * k), { name: 'box' });
   pic.path('cp-ctx', new Path().M(m(half + 25.5, -17)).Q(m(half + 26, -46), m(half + 10, -80)), { style: 'stroke-width:2.5', name: 'cable' });
-  pic.label('cp-th', [106, 212], 'hub gears', [104, 208], m(-20, 41), 'end', 'leader');
+  pic.label('cp-th', [120, 212], 'hub gears', [118, 208], m(2, 42.5), 'end', 'leader');
   pic.label('cp-t', [204, 212], 'sprocket', [202, 208], m(55.2, 36), 'end', 'leader-sprocket');
   pic.label('cp-t', [316, 212], 'cable box', [314, 208], m(half + 25.5, 17), 'end', 'leader-box');
   pic.facts.push(pointsAt(pic, 'leader', 'shell'), pointsAt(pic, 'leader-sprocket', 'sprocket'), pointsAt(pic, 'leader-box', 'box'), touches(pic, 'nut-l', 'end-l', 0.8),
@@ -128,7 +128,7 @@ export function forkFront(): Pic {
   const ay = 395;
   for (const x of [-33, 33]) pic.line('cp-thin', m(x, ay - 22), m(x * 0.5, ay - 120));
   pic.path('cp-obj', poly([m(-36, ay - 22), m(36, ay - 22), m(36, ay + 22), m(-36, ay + 22)]), { name: 'hub' });
-  for (const sx of [-1, 1]) pic.path('cp-obj', poly([m(sx * 36, ay - 9), m(sx * 50, ay - 9), m(sx * 50, ay + 9), m(sx * 36, ay + 9)]));
+  for (const sx of [-1, 1]) pic.path('cp-obj', poly([m(sx * 36, ay - 14), m(sx * 50, ay - 14), m(sx * 50, ay + 14), m(sx * 36, ay + 14)]), { name: sx < 0 ? 'cap-l' : 'cap-r' });
   pic.path('cp-obj', poly([m(41, ay - 80), m(44, ay - 80), m(44, ay + 80), m(41, ay + 80)]), { name: 'rotor' });
   pic.path('cp-rubber', rrect(...m(-22.5, 32), 45 * k, 500 * k, 22.5 * k), { name: 'tyre' });
   // the fork: crown and legs, one outline; the axle's ends show outside the legs, its head and lever on the bike's left
@@ -145,7 +145,7 @@ export function forkFront(): Pic {
   pic.label('cp-t', [312, 40], 'head tube', [310, 36], m(26, -90), 'end', 'leader-head');
   pic.facts.push(pointsAt(pic, 'leader', 'fork'), pointsAt(pic, 'leader-steerer', 'steerer'), pointsAt(pic, 'leader-head', 'head-tube'),
     within(pic, 'steerer-in', 'head-tube', 0.6), touches(pic, 'head-tube', 'fork', 0.5), touches(pic, 'cover', 'head-tube', 0.5),
-    clear(pic, 'tyre', 'fork', 1), touches(pic, 'axle-head', 'fork', 0.6), clear(pic, 'axle-lever', 'fork', 0.3));
+    clear(pic, 'tyre', 'fork', 1), touches(pic, 'axle-head', 'fork', 0.6), clear(pic, 'axle-lever', 'fork', 0.3), touches(pic, 'cap-l', 'fork', 0.6), touches(pic, 'cap-r', 'fork', 0.6));
   pic.fact('the steerer tapers: wider at the crown than at the top', 38.1 > 28.6);
   pic.fact('100 mm between the legs inside at the axle', legIn * 2 === 100);
   return pic;
