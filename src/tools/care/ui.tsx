@@ -196,7 +196,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
           </>
         ) : null}
       </div>
-      {steps ? <StepView key={steps.item.id} source={steps} bars={bike?.look?.bars ?? null} bike={bike} onClose={() => setSteps(null)} /> : null}
+      {steps ? <StepView key={steps.item.id} source={steps} bike={bike} onClose={() => setSteps(null)} /> : null}
     </div>
   );
 }

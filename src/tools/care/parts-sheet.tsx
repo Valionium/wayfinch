@@ -8,6 +8,7 @@ import { bikeArt } from '../../core/bike/art.ts';
 import type { BikeRecord } from '../../core/bike/normalise.ts';
 import { drawnFor, PART_PLACES, partPoint } from '../../core/bike/part-points.ts';
 import { resolveBikeSpec } from '../../core/bike/spec.ts';
+import { pictureDetails } from '../../core/care/pictures.ts';
 import { guidePictures, partById } from '../../core/parts/guide.ts';
 import type { PartId } from '../../core/parts/guide.ts';
 import { partsWordsFrom, PG, TAG_WORDS } from '../../core/wording/en-parts.ts';
@@ -69,7 +70,7 @@ export function PartSheet({ part, bike, onClose }: { part: PartId; bike: BikeRec
   const id = trail[trail.length - 1]!;
   const entry = partById(id)!;
   const said = words!.parts[id];
-  const pictures = guidePictures(entry, bike?.look?.bars ?? null, bike?.brakes === 'rim' ? 'rim' : bike?.brakes === 'cable-disc' || bike?.brakes === 'hydraulic-disc' ? 'disc' : null);
+  const pictures = guidePictures(entry, pictureDetails(bike));
 
   const close = (fromBack: boolean): void => {
     if (!fromBack) history.back();

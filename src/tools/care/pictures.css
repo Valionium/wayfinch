@@ -15,6 +15,7 @@
 .cp-ghost { fill: none; stroke: var(--blaze); stroke-width: 1.6; stroke-dasharray: 3 3; stroke-linecap: round; stroke-linejoin: round; }
 .cp-halo { fill: var(--blaze); opacity: 0.16; stroke: none; }
 .cp-halostroke { fill: var(--blaze); stroke: var(--blaze); stroke-width: 10; stroke-linejoin: round; opacity: 0.16; }
+.cp-halowire { fill: none; stroke: var(--blaze); stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; opacity: 0.16; }
 .cp-arrow { fill: none; stroke: var(--blaze); stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; }
 .cp-head { fill: var(--blaze); stroke: none; }
 .cp-frame { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; }

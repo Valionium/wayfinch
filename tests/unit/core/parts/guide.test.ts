@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { expect, test } from 'vitest';
 import { PART_PLACES } from '../../../../src/core/bike/part-points.ts';
+import type { PictureDetails } from '../../../../src/core/care/pictures.ts';
 import { GUIDE, guidePictures, partById } from '../../../../src/core/parts/guide.ts';
 import { linkSegments, STEP_PARTS } from '../../../../src/core/parts/links.ts';
 import { PICTURE_WORDS } from '../../../../src/core/wording/en-care-pictures.ts';
@@ -36,9 +37,10 @@ test("[PG-DATA] the guide holds the design's 36 parts in its six groups, in orde
   // the words file is checked whole: a part without its text is no file
   expect(partsWordsFrom({ ...WORDS, parts: { ...WORDS.parts, frame: { name: 'Frame' } } }, PART_PLACES)).toBeNull();
   expect(partsWordsFrom(null, PART_PLACES)).toBeNull();
+  // the redo (owner's answer 6 of 9 November 2026): a close-up not yet redrawn does not ship, so a part may have none for now; where its
+  // close-ups depend on the bike, it has one for each kind once they are drawn
   for (const p of GUIDE) {
-    expect(p.pictures.length, p.id).toBeGreaterThanOrEqual(1);
-    if (p.by) expect(p.pictures.length, p.id).toBe(2);
+    if (p.by && p.pictures.length > 0) expect(p.pictures.length, p.id).toBeGreaterThanOrEqual(2);
     for (const pic of p.pictures) {
       const inGuide = guideFiles.includes(pic);
       expect(inGuide || stepFiles.includes(pic), `${p.id}: ${pic}`).toBe(true);
@@ -52,15 +54,20 @@ test("[PG-DATA] the guide holds the design's 36 parts in its six groups, in orde
   expect(partById('derailleur')!.mixed).toContain('hanger');
 });
 
-test("[PG-QR-BOTH] the brake's quick release shows the caliper lever and the V-brake release, the bike's own bars first (owner's answer 1)", () => {
+const D = (o: Partial<PictureDetails> = {}): PictureDetails => ({ brakes: null, rimBrake: null, axle: null, shifting: null, bars: null, ...o });
+
+test("[PG-KINDS] a part's close-ups follow the bike detail that decides them: the bike's own kind first, then the next; never the bars standing in for the brakes", () => {
   const qr = partById('brake-qr')!;
-  expect(guidePictures(qr, 'drop', null)).toEqual(['brake-qr-open', 'vbrake-open']);
-  expect(guidePictures(qr, 'flat', 'rim')).toEqual(['vbrake-open', 'brake-qr-open']);
-  expect(guidePictures(qr, null, null)).toEqual(['brake-qr-open', 'vbrake-open']);
-  expect(guidePictures(qr, 'other', null)).toEqual(['brake-qr-open', 'vbrake-open']);
-  expect(guidePictures(partById('pads')!, 'flat', 'disc')).toEqual(['pg-pads-disc', 'pg-pads-rim']);
-  expect(guidePictures(partById('pads')!, 'flat', 'rim')).toEqual(['pg-pads-rim', 'pg-pads-disc']);
-  expect(guidePictures(partById('frame')!, 'flat', 'disc')).toEqual(['pg-frame']);
+  expect(guidePictures(qr, D({ brakes: 'rim', rimBrake: 'v-brake', bars: 'drop' }))).toEqual(['vbrake-open', 'brake-qr-open']);
+  expect(guidePictures(qr, D({ brakes: 'rim', rimBrake: 'hydraulic' }))).toEqual(['hydro-rim-open', 'brake-qr-open']);
+  expect(guidePictures(qr, D({ bars: 'flat' }))).toEqual(['vbrake-open', 'brake-qr-open']);
+  expect(guidePictures(qr, D())).toEqual(['brake-qr-open', 'vbrake-open']);
+  expect(guidePictures(partById('rim-brake')!, D({ brakes: 'rim', rimBrake: 'hydraulic' }))).toEqual(['pg-rim-hydraulic', 'pg-caliper-rim']);
+  // pads: the bike's own brakes first; not told, the disc first (the most common modern kind)
+  expect(guidePictures(partById('pads')!, D({ brakes: 'rim', bars: 'drop' }))).toEqual(['pg-pads-rim', 'pg-pads-disc']);
+  expect(guidePictures(partById('pads')!, D({ brakes: 'hydraulic-disc', bars: 'flat' }))).toEqual(['pg-pads-disc', 'pg-pads-rim']);
+  expect(guidePictures(partById('pads')!, D())).toEqual(['pg-pads-disc', 'pg-pads-rim']);
+  expect(guidePictures(partById('caliper')!, D())).toEqual(['pg-disc-caliper']);
 });
 
 test("[PG-WORDS] each part has a name and two to four plain sentences; the tags and the sheet's words; no banned word", () => {

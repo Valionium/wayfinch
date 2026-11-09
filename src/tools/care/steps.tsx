@@ -2,12 +2,15 @@
 // task full screen, one step at a time, each with its picture where one is drawn. Back and Next only, no swiping (answer 4). Opening it adds
 // one history entry, so the phone's back gesture closes it in one go. While a roadside card is open the screen is kept awake (answer 5).
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { Bars, BikeRecord } from '../../core/bike/normalise.ts';
-import { picturesFor } from '../../core/care/pictures.ts';
+import type { BikeRecord } from '../../core/bike/normalise.ts';
+import { careDetails } from '../../core/care/fit.ts';
+import { stepsShown } from '../../core/care/lines.ts';
+import { pictureDetails, picturesFor, type Shown } from '../../core/care/pictures.ts';
 import { linkSegments, STEP_PARTS } from '../../core/parts/links.ts';
 import type { PartId } from '../../core/parts/guide.ts';
 import type { CareTask, RoadCard } from '../../core/care/types.ts';
 import { C, CARRY, WHO_LABEL } from '../../core/wording/en-care.ts';
+import { KIND_WORDS, SWITCH_WORDS } from '../../core/wording/en-care-pictures.ts';
 import { loadPictures, Picture, pictureReady } from './picture.tsx';
 
 /** The All steps choice, remembered on the phone: '1' or '0'. A copilot:* key, so Delete co-pilot data removes it. */
@@ -73,11 +76,30 @@ function Before({ source }: { source: StepSource }) {
   );
 }
 
-/** A step's pictures, side by side when there are two (a choice by bars on a bike with other or untold bars); none until loaded. */
-function Pictures({ ids, view }: { ids: string[]; view: string }) {
-  const ready = ids.filter(pictureReady);
+/**
+ * A step's picture: one at a time (care pictures redo, answer 4). Where its kind depends on the bike, the bike's own kind shows (or, not
+ * told, the most common modern one), and a row "Other kinds" offers each other kind with one tap; none until loaded.
+ */
+function Pictures({ shown, view }: { shown: Shown[]; view: string }) {
+  const ready = shown.filter((p) => pictureReady(p.id));
+  const [pick, setPick] = useState<string | null>(null);
   if (ready.length === 0) return null;
-  return <div class={`care-pics${ready.length > 1 ? ' care-pics-two' : ''}`}>{ready.map((id, k) => <Picture key={id} id={id} view={`${view}-${k}`} />)}</div>;
+  const now = ready.find((p) => p.id === pick) ?? ready[0]!;
+  const others = ready.filter((p) => p !== now && p.kind);
+  return (
+    <div class="care-pics">
+      <Picture key={now.id} id={now.id} view={view} />
+      {others.length > 0 ? (
+        <div class="care-kinds" role="group" aria-label={SWITCH_WORDS.other}>
+          <span class="care-kinds-label" aria-hidden="true">{SWITCH_WORDS.other}:</span>
+          {others.map((p) => (
+            <button key={p.id} type="button" class="btn care-kind" aria-label={SWITCH_WORDS.show(KIND_WORDS[p.kind!] ?? p.kind!)}
+              onClick={() => setPick(p.id)}>{KIND_WORDS[p.kind!] ?? p.kind}</button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 type Sheet = typeof import('./parts-sheet.tsx').PartSheet;
@@ -107,10 +129,10 @@ function endOf(source: StepSource): { title: string; body: preact.ComponentChild
 }
 
 /**
- * `bars`: the chosen bike's bars, which pick a picture where the design draws one for each (3.6); null for Not sure or no bike. `bike`: the
- * chosen bike, drawn by the parts guide with the part marked (the app's default bike when null).
+ * `bike`: the chosen bike (null for none): its details pick each picture's kind (care pictures redo, section 2) and which brake lines show
+ * (T9), and the parts guide draws it with the part marked (the app's default bike when null).
  */
-export function StepView({ source, bars, bike = null, onClose }: { source: StepSource; bars: Bars | null; bike?: BikeRecord | null; onClose: () => void }) {
+export function StepView({ source, bike = null, onClose }: { source: StepSource; bike?: BikeRecord | null; onClose: () => void }) {
   const box = useRef<HTMLDialogElement>(null);
   const head = useRef<HTMLHeadingElement>(null);
   const [at, setAt] = useState(0);
@@ -128,12 +150,15 @@ export function StepView({ source, bars, bike = null, onClose }: { source: StepS
     }, () => { /* not loaded (offline before it was cached): the text stays */ });
   };
   const closePart = (): void => { setPart(null); partFrom.current?.focus(); };
-  const steps = source.item.steps;
+  // the steps that show for this bike, as indexes into the card's steps: pictures and part names keep their own step's index
+  const shownSteps = stepsShown(source.item.id, source.item.steps.length, careDetails(bike));
+  const steps = shownSteps.map((i) => source.item.steps[i]!);
   const end = endOf(source);
   const last = end ? steps.length + 1 : steps.length;
   const name = source.kind === 'road' ? source.item.problem : source.item.name;
   const titleId = `care-steps-title-${source.item.id}`;
-  const pictures = steps.map((_, i) => picturesFor(source.item.id, i, bars));
+  const details = pictureDetails(bike);
+  const pictures = shownSteps.map((i) => picturesFor(source.item.id, i, details));
 
   const close = (fromBack: boolean): void => {
     if (!fromBack) history.back();
@@ -154,7 +179,7 @@ export function StepView({ source, bars, bike = null, onClose }: { source: StepS
     const onPop = (): void => { if ((history.state as { careSteps?: string } | null)?.careSteps !== source.item.id) closeRef.current(true); };
     window.addEventListener('popstate', onPop);
     let alive = true;
-    void loadPictures(pictures.flat()).then(() => { if (alive) setReady((n) => n + 1); });
+    void loadPictures(pictures.flat().map((p) => p.id)).then(() => { if (alive) setReady((n) => n + 1); });
     return () => { alive = false; window.removeEventListener('popstate', onPop); };
   }, []);
   useEffect(() => { head.current?.focus(); }, [at, all]);
@@ -182,7 +207,7 @@ export function StepView({ source, bars, bike = null, onClose }: { source: StepS
   const onStep = at >= 1 && at <= steps.length;
   const label = onStep ? C.careStepsCount(at, steps.length) : at === 0 ? C.careStepsBefore : end!.title;
   const pics = onStep ? pictures[at - 1]! : [];
-  const hasPic = pics.some(pictureReady);
+  const hasPic = pics.some((p) => pictureReady(p.id));
 
   return (
     <dialog ref={box} class="care-steps" aria-labelledby={titleId}
@@ -208,19 +233,19 @@ export function StepView({ source, bars, bike = null, onClose }: { source: StepS
             <section class="care-step-before"><h3>{C.careStepsBefore}</h3><Before source={source} /></section>
             {steps.map((s, i) => (
               <section key={i} class="care-step-all">
-                <Pictures ids={pictures[i]!} view={`a${i}`} />
+                <Pictures shown={pictures[i]!} view={`a${i}`} />
                 <h3>{C.careStepN(i + 1)}</h3>
-                <StepText id={source.item.id} at={i} text={s} onPart={openPart} />
+                <StepText id={source.item.id} at={shownSteps[i]!} text={s} onPart={openPart} />
               </section>
             ))}
             {end ? <section class="care-step-end"><h3>{end.title}</h3>{end.body}</section> : null}
           </div>
         ) : (
           <div key={at} class={`care-step${hasPic ? ' care-step-pic' : ''}`}>
-            <Pictures ids={pics} view={`s${at}`} />
+            <Pictures shown={pics} view={`s${at}`} />
             <div class="care-step-words">
               <h2 ref={head} tabIndex={-1} class="care-step-h">{onStep ? C.careStepN(at) : label}</h2>
-              {at === 0 ? <Before source={source} /> : onStep ? <StepText id={source.item.id} at={at - 1} text={steps[at - 1]!} onPart={openPart} /> : end!.body}
+              {at === 0 ? <Before source={source} /> : onStep ? <StepText id={source.item.id} at={shownSteps[at - 1]!} text={steps[at - 1]!} onPart={openPart} /> : end!.body}
             </div>
           </div>
         )}

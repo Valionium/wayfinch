@@ -1,40 +1,81 @@
-// Which drawing shows with which step (care pictures design of 7 November 2026, sections 2, 3.6 and 5). Pure data: a card's or task's id to
-// one entry per step: a picture's id, a choice by the bike's bars, or null. A step with null, or a card not listed, shows its text alone.
-// Each id is a file src/tools/care/pictures/<id>.svg, with its name and description in src/core/wording/en-care-pictures.ts (BC-PIC-FILES).
-import type { Bars } from '../bike/normalise.ts';
+// Which drawing shows with which step (care pictures design of 7 November 2026, sections 2 and 5; the redo of 9 November, section 2, the
+// owner's answers 1, 2 and 4). Pure data: a card's or task's id to one entry per step: a picture's id, a choice among kinds by the bike
+// detail that decides it, or null. A step with null, or a card not listed, shows its text alone: a card whose pictures are not yet redrawn
+// is not listed (answer 6). Each id is a file src/tools/care/pictures/<id>.svg, made by tools/care-art, with its words in
+// src/core/wording/en-care-pictures.ts (BC-PIC-FILES).
+import type { Bars, BikeRecord } from '../bike/normalise.ts';
+import { careDetails } from './fit.ts';
+import type { CareDetails } from './types.ts';
 
-/** A picture that depends on the bars (design 3.6; the owner's answer 1 of 8 November): drop bars, flat bars; other or Not sure, both. */
-export type ByBars = { drop: string; flat: string };
-export type StepPicture = string | ByBars | null;
+export type RimKind = 'caliper' | 'v-brake' | 'hydraulic';
+export type AxleKind = 'thru' | 'qr' | 'nuts';
+/** A picture whose kind depends on the bike: the kinds that have a drawing, by the detail that decides among them. */
+export type Kinds =
+  | { by: 'rim-brake'; pictures: Partial<Record<RimKind, string>> }
+  | { by: 'axle'; pictures: Partial<Record<AxleKind, string>> }
+  | { by: 'bars'; pictures: Partial<Record<'drop' | 'flat', string>> }
+  | { by: 'shifting'; pictures: { cable: string } };
+export type StepPicture = string | Kinds | null;
+/** The bike details that choose a picture's kind; null is Not sure (or no bike). */
+export type PictureDetails = {
+  brakes: CareDetails['brakes']; rimBrake: RimKind | null; axle: AxleKind | null; shifting: CareDetails['shifting']; bars: Bars | null;
+};
+/** One picture to show, with its kind ('caliper', 'thru', …) where it is one of several; the first of a step's list is shown. */
+export type Shown = { id: string; kind: string | null };
 
-/** The brake's quick release: a road caliper's lever on drop bars, a V-brake's curved cable tube on flat bars (review of PR 72, I1). */
-const QR_OPEN: ByBars = { drop: 'brake-qr-open', flat: 'vbrake-open' };
-const QR_CLOSE: ByBars = { drop: 'brake-qr-close', flat: 'vbrake-close' };
+/** The brake's quick release, by the kind of rim brake (redo, answer 2): only on rim-brake steps, never on a disc brake's. */
+const RIM_OPEN: Kinds = { by: 'rim-brake', pictures: { caliper: 'brake-qr-open', 'v-brake': 'vbrake-open', hydraulic: 'hydro-rim-open' } };
+const RIM_CLOSE: Kinds = { by: 'rim-brake', pictures: { caliper: 'brake-qr-close', 'v-brake': 'vbrake-close', hydraulic: 'hydro-rim-close' } };
+/** Centring a rim brake (T10): a road caliper's centring screw, a V-brake's spring screw; a hydraulic rim brake has none. */
+const RIM_CENTRE: Kinds = { by: 'rim-brake', pictures: { caliper: 'rim-centre-caliper', 'v-brake': 'rim-centre-vbrake' } };
+/** The wheel pushed fully into the fork's ends and tightened, by the axle (redo, answer 1). */
+const WHEEL_SEAT: Kinds = { by: 'axle', pictures: { thru: 'wheel-seat-thru', qr: 'wheel-seat-qr', nuts: 'wheel-seat-nuts' } };
 
 export const STEP_PICTURES: Readonly<Record<string, readonly StepPicture[]>> = {
-  'puncture-tube': [null, 'tyre-levers', null, 'pinch-slits', 'patch-press', null, null],
-  'puncture-tubeless': [null, null, 'tubeless-plug', null, null, null, null],
-  'chain-broken': [null, 'quick-link', null, 'stiff-link', null, null],
-  'spoke-snapped': ['spoke-wrap', QR_OPEN, null, null, QR_CLOSE],
-  'brake-rub-rim': [null, null, null, null, QR_OPEN, QR_CLOSE],
-  'brake-rub-disc': [null, null, 'disc-bolts', null, null],
-  'brake-weak-rim': [null, QR_CLOSE, 'barrel-adjuster', null, null],
+  'spoke-snapped': ['spoke-wrap', RIM_OPEN, null, null, RIM_CLOSE],
+  'brake-rub-rim': [WHEEL_SEAT, null, null, RIM_CENTRE, RIM_OPEN, RIM_CLOSE],
+  'brake-rub-disc': [WHEEL_SEAT, 'pad-gap', 'disc-bolts', null, null],
+  'brake-weak-rim': [null, RIM_CLOSE, null, null, null],
   'brake-weak-disc': [null, null, 'disc-pad-adjust', null, null],
-  'gears-skipping': ['stiff-link', null, null, null],
-  'bolt-loose': [null, null, 'twist-test', null],
-  'tyre-torn': [null, 'tyre-boot', null, null],
-  'ebike-no-power': ['battery-refit', 'battery-contacts', null, null, null],
 };
 
 /** Every picture id an entry can show. */
-export const idsOf = (entry: StepPicture): string[] => (entry === null ? [] : typeof entry === 'string' ? [entry] : [entry.drop, entry.flat]);
+export const idsOf = (entry: StepPicture): string[] =>
+  entry === null ? [] : typeof entry === 'string' ? [entry] : Object.values(entry.pictures).filter((id): id is string => typeof id === 'string');
+
+const RIM_ORDER: readonly RimKind[] = ['caliper', 'v-brake', 'hydraulic'];
+const AXLE_ORDER: readonly AxleKind[] = ['thru', 'qr', 'nuts'];
+const lead = <T>(order: readonly T[], first: T): T[] => [first, ...order.filter((k) => k !== first)];
 
 /**
- * The pictures of a card's or task's step (0-based) for a bike's bars, in order; empty for text alone. A choice by bars gives drop bars the
- * first, flat bars the second, and other bars, Not sure or no bike both, side by side, the drop-bar one first.
+ * The kinds in the order they show for a bike: its own first when told; when not, the most common modern one first (redo, section 2).
+ * A rim brake's kind not told: bars break the tie inside rim brakes, since drop-bar levers cannot pull V-brakes (answer 2). An axle not
+ * told: a thru-axle, but a quick release on rim brakes. Electronic gears have no cable to adjust: no picture.
  */
-export function picturesFor(id: string, step: number, bars: Bars | null): string[] {
+export function kindOrder(by: Kinds['by'], d: PictureDetails): string[] {
+  if (by === 'rim-brake') return d.rimBrake ? lead(RIM_ORDER, d.rimBrake) : d.bars === 'flat' ? lead(RIM_ORDER, 'v-brake') : [...RIM_ORDER];
+  if (by === 'axle') return d.axle ? lead(AXLE_ORDER, d.axle) : d.brakes === 'rim' ? lead(AXLE_ORDER, 'qr') : [...AXLE_ORDER];
+  if (by === 'bars') return d.bars === 'flat' ? ['flat', 'drop'] : ['drop', 'flat'];
+  return d.shifting === 'electronic' ? [] : ['cable'];
+}
+
+/** The pictures of a card's or task's step (0-based) for a bike, in order: the first is shown, the others are one tap away. */
+export function picturesFor(id: string, step: number, d: PictureDetails): Shown[] {
   const entry = STEP_PICTURES[id]?.[step] ?? null;
-  if (entry === null || typeof entry === 'string') return idsOf(entry);
-  return bars === 'drop' ? [entry.drop] : bars === 'flat' ? [entry.flat] : [entry.drop, entry.flat];
+  if (entry === null) return [];
+  if (typeof entry === 'string') return [{ id: entry, kind: null }];
+  const pics = entry.pictures as Partial<Record<string, string>>;
+  return kindOrder(entry.by, d).flatMap((kind) => {
+    const id = pics[kind];
+    return id ? [{ id, kind }] : [];
+  });
+}
+
+/** The details that choose pictures, from the bike in use; with no bike, every one Not sure. */
+export function pictureDetails(bike: BikeRecord | null): PictureDetails {
+  const d = careDetails(bike);
+  return {
+    brakes: d.brakes, rimBrake: bike?.brakes === 'rim' ? bike.rimBrake ?? null : null, axle: bike?.axle ?? null,
+    shifting: d.shifting, bars: bike?.look?.bars ?? null,
+  };
 }

@@ -64,6 +64,10 @@ dialog.care-steps::backdrop { background: var(--ground); }
 .care-pics-two .care-pic { margin-top: 12px; }
 .care-pic-art svg { display: block; width: 100%; height: auto; max-height: 45vh; }
 .care-pic figcaption { font-size: 0.9375rem; padding: 4px 10px 8px; }
+/* Other kinds (care pictures redo, answer 4): the bike's own kind shows, each other kind one tap away */
+.care-kinds { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.care-kinds-label { color: var(--muted); font-size: 0.9375rem; }
+.care-kind { min-height: 44px; padding: 6px 12px; }
 .care-steps-nav {
   display: flex; justify-content: flex-end; gap: 12px; padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
   background: var(--panel); border-top: 1px solid var(--line);

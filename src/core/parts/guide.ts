@@ -1,7 +1,7 @@
 // The parts guide (care pictures design of 7 November 2026, section 4; the owner's answers 1, 6, 7 and 8 of 8 November): the 36 parts the
 // cards name, as data that belongs to no one screen, so a later "how a bike works" shows the same entries. Each part's words are in
 // src/core/wording/en-parts.ts, its point on the rider's bike in src/core/bike/part-points.ts, its close-ups in src/tools/care/parts/.
-import type { Bars } from '../bike/normalise.ts';
+import { kindOrder, type PictureDetails } from '../care/pictures.ts';
 import type { PartPlace } from '../bike/part-points.ts';
 
 export type PartId = PartPlace;
@@ -11,8 +11,11 @@ export type PartTag = 'rim' | 'disc' | 'cable-disc' | 'tubeless' | 'derailleur' 
 
 export type GuidePart = {
   id: PartId; group: PartGroup; tag?: PartTag;
-  /** Its close-ups: one, or two that depend on the bike, the drop-bar (or rim-brake) one first. */
-  pictures: readonly string[]; by?: 'bars' | 'brakes';
+  /**
+   * Its close-ups: one, or one for each kind where they depend on the bike (bars: drop, flat; brakes: rim, disc; rim-brake: caliper,
+   * V-brake, hydraulic). None while they are not yet redrawn (care pictures redo, owner's answer 6 of 9 November 2026).
+   */
+  pictures: readonly string[]; by?: 'bars' | 'brakes' | 'rim-brake';
   /** What a beginner would confuse it with (design 4.1). */
   mixed: readonly PartId[];
 };
@@ -21,53 +24,56 @@ const g = (id: PartId, group: PartGroup, pictures: string[], mixed: PartId[] = [
   ({ id, group, pictures, mixed, ...(tag ? { tag } : {}), ...(by ? { by } : {}) });
 
 export const GUIDE: readonly GuidePart[] = [
-  g('frame', 'steering', ['pg-frame']),
-  g('fork', 'steering', ['pg-fork'], ['stanchions']),
-  g('headset', 'steering', ['pg-headset'], ['stem']),
-  g('stem', 'steering', ['pg-stem'], ['headset']),
-  g('handlebar', 'steering', ['pg-bar-drop', 'pg-bar-flat'], [], undefined, 'bars'),
-  g('seatpost', 'steering', ['pg-seatpost']),
-  g('hub', 'wheels', ['pg-hub'], ['hub-gears']),
-  g('wheel-qr', 'wheels', ['pg-wheel-qr'], ['brake-qr', 'thru-axle']),
-  g('thru-axle', 'wheels', ['pg-thru-axle'], ['wheel-qr']),
-  g('spokes', 'wheels', ['pg-spokes']),
-  g('rim', 'wheels', ['pg-rim'], ['bead']),
-  g('dropouts', 'wheels', ['pg-dropout'], ['hanger']),
-  g('tyre', 'tyres', ['pg-tyre'], ['tube']),
-  g('bead', 'tyres', ['pg-bead'], ['rim']),
-  g('tube', 'tyres', ['pg-tube'], ['tyre']),
-  g('valve', 'tyres', ['pg-valves'], ['tubeless-valve']),
-  g('tubeless-valve', 'tyres', ['pg-tubeless-valve'], ['valve'], 'tubeless'),
-  g('brake-lever', 'brakes', ['pg-lever-drop', 'pg-lever-flat'], [], undefined, 'bars'),
-  g('rim-brake', 'brakes', ['pg-caliper-rim', 'pg-vbrake'], ['caliper'], 'rim', 'bars'),
+  g('frame', 'steering', []),
+  g('fork', 'steering', [], ['stanchions']),
+  g('headset', 'steering', [], ['stem']),
+  g('stem', 'steering', [], ['headset']),
+  g('handlebar', 'steering', [], [], undefined, 'bars'),
+  g('seatpost', 'steering', []),
+  g('hub', 'wheels', [], ['hub-gears']),
+  g('wheel-qr', 'wheels', [], ['brake-qr', 'thru-axle']),
+  g('thru-axle', 'wheels', [], ['wheel-qr']),
+  g('spokes', 'wheels', []),
+  g('rim', 'wheels', [], ['bead']),
+  g('dropouts', 'wheels', [], ['hanger']),
+  g('tyre', 'tyres', [], ['tube']),
+  g('bead', 'tyres', [], ['rim']),
+  g('tube', 'tyres', [], ['tyre']),
+  g('valve', 'tyres', [], ['tubeless-valve']),
+  g('tubeless-valve', 'tyres', [], ['valve'], 'tubeless'),
+  g('brake-lever', 'brakes', [], [], undefined, 'bars'),
+  g('rim-brake', 'brakes', ['pg-caliper-rim', 'pg-vbrake', 'pg-rim-hydraulic'], ['caliper'], 'rim', 'rim-brake'),
   g('pads', 'brakes', ['pg-pads-rim', 'pg-pads-disc'], [], undefined, 'brakes'),
-  g('brake-qr', 'brakes', ['brake-qr-open', 'vbrake-open'], ['wheel-qr'], 'rim', 'bars'),
-  g('barrel', 'brakes', ['barrel-adjuster'], ['pad-adjuster']),
+  g('brake-qr', 'brakes', ['brake-qr-open', 'vbrake-open', 'hydro-rim-open'], ['wheel-qr'], 'rim', 'rim-brake'),
+  g('barrel', 'brakes', [], ['pad-adjuster']),
   g('caliper', 'brakes', ['pg-disc-caliper'], ['disc', 'rim-brake'], 'disc'),
   g('disc', 'brakes', ['pg-disc'], ['caliper'], 'disc'),
   g('pad-adjuster', 'brakes', ['disc-pad-adjust'], ['barrel'], 'cable-disc'),
-  g('chain', 'drive', ['pg-chain'], ['quick-link']),
-  g('quick-link', 'drive', ['quick-link'], ['chain']),
-  g('chainring', 'drive', ['pg-chainring'], ['cassette']),
-  g('cassette', 'drive', ['pg-cassette'], ['chainring'], 'derailleur'),
-  g('derailleur', 'drive', ['pg-derailleur'], ['hanger'], 'derailleur'),
-  g('hanger', 'drive', ['pg-hanger'], ['derailleur', 'dropouts'], 'derailleur'),
-  g('gear-cable', 'drive', ['pg-gear-cable']),
-  g('hub-gears', 'drive', ['pg-hub-gears'], ['hub'], 'hub-gears'),
-  g('battery', 'ebike', ['battery-refit', 'battery-contacts'], [], 'ebike'),
-  g('display', 'ebike', ['pg-display'], [], 'ebike'),
-  g('stanchions', 'ebike', ['pg-stanchions'], ['fork'], 'suspension'),
+  g('chain', 'drive', [], ['quick-link']),
+  g('quick-link', 'drive', [], ['chain']),
+  g('chainring', 'drive', [], ['cassette']),
+  g('cassette', 'drive', [], ['chainring'], 'derailleur'),
+  g('derailleur', 'drive', [], ['hanger'], 'derailleur'),
+  g('hanger', 'drive', [], ['derailleur', 'dropouts'], 'derailleur'),
+  g('gear-cable', 'drive', []),
+  g('hub-gears', 'drive', [], ['hub'], 'hub-gears'),
+  g('battery', 'ebike', [], [], 'ebike'),
+  g('display', 'ebike', [], [], 'ebike'),
+  g('stanchions', 'ebike', [], ['fork'], 'suspension'),
 ];
 
 export const partById = (id: string): GuidePart | undefined => GUIDE.find((p) => p.id === id);
 
 /**
- * A part's close-ups for the rider's bike, in order: where they depend on the bars or the brakes, the one matching the bike first, the
- * other beside it (the owner's answer 1: both close-ups, the matching one first); untold, the drop-bar or rim-brake one first.
+ * A part's close-ups for the rider's bike, in order, two at most side by side (owner's answer 1 of 8 November): where they depend on the
+ * bike, the one matching it first, then the next kind; not told, the most common modern kind first (care pictures redo, section 2): a disc
+ * brake's pads before a rim brake's, a road caliper before a V-brake unless flat bars break the tie.
  */
-export function guidePictures(part: GuidePart, bars: Bars | null, brakes: 'rim' | 'disc' | 'none' | null): string[] {
-  const [a, b] = part.pictures;
-  if (!part.by || b === undefined) return [...part.pictures];
-  const second = part.by === 'bars' ? bars === 'flat' : brakes === 'disc';
-  return second ? [b, a!] : [a!, b];
+export function guidePictures(part: GuidePart, d: PictureDetails): string[] {
+  const p = part.pictures;
+  if (!part.by || p.length < 2) return [...p];
+  const order = part.by === 'rim-brake' ? kindOrder('rim-brake', d).map((k) => ['caliper', 'v-brake', 'hydraulic'].indexOf(k))
+    : part.by === 'bars' ? kindOrder('bars', d).map((k) => ['drop', 'flat'].indexOf(k))
+      : d.brakes === 'rim' ? [0, 1] : [1, 0];
+  return order.flatMap((i) => (p[i] ? [p[i]] : [])).slice(0, 2);
 }

@@ -2285,6 +2285,8 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
           <label for="bikeShifting">Shifting<select id="bikeShifting"><option value="unknown">Not set</option><option value="cable">Cable operated</option><option value="electronic">Electronic</option><option value="none">No external shifting cable</option></select></label>
           <label for="bikeSuspension">Suspension<select id="bikeSuspension"><option value="unknown">Not sure</option><option value="none">None</option><option value="front">Front fork</option><option value="full">Full suspension</option></select></label>
           <div class="bike-profile-field"><label for="bikeRackMounts">Rack mounts<select id="bikeRackMounts" aria-describedby="bikeRackMountsHint"><option value="unknown">Not sure</option><option value="yes">Yes</option><option value="no">No</option></select></label><p class="hint" id="bikeRackMountsHint">Small threaded holes near the rear axle and on the seat stays, for a rack.</p></div>
+          <div class="bike-profile-field"><label for="bikeAxle">Wheel axle<select id="bikeAxle" aria-describedby="bikeAxleHint"><option value="unknown">Not sure</option><option value="thru">Thru-axle</option><option value="qr">Quick release</option><option value="nuts">Axle nuts</option></select></label><p class="hint" id="bikeAxleHint">What holds each wheel: a thick axle screwed through the fork, a thin rod with a lever, or nuts.</p></div>
+          <div class="bike-profile-field" id="bikeRimBrakeField"><label for="bikeRimBrake">Rim brake type<select id="bikeRimBrake"><option value="unknown">Not sure</option><option value="caliper">Road caliper</option><option value="v-brake">V-brake</option><option value="hydraulic">Hydraulic rim brake</option></select></label></div>
           <label id="bikeChainField" for="bikeChain">Chain / quick-link reference<input id="bikeChain" type="text" maxlength="120" placeholder="Brand, chain family and speed / part number"></label>
           <label id="bikeHangerField" for="bikeHanger">Derailleur hanger reference<input id="bikeHanger" type="text" maxlength="120" placeholder="Frame-specific part or hanger type"></label>
           <label class="bike-profile-wide" for="bikeNotes">Bike notes <span class="hint">optional</span><textarea id="bikeNotes" rows="3" maxlength="1000" placeholder="e.g. valve length, spare battery or unusual tools"></textarea></label>
@@ -2829,8 +2831,11 @@ const BIKE_PROFILE_LABELS={
   shifting:{unknown:'Not set',cable:'Cable operated',electronic:'Electronic',none:'No external shifting cable'},
   suspension:{unknown:'Not sure',none:'None',front:'Front fork',full:'Full suspension'},
   rackMounts:{unknown:'Not sure',yes:'Yes',no:'No'},
+  // Care pictures redo (owner's answers 1 and 2 of 9 November 2026): the wheels' axle, and with rim brakes their kind
+  axle:{unknown:'Not sure',thru:'Thru-axle',qr:'Quick release',nuts:'Axle nuts'},
+  rimBrake:{unknown:'Not sure',caliper:'Road caliper','v-brake':'V-brake',hydraulic:'Hydraulic rim brake'},
 };
-const BIKE_PROFILE_ANSWERS=['suspension','rackMounts'];
+const BIKE_PROFILE_ANSWERS=['suspension','rackMounts','axle','rimBrake'];
 const BIKE_PROFILE_TEXT={name:100,frontTyre:120,rearTyre:120,padType:120,chainType:120,hangerType:120,notes:1000};
 function normalisePressureBike(value){
   const p=dataObject(value) ? value : {};
@@ -3030,13 +3035,14 @@ function persistBikeProfileSelection(){
 }
 const BIKE_PROFILE_INPUTS={name:'bikeName',tyres:'bikeTyres',frontTyre:'bikeFrontTyre',rearTyre:'bikeRearTyre',
   valve:'bikeValve',brakes:'bikeBrakes',padType:'bikePads',drive:'bikeDrive',shifting:'bikeShifting',
-  suspension:'bikeSuspension',rackMounts:'bikeRackMounts',chainType:'bikeChain',hangerType:'bikeHanger',notes:'bikeNotes'};
+  suspension:'bikeSuspension',rackMounts:'bikeRackMounts',axle:'bikeAxle',rimBrake:'bikeRimBrake',chainType:'bikeChain',hangerType:'bikeHanger',notes:'bikeNotes'};
 // Of the tyre fields only the bike's weight is edited here (spec 7.1 item 3); the rest of bikeProfile.pressure is kept as it was saved.
 const BIKE_WEIGHT_INPUT='bikeBaseKg';
 function bikeProfileFieldVisibility(){
   const drive=$('bikeDrive').value;
   $('bikeChainField').classList.toggle('hidden',drive==='belt');
   $('bikeHangerField').classList.toggle('hidden',['belt','chain-hub'].includes(drive));
+  $('bikeRimBrakeField').classList.toggle('hidden',$('bikeBrakes').value!=='rim');
 }
 // ---- Bike details: the Frame and Maximum weight sections (spec 7.1, 7.4) ----
 // Every sentence the dialog shows about the frame or the weight limit, in one table the wording check reads (limit: true = states a result against the entered limit).
@@ -3436,6 +3442,7 @@ function initialiseBikeProfiles(){
   $('bikeClear').onclick=clearBikeProfile;
   $('bikeNew').onclick=startNewBike;
   $('bikeDrive').onchange=bikeProfileFieldVisibility;
+  $('bikeBrakes').onchange=bikeProfileFieldVisibility;
   $('bikeRemove').onclick=()=>{const p=BIKE_PROFILES.find(b=>b.id===$('bikeSavedSelect').value);if(!p)return;$('bikeRemoveQuestion').textContent=`Remove ${p.name} from saved bikes? Plans using it keep their own copy.`;$('bikeRemovePrompt').classList.remove('hidden');};
   $('bikeRemoveCancel').onclick=()=>{$('bikeRemovePrompt').classList.add('hidden');$('bikeRemove').focus({preventScroll:true});};
   $('bikeRemoveConfirm').onclick=removeSavedBike;

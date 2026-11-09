@@ -15,7 +15,7 @@ export const STEP_PARTS: Readonly<Record<string, readonly L[]>> = {
     [["brake's quick release", 'brake-qr']]],
   'brake-rub-rim': [[['dropouts', 'dropouts'], ["wheel's quick release", 'wheel-qr']], [['tyre bead', 'bead']], [['pad', 'pads'], ['tyre', 'tyre'], ['spokes', 'spokes']],
     [['brake', 'rim-brake']], [["brake's quick release", 'brake-qr']], [["brake's quick release", 'brake-qr']]],
-  'brake-rub-disc': [[['axle', 'thru-axle'], ['dropouts', 'dropouts']], [['pad', 'pads']], [['caliper', 'caliper'], ['lever', 'brake-lever']], [['caliper', 'caliper']],
+  'brake-rub-disc': [[['thru-axle', 'thru-axle'], ["wheel's quick release", 'wheel-qr'], ['dropouts', 'dropouts']], [['pad', 'pads']], [['caliper', 'caliper'], ['lever', 'brake-lever']], [['caliper', 'caliper']],
     [['pad adjuster', 'pad-adjuster']]],
   'brake-weak-rim': [[['rim', 'rim'], ['pads', 'pads']], [["brake's quick release", 'brake-qr']], [['barrel adjuster', 'barrel']], [['pads', 'pads'], ['rim', 'rim']],
     [['pads', 'pads']]],

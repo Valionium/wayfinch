@@ -42,6 +42,8 @@ export type BikeRecord = {
   shifting: 'unknown' | 'cable' | 'electronic' | 'none';
   /** Sub-project 11: only an answer is stored; no field is Not sure, so a bike from before keeps its bytes. */
   suspension?: 'none' | 'front' | 'full'; rackMounts?: 'yes' | 'no';
+  /** Care pictures redo (owner's answers 1 and 2 of 9 November 2026): the wheels' axle, and with rim brakes their kind; answers only. */
+  axle?: 'thru' | 'qr' | 'nuts'; rimBrake?: 'caliper' | 'v-brake' | 'hydraulic';
   pressure: PressureBike; fit: Fit | null; maxWeight: MaxWeight | null; maxWeightAsked: boolean; look: Look | null; geometry: Geometry | null;
 };
 
@@ -55,8 +57,10 @@ const CHOICES = {
   // the last two are stored only as an answer (see BikeRecord)
   suspension: ['unknown', 'none', 'front', 'full'],
   rackMounts: ['unknown', 'yes', 'no'],
+  axle: ['unknown', 'thru', 'qr', 'nuts'],
+  rimBrake: ['unknown', 'caliper', 'v-brake', 'hydraulic'],
 } as const;
-type Choices = { [K in Exclude<keyof typeof CHOICES, 'suspension' | 'rackMounts'>]: (typeof CHOICES)[K][number] };
+type Choices = { [K in Exclude<keyof typeof CHOICES, 'suspension' | 'rackMounts' | 'axle' | 'rimBrake'>]: (typeof CHOICES)[K][number] };
 const FIT_STYLES: readonly FitStyle[] = ['unknown', 'diamond-level', 'diamond-sloping', 'compact', 'trapeze', 'mixte', 'step-through', 'full-suspension'];
 const FIT_SIZES: readonly SizeLetter[] = ['XS', 'S', 'M', 'L', 'XL'];
 const WHEELS: readonly WheelWord[] = ['700c', '650b', '650c', '29', '27.5', '26'];
@@ -200,6 +204,7 @@ export function normaliseBike(raw: unknown): BikeRecord | null {
   return {
     id: raw.id, ...t, name: t.name || 'My bike',
     // each choice in CHOICES' order, which is the page's
+    // the answers-only ones (from suspension on) are no field when Not sure
     ...Object.fromEntries(Object.entries(CHOICES).map(([key, values]) => [key, oneOf(raw[key], values as readonly string[])])
       .filter(([, value], i) => i < 5 || value !== 'unknown')) as Choices,
     pressure: pressureOf(raw.pressure), fit: fitOf(raw.fit), maxWeight: maxWeightOf(raw.maxWeight), maxWeightAsked: raw.maxWeightAsked === true,

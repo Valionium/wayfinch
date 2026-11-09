@@ -6,7 +6,7 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { idsOf, STEP_PICTURES } from '../../../../src/core/care/pictures.ts';
-import { PICTURE_WORDS } from '../../../../src/core/wording/en-care-pictures.ts';
+import { KIND_WORDS, PICTURE_WORDS, SWITCH_WORDS } from '../../../../src/core/wording/en-care-pictures.ts';
 import { C, CARE_TASKS, CARRY, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
 import { ALL_STEPS_KEY } from '../../../../src/tools/care/steps.tsx';
 import { CareScreen } from '../../../../src/tools/care/ui.tsx';
@@ -260,7 +260,8 @@ test('[BC-PIC-NONE] a step with no picture shows its text alone, with no empty f
 
 test('[BC-STEPS-ALL] All steps shows every step on one page with its pictures; the choice is remembered on the phone', async () => {
   await mount();
-  const c = card('puncture-tube');
+  // a card with pictures (care pictures redo, batch 1: the puncture cards' pictures are not yet redrawn)
+  const c = card('brake-rub-disc');
   await openCard(c.id);
   const all = button(C.careStepsAll)!;
   expect(all.getAttribute('aria-pressed')).toBe('false');
@@ -277,7 +278,7 @@ test('[BC-STEPS-ALL] All steps shows every step on one page with its pictures; t
   expect(localStorage.getItem(ALL_STEPS_KEY)).toBe('1');
   // closed and opened again: still all steps
   await click(button(C.careStepsDone)!);
-  await click(host.querySelector('.care-road[data-id="puncture-tube"] .care-open')!);
+  await click(host.querySelector('.care-road[data-id="brake-rub-disc"] .care-open')!);
   await settle();
   expect(dialog()!.querySelectorAll('.care-step-all').length).toBe(c.steps.length);
   await click(button(C.careStepsAll)!);
@@ -348,9 +349,9 @@ test('[BC-STEPS-OPEN] a tap on a roadside card or a Care task in the list opens 
   expect(host.querySelector(`#${dialog()!.getAttribute('aria-labelledby')}`)!.textContent).toBe(card('chain-broken').problem);
 });
 
-/** A saved bike with rim brakes and the given bars (or none told), the bike in use. */
-const rimBike = (bars: string | null) => memory({
-  'loadcheck:bikeProfiles': JSON.stringify([{ id: 'bike_a', name: 'Mine', brakes: 'rim', ...(bars ? { look: { colour: null, bars, ebike: false } } : {}) }]),
+/** A saved bike with rim brakes, the given bars (or none told) and the given rim brake kind (or none told), the bike in use. */
+const rimBike = (bars: string | null, rimBrake?: string) => memory({
+  'loadcheck:bikeProfiles': JSON.stringify([{ id: 'bike_a', name: 'Mine', brakes: 'rim', ...(rimBrake ? { rimBrake } : {}), ...(bars ? { look: { colour: null, bars, ebike: false } } : {}) }]),
   'loadcheck:bikeProfile': JSON.stringify({ id: 'bike_a', name: 'Mine' }),
 }).kv;
 /** Brake rubbing, step 5 ("Open the brake's quick release"), for the bike in `kv`. */
@@ -362,28 +363,71 @@ async function brakeStep5(kv: KeyValueStore): Promise<void> {
 }
 const imgNames = () => [...dialog()!.querySelectorAll('.care-step [role="img"]')].map((i) => i.getAttribute('aria-label'));
 
-test("[BC-PIC-BARS] the brake's quick release: drop bars see the caliper lever, flat bars the V-brake's curved tube, other or untold bars both side by side, the caliper first (I1)", async () => {
-  const caliper = PICTURE_WORDS['brake-qr-open']!.name;
-  const vbrake = PICTURE_WORDS['vbrake-open']!.name;
-  await brakeStep5(rimBike('drop'));
+const kindButtons = () => [...dialog()!.querySelectorAll('.care-step .care-kinds button')].map((b) => b.textContent);
+
+test("[BC-PIC-DETAILS] the brake's quick release follows the kind of rim brake: one picture, the bike's own kind; not told, bars break the tie, no bike the caliper", async () => {
+  const name = (id: string) => PICTURE_WORDS[id]!.name;
+  await brakeStep5(rimBike('drop', 'hydraulic'));
   await shown(1);
-  expect(imgNames()).toEqual([caliper]);
+  expect(imgNames()).toEqual([name('hydro-rim-open')]);
+  await brakeStep5(rimBike('drop', 'v-brake'));
+  await shown(1);
+  expect(imgNames()).toEqual([name('vbrake-open')]);
   await brakeStep5(rimBike('flat'));
   await shown(1);
-  expect(imgNames()).toEqual([vbrake]);
-  for (const bars of ['other', null]) {
+  expect(imgNames()).toEqual([name('vbrake-open')]);
+  for (const bars of ['drop', 'other', null]) {
     await brakeStep5(rimBike(bars));
-    await shown(2);
-    expect(imgNames(), String(bars)).toEqual([caliper, vbrake]);
+    await shown(1);
+    expect(imgNames(), String(bars)).toEqual([name('brake-qr-open')]);
   }
   await brakeStep5(memory().kv); // no bike at all
-  await shown(2);
-  expect(imgNames()).toEqual([caliper, vbrake]);
-  // step 6 closes it again: the V-brake's own picture on flat bars
-  await brakeStep5(rimBike('flat'));
+  await shown(1);
+  expect(imgNames()).toEqual([name('brake-qr-open')]);
+  // step 6 closes it again: the V-brake's own picture
+  await brakeStep5(rimBike('flat', 'v-brake'));
   await click(button(C.careStepsNext)!);
   await shown(1);
-  expect(imgNames()).toEqual([PICTURE_WORDS['vbrake-close']!.name]);
+  expect(imgNames()).toEqual([name('vbrake-close')]);
+});
+
+test("[BC-PIC-SWITCH] \"Other kinds\" offers each other kind with one tap; a tap shows that kind and offers the bike's own again; no switch where a picture has one kind", async () => {
+  await brakeStep5(rimBike('flat'));
+  await shown(1);
+  const group = dialog()!.querySelector('.care-step .care-kinds')!;
+  expect(group.getAttribute('role')).toBe('group');
+  expect(group.getAttribute('aria-label')).toBe(SWITCH_WORDS.other);
+  expect(kindButtons()).toEqual([KIND_WORDS.caliper, KIND_WORDS.hydraulic]);
+  const caliper = [...group.querySelectorAll('button')].find((b) => b.textContent === KIND_WORDS.caliper)!;
+  expect(caliper.getAttribute('aria-label')).toBe(SWITCH_WORDS.show(KIND_WORDS.caliper!));
+  await click(caliper);
+  expect(imgNames()).toEqual([PICTURE_WORDS['brake-qr-open']!.name]);
+  expect(kindButtons()).toEqual([KIND_WORDS['v-brake'], KIND_WORDS.hydraulic]);
+  // the caliper bolts: one picture, one kind, no switch
+  render(null, host);
+  await mount();
+  await openCard('brake-rub-disc');
+  for (let i = 0; i < 3; i += 1) await click(button(C.careStepsNext)!);
+  await shown(1);
+  expect(dialog()!.querySelector('.care-step .care-kinds')).toBeNull();
+});
+
+test('[BC-STEP-LINES] the snapped-spoke card shows a disc bike the disc line only, a rim bike the rim lines only, and with no bike every line, the disc line first', async () => {
+  const spoke = card('spoke-snapped');
+  const lines = async (kv: KeyValueStore): Promise<string[]> => {
+    render(null, host);
+    await mount(kv);
+    await openCard('spoke-snapped');
+    if (button(C.careStepsAll)!.getAttribute('aria-pressed') !== 'true') await click(button(C.careStepsAll)!);
+    const got = [...dialog()!.querySelectorAll('.care-step-all .care-step-t')].map((p) => p.textContent!);
+    await click(button(C.careStepsAll)!);
+    return got;
+  };
+  const disc = memory({ 'loadcheck:bikeProfiles': JSON.stringify([{ id: 'bike_d', name: 'Disc', brakes: 'hydraulic-disc' }]), 'loadcheck:bikeProfile': JSON.stringify({ id: 'bike_d', name: 'Disc' }) }).kv;
+  expect(await lines(disc)).toEqual(spoke.steps.filter((t) => !t.startsWith('Rim brakes:')));
+  expect(await lines(rimBike('drop'))).toEqual(spoke.steps.filter((t) => !t.startsWith('Disc brakes:')));
+  const all = await lines(memory().kv);
+  expect(all).toEqual([spoke.steps[0], spoke.steps[2], spoke.steps[1], spoke.steps[3], spoke.steps[4]]);
 });
 
 test("[BC-STEPS-KEYS] Alt or Ctrl with an arrow is the browser's own: the step view lets it pass", async () => {
@@ -509,7 +553,7 @@ test("[PG-SHEET-BIKE] the entry draws the rider's bike with the part marked, and
   await click(partLink('caliper')!);
   await sheetOpen();
   expect(sheet()!.querySelector('.pg-bike[role="img"]')).not.toBeNull();
-  await click(sheetButton('Rim brake (caliper or V-brake)')!);
+  await click(sheetButton('Rim brake (caliper, V-brake or hydraulic)')!);
   expect(sheet()!.querySelector('.pg-bike')).toBeNull();
   expect(sheet()!.textContent).toContain('Not on your bike, as you described it.');
 });

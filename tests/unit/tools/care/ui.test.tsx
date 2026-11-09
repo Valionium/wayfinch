@@ -6,6 +6,8 @@ import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { C, CARE_TASKS, CARRY, PART_LABEL, ROAD_CARDS, SECTION_LABEL, SECTIONS } from '../../../../src/core/wording/en-care.ts';
 import { ALL_STEPS_KEY } from '../../../../src/tools/care/steps.tsx';
+import { careDetails } from '../../../../src/core/care/fit.ts';
+import { stepsShown } from '../../../../src/core/care/lines.ts';
 import { CareScreen } from '../../../../src/tools/care/ui.tsx';
 import { readHost } from '../../../../src/tools/tyre/host.ts';
 import type { TyreServices } from '../../../../src/tools/tyre/services.ts';
@@ -298,7 +300,8 @@ test("[BC-ROAD] with no bike the Roadside tab lists every card in the draft's or
     expect(d.querySelector('.care-open')!.textContent, c.id).toContain(c.problem);
     const { text: body, steps } = await stepsOf(d);
     expect(body, c.id).toContain(`${C.careRoadCheckFirst}: ${c.checkFirst}`);
-    expect(steps, c.id).toEqual(c.steps);
+    // with no bike, brakes are Not sure: every line shows, a disc line before a rim line (care pictures redo, T9)
+    expect(steps, c.id).toEqual(stepsShown(c.id, c.steps.length, careDetails(null)).map((i) => c.steps[i]));
     expect(body, c.id).toContain(C.careRideOn);
     expect(body, c.id).toContain(c.rideOn);
     expect(body, c.id).toContain(C.careRoadCarry);

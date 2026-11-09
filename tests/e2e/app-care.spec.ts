@@ -283,16 +283,24 @@ test('[BC-STEPS-LAYOUT] the step view fills the screen; on a phone the picture s
   const errors = errorsOf(page);
   app = await loadApp(page, { launch: true, path: '/#/tools/care' });
   await seed(page, [U], null);
-  await openSteps(page, 'puncture-tube', 'Puncture (inner tube)');
+  // a card with pictures (care pictures redo, batch 1: the puncture cards' pictures are not yet redrawn)
+  await openSteps(page, 'brake-rub-disc', 'Disc brake rubbing');
   const dialog = page.getByRole('dialog');
   const box = (await dialog.boundingBox())!;
   const view = page.viewportSize()!;
   expect(Math.round(box.width)).toBe(view.width);
   expect(Math.round(box.height)).toBe(view.height);
   await page.getByRole('button', { name: 'Next' }).click();
+  // step 1, the wheel seated: its kind follows the axle, the other kinds one tap away as 44 px buttons [BC-PIC-SWITCH]
+  await expect(dialog.getByRole('img', { name: 'A thru-axle: push the wheel fully in, then tighten the axle firmly.' })).toBeVisible();
+  const kinds = dialog.getByRole('group', { name: 'Other kinds' });
+  await expect(kinds.getByRole('button')).toHaveCount(2);
+  for (const b of await kinds.getByRole('button').all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await kinds.getByRole('button', { name: 'Show Quick release' }).click();
+  await expect(dialog.getByRole('img', { name: 'A quick release: push the wheel fully in, then close the lever firmly.' })).toBeVisible();
   await page.getByRole('button', { name: 'Next' }).click();
-  await expect(dialog.locator('.care-steps-count')).toHaveText('Step 2 of 7');
-  const img = dialog.getByRole('img', { name: 'Prying the tyre off the rim with two tyre levers.' });
+  await expect(dialog.locator('.care-steps-count')).toHaveText('Step 2 of 5');
+  const img = dialog.getByRole('img', { name: 'A thin gap between each pad and the disc.' });
   await expect(img).toBeVisible();
   const pic = (await img.boundingBox())!;
   const words = (await dialog.locator('.care-step-t').boundingBox())!;
@@ -326,21 +334,21 @@ test('[BC-STEPS-BACK] in a real browser the back gesture closes the step view in
   await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
   await goOffline(page);
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await openSteps(page, 'puncture-tube', 'Puncture (inner tube)');
+  await openSteps(page, 'brake-rub-disc', 'Disc brake rubbing');
   for (let i = 0; i < 4; i += 1) await page.getByRole('button', { name: 'Next' }).click();
   await page.goBack();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page).toHaveURL(/#\/tools\/care$/);
   await expect(page.getByRole('heading', { name: 'Bike care', level: 2 })).toBeVisible();
-  await expect(card(page, 'puncture-tube').locator('.care-open')).toBeFocused();
+  await expect(card(page, 'brake-rub-disc').locator('.care-open')).toBeFocused();
   // offline, the drawing still comes
-  await card(page, 'puncture-tube').locator('.care-open').click();
+  await card(page, 'brake-rub-disc').locator('.care-open').click();
   await expect(page.locator('.care-step-h')).toBeFocused();
   await page.keyboard.press('ArrowRight');
-  await expect(page.locator('.care-steps-count')).toHaveText('Step 1 of 7');
+  await expect(page.locator('.care-steps-count')).toHaveText('Step 1 of 5');
   await page.keyboard.press('ArrowRight');
-  await expect(page.locator('.care-steps-count')).toHaveText('Step 2 of 7');
-  await expect(page.getByRole('dialog').getByRole('img', { name: 'Prying the tyre off the rim with two tyre levers.' })).toBeVisible();
+  await expect(page.locator('.care-steps-count')).toHaveText('Step 2 of 5');
+  await expect(page.getByRole('dialog').getByRole('img', { name: 'A thin gap between each pad and the disc.' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page).toHaveURL(/#\/tools\/care$/);

@@ -234,29 +234,29 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
       'https://www.roadbikerider.com/be-a-hero-on-rides-d3/',
       'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot',
     ],
-    note: "Book p. 49: tape the broken spoke or wrap it round a neighbour; pp. 208-209: broken spokes make the wheel wobble. Opening the brake's quick release is the draft's step 2, now for rim brakes only, named as the brake's own lever, with the weaker-brake caution and a step to close it again (rulings C1 and I1 on PR 59); \"more than a few spokes\" became \"more than one spoke\" (M1). The disc-brake step (\"check the wheel turns without touching the brake; if it rubs, ride slowly\") is the coordinator\'s wording and has no source: flagged for the owner at O5 (the real risk on a disc bike may be the rim touching the frame or fork).",
+    note: "Book p. 49: tape the broken spoke or wrap it round a neighbour; pp. 208-209: broken spokes make the wheel wobble. Opening the brake's quick release is the draft's step 2, now for rim brakes only, named as the brake's own lever, with the weaker-brake caution and a step to close it again (rulings C1 and I1 on PR 59); \"more than a few spokes\" became \"more than one spoke\" (M1). The disc-brake step is the care pictures redo's T8 (owner's approval of 9 November 2026): the disc sits on the hub, so a wobbly rim never touches the brake; Park Tool: tie the broken spoke to a neighbour so it does not flop and scratch the frame (T7). Research note docs/research/2026-11-09-modern-bike-mechanisms.md, sections 1.1 and 4.",
   },
   'brake-rub-rim': {
-    urls: ['https://www.sheldonbrown.com/rim-brakes.html'],
-    note: "Book p. 209: re-seat the wheel, the tyre bead (book, more careful). The draft's centring step and its centring-screw aside had no source and are cut (decision 6); the card sends the rider to a shop to have the brake centred (ruling on PR 59, M6).",
+    urls: ['https://www.sheldonbrown.com/rim-brakes.html', 'https://www.parktool.com/en-us/blog/repair-help/dual-pivot-brake-service', 'https://www.parktool.com/en-us/blog/repair-help/linear-pull-brake-service'],
+    note: "Book p. 209: re-seat the wheel, the tyre bead (book, more careful). The centring step, cut in PR 59 for want of a source, is back as the care pictures redo's T10 (owner's approval of 9 November 2026): Park Tool's dual-pivot page (the centring screw on one arm moves both pads; some calipers have none) and linear-pull page (a spring screw on each arm). T11 says when to open the brake's release: a bent rim that still rubs.",
   },
   'brake-rub-disc': {
     urls: [
       'https://www.parktool.com/en-us/blog/repair-help/mechanical-disc-brake-alignment',
       'https://www.parktool.com/en-int/blog/repair-help/hydraulic-disc-brake-alignment',
     ],
-    note: 'Book p. 213: bent disc, caliper not centred, pads too close; p. 121: loosen, centre, tighten, squeeze the lever several times. The draft\'s "snug the bolts" is replaced by the printed torque, or even tightening until the caliper no longer moves, and a brake test (the coordinator\'s ruling on PR 59, 7 Nov).',
+    note: 'Book p. 213: bent disc, caliper not centred, pads too close; p. 121: loosen, centre, tighten, squeeze the lever several times. The draft\'s "snug the bolts" is replaced by the printed torque, or even tightening until the caliper no longer moves, and a brake test (the coordinator\'s ruling on PR 59, 7 Nov). Care pictures redo (approved by the owner, 9 November 2026): T12 names the thru-axle (most disc bikes have one; research note section 2) and the quick release of the wheel (PR 59, C1); T13 gives the direction to turn the pad adjuster; T14 asks about the lever squeezed with the wheel out (Shimano: the pistons come out; research note section 1.1).',
   },
   'brake-weak-rim': {
     urls: ['https://www.sheldonbrown.com/rim-brakes.html'],
-    note: 'Book p. 211: cleaning, cable and pads; the brake quick release and loose pads (book, more careful); p. 110: a scraping noise means worn pads.',
+    note: 'Book p. 211: cleaning, cable and pads; the brake quick release and loose pads (book, more careful); p. 110: a scraping noise means worn pads. T15 (care pictures redo, 9 November 2026): unscrewing the barrel draws the cable tighter (Park Tool, dual-pivot service); hydraulic rim brakes have no barrel.',
   },
   'brake-weak-disc': {
     urls: [
       'https://www.parktool.com/en-us/blog/repair-help/disc-brake-pad-removal-installation',
       'https://www.parktool.com/en-us/blog/repair-help/mechanical-disc-brake-alignment',
     ],
-    note: 'Book p. 213: oil, worn pads, air in the system (pumping firms the lever when air is in it); p. 120: a grinding noise as the worn-pad sign (book, more careful). "Never touch the disc or pads with your fingers" (the coordinator\'s ruling I3 on PR 59): book p. 120, gloves for the disc braking surfaces.',
+    note: 'Book p. 213: oil, worn pads, air in the system (pumping firms the lever when air is in it); p. 120: a grinding noise as the worn-pad sign (book, more careful). "Never touch the disc or pads with your fingers" (the coordinator\'s ruling I3 on PR 59): book p. 120, gloves for the disc braking surfaces. T16 (care pictures redo, 9 November 2026): the Park Tool mechanical page: many calipers have one pad adjuster, some one each side; pad wear is taken up with the pad adjuster, never the barrel.',
   },
   'gears-skipping': {
     urls: ['https://www.parktool.com/en-us/product/chain-wear-indicator-cc-3-2'],

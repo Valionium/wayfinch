@@ -1,90 +1,94 @@
 // Bike care's pictures in words (care pictures design of 7 November 2026, section 2.5): each drawing's short name (one sentence) and its
 // description (what it shows, in plain words, two to four sentences), and a one-line caption where the picture shows a test or method the
 // step only names, or a view that needs saying. Loaded only with Bike care, under the banned-words test (tests/unit/core/care/pictures.test.ts).
-// Labels drawn inside a picture are repeated here.
+// Labels drawn inside a picture are repeated here. The redo of 9 November 2026 redraws them with tools/care-art, batch by batch.
 export type PictureWords = { name: string; description: string; caption?: string };
 
-// Front or rear: the steps that show these name no wheel (review of PR 72, I3). Drawn from behind, the lever on the bike's left (owner, 8 Nov).
-const QR_CAPTION = "Front or rear wheel, seen from behind the brake: the lever is on the bike's left.";
-const V_CAPTION = "Front or rear wheel, seen from behind the brake: the curved tube sits on the bike's left.";
+// The rim brakes are drawn from behind the rear brake with the wheel cut through at the brake, so the pads show on the rim's flanks below
+// the tyre. The steps name no wheel: the front brake works the same way (review of PR 72, I3; lever on the bike's left, owner, 8 Nov).
+const BEHIND = 'Seen from behind, the wheel cut through at the brake. The front brake works the same way.';
+
+/** Each kind's name on the step view's switch (redo, answer 4): "Other kinds: V-brake · Hydraulic rim brake". */
+export const KIND_WORDS: Readonly<Record<string, string>> = {
+  caliper: 'Road caliper', 'v-brake': 'V-brake', hydraulic: 'Hydraulic rim brake',
+  thru: 'Thru-axle', qr: 'Quick release', nuts: 'Axle nuts', drop: 'Drop bars', flat: 'Flat bars', cable: 'Cable gears',
+};
+/** The switch's own words. */
+export const SWITCH_WORDS = { other: 'Other kinds', show: (kind: string): string => `Show ${kind}` } as const;
 
 export const PICTURE_WORDS: Readonly<Record<string, PictureWords>> = {
-  'tyre-levers': {
-    name: 'Prying the tyre off the rim with two tyre levers.',
-    description: 'The top of a wheel taken out of the bike, seen from the side. A first tyre lever is tucked under the edge of the tyre, pulled down towards the centre of the wheel, and its hooked end is clipped onto a spoke so it stays put; that stretch of tyre edge now sits outside the rim. A second lever is tucked under the tyre edge a hand width further on, and an arrow shows it being run along the rim, away from the first lever. A small picture in the corner shows the whole wheel and where this view is.',
-  },
-  'pinch-slits': {
-    name: 'A pinched tube: two slits side by side.',
-    description: 'A length of inner tube laid flat, with its valve at one end on the side that faces the rim. In the middle are two short slits next to each other, both running along the tube, marked "two slits side by side". This is the mark a tube gets when it is pinched against the rim.',
-  },
-  'patch-press': {
-    name: 'Pressing a patch onto the tube from the middle outwards.',
-    description: 'A length of inner tube with a patch stuck on it. A dotted outline a little bigger than the patch shows the roughened area. Two arrows start at the middle of the patch and point outwards, labelled "press from the middle outwards".',
-  },
-  'tubeless-plug': {
-    name: 'Pushing a plug into the hole in a tubeless tyre.',
-    description: 'The tread of a tyre seen from the side, with a plug tool held above it. The tool\'s tip pushes a plug strip, folded in two, down into the hole, so its two ends still stick out of the tread. An arrow points down, and the strip is labelled "plug".',
-  },
-  'quick-link': {
-    name: 'Joining the two chain ends with a quick link.',
-    description: 'A chain seen from the side, broken into two ends with a gap between them. In the gap sits a quick link, a single link with a pin at each end, labelled "quick link". Two arrows show the chain ends coming together onto the quick link.',
-  },
-  'stiff-link': {
-    name: 'A stiff link in the chain, flexed sideways.',
-    description: 'A straight piece of chain seen from above, so the plates on both sides of each link show. One joint in the middle is marked "stiff link". Two arrows push the chain sideways, one on each side of that joint, to bend it back and forth until it moves freely.',
-  },
-  'spoke-wrap': {
-    name: 'The broken spoke wrapped round its neighbour.',
-    description: 'A close-up of the wheel just below the rim, with several spokes running down from the rim. One spoke has snapped near the rim; its long piece is bent over and wound round the spoke next to it, labelled "broken spoke" and "wrapped round its neighbour". A small picture in the corner shows the whole wheel and where this view is.',
-  },
   'brake-qr-open': {
-    name: "Opening the brake's quick release: the small lever flips from down to up.",
-    description: "A road rim brake at the top of a wheel, seen from behind, with the fork or frame in front of the brake's middle and the brake's arms reaching down either side of the tyre to the pads. A small lever sticks out on the bike's left, labelled \"bike's left\". It points down, labelled \"closed\"; a dashed outline shows it pointing up, labelled \"open\", and a curved arrow shows the flip from down to up. A small picture in the corner shows the whole wheel and where this view is.",
-    caption: QR_CAPTION,
+    name: "Opening a road caliper's quick release: the small lever flips up.",
+    description: "A road rim brake, the caliper, seen from behind with the wheel cut through: its two arms reach down either side of the tyre to the pads, which stand just off the rim's flat sides below the tyre. On the bike's left the cable comes into a barrel and runs a short way down to its clamp; beside the barrel a small lever points down, labelled \"closed\", and a dashed outline shows it flipped up, labelled \"open\", with a curved arrow between. Open, the brake lets a bent rim turn past the pads.",
+    caption: BEHIND,
   },
   'brake-qr-close': {
-    name: "Closing the brake's quick release: the small lever flips from up to down.",
-    description: "A road rim brake at the top of a wheel, seen from behind, with the fork or frame in front of the brake's middle and the brake's arms reaching down either side of the tyre to the pads. A small lever on the bike's left, labelled \"bike's left\", points up, labelled \"open\"; a dashed outline shows it pointing down, labelled \"closed\", and a curved arrow shows the flip from up to down. A small picture in the corner shows the whole wheel and where this view is.",
-    caption: QR_CAPTION,
+    name: "Closing a road caliper's quick release: the small lever flips down.",
+    description: "A road rim brake, the caliper, seen from behind with the wheel cut through, its pads just off the rim's flat sides below the tyre. On the bike's left, beside the cable's barrel, the small lever points up, labelled \"open\"; a dashed outline shows it down, labelled \"closed\", with a curved arrow between. Closed, the brake works fully again.",
+    caption: BEHIND,
   },
   'vbrake-open': {
-    name: "Opening a V-brake: squeeze the arms and lift the curved tube out.",
-    description: "A V-brake at the top of a wheel, seen from behind: two tall arms stand either side of the tyre, joined at the top by the cable. On the left arm the cable runs through a short curved metal tube, labelled \"curved tube\", which sits in a holder. An arrow labelled \"squeeze\" pushes the arms together, and a second arrow labelled \"lift out\" shows the curved tube coming up out of its holder, where a dashed outline shows it. A small picture in the corner shows the whole wheel and where this view is.",
-    caption: V_CAPTION,
+    name: 'Opening a V-brake: squeeze the arms and lift the curved tube out.',
+    description: "A V-brake seen from behind with the wheel cut through: two tall arms stand on bosses on the frame's stays, below the rim, with a pad on each arm against the rim's sides. At the top, on the bike's left arm, the cable runs through a short curved metal tube in a holder. An arrow labelled \"squeeze\" pushes the arm in, and a second arrow labelled \"lift out\" shows the curved tube coming up out of its holder; a dashed outline shows where it goes.",
+    caption: BEHIND,
   },
   'vbrake-close': {
-    name: "Closing a V-brake: squeeze the arms and put the curved tube back.",
-    description: "A V-brake at the top of a wheel, seen from behind: two tall arms stand either side of the tyre, joined at the top by the cable. The short curved metal tube, labelled \"curved tube\", is out of its holder on the left arm; a dashed outline shows it seated. An arrow labelled \"squeeze\" pushes the arms together, and a second arrow labelled \"put back\" shows the tube going back into its holder. A small picture in the corner shows the whole wheel and where this view is.",
-    caption: V_CAPTION,
+    name: 'Closing a V-brake: squeeze the arms and put the curved tube back.',
+    description: "A V-brake seen from behind with the wheel cut through: two tall arms on bosses on the stays, a pad on each against the rim's sides. The short curved metal tube is out of its holder on the bike's left arm; a dashed outline shows it seated, where it goes. An arrow labelled \"squeeze\" pushes the arm in, and a second arrow labelled \"put back\" shows the tube going down into its holder.",
+    caption: BEHIND,
+  },
+  'hydro-rim-open': {
+    name: 'Opening a hydraulic rim brake: flip the lever on the left side down.',
+    description: "A hydraulic rim brake, of the kind many trekking bikes have, seen from behind with the wheel cut through: a cylinder on each side sits on its boss on the stay, its pad against the rim's side, and a hose arches over the tyre between them. On the bike's left, a lever on the cylinder's mount, outside the cylinder, points up, labelled \"closed\"; a dashed outline shows it down, labelled \"open\", with a curved arrow between. Open, that cylinder comes off its mount, so the wheel can come out.",
+    caption: BEHIND,
+  },
+  'hydro-rim-close': {
+    name: 'Closing a hydraulic rim brake: flip the lever on the left side up.',
+    description: "A hydraulic rim brake seen from behind with the wheel cut through: a cylinder on each side on its boss, the pads on the rim's sides, a hose over the tyre. On the bike's left, the lever on the cylinder's mount points down, labelled \"open\"; a dashed outline shows it up, labelled \"closed\", with a curved arrow between.",
+    caption: BEHIND,
+  },
+  'rim-centre-caliper': {
+    name: "A road caliper's centring screw, turned a little.",
+    description: "A road rim brake, the caliper, seen from behind with the wheel cut through, its pads on the rim's sides. On the right arm's shoulder, below the top of the brake, a small screw is marked \"centring screw\", with a curved arrow showing it turned a little. Turning it moves both pads together, towards one side or the other.",
+    caption: 'Seen from behind. Some calipers have no such screw: then a shop centres the brake.',
+  },
+  'rim-centre-vbrake': {
+    name: "A V-brake's spring screw, turned a little.",
+    description: "A V-brake seen from behind with the wheel cut through, a pad on each arm against the rim's sides. Low on the side of the bike's left arm, near its boss, a small screw is marked \"spring screw\", with a curved arrow showing it turned a little. Each arm has one; turning it changes how hard that arm springs back, which moves the pads to one side.",
+    caption: 'Seen from behind.',
+  },
+  'wheel-seat-thru': {
+    name: 'A thru-axle: push the wheel fully in, then tighten the axle firmly.',
+    description: "The front wheel's hub seen from behind, between the fork's two ends, with the brake disc on its left. A thick axle, labelled \"thru-axle\", runs through a closed hole in the left fork end, through the hub, and screws into the right fork end; its lever, folded along the outside of the left fork leg, is marked; the disc stands on the hub's left end. An arrow on the right fork leg, labelled \"push down\", shows the bike's weight pressing the fork down onto the hub, and a curved arrow round the axle's head says \"tighten firmly\".",
+    caption: 'Seen from behind the fork. Some thru-axles have no lever and take a hex key.',
+  },
+  'wheel-seat-qr': {
+    name: 'A quick release: push the wheel fully in, then close the lever firmly.',
+    description: "The front wheel's hub seen from behind, between the fork's two ends. The hub's axle ends sit up in the fork ends' slots; a thin rod runs through the hub, with a nut on the right and the lever on the left. A dashed outline shows the lever sticking out, open, and a curved arrow swings it up along the fork leg, closed, labelled \"close firmly\"; an arrow on the right fork leg, labelled \"push down\", shows the bike's weight pressing the fork down onto the hub.",
+    caption: 'Seen from behind the fork.',
+  },
+  'wheel-seat-nuts': {
+    name: 'Axle nuts: push the wheel fully in, then tighten both nuts.',
+    description: "The front wheel's hub seen from behind, between the fork's two ends. The axle's threaded ends come out through the fork ends' slots, with a nut outside each; the left nut is marked, and a curved arrow round it says \"tighten both\". An arrow on the right fork leg, labelled \"push down\", shows the bike's weight pressing the fork down onto the hub.",
+    caption: 'Seen from behind the fork.',
+  },
+  'pad-gap': {
+    name: 'A thin gap between each pad and the disc.',
+    description: "A disc brake's caliper seen end-on along the disc, close up: the disc's edge stands in the slot between the caliper's two halves, under the bridge that joins them, with a pad on each side; the wheel side is marked. Between each pad and the disc a thin strip of light is marked, labelled \"a thin gap each side\"; the wheel side is marked. When the wheel turns, the disc should touch neither pad.",
+    caption: 'Seen end-on along the disc. Look at the gaps against a light background, as the wheel turns.',
   },
   'disc-bolts': {
-    name: 'The two bolts that hold the disc brake caliper.',
-    description: 'A brake disc, labelled "disc", seen from the left side of the bike, on the front or the rear wheel, as the line under it says. The caliper, the brake\'s body, sits over the edge of the disc on its mount, with the brake hose running from it. The two bolts at either end of the caliper are marked "caliper bolts".',
-  },
-  'barrel-adjuster': {
-    name: 'The barrel adjuster, turned to pull the cable tighter.',
-    description: 'A close-up where the cable\'s outer casing meets the part it works. The casing ends in a ridged barrel, labelled "barrel adjuster", which is screwed into the part. A curved arrow shows the barrel being turned, labelled "turn to pull the cable tighter".',
-  },
-  'twist-test': {
-    name: 'The twist test on the stem and the handlebar.',
-    description: 'Two small pictures. Picture 1, looking down from above while standing in front of the bike: the front wheel is held between the knees and both hands hold the handlebar; a curved arrow shows trying to turn the bar, and the stem, which joins the bar to the fork, is marked "must not turn". Picture 2, from the side: a hand presses down hard on the brake lever hood at the front of a drop handlebar, shown by an arrow, and the clamp of the stem is marked "must not roll".',
-    caption: 'The twist test. 1: hold the front wheel between your knees and try to turn the bar. 2: press down hard on the front of the bar. Neither may move. Not on carbon parts (step 1).',
-  },
-  'tyre-boot': {
-    name: 'A boot inside the tyre, covering the cut.',
-    description: 'The wheel cut through, showing the tyre, the inner tube inside it and the rim below. The tyre has a slit through its side wall, labelled "cut". On the inside of the tyre, between the tyre and the tube, a strip covers the cut, labelled "boot".',
+    name: 'The two bolts that hold a disc brake caliper, on a flat mount and on a post mount.',
+    description: "Two panels, both seen from behind the brake, with the disc upright through the caliper's slot between the pads. Left, \"Flat mount\": the caliper sits on a flat face on top of the chainstay, which is seen end-on, and its bolts come up from under the stay, marked \"bolts\"; the second one hides behind the first. Right, \"Post mount\": the caliper sits on two posts on the back of the fork leg, and its two bolts face you, marked \"bolts\".",
+    caption: 'Your bike has one of the two. Flat-mount bolts are reached from under the stay.',
   },
   'disc-pad-adjust': {
-    name: "Turning a cable disc brake's pad adjuster knobs in a little.",
-    description: 'A cable disc brake seen from above: the disc runs across the picture, edge-on, and the body of the brake sits over it with a pad on each side of the disc. A knob on each face of the body is marked "pad adjuster knobs". Two arrows, labelled "turn in a little", point from the knobs towards the disc, and dashed outlines show each pad a little closer to it.',
+    name: "Turning a cable disc brake's pad adjuster in a little.",
+    description: "A cable disc brake's caliper seen end-on along the disc, close up: the disc's edge in the slot, a pad on each side, and, flat on the caliper's outer side, the arm the cable pulls. On the wheel side, a knurled knob sticks out, marked \"pad adjuster\", with a curved arrow round it labelled \"turn in a little\". Turning it in moves its pad closer to the disc.",
+    caption: 'Seen end-on along the disc. Some cable brakes have an adjuster on each side, as a knob or a hex bolt.',
   },
-  'battery-refit': {
-    name: 'Refitting an e-bike battery on the down tube until it clicks.',
-    description: 'An e-bike battery on the down tube, seen from the side, labelled "battery". Its lower end sits in its holder by the motor, its upper end is tilted away from the tube, and a dashed outline shows it lying flat on the tube. A curved arrow tilts it in, and the lock at the upper end is labelled "until it clicks". A small picture in the corner shows the whole bike and the down tube.',
-    caption: 'One common mount, on the down tube. Yours may sit elsewhere and fit another way.',
-  },
-  'battery-contacts': {
-    name: "Wiping the battery's contacts with a dry cloth.",
-    description: 'The end of an e-bike battery, taken off the bike, with its metal contacts in a socket, labelled "contacts": two flat blades and a few small pins. Beside it is a cloth, labelled "dry cloth", and an arrow shows it moving onto the contacts.',
+  'spoke-wrap': {
+    name: 'The broken spoke wound round the spoke it crosses.',
+    description: "The upper half of a wheel seen from the side, its spokes crossing on their way from the hub to the rim. One spoke has snapped at its nipple, leaving a short stub in the rim; its long piece, still held in the hub, is marked \"broken spoke\". At the point where it crosses a neighbouring spoke, its loose end is wound round that spoke three times, labelled \"wound round its neighbour\", so it cannot flap.",
   },
 };
