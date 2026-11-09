@@ -1066,6 +1066,79 @@ test('[GA-BIGGER] Looking ahead finds nothing: the bigger change is offered unde
   assert.ok(text.includes('No further bag would help much more than Minimal. A bigger change It goes beyond your setup choice, “Bikepacking bags only”'),'under Looking ahead\'s line');
 });
 
+// The owner's video of 9 Nov 2026: a reload on the Gear advisor landed on the planner's Trip step. The history entry, made in the page's
+// own realm, as a browser keeps it across a reload; the addresses it was given, in order.
+const withHistory=(p,state=null)=>{
+  const log=[];
+  p.context.qaHistoryLog=log;
+  p.run(`history={length:2,state:${JSON.stringify(state)},replaceState(s,_t,url){this.state=s;qaHistoryLog.push(url);}};`);
+  Object.assign(p.context.location,{pathname:'/tools/bags/',search:'',hash:''});
+  return log;
+};
+test('[GA-RELOAD] while the advisor shows, the address names it with its way back and the history entry holds the answers, replaced and never pushed; closed, the planner\'s address and no answers',async()=>{
+  const p=page({setup:R2,bike:GRAVEL});
+  const log=withHistory(p);
+  p.run("openAdvisorFromLink('#gear-advisor&back=tools')");
+  assert.equal(log.at(-1),'/tools/bags/#gear-advisor&back=tools','opened from Tools: the way back stays in the address');
+  p.run("setAdvisor('style','panniers');setAdvisor('goal','both')");
+  await p.run('ADVISOR_DONE');
+  assert.equal(log.at(-1),'/tools/bags/#gear-advisor&back=tools');
+  assert.deepEqual(p.json('history.state.gearAdvisor'),{v:1,style:'panniers',styleTouched:true,goal:'both',source:'plan',q:p.json('ADVISOR.q')});
+  assert.equal(p.json('history.length'),2,'no step added');
+  // Back to the Bag planner (opened in this page): the planner's own address, the answers gone from the entry
+  p.run('ADVISOR.back=null;closeAdvisor()');
+  assert.equal(log.at(-1),'/tools/bags/');
+  assert.equal(p.json('history.state'),null);
+  p.run('openAdvisor()');
+  assert.equal(log.at(-1),'/tools/bags/#gear-advisor','opened in this page: no back=');
+  // a delete applied elsewhere reloads the page: the advisor's answers in this tab's history go with the rest
+  p.context.window.location.reload=()=>log.push('reload');
+  p.run('dropForDelete()');
+  assert.deepEqual(log.slice(-2),['/tools/bags/','reload']);
+  assert.equal(p.json('history.state'),null);
+});
+test('[GA-RELOAD] a reload brings back only the answers the advisor still offers: a broken setup, goal, riding or carry is no choice, nights out of range are the trip\'s, the questionnaire when the plan has no bags',async()=>{
+  const p=page({setup:R2,bike:GRAVEL});
+  withHistory(p,{gearAdvisor:{v:1,style:'panniers',styleTouched:true,goal:'backpack',source:'plan',q:null}});
+  p.run("openAdvisorFromLink('#gear-advisor')");
+  await p.run('ADVISOR_DONE');
+  assert.deepEqual(p.json('[ADVISOR.style,ADVISOR.styleTouched,ADVISOR.goal,ADVISOR.source]'),['panniers',true,'backpack','plan']);
+  assert.ok(p.json('ADVISOR.answer && ADVISOR.answer.kind'),'searched again on the plan as restored');
+  const q=page({setup:R2,bike:GRAVEL});
+  withHistory(q,{gearAdvisor:{v:1,style:'rack-only',styleTouched:true,goal:'speed',source:'plan',q:{riding:'unicycle',nights:99,sleep:'indoor',carry:'tons'}}});
+  q.run("S.bags=[];openAdvisorFromLink('#gear-advisor')");
+  assert.notEqual(q.json('ADVISOR.style'),'rack-only');
+  assert.equal(q.json('ADVISOR.styleTouched'),false);
+  assert.equal(q.json('ADVISOR.goal'),null);
+  assert.equal(q.json('ADVISOR.source'),'questionnaire','no bags in the plan');
+  assert.deepEqual(q.json('ADVISOR.q'),{riding:null,nights:q.json('S.nights'),sleep:'indoor',carry:null});
+  // an entry of another kind, or none, brings nothing back
+  for(const state of [null,{gearAdvisor:{v:2,style:'bags',goal:'both'}},{gearAdvisor:'bags'},'x']){
+    const r=page({setup:R2,bike:GRAVEL});
+    withHistory(r,state);
+    r.run("openAdvisorFromLink('#gear-advisor')");
+    assert.equal(r.json('ADVISOR.goal'),null,JSON.stringify(state));
+    assert.equal(r.json('ADVISOR.styleTouched'),false,JSON.stringify(state));
+  }
+});
+
+test('[GA-RELOAD] a delete request applied as the page loads (a tab that never heard of it) brings back none of the answers kept in the history entry, and drops them there (review of PR 87, I1)',async()=>{
+  const p=page({setup:R2,bike:GRAVEL});
+  const log=withHistory(p,{gearAdvisor:{v:1,style:'panniers',styleTouched:true,goal:'backpack',source:'plan',q:{riding:'touring',nights:4,sleep:'camp',carry:'lot'}}});
+  p.values.set('copilot:delete-request:v1',JSON.stringify({app:'copilot',kind:'delete-request',v:1,id:'b'.repeat(32),createdAt:new Date(Date.now()+1000).toISOString()}));
+  assert.equal(p.run('applyDeleteRequest()'),true);
+  p.run("openAdvisorFromLink('#gear-advisor')");
+  assert.ok(log.length>0);
+  assert.equal(p.json('ADVISOR.goal'),null);
+  assert.equal(p.json('ADVISOR.styleTouched'),false);
+  assert.equal(p.json('ADVISOR.q && ADVISOR.q.riding'),null);
+  const kept=p.json('history.state && history.state.gearAdvisor');
+  assert.ok(kept===null || (kept.goal===null && kept.styleTouched===false && (!kept.q || kept.q.riding===null)),'none of the old answers in the entry');
+  // only once: a later opening in the same page reads its own entry again
+  p.run("setAdvisor('goal','handling');ADVISOR.back=null;closeAdvisor();history.state={gearAdvisor:{v:1,style:'bags',styleTouched:true,goal:'both',source:'plan',q:null}};openAdvisorFromLink('#gear-advisor')");
+  assert.equal(p.json('ADVISOR.goal'),'both');
+});
+
 (async()=>{
   // GA_ONLY=<text> runs only the tests whose name holds it (for watching one fail)
   for(const [name,fn] of tests){if(process.env.GA_ONLY && !name.includes(process.env.GA_ONLY))continue;await fn();passed++;console.log('ok',name);}
