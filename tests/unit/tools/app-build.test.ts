@@ -129,14 +129,14 @@ test("[PERF-JS-FIRST] the first screen's JavaScript, bike drawing included, sits
   expect(figures.firstJsGzip).toBeLessThanOrEqual(150_000);
 });
 
-// 200 KB read as 200,000 bytes, as the first-screen budget is (the same ruling).
-test('[PERF-JS-LAZY] all lazy chunks together sit under 200 KB gzipped (200,000 bytes); the bag planner is not counted', () => {
+// 260 KB read as 260,000 bytes, as the first-screen budget is (the same ruling); raised from 200,000 by the owner, 9 Nov 2026 ("Yes, 260 KB").
+test('[PERF-JS-LAZY] all lazy chunks together sit under 260 KB gzipped (260,000 bytes); the bag planner is not counted', () => {
   const figures = measure(on);
   const lazy = files(on).filter((f) => f.endsWith('.js') && f.startsWith('assets/') && !figures.firstFiles.includes(f));
   expect(lazy.length).toBeGreaterThan(2); // the tyre tool, You, A to B and the opening-hours library at least
   expect(figures.lazyJsGzip).toBeGreaterThan(10_000);
   console.log(`PERF-JS-LAZY: ${figures.lazyJsGzip} bytes gzipped in ${lazy.length} chunks`);
-  expect(figures.lazyJsGzip).toBeLessThanOrEqual(200_000);
+  expect(figures.lazyJsGzip).toBeLessThanOrEqual(260_000);
 });
 
 // The glide back (the owner's device check of 5 November): Wayfinch's entry script holds the first frame until it has run, so the bike is
