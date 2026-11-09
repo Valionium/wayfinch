@@ -15042,8 +15042,8 @@ window.applyCalibration = applyCalibration;
   }
   DRAFT_SIGNATURE = JSON.stringify(captureDraft());
   DRAFT_READY = true;
-  FIT_LINES_READY = true; renderFitLines();   // the bikes and the plan are read: the "fits better" lines may show
   writeLoadSummary(true);
+  FIT_LINES_READY = true; renderFitLines();   // the bikes and the plan are read: the "fits better" lines may show
   // A plan reopened at the packing check is not balanced by the opening itself: opening a plan changes nothing of it, byte for byte
   // (LC-MOVE-PLANS); it is balanced at the rider's first step there, with its line (review of PR 89, C2: the owner's call to balance at
   // the opening instead). Until then the weight map's line blames nothing the balancing could take itself (C1).
