@@ -26,7 +26,6 @@ export const T = {
 // Moved from en.ts (9 Nov 2026, care pictures part 2), shown only on the tyre screen: room in the first screen for the parts guide.
 // Its own object, so T keeps its pinned set (HON-BANNED reads both).
 export const TM = {
-  tyreNeedRimTitle: 'No figure yet: tell us your rim type',
   tyreRearLabelShort: 'Rear tyre width',
   tyreBackToPlan: "Back to your bag plan's value",
   tyreBackToYou: 'Back to the value from You',

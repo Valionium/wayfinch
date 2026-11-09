@@ -394,6 +394,87 @@ for (const start of ['legacy', 'step-one'] as const) {
     expect(await planner.evaluate("['suspension' in BIKE_PROFILES[0], 'rackMounts' in BIKE_PROFILES[0], BIKE_PROFILES[0].brakes]")).toEqual([false, false, 'rim']);
   });
 
+  test(`[SET-LIMITS] ${which} page left open never cuts a library of more than 20 setups; the general marks and the trip links stay (review of PR 80, I1)`, async ({ context, page }) => {
+    await phone(page, start);
+    await launch();
+    const planner = await context.newPage();
+    await planner.goto(`${server!.origin}/tools/bags/`, { waitUntil: 'domcontentloaded' });
+    await draftReady(planner);
+    // The bag planner's library grows past the 20 the old page knows: 30 trip setups (each with its trip) and 3 general ones.
+    await planner.evaluate(`(async () => {
+      const one = (id, extra) => normaliseSetup({ ...captureDraft(), id, name: 'Setup ' + id, saved: '2026-11-01',
+        predicted: { mounted: 35, kit: 31, spare: 4, spilled: 0, kg: 14 }, thumb: '', ...extra });
+      SETUPS.push(...Array.from({ length: 30 }, (_, i) => one('t' + i, { forRoute: { hash: 'a'.repeat(64), name: 'Ride ' + i, departureDate: null } })),
+        ...Array.from({ length: 3 }, (_, i) => one('g' + i, { kind: 'general' })));
+      if (!(await store.set(SETUP_KEY, SETUPS))) throw new Error('the planner could not save');
+    })()`);
+    expect(await planner.evaluate('SETUPS.length')).toBe(34);
+    // A rollback or the old tab sees only the setups older pages saved: none the bag planner added (the owner's choice of 9 Nov 2026).
+    const seen = await page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:setups')!) as { id: string }[]).map((s) => s.id));
+    expect(seen.length).toBe(1);
+    expect(seen.some((id) => /^[tg]\d+$/.test(id))).toBe(false);
+    // The old page reads the list as its own start-up does, renames its one, and saves the list back through its own write.
+    expect(await page.evaluate(`(async () => {
+      SETUPS = JSON.parse(localStorage.getItem(SETUP_KEY)).map(normaliseSetup).filter(Boolean);
+      SETUPS[0].name = 'Renamed in the old tab';
+      return store.set(SETUP_KEY, SETUPS);
+    })()`)).toBe(true);
+    await planner.reload({ waitUntil: 'domcontentloaded' });
+    await draftReady(planner);
+    const after = await planner.evaluate(`SETUPS.map((s) => [s.id, setupKind(s), !!s.forRoute, s.name])`) as [string, string, boolean, string][];
+    expect(after.length).toBe(34);   // nothing cut
+    expect(after.filter(([, kind]) => kind === 'general').map(([id]) => id).sort()).toEqual(['g0', 'g1', 'g2']);
+    expect(after.filter(([id, , linked]) => id.startsWith('t') && linked).length).toBe(30);
+    expect(after.find(([id]) => id === seen[0])![3]).toBe('Renamed in the old tab');   // the old tab's own change stays
+  });
+
+  test(`[SET-LIMITS] ${which} stale tab that saves a setup loses none of the setups the bag planner added (the owner's choice of 9 Nov 2026: new setups never enter the list older pages read)`, async ({ context, page }) => {
+    await phone(page, start);
+    // The old tab saves 17 more setups of its own: it holds 18, and it has seen them all.
+    await page.evaluate(`(async () => { for (let i = 0; i < 17; i++) await saveSetup('Old ' + i, ''); })()`);
+    expect(await page.evaluate('SETUPS.length')).toBe(18);
+    await launch();
+    // Then it hears nothing more, as a tab frozen in the background or one back from the back/forward cache, whose pageshow
+    // does not read the setups again.
+    await page.evaluate(`(() => {
+      window.removeEventListener('storage', followOtherTabs);
+      window.removeEventListener('pageshow', checkOtherTabs);
+      document.addEventListener('visibilitychange', (e) => e.stopImmediatePropagation(), true);
+    })()`);
+    const planner = await context.newPage();
+    await planner.goto(`${server!.origin}/tools/bags/`, { waitUntil: 'domcontentloaded' });
+    await draftReady(planner);
+    expect(await planner.evaluate('SETUPS.length')).toBe(18);
+    // The bag planner adds 12 trip setups (each with its trip) and 3 general ones, newest first.
+    await planner.evaluate(`(async () => {
+      const one = (id, extra) => normaliseSetup({ ...captureDraft(), id, name: 'Setup ' + id, saved: '2026-11-08',
+        predicted: { mounted: 35, kit: 31, spare: 4, spilled: 0, kg: 14 }, thumb: '', ...extra });
+      SETUPS.unshift(...Array.from({ length: 12 }, (_, i) => one('n' + i, { forRoute: { hash: 'a'.repeat(64), name: 'Ride ' + i, departureDate: null } })),
+        ...Array.from({ length: 3 }, (_, i) => one('g' + i, { kind: 'general' })));
+      if (!(await store.set(SETUP_KEY, SETUPS))) throw new Error('the planner could not save');
+    })()`);
+    const before = await planner.evaluate('SETUPS.map((s) => s.name)') as string[];
+    expect(before.length).toBe(33);
+    // The stale tab writes a note on one of its own setups, through its own write, and saves one more.
+    expect(await page.evaluate(`(async () => { SETUPS[0].note = 'A note from the stale tab'; return store.set(SETUP_KEY, SETUPS); })()`)).toBe(true);
+    const savedMore = await page.evaluate(`saveSetup('Old 17', '')`);
+    // Nothing the bag planner added is lost: every setup stays, the stale tab's new one with them, the general ones still general.
+    await expect.poll(() => planner.evaluate(`SETUPS.some((s) => s.note === 'A note from the stale tab')`)).toBe(true);
+    const read = async () => await planner.evaluate('SETUPS.map((s) => [s.name, setupKind(s), !!s.forRoute, s.note])') as [string, string, boolean, string][];
+    let kept = await read();
+    expect(before.filter((name) => !kept.some(([n]) => n === name))).toEqual([]);
+    expect(savedMore).toBe(true);   // it holds 18 and sees 18 in the list it reads
+    await expect.poll(() => planner.evaluate('SETUPS.length')).toBe(34);
+    kept = await read();
+    expect(kept.filter(([, kind]) => kind === 'general').map(([n]) => n).sort()).toEqual(['Setup g0', 'Setup g1', 'Setup g2']);
+    expect(kept.filter(([n, , linked]) => n.startsWith('Setup n') && linked).length).toBe(12);
+    expect(kept.some(([, , , note]) => note === 'A note from the stale tab')).toBe(true);
+    expect(await planner.evaluate(() => document.getElementById('tabText')!.textContent ?? '')).not.toMatch(/removed in another tab/);
+    await planner.reload({ waitUntil: 'domcontentloaded' });
+    await draftReady(planner);
+    expect((await planner.evaluate('SETUPS.map((s) => s.name)') as string[]).sort()).toEqual(kept.map(([n]) => n).sort());
+  });
+
   test(`[SW-OLD-TAB-WRITES] a future bike format (3, which no page writes today) would block ${which} bike write, with its message`, async ({ context, page }) => {
     await phone(page, start);
     await launch();

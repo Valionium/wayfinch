@@ -11,10 +11,11 @@ test('[HON-BANNED] no string of the tyre screen\'s own words uses a banned word,
   }
 });
 
-// Five more words moved from en.ts on 9 Nov 2026 (care pictures, part 2) to make room in the first screen: under the same check.
+// Five more words moved from en.ts on 9 Nov 2026 (care pictures, part 2) to make room in the first screen: under the same check. One of
+// them, tyreNeedRimTitle, main moved the same day into TN (en-tyre-notes.ts, checked there); merging main, the four others stay here.
 test('[HON-BANNED] the tyre screen words moved on 9 Nov use no banned word, and every key starts with "tyre"', () => {
   const strings = Object.entries(TM);
-  expect(strings.length).toBe(5);
+  expect(strings.length).toBe(4);
   for (const [key, text] of strings) {
     expect(key).toMatch(/^tyre[A-Z]/);
     expect(bannedHits(text, false), `${key}: ${text}`).toEqual([]);

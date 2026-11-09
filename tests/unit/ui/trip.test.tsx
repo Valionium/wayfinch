@@ -539,6 +539,8 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
 
 describe('The bike on Trip (spec section 3.7)', () => {
   test('[BK-WHERE-TRIP] the bike is the first thing on Trip, drawn with its bags and its caption', async () => {
+    // A new rider gets the first-run card in its place (wish 17, owner's answers of 9 Nov 2026: HINT-NEW); this is today's line.
+    localStorage.setItem('copilot:bikeHint:v1', 's');
     await show();
     const first = host.querySelector('[data-trip-loaded]')!.firstElementChild!;
     expect(first.querySelector('svg.bk')).not.toBeNull();

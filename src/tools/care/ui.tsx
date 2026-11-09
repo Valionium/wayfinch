@@ -11,6 +11,9 @@ import { C, CARE_TASKS, CARRY, PART_LABEL, PARTS, ROAD_CARDS, SECTION_LABEL, SEC
 import { bikeDetailsHref } from '../../ui/bike/link.ts';
 import { choiceVersion } from '../../ui/tools/bike-choice.ts';
 import { BikeLine } from '../../ui/tools/bike-line.tsx';
+import { HN } from '../../core/wording/en-hint.ts';
+import { FitLine } from '../../ui/bike/fit-line.tsx';
+import { noteSeen } from '../../ui/bike/hint-seen.ts';
 import { savedBikeIds, toolBike } from '../tyre/choice.ts';
 import type { ReadOnlyStore } from '../tyre/host.ts';
 import type { TyreServices } from '../tyre/services.ts';
@@ -77,6 +80,8 @@ export function CareScreen({ services }: { services: TyreServices }) {
   // elsewhere: read them again when told and when the page shows again, as Tools does.
   const [tick, redraw] = useState(0);
   void choiceVersion.value;
+  // A place seen, for the first-run bike hint (wish 17).
+  useEffect(() => noteSeen('c'), []);
   useEffect(() => {
     const again = (): void => redraw((n) => n + 1);
     const onStorage = (e: Event): void => { const k = (e as StorageEvent).key; if (k === null || k.startsWith('loadcheck:') || k.startsWith('copilot:bikeChoice')) again(); };
@@ -98,6 +103,9 @@ export function CareScreen({ services }: { services: TyreServices }) {
   const openSteps: OnSteps = (source, from) => { opener.current = from; setSteps(source); };
   // Closed: focus goes back to the button that opened it.
   useEffect(() => { if (steps === null && opener.current) { opener.current.focus(); opener.current = null; } }, [steps]);
+  const title = useRef<HTMLHeadingElement>(null);
+  // Opening the screen puts the focus on its title (no Back button above it any more).
+  useEffect(() => { title.current?.focus(); }, []);
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ care: null, road: null });
 
   const bike = chosenBike(services);
@@ -134,10 +142,11 @@ export function CareScreen({ services }: { services: TyreServices }) {
 
   return (
     <div class="care" data-tick={tick}>
-      <p><a class="btn" href="#/tools">{C.careBack}</a></p>
-      <h2 class="care-title">{C.careTitle}</h2>
+      {/* No Back button here (owner, 9 Nov 2026): the bottom bar's Tools goes back. The title takes the focus as the screen opens. */}
+      <h2 class="care-title" tabIndex={-1} ref={title}>{C.careTitle}</h2>
       <p class="muted">{C.careIntro}</p>
-      <BikeLine services={services} tick={tick} />
+      {/* With no saved bike, the "fits better" line in the bike line's place (wish 17). */}
+      <BikeLine services={services} tick={tick} none={<FitLine before={HN.hintFitCare} after={HN.hintFitCareAfter} back="care" />} />
       <div class="care-tabs" role="tablist" aria-label={C.careTabsLabel}>
         {TABS.map((t, i) => (
           <button key={t.id} type="button" role="tab" id={`care-tab-${t.id}`} class="care-tab" aria-selected={tab === t.id} aria-controls={`care-panel-${t.id}`}
