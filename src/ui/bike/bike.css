@@ -58,3 +58,6 @@
 .bike-line .tyre-label { flex: 0 0 auto; }
 .bike-line select { flex: 1 1 auto; min-width: 0; max-width: 100%; min-height: 44px; padding: 6px 10px; border: 1px solid var(--muted); border-radius: 8px; background: var(--ground); color: var(--ink); font: inherit; text-overflow: ellipsis; }
 .bike-line:not(:has(select)) { overflow-wrap: anywhere; }
+/* The first-run hint's lines (wish 17): the typical bike's line in Tools and the tools' "fits better" lines, links with 44 px targets. */
+.bike-line[data-hint-line] a, .fit-line a { display: inline-flex; align-items: center; min-height: 44px; color: var(--blaze); font-weight: 600; }
+.fit-line { margin: 4px 0 8px; font-size: 0.9375rem; overflow-wrap: anywhere; }
