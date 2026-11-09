@@ -248,7 +248,7 @@ button.go.small{font-size:15px;padding:9px 16px;flex:0 0 auto}
 /* The small view of a day ride: the drawn bike with its bags and the list of what is in each bag, nothing else. The one top bar stays. */
 .small-head{margin:10px 0 4px}.small-head h2{font-family:var(--disp);font-weight:600;font-size:22px;margin:0}.small-head p{margin:2px 0 0;color:var(--muted)}
 .small-foot{margin:14px 0}
-body.lc-small #crumbs,body.lc-small #walkthroughInvite,body.lc-small .wm-block,body.lc-small #rigTools,body.lc-small #rigTrip{display:none!important}
+body.lc-small #crumbs,body.lc-small #walkthroughInvite,body.lc-small #walkthroughOpen,body.lc-small #draftBar,body.lc-small .wm-block,body.lc-small #rigTools,body.lc-small #rigTrip{display:none!important}
 body.lc-small #s4>:not(#packingChecklist):not(#smallFoot){display:none!important}
 body.lc-small .packing-disclosure>summary,body.lc-small .packing-disclosure-body>:not(.packing-groups){display:none!important}
 .setupgroup{margin:14px 0}.setupgroup>h3{font-family:var(--disp);font-weight:600;font-size:16px;margin:0 0 2px}
@@ -11541,8 +11541,8 @@ async function receiveHandoff(){
   HANDOFF.reuse=handoffPlannable(t) ? tripSetupFor(t.route)?.id || null : null;
   const heights=parsed.hasElev ? '' : ' This route has no heights, so its days are split by distance.';
   if(handoffPlannable(t)){
-    const base=tripFoundation(),reuse=HANDOFF.reuse && SETUPS.find(x => x.id === HANDOFF.reuse);
-    showHandoffBar(`A trip from Wayfinch: ${name}${HANDOFF.long ? '' : ', a day ride'}. Plan bags for this trip? A new trip setup gets ${handoffChanges(t)}, with the bags and kit predicted for it, from ${base ? 'your general setup '+base.name : 'the plan here now'}${HANDOFF.long ? '' : ', and shows your bike with its bags'}. Your plan now is kept as a setup.${
+    const base=tripFoundation(),reuse=HANDOFF.reuse && SETUPS.find(x => x.id === HANDOFF.reuse),held=setupHoldingPlan();
+    showHandoffBar(`A trip from Wayfinch: ${name}${HANDOFF.long ? '' : ', a day ride'}. Plan bags for this trip? A new trip setup gets ${handoffChanges(t)}, with the bags and kit predicted for it, from ${base ? 'your general setup '+base.name : 'the plan here now'}${HANDOFF.long ? '' : ', and shows your bike with its bags'}. ${held ? `Your plan now is already saved as ${held.name}.` : 'Your plan now is kept as a setup.'}${
       reuse ? ` Or open the setup made on ${setupDay(reuse)} for this route.` : ''}${heights}`,{apply:true,plan:true,reuse:!!reuse});
   } else showHandoffBar(`A trip from Wayfinch: ${name}. Apply it to this plan? It sets ${handoffChanges(t)}; your bags, kit and bike stay as they are.${heights}`,{apply:true});
   return true;
@@ -11629,14 +11629,22 @@ function planSameKey(p){
 }
 function todayDay(){ const n=new Date(); return `${n.getDate()} ${MONTHS[n.getMonth()].slice(0,3)}`; }
 // The plan here, as a trip setup with no thumbnail (the drawing is made from the plan when shown), unless a saved setup holds it.
+function setupHoldingPlan(){ const sig=planSameKey(captureDraft()); return SETUPS.find(s => planSameKey(s) === sig) || null; }
 function keepPlanBefore(){
-  const sig=planSameKey(captureDraft());
-  if(SETUPS.some(s => planSameKey(s) === sig)) return null;
+  if(setupHoldingPlan()) return null;
   return {...snapshotSetup(`Before ${HANDOFF.name}, ${todayDay()}`,''),thumb:''};
 }
+// The rider's work in a plan: what makes it the same plan, and the ticks, carried items and touched kit (review of PR 80, I2).
+function tripWorkKey(p){ const n=normalisePlan(p); return n ? planSameKey(p)+JSON.stringify([n.packed,n.carried,n.kitTouched]) : ''; }
+// What Undo needs to take back only what the tap did: the plan before, and the plan and each setup as the tap left them.
+function tripBagsUndo(draft,made){
+  return {draft,after:tripWorkKey(captureDraft()),made:made.map(x => x.id),bodies:Object.fromEntries(made.map(x => [x.id,JSON.stringify(x)]))};
+}
+function dayOf(date){ return `${+date.slice(8,10)} ${MONTHS[+date.slice(5,7)-1].slice(0,3)}`; }
+function nightsFrom(nights,date){ return `${nights === 0 ? 'a day ride' : nights+(nights === 1 ? ' night' : ' nights')}${date ? ' from '+dayOf(date) : ''}`; }
 async function planTripBags(){
   if(HANDOFF.busy || !HANDOFF.gpx || !DRAFT_READY || !handoffPlannable(HANDOFF.trip)) return false;
-  const t=HANDOFF.trip,name=HANDOFF.name,undo=JSON.stringify(captureDraft()),setupsBefore=SETUPS.slice(),wasBike=S.bikeProfile ? S.bikeProfile.id : null;
+  const t=HANDOFF.trip,name=HANDOFF.name,undo=JSON.stringify(captureDraft()),wasBike=S.bikeProfile ? S.bikeProfile.id : null;
   const before=keepPlanBefore(),trips=SETUPS.filter(s => setupKind(s) === 'trip').length;
   if(trips+1+(before ? 1 : 0) > MAX_TRIP_SETUPS){
     showHandoffBar(`${setupKindFullMessage('trip')} Then plan bags for ${name} again, or use only the route.`,{apply:true,plan:true,reuse:!!HANDOFF.reuse});
@@ -11660,11 +11668,11 @@ async function planTripBags(){
   SETUPS.unshift(...[saved,before].filter(Boolean));
   const stored=await store.set(SETUP_KEY,SETUPS);
   SAVE_MESSAGE=stored ? '' : 'Saved for this session only. Export to keep it after reload.';
-  TRIP_BAGS.undo={draft:undo,setups:setupsBefore,made:[saved,before].filter(Boolean).map(x => x.id)};
   HANDOFF.busy=false;
   writeHandoffDone('applied'); dropHandoffFragment(); setWayfinchBack('/#/trip');
   queueDraftSave(); renderRecall();
   if(!HANDOFF.long) setSmallView(true);
+  TRIP_BAGS.undo=tripBagsUndo(undo,[saved,before].filter(Boolean));
   showHandoffBar(`Planned for ${name}: a new trip setup${base ? ' from '+base.name : ''}${HANDOFF.long ? ', opened at Bags' : ''}.${before ? ' Your plan before is kept as a setup.' : ''}`,{undo:true});
   return true;
 }
@@ -11672,28 +11680,41 @@ async function planTripBags(){
 async function reuseTripSetup(){
   const s=HANDOFF.reuse && SETUPS.find(x => x.id === HANDOFF.reuse);
   if(HANDOFF.busy || !s || !DRAFT_READY) return false;
-  const undo=JSON.stringify(captureDraft()),setupsBefore=SETUPS.slice(),before=keepPlanBefore();
+  const undo=JSON.stringify(captureDraft()),before=keepPlanBefore();
   if(before && setupKindFull('trip')){ showHandoffBar(setupKindFullMessage('trip'),{apply:true,plan:true,reuse:true}); return false; }
   if(before){ SETUPS.splice(SETUPS.indexOf(s)+1,0,before); savedSetupResult(await store.set(SETUP_KEY,SETUPS)); }
   if(!HANDOFF.long) SMALL_VIEW=true;
   loadSetup(s.id); go(HANDOFF.long ? 2 : 4); if(!HANDOFF.long) setSmallView(true);
-  TRIP_BAGS.undo={draft:undo,setups:setupsBefore,made:before ? [before.id] : []};
   writeHandoffDone('applied'); dropHandoffFragment(); setWayfinchBack('/#/trip');
   queueDraftSave(); renderRecall();
-  showHandoffBar(`Opened ${s.name}, the setup made on ${setupDay(s)} for ${HANDOFF.name}.${before ? ' Your plan before is kept as a setup.' : ''}`,{undo:true});
+  TRIP_BAGS.undo=tripBagsUndo(undo,before ? [before] : []);
+  // the setup comes as it was saved; where the trip now has other nights or another date, the bar says so (review of PR 80, m4)
+  const t=HANDOFF.trip || {},was={n:S.nights,d:S.departureDate || null},now={n:Number.isInteger(t.nights) ? t.nights : S.nights,d:t.departureDate || null};
+  const differs=now.n !== was.n || (now.d && now.d !== was.d) ? ` It was made for ${nightsFrom(was.n,was.d)}; this trip has ${nightsFrom(now.n,now.d)}.` : '';
+  showHandoffBar(`Opened ${s.name}, the setup made on ${setupDay(s)} for ${HANDOFF.name}.${differs}${before ? ' Your plan before is kept as a setup.' : ''}`,{undo:true});
   return true;
 }
+// Undo takes back only what the tap did (review of PR 80, I2, as Contract 2's Undo in the review of PR 43, I3): once the rider has
+// worked on the plan since (a bag, a tick, the kit), nothing is undone and the work stays; a setup the tap made that the rider has
+// changed since (a mark, a note, a name) is kept, and the bar names it. Nothing is deleted that the rider touched.
 async function undoTripBags(){
   const u=TRIP_BAGS.undo; if(!u) return false;
   TRIP_BAGS.undo=null;
+  if(tripWorkKey(captureDraft()) !== u.after){
+    showHandoffBar('Nothing is undone: your plan has changed since it was planned for this trip, so your changes and the setups stay.');
+    return false;
+  }
   const was=S.bikeProfile ? S.bikeProfile.id : null;
   if(SMALL_VIEW) setSmallView(false);
   restorePlan(JSON.parse(u.draft),true,false); planBikeChosen(was);
-  // the setups it made go; any other change to the list since stays
-  SETUPS=SETUPS.filter(s => !u.made.includes(s.id));
-  savedSetupResult(await store.set(SETUP_KEY,SETUPS));
+  // the setups it made go, unless the rider changed one since; any other change to the list since stays
+  const changed=SETUPS.filter(s => u.made.includes(s.id) && JSON.stringify(s) !== u.bodies[s.id]);
+  const gone=SETUPS.filter(s => u.made.includes(s.id) && !changed.includes(s));
+  SETUPS=SETUPS.filter(s => !gone.includes(s));
+  if(gone.length) savedSetupResult(await store.set(SETUP_KEY,SETUPS));
   queueDraftSave(); renderRecall();
-  showHandoffBar('Undone: your plan is as it was, and the setups made for this trip are gone.');
+  showHandoffBar(`Undone: your plan is as it was${gone.length ? `, and ${gone.length === 1 ? 'the setup' : 'the setups'} made for this trip ${gone.length === 1 ? 'is' : 'are'} gone` : ''}.${
+    changed.length ? ` Kept, because you changed ${changed.length === 1 ? 'it' : 'them'} since: ${changed.map(s => s.name).join(', ')}.` : ''}`);
   return true;
 }
 
