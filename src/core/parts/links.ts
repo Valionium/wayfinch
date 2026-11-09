@@ -11,7 +11,7 @@ export const STEP_PARTS: Readonly<Record<string, readonly L[]>> = {
     none, [['tyre', 'tyre'], ['rim', 'rim']], [['tube', 'tube'], ['valve', 'valve'], ['bead', 'bead']]],
   'puncture-tubeless': [none, none, none, none, none, [['spare tube', 'tube'], ['tubeless valve', 'tubeless-valve']], none],
   'chain-broken': [none, [['quick link', 'quick-link']], none, [['rear gears', 'cassette']], none, none],
-  'spoke-snapped': [[['spoke', 'spokes']], [['Rim brakes', 'rim-brake'], ['rim', 'rim'], ["brake's quick release", 'brake-qr']], [['Disc brakes', 'caliper']], none,
+  'spoke-snapped': [[['spoke', 'spokes'], ['hub', 'hub']], [['Rim brakes', 'rim-brake'], ['rim', 'rim'], ["brake's quick release", 'brake-qr']], [['Disc brakes', 'caliper']], none,
     [["brake's quick release", 'brake-qr']]],
   'brake-rub-rim': [[['dropouts', 'dropouts'], ["wheel's quick release", 'wheel-qr']], [['tyre bead', 'bead']], [['pad', 'pads'], ['tyre', 'tyre'], ['spokes', 'spokes']],
     [['brake', 'rim-brake']], [["brake's quick release", 'brake-qr']], [["brake's quick release", 'brake-qr']]],
