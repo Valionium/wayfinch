@@ -313,6 +313,10 @@ test('[TRIP-SMALL] a day ride from Wayfinch in a real browser: the small view sh
   await expect(page.locator('.wf-bar')).toBeVisible();   // the one top bar stays, and reads as part of Trip
   await expect(page.locator('#backToWayfinch')).toHaveText('← Back to Trip');
   expect(await page.evaluate('[S.step, S.nights]')).toEqual([4, 0]);
+  // the balancing runs in slices since the owner's choice of 9 Nov 2026 (wider balancing): once it has answered, with its line in the
+  // small view when it moved things, the tap below changes nothing of the plan
+  await page.waitForFunction('!BALANCE.run && !BALANCE.loading', null, { timeout: 30_000 });
+  await page.evaluate(() => new Promise((r) => setTimeout(r, 50)));   // the packing check drawn after the landing
   const plan = await page.evaluate('JSON.stringify(currentPlan())');
   await page.locator('#smallFull').click();
   await expect(page.locator('#smallHead')).toBeHidden();
