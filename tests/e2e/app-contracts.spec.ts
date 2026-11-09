@@ -305,10 +305,13 @@ test('[TRIP-SMALL] a day ride from Wayfinch in a real browser: the small view sh
   await expect(page.locator('#smallHead')).toBeVisible();
   await expect(page.locator('#smallTripLine')).toContainText('day ride');
   await expect(page.locator('#rigSvg')).toBeVisible();
-  await expect(page.locator('#packingChecklist .packing-groups')).toBeVisible();
-  for (const hidden of ['#crumbs', '#resultBox', '#modeBar', '#verdictBox', '.nightsbar', '#rigTools', '#packingUnpackedOnly', '#printPackingChecklist', '#walkthroughOpen', '#draftBar'])
+  // owner, 9 Nov 2026: per bag a plain list of what goes in it, and water in one line (it was the packing checklist's groups)
+  await expect(page.locator('#smallBags .small-bag').first()).toBeVisible();
+  await expect(page.locator('#smallWater')).toContainText('Water');
+  for (const hidden of ['header.mast', '#crumbs', '#resultBox', '#modeBar', '#verdictBox', '.nightsbar', '#rigTools', '#rigFoot', '#packingChecklist', '#walkthroughOpen', '#draftBar'])
     await expect(page.locator(hidden).first()).toBeHidden();
-  await expect(page.locator('.wf-bar')).toBeVisible();   // the one top bar stays
+  await expect(page.locator('.wf-bar')).toBeVisible();   // the one top bar stays, and reads as part of Trip
+  await expect(page.locator('#backToWayfinch')).toHaveText('← Back to Trip');
   expect(await page.evaluate('[S.step, S.nights]')).toEqual([4, 0]);
   // the balancing runs in slices since the owner's choice of 9 Nov 2026 (wider balancing): once it has answered, with its line in the
   // small view when it moved things, the tap below changes nothing of the plan
@@ -319,7 +322,58 @@ test('[TRIP-SMALL] a day ride from Wayfinch in a real browser: the small view sh
   await expect(page.locator('#smallHead')).toBeHidden();
   await expect(page.locator('#crumbs')).toBeVisible();
   await expect(page.locator('#resultBox')).toBeVisible();
+  await expect(page.locator('#backToWayfinch')).toHaveText('← Back to Wayfinch');
   expect(await page.evaluate('JSON.stringify(currentPlan())')).toBe(plan);
+  expect(errors).toEqual([]);
+});
+
+/** The owner's kind of day ride (9 Nov 2026): the fixture's first 40 km or so, a few hundred metres of climbing, 0 nights, in November. */
+function ownersDayRide(): string {
+  const src = handoffFixture();
+  const pts = [...src.matchAll(/<trkpt lat="([\d.]+)" lon="([\d.]+)"><ele>([\d.]+)<\/ele><\/trkpt>/g)].slice(0, 400);
+  const body = pts.map(([, la, lo, e], i) => `<trkpt lat="${la}" lon="${lo}"><ele>${(+e! + 90 * Math.sin((i / 400) * Math.PI * 3) ** 2).toFixed(1)}</ele></trkpt>`).join('\n');
+  return src.replace(/<trkseg>[\s\S]*<\/trkseg>/, `<trkseg>\n${body}\n</trkseg>`)
+    .replace('nights="2" departureDate="2026-06-12" month="6" sleep="mixed" pace="hard" flatKph="22" startName="Heidelberg" endName="Strasbourg"',
+      'nights="0" departureDate="2026-11-15" month="11" sleep="indoor" pace="sporting" flatKph="22" startName="Heidelberg" endName="Bruchsal"');
+}
+
+test('[TRIP-DAY-BAGS] the owner\'s day ride in a real browser: no bike, no bags and an empty general setup still give bags that hold the day\'s essentials, nothing over; the empty setup stays as it was', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  app = await loadApp(page, { launch: true, path: '/tools/bags/' });
+  await ready(page);
+  await page.evaluate(`(async () => {
+    S.bags = []; S.nights = 0; S.month = 10; S.bikeProfile = null; applyTripKitDefaults();
+    SETUPS.unshift({ ...snapshotSetup('November · 0 nights', ''), thumb: '', kind: 'general' }); await store.set(SETUP_KEY, SETUPS);
+    await flushDraft();
+  })()`);
+  const setupsBefore = await page.evaluate('JSON.stringify(storedSetupsLocal())');
+  await handOver(page, ownersDayRide());
+  await openFresh(page, `/tools/bags/#copilot-handoff=${ID}`);
+  await ready(page);
+  await expect(page.locator('#handoffText')).toContainText('November · 0 nights has no bags, so it is not used');
+  await page.locator('#handoffPlan').click();
+  await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('#handoffText')).toContainText('2 bottle cages, a top tube bag');
+  const state = await page.evaluate(`(() => { const A = currentPlan(); return { pos: S.bags.map(b => b.pos), spill: A.spill.length, out: A.reach.outOfReach.length,
+    kit: ['docs','cash','phone','snacks','lock','bank'].map(id => carrying(id)), km: Math.round(planRoute().distanceKm) }; })()`);
+  expect(state).toEqual({ pos: ['bottle', 'bottle', 'top', 'seat'], spill: 0, out: 0, kit: [true, true, true, true, false, false], km: 40 });
+  await expect(page.locator('#smallOver')).toBeHidden();
+  await expect(page.locator('#smallBags h3')).toHaveText(['Top tube bag', 'Seat pack']);
+  await expect(page.locator('#smallWater')).toHaveText('Water: 2 bottles, 1.25 L.');
+  await expect(page.locator('#smallTripLine')).toHaveText('Heidelberg → Bruchsal · 15 Nov · 40 km · day ride');
+  // the full planner is a secondary button at the end, and Undo is reachable by keyboard
+  await expect(page.locator('#smallFull')).not.toHaveClass(/\bgo\b/);
+  await page.locator('#handoffUndo').focus();
+  await expect(page.locator('#handoffUndo')).toBeFocused();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  // the rider's setups: the empty general setup byte for byte; the two new ones are the plan before and the trip setup
+  const after = await page.evaluate('storedSetupsLocal()') as Array<{ name: string }>;
+  expect(after.map((s) => s.name)).toEqual([expect.stringMatching(/^Heidelberg → Bruchsal, 15 Nov$/), 'November · 0 nights']);
+  expect(JSON.stringify(after.slice(1))).toBe(setupsBefore);
+  await page.locator('#handoffUndo').click();
+  await expect(page.locator('#handoffText')).toContainText('Undone');
+  expect(await page.evaluate('JSON.stringify(storedSetupsLocal())')).toBe(setupsBefore);
   expect(errors).toEqual([]);
 });
 

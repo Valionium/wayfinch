@@ -82,6 +82,27 @@ test('[SET-GROUPS] Saved setups shows General setups first, then Trip setups, ea
   assert.deepEqual(json('recallOrder(SETUPS).map(s=>s.id)'),['g_1','t_1']);
 });
 
+test('[SET-RECALL-KINDS] Start from one you have saved shows the two kinds unmistakably: a labelled group of general setups, then one of trip setups, each named for screen readers (owner, 9 Nov 2026)',()=>{
+  // the QA VM stubs renderRecall: the page's own function is put back for this test only
+  run(q.script.match(/\nfunction renderRecall\(\)\{[\s\S]*?\n\}\n/)[0]);
+  run(`SETUPS=[qaSetup('t_1',{name:'Ride to Speyer'}),qaSetup('g_1',{kind:'general',name:'Everyday'}),qaSetup('t_2'),qaSetup('g_2',{kind:'general'})];S.recallOpen=null;renderRecall();`);
+  const html=json(`$('recallList').innerHTML`);
+  const groups=[...html.matchAll(/<div class="recallgroup ([a-z]+)" role="group" aria-labelledby="([a-zA-Z]+)">\s*<h3[^>]*id="([a-zA-Z]+)"[^>]*>([^<]+)</g)]
+    .map(m=>({kind:m[1],labelledBy:m[2],id:m[3],title:m[4].trim()}));
+  assert.deepEqual(groups.map(g=>[g.kind,g.title]),[['general','General setups'],['trip','Trip setups']],'two groups, general first, each with its heading');
+  for(const g of groups)assert.equal(g.labelledBy,g.id,'each group is named by its own heading');
+  const at=id=>html.indexOf(`data-recall="${id}"`),trip=html.indexOf('Trip setups');
+  assert.ok(at('g_1')>=0 && at('g_1')<trip && at('g_2')<trip,'the general setups sit in the general group');
+  assert.ok(at('t_1')>trip && at('t_2')>trip,'the trip setups in the trip group');
+  assert.doesNotMatch(html,/General · /,'the kind is no longer only a word in the grey line');
+  // a kind with no setup shows no empty group
+  run(`SETUPS=[qaSetup('t_1')];renderRecall();`);
+  const one=json(`$('recallList').innerHTML`);
+  assert.match(one,/Trip setups/);
+  assert.doesNotMatch(one,/General setups/);
+  run('renderRecall=()=>{};');
+});
+
 test('[SET-LIMITS] 20 general and 40 trip setups: a save, a copy, a mark, an undo and an import each stop at their own kind\'s limit and say so',async()=>{
   run(`SETUPS=[...Array.from({length:40},(_,i)=>qaSetup('t'+i)),...Array.from({length:19},(_,i)=>qaSetup('g'+i,{kind:'general'}))];SAVE_MESSAGE='';DELETED_SETUPS.length=0;`);
   assert.equal(await run(`saveSetup('One more trip','')`),false,'the 41st trip setup is refused');
@@ -520,7 +541,8 @@ test('[SET-LIMITS] on a full storage, after a setup write that failed, a delete 
 });
 
 test('[SET-LIMITS] a reload keeps each group\'s order, and with it the general setup Plan bags for this trip starts from (fix round 2 of PR 80, m-C)',async()=>{
-  const library=`qaLibrary().map(s=>{delete s.isDefault;return s;})`;
+  // each setup holds a bag: a general setup with none is never a foundation (owner, 9 Nov 2026)
+  const library=`qaLibrary().map(s=>{delete s.isDefault;s.bags=[{uid:1,pos:'seat',L:10}];return s;})`;
   for(const what of ['a library this page saved','an older page\'s 5 setups and this page\'s library']){
     const storage=sharedStore(),a=tab(storage);
     if(what === 'a library this page saved') await a.run(`SETUPS=${library};store.set(SETUP_KEY,SETUPS)`);

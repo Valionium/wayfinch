@@ -624,7 +624,7 @@ test('[BAL-LINE] the small view shows the balance\'s line at the top of its list
   page.on('pageerror', (e) => errors.push(String(e)));
   await planner(page);
   await page.evaluate(`${BAL_BAGS} go(2); go(3); SMALL_VIEW = true; go(4); setSmallView(true)`);
-  const line = page.locator('#packingChecklist .balance-line');
+  const line = page.locator('#smallBags .balance-line');
   await expect(line).toBeVisible();
   await expect(line).toContainText('Packed for better balance:', { timeout: 30_000 });
   const undo = line.getByRole('button', { name: 'Undo' });
@@ -632,10 +632,10 @@ test('[BAL-LINE] the small view shows the balance\'s line at the top of its list
   expect((await undo.boundingBox())!.height, 'Undo is at least 44 px').toBeGreaterThanOrEqual(44);
   await expect(page.locator('#resultBox')).toBeHidden();
   await expect(page.locator('#weightBlock')).toBeHidden();
-  await expect(page.locator('#packingChecklist .packing-groups')).toBeVisible();
+  await expect(page.locator('#smallBagList')).toBeVisible();
   const balanced = await page.evaluate('JSON.stringify(currentPlan().items)');
   await undo.click();
-  await expect(page.locator('#packingChecklist .balance-line')).toHaveText('Back to the packing before this balance.');
+  await expect(page.locator('#smallBags .balance-line')).toHaveText('Back to the packing before this balance.');
   expect(await page.evaluate('JSON.stringify(currentPlan().items)')).not.toBe(balanced);
   expect(errors).toEqual([]);
 });
