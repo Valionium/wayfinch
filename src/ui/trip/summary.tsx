@@ -4,14 +4,20 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { RouteStop } from '../../core/screen/route-stops.ts';
 import type { Route } from '../../core/types.ts';
 import { showKm, W } from '../../core/wording/en.ts';
+import { TR } from '../../core/wording/en-trip.ts';
 import { Glyph, ICON_WORD, slotsOf } from '../ahead/strip.tsx';
 import { Card } from '../card.tsx';
 import { OsmCredit } from './credit.tsx';
 import { PROFILE_BOX, packDate, profileY, summaryOf } from './model.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
 
-/** Room above the line for the icons: the profile grows from 72 to 112 px (design §6). */
-const ROOM_PX = 40;
+/**
+ * Room above the line for the icons: the profile grows from 72 to 118 px (design §6). Each icon stands on the line, its bottom at
+ * the line's point, so it and its "+N" (2 px below it) stay inside the profile's own box at any height: nothing hangs over the text
+ * below (owner's finding L, 8 Nov 2026). 44 px of icon above the highest point (2 px from the top of the line's 72) fits in 46.
+ */
+const ROOM_PX = 46;
+const ICON_PX = 44;
 const stopWords = (s: RouteStop): string => (s.label ? `${ICON_WORD[s.kind](showKm(s.km))} · ${s.label}` : ICON_WORD[s.kind](showKm(s.km)));
 
 /**
@@ -38,7 +44,7 @@ function ProfileStops({ route, stops }: { route: Route; stops: RouteStop[] }) {
           const more = rest.length ? W.appAheadIconMore(rest.length) : '';
           return (
             <button
-              key={n} type="button" class={`ah-icon ah-icon-${one!.kind}${more && ' ah-icon-more'}`} style={{ left: `${(x * 100).toFixed(2)}%`, top: `${(ROOM_PX + y - 22).toFixed(1)}px` }}
+              key={n} type="button" class={`ah-icon ah-icon-${one!.kind}${more && ' ah-icon-more'}`} style={{ left: `${(x * 100).toFixed(2)}%`, top: `${(ROOM_PX + y - ICON_PX).toFixed(1)}px` }}
               aria-label={more ? `${stopWords(one!)}, ${more}: ${rest.map(stopWords).join(', ')}` : stopWords(one!)} aria-expanded={picked === n} aria-controls={picked === n ? 'trip-stop-list' : undefined}
               onClick={() => setPicked(picked === n ? null : n)}
             >
@@ -83,7 +89,7 @@ export function RouteSummary({ snap, stops }: { snap: TripSnapshot; stops: TripS
             </svg>
             {found && found.length > 0 ? <ProfileStops route={trip.route} stops={found} /> : null}
           </div>
-        ) : <p class="muted">{W.appTripProfileNone}</p>}
+        ) : <p class="muted">{TR.appTripProfileNone}</p>}
         {ready ? null : <p class="muted">{W.appAheadStopsAfter}</p>}
         {s.note ? <p class="notice">{s.note}</p> : null}
         <ol class="trip-days">
@@ -94,7 +100,7 @@ export function RouteSummary({ snap, stops }: { snap: TripSnapshot; stops: TripS
             </li>
           ))}
         </ol>
-        {missingHeights ? <p class="muted">{W.appTripHeightsPending}</p> : snap.heightsLookedUp ? <p class="muted">{W.appTripHeightsCredit}</p> : null}
+        {missingHeights ? <p class="muted">{TR.appTripHeightsPending}</p> : snap.heightsLookedUp ? <p class="muted">{W.appTripHeightsCredit}</p> : null}
         {trip.route.source === 'planned' || snap.prepared?.build ? <OsmCredit lead={W.appTripOsmLead} date={packDate(snap.prepared?.build)} /> : null}
         <p class="muted"><a href="/legal/licences/">{W.appTripLicences}</a></p>
       </div>

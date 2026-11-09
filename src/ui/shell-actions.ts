@@ -130,6 +130,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
 
   const present = (i: ScreenInputs): void => {
     const now = i.now;
+    // With no position the answers show all the same, from the start of today's stage as screen() plans it (AH-FROM-START).
     const built = buildScreen(i);
     const s = built.screen;
     const p = built.parts.position;
@@ -163,9 +164,8 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
         shareOld = null;
       }
     }
-    const dayOne = i.trip.departureDate === null || s.phase === 'before-trip' || (s.ride.date === i.trip.departureDate && s.ride.startKm === 0);
     const next: AheadTrip = {
-      kind: 'trip', screen: s, answers: s.positionLine !== null || dayOne, lengthKm: i.trip.route.lengthKm, towns: townsOf(i),
+      kind: 'trip', screen: s, answers: true, confirmed: s.positionLine !== null, lengthKm: i.trip.route.lengthKm, towns: townsOf(i),
       bike: bikeSource.peek().bike, stillAboutL, badSpeed: !usableFlatKph(i.trip.flatKph),
       approximateHelp: p !== null && p.source === 'gps' && !(p.accuracyM <= APPROXIMATE_HELP_M),
       shareOld, mapLink: readMapLink(), canShare: deps.share !== null, position, weatherSay, weatherBusy, notice,

@@ -7,8 +7,9 @@ import { resolveBikeSpec } from '../../core/bike/spec.ts';
 import './bike.css';
 import { useTheme } from './drawing.tsx';
 
-export function BikeMarker({ bike }: { bike: BikeRecord | null }) {
+/** `faded`: no position is kept yet, so the bike's place on the strip is not confirmed (AH-FROM-START). */
+export function BikeMarker({ bike, faded = false }: { bike: BikeRecord | null; faded?: boolean }) {
   // The theme picks the casing's tone under the rider's colour (owner's ruling A).
   const theme = useTheme();
-  return <span class="bike-marker" aria-hidden="true" dangerouslySetInnerHTML={{ __html: markerArt(resolveBikeSpec(bike, null), theme) }} />;
+  return <span class={faded ? 'bike-marker bike-faded' : 'bike-marker'} data-unconfirmed={faded ? '' : undefined} aria-hidden="true" dangerouslySetInnerHTML={{ __html: markerArt(resolveBikeSpec(bike, null), theme) }} />;
 }

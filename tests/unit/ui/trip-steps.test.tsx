@@ -403,3 +403,84 @@ describe('What the review of PR 73 found', () => {
     other.remove();
   });
 });
+
+describe('After the launch, part 4 (the owner\'s preview check of 8 Nov 2026)', () => {
+  const goLink = () => [...step('go').querySelectorAll('a')].find((a) => a.textContent === W.appTripOpenAhead) ?? null;
+
+  test('[TRIP-NEED-STEP] the Get ready offline step says En route needs it for as long as it is not done: open, folded, after a reload; then it goes', async () => {
+    expect(W.appAheadNeedTitle).toBe('En route needs Get ready offline');
+    const svc = await withRoute(services(preparing()));
+    expect(step('getready').textContent).toContain(W.appAheadNeedTitle);
+    // Not only in the message after the route was added: Trip shown again, without it, still says so.
+    await show(svc);
+    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    expect(host.querySelector('[data-added]')).toBeNull();
+    expect(step('getready').textContent).toContain(W.appAheadNeedTitle);
+    // Folded under another open step too.
+    await click(buttonIn(step('bags'), W.appTripStepBags));
+    expect(openSteps()).toEqual(['bags']);
+    expect(step('getready').textContent).toContain(W.appAheadNeedTitle);
+    await click(buttonIn(step('getready'), W.appTripGetReadyTitle));
+    await until(() => step('getready').querySelector('[data-getready]') !== null, 'the step again');
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes('12 places'), 'the result');
+    await until(() => !step('getready').textContent!.includes(W.appAheadNeedTitle), 'the note to go');
+    await show(svc);
+    expect(step('getready').textContent).not.toContain(W.appAheadNeedTitle);
+  });
+
+  test('[TRIP-NEED-STEP] with no route the step stays one grey line of what it will do', async () => {
+    await show();
+    expect(step('getready').textContent).toContain(W.appTripGetReadyLater);
+    expect(step('getready').textContent).not.toContain(W.appAheadNeedTitle);
+  });
+
+  test('[TRIP-GO-LINK] Open En route shows on Go as soon as Get ready offline is done, in the same visit, with Get ready\'s result still open', async () => {
+    expect(W.appTripOpenAhead).toBe('Open En route');
+    await withRoute(services(preparing()));
+    expect(goLink()).toBeNull();
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes('12 places'), 'the result');
+    expect(openSteps()).toEqual(['getready']);
+    await until(() => goLink() !== null, 'Open En route');
+    expect(goLink()!.getAttribute('href')).toBe('#/ahead');
+    expect(goLink()!.classList.contains('btn')).toBe(true);
+    // Only one, also once Go is opened.
+    await click(buttonIn(step('go'), W.appTripStepGo));
+    expect([...step('go').querySelectorAll('a')].filter((a) => a.textContent === W.appTripOpenAhead)).toHaveLength(1);
+  });
+});
+
+describe('What the review of PR 82 found', () => {
+  test('[TRIP-NEED-STEP] after a Get ready offline that saved places but not the weather, Trip and En route agree that it is no longer needed first', async () => {
+    const { browserAhead } = await import('../../../src/ui/shell-actions.ts');
+    const steps = (): StepReport[] => stepNames.map((s) => ({ step: s, ok: s !== 'weather', note: s === 'weather' ? W.appPrepNoConnection : null }));
+    const partial: Partial<TripServices> = {
+      prepare: async () => {
+        const trip = (await readTrip())!;
+        const db = await openDb();
+        for (let i = 0; i < 3; i++) await db.put('places', { id: `node/${i}`, kind: 'water' });
+        await savePrepared(trip.route.id, { at: NOW, steps: steps(), build: { id: 'b', builtAt: '2026-10-28', countries: {} }, forecastFetchedAt: null, baselineYears: null });
+        return steps();
+      },
+    };
+    const enRoute = async (): Promise<boolean> => {
+      const shell = browserAhead({ now: () => NOW, geolocation: () => undefined, online: () => false, fetch: () => Promise.reject(new Error('no network')), share: null, writeClipboard: null });
+      const stop = shell.start();
+      await until(() => shell.view.value.kind === 'trip', 'En route');
+      const v = shell.view.value;
+      stop();
+      return v.kind === 'trip' && v.beforeReady;
+    };
+    const tripSays = (): boolean => step('getready').textContent!.includes(W.appAheadNeedTitle);
+    await withRoute(services(partial));
+    expect([tripSays(), await enRoute()]).toEqual([true, true]);
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes(W.appTripMissingHeading), 'what was not saved');
+    await until(() => !tripSays(), 'Trip to follow');
+    expect([tripSays(), await enRoute()]).toEqual([false, false]);
+    // The step is not done: what is missing is named, with Try again.
+    expect(step('getready').dataset.state).not.toBe('done');
+    expect(buttonIn(step('getready'), W.appTripRetryButton)).toBeDefined();
+  });
+});
