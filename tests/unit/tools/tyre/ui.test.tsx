@@ -3,7 +3,7 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { W } from '../../../../src/core/wording/en.ts';
-import { T } from '../../../../src/core/wording/en-tyre.ts';
+import { T, TM } from '../../../../src/core/wording/en-tyre.ts';
 import { readHost } from '../../../../src/tools/tyre/host.ts';
 import { TYRE_KEY, exportTyres, importTyres, readStore } from '../../../../src/tools/tyre/storage.ts';
 import type { KeyValueStore } from '../../../../src/tools/tyre/storage.ts';
@@ -360,7 +360,7 @@ describe('review findings, on the screen', () => {
 
   test('[TY-UI-WARNINGS] I3: the one maximum is said to apply to both wheels', async () => {
     await mount(services(memory()));
-    expect(host.textContent).toContain(W.tyreLimitBothWheels);
+    expect(host.textContent).toContain(TM.tyreLimitBothWheels);
   });
 
   test('[TY-UI-WARNINGS] I4: the screen with no figure prints no pressure number', async () => {

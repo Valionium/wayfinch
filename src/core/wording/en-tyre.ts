@@ -30,4 +30,6 @@ export const TM = {
   tyreBackToPlan: "Back to your bag plan's value",
   tyreBackToYou: 'Back to the value from You',
   tyreAskNoPsi: 'No, psi',
+  // and one more (care pictures redo, 9 Nov 2026): main's first screen came within 3 bytes of this branch's
+  tyreLimitBothWheels: 'This one maximum is used for both wheels. If your front and rear tyres have different maximums, enter the lower one.',
 };

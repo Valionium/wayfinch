@@ -627,7 +627,6 @@ export const W = {
   tyreSameAsFront: 'same as the front',
   tyreCouldntRead: (text: string): string => `Couldn't read "${text}" from your bike: enter the width.`,
   tyrePendingLimit: (label: string): string => `No figure until you answer the question about: ${label}.`,
-  tyreLimitBothWheels: 'This one maximum is used for both wheels. If your front and rear tyres have different maximums, enter the lower one.',
   tyreLimitsMoreTitle: 'More limits (optional)',
   tyreMyRimHooked: 'My rim is hooked',
   tyreClear: 'Clear',

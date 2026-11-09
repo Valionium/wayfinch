@@ -414,7 +414,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         <p class="muted">{TN.tyreLimitHint}</p>
         <LimitInput key={`max-${key}`} id="tyre-max" label={W.tyreLimitMaxLabel} required needed="max" value={details.tyreMax} min={details.tyreMin} onPending={onPending}
           onCommit={(l) => change({ tyreMax: l ?? undefined })} />
-        <p class="muted">{W.tyreLimitBothWheels}</p>
+        <p class="muted">{TM.tyreLimitBothWheels}</p>
         {bike?.unreadFront && src.frontMm === 'assumed' ? <p class="muted">{W.tyreCouldntRead(bike.unreadFront)}</p> : null}
         {bike?.unreadRear && src.rearMm === 'assumed' ? <p class="muted">{W.tyreCouldntRead(bike.unreadRear)}</p> : null}
         <Field id={bikeKey('front')} label={W.tyreFrontWidthLabel} source={src.frontMm} needed="front" valueText={`${v.front.printedMm} mm`} resetLabel={resetFor('frontMm')} onReset={resetter('frontMm')}
