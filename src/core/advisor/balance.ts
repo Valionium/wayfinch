@@ -6,7 +6,7 @@
 // copied. The weight map's ideal reads it; the automatic balancing will too. It stops when no single move or swap helps: a careful local
 // search, not a proof that no better packing exists.
 import { handlingScore } from './rank.ts';
-import { WEIGHTS } from './table.ts';
+import { MIN_GAIN_SCORE, WEIGHTS } from './table.ts';
 import type { Pos, TrialResult } from './types.ts';
 
 /** One item the planner placed whole in one bag: its kilos and litres, and that bag (its unit key and position). */
@@ -99,4 +99,18 @@ export function balance(start: Packing, trial: (pins: Record<string, string>, fr
     }
     if (!moved) return done(false);
   }
+}
+
+export type AutoBalanced = { apply: boolean; balanced: Balanced; gain: number };
+
+/**
+ * The bag planner's automatic balancing (the owner's decision of 8 Nov 2026, weight map design §7): the balance of `start` (the planner's
+ * own packing), to be applied only when it is clearly better, by the Gear advisor's own threshold: Better handling's score lower by
+ * MIN_GAIN_SCORE or more. `fixed` as for balance: what the rider keeps where it is. `gain` is the drop of the score, to the hundredth.
+ */
+export function autoBalance(start: Packing, trial: (pins: Record<string, string>, from: Packing) => Packing,
+  o: { fixed?: ReadonlySet<string> | readonly string[]; maxTrials?: number } = {}): AutoBalanced {
+  const balanced = balance(start, trial, o);
+  const gain = Math.round((handlingScore(start.result) - handlingScore(balanced.packing.result)) * 100) / 100;
+  return { apply: balanced.moves.length > 0 && gain >= MIN_GAIN_SCORE - EPS, balanced, gain };
 }

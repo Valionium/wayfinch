@@ -457,3 +457,70 @@ test('[WM-STILL] at 320 px, light and dark: the weight map\'s switches wrap with
     expect(await page.evaluate(() => document.documentElement.scrollWidth), `${scheme}: no sideways scroll`).toBeLessThanOrEqual(320);
   }
 });
+
+// The owner's decision of 8 Nov 2026 (weight map design §7): the bag planner balances by itself at the packing check, with one quiet
+// line and Undo; advisor.js is loaded for it there.
+const BAL_BAGS = "S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:13 }, { uid:3, pos:'frame', L:4.5 }, { uid:4, pos:'top', L:1, slot:'front' }, { uid:5, pos:'fork', L:3, pair:true }]; S.nextUid = 6; S.decks = { bar:false, rack:false };";
+test("[BAL-LINE] at the packing check the plan is balanced with one line and Undo; Undo brings back the planner's own packing; a saved balance packs the same after a reload", async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page);
+  const advisorLoads: string[] = [];
+  page.on('request', (r) => { if (r.url().endsWith('/tools/bags/advisor.js')) advisorLoads.push(r.url()); });
+  // the bags saved and read back once, as the page stores them, so a reload later re-plans nothing of its own
+  await page.evaluate(`${BAL_BAGS} go(2); flushDraft()`);
+  await page.reload({ waitUntil: 'load' });
+  await expect(page.locator('#rigBike svg.bk')).toBeVisible();
+  await page.evaluate('go(3)');
+  const own = await page.evaluate('JSON.stringify(currentPlan().items)');
+  expect(await page.evaluate('!!window.WayfinchAdvisor')).toBe(false); // nothing loaded before the packing check
+  await page.evaluate('go(4)');
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click(); // the weight question, skipped
+  const line = page.locator('#resultBox .balance-line');
+  await expect(line).toContainText('Packed for better balance:');
+  await expect(line).toHaveAttribute('role', 'status');
+  expect(advisorLoads.length).toBe(1);
+  expect(await page.evaluate('JSON.stringify(currentPlan().items)')).not.toBe(own);
+  expect(await page.evaluate('JSON.stringify(S.placements.items) === JSON.stringify(currentPlan().items)')).toBe(true);
+  const balanced = await page.evaluate('JSON.stringify(currentPlan().items)');
+  const undo = line.getByRole('button', { name: 'Undo' });
+  const box = (await undo.boundingBox())!;
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  await undo.click();
+  await expect(line).toHaveText("Back to the planner's own packing.");
+  expect(await page.evaluate('JSON.stringify(currentPlan().items)')).toBe(own);
+  // another visit: what Undo put back is not remembered, so the same balance is offered again, with its line (BAL-STORED)
+  await page.evaluate('flushDraft()');
+  await page.reload({ waitUntil: 'load' });
+  await expect(page.locator('#rigBike svg.bk')).toBeVisible();
+  await page.evaluate('go(4)');
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
+  await expect(page.locator('#resultBox .sec').first()).toBeVisible();
+  await expect(page.locator('#resultBox .balance-line')).toContainText('Packed for better balance:');
+  expect(await page.evaluate('JSON.stringify(currentPlan().items)')).toBe(balanced);
+  // the balance saved: a reload packs the same, with nothing more to move and no line
+  await page.evaluate('flushDraft()');
+  await page.reload({ waitUntil: 'load' });
+  await expect(page.locator('#rigBike svg.bk')).toBeVisible();
+  await page.evaluate('go(4)');
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
+  await expect(page.locator('#resultBox .sec').first()).toBeVisible();
+  expect(await page.evaluate('JSON.stringify(currentPlan().items)')).toBe(balanced);
+  await expect(page.locator('#resultBox .balance-line')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('[BAL-LINE] at 320 px, light and dark: the line wraps without a sideways scroll and its Undo is at least 44 px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await planner(page);
+    await page.evaluate(`${BAL_BAGS} go(4)`);
+    const line = page.locator('#resultBox .balance-line');
+    await expect(line).toContainText('Packed for better balance:');
+    const b = (await line.getByRole('button', { name: 'Undo' }).boundingBox())!;
+    expect(b.height, `${scheme}: Undo is at least 44 px`).toBeGreaterThanOrEqual(44);
+    expect(b.x + b.width, `${scheme}: Undo inside the window`).toBeLessThanOrEqual(320);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), `${scheme}: no sideways scroll`).toBeLessThanOrEqual(320);
+  }
+});

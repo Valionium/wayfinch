@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest';
-import { balance, keepsPromises, MAX_BALANCE_TRIALS } from '../../../../src/core/advisor/balance.ts';
+import { autoBalance, balance, keepsPromises, MAX_BALANCE_TRIALS } from '../../../../src/core/advisor/balance.ts';
 import type { Packing } from '../../../../src/core/advisor/balance.ts';
 import { handlingScore } from '../../../../src/core/advisor/rank.ts';
 import type { Pos, TrialResult } from '../../../../src/core/advisor/types.ts';
-import { WEIGHTS } from '../../../../src/core/advisor/table.ts';
+import { MIN_GAIN_SCORE, WEIGHTS } from '../../../../src/core/advisor/table.ts';
 
 // A stand-in packer: the plan's own assignment, with the pins on top (a pin into a bag with too little room stays where it was, as the
 // planner's "not kept"). Must-reach items count out of reach in a bag the rider cannot reach while riding.
@@ -201,5 +201,46 @@ describe('balancing in the rider\'s own bags (weight map design §7)', () => {
     expect(out.tried).toBe(12);
     expect(out.partial).toBe(true);
     expect(MAX_BALANCE_TRIALS).toBeGreaterThanOrEqual(100);
+  });
+});
+
+// The owner's decision of 8 Nov 2026 (weight map design §7): the bag planner balances by itself, on top of its own packing, and only when
+// it is clearly better: Better handling's score lower by the advisor's own threshold (MIN_GAIN_SCORE) or more.
+describe('automatic balancing (weight map design §7)', () => {
+  test('[BAL-AUTO] applies the balance when it lowers the score by MIN_GAIN_SCORE or more, the balance being the search\'s own', () => {
+    const items: Item[] = [{ id: 'tent', kg: 2.4, L: 5 }, { id: 'clothes', kg: 1, L: 6 }];
+    const p = packer(BAGS, items, { tent: 's-0', clothes: 'b-0' });
+    const out = autoBalance(p.start, p.trial);
+    expect(out.apply).toBe(true);
+    expect(out.balanced).toEqual(balance(p.start, p.trial));
+    expect(out.gain).toBeCloseTo(2.4 * (WEIGHTS.seat - WEIGHTS.frame), 2);
+    expect(MIN_GAIN_SCORE).toBe(0.5);
+  });
+
+  test('[BAL-AUTO] a balance that lowers the score by less than MIN_GAIN_SCORE is not applied; exactly MIN_GAIN_SCORE is', () => {
+    // 0.4 kg from the bar roll (2.2) into the top tube bag (1.2): 0.4 points, a real move but not clearly better
+    const two: Bag[] = [{ key: 't-0', pos: 'top', cap: 1, reach: true }, { key: 'b-0', pos: 'bar', cap: 12, reach: true }];
+    const small = packer(two, [{ id: 'pump', kg: 0.4, L: 0.5 }], { pump: 'b-0' });
+    const a = autoBalance(small.start, small.trial);
+    expect(a.balanced.moves.length).toBe(1);
+    expect(a.gain).toBeCloseTo(0.4, 2);
+    expect(a.apply).toBe(false);
+    // 0.5 kg the same way: 0.5 points, applied
+    const enough = packer(two, [{ id: 'lock', kg: 0.5, L: 0.5 }], { lock: 'b-0' });
+    const b = autoBalance(enough.start, enough.trial);
+    expect(b.gain).toBeCloseTo(0.5, 2);
+    expect(b.apply).toBe(true);
+    // nothing to move: nothing applied
+    const none = packer(two, [{ id: 'lock', kg: 0.5, L: 0.5 }], { lock: 't-0' });
+    expect(autoBalance(none.start, none.trial)).toMatchObject({ apply: false, gain: 0 });
+  });
+
+  test('[BAL-KEEPS] the things it is told to keep (hand placements, must-reach things within reach, things ticked as packed) never move', () => {
+    const items: Item[] = [{ id: 'tent', kg: 2.4, L: 5 }, { id: 'stove', kg: 0.9, L: 1.5 }];
+    const p = packer(BAGS, items, { tent: 's-0', stove: 's-0' });
+    const out = autoBalance(p.start, p.trial, { fixed: ['tent'] });
+    expect(out.balanced.moves.map((m) => m.id)).toEqual(['stove']);
+    expect(out.balanced.packing.pieces.find((x) => x.id === 'tent')!.unit).toBe('s-0');
+    expect(out.apply).toBe(true); // 0.9 kg from the seat pack to the frame bag: 1.44 points
   });
 });

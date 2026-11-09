@@ -28,8 +28,8 @@ const photoOptions={...options,stdin:{...options.stdin,
   sourcefile:'bike-photo-entry.ts'}};
 // The Gear advisor's search (sub-project 13): /tools/bags/advisor.js, loaded only when the advisor opens; window.WayfinchAdvisor.
 const advisorOptions={...options,stdin:{...options.stdin,
-  contents:"import { advise, adviseSteps, biggerSteps } from './src/core/advisor/search.ts';\nimport { balance } from './src/core/advisor/balance.ts';\nimport { DECIDED, MIN_GAIN_BACK_L, SIZE_RANGES, WEIGHTS } from './src/core/advisor/table.ts';\n"
-    +'window.WayfinchAdvisor = Object.freeze({ adviseSteps, advise, biggerSteps, balance, WEIGHTS, SIZE_RANGES, MIN_GAIN_BACK_L, DECIDED });\n',
+  contents:"import { advise, adviseSteps, biggerSteps } from './src/core/advisor/search.ts';\nimport { autoBalance, balance } from './src/core/advisor/balance.ts';\nimport { DECIDED, MIN_GAIN_BACK_L, MIN_GAIN_SCORE, SIZE_RANGES, WEIGHTS } from './src/core/advisor/table.ts';\n"
+    +'window.WayfinchAdvisor = Object.freeze({ adviseSteps, advise, biggerSteps, balance, autoBalance, WEIGHTS, SIZE_RANGES, MIN_GAIN_BACK_L, MIN_GAIN_SCORE, DECIDED });\n',
   sourcefile:'advisor-entry.ts'}};
 // The weight map (design of 8 Nov 2026): /tools/bags/weightmap.js, loaded on the first press of Show weight map; window.WayfinchWeightMap.
 const weightMapOptions={...options,stdin:{...options.stdin,

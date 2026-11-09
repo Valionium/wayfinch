@@ -13,7 +13,7 @@ test("[LC-PAGE-LIVE] the page's hash is the one recorded", () => {
   // The tag load-check-zip-2026-10-30 holds the page as it was live (aa086001…). Since then: the top-tube wording and the update prompt.
   // Sub-project 6 changes the bag planner behind the launch switch (bike.js, the rig, Look); riders keep releases/load-check-root.html
   // (LC-ROOT-FROZEN), so each change here is on purpose and recorded.
-  const recorded = 'e61cfe75da1e308cd6b3cf93cf38f49b4ad51bc7cf5840287506176618438a0b';   // + the ideal's swaps, its promises from the rider's plan and the things left over said (review of PR 78); before them the weight map's own ideal and no frame colour, bikes added in You become the chosen bike (after the launch, part 4c); before them + the Gear advisor as its own page, both goals, a bigger change and the way back from a trial (after the launch, part 4b); before them real bag shapes on the rig and the advisor's sketches, and the weight map (design of 8 Nov 2026; review of PR 71 fixed), merged with main's guided Trip, part 1, and after the launch, parts 2 and 3; before them trial bags and the way in (sub-project 13, group 3), the Gear advisor and main's chosen bike
+  const recorded = 'c75213bfaff85d0c3cec3c5e012fbacd1d8533a94a9f49280eb087c5b309fd7e';   // + the automatic balancing at the packing check (weight map design §7); before it the ideal's swaps, its promises from the rider's plan and the things left over said (review of PR 78); before them the weight map's own ideal and no frame colour, bikes added in You become the chosen bike (after the launch, part 4c); before them + the Gear advisor as its own page, both goals, a bigger change and the way back from a trial (after the launch, part 4b); before them real bag shapes on the rig and the advisor's sketches, and the weight map (design of 8 Nov 2026; review of PR 71 fixed), merged with main's guided Trip, part 1, and after the launch, parts 2 and 3; before them trial bags and the way in (sub-project 13, group 3), the Gear advisor and main's chosen bike
   expect(createHash('sha256').update(readFileSync(PAGE)).digest('hex')).toBe(recorded);
 });
 
@@ -39,6 +39,8 @@ const KEPT = [
   'bike-choice',
   // sub-project 13, group 2: the Gear advisor in the bag planner
   'advisor',
+  // the bag planner's automatic balancing (weight map design §7)
+  'auto-balance',
 ].map((n) => `${n}.cjs`).sort();
 const RETIRED = ['tyre-pressure', 'pressure-tool-markup', 'pressure-tool', 'ui-pressure-layout'];
 
