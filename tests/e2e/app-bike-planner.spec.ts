@@ -589,17 +589,26 @@ test('[BAL-AUTO] at the packing check the balancing runs in slices: "Checking th
   expect(errors).toEqual([]);
 });
 
-// Review of PR 89, C2 and C1: a plan reopened at the packing check, stored in the planner's own packing, was never balanced (the page
-// drew it before the draft was ready), and the weight map's line then blamed the rider's must-reach things for the balance not taken.
-test('[BAL-STORED] a plan reopened at the packing check in the planner\'s own packing is balanced at its first look, and the weight map\'s line blames nothing the balancing could take itself', async ({ page }) => {
+// Review of PR 89, C2 and C1: a plan reopened at the packing check, stored in the planner's own packing, was not balanced, and the weight
+// map's line then blamed the rider's must-reach things for the balance not taken. Opening a plan changes nothing of it (LC-MOVE-PLANS),
+// so it is balanced at the rider's first step there; until then the line blames nothing the balancing could take itself.
+test('[BAL-STORED] a plan reopened at the packing check in the planner\'s own packing: the opening changes nothing and the weight map\'s line blames nothing; the rider\'s first step there balances it', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await planner(page);
   await page.evaluate(`(async () => { ${BAL_BAGS} go(2); go(3); S.step = 4; currentPlan(); await flushDraft(); })()`);
+  const stored = await page.evaluate("localStorage.getItem('loadcheck:draft')");
   await page.reload({ waitUntil: 'load' });
   if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click(); // the weight question, skipped
-  await expect(page.locator('#resultBox .balance-line')).toContainText('Packed for better balance:', { timeout: 30_000 });
+  await page.waitForFunction('DRAFT_READY === true');
   const line = page.locator('#weightLine');
+  // the weight map's line has its answer (or none): never the rider's things for a gain the balancing can take itself
+  await page.waitForFunction("IDEAL_CACHE.value !== null && IDEAL_CACHE.key === idealKey()", null, { timeout: 30_000 });
+  expect(await line.evaluate((el) => (el.hidden ? '' : el.textContent))).not.toMatch(/^Your (hand placement|must-reach thing)/);
+  expect(await page.evaluate("localStorage.getItem('loadcheck:draft')"), 'the opening changed nothing').toBe(stored);
+  // the rider's first step at the packing check: a thing ticked as packed
+  await page.evaluate("setPackedItem('tent', true)");
+  await expect(page.locator('#resultBox .balance-line')).toContainText('Packed for better balance:', { timeout: 30_000 });
   await expect(line).not.toHaveText('Checking the balance…', { timeout: 30_000 });
   // whatever the line names, the balancing cannot take that gain with them held
   const left = await page.evaluate(`(() => { const s = idealTrial(S.bags, {}, S.placements);

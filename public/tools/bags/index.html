@@ -14730,8 +14730,9 @@ window.applyCalibration = applyCalibration;
   DRAFT_SIGNATURE = JSON.stringify(captureDraft());
   DRAFT_READY = true;
   writeLoadSummary(true);
-  // the packing check drawn before the draft was ready could not balance it: it is looked at now (review of PR 89, C2)
-  if(S.step === 4){ autoBalancePlan({ later:true }); if(BALANCE.run || BALANCE.loading){ holdResult(() => renderResult()); drawWeightMap(); } }
+  // A plan reopened at the packing check is not balanced by the opening itself: opening a plan changes nothing of it, byte for byte
+  // (LC-MOVE-PLANS); it is balanced at the rider's first step there, with its line (review of PR 89, C2: the owner's call to balance at
+  // the opening instead). Until then the weight map's line blames nothing the balancing could take itself (C1).
   // The bike chosen in Wayfinch, once the draft is restored and the bikes are loaded (decision 3); this page's own record as its store
   // holds it. A move saves the plan, and with it a summary that differs.
   if(window.storage) for(const k of [BIKE_CHOICE_RECORD_KEY,BIKE_FOLLOWED_KEY]){ const v=await store.get(k); if(v!==null) MEM[k]=v; }
