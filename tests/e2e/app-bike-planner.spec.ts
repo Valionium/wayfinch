@@ -359,9 +359,11 @@ test('[WM-PAGE] Show weight map: off by default, weightmap.js only on the first 
   await expect(cards.nth(0).locator('.wm-sum')).toContainText('Of the weighted load:');
   await expect(cards.nth(0).locator('svg')).toHaveAttribute('aria-label', /^Your weight\. Of the weighted load: /);
   await expect(cards.nth(0).locator('canvas')).toHaveAttribute('aria-hidden', 'true');
-  // the backpack is its own patch, labelled; the ideal carries nothing on the back
+  // the backpack is its own patch, labelled; the ideal (the rider's own setup since the owner's finding G, 8 Nov 2026, no longer a
+  // fixed profile with nothing on the back) never has more on the back than yours
   await expect(cards.nth(0).locator('.wm-label')).toHaveText(['on your back']);
-  await expect(cards.nth(1).locator('.wm-sum')).toContainText(' 0% on your back');
+  const back = async (n: number) => Number(/(\d+)% on your back/.exec((await cards.nth(n).locator('.wm-sum').textContent()) ?? '')![1]);
+  expect(await back(1)).toBeLessThanOrEqual(await back(0));
   // painted: the canvas holds the map
   const painted = await cards.nth(0).locator('canvas').evaluate((c: HTMLCanvasElement) => c.width > 0 && c.getContext('2d')!.getImageData(c.width / 2, c.height / 2, 1, 1).data[3] === 255);
   expect(painted).toBe(true);
@@ -396,5 +398,42 @@ test('[WM-PAGE] Show weight map: off by default, weightmap.js only on the first 
   await show.click();
   await expect(cards).toHaveCount(3);
   expect(loads).toHaveLength(1);
+  expect(errors).toEqual([]);
+});
+
+// The owner's finding G (8 Nov 2026): "Show where yours differs" near the bottom made the page jump.
+test('[WM-STILL] the weight map never moves the page: near the bottom of the window, the difference and the ideal switch keep the scroll and the button where they were', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page);
+  await page.evaluate("S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'frame', L:6 }]; S.nextUid = 4; S.decks = { bar:false, rack:false }; go(3)");
+  await page.locator('#rigWeightMap').click();
+  const cards = page.locator('#weightMap .wm-card');
+  await expect(cards).toHaveCount(2);
+  await expect(page.locator('#weightMap .wm-without')).toHaveAttribute('aria-pressed', 'true'); // no panniers in the plan: without first
+  const steps: [string, () => Promise<void>][] = [
+    ['.wm-diff', () => expect(cards).toHaveCount(3)],
+    ['.wm-with', () => expect(page.locator('#weightMap .wm-with')).toHaveAttribute('aria-pressed', 'true')],
+    ['.wm-diff', () => expect(cards).toHaveCount(2)],
+    ['.wm-without', () => expect(page.locator('#weightMap .wm-without')).toHaveAttribute('aria-pressed', 'true')],
+  ];
+  for (const [sel, changed] of steps) {
+    const button = page.locator(`#weightMap ${sel}`);
+    // the button just above the bottom of the window, where the owner pressed it
+    await button.evaluate((el) => { window.scrollBy(0, el.getBoundingClientRect().bottom - window.innerHeight + 12); });
+    const before = await button.evaluate((el) => [el.getBoundingClientRect().top, window.scrollY]);
+    await button.click();
+    await changed();
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const after = await button.evaluate((el) => [el.getBoundingClientRect().top, window.scrollY]);
+    expect(Math.abs(after[0]! - before[0]!), `${sel}: the button stays where it was`).toBeLessThanOrEqual(1);
+    expect(Math.abs(after[1]! - before[1]!), `${sel}: the page does not scroll`).toBeLessThanOrEqual(1);
+    expect(await page.evaluate((s) => document.activeElement?.matches(`#weightMap ${s}`), sel), `${sel}: focus stays on it`).toBe(true);
+  }
+  // the ideal with panniers: two panniers on the plan without them, drawn in the ideal, and the plan itself unchanged
+  await page.locator('#weightMap .wm-with').click();
+  await expect(cards.nth(1).locator('figcaption')).toContainText('Ideal with panniers');
+  await expect(cards.nth(1).locator('figcaption')).toContainText('two 20 L panniers');
+  expect(await page.evaluate("S.bags.some(b => b.pos === 'rack')")).toBe(false);
   expect(errors).toEqual([]);
 });

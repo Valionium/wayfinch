@@ -1,19 +1,18 @@
-// The weight map (weight map and bag shapes design, section 1): a field of weighted kilos over the bike, an ideal for the same kilos,
+// The weight map (weight map and bag shapes design, section 1): a field of weighted kilos over the bike, the rider's own ideal,
 // and the sentences that carry the whole message without colour.
 import { describe, expect, test } from 'vitest';
 import { HANDLING_WEIGHTS } from '../../../../src/core/advisor/handling.ts';
 import { WEIGHTS } from '../../../../src/core/advisor/table.ts';
-import { bikeArt } from '../../../../src/core/bike/art.ts';
 import type { P } from '../../../../src/core/bike/art.ts';
-import { bagShape } from '../../../../src/core/bike/shapes.ts';
-import { resolveBikeSpec } from '../../../../src/core/bike/spec.ts';
-import { blur, diffLine, FULL, GRID, idealItems, idealShares, shareLine, splat, zoneShares } from '../../../../src/core/bike/weightmap.ts';
+import { blur, diffLine, FULL, GRID, shareLine, splat, zoneShares } from '../../../../src/core/bike/weightmap.ts';
+import { balance } from '../../../../src/core/advisor/balance.ts';
+import type { Packing } from '../../../../src/core/advisor/balance.ts';
+import { handlingScore } from '../../../../src/core/advisor/rank.ts';
 import { WM } from '../../../../src/core/wording/en-weightmap.ts';
 import { bannedHits } from '../../../fixtures/banned.ts';
 
 const sum = (a: Float32Array) => a.reduce((s, v) => s + v, 0);
 const square = (x: number, y: number, s: number): P[] => [[x, y], [x + s, y], [x + s, y + s], [x, y + s]];
-const anchors = bikeArt(resolveBikeSpec(null, null), null).anchors;
 
 describe('the weight map (design section 1)', () => {
   test('[WM-FIELD] one table of handling weights for the advisor and the map', () => {
@@ -44,29 +43,31 @@ describe('the weight map (design section 1)', () => {
     expect(at(one)).toBeGreaterThan(0);
   });
 
-  test('[WM-IDEAL] the fixed profile: 50% frame, 5% top tube, 12% fork cages, 33% panniers; without panniers (the coordinator ruling of 8 Nov) their 33% goes to the others in proportion, no frame bag shares its 50% between top tube and fork', () => {
-    const add = (s: Record<string, number>) => Object.values(s).reduce((a, b) => a + b, 0);
-    const full = idealShares({ rack: true, frame: true, top: true });
-    expect(full).toEqual({ frame: 0.5, top: 0.05, fork: 0.12, rack: 0.33 });
-    // no rack and no pannier mounts: the panniers' 33% to the frame bag, top tube and fork cages, in proportion; nothing in a seat pack
-    const noRack = idealShares({ rack: false, frame: true, top: true });
-    expect(Object.keys(noRack).sort()).toEqual(['fork', 'frame', 'top']);
-    expect(noRack.frame!).toBeCloseTo(0.5 / 0.67, 9);
-    expect(noRack.top!).toBeCloseTo(0.05 / 0.67, 9);
-    expect(noRack.fork!).toBeCloseTo(0.12 / 0.67, 9);
-    const noFrame = idealShares({ rack: true, frame: false, top: true });
-    expect(noFrame.frame ?? 0).toBe(0);
-    expect(noFrame.top! / noFrame.fork!).toBeCloseTo(5 / 12, 9);
-    for (const rack of [true, false]) for (const frame of [true, false]) for (const top of [true, false]) {
-      const s = idealShares({ rack, frame, top });
-      expect(add(s), `${rack} ${frame} ${top}`).toBeCloseTo(1, 9);
-      expect(s.pack ?? 0).toBe(0);
-    }
-    // the ideal's bags carry the same total kilos, at the planner's own anchors
-    const items = idealItems(15, anchors, { rack: true, frame: true, top: true }, bagShape);
-    expect(items.reduce((t, i) => t + i.kg, 0)).toBeCloseTo(15, 9);
-    expect(items.filter((i) => i.pos === 'fork')).toHaveLength(2);
-    expect(items.filter((i) => i.pos === 'rack')).toHaveLength(2);
+  // The owner's finding G (8 Nov 2026) replaced the fixed 50/5/12/33 profile: the ideal is the rider's own setup, packed for the best
+  // balance by the advisor's balancing (balance.test.ts), with panniers and without (the page, qa/rig.cjs; the view, weight-map.test.ts).
+  test('[WM-IDEAL] the ideal is the rider\'s own things in the rider\'s own bags:the same kilos, less weight where it handles worst, never more on the back', () => {
+    const bags = { f: 'frame', s: 'seat', p: 'pack' } as const;
+    const cap: Record<string, number> = { f: 6, s: 14, p: 15 };
+    const things = [{ id: 'tent', kg: 2.4, L: 5 }, { id: 'stove', kg: 0.6, L: 1.5 }, { id: 'book', kg: 0.5, L: 0.5 }];
+    const pack = (at: Record<string, string>): Packing => {
+      const left = { ...cap };
+      for (const t of things) left[at[t.id]!]! -= t.L;
+      const kgByPos: Record<string, number> = {};
+      for (const t of things) kgByPos[bags[at[t.id] as keyof typeof bags]] = (kgByPos[bags[at[t.id] as keyof typeof bags]] ?? 0) + t.kg;
+      const back = things.filter((t) => at[t.id] === 'p');
+      return { result: { overL: 0, spillIds: [], backL: back.reduce((x, t) => x + t.L, 0), backKg: back.reduce((x, t) => x + t.kg, 0), outOfReach: 0, kgByPos, items: {} },
+        pieces: things.map((t) => ({ id: t.id, kg: t.kg, L: t.L, unit: at[t.id]!, pos: bags[at[t.id] as keyof typeof bags] })),
+        rooms: Object.entries(bags).map(([key, pos]) => ({ key, pos, freeL: left[key]! })) };
+    };
+    const plan = { tent: 's', stove: 's', book: 'p' };
+    const start = pack(plan);
+    const ideal = balance(start, (pins) => pack({ ...plan, ...pins })).packing;
+    const kilos = (p: Packing) => Object.values(p.result.kgByPos).reduce((x, y) => x + (y ?? 0), 0);
+    expect(kilos(ideal)).toBeCloseTo(kilos(start), 9);
+    expect(handlingScore(ideal.result)).toBeLessThan(handlingScore(start.result));
+    expect(ideal.result.backL).toBeLessThanOrEqual(start.result.backL);
+    const items = (p: Packing) => p.pieces.map((x) => ({ pos: x.pos, kg: x.kg, outline: [] }));
+    expect(zoneShares(items(ideal)).back).toBeLessThanOrEqual(zoneShares(items(start)).back);
   });
 
   test('[WM-SENTENCE] one sentence per map from the same numbers, and the difference in points', () => {

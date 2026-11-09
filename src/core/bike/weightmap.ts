@@ -1,10 +1,11 @@
 // The weight map (weight map and bag shapes design, section 1): where the packed kilos sit, as weighted kilos (kilos times the handling
-// weight of their position, the advisor's own table), on a fixed scale, next to an ideal spread of the same kilos. Pure: the bag planner
-// hands it each bag's kilos and drawn outline; /tools/bags/weightmap.js paints it.
+// weight of their position, the advisor's own table), on a fixed scale. The ideal beside it is the rider's own setup packed for the best
+// balance (the owner's finding G, 8 Nov 2026; the fixed 50/5/12/33 profile is gone): the bag planner works it out with the advisor's
+// balancing (src/core/advisor/balance.ts). Pure: the bag planner hands it each bag's kilos and drawn outline; /tools/bags/weightmap.js
+// paints it.
 import { HANDLING_WEIGHTS } from '../advisor/handling.ts';
 import { WM } from '../wording/en-weightmap.ts';
-import type { Anchors, P, Placed } from './art.ts';
-import type { Shape } from './shapes.ts';
+import type { P } from './art.ts';
 
 export type MapItem = { pos: string; kg: number; outline: P[] };
 export type Zones = { back: number; rear: number; middle: number; front: number };
@@ -67,55 +68,6 @@ export function blur(m: Float32Array): Float32Array {
     return out;
   };
   return pass(pass(m, GW, GH, (y, x) => y * GW + x), GH, GW, (x, y) => y * GW + x);
-}
-
-/**
- * The ideal's shares (design 1.3, the owner's answer 1): a fixed profile, the same for everyone. Nothing on the back. Without panniers
- * (no rack fitted and no pannier mounts; the coordinator's ruling of 8 Nov) their 33% goes to the other positions, in proportion.
- */
-export function idealShares(o: { rack: boolean; frame: boolean; top: boolean }): Record<string, number> {
-  const s: Record<string, number> = { frame: 0.5, top: 0.05, fork: 0.12, rack: 0.33 };
-  if (!o.top) {
-    if (o.frame) s.frame! += s.top!;
-    else s.fork! += s.top!;
-    delete s.top;
-  }
-  if (!o.frame) {
-    // shared between top tube and fork in their own proportion
-    const [f, t, k] = [s.frame!, s.top ?? 0, s.fork!];
-    delete s.frame;
-    if (s.top !== undefined) s.top = t + (f * t) / (t + k);
-    s.fork = k + (f * k) / (t + k);
-  }
-  if (!o.rack) {
-    const r = s.rack!;
-    delete s.rack;
-    const rest = Object.values(s).reduce((x, y) => x + y, 0);
-    for (const key of Object.keys(s)) s[key] = s[key]! + (r * s[key]!) / rest;
-  }
-  return s;
-}
-
-type ShapeFn = (pos: string, b: Placed, L: number, o?: { slot?: 'front' | 'rear' | null; frame?: string }) => Shape;
-
-/** The ideal's bags: the same total kilos at the planner's own anchors and shapes (a pair's share over both bags). */
-export function idealItems(totalKg: number, a: Anchors, o: { rack: boolean; frame: boolean; top: boolean }, shape: ShapeFn,
-  pairOffset: Readonly<Record<string, P>> = { rack: [-6, 1.5], fork: [-5, -5] }): MapItem[] {
-  const topBox = a.top.front ?? a.top.rear;
-  const s = idealShares({ rack: o.rack, frame: o.frame && !!a.frame, top: o.top && !!topBox });
-  const out: MapItem[] = [];
-  const add = (pos: string, b: Placed, L: number, share: number, extra?: { slot?: 'front' | 'rear'; frame?: string }) =>
-    out.push({ pos, kg: totalKg * share, outline: shape(pos, b, L, extra).outline });
-  const pair = (pos: string, b: Placed, L: number) => {
-    const off = pairOffset[pos]!;
-    add(pos, { ...b, x: b.x + off[0], y: b.y + off[1] }, L, s[pos]! / 2);
-    add(pos, b, L, s[pos]! / 2);
-  };
-  if (s.frame && a.frame) add('frame', { ...a.frame.boxes[0], rot: 0 }, 1, s.frame, { frame: a.frame.shapes[0] });
-  if (s.top && topBox) add('top', topBox, 1.5, s.top, { slot: a.top.front ? 'front' : 'rear' });
-  pair('fork', a.fork, 4);
-  if (s.rack) pair('rack', a.rack, 20);
-  return out;
 }
 
 const ZONE: Record<string, keyof Zones> = {
