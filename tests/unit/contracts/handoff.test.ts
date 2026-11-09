@@ -224,3 +224,126 @@ describe('[C-HANDOFF-ROUTE] the same route in both apps', () => {
       startName: 'Heidelberg', endName: 'Strasbourg', route: expect.stringMatching(/^[0-9a-f]{64}$/) });
   });
 });
+
+// The guided Trip, part 2 (design §3.3, the owner's answers 1 and 3 of 8 Nov 2026): a trip of one night or more goes straight into
+// the full Bag planner at Bags, with everything predicted, as a new trip setup made from the chosen bike's general setup.
+const qaSetup = (id: string, extra: Record<string, unknown> = {}) => `normaliseSetup({...captureDraft(),id:'${id}',name:'Setup ${id}',saved:'2026-10-30',predicted:{mounted:35,kit:31,spare:4,spilled:0,kg:14},thumb:'',...${JSON.stringify(extra)}})`;
+function longPlanner(gpx: string) {
+  const p = planner(gpx);
+  p.page.run('go=n=>{S.step=n;};buildThumb=()=>"";SETUPS=[];S.step=4;');
+  return p;
+}
+describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full Bag planner at Bags, everything predicted', () => {
+  test('the bar offers Plan bags for this trip; the tap keeps the plan there as a setup, makes a trip setup for the route and opens Bags', async () => {
+    const { gpx } = await handedOff('heidelberg-strasbourg', { nights: 2, stay: 'mixed', pace: 'hard', flatKph: 22 }, '2026-06-12');
+    const { page, json } = longPlanner(gpx);
+    expect(await page.run('receiveHandoff()')).toBe(true);
+    expect(json<boolean>('handoffLong(HANDOFF.trip)')).toBe(true);
+    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/Plan bags for this trip/);
+    const draftBefore = page.run('JSON.stringify(captureDraft())');
+    expect(await page.run('planTripBags()')).toBe(true);
+    // the trip went in as Apply puts it in
+    expect(json('{d:S.departureDate,n:S.nights,s:S.sleep,p:S.pace,f:S.flatKph}')).toEqual({ d: '2026-06-12', n: 2, s: 'mixed', p: 'hard', f: 22 });
+    expect(json('[S.place.name,S.place2.name]')).toEqual(['Heidelberg', 'Strasbourg']);
+    expect(json<number>('S.step')).toBe(2);
+    // what was there is kept: the plan before, saved as a trip setup; then the new trip setup, first in the list
+    const setups = json<Array<Record<string, unknown>>>('SETUPS');
+    expect(setups.map((s) => s.name)).toEqual(['Heidelberg → Strasbourg, 12 Jun', expect.stringMatching(/^Before Heidelberg → Strasbourg, \d{1,2} [A-Z][a-z]{2}$/)]);
+    expect(setups.every((s) => s.kind === undefined)).toBe(true);
+    const before = json<Record<string, unknown>>('SETUPS[1]');
+    const kept = page.run(`(()=>{const p=normalisePlan(SETUPS[1]);return planSignature(p);})()`);
+    page.context.qaBefore = draftBefore;
+    expect(kept).toBe(page.run('planSignature(JSON.parse(qaBefore))'));
+    expect(before.thumb).toBe('');
+    const made = setups[0]!;
+    expect(made.forRoute).toEqual({ hash: json('S.gpx.copilotRoute'), name: 'Heidelberg → Strasbourg', departureDate: '2026-06-12' });
+    expect(made.thumb).toBe('');
+    expect(made.base).toBeUndefined(); // no general setup: from the plan that was there
+    // predicted: a fresh packing by the frozen selection, ticks start empty, the untouched kit follows the trip, the rider's own stays
+    expect(json('[S.packed,S.kit.tent,S.kitTouched]')).toEqual([{}, true, { tent: true }]);
+    expect(json('SETUPS[0].packed')).toEqual({});
+    expect(json('S.bags.map(b=>b.uid)')).toEqual([1, 2]);
+    expect(json<string>('normalisePlan(SETUPS[0]).gpx.copilotRoute')).toMatch(/^[0-9a-f]{64}$/);
+    // the answer is written and Back goes to Trip, as with Apply
+    expect(JSON.parse(page.values.get('loadcheck:handoff-done')!)).toMatchObject({ id: ID, outcome: 'applied' });
+    expect(page.nodes.get('backToWayfinch')!.href).toBe('/#/trip');
+    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/^Planned for Heidelberg → Strasbourg/);
+    expect(JSON.parse(page.values.get('loadcheck:setups')!).length).toBe(2);
+  });
+
+  test('the chosen bike\'s general setup is the foundation (the default one first, else the newest); it is never changed; another bike\'s is not used', async () => {
+    const { gpx } = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
+    const { page, json } = longPlanner(gpx);
+    page.run(`(()=>{const mine=S.bikeProfile,other=normaliseBikeProfile({id:'bike_other',name:'Other'});
+      const was=JSON.stringify(S.bags);
+      S.bags=[{uid:1,pos:'bar',L:9},{uid:2,pos:'frame',L:4.5}];S.nextUid=3;const g1=${qaSetup('g_old', { kind: 'general', saved: '2026-09-01' })};
+      S.bags=[{uid:1,pos:'seat',L:10}];S.nextUid=2;const g2=${qaSetup('g_new', { kind: 'general', saved: '2026-10-01' })};
+      S.bikeProfile=other;S.bags=[{uid:1,pos:'rack',L:20,pair:true}];const g3=${qaSetup('g_other', { kind: 'general', saved: '2026-10-20' })};
+      S.bikeProfile=mine;S.bags=JSON.parse(was);S.nextUid=3;SETUPS=[g3,g2,g1];})()`);
+    const generals = page.run('JSON.stringify(SETUPS)');
+    await page.run('receiveHandoff()');
+    expect(json<string>('tripFoundation().id')).toBe('g_new');
+    page.run(`SETUPS.find(s=>s.id==='g_old').isDefault=true;`);
+    expect(json<string>('tripFoundation().id')).toBe('g_old');
+    page.run(`delete SETUPS.find(s=>s.id==='g_old').isDefault;`);
+    expect(await page.run('planTripBags()')).toBe(true);
+    expect(json('S.bags.map(b=>[b.pos,b.L])')).toEqual([['seat', 10]]);
+    expect(json('SETUPS[0].base')).toBe('g_new');
+    expect(json('S.bikeProfile.id')).toBe('bike_mine');
+    // the general setups are as they were, byte for byte (the owner: a trip setup never updates its general setup)
+    expect(page.run(`JSON.stringify(SETUPS.filter(s=>setupKind(s)==='general'))`)).toBe(generals);
+  });
+
+  test('nothing is kept twice: a plan already saved as a setup gets no "Before" copy', async () => {
+    const { gpx } = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
+    const { page, json } = longPlanner(gpx);
+    page.run(`SETUPS=[${qaSetup('t_same')}];`);
+    await page.run('receiveHandoff()');
+    await page.run('planTripBags()');
+    expect(json('SETUPS.map(s=>s.id)')).toEqual([expect.stringMatching(/^st_/), 't_same']);
+  });
+
+  test('Undo goes back to the plan that was there, byte for byte, and takes the setups it made away again', async () => {
+    const { gpx } = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
+    const { page, json } = longPlanner(gpx);
+    page.run(`SETUPS=[${qaSetup('t_x', { kind: 'general' })}];S.bags.push({uid:3,pos:'bar',L:9});S.nextUid=4;`);
+    await page.run('receiveHandoff()');
+    const before = page.run('JSON.stringify(captureDraft())'), setups = page.run('JSON.stringify(SETUPS)');
+    await page.run('planTripBags()');
+    expect(json<number>('SETUPS.length')).toBe(3);
+    expect(await page.run('undoTripBags()')).toBe(true);
+    expect(page.run('JSON.stringify(captureDraft())')).toBe(before);
+    expect(page.run('JSON.stringify(SETUPS)')).toBe(setups);
+    expect(JSON.parse(page.values.get('loadcheck:setups')!).map((s: { id: string }) => s.id)).toEqual(['t_x']);
+    expect(await page.run('undoTripBags()')).toBe(false);
+  });
+
+  test('a trip setup already made for this route is offered again; with 40 trip setups nothing changes and the bar says why', async () => {
+    const handed = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
+    const { page, json } = longPlanner(handed.gpx);
+    const route = handed.trip.route.hash;
+    page.run(`SETUPS=[${qaSetup('t_made', { saved: '2026-11-06', forRoute: { hash: route, name: 'Heidelberg → Strasbourg', departureDate: '2026-06-12' } })}];`);
+    await page.run('receiveHandoff()');
+    expect(json<string>('HANDOFF.reuse')).toBe('t_made');
+    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/the setup made on 6 Nov/);
+    expect(await page.run('reuseTripSetup()')).toBe(true);
+    expect(json('[S.step,SETUPS.length]')).toEqual([2, 1]);
+    expect(JSON.parse(page.values.get('loadcheck:handoff-done')!)).toMatchObject({ outcome: 'applied' });
+    const full = longPlanner(handed.gpx);
+    full.page.run(`SETUPS=Array.from({length:40},(_,i)=>${qaSetup('t_full').replace("id:'t_full'", "id:'t'+i")});`);
+    await full.page.run('receiveHandoff()');
+    const draft = full.page.run('JSON.stringify(captureDraft())');
+    expect(await full.page.run('planTripBags()')).toBe(false);
+    expect(full.page.run('JSON.stringify(captureDraft())')).toBe(draft);
+    expect(String(full.page.nodes.get('handoffText')!.textContent)).toMatch(/40 trip setups/);
+  });
+
+  test('a day ride (0 nights) is not a long trip: Apply stays as it is until the small view comes', async () => {
+    const { gpx } = await handedOff('loop', { nights: 0 });
+    const { page, json } = longPlanner(gpx);
+    await page.run('receiveHandoff()');
+    expect(json<boolean>('handoffLong(HANDOFF.trip)')).toBe(false);
+    expect(String(page.nodes.get('handoffText')!.textContent)).not.toMatch(/Plan bags for this trip/);
+    expect(await page.run('planTripBags()')).toBe(false);
+  });
+});

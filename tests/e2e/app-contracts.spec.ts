@@ -217,6 +217,51 @@ test('[C-HANDOFF] a trip from Wayfinch in a real browser: the bar asks, Apply lo
   expect(errors).toEqual([]);
 });
 
+test('[TRIP-BAGS-LONG] a 2-night trip from Wayfinch in a real browser: Plan bags for this trip opens Bags with a new trip setup and the plan before kept; Undo brings it all back', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await plannerWithPlan(page);
+  const gpx = readFileSync(join(process.cwd(), 'contracts', 'handoff', 'heidelberg-strasbourg.gpx'), 'utf8');
+  await page.evaluate(async ({ gpx, id }) => {
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open('copilot', 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore('handoffs'); };
+      req.onsuccess = () => {
+        const tx = req.result.transaction('handoffs', 'readwrite');
+        tx.objectStore('handoffs').put({ id, gpx, createdAt: new Date().toISOString() }, id);
+        tx.oncomplete = () => { req.result.close(); resolve(); };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+    localStorage.setItem('copilot:handoff:v1', JSON.stringify({ app: 'copilot', kind: 'handoff', v: 1, id, createdAt: new Date().toISOString() }));
+  }, { gpx, id: ID });
+  const before = await page.evaluate('JSON.stringify(captureDraft())');
+  const setupsBefore = await page.evaluate(() => localStorage.getItem('loadcheck:setups'));
+  await openFresh(page, `/tools/bags/#copilot-handoff=${ID}`);
+  await ready(page);
+  await expect(page.locator('#handoffText')).toContainText('Plan bags for this trip?');
+  await expect(page.locator('#handoffApply')).toHaveText('Use only the route');
+  await page.locator('#handoffPlan').click();
+  await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('#handoffText')).toContainText('Planned for Heidelberg → Strasbourg');
+  await expect(page.locator('#handoffPlan')).toBeHidden();
+  await expect(page.locator('#s2')).toBeVisible();
+  expect(await page.evaluate('[S.step, S.nights, S.place && S.place.name]')).toEqual([2, 2, 'Heidelberg']);
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:setups')!) as Array<{ name: string; forRoute?: { hash: string } }>);
+  const [made, kept] = stored;
+  expect(made!.name).toBe('Heidelberg → Strasbourg, 12 Jun');
+  expect(made!.forRoute!.hash).toMatch(/^[0-9a-f]{64}$/);
+  expect(kept!.name).toMatch(/^Before Heidelberg → Strasbourg, /);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:handoff-done')!).outcome)).toBe('applied');
+  await expect(page.locator('#backToWayfinch')).toHaveAttribute('href', '/#/trip');
+  await page.locator('#handoffUndo').click();
+  await expect(page.locator('#handoffText')).toContainText('Undone');
+  expect(await page.evaluate('JSON.stringify(captureDraft())')).toBe(before);
+  expect(await page.evaluate(() => localStorage.getItem('loadcheck:setups'))).toBe(setupsBefore ?? '[]');
+  expect(errors).toEqual([]);
+});
+
 test('[BK-FORK-SAVE] the trip handoff leaves the bike alone: a fork\'s own two colours stay in the plan\'s bike, its saved copy and the draft', async ({ page }) => {
   await plannerWithPlan(page);
   const FORK = { kind: 'pattern', pattern: 'camo', pair: 2, colours: ['#2f7d4f', '#f1c232'] };

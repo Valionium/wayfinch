@@ -1910,6 +1910,8 @@ html.adv-page .advisor-page.hidden{display:block}
   </div>
   <div class="draftbar hidden" id="handoffBar" role="status">
     <span id="handoffText"></span>
+    <button class="kitact hidden" id="handoffPlan" type="button">Plan bags for this trip</button>
+    <button class="linky hidden" id="handoffReuse" type="button">Open that setup</button>
     <button class="kitact" id="handoffApply" type="button">Apply</button>
     <button class="linky" id="handoffCancel" type="button">Cancel</button>
     <button class="linky hidden" id="handoffUndo" type="button">Undo</button>
@@ -11396,7 +11398,7 @@ function applyDeleteRequest(){
    heights and names are its own) and keeps its route hash; bags, kit the rider chose, sizes, ticks, placements, the bike, tyre
    data and setups stay. Either answer is written to loadcheck:handoff-done and the fragment goes. */
 const HANDOFF_KEY='copilot:handoff:v1',HANDOFF_DONE_KEY='loadcheck:handoff-done',HANDOFF_DB='copilot',HANDOFF_STORE='handoffs',CP_NS='urn:x-wayfinch:trip:1';
-const HANDOFF={id:null,gpx:null,trip:null,undo:null,busy:false};
+const HANDOFF={id:null,gpx:null,trip:null,undo:null,busy:false,long:false,reuse:null,name:''};
 function handoffFragmentId(hash=location.hash){ const m=/^#copilot-handoff=([0-9a-f]{32})$/.exec(String(hash||'')); return m ? m[1] : null; }
 function dropHandoffFragment(){
   if(!/^#copilot-handoff=/.test(String(location.hash||''))) return;
@@ -11459,10 +11461,15 @@ function writeHandoffDone(outcome){
   const before=readLocalRaw(HANDOFF_DONE_KEY),value={app:'load-check',kind:'handoff-done',v:1,id:HANDOFF.id,outcome,at:new Date().toISOString()};
   try { window.localStorage.setItem(HANDOFF_DONE_KEY,JSON.stringify(value)); stampSaved(HANDOFF_DONE_KEY,value,before); } catch(e){}
 }
-function showHandoffBar(text,{apply=false,undo=false}={}){
+function showHandoffBar(text,{apply=false,undo=false,plan=false,reuse=false}={}){
   const bar=$('handoffBar'); if(!bar) return;
   $('handoffText').textContent=text;
   $('handoffApply').classList.toggle('hidden',!apply); $('handoffCancel').classList.toggle('hidden',!apply);
+  // a long trip's first answer is Plan bags for this trip; Apply then only puts the route in, as before
+  if($('handoffPlan')){ $('handoffPlan').classList.toggle('hidden',!plan); $('handoffPlan').disabled=HANDOFF.busy; }
+  if($('handoffReuse')){ $('handoffReuse').classList.toggle('hidden',!reuse); $('handoffReuse').textContent=reuse ? 'Open the setup made on '+setupDay(SETUPS.find(x => x.id === HANDOFF.reuse)) : 'Open that setup'; }
+  $('handoffApply').textContent=plan ? 'Use only the route' : 'Apply';
+  $('handoffApply').classList.toggle('kitact',!plan); $('handoffApply').classList.toggle('linky',plan);
   $('handoffApply').disabled=HANDOFF.busy;
   $('handoffUndo').classList.toggle('hidden',!undo);
   bar.classList.toggle('hidden',!text);
@@ -11479,8 +11486,16 @@ async function receiveHandoff(){
   const parsed=parseGPX(gpx);
   if(!parsed || parsed.error){ dropHandoffFragment(); return false; }
   HANDOFF.id=id; HANDOFF.gpx=gpx; HANDOFF.trip=handoffTrip(gpx);
-  const name=parsed.name || 'your route';
-  showHandoffBar(`A trip from Wayfinch: ${name}. Apply it to this plan? It sets ${handoffChanges(HANDOFF.trip)}; your bags, kit and bike stay as they are.${parsed.hasElev ? '' : ' This route has no heights, so its days are split by distance.'}`,{apply:true});
+  const name=parsed.name || 'your route', t=HANDOFF.trip;
+  HANDOFF.name=t.startName && t.endName ? `${t.startName} → ${t.endName}` : name;
+  HANDOFF.long=handoffLong(t);
+  HANDOFF.reuse=HANDOFF.long ? tripSetupFor(t.route)?.id || null : null;
+  const heights=parsed.hasElev ? '' : ' This route has no heights, so its days are split by distance.';
+  if(HANDOFF.long){
+    const base=tripFoundation(),reuse=HANDOFF.reuse && SETUPS.find(x => x.id === HANDOFF.reuse);
+    showHandoffBar(`A trip from Wayfinch: ${name}. Plan bags for this trip? A new trip setup gets ${handoffChanges(t)}, with the bags and kit predicted for it, from ${base ? 'your general setup '+base.name : 'the plan here now'}. Your plan now is kept as a setup.${
+      reuse ? ` Or open the setup made on ${setupDay(reuse)} for this route.` : ''}${heights}`,{apply:true,plan:true,reuse:!!reuse});
+  } else showHandoffBar(`A trip from Wayfinch: ${name}. Apply it to this plan? It sets ${handoffChanges(t)}; your bags, kit and bike stay as they are.${heights}`,{apply:true});
   return true;
 }
 async function applyHandoff(){
@@ -11488,6 +11503,19 @@ async function applyHandoff(){
   HANDOFF.busy=true; $('handoffApply').disabled=true; $('handoffText').textContent='Loading the route from Wayfinch…';
   const undo=JSON.stringify(captureDraft());   // taken before anything changes: for a route that can't be read
   const before=handoffFields();
+  if(!await putHandoffTripIn()){
+    restorePlan(JSON.parse(undo),true,false);
+    HANDOFF.busy=false;
+    showHandoffBar('The route from Wayfinch could not be read. Your plan is unchanged.',{apply:true,plan:HANDOFF.long,reuse:!!HANDOFF.reuse});
+    return false;
+  }
+  HANDOFF.undo={before,after:handoffFields()}; HANDOFF.busy=false;
+  writeHandoffDone('applied'); dropHandoffFragment(); setWayfinchBack('/#/trip');
+  showHandoffBar('The route from Wayfinch is in this plan. Your bags, kit and bike are as they were.',{undo:true});
+  return true;
+}
+// The trip's fields, then the route, as Contract 2's Apply puts them in; false when the route can't be read (nothing undone here).
+async function putHandoffTripIn(){
   const t=HANDOFF.trip || {};
   if(t.departureDate){ S.departureDate=t.departureDate; S.month=+t.departureDate.slice(5,7)-1; }
   else if(t.month !== undefined){ S.month=t.month; if(S.departureDate && +S.departureDate.slice(5,7)-1 !== S.month) S.departureDate=null; }
@@ -11497,12 +11525,7 @@ async function applyHandoff(){
   if(t.flatKph !== undefined) S.flatKph=t.flatKph;
   // then the route, so the climate is asked for the new month
   const res=await loadGPX(HANDOFF.gpx,'Route from Wayfinch',null,{handoff:{start:t.startName || null,end:t.endName || null}});
-  if(!res || !res.ok){
-    restorePlan(JSON.parse(undo),true,false);
-    HANDOFF.busy=false;
-    showHandoffBar('The route from Wayfinch could not be read. Your plan is unchanged.',{apply:true});
-    return false;
-  }
+  if(!res || !res.ok) return false;
   if(t.route) S.gpx.copilotRoute=t.route;
   applyTripKitDefaults();   // only kit defaults the rider never touched follow the new trip
   $('month').value=S.month; $('nights').value=S.nights; syncDepartureDate();
@@ -11510,11 +11533,97 @@ async function applyHandoff(){
   $('sleepChips').querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed',c.dataset.v === S.sleep));
   syncGPXControl(); renderClimate(); renderBags(); renderKit(); if(S.step === 4) renderResult(); drawRig();
   queueDraftSave();
-  HANDOFF.undo={before,after:handoffFields()}; HANDOFF.busy=false;
-  writeHandoffDone('applied'); dropHandoffFragment(); setWayfinchBack('/#/trip');
-  showHandoffBar('The route from Wayfinch is in this plan. Your bags, kit and bike are as they were.',{undo:true});
   return true;
 }
+/* A long trip (one night or more) goes straight into the full Bag planner at Bags, with everything predicted (guided Trip design
+   §3.3, the owner's answers 1 and 3 of 8 Nov 2026). In this order: the plan here is kept as a trip setup unless a saved setup
+   already holds it; the foundation is the chosen bike's general setup (the default one, else the newest), else the plan here;
+   the trip goes in as Apply puts it in; the kit the rider never touched follows the trip, the bags are packed afresh by the
+   frozen selection and the ticks start empty; it is saved as a new trip setup for the route and Bags opens. A general setup is
+   never changed. Undo goes back to the plan that was there and takes the setups it made away. A day ride keeps Apply. */
+const TRIP_BAGS={undo:null};
+function handoffLong(t){ return !!t && Number.isInteger(t.nights) && t.nights >= 1; }
+function setupDay(s){ const d=s && s.saved; return d && /^\d{4}-\d{2}-\d{2}/.test(d) ? `${+d.slice(8,10)} ${MONTHS[+d.slice(5,7)-1].slice(0,3)}` : 'an earlier day'; }
+function tripSetupFor(hash){ return hash ? SETUPS.find(s => setupKind(s) === 'trip' && s.forRoute && s.forRoute.hash === hash) || null : null; }
+function tripFoundation(){
+  const bike=S.bikeProfile ? S.bikeProfile.id : null;
+  const mine=SETUPS.filter(s => setupKind(s) === 'general' && (s.bikeProfile ? s.bikeProfile.id : null) === bike);
+  const when=s => String(s.updated || s.saved || '');
+  return mine.find(s => s.isDefault) || mine.slice().sort((a,b) => when(b).localeCompare(when(a)))[0] || null;
+}
+// What makes two plans the same plan: the bike, the trip, the bags and the kit (not the ticks, the step or the view).
+function planSignature(p){
+  const n=normalisePlan(p); if(!n) return '';
+  const g=n.gpx;
+  return JSON.stringify([n.bikeProfile ? n.bikeProfile.id : null,n.trip,n.bags,n.decks,n.kit,n.custom,n.qty,n.foodMode,n.pinned,n.mode,n.addedKit,
+    g ? [g.name || null,g.km,g.copilotRoute || null] : null]);
+}
+function todayDay(){ const n=new Date(); return `${n.getDate()} ${MONTHS[n.getMonth()].slice(0,3)}`; }
+// The plan here, as a trip setup with no thumbnail (the drawing is made from the plan when shown), unless a saved setup holds it.
+function keepPlanBefore(){
+  const sig=planSignature(captureDraft());
+  if(SETUPS.some(s => planSignature(s) === sig)) return null;
+  return {...snapshotSetup(`Before ${HANDOFF.name}, ${todayDay()}`,''),thumb:''};
+}
+async function planTripBags(){
+  if(HANDOFF.busy || !HANDOFF.gpx || !DRAFT_READY || !handoffLong(HANDOFF.trip)) return false;
+  const t=HANDOFF.trip,name=HANDOFF.name,undo=JSON.stringify(captureDraft()),setupsBefore=SETUPS.slice(),wasBike=S.bikeProfile ? S.bikeProfile.id : null;
+  const before=keepPlanBefore(),trips=SETUPS.filter(s => setupKind(s) === 'trip').length;
+  if(trips+1+(before ? 1 : 0) > MAX_TRIP_SETUPS){
+    showHandoffBar(`${setupKindFullMessage('trip')} Then plan bags for ${name} again, or use only the route.`,{apply:true,plan:true,reuse:!!HANDOFF.reuse});
+    return false;
+  }
+  HANDOFF.busy=true; showHandoffBar(`Planning bags for ${name}…`);
+  const base=tripFoundation();
+  if(base){ restorePlan(base,false); planBikeChosen(wasBike); }
+  if(!await putHandoffTripIn()){
+    restorePlan(JSON.parse(undo),true,false); HANDOFF.busy=false;
+    showHandoffBar('The route from Wayfinch could not be read. Your plan is unchanged.',{apply:true,plan:true,reuse:!!HANDOFF.reuse});
+    return false;
+  }
+  S.packed={}; keepPlan({load:null}); currentPlan();   // packed afresh by the frozen selection, for this trip
+  go(2);
+  const when=S.departureDate ? `${+S.departureDate.slice(8,10)} ${MONTHS[+S.departureDate.slice(5,7)-1].slice(0,3)}` : MONTHS[S.month];
+  const made={...snapshotSetup(`${name}, ${when}`,''),thumb:'',
+    forRoute:{hash:t.route || (S.gpx && S.gpx.copilotRoute) || '',name,departureDate:S.departureDate || null},...(base ? {base:base.id} : {})};
+  const saved=normaliseSetup(made) || made;
+  SETUPS.unshift(...[saved,before].filter(Boolean));
+  const stored=await store.set(SETUP_KEY,SETUPS);
+  SAVE_MESSAGE=stored ? '' : 'Saved for this session only. Export to keep it after reload.';
+  TRIP_BAGS.undo={draft:undo,setups:setupsBefore,made:[saved,before].filter(Boolean).map(x => x.id)};
+  HANDOFF.busy=false;
+  writeHandoffDone('applied'); dropHandoffFragment(); setWayfinchBack('/#/trip');
+  queueDraftSave(); renderRecall();
+  showHandoffBar(`Planned for ${name}: a new trip setup${base ? ' from '+base.name : ''}, opened at Bags.${before ? ' Your plan before is kept as a setup.' : ''}`,{undo:true});
+  return true;
+}
+// The trip setup made for this route before: opened at Bags, the plan here kept as with Plan bags.
+async function reuseTripSetup(){
+  const s=HANDOFF.reuse && SETUPS.find(x => x.id === HANDOFF.reuse);
+  if(HANDOFF.busy || !s || !DRAFT_READY) return false;
+  const undo=JSON.stringify(captureDraft()),setupsBefore=SETUPS.slice(),before=keepPlanBefore();
+  if(before && setupKindFull('trip')){ showHandoffBar(setupKindFullMessage('trip'),{apply:true,plan:true,reuse:true}); return false; }
+  if(before){ SETUPS.splice(SETUPS.indexOf(s)+1,0,before); savedSetupResult(await store.set(SETUP_KEY,SETUPS)); }
+  loadSetup(s.id); go(2);
+  TRIP_BAGS.undo={draft:undo,setups:setupsBefore,made:before ? [before.id] : []};
+  writeHandoffDone('applied'); dropHandoffFragment(); setWayfinchBack('/#/trip');
+  queueDraftSave(); renderRecall();
+  showHandoffBar(`Opened ${s.name}, the setup made on ${setupDay(s)} for ${HANDOFF.name}.${before ? ' Your plan before is kept as a setup.' : ''}`,{undo:true});
+  return true;
+}
+async function undoTripBags(){
+  const u=TRIP_BAGS.undo; if(!u) return false;
+  TRIP_BAGS.undo=null;
+  const was=S.bikeProfile ? S.bikeProfile.id : null;
+  restorePlan(JSON.parse(u.draft),true,false); planBikeChosen(was);
+  // the setups it made go; any other change to the list since stays
+  SETUPS=SETUPS.filter(s => !u.made.includes(s.id));
+  savedSetupResult(await store.set(SETUP_KEY,SETUPS));
+  queueDraftSave(); renderRecall();
+  showHandoffBar('Undone: your plan is as it was, and the setups made for this trip are gone.');
+  return true;
+}
+
 // What Apply sets: the trip's fields, and the route with what loadGPX made of it. Copies, so later changes don't reach them.
 const HANDOFF_TRIP_FIELDS=['departureDate','month','nights','sleep','pace','flatKph'];
 function handoffFields(){
@@ -11556,8 +11665,10 @@ function cancelHandoff(){
   return true;
 }
 $('handoffApply').onclick=() => { applyHandoff(); };
+$('handoffPlan').onclick=() => { planTripBags(); };
+$('handoffReuse').onclick=() => { reuseTripSetup(); };
 $('handoffCancel').onclick=cancelHandoff;
-$('handoffUndo').onclick=undoHandoff;
+$('handoffUndo').onclick=() => { if(TRIP_BAGS.undo) undoTripBags(); else undoHandoff(); };
 // Another bag-planner tab applied a request: this tab discards its plan in memory and never writes it back.
 function followDeleteElsewhere(event){
   if(![DELETE_APPLIED_KEY,DELETING_KEY].includes(event.key) || !event.newValue || event.newValue === event.oldValue) return;
