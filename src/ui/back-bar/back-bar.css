@@ -6,7 +6,7 @@
 @media (prefers-reduced-motion: reduce) { .wf-bar { transition: none; } }
 
 /* Wayfinch's tools (the tyre tool, Bike care): a solid bar clear of the notch, a 44 px link; a jump or a focused field lands below it. */
-html:has(.wf-bar-app) { scroll-padding-top: calc(var(--wf-bar-h, 3.5rem) + 8px); }
+html:has(.wf-bar-app) { scroll-padding-top: calc(var(--wf-bar-h, 3.5rem) + 69px); }
 /* Across the whole screen, with the screen's own side padding inside it, so nothing scrolls past beside it. */
 .wf-bar-app {
   z-index: 5; margin: 0 -16px 12px; padding: env(safe-area-inset-top) calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left));
@@ -16,5 +16,5 @@ html:has(.wf-bar-app) { scroll-padding-top: calc(var(--wf-bar-h, 3.5rem) + 8px);
 .wf-bar-app a { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; padding: 0 8px 0 0; color: var(--ink); font-weight: 600; text-underline-offset: 3px; }
 
 /* While the update bar is up (44 px button, 8 px padding, 1 px edge) it sticks above this bar: this one sticks just below it. */
-html:has(.update-bar) .wf-bar { top: 61px; }
-html:has(.update-bar):has(.wf-bar-app) { scroll-padding-top: calc(61px + var(--wf-bar-h, 3.5rem) + 8px); }
+html:has(.update-bar) .wf-bar:not(.wf-bar-away:not(:focus-within)) { top: 61px; }
+html:has(.update-bar):has(.wf-bar-app) { scroll-padding-top: calc(var(--wf-bar-h, 3.5rem) + 69px); }

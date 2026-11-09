@@ -7,7 +7,7 @@
   html { scroll-padding-bottom: 1rem; }
   .shell { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); grid-template-rows: auto; align-items: start; }
   /* The update bar and the screen share the column beside the rail, so the rail never covers the bar, which sticks at the top of it. */
-  .shell > div { display: flex; flex-direction: column; grid-column: 2; grid-row: 1; align-self: stretch; min-width: 0; min-height: 100vh; min-height: 100dvh; }
+  .shell > div { display: flex; flex-direction: column; grid-column: 2; grid-row: 1; align-self: stretch; min-width: 0; }
   .tabs {
     grid-column: 1; grid-row: 1; position: sticky; top: 0; flex-direction: column; align-self: start;
     height: 100vh; height: 100dvh; padding: 16px 0; border-top: 0; border-right: 1px solid var(--line);
