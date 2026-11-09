@@ -296,7 +296,6 @@ export const W = {
   leavebySundayAssumed: 'Sunday closing is an assumption.',
   leavebyHolidayAssumed: 'Holiday closing is an assumption.',
   leavebyMapDate: (date: string): string => `Map data from ${date}.`,
-  leavebyCantWorkOut: "Leave-by can't be worked out from these settings. Check the flat speed in Trip settings.",
 
   // ---- The Daylight card (sections 6.5 and 6.12). ----
   daylightArrival: (km: string, about: string, line: string): string => `km ${km} ${about} · ${line}`,
@@ -575,7 +574,6 @@ export const W = {
   shareProgressMap: (lat: string, lon: string): string => `Map: https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=14/${lat}/${lon}`,
 
   // ---- The app's shell (sub-project 5): tabs, the update prompt, status words, shared lists and the degraded situations of section 8. ----
-  appName: 'Wayfinch',
   appNavLabel: 'Main',
   appTabAhead: 'En route',
   appTabTrip: 'Trip',
@@ -652,7 +650,6 @@ export const W = {
   tyreWhyDefaultNoPlan: 'No bag plan was used, so the usual split for your handlebar applies.',
   // Tyre pressure: the screen and the Tools cards.
   tyreTitle: 'Tyre pressure',
-  tyreBack: 'Tools',
   tyreBikeLabel: 'Bike',
   tyreBikeNone: 'No saved bike',
   tyreBikeInPlan: ' (in your plan)',
@@ -1010,7 +1007,6 @@ export const W = {
   appAheadUpdatingWeather: 'Asking for a new forecast…',
   appAheadWeatherUpdated: 'Forecast updated.',
   appAheadEmergencyShare: 'Share my location',
-  appAheadEmergencyCoords: 'Coordinates',
   appAheadEmergencyNoPosition: 'No position yet: Update position to add your coordinates here.',
   appAheadShare: 'Share progress',
   appAheadShareText: 'Your message',

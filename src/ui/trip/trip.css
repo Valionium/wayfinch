@@ -47,7 +47,7 @@ progress { width: 100%; accent-color: var(--blaze); }
 .trip-step-done .trip-dot { background: var(--sage); border-color: var(--sage); color: var(--panel); }
 .trip-step-next .trip-dot { background: var(--blaze); border-color: var(--blaze); color: var(--panel); }
 .trip-step-body { min-width: 0; padding: 0 0 12px; }
-.trip-step-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 44px; }
+.trip-step-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; min-height: 44px; }
 .trip-step-head h2 { font-family: var(--font-display); font-size: 1.25rem; margin: 0; }
 .trip-step-later .trip-step-head h2 { color: var(--muted); }
 .trip-step-open, .trip-step-change { min-height: 44px; min-width: 44px; padding: 0 4px; background: none; border: 0; font: inherit; cursor: pointer; }
@@ -58,10 +58,14 @@ progress { width: 100%; accent-color: var(--blaze); }
 .trip-details-line { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0 8px; margin: 0; font-size: 0.9375rem; }
 .trip-added { font-weight: 600; }
 .trip-main > .gap { margin: 0 0 12px; }
-.trip-pick-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.trip-pick-row .trip-remove { flex: 0 1 auto; }
-/* The confirm step takes the whole row once it is asked. */
-.trip-pick-row .trip-remove:has(.notice) { flex: 1 1 100%; }
+/* Remove this trip, in the done Route row after Change: its wrapper adds no box, so the button is a flex item of the row and its
+   confirm step (and any problem) takes a full row of its own below. A quieter look than Change: muted, not the accent. */
+.trip-step-head h2 { flex: 1 1 auto; }
+.trip-step-head .trip-remove { display: contents; }
+/* While its chunk loads, the lazy line says nothing in the row. */
+.trip-step-head > [aria-busy] { display: none; }
+.trip-step-head .trip-remove > .notice, .trip-step-head .trip-remove > .field-problem { flex: 1 1 100%; margin: 4px 0 8px; }
+.trip-step-head .trip-remove > .btn { min-height: 44px; min-width: 44px; padding: 0 8px; background: none; border: 0; box-shadow: none; color: var(--muted); font-size: 0.9375rem; font-weight: 400; text-decoration: underline; }
 .trip-added .btn { margin-top: 8px; display: flex; }
 /* The stops on the profile (TRIP-STOPS): 22 px each side, so an icon centred at either end stays inside; 46 px of room above, where
    they stand on the line (TRIP-STOPS-ROOM, summary.tsx's ROOM_PX). */

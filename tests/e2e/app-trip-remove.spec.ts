@@ -74,9 +74,8 @@ async function openTrip(page: Page, origin: string): Promise<void> {
   await expect(page.locator('[data-trip-line]')).toContainText(ROUTE_NAME);
 }
 
-/** Change on the Route step, and Remove this trip once its chunk is in. */
+/** Remove this trip stands in the folded Route step's row beside Change (owner, 9 Nov 2026): wait for its chunk. */
 async function openRouteStep(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Change: Route', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Remove this trip', exact: true })).toBeVisible();
 }
 
