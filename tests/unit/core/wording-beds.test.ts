@@ -5,12 +5,12 @@ import { TR } from '../../../src/core/wording/en-trip.ts';
 import { TF } from '../../../src/core/wording/en-trip-fields.ts';
 import { bannedHits } from '../../fixtures/banned.ts';
 
-const texts = (): [string, string][] => Object.entries(BD).map(([k, v]) => [k, typeof v === 'function' ? v('Hotel Krone', '92.4', 'Mainz') : v]);
+const texts = (): [string, string][] => Object.entries(BD).map(([k, v]) => [k, typeof v === 'function' ? (v as (...a: unknown[]) => string)('Hotel Krone', '92.4', 'Mainz') : v]);
 
 test('[HON-BANNED] no day-end sleep line uses a banned word; every key is a Trip key, in neither en.ts, en-trip.ts nor en-trip-fields.ts', () => {
-  expect(texts().length).toBe(4);
+  expect(texts().length).toBe(18); // 4, 10 for days that end where you can sleep (owner, 9 Nov 2026), 4 after the review of PR 101
   for (const [key, text] of texts()) {
-    expect(key).toMatch(/^appTripBed/);
+    expect(key).toMatch(/^appTrip(Bed|DayTo|Stop)/);
     expect(text.trim()).not.toBe('');
     expect(bannedHits(text, true), `${key}: ${text}`).toEqual([]);
     expect(key in W, key).toBe(false);
