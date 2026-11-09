@@ -170,8 +170,17 @@ test('[BV-ZOOM] a card whose parts sit close together opens zoomed in on them; o
   expect(tube.f.z).toBeGreaterThan(1.3);
   const tubeView = zoomBox(wholeBox(tube.anchors), tube.f.z, tube.f.centre);
   expect(at(tubeView, [tube.anchors.wheels.front.cx, tube.anchors.wheels.front.cy], 4)).toBe(true);
+  // and every part of the wheel itself is in that view, the valve at the rim's foot too
+  const tubeIt = items.find((x) => x.id === 'puncture-tube')!;
+  const tubeSpec = cardSpec(null, tubeIt.applies, partsOf(tubeIt, careDetails(null)));
+  const tubeArt = bikeArt(tubeSpec, null).anchors;
+  for (const id of ['tyre', 'rim', 'bead', 'tube', 'valve', 'spokes'] as const) expect(at(tubeView, partSpot(id, tubeSpec, tubeArt)!.at, 1), id).toBe(true);
   expect(focus('brake-rub-disc').f.z).toBeGreaterThan(1.3);
-  expect(focus('frame-bolts-check').f.z).toBe(1);
+  // parts at both tyres' far edges and the bar: spread over the bike, it opens whole (a quarter of three parts is none to leave out)
+  const wa = focus('chain-broken').anchors;
+  const { rear, front } = wa.wheels;
+  const spread: [P, P, P] = [[rear.cx - rear.r, rear.cy], [front.cx + front.r, front.cy], wa.points.bar];
+  expect(openingFocus(wholeBox(wa), spread.map((p, i) => [(['tyre', 'rim', 'handlebar'] as const)[i]!, { at: p }] as const)).z).toBe(1);
   expect(focus('tyres-sealant-check').f.z).toBeGreaterThan(1.3);
   // a card naming the frame, which spans the bike, opens whole (an e-bike's battery and display sit close, its frame does not)
   const ebike = items.find((x) => x.id === 'ebike-no-power')!;

@@ -223,7 +223,7 @@ export function focusOf(whole: ViewBox, points: readonly P[]): { z: number; cent
   if (points.length === 0) return { z: 1, centre };
   const xs = points.map((p) => p[0]);
   const ys = points.map((p) => p[1]);
-  const pad = 20;
+  const pad = 12;
   const box = fit({ x: Math.min(...xs) - pad, y: Math.min(...ys) - pad, w: Math.max(...xs) - Math.min(...xs) + 2 * pad, h: Math.max(...ys) - Math.min(...ys) + 2 * pad });
   const z = Math.min(2.6, whole.w / box.w);
   if (z < 1.35) return { z: 1, centre };
@@ -240,12 +240,17 @@ export function openingFocus(whole: ViewBox, spots: readonly (readonly [PartId, 
   const pts = spots.map(([, s]) => s.at);
   const all = focusOf(whole, pts);
   if (all.z > 1 || pts.length < 4) return all;
-  const mid = (v: number[]): number => [...v].sort((a, b) => a - b)[Math.floor(v.length / 2)]!;
-  const m: P = [mid(pts.map((p) => p[0])), mid(pts.map((p) => p[1]))];
-  const far = [...pts].sort((a, b) => Math.hypot(b[0] - m[0], b[1] - m[1]) - Math.hypot(a[0] - m[0], a[1] - m[1]));
+  // each way of leaving out one part, then two (never more than a quarter): the one zooming in furthest that keeps the rest in view
+  const ways = (k: number, from = 0): number[][] => (k === 0 ? [[]] : pts.flatMap((_, i) => (i < from ? [] : ways(k - 1, i + 1).map((w) => [i, ...w]))));
   for (let k = 1; k <= Math.floor(pts.length / 4); k += 1) {
-    const f = focusOf(whole, far.slice(k));
-    if (f.z > 1) return f;
+    let best: { z: number; centre: P } | null = null;
+    for (const out of ways(k)) {
+      const rest = pts.filter((_, i) => !out.includes(i));
+      const f = focusOf(whole, rest);
+      const view = zoomBox(whole, f.z, f.centre);
+      if (f.z > 1 && rest.every((p) => inBox(view, p, 4)) && (!best || f.z > best.z)) best = f;
+    }
+    if (best) return best;
   }
   return all;
 }
