@@ -227,6 +227,8 @@ body{
 .draftbar .linky{margin-left:auto}
 .draftbar.quiet{border-color:var(--line)}
 #bikeFollowUndo{min-height:44px;margin-left:0}
+.balance-line{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin:0 0 12px;font-size:13px;color:var(--muted);line-height:1.45}
+.balance-line .linky{min-height:44px}
 .result-save{margin:0 0 15px}
 .result-save span,.save-message{font-size:12px;color:var(--muted);line-height:1.45}
 .save-message{display:block;margin-top:8px;color:var(--amber)}
@@ -5403,6 +5405,8 @@ function allocate(){ return selectBags(); }
 const PLAN_SCREEN_KEYS = ['placements','step','adv','onlyOn','justSaved','recallOpen','fbOpen','fbSent','packed','packOpen','pollOn','pollStep',
   'devMode','pendingSaveName','pendingSaveNote','theme','editMode','gpx','frameErr'];
 let PLAN_CACHE = { sig:null, plan:null, placements:null }, PLAN_TRIAL = 0, PLAN_PLACED_AGAIN = false;
+// The automatic balancing's own state (weight map design §7); its functions are by the weight map's.
+const BALANCE = { checked:null, pins:null, last:null, reverted:null, undone:new Set(), failed:false };
 
 function planSignature(){
   return JSON.stringify([S, KIT.filter(k => k.added)], function(key, value){
@@ -8798,6 +8802,76 @@ function weightMapIdeal(which){
   if(IDEAL_CACHE.key !== key) IDEAL_CACHE = { key, value:idealFor(which) };
   return IDEAL_CACHE.value;
 }
+
+/* ---- Automatic balancing (the owner's decision of 8 Nov 2026, weight map design §7): at the packing step, on top of the planner's own
+   packing (the frozen rules, called and never changed), advisor.js's balancing in the rider's own bags, no new bag. It is applied only
+   when it is clearly better (Better handling's score lower by the advisor's MIN_GAIN_SCORE or more), with one line and Undo, and it is
+   stored as kept placements (S.placements, through keepPlan). ---- */
+// BALANCE (declared by PLAN_CACHE). checked: the kept placements last looked at, as JSON, so each plan is looked at once; pins: the hand
+// placements then; last: the balance
+// on show, with the planner's own placements it replaced (Undo); reverted: the placements Undo brought back, while the line says so;
+// undone: things the rider put back with Undo, never moved by the balancing again in this visit
+// (not stored: a later visit may offer the same balance again, with its line and Undo).
+// What stays where it is: the rider's hand placements, things ticked as packed, things put back with Undo, and every must-reach thing
+// that is within reach now.
+function balanceFixed(start){
+  const ids = new Set([...Object.keys(S.pinned || {}), ...Object.keys(S.packed || {}).filter(id => S.packed[id]), ...BALANCE.undone]);
+  start.pieces.forEach(p => { const k = kitById(p.id); if(k && isMustReach(k) && reachableFor(k, p.pos)) ids.add(p.id); });
+  return [...ids];
+}
+// Looks at the plan once after each change, at the packing step only (where the line shows); true when a balance was applied.
+function autoBalancePlan(){
+  if(PLAN_TRIAL || TRIAL || S.step !== 4 || !DRAFT_READY || DRAFT_FROZEN) return false;
+  const plan = currentPlan(), sig = JSON.stringify(S.placements), pins = JSON.stringify(S.pinned || {});
+  if(!S.placements || sig === BALANCE.checked) return false;
+  const W = window.WayfinchAdvisor;
+  if(!W || !W.autoBalance){
+    if(!BALANCE.failed) loadAdvisor().then(() => { if(S.step === 4 && !TRIAL){ renderResult(); drawRig(); } }, () => { BALANCE.failed = true; });
+    return false;
+  }
+  // a step the rider made by hand (a move, a forgotten placement) is the rider's own: it is not balanced
+  const byHand = BALANCE.pins !== null && BALANCE.pins !== pins;
+  BALANCE.checked = sig; BALANCE.pins = pins;
+  if(byHand) return false;
+  const before = S.placements, start = idealTrial(S.bags, {}, before);
+  const out = W.autoBalance(start, (p, from) => idealTrial(S.bags, p, from.state), { fixed:balanceFixed(start) });
+  if(!out.apply) return false;
+  const replan = plan.notes.replan;
+  keepPlan({ load:out.balanced.packing.state });
+  const now = currentPlan();
+  if(replan) now.notes.replan = replan;
+  BALANCE.checked = JSON.stringify(S.placements); BALANCE.reverted = null;
+  // the line names the moves that do the most first: kilos times the drop of the handling weight (the lighter half of a swap last)
+  const kg = new Map(out.balanced.packing.pieces.map(p => [p.id, p.kg])), posOf = new Map(start.rooms.map(r => [r.key, r.pos]));
+  const worth = m => (kg.get(m.id) || 0) * ((W.WEIGHTS[posOf.get(m.from)] || 0) - (W.WEIGHTS[posOf.get(m.to)] || 0));
+  const moves = [...out.balanced.moves].sort((a, b) => worth(b) - worth(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  BALANCE.last = { placements:S.placements, before, moves, gain:out.gain, balanced:out.balanced.packing.state };
+  return true;
+}
+// Undo: the planner's own packing back; what moved is kept where the planner put it from now on, in this visit.
+function undoBalance(){
+  const last = BALANCE.last;
+  if(!last || last.placements !== S.placements) return false;
+  last.moves.forEach(m => BALANCE.undone.add(m.id));
+  BALANCE.last = null;
+  keepPlan({ load:last.before });
+  currentPlan();
+  BALANCE.checked = JSON.stringify(S.placements); BALANCE.reverted = S.placements;
+  return true;
+}
+// The one quiet line, while the plan is the one it speaks of.
+function balanceLine(){
+  const last = BALANCE.last;
+  if(last && last.placements === S.placements){
+    const A = currentPlan();
+    const said = last.moves.map(m => { const k = kitById(m.id), s = A.slots.find(x => x.key === m.to);
+      return ((k ? k.name : m.id) + (s ? ' to the ' + unitLabel(s) : '')).toLowerCase(); });
+    const shown = said.length > 3 ? [...said.slice(0, 2), `${said.length - 2} more things`] : said;
+    return `<div class="balance-line" role="status"><span>Packed for better balance: ${htmlEsc(said.length < 2 ? said[0] : shown.slice(0, -1).join(', ') + ' and ' + shown[shown.length - 1])} ·</span> <button class="linky" type="button" data-balance-undo="1">Undo</button></div>`;
+  }
+  if(BALANCE.reverted && BALANCE.reverted === S.placements) return `<div class="balance-line" role="status"><span>Back to the planner's own packing.</span></div>`;
+  return '';
+}
 // The kit on the rack deck, where the deck is drawn.
 function deckMapItem(a){
   const kg = deckClaims().reduce((t, k) => t + itemKg(k), 0), d = a.rackTop;
@@ -10261,7 +10335,7 @@ function mountedEmptySentence(slots){
 }
 // Start again: a full re-plan that also clears ticks and hand placements.
 function startAgain(){
-  S.pinned = {}; S.packed = {}; S.packOpen = null;
+  S.pinned = {}; S.packed = {}; S.packOpen = null; BALANCE.undone = new Set();
   keepPlan({ replan:true, why:'startAgain' });
 }
 function panniersReason(rack){
@@ -10276,6 +10350,7 @@ function panniersBikeBags(unused){
   return usableUnits().some(u => u.pos !== 'rack' && !POSITIONS[u.pos].onBody) ? 'Your bikepacking bags all stay mounted.' : '';
 }
 function renderResult(){
+  autoBalancePlan();
   renderNightsSuggestion();
   const resultFocus=typeof captureFocus === 'function' ? captureFocus($('s4')) : null;
   $('modeBar').querySelectorAll('button').forEach(b =>
@@ -10822,7 +10897,7 @@ function renderResult(){
     roomTip = cf.picks.length + ' would fit';
   }
 
-  const paint = () => (
+  const paint = () => (balanceLine() +
     sec(true, 'Missing', weatherReady
         ? (miss.length ? miss.length + ' to fix' : 'all clear')
         : (miss.length ? miss.length + ' to fix · weather unchecked' : 'weather unchecked'),
@@ -10988,6 +11063,11 @@ function renderResult(){
   $('resultBox').querySelectorAll('[data-forget]').forEach(b => b.onclick = () => keepPlace(() => {
     forgetPlacement(b.dataset.forget);
     renderResult(); drawRig();
+  }));
+  $('resultBox').querySelectorAll('[data-balance-undo]').forEach(b => b.onclick = () => keepPlace(() => {
+    if(!undoBalance()) return;
+    renderResult(); drawRig();
+    $('stepTitle4')?.focus?.({ preventScroll:true });
   }));
   $('resultBox').querySelectorAll('[data-replan]').forEach(b => b.onclick = () => keepPlace(() => {
     keepPlan({ replan:true, why:'asked' });
