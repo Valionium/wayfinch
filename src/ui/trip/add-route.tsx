@@ -5,6 +5,7 @@ import { GPX_MAX_BYTES, GpxError } from '../../core/route/gpx.ts';
 import type { Route } from '../../core/types.ts';
 import { showKm, W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
+import { TF } from '../../core/wording/en-trip-fields.ts';
 import { sameLine } from '../../store/trip.ts';
 import { lazy } from '../lazy.tsx';
 import { routeFromGpx } from './read-gpx.ts';
@@ -80,22 +81,22 @@ export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken
   };
 
   return (
-    <section aria-label={old ? W.appTripReplaceHeading : W.appTripAddTitle}>
+    <section aria-label={old ? TF.appTripReplaceHeading : TF.appTripAddTitle}>
       <div data-add-route>
         <label class="btn btn-primary file-pick">
-          {W.appTripPickGpx}
+          {TF.appTripPickGpx}
           {/* No accept list (owner's iPhone check, 6 Nov 2026): iOS turns it into its own file types, has none for .gpx and greys
               every GPX file out. Any file can be chosen; routeFromGpx refuses what is not a GPX, in words. */}
           <input type="file" onChange={(e) => void onFile(e.currentTarget)} />
         </label>
         <p class="muted">{TR.appTripGpxHint}</p>
-        {busy ? <p role="status">{W.appTripReading}</p> : null}
+        {busy ? <p role="status">{TF.appTripReading}</p> : null}
         {error ? <p class="notice" role="alert">{error}</p> : null}
         {said ? <p role="status">{said}</p> : null}
         {pending && old ? (
           <div class="notice" role="alertdialog" aria-labelledby="trip-replace-title" data-replace>
             <h3 id="trip-replace-title" tabIndex={-1} ref={asking}>{W.appTripReplaceTitle}</h3>
-            <p>{W.appTripReplaceBody(old.route.name, pending.route.name, showKm(pending.route.lengthKm))}</p>
+            <p>{TF.appTripReplaceBody(old.route.name, pending.route.name, showKm(pending.route.lengthKm))}</p>
             <div class="row">
               <button type="button" class="btn btn-primary" onClick={() => void commit(pending)}>{W.appTripReplaceYes}</button>
               <button type="button" class="btn" onClick={() => setPending(null)}>{W.appTripReplaceCancel}</button>
