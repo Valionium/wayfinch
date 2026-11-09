@@ -229,6 +229,13 @@ describe('[C-HANDOFF-ROUTE] the same route in both apps', () => {
 // The guided Trip, part 2 (design §3.3, the owner's answers 1 and 3 of 8 Nov 2026): a trip of one night or more goes straight into
 // the full Bag planner at Bags, with everything predicted, as a new trip setup made from the chosen bike's general setup.
 const qaSetup = (id: string, extra: Record<string, unknown> = {}) => `normaliseSetup({...captureDraft(),id:'${id}',name:'Setup ${id}',saved:'2026-10-30',predicted:{mounted:35,kit:31,spare:4,spilled:0,kg:14},thumb:'',...${JSON.stringify(extra)}})`;
+/** The saved setups as a page opened afresh reads them from this page's storage: the setups a page adds are kept where older pages never
+ *  look, so the list older pages read is not where to find them (third review of PR 80, I-B). */
+const storedSetups = (page: VM) => {
+  const fresh = appVM({ bike: false });
+  for (const [k, v] of page.values) fresh.values.set(k, v);
+  return JSON.parse(fresh.run('JSON.stringify(storedSetupsLocal())') as string) as Array<Record<string, unknown> & { id: string }>;
+};
 function longPlanner(gpx: string) {
   const p = planner(gpx);
   p.page.run('go=n=>{S.step=n;};buildThumb=()=>"";SETUPS=[];S.step=4;');
@@ -269,7 +276,7 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     expect(JSON.parse(page.values.get('loadcheck:handoff-done')!)).toMatchObject({ id: ID, outcome: 'applied' });
     expect(page.nodes.get('backToWayfinch')!.href).toBe('/#/trip');
     expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/^Planned for Heidelberg → Strasbourg/);
-    expect(JSON.parse(page.values.get('loadcheck:setups')!).length).toBe(2);
+    expect(storedSetups(page).length).toBe(2);
   });
 
   test('the chosen bike\'s general setup is the foundation (the default one first, else the newest); it is never changed; another bike\'s is not used', async () => {
@@ -315,7 +322,7 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     expect(await page.run('undoTripBags()')).toBe(true);
     expect(page.run('JSON.stringify(captureDraft())')).toBe(before);
     expect(page.run('JSON.stringify(SETUPS)')).toBe(setups);
-    expect(JSON.parse(page.values.get('loadcheck:setups')!).map((s: { id: string }) => s.id)).toEqual(['t_x']);
+    expect(storedSetups(page).map((s) => s.id)).toEqual(['t_x']);
     expect(await page.run('undoTripBags()')).toBe(false);
   });
 
@@ -335,7 +342,7 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     expect(page.run('JSON.stringify(captureDraft())')).toBe(work);
     expect(json('S.bags.some(b=>b.uid===9)')).toBe(true);
     expect(json('S.packed')).toEqual({ tent: true });
-    const kept = JSON.parse(page.values.get('loadcheck:setups')!).find((s: { id: string }) => s.id === made);
+    const kept = storedSetups(page).find((s) => s.id === made);
     expect(kept).toMatchObject({ kind: 'general', note: 'Our own note' });
     expect(json<number>('SETUPS.length')).toBe(2);
     expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/changed since/);
@@ -353,7 +360,7 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     expect(page.run('JSON.stringify(captureDraft())')).toBe(before);
     // the renamed setup stays; the "Before" copy, untouched, goes
     expect(json('SETUPS.map(s=>[s.id,s.name])')).toEqual([[made, 'Our Vosges trip']]);
-    expect(JSON.parse(page.values.get('loadcheck:setups')!).map((s: { id: string }) => s.id)).toEqual([made]);
+    expect(storedSetups(page).map((s) => s.id)).toEqual([made]);
     expect(json(`SETUPS.some(s=>s.id==='${keptBefore}')`)).toBe(false);
     expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/Our Vosges trip/);
   });
@@ -397,8 +404,8 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     // 34 saved setups: 3 general ones of the chosen bike, 30 trip setups and the one made for this route on 6 Nov; the plan here is
     // none of them, so a "Before" copy is made
     const library = `[${qaSetup('t_made', made)},...${many(3, 'g', { kind: 'general' })},...${many(30, 't')}]`;
-    // the three setup keys, which only the setup write writes (the ledger is also written for other keys, at times that vary; the
-    // QA suite fails it in turn too)
+    // the setup keys, which only the setup write writes (the ledger is also written for other keys, at times that vary; the QA suite
+    // fails it in turn too); the marks record of the first fix round is no longer written, and stays here so a write to it would count
     const KEYS = ['loadcheck:setups', 'loadcheck:setups-more:v1', 'loadcheck:setup-marks:v1'];
     const failAt = (page: VM, n: number) => {
       const put = page.localStorage.setItem, log = { count: 0, failed: '' };
@@ -408,45 +415,51 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
       };
       return log;
     };
-    const stored = (page: VM) => {
-      const fresh = appVM({ bike: false });
-      for (const [k, v] of page.values) fresh.values.set(k, v);
-      return JSON.parse(fresh.run('JSON.stringify(storedSetupsLocal().map(s=>s.id))') as string) as string[];
-    };
-    const start = async () => {
-      const p = longPlanner(handed.gpx);
-      await p.page.run(`SETUPS=${library};store.set(SETUP_KEY,SETUPS)`);
-      p.page.run('S.bags.push({uid:3,pos:"bar",L:9});S.nextUid=4;');
-      await p.page.run('receiveHandoff()');
-      return p;
-    };
-    const ids = stored((await start()).page);
-    expect(ids.length).toBe(34);
-    const flows: [string, string | null, string][] = [
-      ['Plan bags for this trip', null, 'planTripBags()'],
-      ['its Undo', 'planTripBags()', 'undoTripBags()'],
-      ['Open the setup made on 6 Nov', null, 'reuseTripSetup()'],
-      ['its Undo', 'reuseTripSetup()', 'undoTripBags()'],
+    const stored = (page: VM) => storedSetups(page).map((s) => s.id);
+    // Two libraries: all 34 saved here; and an older page's 20 (as it writes them: no kind, no trip link) with 14 saved here, three of
+    // them the chosen bike's general setups and one the setup made for this route (third review of PR 80, I-B: two lists then)
+    const older = `JSON.stringify(Array.from({length:20},(_,i)=>{const s=${qaSetup('X').replace("id:'X'", "id:'o'+i").replace("name:'Setup X'", "name:'Setup o'+i")};return s;}))`;
+    const libraries: [string, string, boolean][] = [
+      ['34 saved here', library, false],
+      ['an older page\'s 20 and 14 saved here', `[${qaSetup('t_made', made)},...${many(3, 'g', { kind: 'general' })},...${many(10, 't')}]`, true],
     ];
     let cases = 0;
-    for (const [what, prep, code] of flows) {
-      const dry = await start();
-      if (prep) expect(await dry.page.run(prep)).toBe(true);
-      const count = failAt(dry.page, Infinity);
-      expect(await dry.page.run(code)).toBe(true);
-      expect(count.count).toBeGreaterThan(0);
-      for (let n = 0; n < count.count; n++) {
-        const { page } = await start();
-        if (prep) await page.run(prep);
-        const log = failAt(page, n);
-        await page.run(code);
-        const label = `${what}, write ${n + 1} of ${count.count} (${log.failed}) fails`;
-        expect(log.failed, label).not.toBe('');
-        const now = stored(page);
-        expect(ids.filter((id) => !now.includes(id)), label).toEqual([]);
-        expect(page.run('SETUPS_STORED'), label).toBe(false);
-        expect(String(page.nodes.get('handoffText')!.textContent), label).toMatch(/did not reach storage/);
-        cases++;
+    for (const [lib, setups, withOlder] of libraries) {
+      const start = async () => {
+        const p = longPlanner(handed.gpx);
+        if (withOlder) p.page.localStorage.setItem('loadcheck:setups', p.page.run(older) as string);
+        await p.page.run(`SETUPS=${setups};store.set(SETUP_KEY,SETUPS)`);
+        p.page.run('S.bags.push({uid:3,pos:"bar",L:9});S.nextUid=4;');
+        await p.page.run('receiveHandoff()');
+        return p;
+      };
+      const ids = stored((await start()).page);
+      expect(ids.length).toBe(34);   // 34 either way: 34 here, or the older page's 20 and 14 here
+      const flows: [string, string | null, string][] = [
+        ['Plan bags for this trip', null, 'planTripBags()'],
+        ['its Undo', 'planTripBags()', 'undoTripBags()'],
+        ['Open the setup made on 6 Nov', null, 'reuseTripSetup()'],
+        ['its Undo', 'reuseTripSetup()', 'undoTripBags()'],
+      ];
+      for (const [what, prep, code] of flows) {
+        const dry = await start();
+        if (prep) expect(await dry.page.run(prep)).toBe(true);
+        const count = failAt(dry.page, Infinity);
+        expect(await dry.page.run(code)).toBe(true);
+        expect(count.count).toBeGreaterThan(0);
+        for (let n = 0; n < count.count; n++) {
+          const { page } = await start();
+          if (prep) await page.run(prep);
+          const log = failAt(page, n);
+          await page.run(code);
+          const label = `${lib}, ${what}, write ${n + 1} of ${count.count} (${log.failed}) fails`;
+          expect(log.failed, label).not.toBe('');
+          const now = stored(page);
+          expect(ids.filter((id) => !now.includes(id)), label).toEqual([]);
+          expect(page.run('SETUPS_STORED'), label).toBe(false);
+          expect(String(page.nodes.get('handoffText')!.textContent), label).toMatch(/did not reach storage/);
+          cases++;
+        }
       }
     }
     expect(cases).toBeGreaterThanOrEqual(8);

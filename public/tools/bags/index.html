@@ -11245,73 +11245,92 @@ async function storeWrite(k, v, detailed=false){
     if(saved && k === DRAFT_KEY) DRAFT_VERSION=draftVersionOf(v);
     return detailed ? {saved,kind} : saved;
 }
-/* Saved setups past the 20 an older page knows (review of PR 80, I1). An older bag-planner tab, a rollback and the frozen copy at /
-   read loadcheck:setups, cut it to 20 on every setup write, and their normaliseSetup drops kind, forRoute, base and isDefault. So
-   this page keeps at most 20 setups there; the rest go to loadcheck:setups-more:v1, which older pages never read, and the new fields
-   of every setup that has any are kept in loadcheck:setup-marks:v1 too, which puts them back on a setup an older page saved without
-   them. Read together, the three are the one list; an older page's own change to one of its 20 (a name, a note, a delete) stays.
-   Where each setup goes (fix round of PR 80, I-1): a write that adds a setup lays the lists out afresh, all of them in the first list
-   while there are 20 or fewer, in the list's order, and past 20 the general setups first, then the trip setups in the list's order. A
-   write that adds none moves none: each setup stays in the list that holds it, so a delete on a full storage only makes values
-   smaller and always frees room, and the first list may hold fewer than 20 until a write that adds a setup. The writes go in an order
-   where stopping after any one of them loses no setup: one moving to the other list is written there before it leaves the list it
-   is in, and the first write that fails stops the rest, so the save is reported as not stored and what was stored stays readable. */
-const SETUP_MORE_KEY='loadcheck:setups-more:v1',SETUP_MARKS_KEY='loadcheck:setup-marks:v1',OLD_PAGE_SETUPS=20;
+/* Saved setups and the pages before this one (review of PR 80, I1, its fix rounds, and the third review: I-A, I-B). Every older page (an
+   older bag-planner tab left open, a rollback, the tagged site's page, the frozen copy at /) reads loadcheck:setups alone: on every setup
+   write it adds the stored setups it never saw after its own and cuts the list to 20, and its normaliseSetup drops kind, forRoute, base and
+   isDefault. So this page never adds a setup there, and no older page, stale or not, can cut one this page added: each setup this page adds
+   goes to loadcheck:setups-more:v1, which older pages never read. loadcheck:setups keeps the setups older pages hold (the rider's from
+   before, and any an older page saves later); this page writes it only to delete one the rider deletes, or to store the rider's change to
+   one there (a name, a note, an update, a report) in the form an older page writes it, without the four fields, so an older page saves it
+   back byte for byte and its stamp stays. loadcheck:setups-more:v1 is this page's list, in its order: each setup this page added, whole,
+   with its marks and the time it last changed (`at`, kept where no older page writes, for Also delete bag planner data), and for each
+   setup of loadcheck:setups a place-holder {id, first: true} with that setup's marks, which puts it in the order. Read together they are
+   the one list (joinSetups): first the setups of loadcheck:setups no entry places (an older page saved them since, newest first; or this
+   page has not written its list yet), then the entries in order, a place-holder taking its setup from loadcheck:setups (an older page's
+   change to it stays) and nothing once an older page deleted it. Nothing is ever cut: a library an older page grew past the limits is kept
+   whole, and an add stops at its kind's limit or at 60 in all and says so (setupAddFull). A write first removes what the rider deleted, each
+   value only getting smaller, so a delete frees room on a full storage even after a save that did not fit; then it writes the rest. The
+   first write that fails stops the others, and the page then says whether the store holds what this tab shows. */
+const SETUP_MORE_KEY='loadcheck:setups-more:v1';
 const SETUP_MARK_FIELDS=['kind','forRoute','base','isDefault'];
-function setupMarksOf(list){
-  const marks={};
-  for(const x of list){
-    const m={}; for(const f of SETUP_MARK_FIELDS) if(x[f] !== undefined) m[f]=x[f];
-    if(Object.keys(m).length) marks[x.id]=m;
-  }
-  return marks;
-}
-function splitSetups(list){
-  if(list.length <= OLD_PAGE_SETUPS) return {main:list.slice(),more:[]};
-  const ordered=[...list.filter(x => setupKind(x) === 'general'),...list.filter(x => setupKind(x) !== 'general')];
-  return {main:ordered.slice(0,OLD_PAGE_SETUPS),more:ordered.slice(OLD_PAGE_SETUPS)};
-}
-// The marks a stored record holds, by setup id ({} for none, or a record this page cannot read).
-function marksIn(value){
-  return dataObject(value) && value.app === 'load-check' && value.kind === 'setup-marks' && value.v === 1 && dataObject(value.marks) ? value.marks : {};
-}
-// A stored setup with its marks put back: each field its marks have, and none they do not.
-function withMarks(raw,marks){
-  if(!Object.hasOwn(marks,raw.id) || !dataObject(marks[raw.id])) return raw;
-  const m=marks[raw.id],x={...raw};
-  for(const f of SETUP_MARK_FIELDS){ if(m[f] !== undefined) x[f]=m[f]; else delete x[f]; }
+// A setup's marks: those of the four fields an older page does not know that it has.
+function setupMarks(x){ const m={}; for(const f of SETUP_MARK_FIELDS) if(x[f] !== undefined) m[f]=x[f]; return m; }
+// A setup as an older page writes it: without those four.
+function olderForm(x){ const o={...x}; for(const f of SETUP_MARK_FIELDS) delete o[f]; return o; }
+// A stored value's entries that have an id ([] for anything that is not a list).
+function setupEntries(v){ return Array.isArray(v) ? v.filter(e => dataObject(e) && typeof e.id === 'string') : []; }
+// A setup of loadcheck:setups with the marks an entry of this page's list keeps for it: each field the entry has, and none it has not.
+function withMarks(raw,entry){
+  const x={...raw};
+  for(const f of SETUP_MARK_FIELDS){ if(entry[f] !== undefined) x[f]=entry[f]; else delete x[f]; }
   return x;
 }
-// The one list from the three stored values: each setup once (the first list's copy, which an older page may have changed, first),
-// its marks put back, through normaliseSetup.
-function joinSetups(main,more,marksValue){
-  const marks=marksIn(marksValue),out=[],ids=new Set();
-  for(const raw of [...(Array.isArray(main) ? main : []),...(Array.isArray(more) ? more : [])]){
-    if(!dataObject(raw) || ids.has(raw.id)) continue;
-    const setup=normaliseSetup(withMarks(raw,marks));
-    if(setup){ out.push(setup); ids.add(setup.id); }
+// The one list from the two stored values (see above), each setup once, through normaliseSetup.
+function joinSetups(main,more){
+  const first=new Map(),out=[],seen=new Set();
+  for(const raw of setupEntries(main)) if(!first.has(raw.id)) first.set(raw.id,raw);
+  const entries=setupEntries(more),placed=new Set(entries.filter(e => first.has(e.id)).map(e => e.id));
+  const add=raw => { const s=normaliseSetup(raw); if(s && !seen.has(s.id)){ out.push(s); seen.add(s.id); } };
+  for(const raw of first.values()) if(!placed.has(raw.id)) add(raw);
+  for(const e of entries){
+    if(seen.has(e.id)) continue;
+    if(first.has(e.id)) add(withMarks(first.get(e.id),e));
+    else if(e.first !== true) add(e);
   }
   return out;
 }
-// The three values as the store holds them (the host's storage where there is one); the start-up reads the setups through this.
-async function storedSetupValues(){ return {main:await store.get(SETUP_KEY),more:await store.get(SETUP_MORE_KEY),marks:await store.get(SETUP_MARKS_KEY)}; }
-async function storedSetups(){ const v=await storedSetupValues(); return joinSetups(v.main,v.more,v.marks); }
+// The two values as the store holds them (the host's storage where there is one); the start-up reads the setups through this.
+async function storedSetupValues(){ return {main:await store.get(SETUP_KEY),more:await store.get(SETUP_MORE_KEY)}; }
+async function storedSetups(){ const v=await storedSetupValues(); return joinSetups(v.main,v.more); }
 // The same from this browser's storage, as another tab's write leaves it.
-function storedSetupsLocal(){ return joinSetups(readLocalJson(SETUP_KEY),readLocalJson(SETUP_MORE_KEY),readLocalJson(SETUP_MARKS_KEY)); }
-function storedSetupIds(){ return [SETUP_KEY,SETUP_MORE_KEY].flatMap(k => { const l=readLocalJson(k); return Array.isArray(l) ? l.filter(dataObject).map(x => x.id) : []; }); }
-function setupRaws(){ return {main:readLocalRaw(SETUP_KEY),more:readLocalRaw(SETUP_MORE_KEY),marks:readLocalRaw(SETUP_MARKS_KEY)}; }
-// Where each setup goes (see above): the two lists, and the setups that move up from the second list to the first.
-function setupLayout(list,main,more){
-  const idsOf=l => new Set((Array.isArray(l) ? l : []).filter(dataObject).map(x => x.id));
-  const inMain=idsOf(main),inMore=idsOf(more);
-  if(list.every(x => x && (inMain.has(x.id) || inMore.has(x.id)))){
-    const first=list.filter(x => inMain.has(x.id));
-    if(first.length <= OLD_PAGE_SETUPS) return {main:first,more:list.filter(x => !inMain.has(x.id)),entering:[]};
-  }
-  const split=splitSetups(list);
-  return {main:split.main,more:split.more,entering:split.main.filter(x => x && inMore.has(x.id))};
+function localSetupValues(){ return {main:readLocalJson(SETUP_KEY),more:readLocalJson(SETUP_MORE_KEY)}; }
+function storedSetupsLocal(){ const v=localSetupValues(); return joinSetups(v.main,v.more); }
+function storedSetupIds(){ return storedSetupsLocal().map(x => x.id); }
+function setupRaws(){ return {main:readLocalRaw(SETUP_KEY),more:readLocalRaw(SETUP_MORE_KEY)}; }
+// The same setups in the same order, each as it reads back.
+function sameSetups(a,b){ return a.length === b.length && JSON.stringify(a.map(x => normaliseSetup(x))) === JSON.stringify(b.map(x => normaliseSetup(x))); }
+/* The writes that take the store from `was` to `list`, in order (see above): first the removals alone, each value only getting smaller;
+   then each setup of loadcheck:setups the rider changed, in the form an older page writes; then this page's list, where the store does not
+   read as the list already. A value is not written where it is stored as it is, nor an empty list where nothing readable is stored. */
+function setupWrites(list,was,now){
+  const keep=new Map(),text=v => JSON.stringify(v),stamps=readSavedAt().items[SETUP_KEY];
+  for(const x of list) if(x && typeof x.id === 'string' && !keep.has(x.id)) keep.set(x.id,x);
+  const main=setupEntries(was.main),more=setupEntries(was.more),firstIds=new Set();
+  const before=new Map(joinSetups(was.main,was.more).map(x => [x.id,text(x)]));
+  const plan=[],cur={[SETUP_KEY]:was.mainText,[SETUP_MORE_KEY]:was.moreText},readable={[SETUP_KEY]:Array.isArray(was.main),[SETUP_MORE_KEY]:Array.isArray(was.more)};
+  const put=(k,v) => { const t=text(v); if(t === cur[k] || !v.length && !readable[k]) return; plan.push([k,v]); cur[k]=t; readable[k]=true; };
+  // 1. the removals alone: each list without the setups the rider deleted (this page's also without a place-holder whose setup is gone)
+  const firstKept=[];
+  for(const e of main) if(keep.has(e.id) && !firstIds.has(e.id)){ firstKept.push(e); firstIds.add(e.id); }
+  put(SETUP_KEY,firstKept);
+  put(SETUP_MORE_KEY,more.filter(e => firstIds.has(e.id) || e.first !== true && keep.has(e.id)));
+  // 2. a setup of loadcheck:setups the rider changed, in the form an older page writes; the others byte for byte
+  put(SETUP_KEY,firstKept.map(e => {
+    const n=normaliseSetup(keep.get(e.id)),o=normaliseSetup(e);
+    return n && o && text(olderForm(o)) === text(olderForm(n)) ? e : olderForm(n || keep.get(e.id));
+  }));
+  // 3. this page's list as the tab holds it: each setup it added whole, with the time it last changed; a place-holder for the others
+  const at=new Map(more.filter(e => e.first !== true && typeof e.at === 'string').map(e => [e.id,e.at]));
+  const mine=[...keep.values()].map(x => {
+    if(firstIds.has(x.id)) return {id:x.id,first:true,...setupMarks(x)};
+    const n=normaliseSetup(x) || x,when=before.get(x.id) === text(n) ? at.get(x.id) || stamps[x.id] : now;
+    return when ? {...n,at:when} : n;
+  });
+  const parsed=t => { try { return t === null || t === undefined ? null : JSON.parse(t); } catch(e){ return null; } };
+  if(!sameSetups(joinSetups(parsed(cur[SETUP_KEY]),parsed(cur[SETUP_MORE_KEY])),[...keep.values()])) put(SETUP_MORE_KEY,mine);
+  return plan;
 }
-// One of the three values, written as storeWrite writes but not stamped (storeSetups stamps the setups once, after its writes). In this
+// One of the two values, written as storeWrite writes but not stamped (storeSetups stamps the setups once, after its writes). In this
 // browser's storage the whole setup write is done at once, before anything else runs; only a host's storage is waited for.
 function writeLocalNow(k,v){
   MEM[k]=v;
@@ -11323,61 +11342,60 @@ async function writeSetupValue(k,v){
   try { if(window.storage){ await window.storage.set(k,JSON.stringify(v)); STORAGE_KIND='host'; return {saved:true,kind:'host'}; } } catch(e){}
   return writeLocalNow(k,v);
 }
-async function storeSetups(v,detailed){
-  const host=!!window.storage,wasRaw=setupRaws();
-  const was=host ? await storedSetupValues() : {main:readLocalJson(SETUP_KEY),more:readLocalJson(SETUP_MORE_KEY),marks:readLocalJson(SETUP_MARKS_KEY)};
-  mergeOtherTabsSetups(v,was);
-  v.forEach(x => x && SETUPS_SEEN.add(x.id));   // this tab knows them now, stored or not: a later write never takes one for another tab's
-  const {main,more,entering}=setupLayout(v,was.main,was.more),marks=setupMarksOf(v);
-  const there=k => readLocalRaw(k) !== null || MEM[k] !== undefined;
-  // In this order, so that stopping after any one write loses no setup: the second list with the setups moving up to the first still
-  // in it, the marks, the first list, then the second list without those.
-  const writes=[];
-  if(more.length || entering.length || there(SETUP_MORE_KEY)) writes.push([SETUP_MORE_KEY,[...more,...entering]]);
-  if(Object.keys(marks).length || there(SETUP_MARKS_KEY)) writes.push([SETUP_MARKS_KEY,{app:'load-check',kind:'setup-marks',v:1,marks}]);
-  writes.push([SETUP_KEY,main]);
-  if(entering.length) writes.push([SETUP_MORE_KEY,more]);
+async function storeSetups(list,detailed){
+  const host=!!window.storage,wasRaw=setupRaws(),now=new Date().toISOString();
+  const v=host ? await storedSetupValues() : localSetupValues(),textOf=x => x === null || x === undefined ? null : JSON.stringify(x);
+  const was={main:v.main,more:v.more,mainText:host ? textOf(v.main) : wasRaw.main,moreText:host ? textOf(v.more) : wasRaw.more};
+  mergeOtherTabsSetups(list,was);
+  list.forEach(x => x && SETUPS_SEEN.add(x.id));   // this tab knows them now, stored or not: a later write never takes one for another tab's
   let saved=true,kind=STORAGE_KIND,browser=false;
-  for(const [k,value] of writes){
-    if(!host && readLocalRaw(k) === JSON.stringify(value)){ MEM[k]=value; continue; }   // stored as it is already
+  for(const [k,value] of setupWrites(list,was,now)){
     const r=host ? await writeSetupValue(k,value) : writeLocalNow(k,value);
     kind=r.kind; if(r.saved && r.kind === 'browser') browser=true;
     if(!r.saved){ saved=false; break; }   // the first write that fails stops the rest
   }
-  if(browser) stampSetups(wasRaw);
+  if(browser) stampSetups(wasRaw,now);
+  // Stored only when the store reads exactly as this tab shows it, whichever writes went through (third review of PR 80, m-B); a list
+  // with an entry no page can read back can only be judged by its writes.
+  const holds=host ? await storedSetups() : storedSetupsLocal();
   SETUPS_KNOWN=new Set(storedSetupIds());
-  SETUPS_STORED=saved;
-  return detailed ? {saved,kind} : saved;
+  SETUPS_STORED=list.every(x => normaliseSetup(x)) ? sameSetups(holds,list) : saved;
+  return detailed ? {saved:SETUPS_STORED,kind} : SETUPS_STORED;
 }
 /* The setups' stamps for Also delete bag planner data (fix round of PR 80, m-1): one per setup, whichever list holds it, kept with the
    first list's stamps in the ledger (the live page keeps those when it writes the ledger for another key), and new only when what the
-   page reads for that setup changes: moving between the lists, or its marks put back on it after an older page saved it without them,
-   is not a change. Each list's own stamp, and the marks', is the newest stamp of the setups it holds, so an older page applying a delete
-   request, which judges those two values whole, keeps one only when a setup in it was saved after the request. */
-function stampSetups(wasRaw){
+   page reads for that setup changes: its marks put back on it after an older page saved it without them is not a change. An older page's
+   own setup write keeps only the stamps of the setups it writes, so a setup this page holds whole also keeps its time in its own entry
+   (`at`), and that time stands in for a stamp the ledger lost (third review of PR 80, m-D). Each list's own stamp is the newest of the
+   setups it holds; this page's list, which an older page applying a delete request keeps or removes whole, counts the setups it keeps marks
+   for too, so it goes only when none of them was saved after the request: such an apply deletes too little then, but never drops a mark. */
+function stampSetups(wasRaw,now=new Date().toISOString()){
   try {
     const parse=t => { try { return t === null ? null : JSON.parse(t); } catch(e){ return null; } };
+    // every stored setup by id, as stored (its marks beside a setup of the first list) and as the page reads it
     const state=raws => {
-      const lists=[parse(raws.main),parse(raws.more)],marks=marksIn(parse(raws.marks)),out=new Map();
-      for(const l of lists) for(const x of Array.isArray(l) ? l : [])
-        if(dataObject(x) && typeof x.id === 'string' && !out.has(x.id))
-          out.set(x.id,{x,marks,text:JSON.stringify(x),mark:JSON.stringify(Object.hasOwn(marks,x.id) ? marks[x.id] : null)});
-      return {lists,marks,out};
+      const main=setupEntries(parse(raws.main)),more=setupEntries(parse(raws.more)),first=new Map(),entry=new Map(),out=new Map();
+      for(const e of main) if(!first.has(e.id)) first.set(e.id,e);
+      for(const e of more) if(!entry.has(e.id)) entry.set(e.id,e);
+      for(const [id,e] of first){ const m=entry.get(id); out.set(id,{text:JSON.stringify(e)+JSON.stringify(m ? setupMarks(m) : {}),x:m ? withMarks(e,m) : e}); }
+      for(const [id,e] of entry) if(!first.has(id) && e.first !== true){ const {at,...x}=e; out.set(id,{text:JSON.stringify(x),x:e}); }
+      return out;
     };
-    const read=e => e.read !== undefined ? e.read : (e.read=JSON.stringify(normaliseSetup(withMarks(e.x,e.marks))));
-    const same=(a,b) => a.text === b.text && a.mark === b.mark || read(a) !== 'null' && read(a) === read(b);
-    const before=state(wasRaw),after=state(setupRaws()),ledger=readSavedAt(),now=new Date().toISOString();
+    const read=s => s.read !== undefined ? s.read : (s.read=JSON.stringify(normaliseSetup(s.x)));
+    const same=(a,b) => a.text === b.text || read(a) !== 'null' && read(a) === read(b);
+    const afterRaw=setupRaws(),before=state(wasRaw),after=state(afterRaw),ledger=readSavedAt();
+    const more=setupEntries(parse(afterRaw.more)),at=new Map(more.filter(e => e.first !== true && typeof e.at === 'string').map(e => [e.id,e.at]));
     const had=ledger.items[SETUP_KEY],stamps={};
-    for(const [id,b] of after.out){
-      const a=before.out.get(id);
-      if(!a || !same(a,b)) stamps[id]=now;          // new or changed now
-      else if(had[id]) stamps[id]=had[id];           // unchanged: its own time, or none
+    for(const [id,s] of after){
+      const b=before.get(id);
+      if(!b || !same(b,s)) stamps[id]=now;                               // new or changed now
+      else if(had[id] || at.get(id)) stamps[id]=had[id] || at.get(id);  // unchanged: its own time, or none
     }
     ledger.items[SETUP_KEY]=stamps;
     const newest=ids => ids.map(id => stamps[id]).filter(Boolean).sort().pop();
     const keyStamp=(k,ids) => { const t=newest(ids); if(t) ledger.keys[k]=t; else delete ledger.keys[k]; };
-    after.lists.forEach((l,i) => keyStamp(i ? SETUP_MORE_KEY : SETUP_KEY,Array.isArray(l) ? l.filter(dataObject).map(x => x.id) : []));
-    keyStamp(SETUP_MARKS_KEY,Object.keys(after.marks));
+    keyStamp(SETUP_KEY,setupEntries(parse(afterRaw.main)).map(e => e.id));
+    keyStamp(SETUP_MORE_KEY,more.filter(e => e.first !== true || Object.keys(setupMarks(e)).length).map(e => e.id));
     window.localStorage.setItem(SAVED_AT_KEY,JSON.stringify(ledger));
   } catch(e){}
 }
@@ -11491,6 +11509,8 @@ function dropDeleteFragment(){
   if(!/^#copilot-delete=/.test(String(location.hash || ''))) return;
   try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
 }
+// What the page says when a removal did not reach storage (third review of PR 80, m-E).
+const DELETE_UNFINISHED_TEXT='Some bag planner data saved before your delete request could not be deleted yet: this browser\'s storage refused the change. The Bag planner tries again each time it opens.';
 // Returns true when a request was applied now.
 function applyDeleteRequest(){
   dropDeleteFragment();
@@ -11498,28 +11518,30 @@ function applyDeleteRequest(){
   if(!request) return false;
   const applied=readLocalJson(DELETE_APPLIED_KEY);
   if(dataObject(applied) && applied.id === request.id) return false;
-  try { window.localStorage.setItem(DELETING_KEY,JSON.stringify({id:request.id})); } catch(e){}
+  // A request whose removals did not all reach storage before is applied again, quietly: the mark that a delete is under way is still
+  // there from then, when the other tabs dropped what they held, so nothing new is written for them to reload on (third review, m-E).
+  const under=readLocalJson(DELETING_KEY);
+  if(!(dataObject(under) && under.id === request.id)) try { window.localStorage.setItem(DELETING_KEY,JSON.stringify({id:request.id})); } catch(e){}
   const cutoff=Date.parse(request.createdAt),ledger=readSavedAt(),now=Date.now();
   // "Later" is at or after the request; a time later than now (a clock set back since) is later too, never "before" (review M2)
   const later=stamp => typeof stamp === 'string' && Number.isFinite(Date.parse(stamp)) && (Date.parse(stamp) >= cutoff || Date.parse(stamp) > now);
   // a day-only date (an older page's setup) is later only when it is a later day than the request's
   const laterDay=day => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day) && day > request.createdAt.slice(0,10);
-  const remove=k => { try { window.localStorage.removeItem(k); } catch(e){} delete MEM[k]; };
+  let written=true;   // every removal reached storage
+  const remove=k => { try { window.localStorage.removeItem(k); } catch(e){ written=false; } delete MEM[k]; };
   const keepList=(k,keep) => {
     const list=readLocalJson(k);
     const kept=Array.isArray(list) ? list.filter(x => dataObject(x) && keep(x)) : [];
     if(!kept.length){ remove(k); return false; }
-    if(kept.length !== list.length){ try { window.localStorage.setItem(k,JSON.stringify(kept)); } catch(e){} MEM[k]=kept; }
+    if(kept.length !== list.length){ try { window.localStorage.setItem(k,JSON.stringify(kept)); } catch(e){ written=false; } MEM[k]=kept; }
     return true;
   };
   const kept={keys:{},items:{}};
   for(const k of localKeys()){
-    if(!k.startsWith('loadcheck:') || [DELETE_APPLIED_KEY,DELETING_KEY,SAVED_AT_KEY,DRAFT_BROWSER_META_KEY,BIKE_FORMAT_KEY,SETUP_MARKS_KEY].includes(k)) continue;
+    if(!k.startsWith('loadcheck:') || [DELETE_APPLIED_KEY,DELETING_KEY,SAVED_AT_KEY,DRAFT_BROWSER_META_KEY,BIKE_FORMAT_KEY,SETUP_KEY,SETUP_MORE_KEY].includes(k)) continue;
     if(k === DRAFT_KEY){
       const draft=readLocalJson(k);
       if(dataObject(draft) && later(draft.updatedAt)) kept.keys[k]=true; else { remove(k); remove(DRAFT_BROWSER_META_KEY); }
-    } else if(k === SETUP_KEY || k === SETUP_MORE_KEY){
-      if(keepList(k,x => later(ledger.items[SETUP_KEY][x.id]) || later(x.updated) || laterDay(x.saved))) kept.keys[k]=true;
     } else if(k === FEEDBACK_KEY){
       if(keepList(k,x => later(x.at))) kept.keys[k]=true;
     } else if(k === BIKE_PROFILE_KEY){
@@ -11528,28 +11550,23 @@ function applyDeleteRequest(){
     else remove(k);
   }
   if(!kept.keys[BIKE_PROFILE_KEY]) remove(BIKE_FORMAT_KEY);   // the format mark guards a list; with no list there is nothing to guard
-  // the setups' marks (review of PR 80, I1) stay only for the setups that stay
-  const setupMarks=readLocalJson(SETUP_MARKS_KEY);
-  if(setupMarks !== null){
-    const staying=new Set([SETUP_KEY,SETUP_MORE_KEY].flatMap(k => { const l=readLocalJson(k); return Array.isArray(l) ? l.map(x => x && x.id) : []; }));
-    const marks=dataObject(setupMarks) && dataObject(setupMarks.marks) ? Object.fromEntries(Object.entries(setupMarks.marks).filter(([id]) => staying.has(id))) : {};
-    if(Object.keys(marks).length){
-      const v={app:'load-check',kind:'setup-marks',v:1,marks};
-      try { window.localStorage.setItem(SETUP_MARKS_KEY,JSON.stringify(v)); } catch(e){}
-      MEM[SETUP_MARKS_KEY]=v; kept.keys[SETUP_MARKS_KEY]=true;
-    } else remove(SETUP_MARKS_KEY);
-  }
+  // The saved setups (third review of PR 80): loadcheck:setups by each setup's stamp or its own times; this page's list by the same, and by
+  // the time each setup it holds whole last changed (`at`, which no older page's write can drop); a place-holder stays with its setup.
+  const laterSetup=x => later(ledger.items[SETUP_KEY][x.id]) || later(x.updated) || laterDay(x.saved);
+  if(keepList(SETUP_KEY,laterSetup)) kept.keys[SETUP_KEY]=true;
+  const firstLeft=new Set(setupEntries(readLocalJson(SETUP_KEY)).map(e => e.id));
+  if(keepList(SETUP_MORE_KEY,e => firstLeft.has(e.id) || e.first !== true && (later(e.at) || laterSetup(e)))) kept.keys[SETUP_MORE_KEY]=true;
   const left={app:'load-check',kind:'saved-at',v:1,keys:{},items:{}};
   for(const k of Object.keys(kept.keys)) if(ledger.keys[k]) left.keys[k]=ledger.keys[k];
   for(const k of SAVED_ITEM_KEYS){
-    const ids=new Set((k === SETUP_KEY ? [SETUP_KEY,SETUP_MORE_KEY] : [k]).flatMap(l => { const list=readLocalJson(l); return Array.isArray(list) ? list.map(x => x && x.id) : []; }));
+    const ids=new Set((k === SETUP_KEY ? [SETUP_KEY,SETUP_MORE_KEY] : [k]).flatMap(l => setupEntries(readLocalJson(l)).map(x => x.id)));
     left.items[k]=Object.fromEntries(Object.entries(ledger.items[k]).filter(([id]) => ids.has(id)));
   }
-  try {
-    if(Object.keys(left.keys).length) window.localStorage.setItem(SAVED_AT_KEY,JSON.stringify(left)); else remove(SAVED_AT_KEY);
-    window.localStorage.setItem(DELETE_APPLIED_KEY,JSON.stringify({app:'load-check',kind:'delete-applied',v:1,id:request.id,at:new Date().toISOString()}));
-  } catch(e){}
-  remove(DELETING_KEY);
+  try { if(Object.keys(left.keys).length) window.localStorage.setItem(SAVED_AT_KEY,JSON.stringify(left)); else window.localStorage.removeItem(SAVED_AT_KEY); } catch(e){}
+  if(written){
+    try { window.localStorage.setItem(DELETE_APPLIED_KEY,JSON.stringify({app:'load-check',kind:'delete-applied',v:1,id:request.id,at:new Date().toISOString()})); } catch(e){}
+    remove(DELETING_KEY);
+  } else showTabNotice(DELETE_UNFINISHED_TEXT,false);   // not marked applied: the next start applies it again, and the rider is told
   DELETE_SEEN=deleteMark();   // this tab's own delete
   return true;
 }
@@ -11761,9 +11778,9 @@ function nightsFrom(nights,date){ return `${nights === 0 ? 'a day ride' : nights
 async function planTripBags(){
   if(HANDOFF.busy || !HANDOFF.gpx || !DRAFT_READY || !handoffPlannable(HANDOFF.trip)) return false;
   const t=HANDOFF.trip,name=HANDOFF.name,undo=JSON.stringify(captureDraft()),wasBike=S.bikeProfile ? S.bikeProfile.id : null;
-  const before=keepPlanBefore(),trips=SETUPS.filter(s => setupKind(s) === 'trip').length;
-  if(trips+1+(before ? 1 : 0) > MAX_TRIP_SETUPS){
-    showHandoffBar(`${setupKindFullMessage('trip')} Then plan bags for ${name} again, or use only the route.`,{apply:true,plan:true,reuse:!!HANDOFF.reuse});
+  const before=keepPlanBefore(),adds=before ? 2 : 1;
+  if(setupAddFull('trip',adds)){   // room for its trip setups, of their kind and in all (third review of PR 80, I-A)
+    showHandoffBar(`${setupKindFullMessage('trip',adds)} Then plan bags for ${name} again, or use only the route.`,{apply:true,plan:true,reuse:!!HANDOFF.reuse});
     return false;
   }
   HANDOFF.busy=true; showHandoffBar(`Planning bags for ${name}…`);
@@ -11798,7 +11815,7 @@ async function reuseTripSetup(){
   const s=HANDOFF.reuse && SETUPS.find(x => x.id === HANDOFF.reuse);
   if(HANDOFF.busy || !s || !DRAFT_READY) return false;
   const undo=JSON.stringify(captureDraft()),before=keepPlanBefore();
-  if(before && setupKindFull('trip')){ showHandoffBar(setupKindFullMessage('trip'),{apply:true,plan:true,reuse:true}); return false; }
+  if(before && setupAddFull('trip')){ showHandoffBar(setupKindFullMessage('trip'),{apply:true,plan:true,reuse:true}); return false; }
   let stored=true;
   if(before){ SETUPS.splice(SETUPS.indexOf(s)+1,0,before); stored=savedSetupResult(await store.set(SETUP_KEY,SETUPS)); }
   if(!HANDOFF.long) SMALL_VIEW=true;
@@ -12330,7 +12347,11 @@ function setupKindFields(p){
 }
 function setupKind(s){ return s && s.kind === 'general' ? 'general' : 'trip'; }
 function setupKindLimit(kind){ return kind === 'general' ? MAX_GENERAL_SETUPS : MAX_TRIP_SETUPS; }
-function setupKindFull(kind,list=SETUPS){ return list.filter(s => setupKind(s) === kind).length >= setupKindLimit(kind); }
+function setupKindCount(kind,list=SETUPS){ return list.filter(s => setupKind(s) === kind).length; }
+function setupKindFull(kind,list=SETUPS){ return setupKindCount(kind,list) >= setupKindLimit(kind); }
+/* Room to add `n` setups of a kind (third review of PR 80, I-A): none past that kind's limit, nor past MAX_SAVED_SETUPS in all. Nothing is
+   ever cut, so a library an older page grew past them is kept whole, and this page adds nothing to it until the rider deletes some. */
+function setupAddFull(kind,n=1,list=SETUPS){ return setupKindCount(kind,list)+n > setupKindLimit(kind) || list.length+n > MAX_SAVED_SETUPS; }
 // Saved setups in two groups, each in the list's own order (newest saved first): the few general ones, then the trip setups.
 function setupGroups(list){ return {general:list.filter(s => setupKind(s) === 'general'),trip:list.filter(s => setupKind(s) === 'trip')}; }
 function recallOrder(list){ const g=setupGroups(list); return [...g.general,...g.trip]; }
@@ -12349,8 +12370,13 @@ function setupGroupsHtml(card){
     `<div class="setupgroup"><h3>Trip setups</h3><p class="setuphint">Each one planned for one trip.</p>${g.trip.length ? g.trip.map(card).join('') :
       `<p class="setuphint">None yet.</p>`}</div>`;
 }
-function setupKindFullMessage(kind){
-  return `You have ${setupKindLimit(kind)} ${kind} setups. Export them, then delete one before adding another.`;
+// The words when there is no room for `n` more: the true count, and how many to delete first.
+function setupKindFullMessage(kind,n=1,list=SETUPS){
+  const kindFull=setupKindCount(kind,list)+n > setupKindLimit(kind);
+  const have=kindFull ? setupKindCount(kind,list) : list.length,max=kindFull ? setupKindLimit(kind) : MAX_SAVED_SETUPS,need=have+n-max;
+  const where=have > max ? `, past the limit of ${max}` : have < max ? ` of the ${max} there is room for` : kindFull ? '' : ', the limit';
+  const what=`${have} ${kindFull ? kind : 'saved'} setups${where}${kindFull ? '' : ' in all'}`;
+  return `You have ${what}. Export them, then delete ${need === 1 ? 'one' : need} before adding another.`;
 }
 function normaliseReport(f){
   if(!dataObject(f) || !dataDate(f.at)) return null;
@@ -12647,15 +12673,13 @@ $('tabLoad').onclick = async () => {
   DRAFT_FROZEN=false;
   if(other) adoptDraft(other); else $('tabBar').classList.add('hidden');
 };
-// Setups saved by another tab are kept: a write adds the stored setups this tab never saw (`was`: the three values as the write read
-// them; the list is read through joinSetups only when one of them is such a setup).
+// Setups saved by another tab are kept: a write adds the stored setups this tab never saw (`was`: the two values as the write read them;
+// the list is read through joinSetups only when one of them is such a setup). Nothing is cut, whatever the count (third review, I-A).
 function mergeOtherTabsSetups(list,was){
   try {
-    const v=was || {main:readLocalJson(SETUP_KEY),more:readLocalJson(SETUP_MORE_KEY),marks:readLocalJson(SETUP_MARKS_KEY)};
+    const v=was || localSetupValues();
     const unseen=x => !SETUPS_SEEN.has(x.id) && !list.some(y => y.id === x.id);
-    const raws=[...(Array.isArray(v.main) ? v.main : []),...(Array.isArray(v.more) ? v.more : [])];
-    if(raws.some(x => dataObject(x) && unseen(x))) joinSetups(v.main,v.more,v.marks).forEach(x => { if(unseen(x)) list.push(x); });
-    list.splice(MAX_SAVED_SETUPS);
+    if([...setupEntries(v.main),...setupEntries(v.more)].some(unseen)) joinSetups(v.main,v.more).forEach(x => { if(unseen(x)) list.push(x); });
   } catch(e){}
 }
 // Plain words for setups another tab removed (review of PR 80, m-2): the rider may have deleted them there, but an older tab that
@@ -12673,9 +12697,9 @@ function followOtherTabs(event){
   if(DELETED_ELSEWHERE) return;
   const key=event.key,all=key === null;
   if(all || key === DRAFT_KEY) checkOtherTabs();
-  if(all || [SETUP_KEY,SETUP_MORE_KEY,SETUP_MARKS_KEY].includes(key)){
+  if(all || [SETUP_KEY,SETUP_MORE_KEY].includes(key)){
     try {
-      const stored=storedSetupsLocal(),now=new Set(storedSetupIds());
+      const stored=storedSetupsLocal(),now=new Set(stored.map(x => x.id));
       const gone=SETUPS.filter(x => SETUPS_KNOWN.has(x.id) && !now.has(x.id));
       SETUPS=stored; SETUPS.forEach(x => SETUPS_SEEN.add(x.id)); SETUPS_KNOWN=now;
       if(gone.length) noteSetupsGone(gone);
@@ -12828,7 +12852,7 @@ async function importAll(text){
     // The same file imported again: its changed setup is already here as an "· imported" copy, so add nothing.
     const prior=existing && SETUPS.find(current => current.id !== s.id && / · imported$/.test(current.name) && importedBody(current) === importedBody(s));
     if(prior){ priorCopy.set(s.id,prior.id); return; }
-    if(setupKindFull(setupKind(s))){ atLimit++; return; }
+    if(setupAddFull(setupKind(s))){ atLimit++; return; }
     if(existing){
       const oldId=s.id; s.id=newSetupId(); remapped.set(oldId,s.id);
       s.name=s.name.slice(0,145)+' · imported'; conflicts++;
@@ -12863,7 +12887,7 @@ async function importAll(text){
     Math.min(rawBikeProfiles.length,MAX_BIKE_PROFILES)-bikeProfiles.length;
   const bikeAtLimit=Math.max(0,rawBikeProfiles.length-MAX_BIKE_PROFILES)+bikeMerge.atLimit;
   return `Added ${addedSetups} setups and ${addedReports} reports.${rawBikeProfiles.length ? ` Added ${bikeMerge.added} bike profiles.` : ''}${bikeMerge.conflicts ? ` Kept ${bikeMerge.conflicts} changed bike profiles as imported copies; your existing bikes are preserved.` : ''}${conflicts ? ` Kept ${conflicts} changed setups as imported copies, preserving your existing versions.` : ''}${invalid ? ` Skipped ${invalid} invalid or oversized entries.` : ''}${
-    atLimit ? ` Skipped ${atLimit} setups beyond the library limit of ${MAX_GENERAL_SETUPS} general and ${MAX_TRIP_SETUPS} trip setups. Your existing entries are kept.` : ''}${
+    atLimit ? ` Skipped ${atLimit} setups beyond the library limit of ${MAX_GENERAL_SETUPS} general and ${MAX_TRIP_SETUPS} trip setups, ${MAX_SAVED_SETUPS} in all. Your existing entries are kept.` : ''}${
     bikeAtLimit ? ` Skipped ${bikeAtLimit} bike profiles beyond the ${MAX_BIKE_PROFILES}-profile library limit. Your existing bikes are kept.` : ''}${
     !setupsSaved || !reportsSaved || !bikesSaved ? ' Imported entries are kept for this session only because browser storage could not save them. Export before closing.' : ''}${
     draft ? ' Choose whether to use the imported working plan below.' : ''}${
@@ -12948,7 +12972,7 @@ function snapshotSetup(name, note){
 }
 async function saveSetup(name, note){
   if(trialWaits('setup')) return false;
-  if(setupKindFull('trip')){   // a setup saved here is a trip setup; the rider marks the general ones
+  if(setupAddFull('trip')){   // a setup saved here is a trip setup; the rider marks the general ones
     SAVE_MESSAGE = setupKindFullMessage('trip');
     if($('saveMsg')) $('saveMsg').textContent = SAVE_MESSAGE;
     draftStatus(SAVE_MESSAGE);
@@ -13103,7 +13127,7 @@ async function renameSetup(id,name){
 }
 async function duplicateSetup(id){
   const original=SETUPS.find(s => s.id === id); if(!original) return false;
-  if(setupKindFull(setupKind(original))){ SAVE_MESSAGE=setupKindFullMessage(setupKind(original));renderResult();return false; }
+  if(setupAddFull(setupKind(original))){ SAVE_MESSAGE=setupKindFullMessage(setupKind(original));renderResult();return false; }
   const copy=JSON.parse(JSON.stringify(original)),base=original.name.slice(0,140);
   delete copy.isDefault;
   let suffix=' · copy',n=2;
@@ -13141,7 +13165,7 @@ async function deleteSetup(id){
 }
 async function undoDeleteSetup(){
   const waiting=DELETED_SETUPS[DELETED_SETUPS.length-1];
-  if(waiting && setupKindFull(setupKind(waiting.setup))){SAVE_MESSAGE=setupKindFullMessage(setupKind(waiting.setup)).replace('before adding another','before undoing this deletion');renderResult();return false;}
+  if(waiting && setupAddFull(setupKind(waiting.setup))){SAVE_MESSAGE=setupKindFullMessage(setupKind(waiting.setup)).replace('before adding another','before undoing this deletion');renderResult();return false;}
   const last = DELETED_SETUPS.pop(); if(!last) return;
   SETUPS.splice(Math.min(last.index, SETUPS.length), 0, last.setup);
   SAVE_MESSAGE = '';

@@ -577,7 +577,7 @@ test('[BK-FORK-SAVE] the fork\'s own colours round-trip: saved, read by a new pa
   assert.deepEqual(p.json('capturePlan().bikeProfile.look.paint'),OWN_PAIR,'the draft');
   p.run("buildThumb=()=>''");   // no rig to draw here: the thumbnail is the browser tests' (LC-LOOK-EXTRAS-SAVE)
   await p.run("saveSetup('Own fork','')");
-  const setup=JSON.parse(p.stored('loadcheck:setups')).find(s=>s.name==='Own fork');
+  const setup=p.json("storedSetupsLocal().find(s=>s.name==='Own fork')");   // as a page reads it back (a setup this page adds is not in the list older pages read)
   assert.deepEqual((setup.plan||setup).bikeProfile.look.paint,OWN_PAIR,'the setup');
   p.run("S.bikeProfile=normaliseBikeProfile({id:'other',name:'Other'})");
   p.run(`loadSetup(${JSON.stringify(setup.id)})`);

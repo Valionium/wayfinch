@@ -47,6 +47,9 @@ function oldData(p){
   p.values.set('someone-else','kept');
 }
 const loadcheckKeys=p=>[...p.values.keys()].filter(k=>k.startsWith('loadcheck:')).sort();
+// The saved setups the two lists hold, by id: the list older pages read, and the page's own list (where a setup the page adds goes; a
+// place-holder there is a setup of the first list, so it is not counted twice; third review of PR 80, I-B).
+const setupIds=p=>[...JSON.parse(p.stored('loadcheck:setups') ?? '[]'),...JSON.parse(p.stored('loadcheck:setups-more:v1') ?? '[]').filter(x=>x.first!==true)].map(x=>x.id);
 
 test('[C-DELETE] a stored request removes every loadcheck:* key saved before it, one by one; no copilot:* key, no other key; loadcheck:delete-applied written',()=>{
   const p=page({hash:'#copilot-delete='+ID});
@@ -101,7 +104,7 @@ test('[C-DELETE] a plan, setup, bike and report saved after the request, before 
   const fresh=page({storage});
   assert.equal(fresh.run('applyDeleteRequest()'),true);
   assert.equal(fresh.stored('loadcheck:draft'),newDraft,'the new plan is kept byte for byte');
-  assert.deepEqual(JSON.parse(fresh.stored('loadcheck:setups')).map(x=>x.id),['st_new']);
+  assert.deepEqual(setupIds(fresh),['st_new']);
   assert.deepEqual(JSON.parse(fresh.stored('loadcheck:bikeProfiles')).map(x=>x.id),['bike_new']);
   assert.equal(JSON.parse(fresh.stored('loadcheck:bikeProfile')).id,'bike_new');
   assert.equal(fresh.stored('loadcheck:bikeProfilesFormat'),'2','the format mark stays while its list does');
@@ -145,12 +148,13 @@ test('[C-DELETE] applied at most once: a second load keeps a newly saved plan',a
   p.run('DRAFT_READY=true;S.bags=[{uid:1,pos:"seat",L:10}];S.nextUid=2;');
   await p.run('flushDraft()');
   await p.run(`store.set(SETUP_KEY,[{id:'st_after',name:'After'}])`);
-  const draft=p.stored('loadcheck:draft'),setups=p.stored('loadcheck:setups');
+  const draft=p.stored('loadcheck:draft'),setups=[p.stored('loadcheck:setups'),p.stored('loadcheck:setups-more:v1')];
   assert.ok(draft);
+  assert.deepEqual(setupIds(p),['st_after']);
   const second=page({storage});
   assert.equal(second.run('applyDeleteRequest()'),false,'the same id is never applied twice');
   assert.equal(second.stored('loadcheck:draft'),draft);
-  assert.equal(second.stored('loadcheck:setups'),setups);
+  assert.deepEqual([second.stored('loadcheck:setups'),second.stored('loadcheck:setups-more:v1')],setups);
   assert.equal(second.log.filter(x=>x.startsWith('remove:')).length,0);
 });
 

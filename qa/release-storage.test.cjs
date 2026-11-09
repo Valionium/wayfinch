@@ -122,7 +122,7 @@ const check=(value,message)=>{assert.ok(value,message);checks++;};
   for(const t of setupTabs)t.run('DRAFT_READY=true;snapshotSetup=(name)=>normaliseSetup({...captureDraft(),id:newSetupId(),name,saved:"2026-10-03",predicted:{mounted:35,kit:31,spare:4,spilled:0,kg:14}});');
   await sa.run('saveSetup("From tab A","")');
   await sb.run('saveSetup("From tab B","")');
-  const names=JSON.parse(shared.values.get('loadcheck:setups')||sa.store.values.get('loadcheck:setups')).map(x=>x.name).sort();
+  const names=JSON.parse(sa.run('JSON.stringify(storedSetupsLocal().map(x=>x.name))')).sort();   // as a page reads the store back
   check(names.join('|')==='From tab A|From tab B','rule 6: saving a setup keeps the setups another tab saved');
   check(sa.run('SETUPS.length')===2,'rule 6: the other tab follows the setups list without writing');
   console.log(JSON.stringify({suite:'storage',checks,maximal20SetupExportBytes:run('qaBytes'),reportsRoundTripped:750}));
