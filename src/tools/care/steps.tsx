@@ -2,8 +2,10 @@
 // task full screen, one step at a time, each with its picture where one is drawn. Back and Next only, no swiping (answer 4). Opening it adds
 // one history entry, so the phone's back gesture closes it in one go. While a roadside card is open the screen is kept awake (answer 5).
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { Bars } from '../../core/bike/normalise.ts';
+import type { Bars, BikeRecord } from '../../core/bike/normalise.ts';
 import { picturesFor } from '../../core/care/pictures.ts';
+import { linkSegments, STEP_PARTS } from '../../core/parts/links.ts';
+import type { PartId } from '../../core/parts/guide.ts';
 import type { CareTask, RoadCard } from '../../core/care/types.ts';
 import { C, CARRY, WHO_LABEL } from '../../core/wording/en-care.ts';
 import { loadPictures, Picture, pictureReady } from './picture.tsx';
@@ -78,6 +80,24 @@ function Pictures({ ids, view }: { ids: string[]; view: string }) {
   return <div class={`care-pics${ready.length > 1 ? ' care-pics-two' : ''}`}>{ready.map((id, k) => <Picture key={id} id={id} view={`${view}-${k}`} />)}</div>;
 }
 
+type Sheet = typeof import('./parts-sheet.tsx').PartSheet;
+type OnPart = (part: PartId, from: HTMLButtonElement) => void;
+
+/**
+ * A step's text with its part names as buttons that open the parts guide (design 4.2): the first mention of each, from the wording data
+ * (STEP_PARTS), the text reading exactly as before.
+ */
+function StepText({ id, at, text, onPart }: { id: string; at: number; text: string; onPart: OnPart }) {
+  const links = STEP_PARTS[id]?.[at] ?? [];
+  return (
+    <p class="care-step-t">
+      {linkSegments(text, links).map((seg, i) => (typeof seg === 'string' ? seg : (
+        <button key={i} type="button" class="care-part" aria-haspopup="dialog" onClick={(e) => onPart(seg.part, e.currentTarget)}>{seg.text}</button>
+      )))}
+    </p>
+  );
+}
+
 /** The end page's heading and words, or null where a task has nothing to add (its last step's Next then reads Done). */
 function endOf(source: StepSource): { title: string; body: preact.ComponentChildren } | null {
   const unsure = source.item.critical ? <p class="care-unsure"><strong>{C.careUnsure}</strong></p> : null;
@@ -86,13 +106,28 @@ function endOf(source: StepSource): { title: string; body: preact.ComponentChild
   return t.note || t.critical ? { title: C.careStepsEnd, body: <>{t.note ? <p>{t.note}</p> : null}{unsure}</> } : null;
 }
 
-/** `bars`: the chosen bike's bars, which pick a picture where the design draws one for each (3.6); null for Not sure or no bike. */
-export function StepView({ source, bars, onClose }: { source: StepSource; bars: Bars | null; onClose: () => void }) {
+/**
+ * `bars`: the chosen bike's bars, which pick a picture where the design draws one for each (3.6); null for Not sure or no bike. `bike`: the
+ * chosen bike, drawn by the parts guide with the part marked (the app's default bike when null).
+ */
+export function StepView({ source, bars, bike = null, onClose }: { source: StepSource; bars: Bars | null; bike?: BikeRecord | null; onClose: () => void }) {
   const box = useRef<HTMLDialogElement>(null);
   const head = useRef<HTMLHeadingElement>(null);
   const [at, setAt] = useState(0);
   const [all, setAll] = useState(readAll);
   const [, setReady] = useState(0);
+  // The parts guide's sheet: its own chunk, loaded with the first tap on a part name; the name tapped gets focus back when it closes.
+  const [part, setPart] = useState<PartId | null>(null);
+  const [PartSheet, setSheet] = useState<Sheet | null>(null);
+  const partFrom = useRef<HTMLButtonElement | null>(null);
+  const openPart: OnPart = (id, from) => {
+    partFrom.current = from;
+    if (PartSheet) { setPart(id); return; }
+    void import('./parts-sheet.tsx').then(async (m) => {
+      if (await m.loadWords()) { setSheet(() => m.PartSheet); setPart(id); }
+    }, () => { /* not loaded (offline before it was cached): the text stays */ });
+  };
+  const closePart = (): void => { setPart(null); partFrom.current?.focus(); };
   const steps = source.item.steps;
   const end = endOf(source);
   const last = end ? steps.length + 1 : steps.length;
@@ -127,6 +162,7 @@ export function StepView({ source, bars, onClose }: { source: StepSource; bars: 
 
   const go = (to: number): void => { if (to >= 0 && to <= last) setAt(to); };
   const onKey = (e: KeyboardEvent): void => {
+    if (part !== null) return; // the sheet has the keys
     if (e.key === 'Escape') { e.preventDefault(); close(false); return; }
     // Alt or Ctrl with an arrow is the browser's own Back or Forward, and Shift or the Command key selects: let them pass.
     if (all || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || (e.target as HTMLElement | null)?.tagName === 'INPUT') return;
@@ -174,7 +210,7 @@ export function StepView({ source, bars, onClose }: { source: StepSource; bars: 
               <section key={i} class="care-step-all">
                 <Pictures ids={pictures[i]!} view={`a${i}`} />
                 <h3>{C.careStepN(i + 1)}</h3>
-                <p class="care-step-t">{s}</p>
+                <StepText id={source.item.id} at={i} text={s} onPart={openPart} />
               </section>
             ))}
             {end ? <section class="care-step-end"><h3>{end.title}</h3>{end.body}</section> : null}
@@ -184,7 +220,7 @@ export function StepView({ source, bars, onClose }: { source: StepSource; bars: 
             <Pictures ids={pics} view={`s${at}`} />
             <div class="care-step-words">
               <h2 ref={head} tabIndex={-1} class="care-step-h">{onStep ? C.careStepN(at) : label}</h2>
-              {at === 0 ? <Before source={source} /> : onStep ? <p class="care-step-t">{steps[at - 1]}</p> : end!.body}
+              {at === 0 ? <Before source={source} /> : onStep ? <StepText id={source.item.id} at={at - 1} text={steps[at - 1]!} onPart={openPart} /> : end!.body}
             </div>
           </div>
         )}
@@ -199,6 +235,7 @@ export function StepView({ source, bars, onClose }: { source: StepSource; bars: 
           </>
         )}
       </div>
+      {part !== null && PartSheet ? <PartSheet key={part} part={part} bike={bike} onClose={closePart} /> : null}
     </dialog>
   );
 }

@@ -422,3 +422,108 @@ test('[BC-STEPS-AWAKE] the page showing again while the first ask is still open 
   expect(dialog()).toBeNull();
   expect(lock.held).toBe(false);
 });
+
+// ---- The parts guide (care pictures design 4.2): a part's name in a step opens its entry as a sheet over the step view ----
+const sheet = () => document.querySelector<HTMLDialogElement>('dialog.part-sheet');
+const partLink = (text: string) => [...dialog()!.querySelectorAll<HTMLButtonElement>('.care-step .care-part')].find((b) => b.textContent === text) ?? null;
+const sheetButton = (name: string) => [...sheet()!.querySelectorAll('button')].find((b) => b.textContent === name || b.getAttribute('aria-label') === name) ?? null;
+const sheetOpen = async () => { await vi.waitFor(() => expect(sheet()).not.toBeNull(), { timeout: 3000 }); await settle(); };
+
+test("[PG-SHEET-OPEN] a part's name in a step is a button that reads as the text; a tap opens its entry over the step, focus on its name; Close returns focus to the name, the step view stays", async () => {
+  const push = vi.spyOn(history, 'pushState');
+  await brakeStep5(rimBike('drop'));
+  const step = card('brake-rub-rim').steps[4]!;
+  expect(dialog()!.querySelector('.care-step-t')!.textContent).toBe(step);
+  const link = partLink("brake's quick release")!;
+  expect(link.tagName).toBe('BUTTON');
+  expect(link.getAttribute('aria-haspopup')).toBe('dialog');
+  await click(link);
+  await sheetOpen();
+  const s = sheet()!;
+  expect(s.open).toBe(true);
+  expect(s.querySelector('h2')!.textContent).toBe("The brake's quick release");
+  expect(document.activeElement).toBe(s.querySelector('h2'));
+  expect(push.mock.calls.at(-1)![0]).toMatchObject({ careSteps: 'brake-rub-rim', carePart: 'brake-qr' });
+  expect(s.textContent).toContain('Only on bikes with rim brakes');
+  const back = vi.mocked(history.back).mock.calls.length;
+  await click(sheetButton('Close')!);
+  expect(sheet()).toBeNull();
+  expect(vi.mocked(history.back).mock.calls.length).toBe(back + 1);
+  expect(dialog()!.open).toBe(true);
+  expect(counter()).toBe(C.careStepsCount(5, 6));
+  expect(document.activeElement).toBe(partLink("brake's quick release"));
+});
+
+test('[PG-SHEET-KEYS] in the sheet, Escape closes the sheet alone and the arrows leave the steps where they are; the back gesture closes the sheet and leaves the step view', async () => {
+  await brakeStep5(rimBike('drop'));
+  await click(partLink("brake's quick release")!);
+  await sheetOpen();
+  const s = sheet()!;
+  await act(() => { s.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); });
+  expect(counter()).toBe(C.careStepsCount(5, 6));
+  await act(() => { s.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); });
+  expect(sheet()).toBeNull();
+  expect(dialog()!.open).toBe(true);
+  // back gesture: the sheet's entry is left for the step view's own
+  await click(partLink("brake's quick release")!);
+  await sheetOpen();
+  await act(() => { history.replaceState({ careSteps: 'brake-rub-rim' }, ''); window.dispatchEvent(new PopStateEvent('popstate', { state: { careSteps: 'brake-rub-rim' } })); });
+  expect(sheet()).toBeNull();
+  expect(dialog()!.open).toBe(true);
+});
+
+test("[PG-SHEET-MIXED] Not to be mixed up with swaps the entry, and Back brings the first one again", async () => {
+  await brakeStep5(rimBike('drop'));
+  await click(partLink("brake's quick release")!);
+  await sheetOpen();
+  expect(sheet()!.textContent).toContain('Not to be mixed up with');
+  await click(sheetButton("The wheel's quick release")!);
+  expect(sheet()!.querySelector('h2')!.textContent).toBe("The wheel's quick release");
+  expect(document.activeElement).toBe(sheet()!.querySelector('h2'));
+  await click(sheetButton('Back')!);
+  expect(sheet()!.querySelector('h2')!.textContent).toBe("The brake's quick release");
+  expect(sheetButton('Back')).toBeNull();
+});
+
+test("[PG-SHEET-BIKE] the entry draws the rider's bike with the part marked, and its close-ups with the bike's own first; a part the bike was told not to have has no drawing", async () => {
+  const caliper = PICTURE_WORDS['brake-qr-open']!.name;
+  const vbrake = PICTURE_WORDS['vbrake-open']!.name;
+  await brakeStep5(rimBike('flat'));
+  await click(partLink("brake's quick release")!);
+  await sheetOpen();
+  const where = sheet()!.querySelector('.pg-bike[role="img"]')!;
+  expect(where.getAttribute('aria-label')).toBe("The brake's quick release, marked on the bike");
+  expect(where.querySelector('svg.bk')!.getAttribute('aria-hidden')).toBe('true');
+  expect(where.querySelectorAll('.pg-marker circle').length).toBe(2);
+  expect(sheet()!.textContent).toContain('Where it is on your bike');
+  await vi.waitFor(() => expect(sheet()!.querySelectorAll('.care-pic [role="img"]').length).toBe(2), { timeout: 3000 });
+  expect([...sheet()!.querySelectorAll('.care-pic [role="img"]')].map((i) => i.getAttribute('aria-label'))).toEqual([vbrake, caliper]);
+  // a bike with disc brakes entered: the caliper bolts' step names the caliper; the rim brake (a mix-up) is not on it
+  render(null, host);
+  await mount(memory({
+    'loadcheck:bikeProfiles': JSON.stringify([{ id: 'bike_d', name: 'Disc', brakes: 'hydraulic-disc' }]),
+    'loadcheck:bikeProfile': JSON.stringify({ id: 'bike_d', name: 'Disc' }),
+  }).kv);
+  await openCard('brake-rub-disc');
+  for (let i = 0; i < 3; i += 1) await click(button(C.careStepsNext)!);
+  await click(partLink('caliper')!);
+  await sheetOpen();
+  expect(sheet()!.querySelector('.pg-bike[role="img"]')).not.toBeNull();
+  await click(sheetButton('Rim brake (caliper or V-brake)')!);
+  expect(sheet()!.querySelector('.pg-bike')).toBeNull();
+  expect(sheet()!.textContent).toContain('Not on your bike, as you described it.');
+});
+
+test('[PG-SHEET-OPEN] with no bike the entry shows the typical bike; All steps carries the same part names', async () => {
+  await mount();
+  await openCard('puncture-tube');
+  await click(button(C.careStepsNext)!);
+  await click(button(C.careStepsNext)!);
+  expect([...dialog()!.querySelectorAll('.care-step .care-part')].map((b) => b.textContent)).toEqual(['tyre bead', 'rim', 'tube']);
+  await click(partLink('tyre bead')!);
+  await sheetOpen();
+  expect(sheet()!.textContent).toContain('Where it is on a typical bike');
+  await click(sheetButton('Close')!);
+  await click(button(C.careStepsAll)!);
+  expect(dialog()!.querySelectorAll('.care-step-list .care-part').length).toBeGreaterThan(5);
+});

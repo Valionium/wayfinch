@@ -4,15 +4,22 @@
 // worker precaches them like every file of a build. They are inlined, not <img>, so they follow the theme's tokens through ./pictures.css;
 // ids inside a drawing get a prefix of their view.
 import { PICTURE_WORDS } from '../../core/wording/en-care-pictures.ts';
+import type { PictureWords } from '../../core/wording/en-care-pictures.ts';
 import './pictures.css';
 
-const FILES = import.meta.glob('./pictures/*.svg', { query: '?url', import: 'default', eager: true });
+// The steps' drawings and the parts guide's close-ups (./parts): each id names one file in one of the two folders (PG-FILES).
+const GLOBBED = {
+  ...import.meta.glob('./pictures/*.svg', { query: '?url', import: 'default', eager: true }),
+  ...import.meta.glob('./parts/*.svg', { query: '?url', import: 'default', eager: true }),
+};
+const FILES: Record<string, string> = {};
+for (const [path, url] of Object.entries(GLOBBED)) FILES[path.replace(/^.*\/|\.svg$/g, '')] = url as string;
 const loaded = new Map<string, string>();
 
 /** Loads the pictures not yet here; a picture that fails to load, or is not one of ours, is left out, so its step shows its text alone. */
 export async function loadPictures(ids: readonly string[]): Promise<void> {
   await Promise.all([...new Set(ids)].filter((id) => !loaded.has(id)).map(async (id) => {
-    const url = FILES[`./pictures/${id}.svg`];
+    const url = FILES[id];
     if (!url) return;
     try {
       const res = await fetch(url);
@@ -23,6 +30,8 @@ export async function loadPictures(ids: readonly string[]): Promise<void> {
 }
 
 export const pictureReady = (id: string | null): id is string => id !== null && loaded.has(id) && PICTURE_WORDS[id] !== undefined;
+/** Loaded, for a caller that brings its own words (the parts guide). */
+export const pictureLoaded = (id: string): boolean => loaded.has(id);
 
 const prefixed = (svg: string, prefix: string): string =>
   svg
@@ -31,8 +40,8 @@ const prefixed = (svg: string, prefix: string): string =>
     .replace(/url\(#([^)]+)\)/g, (_m, id: string) => `url(#${prefix}${id})`);
 
 /** One picture as one image: its name, and its description in a hidden paragraph; a caption under it where it has one. */
-export function Picture({ id, view }: { id: string; view: string }) {
-  const words = PICTURE_WORDS[id]!;
+export function Picture({ id, view, words: own }: { id: string; view: string; words?: PictureWords }) {
+  const words = own ?? PICTURE_WORDS[id]!;
   const prefix = `cs-${view}-`;
   return (
     <figure class="care-pic">

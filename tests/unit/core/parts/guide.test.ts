@@ -10,7 +10,8 @@ import { GUIDE, guidePictures, partById } from '../../../../src/core/parts/guide
 import { linkSegments, STEP_PARTS } from '../../../../src/core/parts/links.ts';
 import { PICTURE_WORDS } from '../../../../src/core/wording/en-care-pictures.ts';
 import { CARE_TASKS, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
-import { GUIDE_PICTURE_WORDS, PART_WORDS, PG, TAG_WORDS } from '../../../../src/core/wording/en-parts.ts';
+import { partsWordsFrom, PG, TAG_WORDS } from '../../../../src/core/wording/en-parts.ts';
+import WORDS from '../../../../src/core/wording/en-parts.json';
 import { bannedHits } from '../../../fixtures/banned.ts';
 
 const ROOT = fileURLToPath(new URL('../../../../src/tools/care/', import.meta.url));
@@ -20,6 +21,9 @@ const CSS = readFileSync(join(ROOT, 'pictures.css'), 'utf8');
 const svgsIn = (dir: string): string[] => readdirSync(dir).filter((f) => f.endsWith('.svg')).map((f) => f.slice(0, -4)).sort();
 const guideFiles = svgsIn(PARTS_DIR);
 const stepFiles = svgsIn(STEPS_DIR);
+const checked = partsWordsFrom(WORDS, PART_PLACES)!;
+const PART_WORDS = checked.parts;
+const GUIDE_PICTURE_WORDS = checked.pictures;
 const sentences = (t: string): number => t.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).length;
 
 test("[PG-DATA] the guide holds the design's 36 parts in its six groups, in order, each with words, close-ups and mix-ups that exist", () => {
@@ -27,7 +31,11 @@ test("[PG-DATA] the guide holds the design's 36 parts in its six groups, in orde
   const groups = new Map<string, number>();
   for (const p of GUIDE) groups.set(p.group, (groups.get(p.group) ?? 0) + 1);
   expect([...groups]).toEqual([['steering', 6], ['wheels', 6], ['tyres', 5], ['brakes', 8], ['drive', 8], ['ebike', 3]]);
+  expect(checked).not.toBeNull();
   expect(Object.keys(PART_WORDS).sort()).toEqual([...PART_PLACES].sort());
+  // the words file is checked whole: a part without its text is no file
+  expect(partsWordsFrom({ ...WORDS, parts: { ...WORDS.parts, frame: { name: 'Frame' } } }, PART_PLACES)).toBeNull();
+  expect(partsWordsFrom(null, PART_PLACES)).toBeNull();
   for (const p of GUIDE) {
     expect(p.pictures.length, p.id).toBeGreaterThanOrEqual(1);
     if (p.by) expect(p.pictures.length, p.id).toBe(2);
