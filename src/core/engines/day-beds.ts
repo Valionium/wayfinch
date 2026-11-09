@@ -53,34 +53,65 @@ export const windowKm = (dayKm: Km): Km => Math.min(BED_WINDOW_KM, Math.max(MIN_
  * for the season or by its prepared hours, is no place to end the day. Unknown stays allowed, as on the card. No date: no judging.
  */
 export type Nights = { departureDate: string | null; hours: PlaceHours[] };
+const NO_NIGHTS: Nights = { departureDate: null, hours: [] };
 
-export function dayBeds(route: Route, places: Place[], matches: RouteMatch[], stay: Stay, nights: Nights = { departureDate: null, hours: [] }): DayBed[] {
-  const hoursOf = new Map(nights.hours.map((h) => [h.placeId, h]));
-  const openThatNight = (day: number) => (x: { place: Place }): boolean =>
-    nights.departureDate === null || nightOf(x.place, hoursOf.get(x.place.id), addDaysIso(nights.departureDate, day - 1), x.place.timeZone).state !== 'closed';
+/** A sleep place near a day's planned end, as the rider may choose it. */
+export type BedChoice = { placeId: string; name: string; km: Km; offRouteM: number; kind: Place['kind']; town: string | null };
+
+type Pass = { place: Place; km: Km; offRouteM: number };
+function passesOf(places: Place[], matches: RouteMatch[]): { beds: Pass[]; towns: Pass[] } {
   const byId = new Map(places.map((p) => [p.id, p]));
   const passes = matches.flatMap((m) => {
     const place = byId.get(m.placeId);
     return place ? [{ place, km: m.km, offRouteM: m.offRouteM }] : [];
   });
-  const beds = passes.filter((x) => BED_KINDS.has(x.place.kind));
-  const towns = passes.filter((x) => x.place.kind === 'settlement' && named(x.place) !== null);
+  return { beds: passes.filter((x) => BED_KINDS.has(x.place.kind)), towns: passes.filter((x) => x.place.kind === 'settlement' && named(x.place) !== null) };
+}
+const byId = (a: Place, b: Place): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+const costAt = (endKm: Km) => (x: { km: Km; offRouteM: number }): number => Math.abs(x.km - endKm) + (DETOUR_FACTOR * x.offRouteM) / 1000;
+
+/** Whether a place is closed on the night day `day` ends, as the Sleep card judges it. No date: never. */
+export function closedThatNight(place: Place, day: number, nights: Nights): boolean {
+  return !openOn(nights, day)({ place, km: 0, offRouteM: 0 });
+}
+
+/** Open that night, or not known to be closed. */
+function openOn(nights: Nights, day: number): (x: Pass) => boolean {
+  const hoursOf = new Map(nights.hours.map((h) => [h.placeId, h]));
+  return (x) => nights.departureDate === null
+    || nightOf(x.place, hoursOf.get(x.place.id), addDaysIso(nights.departureDate, day - 1), x.place.timeZone).state !== 'closed';
+}
+
+function choicesFor(s: { day: number; startKm: Km; endKm: Km }, beds: Pass[], towns: Pass[], stay: Stay, nights: Nights): BedChoice[] {
+  const w = windowKm(s.endKm - s.startKm);
+  const cost = costAt(s.endKm);
+  return beds.filter((x) => Math.abs(x.km - s.endKm) <= w + 1e-9).filter(openOn(nights, s.day))
+    .sort((a, b) => stayRank(a.place.kind, stay) - stayRank(b.place.kind, stay) || cost(a) - cost(b) || byId(a.place, b.place))
+    .map((x) => {
+      const near = towns
+        .filter((t) => haversineKm(t.place, x.place) <= TOWN_NEAR_KM && named(t.place) !== named(x.place))
+        .sort((a, b) => haversineKm(a.place, x.place) - haversineKm(b.place, x.place) || byId(a.place, b.place))[0];
+      return { placeId: x.place.id, name: nameOf(x.place), km: x.km, offRouteM: x.offRouteM, kind: x.place.kind, town: near ? named(near.place) : null };
+    });
+}
+
+/** The sleep places near a day's planned end that are not closed that night, best first: the trip's stay first, then nearest. */
+export function candidatesNear(s: { day: number; startKm: Km; endKm: Km }, places: Place[], matches: RouteMatch[], stay: Stay, nights: Nights = NO_NIGHTS): BedChoice[] {
+  const { beds, towns } = passesOf(places, matches);
+  return choicesFor(s, beds, towns, stay, nights);
+}
+
+export function dayBeds(route: Route, places: Place[], matches: RouteMatch[], stay: Stay, nights: Nights = NO_NIGHTS): DayBed[] {
+  const { beds, towns } = passesOf(places, matches);
   const last = route.stages.length;
   return route.stages.map((s) => {
     const base = { day: s.day, endKm: s.endKm, last: s.day === last };
     if (s.day === last) return { ...base, bed: null, town: null };
+    const best = choicesFor(s, beds, towns, stay, nights)[0];
+    if (best) return { ...base, bed: { name: best.name, km: best.km, offRouteM: best.offRouteM, kind: best.kind, town: best.town }, town: null };
     const w = windowKm(s.endKm - s.startKm);
-    const inWindow = <T extends { km: Km }>(list: T[]): T[] => list.filter((x) => Math.abs(x.km - s.endKm) <= w + 1e-9);
-    const open = openThatNight(s.day);
-    const cost = (x: { km: Km; offRouteM: number }): number => Math.abs(x.km - s.endKm) + (DETOUR_FACTOR * x.offRouteM) / 1000;
-    const best = inWindow(beds).filter(open).sort((a, b) => stayRank(a.place.kind, stay) - stayRank(b.place.kind, stay) || cost(a) - cost(b) || (a.place.id < b.place.id ? -1 : a.place.id > b.place.id ? 1 : 0))[0];
-    if (best) {
-      const near = towns
-        .filter((t) => haversineKm(t.place, best.place) <= TOWN_NEAR_KM && named(t.place) !== named(best.place))
-        .sort((a, b) => haversineKm(a.place, best.place) - haversineKm(b.place, best.place) || (a.place.id < b.place.id ? -1 : 1))[0];
-      return { ...base, bed: { name: nameOf(best.place), km: best.km, offRouteM: best.offRouteM, kind: best.place.kind, town: near ? named(near.place) : null }, town: null };
-    }
-    const town = inWindow(towns).sort((a, b) => cost(a) - cost(b) || (a.place.id < b.place.id ? -1 : 1))[0];
+    const cost = costAt(s.endKm);
+    const town = towns.filter((x) => Math.abs(x.km - s.endKm) <= w + 1e-9).sort((a, b) => cost(a) - cost(b) || byId(a.place, b.place))[0];
     return { ...base, bed: null, town: town ? { name: named(town.place)!, km: town.km } : null };
   });
 }

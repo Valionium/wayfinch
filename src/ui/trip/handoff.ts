@@ -6,6 +6,7 @@ import type { Route, Stay, Trip } from '../../core/types.ts';
 import { haversineKm } from '../../core/geo/haversine.ts';
 import { W } from '../../core/wording/en.ts';
 import { planStages } from '../../core/route/stages.ts';
+import { dayStopOf } from '../../core/route/day-stops.ts';
 import { DEFAULT_SETTINGS } from '../../store/rules.ts';
 import type { Settings } from '../../store/rules.ts';
 
@@ -53,6 +54,13 @@ export function tripAttributes(trip: Trip, settings: Settings, names: { start: s
   const nights = settings.nights ?? planStages(trip.route, { flatKph: settings.flatKph, pace: settings.pace, nights: 0 }).suggestedNights;
   out.push(['nights', String(nights)]);
   if (settings.nights === null) out.push(['nightsFrom', 'suggested']);
+  // Where each day ends, when the days end at places to sleep (owner, 9 Nov 2026): the bag planner ends its days there too.
+  const nightsHere = trip.route.stages.length - 1;
+  const held = nightsHere === nights && nightsHere > 0 ? trip.route.stages.slice(0, -1).map((_, i) => dayStopOf(trip, i)) : [];
+  if (held.length > 0 && held.every((d) => d !== null) && held.some((d) => d!.placeId !== null)) {
+    out.push(['stops', trip.route.stages.slice(0, -1).map((st) => String(st.endKm)).join(',')]);
+    out.push(['stopNames', JSON.stringify(held.map((d) => (d!.placeId !== null ? d!.name : null)))]);
+  }
   if (trip.departureDate) {
     out.push(['departureDate', trip.departureDate]);
     out.push(['month', String(Number(trip.departureDate.slice(5, 7)))]);

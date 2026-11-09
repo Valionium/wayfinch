@@ -7,6 +7,7 @@ import { nowSchedule } from '../../../../src/core/engines/tripday.ts';
 import { ALL_KINDS } from '../../../../src/core/places/types.ts';
 import type { Answer, AnswerItem, Km, Place, PlaceHours } from '../../../../src/core/types.ts';
 import { bannedHits } from '../../../fixtures/banned.ts';
+import { W } from '../../../../src/core/wording/en.ts';
 import { at, bakery, bikeShop, campsite, hut, lodging, pos, shelter, testTrip, type PlaceBuilder } from '../../../fixtures/build.ts';
 import { placeAt } from '../../../fixtures/places.ts';
 import { leaveFacts, preparedHours, type LeaveCase } from './leaveby-helpers.ts';
@@ -634,5 +635,19 @@ describe('boundaries', () => {
   test('the night of another day is named by its date', () => {
     const a = sleep({ spots: [{ b: camp(), km: 60 }], hours: 'open', now: `${FRI} 20:00` });
     expect(a.items[0]!.detail).toContain('open for the night of Sat 17 Oct');
+  });
+});
+
+describe('[TRIP-DAY-STOPS] the stop chosen in Trip (owner, 9 Nov 2026)', () => {
+  test('is marked on the Sleep card as the stop for that night; with no stops, or another route\'s, nothing is', () => {
+    const f = facts({ spots: [{ b: camp('Planned'), km: 78 }, { b: camp('Other'), km: 72 }], positions: [], hours: 'open' });
+    const planned = f.places.find((p) => p.name === 'Planned')!;
+    const none = { placeId: null, name: null, town: null, by: 'auto' as const };
+    const stops = { routeId: f.trip.route.id, basis: [78, 150, 222], days: [{ placeId: planned.id, km: 78, name: 'Planned', town: null, by: 'auto' as const }, { ...none, km: 150 }, { ...none, km: 222 }] };
+    const a = sleepAnswer({ ...f, trip: { ...f.trip, stops } });
+    expect(itemAt(a, 78).detail).toContain(W.sleepYourStop);
+    expect(itemAt(a, 72).detail ?? '').not.toContain(W.sleepYourStop);
+    expect(textOf(sleepAnswer(f))).not.toContain(W.sleepYourStop);
+    expect(textOf(sleepAnswer({ ...f, trip: { ...f.trip, stops: { ...stops, routeId: 'another' } } }))).not.toContain(W.sleepYourStop);
   });
 });
