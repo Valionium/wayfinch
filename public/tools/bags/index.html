@@ -245,6 +245,12 @@ button.go.small{font-size:15px;padding:9px 16px;flex:0 0 auto}
 .setupactions,.comparecontrols{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:9px}
 .comparecontrols>div{flex:1 1 180px;min-width:0}.comparecontrols select{width:100%}
 .setupcompare{margin:12px 0;padding:12px;border:1px solid var(--line);background:var(--panel)}
+/* The small view of a day ride: the drawn bike with its bags and the list of what is in each bag, nothing else. The one top bar stays. */
+.small-head{margin:10px 0 4px}.small-head h2{font-family:var(--disp);font-weight:600;font-size:22px;margin:0}.small-head p{margin:2px 0 0;color:var(--muted)}
+.small-foot{margin:14px 0}
+body.lc-small #crumbs,body.lc-small #walkthroughInvite,body.lc-small .wm-block,body.lc-small #rigTools,body.lc-small #rigTrip{display:none!important}
+body.lc-small #s4>:not(#packingChecklist):not(#smallFoot){display:none!important}
+body.lc-small .packing-disclosure>summary,body.lc-small .packing-disclosure-body>:not(.packing-groups){display:none!important}
 .setupgroup{margin:14px 0}.setupgroup>h3{font-family:var(--disp);font-weight:600;font-size:16px;margin:0 0 2px}
 .setuphint{font-size:13px;color:var(--muted);margin:0 0 8px}
 .comparetable{overflow-x:auto;margin:10px 0;max-width:100%}
@@ -1933,6 +1939,8 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <span id="advisorReturnText"></span>
   </div>
 
+  <!-- the small view's head (the owner's answer 4 of 8 Nov 2026): shown only in the small view of a day ride -->
+  <div class="small-head" id="smallHead" hidden><h2 id="smallTitle" tabindex="-1">Bags for this trip</h2><p id="smallTripLine"></p></div>
   <div class="planner-cols" id="plannerCols">
   <div class="rig" id="rigBox">
     <svg id="rigSvg" viewBox="0 0 320 150" role="group" aria-label="Your bike, bags and bottle cages" tabindex="-1">
@@ -2143,6 +2151,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     </div>
     <div id="verdictBox"></div>
     <div id="packingChecklist"></div>
+    <div class="small-foot" id="smallFoot" hidden><button class="go" id="smallFull" type="button">Open the full Bag planner</button></div>
     <div id="resultBox"></div>
 
     <div class="fbslot" data-fb="4"></div>
@@ -5033,7 +5042,8 @@ function weightCheck(plan = currentPlan(), bike = S.bikeProfile, bagsKg){
   return { state:'room', totalKg:+total.toFixed(2), roomKg:room, overKg:null, atMost:missing.length > 0, missing, sentence };
 }
 // The pop-up never opens over another dialog, the handoff bar or a carried-over question; it then waits for the next time.
-function weightPromptBlocked(){ return DIALOGS.length > 0 || WEIGHT_PROMPT_BLOCKS.handoffBar || WEIGHT_PROMPT_BLOCKS.carriedQuestion; }
+// The small view shows nothing but the bike with its bags: the question waits for the full planner (SMALL_VIEW is a var, set later).
+function weightPromptBlocked(){ return DIALOGS.length > 0 || WEIGHT_PROMPT_BLOCKS.handoffBar || WEIGHT_PROMPT_BLOCKS.carriedQuestion || SMALL_VIEW === true; }
 function weightPromptDue(){
   if(!gearBags().length) return false;
   return S.bikeProfile ? !S.bikeProfile.maxWeightAsked : !MAX_WEIGHT_SKIPPED;
@@ -11189,7 +11199,7 @@ function renderPackingChecklist(allocation){
   const focus=captureFocus(root),model=getChecklistModel(allocation),ready=typeof DRAFT_READY !== 'undefined' && DRAFT_READY;
   root.className='packing-checklist';root.setAttribute('role','region');root.setAttribute('aria-labelledby','packingChecklistTitle');
   const groups=model.groups.map(group=>({...group,items:CHECKLIST_UNPACKED_ONLY ? group.items.filter(row=>!row.packed) : group.items})).filter(group=>group.items.length);
-  root.innerHTML=`<details class="packing-disclosure"${wasOpen?' open':''}><summary><b id="packingChecklistTitle">Packing checklist</b><em>${model.totals.packed} of ${model.totals.items} packed</em></summary><div class="packing-disclosure-body"><p class="packing-trip">${htmlEsc(model.tripLabel)}</p><p>${htmlEsc([...model.tripDetails,model.modeLabel].join(' · '))}</p>
+  root.innerHTML=`<details class="packing-disclosure"${wasOpen || SMALL_VIEW?' open':''}><summary><b id="packingChecklistTitle">Packing checklist</b><em>${model.totals.packed} of ${model.totals.items} packed</em></summary><div class="packing-disclosure-body"><p class="packing-trip">${htmlEsc(model.tripLabel)}</p><p>${htmlEsc([...model.tripDetails,model.modeLabel].join(' · '))}</p>
     ${bikeChecklistSummaryHtml(model.bikeProfile)}
     <div class="packing-progress"><span class="packing-progress-text" id="packingProgressText" role="status" aria-live="polite" aria-atomic="true">${model.totals.packed} of ${model.totals.items} selected items packed · ${model.totals.remaining} remaining</span><progress value="${model.totals.packed}" max="${Math.max(1,model.totals.items)}" aria-label="Packing progress"></progress></div>
     <p>${packingChecklistNumber(model.totals.L)} L selected kit volume · ${packingChecklistNumber(model.totals.kg,3)} kg of kit. ${infoHelp('What the checklist totals and ticks mean','<p>Totals count the selected kit and carried food. Water is listed separately. One tick covers the complete named quantity, including every listed bag share. Shared items appear once; pack all their shares before ticking them.</p>')}</p>
@@ -11528,11 +11538,11 @@ async function receiveHandoff(){
   const name=parsed.name || 'your route', t=HANDOFF.trip;
   HANDOFF.name=t.startName && t.endName ? `${t.startName} → ${t.endName}` : name;
   HANDOFF.long=handoffLong(t);
-  HANDOFF.reuse=HANDOFF.long ? tripSetupFor(t.route)?.id || null : null;
+  HANDOFF.reuse=handoffPlannable(t) ? tripSetupFor(t.route)?.id || null : null;
   const heights=parsed.hasElev ? '' : ' This route has no heights, so its days are split by distance.';
-  if(HANDOFF.long){
+  if(handoffPlannable(t)){
     const base=tripFoundation(),reuse=HANDOFF.reuse && SETUPS.find(x => x.id === HANDOFF.reuse);
-    showHandoffBar(`A trip from Wayfinch: ${name}. Plan bags for this trip? A new trip setup gets ${handoffChanges(t)}, with the bags and kit predicted for it, from ${base ? 'your general setup '+base.name : 'the plan here now'}. Your plan now is kept as a setup.${
+    showHandoffBar(`A trip from Wayfinch: ${name}${HANDOFF.long ? '' : ', a day ride'}. Plan bags for this trip? A new trip setup gets ${handoffChanges(t)}, with the bags and kit predicted for it, from ${base ? 'your general setup '+base.name : 'the plan here now'}${HANDOFF.long ? '' : ', and shows your bike with its bags'}. Your plan now is kept as a setup.${
       reuse ? ` Or open the setup made on ${setupDay(reuse)} for this route.` : ''}${heights}`,{apply:true,plan:true,reuse:!!reuse});
   } else showHandoffBar(`A trip from Wayfinch: ${name}. Apply it to this plan? It sets ${handoffChanges(t)}; your bags, kit and bike stay as they are.${heights}`,{apply:true});
   return true;
@@ -11545,7 +11555,7 @@ async function applyHandoff(){
   if(!await putHandoffTripIn()){
     restorePlan(JSON.parse(undo),true,false);
     HANDOFF.busy=false;
-    showHandoffBar('The route from Wayfinch could not be read. Your plan is unchanged.',{apply:true,plan:HANDOFF.long,reuse:!!HANDOFF.reuse});
+    showHandoffBar('The route from Wayfinch could not be read. Your plan is unchanged.',{apply:true,plan:handoffPlannable(HANDOFF.trip),reuse:!!HANDOFF.reuse});
     return false;
   }
   HANDOFF.undo={before,after:handoffFields()}; HANDOFF.busy=false;
@@ -11582,6 +11592,26 @@ async function putHandoffTripIn(){
    never changed. Undo goes back to the plan that was there and takes the setups it made away. A day ride keeps Apply. */
 const TRIP_BAGS={undo:null};
 function handoffLong(t){ return !!t && Number.isInteger(t.nights) && t.nights >= 1; }
+// Every trip that says its nights can be planned so; a day ride (0 nights) then opens the small view (the owner's answer 4).
+function handoffPlannable(t){ return !!t && Number.isInteger(t.nights) && t.nights >= 0; }
+/* The small view (the owner's answer 4 of 8 Nov 2026): the same page at the Check step, showing exactly the drawn bike with its
+   bags (tappable, as at Check) and the list of what is in each bag, with the same functions; nothing else. A flag of this page
+   only, never stored in a plan or a setup; Open the full Bag planner drops it and keeps the same plan. */
+var SMALL_VIEW=false;
+function setSmallView(on){
+  SMALL_VIEW=!!on;
+  document.body.classList.toggle('lc-small',SMALL_VIEW);
+  $('smallHead').hidden=!SMALL_VIEW; $('smallFoot').hidden=!SMALL_VIEW;
+  if(SMALL_VIEW){
+    const when=S.departureDate ? `${+S.departureDate.slice(8,10)} ${MONTHS[+S.departureDate.slice(5,7)-1].slice(0,3)}` : MONTHS[S.month];
+    $('smallTripLine').textContent=`${HANDOFF.name || 'Your ride'} · ${when} · day ride`;
+  }
+  if(S.step === 4){ renderResult(); }
+  drawRig();
+  const title=SMALL_VIEW ? $('smallTitle') : $('stepTitle'+S.step); if(title) title.focus({preventScroll:true});
+}
+function openFullPlanner(){ if(!SMALL_VIEW) return false; setSmallView(false); if(S.step === 4) maybeAskMaxWeight(); return true; }
+$('smallFull').onclick=openFullPlanner;
 function setupDay(s){ const d=s && s.saved; return d && /^\d{4}-\d{2}-\d{2}/.test(d) ? `${+d.slice(8,10)} ${MONTHS[+d.slice(5,7)-1].slice(0,3)}` : 'an earlier day'; }
 function tripSetupFor(hash){ return hash ? SETUPS.find(s => setupKind(s) === 'trip' && s.forRoute && s.forRoute.hash === hash) || null : null; }
 function tripFoundation(){
@@ -11605,7 +11635,7 @@ function keepPlanBefore(){
   return {...snapshotSetup(`Before ${HANDOFF.name}, ${todayDay()}`,''),thumb:''};
 }
 async function planTripBags(){
-  if(HANDOFF.busy || !HANDOFF.gpx || !DRAFT_READY || !handoffLong(HANDOFF.trip)) return false;
+  if(HANDOFF.busy || !HANDOFF.gpx || !DRAFT_READY || !handoffPlannable(HANDOFF.trip)) return false;
   const t=HANDOFF.trip,name=HANDOFF.name,undo=JSON.stringify(captureDraft()),setupsBefore=SETUPS.slice(),wasBike=S.bikeProfile ? S.bikeProfile.id : null;
   const before=keepPlanBefore(),trips=SETUPS.filter(s => setupKind(s) === 'trip').length;
   if(trips+1+(before ? 1 : 0) > MAX_TRIP_SETUPS){
@@ -11621,7 +11651,8 @@ async function planTripBags(){
     return false;
   }
   S.packed={}; keepPlan({load:null}); currentPlan();   // packed afresh by the frozen selection, for this trip
-  go(2);
+  if(!HANDOFF.long) SMALL_VIEW=true;   // before Check opens, so nothing else asks over the small view
+  go(HANDOFF.long ? 2 : 4);   // a long trip at Bags; a day ride at Check, where the small view shows
   const when=S.departureDate ? `${+S.departureDate.slice(8,10)} ${MONTHS[+S.departureDate.slice(5,7)-1].slice(0,3)}` : MONTHS[S.month];
   const made={...snapshotSetup(`${name}, ${when}`,''),thumb:'',
     forRoute:{hash:t.route || (S.gpx && S.gpx.copilotRoute) || '',name,departureDate:S.departureDate || null},...(base ? {base:base.id} : {})};
@@ -11633,7 +11664,8 @@ async function planTripBags(){
   HANDOFF.busy=false;
   writeHandoffDone('applied'); dropHandoffFragment(); setWayfinchBack('/#/trip');
   queueDraftSave(); renderRecall();
-  showHandoffBar(`Planned for ${name}: a new trip setup${base ? ' from '+base.name : ''}, opened at Bags.${before ? ' Your plan before is kept as a setup.' : ''}`,{undo:true});
+  if(!HANDOFF.long) setSmallView(true);
+  showHandoffBar(`Planned for ${name}: a new trip setup${base ? ' from '+base.name : ''}${HANDOFF.long ? ', opened at Bags' : ''}.${before ? ' Your plan before is kept as a setup.' : ''}`,{undo:true});
   return true;
 }
 // The trip setup made for this route before: opened at Bags, the plan here kept as with Plan bags.
@@ -11643,7 +11675,8 @@ async function reuseTripSetup(){
   const undo=JSON.stringify(captureDraft()),setupsBefore=SETUPS.slice(),before=keepPlanBefore();
   if(before && setupKindFull('trip')){ showHandoffBar(setupKindFullMessage('trip'),{apply:true,plan:true,reuse:true}); return false; }
   if(before){ SETUPS.splice(SETUPS.indexOf(s)+1,0,before); savedSetupResult(await store.set(SETUP_KEY,SETUPS)); }
-  loadSetup(s.id); go(2);
+  if(!HANDOFF.long) SMALL_VIEW=true;
+  loadSetup(s.id); go(HANDOFF.long ? 2 : 4); if(!HANDOFF.long) setSmallView(true);
   TRIP_BAGS.undo={draft:undo,setups:setupsBefore,made:before ? [before.id] : []};
   writeHandoffDone('applied'); dropHandoffFragment(); setWayfinchBack('/#/trip');
   queueDraftSave(); renderRecall();
@@ -11654,6 +11687,7 @@ async function undoTripBags(){
   const u=TRIP_BAGS.undo; if(!u) return false;
   TRIP_BAGS.undo=null;
   const was=S.bikeProfile ? S.bikeProfile.id : null;
+  if(SMALL_VIEW) setSmallView(false);
   restorePlan(JSON.parse(u.draft),true,false); planBikeChosen(was);
   // the setups it made go; any other change to the list since stays
   SETUPS=SETUPS.filter(s => !u.made.includes(s.id));

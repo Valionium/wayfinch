@@ -337,13 +337,49 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     expect(full.page.run('JSON.stringify(captureDraft())')).toBe(draft);
     expect(String(full.page.nodes.get('handoffText')!.textContent)).toMatch(/40 trip setups/);
   });
+});
 
-  test('a day ride (0 nights) is not a long trip: Apply stays as it is until the small view comes', async () => {
+// The small view (the owner's answer 4 of 8 Nov 2026): a day ride (0 nights) gets exactly the drawn bike with its bags at the top
+// of the Check step, the bags tappable, and the list of what is in each bag, with the same functions; nothing else.
+describe('[TRIP-SMALL] a day ride: the small view of the same Bag planner', () => {
+  test('Plan bags for this trip on a day ride makes the trip setup as for a long trip and opens the small view at Check; the full planner is one tap away with the same plan', async () => {
     const { gpx } = await handedOff('loop', { nights: 0 });
     const { page, json } = longPlanner(gpx);
     await page.run('receiveHandoff()');
     expect(json<boolean>('handoffLong(HANDOFF.trip)')).toBe(false);
-    expect(String(page.nodes.get('handoffText')!.textContent)).not.toMatch(/Plan bags for this trip/);
-    expect(await page.run('planTripBags()')).toBe(false);
+    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/Plan bags for this trip/);
+    expect(await page.run('planTripBags()')).toBe(true);
+    expect(json('[S.step,S.nights,SMALL_VIEW]')).toEqual([4, 0, true]);
+    expect(json<boolean>('$("smallHead").hidden')).toBe(false);
+    // nothing else: no question about the bike's maximum weight over it (it waits for the full planner)
+    expect(json<boolean>('weightPromptBlocked()')).toBe(true);
+    expect(String(page.nodes.get('smallTripLine')!.textContent)).toMatch(/day ride/);
+    expect(json('SETUPS[0].forRoute.hash')).toMatch(/^[0-9a-f]{64}$/);
+    // the view is never stored: not in the draft, not in the setup
+    expect(page.run('JSON.stringify(captureDraft())')).not.toMatch(/small/i);
+    expect(JSON.stringify(json('SETUPS[0]'))).not.toMatch(/"small/i);
+    // the same plan object in both views, byte for byte (bag selection Decision 1: one plan object)
+    const inSmall = page.run('JSON.stringify(currentPlan())'), draft = page.run('JSON.stringify(captureDraft())');
+    expect(page.run('openFullPlanner()')).toBe(true);
+    expect(json('[S.step,SMALL_VIEW]')).toEqual([4, false]);
+    expect(json<boolean>('$("smallHead").hidden')).toBe(true);
+    expect(json<boolean>('weightPromptBlocked()')).toBe(false);
+    expect(page.run('JSON.stringify(currentPlan())')).toBe(inSmall);
+    expect(page.run('JSON.stringify(captureDraft())')).toBe(draft);
+    expect(page.run('openFullPlanner()')).toBe(false);
+  });
+
+  test('Undo from the small view brings the plan back and leaves the small view; a long trip never opens it', async () => {
+    const day = longPlanner((await handedOff('loop', { nights: 0 })).gpx);
+    await day.page.run('receiveHandoff()');
+    const before = day.page.run('JSON.stringify(captureDraft())');
+    await day.page.run('planTripBags()');
+    expect(await day.page.run('undoTripBags()')).toBe(true);
+    expect(day.json<boolean>('SMALL_VIEW')).toBe(false);
+    expect(day.page.run('JSON.stringify(captureDraft())')).toBe(before);
+    const long = longPlanner((await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12')).gpx);
+    await long.page.run('receiveHandoff()');
+    await long.page.run('planTripBags()');
+    expect(long.json('[S.step,SMALL_VIEW]')).toEqual([2, false]);
   });
 });
