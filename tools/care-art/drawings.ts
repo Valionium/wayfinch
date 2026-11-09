@@ -54,5 +54,5 @@ export const DRAWINGS: readonly Drawing[] = [
   { id: 'pg-tube', dir: 'parts', make: () => wheelSection('tube'), ref: `${SECTION} The tube marked: it fills the casing and rests on the rim's well.` },
   { id: 'pg-rim', dir: 'parts', make: () => wheelSection('rim'), ref: `${SECTION} The rim marked: flanges with hooks, bead seats, the dip in the middle, the hollow box below.` },
   { id: 'pg-valves', dir: 'parts', make: valves, ref: 'Three valves through the rim, from the side (R §3.5): Presta, thin and threaded with a lock nut on the rim and a small nut on its tip; Schrader, wide, threaded near its top, a pin in its end; Dunlop, wide, a knurled ring nut near its top over the core.' },
-  { id: 'pg-tubeless-valve', dir: 'parts', make: tubelessValve, ref: "The rim cut through at the valve (R §3.1): the tubeless valve's rubber cone base in the dip, over the rim tape; the stem down through the rim; a nut under the rim holds it." },
+  { id: 'pg-tubeless-valve', dir: 'parts', make: tubelessValve, ref: "The rim cut through at the valve (R §3.1): the tubeless valve's rubber cone base in the dip, over the rim tape, drawn as a band along the well; the threaded stem down through the rim with its core at the end; a nut under the rim holds it." },
 ];

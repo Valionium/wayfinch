@@ -110,7 +110,7 @@ export function caliper(state: RimState): Pic {
     pic.facts.push(pointsAt(pic, 'leader-screw', 'screw'), touches(pic, 'screw', 'arm-r', f.mm(1)));
   }
   if (state === 'guide') {
-    pic.label('cp-th', [312, 92], 'caliper', [282, 98], m(ax + 0.6, -18), 'end', 'leader-caliper');
+    pic.label('cp-th', [312, 64], 'caliper', [282, 70], m(ax + 0.6, -18), 'end', 'leader-caliper');
     pic.facts.push(pointsAt(pic, 'leader-caliper', 'arm-r'));
   }
   if (state === 'pads') {

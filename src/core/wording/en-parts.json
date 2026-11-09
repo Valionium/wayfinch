@@ -196,7 +196,7 @@
   },
   "pg-tubeless-valve": {
    "name": "A tubeless valve fixed in the rim.",
-   "description": "The rim, labelled \"rim\", cut through at the valve. The valve, marked \"tubeless valve\", has a cone of rubber that sits in the dip in the middle of the rim, over the rim tape, and a stem down through the rim. A nut on the stem under the rim, labelled \"nut\", holds it tight."
+   "description": "The rim, labelled \"rim\", cut through at the valve. The valve, marked \"tubeless valve\", has a cone of rubber that sits in the dip in the middle of the rim, over the rim tape, and a threaded stem down through the rim, the valve core at its end. A nut on the stem under the rim, labelled \"nut\", holds it tight."
   }
  }
 }

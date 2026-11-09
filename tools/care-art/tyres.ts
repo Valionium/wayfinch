@@ -48,10 +48,15 @@ function beads(pic: Pic, f: Frame, cls = 'cp-dark'): void {
 }
 
 /** The inner tube: the casing's inside, closed by the rim's well; names 'tube'. */
-function innerTube(pic: Pic, f: Frame, cls = 'cp-body', inset = 0.5): void {
-  const { m } = f, c = m(0, YC), r = RI - inset, x = toeX - 0.3;
+function innerTube(pic: Pic, f: Frame, cls = 'cp-body', dent: [number, number] | null = null): void {
+  const { m } = f, c = m(0, YC), r = RI - 0.5, x = toeX - 0.3;
   const yIn = YC + Math.sqrt(r * r - x * x), a = (Math.asin(x / r) * 180) / Math.PI;
-  const p = new Path().M(m(-x, yIn)).arcTo(c, 180 - a, true).L(m(x, SEAT - 0.4)).L(m(toeX - 2.3, CH - 0.5)).L(m(-toeX + 2.3, CH - 0.5)).L(m(-x, SEAT - 0.4)).Z();
+  const p = new Path().M(m(-x, yIn));
+  if (dent) {
+    // where a boot lies against the casing, the tube is pushed in by its thickness
+    p.arcTo(c, dent[0], true).L(pol(c[0], c[1], f.mm(RI - 2), dent[0])).arcTo(c, dent[1], true).L(pol(c[0], c[1], f.mm(r), dent[1]));
+  }
+  p.arcTo(c, 180 - a, true).L(m(x, SEAT - 0.4)).L(m(toeX - 2.3, CH - 0.5)).L(m(-toeX + 2.3, CH - 0.5)).L(m(-x, SEAT - 0.4)).Z();
   pic.path(cls, p, { name: 'tube' });
 }
 
@@ -68,20 +73,20 @@ export function wheelSection(mark: SectionMark): Pic {
     casing(pic, f, 'cp-rubber', [100, 106]);
     const c = m(0, YC);
     const boot = new Path().M(pol(c[0], c[1], f.mm(RI), 72)).arcTo(c, 134, true).L(pol(c[0], c[1], f.mm(RI - 1.4), 134)).arcTo(c, 72, false).Z();
-    innerTube(pic, f, 'cp-body', 1.6);
+    innerTube(pic, f, 'cp-body', [72, 134]);
     pic.path('cp-hi', boot, { name: 'boot' });
     pic.label('cp-th', [306, 190], 'boot', [292, 182], pol(c[0], c[1], f.mm(RI - 0.7), 116), 'end', 'leader-boot');
     pic.label('cp-tm', [306, 96], 'cut', [292, 100], pol(c[0], c[1], f.mm(R + 0.5), 103), 'end', 'leader-cut');
-    pic.label('cp-tm', [14, 46], 'tube', [42, 52], pol(c[0], c[1], f.mm(RI - 4), 320), undefined, 'leader-tube');
+    pic.label('cp-tm', [14, 46], 'tube', [42, 52], pol(c[0], c[1], f.mm(RI - 0.5), 318), undefined, 'leader-tube');
     pic.facts.push(pointsAt(pic, 'leader-boot', 'boot', 1), pointsAt(pic, 'leader-cut', 'tyre-2', 8), pointsAt(pic, 'leader-tube', 'tube', 1));
-    pic.facts.push(touches(pic, 'boot', 'tyre', 1), touches(pic, 'boot', 'tyre-2', 1), touches(pic, 'boot', 'tube', 1), clear(pic, 'boot', 'tube', 0));
+    pic.facts.push(touches(pic, 'boot', 'tyre', 1), touches(pic, 'boot', 'tyre-2', 1), touches(pic, 'boot', 'tube', f.mm(0.8)));
   } else {
     casing(pic, f, mark === 'tyre' ? 'cp-hi' : 'cp-rubber');
     if (tubeIn) innerTube(pic, f, mark === 'tube' ? 'cp-hi' : 'cp-body');
   }
   beads(pic, f, mark === 'bead' ? 'cp-hi' : 'cp-dark');
   if (mark === 'tyre') pic.label('cp-th', [306, 40], 'tyre', [290, 46], pol(...m(0, YC), f.mm(R - 1), 40), 'end', 'leader');
-  if (mark === 'tube') pic.label('cp-th', [306, 40], 'inner tube', [272, 46], pol(...m(0, YC), f.mm(RI - 3), 40), 'end', 'leader');
+  if (mark === 'tube') pic.label('cp-th', [306, 40], 'inner tube', [272, 46], pol(...m(0, YC), f.mm(RI - 0.5), 42), 'end', 'leader');
   if (mark === 'bead') pic.label('cp-th', [306, 150], 'bead', [292, 146], m(WI / 2 - 1.6, SEAT - 1.7), 'end', 'leader');
   if (mark === 'rim') pic.label('cp-th', [306, 200], 'rim', [292, 194], m(WI / 2 + WALL - 0.4, 8), 'end', 'leader');
   if (mark === 'tyre' || mark === 'tube' || mark === 'bead' || mark === 'rim') {
@@ -103,22 +108,25 @@ export function wheelSection(mark: SectionMark): Pic {
 /** A tubeless valve fixed in the rim, cut through at the valve: its rubber base in the rim's dip, its stem through the rim, a nut below. */
 export function tubelessValve(): Pic {
   const pic = new Pic(320, 230);
-  const f = frame(150, 40, 5.2), { m } = f;
+  const f = frame(150, 30, 4.8), { m } = f;
   rim(pic, f);
-  // the rim tape over the well, a thin line
-  pic.path('cp-fine', poly([m(-toeX, SEAT - 0.3), m(-toeX + 2.2, CH - 0.3), m(toeX - 2.2, CH - 0.3), m(toeX, SEAT - 0.3)], false), { style: 'stroke-width:2' });
+  // the rim tape over the well and up its sides to the bead seats
+  pic.path('cp-fine', poly([m(-toeX - 0.4, SEAT - 0.6), m(-toeX + 1.9, CH - 0.7), m(toeX - 1.9, CH - 0.7), m(toeX + 0.4, SEAT - 0.6)], false), { style: 'stroke-width:3', name: 'tape' });
   // the valve: a cone of rubber in the dip, the stem down through the rim, the nut under the rim
-  const base = poly([m(-4.6, CH - 2.8), m(4.6, CH - 2.8), m(2.4, CH - 0.6), m(-2.4, CH - 0.6)]);
+  const base = poly([m(-5.4, CH - 2.8), m(5.4, CH - 2.8), m(3.2, CH + 0.8), m(-3.2, CH + 0.8)]);
   pic.path('cp-hi', base, { name: 'valve' });
-  pic.path('cp-hi', poly([m(-1.6, CH - 0.6), m(1.6, CH - 0.6), m(1.6, DEPTH + 7), m(-1.6, DEPTH + 7)]), { name: 'stem' });
-  for (let y = DEPTH + 3.6; y < DEPTH + 6.6; y += 1.4) pic.line('cp-fine', m(-1.6, y), m(1.6, y - 0.6));
-  pic.path('cp-obj', rrect(...m(-4, DEPTH - 0.4), f.mm(8), f.mm(3.2), 2), { name: 'nut' });
+  pic.path('cp-hi', poly([m(-3, CH + 0.8), m(3, CH + 0.8), m(3, DEPTH + 8), m(-3, DEPTH + 8)]), { name: 'stem' });
+  for (let y = DEPTH + 1; y < DEPTH + 7.6; y += 1.3) pic.line('cp-fine', m(-3, y), m(3, y - 0.8));
+  pic.path('cp-obj', poly([m(-1, DEPTH + 8), m(1, DEPTH + 8), m(1, DEPTH + 11.6), m(-1, DEPTH + 11.6)]));
+  pic.path('cp-obj', rrect(...m(-2, DEPTH + 9.2), f.mm(4), f.mm(1.4), 1));
+  pic.path('cp-obj', rrect(...m(-5.5, DEPTH - 0.4), f.mm(11), f.mm(3.2), 2), { name: 'nut' });
   pic.label('cp-th', [306, 24], 'tubeless valve', [262, 30], m(3.6, CH - 1.6), 'end', 'leader-valve');
-  pic.label('cp-tm', [306, 176], 'nut', [292, 170], m(4, DEPTH + 1.2), 'end', 'leader-nut');
+  pic.label('cp-tm', [306, 176], 'nut', [292, 170], m(5.5, DEPTH + 1.2), 'end', 'leader-nut');
   pic.label('cp-tm', [14, 60], 'rim', [36, 66], m(-WI / 2 - WALL, 6), undefined, 'leader-rim');
   pic.text('cp-tm', [14, 222], 'The rim cut through at the valve');
   pic.facts.push(touches(pic, 'valve', 'rim', f.mm(0.8)), touches(pic, 'nut', 'rim', 0.8), touches(pic, 'stem', 'nut', 0.5));
   pic.facts.push(pointsAt(pic, 'leader-valve', 'valve', 1), pointsAt(pic, 'leader-nut', 'nut', 1), pointsAt(pic, 'leader-rim', 'rim', 1));
+  pic.facts.push(touches(pic, 'tape', 'rim', f.mm(1)), touches(pic, 'valve', 'tape', 1));
   return pic;
 }
 
@@ -131,16 +139,17 @@ export function valves(): Pic {
   const px = 60;
   pic.path('cp-obj', poly([[px - 6, rimTop], [px + 6, rimTop], [px + 6, rimTop - 100], [px - 6, rimTop - 100]]), { name: 'presta' });
   for (let y = rimTop - 10; y > rimTop - 98; y -= 6) pic.line('cp-fine', [px - 6, y], [px + 6, y - 2]);
-  pic.path('cp-obj', rrect(px - 7, rimTop - 7, 14, 7, 1.5));
-  pic.path('cp-obj', poly([[px - 1.5, rimTop - 100], [px + 1.5, rimTop - 100], [px + 1.5, rimTop - 120], [px - 1.5, rimTop - 120]]));
-  pic.path('cp-obj', rrect(px - 4, rimTop - 124, 8, 6, 1.5));
+  pic.path('cp-obj', rrect(px - 11, rimTop - 7, 22, 7, 1.5));
+  for (let x = px - 9; x <= px + 9; x += 3) pic.line('cp-fine', [x, rimTop - 6], [x, rimTop - 1]);
+  pic.path('cp-obj', poly([[px - 1.5, rimTop - 100], [px + 1.5, rimTop - 100], [px + 1.5, rimTop - 124], [px - 1.5, rimTop - 124]]));
+  pic.path('cp-obj', rrect(px - 4, rimTop - 116, 8, 6, 1.5));
   // Schrader: wide, threaded near its top, a pin in the middle of its end
   const sx = 160;
   pic.path('cp-obj', rrect(sx - 8, rimTop - 84, 16, 84, 2), { name: 'schrader' });
-  for (let y = rimTop - 80; y < rimTop - 56; y += 4) pic.line('cp-fine', [sx - 8, y], [sx + 8, y - 2]);
+  for (let y = rimTop - 70; y < rimTop - 50; y += 4) pic.line('cp-fine', [sx - 8, y], [sx + 8, y - 2]);
   // the pin sits in the valve's mouth, just below its end
   pic.line('cp-fine', [sx - 5, rimTop - 84], [sx + 5, rimTop - 84]);
-  pic.line('cp-objline', [sx, rimTop - 82], [sx, rimTop - 76], { style: 'stroke-width:2.5' });
+  pic.line('cp-objline', [sx, rimTop - 82], [sx, rimTop - 74], { style: 'stroke-width:3' });
   // Dunlop (Woods): a wide body, a knurled ring nut near its top holding the core, the core's sleeve above it
   const dx = 260;
   pic.path('cp-obj', rrect(dx - 8, rimTop - 64, 16, 64, 2), { name: 'dunlop' });
@@ -165,7 +174,7 @@ export function tyreLevers(): Pic {
   pic.path('cp-frame', rrect(4, 4, 118, 228, 8)).path('cp-frame', rrect(128, 4, 188, 228, 8));
   // ---- 1: the wheel cut through, small: the beads moved from their seats (dashed, where they were) into the dip
   {
-    const f = frame(63, 120, 2.1), { m } = f;
+    const f = frame(63, 124, 2.5), { m } = f;
     rim(pic, f);
     const c = m(0, YC), i = WI / 2;
     // the casing with its feet down in the dip: outer circle from flange to flange, the feet drawn as they hang in the well
@@ -174,7 +183,7 @@ export function tyreLevers(): Pic {
       .arcTo(c, 180 + aOut - 6, false).L(m(-1, CH - 2.6)).L(m(-3.2, CH - 2.6)).L(m(-i + 2.6, 0.4)).Z(), { name: 'tyre-dip' });
     for (const s of [-1, 1] as const) {
       pic.circle('cp-dark', m(s * 2.2, CH - 1.5), f.mm(1.2), { name: s < 0 ? 'bead-dip-l' : 'bead-dip-r' });
-      pic.circle('cp-ghost', m(s * (WI / 2 - 1.5), SEAT - 1.5), f.mm(1.2));
+      pic.circle('cp-ghost', m(s * (WI / 2 - 1.6), SEAT - 1.7), f.mm(2));
     }
     pic.badge([20, 26], '1');
     pic.text('cp-th', [63, 206], 'into the dip', 'middle');
@@ -182,36 +191,52 @@ export function tyreLevers(): Pic {
   }
   // ---- 2: the top of the wheel from the side; the rim's two arcs and the tyre round one centre; spokes from their nipples
   {
-    const C: Pt = [222, 392], k = 0.95, Rr = 311 * k, Rt = Rr + 36 * k, Rw = Rr - 14 * k, L = 104;
+    const C: Pt = [222, 392], k = 0.95, Rr = 311 * k, Rt = Rr + 36 * k, Rw = Rr - 24 * k, L = 104, span = 14;
     const band = (r0: number, r1: number, a0: number, a1: number) =>
       new Path().M(pol(C[0], C[1], r1, a0)).arcTo(C, a1, true).L(pol(C[0], C[1], r0, a1)).arcTo(C, a0, false).Z();
-    pic.path('cp-obj', band(Rw, Rr, -17, 17), { name: 'rim-side' });
-    for (let a = -15; a <= 15; a += 5.625) {
-      const top = pol(C[0], C[1], Rw, a), lean = (Math.round((a + 15) / 5.625) % 2 === 0 ? 1 : -1) * 4;
-      pic.line('cp-thin', top, pol(C[0], C[1], Rw - 150, a + lean * 0.9));
+    // spokes: from their nipples in the rim's inner wall towards the hub, leaning alternately, ending in the panel
+    const spokes: { top: Pt; low: Pt }[] = [];
+    for (let a = -13.125; a <= 13.2; a += 5.625) {
+      const lean = (Math.round((a + 13.125) / 5.625) % 2 === 0 ? 1 : -1) * 3.6;
+      const top = pol(C[0], C[1], Rw, a), low = pol(C[0], C[1], 168, a + lean);
+      spokes.push({ top, low });
+      pic.line('cp-thin', top, low);
     }
-    const l1 = -9, l2 = 3;
-    // the two levers, the same length: a scooped tip under the bead, the hook end down among the spokes
+    pic.path('cp-obj', band(Rw, Rr, -span, span), { name: 'rim-side' });
+    const l1 = -8, l2 = 4;
     const lever = (a: number, name: string, cls: string) => {
       const tip = pol(C[0], C[1], Rr - 2, a), end = pol(C[0], C[1], Rr - 2 - L, a);
-      pic.path(cls, tube(tip, end, 9), { name });
+      pic.path(cls, tube(tip, end, 10), { name });
       return { tip, end };
     };
+    // lever 1's hook end goes round the spoke nearest to it: that spoke drawn first, so the lever lies over it
+    const end1 = pol(C[0], C[1], Rr - 2 - L, l1);
+    const near = spokes.map((sp) => {
+      const t = Math.max(0, Math.min(1, ((end1[0] - sp.top[0]) * (sp.low[0] - sp.top[0]) + (end1[1] - sp.top[1]) * (sp.low[1] - sp.top[1]))
+        / ((sp.low[0] - sp.top[0]) ** 2 + (sp.low[1] - sp.top[1]) ** 2)));
+      const p: Pt = [sp.top[0] + (sp.low[0] - sp.top[0]) * t, sp.top[1] + (sp.low[1] - sp.top[1]) * t];
+      return { sp, p, d: Math.hypot(p[0] - end1[0], p[1] - end1[1]) };
+    }).sort((x, y) => x.d - y.d)[0]!;
+    pic.line('cp-objline', near.sp.top, near.sp.low, { style: 'stroke-width:1.4', name: 'hooked-spoke' });
     const one = lever(l1, 'lever-1', 'cp-hi');
     lever(l2, 'lever-2', 'cp-obj');
-    // the spoke lever 1 hooks onto, and the hook round it
-    const hookAt = add(one.end, [3, 4]), nip = pol(C[0], C[1], Rw, -14);
-    const dir = [hookAt[0] - nip[0], hookAt[1] - nip[1]] as const, far: Pt = [nip[0] + dir[0] * 1.6, nip[1] + dir[1] * 1.6];
-    pic.line('cp-objline', nip, far, { style: 'stroke-width:1.6', name: 'hooked-spoke' });
-    pic.path('cp-hiline', new Path().M(add(one.end, [-3, -2])).Q(add(hookAt, [-6, 8]), add(hookAt, [5, 3])), { style: 'stroke-width:3', name: 'hook' });
+    // the hook: on from the lever's end, round under the spoke and back up its far side, a J
+    {
+      const su: Pt = [near.sp.low[0] - near.sp.top[0], near.sp.low[1] - near.sp.top[1]], sl = Math.hypot(su[0], su[1]);
+      const u: Pt = [su[0] / sl, su[1] / sl];
+      const side = (one.end[0] - near.p[0]) * -u[1] + (one.end[1] - near.p[1]) * u[0] >= 0 ? 1 : -1;
+      const n: Pt = [-u[1] * side, u[0] * side];
+      const at = (a: number, b: number): Pt => [near.p[0] + u[0] * a + n[0] * b, near.p[1] + u[1] * a + n[1] * b];
+      pic.path('cp-hiline', new Path().M(one.end).L(at(6, 4)).Q(at(12, 0), at(8, -6)).L(at(2, -6)), { style: 'stroke-width:3.5', name: 'hook' });
+    }
     // the tyre over the levers' tips: its edge on the rim, lifted out over the rim's wall between the levers
-    pic.path('cp-rubber', new Path().M(pol(C[0], C[1], Rt, -17)).arcTo(C, 17, true).L(pol(C[0], C[1], Rr, 17)).arcTo(C, l2 + 2, false)
-      .Q(pol(C[0], C[1], Rr - 8, l2 - 1), pol(C[0], C[1], Rr - 10, (l1 + l2) / 2)).Q(pol(C[0], C[1], Rr - 8, l1 + 1), pol(C[0], C[1], Rr, l1 - 2))
-      .arcTo(C, -17, false).Z(), { name: 'tyre-side' });
+    pic.path('cp-rubber', new Path().M(pol(C[0], C[1], Rt, -span)).arcTo(C, span, true).L(pol(C[0], C[1], Rr, span)).arcTo(C, l2 + 2, false)
+      .Q(pol(C[0], C[1], Rr - 16, l2 - 1), pol(C[0], C[1], Rr - 18, (l1 + l2) / 2)).Q(pol(C[0], C[1], Rr - 16, l1 + 1), pol(C[0], C[1], Rr, l1 - 2))
+      .arcTo(C, -span, false).Z(), { name: 'tyre-side' });
     // lever 2 is run along the rim, away from lever 1
-    pic.turn(C, Rr - 24, l2 + 3, l2 + 12);
+    pic.turn(C, Rr - 30, l2 + 3, l2 + 11);
     pic.badge([144, 26], '2');
-    pic.facts.push(touches(pic, 'lever-1', 'tyre-side', 1), touches(pic, 'lever-2', 'tyre-side', 1), touches(pic, 'hook', 'hooked-spoke', 2));
+    pic.facts.push(touches(pic, 'lever-1', 'tyre-side', 1), touches(pic, 'lever-2', 'tyre-side', 1), touches(pic, 'hook', 'hooked-spoke', 1));
   }
   return pic;
 }
@@ -241,12 +266,12 @@ export function patchPress(): Pic {
   const C: Pt = [160, 560], r0 = 430, r1 = 482;
   pic.path('cp-rubber', new Path().M(pol(C[0], C[1], r1, -21)).arcTo(C, 21, true).L(pol(C[0], C[1], r0, 21)).arcTo(C, -21, false).Z(), { name: 'tube' });
   const mid = pol(C[0], C[1], (r0 + r1) / 2, 0);
-  pic.path('cp-thin', rrect(mid[0] - 46, mid[1] - 24, 92, 48, 8), { style: 'stroke-dasharray:4 3', name: 'rough' });
+  pic.path('cp-thin', rrect(mid[0] - 46, mid[1] - 19, 92, 38, 8), { style: 'stroke-dasharray:4 3', name: 'rough' });
   pic.circle('cp-halo', mid, 36);
-  pic.path('cp-hi', rrect(mid[0] - 30, mid[1] - 16, 60, 32, 8), { name: 'patch' });
-  pic.arrow(add(mid, [-6, 0]), add(mid, [-40, 0]));
-  pic.arrow(add(mid, [6, 0]), add(mid, [40, 0]));
-  pic.label('cp-tm', [160, 34], 'roughened area', [160, 40], add(mid, [0, -24]), 'middle', 'leader-rough');
+  pic.path('cp-hi', rrect(mid[0] - 32, mid[1] - 13, 64, 26, 8), { name: 'patch' });
+  pic.arrow(add(mid, [-4, 0]), add(mid, [-26, 0]));
+  pic.arrow(add(mid, [4, 0]), add(mid, [26, 0]));
+  pic.label('cp-tm', [160, 34], 'roughened area', [160, 40], add(mid, [-30, -19]), 'middle', 'leader-rough');
   pic.text('cp-th', [160, 192], 'press from the middle outwards', 'middle');
   pic.facts.push(within(pic, 'patch', 'rough', 0.5), within(pic, 'rough', 'tube', 0.5), pointsAt(pic, 'leader-rough', 'rough', 1));
   return pic;
@@ -267,10 +292,11 @@ export function tubelessPlug(): Pic {
   pic.path('cp-obj', rrect(hole - 22, 14, 44, 40, 10), { name: 'handle' });
   pic.line('cp-objline', [hole, 54], [hole, top + thick + 4], { style: 'stroke-width:4', name: 'needle' });
   // the needle's fork, the strip through it
-  pic.path('cp-objline', new Path().M([hole, top + thick + 2]).L([hole - 5, top + thick + 18]).M([hole, top + thick + 2]).L([hole + 5, top + thick + 18]), { style: 'stroke-width:3' });
+  pic.path('cp-objline', new Path().M([hole, top + thick + 2]).L([hole - 4, top + thick + 11]).M([hole, top + thick + 2]).L([hole + 4, top + thick + 11]), { style: 'stroke-width:3' });
   // the plug strip: through the needle's eye, folded; its two tails out of the hole above the tread
-  const fold = top + thick + 14;
-  const strip = new Path().M([hole - 14, top - 22]).Q([hole - 6, top + 4], [hole - 3, fold - 2]).Q([hole, fold + 4], [hole + 3, fold - 2]).Q([hole + 6, top + 4], [hole + 14, top - 22]);
+  const fold = top + thick + 6;
+  const strip = new Path().M([hole - 14, top - 22]).Q([hole - 3, top - 6], [hole - 2.5, top + 4]).L([hole - 2.5, fold - 3]).Q([hole, fold + 3], [hole + 2.5, fold - 3])
+    .L([hole + 2.5, top + 4]).Q([hole + 3, top - 6], [hole + 14, top - 22]);
   pic.path('cp-halowire', strip);
   pic.path('cp-hiline', strip, { style: 'stroke-width:5', name: 'plug' });
   pic.arrow([hole + 44, 46], [hole + 44, 104]);
