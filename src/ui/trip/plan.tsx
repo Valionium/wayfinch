@@ -40,7 +40,7 @@ function PlaceChoice({ id, label, services, chosen, onChoose }: {
     return (
       <div class="field">
         <span class="field-label">{label}</span>
-        <p class="tool-line">{chosen.name}<span class="muted">{chosen.where ? ` · ${chosen.where}` : ''}</span></p>
+        <p class="tool-line">{chosen.name}<span class="muted">{[chosen.street, chosen.where].filter(Boolean).map((x) => ` · ${x}`).join('')}</span></p>
         <button type="button" class="btn" onClick={() => { onChoose(null); setHits(null); }}>{W.appAbChange(label)}</button>
       </div>
     );
@@ -50,19 +50,25 @@ function PlaceChoice({ id, label, services, chosen, onChoose }: {
       <label for={id}>{label}</label>
       <form class="row" onSubmit={(e) => { e.preventDefault(); void search(); }}>
         <input id={id} type="search" value={text} autoComplete="off" maxLength={200} onInput={(e) => setText(e.currentTarget.value)} />
-        <button type="submit" class="btn">{TR.appAbSearch}</button>
+        <button type="submit" class="btn" disabled={busy}>{TR.appAbSearch}</button>
       </form>
+      <p class="muted">{TR.appAbHint}</p>
       {busy ? <p role="status">{TR.appAbSearching}</p> : null}
       {problem ? <p class="notice" role="alert">{problem}</p> : null}
       {hits && hits.length > 0 ? (
         <>
-          <p class="muted">{TR.appAbPick}</p>
+          <p class="muted" role="status">{TR.appAbPick}</p>
           {hits.some((h) => h.source === 'osm') ? <OsmCredit lead={W.appTripOsmSearch} /> : null}
           {hits.some((h) => h.source === 'geonames') ? <GeoNamesCredit /> : null}
-          <ul class="hits">
+          <ul class="hits" aria-label={`${TR.appAbList}: ${label}`}>
             {hits.map((h, i) => (
               <li key={i}>
-                <button type="button" class="btn hit" onClick={() => onChoose(h)}>{h.name}<span class="muted">{h.where ? ` · ${h.where}` : ''}</span></button>
+                <button type="button" class="btn hit" onClick={() => onChoose(h)}>
+                  <span class="hit-name">{h.name}</span>
+                  {h.street ? <span class="hit-line">{h.street}</span> : null}
+                  {h.kind ? <span class="hit-line">{h.kind}</span> : null}
+                  {h.where ? <span class="hit-line">{h.where}</span> : null}
+                </button>
               </li>
             ))}
           </ul>
