@@ -245,6 +245,8 @@ button.go.small{font-size:15px;padding:9px 16px;flex:0 0 auto}
 .setupactions,.comparecontrols{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:9px}
 .comparecontrols>div{flex:1 1 180px;min-width:0}.comparecontrols select{width:100%}
 .setupcompare{margin:12px 0;padding:12px;border:1px solid var(--line);background:var(--panel)}
+.setupgroup{margin:14px 0}.setupgroup>h3{font-family:var(--disp);font-weight:600;font-size:16px;margin:0 0 2px}
+.setuphint{font-size:13px;color:var(--muted);margin:0 0 8px}
 .comparetable{overflow-x:auto;margin:10px 0;max-width:100%}
 .comparetable table{width:100%;border-collapse:collapse;font-size:13px;line-height:1.5;table-layout:fixed;min-width:420px}
 .comparetable th,.comparetable td{padding:8px;border-bottom:1px solid var(--line-soft);vertical-align:top;text-align:left;overflow-wrap:anywhere}
@@ -9791,12 +9793,12 @@ function renderRecall(){
   wrap.classList.toggle('hidden', !SETUPS.length);
   if(!SETUPS.length){ $('recallList').innerHTML = ''; $('recallDetail').innerHTML = ''; return; }
 
-  $('recallList').innerHTML = SETUPS.map(s => {
+  $('recallList').innerHTML = recallOrder(SETUPS).map(s => {
     const open = S.recallOpen === s.id;
     const p = s.predicted || {};
     return `<button class="pick recall${open?' has':''}" data-recall="${htmlEsc(s.id)}">
       <b>${htmlEsc(s.name)}</b>
-      <i>${MONTHS[s.trip.month].slice(0,3)} · ${plural(s.trip.nights)} · ${s.bags.length} bags</i>
+      <i>${setupKind(s) === 'general' ? 'General · ' : ''}${MONTHS[s.trip.month].slice(0,3)} · ${plural(s.trip.nights)} · ${s.bags.length} bags</i>
       ${s.feedback ? `<span class="pickn done">✓</span>` : ''}</button>`;
   }).join('');
 
@@ -10549,13 +10551,15 @@ function renderResult(){
      ${IMPORTED_SETTINGS ? `<div class="undobar"><span>Imported settings: ${htmlEsc([IMPORTED_SETTINGS.theme ? IMPORTED_SETTINGS.theme+' theme' : '',Object.hasOwn(IMPORTED_SETTINGS,'packEff') ? (IMPORTED_SETTINGS.packEff == null ? 'default' : Math.round(IMPORTED_SETTINGS.packEff*100)+'%')+' packing factor' : ''].filter(Boolean).join(' · '))}. Applying them recalculates your current plan.</span><button class="linky" id="useImportedSettings">Apply imported settings</button><button class="linky" id="dismissImportedSettings">Keep current settings</button></div>` : ''}
      ${renderSetupCompare()}` +
     (SETUPS.length
-      ? SETUPS.map(s => `<div class="setup">
+      ? setupGroupsHtml(s => `<div class="setup">
           <div class="setuphd"><b>${htmlEsc(s.name)}</b><em>${htmlEsc(s.saved)}</em>
             <button class="linky" data-load="${htmlEsc(s.id)}">Load</button>
             <button class="linky" data-rename-setup="${htmlEsc(s.id)}">Rename</button>
             <button class="linky" data-update-setup="${htmlEsc(s.id)}">Update from current plan</button>
             <button class="linky" data-duplicate-setup="${htmlEsc(s.id)}">Duplicate</button>
+            ${setupKindButton(s)}
             <button class="linky del" data-del-setup="${htmlEsc(s.id)}">Delete</button></div>
+          ${setupBaseLine(s)}
           <div class="setupmeta">${(() => {
             const a = s.trip.place || (s.trip.region ? presetPlace(s.trip.region) : null);
             const b = s.trip.place2;
@@ -10567,7 +10571,7 @@ function renderResult(){
           ${renderSetupTools(s)}
           <textarea class="setupnote" data-note="${htmlEsc(s.id)}" aria-label="Notes for ${htmlEsc(s.name)}" rows="2" maxlength="2000" placeholder="Add a note…">${htmlEsc(s.note)}</textarea>
           ${pollFor(s)}
-        </div>`).join('')
+        </div>`)
       : `<div class="emptyfind">Nothing saved yet. Save a setup and you can come back to it, load it again next trip, and write down what actually happened when you packed it.</div>`) +
     // What a report is for: it goes to whoever maintains the app, and the
     // shipped packing factor moves for everyone. Nobody should have to ride
@@ -11014,6 +11018,7 @@ function renderResult(){
   $('resultBox').querySelectorAll('[data-rename-setup]').forEach(b => b.onclick = () => startSetupAction(b.dataset.renameSetup,'rename'));
   $('resultBox').querySelectorAll('[data-update-setup]').forEach(b => b.onclick = () => startSetupAction(b.dataset.updateSetup,'update'));
   $('resultBox').querySelectorAll('[data-duplicate-setup]').forEach(b => b.onclick = () => duplicateSetup(b.dataset.duplicateSetup));
+  $('resultBox').querySelectorAll('[data-setup-kind]').forEach(b => b.onclick = () => { const [id,kind]=b.dataset.setupKind.split(':'); setSetupKind(id,kind); });
   $('resultBox').querySelectorAll('[data-confirm-rename]').forEach(b => b.onclick = () => {
     if(!$('renameSetupName').value.trim()){$('renameSetupName').setCustomValidity('Enter a name for this setup.');$('renameSetupName').reportValidity();return;}
     renameSetup(b.dataset.confirmRename,$('renameSetupName').value);
@@ -11618,7 +11623,7 @@ function useImportedDraft(){
 let SETUP_ACTION = null, SETUP_COMPARE = ['', ''];
 const DELETED_SETUPS = [];
 // Keep file and parser limits identical; a full supported library fits in an export.
-const MAX_SAVED_SETUPS = 20;
+const MAX_SAVED_SETUPS = 60;   // 20 general and 40 trip setups (MAX_GENERAL_SETUPS, MAX_TRIP_SETUPS)
 const MAX_IMPORT_BYTES = 64 * 1024 * 1024;
 const IMPORT_SIZE_MESSAGE = 'That file is too large. Import a Load Check export up to 64 MiB.';
 function importByteLength(text){ return new Blob([text]).size; }
@@ -12021,7 +12026,44 @@ function normaliseSetup(p){
     // The drawing renderer reconstructs this through safeDataThumb's SVG allowlist.
     thumb:typeof p.thumb === 'string' && p.thumb.length <= 200000 ? p.thumb : '',
     factor:dataNumber(p.factor,0.7,1),updated:dataDate(p.updated),
-    feedback:normaliseSetupFeedback(p.feedback)};
+    feedback:normaliseSetupFeedback(p.feedback),...setupKindFields(p)};
+}
+/* General and trip setups (guided Trip design §5, the owner's answer of 8 Nov 2026): a setup is a trip setup unless the rider
+   marked it general. Only a field that is there is written, so a setup saved before reads back byte for byte. */
+const MAX_GENERAL_SETUPS=20, MAX_TRIP_SETUPS=40;
+function setupKindFields(p){
+  const out={},general=p.kind === 'general';
+  if(general) out.kind='general';
+  const r=dataObject(p.forRoute) ? p.forRoute : null;
+  if(r && typeof r.hash === 'string' && /^[0-9a-f]{64}$/.test(r.hash))
+    out.forRoute={hash:r.hash,name:dataText(r.name,160),departureDate:normaliseDepartureDate(r.departureDate) || null};
+  if(dataId(p.base)) out.base=p.base;
+  if(general && p.isDefault === true) out.isDefault=true;
+  return out;
+}
+function setupKind(s){ return s && s.kind === 'general' ? 'general' : 'trip'; }
+function setupKindLimit(kind){ return kind === 'general' ? MAX_GENERAL_SETUPS : MAX_TRIP_SETUPS; }
+function setupKindFull(kind,list=SETUPS){ return list.filter(s => setupKind(s) === kind).length >= setupKindLimit(kind); }
+// Saved setups in two groups, each in the list's own order (newest saved first): the few general ones, then the trip setups.
+function setupGroups(list){ return {general:list.filter(s => setupKind(s) === 'general'),trip:list.filter(s => setupKind(s) === 'trip')}; }
+function recallOrder(list){ const g=setupGroups(list); return [...g.general,...g.trip]; }
+function setupKindButton(s){
+  const to=setupKind(s) === 'general' ? 'trip' : 'general';
+  return `<button class="linky" data-setup-kind="${htmlEsc(s.id)}:${to}">${to === 'general' ? 'Use as a general setup' : 'Use as a trip setup'}</button>`;
+}
+function setupBaseLine(s){
+  const base=s.base && SETUPS.find(x => x.id === s.base && setupKind(x) === 'general');
+  return base ? `<div class="setupmeta">Trip setup from ${htmlEsc(base.name)}</div>` : '';
+}
+function setupGroupsHtml(card){
+  const g=setupGroups(SETUPS);
+  return `<div class="setupgroup"><h3>General setups</h3><p class="setuphint">The few setups you start trips from.</p>${g.general.length ? g.general.map(card).join('') :
+      `<p class="setuphint">None yet. Mark a setup you start trips from with Use as a general setup.</p>`}</div>`+
+    `<div class="setupgroup"><h3>Trip setups</h3><p class="setuphint">Each one planned for one trip.</p>${g.trip.length ? g.trip.map(card).join('') :
+      `<p class="setuphint">None yet.</p>`}</div>`;
+}
+function setupKindFullMessage(kind){
+  return `You have ${setupKindLimit(kind)} ${kind} setups. Export them, then delete one before adding another.`;
 }
 function normaliseReport(f){
   if(!dataObject(f) || !dataDate(f.at)) return null;
@@ -12488,7 +12530,7 @@ async function importAll(text){
     // The same file imported again: its changed setup is already here as an "· imported" copy, so add nothing.
     const prior=existing && SETUPS.find(current => current.id !== s.id && / · imported$/.test(current.name) && importedBody(current) === importedBody(s));
     if(prior){ priorCopy.set(s.id,prior.id); return; }
-    if(SETUPS.length >= MAX_SAVED_SETUPS){ atLimit++; return; }
+    if(setupKindFull(setupKind(s))){ atLimit++; return; }
     if(existing){
       const oldId=s.id; s.id=newSetupId(); remapped.set(oldId,s.id);
       s.name=s.name.slice(0,145)+' · imported'; conflicts++;
@@ -12523,7 +12565,7 @@ async function importAll(text){
     Math.min(rawBikeProfiles.length,MAX_BIKE_PROFILES)-bikeProfiles.length;
   const bikeAtLimit=Math.max(0,rawBikeProfiles.length-MAX_BIKE_PROFILES)+bikeMerge.atLimit;
   return `Added ${addedSetups} setups and ${addedReports} reports.${rawBikeProfiles.length ? ` Added ${bikeMerge.added} bike profiles.` : ''}${bikeMerge.conflicts ? ` Kept ${bikeMerge.conflicts} changed bike profiles as imported copies; your existing bikes are preserved.` : ''}${conflicts ? ` Kept ${conflicts} changed setups as imported copies, preserving your existing versions.` : ''}${invalid ? ` Skipped ${invalid} invalid or oversized entries.` : ''}${
-    atLimit ? ` Skipped ${atLimit} setups beyond the ${MAX_SAVED_SETUPS}-setup library limit. Your existing entries are kept.` : ''}${
+    atLimit ? ` Skipped ${atLimit} setups beyond the library limit of ${MAX_GENERAL_SETUPS} general and ${MAX_TRIP_SETUPS} trip setups. Your existing entries are kept.` : ''}${
     bikeAtLimit ? ` Skipped ${bikeAtLimit} bike profiles beyond the ${MAX_BIKE_PROFILES}-profile library limit. Your existing bikes are kept.` : ''}${
     !setupsSaved || !reportsSaved || !bikesSaved ? ' Imported entries are kept for this session only because browser storage could not save them. Export before closing.' : ''}${
     draft ? ' Choose whether to use the imported working plan below.' : ''}${
@@ -12608,8 +12650,8 @@ function snapshotSetup(name, note){
 }
 async function saveSetup(name, note){
   if(trialWaits('setup')) return false;
-  if(SETUPS.length >= MAX_SAVED_SETUPS){
-    SAVE_MESSAGE = `You have ${SETUPS.length} saved setups. Export them, then delete one before saving another.`;
+  if(setupKindFull('trip')){   // a setup saved here is a trip setup; the rider marks the general ones
+    SAVE_MESSAGE = setupKindFullMessage('trip');
     if($('saveMsg')) $('saveMsg').textContent = SAVE_MESSAGE;
     draftStatus(SAVE_MESSAGE);
     return false;
@@ -12747,6 +12789,15 @@ function startSetupAction(id,kind){
   if(target){ target.focus(); target.scrollIntoView?.({block:'nearest'}); }
   return true;
 }
+// The rider's mark (the owner, 8 Nov 2026): "Use as a general setup", and back. Changes the kind only, never the plan in it.
+async function setSetupKind(id,kind){
+  const s=SETUPS.find(setup => setup.id === id); if(!s || !['general','trip'].includes(kind)) return false;
+  if(setupKind(s) === kind) return true;
+  if(setupKindFull(kind)){ SAVE_MESSAGE=setupKindFullMessage(kind); renderResult(); return false; }
+  if(kind === 'general') s.kind='general'; else { delete s.kind; delete s.isDefault; }
+  SAVE_MESSAGE=kind === 'general' ? `${s.name} is now a general setup: one you start trips from.` : `${s.name} is now a trip setup.`;
+  savedSetupResult(await store.set(SETUP_KEY,SETUPS),SAVE_MESSAGE); renderRecall(); renderResult(); return true;
+}
 async function renameSetup(id,name){
   const s=SETUPS.find(setup => setup.id === id),clean=dataText(name,160).trim(); if(!s || !clean) return false;
   s.name=clean; SETUP_ACTION=null;
@@ -12754,8 +12805,9 @@ async function renameSetup(id,name){
 }
 async function duplicateSetup(id){
   const original=SETUPS.find(s => s.id === id); if(!original) return false;
-  if(SETUPS.length >= MAX_SAVED_SETUPS){ SAVE_MESSAGE=`There are already ${MAX_SAVED_SETUPS} saved setups. Export or delete one before duplicating.`;renderResult();return false; }
+  if(setupKindFull(setupKind(original))){ SAVE_MESSAGE=setupKindFullMessage(setupKind(original));renderResult();return false; }
   const copy=JSON.parse(JSON.stringify(original)),base=original.name.slice(0,140);
+  delete copy.isDefault;
   let suffix=' · copy',n=2;
   while(SETUPS.some(s => s.name === base+suffix)) suffix=' · copy '+n++;
   Object.assign(copy,{id:newSetupId(),name:base+suffix,saved:new Date().toISOString().slice(0,10),updated:null,feedback:null});
@@ -12790,7 +12842,8 @@ async function deleteSetup(id){
   renderResult();
 }
 async function undoDeleteSetup(){
-  if(SETUPS.length >= MAX_SAVED_SETUPS){SAVE_MESSAGE=`There are already ${MAX_SAVED_SETUPS} saved setups. Delete one before undoing this deletion.`;renderResult();return false;}
+  const waiting=DELETED_SETUPS[DELETED_SETUPS.length-1];
+  if(waiting && setupKindFull(setupKind(waiting.setup))){SAVE_MESSAGE=setupKindFullMessage(setupKind(waiting.setup)).replace('before adding another','before undoing this deletion');renderResult();return false;}
   const last = DELETED_SETUPS.pop(); if(!last) return;
   SETUPS.splice(Math.min(last.index, SETUPS.length), 0, last.setup);
   SAVE_MESSAGE = '';
