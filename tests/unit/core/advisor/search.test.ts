@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { candidates, extensions } from '../../../../src/core/advisor/candidates.ts';
 import { compareMinimal } from '../../../../src/core/advisor/rank.ts';
-import { advise, adviseSteps } from '../../../../src/core/advisor/search.ts';
+import { advise, adviseSteps, biggerOffered, biggerSteps } from '../../../../src/core/advisor/search.ts';
 import { MAX_TRIALS } from '../../../../src/core/advisor/table.ts';
 import type { AdvisorAnswer, AdvisorInput, BagIn, Decks, Pos, TrialResult } from '../../../../src/core/advisor/types.ts';
 import { GA } from '../../../../src/core/wording/en-advisor.ts';
@@ -266,5 +266,49 @@ describe('slices (design §3.4: within a second, or in the background)', () => {
     expect(out.answer.partial).toBe(true);
     // advise runs the same generator to the end.
     expect(advise({ ...many, trial: packer(items(12, 12, 12, 12)) })).toEqual(out.answer);
+  });
+
+  test('[GA-SLICES] every planner call counts toward the 20: with no clock hand-back, at most 20 trial calls run before the first yield and between two yields, the base included', () => {
+    const packs = Array.from({ length: 6 }, (_, k) => bag(k + 1, 'pack', 15));
+    const plans: AdvisorInput[] = [
+      input({ goal: 'handling', style: 'bags', trial: packer(items(12, 12, 12, 12)) }),
+      input({ goal: 'both', style: 'bags-first', bags: packs, nextUid: 7, trial: packer(items(12, 12, 12, 12)) }),
+      input({ goal: 'backpack', style: 'panniers', bags: packs, nextUid: 7, trial: packer(items(12, 12, 12, 12)) }),
+    ];
+    for (const plan of plans) {
+      let calls = 0;
+      const counted = { ...plan, handBack: () => false, trial: (b: BagIn[], d: Decks) => { calls++; return plan.trial(b, d); } };
+      const gaps: number[] = [];
+      let last = 0;
+      const gen = adviseSteps(counted);
+      let answer: AdvisorAnswer;
+      for (;;) {
+        const step = gen.next();
+        if (step.done) { answer = step.value; break; }
+        gaps.push(calls - last);
+        last = calls;
+        expect(step.value).toBe(calls);
+      }
+      expect(gaps.length).toBeGreaterThan(1);
+      expect(Math.max(...gaps)).toBeLessThanOrEqual(20);
+      expect(calls - last).toBeLessThanOrEqual(20);
+      expect(answer.tried).toBe(calls);
+      // the same answer however the hand-backs fall
+      expect(advise(plan)).toEqual(answer);
+    }
+    // the bigger change, the same
+    const usable = (b: BagIn) => ({ ok: (b.pos === 'frame' && b.L === 3) || b.pos === 'rack', reason: null });
+    const big = input({ bags: [bag(1, 'pack', 4)], nextUid: 2, usable, style: 'bags', goal: 'handling', trial: packer([{ id: 'a', L: 3, kg: 1 }, { id: 'b', L: 9, kg: 3 }]) });
+    const answer = advise(big);
+    expect(biggerOffered(big, answer)).toBe(true);
+    let calls = 0;
+    const gen = biggerSteps({ ...big, handBack: () => false, trial: (b, d) => { calls++; return big.trial(b, d); } }, answer);
+    let last = 0;
+    for (;;) {
+      const step = gen.next();
+      if (step.done) { expect(calls - last).toBeLessThanOrEqual(20); break; }
+      expect(calls - last).toBeLessThanOrEqual(20);
+      last = calls;
+    }
   });
 });
