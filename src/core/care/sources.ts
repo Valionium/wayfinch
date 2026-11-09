@@ -276,8 +276,9 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
     urls: [
       'https://www.ternbicycles.com/be/support/kb/349039/how-troubleshoot-bosch-ebike-system-tern-bikes',
       'https://helpcenter.velo-de-ville.com/en/support/solutions/articles/80001185577-error-patterns-solutions-for-bosch-shimano',
+      'https://www.manualslib.com/manual/2912956/Bosch-Bdu336y.html?page=85',
     ],
-    note: 'Book p. 215: charge, battery and plugs seated, dirty contacts; the book cleans with a damp cloth and dries fully.',
+    note: 'Book p. 215: charge, battery and plugs seated, dirty contacts; the book cleans with a damp cloth and dries fully. Care pictures redo (approved by the owner, 9 November 2026): T19, switch the system off before taking the battery out, refit until it clicks, lock with the key (Bosch PowerTube instructions); some light e-bikes have a battery that only comes out with tools, which stays in. T20, the battery\'s own button where it has one; on Bosch\'s smart system the main button can be on the handlebar remote or the top tube (Tern\'s Bosch guide).',
   },
 
   // ---- What to carry (group 3) ----

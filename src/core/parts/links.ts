@@ -23,7 +23,7 @@ export const STEP_PARTS: Readonly<Record<string, readonly L[]>> = {
   'gears-skipping': [[['stiff link', 'chain']], [['barrel adjuster', 'barrel']], none, none],
   'bolt-loose': [none, none, none, none],
   'tyre-torn': [[['tube', 'tube']], none, [['tube', 'tube']], none],
-  'ebike-no-power': [[['battery', 'battery']], [['contacts', 'battery']], [['battery', 'battery']], [['display', 'display'], ['remote', 'display']], none],
+  'ebike-no-power': [[['battery', 'battery']], [['contacts', 'battery']], [['battery', 'battery'], ['remote', 'display']], [['display', 'display'], ['remote', 'display']], none],
 };
 
 export type Segment = string | { text: string; part: PartId };

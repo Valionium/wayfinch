@@ -906,9 +906,9 @@ export const ROAD_CARDS: RoadCard[] = [
     id: 'ebike-no-power', problem: "E-bike won't power on", part: 'ebike', applies: { ebike: ['yes'] },
     checkFirst: 'Battery charged? Battery seated and clicked in?',
     steps: [
-      'Remove the battery and refit it until it clicks.',
+      'Switch the system off, then remove the battery and refit it until it clicks; lock it with the key if it has one. A battery that only comes out with tools stays in.',
       'Wipe the contacts with a dry cloth.',
-      'Press the power button on the battery.',
+      "Switch on with the battery's own button if it has one; on some newer bikes the main button is on the handlebar remote or the top tube.",
       'Check display, remote and motor plugs are tight.',
       'Try to power on again; note any error code.',
     ],

@@ -10,7 +10,7 @@
   },
   "headset": {
    "name": "Headset",
-   "text": "The headset is the pair of bearings at the top and the bottom of the frame's head tube, which let the fork and the handlebar turn. When it is loose, the front of the bike knocks as you brake."
+   "text": "The headset is the pair of bearings at the top and the bottom of the frame's head tube, on most new bikes hidden inside it, which let the fork and the handlebar turn. When it is loose, the front of the bike knocks as you brake."
   },
   "stem": {
    "name": "Stem",
@@ -138,7 +138,7 @@
   },
   "display": {
    "name": "Display and remote",
-   "text": "The display on the handlebar shows your speed, the battery and the level of help; the remote by the grip changes the level. On many e-bikes the power button is on the display or the remote, on others on the battery."
+   "text": "The display on the handlebar shows your speed, the battery and the level of help; the remote by the grip changes the level. On many e-bikes the power button is on the display or the remote, on others on the battery or the top tube."
   },
   "stanchions": {
    "name": "Fork legs (stanchions)",
@@ -239,6 +239,36 @@
   "pg-chainring-2x": {
    "name": "Two chainrings on the crank.",
    "description": "The crank from the bike's right side: a big and a smaller toothed ring, marked \"chainrings\", held by four arms round the crank's centre. The crank, labelled \"crank\", runs from the centre to the pedal."
+  },
+  "pg-headset": {
+   "name": "The headset: bearings inside the top and the bottom of the head tube.",
+   "description": "The front of the frame from the side, front to the right: the head tube, wider at the bottom, with the stem on top and the fork below. Inside it, drawn dashed, a bearing at its top and a bigger one at its bottom, with a slim cover over the top, all marked and labelled \"headset\". The stem is labelled \"stem\".",
+   "caption": "Seen from the side, front to the right. On most new bikes the bearings sit inside the head tube, drawn dashed."
+  },
+  "pg-stem": {
+   "name": "The stem, between the steerer and the handlebar.",
+   "description": "The front of the frame from the side, front to the right. On top of the head tube, the stem, marked \"stem\", clamps the fork's steerer with two bolts at its back and reaches forward to the handlebar, which is seen end-on and labelled \"handlebar\". A front plate with four bolts, one above and one below the bar showing, holds the bar in the stem.",
+   "caption": "Seen from the side, front to the right."
+  },
+  "pg-bar-drop": {
+   "name": "A drop handlebar from the side.",
+   "description": "A drop handlebar seen from the side, front to the right, marked \"drop bar\": from the stem it runs forward, then curves down and back to the lower ends, the drops. The rubber hood sits on the front of the curve, labelled \"hood\", with the brake lever hanging in front of the curve."
+  },
+  "pg-lever-drop": {
+   "name": "The brake lever on a drop handlebar.",
+   "description": "A drop handlebar from the side, front to the right. The rubber hood sits on the front of the bar's curve, labelled \"hood\", and the brake lever, marked \"brake lever\", hangs from it in front of the curve, down towards the drops."
+  },
+  "pg-bar-flat": {
+   "name": "A flat handlebar from above.",
+   "description": "A flat handlebar seen from above, forward is up, marked \"flat bar\": the stem reaches forward from the steerer to the middle of the bar, and the bar's ends sweep back a little. Rubber grips sit at its ends, one labelled \"grip\", with the brake levers just ahead of them."
+  },
+  "pg-lever-flat": {
+   "name": "The brake lever on a flat handlebar.",
+   "description": "The right end of a flat handlebar seen from above, forward is up. The brake lever, marked \"brake lever\", is clamped to the bar inside the grip and reaches out just ahead of the grip, labelled \"grip\". The gear shifter sits beside the lever's clamp, and the brake's cable or hose leaves the front of the lever."
+  },
+  "pg-display": {
+   "name": "An e-bike's display and remote on the handlebar.",
+   "description": "A flat handlebar seen from above, forward is up, the stem reaching forward to its middle. Over the stem sits a screen, marked \"display\". On the bar near the left grip, a small box with buttons is marked \"remote\"."
   }
  }
 }

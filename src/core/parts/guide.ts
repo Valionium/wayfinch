@@ -27,9 +27,9 @@ const g = (id: PartId, group: PartGroup, pictures: string[], mixed: PartId[] = [
 export const GUIDE: readonly GuidePart[] = [
   g('frame', 'steering', []),
   g('fork', 'steering', [], ['stanchions']),
-  g('headset', 'steering', [], ['stem']),
-  g('stem', 'steering', [], ['headset']),
-  g('handlebar', 'steering', [], [], undefined, 'bars'),
+  g('headset', 'steering', ['pg-headset'], ['stem']),
+  g('stem', 'steering', ['pg-stem'], ['headset']),
+  g('handlebar', 'steering', ['pg-bar-drop', 'pg-bar-flat'], [], undefined, 'bars'),
   g('seatpost', 'steering', []),
   g('hub', 'wheels', [], ['hub-gears']),
   g('wheel-qr', 'wheels', [], ['brake-qr', 'thru-axle']),
@@ -42,7 +42,7 @@ export const GUIDE: readonly GuidePart[] = [
   g('tube', 'tyres', ['pg-tube'], ['tyre']),
   g('valve', 'tyres', ['pg-valves'], ['tubeless-valve']),
   g('tubeless-valve', 'tyres', ['pg-tubeless-valve'], ['valve'], 'tubeless'),
-  g('brake-lever', 'brakes', [], [], undefined, 'bars'),
+  g('brake-lever', 'brakes', ['pg-lever-drop', 'pg-lever-flat'], [], undefined, 'bars'),
   g('rim-brake', 'brakes', ['pg-caliper-rim', 'pg-vbrake', 'pg-rim-hydraulic'], ['caliper'], 'rim', 'rim-brake'),
   g('pads', 'brakes', ['pg-pads-rim', 'pg-pads-disc'], [], undefined, 'brakes'),
   g('brake-qr', 'brakes', ['brake-qr-open', 'vbrake-open', 'hydro-rim-open'], ['wheel-qr'], 'rim', 'rim-brake'),
@@ -58,8 +58,8 @@ export const GUIDE: readonly GuidePart[] = [
   g('hanger', 'drive', ['pg-hanger'], ['derailleur', 'dropouts'], 'derailleur'),
   g('gear-cable', 'drive', ['pg-gear-cable']),
   g('hub-gears', 'drive', [], ['hub'], 'hub-gears'),
-  g('battery', 'ebike', [], [], 'ebike'),
-  g('display', 'ebike', [], [], 'ebike'),
+  g('battery', 'ebike', ['battery-in-tube', 'battery-contacts'], [], 'ebike'),
+  g('display', 'ebike', ['pg-display'], [], 'ebike'),
   g('stanchions', 'ebike', [], ['fork'], 'suspension'),
 ];
 

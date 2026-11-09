@@ -108,7 +108,9 @@ export const ROAD_FIGURES: Record<string, RoadFigure[]> = {
   ],
   'ebike-no-power': [
     f('problem', "E-bike won't power on"), f('checkFirst', 'Battery charged?'), f('checkFirst', 'Battery seated and clicked in?'),
-    step(0, 'refit it until it clicks'), step(1, 'contacts with a dry cloth'), step(2, 'power button on the battery'),
+    step(0, 'Switch the system off, then remove the battery and refit it until it clicks; lock it with the key if it has one.'),
+    step(0, 'A battery that only comes out with tools stays in.'), step(1, 'contacts with a dry cloth'),
+    step(2, "Switch on with the battery's own button if it has one; on some newer bikes the main button is on the handlebar remote or the top tube."),
     step(3, 'display, remote and motor plugs are tight'), step(4, 'note any error code'),
     f('rideOn', 'Ride unpowered if the bike pedals fine'), f('rideOn', 'Stop if the motor smells hot or the battery is damaged'),
   ],

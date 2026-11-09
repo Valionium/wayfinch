@@ -114,11 +114,14 @@ export class Pic {
   items: Item[] = [];
   shapes = new Map<string, Shape>();
   facts: Fact[] = [];
+  /** A prefix for the names that follow, so a second panel can name its parts as the first does. */
+  ns = '';
   readonly w: number;
   readonly h: number;
   constructor(w: number, h: number) { this.w = w; this.h = h; }
   private keep(name: string | undefined, parts: Pt[][], closed: boolean[]): void {
     if (!name) return;
+    name = this.ns + name;
     if (this.shapes.has(name)) throw new Error(`shape named twice: ${name}`);
     this.shapes.set(name, { name, parts, closed });
   }
@@ -190,7 +193,7 @@ export class Pic {
   }
   fact(what: string, ok: boolean, detail?: string): this { this.facts.push({ what, ok, ...(detail ? { detail } : {}) }); return this; }
   get(name: string): Shape {
-    const s = this.shapes.get(name);
+    const s = this.shapes.get(this.ns + name);
     if (!s) throw new Error(`no shape named ${name}`);
     return s;
   }

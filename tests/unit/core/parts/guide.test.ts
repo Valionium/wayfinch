@@ -83,6 +83,19 @@ test("[PG-KINDS] a part's close-ups follow the bike detail that decides them: th
   // the chain and gear parts drawn in batch 3 each have their close-up
   for (const [id, pic] of [['chain', 'pg-chain'], ['quick-link', 'quick-link'], ['cassette', 'pg-cassette'], ['derailleur', 'pg-derailleur'],
     ['hanger', 'pg-hanger'], ['gear-cable', 'pg-gear-cable']] as const) expect(partById(id)!.pictures, id).toEqual([pic]);
+  // batch 4, the cockpit and the e-bike: the bar and the brake lever by the bars (flat first for flat bars, else drop); the headset, the
+  // stem and the display each one close-up; the battery in the down tube, with its contacts
+  expect(guidePictures(partById('handlebar')!, D({ bars: 'flat' }))).toEqual(['pg-bar-flat', 'pg-bar-drop']);
+  expect(guidePictures(partById('handlebar')!, D())).toEqual(['pg-bar-drop', 'pg-bar-flat']);
+  expect(guidePictures(partById('brake-lever')!, D({ bars: 'flat' }))).toEqual(['pg-lever-flat', 'pg-lever-drop']);
+  expect(guidePictures(partById('brake-lever')!, D({ bars: 'drop' }))).toEqual(['pg-lever-drop', 'pg-lever-flat']);
+  for (const [id, pics] of [['headset', ['pg-headset']], ['stem', ['pg-stem']], ['display', ['pg-display']],
+    ['battery', ['battery-in-tube', 'battery-contacts']]] as const) expect(guidePictures(partById(id)!, D()), id).toEqual(pics);
+});
+
+test('[PG-WORDS] P10 and P13 (care pictures redo, approved 9 November 2026): the headset hidden in the head tube; the power button on the top tube', () => {
+  expect(PART_WORDS.headset!.text).toContain("bearings at the top and the bottom of the frame's head tube, on most new bikes hidden inside it,");
+  expect(PART_WORDS.display!.text).toContain('on others on the battery or the top tube.');
 });
 
 test("[PG-WORDS] each part has a name and two to four plain sentences; the tags and the sheet's words; no banned word", () => {

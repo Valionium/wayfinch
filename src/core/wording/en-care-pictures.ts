@@ -10,6 +10,7 @@ export type PictureWords = { name: string; description: string; caption?: string
 export const KIND_WORDS: Readonly<Record<string, string>> = {
   caliper: 'Road caliper', 'v-brake': 'V-brake', hydraulic: 'Hydraulic rim brake',
   'hydraulic-disc': 'Hydraulic disc brakes', thru: 'Thru-axle', qr: 'Quick release', nuts: 'Axle nuts', drop: 'Drop bars', flat: 'Flat bars', cable: 'Cable gears',
+  'in-tube': 'In the down tube', 'on-tube': 'On the down tube',
 };
 /** The switch's own words. */
 export const SWITCH_WORDS = { other: 'Other kinds', show: (kind: string): string => `Show ${kind}` } as const;

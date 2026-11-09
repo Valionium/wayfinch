@@ -67,8 +67,8 @@ test('[BC-PIC-FILES] a picture uses the theme classes only: no colour value, no 
 
 // The redo (owner's answer 6 of 9 November 2026): a picture not yet redrawn does not ship, its step shows text alone. Batch 1 redrew the
 // brakes and the snapped spoke: each brake card and the spoke card shows at least one picture; the other cards come with later batches.
-test('[BC-PIC-ROAD] each brake card, the snapped-spoke card, the puncture cards, the torn tyre, the broken chain and skipping gears have at least one step with a picture (redo, batches 1 to 3)', () => {
-  for (const id of ['spoke-snapped', 'brake-rub-rim', 'brake-rub-disc', 'brake-weak-rim', 'brake-weak-disc', 'puncture-tube', 'puncture-tubeless', 'tyre-torn', 'chain-broken', 'gears-skipping']) {
+test('[BC-PIC-ROAD] each brake card, the snapped-spoke card, the puncture cards, the torn tyre, the broken chain, skipping gears, the loose bolt and the e-bike have at least one step with a picture (redo, batches 1 to 4)', () => {
+  for (const id of ['spoke-snapped', 'brake-rub-rim', 'brake-rub-disc', 'brake-weak-rim', 'brake-weak-disc', 'puncture-tube', 'puncture-tubeless', 'tyre-torn', 'chain-broken', 'gears-skipping', 'bolt-loose', 'ebike-no-power']) {
     const steps = STEP_PICTURES[id] ?? [];
     expect(steps.some((p) => p !== null), id).toBe(true);
   }
@@ -114,6 +114,19 @@ test('[BC-PIC-DETAILS] a barrel adjuster follows what the bike has: the gears ba
   expect(ids('brake-weak-rim', 2, D({ brakes: 'rim', rimBrake: 'caliper' }))).toEqual(['barrel-caliper', 'barrel-vbrake']);
   expect(ids('brake-weak-rim', 2, D({ brakes: 'rim', bars: 'flat' }))).toEqual(['barrel-vbrake', 'barrel-caliper']);
   expect(ids('brake-weak-rim', 2, D({ brakes: 'rim', rimBrake: 'hydraulic' }))).toEqual(['barrel-caliper', 'barrel-vbrake']);
+});
+
+test('[BC-PIC-DETAILS] the twist test follows the bars (flat first for flat bars, else drop); the battery shows in the down tube first, on it one tap away', () => {
+  // the twist test's second panel presses on the bar the bike has; other bars or not told: drop first (redo, section 2)
+  expect(ids('bolt-loose', 2, D({ bars: 'flat' }))).toEqual(['twist-test-flat', 'twist-test-drop']);
+  expect(ids('bolt-loose', 2, D({ bars: 'drop' }))).toEqual(['twist-test-drop', 'twist-test-flat']);
+  expect(ids('bolt-loose', 2, D({ bars: 'other' }))).toEqual(['twist-test-drop', 'twist-test-flat']);
+  expect(ids('bolt-loose', 2, D())).toEqual(['twist-test-drop', 'twist-test-flat']);
+  expect(ids('bolt-loose', 0, D())).toEqual([]);
+  // no bike detail says where the battery sits: in the down tube (the modern default) first, on it one tap away
+  expect(picturesFor('ebike-no-power', 0, D({ bars: 'flat', brakes: 'rim' }))).toEqual([{ id: 'battery-in-tube', kind: 'in-tube' }, { id: 'battery-on-tube', kind: 'on-tube' }]);
+  expect(ids('ebike-no-power', 1, D())).toEqual(['battery-contacts']);
+  expect(ids('ebike-no-power', 2, D())).toEqual([]);
 });
 
 test("[BC-PIC-DETAILS] a bike's details for pictures: its brakes, its rim brake's kind only with rim brakes, its axle, its shifting and bars; no bike, all Not sure", () => {

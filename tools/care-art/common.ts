@@ -1,7 +1,7 @@
 // Pieces several drawings share: the millimetre frame, the locator insets (design 3.4), and the wheel cut through at the rim (research
 // note R §3.1: beads on the bead seats against the flanges, a dip in the middle; the tyre's outline one circle, its inside a second
 // circle round the same centre, so the casing keeps its thickness all round).
-import { Path, Pic, pol, poly, rrect, type Pt } from './kit.ts';
+import { add, len, Path, perp, Pic, pol, poly, rrect, scale, sub, unit, type Pt } from './kit.ts';
 
 /** Millimetres to drawing units: `k` units per mm, (ox, oy) where the drawing's millimetre origin sits. */
 export const frame = (ox: number, oy: number, k: number) => {
@@ -11,7 +11,7 @@ export const frame = (ox: number, oy: number, k: number) => {
 export type Frame = ReturnType<typeof frame>;
 
 /** The locator inset: a 56-unit square at the top left with a small bike, the place marked in blaze. */
-export function bikeInset(pic: Pic, mark: 'rear-brake' | 'front-brake' | 'rear-hub' | 'front-hub' | 'front-wheel' | 'rear-wheel', at: Pt = [8, 8]): void {
+export function bikeInset(pic: Pic, mark: 'rear-brake' | 'front-brake' | 'rear-hub' | 'front-hub' | 'front-wheel' | 'rear-wheel' | 'down-tube', at: Pt = [8, 8]): void {
   const [x, y] = at;
   pic.path('cp-frame', rrect(x, y, 56, 56, 8));
   const rw: Pt = [x + 15, y + 37], fw: Pt = [x + 41, y + 37], r = 10.5, bb: Pt = [x + 27, y + 38];
@@ -29,6 +29,42 @@ export function bikeInset(pic: Pic, mark: 'rear-brake' | 'front-brake' | 'rear-h
   if (mark === 'front-wheel') pic.circle('cp-hiline', fw, r, { style: 'stroke-width:2.5' });
   if (mark === 'rear-hub') pic.circle('cp-hiline', rw, 3, { style: 'stroke-width:2.5' });
   if (mark === 'front-hub') pic.circle('cp-hiline', fw, 3, { style: 'stroke-width:2.5' });
+  if (mark === 'down-tube') pic.path('cp-hiline', poly([head, bb], false), { style: 'stroke-width:3' });
+}
+
+/**
+ * A band of width `w` (or tapering from w to w1) along a centre line given as sampled points (a Path's `parts[0]`): a bar, a lever's
+ * blade, a hose. Its outline is the centre line offset to each side along the normal, so the band keeps its width round every bend.
+ */
+export function ribbon(centre: readonly Pt[], w: number, w1 = w): Path {
+  const c = centre.filter((p, i) => i === 0 || len(sub(p, centre[i - 1]!)) > 0.01);
+  const side = c.map((p, i) => {
+    const t = unit(sub(c[Math.min(i + 1, c.length - 1)]!, c[Math.max(i - 1, 0)]!));
+    return scale(perp(t), (w + ((w1 - w) * i) / (c.length - 1)) / 2);
+  });
+  return poly([...c.map((p, i) => add(p, side[i]!)), ...c.map((p, i) => sub(p, side[i]!)).reverse()]);
+}
+
+/** A polygon cut to a box (x0, y0, x1, y1), so a part that runs on past a panel's edge stops at it (Sutherland and Hodgman). */
+export function clipTo(pts: readonly Pt[], box: readonly [number, number, number, number]): Pt[] {
+  const [x0, y0, x1, y1] = box;
+  const edges: [(p: Pt) => boolean, (a: Pt, b: Pt) => Pt][] = [
+    [(p) => p[0] >= x0, (a, b) => [x0, a[1] + ((b[1] - a[1]) * (x0 - a[0])) / (b[0] - a[0])]],
+    [(p) => p[0] <= x1, (a, b) => [x1, a[1] + ((b[1] - a[1]) * (x1 - a[0])) / (b[0] - a[0])]],
+    [(p) => p[1] >= y0, (a, b) => [a[0] + ((b[0] - a[0]) * (y0 - a[1])) / (b[1] - a[1]), y0]],
+    [(p) => p[1] <= y1, (a, b) => [a[0] + ((b[0] - a[0]) * (y1 - a[1])) / (b[1] - a[1]), y1]],
+  ];
+  let out = [...pts];
+  for (const [inside, cut] of edges) {
+    const src = out;
+    out = [];
+    src.forEach((p, i) => {
+      const q = src[(i + 1) % src.length]!;
+      if (inside(p)) out.push(p);
+      if (inside(p) !== inside(q)) out.push(cut(p, q));
+    });
+  }
+  return out;
 }
 
 /** A rim and tyre cut through, as millimetres: rim outside width `we`, inside `wi`, flange tops at y = 0 (the frame's origin row). */

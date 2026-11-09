@@ -124,6 +124,30 @@
    "name": "Turning the gears' barrel adjuster at the rear derailleur.",
    "description": "The rear wheel's sprockets and the rear derailleur from the bike's right side, with the chain running round both. Where the gear cable's housing loops into the back of the derailleur, a small ridged barrel is marked \"barrel adjuster\". A curved arrow round it shows it being turned, a click at a time.",
    "caption": "Seen from the bike's right side. On some bikes it is on the shifter instead."
+  },
+  "twist-test-drop": {
+   "name": "The twist test on the stem and a drop handlebar.",
+   "description": "Two small pictures. Picture 1, looking down while standing in front of the bike: the front wheel is held between the knees and both hands hold the bar on its hoods; a curved arrow shows trying to turn the bar, and the stem, which joins the bar to the fork's steerer, is marked \"must not turn\". Picture 2, from the side: a hand presses down hard on the hood at the front of the drop bar, shown by an arrow, and the stem's clamp round the bar, with its two pinch bolts at the back and its four-bolt faceplate, is marked \"must not roll\".",
+   "caption": "The twist test. 1: hold the front wheel between your knees and try to turn the bar. 2: press down hard on the hoods. Neither may move. Not on carbon parts (step 1)."
+  },
+  "twist-test-flat": {
+   "name": "The twist test on the stem and a flat handlebar.",
+   "description": "Two small pictures. Picture 1, looking down while standing in front of the bike: the front wheel is held between the knees and both hands hold the flat bar by its grips; a curved arrow shows trying to turn the bar, and the stem, which joins the bar to the fork's steerer, is marked \"must not turn\". Picture 2, from the side: a hand presses down hard on the grip, behind the stem's clamp, shown by an arrow, and the clamp round the bar is marked \"must not roll\".",
+   "caption": "The twist test. 1: hold the front wheel between your knees and try to turn the bar. 2: press down hard on the grips. Neither may move. Not on carbon parts (step 1)."
+  },
+  "battery-in-tube": {
+   "name": "Refitting an e-bike battery into the down tube until it clicks.",
+   "description": "The down tube from the side, from the motor up to the head tube, with a small picture of the whole bike in the corner. The battery, labelled \"battery\", hangs out of the underside of the tube, still held at its lower end by the motor; a dashed outline shows it inside the tube. A curved arrow swings it up into the tube, and its upper end, where the catch holds it, is labelled \"until it clicks\"; the key lock is beside it.",
+   "caption": "One common design: in the down tube. Yours may sit elsewhere and fit another way."
+  },
+  "battery-on-tube": {
+   "name": "Refitting an e-bike battery onto the down tube until it clicks.",
+   "description": "The down tube from the side, from the motor up to the head tube, with a small picture of the whole bike in the corner. The battery, labelled \"battery\", sits in its holder by the motor at its lower end and is tilted up away from the tube; a dashed outline shows it lying on the tube. A curved arrow tilts it down onto the tube, and its upper end, where the catch holds it, is labelled \"until it clicks\".",
+   "caption": "On the down tube, as on many older e-bikes. Yours may sit elsewhere, such as on the rack, and fit another way."
+  },
+  "battery-contacts": {
+   "name": "Wiping the battery's contacts with a dry cloth.",
+   "description": "An e-bike battery taken off the bike, a long box with its end towards you. In the end is a socket with the metal contacts, two flat blades and two small pins, labelled \"contacts\". Beside it is a cloth, labelled \"dry cloth\", and an arrow shows it moving onto the contacts."
   }
  },
  "titles": {

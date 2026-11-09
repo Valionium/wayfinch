@@ -15,7 +15,8 @@ export type Kinds =
   | { by: 'axle'; pictures: Partial<Record<AxleKind, string>> }
   | { by: 'bars'; pictures: Partial<Record<'drop' | 'flat', string>> }
   | { by: 'shifting'; pictures: { cable: string } }
-  | { by: 'brakes'; pictures: { 'hydraulic-disc': string } };
+  | { by: 'brakes'; pictures: { 'hydraulic-disc': string } }
+  | { by: 'battery'; pictures: { 'in-tube': string; 'on-tube': string } };
 export type StepPicture = string | Kinds | null;
 /** The bike details that choose a picture's kind; null is Not sure (or no bike). */
 export type PictureDetails = {
@@ -37,6 +38,10 @@ const WHEEL_SEAT: Kinds = { by: 'axle', pictures: { thru: 'wheel-seat-thru', qr:
 const BRAKE_BARREL: Kinds = { by: 'rim-brake', pictures: { caliper: 'barrel-caliper', 'v-brake': 'barrel-vbrake' } };
 /** The gears' barrel adjuster at the rear derailleur (T17): cable gears only; electronic gears have no cable. */
 const GEARS_BARREL: Kinds = { by: 'shifting', pictures: { cable: 'gears-barrel' } };
+/** The twist test (batch 4): its second panel presses on the bar the bike has, a drop bar's hood or a flat bar's grip. */
+const TWIST: Kinds = { by: 'bars', pictures: { drop: 'twist-test-drop', flat: 'twist-test-flat' } };
+/** Refitting the battery (T19): no bike detail says where it sits, so in the down tube (the modern default) first, on it one tap away. */
+const BATTERY: Kinds = { by: 'battery', pictures: { 'in-tube': 'battery-in-tube', 'on-tube': 'battery-on-tube' } };
 
 export const STEP_PICTURES: Readonly<Record<string, readonly StepPicture[]>> = {
   'puncture-tube': [PAD_SPACER, 'tyre-levers', null, 'pinch-slits', 'patch-press', null, null],
@@ -49,6 +54,8 @@ export const STEP_PICTURES: Readonly<Record<string, readonly StepPicture[]>> = {
   'brake-weak-disc': [null, null, 'disc-pad-adjust', null, null],
   'chain-broken': [null, 'quick-link', null, 'stiff-link', null, null],
   'gears-skipping': ['stiff-link', GEARS_BARREL, null, null],
+  'bolt-loose': [null, null, TWIST, null],
+  'ebike-no-power': [BATTERY, 'battery-contacts', null, null, null],
 };
 
 /** Every picture id an entry can show. */
@@ -63,12 +70,13 @@ const lead = <T>(order: readonly T[], first: T): T[] => [first, ...order.filter(
  * The kinds in the order they show for a bike: its own first when told; when not, the most common modern one first (redo, section 2).
  * A rim brake's kind not told: bars break the tie inside rim brakes, since drop-bar levers cannot pull V-brakes (answer 2). An axle not
  * told: a thru-axle, but a quick release on rim brakes. Electronic gears have no cable to adjust: no picture. A pad spacer is for
- * hydraulic disc brakes only (shown too while the brakes are not told).
+ * hydraulic disc brakes only (shown too while the brakes are not told). No detail tells where a battery sits: in the down tube first.
  */
 export function kindOrder(by: Kinds['by'], d: PictureDetails): string[] {
   if (by === 'rim-brake') return d.rimBrake ? lead(RIM_ORDER, d.rimBrake) : d.bars === 'flat' ? lead(RIM_ORDER, 'v-brake') : [...RIM_ORDER];
   if (by === 'axle') return d.axle ? lead(AXLE_ORDER, d.axle) : d.brakes === 'rim' ? lead(AXLE_ORDER, 'qr') : [...AXLE_ORDER];
   if (by === 'bars') return d.bars === 'flat' ? ['flat', 'drop'] : ['drop', 'flat'];
+  if (by === 'battery') return ['in-tube', 'on-tube'];
   if (by === 'brakes') return d.brakes === null || d.brakes === 'hydraulic-disc' ? ['hydraulic-disc'] : [];
   return d.shifting === 'electronic' ? [] : ['cable'];
 }
