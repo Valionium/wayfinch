@@ -74,16 +74,18 @@ test('[TB-PAGE-WRITES] a saved bike chosen here writes the page\'s own record on
   assert.equal(p.writes.filter(k=>k.startsWith('copilot:')).length,0,'the page never writes a copilot:* key');
 });
 
-test('[TB-PAGE-WRITES] the shown bike used, a new bike and the bike cleared each write the record once with the new id; No bike is null',async()=>{
+// "Use this bike for this plan" is gone (the owner's finding H, 8 Nov 2026): a bike added from Wayfinch is the one that writes here.
+test('[TB-PAGE-WRITES] a bike added from Wayfinch, a new bike and the bike cleared each write the record once with the new id; No bike is null',async()=>{
   const p=page();
-  p.run("openBikeDetailsFromLink('#bike-details=bike_c&back=tools')");
-  await p.run('useShownBike()');await p.settle();
-  assert.equal(plan(p),'bike_c');
-  assert.equal(p.count(KEY),1);assert.equal(p.mine().bikeId,'bike_c','the shown bike used');
+  p.run("openBikeDetailsFromLink('#bike-details=new&back=you')");
+  p.run("setLook({colour:'#c62f2a'})");await p.settle();
+  const added=plan(p);
+  assert.ok(added && !['bike_a','bike_b','bike_c'].includes(added),'a bike added from Wayfinch is the plan\'s');
+  assert.equal(p.count(KEY),1);assert.equal(p.mine().bikeId,added,'the bike added');
   p.run("closeBikeDetails();openBikeDetails(null);startNewBike();document.getElementById('bikeName').value='Tourer'");
   await p.run('saveBikeProfile()');await p.settle();
   const fresh=plan(p);
-  assert.ok(fresh && !['bike_a','bike_b','bike_c'].includes(fresh),'a new bike is the plan\'s');
+  assert.ok(fresh && !['bike_a','bike_b','bike_c',added].includes(fresh),'a new bike is the plan\'s');
   assert.equal(p.count(KEY),2);assert.equal(p.mine().bikeId,fresh,'the new bike');
   await p.run('clearBikeProfile()');await p.settle();
   assert.equal(plan(p),null);
