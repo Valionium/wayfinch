@@ -15,7 +15,7 @@ import type { Conditions } from '../../core/care/types.ts';
 import { guidePictures, partById } from '../../core/parts/guide.ts';
 import type { PartId } from '../../core/parts/guide.ts';
 import { labelWidth } from '../../core/parts/labels.ts';
-import { cardSpec, focusOf, inBox, inkMarkup, MAX_ZOOM, outline, partSpot, placeView, viewMarkup, wholeBox, zoomBox } from '../../core/parts/view.ts';
+import { cardSpec, inBox, inkMarkup, MAX_ZOOM, openingFocus, outline, partSpot, placeView, viewMarkup, wholeBox, zoomBox } from '../../core/parts/view.ts';
 import type { Spot } from '../../core/parts/view.ts';
 import { WB } from '../../core/wording/en-bike.ts';
 import { PART_SHORT } from '../../core/wording/en-part-names.ts';
@@ -101,7 +101,7 @@ function Drawing({ card, tapped, type, onTap }: { card: ViewCard; tapped: PartId
   const whole = wholeBox(anchors);
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(360);
-  const [zoom, setZoom] = useState<Zoom>(() => focusOf(whole, spots.filter(([id]) => card.parts.includes(id)).map(([, s]) => s.at)));
+  const [zoom, setZoom] = useState<Zoom>(() => openingFocus(whole, spots.filter(([id]) => card.parts.includes(id))));
   const view = zoomBox(whole, zoom.z, zoom.centre);
   const hot = spots.find(([id]) => id === tapped)?.[1];
   // A tapped part out of view brings the view to it.

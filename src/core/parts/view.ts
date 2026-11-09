@@ -228,6 +228,12 @@ export function focusOf(whole: ViewBox, points: readonly P[]): { z: number; cent
   return { z: Math.round(z * 100) / 100, centre: [box.x + box.w / 2, box.y + box.h / 2] };
 }
 
+/** The view a card opens on: its parts' focus, except that a card naming the frame, which spans the bike, opens on the whole bike. */
+export function openingFocus(whole: ViewBox, spots: readonly (readonly [PartId, { at: P }])[]): { z: number; centre: P } {
+  if (spots.some(([id]) => id === 'frame')) return focusOf(whole, []);
+  return focusOf(whole, spots.map(([, s]) => s.at));
+}
+
 export const inBox = (b: ViewBox, p: P, margin = 0): boolean =>
   p[0] >= b.x + margin && p[0] <= b.x + b.w - margin && p[1] >= b.y + margin && p[1] <= b.y + b.h - margin;
 

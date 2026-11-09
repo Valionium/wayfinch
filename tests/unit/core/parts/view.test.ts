@@ -15,7 +15,7 @@ import type { CareDetails } from '../../../../src/core/care/types.ts';
 import { cardParts } from '../../../../src/core/parts/links.ts';
 import { GAP, hitsShapes, labelWidth, placeLabels, segmentHitsRect } from '../../../../src/core/parts/labels.ts';
 import type { Layout, Shapes } from '../../../../src/core/parts/labels.ts';
-import { cardSpec, focusOf, inBox, inkMarkup, outline, outlineOn, partSpot, placeView, typeSpec, viewMarkup, wholeBox, zoomBox } from '../../../../src/core/parts/view.ts';
+import { cardSpec, focusOf, inBox, openingFocus, inkMarkup, outline, outlineOn, partSpot, placeView, typeSpec, viewMarkup, wholeBox, zoomBox } from '../../../../src/core/parts/view.ts';
 import type { ViewBox } from '../../../../src/core/parts/view.ts';
 import { C, CARE_TASKS, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
 import { PART_SHORT, partsLine } from '../../../../src/core/wording/en-part-names.ts';
@@ -157,6 +157,13 @@ test('[BV-ZOOM] a card whose parts sit close together opens zoomed in on them; o
   expect(focus('puncture-tube').f.z).toBe(1);
   expect(focus('frame-bolts-check').f.z).toBe(1);
   expect(focus('tyres-sealant-check').f.z).toBeGreaterThan(1.3);
+  // a card naming the frame, which spans the bike, opens whole (an e-bike's battery and display sit close, its frame does not)
+  const ebike = items.find((x) => x.id === 'ebike-no-power')!;
+  const eParts = partsOf(ebike, careDetails(null));
+  expect(eParts).toContain('frame');
+  const eSpec = cardSpec(null, ebike.applies, eParts);
+  const eArt = bikeArt(eSpec, null).anchors;
+  expect(openingFocus(wholeBox(eArt), eParts.map((p) => [p, partSpot(p, eSpec, eArt)!] as const)).z).toBe(1);
   const whole = wholeBox(chain.anchors);
   fc.assert(fc.property(fc.double({ min: 0.5, max: 6, noNaN: true }), fc.double({ min: -50, max: 400, noNaN: true }), fc.double({ min: -50, max: 200, noNaN: true }), (z, x, y) => {
     const b = zoomBox(whole, z, [x, y]);
