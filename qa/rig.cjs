@@ -463,5 +463,32 @@ test('[BK-BAR-STRAPS] once the kit is chosen the bar straps are drawn on the rol
   assert.ok(n>=315);
 });
 
+// The "fits better" line under the drawing (wish 17, design of 9 Nov 2026, section 5). Its words and button come from the page's own
+// wording table; it reads this page's bikes only, so it writes nothing of its own.
+test('[FIT-LINE] the Bag planner with no bike saved and none in the plan: one quiet line under the drawing, "Drawn as a typical gravel bike, size M. Add your bike and the frame bag fits your frame.", its Add your bike opening Bike details here; a saved bike or the plan\'s: none, and it comes back when the last saved bike goes',()=>{
+  const fresh=appVM();
+  const html=fresh.html;
+  const at=id=>html.indexOf(`id="${id}"`);
+  assert.ok(at('planFitLine')>at('planMain') && at('planFitLine')<at('weightBlock'),'first in the plan column: under the drawing on a phone, beside it when wide, outside the rig, which must fit the window to stay in view (LC-WIDE-COLS)');
+  assert.ok(/<p class="fit-line" id="planFitLine" hidden><\/p>/.test(html),'empty and hidden until the page knows its bikes, so nothing flashes');
+  assert.ok(/body\.lc-small #planFitLine\{display:none!important\}/.test(html),'not in the small view of a day ride, as the rig\'s foot and legend');
+  const line=()=>fresh.context.document.getElementById('planFitLine');
+  const textOf=s=>String(s).replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+  const written=[];const set=fresh.localStorage.setItem;fresh.localStorage.setItem=(k,v)=>{written.push(k);set(k,v);};
+  fresh.run(`S.step=2;S.bags=[];BIKE_PROFILES=[];S.bikeProfile=null;drawRig();`);
+  assert.equal(line().hidden,true,'before start-up has read the bikes and the plan: no line, so a rider with a bike never sees it flash');
+  fresh.run(`FIT_LINES_READY=true;drawRig();`);
+  assert.equal(line().hidden,false,'no bike: the line shows');
+  assert.equal(textOf(line().innerHTML),'Drawn as a typical gravel bike, size M. Add your bike and the frame bag fits your frame.');
+  assert.ok(/<button class="linky" type="button" id="planFitAdd" aria-haspopup="dialog" aria-controls="bikeDetailsBox">Add your bike<\/button>/.test(line().innerHTML),'Add your bike opens this page\'s Bike details');
+  fresh.run(`S.bikeProfile=normaliseBikeProfile({id:'b1',name:'Mine',fit:{style:'diamond-level',size:{kind:'letter',value:'L'}}});drawRig();`);
+  assert.equal(line().hidden,true,'a bike in the plan: no line');
+  fresh.run(`S.bikeProfile=null;BIKE_PROFILES=[normaliseBikeProfile({id:'b2',name:'Saved'})];renderBikeProfiles();`);
+  assert.equal(line().hidden,true,'a saved bike, the plan without one ("Without a bike" in Tools): no line');
+  fresh.run(`BIKE_PROFILES=[];renderBikeProfiles();`);
+  assert.equal(line().hidden,false,'the last saved bike removed: the line again');
+  assert.deepEqual(written.filter(k=>/^copilot:/.test(k)),[],'no co-pilot key written');
+});
+
 for(const [name,fn] of tests){fn();passed++;console.log('ok',name);}
 console.log(`${passed} rig tests passed`);
