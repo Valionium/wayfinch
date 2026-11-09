@@ -296,7 +296,10 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       if (asking) freshen();
       const mine = epoch;
       watching = new AbortController();
+      // Also while En route is not shown: a trip removed meanwhile, in this window or another, stops the routine (review of PR 86, M3).
+      const hear = onChanged(() => void load());
       const fix = await watchBest(ROUTINE, deps.geolocation(), undefined, watching.signal);
+      hear();
       if (mine !== epoch) return false;
       if (isFailure(fix)) {
         const h = await words;
@@ -392,6 +395,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       weatherBusy = true;
       weatherSay = null;
       touch();
+      const mine = epoch;
       try {
         // Any answer from the app's own address means a signal; the hint alone is not trusted to say so (section 9.4).
         const signalNow = deps.online() ? (await checkConnectivity(deps.fetch)).online : false;
@@ -405,11 +409,12 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
           },
           ...(v.kind === 'trip' && Number.isFinite(v.screen.ride.startKm) ? { atKm: v.screen.ride.startKm } : {}),
         }, 'tap');
-        weatherSay = result.say ?? (result.fetched ? W.appAheadWeatherUpdated : null);
+        // An answer for a trip that has gone since says nothing (review of PR 86, M2).
+        if (mine === epoch) weatherSay = result.say ?? (result.fetched ? W.appAheadWeatherUpdated : null);
         // Trip's summary of the forecast reads again too (this window's own screens hear no storage event).
         if (result.fetched) announceHere('weather');
       } catch {
-        weatherSay = W.appStoreNotKept;
+        if (mine === epoch) weatherSay = W.appStoreNotKept;
       } finally {
         weatherBusy = false;
       }

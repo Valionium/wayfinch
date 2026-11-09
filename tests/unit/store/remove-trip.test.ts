@@ -7,10 +7,11 @@ import { anotherWindow, dumpStorage, freshStore, route, trip } from './helpers.t
 import { clearCopies, RefusedError } from '../../../src/store/changed.ts';
 import { closeDb, openDb, ROUTE_META_PREFIX, ROUTE_STORES, STORES } from '../../../src/store/db.ts';
 import { readInputs } from '../../../src/store/inputs.ts';
-import { addPosition, confirmWater, setPlanTomorrow } from '../../../src/store/positions.ts';
+import { addPosition, confirmWater, readPlanTomorrow, setPlanTomorrow } from '../../../src/store/positions.ts';
 import { saveForecast, saveHours, savePrepared, saveZones } from '../../../src/store/prepared.ts';
-import { removeTrip, TRIP_KEYS } from '../../../src/store/remove-trip.ts';
+import { NotPutBackError, removeTrip, TRIP_KEYS } from '../../../src/store/remove-trip.ts';
 import { readSettings, writeSettings } from '../../../src/store/settings.ts';
+import { DEFAULT_SETTINGS } from '../../../src/store/rules.ts';
 import { saveStretch } from '../../../src/store/stretch.ts';
 import { PLAN_TOMORROW_KEY, readTrip, replaceRoute, saveTrip } from '../../../src/store/trip.ts';
 import { HANDOFF_KEY, HANDOFF_STORE } from '../../../src/ui/trip/handoff.ts';
@@ -145,12 +146,22 @@ test('[TRIP-REMOVE] the route, the trip and all En route keeps go; the rest of t
 
   const afterDb = await dumpDb();
   expect(json(afterDb)).toBe(json(freshOf(beforeDb)));
-  // Settings (the nights among them), the theme, the chosen bike, tyre details and every bag-planner key: untouched, byte for byte.
-  expect(localStorage.getItem('copilot:settings')).toBe(settingsBefore);
+  // The nights go back to a fresh start's (the owner's ruling of 9 Nov 2026, as a replaced route); every other setting stays as it was.
+  expect(settingsBefore).toContain('"nights":2');
+  const settingsAfter = JSON.parse(localStorage.getItem('copilot:settings')!) as Record<string, unknown>;
+  const { nights: n0, updatedAt: u0, ...rest0 } = JSON.parse(settingsBefore!) as Record<string, unknown>;
+  const { nights: n1, updatedAt: u1, ...rest1 } = settingsAfter;
+  expect(n0).toBe(2);
+  expect(n1).toBe(DEFAULT_SETTINGS.nights);
+  expect(JSON.stringify(rest1)).toBe(JSON.stringify(rest0));
+  expect(Object.keys(settingsAfter)).toEqual(Object.keys(JSON.parse(settingsBefore!) as object));
+  // A new version, so another window reads the settings again before it writes over them.
+  expect(Date.parse(u1 as string)).toBeGreaterThan(Date.parse(u0 as string));
+  // The theme, the chosen bike, tyre details and every bag-planner key: untouched, byte for byte.
   for (const [k, v] of Object.entries(KEPT_LOCAL)) expect(localStorage.getItem(k), k).toBe(v);
   for (const k of TRIP_KEYS) expect(localStorage.getItem(k), k).toBeNull();
-  const expectedLocal = (JSON.parse(beforeLocal) as [string, string][]).filter(([k]) => !TRIP_KEYS.includes(k) && k !== 'copilot:changed');
-  expect(withoutChanged(dumpStorage())).toBe(JSON.stringify(expectedLocal));
+  const expectedLocal = (JSON.parse(beforeLocal) as [string, string][]).filter(([k]) => !TRIP_KEYS.includes(k) && k !== 'copilot:changed' && k !== 'copilot:settings');
+  expect(JSON.stringify((JSON.parse(withoutChanged(dumpStorage())) as [string, string][]).filter(([k]) => k !== 'copilot:settings'))).toBe(JSON.stringify(expectedLocal));
   expect(sessionStorage.getItem('wf:toolsBike')).toBe(beforeSession);
   sessionStorage.clear();
 
@@ -178,6 +189,27 @@ test('[TRIP-REMOVE] after it, a new route starts clean: none of the old trip com
   expect(i.forecast).toBeNull();
   expect(i.places).toEqual([]);
   expect(i.trip.route.id).toBe('next');
+  expect((await readSettings()).nights).toBeNull();
+});
+
+test('[TRIP-REMOVE] nights already left to the stage model: the settings are not written at all, byte for byte', async () => {
+  await tripPhone();
+  await readSettings();
+  await writeSettings({ nights: null });
+  const before = localStorage.getItem('copilot:settings');
+  await removeTrip(trip().route);
+  expect(localStorage.getItem('copilot:settings')).toBe(before);
+});
+
+test('[TRIP-REMOVE-WINDOWS] another window that read the nights before can not write them back without reading again', async () => {
+  await tripPhone();
+  const other = await anotherWindow();
+  await other.settings.readSettings();
+  await removeTrip(trip().route);
+  const result = await other.settings.writeSettings({ nights: 2 });
+  expect(result.newer).toContain('settings');
+  expect((await readSettings()).nights).toBeNull();
+  closeDb();
 });
 
 test('[TRIP-REMOVE] a phone with no trip (removed in another window already) still ends clean, and nothing else changes', async () => {
@@ -326,4 +358,64 @@ test('[TRIP-REMOVE] it waits for writes under way in this window, so none lands 
   await late;
   // The replace finished first, so it was removed with the rest.
   expect(await readTrip()).toBeNull();
+});
+
+test('[TRIP-REMOVE-FAIL] the browser refuses the settings without the nights: nothing is removed, the nights stay, and the rider is told', async () => {
+  await tripPhone();
+  const beforeDb = json(await dumpDb());
+  const beforeLocal = dumpStorage();
+  const realSet = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = (k: string, v: string) => {
+    if (k === 'copilot:settings') throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+    realSet(k, v);
+  };
+  try {
+    await expect(removeTrip(trip().route)).rejects.toThrow(W.appStoreNotKept);
+  } finally {
+    localStorage.setItem = realSet;
+  }
+  expect(json(await dumpDb())).toBe(beforeDb);
+  expect(withoutChanged(dumpStorage())).toBe(withoutChanged(beforeLocal));
+  expect((await readSettings()).nights).toBe(2);
+});
+
+// Review of PR 86, M1: a tap in another window that had not yet heard of the removal.
+test('[TRIP-REMOVE-WINDOWS] a late Plan tomorrow or water amount from another window never reaches the next route', async () => {
+  await tripPhone();
+  await removeTrip(trip().route);
+  expect(setPlanTomorrow('2026-10-18')).toBe(true);
+  // No trip, no water amount to keep: refused, and nothing is written.
+  expect((await confirmWater(1, NOW)).ok).toBe(false);
+  expect(await (await openDb()).count('waterLeft')).toBe(0);
+  await readTrip();
+  await saveTrip(trip({ route: route({ id: 'next', hash: 'next' }, 60) }));
+  expect(readPlanTomorrow()).toBeNull();
+  expect((await readInputs(NOW))!.waterLeft).toBeNull();
+});
+
+// Review of PR 86, M4: what can not be put back is said, never "nothing was changed".
+test('[TRIP-REMOVE-FAIL] the database refuses and the nights can not be put back: the error says so', async () => {
+  await tripPhone();
+  const proto = Object.getPrototypeOf((await openDb()).transaction(HANDOFF_STORE).store) as { clear: () => unknown };
+  const real = proto.clear;
+  proto.clear = function (this: { name?: string }) {
+    if (this.name === HANDOFF_STORE) throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+    return real.call(this);
+  };
+  const realSet = localStorage.setItem.bind(localStorage);
+  let writes = 0;
+  localStorage.setItem = (k: string, v: string) => {
+    // The first write of the settings (the nights cleared) goes through; putting them back is refused.
+    if (k === 'copilot:settings' && writes++ > 0) throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+    realSet(k, v);
+  };
+  try {
+    const e = await removeTrip(trip().route).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(NotPutBackError);
+  } finally {
+    proto.clear = real;
+    localStorage.setItem = realSet;
+  }
+  // The trip itself is whole.
+  expect((await readTrip())?.route.id).toBe(trip().route.id);
 });

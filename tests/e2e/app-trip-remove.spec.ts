@@ -85,6 +85,7 @@ async function removeIt(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Remove this trip', exact: true }).click();
   const ask = page.getByRole('alertdialog', { name: 'Remove this trip?' });
   await expect(ask).toContainText(`“${ROUTE_NAME}”`);
+  await expect(ask).toContainText("its date, nights and days");
   await ask.getByRole('button', { name: 'Remove trip', exact: true }).click();
   await expect(page.locator('[data-trip-line]')).toHaveText('No trip yet');
 }
@@ -122,7 +123,13 @@ test('[TRIP-REMOVE] in flight mode: the trip and all En route keeps go, the bag 
   expect(await tripLeft(page)).toEqual({ stores: Object.fromEntries(TRIP_STORES.map((n) => [n, 0])), meta: [] });
   const after = await allLocal(page);
   const gone = ['copilot:plan-tomorrow', 'copilot:handoff:v1', 'copilot:heights-lookup', 'copilot:changed'];
-  for (const [k, v] of Object.entries(before)) if (!gone.includes(k)) expect(after[k], k).toBe(v);
+  for (const [k, v] of Object.entries(before)) if (!gone.includes(k) && k !== 'copilot:settings') expect(after[k], k).toBe(v);
+  // The nights go back to a fresh start's; every other setting stays.
+  const { nights: n0, updatedAt: u0, ...rest0 } = JSON.parse(before['copilot:settings']!) as Record<string, unknown>;
+  const { nights: n1, updatedAt: u1, ...rest1 } = JSON.parse(after['copilot:settings']!) as Record<string, unknown>;
+  expect([n0, n1]).toEqual([2, null]);
+  expect(Date.parse(u1 as string)).toBeGreaterThan(Date.parse(u0 as string));
+  expect(JSON.stringify(rest1)).toBe(JSON.stringify(rest0));
   for (const k of gone.slice(0, 3)) expect(after[k], k).toBeUndefined();
   for (const [k, v] of Object.entries(BAGS)) expect(after[k], k).toBe(v);
   const trip = await screenText(page, app.origin, '#/trip');

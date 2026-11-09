@@ -139,6 +139,9 @@ test('[TRIP-REMOVE-ASK] the confirm step names the route, what goes and what sta
 test('[TRIP-REMOVE] after Remove trip, Trip is exactly what a phone that never had the trip shows, and the focus is on its first step', async () => {
   await withRoute();
   await openRoute();
+  const heard: unknown[] = [];
+  const hear = (e: Event): void => { heard.push((e as CustomEvent).detail); };
+  window.addEventListener('copilot:changed-here', hear);
   await click(buttonIn(step('route'), RT.appTripRemove));
   await click(buttonIn(host.querySelector('[data-remove-ask]')!, RT.appTripRemoveYes));
   await until(() => host.querySelector('[data-trip-line]')?.textContent === W.appTripNoTrip, () => `no trip: ${host.textContent?.slice(0, 300)}`);
@@ -146,6 +149,12 @@ test('[TRIP-REMOVE] after Remove trip, Trip is exactly what a phone that never h
   await settle(50);
   expect(document.activeElement).toBe(step('route').querySelector('h2'));
   expect(await readTrip()).toBeNull();
+  // This window's other screens are told (En route's position routine stops: review of PR 86, M3), and a screen reader hears it
+  // (M6), from outside Trip's own markup, which stays that of a fresh start.
+  window.removeEventListener('copilot:changed-here', hear);
+  expect(heard).toContain('all');
+  const said = (): (string | null)[] => [...document.querySelectorAll('[role=status]')].filter((e) => !host.contains(e)).map((e) => e.textContent);
+  await until(() => said().includes(RT.appTripRemoved), () => `the spoken line: ${JSON.stringify(said())}`);
   const removed = host.innerHTML;
   expect(removed).toBe(await freshTrip());
 });

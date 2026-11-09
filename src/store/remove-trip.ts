@@ -1,15 +1,17 @@
 // Remove this trip (owner's wish, 9 November 2026), Trip's Route step: the route, the trip and everything En route keeps for it go,
 // so Trip and En route start over as on the very first open. The rider's bikes, setups and Bag planner plans (the bag planner's own
-// keys, never touched), the settings, the rider's details, rides and tyre details stay byte for byte. Delete co-pilot data
-// (export.ts) still removes everything.
+// keys, never touched), the rider's details, rides and tyre details stay byte for byte, and so does every setting but the nights:
+// those go back to the stage model's suggestion, as when a route is replaced (the owner's ruling of 9 November 2026). Delete
+// co-pilot data (export.ts) still removes everything.
 //
 // One step for the rider, all or nothing (as importAll puts the settings back): this browser's few trip keys are set aside and
-// removed first, then the database's part goes in one transaction; if that fails the keys are put back, so Trip and En route
-// still read the whole trip. A chunk of its own, loaded with the confirm step.
+// removed and the nights cleared first, then the database's part goes in one transaction; if that fails the keys and the settings
+// are put back, so Trip and En route still read the whole trip. A chunk of its own, loaded with the confirm step.
 import type { Route } from '../core/types.ts';
 import { W } from '../core/wording/en.ts';
-import { flushWrites, markChanged, noteCopy, RefusedError, tracked } from './changed.ts';
+import { flushWrites, holdsCopy, markChanged, noteCopy, RefusedError, tracked } from './changed.ts';
 import { CURRENT, inExistingTx } from './db.ts';
+import { readLocalSettings, SETTINGS_KEY, writeLocalSettings } from './settings-local.ts';
 import { clearRouteData, PLAN_TOMORROW_KEY, ROUTE_TX, sameLine, stampKey } from './trip.ts';
 
 /**
@@ -29,10 +31,24 @@ const read = (key: string): string | null => {
   }
 };
 
-function putBack(kept: [string, string][]): void {
-  for (const [key, value] of kept) {
-    try { localStorage.setItem(key, value); } catch { /* it was there a moment ago, so this is not expected */ }
+/**
+ * A removal that failed, and a key or the settings (the nights) that could not be put back either (review of PR 86, M4): the rider
+ * is told so, never "nothing was changed". The trip itself is whole: the database's part is one transaction.
+ */
+export class NotPutBackError extends Error {
+  constructor(cause: unknown) {
+    super('the trip was kept, but not all of its keys could be put back', { cause });
+    this.name = 'NotPutBackError';
   }
+}
+
+/** False when the browser refused one of them back. */
+function putBack(kept: [string, string][]): boolean {
+  let all = true;
+  for (const [key, value] of kept) {
+    try { localStorage.setItem(key, value); } catch { all = false; }
+  }
+  return all;
 }
 
 /**
@@ -52,8 +68,18 @@ async function removing(expected: Route | null): Promise<void> {
     const value = read(key);
     if (value !== null) kept.push([key, value]);
   }
+  // The nights were chosen for this route: a fresh start leaves them to the stage model. Already so, the settings are not written.
+  const { settings, stamp } = readLocalSettings();
+  const settingsBefore = settings.nights === null ? null : read(SETTINGS_KEY);
+  let settingsStamp: string | null = null;
   try {
     for (const [key] of kept) localStorage.removeItem(key);
+    // As a replaced route (trip.ts's forgetRouteChoices), with a new stamp; the other windows are told once all of it is done.
+    if (settingsBefore !== null) {
+      settingsStamp = writeLocalSettings({ nights: null });
+      if (settingsStamp === null) throw new Error(W.appStoreNotKept);
+      kept.push([SETTINGS_KEY, settingsBefore]);
+    }
     await inExistingTx([...ROUTE_TX, HANDOFFS], async (tx) => {
       const before = (await tx.objectStore('trip').get(CURRENT)) as { route?: Route } | undefined;
       if (before?.route && (!expected || !sameLine(before.route, expected))) throw new RefusedError(W.appStoreChangedElsewhere);
@@ -63,11 +89,17 @@ async function removing(expected: Route | null): Promise<void> {
       await tx.objectStore(HANDOFFS).clear();
     });
   } catch (e) {
-    putBack(kept);
+    // The keys first, then the database (not the other way round, as a replace does): a refusal at any point can put the keys back,
+    // while a committed transaction could not be undone if a key were refused after it. A tab closed between the two leaves the
+    // trip with its day plan, heights mark and handoff envelope gone (and the nights at the suggestion): a loss on the careful side,
+    // since the other order would leave them to reach the next route.
+    if (!putBack(kept)) throw new NotPutBackError(e);
     throw e;
   }
   // This window now holds the version that is stored: none.
   noteCopy('trip', null);
   noteCopy('trip-settings', null);
+  // This window's own write counts as read only if it had read the settings before.
+  if (settingsStamp !== null && holdsCopy('settings', stamp)) noteCopy('settings', settingsStamp);
   markChanged('all');
 }

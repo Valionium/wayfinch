@@ -120,3 +120,55 @@ test('[TRIP-REMOVE-WINDOWS] what En route said for the old trip (a position not 
   expect(v.kind === 'trip' && [v.position, v.weatherSay, v.notice]).toEqual([{ kind: 'idle' }, null, null]);
   stop();
 });
+
+// Review of PR 86, M3: the rider tapped Update position on En route, went to Trip and removed the trip there, in this window.
+test('[TRIP-REMOVE-WINDOWS] in this window, with En route no longer shown, the position routine still stops at once when the trip goes', async () => {
+  const i = rainyStop();
+  await seed(i);
+  const geo = fakeGeo();
+  const shell = browserAhead(deps(i, geo));
+  const stop = shell.start();
+  await until(() => shell.view.value.kind === 'trip', 'the screen');
+  const tapped = shell.actions.updatePosition();
+  await until(() => geo.watching === 1, 'the watch');
+  stop(); // Trip is shown now
+
+  await removeTrip(i.trip.route);
+  announceHere('all'); // what Remove this trip tells this window's own screens
+  await until(() => geo.watching === 0, 'the watch to stop');
+  expect(await tapped).toBe(false);
+  expect(shell.view.value.kind === 'no-route' && shell.view.value.position).toEqual({ kind: 'idle' });
+});
+
+// Review of PR 86, M2: Update weather's answer arrives after the trip went.
+test('[TRIP-REMOVE-WINDOWS] a weather refresh that ends after the trip went says nothing on the next route', async () => {
+  const i = rainyStop();
+  await seed(i);
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((r) => { release = r; });
+  let calls = 0;
+  // The app's own address answers (a signal); the weather service's answer comes only after the trip went, and is no answer.
+  const fetch = async (): Promise<Response> => {
+    calls += 1;
+    if (calls === 1) return new Response(null, { status: 200 });
+    await held;
+    throw new Error('no answer');
+  };
+  const shell = browserAhead({ ...deps(i, fakeGeo()), online: () => true, fetch: fetch as typeof globalThis.fetch });
+  const stop = shell.start();
+  await until(() => shell.view.value.kind === 'trip', 'the screen');
+  const updating = shell.actions.updateWeather();
+  await until(() => calls >= 2, 'the weather service asked');
+
+  await removeTrip(i.trip.route);
+  announceHere('all');
+  await until(() => shell.view.value.kind === 'no-route', 'En route with no route');
+  release();
+  await updating;
+  await seed(i);
+  announceHere('trip');
+  await until(() => shell.view.value.kind === 'trip', 'the new trip');
+  const v = shell.view.value;
+  expect(v.kind === 'trip' && [v.weatherSay, v.weatherBusy]).toEqual([null, false]);
+  stop();
+});

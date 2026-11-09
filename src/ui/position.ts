@@ -29,17 +29,19 @@ export function watchBest(o: WatchOptions, geo: Geolocation | undefined, timers:
     let done = false;
     let id: number | null = null;
     let timer: unknown = null;
+    const stopped = (): void => finish({ kind: 'timeout' });
     const finish = (x: Fix | Failure): void => {
       if (done) return;
       done = true;
       if (timer !== null) timers.clearTimeout(timer);
+      stop?.removeEventListener('abort', stopped);
       if (id !== null) {
         try { geo.clearWatch(id); } catch { /* a watch that is gone already */ }
       }
       resolve(x);
     };
     timer = timers.setTimeout(() => finish(best ?? { kind: lastError ?? 'timeout' }), o.timeoutMs);
-    stop?.addEventListener('abort', () => finish({ kind: 'timeout' }));
+    stop?.addEventListener('abort', stopped);
     try {
       id = geo.watchPosition(
         (p) => {
