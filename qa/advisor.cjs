@@ -1139,6 +1139,31 @@ test('[GA-RELOAD] a delete request applied as the page loads (a tab that never h
   assert.equal(p.json('ADVISOR.goal'),'both');
 });
 
+// The "fits better" line above the results (wish 17, design of 9 Nov 2026, section 5): only while no bike is saved and the plan has
+// none, and only with results to describe. It reads this page's bikes only and writes nothing.
+test('[FIT-LINE] the Gear advisor with no bike saved and none in the plan: above its results one quiet line, "Sizes for a typical frame. Add your bike for bag sizes that fit it.", its Add your bike opening Bike details here; no results yet, or a bike: none',async()=>{
+  const html=page().html;
+  const at=id=>html.indexOf(`id="${id}"`);
+  assert.ok(at('advisorFitLine')>at('advisorSteps') && at('advisorFitLine')<at('advisorAnswer'),'between the steps and the results');
+  assert.ok(/<p class="fit-line adv-note" id="advisorFitLine" hidden><\/p>/.test(html),'empty and hidden until there are results');
+  const p=page({setup:R2+'FIT_LINES_READY=true;',bike:null});
+  const line=()=>p.context.document.getElementById('advisorFitLine');
+  p.run('openAdvisor()');
+  assert.equal(line().hidden,true,'no results yet: no line');
+  await ask(p,{style:'bags',goal:'handling'});
+  assert.equal(p.json('ADVISOR.answer.kind'),'suggestions');
+  assert.equal(line().hidden,false,'results on the typical frame: the line');
+  assert.equal(textOf(line().innerHTML),'Sizes for a typical frame. Add your bike for bag sizes that fit it.');
+  assert.ok(/<button class="linky" type="button" id="advisorFitAdd" aria-haspopup="dialog" aria-controls="bikeDetailsBox">Add your bike<\/button>/.test(line().innerHTML));
+  assert.deepEqual(p.writes.filter(k=>/^copilot:/.test(k)),[],'no co-pilot key written');
+  for(const [why,setup] of [['a bike in the plan',`S.bikeProfile=normaliseBikeProfile(${JSON.stringify(GRAVEL)});`],['a saved bike',`BIKE_PROFILES=[normaliseBikeProfile(${JSON.stringify(GRAVEL)})];`]]){
+    const q=page({setup:R2+'FIT_LINES_READY=true;'+setup,bike:null});
+    await ask(q,{style:'bags',goal:'handling'});
+    assert.ok(q.json('ADVISOR.answer.kind'),why+': results');
+    assert.equal(q.context.document.getElementById('advisorFitLine').hidden,true,why+': no line');
+  }
+});
+
 (async()=>{
   // GA_ONLY=<text> runs only the tests whose name holds it (for watching one fail)
   for(const [name,fn] of tests){if(process.env.GA_ONLY && !name.includes(process.env.GA_ONLY))continue;await fn();passed++;console.log('ok',name);}
