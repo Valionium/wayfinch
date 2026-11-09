@@ -337,6 +337,20 @@ function ownersDayRide(): string {
       'nights="0" departureDate="2026-11-15" month="11" sleep="indoor" pace="sporting" flatKph="22" startName="Heidelberg" endName="Bruchsal"');
 }
 
+/** How many of a grid of points over the drawn bottle lie inside the drawn frame bag (0: side by side, no overlap). */
+async function bagOverBottle(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const shell = document.querySelector('#bagLayer .bagg[aria-label="Open Frame bag contents"] .bag-shell') as SVGGeometryElement | null;
+    const bottle = document.querySelector('#bottleLayer rect.bottle') as SVGRectElement | null;
+    if (!shell || !bottle) return -1;
+    const toShell = shell.getScreenCTM()!.inverse().multiply(bottle.getScreenCTM()!);
+    const [x, y, w, h] = ['x', 'y', 'width', 'height'].map((a) => +bottle.getAttribute(a)!);
+    let n = 0;
+    for (let i = 0; i <= 8; i++) for (let j = 0; j <= 16; j++) if (shell.isPointInFill(new DOMPoint(x! + (w! * i) / 8, y! + (h! * j) / 16).matrixTransform(toShell))) n++;
+    return n;
+  });
+}
+
 test('[TRIP-DAY-BAGS] the owner\'s day ride in a real browser: no bike, no bags and an empty general setup still give bags that hold the day\'s essentials, nothing over; the empty setup stays as it was', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -360,8 +374,12 @@ test('[TRIP-DAY-BAGS] the owner\'s day ride in a real browser: no bike, no bags 
   const state = await page.evaluate(`(() => { const A = currentPlan(); return { pos: S.bags.map(b => b.pos), spill: A.spill.length, out: A.reach.outOfReach.length,
     kit: ['docs','cash','phone','snacks','lock','bank'].map(id => carrying(id)), km: Math.round(planRoute().distanceKm),
     phone: A.units[A.items.phone[0][0]].pos }; })()`);
-  expect(state).toEqual({ pos: ['bottle', 'top', 'frame'], spill: 0, out: 0, kit: [true, true, true, true, false, false], km: 40, phone: 'frame' });
+  expect(state).toEqual({ pos: ['bottle', 'top', 'frame'], spill: 0, out: 0, kit: [true, true, true, true, false, false], km: 40, phone: 'top' });   // the 2 L top tube bag beside the half frame bag holds it
   await expect(page.locator('#smallOver')).toBeHidden();
+  // the frame bag leaves room for the bottle: the half shape, and in the drawing bag and bottle side by side (owner, 9 Nov 2026)
+  expect(await page.evaluate(`frameShapeIdx(S.bags.find(b => b.pos === 'frame'))`)).toBe(2);
+  expect(await bagOverBottle(page)).toBe(0);
+  await expect(page.locator('#smallLeft')).toBeHidden();
   await expect(page.locator('#smallBags h3')).toHaveText(['Top tube bag', 'Frame bag']);
   await expect(page.locator('#smallWater')).toHaveText('Water: one bottle (0.75 L) in the frame cage. Refill on the way.');
   await expect(page.locator('#smallWear')).toHaveText('Wear: insulated jacket.');
