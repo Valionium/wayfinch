@@ -11,8 +11,13 @@ import { OsmCredit } from './credit.tsx';
 import { PROFILE_BOX, packDate, profileY, summaryOf } from './model.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
 
-/** Room above the line for the icons: the profile grows from 72 to 112 px (design §6). */
-const ROOM_PX = 40;
+/**
+ * Room above the line for the icons: the profile grows from 72 to 118 px (design §6). Each icon stands on the line, its bottom at
+ * the line's point, so it and its "+N" (2 px below it) stay inside the profile's own box at any height: nothing hangs over the text
+ * below (owner's finding L, 8 Nov 2026). 44 px of icon above the highest point (2 px from the top of the line's 72) fits in 46.
+ */
+const ROOM_PX = 46;
+const ICON_PX = 44;
 const stopWords = (s: RouteStop): string => (s.label ? `${ICON_WORD[s.kind](showKm(s.km))} · ${s.label}` : ICON_WORD[s.kind](showKm(s.km)));
 
 /**
@@ -39,7 +44,7 @@ function ProfileStops({ route, stops }: { route: Route; stops: RouteStop[] }) {
           const more = rest.length ? W.appAheadIconMore(rest.length) : '';
           return (
             <button
-              key={n} type="button" class={`ah-icon ah-icon-${one!.kind}${more && ' ah-icon-more'}`} style={{ left: `${(x * 100).toFixed(2)}%`, top: `${(ROOM_PX + y - 22).toFixed(1)}px` }}
+              key={n} type="button" class={`ah-icon ah-icon-${one!.kind}${more && ' ah-icon-more'}`} style={{ left: `${(x * 100).toFixed(2)}%`, top: `${(ROOM_PX + y - ICON_PX).toFixed(1)}px` }}
               aria-label={more ? `${stopWords(one!)}, ${more}: ${rest.map(stopWords).join(', ')}` : stopWords(one!)} aria-expanded={picked === n} aria-controls={picked === n ? 'trip-stop-list' : undefined}
               onClick={() => setPicked(picked === n ? null : n)}
             >

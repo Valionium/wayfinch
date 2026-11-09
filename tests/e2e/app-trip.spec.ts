@@ -57,7 +57,7 @@ test('[TRIP-FIRST] with a running trip (prepared, departing today) the app opens
     await db.put('meta', { at: new Date(), steps: [], build: null, forecastFetchedAt: null, baselineYears: null }, 'route:preparedSteps');
   });
   await page.goto(`${app.origin}/`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Ahead');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('En route');
   await page.goto(`${app.origin}/#/trip`, { waitUntil: 'domcontentloaded' });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Trip');
@@ -159,4 +159,49 @@ test('[TRIP-FIRST] a prepared trip with no date and no month does not count as r
   await page.goto(`${app.origin}/`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Trip');
   await expect(page.locator('[data-summary]')).toBeVisible();
+});
+
+// The owner's screenshots of 8 Nov 2026 (finding L): the stops and their "+2" hung below the profile over "Day 1 · 38.7 km" and the
+// first line of the opened list. Each project runs this in its own theme; the widths are walked here.
+test('[TRIP-STOPS-ROOM] the stops on the height profile never cover the text below it, at every width, with the list open', async ({ page }) => {
+  test.setTimeout(180_000);
+  app = await loadApp(page);
+  const later = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10);
+  // Two routes with stops at low points of the line, where the icons hung below the profile on main.
+  for (const [id, width] of [['loop', 360], ['loop', 600], ['loop', 840], ['sunday-holiday', 1024], ['sunday-holiday', 1280], ['sunday-holiday', 360]] as const) {
+    await preparedTrip(page, id, { departureDate: later, places: true });
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`${app.origin}/#/trip`, { waitUntil: 'domcontentloaded' });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const icons = page.locator('[data-profile-stops] button');
+    await expect(icons.first()).toBeVisible({ timeout: 20_000 });
+    for (const open of [false, true]) {
+      if (open) {
+        await icons.first().click();
+        await expect(page.locator('[data-stop-list]')).toBeVisible();
+      }
+      const found = await page.evaluate(() => {
+        const box = document.querySelector('.trip-profile-box')!.getBoundingClientRect();
+        const marks = [...document.querySelectorAll('[data-profile-stops] button, [data-profile-stops] .ah-icon-n, [data-profile-stops] svg')].map((e) => e.getBoundingClientRect());
+        const lowest = Math.max(...marks.map((r) => r.bottom));
+        const highest = Math.min(...marks.map((r) => r.top));
+        // Every bit of text after the profile in the summary: the opened list, the notes, the days.
+        const after: { text: string; top: number }[] = [];
+        let el = document.querySelector('.trip-profile-box')!.nextElementSibling;
+        while (el) {
+          for (const t of [el, ...el.querySelectorAll('*')]) {
+            if ((t.textContent ?? '').trim() === '' || t.closest('.visually-hidden')) continue;
+            const r = t.getBoundingClientRect();
+            if (r.height > 0) after.push({ text: (t.textContent ?? '').trim().slice(0, 30), top: r.top });
+          }
+          el = el.nextElementSibling;
+        }
+        return { boxTop: box.top, boxBottom: box.bottom, lowest, highest, after };
+      });
+      expect(found.after.length, `${id}, ${width} px`).toBeGreaterThan(0);
+      expect(found.lowest, `${id}, ${width} px, list ${open}: icons inside the profile's box`).toBeLessThanOrEqual(found.boxBottom + 0.5);
+      expect(found.highest, `${id}, ${width} px, list ${open}: icons inside the profile's box`).toBeGreaterThanOrEqual(found.boxTop - 0.5);
+      for (const t of found.after) expect(t.top, `${id}, ${width} px, list ${open}: "${t.text}" under the icons`).toBeGreaterThanOrEqual(found.lowest - 0.5);
+    }
+  }
 });
