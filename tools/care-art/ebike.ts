@@ -18,7 +18,7 @@ export function batteryRefit(where: 'in' | 'on'): Pic {
   const p = (a: number, b: number): Pt => add(O, add(scale(da, a * k), scale(nb, b * k)));
   bikeInset(pic, 'down-tube');
   // the frame: the down tube runs into the head tube, whose top leaves the picture, and down into the motor
-  pic.path('cp-body', poly([p(-10, -45), p(700, -45), p(700, 45), p(-10, 45)]), { name: 'down-tube' });
+  pic.path('cp-body', poly([p(-10, -45), p(640, -45), p(640, 45), p(-10, 45)]), { name: 'down-tube' });
   const hv: Pt = [-Math.sin(deg(18)), -Math.cos(deg(18))], hn: Pt = [hv[1] * -1, hv[0]];
   const H = p(660, -6), hp = (s: number, t: number): Pt => add(H, add(scale(hv, s * k), scale(hn, t * k)));
   pic.path('cp-body', poly([hp(-110, -30), hp(400, -30), hp(400, 30), hp(-110, 30)]), { name: 'head-tube' });

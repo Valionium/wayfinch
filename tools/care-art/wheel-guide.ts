@@ -19,7 +19,7 @@ export function hubGuide(kind: 'hub' | 'qr' | 'thru'): Pic {
     pic.facts.push(pointsAt(pic, 'leader', 'hub'), pointsAt(pic, 'leader-disc', 'rotor'));
   } else if (kind === 'qr') {
     pic.label('cp-th', [8, 30], 'lever', [10, 26], m(-half - 15, -26), undefined, 'leader');
-    pic.label('cp-t', [312, 200], 'nut', [310, 196], m(half + 12.5, 5), 'end', 'leader-nut');
+    pic.label('cp-th', [312, 200], 'nut', [310, 196], m(half + 12.5, 5), 'end', 'leader-nut');
     pic.facts.push(pointsAt(pic, 'leader', 'lever'), pointsAt(pic, 'leader-nut', 'nut'), touches(pic, 'head', 'leg-l', 0.8), touches(pic, 'nut', 'leg-r', 0.8));
   } else {
     pic.label('cp-th', [312, 200], 'thru-axle', [310, 196], m(20, 6), 'end', 'leader');
@@ -27,7 +27,7 @@ export function hubGuide(kind: 'hub' | 'qr' | 'thru'): Pic {
     // the other kind: a head with a hex socket and no lever, seen end-on
     pic.path('cp-frame', rrect(8, 128, 64, 60, 8));
     boltHead(pic, [40, 158], 15, { name: 'hex-head' });
-    pic.text('cp-tm', [8, 210], 'or a hex key');
+    pic.text('cp-tm', [8, 210], 'or a hex socket');
     pic.facts.push(pointsAt(pic, 'leader', 'axle'), pointsAt(pic, 'leader-lever', 'lever'), touches(pic, 'head', 'leg-l', 0.8),
       at(pic, 'axle through the closed left end', m(-half - 4.5, 0), 'leg-l', 0), at(pic, "axle's thread in the right end", m(half + 4.5, 0), 'leg-r', 0));
   }
@@ -41,17 +41,17 @@ export function hubGuide(kind: 'hub' | 'qr' | 'thru'): Pic {
  */
 export function hubGears(): Pic {
   const pic = new Pic(320, 220);
-  const k = 1.5, cx = 140, cy = 112, half = 67.5;
+  const k = 1.5, cx = 140, cy = 100, half = 67.5;
   const m = (x: number, y: number): Pt => [cx + x * k, cy + y * k];
   for (const side of [-1, 1] as const) {
     const inner = side * half, outer = side * (half + 9), bottom = 6;
-    pic.path('cp-ctx', new Path().M(m(inner + side * 3, -74)).L(m(inner, -6)).L(m(inner, bottom - 3)).Q(m(inner, bottom), m(inner + side * 3, bottom))
-      .L(m(outer - side * 3, bottom)).Q(m(outer, bottom), m(outer, bottom - 3)).L(m(outer, -6)).L(m(outer + side * 4, -74)).Z(), { name: side < 0 ? 'end-l' : 'end-r' });
+    pic.path('cp-ctx', new Path().M(m(inner - side * 12, -80)).L(m(inner, -6)).L(m(inner, bottom - 3)).Q(m(inner, bottom), m(inner + side * 3, bottom))
+      .L(m(outer - side * 3, bottom)).Q(m(outer, bottom), m(outer, bottom - 3)).L(m(outer, -6)).L(m(outer - side * 10, -80)).Z(), { name: side < 0 ? 'end-l' : 'end-r' });
   }
   // the spokes, up and down from the flanges
   for (const x of [-39, 39]) for (const dx of [-1.5, 1.5]) {
-    pic.line('cp-thin', m(x + dx, -50), m(x * 0.55 + dx, -72));
-    pic.line('cp-thin', m(x + dx, 50), m(x * 0.85 + dx, 55));
+    pic.line('cp-thin', m(x + dx, -50), m(x * 0.55 + dx, -80));
+    pic.line('cp-thin', m(x + dx, 50), m(x * 0.7 + dx, 62));
   }
   pic.path('cp-obj', poly([m(-86, -4.75), m(86, -4.75), m(86, 4.75), m(-86, 4.75)]), { name: 'axle' });
   // the right end cap from the shell to the frame's end, the sprocket on it; the left cap
@@ -67,10 +67,11 @@ export function hubGears(): Pic {
   pic.path('cp-obj', rrect(...m(-half - 15.5, -6.5), 6.5 * k, 13 * k, 2), { name: 'nut-l' });
   pic.path('cp-obj', rrect(...m(half + 9, -6.5), 6.5 * k, 13 * k, 2), { name: 'nut-r' });
   pic.path('cp-obj', rrect(...m(half + 15.5, -17), 20 * k, 34 * k, 5 * k), { name: 'box' });
-  pic.path('cp-ctx', new Path().M(m(half + 25.5, -17)).Q(m(half + 26, -46), m(half + 14, -74)), { style: 'stroke-width:2.5', name: 'cable' });
+  pic.path('cp-ctx', new Path().M(m(half + 25.5, -17)).Q(m(half + 26, -46), m(half + 10, -80)), { style: 'stroke-width:2.5', name: 'cable' });
   pic.label('cp-th', [106, 212], 'hub gears', [104, 208], m(-20, 41), 'end', 'leader');
-  pic.label('cp-t', [312, 200], 'sprocket', [310, 196], m(55.2, 36), 'end', 'leader-sprocket');
-  pic.facts.push(pointsAt(pic, 'leader', 'shell'), pointsAt(pic, 'leader-sprocket', 'sprocket'), touches(pic, 'nut-l', 'end-l', 0.8),
+  pic.label('cp-t', [204, 212], 'sprocket', [202, 208], m(55.2, 36), 'end', 'leader-sprocket');
+  pic.label('cp-t', [316, 212], 'cable box', [314, 208], m(half + 25.5, 17), 'end', 'leader-box');
+  pic.facts.push(pointsAt(pic, 'leader', 'shell'), pointsAt(pic, 'leader-sprocket', 'sprocket'), pointsAt(pic, 'leader-box', 'box'), touches(pic, 'nut-l', 'end-l', 0.8),
     touches(pic, 'nut-r', 'end-r', 0.8), touches(pic, 'box', 'nut-r', 0.8), touches(pic, 'cable', 'box', 0.5), touches(pic, 'cap-r', 'end-r', 0.6),
     touches(pic, 'cap-l', 'end-l', 0.6), at(pic, 'the left axle end in its frame end', m(-half - 4.5, 0), 'end-l', 0),
     at(pic, 'the right axle end in its frame end', m(half + 4.5, 0), 'end-r', 0));
@@ -121,13 +122,14 @@ export function forkFront(): Pic {
   pic.path('cp-obj', poly([m(-23, -150), m(-17, -157), m(17, -157), m(23, -150)]), { name: 'cover' });
   pic.path('cp-obj', poly([m(-17, -157), m(-17, -167), m(17, -167), m(17, -157)]), { name: 'spacer' });
   pic.path('cp-obj', rrect(...m(-21, -207), 42 * k, 40 * k, 2), { name: 'stem' });
-  pic.path('cp-ghost', poly([m(-19, 0), m(-14.3, -205), m(14.3, -205), m(19, 0)]), { name: 'steerer' });
-  pic.mark('steerer-in', poly([m(-19, 0), m(-15.5, -150), m(15.5, -150), m(19, 0)]));
+  pic.path('cp-ghost', poly([m(-19, 0), m(-19, -20), m(-14.3, -70), m(-14.3, -205), m(14.3, -205), m(14.3, -70), m(19, -20), m(19, 0)]), { name: 'steerer' });
+  pic.mark('steerer-in', poly([m(-19, 0), m(-19, -20), m(-14.3, -70), m(-14.3, -150), m(14.3, -150), m(14.3, -70), m(19, -20), m(19, 0)]));
   // the wheel behind the legs: the hub and axle, the disc edge-on on the bike's left, the spokes, the tyre in front of them
   const ay = 395;
-  pic.path('cp-ctx', poly([m(41, ay - 80), m(43, ay - 80), m(43, ay + 80), m(41, ay + 80)]), { name: 'rotor' });
   for (const x of [-33, 33]) pic.line('cp-thin', m(x, ay - 22), m(x * 0.5, ay - 120));
-  pic.path('cp-obj', poly([m(-44, ay - 22), m(44, ay - 22), m(44, ay + 22), m(-44, ay + 22)]), { name: 'hub' });
+  pic.path('cp-obj', poly([m(-36, ay - 22), m(36, ay - 22), m(36, ay + 22), m(-36, ay + 22)]), { name: 'hub' });
+  for (const sx of [-1, 1]) pic.path('cp-obj', poly([m(sx * 36, ay - 9), m(sx * 50, ay - 9), m(sx * 50, ay + 9), m(sx * 36, ay + 9)]));
+  pic.path('cp-obj', poly([m(41, ay - 80), m(44, ay - 80), m(44, ay + 80), m(41, ay + 80)]), { name: 'rotor' });
   pic.path('cp-rubber', rrect(...m(-22.5, 32), 45 * k, 500 * k, 22.5 * k), { name: 'tyre' });
   // the fork: crown and legs, one outline; the axle's ends show outside the legs, its head and lever on the bike's left
   const legOut = 72, legIn = 50, top = 22;
@@ -136,15 +138,14 @@ export function forkFront(): Pic {
     .Q(m(-legIn, ay + 13), m(-61, ay + 13)).Q(m(-legOut, ay + 13), m(-legOut, ay - 8)).L(m(-legOut - 2, 60)).L(m(-70, top)).Z();
   pic.path('cp-halostroke', fork);
   pic.path('cp-hi', fork, { name: 'fork' });
-  pic.path('cp-obj', poly([m(-legOut - 3, ay - 6), m(-legOut, ay - 6), m(-legOut, ay + 6), m(-legOut - 3, ay + 6)]), { name: 'thread' });
   pic.path('cp-obj', rrect(...m(legOut, ay - 9), 7 * k, 18 * k, 2), { name: 'axle-head' });
-  pic.path('cp-obj', tube(m(legOut + 4, ay - 4), m(legOut + 4, ay - 60), 9 * k), { name: 'axle-lever' });
+  pic.path('cp-obj', tube(m(legOut + 8, ay - 4), m(legOut + 8, ay - 60), 9 * k), { name: 'axle-lever' });
   pic.label('cp-th', [312, 190], 'fork', [310, 186], m(legOut + 1, 200), 'end', 'leader');
   pic.label('cp-t', [8, 30], 'steerer', [10, 26], m(-16, -120), undefined, 'leader-steerer');
   pic.label('cp-t', [312, 40], 'head tube', [310, 36], m(26, -90), 'end', 'leader-head');
   pic.facts.push(pointsAt(pic, 'leader', 'fork'), pointsAt(pic, 'leader-steerer', 'steerer'), pointsAt(pic, 'leader-head', 'head-tube'),
     within(pic, 'steerer-in', 'head-tube', 0.6), touches(pic, 'head-tube', 'fork', 0.5), touches(pic, 'cover', 'head-tube', 0.5),
-    clear(pic, 'tyre', 'fork', 1), touches(pic, 'axle-head', 'fork', 0.6), touches(pic, 'thread', 'fork', 0.6));
+    clear(pic, 'tyre', 'fork', 1), touches(pic, 'axle-head', 'fork', 0.6), clear(pic, 'axle-lever', 'fork', 0.3));
   pic.fact('the steerer tapers: wider at the crown than at the top', 38.1 > 28.6);
   pic.fact('100 mm between the legs inside at the axle', legIn * 2 === 100);
   return pic;
