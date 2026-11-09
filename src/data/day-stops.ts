@@ -60,7 +60,20 @@ function judged(held: TripStops, fresh: TripStops | null, inputs: ScreenInputs):
  * Settles the stops of the stored trip, with the rider's change if any, and writes the trip when its days change. Resolves to the
  * stops now in force, or null when there are none (no places saved, a day ride, or the route gone meanwhile).
  */
-export async function settleStops(now: Date, change?: StopChange, o: { announce?: boolean } = {}): Promise<TripStops | null> {
+/**
+ * Every stop write of this window, one after another (review of PR 101, I5): Trip's automatic settles, the rider's picks and Undo,
+ * and Prepare's. Each reads the trip only once the one before has written, so a pick is never overwritten by a settle that read
+ * the trip before it.
+ */
+let turn: Promise<unknown> = Promise.resolve();
+
+export function settleStops(now: Date, change?: StopChange, o: { announce?: boolean } = {}): Promise<TripStops | null> {
+  const mine = turn.then(() => settling(now, change, o));
+  turn = mine.catch(() => undefined);
+  return mine;
+}
+
+async function settling(now: Date, change: StopChange | undefined, o: { announce?: boolean }): Promise<TripStops | null> {
   const inputs = await readInputs(now);
   if (!inputs) return null;
   const { trip } = inputs;

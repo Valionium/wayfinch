@@ -212,3 +212,24 @@ describe('review of PR 101: stops judged again, gone places, export', () => {
     expect((await readTrip())!.stops).toBeUndefined();
   });
 });
+
+describe('review of PR 101, I5: every stop write in its turn', () => {
+  test('[TRIP-DAY-STOPS] a rider\'s pick made while an automatic settle is under way is never replaced: in either order, the pick stays', async () => {
+    for (const order of ['pick first', 'settle first'] as const) {
+      freshStore();
+      await tripWithPlaces([['lodging', 95, 'Open Hotel'], ['lodging', 176, 'Hotel C'], ['lodging', 183, 'Hotel E']], { departureDate: null });
+      const p = pointAtKm(180.5);
+      const db = await openDb();
+      await db.put('places', placeAt('campsite', p.lat, p.lon, { id: 'camp-180', name: 'Seasonal Camp', seasonal: 'Apr-Oct' }));
+      await db.add('matches', { placeId: 'camp-180', km: 180.5, offRouteM: 0 });
+      expect((await settleStops(NOW))!.days[1]!.name).toBe('Seasonal Camp');
+      // A date in November: the held automatic stop of day 2 needs judging again, so a plain settle has something to write.
+      const t = (await readTrip())!;
+      await saveTrip({ ...t, departureDate: '2026-11-10' });
+      const hotelC = (await stopChoices(NOW, 2)).find((c) => c.name === 'Hotel C')!;
+      const runs = order === 'pick first' ? [settleStops(NOW, { day: 2, to: hotelC }), settleStops(NOW)] : [settleStops(NOW), settleStops(NOW, { day: 2, to: hotelC })];
+      await Promise.allSettled(runs);
+      expect((await readTrip())!.stops!.days[1], order).toMatchObject({ name: 'Hotel C', by: 'rider' });
+    }
+  });
+});
