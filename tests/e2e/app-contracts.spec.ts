@@ -267,6 +267,31 @@ test('[TRIP-BAGS-LONG] a 2-night trip from Wayfinch in a real browser: Plan bags
   expect(errors).toEqual([]);
 });
 
+test('[TRIP-BAGS-LONG] in a real browser, Undo never deletes a setup the rider changed and never drops later work (review of PR 80, I2)', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await plannerWithPlan(page);
+  await handOver(page, handoffFixture());
+  await openFresh(page, `/tools/bags/#copilot-handoff=${ID}`);
+  await ready(page);
+  await page.locator('#handoffPlan').click();
+  await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
+  // the rider goes on: a bag made bigger at Bags, the new trip setup marked general with a note of the rider's own
+  await page.evaluate(`(async () => {
+    S.bags[0].L = 20; S.bags[0].userL = true; renderBags(); queueDraftSave();
+    await setSetupKind(SETUPS[0].id, 'general'); await saveSetupNote(SETUPS[0].id, 'Our own note');
+  })()`);
+  const work = await page.evaluate('JSON.stringify(captureDraft())');
+  const made = await page.evaluate('SETUPS[0].id');
+  await page.locator('#handoffUndo').click();
+  await expect(page.locator('#handoffText')).toContainText('Nothing is undone');
+  await expect(page.locator('#handoffUndo')).toBeHidden();
+  expect(await page.evaluate('JSON.stringify(captureDraft())')).toBe(work);
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:setups')!) as Array<{ id: string; kind?: string; note: string }>);
+  expect(stored.find((s) => s.id === made)).toMatchObject({ kind: 'general', note: 'Our own note' });
+  expect(errors).toEqual([]);
+});
+
 test('[TRIP-SMALL] a day ride from Wayfinch in a real browser: the small view shows the bike with its bags and what is in each bag, nothing else; the full planner is one tap away', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -281,7 +306,7 @@ test('[TRIP-SMALL] a day ride from Wayfinch in a real browser: the small view sh
   await expect(page.locator('#smallTripLine')).toContainText('day ride');
   await expect(page.locator('#rigSvg')).toBeVisible();
   await expect(page.locator('#packingChecklist .packing-groups')).toBeVisible();
-  for (const hidden of ['#crumbs', '#resultBox', '#modeBar', '#verdictBox', '.nightsbar', '#rigTools', '#packingUnpackedOnly', '#printPackingChecklist'])
+  for (const hidden of ['#crumbs', '#resultBox', '#modeBar', '#verdictBox', '.nightsbar', '#rigTools', '#packingUnpackedOnly', '#printPackingChecklist', '#walkthroughOpen', '#draftBar'])
     await expect(page.locator(hidden).first()).toBeHidden();
   await expect(page.locator('.wf-bar')).toBeVisible();   // the one top bar stays
   expect(await page.evaluate('[S.step, S.nights]')).toEqual([4, 0]);

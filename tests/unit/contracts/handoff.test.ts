@@ -318,6 +318,79 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     expect(await page.run('undoTripBags()')).toBe(false);
   });
 
+  test('Undo never deletes a setup the rider changed and never drops later work (review of PR 80, I2)', async () => {
+    const { gpx } = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
+    const { page, json } = longPlanner(gpx);
+    await page.run('receiveHandoff()');
+    await page.run('planTripBags()');
+    const made = json<string>('SETUPS[0].id');
+    // the rider goes on at Bags: a bag added and a tick; the new trip setup marked general, with a note of the rider's own
+    page.run('S.bags.push({uid:9,pos:"bar",L:9});S.nextUid=10;S.packed={tent:true};');
+    expect(await page.run(`setSetupKind('${made}','general')`)).toBe(true);
+    expect(await page.run(`saveSetupNote('${made}','Our own note')`)).toBe(true);
+    const work = page.run('JSON.stringify(captureDraft())');
+    // Undo is still on the bar: it now takes nothing away
+    expect(await page.run('undoTripBags()')).toBe(false);
+    expect(page.run('JSON.stringify(captureDraft())')).toBe(work);
+    expect(json('S.bags.some(b=>b.uid===9)')).toBe(true);
+    expect(json('S.packed')).toEqual({ tent: true });
+    const kept = JSON.parse(page.values.get('loadcheck:setups')!).find((s: { id: string }) => s.id === made);
+    expect(kept).toMatchObject({ kind: 'general', note: 'Our own note' });
+    expect(json<number>('SETUPS.length')).toBe(2);
+    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/changed since/);
+  });
+
+  test('Undo with the plan untouched brings the plan back, but keeps a made setup the rider changed and says so (review of PR 80, I2)', async () => {
+    const { gpx } = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
+    const { page, json } = longPlanner(gpx);
+    await page.run('receiveHandoff()');
+    const before = page.run('JSON.stringify(captureDraft())');
+    await page.run('planTripBags()');
+    const made = json<string>('SETUPS[0].id'), keptBefore = json<string>('SETUPS[1].id');
+    expect(await page.run(`renameSetup('${made}','Our Vosges trip')`)).toBe(true);
+    expect(await page.run('undoTripBags()')).toBe(true);
+    expect(page.run('JSON.stringify(captureDraft())')).toBe(before);
+    // the renamed setup stays; the "Before" copy, untouched, goes
+    expect(json('SETUPS.map(s=>[s.id,s.name])')).toEqual([[made, 'Our Vosges trip']]);
+    expect(JSON.parse(page.values.get('loadcheck:setups')!).map((s: { id: string }) => s.id)).toEqual([made]);
+    expect(json(`SETUPS.some(s=>s.id==='${keptBefore}')`)).toBe(false);
+    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/Our Vosges trip/);
+  });
+
+  test('Undo of "Open the setup made on …" never drops later work either (review of PR 80, I2)', async () => {
+    const handed = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
+    const { page, json } = longPlanner(handed.gpx);
+    page.run(`SETUPS=[${qaSetup('t_made', { saved: '2026-11-06', forRoute: { hash: handed.trip.route.hash, name: 'Heidelberg → Strasbourg', departureDate: '2026-06-12' } })}];S.bags.push({uid:3,pos:'bar',L:9});S.nextUid=4;`);
+    await page.run('receiveHandoff()');
+    await page.run('reuseTripSetup()');
+    page.run('S.bags.push({uid:9,pos:"frame",L:4});S.nextUid=10;');
+    const work = page.run('JSON.stringify(captureDraft())');
+    expect(await page.run('undoTripBags()')).toBe(false);
+    expect(page.run('JSON.stringify(captureDraft())')).toBe(work);
+    expect(json<number>('SETUPS.length')).toBe(2);
+  });
+
+  test('the bar promises a kept plan only when it will keep one (review of PR 80, m2)', async () => {
+    const { gpx } = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
+    const fresh = longPlanner(gpx);
+    await fresh.page.run('receiveHandoff()');
+    expect(String(fresh.page.nodes.get('handoffText')!.textContent)).toMatch(/Your plan now is kept as a setup/);
+    const same = longPlanner(gpx);
+    same.page.run(`SETUPS=[${qaSetup('t_same')}];`);
+    await same.page.run('receiveHandoff()');
+    expect(String(same.page.nodes.get('handoffText')!.textContent)).not.toMatch(/kept as a setup/);
+    expect(String(same.page.nodes.get('handoffText')!.textContent)).toMatch(/already saved as Setup t_same/);
+  });
+
+  test('"Open the setup made on …" names the trip\'s nights and date when they differ from the setup\'s (review of PR 80, m4)', async () => {
+    const handed = await handedOff('heidelberg-strasbourg', { nights: 3 }, '2026-06-12');
+    const { page } = longPlanner(handed.gpx);
+    page.run(`S.nights=2;S.departureDate='2026-06-05';S.month=5;SETUPS=[${qaSetup('t_made', { saved: '2026-11-06', forRoute: { hash: handed.trip.route.hash, name: 'Heidelberg → Strasbourg', departureDate: '2026-06-05' } })}];`);
+    await page.run('receiveHandoff()');
+    await page.run('reuseTripSetup()');
+    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/made for 2 nights from 5 Jun; this trip has 3 nights from 12 Jun/);
+  });
+
   test('a trip setup already made for this route is offered again; with 40 trip setups nothing changes and the bar says why', async () => {
     const handed = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
     const { page, json } = longPlanner(handed.gpx);
