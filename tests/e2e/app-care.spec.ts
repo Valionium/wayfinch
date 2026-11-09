@@ -345,3 +345,49 @@ test('[BC-STEPS-BACK] in a real browser the back gesture closes the step view in
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page).toHaveURL(/#\/tools\/care$/);
 });
+
+// ---- The parts guide (care pictures design of 7 November 2026, section 4) ----
+test("[PG-SHEET-OPEN] a part's name opens its entry: a bottom sheet on a phone, a side panel when wide; the bike drawn with the part marked, its close-ups; no sideways scroll at 200% text; Escape and the back gesture close the sheet alone", async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [A], 'bike_a');
+  await openSteps(page, 'brake-rub-rim', 'Brake rubbing');
+  for (let i = 0; i < 5; i += 1) await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.locator('.care-steps-count')).toHaveText('Step 5 of 6');
+  const link = page.locator('.care-step .care-part', { hasText: "brake's quick release" });
+  await link.click();
+  const sheet = page.getByRole('dialog', { name: "The brake's quick release" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole('heading', { name: "The brake's quick release" })).toBeFocused();
+  await expect(sheet.getByRole('img', { name: "The brake's quick release, marked on the bike" })).toBeVisible();
+  await expect(sheet.locator('.care-pic [role="img"]')).toHaveCount(2);
+  const box = (await sheet.boundingBox())!;
+  const view = page.viewportSize()!;
+  if (view.width < 720) {
+    expect(Math.round(box.width)).toBe(view.width);
+    expect(Math.abs(box.y + box.height - view.height)).toBeLessThan(2);
+  } else {
+    expect(box.width).toBeLessThanOrEqual(441);
+    expect(Math.abs(box.x + box.width - view.width)).toBeLessThan(2);
+  }
+  for (const zoom of ['100%', '200%']) {
+    await page.evaluate((z) => { document.documentElement.style.fontSize = z; }, zoom);
+    expect(await page.evaluate(() => { const s = document.querySelector('dialog.part-sheet')!; return s.scrollWidth <= s.clientWidth + 1; }), zoom).toBe(true);
+    for (const b of await sheet.locator('.pg-swap, .care-steps-icon').all()) expect((await b.boundingBox())!.height, zoom).toBeGreaterThanOrEqual(44);
+  }
+  await page.evaluate(() => { document.documentElement.style.fontSize = ''; });
+  await page.keyboard.press('Escape');
+  await expect(page.locator('dialog.part-sheet')).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Brake rubbing' })).toBeVisible();
+  await expect(link).toBeFocused();
+  // the back gesture: the sheet goes, the step view stays at its step
+  await link.click();
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole('button', { name: "The wheel's quick release" }).click();
+  await expect(sheet.getByRole('heading', { level: 2 })).toHaveText("The wheel's quick release");
+  await page.goBack();
+  await expect(page.locator('dialog.part-sheet')).toHaveCount(0);
+  await expect(page.locator('.care-steps-count')).toHaveText('Step 5 of 6');
+  await expect(page).toHaveURL(/#\/tools\/care$/);
+  expect(errors).toEqual([]);
+});
