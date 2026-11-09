@@ -78,4 +78,5 @@ progress { width: 100%; accent-color: var(--blaze); }
 .bike-hint-acts a { color: var(--blaze); font-weight: 600; }
 .bike-hint-acts button { background: none; border: 0; color: var(--muted); font: inherit; font-size: 0.9375rem; text-decoration: underline; text-underline-offset: 2px; padding: 0 6px; cursor: pointer; }
 .bike-hint-done { margin: 4px 0 0; font-size: 0.9375rem; }
-.bike-hint-done:empty { display: none; }
+/* Kept in the page while its words load, so a screen reader says them when they arrive (review of PR 90, M1). */
+.bike-hint-done:empty { margin: 0; }

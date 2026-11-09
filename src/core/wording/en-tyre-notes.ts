@@ -1,6 +1,6 @@
 // More of the tyre tool's words that only its own chunk shows (its notes, warnings and refusals), in their own module so that the first
 // screen does not carry them. Moved from en.ts as they were (9 Nov 2026): they pay for the first-run bike card on Trip (wish 17). They
-// follow the same rules as en.ts: the banned-words test reads this object too (tests/unit/core/wording-tyre-notes.test.ts).
+// follow the same rules as en.ts: the banned-words test reads this object too (tests/unit/core/wording-hint.test.ts).
 
 export const TN = {
   tyreWarnIncompatible: 'The lowest pressure this tube needs is above what your tyre or rim allows. These parts do not fit together for this load. Going tubeless, or another tyre or rim, may.',

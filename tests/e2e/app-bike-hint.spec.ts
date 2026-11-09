@@ -60,11 +60,14 @@ test('[HINT-SMALL] Later by keyboard: today\'s line at once, the focus on its Ad
   expect(await page.evaluate(() => localStorage.getItem('copilot:bikeHint:v1'))).toMatch(/^[atypcgsw]+$/);
 });
 
-test('[HINT-SMALL] Make it yours opens Bike details at Look; back on Trip without saving, the line is small', async ({ page }) => {
+test('[HINT-SMALL] Make it yours opens Bike details at Your frame (frame style and size); back on Trip without saving, the line is small', async ({ page }) => {
   app = await loadApp(page);
   await page.getByRole('region', { name: 'Design your bike' }).getByRole('link', { name: 'Make it yours' }).click();
   await expect(page).toHaveURL(`${app.origin}/tools/bags/`);
-  await expect(page.locator('#bikeLookTitle')).toBeFocused();
+  // The owner's ruling of 9 Nov 2026: "Open it at size and frame type". Bike details opens at its top, Your frame, not at Look.
+  await expect(page.locator('#bikeDetailsTitle')).toBeFocused();
+  for (const part of [page.locator('#bikeQuickTitle'), page.getByRole('group', { name: 'Frame style' }), page.getByRole('group', { name: 'Frame size' })]) await expect(part).toBeInViewport();
+  await expect(page.locator('#bikeLookTitle')).not.toBeFocused();
   await page.goto(`${app.origin}/#/trip`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.trip-bike figcaption')).toBeVisible();
   await expect(page.locator('.bike-hint')).toHaveCount(0);

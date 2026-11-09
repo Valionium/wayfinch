@@ -2,6 +2,7 @@
 // The first-run bike hint in the screens (wish 17, design of 9 Nov 2026): the card on Trip, Later, the states it shrinks to, the one-time
 // line after the first bike, the places seen, the one key, and the "fits better" lines of Tyre pressure, Bike care, Tools and You.
 import 'fake-indexeddb/auto';
+import { readFileSync } from 'node:fs';
 import { IDBFactory } from 'fake-indexeddb';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
@@ -68,10 +69,11 @@ describe('the card on Trip', () => {
     expect(box.textContent).toContain(W.bikeHintBody);
     expect(W.bikeHintTitle).toBe('Design your bike');
     expect(W.bikeHintBody).toBe("The app's answers are more accurate when it knows your bike's size and frame type.");
-    // The drawing is the typical one, unpainted, and a tap on it opens Look, as does Make it yours.
+    // The drawing is the typical one, unpainted, and a tap on it opens Look, as today; Make it yours opens Bike details at its top, where
+    // frame style and size are entered (the owner's ruling of 9 Nov 2026: "Open it at size and frame type").
     expect(box.querySelector('.bk-paint')).toBeNull();
     const links = [...box.querySelectorAll('a')];
-    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/tools/bags/#bike-details=new&back=trip&section=look', '/tools/bags/#bike-details=new&back=trip&section=look']);
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/tools/bags/#bike-details=new&back=trip&section=look', '/tools/bags/#bike-details=new&back=trip']);
     expect(links[1]!.textContent).toBe(WB.bikeMakeItYours);
     expect(later().getAttribute('aria-label')).toBe('Later: show this smaller');
     expect(box.querySelector('.btn-primary')).toBeNull();
@@ -191,6 +193,22 @@ describe('after the first bike', () => {
     render(null, host);
     await trip(bikeSource.value);
     expect(host.querySelector('.bike-hint-done')).toBeNull();
+  });
+
+  test('[HINT-GONE] the status is in the page, and never hidden, before its words arrive, so a screen reader says them when they do', async () => {
+    await trip(NO_BIKE);
+    render(null, host);
+    await act(() => { render(<TripBike bike={saved()} trip={false} />, host); });
+    const line = host.querySelector<HTMLElement>('.bike-hint-done')!;
+    expect(line.getAttribute('role')).toBe('status');
+    expect(line.textContent).toBe('');
+    // No rule of Trip's or the bike's stylesheet takes it out of the page while it is empty.
+    const css = ['../../../src/ui/trip/trip.css', '../../../src/ui/bike/bike.css'].map((f) => readFileSync(new URL(f, import.meta.url), 'utf8')).join('\n');
+    const rules = css.match(/[^{}]*bike-hint-done[^{]*\{[^}]*\}/g) ?? [];
+    expect(rules.length).toBeGreaterThan(0);
+    for (const rule of rules) expect(rule, rule).not.toMatch(/display:\s*none|visibility:\s*hidden/);
+    await settle();
+    expect(line.textContent).toBe(HN.hintEveryTool);
   });
 
   test('[HINT-GONE] a bike saved in another tab while the card shows: the line comes in this visit', async () => {
@@ -320,7 +338,7 @@ describe('the places seen and the "fits better" lines', () => {
     expect(none.querySelector('svg.bk')).not.toBeNull();
     expect(none.querySelector('.bk-paint')).toBeNull();
     expect(none.textContent).toBe(Y.youBikesNone);
-    expect(Y.youBikesNone).toBe('No bike yet. Add yours: the Bag planner, Tyre pressure and Bike care are more accurate when they know its size and frame type.');
+    expect(Y.youBikesNone).toBe('No bike yet. Add yours: its colour, tyres and bars. The Bag planner, Tyre pressure and Bike care then fit it.');
     expect([...host.querySelectorAll('a')].some((a) => a.textContent === Y.youBikeAdd)).toBe(true);
   });
 });

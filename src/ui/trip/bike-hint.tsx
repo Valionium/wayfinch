@@ -39,7 +39,8 @@ export function TripBike({ bike, trip }: { bike: BikeSource; trip: boolean | nul
       <h2 id="bike-hint">{W.bikeHintTitle}</h2>
       <p>{W.bikeHintBody}</p>
       <p class="bike-hint-acts">
-        <a href={bikeDetailsHref('new', 'trip', 'look')}>{WB.bikeMakeItYours}</a>
+        {/* At Bike details' top, Your frame, where frame style and size are entered (owner, 9 Nov 2026: "Open it at size and frame type"). */}
+        <a href={bikeDetailsHref('new', 'trip')}>{WB.bikeMakeItYours}</a>
         {/* Focus goes on to the line's Add your bike, so keyboard and screen reader users are not lost. */}
         <button type="button" aria-label={W.bikeHintLaterName} onClick={() => { small(); redo(1); setTimeout(() => box.current?.querySelector<HTMLElement>('figcaption a')?.focus()); }}>{W.bikeHintLater}</button>
       </p>
