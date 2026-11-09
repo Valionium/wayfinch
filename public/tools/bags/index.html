@@ -8996,6 +8996,12 @@ function balanceSlice(run){
     // dropped unfinished: the plan, whichever comes back (Remove after Try, the way back to the packing check), is looked at again
     // (review of PR 89, C2)
     BALANCE.run = null; BALANCE.checked = null;
+    // still at the packing check with a plan that changed under the search: looked at again now, unless a newer look has its own search
+    if(S.step === 4 && !TRIAL && !DRAFT_FROZEN) setTimeout(() => {
+      if(BALANCE.run || S.step !== 4) return;
+      autoBalancePlan({ later:true });
+      if(BALANCE.run && typeof renderResult === 'function' && $('resultBox')) holdResult(() => renderResult());
+    }, 0);
     return;
   }
   // the Gear advisor open: it answers for the plan as it is, so the balance waits until it is closed (review of PR 89, m1)
@@ -9058,7 +9064,7 @@ const balancePacked = last => last.moves.some(m => S.packed && S.packed[m.id]);
 // Undo: the packing before the balance back; what moved is kept where it was from now on, in this visit.
 function undoBalance(){
   const last = BALANCE.last;
-  if(!last || last.placements !== S.placements || balancePacked(last)) return false;
+  if(!last || !samePlacements(last.placements, S.placements) || balancePacked(last)) return false;
   last.moves.forEach(m => BALANCE.undone.add(m.id));
   BALANCE.last = null;
   keepPlan({ load:last.before });
@@ -9066,11 +9072,14 @@ function undoBalance(){
   BALANCE.checked = JSON.stringify(S.placements); BALANCE.reverted = S.placements;
   return true;
 }
+// The plan a line speaks of: the same kept placements, read again or not (a plan the page loaded again, at a reload balanced before the
+// step was taken again, holds an equal copy).
+const samePlacements = (a, b) => a === b || (!!a && !!b && JSON.stringify(a) === JSON.stringify(b));
 // The one quiet line, while the plan is the one it speaks of; while the search runs, that it does.
 function balanceLine(){
   if(BALANCE.loading && S.step === 4 && !TRIAL || BALANCE.run && BALANCE.run.key === idealKey()) return '<div class="balance-line" role="status" aria-busy="true"><span>Checking the balance…</span></div>';
   const last = BALANCE.last;
-  if(last && last.placements === S.placements){
+  if(last && samePlacements(last.placements, S.placements)){
     const A = currentPlan();
     // a kit name with its first letter lowered unless it is a capital word ("ID, cards, insurance"); a thing the rider added as typed
     const named = k => !k ? null : k.added ? k.name : k.name.replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase());
@@ -9082,7 +9091,7 @@ function balanceLine(){
     return `<div class="balance-line" role="status"><span>Packed for better balance: ${list} ·</span> <button class="linky" type="button" data-balance-undo="1">Undo</button></div>`;
   }
   // after an earlier balance the packing before this one still carries its moves, so the line says what it is (review of PR 79, m1)
-  if(BALANCE.reverted && BALANCE.reverted === S.placements) return `<div class="balance-line" role="status"><span>Back to the packing before this balance.</span></div>`;
+  if(BALANCE.reverted && samePlacements(BALANCE.reverted, S.placements)) return `<div class="balance-line" role="status"><span>Back to the packing before this balance.</span></div>`;
   return '';
 }
 // The kit on the rack deck, where the deck is drawn.
@@ -14720,9 +14729,9 @@ window.applyCalibration = applyCalibration;
   }
   DRAFT_SIGNATURE = JSON.stringify(captureDraft());
   DRAFT_READY = true;
+  writeLoadSummary(true);
   // the packing check drawn before the draft was ready could not balance it: it is looked at now (review of PR 89, C2)
   if(S.step === 4){ autoBalancePlan({ later:true }); if(BALANCE.run || BALANCE.loading){ holdResult(() => renderResult()); drawWeightMap(); } }
-  writeLoadSummary(true);
   // The bike chosen in Wayfinch, once the draft is restored and the bikes are loaded (decision 3); this page's own record as its store
   // holds it. A move saves the plan, and with it a summary that differs.
   if(window.storage) for(const k of [BIKE_CHOICE_RECORD_KEY,BIKE_FOLLOWED_KEY]){ const v=await store.get(k); if(v!==null) MEM[k]=v; }
