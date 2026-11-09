@@ -8848,10 +8848,18 @@ function autoBalancePlan(){
   BALANCE.last = { placements:S.placements, before, moves, gain:out.gain, balanced:out.balanced.packing.state };
   return true;
 }
-// Undo: the planner's own packing back; what moved is kept where the planner put it from now on, in this visit.
+// The balancing's memory belongs to one plan: a plan loaded (My plans, a working plan, another tab's) and Start again are looked at
+// afresh, as a first look (review of PR 79, m3).
+function resetBalance(){
+  BALANCE.checked = null; BALANCE.pins = null; BALANCE.last = null; BALANCE.reverted = null; BALANCE.undone = new Set();
+}
+// Undo is offered while nothing it would move back is ticked as packed: a thing the rider packed where the balance put it is never moved
+// back under the tick (review of PR 79, I1). Unticked, Undo is offered again.
+const balancePacked = last => last.moves.some(m => S.packed && S.packed[m.id]);
+// Undo: the packing before the balance back; what moved is kept where it was from now on, in this visit.
 function undoBalance(){
   const last = BALANCE.last;
-  if(!last || last.placements !== S.placements) return false;
+  if(!last || last.placements !== S.placements || balancePacked(last)) return false;
   last.moves.forEach(m => BALANCE.undone.add(m.id));
   BALANCE.last = null;
   keepPlan({ load:last.before });
@@ -8864,12 +8872,17 @@ function balanceLine(){
   const last = BALANCE.last;
   if(last && last.placements === S.placements){
     const A = currentPlan();
+    // a kit name with its first letter lowered unless it is a capital word ("ID, cards, insurance"); a thing the rider added as typed
+    const named = k => !k ? null : k.added ? k.name : k.name.replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase());
     const said = last.moves.map(m => { const k = kitById(m.id), s = A.slots.find(x => x.key === m.to);
-      return ((k ? k.name : m.id) + (s ? ' to the ' + unitLabel(s) : '')).toLowerCase(); });
+      return (named(k) || m.id) + (s ? ' to the ' + unitLabel(s).toLowerCase() : ''); });
     const shown = said.length > 3 ? [...said.slice(0, 2), `${said.length - 2} more things`] : said;
-    return `<div class="balance-line" role="status"><span>Packed for better balance: ${htmlEsc(said.length < 2 ? said[0] : shown.slice(0, -1).join(', ') + ' and ' + shown[shown.length - 1])} ·</span> <button class="linky" type="button" data-balance-undo="1">Undo</button></div>`;
+    const list = htmlEsc(said.length < 2 ? said[0] : shown.slice(0, -1).join(', ') + ' and ' + shown[shown.length - 1]);
+    if(balancePacked(last)) return `<div class="balance-line" role="status"><span>Packed for better balance: ${list}. You have started packing it this way, so it stays.</span></div>`;
+    return `<div class="balance-line" role="status"><span>Packed for better balance: ${list} ·</span> <button class="linky" type="button" data-balance-undo="1">Undo</button></div>`;
   }
-  if(BALANCE.reverted && BALANCE.reverted === S.placements) return `<div class="balance-line" role="status"><span>Back to the planner's own packing.</span></div>`;
+  // after an earlier balance the packing before this one still carries its moves, so the line says what it is (review of PR 79, m1)
+  if(BALANCE.reverted && BALANCE.reverted === S.placements) return `<div class="balance-line" role="status"><span>Back to the packing before this balance.</span></div>`;
   return '';
 }
 // The kit on the rack deck, where the deck is drawn.
@@ -10335,7 +10348,7 @@ function mountedEmptySentence(slots){
 }
 // Start again: a full re-plan that also clears ticks and hand placements.
 function startAgain(){
-  S.pinned = {}; S.packed = {}; S.packOpen = null; BALANCE.undone = new Set();
+  S.pinned = {}; S.packed = {}; S.packOpen = null; resetBalance();
   keepPlan({ replan:true, why:'startAgain' });
 }
 function panniersReason(rack){
@@ -12079,6 +12092,7 @@ function restorePlan(p, draft, restoreSettings=true){
   });
   // A stored null is a plan without bags; anything else unusable is an older or foreign save (design 8.4).
   keepPlan({ load:p.placements, placedAgain:savedPlacements !== null && !p.placements });
+  resetBalance();
   // Saved trips keep the component snapshot they used, even when a reusable
   // profile with the same id has since been edited or deleted.
   persistBikeProfileSelection();

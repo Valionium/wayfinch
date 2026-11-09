@@ -461,7 +461,7 @@ test('[WM-STILL] at 320 px, light and dark: the weight map\'s switches wrap with
 // The owner's decision of 8 Nov 2026 (weight map design §7): the bag planner balances by itself at the packing check, with one quiet
 // line and Undo; advisor.js is loaded for it there.
 const BAL_BAGS = "S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:13 }, { uid:3, pos:'frame', L:4.5 }, { uid:4, pos:'top', L:1, slot:'front' }, { uid:5, pos:'fork', L:3, pair:true }]; S.nextUid = 6; S.decks = { bar:false, rack:false };";
-test("[BAL-LINE] at the packing check the plan is balanced with one line and Undo; Undo brings back the planner's own packing; a saved balance packs the same after a reload", async ({ page }) => {
+test("[BAL-LINE] at the packing check the plan is balanced with one line and Undo; Undo brings back the packing before the balance; a saved balance packs the same after a reload", async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await planner(page);
@@ -487,7 +487,7 @@ test("[BAL-LINE] at the packing check the plan is balanced with one line and Und
   const box = (await undo.boundingBox())!;
   expect(box.height).toBeGreaterThanOrEqual(44);
   await undo.click();
-  await expect(line).toHaveText("Back to the planner's own packing.");
+  await expect(line).toHaveText('Back to the packing before this balance.');
   expect(await page.evaluate('JSON.stringify(currentPlan().items)')).toBe(own);
   // another visit: what Undo put back is not remembered, so the same balance is offered again, with its line (BAL-STORED)
   await page.evaluate('flushDraft()');
@@ -507,6 +507,40 @@ test("[BAL-LINE] at the packing check the plan is balanced with one line and Und
   await expect(page.locator('#resultBox .sec').first()).toBeVisible();
   expect(await page.evaluate('JSON.stringify(currentPlan().items)')).toBe(balanced);
   await expect(page.locator('#resultBox .balance-line')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+// Review of PR 79, I1: a thing ticked as packed where the balance put it is never moved back by Undo.
+test('[BAL-KEEPS] a thing the balance moved, ticked as packed in the packing check: Undo is not offered and the line says why; unticked, Undo is back', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page);
+  await page.evaluate(`${BAL_BAGS} go(3)`);
+  const own = await page.evaluate('JSON.stringify(currentPlan().items)');
+  await page.evaluate('go(4)');
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
+  const line = page.locator('#resultBox .balance-line');
+  await expect(line.getByRole('button', { name: 'Undo' })).toBeVisible();
+  const m = (await page.evaluate('BALANCE.last.moves[0]')) as { id: string; to: string };
+  const balanced = await page.evaluate('JSON.stringify(currentPlan().items)');
+  // the rider packs it where the balance put it and ticks it
+  const tick = async (): Promise<void> => {
+    const box = page.locator(`#resultBox [data-tick="${m.id}"]`).first();
+    if (!(await box.isVisible())) await box.locator('xpath=ancestor::details[1]/summary').click();
+    await box.click();
+  };
+  await tick();
+  expect(await page.evaluate(`!!S.packed[${JSON.stringify(m.id)}]`)).toBe(true);
+  await expect(line).toContainText('You have started packing it this way, so it stays.');
+  await expect(line.getByRole('button', { name: 'Undo' })).toHaveCount(0);
+  expect(await page.evaluate('JSON.stringify(currentPlan().items)')).toBe(balanced);
+  expect(await page.evaluate(`currentPlan().items[${JSON.stringify(m.id)}][0][0]`)).toBe(m.to);
+  // unticked: Undo is back and brings the packing before the balance back
+  await tick();
+  expect(await page.evaluate(`!!S.packed[${JSON.stringify(m.id)}]`)).toBe(false);
+  await line.getByRole('button', { name: 'Undo' }).click();
+  await expect(line).toHaveText('Back to the packing before this balance.');
+  expect(await page.evaluate('JSON.stringify(currentPlan().items)')).toBe(own);
   expect(errors).toEqual([]);
 });
 
