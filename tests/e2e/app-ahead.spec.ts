@@ -30,7 +30,7 @@ async function ahead(page: Page): Promise<void> {
   await page.goto(`${app.origin}/#/ahead`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-ahead="answers"]')).toBeVisible();
   await expect(page.locator('[data-card]')).toHaveCount(6);
-  // The fixture's Get ready offline had no weather service, so the top card names that step (review of PR 73, I2); its button is a
+  // The fixture's Prepare this route had no weather service, so the top card names that step (review of PR 73, I2); its button is a
   // chunk of its own, loaded here, before a test watches what the page sends.
   if ((await page.locator('[data-need-ready]').count()) > 0) await expect(page.locator('[data-need-ready] button')).toBeVisible();
 }
@@ -439,18 +439,18 @@ for (const [name, range, what] of [['wider than the icon', [100, 137], 'Cover'],
   });
 }
 
-// Review of PR 73, M3: Ahead's own Get ready offline button is wired to Trip's very prepare, not a stand-in: on the fixture route
+// Review of PR 73, M3: Ahead's own Prepare this route button is wired to Trip's very prepare, not a stand-in: on the fixture route
 // with nothing saved it saves the places, and the cards that waited for them answer.
-test('[AH-BEFORE-READY] on the real site, Ahead’s Get ready offline saves the places and the waiting cards answer', async ({ page }) => {
+test('[AH-BEFORE-READY] on the real site, Ahead’s Prepare this route saves the places and the waiting cards answer', async ({ page }) => {
   app = await loadApp(page);
   const later = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10);
   await preparedTrip(page, 'heidelberg-strasbourg', { departureDate: later });
   await servePack(page, 'heidelberg-strasbourg');
   await page.goto(`${app.origin}/#/ahead`);
   const card = page.locator('[data-need-ready]');
-  await expect(card).toContainText('En route needs Get ready offline');
-  await expect(page.locator('[data-card="water"]')).toContainText('After Get ready offline');
-  await card.getByRole('button', { name: 'Get ready offline' }).click();
+  await expect(card).toContainText('En route needs Prepare this route');
+  await expect(page.locator('[data-card="water"]')).toContainText('After Prepare this route');
+  await card.getByRole('button', { name: 'Prepare this route' }).click();
   await expect(page.locator('[data-card="water"] .ah-toggle')).toBeVisible({ timeout: 120_000 });
   await expect(page.locator('[data-card="food"] .ah-toggle')).toBeVisible();
   // No forecast here (the weather service is unreachable in the test): the card names that step, with Try again.

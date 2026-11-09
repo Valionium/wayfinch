@@ -288,7 +288,7 @@ describe('Update weather', () => {
       .toBe(W.weatherNoSignal('07:10'));
     stop();
   });
-  test('[AH-WEATHER-UPDATE] before Get ready offline nothing is contacted, and it says what to do', async () => {
+  test('[AH-WEATHER-UPDATE] before Prepare this route nothing is contacted, and it says what to do', async () => {
     const i = rainyStop();
     await seed(i, { prepared: false });
     const asked: string[] = [];

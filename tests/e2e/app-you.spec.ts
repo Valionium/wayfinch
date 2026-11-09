@@ -191,7 +191,7 @@ const meteo = (log: string[]): string[] => log.filter((line) => line.includes('o
 
 test('[WXR-AUTO-WIRED] in the browser: opening with a prepared trip and "Keep trip data fresh" on checks the five models, asks once for the forecast, and a reload within 3 hours asks nothing', async ({ page }) => {
   await ahead(page);
-  // Get ready offline has just asked for the weather, which counts for the 3 hours; take that ask back, as if it were long ago.
+  // Prepare this route has just asked for the weather, which counts for the 3 hours; take that ask back, as if it were long ago.
   await page.evaluate(() => new Promise<void>((done) => {
     const q = indexedDB.open('copilot');
     q.onsuccess = () => { const t = q.result.transaction(['meta'], 'readwrite'); t.objectStore('meta').delete('route:weatherAttempt'); t.oncomplete = () => { q.result.close(); done(); }; };
