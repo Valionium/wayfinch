@@ -4,6 +4,7 @@ import { useState } from 'preact/hooks';
 import { GpxError } from '../../core/route/gpx.ts';
 import type { Route } from '../../core/types.ts';
 import { W } from '../../core/wording/en.ts';
+import { TR } from '../../core/wording/en-trip.ts';
 import { planRoute, searchPlace } from '../../data/routing.ts';
 import type { FoundPlace } from '../../data/routing.ts';
 import { GeoNamesCredit, OsmCredit } from './credit.tsx';
@@ -27,9 +28,9 @@ function PlaceChoice({ id, label, services, chosen, onChoose }: {
     try {
       const found = await searchPlace(text, services.fetch);
       setHits(found);
-      if (found.length === 0) setProblem(W.appAbNoResults);
+      if (found.length === 0) setProblem(TR.appAbNoResults);
     } catch {
-      setProblem(W.appAbSearchFailed);
+      setProblem(TR.appAbSearchFailed);
     } finally {
       setBusy(false);
     }
@@ -49,13 +50,13 @@ function PlaceChoice({ id, label, services, chosen, onChoose }: {
       <label for={id}>{label}</label>
       <form class="row" onSubmit={(e) => { e.preventDefault(); void search(); }}>
         <input id={id} type="search" value={text} autoComplete="off" maxLength={200} onInput={(e) => setText(e.currentTarget.value)} />
-        <button type="submit" class="btn">{W.appAbSearch}</button>
+        <button type="submit" class="btn">{TR.appAbSearch}</button>
       </form>
-      {busy ? <p role="status">{W.appAbSearching}</p> : null}
+      {busy ? <p role="status">{TR.appAbSearching}</p> : null}
       {problem ? <p class="notice" role="alert">{problem}</p> : null}
       {hits && hits.length > 0 ? (
         <>
-          <p class="muted">{W.appAbPick}</p>
+          <p class="muted">{TR.appAbPick}</p>
           {hits.some((h) => h.source === 'osm') ? <OsmCredit lead={W.appTripOsmSearch} /> : null}
           {hits.some((h) => h.source === 'geonames') ? <GeoNamesCredit /> : null}
           <ul class="hits">
@@ -102,13 +103,13 @@ export function PlanAB({ services, onRoute }: { services: TripServices; onRoute:
 
   return (
     <div data-plan-ab>
-      <h3>{W.appAbTitle}</h3>
-      <p class="muted">{W.appAbNote}</p>
-      <PlaceChoice id="ab-from" label={W.appAbFrom} services={services} chosen={picked.from} onChoose={(p) => setPicked((s) => ({ ...s, from: p }))} />
-      <PlaceChoice id="ab-to" label={W.appAbTo} services={services} chosen={picked.to} onChoose={(p) => setPicked((s) => ({ ...s, to: p }))} />
+      <h3>{TR.appAbTitle}</h3>
+      <p class="muted">{TR.appAbNote}</p>
+      <PlaceChoice id="ab-from" label={TR.appAbFrom} services={services} chosen={picked.from} onChoose={(p) => setPicked((s) => ({ ...s, from: p }))} />
+      <PlaceChoice id="ab-to" label={TR.appAbTo} services={services} chosen={picked.to} onChoose={(p) => setPicked((s) => ({ ...s, to: p }))} />
       {picked.from && picked.to ? <button type="button" class="btn btn-primary" onClick={() => void plan()}>{W.appAbPlan}</button> : null}
-      {busy ? <p role="status">{W.appAbPlanning}</p> : null}
-      {none ? <p class="notice" role="alert">{W.appAbNone}</p> : null}
+      {busy ? <p role="status">{TR.appAbPlanning}</p> : null}
+      {none ? <p class="notice" role="alert">{TR.appAbNone}</p> : null}
       {problem ? <p class="notice" role="alert">{problem}</p> : null}
     </div>
   );

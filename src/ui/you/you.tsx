@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { Y } from '../../core/wording/en-you.ts';
 import { W } from '../../core/wording/en.ts';
+import { TR } from '../../core/wording/en-trip.ts';
 import { keepFreshOffered } from '../../data/refresh.ts';
 import { onChanged } from '../../store/changed.ts';
 import { Card } from '../card.tsx';
@@ -46,7 +47,7 @@ function SettingsCard({ services, snap, reload }: { services: YouServices; snap:
               <input type="checkbox" name="keep-fresh" checked={fresh} onChange={async (e) => { const on = e.currentTarget.checked; setFresh(on); if (!(await save('keepFresh', on))) setFresh(settings.keepFresh); }} />
               <span>{W.weatherKeepFresh}</span>
             </label>
-            <p class="muted">{W.appTripKeepFreshWhy}</p>
+            <p class="muted">{TR.appTripKeepFreshWhy}</p>
           </div>
         ) : null}
         {problem ? <p class="field-problem" role="alert">{problem}</p> : null}

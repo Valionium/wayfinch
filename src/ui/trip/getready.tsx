@@ -1,6 +1,7 @@
 // Get ready offline on Trip (spec sections 3.3, 5 and 9.4). It reports what was done, step by step, and what was not: nothing
 // here calls the trip ready, safe or complete (Decision 2). One fixed line asks the rider to test it in flight mode.
 import { W } from '../../core/wording/en.ts';
+import { TR } from '../../core/wording/en-trip.ts';
 import { askForHomeScreen } from '../install.ts';
 import { labelOf, NotSaved, RunProgress, usePrepareRun } from './run.tsx';
 import { savedLine } from './saved-line.ts';
@@ -31,8 +32,8 @@ export function GetReady({ services, snap, reload, lead = null, onRun }: {
 
   return (
     <div data-getready>
-      {leading ? <p class="trip-added" role="status" data-added>{lead} {button}</p> : <p>{W.appTripGetReadyIntro}</p>}
-      {ask ? <p class="notice">{W.appTripIphoneAsk}</p> : null}
+      {leading ? <p class="trip-added" role="status" data-added>{lead} {button}</p> : <p>{TR.appTripGetReadyIntro}</p>}
+      {ask ? <p class="notice">{TR.appTripIphoneAsk}</p> : null}
       {line ? <p class="tool-line">{line}</p> : <p class="muted">{W.appTripNothingSaved}</p>}
       {snap.storageMb !== null ? <p class="muted">{W.appTripStorage(String(snap.storageMb))}</p> : null}
       {leading ? null : button}

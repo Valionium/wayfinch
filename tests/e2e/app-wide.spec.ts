@@ -98,7 +98,7 @@ test('[WIDE-RAIL] up to 839 px one column and the bottom bar; from 840 px a labe
   expect(bar.x).toBe(0);
   expect(bar.width).toBeLessThan(200);
   expect(bar.height).toBeGreaterThanOrEqual(790);
-  for (const name of ['Ahead', 'Trip', 'Tools', 'You']) await expect(nav.getByRole('link', { name })).toBeVisible();
+  for (const name of ['En route', 'Trip', 'Tools', 'You']) await expect(nav.getByRole('link', { name })).toBeVisible();
   const main = await box(page.locator('.ah-main'));
   const side = await box(page.locator('.ah-cards'));
   expect(side.x).toBeGreaterThan(main.x + main.width - 1);

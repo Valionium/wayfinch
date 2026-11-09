@@ -46,7 +46,7 @@ test('[AH-NO-AUTO-POS] no geolocation call at start-up or on tab changes; one af
   app = await loadApp(page);
   await preparedTrip(page, 'heidelberg-strasbourg', { departureDate: today(), places: true });
   await onAhead(page);
-  for (const tab of ['Trip', 'Tools', 'You', 'Ahead']) await page.locator('nav.tabs').getByRole('link', { name: tab }).click();
+  for (const tab of ['Trip', 'Tools', 'You', 'En route']) await page.locator('nav.tabs').getByRole('link', { name: tab }).click();
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('.ahead[data-ahead]')).toBeVisible();
   expect(await calls(page)).toEqual([]);

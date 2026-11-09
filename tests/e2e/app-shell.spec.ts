@@ -12,7 +12,7 @@ test('[APP-SWITCH-ON] / opens the shell on Trip with no trip, with the tabs Ahea
   app = await loadApp(page);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Trip');
   const nav = page.getByRole('navigation', { name: 'Main' });
-  await expect(nav.getByRole('link')).toHaveText(['Ahead', 'Trip', 'Tools', 'You']);
+  await expect(nav.getByRole('link')).toHaveText(['En route', 'Trip', 'Tools', 'You']);
   await expect(nav.getByRole('link', { name: 'Trip' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByText("Add a route to see what's ahead")).toBeVisible();
   await nav.getByRole('link', { name: 'Tools' }).click();
