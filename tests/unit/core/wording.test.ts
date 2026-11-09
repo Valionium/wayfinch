@@ -74,6 +74,7 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   appPrepTilesFailed: [[1], [4]],
   appPrepNoPlaceData: [['30–44'], ['0–12, 140–165']],
   appPrepStorageFull: [[6, 14], [0, 3]],
+  appPrepWait: [['17:05']],
   appStretchPartial: [['70–90', 12], ['70–90', 1]],
   appStretchFailed: [['50', '70']],
   weatherIncomplete: [['07:10'], [null]],

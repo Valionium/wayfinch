@@ -12,8 +12,6 @@ export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 export type GridPoint = { km: Km; lat: number; lon: number; ele: number | null };
 
 const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
-const ELEVATION_URL = 'https://api.open-meteo.com/v1/elevation';
-const ARCHIVE_URL = 'https://archive-api.open-meteo.com/v1/archive';
 const META_URL = (path: string): string => `https://api.open-meteo.com/data/${path}/static/meta.json`;
 
 const HOURLY = ['temperature_2m', 'relative_humidity_2m', 'shortwave_radiation', 'precipitation_probability', 'precipitation', 'weather_code', 'wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'] as const;
@@ -23,11 +21,7 @@ const DAY = 86_400_000;
 const HOUR_MS = 3_600_000;
 const DETAIL_MS = 48 * HOUR_MS; // the hours the rain answers lean on most
 const FORECAST_TIMEOUT_MS = 30_000;
-const SMALL_TIMEOUT_MS = 12_000;
-const ELEVATION_BATCH = 100;
-const BASELINE_YEARS = 5;
-const MIN_BASELINE_DAYS = 20;
-const RAIN_DAY_MM = 1;
+export const SMALL_TIMEOUT_MS = 12_000;
 
 /** The fixed list of five models, by the names of `weather-classes.ts`'s table, with Open-Meteo's path for each. */
 export const MODEL_PATHS: Record<string, string> = {
@@ -41,27 +35,65 @@ export const MODEL_PATHS: Record<string, string> = {
 /** The service refused or failed (`refused`), or answered with less than a whole forecast (`incomplete`). */
 export class WeatherServiceError extends Error {
   readonly kind: 'refused' | 'incomplete';
-  constructor(reason: string, kind: 'refused' | 'incomplete' = 'refused') {
+  /** How long to wait before asking once more, or null when asking again soon would not help (or is not polite). */
+  readonly againInMs: number | null;
+  /** The service's limit was reached (HTTP 429): nothing more is sent until the wait, if any, is over. */
+  readonly limited: boolean;
+  constructor(reason: string, kind: 'refused' | 'incomplete' = 'refused', o: { againInMs?: number | null; limited?: boolean } = {}) {
     super(reason);
     this.name = 'WeatherServiceError';
     this.kind = kind;
+    this.againInMs = o.againInMs ?? null;
+    this.limited = o.limited ?? false;
   }
 }
 const incomplete = (reason: string): WeatherServiceError => new WeatherServiceError(reason, 'incomplete');
+
+/**
+ * Waiting and asking again, for Get ready offline (9 Nov 2026). The free service's limits count for all riders together, and a
+ * minute's limit ends a minute later: one more try after that minute, or a few seconds after a server error or a lost answer.
+ * An hourly, daily or monthly limit is never waited for. Without it, each request is sent once (Update weather has its own spacing).
+ */
+export type Retry = {
+  sleep: (ms: number) => Promise<void>;
+  /** Told when it will ask again before a wait, and null once the wait is over (review of PR 98, I2). */
+  onWait?: (until: Date | null) => void;
+  random?: () => number; now?: () => Date;
+};
+const MINUTE_LIMIT_WAIT_MS = 61_000;
+/** Up to this much more, so riders refused in the same second don't all ask again in the same second (M1). */
+const MINUTE_SPREAD_MS = 5_000;
+const SERVER_WAIT_MS = 3_000;
+
+async function refusalOf(response: Response): Promise<WeatherServiceError> {
+  if (response.status === 429) {
+    let reason = '';
+    try {
+      const body = (await response.json()) as unknown;
+      if (isRecord(body) && typeof body['reason'] === 'string') reason = body['reason'];
+    } catch {
+      /* no reason given */
+    }
+    // "Minutely API request limit exceeded. Please try again in one minute." The others name an hour, a day or a month.
+    const minute = reason === '' || /minute/i.test(reason);
+    return new WeatherServiceError('HTTP 429', 'refused', { limited: true, againInMs: minute ? MINUTE_LIMIT_WAIT_MS : null });
+  }
+  return new WeatherServiceError(`HTTP ${response.status}`, 'refused', { againInMs: response.status >= 500 ? SERVER_WAIT_MS : null });
+}
 
 const requestInit = (timeoutMs: number): RequestInit => ({
   // A copy from a cache, stamped with the time of this fetch, would be an old forecast shown as new.
   cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(timeoutMs),
 });
 
-async function getJson(f: FetchLike, url: string, timeoutMs: number): Promise<unknown> {
+export async function getJson(f: FetchLike, url: string, timeoutMs: number): Promise<unknown> {
   let response: Response;
   try {
     response = await f(url, requestInit(timeoutMs));
   } catch {
-    throw new WeatherServiceError('no answer');
+    throw new WeatherServiceError('no answer', 'refused', { againInMs: SERVER_WAIT_MS });
   }
-  if (!response.ok) throw new WeatherServiceError(`HTTP ${response.status}`);
+  if (!response.ok) throw await refusalOf(response);
   try {
     return await response.json();
   } catch {
@@ -69,10 +101,24 @@ async function getJson(f: FetchLike, url: string, timeoutMs: number): Promise<un
   }
 }
 
-const isRecord = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
+/** As getJson; with `retry`, asked once more after the wait the refusal calls for. */
+export async function askPolitely(f: FetchLike, url: string, timeoutMs: number, retry: Retry | undefined): Promise<unknown> {
+  try {
+    return await getJson(f, url, timeoutMs);
+  } catch (e) {
+    if (!retry || !(e instanceof WeatherServiceError) || e.againInMs === null) throw e;
+    const ms = e.limited ? e.againInMs + Math.floor((retry.random ?? Math.random)() * MINUTE_SPREAD_MS) : e.againInMs;
+    retry.onWait?.(new Date((retry.now?.() ?? new Date()).getTime() + ms));
+    await retry.sleep(ms);
+    retry.onWait?.(null);
+    return getJson(f, url, timeoutMs);
+  }
+}
+
+export const isRecord = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 const round2 = (n: number): number => Math.round(n * 100) / 100;
-const list = (points: { lat: number; lon: number }[], key: 'lat' | 'lon', decimals: number): string => points.map((p) => p[key].toFixed(decimals)).join(',');
-const usable = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
+export const list = (points: { lat: number; lon: number }[], key: 'lat' | 'lon', decimals: number): string => points.map((p) => p[key].toFixed(decimals)).join(',');
+export const usable = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 
 function heightAt(route: Route, km: Km): number | null {
   const pts = route.points;
@@ -188,9 +234,9 @@ function checkWhole(hours: GridHour[], now: Date, days: number): void {
  * One request for the whole grid. Throws `WeatherServiceError` on anything but a whole answer for every point. `fetchedAt`
  * is when the request set out, so it never reads newer than it is. `runs` are the model runs read just before.
  */
-export async function fetchForecast(grid: GridPoint[], o: { days: number; with15: boolean; fetch: FetchLike; now?: () => Date; runs?: ModelRun[] }): Promise<StoredForecast> {
+export async function fetchForecast(grid: GridPoint[], o: { days: number; with15: boolean; fetch: FetchLike; now?: () => Date; runs?: ModelRun[]; retry?: Retry }): Promise<StoredForecast> {
   const fetchedAt = (o.now ?? (() => new Date()))();
-  const body = await getJson(o.fetch, forecastUrl(grid, o.days, o.with15), FORECAST_TIMEOUT_MS);
+  const body = await askPolitely(o.fetch, forecastUrl(grid, o.days, o.with15), FORECAST_TIMEOUT_MS, o.retry);
   const locations = Array.isArray(body) ? body : [body]; // one location comes back as a bare object
   if (isRecord(body) && body['error'] === true) throw new WeatherServiceError('error answer');
   if (locations.length !== grid.length) throw incomplete('wrong number of points');
@@ -223,87 +269,13 @@ export async function fetchModelRuns(f: FetchLike): Promise<ModelRun[]> {
   return runs.filter((r) => r !== null);
 }
 
-/** Heights, 3 decimals, at most 100 per request, one request at a time. A failed batch leaves nulls, never zeros. */
-export async function fetchElevation(points: { lat: number; lon: number }[], f: FetchLike): Promise<(number | null)[]> {
-  const out: (number | null)[] = new Array<number | null>(points.length).fill(null);
-  for (let start = 0; start < points.length; start += ELEVATION_BATCH) {
-    const batch = points.slice(start, start + ELEVATION_BATCH);
-    try {
-      const body = await getJson(f, `${ELEVATION_URL}?latitude=${list(batch, 'lat', 3)}&longitude=${list(batch, 'lon', 3)}`, SMALL_TIMEOUT_MS);
-      const heights = isRecord(body) ? body['elevation'] : null;
-      if (!Array.isArray(heights) || heights.length !== batch.length) continue;
-      heights.forEach((h: unknown, i) => { if (usable(h)) out[start + i] = h; });
-    } catch {
-      // This batch stays unknown.
-    }
-  }
-  return out;
-}
+// Heights and the archive are asked for only by Get ready offline: their bodies are a chunk of their own (openmeteo-prep.ts), so the
+// first screen does not carry them (9 Nov 2026). The same functions, the same answers.
 
-const percentile = (values: number[], q: number): number => {
-  const s = [...values].sort((a, b) => a - b);
-  return s[Math.max(0, Math.min(s.length - 1, Math.floor(q * (s.length - 1))))]!;
-};
-const mean = (values: number[]): number => values.reduce((x, y) => x + y, 0) / values.length;
-const numbers = (x: unknown): number[] => (Array.isArray(x) ? x.filter(usable) : []);
+/** Heights at the points, as openmeteo-prep.ts's fetchElevation. */
+export const fetchElevation = (points: { lat: number; lon: number }[], f: FetchLike, retry?: Retry): Promise<(number | null)[]> =>
+  import('./openmeteo-prep.ts').then((m) => m.fetchElevation(points, f, retry));
 
-type Tally = { lows: number[]; highs: number[]; rain: number[]; years: Set<number> };
-
-/**
- * Load Check's five-year archive method (`fetchNormals`): the five years before this one, measured figures only. One request
- * per year and month for all points, one at a time. A year that fails is left out of the years named; a point with too few
- * days has no baseline. `months` are 1 to 12, as the engines compare them. Throws when nothing at all came.
- */
-export async function fetchBaseline(points: GridPoint[], months: number[], f: FetchLike, now: Date = new Date()): Promise<Baseline> {
-  const thisYear = now.getUTCFullYear();
-  // The archive takes "elevation ... used for statistical downscaling ... comma separated" for several points, and answers with
-  // the elevation its figures are adapted to (open-meteo.com/en/docs/historical-weather-api): the route's, when all are known.
-  const heights = points.every((p) => p.ele !== null) ? `&elevation=${points.map((p) => Math.round(p.ele!)).join(',')}` : '';
-  const answered: (number | null)[] = points.map(() => null);
-  const out: Baseline['points'] = [];
-  const sampled = new Set<number>();
-  for (const month of months) {
-    const tallies: Tally[] = points.map(() => ({ lows: [], highs: [], rain: [], years: new Set() }));
-    for (let back = 1; back <= BASELINE_YEARS; back++) {
-      const year = thisYear - back;
-      const mm = String(month).padStart(2, '0');
-      const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-      const url = `${ARCHIVE_URL}?latitude=${list(points, 'lat', 2)}&longitude=${list(points, 'lon', 2)}${heights}&start_date=${year}-${mm}-01&end_date=${year}-${mm}-${lastDay}`
-        + '&daily=temperature_2m_min,temperature_2m_max,precipitation_sum&timezone=auto';
-      let body: unknown;
-      try {
-        body = await getJson(f, url, SMALL_TIMEOUT_MS);
-      } catch {
-        continue;
-      }
-      const locations = Array.isArray(body) ? body : [body];
-      if (locations.length !== points.length) continue;
-      locations.forEach((location: unknown, i) => {
-        const daily = isRecord(location) ? location['daily'] : null;
-        if (!isRecord(daily)) return;
-        const [lows, highs, rain] = [numbers(daily['temperature_2m_min']), numbers(daily['temperature_2m_max']), numbers(daily['precipitation_sum'])];
-        if (lows.length === 0 || highs.length === 0 || rain.length === 0) return;
-        const t = tallies[i]!;
-        const ele = (location as Record<string, unknown>)['elevation'];
-        if (usable(ele)) answered[i] = ele;
-        t.lows.push(...lows);
-        t.highs.push(...highs);
-        t.rain.push(...rain);
-        t.years.add(year);
-      });
-    }
-    points.forEach((p, i) => {
-      const t = tallies[i]!;
-      if (t.lows.length < MIN_BASELINE_DAYS || t.years.size === 0) return;
-      for (const y of t.years) sampled.add(y);
-      out.push({
-        km: p.km, eleM: answered[i] ?? (heights ? Math.round(p.ele!) : null), month,
-        p10LowC: Math.round(percentile(t.lows, 0.1)), meanLowC: Math.round(mean(t.lows)),
-        p90HighC: Math.round(percentile(t.highs, 0.9)), meanHighC: Math.round(mean(t.highs)),
-        rainDays: Math.round(t.rain.filter((v) => v >= RAIN_DAY_MM).length / t.years.size),
-      });
-    });
-  }
-  if (out.length === 0) throw new WeatherServiceError('no baseline');
-  return { years: `${Math.min(...sampled)}–${Math.max(...sampled)}`, points: out };
-}
+/** The five-year baseline, as openmeteo-prep.ts's fetchBaseline. */
+export const fetchBaseline = (points: GridPoint[], months: number[], f: FetchLike, now: Date = new Date()): Promise<Baseline> =>
+  import('./openmeteo-prep.ts').then((m) => m.fetchBaseline(points, months, f, now));
