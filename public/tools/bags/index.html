@@ -1857,6 +1857,9 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 </style>
 <!-- a number in the text never becomes a call on the first tap (owner's iPhone check, 6 Nov 2026) -->
 <meta name="format-detection" content="telephone=no">
+<!-- Opened as the Gear advisor (#gear-advisor, Tools' card), the first frame waits for the page's script, which shows the advisor as its
+     own page and draws the bike the glide from Tools lands on (the owner's preview check of 8 Nov, I). Any other visit renders as before. -->
+<script data-advisor-first-frame>if(/^#gear-advisor(&|$)/.test(location.hash)){const l=document.createElement('link');l.rel='expect';l.href='#advisorReady';l.setAttribute('blocking','render');document.head.appendChild(l);}</script>
 </head>
 <body>
 <div class="wrap">
@@ -14202,3 +14205,4 @@ function closeLegal(){
 }
 
 </script>
+<span id="advisorReady" hidden></span>
