@@ -114,6 +114,11 @@ test('[TRIP-REMOVE] in flight mode: the trip and all En route keeps go, the bag 
   const before = await allLocal(page);
   await goOffline(page);
   await openTrip(page, app.origin);
+  // The first-run bike hint's key is written by Trip's own visits (wish 17, owner's answers of 9 Nov 2026): it is checked against its
+  // value just before the removal, which must leave it as it is.
+  await page.waitForTimeout(300);
+  const hint = await page.evaluate(() => localStorage.getItem('copilot:bikeHint:v1'));
+  expect(hint).not.toBeNull();
 
   await removeIt(page);
   await expect(page.locator('[data-step="route"] h2')).toBeFocused();
@@ -123,7 +128,8 @@ test('[TRIP-REMOVE] in flight mode: the trip and all En route keeps go, the bag 
   expect(await tripLeft(page)).toEqual({ stores: Object.fromEntries(TRIP_STORES.map((n) => [n, 0])), meta: [] });
   const after = await allLocal(page);
   const gone = ['copilot:plan-tomorrow', 'copilot:handoff:v1', 'copilot:heights-lookup', 'copilot:changed'];
-  for (const [k, v] of Object.entries(before)) if (!gone.includes(k) && k !== 'copilot:settings') expect(after[k], k).toBe(v);
+  for (const [k, v] of Object.entries(before)) if (!gone.includes(k) && k !== 'copilot:settings') expect(after[k], k).toBe(k === 'copilot:bikeHint:v1' ? hint : v);
+  expect(after['copilot:bikeHint:v1']).toBe(hint!);
   // The nights go back to a fresh start's; every other setting stays.
   const { nights: n0, updatedAt: u0, ...rest0 } = JSON.parse(before['copilot:settings']!) as Record<string, unknown>;
   const { nights: n1, updatedAt: u1, ...rest1 } = JSON.parse(after['copilot:settings']!) as Record<string, unknown>;

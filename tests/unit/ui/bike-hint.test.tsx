@@ -233,6 +233,20 @@ describe('after the first bike', () => {
     expect(host.querySelector('.bike-hint-done')!.textContent).toBe(HN.hintEveryTool);
   });
 
+  test('[HINT-GONE] Remove this trip while the line shows: Trip starts over without it, as a fresh start with these keys shows', async () => {
+    await trip(NO_BIKE);
+    render(null, host);
+    const bike = saved();
+    await trip(bike, true);
+    expect(host.querySelector('.bike-hint-done')).not.toBeNull();
+    await trip(bike, false);
+    expect(host.querySelector('.bike-hint-done')).toBeNull();
+    const shown = host.innerHTML;
+    render(null, host);
+    await trip(bike, false);
+    expect(host.innerHTML).toBe(shown);
+  });
+
   test('[HINT-GONE] a rider who had a bike before never sees the line; all bikes removed later: small, never the card', async () => {
     await trip(saved(), true);
     expect(host.querySelector('.bike-hint-done')).toBeNull();

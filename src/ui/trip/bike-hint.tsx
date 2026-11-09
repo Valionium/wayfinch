@@ -23,8 +23,9 @@ export function TripBike({ bike, trip }: { bike: BikeSource; trip: boolean | nul
   const at = useRef<{ used?: boolean; line?: boolean; had?: boolean }>({}).current;
   const box = useRef<HTMLDivElement>(null);
   const before = usedBefore() || bike.summary !== null;
-  // A trip removed in this visit (Remove this trip): Trip starts over, so the hint is settled again, as a fresh start would settle it.
-  if (trip === false && at.had) at.used = undefined;
+  // A trip removed in this visit (Remove this trip): Trip starts over, so the hint is settled again, and the one-time line, already
+  // shown, goes, as a fresh start would show it.
+  if (trip === false && at.had) at.used = at.line = undefined;
   at.had = !!trip;
   if (trip !== null) at.used ??= trip || before;
   const key = readHint();
