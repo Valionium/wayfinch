@@ -1,0 +1,82 @@
+/* The bike view (design of 9 November 2026, 2.2 to 2.4): a bottom sheet over the step view on a phone, a side panel of 560 px from 720 px.
+   Theme colours only, so both themes follow; the drawing keeps the sheet's full width and nothing scrolls sideways. */
+dialog.part-sheet {
+  box-sizing: border-box; position: fixed; inset: auto 0 0 0; width: 100%; max-width: none; max-height: 92vh; margin: 0; padding: 0 16px 16px;
+  border: 0; border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; background: var(--panel); color: var(--ink); overflow-y: auto;
+  overflow-x: hidden; overflow-wrap: break-word;
+}
+dialog.part-sheet::backdrop { background: var(--ground); opacity: 0.6; }
+@media (min-width: 720px) {
+  dialog.part-sheet {
+    inset: 0 0 0 auto; width: 560px; height: 100%; max-height: none; border-top: 0; border-left: 1px solid var(--line); border-radius: 16px 0 0 16px;
+  }
+}
+.pg-top { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; padding: 8px 0; background: var(--panel); }
+.bv-heads { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.bv-kicker { color: var(--muted); font-size: 0.875rem; }
+.pg-name { flex: 1; min-width: 0; margin: 0; font-size: 1.15rem; }
+.pg-name:focus { outline: none; }
+.pg-name:focus-visible { outline: 2px solid var(--blaze); outline-offset: 2px; }
+.pg-back { flex: none; min-height: 44px; }
+.pg-tag, .pg-none { margin: 0 0 8px; }
+.pg-text { font-size: 1.0625rem; }
+.pg-mixed h4 { font-size: 1rem; margin: 12px 0 6px; }
+.pg-mixed ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.pg-swap { min-height: 44px; }
+
+/* The drawing: the sheet's side gutters dropped for it on a phone. */
+.bv-figure { margin: 4px -16px 0; }
+.bv-canvas { position: relative; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.bv-canvas.bv-zoomed { touch-action: none; cursor: grab; }
+.bv-svg { display: block; width: 100%; height: auto; }
+.bv-art { overflow: hidden; }
+.bv-bike { opacity: 0.7; }
+.bv-ink, .bv-hot, .bv-halo { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.bv-ink { stroke: var(--ink); }
+.bv-ink-fill { fill: var(--ink); }
+.bv-hot { stroke: var(--blaze); }
+.bv-hot-fill { fill: var(--blaze); }
+.bv-halo { stroke: var(--blaze); opacity: 0.16; }
+.bv-halo-fill { fill: var(--blaze); }
+.bv-ring.bv-ink, .bv-ring.bv-hot { fill: var(--panel); stroke-width: 1.2; }
+.bv-ring.bv-halo { fill: var(--blaze); stroke: none; }
+.bv-dash { stroke-dasharray: 2.2 1.6; }
+.bv-motor { fill: var(--panel); stroke: var(--line); stroke-width: 1.4; }
+.bv-leader { stroke: var(--muted); stroke-width: 0.9; }
+.bv-dot { fill: var(--ink); }
+.bv-arrow line { stroke: var(--blaze); stroke-width: 2.25; stroke-linecap: round; }
+.bv-arrow polygon { fill: var(--blaze); }
+.bv-label { cursor: pointer; }
+.bv-tap { fill: transparent; }
+.bv-pill { fill: var(--panel); stroke: none; }
+.bv-label-hot .bv-pill { stroke: var(--blaze); stroke-width: 1.5; }
+.bv-label text { fill: var(--ink); font-family: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
+.bv-label-hot text { fill: var(--blaze); }
+.bv-side { fill: var(--muted); font-size: 10px; font-weight: 400; letter-spacing: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .bv-ink, .bv-hot, .bv-pill, .bv-label text { transition: stroke 150ms ease, fill 150ms ease; }
+}
+/* The operating system's high-contrast colours: its text colour for the parts, its grey for the rest. */
+@media (forced-colors: active) {
+  .bv-bike { opacity: 1; }
+  .bv-bike * { stroke: GrayText; }
+  .bv-ink, .bv-hot, .bv-leader, .bv-arrow line { stroke: CanvasText; }
+  .bv-ink-fill, .bv-hot-fill, .bv-dot, .bv-arrow polygon, .bv-label text { fill: CanvasText; }
+}
+.bv-zoom { display: flex; justify-content: flex-end; gap: 8px; padding: 4px 16px 0; }
+.bv-zoom-btn { min-width: 44px; min-height: 44px; font-size: 1.1rem; }
+.bv-whole { font-size: 0.9375rem; }
+.bv-zoom-btn:disabled { opacity: 0.5; cursor: default; }
+.bv-about { font-size: 0.9375rem; margin: 6px 0 10px; }
+.bv-about a { color: inherit; }
+.bv-parts { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+.bv-part { min-height: 44px; border-radius: 22px; padding: 6px 14px; }
+.bv-part[aria-pressed='true'] { border: 2px solid var(--blaze); font-weight: 600; }
+.bv-hint { margin: 8px 0; }
+.bv-entry { margin-top: 8px; }
+.bv-entry-top { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
+.bv-tools { font-size: 0.9375rem; margin: 12px 0 0; }
+@media (min-width: 720px) {
+  .bv-figure { margin: 4px 0 0; }
+  .bv-zoom { padding: 4px 0 0; }
+}

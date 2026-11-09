@@ -4,7 +4,10 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { normaliseBike } from '../../core/bike/normalise.ts';
 import type { BikeRecord } from '../../core/bike/normalise.ts';
+import { resolveBikeSpec } from '../../core/bike/spec.ts';
+import type { BikeType } from '../../core/bike/spec.ts';
 import { careDetails, fitted, softTag } from '../../core/care/fit.ts';
+import { byType, riderType } from '../../core/care/type-order.ts';
 import { searchCare } from '../../core/care/search.ts';
 import type { CareDetails, CareKey, CareTask, Conditions, Fitted, Part, RoadCard } from '../../core/care/types.ts';
 import { C, CARE_TASKS, CARRY, PART_LABEL, PARTS, ROAD_CARDS, SECTION_LABEL, SECTIONS, TAG_LABEL } from '../../core/wording/en-care.ts';
@@ -12,12 +15,13 @@ import { bikeDetailsHref } from '../../ui/bike/link.ts';
 import { choiceVersion } from '../../ui/tools/bike-choice.ts';
 import { BikeLine } from '../../ui/tools/bike-line.tsx';
 import { HN } from '../../core/wording/en-hint.ts';
+import { WB } from '../../core/wording/en-bike.ts';
 import { FitLine } from '../../ui/bike/fit-line.tsx';
 import { noteSeen } from '../../ui/bike/hint-seen.ts';
 import { savedBikeIds, toolBike } from '../tyre/choice.ts';
 import type { ReadOnlyStore } from '../tyre/host.ts';
 import type { TyreServices } from '../tyre/services.ts';
-import { StepView } from './steps.tsx';
+import { loadBikeView, StepView } from './steps.tsx';
 import type { StepSource } from './steps.tsx';
 import './care.css';
 
@@ -54,22 +58,31 @@ function Tags({ item, details }: { item: { tags: CareKey[]; applies: Conditions;
  * design 2.1; review of PR 72, I4). Its words live in the step view, whose All steps shows them on one page for screen readers.
  */
 type OnSteps = (source: StepSource, opener: HTMLButtonElement) => void;
+/** Not usual on the rider's type of bike (the owner's answer 5 (a)): after the others, slightly greyed, still tappable; said in words too. */
+type Other = BikeType | null;
+const TYPE_WORDS: Record<BikeType, string> = {
+  road: WB.bikeTypeRoad, gravel: WB.bikeTypeGravel, touring: WB.bikeTypeTouring, trekking: WB.bikeTypeTrekking, mtb: WB.bikeTypeMtb, fat: WB.bikeTypeFat,
+};
 
-function RoadItem({ card, details, onSteps }: { card: Fitted<RoadCard>; details: CareDetails; onSteps: OnSteps }) {
+function Unusual({ type }: { type: Other }) {
+  return type ? <span class="visually-hidden"> ({C.careLessUsual(TYPE_WORDS[type])})</span> : null;
+}
+
+function RoadItem({ card, details, onSteps, other = null }: { card: Fitted<RoadCard>; details: CareDetails; onSteps: OnSteps; other?: Other }) {
   return (
-    <div class="care-road" data-id={card.id}>
+    <div class={`care-road${other ? ' care-other-type' : ''}`} data-id={card.id}>
       <button type="button" class="care-open" aria-haspopup="dialog" onClick={(e) => onSteps({ kind: 'road', item: card }, e.currentTarget)}>
-        <span class="care-name">{card.problem}</span> <Tags item={card} details={details} />
+        <span class="care-name">{card.problem}</span> <Tags item={card} details={details} /><Unusual type={other} />
       </button>
     </div>
   );
 }
 
-function TaskItem({ task, details, onSteps }: { task: Fitted<CareTask>; details: CareDetails; onSteps: OnSteps }) {
+function TaskItem({ task, details, onSteps, other = null }: { task: Fitted<CareTask>; details: CareDetails; onSteps: OnSteps; other?: Other }) {
   return (
-    <div class="care-task" data-id={task.id}>
+    <div class={`care-task${other ? ' care-other-type' : ''}`} data-id={task.id}>
       <button type="button" class="care-open" aria-haspopup="dialog" onClick={(e) => onSteps({ kind: 'task', item: task }, e.currentTarget)}>
-        <span class="care-name">{task.name}</span> <Tags item={task} details={details} />
+        <span class="care-name">{task.name}</span> <Tags item={task} details={details} /><Unusual type={other} />
       </button>
     </div>
   );
@@ -82,6 +95,13 @@ export function CareScreen({ services }: { services: TyreServices }) {
   void choiceVersion.value;
   // A place seen, for the first-run bike hint (wish 17).
   useEffect(() => noteSeen('c'), []);
+  // The bike view's chunk, fetched while the screen is idle, so the first tap on a part opens it at once (design 7).
+  useEffect(() => {
+    const idle = (window as { requestIdleCallback?: (f: () => void) => number }).requestIdleCallback;
+    const go = (): void => { void loadBikeView(); };
+    const t = idle ? idle(go) : window.setTimeout(go, 1500);
+    return () => { if (!idle) window.clearTimeout(t); };
+  }, []);
   useEffect(() => {
     const again = (): void => redraw((n) => n + 1);
     const onStorage = (e: Event): void => { const k = (e as StorageEvent).key; if (k === null || k.startsWith('loadcheck:') || k.startsWith('copilot:bikeChoice')) again(); };
@@ -110,6 +130,9 @@ export function CareScreen({ services }: { services: TyreServices }) {
 
   const bike = chosenBike(services);
   const details = careDetails(bike);
+  const type = riderType(bike ? resolveBikeSpec(bike, null) : null);
+  // "Add your bike" in the bike view: only while no bike is saved (with bikes saved and none chosen, the rider chose that).
+  const addHref = savedBikeIds(services.storage).length === 0 ? bikeDetailsHref('new', 'care') : null;
   const unsure = bike !== null && Object.values(details).some((v) => v === null);
   const fit = fitted(CARE_TASKS, details);
   const shown = searchCare(query, part ? fit.filter((t) => t.part === part) : fit, searchText);
@@ -172,7 +195,9 @@ export function CareScreen({ services }: { services: TyreServices }) {
           return inSection.length === 0 ? null : (
             <section key={s} class="care-section">
               <h3>{SECTION_LABEL[s]}</h3>
-              {inSection.map((t) => <TaskItem key={t.id} task={t} details={details} onSteps={openSteps} />)}
+              {byType(inSection, type, details).map(({ item: t, usual }) => (
+                <TaskItem key={t.id} task={t} details={details} onSteps={openSteps} other={usual ? null : type} />
+              ))}
             </section>
           );
         })}
@@ -193,7 +218,9 @@ export function CareScreen({ services }: { services: TyreServices }) {
         {tab === 'road' ? (
           <>
             <h3 class="visually-hidden">{C.careRoadHeading}</h3>
-            {allCards.map((c) => <RoadItem key={c.id} card={c} details={details} onSteps={openSteps} />)}
+            {byType(allCards, type, details).map(({ item: c, usual }) => (
+              <RoadItem key={c.id} card={c} details={details} onSteps={openSteps} other={usual ? null : type} />
+            ))}
             <section class="care-section">
               <h3>{C.careCarryTitle}</h3>
               <ul class="care-carry">
@@ -205,7 +232,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
           </>
         ) : null}
       </div>
-      {steps ? <StepView key={steps.item.id} source={steps} bike={bike} onClose={() => setSteps(null)} /> : null}
+      {steps ? <StepView key={steps.item.id} source={steps} bike={bike} addHref={addHref} onClose={() => setSteps(null)} /> : null}
     </div>
   );
 }

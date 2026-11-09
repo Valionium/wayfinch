@@ -87,3 +87,15 @@ dialog.care-steps::backdrop { background: var(--ground); }
   text-decoration: underline dotted var(--blaze); text-decoration-thickness: 2px; text-underline-offset: 3px; cursor: pointer;
 }
 .care-part:focus-visible { outline: 2px solid var(--blaze); outline-offset: 2px; border-radius: 2px; }
+/* "What is it, where is it?" (bike view design 2.1): under the text on every screen of a card, full width, the card's parts below. */
+.care-where {
+  display: flex; align-items: center; gap: 12px; box-sizing: border-box; width: 100%; min-height: 48px; margin: 14px 0 4px; padding: 8px 12px;
+  text-align: left; border-radius: 10px;
+}
+.care-where-bike { flex: none; width: 28px; height: 16px; fill: none; stroke: var(--muted); stroke-width: 1.4; stroke-linejoin: round; }
+.care-where-words { display: flex; flex-direction: column; min-width: 0; }
+.care-where-name { font-weight: 600; }
+.care-where-parts { color: var(--muted); font-size: 0.9375rem; }
+/* Not usual on the rider's type of bike (the owner's answer 5 (a)): after the others, slightly greyed, still a button. */
+.care-other-type { border-style: dashed; }
+.care-other-type .care-open { color: var(--muted); }
