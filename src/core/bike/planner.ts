@@ -2,9 +2,11 @@
 // bag planner's own tap targets and tags (targets.ts), which the co-pilot never needs, and the look extras (paint.ts) with their words.
 import type { Anchors, ArtOptions, P } from './art.ts';
 import { bagLayer } from './bag-art.ts';
-import type { Paint } from './normalise.ts';
+import { besideBottles } from './beside.ts';
+import type { BikeRecord, Paint } from './normalise.ts';
 import { paintedArt } from './paint.ts';
-import type { BagView, BikeSpec } from './spec.ts';
+import { resolveBikeSpec as specOf } from './spec.ts';
+import type { BagView, BikeSpec, PlanView } from './spec.ts';
 import { targetsOf } from './targets.ts';
 import type { Hit } from './targets.ts';
 
@@ -20,17 +22,26 @@ export function withTargets(a: Anchors): PlannerAnchors {
   return a as PlannerAnchors;
 }
 
-/** The drawing with the bike's look extras, if any (`look.paint` of a normalised bike); without them, bikeArt's own. */
-export function bikeArt(spec: BikeSpec, bags: BagView | null, options: ArtOptions = {}, paint: Paint | null = null): { svg: string; anchors: PlannerAnchors; label: string } {
+/** The bag planner's spec: resolveBikeSpec's, and the plan's bottles, so the rig (drawn without its bags) knows where they are. */
+export type PlannerSpec = BikeSpec & { readonly bottles?: BagView['bottles'] };
+export function resolveBikeSpec(bike: BikeRecord | null, plan: PlanView | null): PlannerSpec {
+  return { ...specOf(bike, plan), bottles: plan ? plan.bottles : [] };
+}
+
+/**
+ * The drawing with the bike's look extras, if any (`look.paint` of a normalised bike); without them, bikeArt's own. Its anchors' frame
+ * shapes leave room for the plan's bottles in the triangle (beside.ts): the drawing itself is bikeArt's, byte for byte.
+ */
+export function bikeArt(spec: PlannerSpec, bags: BagView | null, options: ArtOptions = {}, paint: Paint | null = null): { svg: string; anchors: PlannerAnchors; label: string } {
   const art = paintedArt(spec, bags, options, paint);
-  return { ...art, anchors: withTargets(art.anchors) };
+  return { ...art, anchors: withTargets(besideBottles(art.anchors, spec.bottles ?? bags?.bottles ?? [])) };
 }
 
 /**
  * The same drawing with the plan's bags as their real shapes (bag-art.ts) where bikeArt draws its boxes: the bag planner's own
  * sketches (the Gear advisor's). bikeArt stays the co-pilot's drawing byte for byte (C-DRAWING-SET), so its first screen keeps its size.
  */
-export function shapedArt(spec: BikeSpec, bags: BagView | null, options: ArtOptions = {}, paint: Paint | null = null): { svg: string; anchors: PlannerAnchors; label: string } {
+export function shapedArt(spec: PlannerSpec, bags: BagView | null, options: ArtOptions = {}, paint: Paint | null = null): { svg: string; anchors: PlannerAnchors; label: string } {
   const art = bikeArt(spec, bags && { items: [], decks: { bar: null, rack: null }, bottles: [] }, options, paint);
   if (!bags) return art;
   const end = art.svg.lastIndexOf('</svg>');
@@ -39,7 +50,6 @@ export function shapedArt(spec: BikeSpec, bags: BagView | null, options: ArtOpti
 
 export { SWATCHES, nearestSwatchName, oklabMedian } from './colour.ts';
 export { normaliseBike } from './normalise.ts';
-export { resolveBikeSpec } from './spec.ts';
 export { colourName, DEFAULT_COLOURS, FADES, forkColours, pairFor, PATTERN_LIST } from './paint.ts';
 export { PT as PAINT_WORDS } from '../wording/en-paint.ts';
 export { bagShape, PAIR_OFFSET } from './shapes.ts';
