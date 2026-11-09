@@ -249,4 +249,13 @@ export async function deleteCopilotData(): Promise<void> {
     if (key !== null && key.startsWith('copilot:') && key !== DELETE_REQUEST_KEY) keys.push(key);
   }
   for (const key of keys) localStorage.removeItem(key);
+  // Wayfinch's own keys of this tab too (wf:*, such as the bike Tools drew last, review of PR 70, M3): they hold bike ids.
+  try {
+    const own: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key !== null && key.startsWith('wf:')) own.push(key);
+    }
+    for (const key of own) sessionStorage.removeItem(key);
+  } catch { /* no session storage: nothing kept there */ }
 }

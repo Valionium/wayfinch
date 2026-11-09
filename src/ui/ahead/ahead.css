@@ -97,3 +97,13 @@
 .ah-strip .bk-tyre { stroke: var(--muted); } /* the wheels read on both grounds; the line token is too faint at 24 px */
 .ah-stale { border-left: 4px solid var(--amber); padding: 2px 8px; font-weight: 600; }
 .ah-icon-more { color: var(--ink); font-weight: 600; font-family: var(--font-display); }
+/* Before Get ready offline (AH-BEFORE-READY): the card that asks for it, and the cards that wait for it, muted, no status colour. */
+.ah-need { border-left: 6px solid var(--amber); }
+.ah-need-title { font-family: var(--font-display); font-size: 1.25rem; margin: 0 0 4px; }
+.ah-later { border-left-color: var(--line); border-style: dashed; border-left-style: solid; padding-top: 8px; padding-bottom: 8px; }
+.ah-later p { margin: 0; }
+/* The Emergency link at the top (AH-EMERGENCY-LINK) and the bike while no position is kept (AH-FROM-START). */
+.ah-emergency-top { margin: 0 0 8px; text-align: right; }
+.ah-emergency-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; color: var(--red); font-weight: 600; }
+.bike-faded { opacity: 0.4; filter: grayscale(1); }
+.ah-empty { margin: 0 0 12px; }

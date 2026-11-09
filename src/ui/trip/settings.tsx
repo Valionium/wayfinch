@@ -2,9 +2,9 @@
 // named, and the field goes back to the last good value. Nothing here works out the days: the services re-plan them.
 import { useRef, useState } from 'preact/hooks';
 import { W } from '../../core/wording/en.ts';
+import { TR } from '../../core/wording/en-trip.ts';
 import { keepFreshOffered } from '../../data/refresh.ts';
 import type { Settings } from '../../store/rules.ts';
-import { Card } from '../card.tsx';
 import { useFollowing } from '../follow.ts';
 import { suggestedNights } from './model.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
@@ -50,7 +50,11 @@ export function Choice({ name, legend, value, options, onPick }: { name: string;
   );
 }
 
-export function TripSettings({ services, snap, reload }: { services: TripServices; snap: TripSnapshot; reload: () => Promise<void> }) {
+/**
+ * `when`: the departure date and the nights, which stay in the Route step; `details`: the trip details folded under it (guided Trip
+ * design §2.2): start time, pace, flat speed, stay type, camp water and keep fresh.
+ */
+export function TripSettings({ services, snap, reload, part }: { services: TripServices; snap: TripSnapshot; reload: () => Promise<void>; part: 'when' | 'details' }) {
   const { settings, trip } = snap;
   const [problems, setProblems] = useState<Partial<Record<string, string>>>({});
   const [startDraft, setStartDraft] = useFollowing(settings.startTime);
@@ -75,9 +79,9 @@ export function TripSettings({ services, snap, reload }: { services: TripService
   };
   const problem = (f: string): string | null => problems[f] || null;
 
-  return (
-    <Card title={W.appTripSettingsTitle}>
-      <div data-settings>
+  if (part === 'when') {
+    return (
+      <div data-settings="when">
         {trip ? (
           <div class="field">
             <label for="trip-date">{W.appTripDeparture}</label>
@@ -114,16 +118,6 @@ export function TripSettings({ services, snap, reload }: { services: TripService
             {problem('date') ? <p class="field-problem" role="alert">{problem('date')}</p> : null}
           </div>
         ) : null}
-
-        <div class="field">
-          <label for="trip-start">{W.appTripStartTime}</label>
-          <input
-            id="trip-start" type="time" min="04:00" max="14:00" value={startDraft} onInput={(e) => setStartDraft(e.currentTarget.value)}
-            onChange={async (e) => { if (!(await save('startTime', e.currentTarget.value))) setStartDraft(settings.startTime); }}
-          />
-          {problem('startTime') ? <p class="field-problem" role="alert">{problem('startTime')}</p> : null}
-        </div>
-
         <NumberField
           id="trip-nights" label={W.appTripNights} value={settings.nights} step="1" min={0} max={30}
           placeholder={trip ? String(suggestedNights(trip)) : undefined} onCommit={(v) => save('nights', v)} problem={problem('nights')}
@@ -131,33 +125,47 @@ export function TripSettings({ services, snap, reload }: { services: TripService
         {trip ? <p class="muted">{W.appTripNightsSuggested(suggestedNights(trip))}</p> : null}
         {settings.nights !== null ? <button type="button" class="btn" onClick={() => void save('nights', null)}>{W.appTripNightsUseSuggested}</button> : null}
 
-        <Choice
-          name="pace" legend={W.appTripPace} value={settings.pace} onPick={(v) => save('pace', v)}
-          options={[['steady', W.appTripPaceSteady], ['sporting', W.appTripPaceSporting], ['hard', W.appTripPaceHard]]}
-        />
-        {problem('pace') ? <p class="field-problem" role="alert">{problem('pace')}</p> : null}
-
-        <NumberField id="trip-kph" label={W.appTripFlatKph} value={settings.flatKph} step="0.5" min={15} max={40} onCommit={(v) => save('flatKph', v ?? Number.NaN)} problem={problem('flatKph')} />
-
-        <Choice
-          name="stay" legend={W.appTripStay} value={settings.stay} onPick={(v) => save('stay', v)}
-          options={[['camping', W.appTripStayCamping], ['mixed', W.appTripStayMixed], ['accommodation', W.appTripStayAccommodation]]}
-        />
-        {problem('stay') ? <p class="field-problem" role="alert">{problem('stay')}</p> : null}
-
-        <NumberField id="trip-camp" label={W.appTripCampWater} value={settings.campWaterL} step="0.1" min={0} max={5} onCommit={(v) => save('campWaterL', v ?? Number.NaN)} problem={problem('campWaterL')} />
-
-        {keepFreshOffered(services.env.weatherMode) ? (
-          <div class="field">
-            <label class="choice-option">
-              <input type="checkbox" checked={fresh} onChange={async (e) => { const on = e.currentTarget.checked; setFresh(on); if (!(await save('keepFresh', on))) setFresh(settings.keepFresh); }} />
-              <span>{W.weatherKeepFresh}</span>
-            </label>
-            <p class="muted">{W.appTripKeepFreshWhy}</p>
-          </div>
-        ) : null}
-        {trip ? <p class="muted">{W.appTripSettingsStageNote}</p> : null}
+        {trip ? <p class="muted">{TR.appTripSettingsStageNote}</p> : null}
       </div>
-    </Card>
+    );
+  }
+
+  return (
+    <div data-settings="details">
+      <div class="field">
+        <label for="trip-start">{W.appTripStartTime}</label>
+        <input
+          id="trip-start" type="time" min="04:00" max="14:00" value={startDraft} onInput={(e) => setStartDraft(e.currentTarget.value)}
+          onChange={async (e) => { if (!(await save('startTime', e.currentTarget.value))) setStartDraft(settings.startTime); }}
+        />
+        {problem('startTime') ? <p class="field-problem" role="alert">{problem('startTime')}</p> : null}
+      </div>
+
+      <Choice
+        name="pace" legend={W.appTripPace} value={settings.pace} onPick={(v) => save('pace', v)}
+        options={[['steady', W.appTripPaceSteady], ['sporting', W.appTripPaceSporting], ['hard', W.appTripPaceHard]]}
+      />
+      {problem('pace') ? <p class="field-problem" role="alert">{problem('pace')}</p> : null}
+
+      <NumberField id="trip-kph" label={W.appTripFlatKph} value={settings.flatKph} step="0.5" min={15} max={40} onCommit={(v) => save('flatKph', v ?? Number.NaN)} problem={problem('flatKph')} />
+
+      <Choice
+        name="stay" legend={W.appTripStay} value={settings.stay} onPick={(v) => save('stay', v)}
+        options={[['camping', W.appTripStayCamping], ['mixed', W.appTripStayMixed], ['accommodation', W.appTripStayAccommodation]]}
+      />
+      {problem('stay') ? <p class="field-problem" role="alert">{problem('stay')}</p> : null}
+
+      <NumberField id="trip-camp" label={W.appTripCampWater} value={settings.campWaterL} step="0.1" min={0} max={5} onCommit={(v) => save('campWaterL', v ?? Number.NaN)} problem={problem('campWaterL')} />
+
+      {keepFreshOffered(services.env.weatherMode) ? (
+        <div class="field">
+          <label class="choice-option">
+            <input type="checkbox" checked={fresh} onChange={async (e) => { const on = e.currentTarget.checked; setFresh(on); if (!(await save('keepFresh', on))) setFresh(settings.keepFresh); }} />
+            <span>{W.weatherKeepFresh}</span>
+          </label>
+          <p class="muted">{TR.appTripKeepFreshWhy}</p>
+        </div>
+      ) : null}
+    </div>
   );
 }

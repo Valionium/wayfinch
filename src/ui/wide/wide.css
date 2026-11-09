@@ -22,9 +22,10 @@
   .ahead[data-ahead='answers'] {
     display: grid; column-gap: 0; align-items: start;
     grid-template-columns: minmax(0, 7fr) minmax(16rem, 3fr);
-    grid-template-rows: auto 1fr;
-    grid-template-areas: 'main side' 'below side';
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas: 'top top' 'main side' 'below side';
   }
+  .ahead[data-ahead='answers'] > .ah-emergency-top { grid-area: top; }
   .ah-main { grid-area: main; container-type: inline-size; margin-right: 24px; }
   .ah-below { grid-area: below; margin-right: 24px; }
   .ah-cards { grid-area: side; container-type: inline-size; }
@@ -67,6 +68,6 @@
   /* A wider strip and cards. The middle column is kept for the map view (spec section 13), collapsed until it exists. */
   .ahead[data-ahead='answers'] {
     grid-template-columns: minmax(0, 1fr) 0 minmax(20rem, 26rem);
-    grid-template-areas: 'main map side' 'below map side';
+    grid-template-areas: 'top top top' 'main map side' 'below map side';
   }
 }

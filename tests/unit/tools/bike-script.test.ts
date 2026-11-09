@@ -23,7 +23,7 @@ test('[BK-ART-ANCHORS] with the switch on the bag planner gets /tools/bags/bike.
   const context = { window: {} as Record<string, unknown>, text: JSON.stringify(sample[0]) };
   runInNewContext(source, context);
   expect(Object.keys(context.window.WayfinchBike as object).sort()).toEqual(['SWATCHES', 'bikeArt', 'nearestSwatchName', 'normaliseBike', 'oklabMedian', 'resolveBikeSpec',
-    'PATTERN_LIST', 'FADES', 'DEFAULT_COLOURS', 'PAINT_WORDS', 'forkColours', 'pairFor', 'colourName'].sort());
+    'PATTERN_LIST', 'FADES', 'DEFAULT_COLOURS', 'PAINT_WORDS', 'forkColours', 'pairFor', 'colourName', 'bagShape', 'PAIR_OFFSET', 'shapedArt'].sort());
   const theirs = runInNewContext('const B = window.WayfinchBike; B.bikeArt(B.resolveBikeSpec(B.normaliseBike(JSON.parse(text)), null), null).svg', context) as string;
   const mine = bikeArt(resolveBikeSpec(normaliseBike(sample[0]), null), null);
   expect(mine.label).toContain('blue frame');
@@ -39,7 +39,8 @@ test('[BK-ART-ANCHORS] with the switch on the bag planner gets /tools/bags/bike.
 test('[PERF-BIKE] the bike module adds under 15 KB gzipped to the first screen (PERF-JS-FIRST), the wording file it shares aside', async () => {
   const result = await build({
     entryPoints: ['src/core/bike/index.ts'], bundle: true, write: false, format: 'esm', minify: true, logLevel: 'silent',
-    plugins: [{ name: 'shared-wording', setup(b) { b.onResolve({ filter: /wording[\/]en.ts$/ }, (a) => ({ path: a.path, external: true })); } }],
+    // the bike's own words moved from en.ts to en-bike.ts (8 Nov 2026); both are the wording the first screen shares, so both stay aside
+    plugins: [{ name: 'shared-wording', setup(b) { b.onResolve({ filter: /wording[\/]en(-bike)?\.ts$/ }, (a) => ({ path: a.path, external: true })); } }],
   });
   const bytes = gzipSync(result.outputFiles[0]!.contents, { level: 9 }).length;
   expect(bytes).toBeGreaterThan(3_000);

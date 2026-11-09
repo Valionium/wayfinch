@@ -242,6 +242,29 @@ test("[AH-ASK-NOTE] Ahead's which-pass words are their own chunk, loaded with th
   expect(lazy.filter((f) => text(on, f).includes('Choose which pass')).length).toBe(1);
 });
 
+// Review of PR 70, M2: the one top bar's style comes with the tool's chunk, never in the first screen's render-blocking stylesheet.
+test("[WF-BAR] the stylesheet the first screen links holds nothing of the top bar; the tyre tool's chunk brings it", () => {
+  const html = text(on, 'index.html');
+  const sheets = [...html.matchAll(/<link rel="stylesheet"[^>]*href="\/([^"]+\.css)"/g)].map((m) => m[1]!);
+  expect(sheets.length).toBeGreaterThan(0);
+  for (const f of sheets) expect(text(on, f).includes('wf-bar'), f).toBe(false);
+  const figures = measure(on);
+  const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
+  expect(lazy.some((f) => text(on, f).includes('.wf-bar-app'))).toBe(true);
+});
+
+// Re-check of PR 65, R2: the swap of the screen's words while Ahead asks (its regular expression, ending in "(?= |$)") is in that chunk
+// too, so the first screen carries none of it.
+test("[AH-ASK-NOTE] the swap of the screen's words while Ahead asks is in the question's chunk, not in the first screen's JavaScript", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  expect(first.includes('(?= |$)')).toBe(false);
+  const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
+  const chunk = lazy.filter((f) => text(on, f).includes('Choose which pass'));
+  expect(chunk.length).toBe(1);
+  expect(text(on, chunk[0]!)).toContain('(?= |$)');
+});
+
 test("[YOU-INSTALL-ANDROID] the Android install line is You's, never in the first screen's JavaScript", () => {
   const figures = measure(on);
   const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
@@ -277,7 +300,7 @@ test("[TB-TOOLS-LAZY] the Tools screen (bike line, tyre card) is not among the f
 });
 
 // Sub-project 12, group 1: Bike care is a chunk of its own, loaded by a dynamic import like the tyre tool; its words (en-care.ts, with the
-// content) are not in the first screen. 145,711 bytes is main's first screen (235535e, after PRs 64 and 65, which grew it from the 145,569 of the old branch point 42551e2); Bike care adds nothing to it; the
+// content) are not in the first screen. 145,054 bytes is main's first screen (d7289d1, built from origin/main); Bike care adds nothing to it; the
 // rule is that it may never rise above main's figure.
 test("[BC-CHUNK] Bike care is a lazy chunk; en-care is not in the first screen's files, and the first screen is at or below main's figure", () => {
   const figures = measure(on);
@@ -291,7 +314,7 @@ test("[BC-CHUNK] Bike care is a lazy chunk; en-care is not in the first screen's
   expect(first).toContain(`/${chunk[0]!.replace(/^assets\//, '')}`.slice(1));
   expect(text(on, 'index.html')).not.toContain(chunk[0]!);
   console.log(`BC-CHUNK: first screen ${figures.firstJsGzip} bytes gzipped, lazy ${figures.lazyJsGzip}`);
-  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_711);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_054);
 });
 
 // Care pictures, part 1 (design of 7 November 2026, section 5): each drawing is a file of its own, fetched when its step view opens; none is
@@ -313,7 +336,7 @@ test("[BC-PIC-LAZY] no picture is in the first screen's files, Bike care's chunk
   }
   // and no script carries a drawing's own markup
   expect(all.filter((f) => f.endsWith('.js') && text(on, f).includes('class="cp-')), 'a drawing in a script').toEqual([]);
-  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_700);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_054);
 });
 
 test('[BC-SOURCES-PRIVATE] the built Bike care chunk holds no "http": where each fact came from never ships', () => {
@@ -323,4 +346,29 @@ test('[BC-SOURCES-PRIVATE] the built Bike care chunk holds no "http": where each
   expect(care.length).toBeGreaterThan(0);
   for (const f of care) expect(text(on, f).includes('http'), f).toBe(false);
   for (const f of files(on).filter((x) => x.endsWith('.js'))) expect(text(on, f).includes('parktool.com'), f).toBe(false);
+});
+
+// The guided Trip, part 1 (design of 8 Nov 2026): the steps, the trip line and Ahead before Get ready offline come with chunks of
+// their own (the trip details and the departure date, the stops on the profile), so the first screen does not grow.
+// 145,678 bytes is the first screen's figure on main (a62695c) at the branch point; the rule is that it may not rise above it.
+test("[TRIP-GUIDED-FIRST] the guided Trip adds nothing to the first screen: at or below main's figure at the branch point", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  // The trip details' fields are not in it: they load with the Route step or Trip details.
+  expect(first.includes('trip-kph')).toBe(false);
+  console.log(`TRIP-GUIDED-FIRST: first screen ${figures.firstJsGzip} bytes gzipped`);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_678);
+});
+
+// After the launch, part 4 (the owner's preview check of 8 Nov 2026): the Emergency link, the answers from km 0, the empty state and
+// the rename come with room made in en.ts (Trip's chunk-only words moved to en-trip.ts), so the first screen does not grow.
+// 145,378 bytes is the first screen's figure on main (5cd5c5c) at the branch point; the rule is that it may not rise above it.
+test("[AH-P4-FIRST] En route's findings add nothing to the first screen: at or below main's figure at the branch point", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  // The empty state's lines and Trip's chunk-only words are not in it.
+  expect(first.includes('It works offline, from what Get ready offline saves')).toBe(false);
+  expect(first.includes('Plan from A to B')).toBe(false);
+  console.log(`AH-P4-FIRST: first screen ${figures.firstJsGzip} bytes gzipped`);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_378);
 });

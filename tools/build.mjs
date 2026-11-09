@@ -7,10 +7,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build as esbuild } from 'esbuild';
-import { writeImprint } from './build-legal.mjs';
+import { writeBackBar, writeImprint } from './build-legal.mjs';
 import bikeScript from './bike-script.cjs';
 
-const { bikeScriptOptions, photoScriptOptions } = bikeScript;
+const { bikeScriptOptions, photoScriptOptions, advisorScriptOptions, weightMapOptions } = bikeScript;
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 // Until the launch, / serves this frozen copy of the page that went live with the first release (sub-project 6, Decision 2), so edits
@@ -40,7 +40,7 @@ function listFiles(dir) {
 
 function headersFile(launch) {
   const noCache = ['/offline-worker.js', '/', '/build.json'];
-  if (launch) noCache.push('/tools/bags/', '/manifest.webmanifest', '/tools/bags/bike.js', '/tools/bags/bike-photo.js');
+  if (launch) noCache.push('/tools/bags/', '/manifest.webmanifest', '/tools/bags/bike.js', '/tools/bags/bike-photo.js', '/tools/bags/advisor.js', '/tools/bags/weightmap.js');
   const immutable = ['/assets/*', '/vendor/leaflet-1.9.4/*'];
   return [
     ...noCache.map((path) => `${path}\n  Cache-Control: no-cache\n`),
@@ -125,10 +125,16 @@ export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = 
     // The imprint is the bag planner's own block, taken at build time. If it can't be taken, the launch build fails (a site without its
     // imprint must not go out); nothing of the block is printed. The off build never gets here.
     writeImprint(target);
+    // The one top bar of the bag planner and the legal pages (src/ui/back-bar/): /back-bar.js and /back-bar.css, precached with the rest.
+    writeBackBar(target);
     mkdirSync(join(target, 'tools', 'bags'), { recursive: true });
     writeFileSync(join(target, 'tools', 'bags', 'bike.js'), await compileBikeScript());
     // The photo colour picker, loaded only when a rider taps From a photo; precached like every other file.
     writeFileSync(join(target, 'tools', 'bags', 'bike-photo.js'), await compileBikeScript(photoScriptOptions));
+    // The Gear advisor's search (sub-project 13), loaded only when the advisor opens; precached like every other file.
+    writeFileSync(join(target, 'tools', 'bags', 'advisor.js'), await compileBikeScript(advisorScriptOptions));
+    // The weight map (design of 8 Nov 2026), loaded only on the first press of Show weight map; precached like every other file.
+    writeFileSync(join(target, 'tools', 'bags', 'weightmap.js'), await compileBikeScript(weightMapOptions));
   } else {
     // With the switch off the page riders see stays Load Check, at /: the frozen copy, never the bag planner being worked on.
     writeFileSync(join(target, 'index.html'), readFileSync(pagePath));

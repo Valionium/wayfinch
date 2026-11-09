@@ -2,7 +2,7 @@
 // decks from the plan, and the anchors that place bags, bottles, tags and tap targets. Plain strings, so both pages can use it.
 // The outline and wheels are the theme's `line`; the rider's colour is a stroke="#rrggbb" on frame and fork only, over a casing
 // 1.5 units wider in `muted`. Bags keep the fill ramp, so how full a bag looks never depends on the frame colour.
-import { W } from '../wording/en.ts';
+import { WB as W } from '../wording/en-bike.ts';
 import { casingFor, nearestSwatchName } from './colour.ts';
 import type { BagItem, BagView, BikeSpec } from './spec.ts';
 import { SIZE_FACTOR, TEMPLATES } from './templates.ts';
@@ -141,7 +141,7 @@ export const corners = (b: Placed): P[] => {
   return [at(b.x, b.y), at(b.x + b.w, b.y), at(b.x + b.w, b.y + b.h), at(b.x, b.y + b.h)];
 };
 /** Keeps a box inside the viewBox by moving it, never by changing its size. */
-function inside(b: Placed, margin = 1): Placed {
+export function inside(b: Placed, margin = 1): Placed {
   const c = boxOf(corners(b));
   const dx = c.x < margin ? margin - c.x : c.x + c.w > VIEW_W - margin ? VIEW_W - margin - c.x - c.w : 0;
   const dy = c.y < margin ? margin - c.y : c.y + c.h > VIEW_H - margin ? VIEW_H - margin - c.y - c.h : 0;
@@ -421,9 +421,8 @@ function anchorsOf(spec: BikeSpec, g: Geometry, fr: ReturnType<typeof frameOf>, 
   const forkU = unit(sub(g.front, g.headBottom));
   const fork = inside({ x: forkMid[0] - 6 + forkU[1] * -1.5, y: forkMid[1] - 11, w: 12, h: 22, rot: deg(Math.atan2(forkU[1], forkU[0])) - 90 });
   const rackY = g.rear[1] - g.rr - 3;
-  // Panniers hang from the rack beside the wheel, their tops well below the rack-top deck (as in the bag planner today: about 0.4 of
-  // the wheel's radius under its top), so the deck, the bag behind and the bag in front never cover one another.
-  const rack = inside({ x: g.rear[0] - 21, y: rackY + 3 + Math.min(17, 0.42 * g.rr), w: 46, h: 27, rot: 0 });
+  // Panniers hang from the rack rail on their hooks (owner, 8 Nov 2026), beside the wheel, their feet above the axle, the far one too.
+  const rack = inside({ x: g.rear[0] - 21, y: rackY + 2.6, w: 46, h: Math.min(33, g.rr - 2.6), rot: 0 });
   const rackTop = inside({ x: g.rear[0] - 22, y: rackY - 6.6, w: 48, h: 6, rot: 0 });
   const pack = { x: 8, y: 24, w: 29, h: 34, rot: 0 };
   // Bottles at the bolts that exist, turned to the tube.
@@ -518,7 +517,7 @@ function bagsArt(view: BagView, a: Anchors, theme: 'dark' | 'light', prefix: str
   };
   // Back to front: panniers and the rack-top deck, the bottles inside the triangle, the frame bag (in front of them, as on the bike),
   // top-tube bags, seat pack, bar roll, fork bags, decks, the bottle under the down tube, backpack.
-  pairs('rack', a.rack, [-7, -7], 2);
+  pairs('rack', a.rack, [-6, 1.5], 2);
   if (view.decks.rack !== null) deck(art, a.rackTop, view.decks.rack);
   const bottlesOf = (inTriangle: boolean) => {
     for (const b of view.bottles) {
@@ -547,7 +546,7 @@ function bagsArt(view: BagView, a: Anchors, theme: 'dark' | 'light', prefix: str
   return { defs, art };
 }
 
-function deck(art: string[], d: Placed, state: 'empty' | 'loaded'): void {
+export function deck(art: string[], d: Placed, state: 'empty' | 'loaded'): void {
   art.push(`<g class="bk-deck${state === 'empty' ? ' bk-empty' : ''}"><rect class="bk-shell"${attr('x', d.x)}${attr('y', d.y)}${attr('width', d.w)}${attr('height', d.h)} rx="1.5"/>`
     + `<path class="bk-strap" d="M${pt([d.x - 2, d.y + d.h * 0.34])} L${pt([d.x + d.w + 2, d.y + d.h * 0.34])} M${pt([d.x - 2, d.y + d.h * 0.72])} L${pt([d.x + d.w + 2, d.y + d.h * 0.72])}"/></g>`);
 }

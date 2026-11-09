@@ -29,6 +29,7 @@ export function fakeActions(o: { share?: boolean; copy?: boolean; kept?: boolean
     copy: (t) => { calls.push(['copy', t]); return Promise.resolve(o.copy ?? true); },
     smsHref: (t) => `sms:?&body=${encodeURIComponent(t)}`,
     freshen: () => undefined,
+    getReady: () => { calls.push(['getReady']); return Promise.resolve([]); },
   };
   return { actions, calls };
 }

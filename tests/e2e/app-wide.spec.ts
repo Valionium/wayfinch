@@ -98,7 +98,7 @@ test('[WIDE-RAIL] up to 839 px one column and the bottom bar; from 840 px a labe
   expect(bar.x).toBe(0);
   expect(bar.width).toBeLessThan(200);
   expect(bar.height).toBeGreaterThanOrEqual(790);
-  for (const name of ['Ahead', 'Trip', 'Tools', 'You']) await expect(nav.getByRole('link', { name })).toBeVisible();
+  for (const name of ['En route', 'Trip', 'Tools', 'You']) await expect(nav.getByRole('link', { name })).toBeVisible();
   const main = await box(page.locator('.ah-main'));
   const side = await box(page.locator('.ah-cards'));
   expect(side.x).toBeGreaterThan(main.x + main.width - 1);
@@ -118,17 +118,19 @@ test('[WIDE-PANES] Ahead: position, strip and chips in the main pane, the six ca
 
   await page.goto(`${app!.origin}/#/trip`);
   await page.locator('[data-trip-loaded]').waitFor();
-  const summary = await box(page.locator('[data-summary]'));
-  const settings = await box(page.locator('.trip-side .card').first());
-  expect(settings.x).toBeGreaterThan(summary.x + summary.width - 1);
-  expect((await box(page.locator('[data-add-route]'))).x).toBeLessThan(settings.x);
+  // The guided Trip (design of 8 Nov 2026, §2.2): the steps in the main pane, the route's summary in the supporting one.
+  const steps = await box(page.locator('.trip-steps-list'));
+  const summary = await box(page.locator('.trip-side [data-summary]'));
+  expect(summary.x).toBeGreaterThan(steps.x + steps.width - 1);
+  expect((await box(page.locator('.trip-main [data-step="route"]'))).x).toBeLessThan(summary.x);
 
   await page.goto(`${app!.origin}/#/tools`);
   const cards = page.locator('main[data-screen="tools"] > .card');
-  // Tools is a chunk of its own (TB-TOOLS-LAZY): its bag card shows at once, the tyre card and the Bike care card (sub-project 12) when
-  // the chunk has loaded. Two columns: bags and tyre pressure side by side, Bike care below the bags.
-  await expect(cards).toHaveCount(3);
-  expect(await cards.count()).toBe(3);
+  // Tools is a chunk of its own (TB-TOOLS-LAZY): its bag card shows at once, the tyre card, the Bike care card (sub-project 12) and the
+  // Gear advisor's (sub-project 13, group 3) when the chunk has loaded. Two columns: bags and tyre pressure side by side, Bike care below the bags.
+  await expect(cards).toHaveCount(4);
+  expect(await cards.count()).toBe(4);
+  await expect(cards.nth(3).locator('h2')).toHaveText('Gear advisor');
   const [a, b, c] = [await box(cards.nth(0)), await box(cards.nth(1)), await box(cards.nth(2))];
   expect(Math.abs(a.y - b.y)).toBeLessThan(2);
   expect(b.x).toBeGreaterThan(a.x + a.width - 1);
@@ -266,6 +268,25 @@ test('[WIDE-DROP] a GPX file dropped anywhere on Trip becomes the route; the fil
   await page.dispatchEvent('.trip-side', 'drop', { dataTransfer: data });
   await expect(page.locator('[data-summary]')).toBeVisible();
   await expect(page.locator('[data-summary]')).toContainText('km');
+});
+
+// Review of PR 73, I3: with a route there (Go is the open step on the trip's day), a GPX dropped on Trip opens the Route step, which
+// asks before it replaces the route, as its Change does.
+test('[WIDE-DROP] with a route already there, a GPX dropped anywhere on Trip asks before it replaces it, whatever step is open', async ({ page }) => {
+  await open(page, 1280, 720, 'trip');
+  await expect(page.locator('[data-step="go"][data-open]')).toBeVisible();
+  await expect(page.locator('[data-summary]')).toContainText('Heidelberg');
+  const gpx = await fixtureGpx('loop', { heights: true });
+  const data = await page.evaluateHandle((text) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([text], 'loop.gpx', { type: 'application/gpx+xml' }));
+    return dt;
+  }, gpx);
+  await page.dispatchEvent('.trip-side', 'drop', { dataTransfer: data });
+  await expect(page.locator('[data-step="route"] [data-replace]')).toContainText('Replace your route?');
+  await expect(page.locator('[data-summary]')).toContainText('Heidelberg');
+  await page.locator('[data-replace]').getByRole('button', { name: 'Replace route' }).click();
+  await expect(page.locator('[data-summary]')).toContainText('Heilbronn loop');
 });
 
 test('[WIDE-STRAY] a file dropped where there is no zone is cancelled at window level: nothing opens or downloads', async ({ page }) => {

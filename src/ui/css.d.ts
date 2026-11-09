@@ -1,4 +1,8 @@
 declare module '*.css';
+declare module '*.css?inline' {
+  const css: string;
+  export default css;
+}
 
 /** Vite's import.meta.glob, as Bike care's pictures use it: each file's built address (src/tools/care/picture.tsx). */
 interface ImportMeta {

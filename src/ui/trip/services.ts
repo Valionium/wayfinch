@@ -17,11 +17,12 @@ import type { WeatherMode } from '../../data/weather-mode.ts';
 import { NewerDataError, RefusedError } from '../../store/changed.ts';
 import { inExistingTx, inTx, openExisting } from '../../store/db.ts';
 import type { HandoffOutcome } from './handoff.ts';
+import type { RouteStop } from '../../core/screen/route-stops.ts';
 import type { Place } from '../../core/places/types.ts';
-import { readInputs } from '../../store/inputs.ts';
+import { readInputs, SAVED_KM_META } from '../../store/inputs.ts';
 import { readPrepared, readStoredZones } from '../../store/prepared.ts';
 import type { PreparedRecord } from '../../store/prepared.ts';
-import { DEFAULT_SETTINGS, goodDate } from '../../store/rules.ts';
+import { DEFAULT_SETTINGS, goodDate, usableSavedKm } from '../../store/rules.ts';
 import type { Settings } from '../../store/rules.ts';
 import { readSettings, writeSettings } from '../../store/settings.ts';
 import { readTrip, replaceRoute, RouteGoneError, sameLine, saveTrip } from '../../store/trip.ts';
@@ -48,6 +49,8 @@ export type TripSnapshot = {
   day1LeaveBy: string | null;
   heightsLookedUp: boolean;
   running: boolean;
+  /** Nothing Get ready offline saves is here (no places, no saved stretch, no forecast): En route's own test (AH-BEFORE-READY). */
+  nothingSaved?: boolean;
 };
 
 /** `dateNotSaved`: the route was replaced, but the write of its departure date was refused. */
@@ -77,6 +80,8 @@ export type TripServices = {
   writeSettings: (partial: Partial<Record<keyof Settings, unknown>>) => Promise<SettingsOutcome>;
   setDeparture: (date: string | null) => Promise<string | null>;
   prepare: (onProgress: (step: StepName, done: number, total: number) => void, onNotice: (text: string) => void) => Promise<StepReport[]>;
+  /** The stops on the height profile (TRIP-STOPS): Ahead's strip rule for each day, from what is stored; a chunk of its own. */
+  stops: () => Promise<RouteStop[]>;
   /** Contract 2: the trip to the bag planner, which then opens. Absent where there is no bag planner to open. */
   handOff?: () => Promise<HandoffOutcome>;
 };
@@ -113,10 +118,10 @@ function heightsLookedUp(route: Route): boolean {
 
 const weekdayOf = (date: string): number => new Date(`${date}T00:00:00Z`).getUTCDay();
 
-async function counts(): Promise<{ places: number; forecastTo: Date | null; forecastFetchedAt: Date | null; lastPositionAt: Date | null }> {
+async function counts(): Promise<{ places: number; forecastTo: Date | null; forecastFetchedAt: Date | null; lastPositionAt: Date | null; nothingSaved: boolean }> {
   // A read: it makes no database (after a delete in another window it finds none).
   const db = await openExisting();
-  if (!db) return { places: 0, forecastTo: null, forecastFetchedAt: null, lastPositionAt: null };
+  if (!db) return { places: 0, forecastTo: null, forecastFetchedAt: null, lastPositionAt: null, nothingSaved: true };
   const places = await db.count('places');
   const forecast = (await db.get('forecast', 'current')) as { fetchedAt?: unknown; grid?: { hours?: { at: Date }[] }[] } | undefined;
   let forecastTo: Date | null = null;
@@ -129,7 +134,8 @@ async function counts(): Promise<{ places: number; forecastTo: Date | null; fore
     if (p.at instanceof Date && Number.isFinite(p.at.getTime()) && (lastPositionAt === null || p.at > lastPositionAt)) lastPositionAt = p.at;
   }
   const fetched = forecast?.fetchedAt;
-  return { places, forecastTo, forecastFetchedAt: fetched instanceof Date && Number.isFinite(fetched.getTime()) ? fetched : null, lastPositionAt };
+  const nothingSaved = places === 0 && forecast === undefined && usableSavedKm(await db.get('meta', SAVED_KM_META)).length === 0;
+  return { places, forecastTo, forecastFetchedAt: fetched instanceof Date && Number.isFinite(fetched.getTime()) ? fetched : null, lastPositionAt, nothingSaved };
 }
 
 async function storageMb(): Promise<number | null> {
@@ -172,7 +178,7 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
   };
   const nav = typeof navigator === 'undefined' ? undefined : navigator;
   const nothing = (at: Date, settings: Settings, available: boolean): TripSnapshot => ({
-    now: at, available, trip: null, settings, prepared: null, places: 0, forecastTo: null, forecastFetchedAt: null, zone: 'UTC', storageMb: null, day1LeaveBy: null, heightsLookedUp: false, running: false,
+    now: at, available, trip: null, settings, prepared: null, places: 0, forecastTo: null, forecastFetchedAt: null, zone: 'UTC', storageMb: null, day1LeaveBy: null, heightsLookedUp: false, running: false, nothingSaved: true,
   });
 
   const load = async (): Promise<TripSnapshot> => {
@@ -189,7 +195,7 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
     try {
       const prepared = await readPrepared();
       const zone = zoneLookupOf(await readStoredZones())(0).timeZone;
-      const { places, forecastTo, forecastFetchedAt, lastPositionAt } = await counts();
+      const { places, forecastTo, forecastFetchedAt, lastPositionAt, nothingSaved } = await counts();
       const today = localIsoDate(at, zone);
       let day1LeaveBy: string | null = null;
       if (trip.departureDate !== null && addDaysIso(today, 1) === trip.departureDate) {
@@ -199,7 +205,7 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
       }
       return {
         now: at, available: true, trip, settings, prepared, places, forecastTo, forecastFetchedAt, zone, storageMb: await storageMb(), day1LeaveBy,
-        heightsLookedUp: heightsLookedUp(trip.route),
+        heightsLookedUp: heightsLookedUp(trip.route), nothingSaved,
         running: tripRuns({ prepared: prepared !== null, departureDate: trip.departureDate, days: trip.route.stages.length || 1, today, lastPositionAt, now: at }),
       };
     } catch {
@@ -325,6 +331,8 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
       await cleanupHandoff(deps);
       return handOffTrip(trip, settings, deps);
     }),
+
+    stops: () => import('./stops.ts').then((m) => m.readStops(now())),
 
     prepare(onProgress, onNotice) {
       return prepareTrip({
