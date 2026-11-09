@@ -120,8 +120,15 @@ function Drawing({ card, tapped, type, onTap }: { card: ViewCard; tapped: PartId
 
   const shown = spots.filter(([, s]) => inBox(view, s.at, 1));
   const side = (s: Spot): string => (s.side === 'other' ? PG.otherSide : s.side === 'left' ? PG.leftSide : '');
-  const { layout, inset, areaH, scale } = placeView(shown.map(([id, s]) => ({ id, at: s.at, w: labelWidth(PART_SHORT[id], side(s) ? `(${side(s)})` : '') })),
-    view, width, outline(svg, anchors));
+  // While fingers move the drawing the labels step aside (placing them is the costly part) and the canvas keeps its size; they are
+  // placed again as the fingers lift.
+  const [moving, setMoving] = useState(false);
+  const last = useRef<ReturnType<typeof placeView> | null>(null);
+  const placed = moving && last.current
+    ? { ...last.current, layout: { ...last.current.layout, labels: [] }, scale: (width - 2 * last.current.inset) / view.w }
+    : placeView(shown.map(([id, s]) => ({ id, at: s.at, w: labelWidth(PART_SHORT[id], side(s) ? `(${side(s)})` : '') })), view, width, outline(svg, anchors));
+  if (!moving) last.current = placed;
+  const { layout, inset, areaH, scale } = placed;
 
   // Pinch and drag (pointers), and the wheel with Ctrl (a trackpad's pinch): the zoom; a drag moves a zoomed view.
   const pointers = useRef(new Map<number, P>());
@@ -131,6 +138,7 @@ function Drawing({ card, tapped, type, onTap }: { card: ViewCard; tapped: PartId
   const onDown = (e: PointerEvent): void => {
     if ((e.target as Element | null)?.closest?.('.bv-label')) return;
     pointers.current.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pointers.current.size === 2 || zoom.z > 1) setMoving(true);
     if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()] as [P, P];
       pinch.current = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, z: zoom.z };
@@ -148,7 +156,11 @@ function Drawing({ card, tapped, type, onTap }: { card: ViewCard; tapped: PartId
       setZoom({ z: zoom.z, centre: [centreNow[0] - (now[0] - was[0]) / scale, centreNow[1] - (now[1] - was[1]) / scale] });
     }
   };
-  const onUp = (e: PointerEvent): void => { pointers.current.delete(e.pointerId); if (pointers.current.size < 2) pinch.current = null; };
+  const onUp = (e: PointerEvent): void => {
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinch.current = null;
+    if (pointers.current.size === 0) setMoving(false);
+  };
   const onWheel = (e: WheelEvent): void => {
     if (!e.ctrlKey) return;
     e.preventDefault();
