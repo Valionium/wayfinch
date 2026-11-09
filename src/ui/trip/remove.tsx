@@ -1,4 +1,4 @@
-// Remove this trip (owner's wish, 9 November 2026): in Trip's open Route step only, with a trip. A confirm step names what goes and
+// Remove this trip (owner's wish, 9 November 2026; next to Change in the Route step's done row, his correction the same day): with a trip only. A confirm step names what goes and
 // what stays; Remove trip takes the route, the trip and all En route keeps for it off the phone (store/remove-trip.ts), and Trip and
 // En route start over as on the very first open. A chunk of its own, with its words: the first screen carries none of it.
 import { useEffect, useRef, useState } from 'preact/hooks';

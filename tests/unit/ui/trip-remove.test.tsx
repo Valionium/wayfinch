@@ -80,10 +80,9 @@ async function withRoute(svc?: TripServices): Promise<TripServices> {
   return s;
 }
 
-/** Opens the Route step with Change, and waits for its date and Remove this trip. */
+/** Waits for Remove this trip in the folded Route step's row, next to Change (owner, 9 Nov 2026, replacing: in the open step). */
 async function openRoute(): Promise<void> {
-  await click(buttonIn(step('route'), W.appTripStepChange));
-  await until(() => step('route').querySelector('[data-remove-trip] button') !== null, 'Remove this trip');
+  await until(() => step('route').querySelector('.trip-step-head [data-remove-trip] button') !== null, 'Remove this trip');
 }
 
 /** Trip as a phone that never had a trip shows it, with this phone's settings: the same keys, a new database. */
@@ -95,22 +94,29 @@ async function freshTrip(): Promise<string> {
   return host.innerHTML;
 }
 
-test('[TRIP-REMOVE-ASK] Remove this trip is only in the open Route step, and only with a trip', async () => {
+test('[TRIP-REMOVE-ASK] Remove this trip is only in the folded Route step, next to Change, and only with a trip', async () => {
   await show();
   expect(host.querySelector('[data-remove-trip]')).toBeNull();
   expect(buttons(host, RT.appTripRemove)).toEqual([]);
   await withRoute();
-  // The Route step folded: not there.
-  expect(buttons(host, RT.appTripRemove)).toEqual([]);
+  // The Route step folded (done): in its head row, beside Change, with its own name.
   await openRoute();
   expect(buttons(host, RT.appTripRemove).length).toBe(1);
-  expect(step('route').querySelector('.trip-step-body')!.contains(buttons(host, RT.appTripRemove)[0]!)).toBe(true);
+  const head = step('route').querySelector('.trip-step-head')!;
+  expect(head.contains(buttons(host, RT.appTripRemove)[0]!)).toBe(true);
+  expect(head.contains(buttonIn(step('route'), W.appTripStepChange))).toBe(true);
+  expect(buttonIn(step('route'), W.appTripStepChange).getAttribute('aria-label')).not.toBe(RT.appTripRemove);
+  // Opened with Change: the row is gone with Change, and the upload area has no Remove beside it.
+  await click(buttonIn(step('route'), W.appTripStepChange));
+  await until(() => host.querySelector('[data-add-route] input[type=file]') !== null, 'the open step');
+  expect(buttons(host, RT.appTripRemove)).toEqual([]);
+  expect(host.querySelector('[data-add-route] [data-remove-trip]')).toBeNull();
   // Not under the step (Trip details), nor in any other step.
   expect(host.querySelector('[data-trip-details] [data-remove-trip]')).toBeNull();
   for (const name of ['getready', 'bags', 'go']) {
     await click(step(name).querySelector('button')!);
     await settle(20);
-    expect(buttons(host, RT.appTripRemove), name).toEqual([]);
+    expect(buttons(step(name), RT.appTripRemove), name).toEqual([]);
   }
 });
 

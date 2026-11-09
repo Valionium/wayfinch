@@ -53,9 +53,11 @@ type StepState = 'done' | 'next' | 'later';
  * One of the four steps (guided Trip design §2.2). Open, it shows its body; folded, one line: done, its summary and Change (or
  * Update); otherwise what it will do, its title a button when it can be opened.
  */
-function Step({ name, n, title, state, open, line, change, canOpen, onOpen, children, below }: {
+function Step({ name, n, title, state, open, line, change, canOpen, onOpen, children, below, beside }: {
   name: StepName; n: number; title: string; state: StepState; open: boolean; line: string | null; change?: string; canOpen: boolean;
   onOpen: () => void; children?: ComponentChildren; below?: ComponentChildren;
+  /** In the done row, after Change: a second action, its own question opening below the row. */
+  beside?: ComponentChildren;
 }) {
   const no = <span class="visually-hidden">{W.appTripStepNo(n)}</span>;
   const word = change ?? W.appTripStepChange;
@@ -69,6 +71,7 @@ function Step({ name, n, title, state, open, line, change, canOpen, onOpen, chil
             ? <h2 tabIndex={-1}>{no}{title}</h2>
             : <h2>{no}<button type="button" class="trip-step-open" onClick={onOpen}>{title}</button></h2>}
           {!open && state === 'done' ? <button type="button" class="trip-step-change" aria-label={`${word}: ${title}`} onClick={onOpen}>{word}</button> : null}
+          {!open && state === 'done' ? beside : null}
         </div>
         {open ? children : line ? <p class={state === 'done' ? 'trip-step-line' : 'trip-step-line muted'}>{line}</p> : null}
         {below}
@@ -160,6 +163,7 @@ export function TripScreen({ services }: { services: TripServices }) {
           <Step
             name="route" n={1} title={W.appTripStepRoute} state={stateOf('route', trip !== null)} open={openStep === 'route'} canOpen onOpen={choose('route')}
             line={trip ? routeDoneLine(trip) : null} below={snap ? <TripDetails services={services} snap={snap} reload={reload} /> : null}
+            beside={snap?.trip ? <TripSettings services={services} snap={snap} reload={reload} part="remove" /> : null}
           >
             <AddRoute services={services} snap={snap} reload={reload} dropped={dropped} onDropTaken={() => setDropped(null)} onAdded={(said) => { setAdded(said); setChosen(null); }} />
             {snap?.trip ? <TripSettings services={services} snap={snap} reload={reload} part="when" /> : null}

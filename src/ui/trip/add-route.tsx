@@ -16,8 +16,6 @@ type Found = { route: Route; hadHeights: boolean };
 
 // Plan from A to B is its own chunk too: it loads with its form.
 const PlanAB = lazy(() => import('./plan.tsx').then((m) => m.PlanAB));
-// Remove this trip stands beside the upload button (owner, 9 Nov 2026), its own chunk with its confirm step and words.
-const RemoveTrip = lazy(() => import('./remove.tsx').then((m) => m.RemoveTrip));
 
 /** `onAdded`: a route was added or replaced, with the message that goes on to the next step (owner's item 2). */
 export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken }: {
@@ -85,15 +83,12 @@ export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken
   return (
     <section aria-label={old ? TF.appTripReplaceHeading : TF.appTripAddTitle}>
       <div data-add-route>
-        <div class="trip-pick-row">
         <label class="btn btn-primary file-pick">
           {TF.appTripPickGpx}
           {/* No accept list (owner's iPhone check, 6 Nov 2026): iOS turns it into its own file types, has none for .gpx and greys
               every GPX file out. Any file can be chosen; routeFromGpx refuses what is not a GPX, in words. */}
           <input type="file" onChange={(e) => void onFile(e.currentTarget)} />
         </label>
-        {old && snap ? <RemoveTrip snap={snap} reload={reload} /> : null}
-        </div>
         <p class="muted">{TR.appTripGpxHint}</p>
         {busy ? <p role="status">{TF.appTripReading}</p> : null}
         {error ? <p class="notice" role="alert">{error}</p> : null}

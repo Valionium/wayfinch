@@ -7,12 +7,14 @@ import { TF } from '../../core/wording/en-trip-fields.ts';
 import { keepFreshOffered } from '../../data/refresh.ts';
 import type { Settings } from '../../store/rules.ts';
 import { useFollowing } from '../follow.ts';
+import { RemoveTrip } from './remove.tsx';
 import { suggestedNights } from './model.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
 
 type Save = (field: keyof Settings, value: unknown) => Promise<boolean>;
 
-// Remove this trip, last in the Route step: a chunk of its own, with its confirm step and its words (owner's wish, 9 Nov 2026).
+// Remove this trip stands next to Change in the Route step's done row (owner, 9 Nov 2026): `part="remove"` of this chunk, with its
+// confirm step and its words, so the first screen carries no import of its own for it.
 
 export function NumberField({ id, label, value, step, min, max, placeholder, onCommit, problem }: {
   id: string; label: string; value: number | null; step: string; min: number; max: number; placeholder?: string;
@@ -57,7 +59,7 @@ export function Choice({ name, legend, value, options, onPick }: { name: string;
  * `when`: the departure date and the nights, which stay in the Route step; `details`: the trip details folded under it (guided Trip
  * design §2.2): start time, pace, flat speed, stay type, camp water and keep fresh.
  */
-export function TripSettings({ services, snap, reload, part }: { services: TripServices; snap: TripSnapshot; reload: () => Promise<void>; part: 'when' | 'details' }) {
+export function TripSettings({ services, snap, reload, part }: { services: TripServices; snap: TripSnapshot; reload: () => Promise<void>; part: 'when' | 'details' | 'remove' }) {
   const { settings, trip } = snap;
   const [problems, setProblems] = useState<Partial<Record<string, string>>>({});
   const [startDraft, setStartDraft] = useFollowing(settings.startTime);
@@ -82,6 +84,7 @@ export function TripSettings({ services, snap, reload, part }: { services: TripS
   };
   const problem = (f: string): string | null => problems[f] || null;
 
+  if (part === 'remove') return <RemoveTrip snap={snap} reload={reload} />;
   if (part === 'when') {
     return (
       <div data-settings="when">
