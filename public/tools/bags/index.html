@@ -5707,6 +5707,8 @@ const ADVISOR_MOVES_KG = 0.5;
 const ADVISOR = { open:false, style:null, styleTouched:false, goal:null, source:null, q:null, answer:null, input:null, error:'', back:null,
   returnable:false, stale:false, sig:null, again:false, bigger:null };
 let ADVISOR_RUN = 0, ADVISOR_DONE = Promise.resolve(), ADVISOR_SCRIPT = null;
+// a delete request applied as the page loaded: the answers kept in this tab's history entry go too (GA-RELOAD; review of PR 87, I1)
+let ADVISOR_FORGET = false;
 
 function loadAdvisor(){
   if(window.WayfinchAdvisor) return Promise.resolve(window.WayfinchAdvisor);
@@ -6119,6 +6121,16 @@ function advisorPageOn(on){
 // ADVISOR_GLIDE: the bike (and theme) it was last drawn for, so renderAdvisor draws it again whenever the plan's bike changed since.
 let ADVISOR_GLIDE = null;
 const advisorGlideKey = () => JSON.stringify([S.bikeProfile || null, bikeTheme()]);
+// The plan's bike or the theme changed under the open advisor without a tap in it (a bike followed on a return from the back/forward
+// cache, another tab's or the system's theme; review of PR 87, M1 and M2): the drawing, the Bike line, the sketches and the cards again,
+// and for another bike the answer searched again on it, with the rider's answers.
+function advisorFollow(){
+  if(!ADVISOR.open || ADVISOR_GLIDE === advisorGlideKey()) return;
+  let was = null; try { was = JSON.parse(ADVISOR_GLIDE)[0]; } catch(e){}
+  const bike = JSON.stringify(was) !== JSON.stringify(S.bikeProfile || null);
+  renderAdvisor();
+  if(bike) ADVISOR_DONE = runAdvisor();
+}
 function renderAdvisorGlide(){
   const el = $('advisorGlide'); if(!el) return;
   ADVISOR_GLIDE = advisorGlideKey();
@@ -6232,7 +6244,10 @@ function advisorRestore(state){
 }
 function openAdvisorFromLink(hash = location.hash){
   const link = advisorLink(hash); if(!link) return false;
-  if(!ADVISOR.open){ let state = null; try { state = history.state; } catch(e){} advisorRestore(state); }
+  // a delete applied as this page loaded (C-DELETE: a tab that never heard of it, discarded or restored): no answer comes back, and the
+  // entry's own are dropped (review of PR 87, I1)
+  if(!ADVISOR.open && ADVISOR_FORGET){ ADVISOR_FORGET = false; try { history.replaceState(null, '', location.href); } catch(e){} }
+  else if(!ADVISOR.open){ let state = null; try { state = history.state; } catch(e){} advisorRestore(state); }
   if(link.back){
     const [href] = BIKE_BACKS[link.back];
     ADVISOR.back = href; setWayfinchBack(href);   // the one top bar goes there too
@@ -11453,6 +11468,7 @@ function applyDeleteRequest(){
   } catch(e){}
   remove(DELETING_KEY);
   DELETE_SEEN=deleteMark();   // this tab's own delete
+  ADVISOR_FORGET=true;   // and the Gear advisor's answers in this tab's history (GA-RELOAD)
   return true;
 }
 /* ---- Contract 2: a trip from Wayfinch (spec 7.1) ----
@@ -12388,7 +12404,7 @@ function followOtherTabs(event){
 window.addEventListener('storage', followOtherTabs);
 // A hidden, frozen or cached tab may never have received the storage event (rule 8).
 document.addEventListener('visibilitychange', () => { if(document.hidden) flushDraft(); else { checkOtherTabs(); followThemeChoice(); } });
-window.addEventListener('pageshow', event => { checkOtherTabs(); followThemeChoice(); if(event.persisted) followBikeChoice(); });
+window.addEventListener('pageshow', event => { checkOtherTabs(); followThemeChoice(); if(event.persisted){ followBikeChoice(); advisorFollow(); } });
 window.addEventListener('pagehide', flushDraft);
 function showRecoveredDraft(){
   $('draftText').textContent = 'Your working plan was restored from this browser.';
@@ -13791,6 +13807,7 @@ function applyTheme(t){
   if(S.step >= 2) drawRig();          // the fill ramp is read from the stylesheet
   else paintRigBike();                // the frame's casing follows the theme
   if(typeof renderLook==='function')renderLook();
+  advisorFollow();                    // the Gear advisor's drawings, when it shows
 }
 function setTheme(t){ THEME_CHOSEN = true; S.theme = t; applyTheme(t); store.set('loadcheck:theme', t); noteThemeChoice(t); queueDraftSave(); }
 
