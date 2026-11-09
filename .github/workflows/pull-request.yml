@@ -52,16 +52,17 @@ jobs:
       - run: npm ci
       - run: npm run qa
 
-  # The browser tests in three parts side by side (plan Task 23: over 6 minutes in one; in two halves a slow browser install of
-  # 5.5 minutes once cut a half off at its 12), and the budgets alone, so nothing else runs on the machine while they are timed.
-  # The check a merge needs stays `browser`.
+  # The browser tests in four parts side by side (plan Task 23: over 6 minutes in one; three parts grew to 9-12 minutes and were
+  # cut off at their limit with no failing test), and the budgets alone, so nothing else runs on the machine while they are timed.
+  # The job limit is 15 so a slow browser install cannot cut a part off. The check a merge needs stays `browser`, which waits
+  # for every part in this matrix.
   browser-shard:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        part: ['1/3', '2/3', '3/3', 'budgets']
+        part: ['1/4', '2/4', '3/4', '4/4', 'budgets']
     env:
       WAYFINCH_SHARDED: '1'
     steps:
