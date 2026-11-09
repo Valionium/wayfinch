@@ -10,7 +10,8 @@ import { parseGpx } from '../../../src/core/route/gpx.ts';
 import type { XmlDocLike } from '../../../src/core/route/gpx.ts';
 import { planStages } from '../../../src/core/route/stages.ts';
 import type { Pace } from '../../../src/core/route/stages.ts';
-import type { Trip } from '../../../src/core/types.ts';
+import type { Trip, TripStops } from '../../../src/core/types.ts';
+import { withStops } from '../../../src/core/route/day-stops.ts';
 import { DEFAULT_SETTINGS } from '../../../src/store/rules.ts';
 import type { Settings } from '../../../src/store/rules.ts';
 import { handoffGpx, tripAttributes } from '../../../src/ui/trip/handoff.ts';
@@ -224,6 +225,49 @@ describe('[C-HANDOFF-ROUTE] the same route in both apps', () => {
     page.context.qaText = fixture;
     expect(json('handoffTrip(qaText)')).toEqual({ nights: 2, departureDate: '2026-06-12', month: 5, sleep: 'mixed', pace: 'hard', flatKph: 22,
       startName: 'Heidelberg', endName: 'Strasbourg', route: expect.stringMatching(/^[0-9a-f]{64}$/) });
+  });
+});
+
+describe('[TRIP-DAY-STOPS] days that end where you can sleep travel to the bag planner (owner, 9 Nov 2026)', () => {
+  test("the trip's stops travel as the days' ends and names; the bag planner ends its days there; other nights there split by effort again", async () => {
+    const base = await handedOff('multi-day-800', { nights: 3, pace: 'sporting' as Pace });
+    const plan = [...planStages(base.trip.route, { flatKph: 25, pace: 'sporting', nights: 3 })];
+    const ends = [plan[0]!.endKm + 3.2, plan[1]!.endKm, plan[2]!.endKm - 4.1];
+    const stops: TripStops = { routeId: base.trip.route.id, basis: plan.slice(0, -1).map((x) => x.endKm), days: [
+      { placeId: 'n1', km: ends[0]!, name: 'Camping "Am See"', town: 'Lahr', by: 'auto' },
+      { placeId: null, km: plan[1]!.endKm, name: null, town: null, by: 'auto' },
+      { placeId: 'n3', km: ends[2]!, name: 'Hotel Krone', town: null, by: 'rider' },
+    ] };
+    const route = { ...base.trip.route, stages: withStops(base.trip.route, plan, stops, 25) };
+    const trip = { ...base.trip, route, stops };
+    const gpx = handoffGpx(route, tripAttributes(trip, base.settings, { start: 'A', end: 'B' }));
+    const { page, json } = planner(gpx);
+    page.context.qaText = gpx;
+    expect(json('handoffTrip(qaText)')).toMatchObject({ nights: 3, stops: ends, stopNames: ['Camping "Am See"', null, 'Hotel Krone'] });
+    await page.run('receiveHandoff()');
+    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/where each day ends/);
+    expect(await page.run('applyHandoff()')).toBe(true);
+    const days = json<{ km: number; name: string | null }[]>('nightStops().slice(1,-1).map(s=>({km:s.kmExact,name:s.name}))');
+    days.forEach((d, i) => expect(d.km).toBeCloseTo(ends[i]!, 6));
+    expect(days.map((d) => d.name)).toEqual(['Camping "Am See"', null, 'Hotel Krone']);
+    // kept with the plan's route, and gone with another number of nights or another route
+    expect(json('normalisePlan(captureDraft()).gpx.copilotStops.length')).toBe(3);
+    page.run('S.nights=2;');
+    const two = json<number[]>('nightStops().slice(1,-1).map(s=>s.kmExact)');
+    expect(two).toHaveLength(2);
+    expect(two[0]).not.toBeCloseTo(ends[0]!, 1);
+    const other = (await handedOff('loop')).gpx;
+    page.context.qaOther = other;
+    await page.run("loadGPX(qaOther,'other.gpx',null,{handoff:{start:null,end:null}})");
+    expect(json('"copilotStops" in S.gpx')).toBe(false);
+  }, 120_000);
+
+  test('a trip without stops, or whose days no longer end at them, sends none', async () => {
+    const { gpx, trip, settings } = await handedOff('multi-day-800', { nights: 3, pace: 'sporting' as Pace });
+    expect(gpx).not.toMatch(/ stops=/);
+    const plan = [...planStages(trip.route, { flatKph: 25, pace: 'sporting', nights: 3 })];
+    const stale: TripStops = { routeId: trip.route.id, basis: plan.slice(0, -1).map((x) => x.endKm), days: plan.slice(0, -1).map((x) => ({ placeId: 'p', km: x.endKm + 2, name: 'X', town: null, by: 'auto' as const })) };
+    expect(handoffGpx(trip.route, tripAttributes({ ...trip, route: { ...trip.route, stages: plan }, stops: stale }, settings, { start: null, end: null }))).not.toMatch(/ stops=/);
   });
 });
 
