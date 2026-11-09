@@ -27,9 +27,6 @@ const TripSettings = lazy(() => import('./settings.tsx').then((m) => m.TripSetti
 const GetReady = lazy(() => import('./getready.tsx').then((m) => m.GetReady));
 // The route's summary, with its profile and the stops on it, is its own chunk as well.
 const RouteSummary = lazy(() => import('./summary.tsx').then((m) => m.RouteSummary));
-// Remove this trip stands next to Change in the Route step's done row (owner, 9 Nov 2026): its own chunk with its confirm step and
-// words, nothing shown until it is in (the first screen carries none of it).
-const RemoveTrip = lazy(() => import('./remove.tsx').then((m) => m.RemoveTrip), () => null);
 
 /** Contract 2: hands the route and the trip's settings to the bag planner, which asks before it changes anything. */
 function PlanBags({ handOff }: { handOff: NonNullable<TripServices['handOff']> }) {
@@ -166,7 +163,7 @@ export function TripScreen({ services }: { services: TripServices }) {
           <Step
             name="route" n={1} title={W.appTripStepRoute} state={stateOf('route', trip !== null)} open={openStep === 'route'} canOpen onOpen={choose('route')}
             line={trip ? routeDoneLine(trip) : null} below={snap ? <TripDetails services={services} snap={snap} reload={reload} /> : null}
-            beside={snap?.trip ? <RemoveTrip snap={snap} reload={reload} /> : null}
+            beside={snap?.trip ? <TripSettings services={services} snap={snap} reload={reload} part="remove" /> : null}
           >
             <AddRoute services={services} snap={snap} reload={reload} dropped={dropped} onDropTaken={() => setDropped(null)} onAdded={(said) => { setAdded(said); setChosen(null); }} />
             {snap?.trip ? <TripSettings services={services} snap={snap} reload={reload} part="when" /> : null}

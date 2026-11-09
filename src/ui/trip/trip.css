@@ -62,6 +62,8 @@ progress { width: 100%; accent-color: var(--blaze); }
    confirm step (and any problem) takes a full row of its own below. A quieter look than Change: muted, not the accent. */
 .trip-step-head h2 { flex: 1 1 auto; }
 .trip-step-head .trip-remove { display: contents; }
+/* While its chunk loads, the lazy line says nothing in the row. */
+.trip-step-head > [aria-busy] { display: none; }
 .trip-step-head .trip-remove > .notice, .trip-step-head .trip-remove > .field-problem { flex: 1 1 100%; margin: 4px 0 8px; }
 .trip-step-head .trip-remove > .btn { min-height: 44px; min-width: 44px; padding: 0 8px; background: none; border: 0; box-shadow: none; color: var(--muted); font-size: 0.9375rem; font-weight: 400; text-decoration: underline; }
 .trip-added .btn { margin-top: 8px; display: flex; }
