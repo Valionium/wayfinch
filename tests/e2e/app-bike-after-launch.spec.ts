@@ -169,7 +169,7 @@ const forkZoom = (page: Page) => page.evaluate(() => {
  * empty), and the last chip (and its focus) is shown whole below that area. */
 async function forkCloseUpStays(page: Page): Promise<void> {
   const state = () => page.evaluate(() => {
-    const body = document.getElementById('bikeDetailsBody')!, zoom = document.getElementById('lookForkZoom')!, stage = document.getElementById('lookStage')!;
+    const body = document.getElementById('bikeDetailsBody')!, zoom = document.getElementById('lookForkZoom')!, stage = document.getElementById('lookPreview')!;
     const bike = document.querySelector('#lookPreview svg')!.getBoundingClientRect();
     const chips = [...document.querySelectorAll('#lookForkColour label')] as HTMLElement[];
     const last = chips[chips.length - 1]!, b = body.getBoundingClientRect(), z = zoom.getBoundingClientRect(), s = stage.getBoundingClientRect();
@@ -198,14 +198,20 @@ async function forkCloseUpStays(page: Page): Promise<void> {
   await page.keyboard.press('Tab');
   await page.locator('#lookForkColour label').last().locator('input').focus();
   await expect.poll(state).toEqual(all);
-  // past the end of the Fork part, the close-up goes and the bike takes the whole drawing area again
-  await page.evaluate(() => {
-    const body = document.getElementById('bikeDetailsBody')!, end = document.getElementById('lookForkSet')!.getBoundingClientRect();
-    body.scrollTop += end.bottom - document.getElementById('lookStage')!.getBoundingClientRect().bottom + 40;
+  // past the end of the Fork part, the close-up goes and the bike takes the whole drawing area again (where the dialog scrolls that far:
+  // in a tall window the end of the dialog can come first, and the Fork part then stays on screen). As above, the page's second frame
+  // that brings the focused chip into view goes first, or it would scroll back after ours.
+  await page.evaluate(() => new Promise<void>((done) => { requestAnimationFrame(() => requestAnimationFrame(() => { done(); })); }));
+  const past = await page.evaluate(() => {
+    const body = document.getElementById('bikeDetailsBody')!, end = () => document.getElementById('lookForkSet')!.getBoundingClientRect().bottom;
+    const panel = () => document.getElementById('lookPreview')!.getBoundingClientRect().bottom;
+    body.scrollTop += end() - panel() + 40;
+    return end() < panel() - 1;
   });
+  if (!past) return;
   await expect(page.locator('#lookForkZoom')).toBeHidden();
   await expect.poll(() => page.evaluate(() => {
-    const s = document.getElementById('lookStage')!.getBoundingClientRect(), p = document.querySelector('#lookPreview svg')!.getBoundingClientRect();
+    const s = document.getElementById('lookPreview')!.getBoundingClientRect(), p = document.querySelector('#lookPreview svg')!.getBoundingClientRect();
     return Math.abs(p.left + p.width / 2 - (s.left + s.width / 2)) < 2;
   })).toBe(true);
 }

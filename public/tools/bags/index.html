@@ -1604,16 +1604,13 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .bike-look h3{margin:0 0 4px}
 /* 6 px wider than the options on each side: a checked ring (3 px) or a focus ring (4 px) that scrolls under the panel stays under it
    (owner's try-out, 5 Nov 2026). The dialog's body has 12-16 px of room on each side. */
-.look-stage{position:sticky;top:-16px;z-index:2;background:var(--panel);padding:6px 6px 4px;margin:0 -6px 6px;border-bottom:1px solid var(--line);
-  display:flex;align-items:center;justify-content:center;gap:10px;box-sizing:border-box}
-.look-preview{flex:1 1 auto;min-width:0}
+.look-preview{position:sticky;top:-16px;z-index:2;background:var(--panel);padding:6px 6px 4px;margin:0 -6px 6px;border-bottom:1px solid var(--line)}
 .look-preview svg{display:block;width:100%;max-width:420px;height:auto;margin:0 auto}
 /* while the close-up shows, the bike moves to the left at the width renderForkZoom works out, and the close-up sits on its right */
-.look-stage.with-zoom .look-preview{flex:0 0 auto}
-.look-stage.with-zoom .look-preview svg{width:var(--look-bike-w,100%);margin:0}
+.look-preview.with-zoom svg{width:var(--look-bike-w,100%);margin:var(--look-bike-y,0px) 0 0 var(--look-bike-x,0px)}
 /* The fork close-up (owner, 7 Nov 2026): the preview's drawing cut to the fork, 2.5 times as large (its width is set from the cut) */
 /* It shows inside the drawing's area, on the bike's right, while the Fork part is on screen below the drawing, to that part's end. */
-.look-fork-zoom{flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.look-fork-zoom{position:sticky;z-index:3;box-sizing:border-box;margin-left:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .look-fork-zoom svg{display:block;width:100%;height:auto}
 .look-guess{margin:0 0 8px;color:var(--muted);font-size:13px;min-height:1.2em}
 .bike-look fieldset{border:0;padding:0;margin:0 0 10px}
@@ -2235,7 +2232,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         <h3 id="bikeLookTitle" tabindex="-1">Look</h3>
         <p class="hint" id="lookHint"></p>
         <!-- the drawing, and beside it on the right while the fork's colours are chosen, the fork close-up (owner, 9 Nov 2026) -->
-        <div class="look-stage" id="lookStage"><div class="look-preview" id="lookPreview"></div><div class="look-fork-zoom hidden" id="lookForkZoom" aria-hidden="true"></div></div>
+        <div class="look-preview" id="lookPreview"></div><div class="look-fork-zoom hidden" id="lookForkZoom" aria-hidden="true"></div>
         <p class="look-guess" id="lookGuess"></p>
         <fieldset><legend id="lookColourTitle">Colour</legend>
           <div class="look-swatches" id="lookSwatches" role="radiogroup" aria-labelledby="lookColourTitle"></div>
@@ -3780,7 +3777,7 @@ function forkZoomBikeWidth(areaW,gap,cut){
   return Math.max(0,Math.min(alone,tall*320/(cut.h*FORK_ZOOM),(areaW-gap-2)/(1+cut.w*FORK_ZOOM/320)));
 }
 function layoutForkZoom(){
-  const stage=$('lookStage'),zoom=$('lookForkZoom');
+  const stage=$('lookPreview'),zoom=$('lookForkZoom');
   if(!stage || !zoom || !stage.classList || !zoom.classList)return;
   let show=!!FORK_CUT && !!zoom.innerHTML;
   const set=$('lookForkSet'),body=$('bikeDetailsBody');
@@ -3791,12 +3788,20 @@ function layoutForkZoom(){
   }
   zoom.classList.toggle('hidden',!show);
   stage.classList.toggle('with-zoom',show);
-  if(!show){stage.style.removeProperty('--look-bike-w');stage.style.minHeight='';return;}
-  const cs=getComputedStyle(stage),pad=parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight);
-  const areaW=stage.clientWidth-pad,gap=parseFloat(cs.columnGap)||10,bikeW=forkZoomBikeWidth(areaW,gap,FORK_CUT);
+  if(!show){['--look-bike-w','--look-bike-x','--look-bike-y'].forEach(k=>stage.style.removeProperty(k));stage.style.minHeight='';return;}
+  // The drawing (#lookPreview, which holds only the drawing) and the close-up, its next sibling, are both sticky in Look: the close-up
+  // is pulled up over the drawing's right part by its margins (taking no room of its own) and sticks the moment the drawing does.
+  const cs=getComputedStyle(stage),num=k=>parseFloat(cs[k])||0,GAP=10;
+  const areaW=stage.clientWidth-num('paddingLeft')-num('paddingRight'),innerH=Math.min(areaW,420)*150/320;
+  const bikeW=forkZoomBikeWidth(areaW,GAP,FORK_CUT),zoomW=FORK_CUT.w*FORK_ZOOM*bikeW/320+2,zoomH=FORK_CUT.h*FORK_ZOOM*bikeW/320+2;
+  const side=Math.max(0,(areaW-bikeW-GAP-zoomW)/2),panelH=num('paddingTop')+innerH+num('paddingBottom')+num('borderBottomWidth');
+  const down=num('paddingTop')+(innerH-zoomH)/2,after=num('marginBottom');   // the close-up's top within the drawing's area
   stage.style.setProperty('--look-bike-w',r2(bikeW)+'px');
-  zoom.style.width=r2(FORK_CUT.w*FORK_ZOOM*bikeW/320)+'px';
-  stage.style.minHeight=r2(Math.min(areaW,420)*150/320+parseFloat(cs.paddingTop)+parseFloat(cs.paddingBottom)+(parseFloat(cs.borderBottomWidth)||0))+'px';
+  stage.style.setProperty('--look-bike-x',r2(side)+'px');
+  stage.style.setProperty('--look-bike-y',r2((innerH-bikeW*150/320)/2)+'px');
+  stage.style.minHeight=r2(cs.boxSizing==='border-box' ? panelH : innerH)+'px';
+  Object.assign(zoom.style,{width:r2(zoomW)+'px',top:r2(parseFloat(cs.top)+down)+'px',marginRight:r2(side)+'px',
+    marginTop:r2(-(after+panelH-down))+'px',marginBottom:r2(after+panelH-down-zoomH)+'px'});
 }
 let FORK_LAYOUT_FRAME=0;
 function queueForkLayout(){ if(FORK_LAYOUT_FRAME)return; FORK_LAYOUT_FRAME=requestAnimationFrame(()=>{FORK_LAYOUT_FRAME=0;layoutForkZoom();}); }
@@ -3889,7 +3894,7 @@ function flushLookPicker(){
 // in view above Look, and the dialog's lower edge. The browser brings the control itself into view, not the ring, and not past the
 // panel; this scrolls the rest, once now and once after the browser's own scrolling.
 function keepLookFocusInView(e){
-  const body=$('bikeDetailsBody'),preview=$('lookStage'),el=e.target;
+  const body=$('bikeDetailsBody'),preview=$('lookPreview'),el=e.target;
   if(!body || !preview || !el || el===$('bikeLookTitle'))return;
   const fit=()=>{
     // the ring is the option's: on its label (Look's own swatches and chips, and the extras' .lx-swatch and .lx-chip; review of PR 50, I3)
