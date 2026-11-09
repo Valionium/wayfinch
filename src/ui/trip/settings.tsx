@@ -7,14 +7,12 @@ import { TF } from '../../core/wording/en-trip-fields.ts';
 import { keepFreshOffered } from '../../data/refresh.ts';
 import type { Settings } from '../../store/rules.ts';
 import { useFollowing } from '../follow.ts';
-import { lazy } from '../lazy.tsx';
 import { suggestedNights } from './model.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
 
 type Save = (field: keyof Settings, value: unknown) => Promise<boolean>;
 
 // Remove this trip, last in the Route step: a chunk of its own, with its confirm step and its words (owner's wish, 9 Nov 2026).
-const RemoveTrip = lazy(() => import('./remove.tsx').then((m) => m.RemoveTrip));
 
 export function NumberField({ id, label, value, step, min, max, placeholder, onCommit, problem }: {
   id: string; label: string; value: number | null; step: string; min: number; max: number; placeholder?: string;
@@ -131,7 +129,6 @@ export function TripSettings({ services, snap, reload, part }: { services: TripS
         {settings.nights !== null ? <button type="button" class="btn" onClick={() => void save('nights', null)}>{W.appTripNightsUseSuggested}</button> : null}
 
         {trip ? <p class="muted">{TR.appTripSettingsStageNote}</p> : null}
-        {trip ? <RemoveTrip snap={snap} reload={reload} /> : null}
       </div>
     );
   }
