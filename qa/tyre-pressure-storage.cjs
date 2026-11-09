@@ -130,7 +130,8 @@ const KEPT={...PRESSURE,riderKg:null};
     p.run('clearStoredRiderWeight()');
     check(storage.values.get('loadcheck:draft')===second,'[LC-RIDER-GONE] once cleared, a later load writes nothing');
     const html=fs.readFileSync(PAGE,'utf8'),init=html.slice(html.indexOf('/* ==== 95-init.js ==== */'));
-    check(init.indexOf('clearStoredRiderWeight()')>0 && init.indexOf('clearStoredRiderWeight()')<init.indexOf('store.get(SETUP_KEY)'),'[LC-RIDER-GONE] it runs at start-up, before the plan and setups are read');
+    // the start-up reads the setups with storedSetups() (review of PR 80, m-4)
+    check(init.indexOf('clearStoredRiderWeight()')>0 && init.indexOf('clearStoredRiderWeight()')<init.indexOf('await storedSetups()'),'[LC-RIDER-GONE] it runs at start-up, before the plan and setups are read');
     // an old export brings no body weight back, and an export holds none
     await run('importAll(JSON.stringify({draft:{...captureDraft(),tyrePressure:{...qaPressure,riderKg:82}}}))');
     check(run('IMPORTED_DRAFT!==null && IMPORTED_DRAFT.tyrePressure.riderKg===null && IMPORTED_DRAFT.tyrePressure.bagKg===2'),'[LC-RIDER-GONE] an imported old plan carries no body weight, and keeps the rest');
