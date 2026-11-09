@@ -11621,7 +11621,7 @@ function tripFoundation(){
   return mine.find(s => s.isDefault) || mine.slice().sort((a,b) => when(b).localeCompare(when(a)))[0] || null;
 }
 // What makes two plans the same plan: the bike, the trip, the bags and the kit (not the ticks, the step or the view).
-function planSignature(p){
+function planSameKey(p){
   const n=normalisePlan(p); if(!n) return '';
   const g=n.gpx;
   return JSON.stringify([n.bikeProfile ? n.bikeProfile.id : null,n.trip,n.bags,n.decks,n.kit,n.custom,n.qty,n.foodMode,n.pinned,n.mode,n.addedKit,
@@ -11630,8 +11630,8 @@ function planSignature(p){
 function todayDay(){ const n=new Date(); return `${n.getDate()} ${MONTHS[n.getMonth()].slice(0,3)}`; }
 // The plan here, as a trip setup with no thumbnail (the drawing is made from the plan when shown), unless a saved setup holds it.
 function keepPlanBefore(){
-  const sig=planSignature(captureDraft());
-  if(SETUPS.some(s => planSignature(s) === sig)) return null;
+  const sig=planSameKey(captureDraft());
+  if(SETUPS.some(s => planSameKey(s) === sig)) return null;
   return {...snapshotSetup(`Before ${HANDOFF.name}, ${todayDay()}`,''),thumb:''};
 }
 async function planTripBags(){
