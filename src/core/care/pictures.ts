@@ -14,7 +14,8 @@ export type Kinds =
   | { by: 'rim-brake'; pictures: Partial<Record<RimKind, string>> }
   | { by: 'axle'; pictures: Partial<Record<AxleKind, string>> }
   | { by: 'bars'; pictures: Partial<Record<'drop' | 'flat', string>> }
-  | { by: 'shifting'; pictures: { cable: string } };
+  | { by: 'shifting'; pictures: { cable: string } }
+  | { by: 'brakes'; pictures: { 'hydraulic-disc': string } };
 export type StepPicture = string | Kinds | null;
 /** The bike details that choose a picture's kind; null is Not sure (or no bike). */
 export type PictureDetails = {
@@ -28,10 +29,15 @@ const RIM_OPEN: Kinds = { by: 'rim-brake', pictures: { caliper: 'brake-qr-open',
 const RIM_CLOSE: Kinds = { by: 'rim-brake', pictures: { caliper: 'brake-qr-close', 'v-brake': 'vbrake-close', hydraulic: 'hydro-rim-close' } };
 /** Centring a rim brake (T10): a road caliper's centring screw, a V-brake's spring screw; a hydraulic rim brake has none. */
 const RIM_CENTRE: Kinds = { by: 'rim-brake', pictures: { caliper: 'rim-centre-caliper', 'v-brake': 'rim-centre-vbrake' } };
+/** With the wheel out, a pad spacer in a hydraulic disc brake (T1): only for hydraulic disc brakes, and when the brakes are not told. */
+const PAD_SPACER: Kinds = { by: 'brakes', pictures: { 'hydraulic-disc': 'pad-spacer' } };
 /** The wheel pushed fully into the fork's ends and tightened, by the axle (redo, answer 1). */
 const WHEEL_SEAT: Kinds = { by: 'axle', pictures: { thru: 'wheel-seat-thru', qr: 'wheel-seat-qr', nuts: 'wheel-seat-nuts' } };
 
 export const STEP_PICTURES: Readonly<Record<string, readonly StepPicture[]>> = {
+  'puncture-tube': [PAD_SPACER, 'tyre-levers', null, 'pinch-slits', 'patch-press', null, null],
+  'puncture-tubeless': [null, null, 'tubeless-plug', null, null, null, null],
+  'tyre-torn': [null, 'tyre-boot', null, null],
   'spoke-snapped': ['spoke-wrap', RIM_OPEN, null, null, RIM_CLOSE],
   'brake-rub-rim': [WHEEL_SEAT, null, null, RIM_CENTRE, RIM_OPEN, RIM_CLOSE],
   'brake-rub-disc': [WHEEL_SEAT, 'pad-gap', 'disc-bolts', null, null],
@@ -50,12 +56,14 @@ const lead = <T>(order: readonly T[], first: T): T[] => [first, ...order.filter(
 /**
  * The kinds in the order they show for a bike: its own first when told; when not, the most common modern one first (redo, section 2).
  * A rim brake's kind not told: bars break the tie inside rim brakes, since drop-bar levers cannot pull V-brakes (answer 2). An axle not
- * told: a thru-axle, but a quick release on rim brakes. Electronic gears have no cable to adjust: no picture.
+ * told: a thru-axle, but a quick release on rim brakes. Electronic gears have no cable to adjust: no picture. A pad spacer is for
+ * hydraulic disc brakes only (shown too while the brakes are not told).
  */
 export function kindOrder(by: Kinds['by'], d: PictureDetails): string[] {
   if (by === 'rim-brake') return d.rimBrake ? lead(RIM_ORDER, d.rimBrake) : d.bars === 'flat' ? lead(RIM_ORDER, 'v-brake') : [...RIM_ORDER];
   if (by === 'axle') return d.axle ? lead(AXLE_ORDER, d.axle) : d.brakes === 'rim' ? lead(AXLE_ORDER, 'qr') : [...AXLE_ORDER];
   if (by === 'bars') return d.bars === 'flat' ? ['flat', 'drop'] : ['drop', 'flat'];
+  if (by === 'brakes') return d.brakes === null || d.brakes === 'hydraulic-disc' ? ['hydraulic-disc'] : [];
   return d.shifting === 'electronic' ? [] : ['cable'];
 }
 

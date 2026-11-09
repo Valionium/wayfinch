@@ -212,13 +212,12 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
     urls: [
       'https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know',
       'https://www.roadbikerider.com/be-a-hero-on-rides-d3/',
-      'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot',
-    ],
-    note: 'Book pp. 48-49 and 84-85: the order of work, how to find the hole, pinch-flat slits, patch glue timing, a second check of tyre and rim, the pinched-tube check (book, more careful); p. 209: patch or replace the tube.',
+      'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot', 'https://www.parktool.com/en-us/blog/repair-help/tire-and-tube-removal-and-installation', 'https://www.schwalbe.com/AEROTHAN-GLUELESS-PATCHES'],
+    note: 'Book pp. 48-49 and 84-85: the order of work, how to find the hole, pinch-flat slits, patch glue timing, a second check of tyre and rim, the pinched-tube check (book, more careful); p. 209: patch or replace the tube. Care pictures redo (approved by the owner, 9 November 2026): T1, Shimano manuals: with the wheel out a squeezed hydraulic lever pushes the pistons out; T2, Park Tool: push the bead to the middle of the rim first; T3, Schwalbe and Tubolito: glue patches do not hold on TPU tubes; T4 guides the disc between the pads.',
   },
   'puncture-tubeless': {
-    urls: ['https://www.wtb.com/blogs/wtb/how-to-plug-a-puncture-on-a-tubeless-bicycle-tire', 'https://theproscloset.com/blogs/news/how-to-tubeless-tire-plug'],
-    note: "Not covered by the owner's book pages. Step 6 says to remove the tubeless valve (ruling I2 on PR 59: the draft said only the valve core, which leaves the valve in the rim); no public page could be read for how, so no detail is added.",
+    urls: ['https://www.wtb.com/blogs/wtb/how-to-plug-a-puncture-on-a-tubeless-bicycle-tire', 'https://theproscloset.com/blogs/news/how-to-tubeless-tire-plug', 'https://www.performancebike.com/dynaplug-unpacked/cp1498'],
+    note: "Not covered by the owner's book pages. Step 6 says to remove the tubeless valve (ruling I2 on PR 59: the draft said only the valve core, which leaves the valve in the rim); no public page could be read for how, so no detail is added. T5 (care pictures redo, 9 November 2026): a plug with a metal tip comes out before a tube goes in, or it can hole the tube (Dynaplug).",
   },
   'chain-broken': {
     urls: [
@@ -267,8 +266,8 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
     note: 'Book p. 40: the twist test (twist the part to see whether it still moves; never twist carbon parts) and a torque wrench for carbon (book, more careful); p. 206: bar and stem bolts tight. Carbon bolt torque: 4-6 Nm general vs 5.4/6.2/8.8 Nm by maker, so the card says to follow the printed number. The draft\'s "tighten by feel until firm" is unsourced (draft section 6) and is replaced by the printed torque, or, without a wrench, even tightening a little at a time until the part passes the twist test (the coordinator\'s ruling R1 on PR 59, after I4).',
   },
   'tyre-torn': {
-    urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know', 'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot'],
-    note: 'Book p. 48: the repair kit carries a piece of old tyre, about 5 square cm, as a boot.',
+    urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know', 'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot', 'https://www.parktool.com/en-int/blog/calvins-corner/repairing-on-the-ride'],
+    note: 'Book p. 48: the repair kit carries a piece of old tyre, about 5 square cm, as a boot. T18 (care pictures redo, 9 November 2026): a boot needs the pressure of a tube to stay in place, so a tubeless tyre gets a tube too, its valve and any metal-tipped plug out first and the sealant wiped off (Park Tool); the card carries the clean cloth for that wipe (review of PR 59, I3).',
   },
   'ebike-no-power': {
     urls: [

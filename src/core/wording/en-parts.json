@@ -42,7 +42,7 @@
   },
   "rim": {
    "name": "Rim",
-   "text": "The rim is the wheel's outer hoop: the tyre sits on it and the spokes pull on it. With rim brakes, the pads grip its sides."
+   "text": "The rim is the wheel's outer hoop: the tyre sits on it and the spokes pull on it. With rim brakes, the pads grip its sides. In its middle is a dip that gives slack when you fit a tyre."
   },
   "dropouts": {
    "name": "Dropouts",
@@ -54,15 +54,15 @@
   },
   "bead": {
    "name": "Tyre bead",
-   "text": "The bead is the tyre's edge on each side, with a strong wire or fibre inside. It hooks into the rim and holds the tyre on."
+   "text": "The bead is the tyre's edge on each side, with a strong wire or fibre inside. It sits on a ledge inside the rim's edge and holds the tyre on."
   },
   "tube": {
    "name": "Inner tube",
    "text": "The inner tube is the rubber ring inside the tyre that holds the air, filled through its valve. Tubeless tyres have none, but a spare tube can still get you home."
   },
   "valve": {
-   "name": "Valve (Presta, Schrader)",
-   "text": "The valve is where you pump the air in; it comes through a hole in the rim. A Presta valve is thin, with a small nut on its tip to undo before pumping; a Schrader valve is wider, like a car's, with a pin in the middle."
+   "name": "Valve (Presta, Schrader, Dunlop)",
+   "text": "The valve is where you pump the air in; it comes through a hole in the rim. A Presta valve is thin, with a small nut on its tip to undo before pumping; a Schrader valve is wider, like a car's, with a pin in the middle. A Dunlop valve, common on city bikes, is wide with a cap nut over its core."
   },
   "tubeless-valve": {
    "name": "Tubeless valve",
@@ -173,6 +173,30 @@
   "pg-disc-caliper": {
    "name": "The disc brake caliper behind the fork leg.",
    "description": "The front wheel's middle seen from the bike's left side: the brake disc on the hub, the fork leg coming down to the axle. The caliper, marked \"caliper\", sits on two short posts behind the leg above the axle, astride the disc's edge, with its hose running up behind the leg."
+  },
+  "pg-tyre": {
+   "name": "The tyre, the wheel cut through.",
+   "description": "The wheel cut through: the tyre, marked \"tyre\", arches over the inner tube from one side of the rim to the other, its two edges sitting inside the rim's walls. The rim below has a small hook at the top of each wall, labelled \"hook\"."
+  },
+  "pg-bead": {
+   "name": "The tyre's beads on their ledges in the rim.",
+   "description": "The wheel cut through. The two edges of the tyre, marked \"bead\", each sit on a ledge inside the rim's wall, under the small hook at its top, labelled \"hook\"."
+  },
+  "pg-tube": {
+   "name": "The inner tube inside the tyre.",
+   "description": "The wheel cut through. Inside the tyre, the inner tube, marked \"inner tube\", fills the space and rests on the rim. The small hook at the top of each rim wall is labelled \"hook\"."
+  },
+  "pg-rim": {
+   "name": "The rim, the wheel cut through.",
+   "description": "The wheel cut through: the tyre on top and the rim under it, marked \"rim\": a wall on each side with a small hook at its top, labelled \"hook\", a ledge inside each wall where the tyre's edge sits, and a dip in the middle. Below is the rim's hollow box."
+  },
+  "pg-valves": {
+   "name": "A Presta, a Schrader and a Dunlop valve.",
+   "description": "Three valves standing through the rim, seen from the side. On the left, labelled \"Presta\", a thin threaded valve with a nut down on the rim and a small nut on its tip. In the middle, labelled \"Schrader\", a wider valve, threaded near its top, with a pin in its end; on the right, labelled \"Dunlop\", a wide valve with a ridged ring nut near its top over the core."
+  },
+  "pg-tubeless-valve": {
+   "name": "A tubeless valve fixed in the rim.",
+   "description": "The rim, labelled \"rim\", cut through at the valve. The valve, marked \"tubeless valve\", has a cone of rubber that sits in the dip in the middle of the rim, over the rim tape, and a stem down through the rim. A nut on the stem under the rim, labelled \"nut\", holds it tight."
   }
  }
 }

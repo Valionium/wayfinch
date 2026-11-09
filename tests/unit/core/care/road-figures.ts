@@ -13,16 +13,19 @@ const f = (field: Exclude<RoadField, 'step'>, text: string): RoadFigure => ({ fi
 export const ROAD_FIGURES: Record<string, RoadFigure[]> = {
   'puncture-tube': [
     f('problem', 'Puncture (inner tube)'), f('checkFirst', 'Is the tyre flat or only soft?'), f('checkFirst', 'Find the hole in the tyre'),
-    step(0, 'let out remaining air'), step(1, 'hook the first lever on a spoke'), step(1, 'Do not catch the tube'),
+    step(0, 'let out remaining air'), step(0, 'Hydraulic disc brakes: do not squeeze the brake lever while the wheel is out'),
+    step(1, "Squeeze the tyre's edges into the dip in the middle of the rim all round"), step(1, 'hook the first lever on a spoke'), step(1, 'Do not catch the tube'),
     step(2, 'pump it up and listen'), step(2, 'hold the tube near your lips'), step(3, 'Two side-by-side slits'),
     step(4, 'roughen an area a bit bigger than the patch'), step(4, 'about 30-60 seconds'), step(4, 'tacky, not wet'), step(4, "chalk"),
+    step(4, 'Light plastic (TPU) tubes need the patches made for them'),
     step(5, 'grit or small stones'), step(6, 'with a little air in it'), step(6, 'no tube is caught under the bead'),
+    step(6, 'guide the disc between the pads'),
     f('rideOn', 'Fine if it holds air'), f('rideOn', 'Stop if the tyre has a cut or bulge'),
   ],
   'puncture-tubeless': [
     f('problem', 'Puncture (tubeless)'), f('checkFirst', 'Spin the hole to the bottom so sealant plugs it'), f('checkFirst', 'Is it still hissing?'),
     step(0, 'spin it to the bottom'), step(1, 'Pull out the thorn or glass'), step(2, 'Ream the hole'), step(3, 'Trim the plug'),
-    step(4, 'a few minutes'), step(5, 'fit a spare tube'), step(5, 'remove the tubeless valve'), step(6, 'work loose'),
+    step(4, 'a few minutes'), step(5, 'fit a spare tube'), step(5, 'take out the tubeless valve'), step(5, 'any plug with a metal tip, which can hole the tube'), step(6, 'work loose'),
     f('rideOn', 'Fine once it holds air'), f('rideOn', 'Stop if the sidewall is cut or the tyre bulges'),
   ],
   'chain-broken': [
@@ -98,7 +101,8 @@ export const ROAD_FIGURES: Record<string, RoadFigure[]> = {
   ],
   'tyre-torn': [
     f('problem', 'Torn tyre (needs a boot)'), f('checkFirst', 'How big is the cut?'), f('checkFirst', 'Is the tube bulging?'),
-    step(0, 'Remove the wheel and tube'), step(1, 'boot (or a strong patch)'), step(2, 'pump to low pressure first'),
+    step(0, 'Remove the wheel and the tube'), step(0, 'Tubeless: take out the tubeless valve and any plug with a metal tip'), step(0, 'wipe the sealant off round the cut'),
+    step(1, 'boot (or a strong patch)'), step(2, 'pump to low pressure first'),
     step(3, 'Check for bulging'), step(3, 'lower pressure than normal'),
     f('rideOn', 'Fine to ride slowly if the boot holds'), f('rideOn', 'Walk if the tyre bulges'),
   ],
@@ -128,7 +132,7 @@ export const ROAD_CARRY: Record<string, string[]> = {
   'brake-weak-disc': ['carry-multi-tool', 'carry-cloth'],
   'gears-skipping': ['carry-multi-tool', 'carry-quick-link'],
   'bolt-loose': ['carry-multi-tool'],
-  'tyre-torn': ['carry-tyre-boot', 'carry-spare-tube', 'carry-tyre-levers', 'carry-pump'],
+  'tyre-torn': ['carry-tyre-boot', 'carry-spare-tube', 'carry-tyre-levers', 'carry-pump', 'carry-cloth'],
   'ebike-no-power': ['carry-charger', 'carry-cloth'],
 };
 

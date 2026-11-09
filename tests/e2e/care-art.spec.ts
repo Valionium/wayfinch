@@ -1,6 +1,7 @@
 // The construction kit's drawings drawn in a real browser (care pictures redo, proposal of 9 November 2026, section 8): every label lies
 // inside its picture, touches no other label, and crosses no drawn line or shape but its own leader. The font is the device's (the app
-// ships none), so each label's box is taken 8% wider and 2 units taller than this browser draws it.
+// ships none, and Linux's system font runs wider than Windows'), so each label's box is taken 20% wider and 2 units taller than this browser
+// draws it.
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { DRAWINGS } from '../../tools/care-art/drawings.ts';
@@ -19,8 +20,10 @@ test('[CARE-ART-LABELS] every label of every kit drawing is inside its picture, 
       const [, , vw, vh] = root.getAttribute('viewBox')!.split(' ').map(Number) as [number, number, number, number];
       type Box = { x0: number; y0: number; x1: number; y1: number; s: string };
       const boxes: Box[] = [...root.querySelectorAll('text')].filter((t) => !t.classList.contains('cp-badget')).map((t) => {
-        const b = (t as SVGTextElement).getBBox(), grow = b.width * 0.04;
-        return { x0: b.x - grow, y0: b.y - 1, x1: b.x + b.width + grow, y1: b.y + b.height + 1, s: t.textContent ?? '' };
+        // a wider font grows a label away from its anchor: to the right from its start, to the left from its end, both ways from its middle
+        const b = (t as SVGTextElement).getBBox(), grow = b.width * 0.2, anchor = t.getAttribute('text-anchor') ?? 'start';
+        const left = anchor === 'end' ? grow : anchor === 'middle' ? grow / 2 : 0, right = anchor === 'start' ? grow : anchor === 'middle' ? grow / 2 : 0;
+        return { x0: b.x - left, y0: b.y - 1, x1: b.x + b.width + right, y1: b.y + b.height + 1, s: t.textContent ?? '' };
       });
       const inBox = (x: number, y: number, b: Box, pad: number) => x > b.x0 - pad && x < b.x1 + pad && y > b.y0 - pad && y < b.y1 + pad;
       for (const b of boxes) {
@@ -38,9 +41,12 @@ test('[CARE-ART-LABELS] every label of every kit drawing is inside its picture, 
         const style = getComputedStyle(el), half = style.stroke !== 'none' ? Number.parseFloat(style.strokeWidth) / 2 : 0;
         const filled = style.fill !== 'none' && !/\bcp-(objline|hiline|thin|ctx|fine|arrow|ghost|armfill)\b/.test(cls);
         for (const b of boxes) {
-          // a thin line that starts or ends at this label is its leader
+          // a thin line that starts or ends near this label is its leader: it may start beside the label, never run into its words
           const ends = [pts[0]!, pts[pts.length - 1]!];
-          if (/\bcp-thin\b/.test(cls) && ends.some(([x, y]) => inBox(x, y, b, 6))) continue;
+          if (/\bcp-thin\b/.test(cls) && ends.some(([x, y]) => inBox(x, y, b, 6))) {
+            if (pts.some(([x, y]) => inBox(x, y, b, -1))) out.push(`"${b.s}": its leader runs into its words`);
+            continue;
+          }
           if (pts.some(([x, y]) => inBox(x, y, b, half))) { out.push(`"${b.s}" crosses a ${cls || el.tagName}`); continue; }
           if (filled && !card) {
             const probe = [[b.x0, b.y0], [b.x1, b.y0], [b.x0, b.y1], [b.x1, b.y1], [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2]];

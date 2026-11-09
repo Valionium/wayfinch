@@ -92,7 +92,7 @@ export function caliper(state: RimState): Pic {
     pic.turn(pivot, f.mm(8.5), state === 'close' ? openA - 8 : closedA + 8, state === 'close' ? closedA + 8 : openA - 8);
     const open = pol(pivot[0], pivot[1], f.mm(13), openA), closed = pol(pivot[0], pivot[1], f.mm(13), closedA);
     pic.text('cp-th', add(open, [-5, -3]), 'open', 'end');
-    pic.text('cp-th', add(closed, [-5, 13]), 'closed', 'end');
+    pic.text('cp-th', add(closed, [-8, -1]), 'closed', 'end');
   } else {
     pic.path(hi ? 'cp-hi' : 'cp-obj', lever(closedA), { name: 'lever' });
     pic.circle('cp-dark', pivot, 2.2);
@@ -258,7 +258,7 @@ export function hydraulic(state: RimState): Pic {
   pic.text('cp-t', [12, 232], LEFT);
   pic.facts.push(touches(pic, 'mount', 'arm-l', 1), at(pic, 'lever pivot', pivot, 'mount', 0));
   if (state === 'guide') {
-    pic.label('cp-th', [316, 40], 'hydraulic', [300, 46], m(s.we / 2 + REST + 8.5 + 14, -8), 'end', 'leader-h');
+    pic.label('cp-th', [190, 16], 'hydraulic', [214, 20], m(s.we / 2 + REST + 8.5 + 10, -9), 'middle', 'leader-h');
     pic.facts.push(pointsAt(pic, 'leader-h', 'arm-r'));
   }
   for (const x of ['l', 'r']) pic.facts.push(clear(pic, `pad-${x}`, `flank-${x}`, f.mm(REST - 0.2)), touches(pic, `pad-${x}`, `flank-${x}`, f.mm(REST + 0.2)));

@@ -57,7 +57,7 @@ export function wheelSeated(kind: Axle): Pic {
   // the moves: weight down on the bike, then tighten
   const legTop = m(half + 4.5, -58);
   pic.arrow(add(legTop, [-15, -6]), add(legTop, [-15, 20]));
-  pic.text('cp-th', add(legTop, [-21, 4]), 'push down', 'end');
+  pic.text('cp-th', add(legTop, [-21, -6]), 'push down', 'end');
   if (kind === 'qr') {
     // from behind the lever swings in the picture's plane: out from the leg (open) to along it (closed)
     pic.path('cp-ghost', tube(m(-half - 15, -4), m(-half - 46, -10), 4.5 * k));
@@ -135,8 +135,7 @@ export function spokeWrap(): Pic {
   for (let i = 1; i < turns * 2; i += 2) pic.line('cp-objline', add(X, scale(nd, -((pitch * (i + 0.6)) / 2 - (pitch * turns) / 2))), add(X, scale(nd, -((pitch * (i + 1.4)) / 2 - (pitch * turns) / 2))), { style: 'stroke-width:2' });
   const lb = lerp(end(holes[broken]!), X, 0.4);
   pic.label('cp-th', [8, 228], 'broken spoke', [60, 216], lb, undefined, 'leader-broken');
-  pic.label('cp-tm', [8, 18], 'wound round', [40, 45], along(2 + pitch / 2, -1), undefined, 'leader-wrap');
-  pic.text('cp-tm', [8, 39], 'its neighbour');
+  pic.label('cp-tm', [8, 20], 'wound round its neighbour', [40, 45], along(2 + pitch / 2, -1), undefined, 'leader-wrap');
   pic.facts.push(pointsAt(pic, 'leader-broken', 'broken', 1.5), pointsAt(pic, 'leader-wrap', 'broken', 2.5));
   pic.facts.push(touches(pic, 'broken', `spoke-${nj}`, 0.5));
   return pic;

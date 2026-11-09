@@ -150,7 +150,8 @@ test("[BC-ROAD] every card that opens the brake's quick release says it works mu
 
 test('[BC-ROAD] a step that wipes names a cloth the card carries; the disc card never touches the disc with fingers (review of PR 59, I3)', () => {
   const wiping = ROAD_CARDS.filter((c) => c.steps.some((s) => /\bwipe\b/i.test(s)));
-  expect(wiping.map((c) => c.id)).toEqual(['brake-weak-rim', 'brake-weak-disc', 'ebike-no-power']);
+  // T18 (care pictures redo, 9 November 2026): the torn tyre wipes the sealant off round the cut, so it carries the cloth too
+  expect(wiping.map((c) => c.id)).toEqual(['brake-weak-rim', 'brake-weak-disc', 'tyre-torn', 'ebike-no-power']);
   for (const c of wiping) expect(c.carry, c.id).toContain('carry-cloth');
   expect(ROAD_CARDS.find((c) => c.id === 'brake-weak-disc')!.steps.join(' ')).toContain('Never touch the disc or pads with your fingers');
 });
@@ -175,7 +176,9 @@ test('[BC-ROAD] bolt-loose puts the carbon warning first, and tightens only to t
 
 test("[BC-ROAD] a tubeless tyre's spare tube needs the whole tubeless valve out, not only its core (review of PR 59, I2)", () => {
   const steps = ROAD_CARDS.find((c) => c.id === 'puncture-tubeless')!.steps.join(' ');
-  expect(steps).toContain('remove the tubeless valve');
+  // T5 (care pictures redo, the owner's approval of 9 November 2026): the valve and any metal-tipped plug come out first
+  expect(steps).toContain('take out the tubeless valve');
+  expect(steps).toContain('any plug with a metal tip');
   expect(steps).not.toMatch(/valve core/i);
 });
 

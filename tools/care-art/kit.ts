@@ -142,7 +142,14 @@ export class Pic {
     return this;
   }
   /** A label with its leader: a thin line from near the label to the point on the part. */
-  label(cls: 'cp-t' | 'cp-tm' | 'cp-th', at: Pt, s: string, from: Pt, to: Pt, anchor?: 'middle' | 'end', name?: string): this {
+  label(cls: 'cp-t' | 'cp-tm' | 'cp-th', at: Pt, s: string, _from: Pt, to: Pt, anchor?: 'middle' | 'end', name?: string): this {
+    // the leader starts just outside the label's box, at the point of the box nearest the part, so it never runs into the words; the box
+    // is the label as a wide device font draws it (about 6.6 units a letter, a fifth more than this browser's)
+    const w = s.length * (cls === 'cp-tm' ? 6.1 : 6.6) * 1.2;
+    const x0 = anchor === 'end' ? at[0] - w : anchor === 'middle' ? at[0] - w / 2 : at[0], x1 = x0 + w, y0 = at[1] - 12, y1 = at[1] + 3;
+    const cx = Math.max(x0, Math.min(x1, to[0])), cy = Math.max(y0, Math.min(y1, to[1]));
+    const out = unit(sub(to, [cx, cy]));
+    const from: Pt = [cx + out[0] * 3, cy + out[1] * 3];
     this.line('cp-thin', from, to, name ? { name } : {});
     return this.text(cls, at, s, anchor);
   }

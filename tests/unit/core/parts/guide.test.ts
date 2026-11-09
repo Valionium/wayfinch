@@ -9,7 +9,7 @@ import { PART_PLACES } from '../../../../src/core/bike/part-points.ts';
 import type { PictureDetails } from '../../../../src/core/care/pictures.ts';
 import { GUIDE, guidePictures, partById } from '../../../../src/core/parts/guide.ts';
 import { linkSegments, STEP_PARTS } from '../../../../src/core/parts/links.ts';
-import { PICTURE_WORDS } from '../../../../src/core/wording/en-care-pictures.ts';
+import CARE_WORDS from '../../../../src/core/wording/en-care-pictures.json';
 import { CARE_TASKS, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
 import { partsWordsFrom, PG, TAG_WORDS } from '../../../../src/core/wording/en-parts.ts';
 import WORDS from '../../../../src/core/wording/en-parts.json';
@@ -25,6 +25,7 @@ const stepFiles = svgsIn(STEPS_DIR);
 const checked = partsWordsFrom(WORDS, PART_PLACES)!;
 const PART_WORDS = checked.parts;
 const GUIDE_PICTURE_WORDS = checked.pictures;
+const PICTURE_WORDS: Record<string, unknown> = CARE_WORDS.pictures;
 const sentences = (t: string): number => t.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).length;
 
 test("[PG-DATA] the guide holds the design's 36 parts in its six groups, in order, each with words, close-ups and mix-ups that exist", () => {

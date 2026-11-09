@@ -66,7 +66,7 @@ export function discBolts(): Pic {
   {
     const m = (x: number, y: number): Pt => [222 + x * k, 128 + y * k];
     pic.path('cp-ctx', poly([m(-10, -38), m(10, -38), m(9, 36), m(-9, 36)]), { name: 'leg' });
-    rotorEdge(m, 19.1, -24, 34, 'rotor-post');
+    rotorEdge(m, 19.1, -24, 26, 'rotor-post');
     caliper(m, -8, 32, -32, 22, [15, 25.6], 'cal-post');
     pads(m, [15, 25.6], -24, 14, 'post');
     pic.path('cp-ctx', new Path().M(m(-2, -32)).Q(m(-3, -37), m(-8, -40)), { style: 'stroke-width:3' });
@@ -80,7 +80,7 @@ export function discBolts(): Pic {
       pic.facts.push(within(pic, `bolt-post-${i}`, 'cal-post', 0.5));
     }
     pic.facts.push(clear(pic, 'leg', 'rotor-post', k * 2), clear(pic, 'rotor-post', 'cal-post', 0.5));
-    pic.label('cp-th', [306, 214], 'bolts', [292, 204], m(4.6, 12.4), 'end', 'leader-bolts');
+    pic.label('cp-th', [306, 214], 'bolts', [288, 203], m(4.6, 12.4), 'end', 'leader-bolts');
     pic.facts.push(pointsAt(pic, 'leader-bolts', 'bolt-post-1', 1));
     pic.text('cp-t', [308, 26], 'Post mount', 'end');
   }
@@ -192,3 +192,29 @@ export function discSide(mark: 'disc' | 'caliper'): Pic {
   pic.facts.push(at(pic, 'the caliper over the braking ring', pol(c[0], c[1], rr, a), 'caliper', 0), touches(pic, 'caliper', 'leg', 2));
   return pic;
 }
+
+/**
+ * The wheel out of a hydraulic disc brake (puncture step 1, T1): no disc in the slot, so a squeeze of the lever would push the pads
+ * together; a pad spacer between them keeps them apart.
+ */
+export function padSpacer(): Pic {
+  const pic = new Pic(320, 220);
+  const k = 5.2, m = (x: number, y: number): Pt => [140 + x * k, 108 + y * k];
+  const g = 0.9, padW = 3.6, rot0 = 0, rot1 = 1.8, slot: [number, number] = [rot0 - g - padW, rot1 + g + padW];
+  const body = new Path().M(m(slot[0] - 9, -14)).L(m(slot[1] + 9, -14)).L(m(slot[1] + 9, 12)).L(m(slot[1], 12)).L(m(slot[1], -9))
+    .L(m(slot[0], -9)).L(m(slot[0], 12)).L(m(slot[0] - 9, 12)).Z();
+  pic.path('cp-obj', body, { name: 'caliper' });
+  pic.path('cp-rubber', poly([m(slot[0], -6), m(slot[0] + padW, -6), m(slot[0] + padW, 9), m(slot[0], 9)]), { name: 'pad-o' });
+  pic.path('cp-rubber', poly([m(rot1 + g, -6), m(rot1 + g + padW, -6), m(rot1 + g + padW, 9), m(rot1 + g, 9)]), { name: 'pad-i' });
+  // the spacer: a plastic block in the slot where the disc was, its tab above
+  pic.circle('cp-halo', m(0.9, 2), 34);
+  pic.path('cp-hi', poly([m(rot0 - g, -4), m(rot1 + g, -4), m(rot1 + g, 13), m(rot0 - g, 13)]), { name: 'spacer' });
+  pic.path('cp-hi', rrect(...m(-3.5, 13), 9 * k, 5 * k, 3), { name: 'tab' });
+  pic.path('cp-ctx', new Path().M(m(slot[0] - 5, -14)).Q(m(slot[0] - 6, -19), m(slot[0] - 12, -21)), { style: 'stroke-width:3' });
+  pic.label('cp-th', [306, 176], 'pad spacer', [262, 170], m(4, 15.5), 'end', 'leader-spacer');
+  pic.text('cp-tm', [306, 22], 'The wheel out: no disc in the slot', 'end');
+  pic.text('cp-tm', m(slot[1] + 10.5, 2), 'wheel side \u2192');
+  pic.facts.push(touches(pic, 'spacer', 'pad-o', 0.5), touches(pic, 'spacer', 'pad-i', 0.5), touches(pic, 'tab', 'spacer', 0.5), pointsAt(pic, 'leader-spacer', 'tab', 1));
+  return pic;
+}
+

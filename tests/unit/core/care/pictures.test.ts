@@ -7,10 +7,13 @@ import { gzipSync } from 'node:zlib';
 import { expect, test } from 'vitest';
 import { idsOf, kindOrder, pictureDetails, picturesFor, STEP_PICTURES, type PictureDetails } from '../../../../src/core/care/pictures.ts';
 import { normaliseBike } from '../../../../src/core/bike/normalise.ts';
-import { PICTURE_WORDS } from '../../../../src/core/wording/en-care-pictures.ts';
+import { pictureWordsFrom, type PictureWords } from '../../../../src/core/wording/en-care-pictures.ts';
+import CARE_WORDS from '../../../../src/core/wording/en-care-pictures.json';
 import { CARE_TASKS, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
 import { bannedHits } from '../../../fixtures/banned.ts';
 
+// The step pictures' words are a data file, checked whole when read (the redo of 9 November 2026, as the guide's words).
+const PICTURE_WORDS = pictureWordsFrom(CARE_WORDS) as Record<string, PictureWords>;
 const DIR = fileURLToPath(new URL('../../../../src/tools/care/pictures/', import.meta.url));
 const CSS = readFileSync(fileURLToPath(new URL('../../../../src/tools/care/pictures.css', import.meta.url)), 'utf8');
 const files = readdirSync(DIR).filter((f) => f.endsWith('.svg')).map((f) => f.slice(0, -4)).sort();
@@ -31,7 +34,10 @@ test('[BC-PIC-FILES] every picture file is used by a step, and every step\'s pic
   }
 });
 
-test('[BC-PIC-FILES] each picture has a one-sentence name and a description of two to four sentences, with no banned word', () => {
+test('[BC-PIC-FILES] each picture has a one-sentence name and a description of two to four sentences, with no banned word; the words file is checked whole', () => {
+  expect(PICTURE_WORDS).not.toBeNull();
+  expect(pictureWordsFrom({ pictures: { x: { name: 'A name.' } } })).toBeNull();
+  expect(pictureWordsFrom(null)).toBeNull();
   for (const [id, w] of Object.entries(PICTURE_WORDS)) {
     expect(w.name.split(/(?<=\.)\s/).length, id).toBe(1);
     const sentences = w.description.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).length;
@@ -61,8 +67,8 @@ test('[BC-PIC-FILES] a picture uses the theme classes only: no colour value, no 
 
 // The redo (owner's answer 6 of 9 November 2026): a picture not yet redrawn does not ship, its step shows text alone. Batch 1 redrew the
 // brakes and the snapped spoke: each brake card and the spoke card shows at least one picture; the other cards come with later batches.
-test('[BC-PIC-ROAD] each brake card and the snapped-spoke card has at least one step with a picture (redo, batch 1)', () => {
-  for (const id of ['spoke-snapped', 'brake-rub-rim', 'brake-rub-disc', 'brake-weak-rim', 'brake-weak-disc']) {
+test('[BC-PIC-ROAD] each brake card, the snapped-spoke card, the puncture cards and the torn tyre have at least one step with a picture (redo, batches 1 and 2)', () => {
+  for (const id of ['spoke-snapped', 'brake-rub-rim', 'brake-rub-disc', 'brake-weak-rim', 'brake-weak-disc', 'puncture-tube', 'puncture-tubeless', 'tyre-torn']) {
     const steps = STEP_PICTURES[id] ?? [];
     expect(steps.some((p) => p !== null), id).toBe(true);
   }

@@ -3,8 +3,7 @@
 // built as files, not as JavaScript strings, so about 150 drawings never weigh on the lazy JavaScript budget (PERF-JS-LAZY); the offline
 // worker precaches them like every file of a build. They are inlined, not <img>, so they follow the theme's tokens through ./pictures.css;
 // ids inside a drawing get a prefix of their view.
-import { PICTURE_WORDS } from '../../core/wording/en-care-pictures.ts';
-import type { PictureWords } from '../../core/wording/en-care-pictures.ts';
+import { pictureWordsFrom, type PictureWords } from '../../core/wording/en-care-pictures.ts';
 import './pictures.css';
 
 // The steps' drawings and the parts guide's close-ups (./parts): each id names one file in one of the two folders (PG-FILES).
@@ -15,10 +14,23 @@ const GLOBBED = {
 const FILES: Record<string, string> = {};
 for (const [path, url] of Object.entries(GLOBBED)) FILES[path.replace(/^.*\/|\.svg$/g, '')] = url as string;
 const loaded = new Map<string, string>();
+// The step pictures' words: a data file of its own, fetched with the first picture (precached like every build file).
+const WORDS_URL = Object.values(import.meta.glob('../../core/wording/en-care-pictures.json', { query: '?url', import: 'default', eager: true }))[0] as string;
+let pictureWords: Record<string, PictureWords> | null = null;
+async function loadWords(): Promise<void> {
+  if (pictureWords) return;
+  try {
+    const res = await fetch(WORDS_URL);
+    pictureWords = res.ok ? pictureWordsFrom(JSON.parse(await res.text())) : null;
+  } catch { pictureWords = null; }
+}
 
-/** Loads the pictures not yet here; a picture that fails to load, or is not one of ours, is left out, so its step shows its text alone. */
+/**
+ * Loads the pictures not yet here, and their words; a picture that fails to load, or is not one of ours, is left out, and without its
+ * words a step picture is too, so its step shows its text alone.
+ */
 export async function loadPictures(ids: readonly string[]): Promise<void> {
-  await Promise.all([...new Set(ids)].filter((id) => !loaded.has(id)).map(async (id) => {
+  await Promise.all([loadWords(), ...[...new Set(ids)].filter((id) => !loaded.has(id)).map(async (id) => {
     const url = FILES[id];
     if (!url) return;
     try {
@@ -26,10 +38,10 @@ export async function loadPictures(ids: readonly string[]): Promise<void> {
       const svg = res.ok ? await res.text() : '';
       if (svg.startsWith('<svg class="cp" ')) loaded.set(id, svg);
     } catch { /* offline before it was cached: text alone */ }
-  }));
+  })]);
 }
 
-export const pictureReady = (id: string | null): id is string => id !== null && loaded.has(id) && PICTURE_WORDS[id] !== undefined;
+export const pictureReady = (id: string | null): id is string => id !== null && loaded.has(id) && pictureWords?.[id] !== undefined;
 /** Loaded, for a caller that brings its own words (the parts guide). */
 export const pictureLoaded = (id: string): boolean => loaded.has(id);
 
@@ -41,7 +53,7 @@ const prefixed = (svg: string, prefix: string): string =>
 
 /** One picture as one image: its name, and its description in a hidden paragraph; a caption under it where it has one. */
 export function Picture({ id, view, words: own }: { id: string; view: string; words?: PictureWords }) {
-  const words = own ?? PICTURE_WORDS[id]!;
+  const words = own ?? pictureWords![id]!;
   const prefix = `cs-${view}-`;
   return (
     <figure class="care-pic">

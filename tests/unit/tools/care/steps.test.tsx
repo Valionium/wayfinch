@@ -6,7 +6,8 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { idsOf, STEP_PICTURES } from '../../../../src/core/care/pictures.ts';
-import { KIND_WORDS, PICTURE_WORDS, SWITCH_WORDS } from '../../../../src/core/wording/en-care-pictures.ts';
+import { KIND_WORDS, SWITCH_WORDS, type PictureWords } from '../../../../src/core/wording/en-care-pictures.ts';
+import CARE_WORDS from '../../../../src/core/wording/en-care-pictures.json';
 import { C, CARE_TASKS, CARRY, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
 import { ALL_STEPS_KEY } from '../../../../src/tools/care/steps.tsx';
 import { CareScreen } from '../../../../src/tools/care/ui.tsx';
@@ -41,6 +42,7 @@ function fakeWakeLock(): void {
  * In the test runner a picture's address is its source file's, or a data address for a small one (the build never inlines: it ships each
  * as a file of its own, BC-PIC-LAZY); fetch reads either, as the built site serves them.
  */
+const PICTURE_WORDS: Record<string, PictureWords> = CARE_WORDS.pictures;
 const REPO = process.cwd(); // vitest runs from the repository's root
 const body = (url: string): string => (url.startsWith('data:')
   ? Buffer.from(url.slice(url.indexOf(',') + 1), 'base64').toString('utf8')
@@ -563,7 +565,8 @@ test('[PG-SHEET-OPEN] with no bike the entry shows the typical bike; All steps c
   await openCard('puncture-tube');
   await click(button(C.careStepsNext)!);
   await click(button(C.careStepsNext)!);
-  expect([...dialog()!.querySelectorAll('.care-step .care-part')].map((b) => b.textContent)).toEqual(['tyre bead', 'rim', 'tube']);
+  // T2 (9 November 2026) names the rim first: the dip in the middle of the rim
+  expect([...dialog()!.querySelectorAll('.care-step .care-part')].map((b) => b.textContent)).toEqual(['rim', 'tyre bead', 'tube']);
   await click(partLink('tyre bead')!);
   await sheetOpen();
   expect(sheet()!.textContent).toContain('Where it is on a typical bike');

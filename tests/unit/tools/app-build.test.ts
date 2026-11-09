@@ -336,6 +336,12 @@ test("[BC-PIC-LAZY] no picture is in the first screen's files, Bike care's chunk
   }
   // and no script carries a drawing's own markup
   expect(all.filter((f) => f.endsWith('.js') && text(on, f).includes('class="cp-')), 'a drawing in a script').toEqual([]);
+  // their words: a data file of its own, precached, in no script (the redo of 9 November 2026, as the guide's words, PG-LAZY)
+  const said = 'Look at the gaps against a light background';
+  expect(all.filter((f) => f.endsWith('.js') && text(on, f).includes(said)), 'the words in a script').toEqual([]);
+  const wordsFile = all.filter((f) => f.endsWith('.json') && f.startsWith('assets/') && text(on, f).includes(said));
+  expect(wordsFile.length).toBe(1);
+  expect(listed).toContain(`/${wordsFile[0]}`);
   expect(figures.firstJsGzip).toBeLessThanOrEqual(145_036);
 });
 
