@@ -7658,13 +7658,26 @@ function rainAt(t){
 }
 
 // Where you would plausibly stop each night, and what it is like there.
+// Wayfinch's day ends (owner, 9 Nov 2026) when they are one per night of this plan; otherwise none, and the days split by effort.
+function copilotDayEnds(P){
+  const list=S.gpx && S.gpx.copilotStops;
+  return Array.isArray(list) && list.length === P.ridingDays-1 ? list : null;
+}
+// The effort at a route kilometre, between the samples around it, so a day can end at a given place.
+function effortAtKm(index,km){
+  const s=index.samples; if(!s.length) return 0;
+  if(km<=s[0].kmExact) return s[0].effortExact;
+  for(let i=1;i<s.length;i++) if(s[i].kmExact>=km){ const a=s[i-1],b=s[i],span=b.kmExact-a.kmExact; return a.effortExact+(span>0?(b.effortExact-a.effortExact)*(km-a.kmExact)/span:0); }
+  return s[s.length-1].effortExact;
+}
 function nightStops(){
   const P = planRoute();
   if(!P || P.ridingDays < 1) return [];
-  const stops = [];
+  const stops = [], ends=copilotDayEnds(P);
   let previous=null;
   for(let n = 0; n <= P.ridingDays; n++){
     const here=n===P.ridingDays && P.stageIndex.samples.length ? {...P.stageIndex.samples[P.stageIndex.samples.length-1]}
+      : ends && n>0 ? stageBoundary(P.stageIndex,effortAtKm(P.stageIndex,ends[n-1].km))
       : stageBoundary(P.stageIndex,P.effectiveExact*n/P.ridingDays);if(!here)return [];
     const t=n===0?0:n===P.ridingDays?1:here.t,kmExact=here.kmExact;
     const dayKmExact=previous?Math.max(0,kmExact-previous.kmExact):0;
@@ -7679,7 +7692,7 @@ function nightStops(){
       night: nightAt(here.elev, t),
       rain: rainAt(t),
       first: n === 0, last: n === P.ridingDays,
-      name: n === 0 ? placeLabel(S.place) : (n === P.ridingDays ? placeLabel(S.place2) : null),
+      name: n === 0 ? placeLabel(S.place) : (n === P.ridingDays ? placeLabel(S.place2) : ends ? ends[n-1].name : null),
     });
     previous=here;
   }
@@ -12056,6 +12069,13 @@ function handoffTrip(text){
   const flat=dataNumber(a('flatKph'),15,40); if(flat !== null) out.flatKph=flat;
   for(const k of ['startName','endName']){ const v=a(k); if(v && v.trim()) out[k]=v.trim().slice(0,160); }
   if(/^[0-9a-f]{64}$/.test(a('route') || '')) out.route=a('route');
+  // Where each day ends, when Wayfinch ends its days at places to sleep (owner, 9 Nov 2026): one km per night, in order, and names.
+  const stops=String(a('stops') || '').split(',').filter(Boolean).map(Number);
+  if(out.nights && stops.length === out.nights && stops.every((k,i) => Number.isFinite(k) && k > 0 && (i === 0 || k > stops[i-1]))){
+    let names=null; try { names=JSON.parse(a('stopNames') || 'null'); } catch(e){}
+    out.stops=stops;
+    out.stopNames=stops.map((_,i) => Array.isArray(names) && typeof names[i] === 'string' && names[i].trim() ? names[i].trim().slice(0,160) : null);
+  }
   return out;
 }
 // Every field Apply will change, in words (re-check N1): the route always, then only what the trip carries.
@@ -12064,6 +12084,7 @@ function handoffChanges(t){
   if(t.departureDate) parts.push('the date');
   else if(t.month !== undefined) parts.push('the month');
   if(t.nights !== undefined) parts.push(`${t.nights === 1 ? '1 night' : t.nights+' nights'}${t.nightsSuggested ? ', as Wayfinch suggests for this route' : ''}`);
+  if(t.stops) parts.push('where each day ends');
   if(t.sleep) parts.push('the stay');
   if(t.pace) parts.push('the pace');
   if(t.flatKph !== undefined) parts.push('the flat speed');
@@ -12141,6 +12162,7 @@ async function putHandoffTripIn(){
   const res=await loadGPX(HANDOFF.gpx,'Route from Wayfinch',null,{handoff:{start:t.startName || null,end:t.endName || null}});
   if(!res || !res.ok) return false;
   if(t.route) S.gpx.copilotRoute=t.route;
+  if(t.stops) S.gpx.copilotStops=t.stops.map((km,i) => ({km,name:t.stopNames[i]}));
   applyTripKitDefaults();   // only kit defaults the rider never touched follow the new trip
   $('month').value=S.month; $('nights').value=S.nights; syncDepartureDate();
   $('sleepWrap').classList.toggle('hidden',S.nights === 0);
@@ -12760,7 +12782,14 @@ function normaliseGPX(p){
     elevationNote:dataText(p.elevationNote,500),high,
     // Contract 2's hook (spec 7.1 item 12): the co-pilot's route hash, kept with the route it came with. Any other route change
     // makes a new record without it. The handoff that sets it is not built yet.
-    ...(typeof p.copilotRoute === 'string' && /^[0-9a-f]{64}$/.test(p.copilotRoute) ? {copilotRoute:p.copilotRoute} : {})};
+    ...(typeof p.copilotRoute === 'string' && /^[0-9a-f]{64}$/.test(p.copilotRoute) ? {copilotRoute:p.copilotRoute} : {}),
+    // Wayfinch's day ends (owner, 9 Nov 2026), kept with the route they came with; a damaged list is none.
+    ...(copilotStopsOf(p.copilotStops,distance) ? {copilotStops:copilotStopsOf(p.copilotStops,distance)} : {})};
+}
+function copilotStopsOf(list,distance){
+  if(!Array.isArray(list) || !list.length || list.length > 30) return null;
+  const out=list.map(x => dataObject(x) && Number.isFinite(x.km) && x.km > 0 && x.km < distance ? {km:x.km,name:typeof x.name === 'string' && x.name.trim() ? x.name.trim().slice(0,160) : null} : null);
+  return out.every((x,i) => x && (i === 0 || x.km > out[i-1].km)) ? out : null;
 }
 function normaliseRouteSnapshot(p, from, to){
   if(!dataObject(p) || !from || !to || !dataObject(p.from) || !dataObject(p.to))return null;

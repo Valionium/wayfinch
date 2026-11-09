@@ -1,8 +1,48 @@
 // Heights and the five-year archive (spec sections 5 and 6.6), asked for only by Get ready offline: a chunk of its own, reached
 // through openmeteo.ts's fetchElevation and fetchBaseline, so the first screen does not carry them (9 Nov 2026).
 import type { Baseline } from '../core/types.ts';
-import { askPolitely, getJson, isRecord, list, SMALL_TIMEOUT_MS, usable, WeatherServiceError } from './openmeteo.ts';
+import { getJson, isRecord, list, SMALL_TIMEOUT_MS, usable, WeatherServiceError } from './openmeteo.ts';
 import type { FetchLike, GridPoint, Retry } from './openmeteo.ts';
+
+/** Up to this much more, so riders refused in the same second don't all ask again in the same second (review of PR 98, M1). */
+const MINUTE_SPREAD_MS = 5_000;
+
+/** As getJson; with `retry`, asked once more after the wait the refusal calls for. */
+export async function askPolitely(f: FetchLike, url: string, timeoutMs: number, retry: Retry | undefined): Promise<unknown> {
+  try {
+    return await politeJson(f, url, timeoutMs);
+  } catch (e) {
+    if (!retry || !(e instanceof WeatherServiceError) || e.againInMs === null) throw e;
+    const ms = e.limited ? e.againInMs + Math.floor((retry.random ?? Math.random)() * MINUTE_SPREAD_MS) : e.againInMs;
+    retry.onWait?.(new Date((retry.now?.() ?? new Date()).getTime() + ms));
+    await retry.sleep(ms);
+    retry.onWait?.(null);
+    return politeJson(f, url, timeoutMs);
+  }
+}
+
+const MINUTE_LIMIT_WAIT_MS = 61_000;
+const SERVER_WAIT_MS = 3_000;
+
+async function refusalOf(response: Response): Promise<WeatherServiceError> {
+  if (response.status === 429) {
+    let reason = '';
+    try {
+      const body = (await response.json()) as unknown;
+      if (isRecord(body) && typeof body['reason'] === 'string') reason = body['reason'];
+    } catch {
+      /* no reason given */
+    }
+    // "Minutely API request limit exceeded. Please try again in one minute." The others name an hour, a day or a month.
+    const minute = reason === '' || /minute/i.test(reason);
+    return new WeatherServiceError('HTTP 429', 'refused', { limited: true, againInMs: minute ? MINUTE_LIMIT_WAIT_MS : null });
+  }
+  return new WeatherServiceError(`HTTP ${response.status}`, 'refused', { againInMs: response.status >= 500 ? SERVER_WAIT_MS : null });
+}
+
+/** getJson that reads the service's limit and a lost answer, for waiting and asking again. */
+const politeJson = (f: FetchLike, url: string, timeoutMs: number): Promise<unknown> =>
+  getJson(f, url, timeoutMs, refusalOf, () => new WeatherServiceError('no answer', 'refused', { againInMs: SERVER_WAIT_MS }));
 
 const ELEVATION_URL = 'https://api.open-meteo.com/v1/elevation';
 const ARCHIVE_URL = 'https://archive-api.open-meteo.com/v1/archive';
@@ -67,7 +107,7 @@ export async function fetchBaseline(points: GridPoint[], months: number[], f: Fe
         + '&daily=temperature_2m_min,temperature_2m_max,precipitation_sum&timezone=auto';
       let body: unknown;
       try {
-        body = await getJson(f, url, SMALL_TIMEOUT_MS);
+        body = await politeJson(f, url, SMALL_TIMEOUT_MS);
       } catch (e) {
         // Past the service's limit nothing more is sent (review of PR 98, M2); another failure leaves that year out.
         if (e instanceof WeatherServiceError && e.limited) {
