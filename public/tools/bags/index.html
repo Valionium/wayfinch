@@ -11224,7 +11224,12 @@ const store = {
   },
   async set(k, v, detailed=false){
     if(String(k).startsWith('loadcheck:') && deletedSinceLoad()) return detailed ? {saved:false,kind:'memory'} : false;
-    if(k === SETUP_KEY && Array.isArray(v)) mergeOtherTabsSetups(v);
+    if(k === SETUP_KEY && Array.isArray(v)) return storeSetups(v,detailed);
+    return storeWrite(k,v,detailed);
+  },
+};
+// One value, written where it can be: the host's storage, else this browser's, else memory for this session.
+async function storeWrite(k, v, detailed=false){
     const before=String(k).startsWith('loadcheck:') ? readLocalRaw(k) : null;
     MEM[k] = v;
     let saved = false, kind='memory';
@@ -11238,11 +11243,67 @@ const store = {
     STORAGE_KIND=kind;
     if(saved && kind === 'browser') stampSaved(k,v,before);
     if(saved && k === DRAFT_KEY) DRAFT_VERSION=draftVersionOf(v);
-    if(saved && k === SETUP_KEY && Array.isArray(v)) v.forEach(x => x && SETUPS_SEEN.add(x.id));
-    if(k === SETUP_KEY) SETUPS_STORED = saved;
     return detailed ? {saved,kind} : saved;
-  },
-};
+}
+/* Saved setups past the 20 an older page knows (review of PR 80, I1). An older bag-planner tab, a rollback and the frozen copy at /
+   read loadcheck:setups, cut it to 20 on every setup write, and their normaliseSetup drops kind, forRoute, base and isDefault. So
+   this page keeps at most 20 setups there: all of them while there are 20 or fewer, in the list's order; past 20 the general setups
+   first, then the trip setups in the list's order. The rest go to loadcheck:setups-more:v1, which older pages never read, and the
+   new fields of every setup that has any are kept in loadcheck:setup-marks:v1 too, which puts them back on a setup an older page
+   saved without them. Read together, the three are the one list; an older page's own change to one of its 20 (a name, a note, a
+   delete) stays. What moves into the first list is kept in the second until the first holds it, so no moment loses a setup. */
+const SETUP_MORE_KEY='loadcheck:setups-more:v1',SETUP_MARKS_KEY='loadcheck:setup-marks:v1',OLD_PAGE_SETUPS=20;
+const SETUP_MARK_FIELDS=['kind','forRoute','base','isDefault'];
+function setupMarksOf(list){
+  const marks={};
+  for(const x of list){
+    const m={}; for(const f of SETUP_MARK_FIELDS) if(x[f] !== undefined) m[f]=x[f];
+    if(Object.keys(m).length) marks[x.id]=m;
+  }
+  return marks;
+}
+function splitSetups(list){
+  if(list.length <= OLD_PAGE_SETUPS) return {main:list.slice(),more:[]};
+  const ordered=[...list.filter(x => setupKind(x) === 'general'),...list.filter(x => setupKind(x) !== 'general')];
+  return {main:ordered.slice(0,OLD_PAGE_SETUPS),more:ordered.slice(OLD_PAGE_SETUPS)};
+}
+// The one list from the three stored values: each setup once (the first list's copy, which an older page may have changed, first),
+// its marks put back, through normaliseSetup.
+function joinSetups(main,more,marksValue){
+  const marks=dataObject(marksValue) && marksValue.app === 'load-check' && marksValue.kind === 'setup-marks' && marksValue.v === 1 &&
+    dataObject(marksValue.marks) ? marksValue.marks : {};
+  const out=[],ids=new Set();
+  for(const raw of [...(Array.isArray(main) ? main : []),...(Array.isArray(more) ? more : [])]){
+    if(!dataObject(raw) || ids.has(raw.id)) continue;
+    let x=raw;
+    if(Object.hasOwn(marks,raw.id) && dataObject(marks[raw.id])){
+      const m=marks[raw.id]; x={...raw};
+      for(const f of SETUP_MARK_FIELDS){ if(m[f] !== undefined) x[f]=m[f]; else delete x[f]; }
+    }
+    const setup=normaliseSetup(x);
+    if(setup){ out.push(setup); ids.add(setup.id); }
+  }
+  return out;
+}
+function storedSetupsLocal(){ return joinSetups(readLocalJson(SETUP_KEY),readLocalJson(SETUP_MORE_KEY),readLocalJson(SETUP_MARKS_KEY)); }
+async function storedSetups(){ return joinSetups(await store.get(SETUP_KEY),await store.get(SETUP_MORE_KEY),await store.get(SETUP_MARKS_KEY)); }
+async function storeSetups(v,detailed){
+  mergeOtherTabsSetups(v);
+  const {main,more}=splitSetups(v),marks=setupMarksOf(v);
+  const there=k => readLocalRaw(k) !== null || MEM[k] !== undefined;
+  const wasMore=readLocalJson(SETUP_MORE_KEY),inMore=new Set(Array.isArray(wasMore) ? wasMore.map(x => x && x.id) : []);
+  const entering=main.filter(x => inMore.has(x.id));
+  let saved=true;
+  if(more.length || entering.length || there(SETUP_MORE_KEY)) saved=await storeWrite(SETUP_MORE_KEY,[...more,...entering]) && saved;
+  if(Object.keys(marks).length || there(SETUP_MARKS_KEY))
+    saved=await storeWrite(SETUP_MARKS_KEY,{app:'load-check',kind:'setup-marks',v:1,marks}) && saved;
+  const r=await storeWrite(SETUP_KEY,main,true);
+  if(entering.length) saved=await storeWrite(SETUP_MORE_KEY,more) && saved;
+  saved=saved && r.saved;
+  if(saved) v.forEach(x => x && SETUPS_SEEN.add(x.id));
+  SETUPS_STORED=saved;
+  return detailed ? {saved,kind:r.kind} : saved;
+}
 let SETUPS_STORED = true;   // did the last write of the saved setups reach storage? A read that works later does not undo a failed write.
 function storageNote(){
   return !SETUPS_STORED ? 'This session only — the last save did not reach storage (it may be full). Export below to keep anything.'
@@ -11259,7 +11320,7 @@ function storageNote(){
    with no stamp was saved by an older page, before any request could exist, and goes. Never a clear of all storage,
    never a copilot:* key, never a cache. */
 const DELETE_REQUEST_KEY='copilot:delete-request:v1',DELETE_APPLIED_KEY='loadcheck:delete-applied',SAVED_AT_KEY='loadcheck:saved-at:v1';
-const SAVED_ITEM_KEYS=['loadcheck:setups','loadcheck:bikeProfiles'];
+const SAVED_ITEM_KEYS=['loadcheck:setups','loadcheck:bikeProfiles','loadcheck:setups-more:v1'];
 const SUMMARY_KEY='loadcheck:summary:v1';
 let DELETED_ELSEWHERE=false;   // another tab applied a delete request: this one never writes its plan back
 const DELETING_KEY='loadcheck:delete-applying';   // written before the first removal, so other tabs stop at once (review M3)
@@ -11306,10 +11367,12 @@ function clearStoredRiderWeight(){
       window.localStorage.setItem(DRAFT_KEY,JSON.stringify(draft));
       try { writeDraftBrowserMeta(draft,false); } catch(e){}
     }
-    const setups=readLocalJson(SETUP_KEY);
-    if(Array.isArray(setups) && setups.some(hasWeight)){
-      setups.forEach(x => { if(hasWeight(x)) x.tyrePressure.riderKg=null; });
-      window.localStorage.setItem(SETUP_KEY,JSON.stringify(setups));
+    for(const k of [SETUP_KEY,SETUP_MORE_KEY]){
+      const setups=readLocalJson(k);
+      if(Array.isArray(setups) && setups.some(hasWeight)){
+        setups.forEach(x => { if(hasWeight(x)) x.tyrePressure.riderKg=null; });
+        window.localStorage.setItem(k,JSON.stringify(setups));
+      }
     }
   } catch(e){}
 }
@@ -11373,11 +11436,11 @@ function applyDeleteRequest(){
   };
   const kept={keys:{},items:{}};
   for(const k of localKeys()){
-    if(!k.startsWith('loadcheck:') || [DELETE_APPLIED_KEY,DELETING_KEY,SAVED_AT_KEY,DRAFT_BROWSER_META_KEY,BIKE_FORMAT_KEY].includes(k)) continue;
+    if(!k.startsWith('loadcheck:') || [DELETE_APPLIED_KEY,DELETING_KEY,SAVED_AT_KEY,DRAFT_BROWSER_META_KEY,BIKE_FORMAT_KEY,SETUP_MARKS_KEY].includes(k)) continue;
     if(k === DRAFT_KEY){
       const draft=readLocalJson(k);
       if(dataObject(draft) && later(draft.updatedAt)) kept.keys[k]=true; else { remove(k); remove(DRAFT_BROWSER_META_KEY); }
-    } else if(k === SETUP_KEY){
+    } else if(k === SETUP_KEY || k === SETUP_MORE_KEY){
       if(keepList(k,x => later(ledger.items[k][x.id]) || later(x.updated) || laterDay(x.saved))) kept.keys[k]=true;
     } else if(k === FEEDBACK_KEY){
       if(keepList(k,x => later(x.at))) kept.keys[k]=true;
@@ -11387,6 +11450,17 @@ function applyDeleteRequest(){
     else remove(k);
   }
   if(!kept.keys[BIKE_PROFILE_KEY]) remove(BIKE_FORMAT_KEY);   // the format mark guards a list; with no list there is nothing to guard
+  // the setups' marks (review of PR 80, I1) stay only for the setups that stay
+  const setupMarks=readLocalJson(SETUP_MARKS_KEY);
+  if(setupMarks !== null){
+    const staying=new Set([SETUP_KEY,SETUP_MORE_KEY].flatMap(k => { const l=readLocalJson(k); return Array.isArray(l) ? l.map(x => x && x.id) : []; }));
+    const marks=dataObject(setupMarks) && dataObject(setupMarks.marks) ? Object.fromEntries(Object.entries(setupMarks.marks).filter(([id]) => staying.has(id))) : {};
+    if(Object.keys(marks).length){
+      const v={app:'load-check',kind:'setup-marks',v:1,marks};
+      try { window.localStorage.setItem(SETUP_MARKS_KEY,JSON.stringify(v)); } catch(e){}
+      MEM[SETUP_MARKS_KEY]=v; kept.keys[SETUP_MARKS_KEY]=true;
+    } else remove(SETUP_MARKS_KEY);
+  }
   const left={app:'load-check',kind:'saved-at',v:1,keys:{},items:{}};
   for(const k of Object.keys(kept.keys)) if(ledger.keys[k]) left.keys[k]=ledger.keys[k];
   for(const k of SAVED_ITEM_KEYS){
@@ -12490,9 +12564,7 @@ $('tabLoad').onclick = async () => {
 // Setups saved by another tab are kept: a write adds the stored setups this tab never saw.
 function mergeOtherTabsSetups(list){
   try {
-    const raw=window.localStorage.getItem(SETUP_KEY),stored=raw ? JSON.parse(raw) : [];
-    if(!Array.isArray(stored)) return;
-    stored.map(normaliseSetup).filter(Boolean).forEach(x => {
+    storedSetupsLocal().forEach(x => {
       if(!SETUPS_SEEN.has(x.id) && !list.some(y => y.id === x.id)) list.push(x);
     });
     list.splice(MAX_SAVED_SETUPS);
@@ -12504,11 +12576,10 @@ function followOtherTabs(event){
   if(DELETED_ELSEWHERE) return;
   const key=event.key,all=key === null;
   if(all || key === DRAFT_KEY) checkOtherTabs();
-  if(all || key === SETUP_KEY){
+  if(all || [SETUP_KEY,SETUP_MORE_KEY,SETUP_MARKS_KEY].includes(key)){
     try {
-      const saved=JSON.parse(all ? window.localStorage.getItem(SETUP_KEY) : event.newValue);
-      if(Array.isArray(saved)){ SETUPS=saved.map(normaliseSetup).filter(Boolean); SETUPS.forEach(x => SETUPS_SEEN.add(x.id));
-        if(typeof renderRecall === 'function') renderRecall(); }
+      SETUPS=storedSetupsLocal(); SETUPS.forEach(x => SETUPS_SEEN.add(x.id));
+      if(typeof renderRecall === 'function') renderRecall();
     } catch(e){}
   }
   if(all || key === BIKE_PROFILE_KEY){
@@ -14223,8 +14294,8 @@ window.applyCalibration = applyCalibration;
   // Contract 3: a stored delete request is applied before anything is read, so the draft is never restored first.
   if(applyDeleteRequest()){ WALKTHROUGH_SEEN=false; MAX_WEIGHT_SKIPPED=false; }
   clearStoredRiderWeight();
-  const savedSetups=await store.get(SETUP_KEY),savedReports=await store.get(FEEDBACK_KEY);
-  SETUPS=Array.isArray(savedSetups) ? savedSetups.map(normaliseSetup).filter(Boolean) : [];
+  SETUPS=joinSetups(await store.get(SETUP_KEY),await store.get(SETUP_MORE_KEY),await store.get(SETUP_MARKS_KEY));   // storedSetups()
+  const savedReports=await store.get(FEEDBACK_KEY);
   SETUPS.forEach(x => SETUPS_SEEN.add(x.id));
   FEEDBACK=Array.isArray(savedReports) ? savedReports.map(normaliseReport).filter(Boolean) : [];
   await loadBikeProfileData();

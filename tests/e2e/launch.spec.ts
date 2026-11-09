@@ -394,6 +394,40 @@ for (const start of ['legacy', 'step-one'] as const) {
     expect(await planner.evaluate("['suspension' in BIKE_PROFILES[0], 'rackMounts' in BIKE_PROFILES[0], BIKE_PROFILES[0].brakes]")).toEqual([false, false, 'rim']);
   });
 
+  test(`[SET-LIMITS] ${which} page left open never cuts a library of more than 20 setups; the general marks and the trip links stay (review of PR 80, I1)`, async ({ context, page }) => {
+    await phone(page, start);
+    await launch();
+    const planner = await context.newPage();
+    await planner.goto(`${server!.origin}/tools/bags/`, { waitUntil: 'domcontentloaded' });
+    await draftReady(planner);
+    // The bag planner's library grows past the 20 the old page knows: 30 trip setups (each with its trip) and 3 general ones.
+    await planner.evaluate(`(async () => {
+      const one = (id, extra) => normaliseSetup({ ...captureDraft(), id, name: 'Setup ' + id, saved: '2026-11-01',
+        predicted: { mounted: 35, kit: 31, spare: 4, spilled: 0, kg: 14 }, thumb: '', ...extra });
+      SETUPS.push(...Array.from({ length: 30 }, (_, i) => one('t' + i, { forRoute: { hash: 'a'.repeat(64), name: 'Ride ' + i, departureDate: null } })),
+        ...Array.from({ length: 3 }, (_, i) => one('g' + i, { kind: 'general' })));
+      if (!(await store.set(SETUP_KEY, SETUPS))) throw new Error('the planner could not save');
+    })()`);
+    expect(await planner.evaluate('SETUPS.length')).toBe(34);
+    // A rollback or the old tab sees at most the 20 it knows, the general setups among them.
+    const seen = await page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:setups')!) as { id: string }[]).map((s) => s.id));
+    expect(seen.length).toBeLessThanOrEqual(20);
+    expect(['g0', 'g1', 'g2'].every((id) => seen.includes(id))).toBe(true);
+    // The old page reads the list as its own start-up does, renames one, and saves the list back through its own write.
+    expect(await page.evaluate(`(async () => {
+      SETUPS = JSON.parse(localStorage.getItem(SETUP_KEY)).map(normaliseSetup).filter(Boolean);
+      SETUPS.find((s) => s.id === 'g1').name = 'Renamed in the old tab';
+      return store.set(SETUP_KEY, SETUPS);
+    })()`)).toBe(true);
+    await planner.reload({ waitUntil: 'domcontentloaded' });
+    await draftReady(planner);
+    const after = await planner.evaluate(`SETUPS.map((s) => [s.id, setupKind(s), !!s.forRoute, s.name])`) as [string, string, boolean, string][];
+    expect(after.length).toBe(34);   // nothing cut
+    expect(after.filter(([, kind]) => kind === 'general').map(([id]) => id).sort()).toEqual(['g0', 'g1', 'g2']);
+    expect(after.filter(([id, , linked]) => id.startsWith('t') && linked).length).toBe(30);
+    expect(after.find(([id]) => id === 'g1')![3]).toBe('Renamed in the old tab');   // the old tab's own change stays
+  });
+
   test(`[SW-OLD-TAB-WRITES] a future bike format (3, which no page writes today) would block ${which} bike write, with its message`, async ({ context, page }) => {
     await phone(page, start);
     await launch();

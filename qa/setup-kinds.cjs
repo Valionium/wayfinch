@@ -103,6 +103,100 @@ test('[SET-LIMITS] 20 general and 40 trip setups: a save, a copy, a mark, an und
   assert.match(msg,/Skipped 2 setups beyond/);
 });
 
+// Older pages (an old open tab, a rollback, the frozen copy at /) read loadcheck:setups, cut it to 20 on every setup write and drop
+// kind, forRoute, base and isDefault (review of PR 80, I1). The browser test with the real old pages is in tests/e2e/launch.spec.ts.
+const {sharedStore}=require('./app-vm.cjs');
+function tab(storage){
+  const p=appVM({storage});
+  p.run('DRAFT_READY=true;buildThumb=()=>"";');
+  p.run(`var qaSetup=(id,extra={})=>normaliseSetup({...captureDraft(),id,name:'Setup '+id,saved:'2026-10-30',
+    predicted:{mounted:35,kit:31,spare:4,spilled:0,kg:14},thumb:'',...extra});
+    var qaLibrary=()=>[...Array.from({length:30},(_,i)=>qaSetup('t'+i,{forRoute:{hash:'${HASH}',name:'Ride '+i,departureDate:null},...(i===5 ? {base:'g1'} : {})})),
+      ...Array.from({length:3},(_,i)=>qaSetup('g'+i,{kind:'general',...(i===1 ? {isDefault:true} : {})}))];`);
+  p.json=code=>{const t=p.run(`JSON.stringify(${code})`);return t===undefined ? undefined : JSON.parse(t);};
+  return p;
+}
+const MARKS=['kind','forRoute','base','isDefault'];
+const strip=s=>Object.fromEntries(Object.entries(s).filter(([k])=>!MARKS.includes(k)));
+
+test('[SET-LIMITS] past 20 setups, the list older pages read holds 20, the general ones first; the rest and every setup\'s marks are kept where older pages never look; read together they are the one list (review of PR 80, I1)',async()=>{
+  const storage=sharedStore(),a=tab(storage);
+  assert.equal(await a.run('SETUPS=qaLibrary();store.set(SETUP_KEY,SETUPS)'),true);
+  const main=JSON.parse(storage.values.get('loadcheck:setups')),more=JSON.parse(storage.values.get('loadcheck:setups-more:v1'));
+  assert.equal(main.length,20,'an older page sees 20, so its own cut to 20 cuts nothing');
+  assert.deepEqual(main.slice(0,3).map(s=>s.id),['g0','g1','g2'],'the general setups first, so a rollback keeps them in view');
+  assert.deepEqual(main.slice(3).map(s=>s.id),Array.from({length:17},(_,i)=>'t'+i),'then the trip setups in the list\'s order');
+  assert.deepEqual(more.map(s=>s.id),Array.from({length:13},(_,i)=>'t'+(17+i)));
+  // An older page writes its 20 back through its own normaliseSetup: the new fields go; it renamed one and deleted another.
+  const old=main.map(strip).filter(s=>s.id!=='t2').map(s=>s.id==='g2' ? {...s,name:'Renamed in an old tab'} : s);
+  storage.values.set('loadcheck:setups',JSON.stringify(old));
+  const b=tab(sharedStore());
+  for(const [k,v] of storage.values) b.values.set(k,v);
+  const read=await b.run('storedSetups()');
+  const ids=b.json('storedSetupsLocal().map(s=>s.id)');
+  assert.equal(ids.length,32,'nothing cut: 33 less the one the old tab deleted');
+  assert.equal(ids.includes('t2'),false,'the old tab\'s delete stays');
+  assert.equal(read.length,32);
+  const back=b.json(`storedSetupsLocal().map(s=>[s.id,setupKind(s),!!s.forRoute,s.base||null,s.isDefault||false,s.name])`);
+  assert.deepEqual(back.filter(x=>x[1]==='general').map(x=>x[0]),['g0','g1','g2'],'the general marks are back');
+  assert.equal(back.filter(x=>x[0].startsWith('t') && x[2]).length,29,'and every trip link');
+  assert.deepEqual(back.find(x=>x[0]==='t5').slice(3,4),['g1']);
+  assert.equal(back.find(x=>x[0]==='g1')[4],true);
+  assert.equal(back.find(x=>x[0]==='g2')[5],'Renamed in an old tab','the old tab\'s own change stays');
+  // with 20 or fewer, everything stays in the one list in its own order, and plain setups need nothing else
+  const c=tab(sharedStore());
+  await c.run(`SETUPS=Array.from({length:5},(_,i)=>qaSetup('p'+i));store.set(SETUP_KEY,SETUPS)`);
+  assert.deepEqual([...c.values.keys()].filter(k=>k.startsWith('loadcheck:setup')).sort(),['loadcheck:setups']);
+  assert.deepEqual(JSON.parse(c.values.get('loadcheck:setups')).map(s=>s.id),['p0','p1','p2','p3','p4']);
+});
+
+test('[SET-LIMITS] another tab follows a library kept in two lists, and its next write keeps every setup (review of PR 80, I1)',async()=>{
+  const storage=sharedStore(),a=tab(storage),b=tab(storage);
+  await b.run('SETUPS=[];');
+  await a.run('SETUPS=qaLibrary();store.set(SETUP_KEY,SETUPS)');
+  assert.equal(b.json('SETUPS.length'),33,'the other tab follows both lists');
+  assert.equal(b.json(`SETUPS.filter(s=>setupKind(s)==='general').length`),3);
+  assert.equal(await b.run(`saveSetup('One more','')`),true);
+  assert.equal(a.json('SETUPS.length'),34);
+  assert.equal(b.json('storedSetupsLocal().length'),34);
+  // a general setup marked back to a trip setup loses its mark in both places
+  await a.run(`setSetupKind('g0','trip')`);
+  assert.equal(b.json(`setupKind(storedSetupsLocal().find(s=>s.id==='g0'))`),'trip');
+  assert.equal(b.json(`setupKind(SETUPS.find(s=>s.id==='g0'))`),'trip');
+  // deleting down to 20 or fewer brings them all back to the one list
+  await a.run(`(async()=>{for(const s of SETUPS.slice(0,14)) await deleteSetup(s.id);})()`);
+  assert.equal(a.json('SETUPS.length'),20);
+  assert.equal(JSON.parse(storage.values.get('loadcheck:setups')).length,20);
+  assert.deepEqual(JSON.parse(storage.values.get('loadcheck:setups-more:v1') || '[]'),[]);
+});
+
+test('[SET-LIMITS] Also delete bag planner data takes the setups past 20 and their marks with the rest; one saved after the request stays with its marks (review of PR 80, I1)',async()=>{
+  const storage=sharedStore(),a=tab(storage);
+  await a.run('SETUPS=qaLibrary();store.set(SETUP_KEY,SETUPS)');
+  await new Promise(r=>setTimeout(r,5));   // the request comes after that save
+  const asked=new Date().toISOString();
+  storage.values.set('copilot:delete-request:v1',JSON.stringify({app:'copilot',kind:'delete-request',v:1,id:'f'.repeat(32),createdAt:asked}));
+  await new Promise(r=>setTimeout(r,5));
+  // after the request, in another tab that has not seen it yet: one trip setup of the second list gets a new name
+  const b=tab(sharedStore());
+  for(const [k,v] of storage.values) b.values.set(k,v);
+  await b.run(`SETUPS=storedSetupsLocal();renameSetup('t25','Planned after')`);
+  const c=tab(sharedStore());
+  for(const [k,v] of b.values) c.values.set(k,v);
+  assert.equal(c.run('applyDeleteRequest()'),true);
+  assert.equal(c.values.get('loadcheck:setups'),undefined,'every setup of the first list was saved before');
+  assert.deepEqual(JSON.parse(c.values.get('loadcheck:setups-more:v1')).map(s=>s.id),['t25']);
+  const marks=JSON.parse(c.values.get('loadcheck:setup-marks:v1'));
+  assert.deepEqual(Object.keys(marks.marks),['t25'],'the marks of what went go too');
+  assert.deepEqual(c.json(`storedSetupsLocal().map(s=>[s.id,s.name,!!s.forRoute])`),[['t25','Planned after',true]]);
+  // with nothing saved after it, nothing of the three is left
+  const d=tab(sharedStore());
+  await d.run('SETUPS=qaLibrary();store.set(SETUP_KEY,SETUPS)');
+  d.values.set('copilot:delete-request:v1',JSON.stringify({app:'copilot',kind:'delete-request',v:1,id:'e'.repeat(32),createdAt:new Date(Date.now()+60000).toISOString()}));
+  assert.equal(d.run('applyDeleteRequest()'),true);
+  assert.deepEqual([...d.values.keys()].filter(k=>k.startsWith('loadcheck:setup')),[]);
+});
+
 (async()=>{
   for(const [name,fn] of tests){
     try { await fn(); passed++; } catch(e){ console.error('FAIL '+name+'\n'+(e && e.stack || e)); process.exitCode=1; }
