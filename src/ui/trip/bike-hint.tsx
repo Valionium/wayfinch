@@ -20,7 +20,7 @@ const small = (): void => writeHint(withLetters(readHint(), 's'));
 export function TripBike({ bike, trip }: { bike: BikeSource; trip: boolean | null }) {
   const [said, setSaid] = useState('');
   const [, redo] = useState(0);
-  const at = useRef<{ used?: boolean; line?: boolean; had?: boolean }>({}).current;
+  const at = useRef<{ used?: boolean; line?: boolean; had?: boolean; seen?: boolean; gone?: boolean }>({}).current;
   const box = useRef<HTMLDivElement>(null);
   const before = usedBefore() || bike.summary !== null;
   // A trip removed in this visit (Remove this trip): Trip starts over, so the hint is settled again, and the one-time line, already
@@ -29,12 +29,17 @@ export function TripBike({ bike, trip }: { bike: BikeSource; trip: boolean | nul
   at.had = !!trip;
   if (trip !== null) at.used ??= trip || before;
   const key = readHint();
+  // The key gone while this Trip held it (Delete co-pilot data, in this window or another): never written back while it is open (ST-DELETE).
+  if (key) at.seen = true;
+  else if (at.seen) at.gone = true;
   const h = bikeHint(bike.known.length > 0, at.used ?? before, key);
   at.line ||= h.line;
   useEffect(() => {
     // Letters are only ever added: merged with the key as it is now, so a Later tapped before this ran is never written over.
     const now = readHint();
-    if (trip !== null && withLetters(now, h.key) !== now) writeHint(withLetters(now, h.key));
+    if (at.seen && !now) at.gone = true;
+    if (trip !== null && !at.gone && withLetters(now, h.key) !== now) writeHint(withLetters(now, h.key));
+    at.seen ||= !!readHint();
     if (at.line && !said) import('../../core/wording/en-hint.ts').then((m) => setSaid(m.HN.hintEveryTool), () => undefined);
   });
   return h.hint === 'new' ? (

@@ -381,6 +381,17 @@ test("[TRIP-REMOVE-FIRST] Remove this trip adds nothing to the first screen: at 
   expect(figures.firstJsGzip).toBeLessThanOrEqual(145_036);
 });
 
+// The hint key kept deleted in every window (ST-DELETE): paid for by 30 of the tyre tool's labels moved to en-tyre-labels.ts.
+// 144,741 bytes is the first screen's figure on main (4f9cddc) at the branch point; the rule is that it may not rise above it.
+test("[HINT-DELETE-FIRST] keeping the hint key deleted adds nothing to the first screen: at or below main's figure; the moved labels are lazy", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  expect(first).toContain('copilot:bikeHint:v1');
+  expect(first.includes('Cross-check with SRAM')).toBe(false);
+  console.log(`HINT-DELETE-FIRST: first screen ${figures.firstJsGzip} bytes gzipped`);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(144_741);
+});
+
 // Prepare this route (owner's choice, 9 Nov 2026): the new name, the line under the button and the tabs' subtitles. The subtitles'
 // words (en-subtitles.ts) and the line (en-trip.ts) are not in the first screen, which may not rise above main's figure.
 // 144,741 bytes is the first screen's figure on main (4f9cddc) at the branch point.

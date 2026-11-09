@@ -18,7 +18,6 @@ import { TyreScreen } from '../../../src/tools/tyre/ui.tsx';
 import type { TyreServices } from '../../../src/tools/tyre/ui.tsx';
 import { clearCopies } from '../../../src/store/changed.ts';
 import { closeDb } from '../../../src/store/db.ts';
-import { deleteCopilotData, exportAll } from '../../../src/store/export.ts';
 import { HINT_KEY, writeHint } from '../../../src/ui/bike/hint-key.ts';
 import { noteSeen } from '../../../src/ui/bike/hint-seen.ts';
 import { bikeSource, refreshBikeSource } from '../../../src/ui/bike/live.ts';
@@ -258,19 +257,7 @@ describe('after the first bike', () => {
 });
 
 describe('the one key, on the phone only', () => {
-  test('[HINT-LOCAL] one copilot: key of a few letters; Delete co-pilot data removes it (a fresh start shows the card), the export leaves it out, nothing is sent', async () => {
-    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.reject(new Error('no network in this test')));
-    await trip(NO_BIKE);
-    await act(() => { later().click(); });
-    noteSeen('t');
-    expect(key()).toMatch(/^[atypcgsw]+$/);
-    const hintKeys = Object.keys(localStorage).filter((k) => /hint/i.test(k));
-    expect(hintKeys).toEqual([HINT_KEY]);
-    expect(JSON.stringify(await exportAll())).not.toContain('bikeHint');
-    await deleteCopilotData();
-    expect(key()).toBeNull();
-    expect(fetch).not.toHaveBeenCalled();
-  });
+  // [HINT-LOCAL] one copilot: key of a few letters ... is in hint-delete.test.tsx: Delete co-pilot data now lasts for the page.
 
   test('[HINT-LOCAL] storage refused: the card follows the same rules for this visit, from memory', async () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
