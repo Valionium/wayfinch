@@ -6109,8 +6109,9 @@ function advisorPageOn(on){
 function renderAdvisorGlide(){
   const el = $('advisorGlide'); if(!el) return;
   let view = null;
-  try { view = withoutTrial(() => { const step = S.step; S.step = 4; try { return planBagView(); } finally { S.step = step; } }); } catch(e){ view = null; }
-  const art = bikeDrawing(S.bikeProfile, view, { theme:bikeTheme(), idPrefix:'advg' });
+  // read on copies (withInputs), as the cards' drawings are: drawing it never changes the plan or its kept placements
+  try { view = withoutTrial(() => withInputs({}, () => { const step = S.step; S.step = 4; try { return planBagView(); } finally { S.step = step; } })); } catch(e){ view = null; }
+  const art = bikeDrawing(S.bikeProfile, view, { theme:bikeTheme(), idPrefix:'advg' }, true);   // the bags as their real shapes, as on the rig
   el.innerHTML = art ? art.svg.replace(/^<svg\b/, '<svg aria-hidden="true" focusable="false"') : '';
 }
 // Opened by a link (#gear-advisor, Tools' card), the page starts as the advisor before its first frame, so the glide lands on it and

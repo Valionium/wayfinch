@@ -33,7 +33,8 @@ test('[GA-SIZE] advisor.js builds, sets window.WayfinchAdvisor, and is under 20 
   const api = context.window.WayfinchAdvisor as Record<string, unknown>;
   // MIN_GAIN_BACK_L too: the page's cannot-reduce sentence reads it (re-check of PR 60); DECIDED: the page's setup step reads its
   // default and the questionnaire's mapping (the owner's ruling of 7 Nov)
-  expect(Object.keys(api).sort()).toEqual(['DECIDED', 'MIN_GAIN_BACK_L', 'SIZE_RANGES', 'WEIGHTS', 'advise', 'adviseSteps']);
+  // biggerOffered and biggerSteps: the bigger change (the owner's preview check of 8 Nov, F)
+  expect(Object.keys(api).sort()).toEqual(['DECIDED', 'MIN_GAIN_BACK_L', 'SIZE_RANGES', 'WEIGHTS', 'advise', 'adviseSteps', 'biggerOffered', 'biggerSteps']);
   expect(api.MIN_GAIN_BACK_L).toBe(MIN_GAIN_BACK_L);
   expect(JSON.parse(JSON.stringify(api.DECIDED))).toEqual(DECIDED);
   expect(Object.isFrozen(api)).toBe(true);
