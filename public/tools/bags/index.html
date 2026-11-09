@@ -1587,9 +1587,9 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .look-picker input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 .look-status{margin:4px 0;font-size:13px;color:var(--muted);min-height:1.2em}
 #lookUndo{min-height:44px}
-.look-chip.hidden,.bike-look.hidden,#lookUndo.hidden,#bikeDetailsBack.hidden,#bikeSwapUndo.hidden,#bikeUseShown.hidden,.bike-swap.hidden{display:none}
+.look-chip.hidden,.bike-look.hidden,#lookUndo.hidden,#bikeDetailsBack.hidden,#bikeSwapUndo.hidden,.bike-swap.hidden{display:none}
 .bike-swap{margin:6px 0;font-size:14px}
-#bikeSwapUndo,#bikeUseShown{min-height:44px}
+#bikeSwapUndo{min-height:44px}
 #bikeLook .look-picker input[type=color]{min-height:24px;min-width:24px;height:24px}
 /* Look's extras (owner's wish, 5 Nov 2026): frame pattern, its colours, the fork, rim depth. Built by renderLookChoices from bike.js. */
 .lx-swatch,.lx-chip{position:relative;display:flex;align-items:center;gap:8px;min-height:44px;min-width:44px;padding:0 10px;box-sizing:border-box;
@@ -2161,7 +2161,7 @@ html.adv-page .advisor-page.hidden{display:block}
         <div class="fit-quick-result" id="fitQuickResult" role="status" aria-live="polite"></div>
         <div class="bike-profile-status" id="bikeProfileStatus" role="status" aria-live="polite"></div>
         <p class="bike-swap hidden" id="bikeSwapNote" role="status"></p>
-        <div class="bike-profile-actions"><button class="linky hidden" id="bikeSwapUndo" type="button"></button><button class="go small hidden" id="bikeUseShown" type="button"></button></div>
+        <div class="bike-profile-actions"><button class="linky hidden" id="bikeSwapUndo" type="button"></button></div>
       </section>
       <section class="bike-look" id="bikeLook" aria-labelledby="bikeLookTitle">
         <h3 id="bikeLookTitle" tabindex="-1">Look</h3>
@@ -3077,8 +3077,7 @@ const BIKE_WORDING={
   swapNote:{text:'This plan now uses the new bike. {name} was only in this plan, so it is kept: Undo brings it back.'},
   swapUndo:{text:'Undo: bring back {name}'},
   swapUndone:{text:'{name} is back in this plan, as it was.'},
-  useShown:{text:'Use this bike for this plan'},
-  usingShown:{text:'Using {name} for this plan.'},
+  addedChosen:{text:'Saved {name}. It is now the bike for your plan, in every tool.'},
   backTrip:{text:'Back to Trip'},backTools:{text:'Back to Tools'},backYou:{text:'Back to You'},backTyre:{text:'Back to Tyre pressure'},
   backCare:{text:'Back to Bike care'},backAdvisor:{text:'Back to the Gear advisor'},
   // A bike chosen in Wayfinch's Tools moves the plan to it when this page opens (sub-project 11, decision 3): one quiet line and Undo.
@@ -3323,9 +3322,6 @@ function renderBikeProfiles(force=false){
   $('bikeFollowUndo').classList.toggle('hidden',!follow);
   $('bikeFollowUndo').disabled=!ready;
   $('bikeFollowBar').classList.toggle('hidden',!follow && !BIKE_FOLLOW_MESSAGE);
-  $('bikeUseShown').textContent=bikeWord('useShown');
-  $('bikeUseShown').classList.toggle('hidden',!linkHoldsBike() || !BIKE_PROFILE_EDITOR_ID);
-  $('bikeUseShown').disabled=!ready;
   renderBikeKitSummary();
 }
 // The line after a move to the bike chosen in Tools; "Without a bike" moves the plan to no bike, the standard bike.
@@ -3390,7 +3386,9 @@ async function saveBikeProfile(event){
   if(index<0 && BIKE_PROFILES.length>=MAX_BIKE_PROFILES){BIKE_PROFILE_MESSAGE='You have 20 saved bikes. Update or remove one before adding another.';renderBikeProfiles();return false;}
   BIKE_PROFILE_BUSY=true;BIKE_FORM_DIRTY=false;BIKE_PROFILE_MESSAGE='Saving bike…';
   if(index<0)BIKE_PROFILES.push(p);else BIKE_PROFILES[index]=p;
-  const keepPlan=linkHoldsBike();   // opened from the co-pilot: saved, and the plan keeps its own bike
+  // opened from the co-pilot: saved, and the plan keeps its own bike; a bike added there becomes the plan's (the owner's finding H)
+  const adding=LINK_ADDS && index<0,keepPlan=linkHoldsBike() && !adding;
+  if(adding)LINK_ADDS=false;
   if(keepPlan){BIKE_PROFILE_EDITOR_ID=p.id;LOOK_NEW=null;}else useBikeProfile(p);
   let librarySaved=false,currentSaved=keepPlan;
   try{librarySaved=await bikeStoreSet(BIKE_PROFILE_KEY,BIKE_PROFILES.map(normaliseBikeProfile));if(!keepPlan)currentSaved=await persistBikeProfileSelection();}
@@ -3444,6 +3442,9 @@ function initialiseBikeProfiles(){
 let LOOK_OPENING=null,LOOK_CHANGED=false,LOOK_NEW=null,LOOK_MESSAGE='',LOOK_PICKER_TIMER=null,LOOK_RETRY=null,LOOK_CREATING=false;
 // LINK_BIKE: Bike details was opened from the co-pilot. BIKE_SWAPS: plan bikes in no saved list that a tap replaced, newest last.
 let LINK_BIKE=false;const BIKE_SWAPS=[];
+// LINK_ADDS: opened from the co-pilot to add a bike (#bike-details=new, or New bike there). Its first save also makes it the plan's
+// bike, the chosen bike in every tool (the owner's finding H, 8 Nov 2026); a saved bike opened from a link stays that bike only.
+let LINK_ADDS=false;
 let BIKE_FOLLOW_MESSAGE='';   // what the line at the top says after its Undo; gone with the rider's next change of the plan's bike
 // A bike opened from the co-pilot (#bike-details=...) is that bike only while it is not the plan's: no tap in it changes the plan's bike.
 function linkHoldsBike(){return LINK_BIKE && !(BIKE_PROFILE_EDITOR_ID && S.bikeProfile && S.bikeProfile.id===BIKE_PROFILE_EDITOR_ID);}
@@ -3477,35 +3478,25 @@ async function saveShownBike(){
   const p=readBikeProfileEditor();if(!p)return false;
   const i=BIKE_PROFILES.findIndex(b=>b.id===p.id);
   if(i<0 && BIKE_PROFILES.length>=MAX_BIKE_PROFILES){BIKE_PROFILE_MESSAGE='You have 20 saved bikes. Update or remove one before adding another.';renderBikeProfiles();return false;}
+  const adding=LINK_ADDS && i<0;   // a bike added from the co-pilot: saved, and the plan's bike from now on
   if(i<0)BIKE_PROFILES.push(p);else BIKE_PROFILES[i]=p;
   if(LOOK_OPENING && LOOK_OPENING.forId==='')LOOK_OPENING.forId=p.id;   // the new bike's first tap: Undo stays with it
   BIKE_PROFILE_EDITOR_ID=p.id;LOOK_NEW=null;
   BIKE_PROFILE_MESSAGE=bikeWord('lookSavedBike',{name:p.name});
-  BIKE_PROFILE_BUSY=true;BIKE_FORM_DIRTY=false;renderBikeProfiles();
-  let ok=false;try{ok=await persistSavedBikes();}catch(e){}
+  BIKE_PROFILE_BUSY=true;BIKE_FORM_DIRTY=false;
+  if(adding){LINK_ADDS=false;useBikeProfile(p);}else renderBikeProfiles();
+  let ok=false;try{ok=await persistSavedBikes();if(adding)ok=(await persistBikeProfileSelection()) && ok;}catch(e){}
   BIKE_PROFILE_BUSY=false;
+  if(adding && ok)BIKE_PROFILE_MESSAGE=bikeWord('addedChosen',{name:p.name});
   if(!ok && BIKE_PROFILE_MESSAGE!==BIKE_NEWER_MESSAGE)BIKE_PROFILE_MESSAGE='Saved for this session only; Export to keep it.';
   if($('bikeSavedSelect'))$('bikeSavedSelect').value=p.id;
   renderBikeProfiles();renderLook();return ok;
 }
-// The plain way, from a link, to put the bike shown on the plan.
-async function useShownBike(){
-  if(BIKE_PROFILE_BUSY || !DRAFT_READY)return false;
-  const issue=bikeEditorIssue();if(issue){BIKE_PROFILE_MESSAGE=issue;renderBikeProfiles();return false;}
-  const p=readBikeProfileEditor();if(!p)return false;
-  const i=BIKE_PROFILES.findIndex(b=>b.id===p.id);
-  if(i<0 && BIKE_PROFILES.length>=MAX_BIKE_PROFILES){BIKE_PROFILE_MESSAGE='You have 20 saved bikes. Update or remove one before adding another.';renderBikeProfiles();return false;}
-  if(i<0)BIKE_PROFILES.push(p);else BIKE_PROFILES[i]=p;
-  BIKE_PROFILE_BUSY=true;BIKE_FORM_DIRTY=false;useBikeProfile(p);
-  let ok=false;try{ok=await persistSavedBikes();ok=(await persistBikeProfileSelection()) && ok;}catch(e){}
-  BIKE_PROFILE_BUSY=false;
-  BIKE_PROFILE_MESSAGE=ok ? bikeWord('usingShown',{name:p.name}) : 'Using this bike for this session. Check the working-plan save status or Export before closing.';
-  renderBikeProfiles();rememberLookOpening();renderLook();return ok;
-}
 // New bike, in Bike details: an empty form, and a fresh start for Undo.
 function startNewBike(){
+  if(LINK_BIKE)LINK_ADDS=true;   // a bike added in Bike details opened from the co-pilot is added from there
   fillBikeProfileForm(null);$('bikeSavedSelect').value='';$('bikeRemovePrompt').classList.add('hidden');
-  BIKE_PROFILE_MESSAGE='Enter another bike, then use its details or save it for next time. Your current plan keeps its bike until you apply the change.';
+  BIKE_PROFILE_MESSAGE=LINK_BIKE ? 'Enter another bike. Once it is saved, it is the bike for your plan.' : 'Enter another bike, then use its details or save it for next time. Your current plan keeps its bike until you apply the change.';
   renderBikeProfiles();rememberLookOpening();renderLook();$('bikeName').focus({preventScroll:true});
 }
 // The flags a fragment can carry, read exactly: #dev, #quiet, or both joined with &. A bike id never counts as one.
@@ -3856,7 +3847,6 @@ function initialiseLook(){
   // Another bike shown is a fresh start for Undo.
   $('bikeSavedSelect').addEventListener('change',()=>{rememberLookOpening();renderLook();});
   $('bikeSwapUndo').onclick=()=>{undoBikeSwap();$('bikeDetailsTitle').focus({preventScroll:true});};
-  $('bikeUseShown').onclick=useShownBike;
   renderLook();
 }
 
@@ -3953,10 +3943,10 @@ function openBikeDetailsFromLink(hash=location.hash){
   if(!inThisPage(href))setWayfinchBack(href);   // the Gear advisor is in this page: Back to Wayfinch keeps going to Wayfinch
   $('bikeDetailsBack').href=href;$('bikeDetailsBack').textContent=bikeWord(key);$('bikeDetailsBack').classList.remove('hidden');
   openBikeDetails($('rigBikeDetails'),link.section==='look' ? 'look' : 'frame');
-  LINK_BIKE=true;
+  LINK_BIKE=true;LINK_ADDS=false;
   if(plan)fillBikeProfileForm(plan);
   else if(saved){fillBikeProfileForm(saved);$('bikeSavedSelect').value=saved.id;}
-  else if(link.id==='new' || !S.bikeProfile){fillBikeProfileForm(null);$('bikeSavedSelect').value='';LOOK_NEW=null;}
+  else if(link.id==='new' || !S.bikeProfile){fillBikeProfileForm(null);$('bikeSavedSelect').value='';LOOK_NEW=null;LINK_ADDS=true;}
   // an id nobody has, with a bike in the plan: the plan's bike, so nothing is lost and nothing new is made
   else fillBikeProfileForm(S.bikeProfile);
   renderBikeProfiles();
@@ -4003,7 +3993,7 @@ function closeBikeDetails(){
   const back=LINK_BIKE ? $('bikeDetailsBack').href : null;
   closeLookPhoto();flushLookPicker();if(LOOK_RIM_TIMER!==null)flushLookRim();
   LOOK_CHANGED=false;LOOK_MESSAGE='';LINK_BIKE=false;$('lookUndo').classList.add('hidden');$('bikeDetailsBack').classList.add('hidden');
-  $('bikeUseShown').classList.add('hidden');
+  LINK_ADDS=false;
   root.classList.add('hidden');endDialog(root);
   if(back)returnToWayfinch(back);
 }
@@ -8572,6 +8562,23 @@ function bagShapeOf(pos, L, litres, slot){
   return B && B.bagShape && L && L.p ? B.bagShape(pos, L.p, litres, { slot:slot || null, frame:pos === 'frame' ? L.pts : undefined }) : null;
 }
 const shapeTurn = s => s.rot ? ` transform="rotate(${r2(s.rot)} ${r2(s.c[0])} ${r2(s.c[1])})"` : '';
+// The bar's straps on the front roll (the owner's finding G, 8 Nov 2026): what they hold lies along the roll's top, turned with it, and
+// two straps wrap round both. From the roll's outline: its middle, its axis (bike.js draws it running forward and up), its radius.
+function barStrapsOnRoll(outlines){
+  if(!outlines.length) return null;
+  const o = outlines.reduce((a, b) => Math.max(...b.map(p => p[0])) > Math.max(...a.map(p => p[0])) ? b : a);
+  const xs0 = o.map(p => p[0]), ys0 = o.map(p => p[1]);   // the roll is symmetric: its box's middle is its own
+  const cx = (Math.min(...xs0) + Math.max(...xs0)) / 2, cy = (Math.min(...ys0) + Math.max(...ys0)) / 2;
+  const u = [8 / 8.62, -3.2 / 8.62], n = [-u[1], u[0]];   // along the roll, and across it (downwards)
+  const along = o.map(p => (p[0] - cx) * u[0] + (p[1] - cy) * u[1]), r = Math.max(...o.map(p => Math.abs((p[0] - cx) * n[0] + (p[1] - cy) * n[1])));
+  const len = (Math.max(...along) - Math.min(...along)) * 0.55, h = 3.4, up = r + h / 2 - 0.2;
+  const m = [cx - n[0] * up, cy - n[1] * up];
+  const strap = t => { const a = [cx + u[0] * t - n[0] * (r + h + 0.6), cy + u[1] * t - n[1] * (r + h + 0.6)], b = [cx + u[0] * t + n[0] * (r + 0.8), cy + u[1] * t + n[1] * (r + 0.8)];
+    return `M${r2(a[0])},${r2(a[1])} L${r2(b[0])},${r2(b[1])}`; };
+  const xs = o.map(p => p[0]);
+  return { x:r2(m[0] - len / 2), y:r2(m[1] - h / 2), w:r2(len), h, cx:r2(m[0]), cy:r2(m[1]), deg:r2(Math.atan2(u[1], u[0]) * 180 / Math.PI),
+    straps:`${strap(-len * 0.28)} ${strap(len * 0.28)}`, tag:[r2(Math.min(296, Math.max(...xs) + 3)), r2(Math.min(147, cy + 2))] };
+}
 function shellShape(s, pct, bare){
   const id = 'cl'+(clipN++), b = s.box, fh = Math.max(0, (b.h + 2) * pct);
   return { def:`<clipPath id="${id}"><path d="${s.d}"/></clipPath>`,
@@ -8714,7 +8721,7 @@ function drawRig(){
   const A=currentPlan(), { slots } = A;
   const loadedRackDeck=showFill && deckClaims().length>0;
   clipN = 0; RIG_OUTLINES = {};
-  const defs = [], art = [], tags = [];
+  const defs = [], art = [], tags = [], barRolls = [];
   const fb = S.bags.find(b => b.pos === 'frame');
   const frameSmall = frameShapeIdx(fb);
   const bike = rigArt(), anchors = bike ? bike.anchors : null;
@@ -8791,6 +8798,7 @@ function drawRig(){
       if(b.idx > 0 && !slots_) L = shiftShape(L, PAIR_OFF[0], PAIR_OFF[1]);
       const sh = shellOf(L, pct, pos, +b.L, b.slot);
       defs.push(sh.def);
+      if(pos === 'bar'){ const bs = bagShapeOf(pos, L, +b.L, b.slot); if(bs) barRolls.push(bs.outline); }
       const shp = s && bagShapeOf(pos, L, +b.L, b.slot);
       if(shp) RIG_OUTLINES[s.key] = { pos, outline:shp.outline };
       const canBump = !removing && (POSITIONS[pos].pairable && !b.pair || pos === 'frame');
@@ -8844,7 +8852,16 @@ function drawRig(){
     const deckEmpty=showFill && on && !(which==='rack' && loadedRackDeck);
     const deckIdle=showFill && on && which==='bar' && !slots.some(s=>s.pos==='bar');
     const cls = on ? `deck${deckEmpty?' deck-empty':''}${deckIdle?' idle':''}` : 'deck ghostdeck';
-    art.push(`<g class="bagg ${cls}${editing && (removing ? on : true) ? (removing ? ' removable' : ' addable') : ''}"${act}>` +
+    // Once the kit is chosen, the bar's straps are drawn on the roll itself (the owner's finding G, 8 Nov 2026): what they hold lies along
+    // the roll's top and two straps wrap round both. While editing they stay at their own spot, where their tap target is.
+    const roll = which === 'bar' && stage > 2 && on ? barStrapsOnRoll(barRolls) : null;
+    if(roll){
+      art.push(`<g class="bagg ${cls} deck-bar"><rect class="bag-shell" x="${roll.x}" y="${roll.y}" width="${roll.w}" height="${roll.h}" rx="1.5" transform="rotate(${roll.deg} ${roll.cx} ${roll.cy})"/>` +
+        `<path class="strapline" d="${roll.straps}"/></g>`);
+      tags.push(`<text class="bag-tag active deck-tag${deckEmpty?' deck-empty':''}" x="${roll.tag[0]}" y="${roll.tag[1]}" text-anchor="start">STRAPS</text>`);
+      return;
+    }
+    art.push(`<g class="bagg ${cls}${which === 'bar' ? ' deck-bar' : ''}${editing && (removing ? on : true) ? (removing ? ' removable' : ' addable') : ''}"${act}>` +
       `<rect class="bag-shell" x="${D.x}" y="${D.y}" width="${D.w}" height="${D.h}" rx="1.5"/>` +
       `<path class="strapline" d="M${r2(D.x-2)},${r2(D.y+D.h*0.34)} h${r2(D.w+4)} M${r2(D.x-2)},${r2(D.y+D.h*0.72)} h${r2(D.w+4)}"/>` +
       (editing && H ? hitRect(H.box) : '') + `</g>`);

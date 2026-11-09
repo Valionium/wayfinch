@@ -288,5 +288,31 @@ test('[WM-PAGE] the weight map reads the plan as the rig draws it: each packed b
   assert.equal(json('weightMapInput().ideal.rack'),true,'a fitted rack counts whatever the bike says');
 });
 
+// The owner's finding G (8 Nov 2026): the handlebar roll's straps stood in the air beside the roll.
+test('[BK-BAR-STRAPS] once the kit is chosen the bar straps are drawn on the roll, for every style, size and bar; while editing their tap target stays where it was',()=>{
+  const box=(svg,cls)=>{const g=svg.match(new RegExp(`<g class="bagg [^"]*\\b${cls}\\b[^"]*"[^>]*>(.*?)</g>`));if(!g)return null;
+    const r=g[1].match(/<rect class="bag-shell" x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)"/);return r&&{x:+r[1],y:+r[2],w:+r[3],h:+r[4]};};
+  let n=0;
+  for(const style of axes.styles)for(const size of axes.sizes)for(const bars of axes.bars){
+    const bike=bikeOf(style,size,bars,'47-584');
+    for(const L of [5,9,16]){
+      const svg=rig(bike,[{uid:1,pos:'bar',L},{uid:2,pos:'seat',L:10}],3,{bar:true});
+      const roll=json("(()=>{const o=Object.values(RIG_OUTLINES).filter(x=>x.pos==='bar').flatMap(x=>x.outline);const xs=o.map(p=>p[0]),ys=o.map(p=>p[1]);return {x:Math.min(...xs),y:Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};})()");
+      const d=box(svg,'deck-bar');
+      assert.ok(d,`${style} ${size} ${bars} ${L} L: the straps are drawn`);
+      const cx=d.x+d.w/2;
+      assert.ok(cx>roll.x&&cx<roll.x+roll.w,`${style} ${size} ${bars} ${L} L: the straps sit over the roll (${cx} in ${roll.x}..${roll.x+roll.w})`);
+      assert.ok(d.y<roll.y+roll.h&&d.y+d.h>roll.y,`${style} ${size} ${bars} ${L} L: on the roll, not above or below it`);
+      n++;
+    }
+    // editing: the strap deck's own tap target, where its anchor puts it
+    const edit=rig(bike,[{uid:1,pos:'bar',L:9}],2,{bar:true});
+    const hit=json("rigAnchors().hits.find(h=>h.key==='barDeck').box");
+    const g=edit.match(/<g class="bagg [^"]*\bdeck-bar\b[^"]*"[^>]*>(.*?)<\/g>/);
+    assert.ok(g&&g[1].includes(`<rect class="hit" x="${Math.round(hit.x*100)/100}"`),`${style} ${size} ${bars}: the tap target stays at its anchor while editing`);
+  }
+  assert.ok(n>=315);
+});
+
 for(const [name,fn] of tests){fn();passed++;console.log('ok',name);}
 console.log(`${passed} rig tests passed`);
