@@ -633,8 +633,11 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
     expect(json<number>('capL()')).toBeGreaterThanOrEqual(json<number>('kitL()'));
     // and everything that must be reached at the roadside within reach (the selection's own reach rule)
     expect(json('currentPlan().reach.outOfReach')).toEqual([]);
-    // smallest: without any one of the added bags, something would be over or out of reach, or the phone out of its own bags
-    const extras = bags.filter((b) => b.pos !== 'bottle').map((b) => b.pos);
+    // smallest: without any one of the added bags, something would be over or out of reach, or the phone out of its own bags; the 1.2 L
+    // top tube bag is the day ride's first bag (owner, 9 Nov 2026: the top tube bag first, the frame bag only if things are still over),
+    // so only the bags added after it are checked
+    const extras = bags.filter((b) => b.pos !== 'bottle' && b.pos !== 'top').map((b) => b.pos);
+    expect(bags.filter((b) => b.pos === 'top').map((b) => b.L)).toEqual([1.2]);
     for (const pos of extras)
       expect(json<number>(`(p=>p.spill.length+p.reach.outOfReach.length+phoneOffPref(p))(freshPlan({bags:S.bags.filter(b=>b.pos!=='${pos}'),placements:null}))`), `without the ${pos} bag`).toBeGreaterThan(0);
     // the bar names what it proposed
@@ -1039,12 +1042,13 @@ describe('[TRIP-DAY-POCKETS] a day ride counts the jersey and bib shorts pockets
       const room = { jersey: 0, bib: 0 };
       for (const [id, where] of Object.entries(places)) {
         const L = p.json<number>(`itemL(kitById('${id}'))`), kg = p.json<number>(`itemKg(kitById('${id}'))`);
-        expect(L, id).toBeLessThanOrEqual(where === 'bib' ? 0.2 : 0.6);
+        // the packable rain jacket rides in the jersey by kind (owner, 10 Nov 2026), up to 1.2 L; anything else 0.6 L at most
+        expect(L, id).toBeLessThanOrEqual(where === 'bib' ? 0.2 : id === 'rain' ? 1.2 : 0.6);
         expect(kg, id).toBeLessThanOrEqual(0.35);
         expect(p.json<boolean>(`carrying('${id}')`), id).toBe(true);
         room[where] += L;
       }
-      expect(room.jersey, date).toBeLessThanOrEqual(1.5 + 1e-9);
+      expect(room.jersey, date).toBeLessThanOrEqual(2.1 + 1e-9);
       expect(room.bib, date).toBeLessThanOrEqual(0.5 + 1e-9);
       // in no bag: not in the plan's bags, nothing over
       const inBags = p.json<string[]>('Object.keys(currentPlan().items)');
@@ -1136,6 +1140,29 @@ describe('[TRIP-DAY-POCKETS] a day ride counts the jersey and bib shorts pockets
     expect(gear()).toEqual(mine);
     expect(words()).toContain('Your bags stay as you set them.');
     expect(words()).not.toContain('Bags planned again');
+  });
+
+  test('a packable rain jacket and a mini pump ride in the jersey\'s back pockets (owner, 10 Nov 2026); the bags hold the rest, the 1.2 L top tube bag first, the frame bag only if still over', async () => {
+    for (const date of ['2026-04-15', '2026-07-20', '2026-11-15']) {
+      const p = await planned(date);
+      const places = p.json<Places>('pocketPlaces()');
+      expect(places.rain, date).toBe('jersey');
+      expect(places.pump, date).toBe('jersey');
+      expect(places.phone, date).toBe('bib');
+      // the jersey's three back pockets hold 2.1 L in all; what does not fit there goes in the bags, as before
+      const jerseyL = Object.keys(places).filter((id) => places[id] === 'jersey').reduce((n, id) => n + p.json<number>(`itemL(kitById('${id}'))`), 0);
+      expect(jerseyL, date).toBeLessThanOrEqual(2.1 + 1e-9);
+      expect(p.json<number[]>(`S.bags.filter(b=>b.pos==='top').map(b=>b.L)`), date).toEqual([1.2]);
+      expect(p.json('currentPlan().spill.map(k=>k.id)'), date).toEqual([]);
+      if (p.json<boolean>(`S.bags.some(b=>b.pos==='frame')`))
+        expect(p.json<number>(`(t=>t.spill.length+t.reach.outOfReach.length)(freshPlan({bags:S.bags.filter(b=>b.pos!=='frame'),placements:null}))`), date).toBeGreaterThan(0);
+      const words = String(p.page.nodes.get('smallPockets')!.innerHTML).replace(/<[^>]+>/g, ' ');
+      expect(words, date).toMatch(/In your jersey pockets: [^.]*rain jacket[^.]*pump/);
+    }
+    // a heavy budget shell (2 L, 0.45 kg) is no pocket's: it stays in a bag
+    const shell = await planned('2026-11-15', 0.39, `S.custom.rain={L:2,kg:0.45,rigid:0};`);
+    expect(shell.json('pocketPlaces().rain ?? null')).toBeNull();
+    expect(shell.json<string[]>('Object.keys(currentPlan().items)')).toContain('rain');
   });
 
   test('a saved plan without pockets reopens without them; a night, no pockets', async () => {

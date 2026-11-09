@@ -4634,13 +4634,15 @@ function carrying(id){ const k = kitById(id); return !!S.kit[id] && !(k && light
    litres, lists or weight, and one line says where it is. Counted only on an afternoon ride (0 nights within the hard pace's day,
    afternoonRide) whose plan holds S.pockets: a day ride planned from Wayfinch's Trip sets both on; a plan without it never gets them,
    and turning one off is stored with the plan. Only small, light things, in this order, each into the first pocket switched on that
-   still has room for it: the bib shorts pocket (0.5 L, things of 0.2 L or less, such as the phone), then the jersey's back pockets
-   (1.5 L in all, things of 0.6 L or less, such as the ride snacks or a light layer); nothing over 0.35 kg. ---- */
-const POCKETS=[{id:'bib',L:0.5,itemL:0.2,label:'Bib shorts pockets',name:'bib shorts pocket'},{id:'jersey',L:1.5,itemL:0.6,label:'Jersey pockets',name:'jersey pockets'}];
+   still has room for it: the bib shorts pocket (0.5 L, things of 0.2 L or less, such as the phone), then the jersey's three back
+   pockets (2.1 L in all, about 0.7 L each, things of 0.6 L or less, such as the ride snacks or a mini pump, and by kind a packable
+   rain jacket of up to 1.2 L: owner, 10 Nov 2026, a packable rain jacket and a mini pump may go in the jersey's back pockets);
+   nothing over 0.35 kg. What does not fit stays in the bags. ---- */
+const POCKETS=[{id:'bib',L:0.5,itemL:0.2,label:'Bib shorts pockets',name:'bib shorts pocket'},{id:'jersey',L:2.1,itemL:0.6,label:'Jersey pockets',name:'jersey pockets',kinds:{rain:1.2}}];
 // The pockets' line names things shortly (KIT's "ID, cards, insurance" would read as three things in a list).
-const POCKET_NAMES={phone:'phone',snacks:'ride snacks',rain:'rain jacket',warmers:'arm and leg warmers',gloves:'long gloves',docs:'ID and cards',cash:'cash',cap:'cap or buff'};
+const POCKET_NAMES={phone:'phone',snacks:'ride snacks',rain:'rain jacket',pump:'pump',warmers:'arm and leg warmers',gloves:'long gloves',docs:'ID and cards',cash:'cash',cap:'cap or buff'};
 const POCKET_KG=0.35;
-const POCKET_ITEMS=['phone','snacks','rain','warmers','gloves','docs','cash','cap'];
+const POCKET_ITEMS=['phone','snacks','rain','pump','warmers','gloves','docs','cash','cap'];
 function pocketsCounted(){ return !!S.pockets && S.nights === 0 && afternoonRide(); }
 // {kit id: 'jersey' | 'bib'} for what rides in a pocket now
 function pocketPlaces(){
@@ -4650,7 +4652,7 @@ function pocketPlaces(){
   for(const id of POCKET_ITEMS){
     const k=kitById(id);
     if(!k || !S.kit[id] || (k.camp && !camping()) || lightDropped(k) || itemKg(k) > POCKET_KG + 1e-9) continue;
-    const L=itemL(k),p=POCKETS.find(p => L <= p.itemL + 1e-9 && L <= room[p.id] + 1e-9);
+    const L=itemL(k),p=POCKETS.find(p => L <= ((p.kinds && p.kinds[id]) || p.itemL) + 1e-9 && L <= room[p.id] + 1e-9);
     if(p){ out[id]=p.id; room[p.id]=+(room[p.id]-L).toFixed(2); }
   }
   return out;
