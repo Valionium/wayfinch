@@ -60,58 +60,29 @@ export type Retry = {
   onWait?: (until: Date | null) => void;
   random?: () => number; now?: () => Date;
 };
-const MINUTE_LIMIT_WAIT_MS = 61_000;
-/** Up to this much more, so riders refused in the same second don't all ask again in the same second (M1). */
-const MINUTE_SPREAD_MS = 5_000;
-const SERVER_WAIT_MS = 3_000;
-
-async function refusalOf(response: Response): Promise<WeatherServiceError> {
-  if (response.status === 429) {
-    let reason = '';
-    try {
-      const body = (await response.json()) as unknown;
-      if (isRecord(body) && typeof body['reason'] === 'string') reason = body['reason'];
-    } catch {
-      /* no reason given */
-    }
-    // "Minutely API request limit exceeded. Please try again in one minute." The others name an hour, a day or a month.
-    const minute = reason === '' || /minute/i.test(reason);
-    return new WeatherServiceError('HTTP 429', 'refused', { limited: true, againInMs: minute ? MINUTE_LIMIT_WAIT_MS : null });
-  }
-  return new WeatherServiceError(`HTTP ${response.status}`, 'refused', { againInMs: response.status >= 500 ? SERVER_WAIT_MS : null });
-}
-
 const requestInit = (timeoutMs: number): RequestInit => ({
   // A copy from a cache, stamped with the time of this fetch, would be an old forecast shown as new.
   cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(timeoutMs),
 });
 
-export async function getJson(f: FetchLike, url: string, timeoutMs: number): Promise<unknown> {
+/**
+ * The answer's body, or a refusal. `refusal` says what a refused answer means (Prepare this route's own reads the service's limit,
+ * openmeteo-prep.ts), and `lost` what a missing one does; by default each is a plain refusal.
+ */
+export async function getJson(f: FetchLike, url: string, timeoutMs: number,
+  refusal: (r: Response) => Promise<WeatherServiceError> = async (r) => new WeatherServiceError(`HTTP ${r.status}`),
+  lost: () => WeatherServiceError = () => new WeatherServiceError('no answer')): Promise<unknown> {
   let response: Response;
   try {
     response = await f(url, requestInit(timeoutMs));
   } catch {
-    throw new WeatherServiceError('no answer', 'refused', { againInMs: SERVER_WAIT_MS });
+    throw lost();
   }
-  if (!response.ok) throw await refusalOf(response);
+  if (!response.ok) throw await refusal(response);
   try {
     return await response.json();
   } catch {
     throw new WeatherServiceError('not JSON');
-  }
-}
-
-/** As getJson; with `retry`, asked once more after the wait the refusal calls for. */
-export async function askPolitely(f: FetchLike, url: string, timeoutMs: number, retry: Retry | undefined): Promise<unknown> {
-  try {
-    return await getJson(f, url, timeoutMs);
-  } catch (e) {
-    if (!retry || !(e instanceof WeatherServiceError) || e.againInMs === null) throw e;
-    const ms = e.limited ? e.againInMs + Math.floor((retry.random ?? Math.random)() * MINUTE_SPREAD_MS) : e.againInMs;
-    retry.onWait?.(new Date((retry.now?.() ?? new Date()).getTime() + ms));
-    await retry.sleep(ms);
-    retry.onWait?.(null);
-    return getJson(f, url, timeoutMs);
   }
 }
 
@@ -236,7 +207,9 @@ function checkWhole(hours: GridHour[], now: Date, days: number): void {
  */
 export async function fetchForecast(grid: GridPoint[], o: { days: number; with15: boolean; fetch: FetchLike; now?: () => Date; runs?: ModelRun[]; retry?: Retry }): Promise<StoredForecast> {
   const fetchedAt = (o.now ?? (() => new Date()))();
-  const body = await askPolitely(o.fetch, forecastUrl(grid, o.days, o.with15), FORECAST_TIMEOUT_MS, o.retry);
+  const url = forecastUrl(grid, o.days, o.with15);
+  // Waiting and asking again is Prepare this route's alone: its code is in that chunk (openmeteo-prep.ts).
+  const body = o.retry ? await (await import('./openmeteo-prep.ts')).askPolitely(o.fetch, url, FORECAST_TIMEOUT_MS, o.retry) : await getJson(o.fetch, url, FORECAST_TIMEOUT_MS);
   const locations = Array.isArray(body) ? body : [body]; // one location comes back as a bare object
   if (isRecord(body) && body['error'] === true) throw new WeatherServiceError('error answer');
   if (locations.length !== grid.length) throw incomplete('wrong number of points');

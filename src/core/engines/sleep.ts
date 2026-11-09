@@ -23,6 +23,8 @@ import { seasonalWindow } from './water.ts';
 export type SleepFacts = Pick<ScreenInputs, 'trip' | 'places' | 'matches' | 'hours' | 'savedKm' | 'now' | 'routeZones' | 'sun'> & { ride: DayRide; schedule: Schedule };
 
 const NIGHT_RADIUS_KM = 3;
+/** A stop chosen in Trip ends a stage there; a stage end and the stop it was made for differ by rounding at most. */
+const NEAR_STOP_KM = 0.01;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const validDate = (d: Date): boolean => Number.isFinite(d.getTime());
 
@@ -193,6 +195,8 @@ export function sleepAnswer(f: SleepFacts): Answer {
   // The ride the arrivals are read from: the day's ride, or riding there now after the ride.
   const schedule = night ? nowSchedule(ride, f.trip, f.now, env) : f.schedule;
   const target = night ? ride.tonightKm ?? ride.stopKm : ride.stopKm;
+  // The place the rider's day ends at, chosen in Trip (owner, 9 Nov 2026): marked as the stop for the night.
+  const ownStop = f.trip.stops?.routeId === route.id ? f.trip.stops.days.find((d) => Math.abs(d.km - target) <= NEAR_STOP_KM)?.placeId : undefined;
 
   const ridingOf = (side: Side, m: RouteMatch): number =>
     ridingMin(route, side === 'behind' ? ride.behindFromKm : schedule.startKm, m.km, flat, schedule.r)
@@ -308,6 +312,7 @@ export function sleepAnswer(f: SleepFacts): Answer {
       ...(timed ? [formatAbout(c.arrival!, r.tz)] : []),
       ...(r.dl.line ? [r.dl.line] : []),
       ...(c.riding === 'beyond' ? [W.sleepRidingOn] : []),
+      ...(p.id === ownStop ? [W.sleepYourStop] : []),
       nightText,
       ...(isLeanTo(p) ? [W.sleepShelterNote] : []),
       ...(reservation ? [W.sleepReservation(reservation)] : []),

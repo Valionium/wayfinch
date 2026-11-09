@@ -127,3 +127,61 @@ test('[HINT-LOCAL] Delete co-pilot data on You, then Tools, Tyre pressure, Bike 
   await page.waitForTimeout(300);
   expect(await copilot()).toEqual([]);
 });
+
+// The Bag planner's and the Gear advisor's "fits better" lines (design section 5): this page's own Bike details, so its way back is
+// the planner or the advisor; a bike saved there hides the line, the focus stays on the page and the advisor answers for that bike.
+test('[FIT-LINE] the Bag planner and the Gear advisor with no bike: a line under the drawing and above the results, each Add your bike 44 px into Bike details and back; a bike saved there, no line and an answer for it', async ({ page }) => {
+  const problems = watch(page);
+  app = await loadApp(page, { launch: true, path: '/tools/bags/' });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY');
+  const line = page.locator('#planFitLine');
+  await expect(line).toHaveText('Drawn as a typical gravel bike, size M. Add your bike and the frame bag fits your frame.');
+  const add = line.getByRole('button', { name: 'Add your bike' });
+  const box = (await add.boundingBox())!;
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  const drawing = (await page.locator('#rigSvg').boundingBox())!;
+  // under the drawing on a phone; beside it when wide, as the weight map, so the sticky rig still fits the window
+  if (page.viewportSize()!.width < 1100) expect(box.y).toBeGreaterThan(drawing.y + drawing.height - 1);
+  else expect(box.x).toBeGreaterThan(drawing.x + drawing.width - 1);
+  expect(await noSideways(page)).toBe(true);
+  await add.click();
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await expect(page.locator('#bikeDetailsTitle')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#bikeDetailsBox')).toBeHidden();
+  await expect(add).toBeFocused();
+  // the Gear advisor on a plan with bags and no bike: no line until there are results, then one, above them
+  await page.evaluate(`Object.assign(S, { nights: 2, sleep: 'camp', mode: 'comfort', decks: { bar: false, rack: false }, nextUid: 6,
+      bags: [{ uid: 1, pos: 'seat', L: 14 }, { uid: 2, pos: 'bar', L: 12 }, { uid: 3, pos: 'top', slot: 'front', L: 1 }, { uid: 4, pos: 'bottle', slot: 'dt', L: 0.75 }, { uid: 5, pos: 'bottle', slot: 'st', L: 0.75 }] });
+    applyTripKitDefaults(); openAdvisor(document.getElementById('rigBikeDetails'));`);
+  const advisor = page.locator('#advisorBox');
+  const fit = page.locator('#advisorFitLine');
+  await expect(advisor.locator('#advisorAnswer')).toHaveText('Choose all three steps to see what to get.');
+  await expect(fit).toBeHidden();
+  await advisor.locator('label.adv-choice', { hasText: 'Bikepacking bags only' }).click();
+  await advisor.locator('label.adv-choice', { hasText: 'Better handling' }).click();
+  await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
+  await expect(fit).toHaveText('Sizes for a typical frame. Add your bike for bag sizes that fit it.');
+  await expect(line).toBeHidden();   // the planner's line is not on the advisor's page: one per screen
+  const fitAdd = fit.getByRole('button', { name: 'Add your bike' });
+  expect((await fitAdd.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  expect((await fitAdd.boundingBox())!.y).toBeLessThan((await page.locator('#advisorAnswer h3').boundingBox())!.y);
+  expect(await noSideways(page)).toBe(true);
+  await fitAdd.click();
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await page.evaluate(() => { (document.getElementById('bikeMoreDetails') as HTMLDetailsElement).open = true; (document.getElementById('bikeLibraryPanel') as HTMLDetailsElement).open = true; });
+  await page.locator('#bikeName').fill('Mine');
+  await page.locator('#bikeSave').click();
+  await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles') ?? '[]') as { name: string }[]).map((b) => b.name))).toEqual(['Mine']);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#bikeDetailsBox')).toBeHidden();
+  await expect(fit).toBeHidden();
+  await expect(page.locator('#advisorTitle')).toBeFocused();
+  await expect(page.locator('#advisorBikeSelect')).toHaveValue(/.+/);
+  await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
+  // the page wrote none of the co-pilot's keys
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('copilot:')))).toEqual([]);
+  expect(problems).toEqual([]);
+});
