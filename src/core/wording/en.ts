@@ -1030,9 +1030,6 @@ export const W = {
   /** Beside a picker that holds what the rider typed, once a newer position is shown: Use would set the typed one. */
   appAheadManualNewer: (km: string): string => `Newer position: km ${km}`,
   appAheadToTrip: 'Add a route in Trip',
-  // En route with no route (owner's finding M, 8 Nov 2026): what it will show.
-  appAheadEmptyWhat: 'En route shows the next water, food and places to sleep along your route, with the weather and daylight on the way.',
-  appAheadEmptyOffline: 'It works offline, from what Get ready offline saves on this phone.',
   // Ahead before Get ready offline (guided Trip design §2.3).
   appAheadNeedTitle: 'En route needs Get ready offline',
   appAheadNeedBody: 'Water, food, sleep places and weather come from what it saves on this phone.',

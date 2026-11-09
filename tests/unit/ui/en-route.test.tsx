@@ -86,6 +86,9 @@ describe('with no route (finding M)', () => {
   test('[AH-EMPTY] two or three lines on what En route shows, and "Add a route in Trip" to Trip', async () => {
     await show(noRoute(), fakeActions().actions);
     const empty = host.querySelector<HTMLElement>('[data-empty]')!;
+    // The two lines are a chunk of their own; the button is there at once.
+    expect([...empty.querySelectorAll('a')].some((a) => a.textContent === 'Add a route in Trip')).toBe(true);
+    await until(() => empty.querySelectorAll('p').length > 1, 'the lines');
     const lines = [...empty.querySelectorAll('p:not(:has(a))')].map((p) => p.textContent ?? '');
     expect(lines.length).toBeGreaterThanOrEqual(2);
     expect(lines.length).toBeLessThanOrEqual(3);

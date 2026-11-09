@@ -20,6 +20,9 @@ import './ahead.css';
 // The top card's button and progress before Get ready offline: a chunk only a rider without it loads (AH-BEFORE-READY).
 const NeedReady = lazy(() => import('./need-ready.tsx').then((m) => m.NeedReady));
 
+// What En route will show, with no route: two lines of a chunk of their own (AH-EMPTY); the button under them is here.
+const EmptyLines = lazy(() => import('./empty.tsx').then((m) => m.EmptyLines), () => null);
+
 function focusLater(id: string): void {
   // After the render that opens it, so the element exists.
   setTimeout(() => {
@@ -169,8 +172,7 @@ function NoRoute({ view, actions }: { view: Extract<AheadView, { kind: 'no-route
       ) : (
         // What En route is for, before there is a route (owner's finding M, 8 Nov 2026).
         <div class="ah-empty" data-empty>
-          <p>{W.appAheadEmptyWhat}</p>
-          <p class="muted">{W.appAheadEmptyOffline}</p>
+          <EmptyLines />
           <p><a class="btn btn-primary" href="#/trip">{W.appAheadToTrip}</a></p>
         </div>
       )}
