@@ -397,7 +397,9 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     // 34 saved setups: 3 general ones of the chosen bike, 30 trip setups and the one made for this route on 6 Nov; the plan here is
     // none of them, so a "Before" copy is made
     const library = `[${qaSetup('t_made', made)},...${many(3, 'g', { kind: 'general' })},...${many(30, 't')}]`;
-    const KEYS = ['loadcheck:setups', 'loadcheck:setups-more:v1', 'loadcheck:setup-marks:v1', 'loadcheck:saved-at:v1'];
+    // the three setup keys, which only the setup write writes (the ledger is also written for other keys, at times that vary; the
+    // QA suite fails it in turn too)
+    const KEYS = ['loadcheck:setups', 'loadcheck:setups-more:v1', 'loadcheck:setup-marks:v1'];
     const failAt = (page: VM, n: number) => {
       const put = page.localStorage.setItem, log = { count: 0, failed: '' };
       page.localStorage.setItem = function (this: unknown, key: string, value: string) {
@@ -439,9 +441,9 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
         const log = failAt(page, n);
         await page.run(code);
         const label = `${what}, write ${n + 1} of ${count.count} (${log.failed}) fails`;
+        expect(log.failed, label).not.toBe('');
         const now = stored(page);
         expect(ids.filter((id) => !now.includes(id)), label).toEqual([]);
-        if (log.failed === 'loadcheck:saved-at:v1') continue;   // the setups reached storage; only their stamps did not
         expect(page.run('SETUPS_STORED'), label).toBe(false);
         expect(String(page.nodes.get('handoffText')!.textContent), label).toMatch(/did not reach storage/);
         cases++;
