@@ -87,3 +87,14 @@ export function withStops(route: Route, plan: Stage[], stops: TripStops | null, 
   const ends = endsOf(stops, route.lengthKm);
   return sameKms(ends, plannedEnds(plan)) ? plan : stagesEndingAt(route, ends, flatKph);
 }
+
+/** The stop a day of the trip ends at, when the trip's stops are the ones its stages end at; null otherwise (and for the last day). */
+export function dayStopOf(trip: { route: Route; stops?: TripStops }, i: number): TripStop | null {
+  const { stops, route } = trip;
+  if (!stops || stops.routeId !== route.id || !Array.isArray(stops.days) || stops.days.length !== route.stages.length - 1) return null;
+  const d = stops.days[i];
+  const s = route.stages[i];
+  if (!d || !s) return null;
+  const end = d.placeId === null ? stops.basis[i] : d.km;
+  return end !== undefined && Math.abs(s.endKm - end) <= SAME_KM ? d : null;
+}

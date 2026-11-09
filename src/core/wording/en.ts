@@ -530,6 +530,7 @@ export const W = {
   sleepClosedSeason: (season: string): string => `closed for the season (${season})`,
   sleepClosedDay: (when: string): string => `closed for ${when}`,
   sleepHoursUnknown: (when: string): string => `hours not known for ${when}`,
+  sleepYourStop: 'your stop for the night, chosen in Trip',
   sleepRidingOn: "riding on past the day's stop",
   sleepReservation: (value: string): string => `reservation: ${value} (map data)`,
   sleepFee: (value: string): string => `fee: ${value} (map data)`,

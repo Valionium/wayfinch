@@ -95,3 +95,8 @@ progress { width: 100%; accent-color: var(--blaze); }
 .hit { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-width: 0; text-align: left; overflow-wrap: anywhere; }
 .hit-name { font-weight: 600; }
 .hit-line { color: var(--muted); font-size: 0.9375rem; }
+/* Days that end where you can sleep (TRIP-DAY-STOPS): Change stop, its choices and Undo, each a full-size target. */
+.trip-stop-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.trip-stop-choices { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.trip-stop-choices .btn { min-height: 44px; width: 100%; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.trip-stop-actions .btn { min-height: 44px; }

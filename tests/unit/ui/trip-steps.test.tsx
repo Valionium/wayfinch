@@ -9,6 +9,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import type { RouteStop } from '../../../src/core/screen/route-stops.ts';
 import type { DayBed } from '../../../src/core/engines/day-beds.ts';
 import { BD } from '../../../src/core/wording/en-beds.ts';
+import { pointAtRouteKm } from '../../../src/core/geo/project.ts';
+import { placeAt } from '../../fixtures/places.ts';
 import { showKm } from '../../../src/core/wording/en.ts';
 import { W } from '../../../src/core/wording/en.ts';
 import type { StepName, StepReport } from '../../../src/data/prepare.ts';
@@ -308,6 +310,50 @@ describe('The stops on the height profile (guided Trip design §6)', () => {
     expect(lines.at(-1)).toBeNull(); // the last day ends at the route's end
     if (days.length > 2) expect(lines[1]).toContain('nearest town: Bingen');
   });
+});
+
+describe('Days that end where you can sleep (owner, 9 Nov 2026)', () => {
+  /** Two sleep places near day 1's planned end, matched to the route, as Prepare this route saves them. */
+  async function bedsNearDay1(): Promise<{ end: number }> {
+    const trip = (await readTrip())!;
+    const end = trip.route.stages[0]!.endKm;
+    const db = await openDb();
+    for (const [id, kind, name, km] of [['b1', 'lodging', 'Gasthof Adler', end + 1.5], ['b2', 'campsite', 'Camping Rheinaue', end - 2]] as const) {
+      const p = pointAtRouteKm(trip.route, km);
+      await db.put('places', placeAt(kind, p.lat, p.lon, { id, name }));
+      await db.add('matches', { placeId: id, km, offRouteM: 0 });
+    }
+    return { end };
+  }
+  const lines = (): string[] => [...host.querySelectorAll('[data-summary] .trip-days li')].map((li) => li.querySelector('span')!.textContent ?? '');
+
+  test('[TRIP-DAY-STOPS] after Prepare this route a day reads "Day 1 · 91.4 km to …"; Change stop offers the places near and No stop; a pick moves the day, Undo brings it back', async () => {
+    await withRoute(services({ ...preparing() }));
+    expect(host.querySelector('[data-summary]')!.textContent).toContain(BD.appTripBedsAfter);
+    await bedsNearDay1();
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes('14 places'), 'the result'); // the 12 of the stand-in and the two beds
+    await until(() => lines()[0]!.includes(' to '), 'day 1 to a place');
+    const t = (await readTrip())!;
+    expect(lines()[0]).toBe(BD.appTripDayTo(1, showKm(t.route.stages[0]!.endKm - t.route.stages[0]!.startKm), 'Camping Rheinaue'));
+    expect(t.stops!.days[0]!.name).toBe('Camping Rheinaue'); // a camping trip: the campsite first
+    const change = host.querySelector<HTMLButtonElement>('[data-stop-change="1"]')!;
+    expect(change.getAttribute('aria-expanded')).toBe('false');
+    await click(change);
+    await until(() => host.querySelector('[data-stop-choices]') !== null, 'the choices');
+    const offered = [...host.querySelectorAll<HTMLButtonElement>('[data-stop-choices] button')].map((b) => b.textContent);
+    expect(offered).toEqual([expect.stringContaining('Camping Rheinaue'), expect.stringContaining('Gasthof Adler'), BD.appTripStopNo]);
+    await click(buttonIn(host.querySelector('[data-stop-choices]')!, offered[1]!));
+    await until(() => lines()[0]!.includes('Gasthof Adler'), 'day 1 to the guest house');
+    expect((await readTrip())!.stops!.days[0]).toMatchObject({ name: 'Gasthof Adler', by: 'rider' });
+    await click(buttonIn(host.querySelector('[data-summary]')!, BD.appTripStopUndo));
+    await until(() => lines()[0]!.includes('Camping Rheinaue'), 'day 1 back');
+    await click(host.querySelector<HTMLButtonElement>('[data-stop-change="1"]')!);
+    await until(() => host.querySelector('[data-stop-choices]') !== null, 'the choices again');
+    await click(buttonIn(host.querySelector('[data-stop-choices]')!, BD.appTripStopNo));
+    await until(() => !lines()[0]!.includes(' to '), 'day 1 split by effort');
+    expect(host.querySelector('[data-summary]')!.textContent).toContain(BD.appTripStopSplit);
+  }, 30_000);
 });
 
 describe('What the review of PR 73 found', () => {
