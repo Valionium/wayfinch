@@ -52,7 +52,7 @@ test("[PG-DATA] the guide holds the design's 36 parts in its six groups, in orde
   expect(partById('derailleur')!.mixed).toContain('hanger');
 });
 
-test("[PG-DATA] the brake's quick release shows the caliper lever and the V-brake release, the bike's own bars first (owner's answer 1)", () => {
+test("[PG-QR-BOTH] the brake's quick release shows the caliper lever and the V-brake release, the bike's own bars first (owner's answer 1)", () => {
   const qr = partById('brake-qr')!;
   expect(guidePictures(qr, 'drop', null)).toEqual(['brake-qr-open', 'vbrake-open']);
   expect(guidePictures(qr, 'flat', 'rim')).toEqual(['vbrake-open', 'brake-qr-open']);

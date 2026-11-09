@@ -3,7 +3,6 @@
 // drawing's anchors only, with the drawing's own measures (art.ts); tests pin each point to the drawn part for every template.
 import type { Anchors, P } from './art.ts';
 import type { BikeSpec } from './spec.ts';
-import { TEMPLATES } from './templates.ts';
 
 /** The 36 parts of the guide (design 4.3), in its six groups' order. */
 export const PART_PLACES = [
@@ -82,9 +81,10 @@ export function partPoint(spec: BikeSpec, anchors: Anchors, id: PartPlace): P | 
   const hood = barAt(70, -2);
   const discCaliper = add(fc, mul(unit(sub(headBottom, fc)), 7.6 * k));
   const rimTop: P = [fc[0], fc[1] - rimR];
-  const t = TEMPLATES[spec.style.value];
+  // The step-through's down tube is the drawing's one curved tube (its template's `step`; named here, so this module, loaded with the guide,
+  // takes nothing more from the first screen).
   const down = (s: number): P => {
-    if (t.step === undefined) return lerp(bb, headBottom, s);
+    if (spec.style.value !== 'step-through') return lerp(bb, headBottom, s);
     const from = lerp(headTop, headBottom, 0.55);
     return quad(bb, [bb[0] + (from[0] - bb[0]) * 0.45, bb[1] + 4], from, s);
   };

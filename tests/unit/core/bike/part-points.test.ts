@@ -7,6 +7,7 @@ import type { P } from '../../../../src/core/bike/art.ts';
 import { drawnFor, PART_PLACES, partPoint } from '../../../../src/core/bike/part-points.ts';
 import type { PartPlace } from '../../../../src/core/bike/part-points.ts';
 import { resolveBikeSpec } from '../../../../src/core/bike/spec.ts';
+import { TEMPLATES } from '../../../../src/core/bike/templates.ts';
 import type { BikeSpec } from '../../../../src/core/bike/spec.ts';
 import { elements, setBike, SIZES, STYLES } from './drawing-set.ts';
 
@@ -83,6 +84,8 @@ function* bikes(): Generator<{ name: string; spec: BikeSpec }> {
 
 test('[PG-POINTS] every guide part sits on its drawn part, inside the drawing, for every template, size, handlebar, brake and drive', () => {
   expect(PART_PLACES.length).toBe(36);
+  // part-points names the one template with a curved down tube rather than reading TEMPLATES
+  expect(Object.entries(TEMPLATES).filter(([, t]) => t.step !== undefined).map(([k]) => k)).toEqual(['step-through']);
   let checked = 0;
   for (const { name, spec } of bikes()) {
     for (const id of PART_PLACES) {

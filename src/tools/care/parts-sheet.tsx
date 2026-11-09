@@ -12,7 +12,6 @@ import { guidePictures, partById } from '../../core/parts/guide.ts';
 import type { PartId } from '../../core/parts/guide.ts';
 import { partsWordsFrom, PG, TAG_WORDS } from '../../core/wording/en-parts.ts';
 import type { PartsWordsFile } from '../../core/wording/en-parts.ts';
-import { useTheme } from '../../ui/bike/drawing.tsx';
 import { loadPictures, Picture, pictureLoaded } from './picture.tsx';
 import './parts.css';
 
@@ -30,9 +29,16 @@ export async function loadWords(): Promise<boolean> {
   return words !== null;
 }
 
+/** The theme the page shows now, as the bike drawing reads it (src/ui/bike/drawing.tsx); the sheet is drawn anew on each entry. */
+function themeNow(): 'dark' | 'light' {
+  const set = document.documentElement.getAttribute('data-theme');
+  if (set === 'light' || set === 'dark') return set;
+  return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
 /** The whole bike with the part marked, or a line where the rider's bike, as told, has none. */
 function Where({ part, bike }: { part: PartId; bike: BikeRecord | null }) {
-  const theme = useTheme();
+  const theme = themeNow();
   const spec = resolveBikeSpec(bike, null);
   const shown = drawnFor(spec, part);
   if (!shown) return <p class="muted pg-none">{PG.notOnYours}</p>;
