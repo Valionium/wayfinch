@@ -146,7 +146,8 @@ test('[TB-CARD-BIKE] a bike chosen in Tools, its drawing tapped, Bike details cl
 });
 
 // The fork close-up (owner, 7 Nov 2026): while the rider chooses the fork's colours in Look, the same drawing at 2 to 3 times, cut to the
-// fork, inside Look's Fork part; Look opened from Wayfinch (the Tools card) and inside the bag planner alike; no sideways scroll.
+// fork, inside the drawing's area on the bike's right (owner, 9 Nov 2026; before: below the drawing, in Look's Fork part); Look opened
+// from Wayfinch (the Tools card) and inside the bag planner alike; no sideways scroll.
 /** The close-up's zoom against the preview's, and whether everything fits across. */
 const forkZoom = (page: Page) => page.evaluate(() => {
   const zoom = document.querySelector('#lookForkZoom svg');
@@ -163,15 +164,23 @@ const forkZoom = (page: Page) => page.evaluate(() => {
     html: zoom.outerHTML,
   };
 });
-/** After scrolling down through the fork's colours (and by keyboard to the last), the close-up is still in view just below the drawing, and the last chip (and its focus) is shown whole below it. */
+/** After scrolling down through the fork's colours (and by keyboard to the last), the close-up is still in view inside the drawing's
+ * area, on the right of the bike, which moved to the left (owner, 9 Nov 2026; it was below the drawing, on the left, with the right
+ * empty), and the last chip (and its focus) is shown whole below that area. */
 async function forkCloseUpStays(page: Page): Promise<void> {
   const state = () => page.evaluate(() => {
-    const body = document.getElementById('bikeDetailsBody')!, zoom = document.getElementById('lookForkZoom')!, prev = document.getElementById('lookPreview')!;
+    const body = document.getElementById('bikeDetailsBody')!, zoom = document.getElementById('lookForkZoom')!, stage = document.getElementById('lookPreview')!;
+    const bike = document.querySelector('#lookPreview svg')!.getBoundingClientRect();
     const chips = [...document.querySelectorAll('#lookForkColour label')] as HTMLElement[];
-    const last = chips[chips.length - 1]!, b = body.getBoundingClientRect(), z = zoom.getBoundingClientRect(), p = prev.getBoundingClientRect();
+    const last = chips[chips.length - 1]!, b = body.getBoundingClientRect(), z = zoom.getBoundingClientRect(), s = stage.getBoundingClientRect();
     const l = last.getBoundingClientRect();
-    return { inView: z.height > 0 && z.top >= p.bottom - 1 && z.bottom <= b.bottom + 1, lastShown: l.top >= z.bottom - 1 && l.bottom <= b.bottom + 1, across: document.documentElement.scrollWidth <= innerWidth };
+    return {
+      inView: z.height > 0 && z.top >= s.top - 1 && z.bottom <= s.bottom + 1 && z.top >= b.top - 1,
+      beside: z.left >= bike.right - 1 && bike.left + bike.width / 2 < s.left + s.width / 2 && z.right > s.left + s.width / 2,
+      lastShown: l.top >= s.bottom - 1 && l.bottom <= b.bottom + 1, across: document.documentElement.scrollWidth <= innerWidth,
+    };
   });
+  const all = { inView: true, beside: true, lastShown: true, across: true };
   // The tap that chose the fork's colours focused its chip, and the page brings a focused control's ring into view once at once and
   // once more in the next frame (keepLookFocusInView). Wait for that frame, or its second scroll lands after ours and undoes it: our
   // callback runs after the page's, which was asked for first.
@@ -183,12 +192,28 @@ async function forkCloseUpStays(page: Page): Promise<void> {
     const l = chips[chips.length - 1]!.getBoundingClientRect(), b = body.getBoundingClientRect();
     body.scrollTop += l.bottom - (b.bottom - 4);
   });
-  expect(await state()).toEqual({ inView: true, lastShown: true, across: true });
+  await expect.poll(state).toEqual(all);
   // keyboard: the last chip taken, and its focus ring shows whole below the close-up
   await page.evaluate(() => { document.getElementById('bikeDetailsBody')!.scrollTop = 0; });
   await page.keyboard.press('Tab');
   await page.locator('#lookForkColour label').last().locator('input').focus();
-  await expect.poll(state).toEqual({ inView: true, lastShown: true, across: true });
+  await expect.poll(state).toEqual(all);
+  // past the end of the Fork part, the close-up goes and the bike takes the whole drawing area again (where the dialog scrolls that far:
+  // in a tall window the end of the dialog can come first, and the Fork part then stays on screen). As above, the page's second frame
+  // that brings the focused chip into view goes first, or it would scroll back after ours.
+  await page.evaluate(() => new Promise<void>((done) => { requestAnimationFrame(() => requestAnimationFrame(() => { done(); })); }));
+  const past = await page.evaluate(() => {
+    const body = document.getElementById('bikeDetailsBody')!, end = () => document.getElementById('lookForkSet')!.getBoundingClientRect().bottom;
+    const panel = () => document.getElementById('lookPreview')!.getBoundingClientRect().bottom;
+    body.scrollTop += end() - panel() + 40;
+    return end() < panel() - 1;
+  });
+  if (!past) return;
+  await expect(page.locator('#lookForkZoom')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => {
+    const s = document.getElementById('lookPreview')!.getBoundingClientRect(), p = document.querySelector('#lookPreview svg')!.getBoundingClientRect();
+    return Math.abs(p.left + p.width / 2 - (s.left + s.width / 2)) < 2;
+  })).toBe(true);
 }
 async function chooseForkColours(page: Page): Promise<void> {
   await expect(page.locator('#lookForkSet')).toBeVisible();
