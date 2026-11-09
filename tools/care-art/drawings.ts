@@ -3,12 +3,13 @@
 // CARE-ART-BUILT holds each file to its drawing, so a file is never edited by hand. `ref` is the drawing's written reference (method,
 // section 8, step 1): what it must show, from the research note docs/research/2026-11-09-modern-bike-mechanisms.md (R §n), shown beside
 // it on the owner's marking page. Batch 1: brakes and the snapped-spoke card. Batch 2: tyres, tubes, rims and valves. Batch 3: chain
-// and gears. Batch 4: the cockpit and the e-bike.
+// and gears. Batch 4: the cockpit and the e-bike. Batch 5: the rest of the guide (wheels, fork, hub gears).
 import { chainGuide, quickLink, stiffLink } from './chain.ts';
 import { dropGuide, flatGuide, headset, leverFlat, twistTest } from './cockpit.ts';
 import { caliperSlot, discAdjust, discBolts, discSide, padSpacer } from './disc.ts';
 import { driveGuide, gearsBarrel } from './drive.ts';
 import { batteryContacts, batteryRefit } from './ebike.ts';
+import { forkFront, hubGears, hubGuide, spokesGuide } from './wheel-guide.ts';
 import type { Pic } from './kit.ts';
 import { chainring, dropout, leverBarrel } from './parts.ts';
 import { caliper, hydraulic, vbrake } from './rim-brakes.ts';
@@ -28,6 +29,7 @@ const FRONT = "The front end from the bike's right side, front to the right (R �
 const DROP = "A drop bar from the side, front to the right (R §8): from the stem's clamp the tops run forward into the bend, which curves down and back to the drops; reach about 76 mm, drop about 116 mm, the tube 23.8 mm across (31.8 mm at the clamp); the hood on the front of the bend, the lever blade hanging in front of the bend.";
 const FLAT = 'A flat bar from above, forward up (R §8): the stem forward of the steerer to the bar; the bar 680 mm wide, swept 9° back from 100 mm out; grips at its ends, the brake levers just ahead of them.';
 const TWIST = "Book p. 40, the twist test: 1, from above, someone standing in front of the bike holds the front wheel between the knees and the bar in both hands and tries to turn the bar; the stem (two pinch bolts, four-bolt faceplate) must not turn on the steerer. 2, from the side (R §8): ";
+const BEHIND = "The front hub in the fork from behind (R §2): 100 mm between the fork ends' inner faces; the hub's end caps against them; flanges standing above and below the axle, the spokes leaving them; ";
 const BATTERY = "Bosch's pivot design (R §7): the battery's contacts at its lower end, by the motor; seated in the lower holder, it swings about that end until the catch at its upper end holds it (it clicks), then the key locks it; ";
 const SLOT = "A disc caliper's slot seen end-on along the disc, close up (R §1.1, Park Tool hydraulic alignment): the rotor's edge (1.8 mm thick) in the slot between the caliper's two halves, under the bridge that joins them; a pad each side, each a thin gap from the rotor (drawn 0.9 mm so it shows); the wheel side marked.";
 
@@ -71,6 +73,12 @@ export const DRAWINGS: readonly Drawing[] = [
   { id: 'pg-lever-drop', dir: 'parts', make: () => dropGuide('lever'), ref: `${DROP} The lever blade marked, hanging from the hood.` },
   { id: 'pg-bar-flat', dir: 'parts', make: () => flatGuide('bar'), ref: `${FLAT} The bar marked.` },
   { id: 'pg-lever-flat', dir: 'parts', make: leverFlat, ref: "The right end of a flat bar from above, forward up (R §8): the lever's clamp on the bar inside the grip, its body forward to the blade's pivot, the blade out over the front of the grip; the gear shifter beside the clamp, inboard; the brake's housing out of the lever's front." },
+  { id: 'pg-hub', dir: 'parts', make: () => hubGuide('hub'), ref: `${BEHIND}a 12 mm thru-axle through the fork ends and the hub, the disc on the hub's left (the bike's left on the left). The hub marked.` },
+  { id: 'pg-wheel-qr', dir: 'parts', make: () => hubGuide('qr'), ref: `${BEHIND}the hollow axle's ends up in the fork ends' open slots; a 5 mm skewer through it, the cam lever on the left, closed along the leg, the nut on the right. The lever and nut marked.` },
+  { id: 'pg-thru-axle', dir: 'parts', make: () => hubGuide('thru'), ref: `${BEHIND}a 12 mm thru-axle through a closed hole in the left fork end and the hub, screwed into the right one; its lever folded along the leg; the disc on the hub's left. Some thru-axles have no lever and a hex socket instead, shown end-on beside it.` },
+  { id: 'pg-hub-gears', dir: 'parts', make: hubGears, ref: "A hub gear from behind (Shimano Nexus or Alfine; R §5): the frame's rear ends 135 mm apart with open slots; a solid axle through them, a nut outside each, both axle ends in their frame ends; the big shell between flanges, the spokes leaving them; one sprocket inside the right end; the cable box (cassette joint) outside the right end and its nut, the gear cable coming into it." },
+  { id: 'pg-spokes', dir: 'parts', make: spokesGuide, ref: 'Spokes near the rim (R §4): 32 spokes laced three-cross, so neighbours leave the rim at alternating angles towards the hub flange, not straight at the centre; each held in the rim by its nipple. One spoke, its nipple and the rim marked.' },
+  { id: 'pg-fork', dir: 'parts', make: forkFront, ref: "The fork from the front (R §8): the crown under the head tube; two legs either side of the tyre, clear of it, down to the axle, 100 mm apart inside at the ends, which close round a thru-axle (its head and lever on the bike's left, the picture's right); the disc on that side; the steerer tapered from 1.5 in at the crown to 1 1/8 in at the top, hidden inside the head tube (dashed), up to the stem." },
   { id: 'pg-display', dir: 'parts', make: () => flatGuide('display'), ref: `${FLAT} An e-bike's display over the stem, on its mount at the bar; the remote on the bar inside the left lever, by the grip.` },
   { id: 'pg-caliper-rim', dir: 'parts', make: () => caliper('guide'), ref: CALIPER },
   { id: 'pg-vbrake', dir: 'parts', make: () => vbrake('guide'), ref: VBRAKE },

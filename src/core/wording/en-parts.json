@@ -269,6 +269,35 @@
   "pg-display": {
    "name": "An e-bike's display and remote on the handlebar.",
    "description": "A flat handlebar seen from above, forward is up, the stem reaching forward to its middle. Over the stem sits a screen, marked \"display\". On the bar near the left grip, a small box with buttons is marked \"remote\"."
+  },
+  "pg-hub": {
+   "name": "The hub in the middle of the wheel.",
+   "description": "The middle of the front wheel seen from behind, between the two fork ends: a thick axle runs through both fork ends and the hub. The hub, marked \"hub\", is a tube with a flange at each end, its end caps against the fork ends; spokes run up and down from the flanges. On the left of the hub stands the brake disc, labelled \"disc\".",
+   "caption": "Seen from behind the wheel."
+  },
+  "pg-wheel-qr": {
+   "name": "The wheel's quick release: a lever and a nut on a thin rod.",
+   "description": "The front hub seen from behind, between the two fork ends, which have open slots that the hub's axle sits up in. A thin rod runs through the hub, with a lever at the left end, labelled \"lever\", lying closed along the fork leg, and a nut at the right end, labelled \"nut\"; both are marked.",
+   "caption": "Seen from behind the wheel."
+  },
+  "pg-thru-axle": {
+   "name": "A thru-axle through the fork ends and the hub.",
+   "description": "The front hub seen from behind, between the two fork ends. A thick axle, marked \"thru-axle\", runs through a closed hole in the left fork end and through the hub, and screws into the right fork end; its lever, labelled \"lever\", is folded along the left leg. A small picture beside it shows the other kind's end: a round head with a hex socket, labelled \"or a hex key\".",
+   "caption": "Seen from behind the wheel."
+  },
+  "pg-hub-gears": {
+   "name": "A hub gear: a large rear hub with one sprocket.",
+   "description": "The rear hub seen from behind, between the frame's two ends: a large hub, marked \"hub gears\", with spokes running up and down from its flanges. The axle comes out through both frame ends with a nut outside each. Inside the right end sits a single sprocket, labelled \"sprocket\", and outside it, beyond the nut, a small box where the gear cable comes in.",
+   "caption": "Seen from behind the wheel."
+  },
+  "pg-spokes": {
+   "name": "Spokes and their nipples at the rim.",
+   "description": "The top of a wheel, labelled \"rim\", with its spokes running down towards the hub, neighbours leaning one way and the other so that they cross. One spoke is marked \"spoke\", and the small nut that holds it in the rim is marked \"nipple\"."
+  },
+  "pg-fork": {
+   "name": "The fork seen from the front.",
+   "description": "The fork seen from the front, marked \"fork\": its crown under the frame's head tube, and two legs from the crown down either side of the tyre to the axle, whose lever sits outside the right leg. Inside the head tube, drawn dashed, the fork's top tube, labelled \"steerer\", runs up to the stem, narrower at the top than at the crown. The head tube is labelled \"head tube\".",
+   "caption": "Seen from the front. The steerer is hidden inside the head tube, drawn dashed."
   }
  }
 }

@@ -17,14 +17,15 @@ export function batteryRefit(where: 'in' | 'on'): Pic {
   /** a mm along the down tube from the motor, b mm across it towards its underside. */
   const p = (a: number, b: number): Pt => add(O, add(scale(da, a * k), scale(nb, b * k)));
   bikeInset(pic, 'down-tube');
-  // the frame: the down tube runs into the head tube, whose top leaves the picture; the motor round the bottom bracket
+  // the frame: the down tube runs into the head tube, whose top leaves the picture, and down into the motor
   pic.path('cp-body', poly([p(-10, -45), p(700, -45), p(700, 45), p(-10, 45)]), { name: 'down-tube' });
   const hv: Pt = [-Math.sin(deg(18)), -Math.cos(deg(18))], hn: Pt = [hv[1] * -1, hv[0]];
   const H = p(660, -6), hp = (s: number, t: number): Pt => add(H, add(scale(hv, s * k), scale(hn, t * k)));
   pic.path('cp-body', poly([hp(-110, -30), hp(400, -30), hp(400, 30), hp(-110, 30)]), { name: 'head-tube' });
   const mc = p(-30, 0);
-  pic.path('cp-body', rrect(mc[0] - 58 * k, mc[1] - 52 * k, 116 * k, 104 * k, 22 * k), { name: 'motor' });
-  pic.circle('cp-fine', mc, 18 * k);
+  // the motor: a round housing round the crank axle (as Bosch's), the down tube ending in it
+  pic.circle('cp-body', mc, 58 * k, { name: 'motor' });
+  pic.circle('cp-fine', mc, 16 * k);
   // the battery: seated (dashed) and swung out about its lower end
   const L = 420, W = 74, a0 = 80;
   const b0 = where === 'in' ? 44 - W : -45 - W, b1 = b0 + W;
