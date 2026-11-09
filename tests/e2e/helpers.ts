@@ -1,5 +1,5 @@
 // Shared steps for the app's browser tests (plan Task 2). Nothing here prints a page.
-// `preparedTrip` holds the trip and route, and with `places` runs the real Get ready offline on the fixture pack; Task 17 adds weather.
+// `preparedTrip` holds the trip and route, and with `places` runs the real Prepare this route on the fixture pack; Task 17 adds weather.
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -124,7 +124,7 @@ export async function servePack(page: Page, id: string, hold: (url: string) => '
   return { requests, manifest };
 }
 
-/** A trip on a fixture route, saved through the store. With `places`, also Get ready offline's places and hours, on the fixture pack. */
+/** A trip on a fixture route, saved through the store. With `places`, also Prepare this route's places and hours, on the fixture pack. */
 export async function preparedTrip(page: Page, id: string, opts: { departureDate?: string | null; places?: boolean; weather?: boolean; atMs?: number } = {}): Promise<Trip> {
   await withStore(page);
   const fixture = await loadFixtureRoute(id as FixtureRouteId);

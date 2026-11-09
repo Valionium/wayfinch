@@ -38,8 +38,8 @@ test('[BAL-AUTO] at the packing step the plan is balanced in the rider\'s own ba
   for(const [name,bags] of Object.entries(SETS)){
     plan(bags,{rack:bags.some(b=>b.pos==='rack')});
     const before=json(READ),inputs=state(),fresh=json('allocate()');
-    // what the search finds from the planner's own packing, read the advisor's way
-    const found=json(`(()=>{const s=idealTrial(S.bags,{},S.placements);const o=window.WayfinchAdvisor.autoBalance(s,(p,f)=>idealTrial(S.bags,p,f.state),{fixed:balanceFixed(s)});return {apply:o.apply,gain:o.gain,moves:o.balanced.moves};})()`);
+    // what the search finds from the planner's own packing, read the advisor's way, with its wider look (the owner's choice of 9 Nov 2026)
+    const found=json(`(()=>{const s=idealTrial(S.bags,{},S.placements);const o=window.WayfinchAdvisor.autoBalance(s,(p,f)=>idealTrial(S.bags,p,f.state),balanceOptions(s));return {apply:o.apply,gain:o.gain,moves:o.balanced.moves};})()`);
     const did=json('autoBalancePlan()');
     const after=json(READ);
     assert.equal(did,found.apply,`${name}: applied exactly when the search says it is clearly better (${found.gain} points)`);
@@ -237,6 +237,140 @@ test('[BAL-STORED] a plan loaded after another and a plan started again are look
   assert.equal(json('autoBalancePlan()'),true,'Start again is balanced at its first look');
   assert.equal(json('currentPlan().notes.replan&&currentPlan().notes.replan.reason'),'startAgain','its note stays beside the line');
   assert.match(json('balanceLine()'),/Packed for better balance/);
+});
+
+// The owner's choice of 9 Nov 2026 ("Yes, wider balancing"): the balancing also tries the moves the weight map's wider look found (a thing
+// moved the heavier way, so the re-pack puts heavier things where it was), so the planner reaches the best balance by itself.
+test('[BAL-AUTO] the wider look: the balancing tries every single placement of one thing either way once no usual move or swap helps, and so balances plans the usual search left as they were',()=>{
+  const plans={...SETS,'seat, frame and bar':[{uid:1,pos:'seat',L:14},{uid:2,pos:'frame',L:4.5},{uid:3,pos:'bar',L:13}],
+    'seat, bar and frame 6':[{uid:1,pos:'seat',L:14},{uid:2,pos:'bar',L:9},{uid:3,pos:'frame',L:6}],
+    'the frame bag and two fork cages':[{uid:1,pos:'frame',L:4.5},{uid:2,pos:'fork',L:5,pair:true}]};
+  plan(SETS.bikepacking);
+  const opts=json('(()=>{const s=idealTrial(S.bags,{},S.placements);const o=balanceOptions(s);return {wide:o.wide,max:o.maxTrials,extra:Array.isArray(o.extra)};})()');
+  assert.deepEqual(opts,{wide:true,max:json('BALANCE_TRIALS'),extra:true});
+  let wider=0;
+  for(const [name,bags] of Object.entries(plans)){
+    plan(bags,{rack:bags.some(b=>b.pos==='rack')});
+    const narrow=json(`(()=>{const s=idealTrial(S.bags,{},S.placements);const o=window.WayfinchAdvisor.autoBalance(s,(p,f)=>idealTrial(S.bags,p,f.state),{fixed:balanceFixed(s)});return {apply:o.apply,gain:o.gain};})()`);
+    const before=json(READ),did=json('autoBalancePlan()'),after=json(READ);
+    if(did&&!narrow.apply)wider++;
+    if(narrow.apply)assert.equal(did,true,`${name}: what the usual search balanced is still balanced`);
+    if(did)assert.ok(before.score-after.score>=json('window.WayfinchAdvisor.MIN_GAIN_SCORE')-1e-9,`${name}: clearly better (${before.score} to ${after.score})`);
+  }
+  assert.ok(wider>=1,`plans only the wider look balances (${wider})`);
+});
+
+// The page never blocks: at the packing check the balancing runs in slices between frames, "Checking the balance…" meanwhile; a search
+// for a plan that changed since never applies.
+test('[BAL-AUTO] in slices: the packing check asks for the balance, says "Checking the balance…", and applies it once the search is done; a stale search never applies',()=>{
+  plan(SETS.bikepacking);
+  const own=json('S.placements');
+  assert.equal(json('autoBalancePlan({later:true})'),false,'nothing applied at once');
+  assert.deepEqual(json('S.placements'),own,'the plan as it was while the search runs');
+  assert.equal(json('!!BALANCE.run'),true);
+  assert.match(json('balanceLine()'),/Checking the balance…/);
+  assert.equal(json('autoBalancePlan({later:true})'),false,'looked at once: no second search');
+  let slices=0;
+  while(json('!!BALANCE.run')){run('balanceSlice(BALANCE.run)');slices++;assert.ok(slices<100,'the search ends');}
+  assert.ok(slices>=2,`run in slices (${slices})`);
+  assert.notDeepEqual(json('S.placements'),own,'balanced once done');
+  assert.match(json('balanceLine()'),/^<div class="balance-line" role="status"><span>Packed for better balance: /);
+  // the same in one go: the same balance
+  const sliced=json('currentPlan().items');
+  plan(SETS.bikepacking);
+  assert.equal(json('autoBalancePlan()'),true);
+  assert.deepEqual(json('currentPlan().items'),sliced,'the slices give the same balance as one go');
+  // a search for a plan changed since never applies
+  plan(SETS.bikepacking);
+  json('autoBalancePlan({later:true})');
+  run('var qaStale=BALANCE.run;balanceSlice(qaStale)');
+  run(`S.bags=S.bags.filter(b=>b.pos!=='top');currentPlan()`);
+  const changed=json('S.placements');
+  for(let i=0;i<40;i++)run('balanceSlice(qaStale)');
+  assert.deepEqual(json('S.placements'),changed,'the stale search changed nothing');
+  assert.equal(json('BALANCE.run===qaStale'),false,'and was dropped');
+});
+
+// Review of PR 89, C2: Try in Bag planner while the search ran, then Remove: the search was dropped for the trial, yet the plan Remove
+// brought back counted as looked at, so it was never balanced in this visit.
+test('[BAL-STORED] a search dropped unfinished (Try in Bag planner, then Remove) leaves the plan to be looked at again: the restored plan is balanced',()=>{
+  plan(SETS.bikepacking);
+  const own=json('S.placements');
+  json('autoBalancePlan({later:true})');
+  run('balanceSlice(BALANCE.run)');
+  assert.equal(json('!!BALANCE.run'),true,'the search under way');
+  run(`TRIAL={before:{bags:S.bags,decks:S.decks,placements:S.placements,nextUid:S.nextUid,step:4,baseNights:S.baseNights,stepPrev:S.step_prev,cache:PLAN_CACHE},uids:[]};
+    S.bags=[...S.bags,{uid:S.nextUid,pos:'rack',L:20,pair:true,trial:true}];S.nextUid++;currentPlan()`);
+  run('balanceSlice(BALANCE.run)');
+  assert.equal(json('BALANCE.run'),null,'dropped for the trial');
+  // go() is the page's step change (stubbed here, as in qa/advisor.cjs); then the packing check's own look, as renderResult (a no-op in
+  // this VM) starts it
+  run("if(typeof go!=='function')var go=n=>{S.step_prev=S.step;S.step=n;};removeTrial();autoBalancePlan({later:true})");
+  assert.deepEqual(json('S.placements'),own,'Remove brings the plan back');
+  assert.equal(json('!!BALANCE.run'),true,'the restored plan is looked at again');
+  while(json('!!BALANCE.run'))run('balanceSlice(BALANCE.run)');
+  assert.match(json('balanceLine()'),/Packed for better balance/,'and balanced');
+});
+
+// Review of PR 89, C1: the weight map's line named must-reach things for a gain the balancing takes without moving them. They are named
+// only when, with them held as the balancing holds them, less than MIN_GAIN_SCORE is to be had, and freeing them gives MIN_GAIN_SCORE
+// or more; a plan the balancing has yet to balance never blames them.
+test('[WM-NOTE] the line names the rider\'s things only for a gain that holding them costs: never on a plan the balancing can still balance without moving them',()=>{
+  const MIN=json('window.WayfinchAdvisor.MIN_GAIN_SCORE');
+  const NOTE=`(()=>{IDEAL_CACHE={key:null,value:null};const f=weightMapIdeal(true);const s=idealTrial(S.bags,{},S.placements);
+    const held=window.WayfinchAdvisor.autoBalance(s,(p,x)=>idealTrial(S.bags,p,x.state),balanceOptions(s));
+    return {text:f.note&&f.note.text,groups:f.note?f.note.groups.length:0,gain:f.gain,held:held.gain};})()`;
+  for(const [name,bags] of Object.entries(SETS)){
+    // the planner's own packing, not balanced yet (a plan stored before the wider look, or reopened before the balance lands)
+    plan(bags,{rack:bags.some(b=>b.pos==='rack')});
+    const before=json(NOTE);
+    if(before.held>=MIN)assert.equal(before.groups,0,`${name}: the balancing can take ${before.held} itself, so nothing of the rider's is blamed (${before.text})`);
+    // balanced: whatever the line names, holding it costs the gain
+    json('autoBalancePlan()');
+    const after=json(NOTE);
+    if(after.groups)assert.ok(after.held<MIN&&after.gain>=MIN,`${name}: named for ${after.gain}, with ${after.held} to be had while they are held (${after.text})`);
+  }
+  // a hand placement that does cost the balance: the bike lock in a backpack, put there by hand
+  plan([...SETS.bikepacking,{uid:6,pos:'pack',L:10}],{},"S.pinned={lock:'6-0'}");
+  json('autoBalancePlan()');
+  const lock=json(NOTE);
+  assert.match(lock.text,/^Your hand placement in the backpack \(bike lock\) puts more weight on your back\./);
+  assert.ok(lock.held<MIN&&lock.gain>=MIN);
+  // must-reach things that do cost it: bikepacking bags on the page's starting kit, balanced
+  plan(SETS.bikepacking,{},fresh());
+  json('autoBalancePlan()');
+  const reach=json(NOTE);
+  assert.match(reach.text,/^Your must-reach things in the frame bag \([^)]+\) take room there that heavier things could use\./);
+  assert.ok(reach.held<MIN&&reach.gain>=MIN);
+});
+
+// Re-check of PR 89, C1 (probe Q5): after Undo, or with things ticked as packed, the balancing holds those too, yet the line can only name
+// hand placements and must-reach things. What the line names must cost the gain with only those held, everything else free.
+test('[WM-NOTE] after Undo and with things ticked as packed: the line names hand placements and must-reach things only when holding exactly those costs MIN_GAIN_SCORE or more',()=>{
+  const MIN=json('window.WayfinchAdvisor.MIN_GAIN_SCORE');
+  // the gain still to be had with only what the line can name held: the hand placements and the must-reach things within reach
+  const NOTE=`(()=>{IDEAL_CACHE={key:null,value:null};const f=weightMapIdeal(true);const s=idealTrial(S.bags,{},S.placements);
+    const named=[...new Set([...Object.keys(S.pinned||{}),...s.pieces.filter(p=>{const k=kitById(p.id);return k&&isMustReach(k)&&reachableFor(k,p.pos);}).map(p=>p.id)])];
+    const held=window.WayfinchAdvisor.autoBalance(s,(p,x)=>idealTrial(S.bags,p,x.state),{...balanceOptions(s),fixed:named});
+    return {text:f.note&&f.note.text,groups:f.note?f.note.groups.length:0,gain:f.gain,held:held.gain};})()`;
+  // probe Q5: bikepacking bags balanced, then Undo
+  plan(SETS.bikepacking,{},fresh());
+  assert.equal(json('autoBalancePlan()'),true);
+  assert.equal(json('undoBalance()'),true);
+  const undone=json(NOTE);
+  assert.ok(undone.held>=MIN,`after Undo, ${undone.held} is to be had with only hand placements and must-reach things held`);
+  assert.equal(undone.groups,0,`after Undo: nothing of the rider's named for what Undo put back (${undone.text})`);
+  // its twin: the things the balance would move ticked as packed before it looks, so it leaves them where they are
+  plan(SETS.bikepacking,{},fresh());
+  const moves=json(`(()=>{const s=idealTrial(S.bags,{},S.placements);return window.WayfinchAdvisor.autoBalance(s,(p,f)=>idealTrial(S.bags,p,f.state),balanceOptions(s)).balanced.moves.map(m=>m.id);})()`);
+  const reach=new Set(json(`currentPlan().slots.flatMap(s=>s.items.filter(k=>isMustReach(k)&&reachableFor(k,s.pos)).map(k=>k.id))`));
+  const tick=moves.filter(id=>!reach.has(id));
+  assert.ok(tick.length>0,'things to tick');
+  plan(SETS.bikepacking,{},fresh(`S.packed=${JSON.stringify(Object.fromEntries(tick.map(id=>[id,true])))}`));
+  json('autoBalancePlan()');
+  const ticked=json(NOTE);
+  if(ticked.held>=MIN)assert.equal(ticked.groups,0,`ticked: nothing of the rider's named for what the ticks hold (${ticked.text})`);
+  if(ticked.groups)assert.ok(ticked.held<MIN&&ticked.gain>=MIN,`ticked: named only for a gain holding them costs (${ticked.held}, ${ticked.gain})`);
 });
 
 for(const [name,fn] of tests){fn();passed++;console.log('ok',name);}

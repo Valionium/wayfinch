@@ -1,4 +1,4 @@
-// Get ready offline in a real browser on the real site: IndexedDB's own transactions and a tab that is really closed
+// Prepare this route in a real browser on the real site: IndexedDB's own transactions and a tab that is really closed
 // mid-download, which plain-Node tests only stand in for. No outside address is reached. Plan Task 9.
 import { expect, test } from '@playwright/test';
 import { loadApp, preparedTrip, removeBuilds, servePack, withStore } from './helpers.ts';
@@ -20,7 +20,7 @@ const counts = (page: Page) => page.evaluate(async () => {
   return { places: await db.count('places'), hours: await db.count('hours'), matches: await db.count('matches'), tiles: (await db.getAllKeys('savedTiles')).map(String) };
 });
 
-test('[PREP-STEPS] Get ready offline on the real site: places and hours are saved, weather is named, and the answers read them', async ({ page }) => {
+test('[PREP-STEPS] Prepare this route on the real site: places and hours are saved, weather is named, and the answers read them', async ({ page }) => {
   app = await loadApp(page);
   const trip = await preparedTrip(page, 'heidelberg-strasbourg', { departureDate: '2026-10-17', places: true });
   const stored = await counts(page);

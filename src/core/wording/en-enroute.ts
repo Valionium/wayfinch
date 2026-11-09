@@ -4,5 +4,5 @@
 
 export const E = {
   emptyWhat: 'En route shows the next water, food and places to sleep along your route, with the weather and daylight on the way.',
-  emptyOffline: 'It works offline, from what Get ready offline saves on this phone.',
+  emptyOffline: 'It works offline, from what Prepare this route saves on this phone.',
 };

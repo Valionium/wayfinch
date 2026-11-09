@@ -83,6 +83,7 @@ button, a { font: inherit; }
 .shell { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
 .screen { flex: 1; padding: 16px 16px 24px; max-width: 40rem; width: 100%; margin: 0 auto; }
 .screen h1 { font-size: 1.75rem; margin-bottom: 12px; }
+.tab-sub { margin: -6px 0 12px; }
 
 .tabs {
   display: flex;

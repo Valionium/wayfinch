@@ -188,7 +188,7 @@ test('[TRIP-REMOVE-FAIL] a removal the database refuses says so, and leaves the 
   expect(host.querySelector('[data-trip-line]')?.textContent).toContain('Fixture: Heidelberg to Strasbourg');
 });
 
-test('[TRIP-REMOVE-WINDOWS] Get ready offline under way: Trip waits for it to stop at its next step, then shows no trip and no "Working…"', async () => {
+test('[TRIP-REMOVE-WINDOWS] Prepare this route under way: Trip waits for it to stop at its next step, then shows no trip and no "Working…"', async () => {
   let release: () => void = () => undefined;
   const held = new Promise<void>((r) => { release = r; });
   let refused = false;

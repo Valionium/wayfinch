@@ -56,6 +56,9 @@ const TABS: { name: TabName; label: string }[] = [
   { name: 'you', label: W.appTabYou },
 ];
 
+// What the tab is for, under its heading: its words load after the first screen; the line's room is kept meanwhile.
+const TabSubtitle = lazy(() => import('./tab-subtitle.tsx').then((m) => m.TabSubtitle), () => null);
+
 const TITLES: Record<TabName, string> = {
   ahead: W.appTabAhead,
   trip: W.appTabTrip,
@@ -85,6 +88,7 @@ function Screen({ name }: { name: ScreenName }) {
   return (
     <main class="screen" id="main" data-screen={name}>
       <h1>{TITLES[tab]}</h1>
+      {tab === 'trip' || tab === 'ahead' ? <TabSubtitle tab={tab} /> : null}
       {kindsOnScreen(degradedSignal.value, tab).map((kind) => <Degraded key={kind} kind={kind} />)}
       <MovedCardSlot />
       {name === 'ahead' ? <AheadHost /> : null}
