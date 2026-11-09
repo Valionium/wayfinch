@@ -99,6 +99,67 @@
    "name": "A boot inside the tyre, covering the cut.",
    "description": "The wheel cut through: the rim, the tyre's casing on it, and the inner tube filling the casing. The tyre's side wall has a cut right through it, labelled \"cut\". On the inside of the casing, between the casing and the tube, a boot follows the casing's curve over the cut, marked \"boot\", and the tube presses it on.",
    "caption": "The wheel cut through. A boot needs a tube to hold it on, so tubeless tyres get a tube too."
+  },
+  "quick-link": {
+   "name": "A quick link joining the two ends of the chain.",
+   "description": "A length of chain from the side, its links alternating. In the middle, where an outer link would be, a quick link joins two chain ends, marked \"quick link\": its front plate has a pin through one end and a keyhole-shaped slot over the other, labelled \"keyhole\". The pin of the back plate shows in the round end of the keyhole; under load it slides to the narrow end and clicks.",
+   "caption": "Seen from the side. The link must match your chain."
+  },
+  "stiff-link": {
+   "name": "Flexing a joined link sideways to find a stiff one.",
+   "description": "A length of chain seen from above: thin plates along each side, rollers between the inner plates. One joint is marked \"stiff link\". Dashed lines show the chain beyond it bent to one side, and two short arrows show it flexed to either side, labelled \"flex sideways\".",
+   "caption": "Seen from above. Work a stiff link until it moves freely."
+  },
+  "barrel-caliper": {
+   "name": "Unscrewing a road caliper's barrel adjuster.",
+   "description": "A road caliper close up at the top, where the cable housing comes into a small ridged barrel screwed into the brake, marked \"barrel adjuster\". It has been unscrewed a few threads, so the threads show below it; a dashed outline shows where it sat. A curved arrow round it is labelled \"unscrew\".",
+   "caption": "A turn or two pulls the cable tighter."
+  },
+  "barrel-vbrake": {
+   "name": "Unscrewing the barrel adjuster on a flat-bar brake lever.",
+   "description": "A flat-bar brake lever seen from above: the handlebar across, the lever clamped on it, its blade in front towards the grip. At the front of the lever, where the cable housing comes out, a ridged barrel with a ring nut behind it is marked \"barrel adjuster\". It has been unscrewed a few threads, a dashed outline shows where it sat, and a curved arrow round it is labelled \"unscrew\".",
+   "caption": "Seen from above. A V-brake's barrel adjuster is on the lever; a turn or two pulls the cable tighter."
+  },
+  "gears-barrel": {
+   "name": "Turning the gears' barrel adjuster at the rear derailleur.",
+   "description": "The rear wheel's sprockets and the rear derailleur from the bike's right side, with the chain running round both. Where the gear cable's housing loops into the back of the derailleur, a small ridged barrel is marked \"barrel adjuster\". A curved arrow round it shows it being turned, a click at a time.",
+   "caption": "Seen from the bike's right side. On some bikes it is on the shifter instead."
   }
+ },
+ "titles": {
+  "spoke-snapped": [
+   null,
+   "Rim brakes only: let the wobbly wheel pass the pads",
+   "Disc brakes only: check the wheel spins clear",
+   null,
+   "Rim brakes only: close the brake again"
+  ],
+  "brakes-lever-test": [
+   null,
+   null,
+   null,
+   "Rim brakes only: look at the pads"
+  ],
+  "brake-rub-disc": [
+   null,
+   null,
+   null,
+   null,
+   "Cable disc brakes only: move the pad away"
+  ],
+  "brake-weak-rim": [
+   null,
+   null,
+   "Cable rim brakes only: take up the cable",
+   null,
+   null
+  ],
+  "brake-weak-disc": [
+   null,
+   null,
+   "Cable disc brakes only: turn the pad adjuster",
+   "Hydraulic disc brakes only: pump the lever",
+   null
+  ]
  }
 }

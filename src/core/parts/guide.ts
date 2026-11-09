@@ -13,9 +13,10 @@ export type GuidePart = {
   id: PartId; group: PartGroup; tag?: PartTag;
   /**
    * Its close-ups: one, or one for each kind where they depend on the bike (bars: drop, flat; brakes: rim, disc; rim-brake: caliper,
-   * V-brake, hydraulic). None while they are not yet redrawn (care pictures redo, owner's answer 6 of 9 November 2026).
+   * V-brake, hydraulic; axle: thru, then a quick release or nuts). None while they are not yet redrawn (care pictures redo, owner's
+   * answer 6 of 9 November 2026).
    */
-  pictures: readonly string[]; by?: 'bars' | 'brakes' | 'rim-brake';
+  pictures: readonly string[]; by?: 'bars' | 'brakes' | 'rim-brake' | 'axle';
   /** What a beginner would confuse it with (design 4.1). */
   mixed: readonly PartId[];
 };
@@ -35,7 +36,7 @@ export const GUIDE: readonly GuidePart[] = [
   g('thru-axle', 'wheels', [], ['wheel-qr']),
   g('spokes', 'wheels', []),
   g('rim', 'wheels', ['pg-rim'], ['bead']),
-  g('dropouts', 'wheels', [], ['hanger']),
+  g('dropouts', 'wheels', ['pg-dropout-thru', 'pg-dropout-qr'], ['hanger'], undefined, 'axle'),
   g('tyre', 'tyres', ['pg-tyre'], ['tube']),
   g('bead', 'tyres', ['pg-bead'], ['rim']),
   g('tube', 'tyres', ['pg-tube'], ['tyre']),
@@ -45,17 +46,17 @@ export const GUIDE: readonly GuidePart[] = [
   g('rim-brake', 'brakes', ['pg-caliper-rim', 'pg-vbrake', 'pg-rim-hydraulic'], ['caliper'], 'rim', 'rim-brake'),
   g('pads', 'brakes', ['pg-pads-rim', 'pg-pads-disc'], [], undefined, 'brakes'),
   g('brake-qr', 'brakes', ['brake-qr-open', 'vbrake-open', 'hydro-rim-open'], ['wheel-qr'], 'rim', 'rim-brake'),
-  g('barrel', 'brakes', [], ['pad-adjuster']),
+  g('barrel', 'brakes', ['barrel-caliper', 'barrel-vbrake'], ['pad-adjuster'], undefined, 'rim-brake'),
   g('caliper', 'brakes', ['pg-disc-caliper'], ['disc', 'rim-brake'], 'disc'),
   g('disc', 'brakes', ['pg-disc'], ['caliper'], 'disc'),
   g('pad-adjuster', 'brakes', ['disc-pad-adjust'], ['barrel'], 'cable-disc'),
-  g('chain', 'drive', [], ['quick-link']),
-  g('quick-link', 'drive', [], ['chain']),
-  g('chainring', 'drive', [], ['cassette']),
-  g('cassette', 'drive', [], ['chainring'], 'derailleur'),
-  g('derailleur', 'drive', [], ['hanger'], 'derailleur'),
-  g('hanger', 'drive', [], ['derailleur', 'dropouts'], 'derailleur'),
-  g('gear-cable', 'drive', []),
+  g('chain', 'drive', ['pg-chain'], ['quick-link']),
+  g('quick-link', 'drive', ['quick-link'], ['chain']),
+  g('chainring', 'drive', ['pg-chainring-1x', 'pg-chainring-2x'], ['cassette']),
+  g('cassette', 'drive', ['pg-cassette'], ['chainring'], 'derailleur'),
+  g('derailleur', 'drive', ['pg-derailleur'], ['hanger'], 'derailleur'),
+  g('hanger', 'drive', ['pg-hanger'], ['derailleur', 'dropouts'], 'derailleur'),
+  g('gear-cable', 'drive', ['pg-gear-cable']),
   g('hub-gears', 'drive', [], ['hub'], 'hub-gears'),
   g('battery', 'ebike', [], [], 'ebike'),
   g('display', 'ebike', [], [], 'ebike'),
@@ -67,13 +68,15 @@ export const partById = (id: string): GuidePart | undefined => GUIDE.find((p) =>
 /**
  * A part's close-ups for the rider's bike, in order, two at most side by side (owner's answer 1 of 8 November): where they depend on the
  * bike, the one matching it first, then the next kind; not told, the most common modern kind first (care pictures redo, section 2): a disc
- * brake's pads before a rim brake's, a road caliper before a V-brake unless flat bars break the tie.
+ * brake's pads before a rim brake's, a road caliper before a V-brake unless flat bars break the tie, a thru-axle's closed dropout before a
+ * slot unless the axle is a quick release or nuts (or not told on rim brakes). Kinds with no close-up (nuts share the slot) are passed over.
  */
 export function guidePictures(part: GuidePart, d: PictureDetails): string[] {
   const p = part.pictures;
   if (!part.by || p.length < 2) return [...p];
   const order = part.by === 'rim-brake' ? kindOrder('rim-brake', d).map((k) => ['caliper', 'v-brake', 'hydraulic'].indexOf(k))
     : part.by === 'bars' ? kindOrder('bars', d).map((k) => ['drop', 'flat'].indexOf(k))
+      : part.by === 'axle' ? kindOrder('axle', d).map((k) => (k === 'thru' ? 0 : 1))
       : d.brakes === 'rim' ? [0, 1] : [1, 0];
-  return order.flatMap((i) => (p[i] ? [p[i]] : [])).slice(0, 2);
+  return [...new Set(order.flatMap((i) => (p[i] ? [p[i]] : [])))].slice(0, 2);
 }

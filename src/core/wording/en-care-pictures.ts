@@ -14,6 +14,17 @@ export const KIND_WORDS: Readonly<Record<string, string>> = {
 /** The switch's own words. */
 export const SWITCH_WORDS = { other: 'Other kinds', show: (kind: string): string => `Show ${kind}` } as const;
 
+/**
+ * The titles of the steps for some bikes only (the owner's decision of 9 November 2026: "Rim brakes only: close the brake again"), in the
+ * same file: per card, one entry a step, null for a step every bike sees. Checked whole; else null, and the steps keep "Step n".
+ */
+export function stepTitlesFrom(json: unknown): Record<string, (string | null)[]> | null {
+  const t = typeof json === 'object' && json !== null ? (json as { titles?: unknown }).titles : null;
+  if (typeof t !== 'object' || t === null) return null;
+  const ok = Object.values(t).every((a) => Array.isArray(a) && a.every((x) => x === null || typeof x === 'string'));
+  return ok ? (t as Record<string, (string | null)[]>) : null;
+}
+
 /** The step pictures' words file as fetched (en-care-pictures.json), checked whole: each picture with a name and a description; else null. */
 export function pictureWordsFrom(json: unknown): Record<string, PictureWords> | null {
   if (typeof json !== 'object' || json === null) return null;

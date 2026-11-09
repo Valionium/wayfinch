@@ -4,7 +4,7 @@
 import { frame, rimAndTyre, section, bikeInset, boltHead, type Frame, type Section } from './common.ts';
 import { Path, Pic, poly, pol, rrect, tube, touches, clear, pointsAt, at, add, type Pt } from './kit.ts';
 
-export type RimState = 'open' | 'close' | 'centre' | 'guide' | 'pads';
+export type RimState = 'open' | 'close' | 'centre' | 'guide' | 'pads' | 'barrel';
 
 /** A brake arm: an ink casing with a panel core along a path (design 3.2, tubes 7 to 11 wide). */
 const arm = (pic: Pic, p: Path, w: number, name?: string, hi = false): void => {
@@ -49,7 +49,8 @@ const REST = 1.2;
  */
 export function caliper(state: RimState): Pic {
   const pic = new Pic(320, 244);
-  const f = frame(192, 196, 2.2), { m } = f;
+  // the barrel close-up (T15): the same caliper, five times nearer, round its housing stop
+  const f = state === 'barrel' ? frame(201, 440, 5.6) : frame(192, 196, 2.2), { m } = f;
   const s = section(22, 17, 28, 20);
   bikeInset(pic, 'rear-brake');
   stays(pic, f, -47, 34, 28, 40, -44);
@@ -62,23 +63,32 @@ export function caliper(state: RimState): Pic {
   const ax = s.we / 2 + REST + 8.5 + 1.8;
   // the left arm (on the offset pivot) rises at its top into the housing stop
   const armL = new Path().M(m(-10, -41)).C(m(-18, -38), m(-ax, -28), m(-ax, -16)).L(m(-ax, 9));
-  pic.path(hi ? 'cp-hi' : 'cp-obj', poly([m(-9, -50), m(-13, -58), m(-18.5, -56.5), m(-14, -48)]), { name: 'stop-arm' });
+  pic.path(hi ? 'cp-hi' : 'cp-obj', poly([m(-9, -50), m(-12.6, -58), m(-18.4, -58), m(-14, -48)]), { name: 'stop-arm' });
   // the right arm (on the centre bolt) runs up, over the yoke, and ends in a tail on the left, under the stop, with the cable clamp
   const armR = new Path().M(m(ax, 9)).L(m(ax, -16)).C(m(ax, -28), m(18, -38), m(11, -44)).C(m(6, -58), m(-4, -58), m(-9.5, -53.5));
-  arm(pic, armL, 9, 'arm-l', hi);
-  arm(pic, armR, 9, 'arm-r', hi);
+  const aw = state === 'barrel' ? f.mm(4.1) : 9;
+  arm(pic, armL, aw, 'arm-l', hi);
+  arm(pic, armR, aw, 'arm-r', hi);
   pad(pic, f, s, -1, REST, 'cp-rubber', 'pad-l');
   pad(pic, f, s, 1, REST, 'cp-rubber', 'pad-r');
   if (state === 'pads') {
     pic.path('cp-hi', rrect(...m(-s.we / 2 - REST - 6, 1.5), f.mm(6), f.mm(9), 2));
     pic.path('cp-hi', rrect(...m(s.we / 2 + REST, 1.5), f.mm(6), f.mm(9), 2));
   }
-  // the barrel in the stop; the inner cable down to the clamp bolt on the right arm's tail
-  pic.path('cp-obj', rrect(...m(-18.2, -66), f.mm(5.5), f.mm(8), 1.5), { name: 'barrel' });
-  pic.line('cp-fine', m(-15.5, -65), m(-15.5, -58));
+  // the barrel in the stop; the inner cable down to the clamp bolt on the right arm's tail. Unscrewed (T15), it stands a few threads
+  // proud of the stop, which pulls the cable tighter; dashed, where it sat
+  const up = state === 'barrel' ? 2.4 : 0;
+  if (up) {
+    pic.path('cp-ghost', rrect(...m(-18.2, -66), f.mm(5.5), f.mm(8), 1.5));
+    pic.path('cp-obj', poly([m(-17.2, -58 - up), m(-13.8, -58 - up), m(-13.8, -58), m(-17.2, -58)]), { name: 'thread' });
+    for (let y = -58 - up + 0.5; y < -58; y += 0.6) pic.line('cp-fine', m(-17.2, y), m(-13.8, y + 0.3));
+  }
+  pic.path(up ? 'cp-hi' : 'cp-obj', rrect(...m(-18.2, -66 - up), f.mm(5.5), f.mm(8), up ? 3 : 1.5), { name: 'barrel' });
+  if (up) for (let x = -17.2; x < -13; x += 1) pic.line('cp-fine', m(x, -65.2 - up), m(x, -58.8 - up));
+  pic.line('cp-fine', m(-15.5, -65 - up), m(-15.5, -58));
   pic.line('cp-fine', m(-15.5, -58), m(-10.6, -54.2));
   boltHead(pic, m(-9.8, -53.6), f.mm(1.8), { name: 'clamp' });
-  pic.path('cp-ctx', new Path().M(m(-15.5, -66)).Q(m(-15, -80), m(-4, -86)), { style: 'stroke-width:3' });
+  pic.path('cp-ctx', new Path().M(m(-15.5, -66 - up)).Q(m(-15, -80 - up), m(-4, -86 - up)), { style: 'stroke-width:3' });
   // the quick-release lever on the stop: down is closed, up is open
   const pivot = m(-19.5, -60.5);
   const lever = (a: number) => tube(pivot, pol(pivot[0], pivot[1], f.mm(13), a), f.mm(2.4));
@@ -97,9 +107,17 @@ export function caliper(state: RimState): Pic {
     pic.path(hi ? 'cp-hi' : 'cp-obj', lever(closedA), { name: 'lever' });
     pic.circle('cp-dark', pivot, 2.2);
   }
-  pic.text('cp-t', [4, 232], LEFT);
-  pic.facts.push(touches(pic, 'lever', 'barrel', f.mm(2.5)), touches(pic, 'yoke', 'bridge', 1), touches(pic, 'clamp', 'arm-r', f.mm(1)));
-  pic.facts.push(touches(pic, 'stop-arm', 'yoke', 1), touches(pic, 'barrel', 'stop-arm', 1));
+  if (state !== 'barrel') pic.text('cp-t', [4, 232], LEFT);
+  pic.facts.push(touches(pic, 'lever', 'barrel', f.mm(2.5 + up)), touches(pic, 'yoke', 'bridge', 1), touches(pic, 'clamp', 'arm-r', f.mm(1)));
+  pic.facts.push(touches(pic, 'stop-arm', 'yoke', 1), touches(pic, up ? 'thread' : 'barrel', 'stop-arm', 1));
+  if (up) {
+    const c = m(-15.45, -62 - up);
+    pic.circle('cp-halo', c, f.mm(6.5));
+    pic.turnAxis(c, f.mm(5.2), f.mm(1.8), 250, 110);
+    pic.label('cp-th', [314, 40], 'barrel adjuster', [312, 36], m(-12.7, -65.5 - up), 'end', 'leader-barrel');
+    pic.label('cp-th', [316, 70], 'unscrew', [314, 66], add(c, [f.mm(5.4), f.mm(0.6)]), 'end', 'leader-turn');
+    pic.facts.push(pointsAt(pic, 'leader-barrel', 'barrel'), touches(pic, 'thread', 'barrel', 0.5));
+  }
   if (state === 'centre') {
     // the centring screw on the right arm's shoulder beside the yoke
     const scr = m(15.5, -39.5);

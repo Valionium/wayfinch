@@ -106,11 +106,11 @@
   },
   "quick-link": {
    "name": "Quick link",
-   "text": "A quick link is a chain link that joins two chain ends by hand, and clicks shut under load. It has to match the chain's number of speeds."
+   "text": "A quick link is a chain link that joins two chain ends by hand, and clicks shut under load. It has to match the chain: its number of speeds and, for some chains, its make. Many can be used only once."
   },
   "chainring": {
    "name": "Chainring and crank",
-   "text": "The chainring is the toothed ring at the pedals that pulls the chain; the crank is the arm from its middle to the pedal. Some bikes have two or three chainrings."
+   "text": "The chainring is the toothed ring at the pedals that pulls the chain; the crank is the arm from its middle to the pedal. Many gravel and mountain bikes have one chainring, road bikes usually two, older bikes three."
   },
   "cassette": {
    "name": "Rear sprockets (cassette)",
@@ -122,11 +122,11 @@
   },
   "hanger": {
    "name": "Derailleur hanger",
-   "text": "The hanger is the small metal plate between the frame and the rear derailleur. It is made to bend in a fall instead of the frame, and a bent one makes the gears skip."
+   "text": "The hanger is the small metal plate between the frame and the rear derailleur. It is made to bend in a fall instead of the frame, and a bent one makes the gears skip. Many newer bikes share one standard hanger (UDH); the newest derailleurs of some makes bolt to the frame with none."
   },
   "gear-cable": {
    "name": "Gear cable and housing",
-   "text": "The gear cable is the thin wire from the shifter that moves the derailleur or the hub gears; the housing is the casing it runs in. A frayed cable or a kinked housing makes shifting slow."
+   "text": "The gear cable is the thin wire from the shifter that moves the derailleur or the hub gears; the housing is the casing it runs in. A frayed cable or a kinked housing makes shifting slow. Electronic gears have no gear cable."
   },
   "hub-gears": {
    "name": "Hub gears",
@@ -197,6 +197,48 @@
   "pg-tubeless-valve": {
    "name": "A tubeless valve fixed in the rim.",
    "description": "The rim, labelled \"rim\", cut through at the valve. The valve, marked \"tubeless valve\", has a cone of rubber that sits in the dip in the middle of the rim, over the rim tape, and a threaded stem down through the rim, the valve core at its end. A nut on the stem under the rim, labelled \"nut\", holds it tight."
+  },
+  "pg-chain": {
+   "name": "A length of chain from the side.",
+   "description": "Inner and outer links alternate along the chain; each plate joins two pins. One outer plate is marked \"outer plate\"; an inner plate between two outer ones is labelled \"inner plate\", and a pin \"pin\"."
+  },
+  "pg-cassette": {
+   "name": "The rear sprockets on the rear wheel.",
+   "description": "The rear wheel's sprockets, the rear derailleur and the chain from the bike's right side: the chain leaves the top of a sprocket forwards, comes back along the bottom, runs round the derailleur's two small wheels and up onto the sprocket. The ring of sprockets round the axle, twelve of them from small to big, is marked by its biggest, \"rear sprockets\".",
+   "caption": "Seen from the bike's right side."
+  },
+  "pg-derailleur": {
+   "name": "The rear derailleur below the rear sprockets.",
+   "description": "The rear wheel's sprockets, the rear derailleur and the chain from the bike's right side: the chain leaves the top of a sprocket forwards, comes back along the bottom, runs round the derailleur's two small wheels and up onto the sprocket. The derailleur hangs below and behind the axle, its two small wheels in a cage, marked \"rear derailleur\".",
+   "caption": "Seen from the bike's right side."
+  },
+  "pg-hanger": {
+   "name": "The derailleur hanger between frame and derailleur.",
+   "description": "The rear wheel's sprockets, the rear derailleur and the chain from the bike's right side: the chain leaves the top of a sprocket forwards, comes back along the bottom, runs round the derailleur's two small wheels and up onto the sprocket. The small plate round the axle at the frame's end, down to the bolt that holds the derailleur, is marked \"hanger\".",
+   "caption": "Seen from the bike's right side."
+  },
+  "pg-gear-cable": {
+   "name": "The gear housing looping into the rear derailleur.",
+   "description": "The rear wheel's sprockets, the rear derailleur and the chain from the bike's right side: the chain leaves the top of a sprocket forwards, comes back along the bottom, runs round the derailleur's two small wheels and up onto the sprocket. The gear housing comes out of the frame's lower rear tube, loops back and goes into the derailleur, marked \"gear housing\"; the thin cable inside runs on to a clamp bolt.",
+   "caption": "Seen from the bike's right side."
+  },
+  "pg-dropout-thru": {
+   "name": "A dropout with a closed hole, for a thru-axle.",
+   "description": "The end of a fork leg from the side, marked \"dropout\". A closed hole goes round the axle, labelled \"thru-axle\", which slides in from the side.",
+   "caption": "A closed hole: for a thru-axle."
+  },
+  "pg-dropout-qr": {
+   "name": "A dropout with an open slot, for a quick release.",
+   "description": "The end of a fork leg from the side, marked \"dropout\". A slot open at the bottom holds the wheel's axle, labelled \"axle\", sitting all the way up in the top of the slot.",
+   "caption": "An open slot: for a quick release."
+  },
+  "pg-chainring-1x": {
+   "name": "One chainring on the crank.",
+   "description": "The crank from the bike's right side: one toothed ring round the crank's centre, marked \"chainring\", fixed straight to the crank with no arms. The crank, labelled \"crank\", runs from the centre to the pedal."
+  },
+  "pg-chainring-2x": {
+   "name": "Two chainrings on the crank.",
+   "description": "The crank from the bike's right side: a big and a smaller toothed ring, marked \"chainrings\", held by four arms round the crank's centre. The crank, labelled \"crank\", runs from the centre to the pedal."
   }
  }
 }

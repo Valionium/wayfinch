@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 // Bike care's step view (care pictures design of 7 November 2026, part 1): a card or task full screen, one step at a time, with its picture.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { idsOf, STEP_PICTURES } from '../../../../src/core/care/pictures.ts';
-import { KIND_WORDS, SWITCH_WORDS, type PictureWords } from '../../../../src/core/wording/en-care-pictures.ts';
+import { KIND_WORDS, stepTitlesFrom, SWITCH_WORDS, type PictureWords } from '../../../../src/core/wording/en-care-pictures.ts';
 import CARE_WORDS from '../../../../src/core/wording/en-care-pictures.json';
 import { C, CARE_TASKS, CARRY, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
 import { ALL_STEPS_KEY } from '../../../../src/tools/care/steps.tsx';
@@ -39,12 +39,14 @@ function fakeWakeLock(): void {
   });
 }
 /**
- * In the test runner a picture's address is its source file's, or a data address for a small one (the build never inlines: it ships each
- * as a file of its own, BC-PIC-LAZY); fetch reads either, as the built site serves them.
+ * In the test runner a words file's address is its source file's, or a data address for a small one (the build never inlines: it ships
+ * each as a file of its own); the drawings' index (/care-pictures.json, written by the build) points at their source files here.
  */
 const PICTURE_WORDS: Record<string, PictureWords> = CARE_WORDS.pictures;
 const REPO = process.cwd(); // vitest runs from the repository's root
-const body = (url: string): string => (url.startsWith('data:')
+const INDEX = JSON.stringify(Object.fromEntries(['pictures', 'parts'].flatMap((folder) => readdirSync(join(REPO, 'src', 'tools', 'care', folder))
+  .filter((f) => f.endsWith('.svg')).map((f) => [f.slice(0, -4), `/src/tools/care/${folder}/${f}`]))));
+const body = (url: string): string => (url === '/care-pictures.json' ? INDEX : url.startsWith('data:')
   ? Buffer.from(url.slice(url.indexOf(',') + 1), 'base64').toString('utf8')
   : readFileSync(join(REPO, url.replace(/\?.*$/, '')), 'utf8'));
 beforeEach(async () => {
@@ -272,7 +274,9 @@ test('[BC-STEPS-ALL] All steps shows every step on one page with its pictures; t
   await shown(pictures);
   expect(button(C.careStepsAll)!.getAttribute('aria-pressed')).toBe('true');
   const steps = [...dialog()!.querySelectorAll('.care-step-all')];
-  expect(steps.map((s) => s.querySelector('h3')!.textContent)).toEqual(c.steps.map((_, i) => C.careStepN(i + 1)));
+  // a step for some bikes only carries its title (the owner's decision of 9 November 2026): here the cable brakes' last step
+  const titles = stepTitlesFrom(CARE_WORDS)!;
+  expect(steps.map((s) => s.querySelector('h3')!.textContent)).toEqual(c.steps.map((_, i) => titles[c.id]?.[i] ?? C.careStepN(i + 1)));
   steps.forEach((s, i) => expect(s.textContent).toContain(c.steps[i]));
   expect(dialog()!.querySelectorAll('.care-step-all [role="img"]').length).toBe(pictures);
   expect(dialog()!.textContent).toContain(c.checkFirst);
@@ -430,6 +434,38 @@ test('[BC-STEP-LINES] the snapped-spoke card shows a disc bike the disc line onl
   expect(await lines(rimBike('drop'))).toEqual(spoke.steps.filter((t) => !t.startsWith('Disc brakes:')));
   const all = await lines(memory().kv);
   expect(all).toEqual([spoke.steps[0], spoke.steps[2], spoke.steps[1], spoke.steps[3], spoke.steps[4]]);
+});
+
+// The owner's decision of 9 November 2026: the count is of the steps this bike sees; a step for some bikes only has a title saying so.
+test('[BC-STEP-LINES] the step count is of the steps the bike sees, and a step for some bikes only is titled so: "Step 2 of 3" on a disc bike, "of 5" with no bike', async () => {
+  const disc = memory({ 'loadcheck:bikeProfiles': JSON.stringify([{ id: 'bike_d', name: 'Disc', brakes: 'hydraulic-disc' }]), 'loadcheck:bikeProfile': JSON.stringify({ id: 'bike_d', name: 'Disc' }) }).kv;
+  await mount(disc);
+  await openCard('spoke-snapped');
+  if (button(C.careStepsAll)!.getAttribute('aria-pressed') === 'true') await click(button(C.careStepsAll)!);
+  await click(button(C.careStepsNext)!);
+  await click(button(C.careStepsNext)!);
+  expect(counter()).toBe(C.careStepsCount(2, 3));
+  await settle();
+  expect(heading().textContent).toBe('Disc brakes only: check the wheel spins clear');
+  render(null, host);
+  await mount(rimBike('drop'));
+  await openCard('spoke-snapped');
+  await click(button(C.careStepsNext)!);
+  await click(button(C.careStepsNext)!);
+  await settle();
+  expect(counter()).toBe(C.careStepsCount(2, 4));
+  expect(heading().textContent).toBe('Rim brakes only: let the wobbly wheel pass the pads');
+  await click(button(C.careStepsNext)!);
+  await click(button(C.careStepsNext)!);
+  await settle();
+  expect(heading().textContent).toBe('Rim brakes only: close the brake again');
+  render(null, host);
+  await mount();
+  await openCard('spoke-snapped');
+  await click(button(C.careStepsNext)!);
+  await settle();
+  expect(counter()).toBe(C.careStepsCount(1, 5));
+  expect(heading().textContent).toBe(C.careStepN(1));
 });
 
 test("[BC-STEPS-KEYS] Alt or Ctrl with an arrow is the browser's own: the step view lets it pass", async () => {

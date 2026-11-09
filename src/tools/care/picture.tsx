@@ -1,38 +1,46 @@
-// Bike care's drawings (care pictures design of 7 November 2026, section 5): hand-made SVG files in ./pictures, each a file of its own in
-// the build, fetched when a step view that shows it opens, never with the first screen or Bike care's own chunk (BC-PIC-LAZY). They are
-// built as files, not as JavaScript strings, so about 150 drawings never weigh on the lazy JavaScript budget (PERF-JS-LAZY); the offline
-// worker precaches them like every file of a build. They are inlined, not <img>, so they follow the theme's tokens through ./pictures.css;
-// ids inside a drawing get a prefix of their view.
-import { pictureWordsFrom, type PictureWords } from '../../core/wording/en-care-pictures.ts';
+// Bike care's drawings (care pictures design of 7 November 2026, section 5): SVG files in ./pictures and ./parts (made by tools/care-art),
+// each a file of its own in the build, fetched when a step view or the parts guide shows it, never with the first screen or Bike care's
+// own chunk (BC-PIC-LAZY). tools/build.mjs writes them under /assets/care/ with their index at /care-pictures.json (id to address), so no
+// script lists them and about 150 drawings never weigh on the lazy JavaScript budget (PERF-JS-LAZY); the offline worker precaches them
+// like every file of a build. They are inlined, not <img>, so they follow the theme's tokens through ./pictures.css; ids inside a drawing
+// get a prefix of their view.
+import { pictureWordsFrom, stepTitlesFrom, type PictureWords } from '../../core/wording/en-care-pictures.ts';
 import './pictures.css';
 
-// The steps' drawings and the parts guide's close-ups (./parts): each id names one file in one of the two folders (PG-FILES).
-const GLOBBED = {
-  ...import.meta.glob('./pictures/*.svg', { query: '?url', import: 'default', eager: true }),
-  ...import.meta.glob('./parts/*.svg', { query: '?url', import: 'default', eager: true }),
-};
-const FILES: Record<string, string> = {};
-for (const [path, url] of Object.entries(GLOBBED)) FILES[path.replace(/^.*\/|\.svg$/g, '')] = url as string;
+// The drawings' index: each id to its address in the build; fetched once, before the first drawing.
+let index: Promise<Record<string, string>> | null = null;
+const loadIndex = (): Promise<Record<string, string>> => (index ??= fetch('/care-pictures.json').then(async (res) => {
+  const json: unknown = res.ok ? JSON.parse(await res.text()) : null;
+  if (typeof json === 'object' && json !== null) return json as Record<string, string>;
+  index = null;
+  return {};
+}, () => { index = null; return {}; }));
 const loaded = new Map<string, string>();
 // The step pictures' words: a data file of its own, fetched with the first picture (precached like every build file).
 const WORDS_URL = Object.values(import.meta.glob('../../core/wording/en-care-pictures.json', { query: '?url', import: 'default', eager: true }))[0] as string;
 let pictureWords: Record<string, PictureWords> | null = null;
+let titles: Record<string, (string | null)[]> | null = null;
 async function loadWords(): Promise<void> {
   if (pictureWords) return;
   try {
     const res = await fetch(WORDS_URL);
-    pictureWords = res.ok ? pictureWordsFrom(JSON.parse(await res.text())) : null;
+    const json: unknown = res.ok ? JSON.parse(await res.text()) : null;
+    pictureWords = pictureWordsFrom(json);
+    titles = stepTitlesFrom(json);
   } catch { pictureWords = null; }
 }
+/** A step's title when it is for some bikes only ("Rim brakes only: ..."), once the words file is here; else null. */
+export const stepTitle = (id: string, step: number): string | null => titles?.[id]?.[step] ?? null;
 
 /**
  * Loads the pictures not yet here, and their words; a picture that fails to load, or is not one of ours, is left out, and without its
  * words a step picture is too, so its step shows its text alone.
  */
 export async function loadPictures(ids: readonly string[]): Promise<void> {
+  const files = ids.length ? await loadIndex() : {};
   await Promise.all([loadWords(), ...[...new Set(ids)].filter((id) => !loaded.has(id)).map(async (id) => {
-    const url = FILES[id];
-    if (!url) return;
+    const url = files[id];
+    if (typeof url !== 'string') return;
     try {
       const res = await fetch(url);
       const svg = res.ok ? await res.text() : '';

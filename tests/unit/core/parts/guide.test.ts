@@ -69,6 +69,20 @@ test("[PG-KINDS] a part's close-ups follow the bike detail that decides them: th
   expect(guidePictures(partById('pads')!, D({ brakes: 'hydraulic-disc', bars: 'flat' }))).toEqual(['pg-pads-disc', 'pg-pads-rim']);
   expect(guidePictures(partById('pads')!, D())).toEqual(['pg-pads-disc', 'pg-pads-rim']);
   expect(guidePictures(partById('caliper')!, D())).toEqual(['pg-disc-caliper']);
+  // dropouts follow the axle (redo, section 2): a closed hole for a thru-axle first; a slot first when the axle is a quick release or
+  // nuts, or not told on rim brakes
+  expect(guidePictures(partById('dropouts')!, D())).toEqual(['pg-dropout-thru', 'pg-dropout-qr']);
+  expect(guidePictures(partById('dropouts')!, D({ axle: 'qr' }))).toEqual(['pg-dropout-qr', 'pg-dropout-thru']);
+  expect(guidePictures(partById('dropouts')!, D({ axle: 'nuts' }))).toEqual(['pg-dropout-qr', 'pg-dropout-thru']);
+  expect(guidePictures(partById('dropouts')!, D({ brakes: 'rim' }))).toEqual(['pg-dropout-qr', 'pg-dropout-thru']);
+  // the barrel: a caliper's on the brake, a V-brake's on its lever, by the kind of rim brake
+  expect(guidePictures(partById('barrel')!, D({ brakes: 'rim', rimBrake: 'v-brake' }))).toEqual(['barrel-vbrake', 'barrel-caliper']);
+  expect(guidePictures(partById('barrel')!, D())).toEqual(['barrel-caliper', 'barrel-vbrake']);
+  // the chainring: no detail says how many; one ring (1x) first, two (2x) beside it
+  expect(guidePictures(partById('chainring')!, D())).toEqual(['pg-chainring-1x', 'pg-chainring-2x']);
+  // the chain and gear parts drawn in batch 3 each have their close-up
+  for (const [id, pic] of [['chain', 'pg-chain'], ['quick-link', 'quick-link'], ['cassette', 'pg-cassette'], ['derailleur', 'pg-derailleur'],
+    ['hanger', 'pg-hanger'], ['gear-cable', 'pg-gear-cable']] as const) expect(partById(id)!.pictures, id).toEqual([pic]);
 });
 
 test("[PG-WORDS] each part has a name and two to four plain sentences; the tags and the sheet's words; no banned word", () => {

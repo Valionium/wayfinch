@@ -11,7 +11,7 @@ import type { PartId } from '../../core/parts/guide.ts';
 import type { CareTask, RoadCard } from '../../core/care/types.ts';
 import { C, CARRY, WHO_LABEL } from '../../core/wording/en-care.ts';
 import { KIND_WORDS, SWITCH_WORDS } from '../../core/wording/en-care-pictures.ts';
-import { loadPictures, Picture, pictureReady } from './picture.tsx';
+import { loadPictures, Picture, pictureReady, stepTitle } from './picture.tsx';
 
 /** The All steps choice, remembered on the phone: '1' or '0'. A copilot:* key, so Delete co-pilot data removes it. */
 export const ALL_STEPS_KEY = 'copilot:careAllSteps:v1';
@@ -151,7 +151,7 @@ export function StepView({ source, bike = null, onClose }: { source: StepSource;
   };
   const closePart = (): void => { setPart(null); partFrom.current?.focus(); };
   // the steps that show for this bike, as indexes into the card's steps: pictures and part names keep their own step's index
-  const shownSteps = stepsShown(source.item.id, source.item.steps.length, careDetails(bike));
+  const shownSteps = stepsShown(source.item.id, source.item.steps.length, careDetails(bike), pictureDetails(bike).rimBrake);
   const steps = shownSteps.map((i) => source.item.steps[i]!);
   const end = endOf(source);
   const last = end ? steps.length + 1 : steps.length;
@@ -234,7 +234,7 @@ export function StepView({ source, bike = null, onClose }: { source: StepSource;
             {steps.map((s, i) => (
               <section key={i} class="care-step-all">
                 <Pictures shown={pictures[i]!} view={`a${i}`} />
-                <h3>{C.careStepN(i + 1)}</h3>
+                <h3>{stepTitle(source.item.id, shownSteps[i]!) ?? C.careStepN(i + 1)}</h3>
                 <StepText id={source.item.id} at={shownSteps[i]!} text={s} onPart={openPart} />
               </section>
             ))}
@@ -244,7 +244,7 @@ export function StepView({ source, bike = null, onClose }: { source: StepSource;
           <div key={at} class={`care-step${hasPic ? ' care-step-pic' : ''}`}>
             <Pictures shown={pics} view={`s${at}`} />
             <div class="care-step-words">
-              <h2 ref={head} tabIndex={-1} class="care-step-h">{onStep ? C.careStepN(at) : label}</h2>
+              <h2 ref={head} tabIndex={-1} class="care-step-h">{onStep ? stepTitle(source.item.id, shownSteps[at - 1]!) ?? C.careStepN(at) : label}</h2>
               {at === 0 ? <Before source={source} /> : onStep ? <StepText id={source.item.id} at={shownSteps[at - 1]!} text={steps[at - 1]!} onPart={openPart} /> : end!.body}
             </div>
           </div>

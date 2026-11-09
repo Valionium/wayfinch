@@ -224,8 +224,11 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
       'https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know',
       'https://www.roadbikerider.com/be-a-hero-on-rides-d3/',
       'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot',
+      'https://www.parktool.com/en-us/product/master-link-pliers-mlp-1-2',
+      'https://dealers.bike.shimano.com/product/509187/shimano-cycling-sm-cn910-quick-link',
+      'https://www.bike-components.de/en/SRAM/PowerLock-Chain-12-speed-Master-Link-p69115/',
     ],
-    note: 'Book p. 159: join with a link or pin, then flex the joined link sideways to find a stiff one (book, more careful); p. 215: twisted links and a damaged chain are replaced; p. 48: the repair kit has a chain tool.',
+    note: 'Book p. 159: join with a link or pin, then flex the joined link sideways to find a stiff one (book, more careful); p. 215: twisted links and a damaged chain are replaced; p. 48: the repair kit has a chain tool. T6 (care pictures redo, 9 November 2026): a quick link is two plates, each with a pin and a keyhole slot, and must match the chain: its speeds and, for SRAM Flattop and T-Type chains, their own link (Park Tool, Shimano, SRAM).',
   },
   'spoke-snapped': {
     urls: [
@@ -258,8 +261,8 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
     note: 'Book p. 213: oil, worn pads, air in the system (pumping firms the lever when air is in it); p. 120: a grinding noise as the worn-pad sign (book, more careful). "Never touch the disc or pads with your fingers" (the coordinator\'s ruling I3 on PR 59): book p. 120, gloves for the disc braking surfaces. T16 (care pictures redo, 9 November 2026): the Park Tool mechanical page: many calipers have one pad adjuster, some one each side; pad wear is taken up with the pad adjuster, never the barrel.',
   },
   'gears-skipping': {
-    urls: ['https://www.parktool.com/en-us/product/chain-wear-indicator-cc-3-2'],
-    note: 'Book pp. 214-215: stiff links (flex them sideways), worn parts, bent cage or derailleur, dirty chain; pp. 148 and 159: wrong cable tension makes the chain rattle or slip, a stiff link jumps on the rear gears.',
+    urls: ['https://www.parktool.com/en-us/product/chain-wear-indicator-cc-3-2', 'https://theradavist.com/shimano-grx-12-speed-gravel-group-review'],
+    note: 'Book pp. 214-215: stiff links (flex them sideways), worn parts, bent cage or derailleur, dirty chain; pp. 148 and 159: wrong cable tension makes the chain rattle or slip, a stiff link jumps on the rear gears. T17 (care pictures redo, 9 November 2026): electronic gears (SRAM AXS, Shimano Di2) have no gear cable and no barrel adjuster; where a cable gear barrel sits varies, on the rear derailleur on Shimano GRX mechanical (The Radavist).',
   },
   'bolt-loose': {
     urls: ['https://dedhambike.com/articles/torque-table-pg186.htm', 'https://www.cyclingnews.com/features/torque-wrenches-why-you-need-one-and-how-to-use-them'],
@@ -298,8 +301,8 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
     note: 'Book p. 48: a piece of old tyre, about 5 square cm.',
   },
   'carry-quick-link': {
-    urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know'],
-    note: "Book p. 159: links that open without tools exist and join by hand; the book's repair kit lists a chain tool, not a link.",
+    urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know', 'https://dealers.bike.shimano.com/product/509187/shimano-cycling-sm-cn910-quick-link'],
+    note: "Book p. 159: links that open without tools exist and join by hand; the book's repair kit lists a chain tool, not a link. T21 (care pictures redo, 9 November 2026): the link must match the chain's speeds and make, and most 12-speed links (Shimano, SRAM, KMC) are for one use only.",
   },
   'carry-chain-tool': { urls: [], note: 'Book pp. 24 and 48: a chain tool is in the repair kit.' },
   'carry-multi-tool': {

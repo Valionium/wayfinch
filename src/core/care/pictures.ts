@@ -33,6 +33,10 @@ const RIM_CENTRE: Kinds = { by: 'rim-brake', pictures: { caliper: 'rim-centre-ca
 const PAD_SPACER: Kinds = { by: 'brakes', pictures: { 'hydraulic-disc': 'pad-spacer' } };
 /** The wheel pushed fully into the fork's ends and tightened, by the axle (redo, answer 1). */
 const WHEEL_SEAT: Kinds = { by: 'axle', pictures: { thru: 'wheel-seat-thru', qr: 'wheel-seat-qr', nuts: 'wheel-seat-nuts' } };
+/** A brake's barrel adjuster unscrewed (T15): a road caliper's on the brake, a V-brake's on its lever; a hydraulic rim brake has none. */
+const BRAKE_BARREL: Kinds = { by: 'rim-brake', pictures: { caliper: 'barrel-caliper', 'v-brake': 'barrel-vbrake' } };
+/** The gears' barrel adjuster at the rear derailleur (T17): cable gears only; electronic gears have no cable. */
+const GEARS_BARREL: Kinds = { by: 'shifting', pictures: { cable: 'gears-barrel' } };
 
 export const STEP_PICTURES: Readonly<Record<string, readonly StepPicture[]>> = {
   'puncture-tube': [PAD_SPACER, 'tyre-levers', null, 'pinch-slits', 'patch-press', null, null],
@@ -41,8 +45,10 @@ export const STEP_PICTURES: Readonly<Record<string, readonly StepPicture[]>> = {
   'spoke-snapped': ['spoke-wrap', RIM_OPEN, null, null, RIM_CLOSE],
   'brake-rub-rim': [WHEEL_SEAT, null, null, RIM_CENTRE, RIM_OPEN, RIM_CLOSE],
   'brake-rub-disc': [WHEEL_SEAT, 'pad-gap', 'disc-bolts', null, null],
-  'brake-weak-rim': [null, RIM_CLOSE, null, null, null],
+  'brake-weak-rim': [null, RIM_CLOSE, BRAKE_BARREL, null, null],
   'brake-weak-disc': [null, null, 'disc-pad-adjust', null, null],
+  'chain-broken': [null, 'quick-link', null, 'stiff-link', null, null],
+  'gears-skipping': ['stiff-link', GEARS_BARREL, null, null],
 };
 
 /** Every picture id an entry can show. */

@@ -67,8 +67,8 @@ test('[BC-PIC-FILES] a picture uses the theme classes only: no colour value, no 
 
 // The redo (owner's answer 6 of 9 November 2026): a picture not yet redrawn does not ship, its step shows text alone. Batch 1 redrew the
 // brakes and the snapped spoke: each brake card and the spoke card shows at least one picture; the other cards come with later batches.
-test('[BC-PIC-ROAD] each brake card, the snapped-spoke card, the puncture cards and the torn tyre have at least one step with a picture (redo, batches 1 and 2)', () => {
-  for (const id of ['spoke-snapped', 'brake-rub-rim', 'brake-rub-disc', 'brake-weak-rim', 'brake-weak-disc', 'puncture-tube', 'puncture-tubeless', 'tyre-torn']) {
+test('[BC-PIC-ROAD] each brake card, the snapped-spoke card, the puncture cards, the torn tyre, the broken chain and skipping gears have at least one step with a picture (redo, batches 1 to 3)', () => {
+  for (const id of ['spoke-snapped', 'brake-rub-rim', 'brake-rub-disc', 'brake-weak-rim', 'brake-weak-disc', 'puncture-tube', 'puncture-tubeless', 'tyre-torn', 'chain-broken', 'gears-skipping']) {
     const steps = STEP_PICTURES[id] ?? [];
     expect(steps.some((p) => p !== null), id).toBe(true);
   }
@@ -99,6 +99,21 @@ test('[BC-PIC-DETAILS] the wheel seated follows the axle: its own first; not tol
   expect(kindOrder('shifting', D({ shifting: 'electronic' }))).toEqual([]);
   expect(kindOrder('shifting', D())).toEqual(['cable']);
   expect(kindOrder('bars', D({ bars: 'other' }))).toEqual(['drop', 'flat']);
+});
+
+test('[BC-PIC-DETAILS] a barrel adjuster follows what the bike has: the gears barrel for cable gears only, the brake barrel by the kind of rim brake, none on a hydraulic one', () => {
+  // the broken chain: the quick link, then the joined link flexed free; skipping gears start with the same stiff link
+  expect(ids('chain-broken', 1, D())).toEqual(['quick-link']);
+  expect(ids('chain-broken', 3, D())).toEqual(['stiff-link']);
+  expect(ids('gears-skipping', 0, D())).toEqual(['stiff-link']);
+  // T17: cable gears turn a barrel; electronic gears have no cable, so no picture; not told, the cable one
+  expect(ids('gears-skipping', 1, D({ shifting: 'cable' }))).toEqual(['gears-barrel']);
+  expect(ids('gears-skipping', 1, D())).toEqual(['gears-barrel']);
+  expect(ids('gears-skipping', 1, D({ shifting: 'electronic' }))).toEqual([]);
+  // T15: a caliper's barrel sits on the brake, a V-brake's on its lever; a hydraulic rim brake has none
+  expect(ids('brake-weak-rim', 2, D({ brakes: 'rim', rimBrake: 'caliper' }))).toEqual(['barrel-caliper', 'barrel-vbrake']);
+  expect(ids('brake-weak-rim', 2, D({ brakes: 'rim', bars: 'flat' }))).toEqual(['barrel-vbrake', 'barrel-caliper']);
+  expect(ids('brake-weak-rim', 2, D({ brakes: 'rim', rimBrake: 'hydraulic' }))).toEqual(['barrel-caliper', 'barrel-vbrake']);
 });
 
 test("[BC-PIC-DETAILS] a bike's details for pictures: its brakes, its rim brake's kind only with rim brakes, its axle, its shifting and bars; no bike, all Not sure", () => {

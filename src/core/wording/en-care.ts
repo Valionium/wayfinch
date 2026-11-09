@@ -782,7 +782,7 @@ export const ROAD_CARDS: RoadCard[] = [
     checkFirst: 'Where did it break? Is a link twisted or missing?',
     steps: [
       'Remove the damaged links with a chain tool.',
-      'Join the ends with a quick link of the same speed count.',
+      'Join the ends with a quick link made for your chain: the same speed count and, for a SRAM Flattop or T-Type chain, its own kind of link.',
       'Stand on the pedal or squeeze the link until it clicks.',
       'Flex the joined link sideways; if it is stiff, work it until it moves freely, or it will jump on the rear gears.',
       'Test a gentle pedal turn.',
@@ -796,7 +796,7 @@ export const ROAD_CARDS: RoadCard[] = [
     id: 'spoke-snapped', problem: 'Snapped spoke', part: 'wheels', applies: {},
     checkFirst: 'Is only one spoke gone, and does the rim still turn?',
     steps: [
-      'Wrap the broken spoke round a good neighbour or tape it, so it cannot catch the frame, the disc or the gears.',
+      "Bend the broken spoke gently around the next one, or tape it to it, so it can't catch. Spokes are thin steel and bend by hand. If it broke at the hub, pull it out.",
       "Rim brakes: if the rim rubs, open the brake's quick release (on rim brakes), not the wheel's. Until you close it again, this brake works much less: ride slowly and use the other brake.",
       'Disc brakes: the brake needs no opening. Spin the wheel: if the rim touches the frame or the fork, ride slowly.',
       'Ride slowly to a shop.',
@@ -868,7 +868,7 @@ export const ROAD_CARDS: RoadCard[] = [
     checkFirst: 'Chain worn or stiff link? Bent hanger? Cable loose?',
     steps: [
       'Look for a stiff link and wiggle it free.',
-      'Turn the barrel adjuster a click at a time.',
+      'Cable gears: turn the barrel adjuster a click at a time. Electronic gears have no cable: check the shifting battery instead.',
       'Pick a gear where it holds.',
       'Stay in that gear and go home.',
     ],
@@ -929,7 +929,7 @@ export const CARRY: CarryItem[] = [
   { id: 'carry-plug-kit', name: 'Tubeless plug kit', applies: { tyres: ['tubeless'] } },
   { id: 'carry-knife', name: 'Small knife or scissors', applies: { tyres: ['tubeless'] } },
   { id: 'carry-tyre-boot', name: 'Tyre boot (or a piece of old tyre)', applies: {} },
-  { id: 'carry-quick-link', name: 'Quick link (right speed)', applies: { drive: ['chain'] } },
+  { id: 'carry-quick-link', name: 'Quick link for your chain (right speed and make; most 12-speed links are for one use only)', applies: { drive: ['chain'] } },
   { id: 'carry-chain-tool', name: 'Chain tool (or multi-tool with one)', applies: { drive: ['chain'] } },
   { id: 'carry-multi-tool', name: 'Multi-tool (hex keys, screwdriver) that fits the bolts on your bike', applies: {} },
   { id: 'carry-zip-ties', name: 'Zip ties or tape', applies: {} },

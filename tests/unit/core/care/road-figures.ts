@@ -30,13 +30,13 @@ export const ROAD_FIGURES: Record<string, RoadFigure[]> = {
   ],
   'chain-broken': [
     f('problem', 'Broken chain'), f('checkFirst', 'Where did it break?'), f('checkFirst', 'twisted or missing'),
-    step(0, 'chain tool'), step(1, 'quick link of the same speed count'), step(2, 'until it clicks'), step(3, 'Flex the joined link sideways'),
+    step(0, 'chain tool'), step(1, 'a quick link made for your chain: the same speed count and, for a SRAM Flattop or T-Type chain, its own kind of link'), step(2, 'until it clicks'), step(3, 'Flex the joined link sideways'),
     step(3, 'jump on the rear gears'), step(4, 'gentle pedal turn'), step(5, 'Shift gently'),
     f('rideOn', 'Fine on easy gears with gentle power'), f('rideOn', 'Walk if it keeps skipping'), f('rideOn', 'Get it replaced soon'),
   ],
   'spoke-snapped': [
     f('problem', 'Snapped spoke'), f('checkFirst', 'Is only one spoke gone, and does the rim still turn?'),
-    step(0, 'Wrap the broken spoke round a good neighbour or tape it'), step(0, 'so it cannot catch the frame, the disc or the gears'), step(1, "Rim brakes: if the rim rubs, open the brake's quick release"),
+    step(0, 'Bend the broken spoke gently around the next one, or tape it to it, so it can\'t catch.'), step(0, 'Spokes are thin steel and bend by hand.'), step(0, 'If it broke at the hub, pull it out.'), step(1, "Rim brakes: if the rim rubs, open the brake's quick release"),
     step(1, "the brake's quick release (on rim brakes), not the wheel's"),
     step(1, 'Until you close it again, this brake works much less: ride slowly and use the other brake.'),
     step(2, 'Disc brakes: the brake needs no opening.'), step(2, 'if the rim touches the frame or the fork, ride slowly'),
@@ -84,7 +84,7 @@ export const ROAD_FIGURES: Record<string, RoadFigure[]> = {
   ],
   'gears-skipping': [
     f('problem', 'Gears skipping'), f('checkFirst', 'Chain worn or stiff link?'), f('checkFirst', 'Bent hanger?'), f('checkFirst', 'Cable loose?'),
-    step(0, 'stiff link and wiggle it free'), step(1, 'a click at a time'), step(2, 'a gear where it holds'), step(3, 'go home'),
+    step(0, 'stiff link and wiggle it free'), step(1, 'Cable gears: turn the barrel adjuster a click at a time. Electronic gears have no cable: check the shifting battery instead.'), step(2, 'a gear where it holds'), step(3, 'go home'),
     f('rideOn', 'Fine in a gear that holds'), f('rideOn', 'Walk if it slips under load'),
   ],
   'bolt-loose': [
@@ -145,7 +145,7 @@ export const CARRY_NAMES: [string, string][] = [
   ['carry-plug-kit', 'Tubeless plug kit'],
   ['carry-knife', 'Small knife or scissors'],
   ['carry-tyre-boot', 'Tyre boot (or a piece of old tyre)'],
-  ['carry-quick-link', 'Quick link (right speed)'],
+  ['carry-quick-link', 'Quick link for your chain (right speed and make; most 12-speed links are for one use only)'],
   ['carry-chain-tool', 'Chain tool (or multi-tool with one)'],
   ['carry-multi-tool', 'Multi-tool (hex keys, screwdriver) that fits the bolts on your bike'],
   ['carry-zip-ties', 'Zip ties or tape'],
