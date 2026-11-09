@@ -15,6 +15,7 @@ import { withStops } from '../../../src/core/route/day-stops.ts';
 import { DEFAULT_SETTINGS } from '../../../src/store/rules.ts';
 import type { Settings } from '../../../src/store/rules.ts';
 import { handoffGpx, tripAttributes } from '../../../src/ui/trip/handoff.ts';
+import { bannedHits } from '../../fixtures/banned.ts';
 import { loadFixtureRoute } from '../../fixtures/packs/index.ts';
 
 const require = createRequire(import.meta.url);
@@ -736,7 +737,13 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
   });
 
   test('the phone rides in a bag it is meant for (top tube or frame bag), not under the jackets in the seat pack (review of PR 92, I3)', async () => {
+    // with the pockets counted (owner, 9 Nov 2026) the phone rides in the bib shorts pocket; a plan with both pockets off, in one of its bags
+    const worn = await dayRide('2026-11-15');
+    await worn.page.run('receiveHandoff()');
+    await worn.page.run('planTripBags()');
+    expect(worn.json('pocketPlaces().phone')).toBe('bib');
     const { page, json } = await dayRide('2026-11-15');
+    page.run('S.pockets={jersey:false,bib:false};');
     await page.run('receiveHandoff()');
     await page.run('planTripBags()');
     const phoneIn = json<string>(`(P=>P.units[P.items.phone[0][0]].pos)(currentPlan())`);
@@ -851,8 +858,10 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
     // the rider's own over-ear headphones (0.7 L, the rider's size) make the kit a little too big for the 1.2 L top tube bag and even the
     // largest half frame bag (4.5 L). Since the frame bag beside the bottle grows (owner, 9 Nov 2026: the extra goes into the frame bag),
     // the small earbuds of before fit without leaving anything at home, so the case is a bigger item, on a sunny April day.
+    // A rider whose plan has both pockets off (owner, 9 Nov 2026: two switches the rider can turn off): with them on, the cap rides in a
+    // pocket and nothing needs to stay at home.
     const p = await dayRide('2026-04-15');
-    p.page.run(`S.kit.buds=true;S.kitTouched.buds=true;S.custom.buds={L:0.7,kg:0.3,rigid:0};`);
+    p.page.run(`S.kit.buds=true;S.kitTouched.buds=true;S.custom.buds={L:0.7,kg:0.3,rigid:0};S.pockets={jersey:false,bib:false};`);
     await p.page.run('receiveHandoff()');
     const before = p.page.run('JSON.stringify(captureDraft())'), setups = p.page.run('JSON.stringify(SETUPS)');
     expect(await p.page.run('planTripBags()')).toBe(true);
@@ -885,18 +894,21 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
       await p.page.run('receiveHandoff()');
       expect(await p.page.run('planTripBags()')).toBe(true);
       expect(tops(p), date).toEqual([1.2]);
-      expect(p.json<string[]>('gearBags().map(b=>b.pos)').sort(), date).toEqual(['frame', 'top']);
       expect(p.json('currentPlan().spill.map(k=>k.id)'), date).toEqual([]);
       expect(p.json('currentPlan().reach.outOfReach'), date).toEqual([]);
-      // the frame bag beside the bottle, in the half shape, a size from the half shape's own up to 4.5 L, in steps of 0.5 L
-      expect(p.json<number>(`frameShapeIdx(S.bags.find(b=>b.pos==='frame'))`), date).toBe(2);
-      const half = p.json<number>(`withInputs({bags:S.bags.filter(b=>isBottle(b.pos))},()=>frameShapeL(2))`);
-      const L = p.json<number>(`S.bags.find(b=>b.pos==='frame').L`);
-      expect(L, date).toBeGreaterThan(half);
-      expect(L, date).toBeLessThanOrEqual(4.5);
-      expect(((L - half) * 2) % 1, date).toBe(0);
-      // the smallest such size: half a litre less and something is over
-      expect(p.json<number>(`(t=>t.spill.length+t.reach.outOfReach.length+phoneOffPref(t))(freshPlan({bags:S.bags.map(b=>b.pos==='frame'?{...b,L:b.L-0.5}:b),placements:null}))`), date).toBeGreaterThan(0);
+      // the frame bag beside the bottle only when the top tube bag leaves something over (owner, 9 Nov 2026: the frame bag only when
+      // really necessary), in the half shape, a size from the half shape's own up to 4.5 L in steps of 0.5 L, the smallest that does it
+      const frame = p.json<{ L: number } | null>(`S.bags.find(b=>b.pos==='frame') || null`);
+      if (frame) {
+        expect(p.json<number>(`(t=>t.spill.length+t.reach.outOfReach.length)(freshPlan({bags:S.bags.filter(b=>b.pos!=='frame'),placements:null}))`), date).toBeGreaterThan(0);
+        expect(p.json<number>(`frameShapeIdx(S.bags.find(b=>b.pos==='frame'))`), date).toBe(2);
+        const half = p.json<number>(`withInputs({bags:S.bags.filter(b=>isBottle(b.pos))},()=>frameShapeL(2))`);
+        expect(frame.L, date).toBeGreaterThanOrEqual(half);
+        expect(frame.L, date).toBeLessThanOrEqual(4.5);
+        expect(((frame.L - half) * 2) % 1, date).toBe(0);
+        if (frame.L > half)   // the smallest such size: half a litre less and something is over
+          expect(p.json<number>(`(t=>t.spill.length+t.reach.outOfReach.length)(freshPlan({bags:S.bags.map(b=>b.pos==='frame'?{...b,L:b.L-0.5}:b),placements:null}))`), date).toBeGreaterThan(0);
+      }
       expect(p.json('dayLeftAtHome()'), date).toEqual([]);
       for (const id of ESSENTIALS) expect(p.json<boolean>(`carrying('${id}')`), `${date} ${id}`).toBe(true);
       expect(p.json('SETUPS[0].bags'), date).toEqual(p.json('S.bags'));
@@ -913,10 +925,10 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
     bike.page.run(`S.bikeProfile=normaliseBikeProfile({id:'b_m',name:'Medium',fit:{style:'diamond-sloping',size:{kind:'letter',value:'M'},bolts:{st:'yes',dt:'yes'}}});applyTripKitDefaults();`);
     await bike.page.run('receiveHandoff()');
     expect(await bike.page.run('planTripBags()')).toBe(true);
-    // A medium frame's half shape is 3 L: with the 1.2 L top tube bag it cannot hold this day kit, so the proposal keeps its fallback, the
-    // seat pack (reported to the owner, 9 Nov 2026). Any top tube bag in it is 1.2 L, any frame bag the frame's own half size.
-    expect(tops(bike).every((L) => L === 1.2)).toBe(true);
-    expect(bike.json<string[]>('gearBags().map(b=>b.pos)')).toContain('seat');
+    // A medium frame's half shape is 3 L; with the pockets counted (owner, 9 Nov 2026) the 1.2 L top tube bag and it hold the day kit,
+    // with no seat pack. Any frame bag is the frame's own half size.
+    expect(tops(bike)).toEqual([1.2]);
+    expect(bike.json<string[]>('gearBags().map(b=>b.pos)')).not.toContain('seat');
     const frame = bike.json<{ L: number } | null>(`S.bags.find(b=>b.pos==='frame') || null`);
     if (frame) expect(frame.L).toBe(bike.json<number>(`withInputs({bags:S.bags.filter(b=>isBottle(b.pos))},()=>frameShapeL(2))`));
     expect(bike.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
@@ -1000,5 +1012,128 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
     const line = String(page.nodes.get('smallOver')!.textContent);
     expect(line).toMatch(/Camp or spare shoes/);
     expect(line).toMatch(/Open the full Bag planner/);
+  });
+});
+
+// Pockets on a day ride (owner, 9 Nov 2026): riders on an afternoon ride mostly wear bib shorts and a jersey with pockets, so the small
+// things ride there, counted as carried room, not as bags; the frame bag only when really necessary.
+describe('[TRIP-DAY-POCKETS] a day ride counts the jersey and bib shorts pockets as carried room (owner, 9 Nov 2026)', () => {
+  const planned = async (date: string, share = 0.39, setup = '') => {
+    const { gpx } = await handedOff('loop', { nights: 0 }, date, share);
+    const p = longPlanner(gpx);
+    p.page.run(`S.bags=[];S.nextUid=1;S.bikeProfile=null;S.kit={};S.kitTouched={};S.custom={};S.qty={};S.packed={};S.pinned={};${setup}applyTripKitDefaults();`);
+    await p.page.run('receiveHandoff()');
+    expect(await p.page.run('planTripBags()')).toBe(true);
+    return p;
+  };
+  type Places = Record<string, 'jersey' | 'bib'>;
+  type Planned = Awaited<ReturnType<typeof planned>>;
+  const carriedL = (p: Planned) => p.json<number>(`+KIT.filter(k=>carrying(k.id)&&!deckedIds().includes(k.id)).reduce((n,k)=>n+itemL(k),0).toFixed(2)`);
+
+  test('both pockets on by default; only small, light things go in them, within each pocket\'s room; they are in no bag, and the litres add up', async () => {
+    for (const date of ['2026-04-15', '2026-07-20', '2026-11-15']) {
+      const p = await planned(date);
+      expect(p.json('S.pockets'), date).toEqual({ jersey: true, bib: true });
+      const places = p.json<Places>('pocketPlaces()');
+      expect(places.phone, date).toBeDefined();   // the phone rides in a pocket
+      const room = { jersey: 0, bib: 0 };
+      for (const [id, where] of Object.entries(places)) {
+        const L = p.json<number>(`itemL(kitById('${id}'))`), kg = p.json<number>(`itemKg(kitById('${id}'))`);
+        expect(L, id).toBeLessThanOrEqual(where === 'bib' ? 0.2 : 0.6);
+        expect(kg, id).toBeLessThanOrEqual(0.35);
+        expect(p.json<boolean>(`carrying('${id}')`), id).toBe(true);
+        room[where] += L;
+      }
+      expect(room.jersey, date).toBeLessThanOrEqual(1.5 + 1e-9);
+      expect(room.bib, date).toBeLessThanOrEqual(0.5 + 1e-9);
+      // in no bag: not in the plan's bags, nothing over
+      const inBags = p.json<string[]>('Object.keys(currentPlan().items)');
+      for (const id of Object.keys(places)) expect(inBags, `${date} ${id}`).not.toContain(id);
+      expect(p.json('currentPlan().spill.map(k=>k.id)'), date).toEqual([]);
+      // the litres add up: what is in the bags plus what is in the pockets is everything carried
+      const pocketL = Object.keys(places).reduce((n, id) => n + p.json<number>(`itemL(kitById('${id}'))`), 0);
+      expect(p.json<number>('kitL()') + pocketL, date).toBeCloseTo(carriedL(p), 2);
+      expect(p.json<number>('capL()'), date).toBeGreaterThanOrEqual(p.json<number>('kitL()'));
+      // the packing check asks for nothing that rides in a pocket
+      expect(p.json<string[]>('audit().miss.flatMap(m=>m.ids)'), date).toEqual([]);
+    }
+  });
+
+  test('a plain line names what rides in each pocket; two switches, Jersey pockets and Bib shorts pockets, both on', async () => {
+    const p = await planned('2026-11-15');
+    const places = p.json<Places>('pocketPlaces()');
+    const box = p.page.nodes.get('smallPockets')!;
+    expect(box.hidden).toBe(false);
+    // each thing by its short name (KIT's "ID, cards, insurance" would read as three things), joined with "and"
+    const name = (id: string) => p.json<string>(`POCKET_NAMES['${id}']`);
+    const and = (a: string[]) => (a.length < 2 ? a[0] : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`);
+    const of = (w: string) => Object.keys(places).filter((id) => places[id] === w).map(name);
+    const jersey = of('jersey'), bib = of('bib');
+    expect(jersey.length + bib.length).toBeGreaterThan(0);
+    const line = String(box.innerHTML).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    if (jersey.length) expect(line).toContain(`In your jersey pockets: ${and(jersey)}.`);
+    if (bib.length) expect(line).toContain(`In your bib shorts pocket: ${and(bib)}.`);
+    expect(line).toMatch(/In your bib shorts pocket: phone/);
+    expect(bannedHits(line)).toEqual([]);
+    for (const [pocket, label] of [['jersey', 'Jersey pockets'], ['bib', 'Bib shorts pockets']])
+      expect(String(box.innerHTML)).toMatch(new RegExp(`<label class="pocket-switch"><input type="checkbox" role="switch" data-pocket="${pocket}" checked> ${label}</label>`));
+  });
+
+  test('a switch turned off puts those things back in the bags; the choice is stored with the plan and comes back as it was', async () => {
+    const p = await planned('2026-11-15');
+    const jersey = Object.entries(p.json<Places>('pocketPlaces()')).filter(([, w]) => w === 'jersey').map(([id]) => id);
+    expect(jersey.length).toBeGreaterThan(0);
+    p.page.run(`setPocket('jersey',false)`);
+    expect(p.json('S.pockets')).toEqual({ jersey: false, bib: true });
+    const now = p.json<Places>('pocketPlaces()');
+    for (const id of jersey) {
+      expect(now[id] === 'jersey', id).toBe(false);
+      // back in a bag, in the other pocket, or named as over
+      const placed = p.json<string[]>('Object.keys(currentPlan().items)').includes(id) || now[id] === 'bib' || p.json<string[]>('currentPlan().spill.map(k=>k.id)').includes(id);
+      expect(placed, id).toBe(true);
+    }
+    // stored with the plan, in the planner's own draft, and read back exactly
+    const draft = p.json<{ pockets: unknown }>('captureDraft()');
+    expect(draft.pockets).toEqual({ jersey: false, bib: true });
+    p.page.run(`S.pockets={jersey:true,bib:true};restorePlan(${JSON.stringify(draft)},true)`);
+    expect(p.json('S.pockets')).toEqual({ jersey: false, bib: true });
+    // both off: nothing in pockets, the switches still there to turn them back on
+    p.page.run(`setPocket('bib',false)`);
+    expect(p.json('pocketPlaces()')).toEqual({});
+    expect(String(p.page.nodes.get('smallPockets')!.innerHTML)).toMatch(/data-pocket="jersey"/);
+  });
+
+  test('a saved plan without pockets reopens without them; a night, no pockets', async () => {
+    const p = await planned('2026-11-15');
+    const draft = p.json<Record<string, unknown>>('captureDraft()');
+    delete draft.pockets;
+    p.page.run(`restorePlan(${JSON.stringify(draft)},true)`);
+    expect(p.json('S.pockets ?? null')).toBeNull();
+    expect(p.json('pocketPlaces()')).toEqual({});
+    expect(p.json<string>('JSON.stringify(captureDraft())')).not.toMatch(/"pockets"/);
+    // a night: the pockets are not counted, whatever the plan says
+    const night = longPlanner((await handedOff('loop', { nights: 1 }, '2026-11-15', 0.4)).gpx);
+    night.page.run(`S.bags=[];S.nextUid=1;S.bikeProfile=null;S.kit={};S.kitTouched={};S.custom={};S.qty={};S.packed={};S.pinned={};applyTripKitDefaults();`);
+    await night.page.run('receiveHandoff()');
+    await night.page.run('planTripBags()');
+    expect(night.json('S.pockets ?? null')).toBeNull();
+    night.page.run('S.pockets={jersey:true,bib:true};');
+    expect(night.json('pocketPlaces()')).toEqual({});
+  });
+
+  test('bags: the 1.2 L top tube bag first, the half frame bag beside the bottle only if things are still over; a saved medium frame no longer needs the seat pack', async () => {
+    for (const date of ['2026-04-15', '2026-07-20', '2026-10-15', '2026-11-15']) {
+      const p = await planned(date);
+      const gear = p.json<Array<{ pos: string; L: number }>>('gearBags().map(b=>({pos:b.pos,L:b.L}))');
+      expect(gear.filter((b) => b.pos === 'top').map((b) => b.L), date).toEqual([1.2]);
+      expect(gear.map((b) => b.pos), date).not.toContain('seat');
+      expect(p.json('currentPlan().spill.map(k=>k.id)'), date).toEqual([]);
+      if (gear.some((b) => b.pos === 'frame'))   // only when the top tube bag alone leaves something over
+        expect(p.json<number>(`(t=>t.spill.length+t.reach.outOfReach.length)(freshPlan({bags:S.bags.filter(b=>b.pos!=='frame'),placements:null}))`), date).toBeGreaterThan(0);
+    }
+    const bike = await planned('2026-11-15', 0.39, `S.bikeProfile=normaliseBikeProfile({id:'b_m',name:'Medium',fit:{style:'diamond-sloping',size:{kind:'letter',value:'M'},bolts:{st:'yes',dt:'yes'}}});`);
+    expect(bike.json<string[]>('gearBags().map(b=>b.pos)')).not.toContain('seat');
+    expect(bike.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+    expect(bike.json<number[]>(`S.bags.filter(b=>b.pos==='top').map(b=>b.L)`)).toEqual([1.2]);
   });
 });
