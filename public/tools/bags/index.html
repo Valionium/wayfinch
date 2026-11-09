@@ -246,11 +246,30 @@ button.go.small{font-size:15px;padding:9px 16px;flex:0 0 auto}
 .comparecontrols>div{flex:1 1 180px;min-width:0}.comparecontrols select{width:100%}
 .setupcompare{margin:12px 0;padding:12px;border:1px solid var(--line);background:var(--panel)}
 /* The small view of a day ride: the drawn bike with its bags and the list of what is in each bag, nothing else. The one top bar stays. */
-.small-head{margin:10px 0 4px}.small-head h2{font-family:var(--disp);font-weight:600;font-size:22px;margin:0}.small-head p{margin:2px 0 0;color:var(--muted)}
-.small-foot{margin:14px 0}
-body.lc-small #crumbs,body.lc-small #walkthroughInvite,body.lc-small #walkthroughOpen,body.lc-small #draftBar,body.lc-small .wm-block,body.lc-small #rigTools,body.lc-small #rigTrip{display:none!important}
-body.lc-small #s4>:not(#packingChecklist):not(#smallFoot){display:none!important}
-body.lc-small .packing-disclosure>summary,body.lc-small .packing-disclosure-body>:not(.packing-groups){display:none!important}
+/* Owner, 9 Nov 2026: it reads as part of Trip, calm and plain: no Load Check header or tabs, "← Back to Trip", the title and route
+   line, the drawing, then per bag what goes in it, water in one line, and one secondary button to the full Bag planner at the end. */
+.small-head{margin:18px 0 6px}.small-head h2{font-family:var(--body,inherit);font-weight:650;font-size:22px;letter-spacing:0;text-transform:none;margin:0}
+.small-head p{margin:4px 0 0;color:var(--muted);font-size:15px}
+.small-bags{margin:8px 0 0}
+.small-bag{padding:14px 0;border-top:1px solid var(--line)}
+.small-bag:first-child{border-top:0}
+.small-bag h3{font-family:inherit;font-size:16px;font-weight:600;letter-spacing:0;text-transform:none;margin:0 0 6px;color:var(--ink)}
+.small-bag ul{margin:0;padding:0 0 0 18px;line-height:1.7;font-size:15px;color:var(--ink)}
+.small-water{margin:0;padding:14px 0;border-top:1px solid var(--line);font-size:15px;color:var(--ink)}
+.small-over{margin:4px 0 10px;padding:10px 12px;border-left:3px solid var(--amber);background:var(--panel);font-size:15px;line-height:1.5;color:var(--ink)}
+.small-foot{margin:22px 0 28px}
+.small-foot p{margin:8px 0 0;color:var(--muted);font-size:13px}
+button.small-full{min-height:44px;padding:10px 18px;font:inherit;font-size:15px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:6px;cursor:pointer}
+button.small-full:hover{border-color:var(--muted)}
+body.lc-small header.mast,body.lc-small #crumbs,body.lc-small #walkthroughInvite,body.lc-small #walkthroughOpen,body.lc-small #draftBar,body.lc-small .wm-block,body.lc-small #rigTools,body.lc-small #rigTrip,body.lc-small #rigFoot,body.lc-small #rigLegend{display:none!important}
+body.lc-small #s4>:not(#smallBags):not(#smallFoot){display:none!important}
+/* the plan's line and its Undo: quiet, one line under the top bar */
+body.lc-small #handoffBar:not(.hidden){border:0;background:none;padding:8px 0 0;margin:0;color:var(--muted);font-size:14px;gap:4px 12px}
+body.lc-small #handoffBar .linky{margin-left:0;min-height:44px;font-family:inherit;font-size:14px;letter-spacing:0;text-transform:none;font-weight:600}
+@media screen and (min-width:1100px){
+  body.lc-small .planner-cols{display:block;max-width:620px;margin:0 auto}
+  body.lc-small .small-head,body.lc-small #handoffBar:not(.hidden){max-width:620px;margin-left:auto;margin-right:auto}
+}
 .setupgroup{margin:14px 0}.setupgroup>h3{font-family:var(--disp);font-weight:600;font-size:16px;margin:0 0 2px}
 .setuphint{font-size:13px;color:var(--muted);margin:0 0 8px}
 .comparetable{overflow-x:auto;margin:10px 0;max-width:100%}
@@ -2151,7 +2170,14 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     </div>
     <div id="verdictBox"></div>
     <div id="packingChecklist"></div>
-    <div class="small-foot" id="smallFoot" hidden><button class="go" id="smallFull" type="button">Open the full Bag planner</button></div>
+    <!-- the small view's list (owner, 9 Nov 2026): what goes in each bag, water in one line, at most one line on what does not fit -->
+    <div class="small-bags" id="smallBags" hidden>
+      <p class="small-over" id="smallOver" hidden></p>
+      <div id="smallBagList"></div>
+      <p class="small-water" id="smallWater"></p>
+    </div>
+    <div class="small-foot" id="smallFoot" hidden><button class="small-full" id="smallFull" type="button">Open the full Bag planner</button>
+      <p>The same plan, with every step and setting.</p></div>
     <div id="resultBox"></div>
 
     <div class="fbslot" data-fb="4"></div>
@@ -4055,7 +4081,29 @@ function tripKitDefaults(nights=S.nights,sleep=S.sleep,bike=S.bikeProfile){
   selected.shiftcharger=overnight && b.shifting==='electronic';
   if(b.drive==='belt')selected.link=selected.chaintl=selected.lube=false;
   if(b.drive==='belt' || b.drive==='chain-hub')selected.hanger=false;
+  if(!overnight && S.gpx && S.gpx.copilotRoute)Object.assign(selected,dayRideKit());
   return selected;
+}
+/* A day ride from Wayfinch's Trip (its route carries Wayfinch's hash) starts from the day's essentials (owner, 9 Nov 2026: "at least
+   water and a top tube bag and the essentials like IDs, a candy bar or cash"). A day ride planned here alone keeps the starting list
+   the bag selection's own cases were measured with (qa/bag-selection.cjs, LC-SEL-09 and the rest).
+   The essentials:
+   the essentials, sized to the day's riding time, with layers and sun kit by the packing check's own weather and season rules (audit),
+   so the check never asks for what the start left out. The riding time is the planner's own: the route's hours for the day (distance
+   and climbing at the loaded speed), else the pace's hours. A lock is the check's from the first night; a day of meals and the power
+   bank only for a long day (over the steady pace's half day, over the sporting pace's full day); ride snacks always. */
+function dayRideHours(){
+  const r=typeof planRoute==='function' ? planRoute() : null;
+  const h=r ? r.effectiveExact / r.loadedKph : NaN;   // the whole route in one day, whatever nights the plan has now
+  return Number.isFinite(h) ? h : PACE[S.pace || 'sporting'].hours;
+}
+function dayRideKit(){
+  const c=tripClimate(),known=c.nightCold!=null,hours=dayRideHours();
+  const sunMonth=(S.place && S.place.lat < 0) ? (S.month+6)%12 : S.month;
+  return {docs:true,cash:true,phone:true,snacks:true,firstaid:true,rain:true,lock:false,
+    food:hours > PACE.steady.hours,bank:hours > PACE.sporting.hours,
+    puffy:known && c.nightCold < 11,gloves:known && c.nightCold < 5,
+    shades:sunMonth >= 2 && sunMonth <= 9,sun:sunMonth >= 3 && sunMonth <= 8};
 }
 function applyTripKitDefaults(){
   const defaults=tripKitDefaults();
@@ -11197,6 +11245,7 @@ function renderResult(){
   draftStatus(savedDraftMessage());
   queueDraftSave();
   renderPackingChecklist(A);
+  renderSmallBags(A);
   if(resultFocus && typeof restoreFocus === 'function') restoreFocus($('s4'),resultFocus);
 }
 
@@ -11771,8 +11820,9 @@ async function receiveHandoff(){
   HANDOFF.reuse=handoffPlannable(t) ? tripSetupFor(t.route)?.id || null : null;
   const heights=parsed.hasElev ? '' : ' This route has no heights, so its days are split by distance.';
   if(handoffPlannable(t)){
-    const base=tripFoundation(),reuse=HANDOFF.reuse && SETUPS.find(x => x.id === HANDOFF.reuse),held=setupHoldingPlan();
-    showHandoffBar(`A trip from Wayfinch: ${name}${HANDOFF.long ? '' : ', a day ride'}. Plan bags for this trip? A new trip setup gets ${handoffChanges(t)}, with the bags and kit predicted for it, from ${base ? 'your general setup '+base.name : 'the plan here now'}${HANDOFF.long ? '' : ', and shows your bike with its bags'}. ${held ? `Your plan now is already saved as ${held.name}.` : 'Your plan now is kept as a setup.'}${
+    const base=tripFoundation(),reuse=HANDOFF.reuse && SETUPS.find(x => x.id === HANDOFF.reuse),held=setupHoldingPlan(),passed=passedFoundation();
+    const from=base ? 'from your general setup '+base.name : gearBags().length ? 'from the plan here now' : 'starting from the fewest bags that hold the kit';
+    showHandoffBar(`A trip from Wayfinch: ${name}${HANDOFF.long ? '' : ', a day ride'}. Plan bags for this trip? A new trip setup gets ${handoffChanges(t)}, with the bags and kit predicted for it, ${from}${HANDOFF.long ? '' : ', and shows your bike with its bags'}.${passed ? ` Your general setup ${passed.name} has no bags, so it is not used.` : ''} ${held ? `Your plan now is already saved as ${held.name}.` : 'Your plan now is kept as a setup.'}${
       reuse ? ` Or open the setup made on ${setupDay(reuse)} for this route.` : ''}${heights}`,{apply:true,plan:true,reuse:!!reuse});
   } else showHandoffBar(`A trip from Wayfinch: ${name}. Apply it to this plan? It sets ${handoffChanges(t)}; your bags, kit and bike stay as they are.${heights}`,{apply:true});
   return true;
@@ -11831,24 +11881,83 @@ var SMALL_VIEW=false;
 function setSmallView(on){
   SMALL_VIEW=!!on;
   document.body.classList.toggle('lc-small',SMALL_VIEW);
-  $('smallHead').hidden=!SMALL_VIEW; $('smallFoot').hidden=!SMALL_VIEW;
+  $('smallHead').hidden=!SMALL_VIEW; $('smallFoot').hidden=!SMALL_VIEW; $('smallBags').hidden=!SMALL_VIEW;
+  // it reads as part of Trip (owner, 9 Nov 2026): the one top bar says where it goes back to
+  $('backToWayfinch').textContent=SMALL_VIEW ? '← Back to Trip' : '← Back to Wayfinch';
   if(SMALL_VIEW){
     const when=S.departureDate ? `${+S.departureDate.slice(8,10)} ${MONTHS[+S.departureDate.slice(5,7)-1].slice(0,3)}` : MONTHS[S.month];
-    $('smallTripLine').textContent=`${HANDOFF.name || 'Your ride'} · ${when} · day ride`;
+    const r=routeProfile();
+    $('smallTripLine').textContent=`${HANDOFF.name || 'Your ride'} · ${when}${r && r.km ? ` · ${Math.round(r.km)} km` : ''} · day ride`;
   }
   if(S.step === 4){ renderResult(); }
+  renderSmallBags();
   drawRig();
   const title=SMALL_VIEW ? $('smallTitle') : $('stepTitle'+S.step); if(title) title.focus({preventScroll:true});
+}
+/* The small view's list (owner, 9 Nov 2026): per bag, what goes in it, plainly; water in one line; when something has no place, one
+   line naming it, why, and what to do. Read from the packing checklist's own model, so it is the plan at Check, item for item. */
+function renderSmallBags(A){
+  const box=$('smallBags'); if(!box || !SMALL_VIEW) return;
+  const m=getChecklistModel(A || currentPlan());
+  const name=row => `${row.name}${row.quantity > 1 && !kitById(row.id)?.perDay ? ' ×'+row.quantity : ''}`;
+  const bags=m.groups.filter(g => g.id !== 'overflow' && g.id !== 'unassigned');
+  $('smallBagList').innerHTML=bags.map(g => `<section class="small-bag" aria-label="${htmlEsc(g.title)}"><h3>${htmlEsc(g.title)}</h3><ul>${
+    g.items.map(row => `<li>${htmlEsc(name(row))}</li>`).join('')}</ul></section>`).join('');
+  const L=+m.bottles.reduce((n,b) => n+(+b.L || 0),0).toFixed(2);
+  $('smallWater').textContent=m.bottles.length ? `Water: ${m.bottles.length === 1 ? 'one bottle' : m.bottles.length+' bottles'}, ${L} L.`
+    : 'Water: no bottle cage in this plan.';
+  const out=m.groups.filter(g => g.id === 'overflow' || g.id === 'unassigned').flatMap(g => g.items);
+  const long=out.some(row => row.tooLong);
+  $('smallOver').hidden=!out.length;
+  $('smallOver').textContent=out.length ? `${out.map(name).join(', ')} ${out.length === 1 ? 'does' : 'do'} not fit in these bags${
+    long ? ' (too long for them)' : ''}. Open the full Bag planner to add a bag or leave something at home.` : '';
 }
 function openFullPlanner(){ if(!SMALL_VIEW) return false; setSmallView(false); if(S.step === 4) maybeAskMaxWeight(); return true; }
 $('smallFull').onclick=openFullPlanner;
 function setupDay(s){ const d=s && s.saved; return d && /^\d{4}-\d{2}-\d{2}/.test(d) ? `${+d.slice(8,10)} ${MONTHS[+d.slice(5,7)-1].slice(0,3)}` : 'an earlier day'; }
 function tripSetupFor(hash){ return hash ? SETUPS.find(s => setupKind(s) === 'trip' && s.forRoute && s.forRoute.hash === hash) || null : null; }
-function tripFoundation(){
+// A general setup with no bag (bottle cages alone hold no kit) is never a foundation: it would leave the trip with nothing mounted
+// (the owner's day ride of 9 Nov 2026). It is passed over, and the bar names it (passedFoundation).
+const setupHasBags=s => !!s && (s.bags || []).some(b => POSITIONS[b.pos] && !isBottle(b.pos));
+function tripFoundationOf(withBags){
   const bike=S.bikeProfile ? S.bikeProfile.id : null;
-  const mine=SETUPS.filter(s => setupKind(s) === 'general' && (s.bikeProfile ? s.bikeProfile.id : null) === bike);
+  const mine=SETUPS.filter(s => setupKind(s) === 'general' && (s.bikeProfile ? s.bikeProfile.id : null) === bike && (!withBags || setupHasBags(s)));
   const when=s => String(s.updated || s.saved || '');
   return mine.find(s => s.isDefault) || mine.slice().sort((a,b) => when(b).localeCompare(when(a)))[0] || null;
+}
+function tripFoundation(){ return tripFoundationOf(true); }
+// The general setup that would have been the foundation but has no bags; null when none was passed over.
+function passedFoundation(){ const any=tripFoundationOf(false); return any && !setupHasBags(any) ? any : null; }
+/* Bags for a trip whose plan has none (no foundation with bags, and no bag in the plan here): the smallest setup the planner's own rules
+   fill. A cage on each in-frame mount the bike has (water) and a top tube bag where it mounts one (the owner's minimum), then the part
+   of the planner's own typical setup (frame bag, seat pack, handlebar roll, typicalSetup) with which the frozen selection (freshPlan,
+   read only) leaves nothing over, with the fewest must-reach items out of reach, then the fewest litres; when no such set exists, the
+   whole typical setup, and the plan says what is over. The
+   bags go into this plan only (and the trip setup made from it): the plan before is kept as a setup, and Undo takes them away. */
+function proposedTripBags(){
+  const fit=bikeFit(S.bikeProfile),uid=n => S.nextUid+n,own=S.bags.filter(b => isBottle(b.pos));
+  const base=['st','dt'].filter(sl => fit.cages[sl] && !own.some(b => b.slot === sl)).map(sl => ({pos:BOTTLE_SPOTS[sl].pos,slot:sl,L:bottleDefaultFor(BOTTLE_SPOTS[sl].pos,BOTTLE_SPOTS[sl].defL)}));
+  const top=TOP_ORDER.find(sl => fit.topMounts[sl]);
+  if(top) base.push({pos:'top',slot:top,L:POSITIONS.top.defL});
+  const extras=['frame','seat','bar'].filter(p => p !== 'frame' || !fit.frameBag.none);
+  const withIds=list => list.map((b,i) => ({uid:uid(i),...b}));
+  const frameL=withInputs({bags:[...S.bags,...withIds(base)]},() => frameShapeL(minShapeIdx()));
+  const sets=[];
+  for(let m=0;m < 1 << extras.length;m++){
+    const more=extras.filter((p,i) => m & 1 << i).map(p => ({pos:p,L:p === 'frame' ? frameL : POSITIONS[p].defL}));
+    const bags=withIds([...base,...more]),all=[...S.bags,...bags];
+    const trial=freshPlan({bags:all,placements:null});
+    sets.push({bags,over:trial.spill.length,out:trial.reach.outOfReach.length,L:withInputs({bags:all},() => ratedTotal()),n:more.length});
+  }
+  // nothing over, then the fewest must-reach items out of reach (the selection's own reach rule), then the fewest litres and bags
+  const fits=sets.filter(s => !s.over).sort((a,b) => a.out-b.out || a.L-b.L || a.n-b.n);
+  return (fits[0] || sets[sets.length-1]).bags;
+}
+// "2 bottle cages, a top tube bag and a seat pack"
+function bagsInWords(bags){
+  const cages=bags.filter(b => isBottle(b.pos)).length,names=bags.filter(b => !isBottle(b.pos)).map(b => 'a '+POSITIONS[b.pos].label.toLowerCase());
+  const parts=[...(cages ? [cages === 1 ? 'a bottle cage' : cages+' bottle cages'] : []),...names];
+  return parts.length > 1 ? parts.slice(0,-1).join(', ')+' and '+parts[parts.length-1] : parts[0] || '';
 }
 // What makes two plans the same plan: the bike, the trip, the bags and the kit (not the ticks, the step or the view).
 function planSameKey(p){
@@ -11891,6 +12000,8 @@ async function planTripBags(){
     showHandoffBar('The route from Wayfinch could not be read. Your plan is unchanged.',{apply:true,plan:true,reuse:!!HANDOFF.reuse});
     return false;
   }
+  const proposed=gearBags().length ? null : proposedTripBags();   // nothing mounted to start from: the smallest setup that holds the kit
+  if(proposed){ S.bags=[...S.bags,...proposed]; S.nextUid=Math.max(S.nextUid,...proposed.map(b => b.uid+1)); }
   S.packed={}; keepPlan({load:null}); currentPlan();   // packed afresh by the frozen selection, for this trip
   if(!HANDOFF.long) SMALL_VIEW=true;   // before Check opens, so nothing else asks over the small view
   go(HANDOFF.long ? 2 : 4);   // a long trip at Bags; a day ride at Check, where the small view shows
@@ -11906,7 +12017,9 @@ async function planTripBags(){
   queueDraftSave(); renderRecall();
   if(!HANDOFF.long) setSmallView(true);
   TRIP_BAGS.undo=tripBagsUndo(undo,[saved,before].filter(Boolean));
-  showHandoffBar(`Planned for ${name}: a new trip setup${base ? ' from '+base.name : ''}${HANDOFF.long ? ', opened at Bags' : ''}.${before ? ' Your plan before is kept as a setup.' : ''}${
+  const passed=base ? null : passedFoundation();
+  showHandoffBar(`Planned for ${name}: a new trip setup${base ? ' from '+base.name : ''}${proposed ? ` with ${bagsInWords(proposed)}` : ''}${HANDOFF.long ? ', opened at Bags' : ''}.${
+    passed ? ` ${passed.name} has no bags, so it is not used.` : ''}${before ? ' Your plan before is kept as a setup.' : ''}${
     stored ? '' : tripSetupsNotStored(before ? 2 : 1)}`,{undo:true});
   return true;
 }

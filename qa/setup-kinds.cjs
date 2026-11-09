@@ -520,7 +520,8 @@ test('[SET-LIMITS] on a full storage, after a setup write that failed, a delete 
 });
 
 test('[SET-LIMITS] a reload keeps each group\'s order, and with it the general setup Plan bags for this trip starts from (fix round 2 of PR 80, m-C)',async()=>{
-  const library=`qaLibrary().map(s=>{delete s.isDefault;return s;})`;
+  // each setup holds a bag: a general setup with none is never a foundation (owner, 9 Nov 2026)
+  const library=`qaLibrary().map(s=>{delete s.isDefault;s.bags=[{uid:1,pos:'seat',L:10}];return s;})`;
   for(const what of ['a library this page saved','an older page\'s 5 setups and this page\'s library']){
     const storage=sharedStore(),a=tab(storage);
     if(what === 'a library this page saved') await a.run(`SETUPS=${library};store.set(SETUP_KEY,SETUPS)`);
