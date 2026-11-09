@@ -344,5 +344,34 @@ test('[WM-NOTE] the line names the rider\'s things only for a gain that holding 
   assert.ok(reach.held<MIN&&reach.gain>=MIN);
 });
 
+// Re-check of PR 89, C1 (probe Q5): after Undo, or with things ticked as packed, the balancing holds those too, yet the line can only name
+// hand placements and must-reach things. What the line names must cost the gain with only those held, everything else free.
+test('[WM-NOTE] after Undo and with things ticked as packed: the line names hand placements and must-reach things only when holding exactly those costs MIN_GAIN_SCORE or more',()=>{
+  const MIN=json('window.WayfinchAdvisor.MIN_GAIN_SCORE');
+  // the gain still to be had with only what the line can name held: the hand placements and the must-reach things within reach
+  const NOTE=`(()=>{IDEAL_CACHE={key:null,value:null};const f=weightMapIdeal(true);const s=idealTrial(S.bags,{},S.placements);
+    const named=[...new Set([...Object.keys(S.pinned||{}),...s.pieces.filter(p=>{const k=kitById(p.id);return k&&isMustReach(k)&&reachableFor(k,p.pos);}).map(p=>p.id)])];
+    const held=window.WayfinchAdvisor.autoBalance(s,(p,x)=>idealTrial(S.bags,p,x.state),{...balanceOptions(s),fixed:named});
+    return {text:f.note&&f.note.text,groups:f.note?f.note.groups.length:0,gain:f.gain,held:held.gain};})()`;
+  // probe Q5: bikepacking bags balanced, then Undo
+  plan(SETS.bikepacking,{},fresh());
+  assert.equal(json('autoBalancePlan()'),true);
+  assert.equal(json('undoBalance()'),true);
+  const undone=json(NOTE);
+  assert.ok(undone.held>=MIN,`after Undo, ${undone.held} is to be had with only hand placements and must-reach things held`);
+  assert.equal(undone.groups,0,`after Undo: nothing of the rider's named for what Undo put back (${undone.text})`);
+  // its twin: the things the balance would move ticked as packed before it looks, so it leaves them where they are
+  plan(SETS.bikepacking,{},fresh());
+  const moves=json(`(()=>{const s=idealTrial(S.bags,{},S.placements);return window.WayfinchAdvisor.autoBalance(s,(p,f)=>idealTrial(S.bags,p,f.state),balanceOptions(s)).balanced.moves.map(m=>m.id);})()`);
+  const reach=new Set(json(`currentPlan().slots.flatMap(s=>s.items.filter(k=>isMustReach(k)&&reachableFor(k,s.pos)).map(k=>k.id))`));
+  const tick=moves.filter(id=>!reach.has(id));
+  assert.ok(tick.length>0,'things to tick');
+  plan(SETS.bikepacking,{},fresh(`S.packed=${JSON.stringify(Object.fromEntries(tick.map(id=>[id,true])))}`));
+  json('autoBalancePlan()');
+  const ticked=json(NOTE);
+  if(ticked.held>=MIN)assert.equal(ticked.groups,0,`ticked: nothing of the rider's named for what the ticks hold (${ticked.text})`);
+  if(ticked.groups)assert.ok(ticked.held<MIN&&ticked.gain>=MIN,`ticked: named only for a gain holding them costs (${ticked.held}, ${ticked.gain})`);
+});
+
 for(const [name,fn] of tests){fn();passed++;console.log('ok',name);}
 console.log(`${passed} automatic balancing tests passed`);

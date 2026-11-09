@@ -8840,10 +8840,15 @@ function splitThings(){
 }
 // The search from the plan as it is: nothing held (the rider's hand placements and must-reach things may move, keeping every promise:
 // nothing more left over, on the back or out of reach).
-// With the rider's things held as the balancing holds them, too (review of PR 89, C1), unless the balancing's own record of this plan
-// says what that gives; both share the remembered trials.
+// With exactly the things the line can name held, too (review of PR 89, C1 and its re-check): the rider's hand placements and the
+// must-reach things within reach, everything else free (things ticked as packed or put back with Undo too, which the line never
+// names), so it names them only for a gain holding them costs. The balancing's own record of this plan says it when it held the same.
+// Both share the remembered trials.
+const nameableFixed = start => [...new Set([...Object.keys(S.pinned || {}),
+  ...start.pieces.filter(p => { const k = kitById(p.id); return k && isMustReach(k) && reachableFor(k, p.pos); }).map(p => p.id)])];
 function idealSearch(){
-  const start = idealTrial(S.bags, {}, S.placements), trial = rememberedTrial(), extra = splitThings(), opts = balanceOptions(start);
+  const start = idealTrial(S.bags, {}, S.placements), trial = rememberedTrial(), extra = splitThings();
+  const opts = { ...balanceOptions(start), fixed:nameableFixed(start) };
   const fixed = JSON.stringify([...opts.fixed].sort()), rec = BALANCE.held;
   return { start, heldGain:rec && rec.key === idealKey() && rec.fixed === fixed ? rec.gain : undefined, nh:0,
     held:n => window.WayfinchAdvisor.autoBalance(start, trial, { ...opts, maxTrials:n }),
