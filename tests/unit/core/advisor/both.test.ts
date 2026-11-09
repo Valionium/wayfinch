@@ -164,3 +164,32 @@ describe('a bigger change where nothing helps, and only where it could do more (
     expect(biggerOffered(empties, { ...a, ahead: a.items[0]! })).toBe(false);
   });
 });
+
+describe('review of PR 81', () => {
+  test('[GA-BOTH] M1: under both goals no suggestion counts whose combined score is worse than the plan\'s, though it takes 0.6 L off the back', () => {
+    // the plan: a 3 L frame bag and a 20 L backpack holding 12 L; the one candidate, a 10 L seat pack, takes 0.6 L off the back but moves
+    // the frame bag's kit into the seat pack: handling 12.5 to 14.28 (+14 %), back 12 to 11.4 L (-5 %), combined 2.09 against 2
+    const base: TrialResult = { overL: 0, spillIds: [], backL: 12, backKg: 3, outOfReach: 0, kgByPos: { frame: 2, pack: 3 }, items: {} };
+    const worse: TrialResult = { overL: 0, spillIds: [], backL: 11.4, backKg: 2.8, outOfReach: 0, kgByPos: { frame: 0.78, seat: 1.42, pack: 2.8 }, items: {} };
+    expect(bothScore(base, worse)).toBeGreaterThan(2);
+    const i = input({ bags: [bag(1, 'frame', 3, { shape: 2 }), bag(2, 'pack', 20)], nextUid: 3, style: 'bags', goal: 'both',
+      usable: (b: BagIn) => ({ ok: b.pos === 'seat' && b.L === 10, reason: null }),
+      trial: (bags) => (bags.some((b) => b.pos === 'seat') ? worse : base) });
+    const a = advise(i);
+    expect(a.kind).toBe('cannot-reduce');
+    // Get the backpack off alone still takes it: 0.6 L off the back is its goal
+    expect(advise({ ...i, goal: 'backpack' }).kind).toBe('suggestions');
+  });
+
+  test('[GA-BIGGER] M3: under Bags first, when nothing helps the search has already tried every pannier, so no bigger change is offered', () => {
+    const usable = (b: BagIn) => ({ ok: (b.pos === 'frame' && b.L === 3) || b.pos === 'rack', reason: null });
+    // a 60 L item nothing on this bike can take (a pair of the largest panniers holds 50 L)
+    const i = input({ bags: [bag(1, 'pack', 4)], nextUid: 2, usable, style: 'bags-first', goal: 'handling', trial: packer([{ id: 'huge', L: 60, kg: 5 }]) });
+    const a = advise(i);
+    expect(a.kind).toBe('nothing-helps');
+    expect(biggerOffered(i, a)).toBe(false);
+    // under Bikepacking bags only the panniers were never tried: offered
+    const b = { ...i, style: 'bags' as const };
+    expect(biggerOffered(b, advise(b))).toBe(true);
+  });
+});

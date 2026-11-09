@@ -923,7 +923,14 @@ test('[GA-BOTH] both goals ticked are one goal, both: the search runs on it, bot
   for(const v of ['handling','backpack'])assert.ok(new RegExp(`<input type="checkbox" name="advGoal" value="${v}" checked>`).test(steps),v+' ticked');
   assert.equal(p.json('ADVISOR.answer.kind'),'suggestions');
   const text=textOf(view(p).answer);
-  assert.ok(text.includes('With both goals, each suggestion is ranked by one score: how much better the handling gets plus how much comes off your back, each as a share of what you have now, counted equally.'),'how they are ranked');
+  // R2 carries nothing on the back: both read as Better handling, and the line says so, not "how much comes off your back" (review of PR 81, M2)
+  assert.ok(text.includes('With both goals and nothing on your back now, the suggestions are ranked as for Better handling.'),'how they are ranked, with an empty back');
+  assert.ok(!text.includes('comes off your back'),'no word of the back when nothing is on it');
+  // with a backpack in the plan: the one combined score
+  const q=page({setup:BAGS,bike:FULL});
+  await ask(q,{style:'bags',goal:'both'});
+  assert.equal(q.json('ADVISOR.answer.kind'),'suggestions');
+  assert.ok(textOf(view(q).answer).includes('With both goals, each suggestion is ranked by one score: how much better the handling gets plus how much comes off your back, each as a share of what you have now, counted equally.'),'how they are ranked');
   // one goal again: the line goes
   await ask(p,{goal:'handling'});
   assert.ok(!textOf(view(p).answer).includes('With both goals'),'one goal: no line');
@@ -999,6 +1006,25 @@ test('[GA-RETURN] after Try in Bag planner, Back to the Gear advisor brings its 
   assert.equal(p.json('ADVISOR.answer'),null);
   assert.equal(p.json('ADVISOR.style'),'bags-first','the default setup again');
   assert.ok(/Choose all three steps/.test(textOf(view(p).answer)));
+});
+
+test('[GA-RETURN] the plan changed during the trial (review of PR 81, I1): 2 nights made 6, then Remove, then back: the same answers searched again, with the line; during the trial the answer kept says the plan changed',async()=>{
+  const p=saved();
+  assert.equal(p.json('S.nights'),2);
+  await ask(p,{style:'bags-first',goal:'handling'});
+  p.run('ADVISOR.answer.mark=1');
+  p.run(`startTrial(${cards}[0])`);
+  p.run('S.nights=6');
+  // back during the trial: the answer as it was, and a line that the plan has changed since
+  p.run('returnToAdvisor()');
+  assert.equal(p.json('ADVISOR.answer.mark'),1,'kept while the trial is on');
+  assert.ok(textOf(view(p).answer).includes('Your plan changed since these suggestions: keep or remove the bag you are trying, and the Gear advisor looks again.'),'the line during the trial');
+  p.run('closeAdvisor();removeTrial()');
+  assert.equal(p.json('S.nights'),6,'Remove keeps the rider\'s other changes');
+  p.run('returnToAdvisor()');
+  await p.run('ADVISOR_DONE');
+  assert.equal(p.json('ADVISOR.answer && ADVISOR.answer.mark'),null,'searched again');
+  assert.ok(textOf(view(p).answer).includes('Your plan changed since, so the Gear advisor looked again with your answers.'),'and it says so');
 });
 
 test('[GA-BIGGER] nothing helps within Bikepacking bags only: "A bigger change" is offered, naming the setup choice, with no pannier in the words; on a tap it shows a rack and panniers, says what it overrides, and Try in Bag planner works on it',async()=>{

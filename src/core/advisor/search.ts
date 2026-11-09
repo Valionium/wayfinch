@@ -62,11 +62,11 @@ export function* adviseSteps(given: AdvisorInput): Generator<number, AdvisorAnsw
   const tried: Suggestion[] = [];
   const good: Suggestion[] = [];
   // A candidate counts when it is valid and, unless the rider's things overflow now (then any full fix counts), gains enough (decision 6).
-  // Both goals (D): a gain on either counts.
+  // Both goals (D): a gain on either counts, with the combined score below the plan's own (review of PR 81, M1).
   const gains = (s: Suggestion) => baseOver || (input.goal === 'handling'
     ? baseScore - s.score >= MIN_GAIN_SCORE - EPS
     : input.goal === 'backpack' ? base.backL - s.result.backL >= MIN_GAIN_BACK_L - EPS
-      : baseScore - s.score >= MIN_GAIN_SCORE - EPS || base.backL - s.result.backL >= MIN_GAIN_BACK_L - EPS);
+      : betterThan('both', base, base, s.result));
 
   let stopped = false;
   // a hand-back after every SLICE trials, or sooner when the page's clock asks for it (review of PR 61, I4)
@@ -231,7 +231,8 @@ function rangeOf(s: Suggestion, same: Suggestion[]): [number, number] {
 export function biggerOffered(given: AdvisorInput, answer?: AdvisorAnswer): boolean {
   if (given.style === 'panniers' || !panniersAllowed({ ...planAsStyled(given), style: 'panniers' })) return false;
   if (!answer) return true;
-  if (answer.kind === 'nothing-helps') return true;
+  // Bags first's second round has already tried every pannier where nothing helps: a bigger change could find nothing (review of PR 81, M3)
+  if (answer.kind === 'nothing-helps') return given.style === 'bags';
   if (answer.kind !== 'suggestions' || answer.ahead || !answer.items[0]) return false;
   return given.goal !== 'backpack' || answer.items[0].result.backL > NOTHING_ON_BACK_L;
 }

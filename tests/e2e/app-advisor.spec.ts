@@ -484,7 +484,8 @@ test('[GA-BOTH] in the browser: both goals ticked together, the answer says how 
   await box.locator('label.adv-choice', { hasText: 'Get the backpack off' }).click();
   await expect(box.getByRole('checkbox', { name: 'Better handling' })).toBeChecked();
   await expect(box.getByRole('checkbox', { name: 'Get the backpack off' })).toBeChecked();
-  await expect(page.locator('#advisorAnswer')).toContainText('With both goals, each suggestion is ranked by one score', { timeout: 30_000 });
+  // the gravel plan carries nothing on the back: both read as Better handling, and the line says so (review of PR 81, M2)
+  await expect(page.locator('#advisorAnswer')).toContainText('With both goals and nothing on your back now, the suggestions are ranked as for Better handling.', { timeout: 30_000 });
   expect(await page.evaluate('ADVISOR.input.goal')).toBe('both');
   await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
   await expect.poll(() => page.evaluate('ADVISOR.goal')).toBe('backpack');
