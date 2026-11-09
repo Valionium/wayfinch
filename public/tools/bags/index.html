@@ -403,8 +403,16 @@ button.go.small{font-size:15px;padding:9px 16px;flex:0 0 auto}
 .bk-far{opacity:.62}
 .bagg.ghost .bk-detail{display:none}
 /* the weight map, under the rig once the kit is chosen */
-.wm-show,.wm-diff{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--muted-dim);border-radius:8px;padding:8px 12px;min-height:44px;margin-top:10px;cursor:pointer}
-.wm-show:focus-visible,.wm-diff:focus-visible{outline:2px solid var(--blaze);outline-offset:2px}
+.wm-show,.wm-diff,.wm-ideal button{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--muted-dim);border-radius:8px;padding:8px 12px;min-height:44px;margin-top:10px;cursor:pointer}
+.wm-show:focus-visible,.wm-diff:focus-visible,.wm-ideal button:focus-visible{outline:2px solid var(--blaze);outline-offset:2px}
+/* the switches sit above the maps, so nothing they change ever moves them (the owner's finding G, 8 Nov 2026) */
+.wm-ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:0 10px;margin-bottom:10px}
+.wm-ideal{display:inline-flex}
+.wm-ideal button{margin-right:-1px}
+.wm-ideal button:first-child{border-radius:8px 0 0 8px}
+.wm-ideal button:last-child{border-radius:0 8px 8px 0}
+.wm-ideal button[aria-pressed="true"]{background:var(--panel-hi);border-color:var(--ink);font-weight:600}
+.wm-same{display:block;margin-top:2px}
 .rig-wm{margin-top:10px}
 .wm-maps{display:grid;gap:10px;grid-template-columns:1fr}
 @media (min-width:700px){
@@ -8514,12 +8522,15 @@ function writeLoadSummary(always = false){
 // The rig's bike (spec 7.4, "Bags and anchors"): drawn by bike.js from the plan's bike and bags, without the bags themselves.
 // The page draws the bags, tags and tap targets from the anchors, where the bike says they go. Which mounts exist is bikeFit's,
 // the one frame-fit rule the plan uses, so a spot is offered exactly where a bag can go.
-function rigArt(){
+// `neutral`: the same bike without its colour or paint, for the weight maps (the owner's finding G, 8 Nov 2026): its shape, bars and
+// e-bike kept, its own ids, so it never clashes with the rig's.
+function rigArt(neutral = false){
   const B = bikeModule(); if(!B) return RIG_FALLBACK;
-  const fit = bikeFit(S.bikeProfile), view = planBagView(), bike = B.normaliseBike(S.bikeProfile);
+  const fit = bikeFit(S.bikeProfile), view = planBagView(), own = B.normaliseBike(S.bikeProfile);
+  const bike = neutral && own && own.look ? { ...own, look:{ ...own.look, colour:null, paint:null } } : own;
   const spec = { ...B.resolveBikeSpec(bike, view),
     mounts:{ st:!!fit.cages.st, dt:!!fit.cages.dt, un:!!fit.cages.un, top:!!(fit.topMounts.front || fit.topMounts.rear), frame:!fit.frameBag.none } };
-  return B.bikeArt(spec, null, { theme:bikeTheme(), idPrefix:'rig' }, bike && bike.look && bike.look.paint || null);
+  return B.bikeArt(spec, null, { theme:bikeTheme(), idPrefix:neutral ? 'wm' : 'rig' }, !neutral && bike && bike.look && bike.look.paint || null);
 }
 function rigAnchors(){ const r = rigArt(); return r ? r.anchors : null; }
 
@@ -8701,7 +8712,7 @@ function frameShapeGlyph(b){
 
 /* ---- The weight map (design of 8 Nov 2026): /tools/bags/weightmap.js (window.WayfinchWeightMap), loaded on the first press of Show
    weight map, never before. A view of the plan, not data: nothing of it is saved. It reads each bag where the rig draws it. ---- */
-const WEIGHT_MAP = { on:false, diff:false, drawn:'' };
+const WEIGHT_MAP = { on:false, diff:false, drawn:'', which:null };   // which: the ideal the rider switched to, null for the plan's
 let WEIGHT_MAP_SCRIPT = null, RIG_OUTLINES = {};
 function loadWeightMap(){
   if(window.WayfinchWeightMap) return Promise.resolve(window.WayfinchWeightMap);
@@ -8713,21 +8724,90 @@ function loadWeightMap(){
   });
   return WEIGHT_MAP_SCRIPT;
 }
-// Each packed bag, bottle and the rack deck's load with its kilos and its outline as drawn; the ideal's fixed profile needs to know
-// whether a rack is fitted (panniers or the rack deck in the plan), a frame bag fits and the top tube takes a bag.
+// The ideal (the owner's finding G, 8 Nov 2026): the rider's own things in the rider's own bags, in the best arrangement the planner
+// allows: advisor.js's balancing (WM-BALANCE) over this page's own packing, each trial a hand placement more on planWith's copies, so
+// the frozen rules are only ever called and nothing of the plan changes. With panniers and without, the one matching the plan first.
+const IDEAL_PANNIER_L = 20;
+let IDEAL_CACHE = { key:null, value:null };
+const idealFirst = () => S.bags.some(b => b.pos === 'rack') || hasDeck('rack') ? 'with' : 'without';
+// The ideal's bags: the plan's own; with panniers on a plan that has none, a pair of 20 L panniers added (not on a bike set to no rack
+// mounts, unless the plan has a rack); without panniers, the plan's taken away.
+function idealSetup(which){
+  const has = S.bags.some(b => b.pos === 'rack');
+  if(which === 'with' && !has){
+    if(advisorNoMounts() && !hasDeck('rack')) return { why:'mounts' };
+    return { kind:'added', bags:[...S.bags, { uid:S.nextUid, pos:'rack', L:IDEAL_PANNIER_L, pair:true }] };
+  }
+  if(which === 'without' && has) return { kind:'removed', bags:S.bags.filter(b => b.pos !== 'rack') };
+  return { kind:'own', bags:S.bags };
+}
+// A plan as the balancing reads it, while the trial's inputs are in place: each item placed whole in one bag (food, which fills the
+// gaps, and bottles stay as the planner has them), the bags in use with their free litres, and the plan's kilos per bag for the map.
+function balancePacking(plan){
+  const pieces = [], rooms = [];
+  plan.slots.forEach(s => {
+    if(isBottle(s.pos)) return;
+    rooms.push({ key:s.key, pos:s.pos, freeL:s.left });
+    const by = new Map();
+    s.items.forEach(k => { const kit = kitById(k.id); if(kit && kit.divisible) return;
+      const v = by.get(k.id) || { kg:0, L:0 }; v.kg += placedKg(k); v.L += k.vol; by.set(k.id, v); });
+    by.forEach((v, id) => { if((plan.items[id] || []).length === 1) pieces.push({ id, kg:+v.kg.toFixed(3), L:+v.L.toFixed(2), unit:s.key, pos:s.pos }); });
+  });
+  return { result:advisorResult(plan), pieces, rooms, state:{ v:1, basis:plan.basis, inUse:plan.inUse, items:plan.items },
+    slots:plan.slots.map(s => ({ key:s.key, pos:s.pos, kg:weightIn(s) })), spill:plan.spill.map(k => k.id), overL:plan.summary.overL };
+}
+function idealTrial(bags, pins, placements){
+  return planWith({ bags:bags.map(({ hand, ...b }) => ({ ...b })), decks:{ ...S.decks }, pinned:{ ...S.pinned, ...pins }, placements }, balancePacking);
+}
+// Where a bag of the ideal is drawn: as the rig draws it, or, for a bag the rig does not show (the panniers added), where it would.
+function idealOutline(key, bags){
+  if(RIG_OUTLINES[key]) return RIG_OUTLINES[key].outline;
+  const [uid, idx] = String(key).split('-'), b = bags.find(x => String(x.uid) === uid); if(!b) return null;
+  const n = bags.filter(x => x.pos === b.pos).flatMap(physical).length;
+  let L = layout(b.pos, +idx, n, frameShapeIdx(bags.find(x => x.pos === 'frame')), b.slot, rigAnchors()); if(!L) return null;
+  if(+idx > 0 && !slotsFor(b.pos)){ const o = pairOffset(b.pos); L = shiftShape(L, o[0], o[1]); }
+  const s = bagShapeOf(b.pos, L, +b.L, b.slot);
+  return s ? s.outline : null;
+}
+function idealFor(which){
+  const setup = idealSetup(which);
+  if(setup.why) return { why:setup.why };
+  const start = idealTrial(setup.bags, {}, setup.kind === 'own' ? S.placements : null);
+  if(setup.kind === 'removed'){
+    const mine = currentPlan(), spilled = new Set(mine.spill.map(k => k.id));
+    if(start.overL > mine.summary.overL + 0.005 || start.spill.some(id => !spilled.has(id))) return { why:'room' };
+  }
+  const out = window.WayfinchAdvisor.balance(start, (pins, from) => idealTrial(setup.bags, pins, from.state), { fixed:Object.keys(S.pinned || {}) });
+  const items = out.packing.slots.filter(s => s.kg > 0).map(s => ({ pos:s.pos, kg:s.kg, outline:idealOutline(s.key, setup.bags) }))
+    .filter(i => i.outline && i.outline.length >= 3);
+  return { kind:setup.kind, items, same:setup.kind === 'own' && !out.moves.length, balanced:out };
+}
+// Worked out again only when the plan, its placements or the choice changed.
+function weightMapIdeal(which){
+  const key = JSON.stringify([which, planSignature(), S.placements, S.nextUid]);
+  if(IDEAL_CACHE.key !== key) IDEAL_CACHE = { key, value:idealFor(which) };
+  return IDEAL_CACHE.value;
+}
+// The kit on the rack deck, where the deck is drawn.
+function deckMapItem(a){
+  const kg = deckClaims().reduce((t, k) => t + itemKg(k), 0), d = a.rackTop;
+  return kg > 0 ? [{ pos:'deck', kg, outline:[[d.x, d.y], [d.x + d.w, d.y], [d.x + d.w, d.y + d.h], [d.x, d.y + d.h]] }] : [];
+}
+// Each packed bag, bottle and the rack deck's load with its kilos and its outline as drawn; the ideal for the switch's choice; the bike
+// without its colour (WM-NEUTRAL). Needs bike.js and advisor.js.
 function weightMapInput(){
-  const B = bikeModule(), a = rigAnchors(); if(!B || !B.bagShape || !a) return null;
-  const items = [], fit = bikeFit(S.bikeProfile);
+  const B = bikeModule(), a = rigAnchors(); if(!B || !B.bagShape || !a || !window.WayfinchAdvisor) return null;
+  const items = [];
   currentPlan().slots.forEach(s => { const o = RIG_OUTLINES[s.key], kg = (s.items || []).reduce((t, k) => t + placedKg(k), 0);
     if(o && kg > 0) items.push({ pos:o.pos, kg, outline:o.outline }); });
-  const deck = deckClaims().reduce((t, k) => t + itemKg(k), 0), d = a.rackTop;
-  if(deck > 0) items.push({ pos:'deck', kg:deck, outline:[[d.x, d.y], [d.x + d.w, d.y], [d.x + d.w, d.y + d.h], [d.x, d.y + d.h]] });
-  const art = rigArt();
-  return { items, anchors:a, shape:B.bagShape, pairOffset:B.PAIR_OFFSET, diff:WEIGHT_MAP.diff,
-    // panniers in the ideal when a rack is fitted or the bike has pannier mounts (the coordinator's ruling of 8 Nov, review of PR 71, I1)
-    ideal:{ rack:S.bags.some(b => b.pos === 'rack') || hasDeck('rack') || !!S.bikeProfile && S.bikeProfile.rackMounts === 'yes', frame:!fit.frameBag.none, top:!!(fit.topMounts.front || fit.topMounts.rear) },
+  items.push(...deckMapItem(a));
+  const which = WEIGHT_MAP.which || idealFirst(), found = weightMapIdeal(which);
+  const ideal = found.why ? { why:found.why } : { kind:found.kind, items:[...found.items, ...deckMapItem(a)], same:found.same };
+  const art = rigArt(true);
+  return { items, scale:a.scale, ideal, which, diff:WEIGHT_MAP.diff,
     bike:art ? art.svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '') : '',
-    onDiff:on => { WEIGHT_MAP.diff = on; drawWeightMap(); } };
+    onDiff:on => { WEIGHT_MAP.diff = on; drawWeightMap(); },
+    onIdeal:w => { WEIGHT_MAP.which = w; drawWeightMap(); } };
 }
 function drawWeightMap(){
   const button = $('rigWeightMap'), box = $('weightMap'); if(!button || !box) return;
@@ -8738,13 +8818,15 @@ function drawWeightMap(){
   button.onclick = () => { WEIGHT_MAP.on = !WEIGHT_MAP.on; WEIGHT_MAP.drawn = ''; drawWeightMap(); };
   box.hidden = !on;
   if(!on) return;
-  const input = weightMapInput(); if(!input) return;
-  // drawn again only when the plan, the theme or the difference changed
-  const key = JSON.stringify([input.items, input.ideal, input.diff, bikeTheme(), input.bike]);
-  if(key === WEIGHT_MAP.drawn) return;
-  WEIGHT_MAP.drawn = key;
-  loadWeightMap().then(M => { if(WEIGHT_MAP.on && WEIGHT_MAP.drawn === key) M.render(box, input); })
-    .catch(() => { WEIGHT_MAP.drawn = ''; box.textContent = 'The weight map could not be loaded. Check the connection and press Show weight map again.'; });
+  Promise.all([loadWeightMap(), loadAdvisor()]).then(([M]) => {
+    if(!WEIGHT_MAP.on) return;
+    const input = weightMapInput(); if(!input) return;
+    // drawn again only when the plan, the theme, the ideal or the difference changed
+    const key = JSON.stringify([input.items, input.which, IDEAL_CACHE.key, input.diff, bikeTheme(), input.bike]);
+    if(key === WEIGHT_MAP.drawn) return;
+    WEIGHT_MAP.drawn = key;
+    M.render(box, input);
+  }).catch(() => { WEIGHT_MAP.drawn = ''; box.textContent = 'The weight map could not be loaded. Check the connection and press Show weight map again.'; });
 }
 
 // The bike at the back of the rig, redrawn on its own when only the look or the theme changed.

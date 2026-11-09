@@ -271,21 +271,90 @@ test('[WM-PAGE] the weight map reads the plan as the rig draws it: each packed b
     assert.equal(nodes.get('weightMap').hidden,true,`${set}: off by default`);
     const got=json(`(()=>{const i=weightMapInput();const A=currentPlan();
       const packed=A.slots.reduce((t,s)=>t+(s.items||[]).reduce((u,k)=>u+placedKg(k),0),0)+deckClaims().reduce((t,k)=>t+itemKg(k),0);
-      return {packed,items:i.items.map(x=>({pos:x.pos,kg:x.kg,n:x.outline.length})),ideal:i.ideal,shape:typeof i.shape};})()`);
+      return {packed,items:i.items.map(x=>({pos:x.pos,kg:x.kg,n:x.outline.length})),which:i.which,scale:i.scale};})()`);
     const kg=got.items.reduce((t,x)=>t+x.kg,0);
     assert.ok(Math.abs(kg-got.packed)<1e-6,`${set}: ${kg} kg on the map, ${got.packed} kg packed`);
     for(const x of got.items)assert.ok(x.n>=3&&x.kg>0,`${set}: ${x.pos} has an outline and kilos`);
-    assert.equal(got.shape,'function');
-    if(set==='touring'){assert.equal(got.ideal.rack,true,'a plan with panniers has a rack');assert.ok(got.items.length>=3,'the packed bags are on the map');}
+    assert.ok(got.scale>0);
+    if(set==='touring')assert.ok(got.items.length>=3,'the packed bags are on the map');
   }
-  // the ideal has panniers when a rack is fitted or the bike has pannier mounts (coordinator's ruling, 8 Nov): a seat-pack rider
-  // whose bike says Yes is compared with panniers; with No or Not sure, and no rack in the plan, the ideal has none
-  for(const [mounts,want] of [['yes',true],['no',false],[undefined,false]]){
-    rig({...bike,...(mounts?{rackMounts:mounts}:{})},SETS.bikepacking,3,{});
-    assert.equal(json('weightMapInput().ideal.rack'),want,`rack mounts ${mounts}`);
-  }
+  // the coordinator's rack-mounts rule for the one ideal (review of PR 71, I1) is replaced by the owner's two ideals (WM-IDEAL below)
+});
+
+// The owner's finding G (8 Nov 2026): the ideal is the rider's own setup, not a fixed profile; with panniers and without, switchable.
+const IDEAL=`(()=>{const i=weightMapInput();const kg=l=>l.reduce((t,x)=>t+x.kg,0);const w=l=>l.reduce((t,x)=>t+x.kg*(window.WayfinchAdvisor.WEIGHTS[x.pos]||1),0);
+  const d=i.ideal;return {which:i.which,why:d.why||null,kind:d.kind||null,same:!!d.same,yours:kg(i.items),ideal:d.items?kg(d.items):null,
+  wy:w(i.items),wi:d.items?w(d.items):null,racks:d.items?d.items.filter(x=>x.pos==='rack').length:null,
+  outlines:d.items?d.items.every(x=>x.outline.length>=3):null,back:d.items?kg(d.items.filter(x=>x.pos==='pack')):null,yoursBack:kg(i.items.filter(x=>x.pos==='pack'))};})()`;
+const ideal=which=>{run(`WEIGHT_MAP.which=${JSON.stringify(which)}`);return json(IDEAL);};
+test("[WM-IDEAL] the page's ideal is the rider's own things and kilos in the rider's own bags, balanced: with panniers first when the plan uses a rack, else without; the other a press away",()=>{
+  const bike=bikeOf('diamond-sloping','M','drop','47-584');
+  const same=(g,name)=>{
+    assert.ok(Math.abs(g.ideal-g.yours)<0.01,`${name}: the same kilos (${g.ideal} and ${g.yours})`);
+    assert.ok(g.wi<=g.wy+1e-6,`${name}: never worse than yours by the handling weights (${g.wi} and ${g.wy})`);
+    assert.ok(g.back<=g.yoursBack+1e-6,`${name}: never more on the back`);
+    assert.equal(g.outlines,true,`${name}: every bag drawn`);
+  };
+  // panniers in the plan: with panniers first, the plan's own bags
+  rig(bike,SETS.touring,3,{rack:true});
+  let g=ideal(null);
+  assert.deepEqual([g.which,g.kind],['with','own']);
+  same(g,'touring with');
+  assert.equal(g.racks,2,'both panniers drawn');
+  g=ideal('without');
+  assert.equal(g.which,'without');
+  if(g.why)assert.equal(g.why,'room','touring without: the other bags cannot hold everything');
+  else{assert.equal(g.kind,'removed');assert.equal(g.racks,0);same(g,'touring without');}
+  // a rack deck alone counts as a rack in the plan
+  rig(bike,SETS.singles.filter(b=>b.pos!=='rack'),3,{rack:true});
+  assert.equal(ideal(null).which,'with');
+  // no panniers: without first, the plan's own bags; with panniers adds a pair of 20 L panniers
+  rig(bike,SETS.bikepacking,3,{});
+  g=ideal(null);
+  assert.deepEqual([g.which,g.kind],['without','own']);
+  same(g,'bikepacking without');
+  g=ideal('with');
+  assert.deepEqual([g.which,g.kind],['with','added']);
+  same(g,'bikepacking with');
+  if(g.racks!==null)assert.ok(g.racks===0||g.racks===2,'the added pair is drawn as two');
+  assert.equal(json("S.bags.some(b=>b.pos==='rack')"),false,'the plan itself never changes');
+  // a bike set to no rack mounts, with no rack in the plan: no ideal with panniers, and why
+  rig({...bike,rackMounts:'no'},SETS.bikepacking,3,{});
+  assert.equal(ideal('with').why,'mounts');
+  assert.equal(ideal('without').kind,'own');
   rig({...bike,rackMounts:'no'},SETS.touring,3,{rack:true});
-  assert.equal(json('weightMapInput().ideal.rack'),true,'a fitted rack counts whatever the bike says');
+  assert.equal(ideal('with').kind,'own','a plan with a rack keeps it whatever the bike says');
+  run('WEIGHT_MAP.which=null');
+});
+
+test('[WM-IDEAL] the balancing moves things, and never changes the plan; a hand placement stays where the rider put it; full bags and a backpack: already the best, said so',()=>{
+  const bike=bikeOf('diamond-sloping','M','drop','47-584');
+  rig(bike,SETS.bikepacking,3,{});
+  const before=run('JSON.stringify([S.bags,S.pinned,S.placements,S.kit])');
+  const moved=json(`(()=>{IDEAL_CACHE={key:null,value:null};return weightMapIdeal('without').balanced.moves;})()`);
+  assert.ok(moved.length>0,'something moves to a lighter place');
+  assert.equal(run('JSON.stringify([S.bags,S.pinned,S.placements,S.kit])'),before,'the plan is as it was');
+  // pinned where it is, the first thing that moved stays there
+  run(`S.pinned=${JSON.stringify({[moved[0].id]:moved[0].from})};IDEAL_CACHE={key:null,value:null}`);
+  const unit=json(`weightMapIdeal('without').balanced.packing.pieces.find(p=>p.id===${JSON.stringify(moved[0].id)}).unit`);
+  assert.equal(unit,moved[0].from,'a hand placement never moves');
+  run('S.pinned={}');
+  // small bike bags, full, and a backpack: nothing fits anywhere lighter, so the ideal is the plan, and it says so
+  rig(bike,[{uid:1,pos:'seat',L:9},{uid:2,pos:'bar',L:9},{uid:3,pos:'frame',L:6},{uid:4,pos:'pack',L:30}],3,{});
+  const g=ideal(null);
+  assert.deepEqual([g.kind,g.same],['own',true]);
+  assert.ok(Math.abs(g.wi-g.wy)<1e-6&&Math.abs(g.back-g.yoursBack)<1e-6);
+  run('WEIGHT_MAP.which=null');
+});
+
+test("[WM-NEUTRAL] the bike in the weight maps has no frame colour or paint, and the same shape as the rig's",()=>{
+  const bike={...bikeOf('diamond-sloping','M','drop','47-584'),look:{bars:'drop',colour:'#c62f2a',ebike:true}};
+  rig(bike,SETS.bikepacking,3,{});
+  const r=json(`(()=>{const i=weightMapInput();return {map:i.bike,rig:rigArt().svg,same:JSON.stringify(rigArt(true).anchors)===JSON.stringify(rigArt().anchors)};})()`);
+  assert.ok(r.rig.includes('#c62f2a'),'the rig is red');
+  assert.ok(!r.map.includes('#c62f2a'),"the maps' bike is not");
+  assert.ok(r.map.includes('bk-'),'it is the bike drawing');
+  assert.equal(r.same,true,'the same shape and anchors');
 });
 
 // The owner's finding G (8 Nov 2026): the handlebar roll's straps stood in the air beside the roll.
