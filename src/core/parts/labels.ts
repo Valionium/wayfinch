@@ -213,20 +213,29 @@ function candidates(g: Group, groups: readonly Group[], width: number, areaH: nu
   return out.sort((a, b) => a.cost - b.cost);
 }
 
+const nearSegment = (q: Pt, a: Pt, b: Pt): number => {
+  const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+  const t = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+  return Math.hypot(q[0] - a[0] - t * dx, q[1] - a[1] - t * dy);
+};
+
 function placeIn(order: readonly Group[], spots: ReadonlyMap<Group, Spot[]>): Placed[] {
   const placed: Placed[] = [];
+  const all = [...spots.keys()];
   for (const g of order) {
-    const free = (c: Spot, leaders: boolean): boolean => {
+    // 2: a leader crossing no other and passing no other part's point (so it never seems to point at that one); 1: crossing no other
+    const free = (c: Spot, level: number): boolean => {
+      if (level >= 2 && all.some((o) => o !== g && nearSegment(o.at, c.from, g.at) < 6)) return false;
       for (const p of placed) {
         if (overlaps(c.box, p.box, GAP)) return false;
         if (segmentHitsRect(c.from, g.at, p.box)) return false;
         if (segmentHitsRect(p.from, p.g.at, c.box)) return false;
-        if (leaders && segmentsCross(c.from, g.at, p.from, p.g.at)) return false;
+        if (level >= 1 && segmentsCross(c.from, g.at, p.from, p.g.at)) return false;
       }
       return true;
     };
-    const all = spots.get(g)!;
-    const pick = all.find((c) => free(c, true)) ?? all.find((c) => free(c, false));
+    const mine = spots.get(g)!;
+    const pick = mine.find((c) => free(c, 2)) ?? mine.find((c) => free(c, 1)) ?? mine.find((c) => free(c, 0));
     if (pick) placed.push({ g, box: pick.box, from: pick.from });
   }
   return placed;

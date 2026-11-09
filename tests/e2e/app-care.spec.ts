@@ -1,5 +1,6 @@
 // Bike care in a real browser (sub-project 12, group 1): opened from You with a bike chosen, a chosen bike deleted in another tab, and the
 // screen at phone and laptop size in both themes (the projects give the size and the theme), at 200% text, offline, by keyboard.
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { goOffline, loadApp, removeBuilds } from './helpers.ts';
@@ -355,7 +356,7 @@ test('[BC-STEPS-BACK] in a real browser the back gesture closes the step view in
 });
 
 // ---- The parts guide (care pictures design of 7 November 2026, section 4) ----
-test("[PG-SHEET-OPEN] a part's name opens its entry: a bottom sheet on a phone, a side panel when wide; the bike drawn with the part marked, its close-ups; no sideways scroll at 200% text; Escape and the back gesture close the sheet alone", async ({ page }) => {
+test("[PG-SHEET-OPEN] a part's name opens the bike view: a bottom sheet on a phone, a side panel when wide; the part marked on a typical bike of the rider's type, its entry and close-ups; no sideways scroll at 200% text; Escape and the back gesture close it alone", async ({ page }) => {
   const errors = errorsOf(page);
   app = await loadApp(page, { launch: true, path: '/#/tools/care' });
   await seed(page, [A], 'bike_a');
@@ -364,10 +365,11 @@ test("[PG-SHEET-OPEN] a part's name opens its entry: a bottom sheet on a phone, 
   await expect(page.locator('.care-steps-count')).toHaveText('Step 5 of 6');
   const link = page.locator('.care-step .care-part', { hasText: "brake's quick release" });
   await link.click();
-  const sheet = page.getByRole('dialog', { name: "The brake's quick release" });
+  const sheet = page.getByRole('dialog', { name: 'Where to find: Brake rubbing' });
   await expect(sheet).toBeVisible();
-  await expect(sheet.getByRole('heading', { name: "The brake's quick release" })).toBeFocused();
-  await expect(sheet.getByRole('img', { name: "The brake's quick release, marked on the bike" })).toBeVisible();
+  await expect(sheet.getByRole('heading', { name: 'Brake rubbing', level: 2 })).toBeFocused();
+  await expect(sheet.getByRole('heading', { name: "The brake's quick release", level: 3 })).toBeVisible();
+  await expect(sheet.getByRole('img', { name: /^A typical gravel bike, greyed out\. .* Marked: brake quick release\./ })).toBeVisible();
   await expect(sheet.locator('.care-pic [role="img"]')).toHaveCount(2);
   const box = (await sheet.boundingBox())!;
   const view = page.viewportSize()!;
@@ -375,28 +377,159 @@ test("[PG-SHEET-OPEN] a part's name opens its entry: a bottom sheet on a phone, 
     expect(Math.round(box.width)).toBe(view.width);
     expect(Math.abs(box.y + box.height - view.height)).toBeLessThan(2);
   } else {
-    expect(box.width).toBeLessThanOrEqual(441);
+    expect(box.width).toBeLessThanOrEqual(561);
     expect(Math.abs(box.x + box.width - view.width)).toBeLessThan(2);
   }
   for (const zoom of ['100%', '200%']) {
     await page.evaluate((z) => { document.documentElement.style.fontSize = z; }, zoom);
     expect(await page.evaluate(() => { const s = document.querySelector('dialog.part-sheet')!; return s.scrollWidth <= s.clientWidth + 1; }), zoom).toBe(true);
-    for (const b of await sheet.locator('.pg-swap, .care-steps-icon').all()) expect((await b.boundingBox())!.height, zoom).toBeGreaterThanOrEqual(44);
+    for (const b of await sheet.locator('.pg-swap, .care-steps-icon, .bv-part, .bv-zoom-btn').all()) expect((await b.boundingBox())!.height, zoom).toBeGreaterThanOrEqual(44);
   }
   await page.evaluate(() => { document.documentElement.style.fontSize = ''; });
   await page.keyboard.press('Escape');
   await expect(page.locator('dialog.part-sheet')).toHaveCount(0);
   await expect(page.getByRole('dialog', { name: 'Brake rubbing' })).toBeVisible();
   await expect(link).toBeFocused();
-  // the back gesture: the sheet goes, the step view stays at its step
+  // the back gesture: the view goes, the step view stays at its step
   await link.click();
   await expect(sheet).toBeVisible();
   await sheet.getByRole('button', { name: "The wheel's quick release" }).click();
-  // the dialog is named by the entry it shows now
-  await expect(page.getByRole('dialog', { name: "The wheel's quick release" }).getByRole('heading', { level: 2 })).toHaveText("The wheel's quick release");
+  await expect(sheet.getByRole('heading', { level: 3 })).toHaveText("The wheel's quick release");
   await page.goBack();
   await expect(page.locator('dialog.part-sheet')).toHaveCount(0);
   await expect(page.locator('.care-steps-count')).toHaveText('Step 5 of 6');
   await expect(page).toHaveURL(/#\/tools\/care$/);
+  expect(errors).toEqual([]);
+});
+
+/** The labels as the browser draws them: each text inside its pill, no two pills overlapping, every pill inside the drawing's box. */
+async function labelsDrawn(page: Page): Promise<{ id: string; text: DOMRect; pill: DOMRect }[]> {
+  return page.evaluate(() => [...document.querySelectorAll<SVGGElement>('dialog.part-sheet .bv-label')].map((g) => ({
+    id: g.dataset.part!,
+    text: g.querySelector('text')!.getBoundingClientRect().toJSON() as DOMRect,
+    pill: g.querySelector('.bv-pill')!.getBoundingClientRect().toJSON() as DOMRect,
+  })));
+}
+
+test('[BV-LABELS] in a real browser, on every roadside card at the project size and theme: every label\'s words fit its pill, no two labels overlap, nothing scrolls sideways; no automatic accessibility violations', async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [U], null);
+  await roadTab(page).click();
+  const ids = await page.locator('.care-road').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.id!));
+  expect(ids.length).toBeGreaterThan(8);
+  for (const id of ids) {
+    await card(page, id).locator('.care-open').click();
+    await expect(page.locator('dialog.care-steps')).toBeVisible();
+    const where = page.locator('.care-where');
+    if (await where.count() === 0) {
+      await page.keyboard.press('Escape');
+      await expect(page.locator('dialog.care-steps')).toHaveCount(0);
+      continue;
+    }
+    await where.click();
+    const sheet = page.locator('dialog.part-sheet');
+    await expect(sheet).toBeVisible();
+    await expect(sheet.locator('.bv-label').first()).toBeVisible();
+    const drawn = await labelsDrawn(page);
+    const svg = (await sheet.locator('.bv-svg').boundingBox())!;
+    for (const l of drawn) {
+      expect(l.text.left, `${id} ${l.id}`).toBeGreaterThanOrEqual(l.pill.left - 0.5);
+      expect(l.text.right, `${id} ${l.id}: words wider than the pill`).toBeLessThanOrEqual(l.pill.right + 0.5);
+      expect(l.pill.left, `${id} ${l.id}`).toBeGreaterThanOrEqual(svg.x - 0.5);
+      expect(l.pill.right, `${id} ${l.id}`).toBeLessThanOrEqual(svg.x + svg.width + 0.5);
+      for (const m of drawn) {
+        if (m === l) continue;
+        const apart = l.pill.right <= m.pill.left || m.pill.right <= l.pill.left || l.pill.bottom <= m.pill.top || m.pill.bottom <= l.pill.top;
+        expect(apart, `${id}: ${l.id} and ${m.id}`).toBe(true);
+      }
+    }
+    expect(await page.evaluate(() => { const s = document.querySelector('dialog.part-sheet')!; return s.scrollWidth <= s.clientWidth + 1; }), id).toBe(true);
+    if (id === 'brake-rub-disc') {
+      // one part tapped: the arrow and the pressed button
+      await sheet.getByRole('button', { name: 'Disc caliper', exact: true }).click();
+      await expect(sheet.locator('.bv-arrow')).toHaveCount(1);
+      const results = await new AxeBuilder({ page }).include('dialog.part-sheet').analyze();
+      expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join('; ')}`)).toEqual([]);
+    }
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('dialog.care-steps')).toHaveCount(0);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('[BV-BUTTON] by keyboard: "What is it, where is it?" opens the view, focus on its title; Tab reaches the zoom buttons and every part, Enter presses one; Escape gives the focus back to the button', async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [U], null);
+  await openSteps(page, 'chain-broken', 'Broken chain');
+  const where = page.locator('.care-where');
+  await expect(where).toContainText('What is it, where is it?');
+  await where.focus();
+  await page.keyboard.press('Enter');
+  const sheet = page.getByRole('dialog', { name: 'Where to find: Broken chain' });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole('heading', { level: 2 })).toBeFocused();
+  // the drawing opens zoomed in on the drive (the owner's answer 2); Whole bike, then Zoom in by keyboard
+  await expect(sheet.getByRole('img', { name: /Zoomed in\.$/ })).toBeVisible();
+  const reached: string[] = [];
+  for (let i = 0; i < 12; i += 1) {
+    await page.keyboard.press('Tab');
+    reached.push(await page.evaluate(() => (document.activeElement as HTMLElement).getAttribute('aria-label') ?? document.activeElement!.textContent ?? ''));
+  }
+  expect(reached).toEqual(expect.arrayContaining(['Zoom out', 'Whole bike', 'Quick link', 'Chain', 'Rear gears']));
+  await sheet.getByRole('button', { name: 'Whole bike' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(sheet.getByRole('img', { name: /greyed out\. Standing out: [^.]*\.$/ })).toBeVisible();
+  await sheet.getByRole('button', { name: 'Zoom in' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(sheet.getByRole('img', { name: /Zoomed in\.$/ })).toBeVisible();
+  await sheet.getByRole('button', { name: 'Quick link', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(sheet.getByRole('button', { name: 'Quick link', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(sheet.getByRole('heading', { name: 'Quick link', level: 3 })).toBeVisible();
+  // a tap on a label on the drawing does the same
+  await sheet.locator('.bv-label[data-part="chain"]').click();
+  await expect(sheet.getByRole('button', { name: 'Chain', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('dialog.part-sheet')).toHaveCount(0);
+  await expect(where).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
+test('[BV-ZOOM] a pinch (two pointers) and Ctrl with the wheel zoom the drawing; a drag moves a zoomed view; the page never scrolls sideways', async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [U], null);
+  await openSteps(page, 'brake-rub-disc', 'Disc brake rubbing');
+  await page.locator('.care-where').click();
+  const sheet = page.locator('dialog.part-sheet');
+  await expect(sheet).toBeVisible();
+  const canvas = sheet.locator('.bv-canvas');
+  await expect(canvas).not.toHaveClass(/bv-zoomed/);
+  const box = (await canvas.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -200);
+  await page.keyboard.up('Control');
+  await expect(canvas).toHaveClass(/bv-zoomed/);
+  const before = await sheet.locator('.bv-art').getAttribute('viewBox');
+  await canvas.dispatchEvent('pointerdown', { pointerId: 1, clientX: box.x + box.width / 2, clientY: box.y + box.height / 2, isPrimary: true });
+  await canvas.dispatchEvent('pointermove', { pointerId: 1, clientX: box.x + box.width / 2 - 40, clientY: box.y + box.height / 2, isPrimary: true });
+  await canvas.dispatchEvent('pointerup', { pointerId: 1 });
+  expect(await sheet.locator('.bv-art').getAttribute('viewBox')).not.toBe(before);
+  await sheet.getByRole('button', { name: 'Whole bike' }).click();
+  await expect(canvas).not.toHaveClass(/bv-zoomed/);
+  // two fingers moving apart
+  const c = [box.x + box.width / 2, box.y + box.height / 2];
+  await canvas.dispatchEvent('pointerdown', { pointerId: 1, clientX: c[0]! - 20, clientY: c[1], isPrimary: true });
+  await canvas.dispatchEvent('pointerdown', { pointerId: 2, clientX: c[0]! + 20, clientY: c[1] });
+  await canvas.dispatchEvent('pointermove', { pointerId: 2, clientX: c[0]! + 80, clientY: c[1] });
+  await canvas.dispatchEvent('pointerup', { pointerId: 1 });
+  await canvas.dispatchEvent('pointerup', { pointerId: 2 });
+  await expect(canvas).toHaveClass(/bv-zoomed/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
   expect(errors).toEqual([]);
 });

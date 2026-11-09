@@ -11,7 +11,7 @@ import type { Style } from '../bike/templates.ts';
 import { framePoints } from '../bike/templates.ts';
 import type { Conditions } from '../care/types.ts';
 import type { PartId } from './guide.ts';
-import { placeLabels } from './labels.ts';
+import { placeLabels, segmentsCross } from './labels.ts';
 import type { Layout, Pt } from './labels.ts';
 
 type Typical = { rim: number; mm: number; style: Style; bars: 'drop' | 'flat'; fork: 'rigid' | 'suspension' };
@@ -282,21 +282,32 @@ export function outlineOn(o: Outline, view: ViewBox, scale: number, inset = 0): 
 /** Where the drawing sits in the canvas (`inset` px from each side, `areaH` tall, `scale` px a unit) and its labels' places. */
 export type Placement = { layout: Layout; inset: number; areaH: number; scale: number };
 
+/** How many pairs of leaders cross: the fewer, the easier the drawing reads. */
+function crossings(layout: Layout): number {
+  const seen = layout.labels.filter((l, i, all) => all.findIndex((m) => m.to[0] === l.to[0] && m.to[1] === l.to[1]) === i);
+  let n = 0;
+  for (let i = 0; i < seen.length; i += 1) for (let j = i + 1; j < seen.length; j += 1) if (segmentsCross(seen[i]!.from, seen[i]!.to, seen[j]!.from, seen[j]!.to)) n += 1;
+  return n;
+}
+
 /**
  * The labels of the parts in view (`items`, at their points in drawing units, with their labels' widths), on a canvas `width` px wide.
- * The drawing takes the whole width; where a label then finds no place, the drawing is drawn a little smaller, leaving free space at its
- * sides, until every label has one.
+ * The drawing takes the whole width, or is drawn a little smaller to leave free space at its sides, as the owner's reference picture
+ * does: the smaller drawing only where it places a label the whole width cannot, or uncrosses leaders.
  */
 export function placeView(items: readonly { id: string; at: P; w: number }[], view: ViewBox, width: number, o: Outline): Placement {
-  let out: Placement | null = null;
+  let out: (Placement & { score: number }) | null = null;
   for (const share of [0, 0.07, 0.14, 0.21]) {
     const inset = Math.round(width * share);
     const scale = (width - 2 * inset) / view.w;
     const areaH = Math.round(view.h * scale);
     const at = (p: P): Pt => [r2((p[0] - view.x) * scale + inset), r2((p[1] - view.y) * scale)];
     const layout = placeLabels(items.map((i) => ({ id: i.id, at: at(i.at), w: i.w })), width, areaH, outlineOn(o, view, scale, inset));
-    out = { layout, inset, areaH, scale };
-    if (layout.labels.length === items.length) break;
+    // every label placed first, then fewer crossings; a smaller drawing must earn its place by two crossings fewer
+    const score = (items.length - layout.labels.length) * 1000 + crossings(layout) * 2 + share * 10;
+    if (!out || score < out.score) out = { layout, inset, areaH, scale, score };
+    if (out.score < 1) break;
   }
-  return out!;
+  const { layout, inset, areaH, scale } = out!;
+  return { layout, inset, areaH, scale };
 }

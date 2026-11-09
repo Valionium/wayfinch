@@ -4,6 +4,8 @@ dialog.part-sheet {
   box-sizing: border-box; position: fixed; inset: auto 0 0 0; width: 100%; max-width: none; max-height: 92vh; margin: 0; padding: 0 16px 16px;
   border: 0; border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; background: var(--panel); color: var(--ink); overflow-y: auto;
   overflow-x: hidden; overflow-wrap: break-word;
+  /* the drawing is laid out to the sheet's width: a scroll bar coming and going must not change it */
+  scrollbar-gutter: stable;
 }
 dialog.part-sheet::backdrop { background: var(--ground); opacity: 0.6; }
 @media (min-width: 720px) {
