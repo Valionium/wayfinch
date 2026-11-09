@@ -773,6 +773,59 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
     expect(own.json<boolean>(`kitSizeIsRiders(kitById('tubes'))`)).toBe(true);
   });
 
+  test('a bottle in the frame: the day ride\'s frame bag is the half shape that leaves room for it, never a bigger one over the bottle (owner, 9 Nov 2026)', async () => {
+    // "for the small planner, the frame bag should be fitted accordingly to the bottle"
+    for (const date of ['2026-11-15', '2026-07-20']) {
+      const p = await dayRide(date);
+      await p.page.run('receiveHandoff()');
+      expect(await p.page.run('planTripBags()')).toBe(true);
+      expect(p.json('S.bags.filter(b=>isBottle(b.pos)).map(b=>b.slot)'), date).toEqual(['dt']);
+      const frame = p.json<{ L: number; shape?: number } | null>(`S.bags.find(b=>b.pos==='frame') || null`);
+      expect(frame, date).not.toBeNull();
+      expect(p.json<number>(`frameShapeIdx(S.bags.find(b=>b.pos==='frame'))`), date).toBe(2);
+      expect(frame!.L, date).toBe(p.json<number>('frameShapeL(2)'));
+      expect(p.json<string[]>('gearBags().map(b=>b.pos)').sort(), date).toEqual(['frame', 'top']);
+      expect(p.json('currentPlan().spill.map(k=>k.id)'), date).toEqual([]);
+      // nothing needed to be left at home for these rides
+      expect(p.json('dayLeftAtHome()'), date).toEqual([]);
+      expect(p.json<boolean>('$("smallLeft").hidden'), date).toBe(true);
+      for (const id of ESSENTIALS) expect(p.json<boolean>(`carrying('${id}')`), `${date} ${id}`).toBe(true);
+    }
+    // a bike with only a seat-tube mount: the bottle goes there, and the frame bag is the half shape again
+    const st = await dayRide('2026-07-20');
+    st.page.run(`S.bikeProfile=normaliseBikeProfile({id:'b_st',name:'ST only',fit:{style:'diamond',bolts:{st:'yes',dt:'no',un:'no'}}});applyTripKitDefaults();`);
+    await st.page.run('receiveHandoff()');
+    await st.page.run('planTripBags()');
+    expect(st.json('S.bags.filter(b=>isBottle(b.pos)).map(b=>b.slot)')).toEqual(['st']);
+    expect(st.json<number>(`frameShapeIdx(S.bags.find(b=>b.pos==='frame'))`)).toBe(2);
+  });
+
+  test('when the day kit does not fit beside the bottle, the least essential things stay at home before any bag is added, and the small view says so in one line (owner, 9 Nov 2026)', async () => {
+    // the rider's own headphones make the kit a little too big for the top tube bag and the half frame bag
+    const p = await dayRide('2026-11-15');
+    p.page.run(`S.kit.buds=true;S.kitTouched.buds=true;`);
+    await p.page.run('receiveHandoff()');
+    const before = p.page.run('JSON.stringify(captureDraft())'), setups = p.page.run('JSON.stringify(SETUPS)');
+    expect(await p.page.run('planTripBags()')).toBe(true);
+    expect(p.json<string[]>('gearBags().map(b=>b.pos)')).not.toContain('seat');
+    expect(p.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+    expect(p.json('dayLeftAtHome()')).toEqual(['cap']);
+    expect(p.json<boolean>(`carrying('cap')`)).toBe(false);
+    expect(p.json<boolean>(`carrying('buds')`)).toBe(true);   // the rider's own choice stays
+    for (const id of ESSENTIALS) expect(p.json<boolean>(`carrying('${id}')`), id).toBe(true);
+    expect(p.json<boolean>('$("smallLeft").hidden')).toBe(false);
+    expect(String(p.page.nodes.get('smallLeft')!.textContent)).toBe('Left at home: cap or buff.');
+    // Undo gives the plan and the setups back exactly
+    expect(await p.page.run('undoTripBags()')).toBe(true);
+    expect(p.page.run('JSON.stringify(captureDraft())')).toBe(before);
+    expect(p.page.run('JSON.stringify(SETUPS)')).toBe(setups);
+    // the order: never water, ID, cash, phone, first aid, the repair kit, the rain jacket or snacks
+    const order = p.json<string[]>('DAY_LEAVE_ORDER.map(x=>x.id)');
+    expect(order[0]).toBe('cap');
+    for (const id of ['water', 'docs', 'cash', 'phone', 'firstaid', 'tool', 'tubes', 'pump', 'levers', 'link', 'chaintl', 'patch', 'plugs', 'rain', 'snacks'])
+      expect(order, id).not.toContain(id);
+  });
+
   test('a day ride carries one spare tube, not two, and the small view names it so; a trip with a night keeps two (owner, 9 Nov 2026)', async () => {
     const nov = await dayRide('2026-11-15');
     await nov.page.run('receiveHandoff()');
