@@ -18,9 +18,7 @@ import { NewerDataError, RefusedError } from '../../store/changed.ts';
 import { inExistingTx, inTx, openExisting } from '../../store/db.ts';
 import type { HandoffOutcome } from './handoff.ts';
 import type { RouteStop } from '../../core/screen/route-stops.ts';
-import type { BedChoice, DayBed } from '../../core/engines/day-beds.ts';
-import type { StopChange } from '../../data/day-stops.ts';
-import type { TripStops } from '../../core/types.ts';
+import type { DayBed } from '../../core/engines/day-beds.ts';
 import type { Place } from '../../core/places/types.ts';
 import { readInputs, SAVED_KM_META } from '../../store/inputs.ts';
 import { readPrepared, readStoredZones } from '../../store/prepared.ts';
@@ -87,9 +85,6 @@ export type TripServices = {
   stops: () => Promise<RouteStop[]>;
   /** A place to sleep near each day's end (TRIP-DAY-BEDS), from the same chunk. */
   dayBeds?: () => Promise<DayBed[]>;
-  /** Days that end where you can sleep (TRIP-DAY-STOPS): settle the stops, with the rider's change or Undo; the places to pick from. */
-  settleStops?: (change?: StopChange) => Promise<TripStops | null>;
-  stopChoices?: (day: number) => Promise<BedChoice[]>;
   /** Contract 2: the trip to the bag planner, which then opens. Absent where there is no bag planner to open. */
   handOff?: () => Promise<HandoffOutcome>;
 };
@@ -342,8 +337,6 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
 
     stops: () => import('./stops.ts').then((m) => m.readStops(now())),
     dayBeds: () => import('./stops.ts').then((m) => m.readDayBeds(now())),
-    settleStops: (change) => inTurn(() => import('../../data/day-stops.ts').then((m) => m.settleStops(now(), change))),
-    stopChoices: (day) => import('../../data/day-stops.ts').then((m) => m.stopChoices(now(), day)),
 
     prepare(onProgress, onNotice) {
       return prepareTrip({

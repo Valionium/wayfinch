@@ -6,6 +6,7 @@ import { windowKm } from '../../core/engines/day-beds.ts';
 import type { BedChoice, DayBed } from '../../core/engines/day-beds.ts';
 import { dayStopOf } from '../../core/route/day-stops.ts';
 import type { Route, Trip, TripStops } from '../../core/types.ts';
+import type { StopChange } from '../../data/day-stops.ts';
 import { showKm, W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
 import { BD } from '../../core/wording/en-beds.ts';
@@ -123,8 +124,16 @@ const focusChange = (day: number): void => {
   setTimeout(() => (document.querySelector(`[data-stop-change="${day}"]`) as HTMLButtonElement | null)?.focus(), 0);
 };
 
-export function RouteSummary({ snap, stops, beds, settle, choices }: {
-  snap: TripSnapshot; stops: TripServices['stops']; beds?: TripServices['dayBeds']; settle?: TripServices['settleStops']; choices?: TripServices['stopChoices'];
+/**
+ * Settling the stops and the places to pick, from their own chunk (TRIP-DAY-STOPS). The route summary is itself a chunk, so the
+ * first screen carries none of it.
+ */
+const settleStops = (change?: StopChange): Promise<TripStops | null> => import('../../data/day-stops.ts').then((m) => m.settleStops(new Date(), change));
+const stopChoices = (day: number): Promise<BedChoice[]> => import('../../data/day-stops.ts').then((m) => m.stopChoices(new Date(), day));
+
+export function RouteSummary({ snap, stops, beds, settle = settleStops, choices = stopChoices }: {
+  snap: TripSnapshot; stops: TripServices['stops']; beds?: TripServices['dayBeds'];
+  settle?: (change?: StopChange) => Promise<TripStops | null>; choices?: (day: number) => Promise<BedChoice[]>;
 }) {
   const { trip } = snap;
   // The stops come once Get ready offline has saved places: read again when the route, its days, its date, what was saved or the
@@ -210,7 +219,7 @@ export function RouteSummary({ snap, stops, beds, settle, choices }: {
                 <span class="muted trip-day-detail">{stage.detail}</span>
                 {stop?.below ? <span class="muted trip-day-detail" data-day-stop>{stop.below}</span> : null}
                 {bed ? <span class="muted trip-day-detail" data-day-bed>{bed}</span> : null}
-                {stop && settle ? (
+                {stop ? (
                   <span class="trip-stop-actions">
                     <button type="button" class="btn linky" data-stop-change={n} aria-expanded={open?.day === n ? 'true' : 'false'} aria-controls={`trip-stop-choices-${n}`}
                       aria-label={BD.appTripStopChangeLabel(n, held?.placeId ? held.name : null)} onClick={() => openChoices(n)}>{BD.appTripStopChange}</button>

@@ -1,7 +1,7 @@
 // Get ready offline (spec section 5): heights, places, hours, weather, baseline, save. Each step is reported on its own, and a
 // failed step never discards the others. Weather's requests come in as arguments; the grid, days and points are openmeteo.ts's
 // own, so a forecast asked for here is the very request Update weather sends.
-import { addDaysIso, formatHm, localIsoDate } from '../core/answers/time.ts';
+import { addDaysIso, localIsoDate } from '../core/answers/time.ts';
 import { modelsForRoute } from '../core/engines/weather-classes.ts';
 import { zoneLookupOf } from '../core/engines/tripday.ts';
 import { hoursWindowDates, ridingDaysOf } from '../core/hours/window.ts';
@@ -24,7 +24,6 @@ import { preparedStore, readBaselineYears, readForecastDate, readHeldHolidays, r
 import type { PreparedRecord, PreparedStore } from '../store/prepared.ts';
 import { readLocalSettings } from '../store/settings-local.ts';
 import { RouteGoneError, readTrip } from '../store/trip.ts';
-import { readWeatherState } from '../store/weather.ts';
 import { loadBoundaries } from './boundaries.ts';
 import { checkConnectivity } from './connectivity.ts';
 import { downloadTiles, isStorageFull, STORAGE_FULL } from './packs/download.ts';
@@ -345,8 +344,7 @@ async function weatherStep(deps: PrepareDeps, store: PreparedStore, online: bool
     if (!(await store.reserveWeather(route.id, now, WEATHER_GAP_MS))) {
       if (await readForecastDate()) return { step: 'weather', ok: true, note: W.appPrepWeatherRecent };
       // Asked minutes ago (a reload during its wait, say) and nothing saved: nothing is asked now, and it says when it can be.
-      const at = (await readWeatherState())?.lastAttemptAt;
-      return { step: 'weather', ok: false, note: at ? W.weatherSpaced(null, formatHm(new Date(at.getTime() + WEATHER_GAP_MS), startZoneOf(zones))) : W.appPrepWeatherFailed };
+      return { step: 'weather', ok: false, note: await (await import('./heights.ts')).spacedNote(startZoneOf(zones), WEATHER_GAP_MS) };
     }
     const runs = await runsFor(deps, route, zones);
     const today = localIsoDate(now, startZoneOf(zones));
@@ -448,16 +446,8 @@ export async function prepareTrip(deps: PrepareDeps, onProgress: (step: StepName
     begin('hours');
     reports.push(await hoursStep(store, trip, zones, deps.now(), (done, total) => onProgress('hours', done, total)));
     // With places and their hours saved, each day ends at a place to sleep near its planned end (owner, 9 Nov 2026), judged for its
-    // night with those hours (review of PR 101, I1), before the forecast and the archive are asked for its grid. A chunk of its own;
-    // its failure keeps the planned ends.
-    try {
-      await (await import('./day-stops.ts')).settleStops(deps.now(), undefined, { announce: false });
-      const settled = await store.readTrip();
-      if (!settled || settled.route.id !== trip.route.id) throw new RouteGoneError();
-      trip = settled;
-    } catch (e) {
-      if (routeGone(e)) throw e;
-    }
+    // night with those hours (review of PR 101, I1), before the forecast and the archive are asked for its grid (heights.ts).
+    trip = await (await import('./heights.ts')).settleDayStops(deps.now(), store, trip);
     begin('weather');
     reports.push(await weatherStep(deps, store, online, trip, zones, deps.now()));
     begin('baseline');

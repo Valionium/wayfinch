@@ -400,7 +400,7 @@ describe('Review of PR 101: the day lines and Change stop', () => {
     expect(host.querySelector('[data-stop-said]')!.textContent).toBe(BD.appTripStopChanged(1));
     expect(host.querySelector('[data-summary]')!.textContent).toContain(BD.appTripStopUndo);
     // Another window picks "No stop" for day 1: this window's Undo would bring back what that window replaced, so it goes.
-    await browserTripServices(() => NOW).settleStops!({ day: 1, to: null });
+    await (await import('../../../src/data/day-stops.ts')).settleStops(NOW, { day: 1, to: null });
     await until(() => !(dayLine().textContent ?? '').includes(' to '), "the other window's change");
     expect([...host.querySelectorAll('[data-summary] button')].some((b) => b.textContent === BD.appTripStopUndo)).toBe(false);
   }, 30_000);

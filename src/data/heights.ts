@@ -2,6 +2,9 @@
 // does not carry it. A sample of the route goes to the elevation service, at most MAX_HEIGHT_POINTS of them; what comes is kept
 // for the route, so Try again asks only for the rest (9 Nov 2026).
 import { formatHm } from '../core/answers/time.ts';
+import type { Trip } from '../core/types.ts';
+import { readWeatherState } from '../store/weather.ts';
+import { RouteGoneError } from '../store/trip.ts';
 import type { LatLng } from '../core/geo/haversine.ts';
 import type { RawPoint } from '../core/route/gpx.ts';
 import { buildRoute } from '../core/route/profile.ts';
@@ -97,4 +100,27 @@ async function lookedUpHeights(route: Route, deps: PrepareDeps, store: PreparedS
 export async function routeWithHeights(route: Route, deps: PrepareDeps, store: PreparedStore): Promise<Route | null> {
   const heights = await lookedUpHeights(route, deps, store);
   return heights ? buildRoute(rawOf(route, (i) => heights[i] ?? null), route.name, route.source) : null;
+}
+
+// ---- Prepare this route's other parts that only it needs, off the first screen ----
+
+/** Asked minutes ago and nothing saved: when it can try again (review of PR 98, I2); without a known ask, that it did not answer. */
+export async function spacedNote(zone: string, gapMs: number): Promise<string> {
+  const at = (await readWeatherState())?.lastAttemptAt;
+  return at ? W.weatherSpaced(null, formatHm(new Date(at.getTime() + gapMs), zone)) : W.appPrepWeatherFailed;
+}
+
+/**
+ * Each day ends at a place to sleep (owner, 9 Nov 2026), settled without a mid-run read of the screens; the trip as stored then.
+ * Its failure keeps the planned ends; a route replaced meanwhile stops the run.
+ */
+export async function settleDayStops(now: Date, store: Pick<PreparedStore, 'readTrip'>, trip: Trip): Promise<Trip> {
+  try {
+    await (await import('./day-stops.ts')).settleStops(now, undefined, { announce: false });
+  } catch {
+    return trip;
+  }
+  const settled = await store.readTrip();
+  if (!settled || settled.route.id !== trip.route.id) throw new RouteGoneError();
+  return settled;
 }
