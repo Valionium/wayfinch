@@ -128,10 +128,11 @@ export type AutoBalanced = { apply: boolean; balanced: Balanced; gain: number };
 /**
  * The bag planner's automatic balancing (the owner's decision of 8 Nov 2026, weight map design §7): the balance of `start` (the planner's
  * own packing), to be applied only when it is clearly better, by the Gear advisor's own threshold: Better handling's score lower by
- * MIN_GAIN_SCORE or more. `fixed` as for balance: what the rider keeps where it is. `gain` is the drop of the score, to the hundredth.
+ * MIN_GAIN_SCORE or more. `fixed` as for balance: what the rider keeps where it is; `wide` and `extra` as for balance (the bag planner
+ * takes the wider look: the owner's choice of 9 Nov 2026). `gain` is the drop of the score, to the hundredth.
  */
 export function autoBalance(start: Packing, trial: (pins: Record<string, string>, from: Packing) => Packing,
-  o: { fixed?: ReadonlySet<string> | readonly string[]; maxTrials?: number } = {}): AutoBalanced {
+  o: { fixed?: ReadonlySet<string> | readonly string[]; maxTrials?: number; wide?: boolean; extra?: readonly string[] } = {}): AutoBalanced {
   const balanced = balance(start, trial, o);
   const gain = Math.round((handlingScore(start.result) - handlingScore(balanced.packing.result)) * 100) / 100;
   return { apply: balanced.moves.length > 0 && gain >= MIN_GAIN_SCORE - EPS, balanced, gain };

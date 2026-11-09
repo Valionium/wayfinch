@@ -38,8 +38,8 @@ test('[BAL-AUTO] at the packing step the plan is balanced in the rider\'s own ba
   for(const [name,bags] of Object.entries(SETS)){
     plan(bags,{rack:bags.some(b=>b.pos==='rack')});
     const before=json(READ),inputs=state(),fresh=json('allocate()');
-    // what the search finds from the planner's own packing, read the advisor's way
-    const found=json(`(()=>{const s=idealTrial(S.bags,{},S.placements);const o=window.WayfinchAdvisor.autoBalance(s,(p,f)=>idealTrial(S.bags,p,f.state),{fixed:balanceFixed(s)});return {apply:o.apply,gain:o.gain,moves:o.balanced.moves};})()`);
+    // what the search finds from the planner's own packing, read the advisor's way, with its wider look (the owner's choice of 9 Nov 2026)
+    const found=json(`(()=>{const s=idealTrial(S.bags,{},S.placements);const o=window.WayfinchAdvisor.autoBalance(s,(p,f)=>idealTrial(S.bags,p,f.state),balanceOptions(s));return {apply:o.apply,gain:o.gain,moves:o.balanced.moves};})()`);
     const did=json('autoBalancePlan()');
     const after=json(READ);
     assert.equal(did,found.apply,`${name}: applied exactly when the search says it is clearly better (${found.gain} points)`);
@@ -237,6 +237,58 @@ test('[BAL-STORED] a plan loaded after another and a plan started again are look
   assert.equal(json('autoBalancePlan()'),true,'Start again is balanced at its first look');
   assert.equal(json('currentPlan().notes.replan&&currentPlan().notes.replan.reason'),'startAgain','its note stays beside the line');
   assert.match(json('balanceLine()'),/Packed for better balance/);
+});
+
+// The owner's choice of 9 Nov 2026 ("Yes, wider balancing"): the balancing also tries the moves the weight map's wider look found (a thing
+// moved the heavier way, so the re-pack puts heavier things where it was), so the planner reaches the best balance by itself.
+test('[BAL-AUTO] the wider look: the balancing tries every single placement of one thing either way once no usual move or swap helps, and so balances plans the usual search left as they were',()=>{
+  const plans={...SETS,'seat, frame and bar':[{uid:1,pos:'seat',L:14},{uid:2,pos:'frame',L:4.5},{uid:3,pos:'bar',L:13}],
+    'seat, bar and frame 6':[{uid:1,pos:'seat',L:14},{uid:2,pos:'bar',L:9},{uid:3,pos:'frame',L:6}],
+    'the frame bag and two fork cages':[{uid:1,pos:'frame',L:4.5},{uid:2,pos:'fork',L:5,pair:true}]};
+  plan(SETS.bikepacking);
+  const opts=json('(()=>{const s=idealTrial(S.bags,{},S.placements);const o=balanceOptions(s);return {wide:o.wide,max:o.maxTrials,extra:Array.isArray(o.extra)};})()');
+  assert.deepEqual(opts,{wide:true,max:json('BALANCE_TRIALS'),extra:true});
+  let wider=0;
+  for(const [name,bags] of Object.entries(plans)){
+    plan(bags,{rack:bags.some(b=>b.pos==='rack')});
+    const narrow=json(`(()=>{const s=idealTrial(S.bags,{},S.placements);const o=window.WayfinchAdvisor.autoBalance(s,(p,f)=>idealTrial(S.bags,p,f.state),{fixed:balanceFixed(s)});return {apply:o.apply,gain:o.gain};})()`);
+    const before=json(READ),did=json('autoBalancePlan()'),after=json(READ);
+    if(did&&!narrow.apply)wider++;
+    if(narrow.apply)assert.equal(did,true,`${name}: what the usual search balanced is still balanced`);
+    if(did)assert.ok(before.score-after.score>=json('window.WayfinchAdvisor.MIN_GAIN_SCORE')-1e-9,`${name}: clearly better (${before.score} to ${after.score})`);
+  }
+  assert.ok(wider>=1,`plans only the wider look balances (${wider})`);
+});
+
+// The page never blocks: at the packing check the balancing runs in slices between frames, "Checking the balance…" meanwhile; a search
+// for a plan that changed since never applies.
+test('[BAL-AUTO] in slices: the packing check asks for the balance, says "Checking the balance…", and applies it once the search is done; a stale search never applies',()=>{
+  plan(SETS.bikepacking);
+  const own=json('S.placements');
+  assert.equal(json('autoBalancePlan({later:true})'),false,'nothing applied at once');
+  assert.deepEqual(json('S.placements'),own,'the plan as it was while the search runs');
+  assert.equal(json('!!BALANCE.run'),true);
+  assert.match(json('balanceLine()'),/Checking the balance…/);
+  assert.equal(json('autoBalancePlan({later:true})'),false,'looked at once: no second search');
+  let slices=0;
+  while(json('!!BALANCE.run')){run('balanceSlice(BALANCE.run)');slices++;assert.ok(slices<100,'the search ends');}
+  assert.ok(slices>=2,`run in slices (${slices})`);
+  assert.notDeepEqual(json('S.placements'),own,'balanced once done');
+  assert.match(json('balanceLine()'),/^<div class="balance-line" role="status"><span>Packed for better balance: /);
+  // the same in one go: the same balance
+  const sliced=json('currentPlan().items');
+  plan(SETS.bikepacking);
+  assert.equal(json('autoBalancePlan()'),true);
+  assert.deepEqual(json('currentPlan().items'),sliced,'the slices give the same balance as one go');
+  // a search for a plan changed since never applies
+  plan(SETS.bikepacking);
+  json('autoBalancePlan({later:true})');
+  run('var qaStale=BALANCE.run;balanceSlice(qaStale)');
+  run(`S.bags=S.bags.filter(b=>b.pos!=='top');currentPlan()`);
+  const changed=json('S.placements');
+  for(let i=0;i<40;i++)run('balanceSlice(qaStale)');
+  assert.deepEqual(json('S.placements'),changed,'the stale search changed nothing');
+  assert.equal(json('BALANCE.run===qaStale'),false,'and was dropped');
 });
 
 for(const [name,fn] of tests){fn();passed++;console.log('ok',name);}

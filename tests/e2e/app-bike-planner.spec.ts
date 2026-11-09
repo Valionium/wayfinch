@@ -344,8 +344,10 @@ async function packingCheck(page: Page, bags: string): Promise<void> {
   await expect(line).not.toHaveText('Checking the balance…', { timeout: 30_000 });
   await expect(line).not.toHaveAttribute('aria-busy', 'true');
 }
-const SMALL_BAGS = "S.bags = [{ uid:1, pos:'seat', L:5 }, { uid:2, pos:'bar', L:5 }, { uid:3, pos:'pack', L:30 }]; S.nextUid = 4; S.decks = { bar:false, rack:false };";
-const SBF_BAGS = "S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'frame', L:6 }]; S.nextUid = 4; S.decks = { bar:false, rack:false };";
+// bikepacking bags: once balanced, the must-reach things in the frame bag still keep the load from the best arrangement found
+const BP_BAGS = "S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:13 }, { uid:3, pos:'frame', L:4.5 }, { uid:4, pos:'top', L:1, slot:'front' }, { uid:5, pos:'fork', L:3, pair:true }]; S.nextUid = 6; S.decks = { bar:false, rack:false };";
+// the same with a backpack, and the bike lock put in it by hand
+const LOCK_BAGS = "S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:13 }, { uid:3, pos:'frame', L:4.5 }, { uid:4, pos:'top', L:1, slot:'front' }, { uid:5, pos:'fork', L:3, pair:true }, { uid:6, pos:'pack', L:10 }]; S.nextUid = 7; S.decks = { bar:false, rack:false }; S.pinned = { lock:'6-0' };";
 
 test('[WM-PAGE] the line at the packing check; Show the map off by default, weightmap.js only on its first press, yours over the ideal on a phone, the difference opt-in, the backpack on your back', async ({ page }) => {
   const errors: string[] = [];
@@ -353,15 +355,15 @@ test('[WM-PAGE] the line at the packing check; Show the map off by default, weig
   const loads: string[] = [];
   page.on('request', (r) => { if (r.url().endsWith('/weightmap.js')) loads.push(r.url()); });
   await planner(page);
-  // small bike bags, so the backpack carries some of the kit
-  await page.evaluate(`${SMALL_BAGS} go(2); go(3)`);
+  // the bike lock put in the backpack by hand, so the backpack carries some of the kit
+  await page.evaluate(`${LOCK_BAGS} go(2); go(3)`);
   const show = page.locator('#rigWeightMap');
   const line = page.locator('#weightLine');
   await expect(line).toBeHidden(); // not before the packing check
   await expect(show).toBeHidden();
-  await packingCheck(page, SMALL_BAGS);
-  // the rider's must-reach things keep the load from the best arrangement found: said, with the map a press away
-  await expect(line).toHaveText(/^Your must-reach things? in the /);
+  await packingCheck(page, LOCK_BAGS);
+  // the rider's hand placement keeps the load from the best arrangement found: said, with the map a press away
+  await expect(line).toHaveText(/^Your hand placement in the backpack \(bike lock\) puts more weight on your back\./);
   await expect(show).toBeVisible();
   await expect(show).toHaveText('Show the map');
   await expect(show).toHaveAttribute('aria-expanded', 'false');
@@ -440,7 +442,7 @@ test('[WM-STILL] the weight map never moves the page: near the bottom of the win
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await planner(page);
-  await packingCheck(page, SBF_BAGS);
+  await packingCheck(page, BP_BAGS);
   await expect(page.locator('#rigWeightMap')).toBeVisible();
   const cards = page.locator('#weightMap .wm-card');
   const steps: [string, () => Promise<void>][] = [
@@ -461,9 +463,8 @@ test('[WM-STILL] the weight map never moves the page: near the bottom of the win
     expect(Math.abs(after[1]! - before[1]!), `${sel}: the page does not scroll`).toBeLessThanOrEqual(1);
     expect(await page.evaluate((s) => document.activeElement?.matches(s), sel), `${sel}: focus stays on it`).toBe(true);
   }
-  // the line worked out again while the rider reads further down: the packing check's heading stays where it was (a plan whose line
-  // takes more room than "Checking the balance…")
-  await packingCheck(page, SMALL_BAGS);
+  // the line worked out again while the rider reads further down: the packing check's heading stays where it was (the line takes more
+  // room than "Checking the balance…")
   const heights = [await page.locator('#weightLine').evaluate((el) => el.getBoundingClientRect().height)];
   const heading = page.locator('#stepTitle4');
   await heading.evaluate((el) => { window.scrollBy(0, el.getBoundingClientRect().top - 8); });
@@ -486,7 +487,7 @@ test('[WM-STILL] at 320 px, light and dark: the line wraps and the weight map\'s
   for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await planner(page);
-    await packingCheck(page, SBF_BAGS);
+    await packingCheck(page, BP_BAGS);
     await page.locator('#rigWeightMap').click();
     await expect(page.locator('#weightMap .wm-card')).toHaveCount(2);
     for (const sel of ['#rigWeightMap', '#weightMap .wm-diff']) {
@@ -555,6 +556,39 @@ test("[BAL-LINE] at the packing check the plan is balanced with one line and Und
 });
 
 // Review of PR 79, I1: a thing ticked as packed where the balance put it is never moved back by Undo.
+// The owner's choice of 9 Nov 2026 ("Yes, wider balancing"): the balancing takes the wider look, so it runs in slices between frames,
+// "Checking the balance…" meanwhile; the page never blocks or jumps.
+test('[BAL-AUTO] at the packing check the balancing runs in slices: "Checking the balance…" while frames are drawn, then its line; the section the rider reads keeps its place', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page);
+  await page.evaluate(`${BAL_BAGS} go(2); go(3)`);
+  const r = await page.evaluate(`(async () => {
+    go(4);
+    if (!document.getElementById('maxWeightBox').classList.contains('hidden')) document.getElementById('mwClose').click();
+    const line = () => (document.querySelector('#resultBox .balance-line') || {}).textContent || '';
+    const secs = () => [...document.querySelectorAll('#resultBox .sec')];
+    const first = line();
+    // the rider reads further down: the third section near the top of the window
+    const i = Math.min(2, secs().length - 1);
+    window.scrollTo(0, window.scrollY + secs()[i].getBoundingClientRect().top - 120);
+    const before = secs()[i].getBoundingClientRect().top, boxTop = document.getElementById('resultBox').getBoundingClientRect().top;
+    const t0 = performance.now();
+    let frames = 0;
+    while (line() === 'Checking the balance…' && frames < 2000) { await new Promise((res) => requestAnimationFrame(res)); frames++; }
+    return { first, frames, before, boxTop, after: secs()[i].getBoundingClientRect().top, text: line(), ms: Math.round(performance.now() - t0) };
+  })()`) as { first: string; frames: number; before: number; boxTop: number; after: number; text: string; ms: number };
+  console.log(`BAL-AUTO: the balance after ${r.ms} ms, ${r.frames} frames drawn meanwhile`);
+  expect(r.first).toBe('Checking the balance…');
+  expect(r.frames, 'frames are drawn while the search runs').toBeGreaterThanOrEqual(2);
+  expect(r.text).toMatch(/^Packed for better balance: /);
+  expect(r.boxTop, 'the packing check starts above the window').toBeLessThan(0);
+  expect(Math.abs(r.after - r.before), 'the section the rider reads stays where it was').toBeLessThanOrEqual(1);
+  // the weight map's line follows, from the balanced plan
+  await expect(page.locator('#weightLine')).not.toHaveText('Checking the balance…', { timeout: 30_000 });
+  expect(errors).toEqual([]);
+});
+
 test('[BAL-KEEPS] a thing the balance moved, ticked as packed in the packing check: Undo is not offered and the line says why; unticked, Undo is back', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));

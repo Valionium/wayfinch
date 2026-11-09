@@ -271,4 +271,18 @@ describe('automatic balancing (weight map design §7)', () => {
     expect(out.balanced.packing.pieces.find((x) => x.id === 'tent')!.unit).toBe('s-0');
     expect(out.apply).toBe(true); // 0.9 kg from the seat pack to the frame bag: 1.44 points
   });
+
+  // The owner's choice of 9 Nov 2026 ("Yes, wider balancing"): the automatic balancing takes the wider look too.
+  test('[BAL-AUTO] with the wider look it applies a balance the usual search cannot find: the bulky light jacket out of the full frame bag, the food in', () => {
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 3, reach: true }, { key: 's-0', pos: 'seat', cap: 14, reach: true }];
+    const items: FItem[] = [{ id: 'jacket', kg: 0.2, L: 3 }, { id: 'food', kg: 2, L: 3, food: true }];
+    const p = repacker(bags, items, { jacket: 'f-0' });
+    expect(autoBalance(p.start, p.trial).apply).toBe(false);
+    const out = autoBalance(p.start, p.trial, { wide: true, extra: [] });
+    expect(out.apply).toBe(true);
+    expect(out.balanced).toEqual(balance(p.start, p.trial, { wide: true, extra: [] }));
+    expect(out.gain).toBeCloseTo((2 - 0.2) * (WEIGHTS.seat - WEIGHTS.frame), 2);
+    // what the rider keeps where it is stays there, wider look or not
+    expect(autoBalance(p.start, p.trial, { wide: true, fixed: ['jacket'] }).apply).toBe(false);
+  });
 });

@@ -336,9 +336,9 @@ const PROBE=()=>json(`(()=>{const W=window.WayfinchAdvisor.WEIGHTS;
     ids.forEach(id=>b.packing.rooms.forEach(r=>{const at=b.packing.state.items[id]||[];if(!(at.length===1&&at[0][0]===r.key))tryPins({[id]:r.key},id+'>'+r.key);}));
     const P=b.packing.pieces;P.forEach(p=>P.forEach(q=>{if(p.unit!==q.unit&&p.kg>q.kg&&W[q.pos]<W[p.pos])tryPins({[p.id]:q.unit,[q.id]:p.unit},p.id+'<>'+q.id);}));
   }
-  return {partial:f.partial,gain:f.gain,text:f.note&&f.note.text,keeps:keeps(b.packing.result),plan:sc(st),best,better,n};})()`);
+  return {partial:f.partial,gain:f.gain,text:f.note&&f.note.text,groups:f.note?f.note.groups.length:0,min:window.WayfinchAdvisor.MIN_GAIN_SCORE,keeps:keeps(b.packing.result),plan:sc(st),best,better,n};})()`);
 const MA_PLAN=[{uid:1,pos:'frame',L:4.5},{uid:2,pos:'fork',L:5,pair:true}];
-test('[WM-IDEAL] the ideal is a balance no single placement of one thing (either way) or swap improves while keeping the promises, once the search finished; the default line only then',()=>{
+test('[WM-IDEAL] the ideal is a balance no single placement of one thing (either way) or swap improves while keeping the promises, once the search finished; the default line only with nothing the rider fixed moved and no clearly better balance',()=>{
   const bike=bikeOf('diamond-sloping','M','drop','47-584');
   const plans={
     'the frame bag and two fork cages (review of PR 78, m-A)':MA_PLAN,
@@ -354,16 +354,18 @@ test('[WM-IDEAL] the ideal is a balance no single placement of one thing (either
     assert.equal(r.keeps,true,`${name}: the ideal keeps every promise`);
     assert.ok(r.best<=r.plan,`${name}: never worse than the plan`);
     assert.ok(Math.abs(r.plan-r.best-r.gain)<0.006,`${name}: the gain is the plan's score less the ideal's (${r.plan} - ${r.best}, ${r.gain})`);
-    if(r.partial)assert.notEqual(r.text,DEFAULT_LINE,`${name}: an unfinished search never says the default line`);
-    else{finished++;assert.deepEqual(r.better,[],`${name}: ${r.n} trials; none of them may beat the finished ideal`);}
-    if(r.text===DEFAULT_LINE)assert.ok(!r.partial&&r.gain<0.01,`${name}: the default line only when the finished search found nothing 0.01 better`);
-    else if(r.text)assert.ok(r.gain>=0.01,`${name}: a line that says the load could be better, only when it could be (${r.gain})`);
+    if(!r.partial){finished++;assert.deepEqual(r.better,[],`${name}: ${r.n} trials; none of them may beat the finished ideal`);}
+    // the owner's choice of 9 Nov 2026: the balancing reaches the best balance itself, so a gain under its threshold left is the default line
+    if(r.text===DEFAULT_LINE)assert.ok(r.gain<r.min,`${name}: the default line only with less than ${r.min} better left (${r.gain})`);
+    else if(r.text)assert.ok(r.groups>0&&r.gain>=r.min,`${name}: a line that says the load could be better, only when it could be (${r.gain})`);
   }
   assert.ok(finished>=3,`the probe ran on finished searches (${finished})`);
-  // review of PR 78, m-A: the old note said "no better balance" here, yet the tyre levers into a fork cage lowered the score
+  // review of PR 78, m-A: the old note said "no better balance" here, yet the tyre levers into a fork cage lowered the score; the ideal
+  // finds that now, and the gain (a few hundredths) is under the balancing's threshold, so the default line (the owner's choice of 9 Nov)
   rig(bike,MA_PLAN,4,{});
   const m=PROBE();
-  assert.ok(m.gain>=0.01&&m.text!==DEFAULT_LINE,`the frame bag and two fork cages: ${m.gain} better, said (${m.text})`);
+  assert.ok(m.gain>=0.01&&m.gain<m.min,`the frame bag and two fork cages: ${m.gain} better, found`);
+  assert.equal(m.text,DEFAULT_LINE);
   rig(bike,[{uid:1,pos:'pack',L:30}],4,{});
   assert.equal(PROBE().text,DEFAULT_LINE,'a backpack alone: nothing to move, so the default line');
 });
@@ -376,15 +378,15 @@ const NOTE=()=>json(`(()=>{const f=weightMapIdeal(true);const to=new Map(f.balan
     was:from.get(t.id)&&from.get(t.id).unit,now:to.get(t.id)&&to.get(t.id).unit,pinned:(S.pinned||{})[t.id]||null,
     must:!!(kitById(t.id)&&isMustReach(kitById(t.id))&&reachableFor(kitById(t.id),from.get(t.id).pos))}))}))};})()`);
 const BANNED=/safe|guarant|prevent|you should|must not|warning|error|fail/i;
-test('[WM-NOTE] the line names the hand placements and must-reach things the best arrangement found puts elsewhere, and what they do; otherwise a better balance is possible, or the default line',()=>{
+test('[WM-NOTE] the line names the hand placements and must-reach things the best arrangement found puts elsewhere, and what they do; otherwise the default line, and nothing when the planner could do clearly better itself',()=>{
   const bike=bikeOf('diamond-sloping','M','drop','47-584');
   const seen=new Set();
   const check=name=>{
     const n=NOTE();
-    if(!n.text)return n;
+    if(!n.text){assert.ok(!n.groups.length&&n.gain>=json('window.WayfinchAdvisor.MIN_GAIN_SCORE'),`${name}: no line only when the planner could do clearly better itself (${n.gain})`);return n;}
     assert.ok(!BANNED.test(n.text),`${name}: plain words (${n.text})`);
-    seen.add(n.text===DEFAULT_LINE?'default':n.groups.length?'groups':'better');
-    if(n.text===DEFAULT_LINE){assert.equal(n.map,false,`${name}: no map with the default line`);return n;}
+    seen.add(n.text===DEFAULT_LINE?'default':'groups');
+    if(n.text===DEFAULT_LINE){assert.equal(n.map,false,`${name}: no map with the default line`);assert.ok(n.gain<json('window.WayfinchAdvisor.MIN_GAIN_SCORE'),`${name}: the default line only under the balancing's threshold (${n.gain})`);return n;}
     assert.equal(n.map,true,`${name}: "Show the map" with every other line`);
     for(const g of n.groups){
       for(const t of g.things){
@@ -395,7 +397,8 @@ test('[WM-NOTE] the line names the hand placements and must-reach things the bes
       }
       assert.match(n.text,g.kind==='hand'?/Your hand placements? in the /:/Your must-reach things? in the /,`${name}: the kind said`);
     }
-    if(!n.groups.length)assert.match(n.text,/^A (slightly )?better balance is possible with your own bags\.$/,`${name}: ${n.text}`);
+    assert.ok(n.groups.length>0&&n.gain>=json('window.WayfinchAdvisor.MIN_GAIN_SCORE'),`${name}: every other line names what the rider fixed, with a gain the balancing would take (${n.text}, ${n.gain})`);
+    assert.doesNotMatch(n.text,/better balance is possible/,`${name}: no line beyond the owner's two kinds`);
     return n;
   };
   // the must-reach things in a full frame bag take the room heavier things could use

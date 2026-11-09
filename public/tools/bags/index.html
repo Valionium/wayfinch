@@ -5404,7 +5404,7 @@ const PLAN_SCREEN_KEYS = ['placements','step','adv','onlyOn','justSaved','recall
   'devMode','pendingSaveName','pendingSaveNote','theme','editMode','gpx','frameErr'];
 let PLAN_CACHE = { sig:null, plan:null, placements:null }, PLAN_TRIAL = 0, PLAN_PLACED_AGAIN = false;
 // The automatic balancing's own state (weight map design §7); its functions are by the weight map's.
-const BALANCE = { checked:null, pins:null, last:null, reverted:null, undone:new Set(), failed:false };
+const BALANCE = { checked:null, pins:null, last:null, reverted:null, undone:new Set(), failed:false, run:null, loading:false };
 
 function planSignature(){
   return JSON.stringify([S, KIT.filter(k => k.added)], function(key, value){
@@ -8808,17 +8808,26 @@ function idealScore(r){
   const W = window.WayfinchAdvisor.WEIGHTS;
   return Math.round(Object.entries(r.kgByPos).reduce((t, [p, kg]) => t + (kg || 0) * (W[p] || 0), 0) * 100) / 100;
 }
-// The search from the plan as it is: nothing held (the rider's hand placements and must-reach things may move, keeping every promise:
-// nothing more left over, on the back or out of reach), the things the planner split over bags tried whole too.
-function idealSearch(){
-  const start = idealTrial(S.bags, {}, S.placements), A = currentPlan(), seen = new WeakMap();
-  const trial = (pins, from) => {
+// A search's trials, each remembered by where it starts and its placements, so a later slice runs the same search again cheaply and only
+// adds new trials (the ideal's and the automatic balancing's alike).
+function rememberedTrial(){
+  const seen = new WeakMap();
+  return (pins, from) => {
     let m = seen.get(from); if(!m) seen.set(from, m = new Map());
     const k = JSON.stringify(pins);
     if(!m.has(k)) m.set(k, idealTrial(S.bags, pins, from.state));
     return m.get(k);
   };
-  const extra = Object.keys(A.items).filter(id => (A.items[id] || []).length > 1 && !(kitById(id) || {}).divisible);
+}
+// The things the planner split over bags, which the wider look tries whole too.
+function splitThings(){
+  const A = currentPlan();
+  return Object.keys(A.items).filter(id => (A.items[id] || []).length > 1 && !(kitById(id) || {}).divisible);
+}
+// The search from the plan as it is: nothing held (the rider's hand placements and must-reach things may move, keeping every promise:
+// nothing more left over, on the back or out of reach).
+function idealSearch(){
+  const start = idealTrial(S.bags, {}, S.placements), trial = rememberedTrial(), extra = splitThings();
   return { start, run:n => window.WayfinchAdvisor.balance(start, trial, { wide:true, extra, maxTrials:n }) };
 }
 function idealResult(out, start){
@@ -8831,7 +8840,7 @@ const idealKey = () => JSON.stringify([planSignature(), S.placements]);
 function idealStep(c){
   c.n = Math.min(IDEAL_TRIALS, c.n + IDEAL_SLICE);
   const out = c.search.run(c.n);
-  if(!out.partial || c.n >= IDEAL_TRIALS) c.value = idealResult(out, c.search.start);
+  if(!out.partial || c.n >= IDEAL_TRIALS){ c.value = idealResult(out, c.search.start); c.search = null; }   // the remembered trials go
 }
 function idealSlice(c){
   if(IDEAL_CACHE !== c || c.value || c.key !== idealKey()) return;   // a newer plan has its own search
@@ -8853,10 +8862,12 @@ function weightMapIdeal(now = false){
   return c.value;
 }
 
-// The line under the drawing (the owner's decision of 9 Nov 2026), from the same search, never a guess: the default line when nothing the
-// search tries lowers the score by 0.01 or more (WM-BALANCE's step) and it finished; else which of the rider's hand placements and
-// must-reach things (within reach where they are) the best arrangement found puts elsewhere, by bag, and what that does there; with
-// none of them, that a better balance is possible. An unfinished search that found nothing says nothing.
+// The line under the drawing (the owner's decision of 9 Nov 2026), from the same search, never a guess: which of the rider's hand
+// placements and must-reach things (within reach where they are) the best arrangement found puts elsewhere, by bag, and what that does
+// there. The automatic balancing takes the wider look too (the owner's choice of 9 Nov 2026), so the plan is the best balance found but
+// for what the rider keeps: a gain under the balancing's own threshold (MIN_GAIN_SCORE) is the default line, whatever moves; with none of
+// the rider's things moved and a larger gain (rare: a step made by hand, things ticked as packed or put back with Undo, which the
+// balancing leaves where they are), nothing at all.
 const NOTE_ZONES = { front:'at the front', rear:'at the rear', centre:'in the middle', body:'on your back' };
 // a kit name with its first letter lowered unless it is a capital word ("ID, cards, insurance"); a thing the rider added as typed
 const kitWord = k => !k ? null : k.added ? k.name : k.name.replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase());
@@ -8872,7 +8883,7 @@ function noteSentence(g){
   return `${who} in the ${bag} (${noteList(g.things.map(t => kitWord(kitById(t.id)) || t.id))}) ${effect}.`;
 }
 function balanceNote(out, start, gain){
-  if(gain < 0.01) return out.partial ? null : { text:'Your load is as balanced as your bags allow.', map:false, groups:[] };
+  if(gain < window.WayfinchAdvisor.MIN_GAIN_SCORE) return { text:'Your load is as balanced as your bags allow.', map:false, groups:[] };
   const to = new Map(out.packing.pieces.map(p => [p.id, p])), pinned = S.pinned || {}, groups = [];
   start.pieces.forEach(p => {
     const q = to.get(p.id); if(!q || q.unit === p.unit) return;
@@ -8883,14 +8894,14 @@ function balanceNote(out, start, gain){
     if(!g) groups.push(g = { kind, unit:p.unit, pos:p.pos, things:[] });
     g.things.push({ id:p.id, kg:p.kg, to:q.pos });
   });
-  if(!groups.length){
-    const text = gain >= window.WayfinchAdvisor.MIN_GAIN_SCORE ? 'A better balance is possible with your own bags.' : 'A slightly better balance is possible with your own bags.';
-    return { text, map:true, groups };
-  }
+  if(!groups.length) return null;
   const kg = g => g.things.reduce((t, x) => t + x.kg, 0);
   groups.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'hand' ? -1 : 1) || kg(b) - kg(a) || (a.unit < b.unit ? -1 : a.unit > b.unit ? 1 : 0));
   const said = groups.slice(0, 2).map(noteSentence);
-  if(groups.length > 2) said.push('Other hand placements and must-reach things of yours do too.');
+  if(groups.length > 2){
+    const kinds = new Set(groups.slice(2).map(g => g.kind));
+    said.push(kinds.size > 1 ? 'Other hand placements and must-reach things of yours do too.' : kinds.has('hand') ? 'Other hand placements of yours do too.' : 'Other must-reach things of yours do too.');
+  }
   return { text:said.join(' '), map:true, groups:groups.slice(0, 2) };
 }
 
@@ -8910,24 +8921,79 @@ function balanceFixed(start){
   start.pieces.forEach(p => { const k = kitById(p.id); if(k && isMustReach(k) && reachableFor(k, p.pos)) ids.add(p.id); });
   return [...ids];
 }
-// Looks at the plan once after each change, at the packing step only (where the line shows); true when a balance was applied.
-function autoBalancePlan(){
+// The search with its wider look (the owner's choice of 9 Nov 2026, "Yes, wider balancing"): once no usual move or swap helps, every
+// single placement of one thing either way, and the things split over bags whole, so the planner reaches the best balance by itself.
+// At most BALANCE_TRIALS trials, then it answers with what it found.
+const BALANCE_TRIALS = 200;
+const balanceOptions = start => ({ fixed:balanceFixed(start), wide:true, extra:splitThings(), maxTrials:BALANCE_TRIALS });
+// Looks at the plan once after each change, at the packing step only (where the line shows); true when a balance was applied. later: the
+// page's own look (renderResult), which runs the search in slices between frames, "Checking the balance…" meanwhile, and applies it
+// when done (balanceSlice), so the page never blocks; without it, at once (the QA suites).
+function autoBalancePlan(o = {}){
   if(PLAN_TRIAL || TRIAL || S.step !== 4 || !DRAFT_READY || DRAFT_FROZEN) return false;
-  const plan = currentPlan(), sig = JSON.stringify(S.placements), pins = JSON.stringify(S.pinned || {});
+  currentPlan();   // the plan, and with it its kept placements, as the packing check shows them
+  const sig = JSON.stringify(S.placements), pins = JSON.stringify(S.pinned || {});
   if(!S.placements || sig === BALANCE.checked) return false;
   const W = window.WayfinchAdvisor;
   if(!W || !W.autoBalance){
-    if(!BALANCE.failed) loadAdvisor().then(() => { if(S.step === 4 && !TRIAL){ renderResult(); drawRig(); } }, () => { BALANCE.failed = true; });
+    // advisor.js on its way: the line says the balance is being checked, and the packing check is drawn again once it is here (or not)
+    if(!BALANCE.failed && !BALANCE.loading){
+      BALANCE.loading = true;
+      loadAdvisor().then(() => { BALANCE.loading = false; if(S.step === 4 && !TRIAL){ holdResult(() => renderResult()); drawRig(); } },
+        () => { BALANCE.loading = false; BALANCE.failed = true; if(S.step === 4 && !TRIAL){ holdResult(() => renderResult()); drawRig(); } });
+    }
     return false;
   }
   // a step the rider made by hand (a move, a forgotten placement) is the rider's own: it is not balanced
   const byHand = BALANCE.pins !== null && BALANCE.pins !== pins;
-  BALANCE.checked = sig; BALANCE.pins = pins;
+  BALANCE.checked = sig; BALANCE.pins = pins; BALANCE.run = null;
   if(byHand) return false;
-  const before = S.placements, start = idealTrial(S.bags, {}, before);
-  const out = W.autoBalance(start, (p, from) => idealTrial(S.bags, p, from.state), { fixed:balanceFixed(start) });
+  const before = S.placements, start = idealTrial(S.bags, {}, before), opts = balanceOptions(start), trial = rememberedTrial();
+  const run = { key:idealKey(), fixed:JSON.stringify([...opts.fixed].sort()), before, start, n:0, out:null, go:n => W.autoBalance(start, trial, { ...opts, maxTrials:n }) };
+  if(!o.later){ run.out = run.go(BALANCE_TRIALS); return applyBalance(run); }
+  BALANCE.run = run;
+  setTimeout(() => balanceSlice(run), 0);
+  return false;
+}
+// One slice of the search; once it is done the balance is applied (or not) and the packing check drawn again, the page held still.
+// A search for a plan that changed since, or once the packing check or the plan is left, is dropped.
+function balanceSlice(run){
+  if(BALANCE.run !== run) return;
+  if(PLAN_TRIAL || TRIAL || S.step !== 4 || DRAFT_FROZEN || run.key !== idealKey()){
+    BALANCE.run = null;
+    if(run.key === idealKey()) BALANCE.checked = null;   // the same plan, looked at again on the way back to the packing check
+    return;
+  }
+  run.n = Math.min(BALANCE_TRIALS, run.n + IDEAL_SLICE);
+  const out = run.go(run.n);
+  if(out.balanced.partial && run.n < BALANCE_TRIALS){ setTimeout(() => balanceSlice(run), 0); return; }
+  BALANCE.run = null;
+  // something ticked as packed (or otherwise kept) while the search ran: that is the rider's now, so the plan is looked at again
+  if(JSON.stringify([...balanceFixed(run.start)].sort()) !== run.fixed) BALANCE.checked = null;
+  else { run.out = out; applyBalance(run); }
+  if(typeof renderResult === 'function' && $('resultBox')) holdResult(() => renderResult());
+  drawRig();
+}
+// The packing check drawn again where the rider reads it: its open sections stay open, and while it starts above the top of the window
+// the section at the top keeps its place (the page's own anchor does that after a press).
+function holdResult(paint){
+  const box = $('resultBox'), secs = () => [...box.querySelectorAll('.sec')];
+  const measure = typeof box.getBoundingClientRect === 'function' && !VIEWPORT_ANCHOR;
+  const open = secs().map(x => x.hasAttribute('open'));
+  const tops = measure ? secs().map(x => x.getBoundingClientRect().top) : [];
+  const at = Math.max(0, tops.filter(t => t <= 0).length - 1);
+  const above = measure && box.getBoundingClientRect().top < 0;
+  paint();
+  const now = secs();
+  if(open.length === now.length) now.forEach((x, i) => { if(open[i]) x.setAttribute('open', ''); });
+  if(!above || !now[at] || tops[at] === undefined) return;
+  const d = now[at].getBoundingClientRect().top - tops[at];
+  if(Math.abs(d) > .5) window.scrollTo({ top:window.scrollY + d, left:window.scrollX, behavior:'instant' });
+}
+function applyBalance(run){
+  const out = run.out, start = run.start, before = run.before, W = window.WayfinchAdvisor;
   if(!out.apply) return false;
-  const replan = plan.notes.replan;
+  const replan = currentPlan().notes.replan;
   keepPlan({ load:out.balanced.packing.state });
   const now = currentPlan();
   if(replan) now.notes.replan = replan;
@@ -8942,7 +9008,7 @@ function autoBalancePlan(){
 // The balancing's memory belongs to one plan: a plan loaded (My plans, a working plan, another tab's) and Start again are looked at
 // afresh, as a first look (review of PR 79, m3).
 function resetBalance(){
-  BALANCE.checked = null; BALANCE.pins = null; BALANCE.last = null; BALANCE.reverted = null; BALANCE.undone = new Set();
+  BALANCE.run = null; BALANCE.checked = null; BALANCE.pins = null; BALANCE.last = null; BALANCE.reverted = null; BALANCE.undone = new Set();
 }
 // Undo is offered while nothing it would move back is ticked as packed: a thing the rider packed where the balance put it is never moved
 // back under the tick (review of PR 79, I1). Unticked, Undo is offered again.
@@ -8958,8 +9024,9 @@ function undoBalance(){
   BALANCE.checked = JSON.stringify(S.placements); BALANCE.reverted = S.placements;
   return true;
 }
-// The one quiet line, while the plan is the one it speaks of.
+// The one quiet line, while the plan is the one it speaks of; while the search runs, that it does.
 function balanceLine(){
+  if(BALANCE.loading && S.step === 4 && !TRIAL || BALANCE.run && BALANCE.run.key === idealKey()) return '<div class="balance-line" role="status" aria-busy="true"><span>Checking the balance…</span></div>';
   const last = BALANCE.last;
   if(last && last.placements === S.placements){
     const A = currentPlan();
@@ -9009,8 +9076,9 @@ function drawWeightMap(){
 }
 function fillWeightMap(line, button, box){
   if(S.step !== 4 || !bikeModule() || WEIGHT_MAP.failed){ line.hidden = true; button.hidden = true; box.hidden = true; return; }
-  const ready = !!(window.WayfinchAdvisor && window.WayfinchAdvisor.balance);
-  if(!ready) loadAdvisor().then(() => drawWeightMap(), () => { WEIGHT_MAP.failed = true; drawWeightMap(); });
+  // the automatic balancing first: the ideal is worked out from the plan it leaves
+  const ready = !!(window.WayfinchAdvisor && window.WayfinchAdvisor.balance) && !(BALANCE.run && BALANCE.run.key === idealKey());
+  if(!window.WayfinchAdvisor) loadAdvisor().then(() => drawWeightMap(), () => { WEIGHT_MAP.failed = true; drawWeightMap(); });
   const found = ready ? weightMapIdeal() : null;
   line.hidden = false;
   if(!found){
@@ -10479,7 +10547,7 @@ function panniersBikeBags(unused){
   return usableUnits().some(u => u.pos !== 'rack' && !POSITIONS[u.pos].onBody) ? 'Your bikepacking bags all stay mounted.' : '';
 }
 function renderResult(){
-  autoBalancePlan();
+  autoBalancePlan({ later:true });
   renderNightsSuggestion();
   const resultFocus=typeof captureFocus === 'function' ? captureFocus($('s4')) : null;
   $('modeBar').querySelectorAll('button').forEach(b =>
