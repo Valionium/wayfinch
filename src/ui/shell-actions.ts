@@ -7,7 +7,7 @@
 // queue, so two taps in a row never write over each other.
 import { effect, signal, untracked } from '@preact/signals';
 import type { Signal } from '@preact/signals';
-import { formatHm } from '../core/answers/time.ts';
+import { formatHm, localIsoDate } from '../core/answers/time.ts';
 import { emergencyCard } from '../core/engines/emergency.ts';
 import type { Fix } from '../core/engines/locate.ts';
 import { usableFlatKph } from '../core/engines/pace.ts';
@@ -128,11 +128,29 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     return run;
   };
 
+  /** The screen of the real day, as screen() built it: what the store keeps after a read (its day start, the route end). */
+  let realScreen: AheadTrip['screen'] | null = null;
+
   const present = (i: ScreenInputs): void => {
     const now = i.now;
-    const built = buildScreen(i);
+    const real = buildScreen(i);
+    realScreen = real.screen;
+    let built = real;
+    // No position to choose first (owner's finding K, 8 Nov 2026): with none to count from, the answers count from the route start
+    // (km 0), as on day 1 today, and say so; Emergency keeps the real day's card. Day 1, a trip with no date and before the trip
+    // already plan from km 0; the route's end and a planned tomorrow stay as they are.
+    const r = real.screen;
+    const dayOne = i.trip.departureDate === null || r.phase === 'before-trip' || (r.ride.date === i.trip.departureDate && r.ride.startKm === 0);
+    if (r.positionLine === null && !dayOne && r.phase !== 'route-end' && i.planTomorrow === null) {
+      try {
+        const today = localIsoDate(now, zoneLookupOf(i.routeZones)(0).timeZone);
+        const fromStart = buildScreen({ ...i, trip: { ...i.trip, departureDate: today }, positions: [], dayStarts: [], routeEndDate: null });
+        fromStart.screen.chips.emergency = r.chips.emergency;
+        built = fromStart;
+      } catch { /* the real day's screen stays */ }
+    }
     const s = built.screen;
-    const p = built.parts.position;
+    const p = real.parts.position;
     // While Ahead asks which pass, Emergency already shows the fix as it came (review of PR 53, I1): it never waits on a question.
     if (pendingFix && pendingKm !== null) {
       try {
@@ -163,9 +181,8 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
         shareOld = null;
       }
     }
-    const dayOne = i.trip.departureDate === null || s.phase === 'before-trip' || (s.ride.date === i.trip.departureDate && s.ride.startKm === 0);
     const next: AheadTrip = {
-      kind: 'trip', screen: s, answers: s.positionLine !== null || dayOne, lengthKm: i.trip.route.lengthKm, towns: townsOf(i),
+      kind: 'trip', screen: s, answers: true, confirmed: r.positionLine !== null, lengthKm: i.trip.route.lengthKm, towns: townsOf(i),
       bike: bikeSource.peek().bike, stillAboutL, badSpeed: !usableFlatKph(i.trip.flatKph),
       approximateHelp: p !== null && p.source === 'gps' && !(p.accuracyM <= APPROXIMATE_HELP_M),
       shareOld, mapLink: readMapLink(), canShare: deps.share !== null, position, weatherSay, weatherBusy, notice,
@@ -236,10 +253,10 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       return;
     }
     present(read);
-    const shown = view.peek();
-    if (shown.kind === 'trip') {
+    const kept = realScreen;
+    if (view.peek().kind === 'trip' && kept) {
       const routeId = read.trip.route.id;
-      void inTurn(() => keepAfterScreen(shown.screen, at, routeId)).catch(() => undefined);
+      void inTurn(() => keepAfterScreen(kept, at, routeId)).catch(() => undefined);
     }
   };
 

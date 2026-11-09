@@ -134,8 +134,10 @@ function Ruler({ strip, onSet }: { strip: Strip; onSet: (km: number) => void }) 
   );
 }
 
-export function RouteStrip({ strip, bike, onOpen, onSetPosition, stopsLater = false }: {
+export function RouteStrip({ strip, bike, onOpen, onSetPosition, stopsLater = false, unconfirmed = false }: {
   strip: Strip; bike: BikeRecord | null; onOpen: (card: CardName) => void;
+  /** No position kept yet: the bike shows faded until Update position, the picker or the slider keeps one (AH-FROM-START). */
+  unconfirmed?: boolean;
   /** Given only on a computer: the ruler, with the keys along the strip (spec 3.8). */
   onSetPosition?: (km: number) => void;
   /** Before Get ready offline: the line and the bike, no icons, and why (AH-BEFORE-READY). */
@@ -158,7 +160,7 @@ export function RouteStrip({ strip, bike, onOpen, onSetPosition, stopsLater = fa
         <span class="ah-strip-end">{strip.endText}</span>
       </div>
       <div class="ah-strip-body">
-        <BikeMarker bike={bike} />
+        {unconfirmed ? <span class="ah-bike-unconfirmed" data-unconfirmed><BikeMarker bike={bike} /></span> : <BikeMarker bike={bike} />}
         <div class="ah-strip-track" ref={track}>
           <div class="ah-strip-line" />
           <div class="ah-strip-bands">

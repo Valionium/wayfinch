@@ -232,7 +232,8 @@ describe('cards', () => {
 
   test('[AH-FIRST-USE] on a phone the picker of first use closes when answers first show, unless the rider has started using it', async () => {
     const { actions } = fakeActions();
-    const none = trip(viewOf(rainyStop({ now: `${SAT} 09:00`, positions: [] })));
+    // The shell now shows answers with no position too (AH-FROM-START, owner's finding K); a view without them is handed in here.
+    const none: AheadTrip = { ...trip(viewOf(rainyStop({ now: `${SAT} 09:00`, positions: [] }))), answers: false };
     const found = trip(viewOf(rainyStop({ now: `${SAT} 09:00`, positions: [pos({ km: 3, at: `${SAT} 09:00` })] })));
     expect([none.answers, found.answers]).toEqual([false, true]);
     const kmField = () => host.querySelector<HTMLInputElement>('#ah-picker input[type=number]');
@@ -625,16 +626,15 @@ describe('degraded', () => {
     expect(await dialled(buttonNamed(W.emergencyCall, card))).toBe('tel:112');
   });
 
-  test('[AH-FIRST-USE] no position on a trip day after day 1: only Update position and the picker, no answers; before the trip, day 1\'s answers show', async () => {
+  test('[AH-FIRST-USE] no position on a trip day after day 1: Update position and the answers from km 0 (AH-FROM-START, owner\'s finding K); before the trip, day 1\'s answers show', async () => {
     const day2 = trip(viewOf(rainyStop({ now: `${SAT} 09:00`, positions: [] })));
-    expect(day2.answers).toBe(false);
+    expect(day2.answers).toBe(true);
     await show(day2, fakeActions().actions);
-    expect(host.querySelector('[data-ahead="first-use"]')).not.toBeNull();
-    expect(host.querySelectorAll('[data-card]')).toHaveLength(0);
-    expect(host.querySelector('[data-strip]')).toBeNull();
+    expect(host.querySelector('[data-ahead="answers"]')).not.toBeNull();
+    expect(host.querySelectorAll('[data-card]')).toHaveLength(6);
+    expect(host.querySelector('[data-strip]')).not.toBeNull();
     expect(host.querySelector('[data-update-position]')).not.toBeNull();
-    expect(host.querySelector('#ah-picker')).not.toBeNull();
-    expect(text()).toContain(W.appAheadFirstUse);
+    expect(host.querySelector('.ah-notes')!.textContent).toContain(W.routeNoPositionFromStart);
 
     const before = trip(viewOf(rainyStop({ now: '2026-10-15 18:00', positions: [] })));
     expect(before.screen.phase).toBe('before-trip');

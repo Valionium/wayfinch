@@ -751,7 +751,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - stops at ≤ 50 m; at 45 s keeps the best; accuracy is always on the position line [AH-ROUTINE]
 - accuracy worse than about 1 km: the explanation of how to allow precise location; > 500 m is marked approximate [AH-APPROX-HELP]
 - denied or failing watchPosition (init script): manual picker by strip, kilometre or town works [AH-MANUAL]
-- only the button and the picker. No answers until a position exists, while screen()'s before-trip answers appear once a day-1 plan applies [AH-FIRST-USE]
+- Update position and the picker are always there; with no position the answers count from the route start and say so (AH-FROM-START, the owner's finding K of 8 Nov 2026, in place of "no answers until a position exists"), while screen()'s before-trip answers appear once a day-1 plan applies [AH-FIRST-USE]
 - "Add a route to see what's ahead"; no Try the demo [AH-NO-ROUTE]
 - reopened later: answers from the last position, "as of 14:20, 40 min ago", prominent Update position [AH-RETURN]
 

@@ -20,8 +20,10 @@ export type Town = { name: string; km: Km };
 export type AheadTrip = {
   kind: 'trip';
   screen: Screen;
-  /** False only while no position exists and no day-1 plan applies (AH-FIRST-USE): then only the button and the picker. */
+  /** Whether the answers show. The shell always sets it now (AH-FROM-START); false gives only the button and the picker. */
   answers: boolean;
+  /** A position is kept and shown: until then the bike on the strip shows as not confirmed (AH-FROM-START). */
+  confirmed: boolean;
   lengthKm: Km;
   towns: Town[];
   bike: BikeRecord | null;

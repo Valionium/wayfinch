@@ -29,6 +29,26 @@ function focusLater(id: string): void {
   }, 0);
 }
 
+/**
+ * The Emergency link at the very top (owner's finding B, 8 Nov 2026): it jumps to the Emergency chip and opens it, and changes no
+ * address (the tabs live in it). The chip's 112 and its call's confirmation are the chip's own, unchanged.
+ */
+function EmergencyLink({ onOpen }: { onOpen: () => void }) {
+  // Scrolled to once the open panel is drawn, its first button (112, which asks first) taking the focus; again on every tap.
+  const [jumps, setJumps] = useState(0);
+  useEffect(() => {
+    if (jumps === 0) return;
+    const el = document.getElementById('chip-emergency');
+    el?.scrollIntoView?.({ block: 'start' });
+    el?.querySelector<HTMLElement>('button')?.focus?.();
+  }, [jumps]);
+  return (
+    <p class="ah-emergency-top">
+      <a href="#chip-emergency" class="ah-emergency-link" data-emergency-link onClick={(e) => { e.preventDefault(); onOpen(); setJumps((n) => n + 1); }}>{W.appAheadChipEmergency}</a>
+    </p>
+  );
+}
+
 function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
   const s = v.screen;
   const [open, setOpen] = useState<ReadonlySet<CardName>>(new Set());
@@ -94,6 +114,7 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
   ) : null;
   return (
     <div class="ahead" data-ahead={v.answers ? 'answers' : 'first-use'} onKeyDown={onKeyDown}>
+      <EmergencyLink onOpen={() => { actions.freshen(); setChip('emergency'); }} />
       <div class="ah-main">
         {v.beforeReady ? need : null}
         {v.notice ? <p class="notice" role="status">{v.notice}</p> : null}
@@ -109,7 +130,7 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
           <>
             {s.notes.length > 0 ? <ul class="ah-notes notice">{s.notes.map((n, i) => <li key={i}>{n}</li>)}</ul> : null}
             {v.badSpeed ? <p class="notice"><a href="#/trip">{W.appAheadSpeedLink}</a></p> : null}
-            <RouteStrip strip={s.strip} bike={v.bike} onOpen={openCard} onSetPosition={rail ? (km) => void actions.setManual(km) : undefined} stopsLater={v.beforeReady} />
+            <RouteStrip strip={s.strip} bike={v.bike} onOpen={openCard} onSetPosition={rail ? (km) => void actions.setManual(km) : undefined} stopsLater={v.beforeReady} unconfirmed={!v.confirmed} />
           </>
         ) : null}
         {v.beforeReady ? null : need}
@@ -130,7 +151,7 @@ const NONE: ReadonlySet<CardName> = new Set();
 
 export function AheadScreen({ view, actions }: { view: AheadView; actions: AheadActions }) {
   if (view.kind === 'loading') return <div class="ahead" aria-busy="true" />;
-  // With no route the shell's notice says "Add a route to see what's ahead"; there is no demo in the first version.
+  // With no route the shell's notice says "Add a route to see what's ahead", and the page what it will show; there is no demo.
   if (view.kind === 'no-route' || view.kind === 'unreadable') return <NoRoute view={view} actions={actions} />;
   return <TripAhead v={view} actions={actions} />;
 }
@@ -139,12 +160,20 @@ function NoRoute({ view, actions }: { view: Extract<AheadView, { kind: 'no-route
   const [open, setOpen] = useState(false);
   return (
     <div class="ahead" data-ahead={view.kind}>
+      <EmergencyLink onOpen={() => setOpen(true)} />
       {view.kind === 'unreadable' ? (
         <>
           <p class="notice" role="alert">{W.appAheadUnreadable}</p>
           <p><button type="button" class="btn btn-primary" onClick={() => void actions.retry()}>{W.appAheadRetry}</button></p>
         </>
-      ) : <p><a class="btn btn-primary" href="#/trip">{W.appAheadToTrip}</a></p>}
+      ) : (
+        // What En route is for, before there is a route (owner's finding M, 8 Nov 2026).
+        <div class="ah-empty" data-empty>
+          <p>{W.appAheadEmptyWhat}</p>
+          <p class="muted">{W.appAheadEmptyOffline}</p>
+          <p><a class="btn btn-primary" href="#/trip">{W.appAheadToTrip}</a></p>
+        </div>
+      )}
       <ChipRow shown={['emergency']} open={open ? 'emergency' : null} onOpen={(c) => setOpen(c !== null)} />
       {open ? (
         <section class="card ah-chip-panel ah-large" id="chip-emergency" aria-label={W.appAheadChipEmergency}>
