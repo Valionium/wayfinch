@@ -18,7 +18,7 @@ import { handoffGpx, tripAttributes } from '../../../src/ui/trip/handoff.ts';
 import { loadFixtureRoute } from '../../fixtures/packs/index.ts';
 
 const require = createRequire(import.meta.url);
-type VM = { run: (code: string) => unknown; context: Record<string, unknown>; values: Map<string, string>; nodes: Map<string, { href?: string; textContent?: string }>;
+type VM = { run: (code: string) => unknown; context: Record<string, unknown>; values: Map<string, string>; nodes: Map<string, { href?: string; textContent?: string; innerHTML?: string }>;
   store: unknown; localStorage: { setItem: (key: string, value: string) => void } };
 const { appVM } = require('../../../qa/app-vm.cjs') as { appVM: (o?: { bike?: boolean; storage?: unknown }) => VM };
 const { window } = new JSDOM('');
@@ -617,27 +617,25 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
     expect(page.run(`JSON.stringify(SETUPS.filter(s=>s.id==='g_empty'))`)).toBe(setups);
   });
 
-  test('with no bags anywhere, it proposes the smallest setup the planner\'s own rules fill: the bike\'s bottle cages, a top tube bag and only what the kit needs; nothing is over', async () => {
+  test('with no bags anywhere, it proposes the smallest setup the planner\'s own rules fill: one bottle, a top tube bag and/or a frame bag, a seat pack only when they cannot hold the day kit; nothing is over', async () => {
     const { page, json } = await dayRide('2026-11-15');
     await page.run('receiveHandoff()');
     expect(await page.run('planTripBags()')).toBe(true);
     const bags = json<Array<{ pos: string; slot?: string; L: number }>>('S.bags');
-    // water: a cage on each in-frame mount the bike has (no bike saved: both, as the planner assumes)
-    expect(bags.filter((b) => b.pos === 'bottle').map((b) => b.slot).sort()).toEqual(['dt', 'st']);
-    expect(json<number>('waterL()')).toBeGreaterThan(1);
-    // a top tube bag, the owner's minimum
-    expect(bags.filter((b) => b.pos === 'top')).toHaveLength(1);
-    // the rest only from the planner's own typical setup (frame bag, seat pack, handlebar roll)
-    for (const b of bags) expect(['bottle', 'top', 'frame', 'seat', 'bar']).toContain(b.pos);
+    // water: one bottle, on the down tube, the roomiest mount (owner, 9 Nov 2026: "and one bottle of water")
+    expect(bags.filter((b) => b.pos === 'bottle').map((b) => b.slot)).toEqual(['dt']);
+    expect(json<number>('waterL()')).toBeGreaterThan(0.5);
+    // the bags only from the top tube bag, the frame bag and the seat pack (owner, 9 Nov 2026: "It's always top tube and frame bag")
+    for (const b of bags) expect(['bottle', 'top', 'frame', 'seat']).toContain(b.pos);
     // nothing over, and the whole kit in bags
     expect(json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
     expect(json<number>('capL()')).toBeGreaterThanOrEqual(json<number>('kitL()'));
     // and everything that must be reached at the roadside within reach (the selection's own reach rule)
     expect(json('currentPlan().reach.outOfReach')).toEqual([]);
-    // smallest: without any one of the added bags (not the cages or the top tube bag), something would be over or out of reach
-    const extras = bags.filter((b) => !['bottle', 'top'].includes(b.pos)).map((b) => b.pos);
+    // smallest: without any one of the added bags, something would be over or out of reach, or the phone out of its own bags
+    const extras = bags.filter((b) => b.pos !== 'bottle').map((b) => b.pos);
     for (const pos of extras)
-      expect(json<number>(`(p=>p.spill.length+p.reach.outOfReach.length)(freshPlan({bags:S.bags.filter(b=>b.pos!=='${pos}')}))`), `without the ${pos} bag`).toBeGreaterThan(0);
+      expect(json<number>(`(p=>p.spill.length+p.reach.outOfReach.length+phoneOffPref(p))(freshPlan({bags:S.bags.filter(b=>b.pos!=='${pos}'),placements:null}))`), `without the ${pos} bag`).toBeGreaterThan(0);
     // the bar names what it proposed
     expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/top tube bag/i);
     // the setup made for the trip holds the same bags
@@ -655,12 +653,18 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
     for (const id of ['lock', 'bank', 'food', 'base1', 'socks', 'wash', 'teeth', 'cables', 'towel', 'quilt', 'tent'])
       expect(on(nov, id), id).toBe(false);
     expect(nov.json<number>('planRoute().hoursDay')).toBeLessThan(4);
-    // the packing check asks for nothing the start left out, and the layers are exactly what its rules ask for
+    // the packing check asks for nothing the start left out, and the layers are exactly what its rules ask for: for a day ride by
+    // the day's temperature over the riding hours (owner, 9 Nov 2026: "Yes, by day temp"), not the month's coldest night
     expect(nov.json<string[]>('audit().miss.flatMap(m=>m.ids)')).toEqual([]);
-    const c = nov.json<{ nightCold: number | null }>('tripClimate()');
+    const c = nov.json<{ nightCold: number | null; dayMean: number | null }>('tripClimate()');
     expect(c.nightCold).not.toBeNull();
-    expect(on(nov, 'puffy')).toBe(c.nightCold! < 11);
-    expect(on(nov, 'gloves')).toBe(c.nightCold! < 5);
+    const day = nov.json<number>('dayRideTemp(tripClimate())');
+    expect(day).toBe(Math.round((c.nightCold! + c.dayMean!) / 2));
+    // the jacket, when the day calls for it, is worn, not packed (owner, 9 Nov 2026: "Worn, one spare tube")
+    expect(on(nov, 'puffy')).toBe(false);
+    expect(nov.json<boolean>('dayRideWearsJacket()')).toBe(day < 11);
+    expect(on(nov, 'gloves')).toBe(day < 5);
+    expect([nov.json<boolean>('dayRideWearsJacket()'), on(nov, 'gloves')]).toEqual([true, true]);   // a cold November day still calls for both
     expect([on(nov, 'shades'), on(nov, 'sun')]).toEqual([false, false]);   // November: no sun season
     const jun = await dayRide('2026-06-20');
     await jun.page.run('receiveHandoff()');
@@ -673,6 +677,152 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
     await long.page.run('planTripBags()');
     expect(long.json<number>('planRoute().hoursDay')).toBeGreaterThan(6);
     expect([on(long, 'food'), on(long, 'bank')]).toEqual([true, true]);
+    // rain is likely on this route in June: the rain trousers come along, so the check asks for nothing here either (review of PR 92, M1)
+    expect(long.json<number>('tripClimate().wetChance')).toBeGreaterThan(33);
+    expect(on(long, 'rainpants')).toBe(true);
+    expect(long.json<string[]>('audit().miss.flatMap(m=>m.ids)')).toEqual([]);
+  });
+
+  test('a hot July day ride packs no insulated jacket and no long gloves, and the check does not ask for them; a night out keeps the night rule (owner, 9 Nov 2026; review of PR 92, I1)', async () => {
+    const jul = await dayRide('2026-07-20');
+    await jul.page.run('receiveHandoff()');
+    await jul.page.run('planTripBags()');
+    const c = jul.json<{ nightCold: number; dayHot: number }>('tripClimate()');
+    expect(c.dayHot).toBeGreaterThanOrEqual(32);   // warm days to 32 °C
+    expect(c.nightCold).toBeLessThan(11);          // while the month's cold nights alone would still call for the jacket
+    expect(jul.json<boolean>(`carrying('puffy')`)).toBe(false);
+    expect(jul.json<boolean>('dayRideWearsJacket()')).toBe(false);
+    expect(jul.json<boolean>(`carrying('gloves')`)).toBe(false);
+    expect(jul.json<string[]>('audit().miss.flatMap(m=>m.ids)')).toEqual([]);
+    expect(jul.json<boolean>('$("smallWear").hidden')).toBe(true);
+    // the same weather with one night: the evening counts, and the check asks for the jacket by the night as before
+    jul.page.run('S.nights=1;');
+    expect(jul.json<string[]>('audit().miss.flatMap(m=>m.ids)')).toContain('puffy');
+    expect(jul.json<string>(`audit().miss.find(m=>m.ids.includes('puffy')).d`)).toMatch(/^Nights drop to about/);
+    jul.page.run('S.nights=0;');
+    // a cold November day ride: the jacket is worn (owner, 9 Nov 2026: "Worn, one spare tube"), so the check does not ask to pack it,
+    // and the small view says to wear it, in one line
+    const nov = await dayRide('2026-11-15');
+    await nov.page.run('receiveHandoff()');
+    await nov.page.run('planTripBags()');
+    expect(nov.json<boolean>(`carrying('puffy')`)).toBe(false);
+    expect(nov.json<string[]>('audit().miss.flatMap(m=>m.ids)')).toEqual([]);
+    expect(nov.json<boolean>('$("smallWear").hidden')).toBe(false);
+    expect(String(nov.page.nodes.get('smallWear')!.textContent)).toBe('Wear: insulated jacket.');
+    // packed by the rider in the full planner, it is in a bag again, and the wear line goes
+    nov.page.run('S.kit.puffy=true;S.kitTouched.puffy=true;renderSmallBags();');
+    expect(nov.json<boolean>('$("smallWear").hidden')).toBe(true);
+  });
+
+  test('a bike with no bottle mounts still carries water on a day ride: in a bag the planner\'s own placement rules choose, and the water line says where (review of PR 92, I2)', async () => {
+    for (const fit of [{ style: 'diamond', bolts: { st: 'no', dt: 'no', un: 'no' } }, { style: 'step-through' }]) {
+      const p = await dayRide('2026-11-15');
+      p.page.run(`S.bikeProfile=normaliseBikeProfile({id:'b_nocage',name:'No cages',fit:${JSON.stringify(fit)}});applyTripKitDefaults();`);
+      await p.page.run('receiveHandoff()');
+      expect(await p.page.run('planTripBags()')).toBe(true);
+      expect(p.json<number>('liveBottles().length'), fit.style).toBe(0);
+      expect(p.json<boolean>(`carrying('water')`), fit.style).toBe(true);
+      expect(p.json('currentPlan().spill.map(k=>k.id)'), fit.style).toEqual([]);
+      const bag = p.json<string>(`getChecklistModel(currentPlan()).groups.find(g=>g.items.some(r=>r.id==='water')).title`);
+      expect(String(p.page.nodes.get('smallWater')!.textContent), fit.style).toBe(`Water: a bottle in the ${bag.toLowerCase()}, since this bike has no bottle cage mounts.`);
+      expect(String(p.page.nodes.get('smallBagList')!.innerHTML)).toMatch(/<li>Water bottle<\/li>/);
+    }
+    // with bottle cages, the bottles carry the water and no extra water goes in a bag
+    const caged = await dayRide('2026-11-15');
+    await caged.page.run('receiveHandoff()');
+    await caged.page.run('planTripBags()');
+    expect(caged.json<number>('liveBottles().length')).toBe(1);
+    expect(caged.json<boolean>(`carrying('water')`)).toBe(false);
+  });
+
+  test('the phone rides in a bag it is meant for (top tube or frame bag), not under the jackets in the seat pack (review of PR 92, I3)', async () => {
+    const { page, json } = await dayRide('2026-11-15');
+    await page.run('receiveHandoff()');
+    await page.run('planTripBags()');
+    const phoneIn = json<string>(`(P=>P.units[P.items.phone[0][0]].pos)(currentPlan())`);
+    expect(['top', 'frame']).toContain(phoneIn);
+    expect(json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+    expect(json('currentPlan().reach.outOfReach')).toEqual([]);
+  });
+
+  test('an afternoon ride gets a top tube bag and/or a frame bag and one bottle; the seat pack only when those truly cannot hold the day kit (owner, 9 Nov 2026)', async () => {
+    // "No one on an afternoon ride uses the seat pack. It's always top tube and frame bag, and mostly only one, and one bottle of water."
+    // the owner's ride in July: the day kit fits the top tube and frame bags, so no seat pack
+    const jul = await dayRide('2026-07-20');
+    await jul.page.run('receiveHandoff()');
+    expect(await jul.page.run('planTripBags()')).toBe(true);
+    expect(jul.json<number>('dayRideHours()')).toBeLessThanOrEqual(jul.json<number>('PACE.hard.hours'));
+    expect(jul.json('S.bags.filter(b=>isBottle(b.pos)).map(b=>b.slot)')).toEqual(['dt']);
+    const julPos = jul.json<string[]>('gearBags().map(b=>b.pos)');
+    expect(julPos.every((p) => p === 'top' || p === 'frame')).toBe(true);
+    expect(julPos.length).toBeGreaterThan(0);
+    expect(jul.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+    expect(String(jul.page.nodes.get('smallWater')!.textContent)).toBe('Water: one bottle (0.75 L) in the frame cage. Refill on the way.');
+    expect(julPos.sort()).toEqual(['frame', 'top']);   // the July case as before the jacket and tube ruling
+    // and in November: the jacket is worn and one spare tube rides (owner, 9 Nov 2026: "Worn, one spare tube"), so the day kit fits
+    // the top tube and frame bags too: one bottle, no seat pack, no handlebar roll
+    const nov = await dayRide('2026-11-15');
+    await nov.page.run('receiveHandoff()');
+    await nov.page.run('planTripBags()');
+    expect(nov.json('S.bags.filter(b=>isBottle(b.pos)).map(b=>b.slot)')).toEqual(['dt']);
+    const novPos = nov.json<string[]>('gearBags().map(b=>b.pos)');
+    expect(novPos.length).toBeGreaterThan(0);
+    expect(novPos.every((p) => p === 'top' || p === 'frame')).toBe(true);
+    expect(nov.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+  });
+
+  test('a day ride carries one spare tube, not two, and the small view names it so; a trip with a night keeps two (owner, 9 Nov 2026)', async () => {
+    const nov = await dayRide('2026-11-15');
+    await nov.page.run('receiveHandoff()');
+    await nov.page.run('planTripBags()');
+    expect(nov.json<boolean>(`carrying('tubes')`)).toBe(true);
+    expect(nov.json<number>(`itemL(kitById('tubes'))`)).toBe(0.35);
+    expect(nov.json<number>(`itemKg(kitById('tubes'))`)).toBeCloseTo(0.18, 2);
+    expect(String(nov.page.nodes.get('smallBagList')!.innerHTML)).toMatch(/<li>Spare tube<\/li>/);
+    expect(String(nov.page.nodes.get('smallBagList')!.innerHTML)).not.toMatch(/Spare tubes ×2/);
+    expect(nov.json<string[]>('audit().miss.flatMap(m=>m.ids)')).toEqual([]);
+    // Undo gives the plan back exactly, the tube's size included
+    const back = await dayRide('2026-11-15');
+    await back.page.run('receiveHandoff()');
+    const before = back.page.run('JSON.stringify(captureDraft())');
+    await back.page.run('planTripBags()');
+    expect(await back.page.run('undoTripBags()')).toBe(true);
+    expect(back.page.run('JSON.stringify(captureDraft())')).toBe(before);
+    // a size the rider set is the rider's: it stays
+    const own = await dayRide('2026-11-15');
+    own.page.run(`S.custom.tubes={L:0.5,kg:0.2,rigid:0};`);
+    await own.page.run('receiveHandoff()');
+    await own.page.run('planTripBags()');
+    expect(own.json('S.custom.tubes')).toEqual({ L: 0.5, kg: 0.2, rigid: 0 });
+    // one night in November: two tubes and the jacket packed, as before
+    const night = longPlanner((await handedOff('loop', { nights: 1 }, '2026-11-15', 0.4)).gpx);
+    night.page.run(`S.bags=[];S.nextUid=1;S.bikeProfile=null;S.kit={};S.kitTouched={};S.custom={};S.qty={};S.packed={};S.pinned={};applyTripKitDefaults();`);
+    await night.page.run('receiveHandoff()');
+    await night.page.run('planTripBags()');
+    expect(night.json('S.nights')).toBe(1);
+    expect(night.json<number>(`itemL(kitById('tubes'))`)).toBe(0.7);
+    expect(night.json<boolean>(`carrying('puffy')`)).toBe(true);
+  });
+
+  test('a very long single push (beyond the hard pace\'s dawn-to-dusk day) may take the seat pack and both cages, as before', async () => {
+    const long = await dayRide('2026-06-20', { route: 'heidelberg-strasbourg' });
+    await long.page.run('receiveHandoff()');
+    await long.page.run('planTripBags()');
+    expect(long.json<number>('dayRideHours()')).toBeGreaterThan(long.json<number>('PACE.hard.hours'));
+    expect(long.json('S.bags.filter(b=>isBottle(b.pos)).map(b=>b.slot).sort()')).toEqual(['dt', 'st']);
+    expect(long.json<string[]>('gearBags().map(b=>b.pos)')).toContain('seat');
+    expect(String(long.page.nodes.get('smallWater')!.textContent)).toBe('Water: 2 bottles (1.25 L) in the frame cages. Refill on the way.');
+    expect(long.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+  });
+
+  test('the small view\'s water line names the bottles and where they are, never an amount planned for the ride; each bag is a heading, not a landmark (review of PR 92, M2, M5)', async () => {
+    const { page } = await dayRide('2026-11-15');
+    await page.run('receiveHandoff()');
+    await page.run('planTripBags()');
+    expect(String(page.nodes.get('smallWater')!.textContent)).toBe('Water: one bottle (0.75 L) in the frame cage. Refill on the way.');
+    const list = String(page.nodes.get('smallBagList')!.innerHTML);
+    expect(list).toMatch(/<h3>/);
+    expect(list).not.toMatch(/<section|aria-label/);
   });
 
   test('the rider\'s own bags in the plan here are used, never replaced; Undo brings back the plan and the setups exactly', async () => {
@@ -689,7 +839,8 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
 
   test('when even the whole typical setup cannot hold the kit, the small view says what is over and what to do, in one line', async () => {
     const { page, json } = await dayRide('2026-11-15');
-    page.run(`S.kit.shoes=true;S.kitTouched.shoes=true;S.qty.shoes=6;`);
+    // nine pairs (it was six): the day kit is smaller since the jacket is worn and one tube rides (owner, 9 Nov 2026)
+    page.run(`S.kit.shoes=true;S.kitTouched.shoes=true;S.qty.shoes=9;`);
     await page.run('receiveHandoff()');
     expect(await page.run('planTripBags()')).toBe(true);
     expect(json<number>('currentPlan().spill.length')).toBeGreaterThan(0);
