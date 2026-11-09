@@ -68,7 +68,8 @@ export function createUpdater(env: UpdaterEnv) {
     note.value = '';
     const finish = async (key?: keyof typeof U) => {
       applying = false;
-      note.value = key ? (await import('../core/wording/en-update.ts')).U[key] : '';
+      // If the words chunk cannot be fetched, a short plain line still tells the rider the update did not go through.
+      note.value = key ? await import('../core/wording/en-update.ts').then((m) => m.U[key], () => 'Update not applied.') : '';
     };
     let saved = false;
     try {
