@@ -217,11 +217,8 @@ test('[C-HANDOFF] a trip from Wayfinch in a real browser: the bar asks, Apply lo
   expect(errors).toEqual([]);
 });
 
-test('[TRIP-BAGS-LONG] a 2-night trip from Wayfinch in a real browser: Plan bags for this trip opens Bags with a new trip setup and the plan before kept; Undo brings it all back', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
-  await plannerWithPlan(page);
-  const gpx = readFileSync(join(process.cwd(), 'contracts', 'handoff', 'heidelberg-strasbourg.gpx'), 'utf8');
+/** The co-pilot's handoff as it writes it (src/store/db.ts and src/ui/trip/handoff.ts): the GPX in its database, the envelope. */
+async function handOver(page: Page, gpx: string): Promise<void> {
   await page.evaluate(async ({ gpx, id }) => {
     await new Promise<void>((resolve, reject) => {
       const req = indexedDB.open('copilot', 1);
@@ -236,6 +233,14 @@ test('[TRIP-BAGS-LONG] a 2-night trip from Wayfinch in a real browser: Plan bags
     });
     localStorage.setItem('copilot:handoff:v1', JSON.stringify({ app: 'copilot', kind: 'handoff', v: 1, id, createdAt: new Date().toISOString() }));
   }, { gpx, id: ID });
+}
+const handoffFixture = () => readFileSync(join(process.cwd(), 'contracts', 'handoff', 'heidelberg-strasbourg.gpx'), 'utf8');
+
+test('[TRIP-BAGS-LONG] a 2-night trip from Wayfinch in a real browser: Plan bags for this trip opens Bags with a new trip setup and the plan before kept; Undo brings it all back', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await plannerWithPlan(page);
+  await handOver(page, handoffFixture());
   const before = await page.evaluate('JSON.stringify(captureDraft())');
   const setupsBefore = await page.evaluate(() => localStorage.getItem('loadcheck:setups'));
   await openFresh(page, `/tools/bags/#copilot-handoff=${ID}`);
@@ -259,6 +264,33 @@ test('[TRIP-BAGS-LONG] a 2-night trip from Wayfinch in a real browser: Plan bags
   await expect(page.locator('#handoffText')).toContainText('Undone');
   expect(await page.evaluate('JSON.stringify(captureDraft())')).toBe(before);
   expect(await page.evaluate(() => localStorage.getItem('loadcheck:setups'))).toBe(setupsBefore ?? '[]');
+  expect(errors).toEqual([]);
+});
+
+test('[TRIP-SMALL] a day ride from Wayfinch in a real browser: the small view shows the bike with its bags and what is in each bag, nothing else; the full planner is one tap away', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await plannerWithPlan(page);
+  await handOver(page, handoffFixture().replace('nights="2"', 'nights="0"'));
+  await openFresh(page, `/tools/bags/#copilot-handoff=${ID}`);
+  await ready(page);
+  await expect(page.locator('#handoffText')).toContainText('a day ride');
+  await page.locator('#handoffPlan').click();
+  await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('#smallHead')).toBeVisible();
+  await expect(page.locator('#smallTripLine')).toContainText('day ride');
+  await expect(page.locator('#rigSvg')).toBeVisible();
+  await expect(page.locator('#packingChecklist .packing-groups')).toBeVisible();
+  for (const hidden of ['#crumbs', '#resultBox', '#modeBar', '#verdictBox', '.nightsbar', '#rigTools', '#packingUnpackedOnly', '#printPackingChecklist'])
+    await expect(page.locator(hidden).first()).toBeHidden();
+  await expect(page.locator('.wf-bar')).toBeVisible();   // the one top bar stays
+  expect(await page.evaluate('[S.step, S.nights]')).toEqual([4, 0]);
+  const plan = await page.evaluate('JSON.stringify(currentPlan())');
+  await page.locator('#smallFull').click();
+  await expect(page.locator('#smallHead')).toBeHidden();
+  await expect(page.locator('#crumbs')).toBeVisible();
+  await expect(page.locator('#resultBox')).toBeVisible();
+  expect(await page.evaluate('JSON.stringify(currentPlan())')).toBe(plan);
   expect(errors).toEqual([]);
 });
 
