@@ -442,7 +442,7 @@ export async function prepareTrip(deps: PrepareDeps, onProgress: (step: StepName
     // With places saved, each day ends at a place to sleep near its planned end (owner, 9 Nov 2026), before the forecast and the
     // archive are asked for its grid. A chunk of its own; its failure keeps the planned ends.
     try {
-      await (await import('./day-stops.ts')).settleStops(deps.now());
+      await (await import('./day-stops.ts')).settleStops(deps.now(), undefined, { announce: false });
     } catch (e) {
       if (routeGone(e)) throw e;
     }

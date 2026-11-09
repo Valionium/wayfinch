@@ -39,7 +39,7 @@ export async function stopChoices(now: Date, day: number): Promise<BedChoice[]> 
  * Settles the stops of the stored trip, with the rider's change if any, and writes the trip when its days change. Resolves to the
  * stops now in force, or null when there are none (no places saved, a day ride, or the route gone meanwhile).
  */
-export async function settleStops(now: Date, change?: StopChange): Promise<TripStops | null> {
+export async function settleStops(now: Date, change?: StopChange, o: { announce?: boolean } = {}): Promise<TripStops | null> {
   const inputs = await readInputs(now);
   if (!inputs) return null;
   const { trip } = inputs;
@@ -68,7 +68,8 @@ export async function settleStops(now: Date, change?: StopChange): Promise<TripS
   const { stops: _old, ...rest } = stored;
   void _old;
   await saveTrip({ ...rest, route: { ...stored.route, stages, sampleGrid: grid }, ...(next ? { stops: next } : {}) });
-  // Trip and En route in this window read the new days at once; other windows by the store's own mark.
-  announceHere('trip');
+  // Trip and En route in this window read the new days at once; other windows by the store's own mark. Prepare this route says
+  // nothing mid-run: a screen read again then would drop its run's own ending (Ahead's waiting card), and the run's end reads all.
+  if (o.announce !== false) announceHere('trip');
   return next;
 }
