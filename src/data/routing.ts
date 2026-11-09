@@ -168,8 +168,11 @@ export async function planRoute(a: LatLon, b: LatLon, fetchIt: Fetch, routers: r
 
 // ---- place search ---------------------------------------------------------------------------------------------------------
 
-/** `source`: whose data the hit is, for its credit: Open-Meteo's geocoding answers from GeoNames (CC BY 4.0), Photon from OpenStreetMap. */
-export type FoundPlace = { name: string; where: string; lat: number; lon: number; source: 'geonames' | 'osm' };
+/**
+ * `source`: whose data the hit is, for its credit: Open-Meteo's geocoding answers from GeoNames (CC BY 4.0), Photon from OpenStreetMap.
+ * `street` (street and number) and `kind` (what it is: station, camp site) are only there when Photon gave them and they add to the name.
+ */
+export type FoundPlace = { name: string; where: string; lat: number; lon: number; source: 'geonames' | 'osm'; street?: string; kind?: string };
 
 const METEO_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 const PHOTON_URL = 'https://photon.komoot.io/api/';
@@ -192,15 +195,40 @@ function meteoHits(answer: unknown): FoundPlace[] {
 
 const PHOTON_KEYS = ['place', 'natural', 'water', 'waterway', 'mountain_pass', 'boundary'];
 
-function photonHits(answer: unknown): FoundPlace[] {
+/** What a hit is, in words: Photon's own value (`camp_site`), shown only when it is not a plain town or an unnamed building. */
+const kindOf = (key: unknown, value: unknown): string | undefined => {
+  const v = clean(value, 40).replace(/_/g, ' ');
+  return key === 'place' || v === '' || v === 'yes' ? undefined : v;
+};
+
+/** Hits from Photon. `broad`: an address or a named place was asked for, so streets, house numbers, stations and the like stay. */
+function photonHits(answer: unknown, broad: boolean): FoundPlace[] {
   const features = isRecord(answer) && Array.isArray(answer.features) ? (answer.features as unknown[]) : [];
   const out: FoundPlace[] = [];
+  const seen = new Set<string>();
   for (const f of features) {
     if (!isRecord(f) || !isRecord(f.properties) || !isRecord(f.geometry) || f.geometry.type !== 'Point' || !Array.isArray(f.geometry.coordinates)) continue;
     const [lon, lat] = f.geometry.coordinates as unknown[];
     const p = f.properties;
-    if (clean(p.name, 160) === '' || !validLatLon(lat, lon) || !PHOTON_KEYS.includes(String(p.osm_key))) continue;
-    out.push({ name: clean(p.name, 160), where: joined([p.city, p.state, p.country]), lat, lon: lon as number, source: 'osm' });
+    if (!validLatLon(lat, lon) || (!broad && !PHOTON_KEYS.includes(String(p.osm_key)))) continue;
+    const road = clean(p.street, 100);
+    const number = clean(p.housenumber, 20);
+    const roadLine = road === '' ? '' : number === '' ? road : `${road} ${number}`;
+    const name = clean(p.name, 160) || (broad ? roadLine : '');
+    if (name === '') continue;
+    const town = clean(p.city, 80) || clean(p.locality, 80) || clean(p.district, 80) || clean(p.county, 80);
+    const postcodeTown = [clean(p.postcode, 12), town].filter((x) => x !== '').join(' ');
+    const where = joined([postcodeTown, p.state, p.country]);
+    const hit: FoundPlace = { name, where, lat, lon: lon as number, source: 'osm' };
+    if (broad) {
+      if (roadLine !== '' && roadLine !== name) hit.street = roadLine;
+      const kind = kindOf(p.osm_key, p.osm_value);
+      if (kind) hit.kind = kind;
+    }
+    const key = `${name}|${hit.street ?? ''}|${where}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(hit);
   }
   return out.slice(0, MAX_HITS);
 }
@@ -215,24 +243,33 @@ const isFeature = (q: string): boolean => FEATURE_WORD.test(withoutAccents(q)) |
 const viaMeteo = async (q: string, f: Fetch): Promise<FoundPlace[]> =>
   meteoHits(await getJson(f, `${METEO_URL}?name=${encodeURIComponent(q)}&count=${MAX_HITS}&language=en&format=json`, SEARCH_MS));
 
-async function viaPhoton(q: string, f: Fetch): Promise<FoundPlace[]> {
+const STREET_WORD = /(?:stra(?:ss|ß)e|str\.|weg|platz|allee|gasse|damm|ufer|chaussee|steig|pfad)(?![a-zäöüß])|\b(?:ring|street|road|avenue|lane|boulevard|rue|via|strada|calle|carrer|straat)\b/i;
+const PLACE_WORD = /(?:bahnhof|camping|zeltplatz|hotel|pension|gasthof|gasthaus|herberge|hütte|huette|krankenhaus|supermarkt|haltestelle)|\b(?:hbf|bhf|station|gare|stazione|campsite|hostel|hut|refuge|restaurant|apotheke|pharmacy|supermarket|hospital|schloss|castle|museum)\b/i;
+
+/** Text that names a street, a house number, a postcode or a known kind of place: Photon gets it without the town filters. */
+export const isAddressOrNamedPlace = (q: string): boolean => /\d/.test(q) || STREET_WORD.test(q) || PLACE_WORD.test(q);
+
+async function viaPhoton(q: string, f: Fetch, broad = false): Promise<FoundPlace[]> {
   const url = new URL(PHOTON_URL);
   url.searchParams.set('q', q);
   url.searchParams.set('limit', String(MAX_HITS));
   url.searchParams.set('lang', 'en');
-  // Fixed filters, so a search finds places and not shops or streets of a similar name.
-  for (const tag of ['place', 'natural', 'water', 'waterway', 'mountain_pass', 'boundary:administrative']) url.searchParams.append('osm_tag', tag);
-  return photonHits(await getJson(f, url.toString(), SEARCH_MS));
+  // Fixed filters, so a plain place search finds places and not shops or streets of a similar name; an address search has none.
+  if (!broad) for (const tag of ['place', 'natural', 'water', 'waterway', 'mountain_pass', 'boundary:administrative']) url.searchParams.append('osm_tag', tag);
+  return photonHits(await getJson(f, url.toString(), SEARCH_MS), broad);
 }
 
 /**
- * Places for the words typed: Open-Meteo's geocoding for towns, Photon for natural features, each the fallback of the other. Only
- * the text is sent. An empty list means nothing was found; both services failing throws.
+ * Places for the words typed: Open-Meteo's geocoding for towns, Photon for natural features, addresses and named places (streets,
+ * house numbers, stations, campsites, hotels), each the fallback of the other. One request to the first service, one more to the
+ * other only when the first found nothing or failed. Only the text is sent. An empty list means nothing was found; both services
+ * failing throws.
  */
 export async function searchPlace(text: string, fetchIt: Fetch): Promise<FoundPlace[]> {
   const q = text.trim();
   if (q.length < 2 || q.length > 200) return [];
-  const order = isFeature(q) ? [viaPhoton, viaMeteo] : [viaMeteo, viaPhoton];
+  const broad = isAddressOrNamedPlace(q);
+  const order = broad ? [(a: string, b: Fetch) => viaPhoton(a, b, true), viaMeteo] : isFeature(q) ? [viaPhoton, viaMeteo] : [viaMeteo, viaPhoton];
   let failures = 0;
   for (const ask of order) {
     try {

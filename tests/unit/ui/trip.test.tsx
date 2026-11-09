@@ -631,6 +631,28 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     expect(net.urls.some((u) => /routed-(foot|car)|project-osrm|profile=(car|foot)/.test(u))).toBe(false);
   });
 
+  test('[AB-SEARCH] an address search shows each hit with street, kind, postcode and town as a labelled list of buttons, with the OpenStreetMap credit', async () => {
+    const feature = (city: string, postcode: string) => ({ type: 'Feature', properties: { housenumber: '12', street: 'Hauptstraße', postcode, city, country: 'Germany', osm_key: 'building', osm_value: 'yes' }, geometry: { type: 'Point', coordinates: [8.69, 49.4] } });
+    const fetchStub = ((input: string | URL | Request) => {
+      const url = String(input);
+      if (url.startsWith('https://photon.komoot.io/')) return Promise.resolve(new Response(JSON.stringify({ features: [feature('Heidelberg', '69117'), feature('Wiesloch', '69168')] }), { status: 200 }));
+      return Promise.resolve(new Response('no', { status: 503 }));
+    }) as typeof fetch;
+    await show(services({ fetch: fetchStub }));
+    await type('ab-from', 'Hauptstraße 12');
+    await until(() => host.querySelectorAll('button.hit').length === 2, 'two hits');
+    const list = host.querySelector('ul.hits')!;
+    expect(list.getAttribute('aria-label')).toBe(`${TR.appAbList}: ${TR.appAbFrom}`);
+    const hits = [...host.querySelectorAll('button.hit')].map((b) => b.textContent);
+    expect(hits[0]).toContain('Hauptstraße 12');
+    expect(hits[0]).toContain('69117 Heidelberg');
+    expect(hits[1]).toContain('69168 Wiesloch');
+    expect(host.querySelector('[role=status]')?.textContent).toContain(TR.appAbPick);
+    expect(host.querySelector('a[href="https://www.openstreetmap.org/copyright"]')).not.toBeNull();
+    await click(host.querySelector('button.hit')!);
+    expect(text()).toContain('69117 Heidelberg');
+  });
+
   test('[AB-SEARCH] nothing found and a failing search each say so in words, and a failed search is not "nothing found"', async () => {
     const net = network(true);
     await show(services({ fetch: net.fetch }));
