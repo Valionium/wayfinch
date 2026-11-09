@@ -89,4 +89,19 @@ describe('the ideal from the rider\'s own setup, with and without panniers (the 
     render(host, input());
     expect(host.querySelector('.wm-same')).toBeNull();
   });
+
+  // Review of PR 78: I2 (an ideal that would put more on the back says why), m1 (more kilos than yours is said), I1 (no claim of the best).
+  test('[WM-IDEAL] an ideal that would put more on the back says why; one carrying the things left over says so; no claim of "the best"', () => {
+    render(host, input({ which: 'without', ideal: { why: 'back' } }));
+    expect(cards()[1]!.querySelector('.wm-sum')!.textContent).toBe(WM.why.back);
+    render(host, input({ which: 'with', ideal: { why: 'backWith' } }));
+    expect(cards()[1]!.querySelector('.wm-sum')!.textContent).toBe(WM.why.backWith);
+    render(host, input({ which: 'with', ideal: { kind: 'added', items: IDEAL, same: false, more: true } }));
+    expect(cards()[1]!.querySelector('figcaption')!.textContent).toBe(`${WM.idealWith} ${WM.idealSub.addedMore}`);
+    render(host, input({ which: 'with', ideal: { kind: 'added', items: IDEAL, same: false, more: false } }));
+    expect(cards()[1]!.querySelector('figcaption')!.textContent).toBe(`${WM.idealWith} ${WM.idealSub.added}`);
+    // the search is a careful one, not a proof: the words say what it found
+    for (const s of [...Object.values(WM.idealSub), WM.idealSame]) expect(s).not.toMatch(/the best balance(?! the planner found)/);
+    expect(WM.idealSame).not.toMatch(/already has the best/);
+  });
 });

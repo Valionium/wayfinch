@@ -3,6 +3,7 @@ import { balance, keepsPromises, MAX_BALANCE_TRIALS } from '../../../../src/core
 import type { Packing } from '../../../../src/core/advisor/balance.ts';
 import { handlingScore } from '../../../../src/core/advisor/rank.ts';
 import type { Pos, TrialResult } from '../../../../src/core/advisor/types.ts';
+import { WEIGHTS } from '../../../../src/core/advisor/table.ts';
 
 // A stand-in packer: the plan's own assignment, with the pins on top (a pin into a bag with too little room stays where it was, as the
 // planner's "not kept"). Must-reach items count out of reach in a bag the rider cannot reach while riding.
@@ -36,6 +37,57 @@ function packer(bags: Bag[], items: Item[], plan: Record<string, string>) {
     };
   };
   return { start: pack({}), trial: (pins: Record<string, string>) => { calls++; return pack(pins); }, calls: () => calls };
+}
+
+// A stand-in closer to the planner's kept plan: every pinned item is taken out first, then placed in its pinned bag when it fits there
+// (else back where it was, else left over), and food (`food`) is no piece: it fills the gaps last, lightest position first, and what
+// does not fit is left over. A bag's free litres are what is left after the food; `fillL` is the food's litres in it.
+type FItem = Item & { food?: boolean };
+const order = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+function repacker(bags: Bag[], items: FItem[], plan: Record<string, string>) {
+  const bag = (key: string) => bags.find((b) => b.key === key)!;
+  const byLight = [...bags].sort((a, b) => WEIGHTS[a.pos] - WEIGHTS[b.pos] || order(a.key, b.key));
+  const pack = (pins: Record<string, string>): Packing => {
+    const at: Record<string, string> = {};
+    const left = new Map(bags.map((b) => [b.key, b.cap]));
+    const solid = items.filter((it) => !it.food);
+    const put = (id: string, key: string, L: number) => { at[id] = key; left.set(key, left.get(key)! - L); };
+    for (const it of solid) if (!(it.id in pins)) put(it.id, plan[it.id]!, it.L);
+    let overL = 0;
+    const spillIds: string[] = [];
+    for (const it of solid.filter((x) => x.id in pins)) {
+      const key = [pins[it.id]!, plan[it.id]!].find((k) => left.get(k)! + 1e-9 >= it.L);
+      if (key) put(it.id, key, it.L);
+      else { overL += it.L; spillIds.push(it.id); }
+    }
+    const kgByPos: Partial<Record<Pos, number>> = {};
+    const add = (p: Pos, kg: number) => { kgByPos[p] = (kgByPos[p] ?? 0) + kg; };
+    const fill = new Map(bags.map((b) => [b.key, 0]));
+    for (const it of items.filter((x) => x.food)) {
+      let need = it.L;
+      for (const b of byLight) {
+        const take = Math.min(need, left.get(b.key)!);
+        if (take <= 1e-9) continue;
+        left.set(b.key, left.get(b.key)! - take); fill.set(b.key, fill.get(b.key)! + take); add(b.pos, (it.kg * take) / it.L); need -= take;
+      }
+      overL += need;
+    }
+    for (const it of solid) if (at[it.id]) add(bag(at[it.id]!).pos, it.kg);
+    const onBack = (key: string) => bag(key).pos === 'pack';
+    const back = solid.filter((it) => at[it.id] && onBack(at[it.id]!));
+    const result: TrialResult = {
+      overL: +overL.toFixed(2), spillIds,
+      backL: back.reduce((t, x) => t + x.L, 0) + bags.filter((b) => onBack(b.key)).reduce((t, b) => t + fill.get(b.key)!, 0),
+      backKg: back.reduce((t, x) => t + x.kg, 0),
+      outOfReach: solid.filter((it) => it.reach && at[it.id] && !bag(at[it.id]!).reach).length, kgByPos, items: {},
+    };
+    return {
+      result,
+      pieces: solid.filter((it) => at[it.id]).map((it) => ({ id: it.id, kg: it.kg, L: it.L, unit: at[it.id]!, pos: bag(at[it.id]!).pos })),
+      rooms: bags.map((b) => ({ key: b.key, pos: b.pos, freeL: +left.get(b.key)!.toFixed(2), fillL: +fill.get(b.key)!.toFixed(2) })),
+    };
+  };
+  return { start: pack({}), trial: (pins: Record<string, string>) => pack(pins) };
 }
 
 const BAGS: Bag[] = [
@@ -95,6 +147,49 @@ describe('balancing in the rider\'s own bags (weight map design §7)', () => {
     expect(keepsPromises(base, { ...base, overL: 0, spillIds: [] })).toBe(true);
     expect(keepsPromises(base, { ...base, backL: 3.1 })).toBe(false);
     expect(keepsPromises(base, { ...base, outOfReach: 2 })).toBe(false);
+  });
+
+  // Review of PR 78, I1: the search also swaps two things, and uses the room the planner's re-pack makes (food fills the gaps last).
+  test('[WM-BALANCE] swaps two things when neither single move fits: a full frame bag\'s light jacket for the heavy small lock on the back', () => {
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 2, reach: true }, { key: 'p-0', pos: 'pack', cap: 30, reach: true }];
+    const items: Item[] = [{ id: 'jacket', kg: 0.3, L: 1.5 }, { id: 'lock', kg: 1.2, L: 1.5 }, { id: 'clothes', kg: 0.8, L: 8 }];
+    const p = repacker(bags, items, { jacket: 'f-0', lock: 'p-0', clothes: 'p-0' });
+    expect(p.start.rooms.find((r) => r.key === 'f-0')!.freeL).toBe(0.5); // the lock alone does not fit
+    const out = balance(p.start, p.trial);
+    expect(out.pins).toEqual({ lock: 'f-0', jacket: 'p-0' });
+    expect(out.moves).toEqual([{ id: 'jacket', from: 'f-0', to: 'p-0' }, { id: 'lock', from: 'p-0', to: 'f-0' }]);
+    expect(keepsPromises(p.start.result, out.packing.result)).toBe(true);
+    expect(handlingScore(out.packing.result)).toBeCloseTo(handlingScore(p.start.result) - 0.9 * 2.5, 2);
+    expect(balance(p.start, p.trial)).toEqual(out);
+  });
+
+  test('[WM-BALANCE] a swap that puts more litres on the back is never kept', () => {
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 3, reach: true }, { key: 'p-0', pos: 'pack', cap: 30, reach: true }];
+    const items: Item[] = [{ id: 'jacket', kg: 0.3, L: 3 }, { id: 'lock', kg: 1.2, L: 1.5 }];
+    const p = repacker(bags, items, { jacket: 'f-0', lock: 'p-0' });
+    const out = balance(p.start, p.trial);
+    expect(out.moves).toEqual([]);
+    expect(out.tried).toBe(1); // the swap was tried, and refused
+  });
+
+  test('[WM-BALANCE] a move into a bag whose free litres the food takes is tried: the re-pack puts the food elsewhere', () => {
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 4, reach: true }, { key: 's-0', pos: 'seat', cap: 14, reach: false }];
+    const items: FItem[] = [{ id: 'food', kg: 1, L: 3, food: true }, { id: 'stove', kg: 0.8, L: 2 }];
+    const p = repacker(bags, items, { stove: 's-0' });
+    expect(p.start.rooms.find((r) => r.key === 'f-0')!.freeL).toBe(1); // the food went first into the frame bag
+    const out = balance(p.start, p.trial);
+    expect(out.pins).toEqual({ stove: 'f-0' });
+    expect(keepsPromises(p.start.result, out.packing.result)).toBe(true);
+    expect(handlingScore(out.packing.result)).toBeLessThan(handlingScore(p.start.result) - 0.01);
+  });
+
+  test('[WM-BALANCE] a move refused before is tried again once another move changed the packing', () => {
+    const items: Item[] = [{ id: 'tent', kg: 2, L: 4 }, { id: 'book', kg: 1, L: 1 }];
+    const p = packer(BAGS, items, { tent: 's-0', book: 's-0' });
+    // the planner refuses the tent anywhere while the book has not moved: the tent's best move, refused first, is kept once it has
+    const trial = (pins: Record<string, string>) => (pins.tent && !pins.book ? p.start : p.trial(pins));
+    const out = balance(p.start, trial);
+    expect(out.pins).toEqual({ book: 'f-0', tent: 'f-0' });
   });
 
   test('[WM-BALANCE] at most MAX_BALANCE_TRIALS trials: the answer is then marked partial', () => {

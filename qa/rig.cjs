@@ -283,7 +283,7 @@ test('[WM-PAGE] the weight map reads the plan as the rig draws it: each packed b
 
 // The owner's finding G (8 Nov 2026): the ideal is the rider's own setup, not a fixed profile; with panniers and without, switchable.
 const IDEAL=`(()=>{const i=weightMapInput();const kg=l=>l.reduce((t,x)=>t+x.kg,0);const w=l=>l.reduce((t,x)=>t+x.kg*(window.WayfinchAdvisor.WEIGHTS[x.pos]||1),0);
-  const d=i.ideal;return {which:i.which,why:d.why||null,kind:d.kind||null,same:!!d.same,yours:kg(i.items),ideal:d.items?kg(d.items):null,
+  const d=i.ideal;return {which:i.which,why:d.why||null,kind:d.kind||null,same:!!d.same,more:!!d.more,yours:kg(i.items),ideal:d.items?kg(d.items):null,
   wy:w(i.items),wi:d.items?w(d.items):null,racks:d.items?d.items.filter(x=>x.pos==='rack').length:null,
   outlines:d.items?d.items.every(x=>x.outline.length>=3):null,back:d.items?kg(d.items.filter(x=>x.pos==='pack')):null,yoursBack:kg(i.items.filter(x=>x.pos==='pack'))};})()`;
 const ideal=which=>{run(`WEIGHT_MAP.which=${JSON.stringify(which)}`);return json(IDEAL);};
@@ -327,7 +327,7 @@ test("[WM-IDEAL] the page's ideal is the rider's own things and kilos in the rid
   run('WEIGHT_MAP.which=null');
 });
 
-test('[WM-IDEAL] the balancing moves things, and never changes the plan; a hand placement stays where the rider put it; full bags and a backpack: already the best, said so',()=>{
+test('[WM-IDEAL] the balancing moves things, and never changes the plan; a hand placement stays where the rider put it; a backpack alone: already the best, said so',()=>{
   const bike=bikeOf('diamond-sloping','M','drop','47-584');
   rig(bike,SETS.bikepacking,3,{});
   const before=run('JSON.stringify([S.bags,S.pinned,S.placements,S.kit])');
@@ -339,11 +339,95 @@ test('[WM-IDEAL] the balancing moves things, and never changes the plan; a hand 
   const unit=json(`weightMapIdeal('without').balanced.packing.pieces.find(p=>p.id===${JSON.stringify(moved[0].id)}).unit`);
   assert.equal(unit,moved[0].from,'a hand placement never moves');
   run('S.pinned={}');
-  // small bike bags, full, and a backpack: nothing fits anywhere lighter, so the ideal is the plan, and it says so
-  rig(bike,[{uid:1,pos:'seat',L:9},{uid:2,pos:'bar',L:9},{uid:3,pos:'frame',L:6},{uid:4,pos:'pack',L:30}],3,{});
+  // a backpack alone: there is no other bag to move anything to, so the ideal is the plan, and it says so (the full bike bags with a
+  // backpack the builder used here did have a better balance, a swap: review of PR 78, I1, and the probe test below)
+  rig(bike,[{uid:1,pos:'pack',L:30}],3,{});
   const g=ideal(null);
   assert.deepEqual([g.kind,g.same],['own',true]);
   assert.ok(Math.abs(g.wi-g.wy)<1e-6&&Math.abs(g.back-g.yoursBack)<1e-6);
+  run('WEIGHT_MAP.which=null');
+});
+
+// Review of PR 78, I1: the ideal said "the best balance" while a swap of two things (the lock on the back for the rain jacket in the
+// frame bag) kept every promise and lowered the score. The probe: from the ideal, every single move of one thing into another bag in use
+// at a lighter place and every swap of two things in different bags that puts the heavier at the lighter place, whatever the litres
+// look like (the trial, on the page's own planWith, decides what fits); none that the planner keeps where it was put may keep the
+// promises (measured from the rider's plan) and lower the score by 0.01 or more. Moves the other way are never the search's, nor a
+// placement the planner does not keep (the re-pack then puts the thing elsewhere).
+const PROBE=which=>json(`(()=>{IDEAL_CACHE={key:null,value:null};const W=window.WayfinchAdvisor.WEIGHTS;
+  const sc=r=>Math.round(Object.entries(r.kgByPos).reduce((t,[p,k])=>t+(k||0)*W[p],0)*100)/100;
+  const mine=advisorResult(currentPlan()),sp=new Set(mine.spillIds);
+  const keeps=r=>r.overL<=mine.overL+0.005&&r.spillIds.every(id=>sp.has(id))&&r.backL<=mine.backL+0.005&&r.outOfReach<=mine.outOfReach;
+  const setup=idealSetup(${JSON.stringify(which)}),found=weightMapIdeal(${JSON.stringify(which)});if(found.why)return {why:found.why};
+  const b=found.balanced,best=sc(b.packing.result),pinned=new Set(Object.keys(S.pinned||{}));
+  const free=b.packing.pieces.filter(p=>!pinned.has(p.id)),better=[];let n=0;
+  const tryPins=(pins,name)=>{n++;const t=idealTrial(setup.bags,{...b.pins,...pins},b.packing.state),r=t.result;
+    const placed=Object.entries(pins).every(([id,key])=>t.pieces.some(p=>p.id===id&&p.unit===key));
+    if(placed&&keeps(r)&&sc(r)<=best-0.01)better.push(name+' '+best+'>'+sc(r));};
+  free.forEach(p=>b.packing.rooms.forEach(r=>{if(r.key!==p.unit&&W[r.pos]<W[p.pos])tryPins({[p.id]:r.key},p.id+'>'+r.key);}));
+  free.forEach(p=>free.forEach(q=>{if(p.unit!==q.unit&&p.kg>q.kg&&W[q.pos]<W[p.pos])tryPins({[p.id]:q.unit,[q.id]:p.unit},p.id+'<>'+q.id);}));
+  return {same:found.same,partial:b.partial,moves:b.moves.length,better,n};})()`);
+test('[WM-IDEAL] the ideal is a balance no single move or swap of one thing improves while keeping the promises; "already the best" only then',()=>{
+  const bike=bikeOf('diamond-sloping','M','drop','47-584');
+  const plans={
+    'full bags and a backpack':[{uid:1,pos:'seat',L:9},{uid:2,pos:'bar',L:9},{uid:3,pos:'frame',L:6},{uid:4,pos:'pack',L:30}],
+    bikepacking:SETS.bikepacking,
+    'seat, frame and bar':[{uid:1,pos:'seat',L:14},{uid:2,pos:'frame',L:4.5},{uid:3,pos:'bar',L:13}],
+    touring:SETS.touring,
+  };
+  for(const [name,bags] of Object.entries(plans)){
+    rig(bike,bags,3,{rack:bags.some(b=>b.pos==='rack')});
+    const r=PROBE(null);
+    assert.ok(!r.why,`${name}: an ideal`);
+    assert.equal(r.partial,false,`${name}: the search finished`);
+    assert.deepEqual(r.better,[],`${name}: ${r.n} trials; none of them may beat the ideal`);
+    if(r.same)assert.equal(r.moves,0,`${name}: "already the best" only with no move found`);
+  }
+  // the reviewer's plan: the heavy lock no longer rides on the back while the rain jacket sits in the frame bag
+  rig(bike,plans['full bags and a backpack'],3,{});
+  assert.equal(PROBE(null).same,false,'full bags and a backpack: a better balance exists, so not "already the best"');
+  run('WEIGHT_MAP.which=null');
+});
+
+// Review of PR 78, I2: "Ideal without panniers" put what the panniers held on the rider's back, and still called it the ideal.
+test("[WM-IDEAL] an ideal never puts more on the rider's back or more out of reach than the rider's own plan: one that would says why",()=>{
+  const bike=bikeOf('diamond-sloping','M','drop','47-584');
+  const cases=[
+    [{uid:1,pos:'rack',L:20,pair:true},{uid:2,pos:'bar',L:9},{uid:3,pos:'frame',L:5},{uid:4,pos:'pack',L:30}],
+    [{uid:1,pos:'rack',L:15,pair:true},{uid:2,pos:'seat',L:10},{uid:3,pos:'frame',L:5},{uid:4,pos:'pack',L:20}],
+  ];
+  for(const bags of cases){
+    rig(bike,bags,3,{rack:true});
+    run('IDEAL_CACHE={key:null,value:null}');
+    for(const which of ['with','without']){
+      const g=ideal(which);
+      const out=json(`(()=>{const f=weightMapIdeal(${JSON.stringify(which)});return f.why?null:{back:f.balanced.packing.result.backL,reach:f.balanced.packing.result.outOfReach};})()`);
+      const mine=json('advisorResult(currentPlan())');
+      if(g.why){assert.ok(['room','back'].includes(g.why),`${which}: ${g.why}`);continue;}
+      assert.ok(g.back<=g.yoursBack+1e-6,`${which}: ${g.back} kg on the back in the ideal, ${g.yoursBack} kg in yours`);
+      assert.ok(out.back<=mine.backL+0.005&&out.reach<=mine.outOfReach,`${which}: no more litres on the back, nothing more out of reach`);
+    }
+  }
+  // the first case: the panniers' things would go on the back, so there is no ideal without them, and the page says why
+  rig(bike,cases[0],3,{rack:true});
+  assert.equal(ideal('without').why,'back');
+  run('WEIGHT_MAP.which=null');
+});
+
+// Review of PR 78, m1: with panniers added, a plan with things left over gets them packed, so the ideal carries more kilos than yours.
+test('[WM-IDEAL] an ideal with more kilos than yours (the things left over packed in the added panniers) says so',()=>{
+  const bike=bikeOf('diamond-sloping','M','drop','47-584');
+  rig(bike,[{uid:1,pos:'seat',L:6},{uid:2,pos:'top',L:1,slot:'front'},{uid:3,pos:'pack',L:10}],3,{});
+  assert.ok(json('currentPlan().summary.overL')>0,'things are left over in the plan');
+  const g=ideal('with');
+  assert.equal(g.kind,'added');
+  if(Math.abs(g.ideal-g.yours)>=0.01)assert.equal(g.more,true,`${g.ideal} kg in the ideal, ${g.yours} kg in yours: said`);
+  assert.ok(g.ideal>=g.yours-0.01,'never less than yours');
+  // a plan with nothing left over: the same kilos, nothing said
+  rig(bike,SETS.bikepacking,3,{});
+  const h=ideal('with');
+  assert.ok(Math.abs(h.ideal-h.yours)<0.01);
+  assert.equal(h.more,false);
   run('WEIGHT_MAP.which=null');
 });
 
