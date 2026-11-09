@@ -140,3 +140,27 @@ function runBigger(i: AdvisorInput, answer: Extract<ReturnType<typeof advise>, {
   const gen = biggerSteps(i, answer);
   for (;;) { const step = gen.next(); if (step.done) return step.value; }
 }
+
+describe('a bigger change where nothing helps, and only where it could do more (the owner, 8 Nov: F)', () => {
+  const usable = (b: BagIn) => ({ ok: (b.pos === 'frame' && b.L === 3) || b.pos === 'rack', reason: null });
+  test('[GA-BIGGER] nothing helps within Bikepacking bags only: the bigger change is panniers, and everything fits with them', () => {
+    const i = input({ bags: [bag(1, 'pack', 4)], nextUid: 2, usable, style: 'bags', goal: 'handling', trial: packer([{ id: 'a', L: 3, kg: 1 }, { id: 'b', L: 9, kg: 3 }]) });
+    const answer = advise(i);
+    expect(answer.kind).toBe('nothing-helps');
+    expect(biggerOffered(i, answer)).toBe(true);
+    const gen = biggerSteps(i, answer);
+    let out; for (;;) { const step = gen.next(); if (step.done) { out = step.value; break; } }
+    expect(out.bigger?.add.some((b) => b.pos === 'rack')).toBe(true);
+    expect(out.bigger?.result.overL).toBe(0);
+  });
+
+  test('[GA-BIGGER] not offered where nothing could do more: Get the backpack off with Minimal\'s first emptying the back, or Looking ahead found a set', () => {
+    const empties = input({ bags: [bag(1, 'pack', 20)], nextUid: 2, usable, style: 'bags', goal: 'backpack', trial: packer([{ id: 'a', L: 3, kg: 1 }]) });
+    const a = advise(empties);
+    if (a.kind !== 'suggestions') throw new Error(a.kind);
+    expect(a.items[0]!.result.backL).toBe(0);
+    expect(biggerOffered(empties)).toBe(true);
+    expect(biggerOffered(empties, a)).toBe(false);
+    expect(biggerOffered(empties, { ...a, ahead: a.items[0]! })).toBe(false);
+  });
+});

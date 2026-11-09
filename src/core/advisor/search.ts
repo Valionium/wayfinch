@@ -225,11 +225,15 @@ function rangeOf(s: Suggestion, same: Suggestion[]): [number, number] {
 /**
  * A bigger change (the owner's preview check of 8 Nov, F): offered where the setup choice ruled out something the bike can take. Under
  * Bikepacking bags only, panniers or a rack to fit; under Bags first, panniers though bags do it. Never under Panniers are fine, and never
- * with no rack fitted and rack mounts no (a fact, not a choice).
+ * with no rack fitted and rack mounts no (a fact, not a choice). With an answer, only where it could do more: Looking ahead found nothing
+ * (and for Get the backpack off Minimal's first leaves something on the back), or nothing helps within the setup.
  */
-export function biggerOffered(given: AdvisorInput): boolean {
-  if (given.style === 'panniers') return false;
-  return panniersAllowed({ ...planAsStyled(given), style: 'panniers' });
+export function biggerOffered(given: AdvisorInput, answer?: AdvisorAnswer): boolean {
+  if (given.style === 'panniers' || !panniersAllowed({ ...planAsStyled(given), style: 'panniers' })) return false;
+  if (!answer) return true;
+  if (answer.kind === 'nothing-helps') return true;
+  if (answer.kind !== 'suggestions' || answer.ahead || !answer.items[0]) return false;
+  return given.goal !== 'backpack' || answer.items[0].result.backL > NOTHING_ON_BACK_L;
 }
 
 /** What a bigger change answers: its best suggestion or none, the setup choice it goes beyond, and the trials it ran. */
@@ -237,29 +241,32 @@ export type BiggerAnswer = { bigger: Suggestion | null; overrides: Setup; tried:
 
 /**
  * The bigger change's search, in slices as adviseSteps: on the plan as the rider's setup reads it, with what that setup ruled out allowed
- * (Panniers are fine), only the candidates holding it: Minimal's first plus panniers (or a rack to fit, under Bikepacking bags only), and
- * those alone. One counts when it is valid and does better than Minimal's first by decision 6; the goal's order picks the best.
+ * (Panniers are fine), only the candidates holding it. After suggestions: Minimal's first plus panniers (or a rack to fit, under
+ * Bikepacking bags only), or those alone, valid and better than Minimal's first by decision 6. After nothing helps: one or two new
+ * things holding it, valid (everything fits). The goal's order picks the best.
  */
 export function* biggerSteps(given: AdvisorInput, answer: AdvisorAnswer): Generator<number, BiggerAnswer> {
   const overrides = given.style;
-  if (!biggerOffered(given) || answer.kind !== 'suggestions' || !answer.items[0]) return { bigger: null, overrides, tried: 0, partial: false };
+  if (!biggerOffered(given, answer)) return { bigger: null, overrides, tried: 0, partial: false };
   const input: AdvisorInput = { ...planAsStyled(given), style: 'panniers' };
   const fitted = rackFitted(input);
   const ruledOut = (c: Candidate) => c.add.some((b) => b.pos === 'rack') || (overrides === 'bags' && c.deck && !fitted);
-  const first = answer.items[0];
+  const first = answer.kind === 'suggestions' ? answer.items[0]! : null;
   let trials = 0;
   let partial = false;
   const base = input.trial(input.bags, input.decks);
   trials++;
   const found: Suggestion[] = [];
   const handBack = () => trials % SLICE === 0 || (input.handBack?.() ?? false);
-  for (const c of [...extensions(input, first, true), ...candidates(input, 'add', true)]) {
+  const tries = first ? [...extensions(input, first, true), ...candidates(input, 'add', true)]
+    : [...candidates(input, 'add', true), ...candidates(input, 'add-two', true)];
+  for (const c of tries) {
     if (!ruledOut(c)) continue;
     if (trials >= MAX_TRIALS) { partial = true; break; }
     const result = input.trial(bagsFor(input, c), c.decks);
     trials++;
     const s = suggestion(c, result);
-    if (isValid(base, result) && betterThan(input.goal, base, first.result, result)) found.push(s);
+    if (isValid(base, result) && (!first || betterThan(input.goal, base, first.result, result))) found.push(s);
     if (handBack()) yield trials;
   }
   const order = compareFor(input.goal, base);
