@@ -8708,7 +8708,9 @@ function balancePacking(plan){
   const pieces = [], rooms = [];
   plan.slots.forEach(s => {
     if(isBottle(s.pos)) return;
-    rooms.push({ key:s.key, pos:s.pos, freeL:s.left });
+    // fillL: the food's litres, which the re-pack places last around a hand placement (review of PR 78, I1)
+    const fillL = s.items.reduce((t, k) => { const kit = kitById(k.id); return t + (kit && kit.divisible ? k.vol : 0); }, 0);
+    rooms.push({ key:s.key, pos:s.pos, freeL:s.left, fillL:+fillL.toFixed(2) });
     const by = new Map();
     s.items.forEach(k => { const kit = kitById(k.id); if(kit && kit.divisible) return;
       const v = by.get(k.id) || { kg:0, L:0 }; v.kg += placedKg(k); v.L += k.vol; by.set(k.id, v); });
@@ -8739,9 +8741,17 @@ function idealFor(which){
     if(start.overL > mine.summary.overL + 0.005 || start.spill.some(id => !spilled.has(id))) return { why:'room' };
   }
   const out = window.WayfinchAdvisor.balance(start, (pins, from) => idealTrial(setup.bags, pins, from.state), { fixed:Object.keys(S.pinned || {}) });
+  // The search keeps its promises from its own start; an ideal with other bags must also keep the rider's plan's: no more litres on
+  // the back and nothing more out of reach (review of PR 78, I2), else it says why instead.
+  if(setup.kind !== 'own'){
+    const mine = advisorResult(currentPlan()), got = out.packing.result;
+    if(got.backL > mine.backL + 0.005 || got.outOfReach > mine.outOfReach) return { why:setup.kind === 'removed' ? 'back' : 'backWith' };
+  }
   const items = out.packing.slots.filter(s => s.kg > 0).map(s => ({ pos:s.pos, kg:s.kg, outline:idealOutline(s.key, setup.bags) }))
     .filter(i => i.outline && i.outline.length >= 3);
-  return { kind:setup.kind, items, same:setup.kind === 'own' && !out.moves.length, balanced:out };
+  // more: the added panniers also take things the plan leaves over, so the ideal carries more kilos than yours (review of PR 78, m1)
+  const more = out.packing.slots.reduce((t, s) => t + s.kg, 0) > currentPlan().slots.reduce((t, s) => t + weightIn(s), 0) + 0.005;
+  return { kind:setup.kind, items, same:setup.kind === 'own' && !out.moves.length && !out.partial, more, balanced:out };
 }
 // Worked out again only when the plan, its placements or the choice changed.
 function weightMapIdeal(which){
@@ -8763,7 +8773,7 @@ function weightMapInput(){
     if(o && kg > 0) items.push({ pos:o.pos, kg, outline:o.outline }); });
   items.push(...deckMapItem(a));
   const which = WEIGHT_MAP.which || idealFirst(), found = weightMapIdeal(which);
-  const ideal = found.why ? { why:found.why } : { kind:found.kind, items:[...found.items, ...deckMapItem(a)], same:found.same };
+  const ideal = found.why ? { why:found.why } : { kind:found.kind, items:[...found.items, ...deckMapItem(a)], same:found.same, more:found.more };
   const art = rigArt(true);
   return { items, scale:a.scale, ideal, which, diff:WEIGHT_MAP.diff,
     bike:art ? art.svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '') : '',

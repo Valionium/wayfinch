@@ -437,3 +437,23 @@ test('[WM-STILL] the weight map never moves the page: near the bottom of the win
   expect(await page.evaluate("S.bags.some(b => b.pos === 'rack')")).toBe(false);
   expect(errors).toEqual([]);
 });
+
+// Review of PR 78, m4: the switch row (a pressed pair and "Show where yours differs") at the narrowest phone, in both themes.
+test('[WM-STILL] at 320 px, light and dark: the weight map\'s switches wrap without a sideways scroll, every button at least 44 px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await planner(page);
+    await page.evaluate("S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'frame', L:6 }]; S.nextUid = 4; S.decks = { bar:false, rack:false }; go(3)");
+    await page.locator('#rigWeightMap').click();
+    await expect(page.locator('#weightMap .wm-card')).toHaveCount(2);
+    for (const sel of ['.wm-with', '.wm-without', '.wm-diff']) {
+      const b = (await page.locator(`#weightMap ${sel}`).boundingBox())!;
+      expect(Math.min(b.width, b.height), `${scheme}: ${sel} is at least 44 px`).toBeGreaterThanOrEqual(44);
+      expect(b.x + b.width, `${scheme}: ${sel} inside the window`).toBeLessThanOrEqual(320);
+    }
+    await page.locator('#weightMap .wm-diff').click();
+    await expect(page.locator('#weightMap .wm-card')).toHaveCount(3);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), `${scheme}: no sideways scroll`).toBeLessThanOrEqual(320);
+  }
+});

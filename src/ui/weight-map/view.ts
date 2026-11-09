@@ -1,6 +1,6 @@
 // The bag planner's weight map (weight map and bag shapes design, 1.4 to 1.7): served as /tools/bags/weightmap.js, loaded on the first
 // press of "Show weight map". Your weight and the ideal share one fixed scale; the difference is opt-in. The ideal is the rider's own
-// setup packed for the best balance, with panniers or without (the owner's finding G, 8 Nov 2026): the page works it out and hands it
+// setup packed for the best balance the planner found, with panniers or without (the owner's finding G, 8 Nov 2026): the page works it out and hands it
 // over. Each map's canvas is decoration (aria-hidden): its picture's name is the sentence under it, which carries the whole message
 // without colour. The page never jumps (finding G): the switches sit above the maps and are built once, every later change is made in
 // place, and the difference is added and taken away at the end.
@@ -9,8 +9,11 @@ import { blur, diffLine, FULL, GRID, shareLine, splat, zoneShares } from '../../
 import type { MapItem } from '../../core/bike/weightmap.ts';
 import { WM } from '../../core/wording/en-weightmap.ts';
 
-/** The ideal the page worked out: the bags it uses (own, own plus two panniers, own without the panniers), or why there is none. */
-export type Ideal = { kind: keyof typeof WM.idealSub; items: MapItem[]; same: boolean } | { why: keyof typeof WM.why };
+/**
+ * The ideal the page worked out: the bags it uses (own, own plus two panniers, own without the panniers), or why there is none. `more`:
+ * the added panniers also take the things the plan leaves over, so it carries more kilos than yours (review of PR 78, m1).
+ */
+export type Ideal = { kind: 'own' | 'added' | 'removed'; items: MapItem[]; same: boolean; more?: boolean } | { why: keyof typeof WM.why };
 export type Which = 'with' | 'without';
 
 export type MapInput = {
@@ -144,7 +147,7 @@ export function render(host: HTMLElement, input: MapInput): void {
   const why = has ? '' : WM.why[ideal.why];
   const [yc, ic] = [maps.querySelector('[data-card="y"]')!, maps.querySelector('[data-card="i"]')!];
   fill(yc, { title: WM.yours, sub: WM.yoursSub(total.toFixed(1)), line: shareLine(zy), art: art(items), field: Fy, diff: false }, colours, input.bike);
-  fill(ic, { title: input.which === 'with' ? WM.idealWith : WM.idealWithout, sub: has ? WM.idealSub[ideal.kind] : '', line: has ? shareLine(zi!) : why,
+  fill(ic, { title: input.which === 'with' ? WM.idealWith : WM.idealWithout, sub: has ? WM.idealSub[ideal.kind === 'added' && ideal.more ? 'addedMore' : ideal.kind] : '', line: has ? shareLine(zi!) : why,
     art: has ? art(ideal.items) : '', field: Fi, diff: false, ...(has && ideal.same ? { note: WM.idealSame } : {}) }, colours, input.bike);
   // the difference: added at the end and taken away again, so nothing above it moves
   let dc = maps.querySelector('[data-card="d"]');
