@@ -604,7 +604,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - screen() ≤ 300 ms in the page on a 200 km route, with rain windows, wait or go, stop ideas, leave-by, rescue point (§4.5) [PERF-SCREEN]
 - Preparation of the 800 km fixture ≤ 20 s of processing, network excluded (§4.5) [PERF-PREP-800]
 - JavaScript before the first screen ≤ 150 KB gzipped, bike drawing included; 150 KB is 150,000 bytes (coordinator's ruling, 3 Nov 2026: it tightens the test and loosens nothing; the owner may reverse it) (§4.5) [PERF-JS-FIRST]
-- All lazy chunks together ≤ 200 KB gzipped; bag planner excluded (§4.5) [PERF-JS-LAZY]
+- All lazy chunks together ≤ 260 KB gzipped (260,000 bytes); bag planner excluded. Raised from 200 KB by the owner's decision, 9 Nov 2026 ("Yes, 260 KB"); the first-screen budget is unchanged (§4.5) [PERF-JS-LAZY]
 - One bike with bags drawn ≤ 20 ms (§4.5) [PERF-BIKE]
 - Heidelberg → Strasbourg places: the fixture pack's size, ≤ 3 MB, is checked on every pull request (§4.5) [PERF-PACK]
 - Heidelberg → Strasbourg places on a live pack: ≤ 3 MB and ≤ 30 s on the stand-in's network, on the owner's Run workflow only, because a pull request must not depend on outside data; no test or workflow step exists yet; checked by hand on the release checklist, last on 3 Nov 2026 (§4.5) [PERF-PACK-LIVE]
