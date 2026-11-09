@@ -5,6 +5,12 @@ export const HINT_KEY = 'copilot:bikeHint:v1';
 
 // Set only while the browser refuses to keep the key; any write it keeps again ends it.
 let kept: string | null = null;
+// Another window removed the key (Delete co-pilot data, ST-DELETE): as with every co-pilot store a delete removed, this page never writes
+// it back; the hint follows its rules from memory until the next start.
+let deleted = false;
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => { if (e.key === null || (e.key === HINT_KEY && e.newValue === null)) deleted = true; });
+}
 
 export function readHint(): string {
   try {
@@ -16,11 +22,13 @@ export function readHint(): string {
 
 export function writeHint(key: string): void {
   try {
-    localStorage.setItem(HINT_KEY, key);
-    kept = null;
-  } catch {
-    kept = key;
-  }
+    if (!deleted) {
+      localStorage.setItem(HINT_KEY, key);
+      kept = null;
+      return;
+    }
+  } catch { /* this visit only */ }
+  kept = key;
 }
 
 /** A trip is read with Trip's snapshot, a bag plan with the bike; here, a tyre result or anything Wayfinch saved (`copilot:changed`). */

@@ -3,8 +3,11 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { loadApp, removeBuilds } from './helpers.ts';
+import { loadApp, removeBuilds, withStore } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
+import type { StoreInPage } from './fixtures/store-page.ts';
+
+declare const __store: StoreInPage;
 
 let app: LoadedApp | undefined;
 test.afterEach(async () => { await app?.close(); app = undefined; });
@@ -83,4 +86,25 @@ test('[HINT-NEW] 320 px: the card fits with no sideways scroll; [FIT-LINE] Tyre 
   await expect(line).toHaveText('No saved bike, so nothing is filled in. Add your bike and its tyre sizes fill in here.');
   expect((await line.getByRole('link', { name: 'Add your bike' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(await noSideways(page)).toBe(true);
+});
+
+test('[HINT-LOCAL] Delete co-pilot data with a second window on Trip: that window, its Trip, Tools and Later never write the hint key back', async ({ page }) => {
+  app = await loadApp(page);
+  const other = await page.context().newPage();
+  await other.goto(app.origin, { waitUntil: 'domcontentloaded' });
+  await expect(other.getByRole('region', { name: 'Design your bike' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('copilot:bikeHint:v1'))).not.toBeNull();
+  await withStore(page);
+  await page.evaluate(() => __store.deleteCopilotData());
+  const copilot = () => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('copilot:')));
+  expect(await copilot()).toEqual([]);
+  // The second window goes on: Tools (a place seen), Trip again, Later.
+  await other.evaluate(() => { location.hash = '#/tools'; });
+  await expect(other.locator('[data-hint-line]')).toBeVisible();
+  await other.evaluate(() => { location.hash = '#/trip'; });
+  await other.getByRole('button', { name: 'Later: show this smaller' }).click();
+  await expect(other.locator('.bike-hint')).toHaveCount(0);
+  await page.waitForTimeout(300);
+  expect(await copilot()).toEqual([]);
+  await other.close();
 });
