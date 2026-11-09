@@ -7,6 +7,7 @@
 // was away: the bikes, the theme, every screen's sections (another Wayfinch window may have written), and the trip handoff the bag
 // planner may have answered. The moved card reads its own mark (moved-card.tsx).
 import { refreshBikeSource } from './bike/live.ts';
+import { checkGone } from './deleted.ts';
 import { cleanupStoredHandoff } from './trip/handoff.ts';
 import { announceHere, onChanged } from '../store/changed.ts';
 import { applyTheme } from './theme-apply.ts';
@@ -33,6 +34,8 @@ export function followReturns(): void {
   window.addEventListener('pageshow', (e) => {
     follow();
     if (!e.persisted) return;
+    // A delete made while this page sat in the cache: it heard no storage event (deleted.ts).
+    checkGone();
     refreshBikeSource();
     announceHere('all');
     void cleanupStoredHandoff();

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { T, TM } from '../../core/wording/en-tyre.ts';
 import { W, shortMapDate } from '../../core/wording/en.ts';
+import { TF } from '../../core/wording/en-tyre-labels.ts';
 import { TN } from '../../core/wording/en-tyre-notes.ts';
 import { HN } from '../../core/wording/en-hint.ts';
 import { BackBar } from '../../ui/back-bar/back-bar.tsx';
@@ -29,8 +30,8 @@ export type { TyreServices } from './services.ts';
 import type { TyreServices } from './services.ts';
 
 const ASSUMED_WORDS: Record<FieldName, string> = {
-  riderKg: W.tyreAssumedRider, bikeKg: W.tyreAssumedBike, bars: W.tyreAssumedBars, wheelBsdMm: W.tyreAssumedWheel, frontMm: W.tyreAssumedFront,
-  rearMm: W.tyreAssumedRear, casing: W.tyreAssumedCasing, setup: W.tyreAssumedSetup, rimType: TN.tyreAssumedRimType, rimInnerMm: W.tyreAssumedRim,
+  riderKg: TF.tyreAssumedRider, bikeKg: TF.tyreAssumedBike, bars: TF.tyreAssumedBars, wheelBsdMm: W.tyreAssumedWheel, frontMm: TF.tyreAssumedFront,
+  rearMm: TF.tyreAssumedRear, casing: TF.tyreAssumedCasing, setup: W.tyreAssumedSetup, rimType: TN.tyreAssumedRimType, rimInnerMm: TF.tyreAssumedRim,
   surface: W.tyreAssumedSurface, carriedKg: W.tyreAssumedNoLuggage,
 };
 
@@ -105,7 +106,7 @@ function NumberInput({ id, label, value, onCommit, unit, assumed, signed = false
       />
       {unit ? <span class="muted">{unit}</span> : null}
       {value === undefined && text.trim() === '' && assumed !== undefined ? <span class="muted">{W.tyreAssumedTag(`${assumed}${unit ? ' ' + unit : ''}`)}</span> : null}
-      {bad ? <span class="tyre-error" id={`${id}-err`} role="alert">{W.tyreNotANumber}</span> : null}
+      {bad ? <span class="tyre-error" id={`${id}-err`} role="alert">{TF.tyreNotANumber}</span> : null}
     </label>
   );
 }
@@ -375,7 +376,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
 
   const resetFor = (field: FieldName): string => {
     const f = fallback[field];
-    return f === 'bike' ? W.tyreBackToBike : f === 'plan' ? TM.tyreBackToPlan : f === 'you' ? TM.tyreBackToYou : W.tyreClear;
+    return f === 'bike' ? W.tyreBackToBike : f === 'plan' ? TF.tyreBackToPlan : f === 'you' ? TF.tyreBackToYou : W.tyreClear;
   };
   const choiceValue = <T extends string>(field: FieldName, value: T | 'unset'): T | undefined => (src[field] === 'assumed' || value === 'unset' ? undefined : value);
   const notes = result?.warningItems ?? [];
@@ -421,19 +422,19 @@ export function TyreScreen({ services }: { services: TyreServices }) {
           editor={<NumberInput key={`front-${key}`} id="tyre-front" label={W.tyreFrontWidthLabel} needed value={own('frontMm', v.front.printedMm)} assumed={v.front.printedMm} onCommit={(n) => change({ frontMm: n })} unit="mm" />} />
         <Field id={bikeKey('rear')} label={W.tyreRearWidthLabel} source={src.rearMm} needed="rear" valueText={`${v.rear.printedMm} mm`} resetLabel={resetFor('rearMm')} onReset={resetter('rearMm')}
           editor={<NumberInput key={`rear-${key}`} id="tyre-rear" label={W.tyreRearWidthLabel} needed value={own('rearMm', v.rear.printedMm)} assumed={v.rear.printedMm} onCommit={(n) => change({ rearMm: n })} unit="mm" />} />
-        {resolved.rearFollowsFront && (v.rimType === 'hookless' || v.rimType === 'unset') ? <p class="muted">{TM.tyreRearLabelShort}: {W.tyreSameAsFront}</p> : null}
+        {resolved.rearFollowsFront && (v.rimType === 'hookless' || v.rimType === 'unset') ? <p class="muted">{TF.tyreRearLabelShort}: {W.tyreSameAsFront}</p> : null}
         <Choice<RimType> id="tyre-rimtype" label={W.tyreRimTypeLabel} source={src.rimType} needed="rim" value={choiceValue('rimType', v.rimType)} onChange={(x) => change({ rimType: x })}
           options={[{ value: 'hooked', label: W.tyreRimHooked }, { value: 'hookless', label: W.tyreRimHookless }, { value: 'tubular', label: W.tyreRimTubular }]} />
       </section>
 
       <section class="card tyre-result" aria-live="polite" aria-labelledby="tyre-result-title" ref={resultRef}>
-        <h2 id="tyre-result-title">{W.tyreResultTitle}</h2>
+        <h2 id="tyre-result-title">{TF.tyreResultTitle}</h2>
         {!resolved.input ? <p>{W.tyreNeedMax}</p> : null}
         {blockedBy !== null ? <p class="notice">{W.tyrePendingLimit(blockedBy)}</p> : null}
         {blockedBy === null && result?.needsWidth ? <p class="notice">{resolved.sources.rimType === 'assumed' ? W.tyreNeedTwo : W.tyreNeedWidthOnly}</p> : null}
         {blockedBy === null && result && result.refused.length ? (
           <>
-            <h3>{W.tyreRefusedTitle}</h3>
+            <h3>{TF.tyreRefusedTitle}</h3>
             <ul>{result.refused.map((t) => <li key={t}>{t}</li>)}</ul>
           </>
         ) : null}
@@ -520,16 +521,16 @@ export function TyreScreen({ services }: { services: TyreServices }) {
                 {WHEELS.map((w) => <option key={w.bsdMm} value={String(w.bsdMm)}>{w.label}</option>)}
               </select>
             </label>} />
-        <Field id={bikeKey('rim')} label={W.tyreRimInnerLabel} source={src.rimInnerMm} valueText={`${v.rimInnerMm} mm`} resetLabel={resetFor('rimInnerMm')} onReset={resetter('rimInnerMm')}
-          editor={<NumberInput key={`rim-${key}`} id="tyre-rim" label={W.tyreRimInnerLabel} value={own('rimInnerMm', v.rimInnerMm)} assumed={v.rimInnerMm} onCommit={(n) => change({ rimInnerMm: n })} unit="mm" />} />
+        <Field id={bikeKey('rim')} label={TF.tyreRimInnerLabel} source={src.rimInnerMm} valueText={`${v.rimInnerMm} mm`} resetLabel={resetFor('rimInnerMm')} onReset={resetter('rimInnerMm')}
+          editor={<NumberInput key={`rim-${key}`} id="tyre-rim" label={TF.tyreRimInnerLabel} value={own('rimInnerMm', v.rimInnerMm)} assumed={v.rimInnerMm} onCommit={(n) => change({ rimInnerMm: n })} unit="mm" />} />
       </Card>
 
       <Card title={W.tyreSectionSurface}>
         <Choice<Surface> id="tyre-surface" label={W.tyreSurfaceLabel} source={src.surface} value={choiceValue('surface', v.surface)} onChange={(x) => change({ surface: x })}
-          options={[{ value: 'paved', label: W.tyreSurfacePaved }, { value: 'rough', label: W.tyreSurfaceRough }, { value: 'unpaved', label: W.tyreSurfaceUnpaved }]} />
+          options={[{ value: 'paved', label: W.tyreSurfacePaved }, { value: 'rough', label: TF.tyreSurfaceRough }, { value: 'unpaved', label: W.tyreSurfaceUnpaved }]} />
         <label class="tyre-check">
           <input type="checkbox" checked={details.wet ?? false} onChange={(e) => change({ wet: (e.currentTarget as HTMLInputElement).checked })} />
-          <span>{W.tyreWetLabel}</span>
+          <span>{TF.tyreWetLabel}</span>
         </label>
       </Card>
 
@@ -547,11 +548,11 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         <MeasuredFields key={`m-${key}`} value={details.measured} onCommit={(m) => change({ measured: m })} />
         <p class="muted">{T.tyreCaliperHelp}</p>
         <NumberInput key={`cf-${key}`} id="tyre-cfront" label={W.tyreCaliperFrontLabel} value={details.caliperFrontMm ?? undefined} onCommit={(n) => change({ caliperFrontMm: n ?? null })} unit="mm" />
-        <NumberInput key={`cr-${key}`} id="tyre-crear" label={W.tyreCaliperRearLabel} value={details.caliperRearMm ?? undefined} onCommit={(n) => change({ caliperRearMm: n ?? null })} unit="mm" />
+        <NumberInput key={`cr-${key}`} id="tyre-crear" label={TF.tyreCaliperRearLabel} value={details.caliperRearMm ?? undefined} onCommit={(n) => change({ caliperRearMm: n ?? null })} unit="mm" />
       </Card>
 
       {resolved.input ? (
-        <Card title={W.tyreSramTitle}>
+        <Card title={TF.tyreSramTitle}>
           <p>{TN.tyreSramIntro}</p>
           <ul class="tyre-sram">
             {sramList(v).map((row) => <li key={row.label}><strong>{row.label}:</strong> {row.value}</li>)}

@@ -249,6 +249,8 @@ export async function deleteCopilotData(): Promise<void> {
     if (key !== null && key.startsWith('copilot:') && key !== DELETE_REQUEST_KEY) keys.push(key);
   }
   for (const key of keys) localStorage.removeItem(key);
+  // This window's screens hear no storage event of its own delete: the keys the app writes on its own stay deleted (ui/deleted.ts).
+  try { globalThis.dispatchEvent(new Event('copilot:deleted')); } catch { /* no event system here */ }
   // Wayfinch's own keys of this tab too (wf:*, such as the bike Tools drew last, review of PR 70, M3): they hold bike ids.
   try {
     const own: string[] = [];
