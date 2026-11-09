@@ -384,7 +384,8 @@ test("[PG-SHEET-OPEN] a part's name opens its entry: a bottom sheet on a phone, 
   await link.click();
   await expect(sheet).toBeVisible();
   await sheet.getByRole('button', { name: "The wheel's quick release" }).click();
-  await expect(sheet.getByRole('heading', { level: 2 })).toHaveText("The wheel's quick release");
+  // the dialog is named by the entry it shows now
+  await expect(page.getByRole('dialog', { name: "The wheel's quick release" }).getByRole('heading', { level: 2 })).toHaveText("The wheel's quick release");
   await page.goBack();
   await expect(page.locator('dialog.part-sheet')).toHaveCount(0);
   await expect(page.locator('.care-steps-count')).toHaveText('Step 5 of 6');
