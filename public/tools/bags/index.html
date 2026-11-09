@@ -402,6 +402,10 @@ body.lc-small .sitefoot .linky:hover{color:var(--ink)}
 .rig-foot b{font-weight:600;color:var(--ink);font-size:13px;letter-spacing:.04em}
 .rig-foot .over{color:var(--blaze)}
 .rig-foot .fits{color:var(--sage)}
+/* the "fits better" lines (wish 17, design of 9 Nov 2026, section 5): one quiet sentence, its Add your bike a 44 px target */
+.fit-line{margin:8px 0 12px;font-size:13px;line-height:1.45;color:var(--muted);overflow-wrap:anywhere}
+.fit-line .linky{display:inline-flex;align-items:center;min-height:44px;vertical-align:middle;font-family:inherit;font-size:inherit;letter-spacing:0;text-transform:none;font-weight:600}
+body.lc-small #planFitLine{display:none!important}
 .bg-line{fill:none;stroke:var(--line);stroke-width:2.4;stroke-linecap:round}
 .bg-wheel{fill:none;stroke:var(--line);stroke-width:2.4}
 /* The bike from bike.js (spec 7.4): its bk-* parts on this page's tokens, as .bg-line and .bg-wheel were. Stroke widths come with
@@ -1999,6 +2003,8 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
   </div>
 
   <main id="planMain">
+  <!-- the "fits better" line (wish 17): under the drawing on a phone, beside it when wide, as the weight map, so the rig still fits the window -->
+  <p class="fit-line" id="planFitLine" hidden></p>
   <!-- the weight map (design of 8 Nov 2026): right under the drawing on a phone, beside it when wide; outside the rig, which must fit the window to stay in view. Since the owner's decision of 9 Nov 2026 one line at the packing check, the map only behind "Show the map" -->
   <div class="wm-block" id="weightBlock">
     <p class="wm-line" id="weightLine" tabindex="-1" hidden></p>
@@ -2219,6 +2225,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <div id="advisorSteps"></div>
       <p class="adv-progress hidden" id="advisorProgress" role="status" aria-live="polite"></p>
       <p class="sr-only" id="advisorStatus" role="status" aria-live="polite"></p>
+      <p class="fit-line adv-note" id="advisorFitLine" hidden></p>
       <section class="adv-answer" id="advisorAnswer"></section>
     </div>
   </section>
@@ -3157,7 +3164,11 @@ const BIKE_WORDING={
   followUndone:{text:'Back to planning for {name}.'},
   followUndoneNone:{text:'Back to planning without a bike.'},
   // "Without a bike" chosen in Tools (owner, 7 Nov 2026): the plan moves to the standard bike, with the same Undo.
-  followNoteNone:{text:'Now planning without a saved bike ·'}
+  followNoteNone:{text:'Now planning without a saved bike ·'},
+  // The "fits better" lines (wish 17, design of 9 Nov 2026, section 5): the words before Add your bike and after it; the Gear
+  // advisor's own are in its table. A fact about the result shown, never a request.
+  fitAdd:{text:'Add your bike'},
+  fitPlanner:{text:'Drawn as a typical gravel bike, size M.'},fitPlannerAfter:{text:'and the frame bag fits your frame.'}
 };
 const bikeWord=(key,values={})=>BIKE_WORDING[key].text.replace(/\{(\w+)\}/g,(m,k)=>values[k]??m);
 const FIT_STYLE_NAMES={unknown:'Not sure','diamond-level':'Diamond, level top tube','diamond-sloping':'Diamond, sloping top tube',compact:'Compact',trapeze:'Trapeze',mixte:'Mixte','step-through':'Step-through','full-suspension':'Full suspension'};
@@ -3367,6 +3378,7 @@ function renderBikeKitSummary(){
   const button=$('bikeEditFromKit');if(button)button.onclick=()=>openBikeDetails(button,'repair');
 }
 function renderBikeProfiles(force=false){
+  renderFitLines();   // the saved bikes changed: the "fits better" lines follow
   const select=$('bikeSavedSelect');if(!select)return;
   const selected=force ? S.bikeProfile?.id || '' : select.value;
   select.innerHTML='<option value="">Choose a saved bike…</option>'+BIKE_PROFILES.map(p=>`<option value="${htmlEsc(p.id)}">${htmlEsc(p.name)}</option>`).join('');
@@ -4103,6 +4115,7 @@ function closeBikeDetails(){
   LINK_ADDS=false;
   root.classList.add('hidden');endDialog(root);
   if(back)returnToWayfinch(back);
+  else advisorFollow();   // opened over the Gear advisor (its "fits better" line): a bike saved there gets its own answer
 }
 function initialiseBikeDetails(){
   $('bikeDetailsOpen').onclick=()=>openBikeDetails($('bikeDetailsOpen'),'repair');
@@ -5851,6 +5864,8 @@ const ADVISOR_WORDING = {
   trialConflict:{text:'Not kept yet: this plan was changed in another tab, so this tab is not saving.'},
   trialUpdate:{text:'Keep or remove the bag you are trying first, then apply the update.'},
   tryNeedsPlan:{text:'To try a bag in the Bag planner, use your own packing: add your bags there first.'},
+  // the "fits better" line above the results (wish 17, design of 9 Nov 2026, section 5), around Add your bike
+  fitTypical:{text:'Sizes for a typical frame.'}, fitTypicalAfter:{text:'for bag sizes that fit it.'},
 };
 const advisorWord = (key, values = {}) => ADVISOR_WORDING[key].text.replace(/\{(\w+)\}/g, (m, k) => values[k] ?? m);
 const ADVISOR_TYPES = { top:'typeTop', frame:'typeFrame', fork:'typeFork', bar:'typeBar', seat:'typeSeat', rack:'typeRack', pack:'typePack', bottle:'typeBottle', bottleU:'typeBottle' };
@@ -6164,6 +6179,30 @@ function renderAdvisorAnswer(){
     : ADVISOR.answer ? advisorAnswerHtml(ADVISOR.answer, ADVISOR.input) : '';
   const status = $('advisorStatus');
   if(status) status.textContent = ADVISOR.error || (!advisorComplete() ? advisorWord('needAll') : ADVISOR.answer ? advisorStatus(ADVISOR.answer) : '');
+  renderFitLines();
+}
+/* ---- The "fits better" lines (wish 17, design of 9 Nov 2026, section 5): while no bike is saved and the plan has none, one quiet
+   line under the drawing (beside it when wide), and one above the Gear advisor's results while it shows some, say what they are worked out on. Add your
+   bike opens this page's own Bike details, so closing it comes back here. They read only this page's bikes; nothing is counted,
+   remembered or written. [line, its button, the words before and after it, what takes the focus back when a bike saved there hides it] */
+const FIT_LINES = [['planFitLine', 'planFitAdd', () => bikeWord('fitPlanner'), () => bikeWord('fitPlannerAfter'), 'rigSvg'],
+  ['advisorFitLine', 'advisorFitAdd', () => advisorWord('fitTypical'), () => advisorWord('fitTypicalAfter'), 'advisorTitle']];
+// set once the page has read its bikes and the plan at start-up, so a rider with a bike never sees the line flash
+let FIT_LINES_READY = false;
+function renderFitLines(){
+  const none = FIT_LINES_READY && !BIKE_PROFILES.length && !S.bikeProfile;
+  for(const [id, add, before, after, then] of FIT_LINES){
+    const line = $(id); if(!line) continue;
+    const show = none && (id !== 'advisorFitLine' || !ADVISOR.error && advisorComplete() && !!ADVISOR.answer);
+    if(show && !line.dataset.filled){
+      line.innerHTML = `${htmlEsc(before())} <button class="linky" type="button" id="${add}" aria-haspopup="dialog" aria-controls="bikeDetailsBox">${htmlEsc(bikeWord('fitAdd'))}</button> ${htmlEsc(after())}`;
+      line.dataset.filled = '1';
+      const button = $(add); if(button) button.onclick = () => openBikeDetails(button);
+    }
+    line.hidden = !show;
+    // a bike saved in Bike details opened from here hides the line: closing it puts the focus on what stays
+    if(!show) for(const d of DIALOGS) if(d.returnFocus && d.returnFocus === $(add)) d.returnFocus = $(then);
+  }
 }
 // Re-drawn on every choice; the focused control is found again by its name and value (radios) or id, so the keyboard keeps its place.
 function renderAdvisor(){
@@ -9553,6 +9592,7 @@ function drawRig(){
       ` &nbsp; <span class="lg ghost-key"></span> Left at home`;
   }
   labelRigActions();
+  renderFitLines();
   restoreFocus($('rigSvg'),rigFocus);
   queueDraftSave();
 }
@@ -15082,6 +15122,7 @@ window.applyCalibration = applyCalibration;
   DRAFT_SIGNATURE = JSON.stringify(captureDraft());
   DRAFT_READY = true;
   writeLoadSummary(true);
+  FIT_LINES_READY = true; renderFitLines();   // the bikes and the plan are read: the "fits better" lines may show
   // A plan reopened at the packing check is not balanced by the opening itself: opening a plan changes nothing of it, byte for byte
   // (LC-MOVE-PLANS); it is balanced at the rider's first step there, with its line (review of PR 89, C2: the owner's call to balance at
   // the opening instead). Until then the weight map's line blames nothing the balancing could take itself (C1).

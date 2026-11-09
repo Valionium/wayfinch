@@ -13,47 +13,7 @@ export function wheelSeated(kind: Axle): Pic {
   const k = 1.75, cx = kind === 'thru' ? 205 : 192, cy = 128;
   const m = (x: number, y: number): Pt => [cx + x * k, cy + y * k];
   const half = 50; // 100 mm between the fork ends' inner faces
-  // the fork legs: from above the picture down to the axle; a thru-axle's end closes round it, a slot's ends stop at it
-  for (const side of [-1, 1] as const) {
-    const inner = side * half, outer = side * (half + 9);
-    const bottom = kind === 'thru' ? 12 : 6;
-    const p = new Path().M(m(inner + side * 2, -74)).L(m(inner, -6)).L(m(inner, bottom - 3)).Q(m(inner, bottom), m(inner + side * 3, bottom))
-      .L(m(outer - side * 3, bottom)).Q(m(outer, bottom), m(outer, bottom - 3)).L(m(outer, -6)).L(m(outer + side * 3, -74)).Z();
-    pic.path('cp-ctx', p, { name: side < 0 ? 'leg-l' : 'leg-r' });
-  }
-  if (kind === 'thru') {
-    // the disc on the hub's left end, edge-on: context, behind the hub and the axle
-    pic.path('cp-ctx', poly([m(-43, -80), m(-41.2, -80), m(-41.2, 80), m(-43, 80)]), { name: 'rotor' });
-  }
-  // the hub: end caps between the inner faces, flanges, a shell of 30 mm; spokes up to the rim
-  const cap = (side: -1 | 1) => poly([m(side * half, -9.5), m(side * (half - 6), -9.5), m(side * (half - 6), 9.5), m(side * half, 9.5)]);
-  pic.path('cp-obj', cap(-1), { name: 'cap-l' }).path('cp-obj', cap(1), { name: 'cap-r' });
-  // the shell between the flanges, the flanges (discs, so from behind they stand above and below the axle)
-  pic.path('cp-obj', new Path().M(m(-44, -11)).L(m(-36, -11)).L(m(-36, -26)).L(m(-31, -26)).L(m(-31, -15)).L(m(31, -15)).L(m(31, -26)).L(m(36, -26))
-    .L(m(36, -11)).L(m(44, -11)).L(m(44, 11)).L(m(36, 11)).L(m(36, 26)).L(m(31, 26)).L(m(31, 15)).L(m(-31, 15)).L(m(-31, 26)).L(m(-36, 26))
-    .L(m(-36, 11)).L(m(-44, 11)).Z(), { name: 'hub' });
-  for (const x of [-33.5, 33.5]) for (const dx of [-1.6, 1.6]) {
-    pic.line('cp-thin', m(x + dx, -26), m(x * 0.7 + dx, -54));
-    pic.line('cp-thin', m(x + dx, 26), m(x * 0.84 + dx, 38));
-  }
-  if (kind === 'thru') {
-    pic.path('cp-obj', poly([m(-half - 9, -6), m(half + 6, -6), m(half + 6, 6), m(-half - 9, 6)]), { name: 'axle' });
-    for (let x = half + 0.5; x < half + 6; x += 1.5) pic.line('cp-fine', m(x, -6), m(x + 1, 6));
-    pic.path('cp-obj', rrect(...m(-half - 16, -9), 7 * k, 18 * k, 4), { name: 'head' });
-    pic.path('cp-hi', tube(m(-half - 15, -7), m(-half - 15, -46), 5 * k), { name: 'lever' });
-  } else if (kind === 'qr') {
-    for (const side of [-1, 1] as const) pic.path('cp-obj', poly([m(side * half, -5), m(side * (half + 9), -5), m(side * (half + 9), 5), m(side * half, 5)]), { name: side < 0 ? 'end-l' : 'end-r' });
-    pic.line('cp-objline', m(-half - 10, 0), m(half + 10, 0), { style: 'stroke-width:4', name: 'skewer' });
-    pic.path('cp-obj', rrect(...m(half + 9, -6), 7 * k, 12 * k, 3), { name: 'nut' });
-    pic.path('cp-obj', rrect(...m(-half - 16, -6), 7 * k, 12 * k, 3), { name: 'head' });
-    pic.path('cp-hi', tube(m(-half - 15, -4), m(-half - 15, -44), 4.5 * k), { name: 'lever' });
-  } else {
-    pic.path('cp-obj', poly([m(-half - 14, -4.75), m(half + 14, -4.75), m(half + 14, 4.75), m(-half - 14, 4.75)]), { name: 'axle' });
-    for (const side of [-1, 1] as const) {
-      const x = side < 0 ? -half - 15.5 : half + 9;
-      pic.path(side < 0 ? 'cp-hi' : 'cp-obj', rrect(...m(x, -6.5), 6.5 * k, 13 * k, 2), { name: side < 0 ? 'nut-l' : 'nut-r' });
-    }
-  }
+  forkHub(pic, kind, m, k);
   // the moves: weight down on the bike, then tighten
   const legTop = m(half + 4.5, -58);
   pic.arrow(add(legTop, [-15, -6]), add(legTop, [-15, 20]));
@@ -79,6 +39,63 @@ export function wheelSeated(kind: Axle): Pic {
   if (kind === 'qr') pic.facts.push(touches(pic, 'head', 'leg-l', 0.8), touches(pic, 'nut', 'leg-r', 0.8), touches(pic, 'end-l', 'cap-l', 0.6), touches(pic, 'end-r', 'cap-r', 0.6));
   if (kind === 'nuts') pic.facts.push(touches(pic, 'nut-l', 'leg-l', 0.8), touches(pic, 'nut-r', 'leg-r', 0.8));
   return pic;
+}
+
+/** The hub's shell from behind: end caps' seats, the flanges standing above and below the axle, a 30 mm shell between. */
+const hubShell = (m: (x: number, y: number) => Pt): Path =>
+  new Path().M(m(-44, -11)).L(m(-36, -11)).L(m(-36, -26)).L(m(-31, -26)).L(m(-31, -15)).L(m(31, -15)).L(m(31, -26)).L(m(36, -26))
+    .L(m(36, -11)).L(m(44, -11)).L(m(44, 11)).L(m(36, 11)).L(m(36, 26)).L(m(31, 26)).L(m(31, 15)).L(m(-31, 15)).L(m(-31, 26)).L(m(-36, 26))
+    .L(m(-36, 11)).L(m(-44, 11)).Z();
+
+/**
+ * The front wheel's hub in the fork from behind (R §2), 100 mm between the fork ends' inner faces at `k` units a mm: the legs, a disc on
+ * a thru-axle's hub, the end caps against the fork ends, the shell and flanges, the spokes leaving them; then the axle: a thru-axle
+ * through the closed left end into the right, its lever folded along the leg; a quick release's skewer, cam head and nut, its hollow
+ * axle's ends in the slots; or a solid axle with a nut outside each end. `hi` marks one part for the guide.
+ */
+export function forkHub(pic: Pic, kind: Axle, m: (x: number, y: number) => Pt, k: number, hi?: 'hub' | 'axle' | 'qr'): void {
+  const half = 50;
+  // the fork legs: from above the picture down to the axle; a thru-axle's end closes round it, a slot's ends stop at it
+  for (const side of [-1, 1] as const) {
+    const inner = side * half, outer = side * (half + 9);
+    const bottom = kind === 'thru' ? 12 : 6;
+    const p = new Path().M(m(inner + side * 2, -74)).L(m(inner, -6)).L(m(inner, bottom - 3)).Q(m(inner, bottom), m(inner + side * 3, bottom))
+      .L(m(outer - side * 3, bottom)).Q(m(outer, bottom), m(outer, bottom - 3)).L(m(outer, -6)).L(m(outer + side * 3, -74)).Z();
+    pic.path('cp-ctx', p, { name: side < 0 ? 'leg-l' : 'leg-r' });
+  }
+  if (kind === 'thru') {
+    // the disc on the hub's left end, edge-on: context, behind the hub and the axle
+    pic.path('cp-ctx', poly([m(-43, -80), m(-41.2, -80), m(-41.2, 80), m(-43, 80)]), { name: 'rotor' });
+  }
+  // the hub: end caps between the inner faces, flanges, a shell of 30 mm; spokes up to the rim
+  const cap = (side: -1 | 1) => poly([m(side * half, -9.5), m(side * (half - 6), -9.5), m(side * (half - 6), 9.5), m(side * half, 9.5)]);
+  pic.path('cp-obj', cap(-1), { name: 'cap-l' }).path('cp-obj', cap(1), { name: 'cap-r' });
+  // the shell between the flanges, the flanges (discs, so from behind they stand above and below the axle)
+  const shell = hubShell(m);
+  if (hi === 'hub') pic.path('cp-halostroke', shell);
+  pic.path(hi === 'hub' ? 'cp-hi' : 'cp-obj', shell, { name: 'hub' });
+  for (const x of [-33.5, 33.5]) for (const dx of [-1.6, 1.6]) {
+    pic.line('cp-thin', m(x + dx, -26), m(x * 0.7 + dx, -54));
+    pic.line('cp-thin', m(x + dx, 26), m(x * 0.84 + dx, 38));
+  }
+  if (kind === 'thru') {
+    pic.path(hi === 'axle' ? 'cp-hi' : 'cp-obj', poly([m(-half - 9, -6), m(half + 6, -6), m(half + 6, 6), m(-half - 9, 6)]), { name: 'axle' });
+    for (let x = half + 0.5; x < half + 6; x += 1.5) pic.line('cp-fine', m(x, -6), m(x + 1, 6));
+    pic.path(hi === 'axle' ? 'cp-hi' : 'cp-obj', rrect(...m(-half - 16, -9), 7 * k, 18 * k, 4), { name: 'head' });
+    pic.path(hi === 'hub' ? 'cp-obj' : 'cp-hi', tube(m(-half - 15, -7), m(-half - 15, -46), 5 * k), { name: 'lever' });
+  } else if (kind === 'qr') {
+    for (const side of [-1, 1] as const) pic.path('cp-obj', poly([m(side * half, -5), m(side * (half + 9), -5), m(side * (half + 9), 5), m(side * half, 5)]), { name: side < 0 ? 'end-l' : 'end-r' });
+    pic.line(hi === 'qr' ? 'cp-hiline' : 'cp-objline', m(-half - 10, 0), m(half + 10, 0), { style: 'stroke-width:4', name: 'skewer' });
+    pic.path(hi === 'qr' ? 'cp-hi' : 'cp-obj', rrect(...m(half + 9, -6), 7 * k, 12 * k, 3), { name: 'nut' });
+    pic.path(hi === 'qr' ? 'cp-hi' : 'cp-obj', rrect(...m(-half - 16, -6), 7 * k, 12 * k, 3), { name: 'head' });
+    pic.path(hi === 'hub' ? 'cp-obj' : 'cp-hi', tube(m(-half - 15, -4), m(-half - 15, -44), 4.5 * k), { name: 'lever' });
+  } else {
+    pic.path('cp-obj', poly([m(-half - 14, -4.75), m(half + 14, -4.75), m(half + 14, 4.75), m(-half - 14, 4.75)]), { name: 'axle' });
+    for (const side of [-1, 1] as const) {
+      const x = side < 0 ? -half - 15.5 : half + 9;
+      pic.path(side < 0 ? 'cp-hi' : 'cp-obj', rrect(...m(x, -6.5), 6.5 * k, 13 * k, 2), { name: side < 0 ? 'nut-l' : 'nut-r' });
+    }
+  }
 }
 
 /**

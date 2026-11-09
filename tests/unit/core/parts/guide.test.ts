@@ -91,6 +91,9 @@ test("[PG-KINDS] a part's close-ups follow the bike detail that decides them: th
   expect(guidePictures(partById('brake-lever')!, D({ bars: 'drop' }))).toEqual(['pg-lever-drop', 'pg-lever-flat']);
   for (const [id, pics] of [['headset', ['pg-headset']], ['stem', ['pg-stem']], ['display', ['pg-display']],
     ['battery', ['battery-in-tube', 'battery-contacts']]] as const) expect(guidePictures(partById(id)!, D()), id).toEqual(pics);
+  // batch 5, the rest of the guide: the fork from the front, the hub and both axles from behind, the hub gears, the spokes
+  for (const [id, pic] of [['fork', 'pg-fork'], ['hub', 'pg-hub'], ['wheel-qr', 'pg-wheel-qr'], ['thru-axle', 'pg-thru-axle'],
+    ['hub-gears', 'pg-hub-gears'], ['spokes', 'pg-spokes']] as const) expect(guidePictures(partById(id)!, D()), id).toEqual([pic]);
 });
 
 test('[PG-WORDS] P10 and P13 (care pictures redo, approved 9 November 2026): the headset hidden in the head tube; the power button on the top tube', () => {
