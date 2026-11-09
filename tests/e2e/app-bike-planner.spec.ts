@@ -461,13 +461,18 @@ test('[WM-STILL] the weight map never moves the page: near the bottom of the win
     expect(Math.abs(after[1]! - before[1]!), `${sel}: the page does not scroll`).toBeLessThanOrEqual(1);
     expect(await page.evaluate((s) => document.activeElement?.matches(s), sel), `${sel}: focus stays on it`).toBe(true);
   }
-  // the line worked out again while the rider reads further down: the packing check's heading stays where it was
+  // the line worked out again while the rider reads further down: the packing check's heading stays where it was (a plan whose line
+  // takes more room than "Checking the balance…")
+  await packingCheck(page, SMALL_BAGS);
+  const heights = [await page.locator('#weightLine').evaluate((el) => el.getBoundingClientRect().height)];
   const heading = page.locator('#stepTitle4');
   await heading.evaluate((el) => { window.scrollBy(0, el.getBoundingClientRect().top - 8); });
-  expect(await page.locator('#weightBlock').evaluate((el) => el.getBoundingClientRect().bottom)).toBeLessThan(0);
+  expect(await page.locator('#weightBlock').evaluate((el) => el.getBoundingClientRect().top), 'the line above the top of the window').toBeLessThan(0);
   const top = await heading.evaluate((el) => el.getBoundingClientRect().top);
   await page.evaluate('IDEAL_CACHE = { key:null, value:null }; drawWeightMap()');
   await expect(page.locator('#weightLine')).toHaveText('Checking the balance…');
+  heights.push(await page.locator('#weightLine').evaluate((el) => el.getBoundingClientRect().height));
+  if ((page.viewportSize()?.width ?? 0) < 700) expect(heights[0]!, 'on a phone the line takes more room than while it checks').toBeGreaterThan(heights[1]! + 1);
   expect(Math.abs((await heading.evaluate((el) => el.getBoundingClientRect().top)) - top), 'while it checks').toBeLessThanOrEqual(1);
   await expect(page.locator('#weightLine')).not.toHaveText('Checking the balance…', { timeout: 30_000 });
   expect(Math.abs((await heading.evaluate((el) => el.getBoundingClientRect().top)) - top), 'with the line back').toBeLessThanOrEqual(1);
