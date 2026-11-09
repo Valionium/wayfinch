@@ -11,7 +11,7 @@ import type { Style } from '../bike/templates.ts';
 import { framePoints } from '../bike/templates.ts';
 import type { Conditions } from '../care/types.ts';
 import type { PartId } from './guide.ts';
-import { placeLabels, segmentsCross } from './labels.ts';
+import { labelHeight, labelSize, placeLabels, segmentsCross } from './labels.ts';
 import type { Layout, Pt } from './labels.ts';
 
 type Typical = { rim: number; mm: number; style: Style; bars: 'drop' | 'flat'; fork: 'rigid' | 'suspension' };
@@ -141,6 +141,8 @@ export function partSpot(id: PartId, spec: BikeSpec, anchors: Anchors): Spot | n
     }
     case 'stanchions':
       return { ...s, piece: { d: `M${pt(headBottom)} L${pt(lerp(headBottom, front, 0.46))}`, w: 4.2 * k, dashed: false } };
+    // the fork's ends, on the card's wheel (the guide's point is the rear's): one wheel of a pair a card (review of PR 107, M5)
+    case 'dropouts': return { ...ring(), at: [r2(front[0]), r2(front[1])] };
     case 'brake-qr': return ring('left');
     case 'pad-adjuster': return ring('other');
     default: return ring();
@@ -228,10 +230,24 @@ export function focusOf(whole: ViewBox, points: readonly P[]): { z: number; cent
   return { z: Math.round(z * 100) / 100, centre: [box.x + box.w / 2, box.y + box.h / 2] };
 }
 
-/** The view a card opens on: its parts' focus, except that a card naming the frame, which spans the bike, opens on the whole bike. */
+/**
+ * The view a card opens on: its parts' focus. Where one or two far-off parts alone keep it whole (a warning's brake lever on the bar in
+ * a puncture card), up to a quarter of the parts, those farthest from the rest, are left out of it: the card opens on its own parts and
+ * a tap on a left-out one brings the view to it (review of PR 107, M3). A card naming the frame, which spans the bike, opens whole.
+ */
 export function openingFocus(whole: ViewBox, spots: readonly (readonly [PartId, { at: P }])[]): { z: number; centre: P } {
   if (spots.some(([id]) => id === 'frame')) return focusOf(whole, []);
-  return focusOf(whole, spots.map(([, s]) => s.at));
+  const pts = spots.map(([, s]) => s.at);
+  const all = focusOf(whole, pts);
+  if (all.z > 1 || pts.length < 4) return all;
+  const mid = (v: number[]): number => [...v].sort((a, b) => a - b)[Math.floor(v.length / 2)]!;
+  const m: P = [mid(pts.map((p) => p[0])), mid(pts.map((p) => p[1]))];
+  const far = [...pts].sort((a, b) => Math.hypot(b[0] - m[0], b[1] - m[1]) - Math.hypot(a[0] - m[0], a[1] - m[1]));
+  for (let k = 1; k <= Math.floor(pts.length / 4); k += 1) {
+    const f = focusOf(whole, far.slice(k));
+    if (f.z > 1) return f;
+  }
+  return all;
 }
 
 export const inBox = (b: ViewBox, p: P, margin = 0): boolean =>
@@ -288,11 +304,25 @@ export function outlineOn(o: Outline, view: ViewBox, scale: number, inset = 0): 
 /** Where the drawing sits in the canvas (`inset` px from each side, `areaH` tall, `scale` px a unit) and its labels' places. */
 export type Placement = { layout: Layout; inset: number; areaH: number; scale: number };
 
-/** How many pairs of leaders cross: the fewer, the easier the drawing reads. */
-function crossings(layout: Layout): number {
+const toSegment = (q: Pt, a: Pt, b: Pt): number => {
+  const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+  const t = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+  return Math.hypot(q[0] - a[0] - t * dx, q[1] - a[1] - t * dy);
+};
+/**
+ * How hard the leaders are to follow: two for each pair that cross, one for each leader passing within 6 px of another part's point
+ * (it then seems to point there too). The fewer, the easier the drawing reads (review of PR 107, M2).
+ */
+export function tangles(layout: Layout): number {
   const seen = layout.labels.filter((l, i, all) => all.findIndex((m) => m.to[0] === l.to[0] && m.to[1] === l.to[1]) === i);
   let n = 0;
-  for (let i = 0; i < seen.length; i += 1) for (let j = i + 1; j < seen.length; j += 1) if (segmentsCross(seen[i]!.from, seen[i]!.to, seen[j]!.from, seen[j]!.to)) n += 1;
+  for (let i = 0; i < seen.length; i += 1) {
+    for (let j = 0; j < seen.length; j += 1) {
+      if (i === j) continue;
+      if (j > i && segmentsCross(seen[i]!.from, seen[i]!.to, seen[j]!.from, seen[j]!.to)) n += 2;
+      if (toSegment(seen[j]!.to, seen[i]!.from, seen[i]!.to) < 6) n += 1;
+    }
+  }
   return n;
 }
 
@@ -301,16 +331,16 @@ function crossings(layout: Layout): number {
  * The drawing takes the whole width, or is drawn a little smaller to leave free space at its sides, as the owner's reference picture
  * does: the smaller drawing only where it places a label the whole width cannot, or uncrosses leaders.
  */
-export function placeView(items: readonly { id: string; at: P; w: number }[], view: ViewBox, width: number, o: Outline): Placement {
+export function placeView(items: readonly { id: string; at: P; w: number }[], view: ViewBox, width: number, o: Outline, lh = labelHeight(labelSize(width))): Placement {
   let out: (Placement & { score: number }) | null = null;
   for (const share of [0, 0.07, 0.14, 0.21]) {
     const inset = Math.round(width * share);
     const scale = (width - 2 * inset) / view.w;
     const areaH = Math.round(view.h * scale);
     const at = (p: P): Pt => [r2((p[0] - view.x) * scale + inset), r2((p[1] - view.y) * scale)];
-    const layout = placeLabels(items.map((i) => ({ id: i.id, at: at(i.at), w: i.w })), width, areaH, outlineOn(o, view, scale, inset));
-    // every label placed first, then fewer crossings; a smaller drawing must earn its place by two crossings fewer
-    const score = (items.length - layout.labels.length) * 1000 + crossings(layout) * 2 + share * 10;
+    const layout = placeLabels(items.map((i) => ({ id: i.id, at: at(i.at), w: i.w })), width, areaH, outlineOn(o, view, scale, inset), lh);
+    // every label placed first, then fewer tangles; a smaller drawing must earn its place by about two fewer
+    const score = (items.length - layout.labels.length) * 1000 + tangles(layout) * 2 + share * 10;
     if (!out || score < out.score) out = { layout, inset, areaH, scale, score };
     if (out.score < 1) break;
   }

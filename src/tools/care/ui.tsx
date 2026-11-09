@@ -97,10 +97,10 @@ export function CareScreen({ services }: { services: TyreServices }) {
   useEffect(() => noteSeen('c'), []);
   // The bike view's chunk, fetched while the screen is idle, so the first tap on a part opens it at once (design 7).
   useEffect(() => {
-    const idle = (window as { requestIdleCallback?: (f: () => void) => number }).requestIdleCallback;
+    const w = window as { requestIdleCallback?: (f: () => void) => number; cancelIdleCallback?: (t: number) => void };
     const go = (): void => { void loadBikeView(); };
-    const t = idle ? idle(go) : window.setTimeout(go, 1500);
-    return () => { if (!idle) window.clearTimeout(t); };
+    const t = w.requestIdleCallback ? w.requestIdleCallback(go) : window.setTimeout(go, 1500);
+    return () => { if (w.requestIdleCallback) w.cancelIdleCallback?.(t); else window.clearTimeout(t); };
   }, []);
   useEffect(() => {
     const again = (): void => redraw((n) => n + 1);

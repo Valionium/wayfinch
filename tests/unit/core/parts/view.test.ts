@@ -13,9 +13,9 @@ import { careDetails } from '../../../../src/core/care/fit.ts';
 import { byType, riderType, TYPE_USUAL, usualOn } from '../../../../src/core/care/type-order.ts';
 import type { CareDetails } from '../../../../src/core/care/types.ts';
 import { cardParts } from '../../../../src/core/parts/links.ts';
-import { GAP, hitsShapes, labelWidth, placeLabels, segmentHitsRect } from '../../../../src/core/parts/labels.ts';
+import { GAP, hitsShapes, labelSize, labelWidth, placeLabels, segmentHitsRect } from '../../../../src/core/parts/labels.ts';
 import type { Layout, Shapes } from '../../../../src/core/parts/labels.ts';
-import { cardSpec, focusOf, inBox, openingFocus, inkMarkup, outline, outlineOn, partSpot, placeView, typeSpec, viewMarkup, wholeBox, zoomBox } from '../../../../src/core/parts/view.ts';
+import { cardSpec, inBox, openingFocus, inkMarkup, outline, outlineOn, partSpot, placeView, tangles, typeSpec, viewMarkup, wholeBox, zoomBox } from '../../../../src/core/parts/view.ts';
 import type { ViewBox } from '../../../../src/core/parts/view.ts';
 import { C, CARE_TASKS, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
 import { PART_SHORT, partsLine } from '../../../../src/core/wording/en-part-names.ts';
@@ -81,6 +81,14 @@ test('[BV-SPOT] each of the 36 parts stands out on every type\'s bike that has i
       if (s!.clip) expect(s!.clip.c, `${t} ${id}`).toEqual([anchors.wheels.front.cx, anchors.wheels.front.cy]);
     }
   }
+  // a card about one wheel marks that wheel only: Disc brake rubbing's axle, quick release, dropouts, caliper and disc on the front
+  // (design 2.4; review of PR 107, M5)
+  const rub = cardSpec(null, { brakes: ['hydraulic-disc'] }, ['thru-axle', 'wheel-qr', 'dropouts', 'caliper', 'disc']);
+  const ra = bikeArt(rub, null).anchors;
+  for (const id of ['thru-axle', 'wheel-qr', 'dropouts', 'caliper', 'disc'] as const) {
+    const p = partSpot(id, rub, ra)!.at;
+    expect(Math.hypot(p[0] - ra.wheels.front.cx, p[1] - ra.wheels.front.cy), id).toBeLessThan(ra.wheels.front.r);
+  }
   // far side and left side, as the labels say
   const disc = typeSpec('gravel');
   const a = bikeArt(disc, null).anchors;
@@ -104,7 +112,8 @@ test('[BV-SPOT] on every template and size a part stands out where the drawing h
       const { anchors } = bikeArt(spec, null);
       const s = partSpot(id, spec, anchors);
       expect(s, `${style} ${size} ${id}`).not.toBeNull();
-      expect(s!.at).toEqual(partPoint(spec, anchors, id));
+      if (id === 'dropouts') expect(s!.at).toEqual([anchors.wheels.front.cx, anchors.wheels.front.cy].map((n) => Math.round(n * 100) / 100));
+      else expect(s!.at).toEqual(partPoint(spec, anchors, id));
       expect(at(wholeBox(anchors), s!.at, 1), `${style} ${size} ${id}`).toBe(true);
     }
     if (size === 'S') {
@@ -147,14 +156,21 @@ test('[BV-ZOOM] a card whose parts sit close together opens zoomed in on them; o
     const parts = partsOf(it, careDetails(null));
     const spec = cardSpec(null, it.applies, parts);
     const { anchors } = bikeArt(spec, null);
-    const pts = parts.flatMap((p) => { const s = partSpot(p, spec, anchors); return s ? [s.at] : []; });
-    return { f: focusOf(wholeBox(anchors), pts), anchors, pts };
+    const spots = parts.flatMap((p) => { const s = partSpot(p, spec, anchors); return s ? [[p, s] as const] : []; });
+    const pts = spots.map(([, s]) => s.at);
+    return { f: openingFocus(wholeBox(anchors), spots), anchors, pts };
   };
   const chain = focus('chain-broken');
   expect(chain.f.z).toBeGreaterThan(1.3);
   const view = zoomBox(wholeBox(chain.anchors), chain.f.z, chain.f.centre);
   for (const p of chain.pts) expect(at(view, p, 4)).toBe(true);
-  expect(focus('puncture-tube').f.z).toBe(1);
+  // the puncture card opens on its wheel: the warning's brake lever on the bar is left out of the focus (review of PR 107, M3), as the
+  // disc card's lever is
+  const tube = focus('puncture-tube');
+  expect(tube.f.z).toBeGreaterThan(1.3);
+  const tubeView = zoomBox(wholeBox(tube.anchors), tube.f.z, tube.f.centre);
+  expect(at(tubeView, [tube.anchors.wheels.front.cx, tube.anchors.wheels.front.cy], 4)).toBe(true);
+  expect(focus('brake-rub-disc').f.z).toBeGreaterThan(1.3);
   expect(focus('frame-bolts-check').f.z).toBe(1);
   expect(focus('tyres-sealant-check').f.z).toBeGreaterThan(1.3);
   // a card naming the frame, which spans the bike, opens whole (an e-bike's battery and display sit close, its frame does not)
@@ -206,6 +222,7 @@ function checkLayout(l: Layout, n: number, width: number, top: number, areaH: nu
 
 test('[BV-LABELS] on every card, type and width (320 and 360 px phones, the 528 px panel), opened on its focus or on the whole bike, every part in view is labelled off the bike, with no overlap and no leader through another label', () => {
   let layouts = 0;
+  const tangled: number[] = [];
   for (const it of items) {
     const parts = partsOf(it, careDetails(null));
     if (parts.length === 0) continue;
@@ -216,13 +233,14 @@ test('[BV-LABELS] on every card, type and width (320 and 360 px phones, the 528 
         const o = outline(svg, anchors);
         const spots = parts.flatMap((p) => { const s = partSpot(p, spec, anchors); return s ? [[p, s] as const] : []; });
         const whole = wholeBox(anchors);
-        const f = focusOf(whole, spots.map(([, s]) => s.at));
+        const f = openingFocus(whole, spots);
         for (const view of [zoomBox(whole, f.z, f.centre), whole]) {
           for (const width of [320, 360, 528]) {
-            const ins = spots.filter(([, s]) => inBox(view, s.at, 1)).map(([p, s]) => ({ id: p, at: s.at, w: labelWidth(PART_SHORT[p], s.side ? `(${s.side} side)` : '') }));
+            const ins = spots.filter(([, s]) => inBox(view, s.at, 1)).map(([p, s]) => ({ id: p, at: s.at, w: labelWidth(PART_SHORT[p], s.side ? `(${s.side} side)` : '', labelSize(width)) }));
             const pl = placeView(ins, view, width, o);
             const shapes = outlineOn(o, view, pl.scale, pl.inset);
             checkLayout(pl.layout, ins.length, width, pl.layout.top, pl.areaH, { ...shapes, pad: 0 }, `${it.id} ${t} ${width} ${view.w}`);
+            if (tapped === null && view !== whole) tangled.push(tangles(pl.layout));
             layouts += 1;
           }
         }
@@ -230,6 +248,9 @@ test('[BV-LABELS] on every card, type and width (320 and 360 px phones, the 528 
     }
   }
   expect(layouts).toBeGreaterThan(1000);
+  // as each card opens: leaders that cross or pass another part's point are rare and few (review of PR 107, M2)
+  expect(Math.max(...tangled)).toBeLessThanOrEqual(6);
+  expect(tangled.filter((n) => n > 0).length / tangled.length).toBeLessThan(0.05);
 }, 120_000);
 
 test('[BV-LABELS] any few parts anywhere on the drawing get their labels, under the same promises', () => {

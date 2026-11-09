@@ -10,19 +10,23 @@ export type LabelOut = { id: string; box: Rect; from: Pt; to: Pt };
 export type Layout = { labels: LabelOut[]; top: number; height: number };
 
 /** A label's height and the rows' pitch, in px; the gap kept between labels. */
-export const LABEL_H = 22;
-export const ROW = 27;
 export const GAP = 5;
+/**
+ * The labels' size in px (review of PR 107, M1, toward the design's 13.5 units): capitals of 12 px on a phone, 13 px in the wide panel,
+ * and the small "(other side)" one px smaller; a label is twice its letters tall.
+ */
+export const labelSize = (width: number): number => (width >= 480 ? 13 : 12);
+export const labelHeight = (size: number): number => size * 2;
 const MAX_ROWS = 4;
 
 /**
- * A label's width in px at the view's label size (11 px capitals, 600 weight, 0.04 em apart, 6 px padding a side): a little wider than
- * the app's font draws it, so a label never overruns its box. `extra` is the small lowercase "(other side)" after the name.
+ * A label's width in px at `size` px capitals (600 weight, 0.04 em apart, 6 px padding a side), with the lowercase "(other side)" one
+ * px smaller as `extra`: a little wider than the app's font draws it, so a label never overruns its box.
  */
-export function labelWidth(name: string, extra = ''): number {
+export function labelWidth(name: string, extra = '', size = 12): number {
   const em = (c: string): number => (c === ' ' ? 0.26 : /[IJ1.,'()]/.test(c) ? 0.34 : /[MW]/.test(c) ? 0.9 : 0.66);
-  const caps = [...name.toUpperCase()].reduce((n, c) => n + em(c) + 0.04, 0) * 11;
-  const small = extra ? [...extra].reduce((n, c) => n + (c === ' ' ? 0.24 : /[il().,']/.test(c) ? 0.26 : /[mw]/.test(c) ? 0.82 : 0.54), 0) * 10 + 4 : 0;
+  const caps = [...name.toUpperCase()].reduce((n, c) => n + em(c) + 0.04, 0) * size;
+  const small = extra ? [...extra].reduce((n, c) => n + (c === ' ' ? 0.24 : /[il().,']/.test(c) ? 0.26 : /[mw]/.test(c) ? 0.82 : 0.54), 0) * (size - 1) + 4 : 0;
   return Math.ceil(caps + small + 12);
 }
 
@@ -132,7 +136,8 @@ function edgeFrom(b: Rect, p: Pt): Pt {
  * `top` is the height of the rows above the drawing (draw the drawing that far down) and `height` the canvas's whole height; the labels
  * are in canvas units, with `from` on the label's edge and `to` the part's point.
  */
-export function placeLabels(items: readonly LabelIn[], width: number, areaH: number, shapes: Shapes = { circles: [], segs: [], pad: 0 }): Layout {
+export function placeLabels(items: readonly LabelIn[], width: number, areaH: number, shapes: Shapes = { circles: [], segs: [], pad: 0 }, lh = labelHeight(12)): Layout {
+  const ROW = lh + GAP;
   // Parts at one point (a hub's axle and its quick release) share one leader: their labels stack in one block.
   const groups: Group[] = [];
   for (const it of items) {
@@ -156,7 +161,7 @@ export function placeLabels(items: readonly LabelIn[], width: number, areaH: num
   let best: Placed[] = [];
   // More rows only where four a side leave a label without a place.
   for (const rows of [MAX_ROWS, 2 * MAX_ROWS]) {
-    const spots = new Map(groups.map((g) => [g, candidates(g, groups, width, areaH, busy, rows)]));
+    const spots = new Map(groups.map((g) => [g, candidates(g, groups, width, areaH, busy, rows, lh)]));
     for (const order of orders) {
       const placed = placeIn(order, spots);
       if (placed.length > best.length) best = placed;
@@ -164,7 +169,7 @@ export function placeLabels(items: readonly LabelIn[], width: number, areaH: num
     }
     if (best.length === groups.length) break;
   }
-  const pad = (ROW - LABEL_H) / 2;
+  const pad = (ROW - lh) / 2;
   const topRows = Math.max(0, ...best.filter((p) => p.box.y < 0).map((p) => Math.ceil((-p.box.y + pad) / ROW - 1e-9)));
   const bottomRows = Math.max(0, ...best.filter((p) => p.box.y >= areaH).map((p) => Math.ceil((p.box.y + p.box.h - areaH + pad) / ROW - 1e-9)));
   const top = topRows * ROW;
@@ -173,7 +178,7 @@ export function placeLabels(items: readonly LabelIn[], width: number, areaH: num
     const p = best.find((x) => x.g.ids.includes(it.id));
     if (!p) return [];
     const k = p.g.ids.indexOf(it.id);
-    const box = { x: p.box.x, y: p.box.y + top + k * (LABEL_H + GAP), w: p.g.ws[k]!, h: LABEL_H };
+    const box = { x: p.box.x, y: p.box.y + top + k * (lh + GAP), w: p.g.ws[k]!, h: lh };
     return [{ id: it.id, box, from: shift(p.from), to: shift(p.g.at) }];
   });
   return { labels, top, height: top + areaH + bottomRows * ROW };
@@ -185,10 +190,11 @@ type Placed = { g: Group; box: Rect; from: Pt };
 type Spot = { box: Rect; from: Pt; cost: number };
 
 /** Every place a group's block may take, cheapest first: the shorter its leader the better, an outer row costing a little more. */
-function candidates(g: Group, groups: readonly Group[], width: number, areaH: number, busy: (r: Rect) => boolean, rows: number): Spot[] {
-  const pad = (ROW - LABEL_H) / 2;
+function candidates(g: Group, groups: readonly Group[], width: number, areaH: number, busy: (r: Rect) => boolean, rows: number, lh: number): Spot[] {
+  const ROW = lh + GAP;
+  const pad = (ROW - lh) / 2;
   const w = Math.max(...g.ws);
-  const h = g.ids.length * LABEL_H + (g.ids.length - 1) * GAP;
+  const h = g.ids.length * lh + (g.ids.length - 1) * GAP;
   const out: Spot[] = [];
   const add = (box: Rect, extra: number): void => {
     const from = edgeFrom(box, g.at);

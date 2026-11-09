@@ -700,11 +700,12 @@ test("[BV-VIEW] the card's parts as buttons and as labels on the drawing; a tap 
 
 test('[BV-ZOOM] a card whose parts sit close together opens zoomed in on them; Whole bike, Zoom in and Zoom out are buttons; a card spread over the bike opens whole', async () => {
   await mount();
-  await openCard('puncture-tube');
+  await openCard('ebike-no-power');
   await click(where()[0]!);
   await sheetOpen();
   const zoomed = () => sheet()!.querySelector('.bv-canvas')!.classList.contains('bv-zoomed');
-  // the brake lever is on the bar, far from the wheel: this card is spread out
+  // this card names the frame, which spans the bike (the puncture card, once spread by its warning's brake lever, now opens on its
+  // wheel: review of PR 107, M3)
   expect(zoomed()).toBe(false);
   await click(sheetButton('Close')!);
   render(null, host);

@@ -23,7 +23,7 @@ export const STEP_PARTS: Readonly<Record<string, readonly L[]>> = {
   'gears-skipping': [[['stiff link', 'chain']], [['barrel adjuster', 'barrel']], none, none],
   'bolt-loose': [none, none, none, none],
   'tyre-torn': [[['tube', 'tube'], ['tubeless valve', 'tubeless-valve']], none, [['tube', 'tube']], none],
-  'ebike-no-power': [[['battery', 'battery']], [['contacts', 'battery']], [['battery', 'battery'], ['remote', 'display'], ['handlebar', 'handlebar'], ['top tube', 'frame']], [['display', 'display'], ['remote', 'display']], none],
+  'ebike-no-power': [[['battery', 'battery']], [['contacts', 'battery']], [['battery', 'battery'], ['remote', 'display'], ['top tube', 'frame']], [['display', 'display'], ['remote', 'display']], none],
   'brakes-lever-test': [[['lever', 'brake-lever']], [['lever', 'brake-lever']], none, [['Rim brakes', 'rim-brake'], ['pads', 'pads'], ['rim', 'rim']]],
   'ebike-charge-indoors': [[['battery', 'battery']], none, none, none],
   'frame-wash': [none, none, none, [['chain', 'chain']]],
@@ -38,12 +38,12 @@ export const STEP_PARTS: Readonly<Record<string, readonly L[]>> = {
   'brakes-pads-disc': [[['caliper', 'caliper']], [['pad', 'pads']], [['pads', 'pads']], [['lever', 'brake-lever'], ['pads', 'pads']], [['pad', 'pads'], ['lever', 'brake-lever'], ['caliper', 'caliper']]],
   'brakes-pads-rim': [[['pad', 'pads']], [['rim', 'rim'], ['pad', 'pads']], [['pad', 'pads'], ['rim', 'rim'], ['tyre', 'tyre'], ['spokes', 'spokes']], [['rim', 'rim']], none, [['pads', 'pads'], ['rim', 'rim'], ['tyre', 'tyre']]],
   'wheels-spokes-check': [[['spokes', 'spokes']], [['rim', 'rim'], ['frame', 'frame']], [['frame', 'frame']], [['rim', 'rim']], none],
-  'frame-bolts-check': [[['stem', 'stem'], ['handlebar', 'handlebar'], ['seatpost clamp', 'seatpost'], ['crank', 'chainring'], ['wheel quick releases', 'wheel-qr']], [['handlebar', 'handlebar'], ['stem', 'stem'], ['seatpost', 'seatpost']], [['handlebar', 'handlebar'], ['stem', 'stem']], [['bar', 'handlebar'], ['levers', 'brake-lever']], [['crank', 'chainring']], none],
+  'frame-bolts-check': [[['stem', 'stem'], ['handlebar', 'handlebar'], ['seatpost clamp', 'seatpost'], ['crank', 'chainring'], ['wheel quick releases', 'wheel-qr']], [['handlebar', 'handlebar'], ['stem', 'stem'], ['seatpost', 'seatpost']], [['handlebar', 'handlebar'], ['stem', 'stem']], [['bar', 'handlebar']], [['crank', 'chainring']], none],
   'gears-electronic-battery': [none, none, none],
   'frame-headset-check': [[['bar', 'handlebar'], ['headset', 'headset']], [['headset', 'headset']], [['bars', 'handlebar']], none],
   'gears-cables-look': [[['cable and casing', 'gear-cable'], ['frame', 'frame']], none, [['cable and casing', 'gear-cable']]],
   'chain-lube': [[['chain', 'chain']], [['chain', 'chain'], ['rear derailleur', 'derailleur']], none, [['rear gears', 'cassette'], ['chainrings', 'chainring']], [['derailleur', 'derailleur']], [['brake discs', 'disc'], ['rims', 'rim']]],
-  'tyres-sealant-check': [none, [['valve core', 'valve']], none, none],
+  'tyres-sealant-check': [none, [['valve core', 'tubeless-valve']], none, none],
   'belt-inspect': [none, none, none],
   'ebike-battery-care': [none, none, none],
   'susp-wipe-stanchions': [[['fork tubes', 'stanchions']], none, none],
@@ -51,7 +51,7 @@ export const STEP_PARTS: Readonly<Record<string, readonly L[]>> = {
   'gears-cassette-wear': [[['chain', 'chain']], [['chain', 'chain']], [['rear gears', 'cassette'], ['chainrings', 'chainring']], [['chainrings', 'chainring'], ['chain', 'chain']], [['chain', 'chain'], ['rear gears', 'cassette'], ['rings', 'chainring']]],
   'wheels-hubs-check': [[['rim', 'rim']], [['frame', 'frame'], ['hubs', 'hub']], none, [['hub', 'hub']], [['dropouts', 'dropouts'], ["wheel's quick release", 'wheel-qr']]],
   'brakes-rotor-thickness': [[['disc', 'disc']], [['brake caliper', 'caliper']], [['disc', 'disc']], [['discs', 'disc']]],
-  'tyres-sealant-topup': [[['valve core', 'valve']], none, none, [['tyre', 'tyre']]],
+  'tyres-sealant-topup': [[['valve core', 'tubeless-valve']], none, none, [['tyre', 'tyre']]],
   'susp-lowers-service': [none, none, [['fork', 'fork']]],
   'gears-hub-oil': [[['hub gears', 'hub-gears']], none, none],
   'gears-cables-replace': [[['derailleur', 'derailleur']], none, [['cable and casing', 'gear-cable']], none],
@@ -82,7 +82,8 @@ export function cardParts(id: string, texts: readonly string[], shown: readonly 
 
 export type Segment = string | { text: string; part: PartId };
 
-const isWordChar = (c: string | undefined): boolean => c !== undefined && /[A-Za-z0-9]/.test(c);
+// A hyphen joins words: "disc" in "disc-brake cleaner" is part of a product's name (review of PR 107, M4).
+const isWordChar = (c: string | undefined): boolean => c !== undefined && /[A-Za-z0-9-]/.test(c);
 
 /**
  * A step's text cut at each linked word, in the text's order. Each word, in the list's order, takes its first mention that stands as a

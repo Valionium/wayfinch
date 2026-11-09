@@ -433,6 +433,10 @@ test('[BV-LABELS] in a real browser, on every roadside card at the project size 
     await expect(sheet.locator('.bv-label').first()).toBeVisible();
     const drawn = await labelsDrawn(page);
     const svg = (await sheet.locator('.bv-svg').boundingBox())!;
+    // the labels' size (review of PR 107, M1): capitals of at least 12 px, "(other side)" at least 11 px
+    const sizes = await page.evaluate(() => [...document.querySelectorAll('dialog.part-sheet .bv-label text, dialog.part-sheet .bv-side')]
+      .map((t) => [t.classList.contains('bv-side') ? 11 : 12, parseFloat(getComputedStyle(t).fontSize)]));
+    for (const [least, got] of sizes) expect(got, id).toBeGreaterThanOrEqual(least!);
     for (const l of drawn) {
       expect(l.text.left, `${id} ${l.id}`).toBeGreaterThanOrEqual(l.pill.left - 0.5);
       expect(l.text.right, `${id} ${l.id}: words wider than the pill`).toBeLessThanOrEqual(l.pill.right + 0.5);
@@ -508,6 +512,9 @@ test('[BV-ZOOM] a pinch (two pointers) and Ctrl with the wheel zoom the drawing;
   const sheet = page.locator('dialog.part-sheet');
   await expect(sheet).toBeVisible();
   const canvas = sheet.locator('.bv-canvas');
+  // it opens on its front wheel (its far-off brake lever left out of the focus: review of PR 107, M3); from the whole bike
+  await expect(canvas).toHaveClass(/bv-zoomed/);
+  await sheet.getByRole('button', { name: 'Whole bike' }).click();
   await expect(canvas).not.toHaveClass(/bv-zoomed/);
   const box = (await canvas.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);

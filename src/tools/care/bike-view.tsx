@@ -14,7 +14,7 @@ import type { PictureDetails } from '../../core/care/pictures.ts';
 import type { Conditions } from '../../core/care/types.ts';
 import { guidePictures, partById } from '../../core/parts/guide.ts';
 import type { PartId } from '../../core/parts/guide.ts';
-import { labelWidth } from '../../core/parts/labels.ts';
+import { labelSize, labelWidth } from '../../core/parts/labels.ts';
 import { cardSpec, inBox, inkMarkup, MAX_ZOOM, openingFocus, outline, partSpot, placeView, viewMarkup, wholeBox, zoomBox } from '../../core/parts/view.ts';
 import type { Spot } from '../../core/parts/view.ts';
 import { WB } from '../../core/wording/en-bike.ts';
@@ -119,6 +119,7 @@ function Drawing({ card, tapped, type, onTap }: { card: ViewCard; tapped: PartId
   }, []);
 
   const shown = spots.filter(([, s]) => inBox(view, s.at, 1));
+  const size = labelSize(width);
   const side = (s: Spot): string => (s.side === 'other' ? PG.otherSide : s.side === 'left' ? PG.leftSide : '');
   // While fingers move the drawing the labels step aside (placing them is the costly part) and the canvas keeps its size; they are
   // placed again as the fingers lift.
@@ -126,7 +127,7 @@ function Drawing({ card, tapped, type, onTap }: { card: ViewCard; tapped: PartId
   const last = useRef<ReturnType<typeof placeView> | null>(null);
   const placed = moving && last.current
     ? { ...last.current, layout: { ...last.current.layout, labels: [] }, scale: (width - 2 * last.current.inset) / view.w }
-    : placeView(shown.map(([id, s]) => ({ id, at: s.at, w: labelWidth(PART_SHORT[id], side(s) ? `(${side(s)})` : '') })), view, width, outline(svg, anchors));
+    : placeView(shown.map(([id, s]) => ({ id, at: s.at, w: labelWidth(PART_SHORT[id], side(s) ? `(${side(s)})` : '', size) })), view, width, outline(svg, anchors));
   if (!moving) last.current = placed;
   const { layout, inset, areaH, scale } = placed;
 
@@ -215,8 +216,8 @@ function Drawing({ card, tapped, type, onTap }: { card: ViewCard; tapped: PartId
             return (
               <g key={id} class={`bv-label${id === tapped ? ' bv-label-hot' : ''}`} data-part={id} onClick={() => onTap(id)}>
                 <rect class="bv-pill" x={b.x} y={b.y} width={b.w} height={b.h} rx={b.h / 2} />
-                <text x={b.x + 6} y={b.y + b.h / 2} dominant-baseline="central">
-                  {PART_SHORT[id].toUpperCase()}{side(s) ? <tspan class="bv-side" dx="4">({side(s)})</tspan> : null}
+                <text x={b.x + 6} y={b.y + b.h / 2} dominant-baseline="central" style={{ fontSize: `${size}px` }}>
+                  {PART_SHORT[id].toUpperCase()}{side(s) ? <tspan class="bv-side" dx="4" style={{ fontSize: `${size - 1}px` }}>({side(s)})</tspan> : null}
                 </text>
               </g>
             );

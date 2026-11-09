@@ -168,6 +168,27 @@ test("[PG-LINKS] every roadside card and Care task lists its steps' part names; 
   // the tools are not parts: "levers" in a tyre card are tyre levers
   expect(STEP_PARTS['puncture-tube']![1]!.map(([, p]) => p)).not.toContain('brake-lever');
   expect(STEP_PARTS['tyres-replace']![3]!.map(([, p]) => p)).not.toContain('brake-lever');
+  // review of PR 107, M4: no link inside a hyphenated word ("disc-brake cleaner"); "gear levers" are not brake levers; a tubeless
+  // task's valve core is the tubeless valve's; "handlebar remote" is the remote alone
+  for (const [id, steps] of Object.entries(STEP_PARTS)) {
+    steps.forEach((step, i) => {
+      for (const seg of linkSegments(items.get(id)![i]!, step)) if (typeof seg !== 'string') expect(seg.text, `${id} ${i + 1}`).not.toMatch(/-$|^-/);
+    });
+    const text = items.get(id)!;
+    steps.forEach((step, i) => {
+      let at = 0;
+      for (const seg of linkSegments(text[i]!, step)) {
+        if (typeof seg === 'string') { at += seg.length; continue; }
+        expect(/[-A-Za-z0-9]/.test(text[i]![at - 1] ?? ' ') || /[-A-Za-z0-9]/.test(text[i]![at + seg.text.length] ?? ' '), `${id} ${i + 1}: ${seg.text}`).toBe(false);
+        at += seg.text.length;
+      }
+    });
+  }
+  expect(linkSegments(items.get('brakes-squeal')![0]!, STEP_PARTS['brakes-squeal']![0]!).filter((s) => typeof s !== 'string').map((s) => (s as { text: string }).text)).toEqual(['pads', 'disc']);
+  expect(items.get('brakes-squeal')![0]!.indexOf('wipe the disc')).toBeGreaterThan(0);
+  expect(STEP_PARTS['frame-bolts-check']![3]!.map(([, p]) => p)).not.toContain('brake-lever');
+  expect(STEP_PARTS['tyres-sealant-check']![1]).toEqual([['valve core', 'tubeless-valve']]);
+  expect(STEP_PARTS['ebike-no-power']![2]!.map(([, p]) => p)).not.toContain('handlebar');
   expect(STEP_PARTS['chain-wear-check']![0]).toEqual([['chainring', 'chainring'], ['rear gear', 'cassette'], ['chain', 'chain']]);
 });
 
