@@ -439,13 +439,6 @@ export async function prepareTrip(deps: PrepareDeps, onProgress: (step: StepName
       reports.push(failed('places', e));
     }
     const zones = await readStoredZones();
-    // With places saved, each day ends at a place to sleep near its planned end (owner, 9 Nov 2026), before the forecast and the
-    // archive are asked for its grid. A chunk of its own; its failure keeps the planned ends.
-    try {
-      await (await import('./day-stops.ts')).settleStops(deps.now(), undefined, { announce: false });
-    } catch (e) {
-      if (routeGone(e)) throw e;
-    }
     // The rider may have changed the date, speed, pace or nights while places downloaded: the later steps go by the trip as it is
     // stored now (the same route; a replaced one stops the run).
     const current = await store.readTrip();
@@ -454,6 +447,17 @@ export async function prepareTrip(deps: PrepareDeps, onProgress: (step: StepName
 
     begin('hours');
     reports.push(await hoursStep(store, trip, zones, deps.now(), (done, total) => onProgress('hours', done, total)));
+    // With places and their hours saved, each day ends at a place to sleep near its planned end (owner, 9 Nov 2026), judged for its
+    // night with those hours (review of PR 101, I1), before the forecast and the archive are asked for its grid. A chunk of its own;
+    // its failure keeps the planned ends.
+    try {
+      await (await import('./day-stops.ts')).settleStops(deps.now(), undefined, { announce: false });
+      const settled = await store.readTrip();
+      if (!settled || settled.route.id !== trip.route.id) throw new RouteGoneError();
+      trip = settled;
+    } catch (e) {
+      if (routeGone(e)) throw e;
+    }
     begin('weather');
     reports.push(await weatherStep(deps, store, online, trip, zones, deps.now()));
     begin('baseline');

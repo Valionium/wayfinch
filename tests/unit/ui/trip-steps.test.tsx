@@ -340,7 +340,7 @@ describe('Days that end where you can sleep (owner, 9 Nov 2026)', () => {
     const change = host.querySelector<HTMLButtonElement>('[data-stop-change="1"]')!;
     expect(change.getAttribute('aria-expanded')).toBe('false');
     await click(change);
-    await until(() => host.querySelector('[data-stop-choices]') !== null, 'the choices');
+    await until(() => host.querySelector('[data-stop-choices] button') !== null, 'the choices');
     const offered = [...host.querySelectorAll<HTMLButtonElement>('[data-stop-choices] button')].map((b) => b.textContent);
     expect(offered).toEqual([expect.stringContaining('Camping Rheinaue'), expect.stringContaining('Gasthof Adler'), BD.appTripStopNo]);
     await click(buttonIn(host.querySelector('[data-stop-choices]')!, offered[1]!));
@@ -349,10 +349,60 @@ describe('Days that end where you can sleep (owner, 9 Nov 2026)', () => {
     await click(buttonIn(host.querySelector('[data-summary]')!, BD.appTripStopUndo));
     await until(() => lines()[0]!.includes('Camping Rheinaue'), 'day 1 back');
     await click(host.querySelector<HTMLButtonElement>('[data-stop-change="1"]')!);
-    await until(() => host.querySelector('[data-stop-choices]') !== null, 'the choices again');
+    await until(() => host.querySelector('[data-stop-choices] button') !== null, 'the choices again');
     await click(buttonIn(host.querySelector('[data-stop-choices]')!, BD.appTripStopNo));
     await until(() => !lines()[0]!.includes(' to '), 'day 1 split by effort');
     expect(host.querySelector('[data-summary]')!.textContent).toContain(BD.appTripStopSplit);
+  }, 30_000);
+});
+
+describe('Review of PR 101: the day lines and Change stop', () => {
+  async function placesNearDay1(list: [string, 'lodging' | 'campsite' | 'settlement', string, number][]): Promise<number> {
+    const trip = (await readTrip())!;
+    const end = trip.route.stages[0]!.endKm;
+    const db = await openDb();
+    for (const [id, kind, name, off] of list) {
+      const p = pointAtRouteKm(trip.route, end + off);
+      await db.put('places', placeAt(kind, p.lat, p.lon, { id, name }));
+      await db.add('matches', { placeId: id, km: end + off, offRouteM: 0 });
+    }
+    return end;
+  }
+  const dayLine = (): Element => host.querySelector('[data-summary] .trip-days li')!;
+  async function prepared(): Promise<void> {
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes(' places'), 'the result');
+  }
+
+  test('[TRIP-DAY-STOPS] a day with no place to sleep near its end keeps the nearest town line (M1)', async () => {
+    await withRoute(services({ ...preparing() }));
+    await placesNearDay1([['t1', 'settlement', 'Bingen', 2]]);
+    await prepared();
+    await until(() => (dayLine().textContent ?? '').includes('nearest town: Bingen'), 'the town line');
+  }, 30_000);
+
+  test("[TRIP-DAY-STOPS] Change stop says which day and stop it changes, marks the current one, keeps the focus, says the change; another window's change ends its Undo (M3, M7)", async () => {
+    await withRoute(services({ ...preparing() }));
+    await placesNearDay1([['b1', 'lodging', 'Gasthof Adler', 1.5], ['b2', 'campsite', 'Camping Rheinaue', -2]]);
+    await prepared();
+    await until(() => (dayLine().textContent ?? '').includes(' to '), 'day 1 to a place');
+    const change = (): HTMLButtonElement => host.querySelector<HTMLButtonElement>('[data-stop-change="1"]')!;
+    expect(change().getAttribute('aria-label')).toBe(BD.appTripStopChangeLabel(1, 'Camping Rheinaue'));
+    await click(change());
+    await until(() => host.querySelector('[data-stop-choices] button') !== null, 'the choices');
+    const list = host.querySelector('[data-stop-choices]')!;
+    expect(change().getAttribute('aria-controls')).toBe(list.id);
+    const current = list.querySelector('[aria-current="true"]')!;
+    expect(current.textContent).toContain('Camping Rheinaue');
+    await click(buttonIn(list, [...list.querySelectorAll('button')].find((b) => b.textContent!.includes('Gasthof Adler'))!.textContent!));
+    await until(() => (dayLine().textContent ?? '').includes('Gasthof Adler'), 'day 1 to the guest house');
+    expect(document.activeElement).toBe(change());
+    expect(host.querySelector('[data-stop-said]')!.textContent).toBe(BD.appTripStopChanged(1));
+    expect(host.querySelector('[data-summary]')!.textContent).toContain(BD.appTripStopUndo);
+    // Another window picks "No stop" for day 1: this window's Undo would bring back what that window replaced, so it goes.
+    await browserTripServices(() => NOW).settleStops!({ day: 1, to: null });
+    await until(() => !(dayLine().textContent ?? '').includes(' to '), "the other window's change");
+    expect([...host.querySelectorAll('[data-summary] button')].some((b) => b.textContent === BD.appTripStopUndo)).toBe(false);
   }, 30_000);
 });
 

@@ -8,7 +8,7 @@ import { bannedHits } from '../../fixtures/banned.ts';
 const texts = (): [string, string][] => Object.entries(BD).map(([k, v]) => [k, typeof v === 'function' ? (v as (...a: unknown[]) => string)('Hotel Krone', '92.4', 'Mainz') : v]);
 
 test('[HON-BANNED] no day-end sleep line uses a banned word; every key is a Trip key, in neither en.ts, en-trip.ts nor en-trip-fields.ts', () => {
-  expect(texts().length).toBe(14); // 4, and 10 for days that end where you can sleep (owner, 9 Nov 2026)
+  expect(texts().length).toBe(18); // 4, 10 for days that end where you can sleep (owner, 9 Nov 2026), 4 after the review of PR 101
   for (const [key, text] of texts()) {
     expect(key).toMatch(/^appTrip(Bed|DayTo|Stop)/);
     expect(text.trim()).not.toBe('');

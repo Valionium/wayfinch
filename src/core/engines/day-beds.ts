@@ -70,6 +70,11 @@ function passesOf(places: Place[], matches: RouteMatch[]): { beds: Pass[]; towns
 const byId = (a: Place, b: Place): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 const costAt = (endKm: Km) => (x: { km: Km; offRouteM: number }): number => Math.abs(x.km - endKm) + (DETOUR_FACTOR * x.offRouteM) / 1000;
 
+/** Whether a place is closed on the night day `day` ends, as the Sleep card judges it. No date: never. */
+export function closedThatNight(place: Place, day: number, nights: Nights): boolean {
+  return !openOn(nights, day)({ place, km: 0, offRouteM: 0 });
+}
+
 /** Open that night, or not known to be closed. */
 function openOn(nights: Nights, day: number): (x: Pass) => boolean {
   const hoursOf = new Map(nights.hours.map((h) => [h.placeId, h]));

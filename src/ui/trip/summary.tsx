@@ -73,33 +73,55 @@ function bedLine(b: DayBed | undefined, dayKm: number): string | null {
   return b.town ? BD.appTripBedTown(b.town.name, showKm(b.town.km), w) : BD.appTripBedNone(w);
 }
 
-/** The words of a day that ends at a stop (TRIP-DAY-STOPS): its first line, and the line under it. Null: no stop holds for it. */
-function dayEndWords(trip: Trip, i: number, text: string): { text: string; below: string | null } | null {
+/**
+ * The words of a day that ends at a stop (TRIP-DAY-STOPS): its first line, and the line under it. Null: no stop holds for it.
+ * `town`: the nearest town near a planned end with no place to sleep (review of PR 101, M1).
+ */
+export function dayEndWords(trip: Trip, i: number, text: string, town: { name: string; km: number } | null = null): { text: string; below: string | null } | null {
   const stop = dayStopOf(trip, i);
   const s = trip.route.stages[i];
-  if (!stop || !s) return null;
+  if (!stop || !s || !trip.stops) return null;
   const km = showKm(s.endKm - s.startKm);
   if (stop.placeId !== null && stop.name) {
     // Day 1's leave-by time, when there is one, stays after the stop's name.
     const rest = text.slice(W.appTripDayRow(s.day, km).length);
-    return { text: `${BD.appTripDayTo(s.day, km, stop.name)}${rest}`, below: stop.town ? BD.appTripStopBy(stop.town) : null };
+    const below = stop.closed ? BD.appTripStopClosed : stop.was ? BD.appTripStopGone(stop.was) : stop.town ? BD.appTripStopBy(stop.town) : null;
+    return { text: `${BD.appTripDayTo(s.day, km, stop.name)}${rest}`, below };
   }
-  return { text, below: stop.by === 'rider' ? BD.appTripStopSplit : BD.appTripStopNone(showKm(windowKm(s.endKm - s.startKm))) };
+  if (stop.by === 'rider') return { text, below: BD.appTripStopSplit };
+  // The window the places were searched in: the planned day's (M2).
+  const basis = trip.stops.basis;
+  const w = showKm(windowKm(basis[i]! - (basis[i - 1] ?? 0)));
+  return { text, below: town ? BD.appTripBedTown(town.name, showKm(town.km), w) : BD.appTripStopNone(w) };
 }
 
 /** Change a day's stop: the places near its planned end and "No stop", each a button (TRIP-DAY-STOPS). */
-function StopChoices({ day, choices, pick }: { day: number; choices: BedChoice[] | null; pick: (to: BedChoice | null) => void }) {
-  if (choices === null) return <p class="muted" role="status">{TR.appAbSearching}</p>;
+function StopChoices({ day, choices, current, pick }: { day: number; choices: BedChoice[] | null; current: string | null; pick: (to: BedChoice | null) => void }) {
   return (
-    <div data-stop-choices={day}>
-      {choices.length === 0 ? <p class="muted">{BD.appTripStopNoChoice}</p> : null}
-      <ul class="trip-stop-choices">
-        {choices.map((c) => <li key={c.placeId}><button type="button" class="btn hit" onClick={() => pick(c)}>{BD.appTripStopPick(c.name, showKm(c.km))}</button></li>)}
-        <li><button type="button" class="btn hit" onClick={() => pick(null)}>{BD.appTripStopNo}</button></li>
-      </ul>
+    <div data-stop-choices={day} id={`trip-stop-choices-${day}`}>
+      {choices === null ? <p class="muted">{TR.appAbSearching}</p> : (
+        <>
+          {choices.length === 0 ? <p class="muted">{BD.appTripStopNoChoice}</p> : null}
+          <ul class="trip-stop-choices">
+            {choices.map((c) => (
+              <li key={c.placeId}>
+                <button type="button" class="btn hit" aria-current={c.placeId === current ? 'true' : undefined} onClick={() => pick(c)}>
+                  {BD.appTripStopPick(c.name, showKm(c.km))}{c.placeId === current ? ` (${BD.appTripStopCurrent})` : ''}
+                </button>
+              </li>
+            ))}
+            <li><button type="button" class="btn hit" aria-current={current === null ? 'true' : undefined} onClick={() => pick(null)}>{BD.appTripStopNo}</button></li>
+          </ul>
+        </>
+      )}
     </div>
   );
 }
+
+/** After a change, the focus goes back to that day's Change stop button: the one it came from (review of PR 101, M7). */
+const focusChange = (day: number): void => {
+  setTimeout(() => (document.querySelector(`[data-stop-change="${day}"]`) as HTMLButtonElement | null)?.focus(), 0);
+};
 
 export function RouteSummary({ snap, stops, beds, settle, choices }: {
   snap: TripSnapshot; stops: TripServices['stops']; beds?: TripServices['dayBeds']; settle?: TripServices['settleStops']; choices?: TripServices['stopChoices'];
@@ -114,7 +136,14 @@ export function RouteSummary({ snap, stops, beds, settle, choices }: {
     if (key && settle) settle().catch(() => undefined);
   }, [key, settle]);
   const [open, setOpen] = useState<{ day: number; list: BedChoice[] | null } | null>(null);
-  const [undo, setUndo] = useState<{ day: number; before: TripStops | null } | null>(null);
+  const [undo, setUndo] = useState<{ day: number; before: TripStops | null; after: TripStops | null } | null>(null);
+  const [said, setSaid] = useState('');
+  // Undo is only for the change this window just made: a trip removed, another route, or a change from elsewhere ends it, and the
+  // open list with it (review of PR 101, M3).
+  const nowStops = JSON.stringify(trip?.stops ?? null);
+  useEffect(() => {
+    if (undo && (!key || JSON.stringify(undo.after) !== nowStops)) { setUndo(null); setOpen(null); setSaid(''); }
+  }, [key, nowStops]);
   const openChoices = (day: number): void => {
     if (open?.day === day) { setOpen(null); return; }
     setOpen({ day, list: null });
@@ -124,13 +153,14 @@ export function RouteSummary({ snap, stops, beds, settle, choices }: {
     if (!settle || !trip) return;
     const before = trip.stops ?? null;
     setOpen(null);
-    settle({ day, to }).then(() => setUndo({ day, before }), () => undefined);
+    settle({ day, to }).then((after) => { setUndo({ day, before, after }); setSaid(BD.appTripStopChanged(day)); focusChange(day); }, () => undefined);
   };
   const undoPick = (): void => {
     if (!settle || !undo) return;
-    const { before } = undo;
+    const { before, day } = undo;
     setUndo(null);
-    settle({ restore: before }).catch(() => undefined);
+    setSaid('');
+    settle({ restore: before }).then(() => focusChange(day), () => undefined);
   };
   const [found, setFound] = useState<RouteStop[] | null>(null);
   useEffect(() => {
@@ -169,7 +199,9 @@ export function RouteSummary({ snap, stops, beds, settle, choices }: {
         <ol class="trip-days">
           {s.stages.map((stage, i) => {
             const day = trip.route.stages[i];
-            const stop = dayEndWords(trip, i, stage.text);
+            const near = day && bedsFound ? bedsFound.find((b) => b.day === day.day && b.endKm === day.endKm) : undefined;
+            const stop = dayEndWords(trip, i, stage.text, near?.town ?? null);
+            const held = dayStopOf(trip, i);
             const bed = !stop && day && bedsFound ? bedLine(bedsFound.find((b) => b.day === day.day && b.endKm === day.endKm), day.endKm - day.startKm) : null;
             const n = i + 1;
             return (
@@ -180,15 +212,17 @@ export function RouteSummary({ snap, stops, beds, settle, choices }: {
                 {bed ? <span class="muted trip-day-detail" data-day-bed>{bed}</span> : null}
                 {stop && settle ? (
                   <span class="trip-stop-actions">
-                    <button type="button" class="btn linky" data-stop-change={n} aria-expanded={open?.day === n ? 'true' : 'false'} onClick={() => openChoices(n)}>{BD.appTripStopChange}</button>
-                    {undo?.day === n ? <><span class="muted" role="status">{BD.appTripStopChanged(n)}</span> <button type="button" class="btn linky" onClick={undoPick}>{BD.appTripStopUndo}</button></> : null}
+                    <button type="button" class="btn linky" data-stop-change={n} aria-expanded={open?.day === n ? 'true' : 'false'} aria-controls={`trip-stop-choices-${n}`}
+                      aria-label={BD.appTripStopChangeLabel(n, held?.placeId ? held.name : null)} onClick={() => openChoices(n)}>{BD.appTripStopChange}</button>
+                    {undo?.day === n ? <><span class="muted">{BD.appTripStopChanged(n)}</span> <button type="button" class="btn linky" onClick={undoPick}>{BD.appTripStopUndo}</button></> : null}
                   </span>
                 ) : null}
-                {open?.day === n ? <StopChoices day={n} choices={open.list} pick={(to) => pick(n, to)} /> : null}
+                {open?.day === n ? <StopChoices day={n} choices={open.list} current={held?.placeId ?? null} pick={(to) => pick(n, to)} /> : null}
               </li>
             );
           })}
         </ol>
+        <p class="visually-hidden" role="status" aria-live="polite" data-stop-said>{said}</p>
         {missingHeights ? <p class="muted">{TR.appTripHeightsPending}</p> : snap.heightsLookedUp ? <p class="muted">{W.appTripHeightsCredit}</p> : null}
         {trip.route.source === 'planned' || snap.prepared?.build ? <OsmCredit lead={TF.appTripOsmLead} date={packDate(snap.prepared?.build)} /> : null}
         <p class="muted"><a href="/legal/licences/">{W.appTripLicences}</a></p>

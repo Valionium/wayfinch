@@ -188,7 +188,13 @@ export type SunSource = (lat: number, lon: number, ridingDate: string) => SunTim
 export type Stay = 'camping' | 'mixed' | 'accommodation';
 
 /** Where one day ends (owner's ruling of 9 Nov 2026): a saved sleep place, or none (placeId null: the planned end, at `km`). */
-export type TripStop = { placeId: string | null; km: Km; name: string | null; town: string | null; by: 'auto' | 'rider' };
+export type TripStop = {
+  placeId: string | null; km: Km; name: string | null; town: string | null; by: 'auto' | 'rider';
+  /** The rider's stop is closed that night (its season or prepared hours): kept, and said (review of PR 101, I1). */
+  closed?: true;
+  /** The rider's stop that is gone from the saved places, replaced by this automatic one: said (review of PR 101, I2). */
+  was?: string;
+};
 /**
  * The day ends chosen for one route and one plan: `basis` holds the planned ends (equal effort) they were chosen for, one per
  * night, and `days` the stop of each. Any other route or plan has none (core/route/day-stops.ts).

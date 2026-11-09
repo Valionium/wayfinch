@@ -10,6 +10,11 @@ export const BD = {
   appTripStopNone: (windowKm: string): string => `No place to sleep mapped within ${windowKm} km of the planned end, so the day ends there.`,
   appTripStopSplit: 'No stop chosen: the day ends where the effort splits evenly.',
   appTripStopChange: 'Change stop',
+  // Review of PR 101: a stop closed that night, or gone from the map data, is said; Change stop names its day and stop.
+  appTripStopClosed: 'Closed that night, by its season or opening hours. Change stop to choose another.',
+  appTripStopGone: (was: string): string => `Your stop ${was} is no longer in the map data, so the day now ends at the place above.`,
+  appTripStopChangeLabel: (day: number, name: string | null): string => `Change where day ${day} ends${name === null ? '' : `, now ${name}`}`,
+  appTripStopCurrent: 'now',
   appTripStopPick: (name: string, km: string): string => `${name}, km ${km}`,
   appTripStopNo: 'No stop: split by effort',
   appTripStopUndo: 'Undo',

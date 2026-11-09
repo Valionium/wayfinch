@@ -11,6 +11,8 @@ import { prepareTrip } from '../../../src/data/prepare.ts';
 import { openDb } from '../../../src/store/db.ts';
 import { readTrip, replaceRoute, saveTrip } from '../../../src/store/trip.ts';
 import { removeTrip } from '../../../src/store/remove-trip.ts';
+import { exportAll, importAll } from '../../../src/store/export.ts';
+import type { ExportFile } from '../../../src/store/export.ts';
 import { flatRoute, pointAtKm } from '../../fixtures/build.ts';
 import { placeAt } from '../../fixtures/places.ts';
 import { fixtureBuild, fixtureTrip, PackServer } from './pack-server.ts';
@@ -123,5 +125,90 @@ describe('day stops on the store', () => {
     expect(after.stops!.days).toHaveLength(after.route.stages.length - 1);
     for (const [i, d] of after.stops!.days.entries()) expect(after.route.stages[i]!.endKm).toBeCloseTo(d.placeId === null ? after.stops!.basis[i]! : d.km, 9);
     expect(grids[0]).toEqual(after.route.sampleGrid);
+  });
+});
+
+describe('review of PR 101: stops judged again, gone places, export', () => {
+  /** Adds a place and its match after the trip is stored. */
+  async function addPlace(kind: string, km: number, name: string, over: Record<string, unknown> = {}): Promise<string> {
+    const p = pointAtKm(km);
+    const place = placeAt(kind as 'campsite', p.lat, p.lon, { id: `${kind}-${km}`, name, ...over });
+    const db = await openDb();
+    await db.put('places', place);
+    await db.add('matches', { placeId: place.id, km, offRouteM: 0 });
+    return place.id;
+  }
+  async function dropPlace(id: string): Promise<void> {
+    const db = await openDb();
+    await db.delete('places', id);
+    const tx = db.transaction('matches', 'readwrite');
+    for (let c = await tx.store.openCursor(); c; c = await c.continue()) if ((c.value as { placeId: string }).placeId === id) await c.delete();
+    await tx.done;
+  }
+  const setDate = async (date: string | null): Promise<void> => { const t = (await readTrip())!; await saveTrip({ ...t, departureDate: date }); };
+
+  test('[TRIP-DAY-STOPS] a date set later judges the stops again: an automatic stop closed that night is replaced (I1)', async () => {
+    await tripWithPlaces([['lodging', 95, 'Open Hotel'], ['lodging', 177, 'Hotel C']], { departureDate: null });
+    await addPlace('campsite', 91, 'Seasonal Camp', { seasonal: 'Apr-Oct' });
+    expect((await settleStops(NOW))!.days[0]!.name).toBe('Seasonal Camp');
+    await setDate('2026-11-10');
+    const again = (await settleStops(NOW))!;
+    expect(again.days[0]!.name).toBe('Open Hotel');
+    expect((await readTrip())!.route.stages[0]!.endKm).toBe(95);
+  });
+
+  test('[TRIP-DAY-STOPS] prepared hours closed on the night of day 1 make that place no stop, also when it was held before (I1)', async () => {
+    await tripWithPlaces([['lodging', 91, 'Shut Monday'], ['lodging', 96, 'Open'], ['lodging', 177, 'Hotel C']], { departureDate: '2026-11-09' });
+    expect((await settleStops(NOW))!.days[0]!.name).toBe('Shut Monday');
+    await (await openDb()).put('hours', { placeId: 'lodging-91', windowStart: new Date('2026-11-01T00:00:00Z'), windowEnd: new Date('2026-11-30T00:00:00Z'),
+      spans: [{ from: new Date('2026-11-01T00:00:00Z'), to: new Date('2026-11-30T00:00:00Z'), state: 'closed' }] });
+    expect((await settleStops(NOW))!.days[0]!.name).toBe('Open');
+  });
+
+  test('[TRIP-DAY-STOPS] a stop the rider chose that is closed that night is kept, and marked closed (I1)', async () => {
+    await tripWithPlaces([['lodging', 95, 'Open Hotel'], ['lodging', 177, 'Hotel C']], { departureDate: null });
+    await addPlace('campsite', 88, 'Seasonal Camp', { seasonal: 'Apr-Oct' });
+    await settleStops(NOW);
+    const camp = (await stopChoices(NOW, 1)).find((c) => c.name === 'Seasonal Camp')!;
+    await settleStops(NOW, { day: 1, to: camp });
+    await setDate('2026-11-10');
+    const again = (await settleStops(NOW))!;
+    expect(again.days[0]).toMatchObject({ name: 'Seasonal Camp', by: 'rider', closed: true });
+    await setDate('2026-06-10');
+    expect((await settleStops(NOW))!.days[0]!.closed).toBeUndefined();
+  });
+
+  test('[TRIP-DAY-STOPS] a stop whose place is gone from the saved places is chosen afresh; a rider\'s says so (I2)', async () => {
+    await tripWithPlaces([['lodging', 91, 'Gone Hotel'], ['lodging', 96, 'Other'], ['lodging', 177, 'Hotel C']]);
+    expect((await settleStops(NOW))!.days[0]!.name).toBe('Gone Hotel');
+    await dropPlace('lodging-91');
+    const auto = (await settleStops(NOW))!;
+    expect(auto.days[0]).toMatchObject({ name: 'Other', by: 'auto' });
+    expect(auto.days[0]!.was).toBeUndefined();
+    await settleStops(NOW, { day: 1, to: (await stopChoices(NOW, 1)).find((c) => c.name === 'Other')! });
+    await dropPlace('lodging-96');
+    await addPlace('lodging', 93, 'Newer');
+    const replaced = (await settleStops(NOW))!;
+    expect(replaced.days[0]).toMatchObject({ name: 'Newer', by: 'auto', was: 'Other' });
+    expect((await readTrip())!.route.stages[0]!.endKm).toBe(93);
+    // said until the rider picks again, not lost on the next settle
+    expect((await settleStops(NOW))!.days[0]!.was).toBe('Other');
+  });
+
+  test('[TRIP-DAY-STOPS] export and import carry the stops, the rider\'s own pick included; another route\'s are left out (I3)', async () => {
+    await tripWithPlaces([['lodging', 91, 'H1'], ['lodging', 86, 'H2'], ['lodging', 177, 'Hotel C']]);
+    await settleStops(NOW);
+    await settleStops(NOW, { day: 1, to: (await stopChoices(NOW, 1)).find((c) => c.name === 'H2')! });
+    const before = (await readTrip())!.stops;
+    const file = JSON.parse(JSON.stringify(await exportAll())) as ExportFile;
+    expect(file.trip!.stops).toEqual(before);
+    freshStore();
+    expect((await importAll(file)).ok).toBe(true);
+    expect((await readTrip())!.stops).toEqual(before);
+    freshStore();
+    const other = JSON.parse(JSON.stringify(file)) as ExportFile;
+    other.trip!.stops = { ...other.trip!.stops!, routeId: 'route-else' };
+    expect((await importAll(other)).ok).toBe(true);
+    expect((await readTrip())!.stops).toBeUndefined();
   });
 });

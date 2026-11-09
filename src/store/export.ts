@@ -2,7 +2,7 @@
 // settings, calibration and tyre details. It never holds positions, check-ins, day starts, the route-end date, water left,
 // Plan tomorrow, or anything of the bag planner. Sections are built field by field, so nothing else can travel in or out.
 import { deleteDB } from 'idb';
-import type { Climb, Profile, Route, RoutePoint, Stage, Trip } from '../core/types.ts';
+import type { Climb, Profile, Route, RoutePoint, Stage, Trip, TripStop, TripStops } from '../core/types.ts';
 import type { Ride } from '../core/engines/water-learning.ts';
 import { W } from '../core/wording/en.ts';
 import { exportTyres, importTyres } from '../tools/tyre/storage.ts';
@@ -44,10 +44,33 @@ const routeOf = (r: Route): Route => ({
   id: r.id, name: r.name, points: r.points.map(pointOf), lengthKm: r.lengthKm, ascentM: r.ascentM,
   stages: r.stages.map(stageOf), climbs: r.climbs.map(climbOf), source: r.source, sampleGrid: r.sampleGrid, hash: r.hash,
 });
-const tripOf = (t: Trip): Trip => ({
-  route: routeOf(t.route), departureDate: t.departureDate, startTime: t.startTime, flatKph: t.flatKph, stay: t.stay, campWaterL: t.campWaterL,
-  ...(t.pace === undefined ? {} : { pace: t.pace }),
-});
+/**
+ * The day ends with the trip (review of PR 101, I3): the rider's own picks travel too. Only those of this very route, each field as
+ * the type says; anything else is left out, and the next settle chooses afresh.
+ */
+function stopsOf(t: Trip): TripStops | null {
+  const s = t.stops as unknown as Record<string, unknown> | undefined;
+  if (!s || typeof s !== 'object' || s['routeId'] !== t.route.id || !Array.isArray(s['basis']) || !Array.isArray(s['days'])) return null;
+  const basis = (s['basis'] as unknown[]).filter((k): k is number => typeof k === 'number' && Number.isFinite(k));
+  const text = (x: unknown): string | null => (typeof x === 'string' ? x.slice(0, 160) : null);
+  const days = (s['days'] as unknown[]).map((d): TripStop | null => {
+    if (!d || typeof d !== 'object') return null;
+    const r = d as Record<string, unknown>;
+    if (typeof r['km'] !== 'number' || !Number.isFinite(r['km']) || (r['by'] !== 'auto' && r['by'] !== 'rider') || (r['placeId'] !== null && typeof r['placeId'] !== 'string')) return null;
+    return {
+      placeId: r['placeId'] as string | null, km: r['km'], name: text(r['name']), town: text(r['town']), by: r['by'],
+      ...(r['closed'] === true ? { closed: true as const } : {}), ...(typeof r['was'] === 'string' ? { was: r['was'].slice(0, 160) } : {}),
+    };
+  });
+  return basis.length === s['basis'].length && days.length === basis.length && days.every((d) => d !== null) ? { routeId: t.route.id, basis, days: days as TripStop[] } : null;
+}
+const tripOf = (t: Trip): Trip => {
+  const stops = stopsOf(t);
+  return {
+    route: routeOf(t.route), departureDate: t.departureDate, startTime: t.startTime, flatKph: t.flatKph, stay: t.stay, campWaterL: t.campWaterL,
+    ...(t.pace === undefined ? {} : { pace: t.pace }), ...(stops ? { stops } : {}),
+  };
+};
 // The chosen bike is read leniently: an export from before it, or a bad id, comes in as none and never stops the file.
 const settingsOf = (s: Settings): Settings => {
   const out = {} as Record<string, unknown>;

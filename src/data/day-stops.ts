@@ -3,12 +3,12 @@
 // settles them again whenever its route or plan changes, and when the rider picks another place or "No stop" (with Undo).
 // The stops are kept with the trip, for its route and its plan alone (core/route/day-stops.ts), and the route's stages end there,
 // so every card, the forecast grid and the handoff read the same days.
-import { candidatesNear } from '../core/engines/day-beds.ts';
+import { candidatesNear, closedThatNight } from '../core/engines/day-beds.ts';
 import type { BedChoice } from '../core/engines/day-beds.ts';
 import { chooseStops, stopsHold, withStops } from '../core/route/day-stops.ts';
 import { sampleGrid } from '../core/route/grid.ts';
 import { planStages } from '../core/route/stages.ts';
-import type { ScreenInputs, Stage, TripStops } from '../core/types.ts';
+import type { ScreenInputs, Stage, TripStop, TripStops } from '../core/types.ts';
 import { announceHere } from '../store/changed.ts';
 import { readInputs } from '../store/inputs.ts';
 import { readLocalSettings } from '../store/settings-local.ts';
@@ -36,6 +36,27 @@ export async function stopChoices(now: Date, day: number): Promise<BedChoice[]> 
 }
 
 /**
+ * The held stops judged again for the nights and the places as they are now (review of PR 101, I1 and I2): an automatic stop is
+ * chosen afresh (a place closed that night, gone or outranked gives way); the rider's own stays, marked when it is closed that
+ * night, and gives way to an automatic one, said, when its place is gone; the rider's "No stop" stays.
+ */
+function judged(held: TripStops, fresh: TripStops | null, inputs: ScreenInputs): TripStops {
+  const byId = new Map(inputs.places.map((p) => [p.id, p]));
+  const matched = new Set(inputs.matches.map((m) => m.placeId));
+  const days = held.days.map((d, i): TripStop => {
+    const now = fresh?.days[i] ?? { placeId: null, km: held.basis[i]!, name: null, town: null, by: 'auto' as const };
+    if (d.by === 'auto') return d.was && now.placeId === d.placeId ? { ...now, was: d.was } : now;
+    if (d.placeId === null) return d;
+    const place = byId.get(d.placeId);
+    if (!place || !matched.has(d.placeId)) return { ...now, ...(d.name ? { was: d.name } : {}) };
+    const { closed: _was, ...kept } = d;
+    void _was;
+    return closedThatNight(place, i + 1, nightsOf(inputs)) ? { ...kept, closed: true } : kept;
+  });
+  return { ...held, days };
+}
+
+/**
  * Settles the stops of the stored trip, with the rider's change if any, and writes the trip when its days change. Resolves to the
  * stops now in force, or null when there are none (no places saved, a day ride, or the route gone meanwhile).
  */
@@ -45,10 +66,11 @@ export async function settleStops(now: Date, change?: StopChange, o: { announce?
   const { trip } = inputs;
   const { route } = trip;
   const plan = planOf(inputs);
+  const fresh = plan.length > 1 && inputs.matches.length > 0 ? chooseStops(route, plan, inputs.places, inputs.matches, trip.stay, nightsOf(inputs)) : null;
   const held = stopsHold(trip.stops, route, plan) ? trip.stops : null;
   let next: TripStops | null;
-  if (change && 'restore' in change) next = change.restore && stopsHold(change.restore, route, plan) ? change.restore : null;
-  else next = held ?? (plan.length > 1 && inputs.matches.length > 0 ? chooseStops(route, plan, inputs.places, inputs.matches, trip.stay, nightsOf(inputs)) : null);
+  if (change && 'restore' in change) next = change.restore && stopsHold(change.restore, route, plan) ? judged(change.restore, fresh, inputs) : null;
+  else next = held && fresh ? judged(held, fresh, inputs) : fresh;
   if (next && change && 'day' in change) {
     const i = change.day - 1;
     if (i >= 0 && i < next.days.length) {
