@@ -1,5 +1,6 @@
 // Words only Trip's own chunks show: the trip settings' field names (the departure date, the nights and the trip details,
-// src/ui/trip/settings.tsx), the route's summary (summary.tsx) and Get ready offline's storage line (getready.tsx). Moved from en.ts as
+// src/ui/trip/settings.tsx), the route's summary and its credits (summary.tsx, credit.tsx), Add a route (add-route.tsx) and Get ready offline's
+// storage line (getready.tsx). Moved from en.ts as
 // they were, to make room on the first screen for Remove this trip (owner's wish, 9 November 2026). They follow the same rules as
 // en.ts: the banned-words test reads this object too (tests/unit/core/wording-remove.test.ts).
 
@@ -17,4 +18,12 @@ export const TF = {
   appTripOsmLead: 'Places and routes: ',
   appTripStopsLabel: 'Stops along the route',
   appTripStorage: (mb: string): string => `${mb} MB used on this phone`,
+  appTripAddTitle: 'Add a route',
+  appTripReplaceHeading: 'Use another route',
+  appTripPickGpx: 'Choose a GPX file',
+  appTripReading: 'Reading the file…',
+  appTripReplaceBody: (oldName: string, newName: string, km: string): string => `“${newName}” (${km} km) would replace “${oldName}”. The places, forecast, positions, departure date and nights saved for the old route are removed. The departure date goes back to today and the nights to the stage model's suggestion; pace, speed, start time, stay and camp water stay.`,
+  appTripOsmLink: '© OpenStreetMap contributors',
+  appTripGeoNamesLink: 'GeoNames',
+  appTripGeoNamesLicence: ', CC BY 4.0',
 };
