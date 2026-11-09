@@ -269,7 +269,7 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     expect(JSON.parse(page.values.get('loadcheck:handoff-done')!)).toMatchObject({ id: ID, outcome: 'applied' });
     expect(page.nodes.get('backToWayfinch')!.href).toBe('/#/trip');
     expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/^Planned for Heidelberg → Strasbourg/);
-    expect(JSON.parse(page.values.get('loadcheck:setups')!).length).toBe(2);
+    expect(json<number>('storedSetupsLocal().length')).toBe(2);
   });
 
   test('the chosen bike\'s general setup is the foundation (the default one first, else the newest); it is never changed; another bike\'s is not used', async () => {
@@ -315,7 +315,7 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     expect(await page.run('undoTripBags()')).toBe(true);
     expect(page.run('JSON.stringify(captureDraft())')).toBe(before);
     expect(page.run('JSON.stringify(SETUPS)')).toBe(setups);
-    expect(JSON.parse(page.values.get('loadcheck:setups')!).map((s: { id: string }) => s.id)).toEqual(['t_x']);
+    expect(json('storedSetupsLocal().map(s=>s.id)')).toEqual(['t_x']);
     expect(await page.run('undoTripBags()')).toBe(false);
   });
 
@@ -335,7 +335,7 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     expect(page.run('JSON.stringify(captureDraft())')).toBe(work);
     expect(json('S.bags.some(b=>b.uid===9)')).toBe(true);
     expect(json('S.packed')).toEqual({ tent: true });
-    const kept = JSON.parse(page.values.get('loadcheck:setups')!).find((s: { id: string }) => s.id === made);
+    const kept = json(`storedSetupsLocal().find(s=>s.id==='${made}')`);
     expect(kept).toMatchObject({ kind: 'general', note: 'Our own note' });
     expect(json<number>('SETUPS.length')).toBe(2);
     expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/changed since/);
@@ -353,7 +353,7 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     expect(page.run('JSON.stringify(captureDraft())')).toBe(before);
     // the renamed setup stays; the "Before" copy, untouched, goes
     expect(json('SETUPS.map(s=>[s.id,s.name])')).toEqual([[made, 'Our Vosges trip']]);
-    expect(JSON.parse(page.values.get('loadcheck:setups')!).map((s: { id: string }) => s.id)).toEqual([made]);
+    expect(json('storedSetupsLocal().map(s=>s.id)')).toEqual([made]);
     expect(json(`SETUPS.some(s=>s.id==='${keptBefore}')`)).toBe(false);
     expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/Our Vosges trip/);
   });
@@ -389,14 +389,16 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     expect(String(page.nodes.get('handoffText')!.textContent)).not.toMatch(/changed/);
   });
 
-  test('whichever single write of Plan bags for this trip, its Undo, the setup made before or its Undo fails, no saved setup is lost and the bar says the save did not reach storage (review of PR 80, I-1)', async () => {
+  test('whichever single write of Plan bags for this trip, its Undo, the setup made before or its Undo fails, no saved setup is lost and the bar says the save did not reach storage exactly when the store does not hold what the tab holds (review of PR 80, I-1; fix round 2, m-B)', async () => {
     const handed = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
     const many = (n: number, prefix: string, extra: Record<string, unknown> = {}) =>
       `Array.from({length:${n}},(_,i)=>${qaSetup('X', extra).replace("id:'X'", `id:'${prefix}'+i`).replace("name:'Setup X'", `name:'Setup ${prefix}'+i`)})`;
     const made = { saved: '2026-11-06', forRoute: { hash: handed.trip.route.hash, name: 'Heidelberg → Strasbourg', departureDate: '2026-06-12' } };
-    // 34 saved setups: 3 general ones of the chosen bike, 30 trip setups and the one made for this route on 6 Nov; the plan here is
-    // none of them, so a "Before" copy is made
-    const library = `[${qaSetup('t_made', made)},...${many(3, 'g', { kind: 'general' })},...${many(30, 't')}]`;
+    // 34 saved setups: 15 trip setups an older page saved (in the list it reads), and 3 general ones of the chosen bike, 15 trip setups
+    // and the one made for this route on 6 Nov, which this page added (the second list); the plan here is none of them, so a "Before"
+    // copy is made
+    const older = `${many(15, 'o')}.map(s=>{for(const f of SETUP_MARK_FIELDS) delete s[f];return s;})`;
+    const library = `[${qaSetup('t_made', made)},...${many(3, 'g', { kind: 'general' })},...${many(15, 't')}]`;
     // the three setup keys, which only the setup write writes (the ledger is also written for other keys, at times that vary; the
     // QA suite fails it in turn too)
     const KEYS = ['loadcheck:setups', 'loadcheck:setups-more:v1', 'loadcheck:setup-marks:v1'];
@@ -415,7 +417,7 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     };
     const start = async () => {
       const p = longPlanner(handed.gpx);
-      await p.page.run(`SETUPS=${library};store.set(SETUP_KEY,SETUPS)`);
+      await p.page.run(`window.localStorage.setItem(SETUP_KEY,JSON.stringify(${older}));SETUPS=[...${library},...storedSetupsLocal()];store.set(SETUP_KEY,SETUPS)`);
       p.page.run('S.bags.push({uid:3,pos:"bar",L:9});S.nextUid=4;');
       await p.page.run('receiveHandoff()');
       return p;
@@ -428,7 +430,7 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
       ['Open the setup made on 6 Nov', null, 'reuseTripSetup()'],
       ['its Undo', 'reuseTripSetup()', 'undoTripBags()'],
     ];
-    let cases = 0;
+    let cases = 0, notHeld = 0;
     for (const [what, prep, code] of flows) {
       const dry = await start();
       if (prep) expect(await dry.page.run(prep)).toBe(true);
@@ -444,12 +446,16 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
         expect(log.failed, label).not.toBe('');
         const now = stored(page);
         expect(ids.filter((id) => !now.includes(id)), label).toEqual([]);
-        expect(page.run('SETUPS_STORED'), label).toBe(false);
-        expect(String(page.nodes.get('handoffText')!.textContent), label).toMatch(/did not reach storage/);
+        // the page says so exactly when the store does not hold what the tab holds (fix round 2 of PR 80, m-B)
+        const held = page.run(`(()=>{const by=l=>JSON.stringify(l.map(s=>JSON.stringify(normaliseSetup(s))).sort());return by(SETUPS)===by(storedSetupsLocal());})()`);
+        expect(page.run('SETUPS_STORED'), label).toBe(held);
+        if (held) expect(String(page.nodes.get('handoffText')!.textContent), label).not.toMatch(/did not reach storage/);
+        else { expect(String(page.nodes.get('handoffText')!.textContent), label).toMatch(/did not reach storage/); notHeld++; }
         cases++;
       }
     }
     expect(cases).toBeGreaterThanOrEqual(8);
+    expect(notHeld).toBeGreaterThan(0);
   }, 120_000);
 
   test('the bar promises a kept plan only when it will keep one (review of PR 80, m2)', async () => {

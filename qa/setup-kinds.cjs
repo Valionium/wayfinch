@@ -46,11 +46,12 @@ test('[SET-KIND] the rider marks a trip setup as general and can change it back;
   run(`SETUPS=[qaSetup('t_a'),qaSetup('t_b')];SAVE_MESSAGE='';`);
   assert.equal(await run(`setSetupKind('t_a','general')`),true);
   assert.equal(json(`setupKind(SETUPS.find(s=>s.id==='t_a'))`),'general');
-  assert.equal(JSON.parse(q.values.get('loadcheck:setups')).find(s=>s.id==='t_a').kind,'general','stored at once');
+  assert.equal(json(`storedSetupsLocal().find(s=>s.id==='t_a').kind`),'general','stored at once');
   assert.match(json('SAVE_MESSAGE'),/general setup/);
   assert.equal(await run(`setSetupKind('t_a','trip')`),true);
-  const stored=JSON.parse(q.values.get('loadcheck:setups')).find(s=>s.id==='t_a');
+  const stored=json(`storedSetupsLocal().find(s=>s.id==='t_a')`);
   assert.equal(stored.kind,undefined,'back to a trip setup: the kind is gone again');
+  assert.equal(JSON.stringify(JSON.parse(q.values.get('loadcheck:setups-more:v1')).find(s=>s.id==='t_a')).includes('"kind"'),false,'in its stored copy too');
   assert.equal(await run(`saveSetup('New one','')`),true);
   assert.equal(json(`setupKind(SETUPS[0])`),'trip','a setup saved from the planner is a trip setup');
   await run(`setSetupKind('t_b','general')`);
@@ -119,35 +120,39 @@ function tab(storage){
 const MARKS=['kind','forRoute','base','isDefault'];
 const strip=s=>Object.fromEntries(Object.entries(s).filter(([k])=>!MARKS.includes(k)));
 
-test('[SET-LIMITS] past 20 setups, the list older pages read holds 20, the general ones first; the rest and every setup\'s marks are kept where older pages never look; read together they are the one list (review of PR 80, I1)',async()=>{
+test('[SET-LIMITS] a setup this page adds never enters the list older pages read: that list keeps only what older pages saved there; the rest and every setup\'s marks are kept where older pages never look; read together they are the one list (review of PR 80, I1; the owner\'s choice of 9 Nov 2026)',async()=>{
   const storage=sharedStore(),a=tab(storage);
-  assert.equal(await a.run('SETUPS=qaLibrary();store.set(SETUP_KEY,SETUPS)'),true);
-  const main=JSON.parse(storage.values.get('loadcheck:setups')),more=JSON.parse(storage.values.get('loadcheck:setups-more:v1'));
-  assert.equal(main.length,20,'an older page sees 20, so its own cut to 20 cuts nothing');
-  assert.deepEqual(main.slice(0,3).map(s=>s.id),['g0','g1','g2'],'the general setups first, so a rollback keeps them in view');
-  assert.deepEqual(main.slice(3).map(s=>s.id),Array.from({length:17},(_,i)=>'t'+i),'then the trip setups in the list\'s order');
-  assert.deepEqual(more.map(s=>s.id),Array.from({length:13},(_,i)=>'t'+(17+i)));
-  // An older page writes its 20 back through its own normaliseSetup: the new fields go; it renamed one and deleted another.
-  const old=main.map(strip).filter(s=>s.id!=='t2').map(s=>s.id==='g2' ? {...s,name:'Renamed in an old tab'} : s);
+  // 5 setups an older page saved, then this page's library of 33 on top
+  olderPageSaved(a,`Array.from({length:5},(_,i)=>qaSetup('o'+i))`);
+  const older=storage.values.get('loadcheck:setups');
+  assert.equal(await a.run('SETUPS=[...qaLibrary(),...storedSetupsLocal()];store.set(SETUP_KEY,SETUPS)'),true);
+  assert.equal(storage.values.get('loadcheck:setups'),older,'the list older pages read is as the older page left it, byte for byte');
+  const more=JSON.parse(storage.values.get('loadcheck:setups-more:v1'));
+  assert.deepEqual(more.map(s=>s.id),a.json('qaLibrary().map(s=>s.id)'),'every setup this page added is in the second list, in the list\'s order');
+  // marking one of the older page's setups general moves it nowhere
+  assert.equal(await a.run(`setSetupKind('o2','general')`),true);
+  assert.deepEqual(JSON.parse(storage.values.get('loadcheck:setups')).map(s=>s.id),['o0','o1','o2','o3','o4']);
+  // An older page writes its 5 back through its own normaliseSetup: the new fields go; it renamed one and deleted another.
+  const old=JSON.parse(storage.values.get('loadcheck:setups')).map(strip).filter(s=>s.id!=='o3').map(s=>s.id==='o2' ? {...s,name:'Renamed in an old tab'} : s);
   storage.values.set('loadcheck:setups',JSON.stringify(old));
   const b=tab(sharedStore());
   for(const [k,v] of storage.values) b.values.set(k,v);
   const read=await b.run('storedSetups()');
   const ids=b.json('storedSetupsLocal().map(s=>s.id)');
-  assert.equal(ids.length,32,'nothing cut: 33 less the one the old tab deleted');
-  assert.equal(ids.includes('t2'),false,'the old tab\'s delete stays');
-  assert.equal(read.length,32);
+  assert.equal(ids.length,37,'nothing cut: 38 less the one the old tab deleted');
+  assert.equal(ids.includes('o3'),false,'the old tab\'s delete stays');
+  assert.equal(read.length,37);
   const back=b.json(`storedSetupsLocal().map(s=>[s.id,setupKind(s),!!s.forRoute,s.base||null,s.isDefault||false,s.name])`);
-  assert.deepEqual(back.filter(x=>x[1]==='general').map(x=>x[0]),['g0','g1','g2'],'the general marks are back');
-  assert.equal(back.filter(x=>x[0].startsWith('t') && x[2]).length,29,'and every trip link');
+  assert.deepEqual(back.filter(x=>x[1]==='general').map(x=>x[0]).sort(),['g0','g1','g2','o2'],'the general marks are back, the older page\'s setup among them');
+  assert.equal(back.filter(x=>x[0].startsWith('t') && x[2]).length,30,'and every trip link');
   assert.deepEqual(back.find(x=>x[0]==='t5').slice(3,4),['g1']);
   assert.equal(back.find(x=>x[0]==='g1')[4],true);
-  assert.equal(back.find(x=>x[0]==='g2')[5],'Renamed in an old tab','the old tab\'s own change stays');
-  // with 20 or fewer, everything stays in the one list in its own order, and plain setups need nothing else
+  assert.equal(back.find(x=>x[0]==='o2')[5],'Renamed in an old tab','the old tab\'s own change stays');
+  // a library this page saves from the start has nothing in the list older pages read, and plain setups need nothing else
   const c=tab(sharedStore());
   await c.run(`SETUPS=Array.from({length:5},(_,i)=>qaSetup('p'+i));store.set(SETUP_KEY,SETUPS)`);
-  assert.deepEqual([...c.values.keys()].filter(k=>k.startsWith('loadcheck:setup')).sort(),['loadcheck:setups']);
-  assert.deepEqual(JSON.parse(c.values.get('loadcheck:setups')).map(s=>s.id),['p0','p1','p2','p3','p4']);
+  assert.deepEqual([...c.values.keys()].filter(k=>k.startsWith('loadcheck:setup')).sort(),['loadcheck:setups-more:v1']);
+  assert.deepEqual(JSON.parse(c.values.get('loadcheck:setups-more:v1')).map(s=>s.id),['p0','p1','p2','p3','p4']);
 });
 
 test('[SET-LIMITS] another tab follows a library kept in two lists, and its next write keeps every setup (review of PR 80, I1)',async()=>{
@@ -163,18 +168,18 @@ test('[SET-LIMITS] another tab follows a library kept in two lists, and its next
   await a.run(`setSetupKind('g0','trip')`);
   assert.equal(b.json(`setupKind(storedSetupsLocal().find(s=>s.id==='g0'))`),'trip');
   assert.equal(b.json(`setupKind(SETUPS.find(s=>s.id==='g0'))`),'trip');
-  // deleting down to 20 or fewer moves nothing up, so a delete on a full storage frees room (fix round of PR 80, I-1), and nothing
-  // else goes; the next setup added brings them all back to the one list
+  // deletes move nothing, so a delete on a full storage frees room (fix round of PR 80, I-1), and nothing else goes; a setup added
+  // after them goes to the second list too, never to the list older pages read (the owner's choice of 9 Nov 2026)
   await a.run(`(async()=>{for(const s of SETUPS.slice(0,15)) await deleteSetup(s.id);})()`);
   assert.equal(a.json('SETUPS.length'),19);
   assert.equal(b.json('storedSetupsLocal().length'),19);
-  const first=JSON.parse(storage.values.get('loadcheck:setups')),second=JSON.parse(storage.values.get('loadcheck:setups-more:v1'));
-  assert.equal(first.length+second.length,19,'each setup in one list');
-  assert.ok(second.length>0,'the deletes moved nothing up');
-  assert.equal(await a.run(`saveSetup('Back to one list','')`),true);
+  assert.equal(storage.values.get('loadcheck:setups'),undefined,'nothing in the list older pages read');
+  assert.equal(JSON.parse(storage.values.get('loadcheck:setups-more:v1')).length,19,'each setup in one list');
+  assert.equal(await a.run(`saveSetup('Into the second list','')`),true);
   assert.equal(a.json('SETUPS.length'),20);
-  assert.equal(JSON.parse(storage.values.get('loadcheck:setups')).length,20);
-  assert.deepEqual(JSON.parse(storage.values.get('loadcheck:setups-more:v1') || '[]'),[]);
+  assert.equal(storage.values.get('loadcheck:setups'),undefined);
+  assert.equal(JSON.parse(storage.values.get('loadcheck:setups-more:v1'))[0].name,'Into the second list');
+  assert.equal(b.json('SETUPS.length'),20);
 });
 
 test('[SET-LIMITS] Also delete bag planner data takes the setups past 20 and their marks with the rest; one saved after the request stays with its marks (review of PR 80, I1)',async()=>{
@@ -216,10 +221,10 @@ function fill(p,room){
 }
 const SETUP_WRITE_KEYS=['loadcheck:setups','loadcheck:setups-more:v1','loadcheck:setup-marks:v1','loadcheck:saved-at:v1'];
 function failAt(p,n){
-  const put=p.localStorage.setItem,log={count:0,failed:null,after:[]};
+  const put=p.localStorage.setItem,log={count:0,failed:null,after:[],afterWrites:[]};
   p.localStorage.setItem=function(key,value){
     if(SETUP_WRITE_KEYS.includes(key)){
-      if(log.failed) log.after.push(key);
+      if(log.failed){ log.after.push(key); log.afterWrites.push([key,p.values.get(key) ?? null,String(value)]); }
       if(log.count++===n){ log.failed=key; throw new Error('QuotaExceededError'); }
     }
     return put.call(this,key,value);
@@ -246,10 +251,11 @@ function reread(values,base){
 const later=()=>new Promise(r=>setTimeout(r,5));
 
 test('[SET-LIMITS] storage that fills during a setup write never loses an untouched setup: a delete frees room, and a write that cannot finish keeps what was stored (review of PR 80, I-1)',async()=>{
-  // Probe A: 25 trip setups, the 21st (t20, in the second list) a little larger; storage within 200 characters of full. The rider
-  // deletes t3, in the first list, to make room.
+  // Probe A: 25 trip setups, 20 an older page saved and 5 this page added, the 21st (t20, in the second list) a little larger; storage
+  // within 200 characters of full. The rider deletes t3, in the first list, to make room.
   const storage=sharedStore(),a=tab(storage);
-  await a.run(`SETUPS=Array.from({length:25},(_,i)=>qaSetup('t'+i,i===20 ? {note:'x'.repeat(600)} : {}));store.set(SETUP_KEY,SETUPS)`);
+  olderPageSaved(a,`Array.from({length:20},(_,i)=>qaSetup('t'+i))`);
+  await a.run(`SETUPS=[...Array.from({length:5},(_,i)=>qaSetup('t'+(20+i),i===0 ? {note:'x'.repeat(600)} : {})),...storedSetupsLocal()];store.set(SETUP_KEY,SETUPS)`);
   assert.deepEqual(JSON.parse(storage.values.get('loadcheck:setups-more:v1')).map(s=>s.id),['t20','t21','t22','t23','t24']);
   fill(a,200);
   await a.run(`deleteSetup('t3')`);
@@ -259,7 +265,7 @@ test('[SET-LIMITS] storage that fills during a setup write never loses an untouc
   assert.equal(ids.length,24);
   assert.equal(a.json('SETUPS_STORED'),true);
   // Probe B: 20 trip setups, the 20th (t19) larger; storage within 1,000 characters of full. A small new setup goes on top, as Plan
-  // bags for this trip adds its setups without a picture, so t19 would move to the second list.
+  // bags for this trip adds its setups without a picture (into the second list, which is not stored yet).
   const s2=sharedStore(),b=tab(s2);
   await b.run(`SETUPS=Array.from({length:20},(_,i)=>qaSetup('t'+i,i===19 ? {thumb:'<svg>'+'x'.repeat(5000)+'</svg>'} : {}));store.set(SETUP_KEY,SETUPS)`);
   const before=reread(s2.values);
@@ -273,39 +279,65 @@ test('[SET-LIMITS] storage that fills during a setup write never loses an untouc
   assert.match(b.json('SAVE_MESSAGE'),/session only/);
 });
 
-test('[SET-LIMITS] whichever single write of a setup save fails, no setup the rider did not delete is lost or changed, the rest of the save stops, and the page says it did not reach storage (review of PR 80, I-1)',async()=>{
+test('[SET-LIMITS] whichever single write of a setup save fails, no setup the rider did not delete is lost or changed, what follows only takes out what the rider deleted, and the page says it did not reach storage exactly when the store does not hold what the tab holds (review of PR 80, I-1; fix round 2, m-A and m-B)',async()=>{
+  // [what, the setups an older page saved (the list it reads), the setups this page added (the second list), the ids the writes use]
   const libraries=[
-    ['fewer than 20',`Array.from({length:5},(_,i)=>qaSetup('t'+i))`,{first:'t1',trip:'t2'}],
-    ['exactly 20',`[...Array.from({length:3},(_,i)=>qaSetup('g'+i,{kind:'general'})),...Array.from({length:17},(_,i)=>qaSetup('t'+i,{forRoute:{hash:'${HASH}',name:'Ride '+i,departureDate:null}}))]`,
-      {first:'t3',trip:'t5',general:'g1'}],
-    ['more than 20, general and trip setups mixed','qaLibrary()',{first:'t3',second:'t25',trip:'t25',general:'g1'}],
-    ['20 general setups, so every trip setup is in the second list',`[...Array.from({length:20},(_,i)=>qaSetup('g'+i,{kind:'general'})),...Array.from({length:5},(_,i)=>qaSetup('t'+i))]`,
-      {first:'g3',second:'t2',general:'g1'}],
+    ['fewer than 20, all saved by an older page',`Array.from({length:5},(_,i)=>qaSetup('t'+i))`,'[]',{first:'t1',trip:'t2'}],
+    ['exactly 20: 17 an older page saved, 3 general ones this page added',`Array.from({length:17},(_,i)=>qaSetup('t'+i))`,
+      `Array.from({length:3},(_,i)=>qaSetup('g'+i,{kind:'general'}))`,{first:'t3',second:'g2',trip:'t5',general:'g1'}],
+    ['more than 20, general and trip setups mixed: 5 an older page saved, the library this page added',`Array.from({length:5},(_,i)=>qaSetup('o'+i))`,
+      'qaLibrary()',{first:'o3',second:'t25',trip:'t25',general:'g1',firstTrip:'o2'}],
+    ['5 trip setups an older page saved, 20 general ones this page added',`Array.from({length:5},(_,i)=>qaSetup('t'+i))`,
+      `Array.from({length:20},(_,i)=>qaSetup('g'+i,{kind:'general'}))`,{first:'t3',second:'g2',general:'g1',trip:'t2'}],
+    ['all 25 added by this page',`[]`,`Array.from({length:25},(_,i)=>qaSetup('t'+i,{forRoute:{hash:'${HASH}',name:'Ride '+i,departureDate:null}}))`,
+      {second:'t4',trip:'t5'}],
   ];
   // [what, the write, the setup it deletes, the setup it changes, a write before it]
   const ops=ids=>[
     ['a new setup on top',`saveSetup('New one','')`],
-    ['a delete in the first list',`deleteSetup('${ids.first}')`,ids.first],
+    ids.first && ['a delete in the first list',`deleteSetup('${ids.first}')`,ids.first],
     ids.second && ['a delete in the second list',`deleteSetup('${ids.second}')`,ids.second],
     ids.trip && ['a mark as a general setup',`setSetupKind('${ids.trip}','general')`,null,ids.trip],
+    ids.firstTrip && ['a mark of a setup in the first list',`setSetupKind('${ids.firstTrip}','general')`,null,ids.firstTrip],
     ids.general && ['a mark back to a trip setup',`setSetupKind('${ids.general}','trip')`,null,ids.general],
-    ['a rename',`renameSetup('${ids.first}','Renamed')`,null,ids.first],
-    ['a copy',`duplicateSetup('${ids.first}')`],
-    ['an undone delete',`undoDeleteSetup()`,ids.first,null,`deleteSetup('${ids.first}')`],
+    ['a rename',`renameSetup('${ids.first || ids.second}','Renamed')`,null,ids.first || ids.second],
+    ['a note in the second list',ids.second && `saveSetupNote('${ids.second}','A note')`,null,ids.second],
+    ['a copy',`duplicateSetup('${ids.first || ids.second}')`],
+    ['an undone delete',`undoDeleteSetup()`,ids.first || ids.second,null,`deleteSetup('${ids.first || ids.second}')`],
     ['an import',`importAll(JSON.stringify({setups:[qaSetup('imp1'),qaSetup('imp2',{saved:'2026-11-05'})]}))`],
-  ].filter(Boolean);
-  let cases=0;
-  for(const [what,library,ids] of libraries){
+  ].filter(x=>x && x[1]);
+  // a write after the failure only takes setups out: each list and the marks keep only entries they held, byte for byte
+  const onlyTakesOut=([key,before,after])=>{
+    if(key === 'loadcheck:saved-at:v1') return true;
+    const was=JSON.parse(before ?? 'null'),now=JSON.parse(after);
+    if(Array.isArray(now)){
+      const old=new Set((Array.isArray(was) ? was : []).map(x=>JSON.stringify(x)));
+      return now.length<(Array.isArray(was) ? was.length : 0) && now.every(x=>old.has(JSON.stringify(x)));
+    }
+    return false;
+  };
+  let cases=0,stored=0;
+  for(const [what,older,added,ids] of libraries){
     const base=tab(sharedStore());
-    await base.run(`SETUPS=${library};store.set(SETUP_KEY,SETUPS)`);
-    const stored=reread(base.values),joined=base.run('JSON.stringify(storedSetupsLocal())');
+    if(older !== `[]`) olderPageSaved(base,older);
+    await base.run(`SETUPS=[...${added},...storedSetupsLocal()];store.set(SETUP_KEY,SETUPS)`);
+    const before=reread(base.values),joined=base.run('JSON.stringify(storedSetupsLocal())');
+    if(ids.first) assert.ok(JSON.parse(base.values.get('loadcheck:setups')).some(x=>x.id===ids.first),`${what}: ${ids.first} is in the first list`);
+    if(ids.second) assert.ok(JSON.parse(base.values.get('loadcheck:setups-more:v1')).some(x=>x.id===ids.second),`${what}: ${ids.second} is in the second list`);
+    // One tab for this library, opened afresh on it for each case: its storage put back, and everything the setup write keeps in memory
+    // with it (a new VM per case would take most of the suite's time).
+    const pool=tab(sharedStore()),put=pool.localStorage.setItem;
+    pool.context.qaJoined=joined;
     for(const [op,code,deleted,changed,prep] of ops(ids)){
       // a tab that opened on this library: its setups as the page reads them
       const start=async()=>{
-        const p=tab(sharedStore());
+        const p=pool;
+        p.localStorage.setItem=put;
+        p.values.clear();
         for(const [k,v] of base.values) p.values.set(k,v);
-        p.context.qaJoined=joined;
-        await p.run('SETUPS=JSON.parse(qaJoined);SETUPS.forEach(x=>SETUPS_SEEN.add(x.id));DELETED_SETUPS.length=0;SETUPS_STORED=true;SAVE_MESSAGE="";');
+        await p.run(`for(const k of Object.keys(MEM)) delete MEM[k];SETUPS_SEEN.clear();SETUPS_KNOWN=new Set(storedSetupIds());STORAGE_KIND='browser';
+          SETUP_ACTION=null;SETUP_COMPARE=['',''];FEEDBACK=[];
+          SETUPS=JSON.parse(qaJoined);SETUPS.forEach(x=>SETUPS_SEEN.add(x.id));DELETED_SETUPS.length=0;SETUPS_STORED=true;SAVE_MESSAGE="";`);
         if(prep) await p.run(prep);
         return p;
       };
@@ -315,21 +347,23 @@ test('[SET-LIMITS] whichever single write of a setup save fails, no setup the ri
         const p=await start(),log=failAt(p,n);
         await p.run(code);
         const label=`${what}, ${op}, write ${n+1} of ${count.count} (${log.failed}) fails`;
-        const now=reread(p.values,stored);
-        for(const id of Object.keys(stored)){
+        const now=reread(p.values,before);
+        for(const id of Object.keys(before)){
           if(id === deleted) continue;
           assert.ok(now[id],`${label}: ${id} is lost`);
-          if(id !== changed) assert.equal(now[id].read,stored[id].read,`${label}: ${id} changed`);
+          if(id !== changed) assert.equal(now[id].read,before[id].read,`${label}: ${id} changed`);
         }
-        if(log.failed === 'loadcheck:saved-at:v1') continue;   // the setups reached storage; only their stamps did not
-        assert.equal(p.json('SETUPS_STORED'),false,`${label}: the page says it was stored`);
-        assert.match(p.json('storageNote()'),/did not reach storage/,label);
-        assert.deepEqual(log.after.filter(k=>k!=='loadcheck:saved-at:v1'),[],`${label}: the save went on after the failure`);
+        for(const w of log.afterWrites) assert.ok(onlyTakesOut(w),`${label}: after the failure, ${w[0]} was written with more than a delete`);
+        const held=tabHeld(p);
+        assert.equal(p.json('SETUPS_STORED'),held,`${label}: the page says it is stored exactly when the store holds what the tab holds`);
+        if(held) stored++;
+        else assert.match(p.json('storageNote()'),/did not reach storage/,label);
         cases++;
       }
     }
   }
-  assert.ok(cases>=40,'enough failing writes were tried: '+cases);
+  assert.ok(cases>=60,'enough failing writes were tried: '+cases);
+  assert.ok(stored>0,'and some of them had stored all there was to store: '+stored);
 });
 
 test('[SET-LIMITS] whichever single write of Also delete bag planner data fails, every setup saved after the request is still stored (review of PR 80, I-1)',async()=>{
@@ -353,8 +387,8 @@ test('[SET-LIMITS] whichever single write of Also delete bag planner data fails,
 });
 
 test('[SET-LIMITS] Also delete bag planner data takes every setup saved before the request, whichever list holds it now: moving between the lists is not a change (review of PR 80, m-1)',async()=>{
-  // The twin of the case above, in a tab that has not seen the request: a new setup on top (t16 moves to the second list), a delete,
-  // and two deletes, then a new setup (t17 moves up to the first list).
+  // The twin of the case above, in a tab that has not seen the request: a new setup on top, a delete, and two deletes, then a new
+  // setup. (Before the owner's choice of 9 Nov 2026 these moved setups between the lists; now each stays where it is.)
   const cases=[
     ['a new setup on top',`saveSetup('Planned after','')`,['Planned after']],
     ['a delete',`deleteSetup('t0')`,[]],
@@ -377,26 +411,201 @@ test('[SET-LIMITS] Also delete bag planner data takes every setup saved before t
   }
 });
 
-test('[SET-LIMITS] a tab whose saved setups another tab removes names them, so a loss from an older tab is never silent (review of PR 80, m-2)',async()=>{
+test('[SET-LIMITS] a tab whose saved setups another tab removes names them, so a removal in another tab is never silent (review of PR 80, m-2)',async()=>{
   const storage=sharedStore(),a=tab(storage),b=tab(storage);
-  await a.run('SETUPS=qaLibrary();store.set(SETUP_KEY,SETUPS)');
-  assert.equal(b.json('SETUPS.length'),33);
-  // An older page's write of the first list: the 20 it keeps after its own cut, without the marks it does not know. g2 and t0 to t11
-  // are in neither list now.
-  const old=appVM({storage});
-  const cut=[...JSON.parse(storage.values.get('loadcheck:setups')).filter(s=>s.id!=='g2' && !/^t([0-9]|1[01])$/.test(s.id)),
-    ...JSON.parse(storage.values.get('loadcheck:setups-more:v1'))].slice(0,20).map(strip);
-  old.localStorage.setItem('loadcheck:setups',JSON.stringify(cut));
-  assert.equal(b.json('SETUPS.length'),20);
+  olderPageSaved(a,`Array.from({length:5},(_,i)=>qaSetup('o'+i))`);
+  await a.run('SETUPS=[...qaLibrary(),...storedSetupsLocal()];store.set(SETUP_KEY,SETUPS)');
+  assert.equal(b.json('SETUPS.length'),38);
+  // An older tab, following, deletes two of the setups it sees.
+  const old=oldTab(storage);
+  for(const name of ['Setup o1','Setup o2']) await old.run(`deleteSetup(SETUPS.find(s=>s.name===${JSON.stringify(name)}).id)`);
+  assert.equal(b.json('SETUPS.length'),36);
   const text=String(b.nodes.get('tabText').textContent);
-  assert.match(text,/^13 saved setups were removed in another tab: Setup g2, /);
-  assert.match(text,/older Bag planner tab/);
+  assert.match(text,/^A saved setup was removed in another tab: Setup o2\. If that was not you, Import an export to bring it back\.$/);
+  // several at once are named together
+  const c=tab(sharedStore());
+  for(const [k,v] of storage.values) c.values.set(k,v);
+  await c.run('SETUPS=storedSetupsLocal();SETUPS.forEach(x=>SETUPS_SEEN.add(x.id));SETUPS_KNOWN=new Set(storedSetupIds());');
+  c.localStorage.setItem('loadcheck:setups-more:v1',JSON.stringify(JSON.parse(c.values.get('loadcheck:setups-more:v1')).filter(x=>!/^t([0-9]|1[01])$/.test(x.id))));
+  c.fireStorage('loadcheck:setups-more:v1',null,null);
+  assert.match(String(c.nodes.get('tabText').textContent),/^12 saved setups were removed in another tab: Setup t0, Setup t1, Setup t2, Setup t3, Setup t4 and 7 more\. If that was not you, Import an export to bring them back\.$/);
   // the tab's own delete names nothing there; a delete in another tab is named
   b.nodes.get('tabText').textContent='';
   await b.run(`deleteSetup('t12')`);
   assert.equal(String(b.nodes.get('tabText').textContent),'');
   await a.run(`SETUPS=storedSetupsLocal();deleteSetup('t13')`);
   assert.match(String(b.nodes.get('tabText').textContent),/^A saved setup was removed in another tab: Setup t13\./);
+});
+
+// An older page on the same storage: the frozen copy at / (releases/load-check-root.html), as an older Bag planner tab left open or a
+// rollback runs it. It reads loadcheck:setups as its own start-up does, cuts it to 20 and drops the four new fields.
+const path=require('node:path');
+function oldTab(storage){
+  const p=appVM({storage,page:path.join(__dirname,'..','releases','load-check-root.html'),bike:false});
+  p.run('DRAFT_READY=true;buildThumb=()=>"";SETUPS=(JSON.parse(window.localStorage.getItem("loadcheck:setups")||"[]")).map(normaliseSetup).filter(Boolean);'+
+    'if(typeof SETUPS_SEEN!=="undefined")SETUPS.forEach(x=>SETUPS_SEEN.add(x.id));');
+  p.json=code=>{const t=p.run(`JSON.stringify(${code})`);return t===undefined ? undefined : JSON.parse(t);};
+  return p;
+}
+// Setups an older page saved, in the list it reads: as it writes them, without the four new fields.
+function olderPageSaved(p,code){ p.localStorage.setItem('loadcheck:setups',JSON.stringify(p.json(code).map(strip))); }
+const storedIds=values=>Object.keys(reread(values)).sort();
+// Does the store hold what the tab holds: each setup as the page reads it, whatever the order?
+const tabHeld=p=>p.json(`(()=>{const by=l=>JSON.stringify(l.map(s=>JSON.stringify(normaliseSetup(s))).sort());return by(SETUPS)===by(storedSetupsLocal());})()`);
+
+test('[SET-LIMITS] a full library never loses a setup when an older page saved into room a delete left (fix round 2 of PR 80, I-A)',async()=>{
+  const storage=sharedStore(),a=tab(storage);
+  // 20 setups an older page saved; the rider marks five of them general here and adds 15 general and 25 trip setups: 20 + 40.
+  olderPageSaved(a,`Array.from({length:20},(_,i)=>qaSetup('o'+i))`);
+  await a.run('SETUPS=storedSetupsLocal();SETUPS.forEach(x=>SETUPS_SEEN.add(x.id));SAVE_MESSAGE="";DELETED_SETUPS.length=0;');
+  for(let i=0;i<5;i++) assert.equal(await a.run(`setSetupKind('o${i}','general')`),true);
+  assert.equal(await a.run(`SETUPS.unshift(...Array.from({length:15},(_,i)=>qaSetup('g'+i,{kind:'general'})),...Array.from({length:25},(_,i)=>qaSetup('t'+i)));store.set(SETUP_KEY,SETUPS)`),true);
+  assert.equal(a.json(`SETUPS.filter(s=>setupKind(s)==='general').length`),20);
+  // The rider deletes the five general setups of the list an older page reads; an older tab, following, shows 15 and saves 5 there.
+  for(let i=0;i<5;i++) await a.run(`deleteSetup('o${i}')`);
+  const old=oldTab(storage);
+  assert.equal(old.json('SETUPS.length'),15,'the older page shows the 15 left in the list it reads');
+  for(let i=0;i<5;i++) assert.equal(await old.run(`saveSetup('Older page ${i}','')`),true);
+  assert.equal(a.json('SETUPS.length'),60,'this tab follows: 60 in all');
+  assert.equal(a.json(`SETUPS.filter(s=>setupKind(s)==='trip').length`),45,'45 of them trip setups');
+  let all=storedIds(storage.values);
+  assert.equal(all.length,60);
+  // Each add from here keeps every stored setup, or is refused with a true message.
+  const adds=[
+    ['a copy of a general setup',`duplicateSetup('g0')`],
+    ['an import of 3 general setups',`importAll(JSON.stringify({setups:Array.from({length:3},(_,i)=>qaSetup('imp'+i,{kind:'general'}))}))`],
+    ['an undone delete of a general setup',`undoDeleteSetup()`],
+    ['a save, a trip setup',`saveSetup('One more','')`],
+  ];
+  for(const [what,code] of adds){
+    await a.run('SAVE_MESSAGE=""');
+    const said=await a.run(code),now=storedIds(storage.values);
+    for(const id of all) assert.ok(now.includes(id),`${what}: ${id} is lost`);
+    const added=now.length-all.length,text=typeof said === 'string' ? said : a.json('SAVE_MESSAGE');
+    if(typeof said === 'string') assert.equal(Number((/Added (\d+) setups/.exec(said) || [])[1]),added,`${what}: the message counts what was added`);
+    if(!added){
+      assert.doesNotMatch(text,/You have 40 trip|You have 20 general/,`${what}: no count that is not the count`);
+      assert.match(text,/60 saved setups|45 trip setups|60 in all/,`${what}: refused, and the message says why: ${text}`);
+    }
+    assert.equal(a.json('SETUPS_STORED'),true,what);
+    all=now;
+  }
+  assert.match(a.json(`setupKindFullMessage('trip')`),/^You have 45 trip setups\./,'the count is the count');
+});
+
+test('[SET-LIMITS] on a full storage, after a setup write that failed, a delete still reaches storage (fix round 2 of PR 80, m-A)',async()=>{
+  // Story 1: 20 setups, storage within 26 characters of full: the save of a 21st fails. Story 2: 12 setups, storage within 100
+  // characters of full: Use as a general setup fails at the new marks record. Each with the setups saved by this page, and in the list
+  // an older page reads. A setup this page saved carries its mark in its own list too, so there storage within 10 characters of full
+  // makes the mark fail.
+  const stories=[
+    ['20 setups, a 21st saved',20,{this:26,older:26},`saveSetup('One more','')`,'t3'],
+    ['12 setups, one marked general',12,{this:10,older:100},`setSetupKind('t2','general')`,'t5'],
+  ];
+  for(const [what,n,rooms,first,doomed] of stories) for(const where of ['saved by this page','saved by an older page']){
+    const label=`${what}, ${where}`,storage=sharedStore(),a=tab(storage),room=where === 'saved by this page' ? rooms.this : rooms.older;
+    if(where === 'saved by this page') await a.run(`SETUPS=Array.from({length:${n}},(_,i)=>qaSetup('t'+i));store.set(SETUP_KEY,SETUPS)`);
+    else { olderPageSaved(a,`Array.from({length:${n}},(_,i)=>qaSetup('t'+i))`); await a.run('SETUPS=storedSetupsLocal();SETUPS.forEach(x=>SETUPS_SEEN.add(x.id));'); }
+    const before=storedIds(storage.values);
+    fill(a,room);
+    await a.run(first);
+    assert.equal(a.json('SETUPS_STORED'),false,`${label}: the first write did not reach storage`);
+    await a.run(`deleteSetup('${doomed}')`);
+    const now=storedIds(storage.values),held=a.json('SETUPS.map(s=>s.id)');
+    assert.equal(now.includes(doomed),false,`${label}: the delete reached storage`);
+    for(const id of before) if(id !== doomed) assert.ok(now.includes(id),`${label}: ${id} is lost`);
+    for(const id of now) assert.ok(held.includes(id),`${label}: ${id} is stored, but the tab does not hold it`);
+    assert.equal(a.json('SETUPS_STORED'),tabHeld(a),`${label}: the page says it is stored exactly when the store holds what the tab holds`);
+  }
+});
+
+test('[SET-LIMITS] a reload keeps each group\'s order, and with it the general setup Plan bags for this trip starts from (fix round 2 of PR 80, m-C)',async()=>{
+  const library=`qaLibrary().map(s=>{delete s.isDefault;return s;})`;
+  for(const what of ['a library this page saved','an older page\'s 5 setups and this page\'s library']){
+    const storage=sharedStore(),a=tab(storage);
+    if(what === 'a library this page saved') await a.run(`SETUPS=${library};store.set(SETUP_KEY,SETUPS)`);
+    else {
+      olderPageSaved(a,`Array.from({length:5},(_,i)=>qaSetup('o'+i))`);
+      await a.run(`SETUPS=[...${library},...storedSetupsLocal()];store.set(SETUP_KEY,SETUPS)`);
+    }
+    const fresh=async()=>{
+      const b=tab(sharedStore());
+      for(const [k,v] of storage.values) b.values.set(k,v);
+      await b.run('(async()=>{SETUPS=await storedSetups();})()');
+      return b;
+    };
+    // the review's probe: a setup of the second list marked general
+    assert.equal(await a.run(`setSetupKind('t25','general')`),true);
+    const general=a.json('setupGroups(SETUPS).general.map(s=>s.id)'),base=a.json('tripFoundation().id');
+    assert.equal(general[0],'t25','in the tab, t25 comes first of the general setups');
+    let b=await fresh();
+    assert.deepEqual(b.json('setupGroups(SETUPS).general.map(s=>s.id)'),general,`${what}: the general group keeps its order`);
+    assert.equal(b.json('tripFoundation().id'),base,`${what}: Plan bags for this trip starts from the same setup`);
+    assert.deepEqual(b.json('SETUPS.map(s=>s.id)'),a.json('SETUPS.map(s=>s.id)'),`${what}: and the whole list its order`);
+    // then a new setup on top
+    assert.equal(await a.run(`saveSetup('Newest','')`),true);
+    b=await fresh();
+    assert.deepEqual(b.json('SETUPS.map(s=>s.id)'),a.json('SETUPS.map(s=>s.id)'),`${what}: after a new setup too, newest first`);
+  }
+});
+
+test('[SET-LIMITS] Also delete bag planner data marks its request applied only when every removal reached storage, and the next start applies it again (fix round 2 of PR 80, m-E)',async()=>{
+  const base=tab(sharedStore()),id='c'.repeat(32);
+  olderPageSaved(base,`Array.from({length:5},(_,i)=>qaSetup('o'+i))`);
+  await base.run('SETUPS=[...qaLibrary(),...storedSetupsLocal()];store.set(SETUP_KEY,SETUPS)');
+  await later();
+  base.values.set('copilot:delete-request:v1',JSON.stringify({app:'copilot',kind:'delete-request',v:1,id,createdAt:new Date().toISOString()}));
+  await later();
+  await base.run(`(async()=>{await renameSetup('t25','After');await renameSetup('o1','After too');})()`);
+  const start=()=>{ const p=tab(sharedStore()); for(const [k,v] of base.values) p.values.set(k,v); return p; };
+  const dry=start(),count=failAt(dry,Infinity);
+  assert.equal(dry.run('applyDeleteRequest()'),true);
+  assert.deepEqual(storedIds(dry.values),['o1','t25']);
+  let partial=0;
+  for(let n=0;n<count.count;n++){
+    const p=start();
+    failAt(p,n);
+    p.run('applyDeleteRequest()');
+    const left=storedIds(p.values),applied=JSON.parse(p.values.get('loadcheck:delete-applied') || 'null');
+    if(left.some(x => !['o1','t25'].includes(x))){
+      partial++;
+      assert.notEqual(applied && applied.id,id,`write ${n+1} of ${count.count} fails: setups saved before the request stay, so it is not marked applied`);
+      const again=tab(sharedStore());
+      for(const [k,v] of p.values) again.values.set(k,v);
+      assert.equal(again.run('applyDeleteRequest()'),true,'the next start applies it');
+      assert.deepEqual(storedIds(again.values),['o1','t25'],'and then only what was saved after the request is left');
+    }
+  }
+  assert.ok(partial>0,'a failing write left setups saved before the request: '+partial);
+});
+
+test('[SET-LIMITS] a stale older tab that saves a setup loses none of the setups the bag planner added (the frozen copy at /, in the VM; the owner\'s choice of 9 Nov 2026)',async()=>{
+  const storage=sharedStore(),old=oldTab(storage);
+  for(let i=0;i<18;i++) assert.equal(await old.run(`saveSetup('Old ${i}','')`),true);
+  // Then the older tab hears nothing more, as a tab frozen in the background.
+  storage.vms.delete(old);
+  const b=tab(storage);
+  await b.run('SETUPS=storedSetupsLocal();SETUPS.forEach(x=>SETUPS_SEEN.add(x.id));');
+  assert.equal(b.json('SETUPS.length'),18);
+  await b.run(`SETUPS.unshift(...Array.from({length:12},(_,i)=>qaSetup('n'+i,{forRoute:{hash:'${HASH}',name:'Ride '+i,departureDate:null}})),
+    ...Array.from({length:3},(_,i)=>qaSetup('g'+i,{kind:'general'})));store.set(SETUP_KEY,SETUPS)`);
+  await b.run(`renameSetup(SETUPS.find(s=>s.name==='Old 0').id,'Renamed here')`);
+  const before=storedIds(storage.values);
+  assert.equal(before.length,33);
+  // The stale tab writes a note on one of its own setups, and saves one more, through its own write.
+  assert.equal(await old.run(`(async()=>{SETUPS[1].note='A note from the stale tab';return store.set(SETUP_KEY,SETUPS);})()`),true);
+  const savedMore=await old.run(`saveSetup('Old 18','')`);
+  b.fireStorage(null,null,null);
+  const now=b.json('storedSetupsLocal().map(s=>[s.id,s.name,setupKind(s),!!s.forRoute,s.note])');
+  for(const id of before) assert.ok(now.some(x=>x[0]===id),`${id} is lost`);
+  assert.equal(savedMore,true,'the stale tab, holding 19, saves one more');
+  assert.equal(now.length,34,'every setup, and the stale tab\'s new one');
+  assert.deepEqual(now.filter(x=>x[2]==='general').map(x=>x[0]).sort(),['g0','g1','g2'],'the general setups stay general');
+  assert.equal(now.filter(x=>x[3]).length,12,'and every trip link stays');
+  assert.ok(now.some(x=>x[4]==='A note from the stale tab'),'the stale tab\'s own note stays');
+  // What it can still do: revert an edit to a setup in the list it reads (here the rename made in the bag planner).
+  assert.equal(now.some(x=>x[1]==='Renamed here'),false,'known: the stale tab wrote its own copy of Old 0 back');
+  assert.equal(String((b.nodes.get('tabText') || {}).textContent || '').includes('removed'),false,'nothing was removed, so nothing is named');
 });
 
 test('[SET-LIMITS] the page starts with storedSetups(), and the three stored values are read through the store in one place (review of PR 80, m-4)',()=>{

@@ -242,7 +242,7 @@ test('[TRIP-BAGS-LONG] a 2-night trip from Wayfinch in a real browser: Plan bags
   await plannerWithPlan(page);
   await handOver(page, handoffFixture());
   const before = await page.evaluate('JSON.stringify(captureDraft())');
-  const setupsBefore = await page.evaluate(() => localStorage.getItem('loadcheck:setups'));
+  const setupsBefore = await page.evaluate('JSON.stringify(storedSetupsLocal())');   // the setups as the page reads its two lists
   await openFresh(page, `/tools/bags/#copilot-handoff=${ID}`);
   await ready(page);
   await expect(page.locator('#handoffText')).toContainText('Plan bags for this trip?');
@@ -253,7 +253,7 @@ test('[TRIP-BAGS-LONG] a 2-night trip from Wayfinch in a real browser: Plan bags
   await expect(page.locator('#handoffPlan')).toBeHidden();
   await expect(page.locator('#s2')).toBeVisible();
   expect(await page.evaluate('[S.step, S.nights, S.place && S.place.name]')).toEqual([2, 2, 'Heidelberg']);
-  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:setups')!) as Array<{ name: string; forRoute?: { hash: string } }>);
+  const stored = await page.evaluate('storedSetupsLocal()') as Array<{ name: string; forRoute?: { hash: string } }>;
   const [made, kept] = stored;
   expect(made!.name).toBe('Heidelberg → Strasbourg, 12 Jun');
   expect(made!.forRoute!.hash).toMatch(/^[0-9a-f]{64}$/);
@@ -263,7 +263,7 @@ test('[TRIP-BAGS-LONG] a 2-night trip from Wayfinch in a real browser: Plan bags
   await page.locator('#handoffUndo').click();
   await expect(page.locator('#handoffText')).toContainText('Undone');
   expect(await page.evaluate('JSON.stringify(captureDraft())')).toBe(before);
-  expect(await page.evaluate(() => localStorage.getItem('loadcheck:setups'))).toBe(setupsBefore ?? '[]');
+  expect(await page.evaluate('JSON.stringify(storedSetupsLocal())')).toBe(setupsBefore);
   expect(errors).toEqual([]);
 });
 
@@ -287,7 +287,7 @@ test('[TRIP-BAGS-LONG] in a real browser, Undo never deletes a setup the rider c
   await expect(page.locator('#handoffText')).toContainText('Nothing is undone');
   await expect(page.locator('#handoffUndo')).toBeHidden();
   expect(await page.evaluate('JSON.stringify(captureDraft())')).toBe(work);
-  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:setups')!) as Array<{ id: string; kind?: string; note: string }>);
+  const stored = await page.evaluate('storedSetupsLocal()') as Array<{ id: string; kind?: string; note: string }>;
   expect(stored.find((s) => s.id === made)).toMatchObject({ kind: 'general', note: 'Our own note' });
   expect(errors).toEqual([]);
 });

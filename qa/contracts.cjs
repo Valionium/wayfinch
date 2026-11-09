@@ -101,7 +101,9 @@ test('[C-DELETE] a plan, setup, bike and report saved after the request, before 
   const fresh=page({storage});
   assert.equal(fresh.run('applyDeleteRequest()'),true);
   assert.equal(fresh.stored('loadcheck:draft'),newDraft,'the new plan is kept byte for byte');
-  assert.deepEqual(JSON.parse(fresh.stored('loadcheck:setups')).map(x=>x.id),['st_new']);
+  // st_new went to the second list (the owner's choice of 9 Nov 2026); the older page's st_old, in the first, is gone with the list
+  assert.equal(fresh.stored('loadcheck:setups'),null);
+  assert.deepEqual(JSON.parse(fresh.stored('loadcheck:setups-more:v1')).map(x=>x.id),['st_new']);
   assert.deepEqual(JSON.parse(fresh.stored('loadcheck:bikeProfiles')).map(x=>x.id),['bike_new']);
   assert.equal(JSON.parse(fresh.stored('loadcheck:bikeProfile')).id,'bike_new');
   assert.equal(fresh.stored('loadcheck:bikeProfilesFormat'),'2','the format mark stays while its list does');

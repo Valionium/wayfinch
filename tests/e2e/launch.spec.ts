@@ -409,14 +409,14 @@ for (const start of ['legacy', 'step-one'] as const) {
       if (!(await store.set(SETUP_KEY, SETUPS))) throw new Error('the planner could not save');
     })()`);
     expect(await planner.evaluate('SETUPS.length')).toBe(34);
-    // A rollback or the old tab sees at most the 20 it knows, the general setups among them.
+    // A rollback or the old tab sees only the setups older pages saved: none the bag planner added (the owner's choice of 9 Nov 2026).
     const seen = await page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:setups')!) as { id: string }[]).map((s) => s.id));
-    expect(seen.length).toBeLessThanOrEqual(20);
-    expect(['g0', 'g1', 'g2'].every((id) => seen.includes(id))).toBe(true);
-    // The old page reads the list as its own start-up does, renames one, and saves the list back through its own write.
+    expect(seen.length).toBe(1);
+    expect(seen.some((id) => /^[tg]\d+$/.test(id))).toBe(false);
+    // The old page reads the list as its own start-up does, renames its one, and saves the list back through its own write.
     expect(await page.evaluate(`(async () => {
       SETUPS = JSON.parse(localStorage.getItem(SETUP_KEY)).map(normaliseSetup).filter(Boolean);
-      SETUPS.find((s) => s.id === 'g1').name = 'Renamed in the old tab';
+      SETUPS[0].name = 'Renamed in the old tab';
       return store.set(SETUP_KEY, SETUPS);
     })()`)).toBe(true);
     await planner.reload({ waitUntil: 'domcontentloaded' });
@@ -425,10 +425,10 @@ for (const start of ['legacy', 'step-one'] as const) {
     expect(after.length).toBe(34);   // nothing cut
     expect(after.filter(([, kind]) => kind === 'general').map(([id]) => id).sort()).toEqual(['g0', 'g1', 'g2']);
     expect(after.filter(([id, , linked]) => id.startsWith('t') && linked).length).toBe(30);
-    expect(after.find(([id]) => id === 'g1')![3]).toBe('Renamed in the old tab');   // the old tab's own change stays
+    expect(after.find(([id]) => id === seen[0])![3]).toBe('Renamed in the old tab');   // the old tab's own change stays
   });
 
-  test(`[SET-LIMITS] known risk, not a guarantee (review of PR 80, m-2): ${which} stale tab that saves a setup loses every setup it never saw past the 20 it keeps, not just one; an open bag-planner tab names them`, async ({ context, page }) => {
+  test(`[SET-LIMITS] ${which} stale tab that saves a setup loses none of the setups the bag planner added (the owner's choice of 9 Nov 2026: new setups never enter the list older pages read)`, async ({ context, page }) => {
     await phone(page, start);
     // The old tab saves 17 more setups of its own: it holds 18, and it has seen them all.
     await page.evaluate(`(async () => { for (let i = 0; i < 17; i++) await saveSetup('Old ' + i, ''); })()`);
@@ -455,17 +455,21 @@ for (const start of ['legacy', 'step-one'] as const) {
     })()`);
     const before = await planner.evaluate('SETUPS.map((s) => s.name)') as string[];
     expect(before.length).toBe(33);
-    // The stale tab writes a note on one of its own setups, through its own write.
+    // The stale tab writes a note on one of its own setups, through its own write, and saves one more.
     expect(await page.evaluate(`(async () => { SETUPS[0].note = 'A note from the stale tab'; return store.set(SETUP_KEY, SETUPS); })()`)).toBe(true);
-    // Exactly what is lost: every setup it never saw past the 20 it keeps, here the general setup g2 and the 12 new trip setups.
-    // Its own 18 and g0 and g1 stay, the two general ones still general.
-    await expect.poll(() => planner.evaluate('SETUPS.length')).toBe(20);
-    const kept = await planner.evaluate('SETUPS.map((s) => [s.name, setupKind(s)])') as [string, string][];
-    const lost = before.filter((name) => !kept.some(([n]) => n === name));
-    expect(lost).toEqual([...Array.from({ length: 12 }, (_, i) => 'Setup n' + i), 'Setup g2']);
-    expect(kept.filter(([, kind]) => kind === 'general').map(([n]) => n).sort()).toEqual(['Setup g0', 'Setup g1']);
-    // The bag-planner tab that was open names them, so the loss is not silent; after a reload the 20 are what is stored.
-    expect(await planner.evaluate(() => document.getElementById('tabText')!.textContent ?? '')).toMatch(/^13 saved setups were removed in another tab: Setup n0, Setup n1, /);
+    const savedMore = await page.evaluate(`saveSetup('Old 17', '')`);
+    // Nothing the bag planner added is lost: every setup stays, the stale tab's new one with them, the general ones still general.
+    await expect.poll(() => planner.evaluate(`SETUPS.some((s) => s.note === 'A note from the stale tab')`)).toBe(true);
+    const read = async () => await planner.evaluate('SETUPS.map((s) => [s.name, setupKind(s), !!s.forRoute, s.note])') as [string, string, boolean, string][];
+    let kept = await read();
+    expect(before.filter((name) => !kept.some(([n]) => n === name))).toEqual([]);
+    expect(savedMore).toBe(true);   // it holds 18 and sees 18 in the list it reads
+    await expect.poll(() => planner.evaluate('SETUPS.length')).toBe(34);
+    kept = await read();
+    expect(kept.filter(([, kind]) => kind === 'general').map(([n]) => n).sort()).toEqual(['Setup g0', 'Setup g1', 'Setup g2']);
+    expect(kept.filter(([n, , linked]) => n.startsWith('Setup n') && linked).length).toBe(12);
+    expect(kept.some(([, , , note]) => note === 'A note from the stale tab')).toBe(true);
+    expect(await planner.evaluate(() => document.getElementById('tabText')!.textContent ?? '')).not.toMatch(/removed in another tab/);
     await planner.reload({ waitUntil: 'domcontentloaded' });
     await draftReady(planner);
     expect((await planner.evaluate('SETUPS.map((s) => s.name)') as string[]).sort()).toEqual(kept.map(([n]) => n).sort());
