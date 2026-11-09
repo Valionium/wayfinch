@@ -296,9 +296,9 @@ describe('Tools loads as its own chunk', () => {
     expect(cards().length).toBeGreaterThanOrEqual(1);
     expect(root.querySelector('main[data-screen="tools"] .bike-large svg')).not.toBeNull();
     expect(root.querySelector('.bike-line')).not.toBeNull();
-    // Then the whole screen: the line and the three cards (the Gear advisor's joined the lazy chunk in sub-project 13, group 3).
-    await vi.waitFor(() => expect(cards().length).toBe(3));
-    expect(cards()[2]!.querySelector('h2')?.textContent).toBe('Gear advisor');
+    // Then the whole screen: the line and the four cards (bags, tyre pressure, Bike care: sub-project 12; the Gear advisor's: sub-project 13, group 3).
+    await vi.waitFor(() => expect(cards().length).toBe(4));
+    expect(cards()[3]!.querySelector('h2')?.textContent).toBe('Gear advisor');
     expect(root.querySelector('.bike-line select')).not.toBeNull();
     expect(root.querySelectorAll('.bike-line').length).toBe(1);
     render(null, root);

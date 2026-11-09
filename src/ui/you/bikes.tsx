@@ -1,11 +1,13 @@
 // Your bikes (spec sections 3.5 and 3.7): the bag planner owns the library, so this lists and links and writes nothing. The bike of
 // the current plan comes first, marked; each has a small drawing without bags.
 import type { BikeRecord } from '../../core/bike/normalise.ts';
+import { CL } from '../../core/wording/en-care-link.ts';
 import { Y } from '../../core/wording/en-you.ts';
 import { BikeDrawing } from '../bike/drawing.tsx';
 import { bikeDetailsHref } from '../bike/link.ts';
 import { bikeSource } from '../bike/live.ts';
 import { Card } from '../card.tsx';
+import { toolHref } from '../tools/bike-link.ts';
 
 export type BikeRow = { bike: BikeRecord; mark: string | null };
 
@@ -47,6 +49,7 @@ export function BikesCards() {
                     <strong>{bike.name || Y.youBikeUnnamed}</strong>
                     {mark ? <span class="you-bike-mark">{mark}</span> : null}
                     <a class="btn" href={bikeDetailsHref(bike.id, 'you')}>{Y.youBikeEdit}<span class="visually-hidden"> {bike.name || Y.youBikeUnnamed}</span></a>
+                    <a class="btn" href={toolHref('tools/care', bike.id)}>{CL.careForBike}<span class="visually-hidden"> {bike.name || Y.youBikeUnnamed}</span></a>
                   </div>
                 </li>
               ))}

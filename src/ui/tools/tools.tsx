@@ -1,6 +1,7 @@
 // The Tools tab (spec section 3.4): the bag planner, with the rider's bike and its bags (section 3.7), and the tyre calculator, each
 // with its last result; then the Gear advisor (sub-project 13), which runs inside the bag planner page. It reads Load Check's summary and bikes and the tyre tool's own storage, and writes nothing.
 import { useEffect, useState } from 'preact/hooks';
+import { CL } from '../../core/wording/en-care-link.ts';
 import { GA } from '../../core/wording/en-advisor.ts';
 import { W } from '../../core/wording/en.ts';
 import { savedBikeIds, toolBike } from '../../tools/tyre/choice.ts';
@@ -64,6 +65,10 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
         <p class="tool-line">{last ? W.tyreCardLast(trimBar(last.frontBar), trimBar(last.rearBar)) : W.tyreCardNone}</p>
         {last?.bike ? <p class="muted">{W.tyreCardBike(last.bike)}</p> : null}
         <a class="btn btn-primary" href="#/tools/tyre">{W.tyreCardOpen}<span class="visually-hidden"> {W.tyreCardTitle}</span></a>
+      </Card>
+      <Card title={CL.careCardTitle}>
+        <p class="muted">{CL.careCardBody}</p>
+        <a class="btn btn-primary" href="#/tools/care">{CL.careCardOpen}<span class="visually-hidden"> {CL.careCardTitle}</span></a>
       </Card>
       <Card title={GA.advisorCardTitle}>
         <p class="tool-line">{GA.advisorCardLine}</p>
