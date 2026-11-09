@@ -13,7 +13,8 @@ export const BD = {
   // Review of PR 101: a stop closed that night, or gone from the map data, is said; Change stop names its day and stop.
   appTripStopClosed: 'Closed that night, by its season or opening hours. Change stop to choose another.',
   appTripStopGone: (was: string): string => `Your stop ${was} is no longer in the map data, so the day now ends at the place above.`,
-  appTripStopChangeLabel: (day: number, name: string | null): string => `Change where day ${day} ends${name === null ? '' : `, now ${name}`}`,
+  // The visible words first, so a spoken command finds it (axe: label-content-name-mismatch).
+  appTripStopChangeLabel: (day: number, name: string | null): string => `Change stop for day ${day}${name === null ? '' : `, now ${name}`}`,
   appTripStopCurrent: 'now',
   appTripStopPick: (name: string, km: string): string => `${name}, km ${km}`,
   appTripStopNo: 'No stop: split by effort',

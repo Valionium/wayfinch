@@ -221,7 +221,7 @@ export function RouteSummary({ snap, stops, beds, settle = settleStops, choices 
                 {bed ? <span class="muted trip-day-detail" data-day-bed>{bed}</span> : null}
                 {stop ? (
                   <span class="trip-stop-actions">
-                    <button type="button" class="btn linky" data-stop-change={n} aria-expanded={open?.day === n ? 'true' : 'false'} aria-controls={`trip-stop-choices-${n}`}
+                    <button type="button" class="btn linky" data-stop-change={n} aria-expanded={open?.day === n ? 'true' : 'false'} aria-controls={open?.day === n ? `trip-stop-choices-${n}` : undefined}
                       aria-label={BD.appTripStopChangeLabel(n, held?.placeId ? held.name : null)} onClick={() => openChoices(n)}>{BD.appTripStopChange}</button>
                     {undo?.day === n ? <><span class="muted">{BD.appTripStopChanged(n)}</span> <button type="button" class="btn linky" onClick={undoPick}>{BD.appTripStopUndo}</button></> : null}
                   </span>
