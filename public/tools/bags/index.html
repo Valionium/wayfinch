@@ -3597,6 +3597,7 @@ function lookFromTaps(look,taps){
 const LOOK_BARS=[['drop','lookDrop'],['flat','lookFlat'],['other','lookOther'],['','lookNotSet']];
 const LOOK_EBIKE=[['true','lookYes'],['false','lookNo'],['','lookNotSet']];
 const LOOK_MOTOR=[['cranks','lookMotorCranks'],['rear-hub','lookMotorRear'],['front-hub','lookMotorFront'],['','lookNotSet']];
+let LOOK_MOTOR_CHIPS='';
 // The bike Bike details shows: the plan's, a saved one opened without applying it, or none yet (a new bike).
 function lookTarget(){
   const id=BIKE_PROFILE_EDITOR_ID;
@@ -3624,7 +3625,7 @@ function renderLookChoices(){
   const chips=(name,list)=>list.map(([v,key])=>`<label class="look-chip"><input type="radio" name="${name}" value="${v}"><span>${htmlEsc(bikeWord(key))}</span></label>`).join('');
   $('lookBars').innerHTML=chips('lookBars',LOOK_BARS);
   $('lookEbike').innerHTML=chips('lookEbike',LOOK_EBIKE);
-  $('lookMotor').innerHTML=chips('lookMotor',LOOK_MOTOR);
+  LOOK_MOTOR_CHIPS=chips('lookMotor',LOOK_MOTOR);$('lookMotorSet').hidden=true;$('lookMotor').innerHTML='';
   $('lookPickerText').textContent=bikeWord('lookMore');
   $('lookPhoto').textContent=bikeWord('lookPhoto');
   $('lookUndo').textContent=bikeWord('lookUndo');
@@ -3792,8 +3793,12 @@ function renderLook(){
   check('lookColour',look.colour===null ? '' : swatch ? look.colour : '\u0000');
   check('lookBars',look.bars||'');
   check('lookEbike',look.ebike===null ? '' : String(look.ebike));
-  // only for an e-bike; an answer given before stays on the bike, shown again when it is one
-  $('lookMotorSet').hidden=look.ebike!==true;
+  // only for an e-bike, its chips in the page only then; an answer given before stays on the bike, shown again when it is one
+  const motorShown=look.ebike===true;
+  if($('lookMotorSet').hidden===motorShown){
+    $('lookMotor').innerHTML=motorShown ? LOOK_MOTOR_CHIPS : '';$('lookMotorSet').hidden=!motorShown;
+    const ready=typeof DRAFT_READY!=='undefined' && DRAFT_READY;document.querySelectorAll?.('#lookMotor input').forEach(i=>{i.disabled=!ready;});
+  }
   check('lookMotor',look.motor||'');
   syncLookExtras(look);
   renderForkZoom(bike,art);
