@@ -10,7 +10,7 @@ export type Axle = 'thru' | 'qr' | 'nuts';
 export function wheelSeated(kind: Axle): Pic {
   const pic = new Pic(320, 226);
   bikeInset(pic, 'front-hub');
-  const k = 1.75, cx = 192, cy = 128;
+  const k = 1.75, cx = kind === 'thru' ? 205 : 192, cy = 128;
   const m = (x: number, y: number): Pt => [cx + x * k, cy + y * k];
   const half = 50; // 100 mm between the fork ends' inner faces
   // the fork legs: from above the picture down to the axle; a thru-axle's end closes round it, a slot's ends stop at it
@@ -68,7 +68,7 @@ export function wheelSeated(kind: Axle): Pic {
     pic.turnAxis(c, 11, 24, -30, 200);
   }
   // the action beside its arrow, the part's name with its leader, and the side
-  pic.text('cp-th', [12, 178], kind === 'thru' ? 'tighten firmly' : kind === 'qr' ? 'close firmly' : 'tighten both');
+  pic.text('cp-th', [4, 178], kind === 'thru' ? 'tighten firmly' : kind === 'qr' ? 'close firmly' : 'tighten both');
   const named = kind === 'thru' ? m(20, 6) : kind === 'qr' ? m(20, 0.8) : m(20, 4.75);
   pic.label('cp-t', [312, 214], kind === 'thru' ? 'thru-axle' : kind === 'qr' ? 'quick release' : 'axle nuts', [300, 202], named, 'end', 'leader-name');
   pic.facts.push(pointsAt(pic, 'leader-name', kind === 'qr' ? 'skewer' : 'axle', 2));
@@ -87,10 +87,10 @@ export function wheelSeated(kind: Axle): Pic {
  */
 export function spokeWrap(): Pic {
   const pic = new Pic(320, 236);
-  const C: Pt = [160, 236], k = 0.6, R = 300 * k, Rn = 296 * k, Rf = 28 * k;
+  const C: Pt = [185, 236], k = 0.6, R = 300 * k, Rn = 296 * k, Rf = 28 * k;
   // rim: two arcs round the wheel's centre, its inner wall where the nipples sit
-  pic.path('cp-obj', new Path().M(pol(C[0], C[1], R + 22 * k, -72)).arcTo(C, 72, true).L(pol(C[0], C[1], Rn, 72)).arcTo(C, -72, false).Z(), { name: 'rim' });
-  pic.path('cp-fine', new Path().M(pol(C[0], C[1], R + 6 * k, -72)).arcTo(C, 72, true));
+  pic.path('cp-obj', new Path().M(pol(C[0], C[1], R + 22 * k, -78)).arcTo(C, 78, true).L(pol(C[0], C[1], Rn, 78)).arcTo(C, -78, false).Z(), { name: 'rim' });
+  pic.path('cp-fine', new Path().M(pol(C[0], C[1], R + 6 * k, -78)).arcTo(C, 78, true));
   pic.circle('cp-obj', C, Rf + 3);
   // 32 holes, 11.25 degrees apart; the spokes lean alternately (three-cross: their hub end 67.5 degrees round from their hole)
   const holes: { a: number; lean: number }[] = [];
@@ -135,7 +135,7 @@ export function spokeWrap(): Pic {
   for (let i = 1; i < turns * 2; i += 2) pic.line('cp-objline', add(X, scale(nd, -((pitch * (i + 0.6)) / 2 - (pitch * turns) / 2))), add(X, scale(nd, -((pitch * (i + 1.4)) / 2 - (pitch * turns) / 2))), { style: 'stroke-width:2' });
   const lb = lerp(end(holes[broken]!), X, 0.4);
   pic.label('cp-th', [8, 228], 'broken spoke', [60, 216], lb, undefined, 'leader-broken');
-  pic.label('cp-tm', [8, 20], 'wound round its neighbour', [40, 45], along(2 + pitch / 2, -1), undefined, 'leader-wrap');
+  pic.label('cp-tm', [8, 20], 'wound round', [40, 45], along(2 + pitch / 2, -1), undefined, 'leader-wrap');
   pic.facts.push(pointsAt(pic, 'leader-broken', 'broken', 1.5), pointsAt(pic, 'leader-wrap', 'broken', 2.5));
   pic.facts.push(touches(pic, 'broken', `spoke-${nj}`, 0.5));
   return pic;

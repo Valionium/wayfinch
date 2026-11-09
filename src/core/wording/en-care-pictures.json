@@ -72,7 +72,7 @@
   },
   "spoke-wrap": {
    "name": "The broken spoke wound round the spoke it crosses.",
-   "description": "The upper half of a wheel seen from the side, its spokes crossing on their way from the hub to the rim. One spoke has snapped at its nipple, leaving a short stub in the rim; its long piece, still held in the hub, is marked \"broken spoke\". At the point where it crosses a neighbouring spoke, its loose end is wound round that spoke three times, labelled \"wound round its neighbour\", so it cannot flap."
+   "description": "The upper half of a wheel seen from the side, its spokes crossing on their way from the hub to the rim. One spoke has snapped at its nipple, leaving a short stub in the rim; its long piece, still held in the hub, is marked \"broken spoke\". At the point where it crosses a neighbouring spoke, its loose end is wound round that spoke three times, labelled \"wound round\", so it cannot flap."
   },
   "pad-spacer": {
    "name": "With the wheel out, a pad spacer between a hydraulic disc brake's pads.",

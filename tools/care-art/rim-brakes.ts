@@ -97,7 +97,7 @@ export function caliper(state: RimState): Pic {
     pic.path(hi ? 'cp-hi' : 'cp-obj', lever(closedA), { name: 'lever' });
     pic.circle('cp-dark', pivot, 2.2);
   }
-  pic.text('cp-t', [12, 232], LEFT);
+  pic.text('cp-t', [4, 232], LEFT);
   pic.facts.push(touches(pic, 'lever', 'barrel', f.mm(2.5)), touches(pic, 'yoke', 'bridge', 1), touches(pic, 'clamp', 'arm-r', f.mm(1)));
   pic.facts.push(touches(pic, 'stop-arm', 'yoke', 1), touches(pic, 'barrel', 'stop-arm', 1));
   if (state === 'centre') {
@@ -106,7 +106,7 @@ export function caliper(state: RimState): Pic {
     pic.circle('cp-halo', scr, 15);
     boltHead(pic, scr, f.mm(1.6), { cls: 'cp-hi', name: 'screw' });
     pic.turn(scr, 12, -150, -30);
-    pic.label('cp-th', [312, 70], 'centring screw', [272, 76], add(scr, [2.5, -2.5]), 'end', 'leader-screw');
+    pic.label('cp-th', [312, 44], 'centring screw', [272, 50], add(scr, [2.5, -2.5]), 'end', 'leader-screw');
     pic.facts.push(pointsAt(pic, 'leader-screw', 'screw'), touches(pic, 'screw', 'arm-r', f.mm(1)));
   }
   if (state === 'guide') {
@@ -183,23 +183,23 @@ export function vbrake(state: RimState): Pic {
     if (out) pic.arrow(add(seated, [-14, 4]), add(seated, [-14, -14]));
     else pic.arrow(add(seated, [-14, -14]), add(seated, [-14, 4]));
     pic.arrow(m(-ax - 13, -24), m(-ax - 5.5, -24));
-    pic.text('cp-th', add(seated, [-20, -20]), out ? 'lift out' : 'put back', 'end');
+    pic.text('cp-th', add(seated, [-20, 22]), out ? 'lift out' : 'put back', 'end');
     pic.text('cp-th', add(m(-ax - 13, -24), [-8, 4.5]), 'squeeze', 'end');
   }
-  pic.text('cp-t', [12, 238], LEFT);
+  pic.text('cp-t', [4, 238], LEFT);
   if (state === 'centre') {
     // the spring screw on the side of the left arm, near its foot (each arm has one)
     const scr = m(-ax - 3.2, bossY - 9);
     pic.circle('cp-halo', scr, 14);
     boltHead(pic, scr, f.mm(2), { cls: 'cp-hi', name: 'screw' });
     pic.turn(scr, 12, 210, 330);
-    pic.label('cp-th', [12, 214], 'spring screw', [60, 204], add(scr, [-2, 2.5]), undefined, 'leader-screw');
+    pic.label('cp-th', [118, 200], 'spring screw', [112, 204], add(scr, [-2, 2.5]), 'end', 'leader-screw');
     pic.facts.push(pointsAt(pic, 'leader-screw', 'screw'));
   }
   if (state === 'guide') {
-    pic.label('cp-th', [312, 200], 'V-brake', [296, 188], m(ax, -10), 'end', 'leader-v');
+    pic.label('cp-th', [80, 150], 'V-brake', [86, 146], m(-ax, -10), 'end', 'leader-v');
     pic.label('cp-tm', [306, 40], 'curved tube', [262, 44], add(seated, [12, -16]), 'end', 'leader-tube');
-    pic.facts.push(pointsAt(pic, 'leader-v', 'arm-r'), pointsAt(pic, 'leader-tube', 'noodle', 3));
+    pic.facts.push(pointsAt(pic, 'leader-v', 'arm-l'), pointsAt(pic, 'leader-tube', 'noodle', 3));
   }
   rimFacts(pic, s, f, ['arm-l', 'arm-r'], true);
   pic.facts.push(touches(pic, 'arm-l', 'boss-l', 3), touches(pic, 'arm-r', 'boss-r', 3));
@@ -255,7 +255,7 @@ export function hydraulic(state: RimState): Pic {
     pic.path('cp-obj', lever(closedA), { name: 'lever' });
     pic.circle('cp-dark', pivot, 2.4);
   }
-  pic.text('cp-t', [12, 232], LEFT);
+  pic.text('cp-t', [4, 232], LEFT);
   pic.facts.push(touches(pic, 'mount', 'arm-l', 1), at(pic, 'lever pivot', pivot, 'mount', 0));
   if (state === 'guide') {
     pic.label('cp-th', [190, 16], 'hydraulic', [214, 20], m(s.we / 2 + REST + 8.5 + 10, -9), 'middle', 'leader-h');

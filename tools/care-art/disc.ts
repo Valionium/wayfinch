@@ -69,7 +69,7 @@ export function discBolts(): Pic {
     rotorEdge(m, 19.1, -24, 26, 'rotor-post');
     caliper(m, -8, 32, -32, 22, [15, 25.6], 'cal-post');
     pads(m, [15, 25.6], -24, 14, 'post');
-    pic.path('cp-ctx', new Path().M(m(-2, -32)).Q(m(-3, -37), m(-8, -40)), { style: 'stroke-width:3' });
+    pic.path('cp-ctx', new Path().M(m(-2, -32)).Q(m(-3, -36), m(-10, -37)), { style: 'stroke-width:3' });
     for (const [i, y] of [-21, 11].entries()) {
       pic.circle('cp-halo', m(3, y), 15);
       // a socket head, round, with its hex key hole
@@ -109,7 +109,7 @@ function slotBody(pic: Pic, m: (x: number, y: number) => Pt, slot: [number, numb
  */
 export function caliperSlot(mode: 'gap' | 'pads'): Pic {
   const pic = new Pic(320, 220);
-  const k = 5.2, m = (x: number, y: number): Pt => [140 + x * k, 108 + y * k];
+  const k = 5.2, m = (x: number, y: number): Pt => [110 + x * k, 108 + y * k];
   // mm: rotor 1.8 thick at x 0..1.8; pads 3.6 each, gap 0.5 (drawn 0.9 so it shows)
   const g = 0.9, padW = 3.6, rot0 = 0, rot1 = 1.8;
   const slot: [number, number] = [rot0 - g - padW, rot1 + g + padW];
@@ -138,7 +138,7 @@ export function caliperSlot(mode: 'gap' | 'pads'): Pic {
  */
 export function discAdjust(): Pic {
   const pic = new Pic(320, 220);
-  const k = 5.2, m = (x: number, y: number): Pt => [140 + x * k, 112 + y * k];
+  const k = 5.2, m = (x: number, y: number): Pt => [110 + x * k, 112 + y * k];
   const g = 0.9, padW = 3.6, rot0 = 0, rot1 = 1.8, slot: [number, number] = [rot0 - g - padW, rot1 + g + padW];
   slotBody(pic, m, slot, [rot0, rot1], m(slot[1] - 3, -16.5));
   pic.path('cp-rubber', poly([m(slot[0], -6), m(slot[0] + padW, -6), m(slot[0] + padW, 9), m(slot[0], 9)]), { name: 'pad-o' });
@@ -199,7 +199,7 @@ export function discSide(mark: 'disc' | 'caliper'): Pic {
  */
 export function padSpacer(): Pic {
   const pic = new Pic(320, 220);
-  const k = 5.2, m = (x: number, y: number): Pt => [140 + x * k, 108 + y * k];
+  const k = 5.2, m = (x: number, y: number): Pt => [120 + x * k, 98 + y * k];
   const g = 0.9, padW = 3.6, rot0 = 0, rot1 = 1.8, slot: [number, number] = [rot0 - g - padW, rot1 + g + padW];
   const body = new Path().M(m(slot[0] - 9, -14)).L(m(slot[1] + 9, -14)).L(m(slot[1] + 9, 12)).L(m(slot[1], 12)).L(m(slot[1], -9))
     .L(m(slot[0], -9)).L(m(slot[0], 12)).L(m(slot[0] - 9, 12)).Z();
@@ -212,7 +212,7 @@ export function padSpacer(): Pic {
   pic.path('cp-hi', rrect(...m(-3.5, 13), 9 * k, 5 * k, 3), { name: 'tab' });
   pic.path('cp-ctx', new Path().M(m(slot[0] - 5, -14)).Q(m(slot[0] - 6, -19), m(slot[0] - 12, -21)), { style: 'stroke-width:3' });
   pic.label('cp-th', [306, 176], 'pad spacer', [262, 170], m(4, 15.5), 'end', 'leader-spacer');
-  pic.text('cp-tm', [306, 22], 'The wheel out: no disc in the slot', 'end');
+  pic.text('cp-tm', [8, 214], 'The wheel out: no disc in the slot');
   pic.text('cp-tm', m(slot[1] + 10.5, 2), 'wheel side \u2192');
   pic.facts.push(touches(pic, 'spacer', 'pad-o', 0.5), touches(pic, 'spacer', 'pad-i', 0.5), touches(pic, 'tab', 'spacer', 0.5), pointsAt(pic, 'leader-spacer', 'tab', 1));
   return pic;

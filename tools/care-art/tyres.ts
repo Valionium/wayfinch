@@ -86,8 +86,8 @@ export function wheelSection(mark: SectionMark): Pic {
   }
   beads(pic, f, mark === 'bead' ? 'cp-hi' : 'cp-dark');
   if (mark === 'tyre') pic.label('cp-th', [306, 40], 'tyre', [290, 46], pol(...m(0, YC), f.mm(R - 1), 40), 'end', 'leader');
-  if (mark === 'tube') pic.label('cp-th', [306, 40], 'inner tube', [272, 46], pol(...m(0, YC), f.mm(RI - 0.5), 42), 'end', 'leader');
-  if (mark === 'bead') pic.label('cp-th', [306, 150], 'bead', [292, 146], m(WI / 2 - 1.6, SEAT - 1.7), 'end', 'leader');
+  if (mark === 'tube') pic.label('cp-th', [222, 24], 'inner tube', [220, 22], pol(...m(0, YC), f.mm(RI - 0.5), 42), undefined, 'leader');
+  if (mark === 'bead') pic.label('cp-th', [228, 150], 'bead', [226, 146], m(WI / 2 - 1.6, SEAT - 1.7), undefined, 'leader');
   if (mark === 'rim') pic.label('cp-th', [306, 200], 'rim', [292, 194], m(WI / 2 + WALL - 0.4, 8), 'end', 'leader');
   if (mark === 'tyre' || mark === 'tube' || mark === 'bead' || mark === 'rim') {
     const target = mark === 'bead' ? 'bead-r' : mark;
