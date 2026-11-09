@@ -390,6 +390,24 @@ test('[TRIP-DAY-BAGS] the owner\'s day ride in a real browser: no bike, no bags 
   expect(errors).toEqual([]);
 });
 
+test('[TRIP-DAY-BAGS] in the full planner the day ride\'s tube reads as one tube for a day ride, never "×2" or "yours" (review of PR 95, I1)', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  app = await loadApp(page, { launch: true, path: '/tools/bags/' });
+  await ready(page);
+  await page.evaluate(`(async () => { S.bags = []; S.nights = 0; S.month = 10; S.bikeProfile = null; S.custom = {}; applyTripKitDefaults(); await flushDraft(); })()`);
+  await handOver(page, ownersDayRide());
+  await openFresh(page, `/tools/bags/#copilot-handoff=${ID}`);
+  await ready(page);
+  await page.locator('#handoffPlan').click();
+  await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
+  await page.locator('#smallFull').click();
+  await page.evaluate('S.adv = true; go(3); renderKit();');
+  await expect(page.locator('.kititem[data-k="tubes"] .kn')).toHaveText('Spare tube (one, for a day ride)');
+  await expect(page.locator('.reset[data-reset="tubes"]')).toHaveText('Reset to two tubes, 0.7 L');
+  expect(errors).toEqual([]);
+});
+
 test('[BK-FORK-SAVE] the trip handoff leaves the bike alone: a fork\'s own two colours stay in the plan\'s bike, its saved copy and the draft', async ({ page }) => {
   await plannerWithPlan(page);
   const FORK = { kind: 'pattern', pattern: 'camo', pair: 2, colours: ['#2f7d4f', '#f1c232'] };

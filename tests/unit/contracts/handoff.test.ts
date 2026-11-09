@@ -618,7 +618,7 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
     expect(day).toBe(Math.round((c.nightCold! + c.dayMean!) / 2));
     // the jacket, when the day calls for it, is worn, not packed (owner, 9 Nov 2026: "Worn, one spare tube")
     expect(on(nov, 'puffy')).toBe(false);
-    expect(nov.json<boolean>('dayRideWearsJacket()')).toBe(day < 11);
+    expect(nov.json<boolean>('dayRideWearsJacket()')).toBe(day < 8);   // worn only below 8 °C (owner, 9 Nov 2026: "Below 8 °C")
     expect(on(nov, 'gloves')).toBe(day < 5);
     expect([nov.json<boolean>('dayRideWearsJacket()'), on(nov, 'gloves')]).toEqual([true, true]);   // a cold November day still calls for both
     expect([on(nov, 'shades'), on(nov, 'sun')]).toEqual([false, false]);   // November: no sun season
@@ -725,6 +725,52 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
     expect(novPos.length).toBeGreaterThan(0);
     expect(novPos.every((p) => p === 'top' || p === 'frame')).toBe(true);
     expect(nov.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+  });
+
+  test('the insulated jacket is worn on a day ride only below 8 °C; a mild April day neither wears nor packs it (owner, 9 Nov 2026: "Below 8 °C")', async () => {
+    const apr = await dayRide('2026-04-15');
+    await apr.page.run('receiveHandoff()');
+    await apr.page.run('planTripBags()');
+    const c = apr.json<{ dayMean: number }>('tripClimate()');
+    expect(c.dayMean).toBe(16);   // the usual high of an April day here
+    const t = apr.json<number>('dayRideTemp(tripClimate())');
+    expect(t).toBeGreaterThanOrEqual(8);
+    expect(apr.json<boolean>('dayRideWearsJacket()')).toBe(false);
+    expect(apr.json<boolean>(`carrying('puffy')`)).toBe(false);
+    expect(apr.json<boolean>('$("smallWear").hidden')).toBe(true);
+    expect(apr.json<string[]>('audit().miss.flatMap(m=>m.ids)')).toEqual([]);
+    expect(apr.json<string>('climateConsequence(true)')).not.toMatch(/insulated jacket/);
+    // November, about 4 °C over the riding hours: worn
+    const nov = await dayRide('2026-11-15');
+    await nov.page.run('receiveHandoff()');
+    await nov.page.run('planTripBags()');
+    expect(nov.json<number>('dayRideTemp(tripClimate())')).toBeLessThan(8);
+    expect(nov.json<boolean>('dayRideWearsJacket()')).toBe(true);
+    expect(String(nov.page.nodes.get('smallWear')!.textContent)).toBe('Wear: insulated jacket.');
+    // one night in April: the night rule as before, the jacket asked for by the cold night
+    apr.page.run('S.nights=1;');
+    expect(apr.json<string[]>('audit().miss.flatMap(m=>m.ids)')).toContain('puffy');
+  });
+
+  test('in the full planner the day ride\'s tube reads as what it is, one tube for a day ride, never "×2" or the rider\'s own size; with nights it is two tubes again (review of PR 95, I1)', async () => {
+    const p = await dayRide('2026-11-15');
+    await p.page.run('receiveHandoff()');
+    await p.page.run('planTripBags()');
+    expect(p.page.run('openFullPlanner()')).toBe(true);
+    expect(p.json<string>(`kitName(kitById('tubes'))`)).toBe('Spare tube (one, for a day ride)');
+    const row = p.json<{ name: string }>(`getChecklistModel(currentPlan()).groups.flatMap(g=>g.items).find(r=>r.id==='tubes')`);
+    expect(row.name).toBe('Spare tube (one, for a day ride)');
+    expect(p.json<boolean>(`kitSizeIsRiders(kitById('tubes'))`)).toBe(false);
+    // the trip gets nights: the day size goes, two tubes again, under the frozen KIT name
+    p.page.run('S.nights=2;applyTripKitDefaults();');
+    expect(p.json('S.custom.tubes ?? null')).toBeNull();
+    expect(p.json<number>(`itemL(kitById('tubes'))`)).toBe(0.7);
+    expect(p.json<string>(`kitName(kitById('tubes'))`)).toBe('Spare tubes ×2');
+    // a size the rider set stays through any change of nights, and is the rider's
+    const own = await dayRide('2026-11-15');
+    own.page.run(`S.custom.tubes={L:0.5,kg:0.2,rigid:0};S.nights=2;applyTripKitDefaults();`);
+    expect(own.json('S.custom.tubes')).toEqual({ L: 0.5, kg: 0.2, rigid: 0 });
+    expect(own.json<boolean>(`kitSizeIsRiders(kitById('tubes'))`)).toBe(true);
   });
 
   test('a day ride carries one spare tube, not two, and the small view names it so; a trip with a night keeps two (owner, 9 Nov 2026)', async () => {

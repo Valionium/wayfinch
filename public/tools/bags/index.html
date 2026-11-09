@@ -4150,14 +4150,21 @@ function dayRideTemp(c){
 }
 // The temperature the insulated jacket and the long gloves are packed by: the riding hours' on a day ride, else the cold night's.
 function warmLayerTemp(c, nights = S.nights){ return nights === 0 ? dayRideTemp(c) : (c ? c.nightCold : null); }
-/* On a day ride the insulated jacket the day calls for is worn, not packed (owner, 9 Nov 2026: "Worn, one spare tube"): it is in no
-   bag and adds no litres; the small view says "Wear: insulated jacket." A night or more packs it as before. */
-function dayRideWearsJacket(){ const c=tripClimate(); return S.nights === 0 && c.nightCold != null && dayRideTemp(c) < 11; }
+/* On a day ride the insulated jacket is worn, not packed (owner, 9 Nov 2026: "Worn, one spare tube"), and only when the riding hours
+   are below 8 °C (owner, 9 Nov 2026: "Below 8 °C"); from 8 °C it is neither worn nor packed, the day kit's rain jacket being the light
+   layer. It is in no bag and adds no litres; the small view says "Wear: insulated jacket." A night or more packs it as before. */
+const DAY_JACKET_BELOW=8;
+function dayRideWearsJacket(){ const c=tripClimate(); return S.nights === 0 && c.nightCold != null && dayRideTemp(c) < DAY_JACKET_BELOW; }
 // A day ride's one spare tube (same ruling): the frozen KIT item is "Spare tubes ×2", so the day kit sizes it as one, half its litres
 // and weight, through the planner's own size of an item (S.custom), unless the rider set a size of their own.
 const DAY_TUBE={L:0.35,kg:0.18,rigid:0};
 const isDayTube=c => !!c && c.L === DAY_TUBE.L && c.kg === DAY_TUBE.kg && (c.rigid || 0) === 0;
 function oneSpareTube(){ if(S.nights === 0 && S.kit.tubes && !S.custom.tubes && qtyOf(kitById('tubes')) === 1) S.custom.tubes={...DAY_TUBE}; }
+// The day size is the planner's, not the rider's (review of PR 95, I1): while the trip is a day ride the item reads as one tube for a
+// day ride and carries no "yours"; once the trip has nights the size goes again (applyTripKitDefaults), two tubes under KIT's name.
+const dayTubeNow=() => S.nights === 0 && isDayTube(S.custom.tubes);
+function kitName(k){ return k && k.id === 'tubes' && dayTubeNow() ? 'Spare tube (one, for a day ride)' : k.name; }
+function kitSizeIsRiders(k){ return isTweaked(k) && !(k.id === 'tubes' && isDayTube(S.custom.tubes)); }
 /* Water without bottle cages (owner: "at least water"): when the plan will have no bottle, neither its own nor the cages the day ride's
    proposal adds on the bike's in-frame mounts (proposedTripBags), the day's water goes in a bag, placed by the frozen selection. */
 function dayRideNeedsBagWater(){
@@ -4178,6 +4185,7 @@ function applyTripKitDefaults(){
   const defaults=tripKitDefaults();
   S.kitTouched=S.kitTouched || {};
   for(const [id,selected] of Object.entries(defaults))if(!S.kitTouched[id])S.kit[id]=selected && !bikeRepairAlternative(id);
+  if(S.nights > 0 && isDayTube(S.custom.tubes)) delete S.custom.tubes;   // a day ride's one tube: two again with nights
 }
 function bikeRepairAlternative(id){
   if(!['brakecable','gearcable','shiftcharger'].includes(id))return null;
@@ -6542,7 +6550,7 @@ function getChecklistModel(A=currentPlan()){
   const selected=activeKit(),byId=new Map(),groups=[],byGroup=new Map();
   selected.forEach(k=>{
     const quantity=k.perDay?foodDays():qtyOf(k);
-    byId.set(k.id,{id:k.id,name:k.name,category:k.cat,quantity,
+    byId.set(k.id,{id:k.id,name:kitName(k),category:k.cat,quantity,
       quantityLabel:k.perDay?`${quantity} riding day${quantity===1?'':'s'}`:quantity>1?`${quantity} ×`:'',
       packed:!!S.packed[k.id],L:itemL(k),kg:itemKg(k),rigidCm:rigidOf(k),placements:[],
       placementLabel:'',note:'',bikeReference:bikeRepairReference(k.id),status:'unassigned',tooLong:false});
@@ -6675,13 +6683,13 @@ function incomingFor(A, key){
       const full = kitById(k.id); if(!full || !fits(full)) return;
       const from=A.slots.filter(x=>x.key!==key && x.items.some(i=>i.id===k.id)).map(unitLabel);
       if(A.spill.some(x=>x.id===k.id))from.push('the overflow');
-      out.push({ id:k.id, name:k.name, vol:itemL(full), from:from.join(', ') });
+      out.push({ id:k.id, name:kitName(k), vol:itemL(full), from:from.join(', ') });
     });
   });
   A.spill.forEach(k => {
     if(k.part || out.some(x=>x.id===k.id)) return;
     const full = kitById(k.id); if(!full || !fits(full)) return;
-    out.push({ id:k.id, name:k.name, vol:itemL(full), from:'the overflow' });
+    out.push({ id:k.id, name:kitName(k), vol:itemL(full), from:'the overflow' });
   });
   return out.sort((a,b) => b.vol - a.vol).slice(0, 8);
 }
@@ -6695,7 +6703,7 @@ function strapOptions(res){
   const cand = [];
   res.slots.forEach(s => s.items.forEach(k => {
     if(!k.part && STRAPPABLE.includes(k.id) && k.vol > 0.2)
-      cand.push({ id:k.id, name:k.name, vol:k.vol, from:POSITIONS[s.pos].label.toLowerCase() });
+      cand.push({ id:k.id, name:kitName(k), vol:k.vol, from:POSITIONS[s.pos].label.toLowerCase() });
   }));
   cand.sort((a,b) => b.vol - a.vol);
   return { decks, cand };
@@ -6727,7 +6735,7 @@ function comfortFill(res){
       const spot = free.sort((a,b) => b.left - a.left).find(f => f.left >= L && fitsLength(k, f));
       if(!spot) return;
       spot.left = +(spot.left - L).toFixed(2);
-      picks.push({ id:k.id, name:k.name, L, where:POSITIONS[spot.pos].label.toLowerCase() });
+      picks.push({ id:k.id, name:kitName(k), L, where:POSITIONS[spot.pos].label.toLowerCase() });
     });
   return { picks, freeL, emptyBags, addedL:+picks.reduce((s,p)=>s+p.L,0).toFixed(1) };
 }
@@ -6795,7 +6803,7 @@ function fixSuggestion(){
     // Leaving something behind is a kept step, so no selection runs here.
     const r = planWith({ remove:[...drop.map(d => d.id), k.id] }), v = vol(r);
     if(v < over - 0.01){
-      drop.push({ id:k.id, name:k.name, L:itemL(k), kg:itemKg(k) });
+      drop.push({ id:k.id, name:kitName(k), L:itemL(k), kg:itemKg(k) });
       res = r; over = v;
     }
   }
@@ -8338,9 +8346,7 @@ function audit(){
   // a day ride: by the riding hours' temperature (owner, 9 Nov 2026); a night or more: by the cold night, as before
   const warm = warmLayerTemp(c, n);
   if(!has('puffy') && known && warm < 11 && n > 0)   // a day ride wears it (owner, 9 Nov 2026: "Worn, one spare tube")
-    M('Insulated jacket', n === 0
-      ? `Over the riding hours a cold day here is about ${warm}°C. An insulated jacket keeps you warm at a stop, or while a repair holds you up.`
-      : `Nights drop to about ${c.nightCold}°C on the cold end. Being cold in the evening is the single most common reason people cut a first tour short.`, ['puffy']);
+    M('Insulated jacket', `Nights drop to about ${c.nightCold}°C on the cold end. Being cold in the evening is the single most common reason people cut a first tour short.`, ['puffy']);
   if(!has('gloves') && known && warm < 5)
     M('Long gloves', n === 0 ? `Riding near ${warm}°C on a cold day. Cold hands stop you braking properly on descents.`
       : `Mornings near ${c.nightCold}°C. Cold hands stop you braking properly on descents.`, ['gloves']);
@@ -10580,13 +10586,13 @@ function renderKit(){
             <label>Volume <input type="number" inputmode="decimal" step="any" min="0" max="100" value="${baseL(k)}" data-num="${htmlEsc(k.id)}:L"> L</label>
             <label>Weight <input type="number" inputmode="decimal" step="any" min="0" max="100" value="${baseKg(k)}" data-num="${htmlEsc(k.id)}:kg"> kg</label>
             <label>Longest <input type="number" inputmode="decimal" step="any" min="0" max="200" value="${rigidOf(k)}" data-num="${htmlEsc(k.id)}:rigid"> cm</label>
-            ${isTweaked(k) ? `<button class="reset" data-reset="${htmlEsc(k.id)}">Reset to ${k.L} L${k.rigid?` · ${k.rigid} cm`:''}</button>` : `<span class="deflt">typical for this item</span>`}
+            ${isTweaked(k) ? `<button class="reset" data-reset="${htmlEsc(k.id)}">Reset to ${kitSizeIsRiders(k) ? '' : 'two tubes, '}${k.L} L${k.rigid?` · ${k.rigid} cm`:''}</button>` : `<span class="deflt">typical for this item</span>`}
           </div></div>` : '';
         return `<div class="kitwrap${S.adv&&on?' open':''}">
           <div class="kititem ${on?'on':'off'}" data-k="${htmlEsc(k.id)}">
             <button type="button" class="kit-toggle" data-toggle-kit="${htmlEsc(k.id)}" role="checkbox" aria-checked="${!!on}">
             <span class="kitbox" aria-hidden="true"></span>
-            <span class="kn">${htmlEsc(k.name)}${k.perDay?` <em class="dim">(${foodDays()} day${foodDays()>1?'s':''}${resupplying()?', then resupply':''})</em>`:''}${isTweaked(k)?' <em class="tag">yours</em>':''}${k.added?' <em class="atag">added</em>':k.comfort?' <em class="ctag">comfort</em>':''}</span>
+            <span class="kn">${htmlEsc(kitName(k))}${k.perDay?` <em class="dim">(${foodDays()} day${foodDays()>1?'s':''}${resupplying()?', then resupply':''})</em>`:''}${kitSizeIsRiders(k)?' <em class="tag">yours</em>':''}${k.added?' <em class="atag">added</em>':k.comfort?' <em class="ctag">comfort</em>':''}</span>
             </button>
             ${on && k.perDay ? `<span class="foodsel">${
               [[1,'1 day'],[2,'2 days'],['all','whole trip']].map(([v,lab]) =>
