@@ -11247,11 +11247,15 @@ async function storeWrite(k, v, detailed=false){
 }
 /* Saved setups past the 20 an older page knows (review of PR 80, I1). An older bag-planner tab, a rollback and the frozen copy at /
    read loadcheck:setups, cut it to 20 on every setup write, and their normaliseSetup drops kind, forRoute, base and isDefault. So
-   this page keeps at most 20 setups there: all of them while there are 20 or fewer, in the list's order; past 20 the general setups
-   first, then the trip setups in the list's order. The rest go to loadcheck:setups-more:v1, which older pages never read, and the
-   new fields of every setup that has any are kept in loadcheck:setup-marks:v1 too, which puts them back on a setup an older page
-   saved without them. Read together, the three are the one list; an older page's own change to one of its 20 (a name, a note, a
-   delete) stays. What moves into the first list is kept in the second until the first holds it, so no moment loses a setup. */
+   this page keeps at most 20 setups there; the rest go to loadcheck:setups-more:v1, which older pages never read, and the new fields
+   of every setup that has any are kept in loadcheck:setup-marks:v1 too, which puts them back on a setup an older page saved without
+   them. Read together, the three are the one list; an older page's own change to one of its 20 (a name, a note, a delete) stays.
+   Where each setup goes (fix round of PR 80, I-1): a write that adds a setup lays the lists out afresh, all of them in the first list
+   while there are 20 or fewer, in the list's order, and past 20 the general setups first, then the trip setups in the list's order. A
+   write that adds none moves none: each setup stays in the list that holds it, so a delete on a full storage only makes values
+   smaller and always frees room, and the first list may hold fewer than 20 until a write that adds a setup. The writes go in an order
+   where stopping after any one of them loses no setup: one moving to the other list is written there before it leaves the list it
+   is in, and the first write that fails stops the rest, so the save is reported as not stored and what was stored stays readable. */
 const SETUP_MORE_KEY='loadcheck:setups-more:v1',SETUP_MARKS_KEY='loadcheck:setup-marks:v1',OLD_PAGE_SETUPS=20;
 const SETUP_MARK_FIELDS=['kind','forRoute','base','isDefault'];
 function setupMarksOf(list){
@@ -11267,42 +11271,115 @@ function splitSetups(list){
   const ordered=[...list.filter(x => setupKind(x) === 'general'),...list.filter(x => setupKind(x) !== 'general')];
   return {main:ordered.slice(0,OLD_PAGE_SETUPS),more:ordered.slice(OLD_PAGE_SETUPS)};
 }
+// The marks a stored record holds, by setup id ({} for none, or a record this page cannot read).
+function marksIn(value){
+  return dataObject(value) && value.app === 'load-check' && value.kind === 'setup-marks' && value.v === 1 && dataObject(value.marks) ? value.marks : {};
+}
+// A stored setup with its marks put back: each field its marks have, and none they do not.
+function withMarks(raw,marks){
+  if(!Object.hasOwn(marks,raw.id) || !dataObject(marks[raw.id])) return raw;
+  const m=marks[raw.id],x={...raw};
+  for(const f of SETUP_MARK_FIELDS){ if(m[f] !== undefined) x[f]=m[f]; else delete x[f]; }
+  return x;
+}
 // The one list from the three stored values: each setup once (the first list's copy, which an older page may have changed, first),
 // its marks put back, through normaliseSetup.
 function joinSetups(main,more,marksValue){
-  const marks=dataObject(marksValue) && marksValue.app === 'load-check' && marksValue.kind === 'setup-marks' && marksValue.v === 1 &&
-    dataObject(marksValue.marks) ? marksValue.marks : {};
-  const out=[],ids=new Set();
+  const marks=marksIn(marksValue),out=[],ids=new Set();
   for(const raw of [...(Array.isArray(main) ? main : []),...(Array.isArray(more) ? more : [])]){
     if(!dataObject(raw) || ids.has(raw.id)) continue;
-    let x=raw;
-    if(Object.hasOwn(marks,raw.id) && dataObject(marks[raw.id])){
-      const m=marks[raw.id]; x={...raw};
-      for(const f of SETUP_MARK_FIELDS){ if(m[f] !== undefined) x[f]=m[f]; else delete x[f]; }
-    }
-    const setup=normaliseSetup(x);
+    const setup=normaliseSetup(withMarks(raw,marks));
     if(setup){ out.push(setup); ids.add(setup.id); }
   }
   return out;
 }
+// The three values as the store holds them (the host's storage where there is one); the start-up reads the setups through this.
+async function storedSetupValues(){ return {main:await store.get(SETUP_KEY),more:await store.get(SETUP_MORE_KEY),marks:await store.get(SETUP_MARKS_KEY)}; }
+async function storedSetups(){ const v=await storedSetupValues(); return joinSetups(v.main,v.more,v.marks); }
+// The same from this browser's storage, as another tab's write leaves it.
 function storedSetupsLocal(){ return joinSetups(readLocalJson(SETUP_KEY),readLocalJson(SETUP_MORE_KEY),readLocalJson(SETUP_MARKS_KEY)); }
-async function storedSetups(){ return joinSetups(await store.get(SETUP_KEY),await store.get(SETUP_MORE_KEY),await store.get(SETUP_MARKS_KEY)); }
+function storedSetupIds(){ return [SETUP_KEY,SETUP_MORE_KEY].flatMap(k => { const l=readLocalJson(k); return Array.isArray(l) ? l.filter(dataObject).map(x => x.id) : []; }); }
+function setupRaws(){ return {main:readLocalRaw(SETUP_KEY),more:readLocalRaw(SETUP_MORE_KEY),marks:readLocalRaw(SETUP_MARKS_KEY)}; }
+// Where each setup goes (see above): the two lists, and the setups that move up from the second list to the first.
+function setupLayout(list,main,more){
+  const idsOf=l => new Set((Array.isArray(l) ? l : []).filter(dataObject).map(x => x.id));
+  const inMain=idsOf(main),inMore=idsOf(more);
+  if(list.every(x => x && (inMain.has(x.id) || inMore.has(x.id)))){
+    const first=list.filter(x => inMain.has(x.id));
+    if(first.length <= OLD_PAGE_SETUPS) return {main:first,more:list.filter(x => !inMain.has(x.id)),entering:[]};
+  }
+  const split=splitSetups(list);
+  return {main:split.main,more:split.more,entering:split.main.filter(x => x && inMore.has(x.id))};
+}
+// One of the three values, written as storeWrite writes but not stamped (storeSetups stamps the setups once, after its writes). In this
+// browser's storage the whole setup write is done at once, before anything else runs; only a host's storage is waited for.
+function writeLocalNow(k,v){
+  MEM[k]=v;
+  try { window.localStorage.setItem(k,JSON.stringify(v)); STORAGE_KIND='browser'; return {saved:true,kind:'browser'}; }
+  catch(e){ STORAGE_KIND='memory'; return {saved:false,kind:'memory'}; }
+}
+async function writeSetupValue(k,v){
+  MEM[k]=v;
+  try { if(window.storage){ await window.storage.set(k,JSON.stringify(v)); STORAGE_KIND='host'; return {saved:true,kind:'host'}; } } catch(e){}
+  return writeLocalNow(k,v);
+}
 async function storeSetups(v,detailed){
-  mergeOtherTabsSetups(v);
-  const {main,more}=splitSetups(v),marks=setupMarksOf(v);
+  const host=!!window.storage,wasRaw=setupRaws();
+  const was=host ? await storedSetupValues() : {main:readLocalJson(SETUP_KEY),more:readLocalJson(SETUP_MORE_KEY),marks:readLocalJson(SETUP_MARKS_KEY)};
+  mergeOtherTabsSetups(v,was);
+  v.forEach(x => x && SETUPS_SEEN.add(x.id));   // this tab knows them now, stored or not: a later write never takes one for another tab's
+  const {main,more,entering}=setupLayout(v,was.main,was.more),marks=setupMarksOf(v);
   const there=k => readLocalRaw(k) !== null || MEM[k] !== undefined;
-  const wasMore=readLocalJson(SETUP_MORE_KEY),inMore=new Set(Array.isArray(wasMore) ? wasMore.map(x => x && x.id) : []);
-  const entering=main.filter(x => inMore.has(x.id));
-  let saved=true;
-  if(more.length || entering.length || there(SETUP_MORE_KEY)) saved=await storeWrite(SETUP_MORE_KEY,[...more,...entering]) && saved;
-  if(Object.keys(marks).length || there(SETUP_MARKS_KEY))
-    saved=await storeWrite(SETUP_MARKS_KEY,{app:'load-check',kind:'setup-marks',v:1,marks}) && saved;
-  const r=await storeWrite(SETUP_KEY,main,true);
-  if(entering.length) saved=await storeWrite(SETUP_MORE_KEY,more) && saved;
-  saved=saved && r.saved;
-  if(saved) v.forEach(x => x && SETUPS_SEEN.add(x.id));
+  // In this order, so that stopping after any one write loses no setup: the second list with the setups moving up to the first still
+  // in it, the marks, the first list, then the second list without those.
+  const writes=[];
+  if(more.length || entering.length || there(SETUP_MORE_KEY)) writes.push([SETUP_MORE_KEY,[...more,...entering]]);
+  if(Object.keys(marks).length || there(SETUP_MARKS_KEY)) writes.push([SETUP_MARKS_KEY,{app:'load-check',kind:'setup-marks',v:1,marks}]);
+  writes.push([SETUP_KEY,main]);
+  if(entering.length) writes.push([SETUP_MORE_KEY,more]);
+  let saved=true,kind=STORAGE_KIND,browser=false;
+  for(const [k,value] of writes){
+    if(!host && readLocalRaw(k) === JSON.stringify(value)){ MEM[k]=value; continue; }   // stored as it is already
+    const r=host ? await writeSetupValue(k,value) : writeLocalNow(k,value);
+    kind=r.kind; if(r.saved && r.kind === 'browser') browser=true;
+    if(!r.saved){ saved=false; break; }   // the first write that fails stops the rest
+  }
+  if(browser) stampSetups(wasRaw);
+  SETUPS_KNOWN=new Set(storedSetupIds());
   SETUPS_STORED=saved;
-  return detailed ? {saved,kind:r.kind} : saved;
+  return detailed ? {saved,kind} : saved;
+}
+/* The setups' stamps for Also delete bag planner data (fix round of PR 80, m-1): one per setup, whichever list holds it, kept with the
+   first list's stamps in the ledger (the live page keeps those when it writes the ledger for another key), and new only when what the
+   page reads for that setup changes: moving between the lists, or its marks put back on it after an older page saved it without them,
+   is not a change. Each list's own stamp, and the marks', is the newest stamp of the setups it holds, so an older page applying a delete
+   request, which judges those two values whole, keeps one only when a setup in it was saved after the request. */
+function stampSetups(wasRaw){
+  try {
+    const parse=t => { try { return t === null ? null : JSON.parse(t); } catch(e){ return null; } };
+    const state=raws => {
+      const lists=[parse(raws.main),parse(raws.more)],marks=marksIn(parse(raws.marks)),out=new Map();
+      for(const l of lists) for(const x of Array.isArray(l) ? l : [])
+        if(dataObject(x) && typeof x.id === 'string' && !out.has(x.id))
+          out.set(x.id,{x,marks,text:JSON.stringify(x),mark:JSON.stringify(Object.hasOwn(marks,x.id) ? marks[x.id] : null)});
+      return {lists,marks,out};
+    };
+    const read=e => e.read !== undefined ? e.read : (e.read=JSON.stringify(normaliseSetup(withMarks(e.x,e.marks))));
+    const same=(a,b) => a.text === b.text && a.mark === b.mark || read(a) !== 'null' && read(a) === read(b);
+    const before=state(wasRaw),after=state(setupRaws()),ledger=readSavedAt(),now=new Date().toISOString();
+    const had=ledger.items[SETUP_KEY],stamps={};
+    for(const [id,b] of after.out){
+      const a=before.out.get(id);
+      if(!a || !same(a,b)) stamps[id]=now;          // new or changed now
+      else if(had[id]) stamps[id]=had[id];           // unchanged: its own time, or none
+    }
+    ledger.items[SETUP_KEY]=stamps;
+    const newest=ids => ids.map(id => stamps[id]).filter(Boolean).sort().pop();
+    const keyStamp=(k,ids) => { const t=newest(ids); if(t) ledger.keys[k]=t; else delete ledger.keys[k]; };
+    after.lists.forEach((l,i) => keyStamp(i ? SETUP_MORE_KEY : SETUP_KEY,Array.isArray(l) ? l.filter(dataObject).map(x => x.id) : []));
+    keyStamp(SETUP_MARKS_KEY,Object.keys(after.marks));
+    window.localStorage.setItem(SAVED_AT_KEY,JSON.stringify(ledger));
+  } catch(e){}
 }
 let SETUPS_STORED = true;   // did the last write of the saved setups reach storage? A read that works later does not undo a failed write.
 function storageNote(){
@@ -11320,7 +11397,8 @@ function storageNote(){
    with no stamp was saved by an older page, before any request could exist, and goes. Never a clear of all storage,
    never a copilot:* key, never a cache. */
 const DELETE_REQUEST_KEY='copilot:delete-request:v1',DELETE_APPLIED_KEY='loadcheck:delete-applied',SAVED_AT_KEY='loadcheck:saved-at:v1';
-const SAVED_ITEM_KEYS=['loadcheck:setups','loadcheck:bikeProfiles','loadcheck:setups-more:v1'];
+// one stamp per item; a setup's is under loadcheck:setups whichever of the two lists holds it (stampSetups, review of PR 80, m-1)
+const SAVED_ITEM_KEYS=['loadcheck:setups','loadcheck:bikeProfiles'];
 const SUMMARY_KEY='loadcheck:summary:v1';
 let DELETED_ELSEWHERE=false;   // another tab applied a delete request: this one never writes its plan back
 const DELETING_KEY='loadcheck:delete-applying';   // written before the first removal, so other tabs stop at once (review M3)
@@ -11441,7 +11519,7 @@ function applyDeleteRequest(){
       const draft=readLocalJson(k);
       if(dataObject(draft) && later(draft.updatedAt)) kept.keys[k]=true; else { remove(k); remove(DRAFT_BROWSER_META_KEY); }
     } else if(k === SETUP_KEY || k === SETUP_MORE_KEY){
-      if(keepList(k,x => later(ledger.items[k][x.id]) || later(x.updated) || laterDay(x.saved))) kept.keys[k]=true;
+      if(keepList(k,x => later(ledger.items[SETUP_KEY][x.id]) || later(x.updated) || laterDay(x.saved))) kept.keys[k]=true;
     } else if(k === FEEDBACK_KEY){
       if(keepList(k,x => later(x.at))) kept.keys[k]=true;
     } else if(k === BIKE_PROFILE_KEY){
@@ -11464,7 +11542,7 @@ function applyDeleteRequest(){
   const left={app:'load-check',kind:'saved-at',v:1,keys:{},items:{}};
   for(const k of Object.keys(kept.keys)) if(ledger.keys[k]) left.keys[k]=ledger.keys[k];
   for(const k of SAVED_ITEM_KEYS){
-    const list=readLocalJson(k),ids=new Set(Array.isArray(list) ? list.map(x => x && x.id) : []);
+    const ids=new Set((k === SETUP_KEY ? [SETUP_KEY,SETUP_MORE_KEY] : [k]).flatMap(l => { const list=readLocalJson(l); return Array.isArray(list) ? list.map(x => x && x.id) : []; }));
     left.items[k]=Object.fromEntries(Object.entries(ledger.items[k]).filter(([id]) => ids.has(id)));
   }
   try {
@@ -11667,8 +11745,11 @@ function todayDay(){ const n=new Date(); return `${n.getDate()} ${MONTHS[n.getMo
 function setupHoldingPlan(){ const sig=planSameKey(captureDraft()); return SETUPS.find(s => planSameKey(s) === sig) || null; }
 function keepPlanBefore(){
   if(setupHoldingPlan()) return null;
-  return {...snapshotSetup(`Before ${HANDOFF.name}, ${todayDay()}`,''),thumb:''};
+  const raw={...snapshotSetup(`Before ${HANDOFF.name}, ${todayDay()}`,''),thumb:''};
+  return normaliseSetup(raw) || raw;   // as it reads back from storage, so Undo knows it unchanged after another tab's write (review of PR 80, m-3)
 }
+// What the bar adds when the setups a tap made or removed did not reach storage (fix round of PR 80, I-1).
+const tripSetupsNotStored=n => ` The save did not reach storage (it may be full), so ${n === 1 ? 'the new setup is' : 'the new setups are'} kept for this session only.`;
 // The rider's work in a plan: what makes it the same plan, and the ticks, carried items and touched kit (review of PR 80, I2).
 function tripWorkKey(p){ const n=normalisePlan(p); return n ? planSameKey(p)+JSON.stringify([n.packed,n.carried,n.kitTouched]) : ''; }
 // What Undo needs to take back only what the tap did: the plan before, and the plan and each setup as the tap left them.
@@ -11708,7 +11789,8 @@ async function planTripBags(){
   queueDraftSave(); renderRecall();
   if(!HANDOFF.long) setSmallView(true);
   TRIP_BAGS.undo=tripBagsUndo(undo,[saved,before].filter(Boolean));
-  showHandoffBar(`Planned for ${name}: a new trip setup${base ? ' from '+base.name : ''}${HANDOFF.long ? ', opened at Bags' : ''}.${before ? ' Your plan before is kept as a setup.' : ''}`,{undo:true});
+  showHandoffBar(`Planned for ${name}: a new trip setup${base ? ' from '+base.name : ''}${HANDOFF.long ? ', opened at Bags' : ''}.${before ? ' Your plan before is kept as a setup.' : ''}${
+    stored ? '' : tripSetupsNotStored(before ? 2 : 1)}`,{undo:true});
   return true;
 }
 // The trip setup made for this route before: opened at Bags, the plan here kept as with Plan bags.
@@ -11717,7 +11799,8 @@ async function reuseTripSetup(){
   if(HANDOFF.busy || !s || !DRAFT_READY) return false;
   const undo=JSON.stringify(captureDraft()),before=keepPlanBefore();
   if(before && setupKindFull('trip')){ showHandoffBar(setupKindFullMessage('trip'),{apply:true,plan:true,reuse:true}); return false; }
-  if(before){ SETUPS.splice(SETUPS.indexOf(s)+1,0,before); savedSetupResult(await store.set(SETUP_KEY,SETUPS)); }
+  let stored=true;
+  if(before){ SETUPS.splice(SETUPS.indexOf(s)+1,0,before); stored=savedSetupResult(await store.set(SETUP_KEY,SETUPS)); }
   if(!HANDOFF.long) SMALL_VIEW=true;
   loadSetup(s.id); go(HANDOFF.long ? 2 : 4); if(!HANDOFF.long) setSmallView(true);
   writeHandoffDone('applied'); dropHandoffFragment(); setWayfinchBack('/#/trip');
@@ -11726,7 +11809,8 @@ async function reuseTripSetup(){
   // the setup comes as it was saved; where the trip now has other nights or another date, the bar says so (review of PR 80, m4)
   const t=HANDOFF.trip || {},was={n:S.nights,d:S.departureDate || null},now={n:Number.isInteger(t.nights) ? t.nights : S.nights,d:t.departureDate || null};
   const differs=now.n !== was.n || (now.d && now.d !== was.d) ? ` It was made for ${nightsFrom(was.n,was.d)}; this trip has ${nightsFrom(now.n,now.d)}.` : '';
-  showHandoffBar(`Opened ${s.name}, the setup made on ${setupDay(s)} for ${HANDOFF.name}.${differs}${before ? ' Your plan before is kept as a setup.' : ''}`,{undo:true});
+  showHandoffBar(`Opened ${s.name}, the setup made on ${setupDay(s)} for ${HANDOFF.name}.${differs}${before ? ' Your plan before is kept as a setup.' : ''}${
+    stored ? '' : tripSetupsNotStored(1)}`,{undo:true});
   return true;
 }
 // Undo takes back only what the tap did (review of PR 80, I2, as Contract 2's Undo in the review of PR 43, I3): once the rider has
@@ -11746,10 +11830,11 @@ async function undoTripBags(){
   const changed=SETUPS.filter(s => u.made.includes(s.id) && JSON.stringify(s) !== u.bodies[s.id]);
   const gone=SETUPS.filter(s => u.made.includes(s.id) && !changed.includes(s));
   SETUPS=SETUPS.filter(s => !gone.includes(s));
-  if(gone.length) savedSetupResult(await store.set(SETUP_KEY,SETUPS));
+  const stored=gone.length ? savedSetupResult(await store.set(SETUP_KEY,SETUPS)) : true;
   queueDraftSave(); renderRecall();
   showHandoffBar(`Undone: your plan is as it was${gone.length ? `, and ${gone.length === 1 ? 'the setup' : 'the setups'} made for this trip ${gone.length === 1 ? 'is' : 'are'} gone` : ''}.${
-    changed.length ? ` Kept, because you changed ${changed.length === 1 ? 'it' : 'them'} since: ${changed.map(s => s.name).join(', ')}.` : ''}`);
+    changed.length ? ` Kept, because you changed ${changed.length === 1 ? 'it' : 'them'} since: ${changed.map(s => s.name).join(', ')}.` : ''}${
+    stored ? '' : ` The change did not reach storage (it may be full), so ${gone.length === 1 ? 'that setup' : 'those setups'} may come back after a reload.`}`);
   return true;
 }
 
@@ -11811,6 +11896,7 @@ let DRAFT_READY = false, DRAFT_TIMER = null, DRAFT_SIGNATURE = null;
 // read or wrote, and writes only while the stored version is still that one.
 let DRAFT_VERSION = null, DRAFT_FROZEN = false;
 const SETUPS_SEEN = new Set();
+let SETUPS_KNOWN = new Set();   // the setups this tab last saw stored, in either list: one gone since, another tab removed (review of PR 80, m-2)
 let DRAFT_WRITES = Promise.resolve();
 let DRAFT_LATEST_SERIAL = null, DRAFT_PENDING_SERIAL = null;
 let DRAFT_READ_KIND = 'memory';
@@ -12561,14 +12647,25 @@ $('tabLoad').onclick = async () => {
   DRAFT_FROZEN=false;
   if(other) adoptDraft(other); else $('tabBar').classList.add('hidden');
 };
-// Setups saved by another tab are kept: a write adds the stored setups this tab never saw.
-function mergeOtherTabsSetups(list){
+// Setups saved by another tab are kept: a write adds the stored setups this tab never saw (`was`: the three values as the write read
+// them; the list is read through joinSetups only when one of them is such a setup).
+function mergeOtherTabsSetups(list,was){
   try {
-    storedSetupsLocal().forEach(x => {
-      if(!SETUPS_SEEN.has(x.id) && !list.some(y => y.id === x.id)) list.push(x);
-    });
+    const v=was || {main:readLocalJson(SETUP_KEY),more:readLocalJson(SETUP_MORE_KEY),marks:readLocalJson(SETUP_MARKS_KEY)};
+    const unseen=x => !SETUPS_SEEN.has(x.id) && !list.some(y => y.id === x.id);
+    const raws=[...(Array.isArray(v.main) ? v.main : []),...(Array.isArray(v.more) ? v.more : [])];
+    if(raws.some(x => dataObject(x) && unseen(x))) joinSetups(v.main,v.more,v.marks).forEach(x => { if(unseen(x)) list.push(x); });
     list.splice(MAX_SAVED_SETUPS);
   } catch(e){}
+}
+// Plain words for setups another tab removed (review of PR 80, m-2): the rider may have deleted them there, but an older tab that
+// heard none of the newer saves removes those it never saw when it saves a setup, and nothing brings them back but an export.
+function noteSetupsGone(gone){
+  const n=gone.length,them=n === 1 ? 'it' : 'them';
+  const names=gone.slice(0,5).map(s => s.name).join(', ')+(n > 5 ? ` and ${n-5} more` : '');
+  const text=`${n === 1 ? 'A saved setup was' : n+' saved setups were'} removed in another tab: ${names}. If that was not you, an older Bag planner tab still open may have removed ${them}; Import an export to bring ${them} back.`;
+  if(DRAFT_FROZEN){ SAVE_MESSAGE=text; return; }   // the bar says the plan changed in another tab: that stays in view
+  showTabNotice(text,false);
 }
 function followOtherTabs(event){
   try { if(event.storageArea && event.storageArea !== window.localStorage) return; } catch(e){ return; }
@@ -12578,7 +12675,10 @@ function followOtherTabs(event){
   if(all || key === DRAFT_KEY) checkOtherTabs();
   if(all || [SETUP_KEY,SETUP_MORE_KEY,SETUP_MARKS_KEY].includes(key)){
     try {
-      SETUPS=storedSetupsLocal(); SETUPS.forEach(x => SETUPS_SEEN.add(x.id));
+      const stored=storedSetupsLocal(),now=new Set(storedSetupIds());
+      const gone=SETUPS.filter(x => SETUPS_KNOWN.has(x.id) && !now.has(x.id));
+      SETUPS=stored; SETUPS.forEach(x => SETUPS_SEEN.add(x.id)); SETUPS_KNOWN=now;
+      if(gone.length) noteSetupsGone(gone);
       if(typeof renderRecall === 'function') renderRecall();
     } catch(e){}
   }
@@ -14294,9 +14394,9 @@ window.applyCalibration = applyCalibration;
   // Contract 3: a stored delete request is applied before anything is read, so the draft is never restored first.
   if(applyDeleteRequest()){ WALKTHROUGH_SEEN=false; MAX_WEIGHT_SKIPPED=false; }
   clearStoredRiderWeight();
-  SETUPS=joinSetups(await store.get(SETUP_KEY),await store.get(SETUP_MORE_KEY),await store.get(SETUP_MARKS_KEY));   // storedSetups()
+  SETUPS=await storedSetups();
   const savedReports=await store.get(FEEDBACK_KEY);
-  SETUPS.forEach(x => SETUPS_SEEN.add(x.id));
+  SETUPS.forEach(x => SETUPS_SEEN.add(x.id)); SETUPS_KNOWN=new Set(storedSetupIds());
   FEEDBACK=Array.isArray(savedReports) ? savedReports.map(normaliseReport).filter(Boolean) : [];
   await loadBikeProfileData();
   // The one theme, with this page's records as its store holds them (an embedding host's storage too)

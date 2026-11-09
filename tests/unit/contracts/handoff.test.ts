@@ -17,8 +17,9 @@ import { handoffGpx, tripAttributes } from '../../../src/ui/trip/handoff.ts';
 import { loadFixtureRoute } from '../../fixtures/packs/index.ts';
 
 const require = createRequire(import.meta.url);
-type VM = { run: (code: string) => unknown; context: Record<string, unknown>; values: Map<string, string>; nodes: Map<string, { href?: string; textContent?: string }> };
-const { appVM } = require('../../../qa/app-vm.cjs') as { appVM: (o?: { bike?: boolean }) => VM };
+type VM = { run: (code: string) => unknown; context: Record<string, unknown>; values: Map<string, string>; nodes: Map<string, { href?: string; textContent?: string }>;
+  store: unknown; localStorage: { setItem: (key: string, value: string) => void } };
+const { appVM } = require('../../../qa/app-vm.cjs') as { appVM: (o?: { bike?: boolean; storage?: unknown }) => VM };
 const { window } = new JSDOM('');
 const parseXml = (s: string): XmlDocLike => new window.DOMParser().parseFromString(s, 'application/xml') as unknown as XmlDocLike;
 const ID = '0123456789abcdef0123456789abcdef';
@@ -369,6 +370,85 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     expect(page.run('JSON.stringify(captureDraft())')).toBe(work);
     expect(json<number>('SETUPS.length')).toBe(2);
   });
+
+  test('Undo after another tab wrote setups takes the "Before" copy away too, and names no change the rider never made (review of PR 80, m-3)', async () => {
+    const { gpx } = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
+    const { page, json } = longPlanner(gpx);
+    await page.run('receiveHandoff()');
+    const before = page.run('JSON.stringify(captureDraft())');
+    await page.run('planTripBags()');
+    expect(json<number>('SETUPS.length')).toBe(2);
+    // another tab of the bag planner saves a setup of its own; this tab follows, each setup as it reads back from storage
+    const other = appVM({ bike: false, storage: page.store });
+    other.run('DRAFT_READY=true;buildThumb=()=>"";SETUPS=storedSetupsLocal();SETUPS.forEach(x=>SETUPS_SEEN.add(x.id));');
+    await other.run(`saveSetup('From the other tab','')`);
+    expect(json<string[]>('SETUPS.map(s=>s.name)')).toContain('From the other tab');
+    expect(await page.run('undoTripBags()')).toBe(true);
+    expect(page.run('JSON.stringify(captureDraft())')).toBe(before);
+    expect(json('SETUPS.map(s=>s.name)')).toEqual(['From the other tab']);
+    expect(String(page.nodes.get('handoffText')!.textContent)).not.toMatch(/changed/);
+  });
+
+  test('whichever single write of Plan bags for this trip, its Undo, the setup made before or its Undo fails, no saved setup is lost and the bar says the save did not reach storage (review of PR 80, I-1)', async () => {
+    const handed = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
+    const many = (n: number, prefix: string, extra: Record<string, unknown> = {}) =>
+      `Array.from({length:${n}},(_,i)=>${qaSetup('X', extra).replace("id:'X'", `id:'${prefix}'+i`).replace("name:'Setup X'", `name:'Setup ${prefix}'+i`)})`;
+    const made = { saved: '2026-11-06', forRoute: { hash: handed.trip.route.hash, name: 'Heidelberg → Strasbourg', departureDate: '2026-06-12' } };
+    // 34 saved setups: 3 general ones of the chosen bike, 30 trip setups and the one made for this route on 6 Nov; the plan here is
+    // none of them, so a "Before" copy is made
+    const library = `[${qaSetup('t_made', made)},...${many(3, 'g', { kind: 'general' })},...${many(30, 't')}]`;
+    const KEYS = ['loadcheck:setups', 'loadcheck:setups-more:v1', 'loadcheck:setup-marks:v1', 'loadcheck:saved-at:v1'];
+    const failAt = (page: VM, n: number) => {
+      const put = page.localStorage.setItem, log = { count: 0, failed: '' };
+      page.localStorage.setItem = function (this: unknown, key: string, value: string) {
+        if (KEYS.includes(key) && log.count++ === n) { log.failed = key; throw new Error('QuotaExceededError'); }
+        return put.call(this, key, value);
+      };
+      return log;
+    };
+    const stored = (page: VM) => {
+      const fresh = appVM({ bike: false });
+      for (const [k, v] of page.values) fresh.values.set(k, v);
+      return JSON.parse(fresh.run('JSON.stringify(storedSetupsLocal().map(s=>s.id))') as string) as string[];
+    };
+    const start = async () => {
+      const p = longPlanner(handed.gpx);
+      await p.page.run(`SETUPS=${library};store.set(SETUP_KEY,SETUPS)`);
+      p.page.run('S.bags.push({uid:3,pos:"bar",L:9});S.nextUid=4;');
+      await p.page.run('receiveHandoff()');
+      return p;
+    };
+    const ids = stored((await start()).page);
+    expect(ids.length).toBe(34);
+    const flows: [string, string | null, string][] = [
+      ['Plan bags for this trip', null, 'planTripBags()'],
+      ['its Undo', 'planTripBags()', 'undoTripBags()'],
+      ['Open the setup made on 6 Nov', null, 'reuseTripSetup()'],
+      ['its Undo', 'reuseTripSetup()', 'undoTripBags()'],
+    ];
+    let cases = 0;
+    for (const [what, prep, code] of flows) {
+      const dry = await start();
+      if (prep) expect(await dry.page.run(prep)).toBe(true);
+      const count = failAt(dry.page, Infinity);
+      expect(await dry.page.run(code)).toBe(true);
+      expect(count.count).toBeGreaterThan(0);
+      for (let n = 0; n < count.count; n++) {
+        const { page } = await start();
+        if (prep) await page.run(prep);
+        const log = failAt(page, n);
+        await page.run(code);
+        const label = `${what}, write ${n + 1} of ${count.count} (${log.failed}) fails`;
+        const now = stored(page);
+        expect(ids.filter((id) => !now.includes(id)), label).toEqual([]);
+        if (log.failed === 'loadcheck:saved-at:v1') continue;   // the setups reached storage; only their stamps did not
+        expect(page.run('SETUPS_STORED'), label).toBe(false);
+        expect(String(page.nodes.get('handoffText')!.textContent), label).toMatch(/did not reach storage/);
+        cases++;
+      }
+    }
+    expect(cases).toBeGreaterThanOrEqual(8);
+  }, 120_000);
 
   test('the bar promises a kept plan only when it will keep one (review of PR 80, m2)', async () => {
     const { gpx } = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');

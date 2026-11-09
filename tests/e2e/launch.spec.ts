@@ -428,6 +428,49 @@ for (const start of ['legacy', 'step-one'] as const) {
     expect(after.find(([id]) => id === 'g1')![3]).toBe('Renamed in the old tab');   // the old tab's own change stays
   });
 
+  test(`[SET-LIMITS] known risk, not a guarantee (review of PR 80, m-2): ${which} stale tab that saves a setup loses every setup it never saw past the 20 it keeps, not just one; an open bag-planner tab names them`, async ({ context, page }) => {
+    await phone(page, start);
+    // The old tab saves 17 more setups of its own: it holds 18, and it has seen them all.
+    await page.evaluate(`(async () => { for (let i = 0; i < 17; i++) await saveSetup('Old ' + i, ''); })()`);
+    expect(await page.evaluate('SETUPS.length')).toBe(18);
+    await launch();
+    // Then it hears nothing more, as a tab frozen in the background or one back from the back/forward cache, whose pageshow
+    // does not read the setups again.
+    await page.evaluate(`(() => {
+      window.removeEventListener('storage', followOtherTabs);
+      window.removeEventListener('pageshow', checkOtherTabs);
+      document.addEventListener('visibilitychange', (e) => e.stopImmediatePropagation(), true);
+    })()`);
+    const planner = await context.newPage();
+    await planner.goto(`${server!.origin}/tools/bags/`, { waitUntil: 'domcontentloaded' });
+    await draftReady(planner);
+    expect(await planner.evaluate('SETUPS.length')).toBe(18);
+    // The bag planner adds 12 trip setups (each with its trip) and 3 general ones, newest first.
+    await planner.evaluate(`(async () => {
+      const one = (id, extra) => normaliseSetup({ ...captureDraft(), id, name: 'Setup ' + id, saved: '2026-11-08',
+        predicted: { mounted: 35, kit: 31, spare: 4, spilled: 0, kg: 14 }, thumb: '', ...extra });
+      SETUPS.unshift(...Array.from({ length: 12 }, (_, i) => one('n' + i, { forRoute: { hash: 'a'.repeat(64), name: 'Ride ' + i, departureDate: null } })),
+        ...Array.from({ length: 3 }, (_, i) => one('g' + i, { kind: 'general' })));
+      if (!(await store.set(SETUP_KEY, SETUPS))) throw new Error('the planner could not save');
+    })()`);
+    const before = await planner.evaluate('SETUPS.map((s) => s.name)') as string[];
+    expect(before.length).toBe(33);
+    // The stale tab writes a note on one of its own setups, through its own write.
+    expect(await page.evaluate(`(async () => { SETUPS[0].note = 'A note from the stale tab'; return store.set(SETUP_KEY, SETUPS); })()`)).toBe(true);
+    // Exactly what is lost: every setup it never saw past the 20 it keeps, here the general setup g2 and the 12 new trip setups.
+    // Its own 18 and g0 and g1 stay, the two general ones still general.
+    await expect.poll(() => planner.evaluate('SETUPS.length')).toBe(20);
+    const kept = await planner.evaluate('SETUPS.map((s) => [s.name, setupKind(s)])') as [string, string][];
+    const lost = before.filter((name) => !kept.some(([n]) => n === name));
+    expect(lost).toEqual([...Array.from({ length: 12 }, (_, i) => 'Setup n' + i), 'Setup g2']);
+    expect(kept.filter(([, kind]) => kind === 'general').map(([n]) => n).sort()).toEqual(['Setup g0', 'Setup g1']);
+    // The bag-planner tab that was open names them, so the loss is not silent; after a reload the 20 are what is stored.
+    expect(await planner.evaluate(() => document.getElementById('tabText')!.textContent ?? '')).toMatch(/^13 saved setups were removed in another tab: Setup n0, Setup n1, /);
+    await planner.reload({ waitUntil: 'domcontentloaded' });
+    await draftReady(planner);
+    expect((await planner.evaluate('SETUPS.map((s) => s.name)') as string[]).sort()).toEqual(kept.map(([n]) => n).sort());
+  });
+
   test(`[SW-OLD-TAB-WRITES] a future bike format (3, which no page writes today) would block ${which} bike write, with its message`, async ({ context, page }) => {
     await phone(page, start);
     await launch();
