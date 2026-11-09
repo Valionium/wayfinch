@@ -104,6 +104,9 @@ export function CareScreen({ services }: { services: TyreServices }) {
   const [part, setPart] = useState<Part | null>(null);
   const [openCard, setOpenCard] = useState<string | null>(null);
   const searchBox = useRef<HTMLInputElement>(null);
+  const title = useRef<HTMLHeadingElement>(null);
+  // Opening the screen puts the focus on its title (no Back button above it any more).
+  useEffect(() => { title.current?.focus(); }, []);
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ care: null, road: null });
 
   const bike = chosenBike(services);
@@ -140,8 +143,8 @@ export function CareScreen({ services }: { services: TyreServices }) {
 
   return (
     <div class="care" data-tick={tick}>
-      <p><a class="btn" href="#/tools">{C.careBack}</a></p>
-      <h2 class="care-title">{C.careTitle}</h2>
+      {/* No Back button here (owner, 9 Nov 2026): the bottom bar's Tools goes back. The title takes the focus as the screen opens. */}
+      <h2 class="care-title" tabIndex={-1} ref={title}>{C.careTitle}</h2>
       <p class="muted">{C.careIntro}</p>
       {/* With no saved bike, the "fits better" line in the bike line's place (wish 17). */}
       <BikeLine services={services} tick={tick} none={<FitLine before={HN.hintFitCare} after={HN.hintFitCareAfter} back="care" />} />
