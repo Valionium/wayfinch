@@ -441,3 +441,36 @@ describe('long routes: polite to the limit all riders share (9 Nov 2026)', () =>
     expect(plain.urls).toHaveLength(1); // Update weather's own spacing stands: one request
   });
 });
+
+describe('review of PR 98: the wait, spread and told; the archive polite too', () => {
+  const minuteLimit = (): Response => json(recorded('limit-minutely-429'), 429);
+  const pts = (n: number): { lat: number; lon: number }[] => Array.from({ length: n }, (_, i) => ({ lat: 49 + i / 1000, lon: 8.5 }));
+  const heights = (u: string): Response => json({ elevation: params(u).get('latitude')!.split(',').map((_, i) => 100 + i) });
+
+  test('[WXR-POLITE] a minute\'s wait is 61 to 66 s, spread so that riders refused together do not all ask again together (M1)', async () => {
+    const slept: number[] = [];
+    for (const r of [0, 0.5, 0.999]) {
+      let n = 0;
+      await fetchElevation(pts(3), stubFetch((u) => (++n === 1 ? minuteLimit() : heights(u))), { sleep: async (ms) => { slept.push(ms); }, random: () => r });
+    }
+    expect(slept.every((ms) => ms >= 61_000 && ms <= 66_000)).toBe(true);
+    expect(new Set(slept).size).toBe(3);
+  });
+
+  test('[WXR-POLITE] the wait is told: when it will ask again, before the wait, and that it goes on, after (I2)', async () => {
+    const told: (string | null)[] = [];
+    let n = 0;
+    const f = stubFetch((u) => { told.push(`request ${n + 1}`); return ++n === 1 ? minuteLimit() : heights(u); });
+    await fetchElevation(pts(3), f, {
+      sleep: async (ms) => { told.push(`sleep ${ms}`); }, random: () => 0, now: () => NOW,
+      onWait: (until) => { told.push(until === null ? 'on' : until.toISOString()); },
+    });
+    expect(told).toEqual(['request 1', new Date(NOW.getTime() + 61_000).toISOString(), 'sleep 61000', 'on', 'request 2']);
+  });
+
+  test('[WXR-POLITE] the archive stops asking after a 429: nothing more is sent (M2)', async () => {
+    const f = stubFetch(minuteLimit);
+    await expect(fetchBaseline(points(2), [7, 8], f, NOW)).rejects.toBeInstanceOf(WeatherServiceError);
+    expect(f.urls).toHaveLength(1);
+  });
+});

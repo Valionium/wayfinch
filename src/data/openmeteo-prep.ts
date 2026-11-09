@@ -55,7 +55,9 @@ export async function fetchBaseline(points: GridPoint[], months: number[], f: Fe
   const answered: (number | null)[] = points.map(() => null);
   const out: Baseline['points'] = [];
   const sampled = new Set<number>();
+  let limited = false;
   for (const month of months) {
+    if (limited) break;
     const tallies: Tally[] = points.map(() => ({ lows: [], highs: [], rain: [], years: new Set() }));
     for (let back = 1; back <= BASELINE_YEARS; back++) {
       const year = thisYear - back;
@@ -66,7 +68,12 @@ export async function fetchBaseline(points: GridPoint[], months: number[], f: Fe
       let body: unknown;
       try {
         body = await getJson(f, url, SMALL_TIMEOUT_MS);
-      } catch {
+      } catch (e) {
+        // Past the service's limit nothing more is sent (review of PR 98, M2); another failure leaves that year out.
+        if (e instanceof WeatherServiceError && e.limited) {
+          limited = true;
+          break;
+        }
         continue;
       }
       const locations = Array.isArray(body) ? body : [body];

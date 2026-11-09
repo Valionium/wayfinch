@@ -74,3 +74,36 @@ describe('day beds', () => {
     expect(a[0]!.bed!.name).toMatch(/campsite|guest house/i);
   });
 });
+
+describe('review of PR 98: a bed closed that night is not named (I1)', () => {
+  // Day 1 of a trip leaving Tue 10 Nov ends on the night of 10 Nov; day 2 on the night of 11 Nov.
+  const november = { departureDate: '2026-11-10', hours: [] };
+  const list = () => [at('campsite', 92, { name: 'Camping Rheinaue', seasonal: 'Apr-Oct' }), at('lodging', 96, { name: 'Gasthof Adler' })];
+
+  test('[TRIP-DAY-BEDS] a campsite mapped Apr-Oct is not named for a November night: the next bed is, whatever the stay', () => {
+    for (const stay of ['camping', 'mixed', 'accommodation'] as const) {
+      const out = dayBeds(route, list().map((x) => x.place), list().map((x) => x.match), stay, november);
+      expect(out[0]!.bed!.name, stay).toBe('Gasthof Adler');
+    }
+  });
+
+  test('[TRIP-DAY-BEDS] with only closed beds near the end, the town or plainly none; open in season, and unknown hours stay allowed, as on the Sleep card', () => {
+    const closed = [at('campsite', 92, { name: 'Camping Rheinaue', seasonal: 'Apr-Oct' }), at('settlement', 93, { name: 'Bingen' })];
+    expect(dayBeds(route, closed.map((x) => x.place), closed.map((x) => x.match), 'camping', november)[0]).toMatchObject({ bed: null, town: { name: 'Bingen' } });
+    const june = { departureDate: '2026-06-10', hours: [] };
+    expect(dayBeds(route, list().map((x) => x.place), list().map((x) => x.match), 'camping', june)[0]!.bed!.name).toBe('Camping Rheinaue');
+    const unknown = [at('campsite', 92, { name: 'Unknown hours', openingHours: 'Mo-Su 08:00-20:00' })];
+    expect(dayBeds(route, unknown.map((x) => x.place), unknown.map((x) => x.match), 'camping', november)[0]!.bed!.name).toBe('Unknown hours');
+  });
+
+  test('[TRIP-DAY-BEDS] prepared hours that say closed the whole night leave the place out; with no date nothing is judged', () => {
+    const shut = at('lodging', 91, { name: 'Shut' });
+    const open = at('lodging', 97, { name: 'Open' });
+    const hours = [{ placeId: shut.place.id, windowStart: new Date('2026-11-01T00:00:00Z'), windowEnd: new Date('2026-11-30T00:00:00Z'),
+      spans: [{ from: new Date('2026-11-01T00:00:00Z'), to: new Date('2026-11-30T00:00:00Z'), state: 'closed' as const }] }];
+    const places = [shut.place, open.place];
+    const matches = [shut.match, open.match];
+    expect(dayBeds(route, places, matches, 'mixed', { departureDate: '2026-11-10', hours })[0]!.bed!.name).toBe('Open');
+    expect(dayBeds(route, places, matches, 'mixed', { departureDate: null, hours })[0]!.bed!.name).toBe('Shut');
+  });
+});

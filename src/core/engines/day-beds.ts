@@ -2,8 +2,10 @@
 // looking for towns or hotels where you could stop"). The days stay the stage model's: stage ends are the equal-effort split
 // points, the same as in the bag planner (spec §6.2, Stages), and every card reads them. This only names, for each day but the
 // last, the saved sleep place that suits the end best, and the town by it; with none near, the nearest town, or nothing.
+import { addDaysIso } from '../answers/time.ts';
 import { haversineKm } from '../geo/haversine.ts';
-import type { Km, Place, RouteMatch, Route, Stay } from '../types.ts';
+import type { Km, Place, PlaceHours, RouteMatch, Route, Stay } from '../types.ts';
+import { nightOf } from './sleep.ts';
 import { W } from '../wording/en.ts';
 
 /** At most this far before or after a day's planned end, along the route. */
@@ -46,6 +48,13 @@ function stayRank(kind: Place['kind'], stay: Stay): number {
 
 export const windowKm = (dayKm: Km): Km => Math.min(BED_WINDOW_KM, Math.max(MIN_WINDOW_KM, dayKm * WINDOW_SHARE));
 
+/**
+ * The night each day ends on, to judge its beds as the Sleep card judges them (review of PR 98, I1): a place closed that night,
+ * for the season or by its prepared hours, is no place to end the day. Unknown stays allowed, as on the card. No date: no judging.
+ */
+export type Nights = { departureDate: string | null; hours: PlaceHours[] };
+const NO_NIGHTS: Nights = { departureDate: null, hours: [] };
+
 /** A sleep place near a day's planned end, as the rider may choose it. */
 export type BedChoice = { placeId: string; name: string; km: Km; offRouteM: number; kind: Place['kind']; town: string | null };
 
@@ -61,10 +70,17 @@ function passesOf(places: Place[], matches: RouteMatch[]): { beds: Pass[]; towns
 const byId = (a: Place, b: Place): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 const costAt = (endKm: Km) => (x: { km: Km; offRouteM: number }): number => Math.abs(x.km - endKm) + (DETOUR_FACTOR * x.offRouteM) / 1000;
 
-function choicesFor(s: { startKm: Km; endKm: Km }, beds: Pass[], towns: Pass[], stay: Stay): BedChoice[] {
+/** Open that night, or not known to be closed. */
+function openOn(nights: Nights, day: number): (x: Pass) => boolean {
+  const hoursOf = new Map(nights.hours.map((h) => [h.placeId, h]));
+  return (x) => nights.departureDate === null
+    || nightOf(x.place, hoursOf.get(x.place.id), addDaysIso(nights.departureDate, day - 1), x.place.timeZone).state !== 'closed';
+}
+
+function choicesFor(s: { day: number; startKm: Km; endKm: Km }, beds: Pass[], towns: Pass[], stay: Stay, nights: Nights): BedChoice[] {
   const w = windowKm(s.endKm - s.startKm);
   const cost = costAt(s.endKm);
-  return beds.filter((x) => Math.abs(x.km - s.endKm) <= w + 1e-9)
+  return beds.filter((x) => Math.abs(x.km - s.endKm) <= w + 1e-9).filter(openOn(nights, s.day))
     .sort((a, b) => stayRank(a.place.kind, stay) - stayRank(b.place.kind, stay) || cost(a) - cost(b) || byId(a.place, b.place))
     .map((x) => {
       const near = towns
@@ -74,19 +90,19 @@ function choicesFor(s: { startKm: Km; endKm: Km }, beds: Pass[], towns: Pass[], 
     });
 }
 
-/** The sleep places within the window of a day's planned end, best first: the trip's stay first, then nearest, a detour counted. */
-export function candidatesNear(s: { startKm: Km; endKm: Km }, places: Place[], matches: RouteMatch[], stay: Stay): BedChoice[] {
+/** The sleep places near a day's planned end that are not closed that night, best first: the trip's stay first, then nearest. */
+export function candidatesNear(s: { day: number; startKm: Km; endKm: Km }, places: Place[], matches: RouteMatch[], stay: Stay, nights: Nights = NO_NIGHTS): BedChoice[] {
   const { beds, towns } = passesOf(places, matches);
-  return choicesFor(s, beds, towns, stay);
+  return choicesFor(s, beds, towns, stay, nights);
 }
 
-export function dayBeds(route: Route, places: Place[], matches: RouteMatch[], stay: Stay): DayBed[] {
+export function dayBeds(route: Route, places: Place[], matches: RouteMatch[], stay: Stay, nights: Nights = NO_NIGHTS): DayBed[] {
   const { beds, towns } = passesOf(places, matches);
   const last = route.stages.length;
   return route.stages.map((s) => {
     const base = { day: s.day, endKm: s.endKm, last: s.day === last };
     if (s.day === last) return { ...base, bed: null, town: null };
-    const best = choicesFor(s, beds, towns, stay)[0];
+    const best = choicesFor(s, beds, towns, stay, nights)[0];
     if (best) return { ...base, bed: { name: best.name, km: best.km, offRouteM: best.offRouteM, kind: best.kind, town: best.town }, town: null };
     const w = windowKm(s.endKm - s.startKm);
     const cost = costAt(s.endKm);

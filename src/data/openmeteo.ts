@@ -54,8 +54,15 @@ const incomplete = (reason: string): WeatherServiceError => new WeatherServiceEr
  * minute's limit ends a minute later: one more try after that minute, or a few seconds after a server error or a lost answer.
  * An hourly, daily or monthly limit is never waited for. Without it, each request is sent once (Update weather has its own spacing).
  */
-export type Retry = { sleep: (ms: number) => Promise<void> };
+export type Retry = {
+  sleep: (ms: number) => Promise<void>;
+  /** Told when it will ask again before a wait, and null once the wait is over (review of PR 98, I2). */
+  onWait?: (until: Date | null) => void;
+  random?: () => number; now?: () => Date;
+};
 const MINUTE_LIMIT_WAIT_MS = 61_000;
+/** Up to this much more, so riders refused in the same second don't all ask again in the same second (M1). */
+const MINUTE_SPREAD_MS = 5_000;
 const SERVER_WAIT_MS = 3_000;
 
 async function refusalOf(response: Response): Promise<WeatherServiceError> {
@@ -100,7 +107,10 @@ export async function askPolitely(f: FetchLike, url: string, timeoutMs: number, 
     return await getJson(f, url, timeoutMs);
   } catch (e) {
     if (!retry || !(e instanceof WeatherServiceError) || e.againInMs === null) throw e;
-    await retry.sleep(e.againInMs);
+    const ms = e.limited ? e.againInMs + Math.floor((retry.random ?? Math.random)() * MINUTE_SPREAD_MS) : e.againInMs;
+    retry.onWait?.(new Date((retry.now?.() ?? new Date()).getTime() + ms));
+    await retry.sleep(ms);
+    retry.onWait?.(null);
     return getJson(f, url, timeoutMs);
   }
 }

@@ -4,6 +4,7 @@
 // the planned end when nothing is near or the rider chose "No stop". The days are then worked out as the stage model works out
 // its own: riding hours from the effort between the ends, climbing from the climbing between them.
 import { candidatesNear } from '../engines/day-beds.ts';
+import type { Nights } from '../engines/day-beds.ts';
 import type { Km, Place, Route, RouteMatch, Stage, Stay, TripStop, TripStops } from '../types.ts';
 import { effortProfile, LOAD_PENALTY } from './stages.ts';
 
@@ -72,9 +73,9 @@ export function endsOf(stops: TripStops, lengthKm: Km): Km[] {
 }
 
 /** Each day's stop chosen afresh from the saved places: the best near each planned end, or none. */
-export function chooseStops(route: Route, plan: Stage[], places: Place[], matches: RouteMatch[], stay: Stay): TripStops {
+export function chooseStops(route: Route, plan: Stage[], places: Place[], matches: RouteMatch[], stay: Stay, nights?: Nights): TripStops {
   const days: TripStop[] = plan.slice(0, -1).map((s) => {
-    const best = candidatesNear(s, places, matches, stay)[0];
+    const best = candidatesNear(s, places, matches, stay, nights)[0];
     return best ? { placeId: best.placeId, km: best.km, name: best.name, town: best.town, by: 'auto' } : { placeId: null, km: s.endKm, name: null, town: null, by: 'auto' };
   });
   return { routeId: route.id, basis: plannedEnds(plan), days };
