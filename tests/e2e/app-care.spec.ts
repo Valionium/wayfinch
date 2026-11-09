@@ -533,3 +533,62 @@ test('[BV-ZOOM] a pinch (two pointers) and Ctrl with the wheel zoom the drawing;
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
   expect(errors).toEqual([]);
 });
+
+// Review of PR 107, I1: a tap anywhere on a label's pill picks that label's part, never a neighbour's (stacked labels sit 5 px apart).
+test("[BV-VIEW] a tap at the top, middle or bottom of any label's pill picks that label's own part, on the busiest cards", async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [U], null);
+  for (const [id, name] of [['puncture-tube', 'Puncture (inner tube)'], ['brake-rub-disc', 'Disc brake rubbing']] as const) {
+    await openSteps(page, id, name);
+    await page.locator('.care-where').click();
+    const sheet = page.locator('dialog.part-sheet');
+    await expect(sheet.locator('.bv-label').first()).toBeVisible();
+    const hits = await page.evaluate(() => [...document.querySelectorAll<SVGGElement>('dialog.part-sheet .bv-label')].flatMap((g) => {
+      const r = g.querySelector('.bv-pill')!.getBoundingClientRect();
+      return [r.top + 2, r.top + r.height / 2, r.bottom - 2].map((y) => {
+        const el = document.elementFromPoint(r.left + r.width / 2, y);
+        return `${g.dataset.part} -> ${el?.closest('[data-part]')?.getAttribute('data-part') ?? 'none'}`;
+      });
+    }));
+    expect(hits.filter((h) => { const [a, b] = h.split(' -> '); return a !== b; }), id).toEqual([]);
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('dialog.care-steps')).toHaveCount(0);
+  }
+  expect(errors).toEqual([]);
+});
+
+// Review of PR 107, I2: a mouse drag that ends outside the drawing ends the drag: the labels come back and a hover does not pan.
+test('[BV-ZOOM] a mouse drag of a zoomed drawing let go outside it ends there: the labels come back, and a hover after it moves nothing', async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [U], null);
+  await openSteps(page, 'chain-broken', 'Broken chain');
+  await page.locator('.care-where').click();
+  const sheet = page.locator('dialog.part-sheet');
+  const canvas = sheet.locator('.bv-canvas');
+  await expect(canvas).toHaveClass(/bv-zoomed/);
+  const box = (await canvas.boundingBox())!;
+  // a short drag from near the drawing's foot, let go below it: the view moves a little, and the labels of the parts still in view return
+  const start = await page.evaluate(() => {
+    const art = document.querySelector('dialog.part-sheet .bv-art')!.getBoundingClientRect();
+    for (let y = art.bottom - 4; y > art.top; y -= 4) for (let x = art.left + 10; x < art.right - 10; x += 8) {
+      const el = document.elementFromPoint(x, y);
+      if (el?.closest('.bv-canvas') && !el.closest('.bv-label, .bv-tap')) return { x, y, el: el.getAttribute('class') };
+    }
+    return null;
+  });
+  await page.mouse.move(start!.x, start!.y);
+  await page.mouse.down();
+  await expect(canvas).toHaveClass(/bv-moving/);
+  await page.mouse.move(start!.x + 4, box.y + box.height + 30, { steps: 4 });
+  await page.mouse.up();
+  await expect(canvas).not.toHaveClass(/bv-moving/);
+  await expect(sheet.locator('.bv-label').first()).toBeVisible();
+  const before = await sheet.locator('.bv-art').getAttribute('viewBox');
+  await page.mouse.move(box.x + 20, box.y + box.height / 2, { steps: 4 });
+  await page.mouse.move(box.x + box.width - 20, box.y + box.height / 2, { steps: 4 });
+  expect(await sheet.locator('.bv-art').getAttribute('viewBox')).toBe(before);
+  expect(errors).toEqual([]);
+});

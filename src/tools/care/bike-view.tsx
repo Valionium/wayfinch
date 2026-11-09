@@ -136,8 +136,10 @@ function Drawing({ card, tapped, type, onTap }: { card: ViewCard; tapped: PartId
   const centreNow: P = [view.x + view.w / 2, view.y + view.h / 2];
   const setZ = (z: number, centre: P): void => setZoom({ z: Math.min(MAX_ZOOM, Math.max(1, r2(z))), centre });
   const onDown = (e: PointerEvent): void => {
-    if ((e.target as Element | null)?.closest?.('.bv-label')) return;
+    if ((e.target as Element | null)?.closest?.('.bv-label, .bv-tap')) return;
     pointers.current.set(e.pointerId, [e.clientX, e.clientY]);
+    // Held until the pointer lifts, wherever it is then (review of PR 107, I2).
+    try { (e.currentTarget as Element).setPointerCapture?.(e.pointerId); } catch { /* not a live pointer (a synthetic event) */ }
     if (pointers.current.size === 2 || zoom.z > 1) setMoving(true);
     if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()] as [P, P];
@@ -147,6 +149,8 @@ function Drawing({ card, tapped, type, onTap }: { card: ViewCard; tapped: PartId
   const onMove = (e: PointerEvent): void => {
     const was = pointers.current.get(e.pointerId);
     if (!was) return;
+    // a mouse with no button held has let go somewhere the drawing did not hear
+    if (e.pointerType === 'mouse' && e.buttons === 0) { onUp(e); return; }
     const now: P = [e.clientX, e.clientY];
     pointers.current.set(e.pointerId, now);
     if (pointers.current.size === 2 && pinch.current) {
@@ -178,9 +182,10 @@ function Drawing({ card, tapped, type, onTap }: { card: ViewCard; tapped: PartId
   const hotLabel = tapped ? byId.get(tapped) : undefined;
   return (
     <div class="bv-figure">
-      <div ref={box} class={`bv-canvas${zoom.z > 1 ? ' bv-zoomed' : ''}`} role="img" aria-label={label}
+      <div ref={box} class={`bv-canvas${zoom.z > 1 ? ' bv-zoomed' : ''}${moving ? ' bv-moving' : ''}`} role="img" aria-label={label}
         onPointerDown={(e) => onDown(e as unknown as PointerEvent)} onPointerMove={(e) => onMove(e as unknown as PointerEvent)}
         onPointerUp={(e) => onUp(e as unknown as PointerEvent)} onPointerCancel={(e) => onUp(e as unknown as PointerEvent)}
+        onLostPointerCapture={(e) => onUp(e as unknown as PointerEvent)}
         onWheel={(e) => onWheel(e as unknown as WheelEvent)}>
         <svg class="bv-svg" viewBox={`0 0 ${width} ${H}`} width={width} height={H} aria-hidden="true" focusable="false">
           <svg class="bv-art" x={inset} y={layout.top} width={width - 2 * inset} height={areaH} viewBox={`${r2(view.x)} ${r2(view.y)} ${r2(view.w)} ${r2(view.h)}`}>
@@ -195,14 +200,20 @@ function Drawing({ card, tapped, type, onTap }: { card: ViewCard; tapped: PartId
               )))}
             {hotLabel ? <Arrow from={hotLabel.from} to={hotLabel.to} /> : null}
           </g>
+          {/* The 44 px tap areas, all under the labels: a tap on a pill is always that pill's, the larger area only fills the gaps. */}
+          <g class="bv-taps">
+            {layout.labels.map((l) => {
+              const b = l.box;
+              const pad = Math.max(0, (44 - b.h) / 2);
+              return <rect key={l.id} class="bv-tap" data-part={l.id} x={b.x - 2} y={b.y - pad} width={b.w + 4} height={b.h + 2 * pad} onClick={() => onTap(l.id as PartId)} />;
+            })}
+          </g>
           {layout.labels.map((l) => {
             const id = l.id as PartId;
             const s = shown.find(([x]) => x === id)![1];
             const b = l.box;
-            const pad = Math.max(0, (44 - b.h) / 2);
             return (
               <g key={id} class={`bv-label${id === tapped ? ' bv-label-hot' : ''}`} data-part={id} onClick={() => onTap(id)}>
-                <rect class="bv-tap" x={b.x - 2} y={b.y - pad} width={b.w + 4} height={b.h + 2 * pad} />
                 <rect class="bv-pill" x={b.x} y={b.y} width={b.w} height={b.h} rx={b.h / 2} />
                 <text x={b.x + 6} y={b.y + b.h / 2} dominant-baseline="central">
                   {PART_SHORT[id].toUpperCase()}{side(s) ? <tspan class="bv-side" dx="4">({side(s)})</tspan> : null}

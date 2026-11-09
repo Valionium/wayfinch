@@ -49,7 +49,7 @@ dialog.part-sheet::backdrop { background: var(--ground); opacity: 0.6; }
 .bv-arrow line { stroke: var(--blaze); stroke-width: 2.25; stroke-linecap: round; }
 .bv-arrow polygon { fill: var(--blaze); }
 .bv-label { cursor: pointer; }
-.bv-tap { fill: transparent; }
+.bv-tap { fill: transparent; cursor: pointer; }
 .bv-pill { fill: var(--panel); stroke: none; }
 .bv-label-hot .bv-pill { stroke: var(--blaze); stroke-width: 1.5; }
 .bv-label text { fill: var(--ink); font-family: inherit; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
