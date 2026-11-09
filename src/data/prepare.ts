@@ -113,13 +113,6 @@ async function heightsStep(deps: PrepareDeps, store: PreparedStore, online: bool
     // Another window changed the trip, or there's no room: the next steps go on with the route that is stored.
     return { report: { step: 'heights', ok: false, note: noteFor(e, W.appPrepSaveFailed) }, trip: current };
   }
-  if (missing && report.ok) {
-    try {
-      await store.dropKeptHeights();
-    } catch {
-      /* never read again: the route's id has changed */
-    }
-  }
   return { report, trip: { ...current, route: next.route } };
 }
 

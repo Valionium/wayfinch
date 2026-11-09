@@ -99,7 +99,14 @@ async function lookedUpHeights(route: Route, deps: PrepareDeps, store: PreparedS
 /** The route with every height, or null while any sample stays unanswered. */
 export async function routeWithHeights(route: Route, deps: PrepareDeps, store: PreparedStore): Promise<Route | null> {
   const heights = await lookedUpHeights(route, deps, store);
-  return heights ? buildRoute(rawOf(route, (i) => heights[i] ?? null), route.name, route.source) : null;
+  if (!heights) return null;
+  // Every height is in: none need keeping any more (review of PR 98, M5). A save of the route that then fails asks again next time.
+  try {
+    await store.dropKeptHeights();
+  } catch {
+    /* never read again: the route's id changes with its heights */
+  }
+  return buildRoute(rawOf(route, (i) => heights[i] ?? null), route.name, route.source);
 }
 
 // ---- Prepare this route's other parts that only it needs, off the first screen ----
