@@ -266,9 +266,16 @@ body.lc-small #s4>:not(#smallBags):not(#smallFoot){display:none!important}
 /* the plan's line and its Undo: quiet, one line under the top bar */
 body.lc-small #handoffBar:not(.hidden){border:0;background:none;padding:8px 0 0;margin:0;color:var(--muted);font-size:14px;gap:4px 12px}
 body.lc-small #handoffBar .linky{margin-left:0;min-height:44px;font-family:inherit;font-size:14px;letter-spacing:0;text-transform:none;font-weight:600}
+/* the footer: the legal link stays, in the small view's own plain type; the Load Check tagline goes (review of PR 92, M6) */
+body.lc-small .sitefoot>span{display:none}
+body.lc-small .sitefoot{font-family:inherit;letter-spacing:0;margin-top:8px}
+body.lc-small .sitefoot .linky{min-height:44px;font-family:inherit;font-size:14px;letter-spacing:0;text-transform:none;color:var(--muted)}
+body.lc-small .sitefoot .linky:hover{color:var(--ink)}
 @media screen and (min-width:1100px){
   body.lc-small .planner-cols{display:block;max-width:620px;margin:0 auto}
-  body.lc-small .small-head,body.lc-small #handoffBar:not(.hidden){max-width:620px;margin-left:auto;margin-right:auto}
+  body.lc-small .small-head,body.lc-small #handoffBar:not(.hidden),body.lc-small .sitefoot{max-width:620px;margin-left:auto;margin-right:auto}
+  /* "← Back to Trip" starts where the column starts (review of PR 92, M7); the bar's line still runs the full width */
+  body.lc-small .guide-launch-row{padding-left:calc((100% - 620px) / 2);padding-right:calc((100% - 620px) / 2)}
 }
 .setupgroup{margin:14px 0}.setupgroup>h3{font-family:var(--disp);font-weight:600;font-size:16px;margin:0 0 2px}
 .setuphint{font-size:13px;color:var(--muted);margin:0 0 8px}
@@ -4123,8 +4130,8 @@ function tripKitDefaults(nights=S.nights,sleep=S.sleep,bike=S.bikeProfile){
    water and a top tube bag and the essentials like IDs, a candy bar or cash"). A day ride planned here alone keeps the starting list
    the bag selection's own cases were measured with (qa/bag-selection.cjs, LC-SEL-09 and the rest).
    The essentials:
-   the essentials, sized to the day's riding time, with layers and sun kit by the packing check's own weather and season rules (audit),
-   so the check never asks for what the start left out. The riding time is the planner's own: the route's hours for the day (distance
+   the essentials, sized to the day's riding time, with layers, rain trousers and sun kit by the packing check's own weather and season
+   rules (audit; the warm layers by the riding hours' temperature, dayRideTemp), so the check never asks for what the start left out. The riding time is the planner's own: the route's hours for the day (distance
    and climbing at the loaded speed), else the pace's hours. A lock is the check's from the first night; a day of meals and the power
    bank only for a long day (over the steady pace's half day, over the sporting pace's full day); ride snacks always. */
 function dayRideHours(){
@@ -4132,12 +4139,29 @@ function dayRideHours(){
   const h=r ? r.effectiveExact / r.loadedKph : NaN;   // the whole route in one day, whatever nights the plan has now
   return Number.isFinite(h) ? h : PACE[S.pace || 'sporting'].hours;
 }
+/* The warm layers of a day ride (0 nights) go by the day, not the night (owner, 9 Nov 2026: "Yes, by day temp"). The riding hours run
+   from the morning into the afternoon, so their temperature is taken halfway between the cold end of the night's low (the packing
+   guide's own cold figure) and the usual high of the day, from the same climate figures (tripClimate). A night or more keeps the
+   cold-night rule. Without a day figure, the night's. */
+function dayRideTemp(c){
+  if(!c || c.nightCold == null) return null;
+  return c.dayMean == null ? c.nightCold : Math.round((c.nightCold + c.dayMean) / 2);
+}
+// The temperature the insulated jacket and the long gloves are packed by: the riding hours' on a day ride, else the cold night's.
+function warmLayerTemp(c, nights = S.nights){ return nights === 0 ? dayRideTemp(c) : (c ? c.nightCold : null); }
+/* Water without bottle cages (owner: "at least water"): when the plan will have no bottle, neither its own nor the cages the day ride's
+   proposal adds on the bike's in-frame mounts (proposedTripBags), the day's water goes in a bag, placed by the frozen selection. */
+function dayRideNeedsBagWater(){
+  if(liveBottles().length) return false;
+  const fit=bikeFit(S.bikeProfile);
+  return !!gearBags().length || !['st','dt'].some(sl => fit.cages[sl]);
+}
 function dayRideKit(){
-  const c=tripClimate(),known=c.nightCold!=null,hours=dayRideHours();
+  const c=tripClimate(),known=c.nightCold!=null,hours=dayRideHours(),warm=dayRideTemp(c);
   const sunMonth=(S.place && S.place.lat < 0) ? (S.month+6)%12 : S.month;
   return {docs:true,cash:true,phone:true,snacks:true,firstaid:true,rain:true,lock:false,
     food:hours > PACE.steady.hours,bank:hours > PACE.sporting.hours,
-    puffy:known && c.nightCold < 11,gloves:known && c.nightCold < 5,
+    puffy:known && warm < 11,gloves:known && warm < 5,rainpants:known && c.wetChance > 33,water:dayRideNeedsBagWater(),
     shades:sunMonth >= 2 && sunMonth <= 9,sun:sunMonth >= 3 && sunMonth <= 8};
 }
 function applyTripKitDefaults(){
@@ -8301,10 +8325,15 @@ function audit(){
     M('Electronic shifting charger or spare battery',"Check your system's charge range for this trip and take its compatible charger, charging lead or spare battery as appropriate. A phone charging cable alone may not work; check controller batteries separately.",['shiftcharger']);
 
   if(!has('rain') && known) M('Rain jacket', `Roughly ${c.wetChance}% of days see rain here in ${MONTHS[S.month]}. Over ${n+1} days, expect to need it.`, ['rain']);
-  if(!has('puffy') && known && c.nightCold < 11)
-    M('Insulated jacket', `Nights drop to about ${c.nightCold}°C on the cold end. Being cold in the evening is the single most common reason people cut a first tour short.`, ['puffy']);
-  if(!has('gloves') && known && c.nightCold < 5)
-    M('Long gloves', `Mornings near ${c.nightCold}°C. Cold hands stop you braking properly on descents.`, ['gloves']);
+  // a day ride: by the riding hours' temperature (owner, 9 Nov 2026); a night or more: by the cold night, as before
+  const warm = warmLayerTemp(c, n);
+  if(!has('puffy') && known && warm < 11)
+    M('Insulated jacket', n === 0
+      ? `Over the riding hours a cold day here is about ${warm}°C. An insulated jacket keeps you warm at a stop, or while a repair holds you up.`
+      : `Nights drop to about ${c.nightCold}°C on the cold end. Being cold in the evening is the single most common reason people cut a first tour short.`, ['puffy']);
+  if(!has('gloves') && known && warm < 5)
+    M('Long gloves', n === 0 ? `Riding near ${warm}°C on a cold day. Cold hands stop you braking properly on descents.`
+      : `Mornings near ${c.nightCold}°C. Cold hands stop you braking properly on descents.`, ['gloves']);
 
   if(camping() && !has('quilt'))
     M('A sleep system', 'Camping is selected but there is nothing to sleep in.', ['quilt']);
@@ -8437,9 +8466,9 @@ function haveClimate(){ const c = tripClimate(); return c && c.nightCold != null
 
 function weatherKit(c){
   if(!c || c.nightCold == null) return [];
-  const a = [];
-  if(c.nightCold < 11) a.push(['an insulated jacket', 2.0]);
-  if(c.nightCold < 5)  a.push(['long gloves', 0.3]);
+  const a = [], warm = warmLayerTemp(c);   // a day ride: the riding hours' temperature (owner, 9 Nov 2026)
+  if(warm < 11) a.push(['an insulated jacket', 2.0]);
+  if(warm < 5)  a.push(['long gloves', 0.3]);
   if(c.nightCold < 2 && camping()) a.push(['a warmer sleep system', 3.0]);
   if(c.wetChance > 28) a.push(['dry bags', 0.3]);
   if(c.wetChance > 33) a.push(['rain trousers', 0.8]);
@@ -8463,7 +8492,8 @@ function climateConsequence(contentOnly=false){
     : extra[0][0];
   const heights=(c.both ? [c.placeA?.elev,c.placeB?.elev] : [c.place?.elev]).filter(Number.isFinite);
   const heightText=heights.length ? `${heights.length>1 ? `${Math.min(...heights)}–${Math.max(...heights)}` : heights[0]} m and ` : '';
-  const explanation=`<p>${heightText}around ${c.nightCold}°C on cold nights make ${list} worth allowing for — about <b>${L} L</b> more than the mild-weather baseline.</p><p>This is a seasonal packing guide, not a forecast.</p>`;
+  const cold=S.nights === 0 ? `around ${dayRideTemp(c)}°C over the riding hours on a cold day` : `around ${c.nightCold}°C on cold nights`;
+  const explanation=`<p>${heightText}${cold} make ${list} worth allowing for — about <b>${L} L</b> more than the mild-weather baseline.</p><p>This is a seasonal packing guide, not a forecast.</p>`;
   return contentOnly ? explanation : infoHelp('Why the place matters', explanation);
 }
 
@@ -11939,12 +11969,22 @@ function setSmallView(on){
 function renderSmallBags(A){
   const box=$('smallBags'); if(!box || !SMALL_VIEW) return;
   const m=getChecklistModel(A || currentPlan());
-  const name=row => `${row.name}${row.quantity > 1 && !kitById(row.id)?.perDay ? ' ×'+row.quantity : ''}`;
+  // the water in a bag reads as what it is here: a bottle (KIT's name speaks of bottle cages the bike may not have)
+  const name=row => row.id === 'water' ? 'Water bottle' : `${row.name}${row.quantity > 1 && !kitById(row.id)?.perDay ? ' ×'+row.quantity : ''}`;
   const bags=m.groups.filter(g => g.id !== 'overflow' && g.id !== 'unassigned');
-  $('smallBagList').innerHTML=bags.map(g => `<section class="small-bag" aria-label="${htmlEsc(g.title)}"><h3>${htmlEsc(g.title)}</h3><ul>${
-    g.items.map(row => `<li>${htmlEsc(name(row))}</li>`).join('')}</ul></section>`).join('');
-  const L=+m.bottles.reduce((n,b) => n+(+b.L || 0),0).toFixed(2);
-  $('smallWater').textContent=m.bottles.length ? `Water: ${m.bottles.length === 1 ? 'one bottle' : m.bottles.length+' bottles'}, ${L} L.`
+  // each bag a heading and its list, no landmark of its own (review of PR 92, M5)
+  $('smallBagList').innerHTML=bags.map(g => `<div class="small-bag"><h3>${htmlEsc(g.title)}</h3><ul>${
+    g.items.map(row => `<li>${htmlEsc(name(row))}</li>`).join('')}</ul></div>`).join('');
+  // Water in one line: the bottles there are and where, never an amount sized to the ride (review of PR 92, M2); without a cage, the
+  // bag the selection put the water in (I2)
+  const L=+m.bottles.reduce((n,b) => n+(+b.L || 0),0).toFixed(2),count=m.bottles.length;
+  const inFrame=liveBottles().every(b => b.slot === 'st' || b.slot === 'dt');
+  const cages=count ? `${count === 1 ? 'one bottle' : count+' bottles'} (${L} L) in the ${inFrame ? 'frame' : 'bottle'} cage${count === 1 ? '' : 's'}` : '';
+  const bagWater=bags.find(g => g.items.some(row => row.id === 'water'));
+  const inBag=bagWater ? `a bottle in the ${bagWater.title.toLowerCase()}` : '';
+  const noMounts=!['st','dt','un'].some(sl => bikeFit(S.bikeProfile).cages[sl]);
+  $('smallWater').textContent=count ? `Water: ${cages}${inBag ? ' and '+inBag : ''}. Refill on the way.`
+    : inBag ? `Water: ${inBag}, since this ${noMounts ? 'bike has no bottle cage mounts' : 'plan has no bottle cage'}.`
     : 'Water: no bottle cage in this plan.';
   const out=m.groups.filter(g => g.id === 'overflow' || g.id === 'unassigned').flatMap(g => g.items);
   const long=out.some(row => row.tooLong);
@@ -11969,28 +12009,65 @@ function tripFoundation(){ return tripFoundationOf(true); }
 // The general setup that would have been the foundation but has no bags; null when none was passed over.
 function passedFoundation(){ const any=tripFoundationOf(false); return any && !setupHasBags(any) ? any : null; }
 /* Bags for a trip whose plan has none (no foundation with bags, and no bag in the plan here): the smallest setup the planner's own rules
-   fill. A cage on each in-frame mount the bike has (water) and a top tube bag where it mounts one (the owner's minimum), then the part
+   fill. An afternoon ride (afternoonRide) first tries one bottle and the top tube and frame bags (afternoonBags). Otherwise a cage on each in-frame mount the bike has (water) and a top tube bag where it mounts one (the owner's minimum), then the part
    of the planner's own typical setup (frame bag, seat pack, handlebar roll, typicalSetup) with which the frozen selection (freshPlan,
-   read only) leaves nothing over, with the fewest must-reach items out of reach, then the fewest litres; when no such set exists, the
+   read only) leaves nothing over, with the fewest must-reach items out of reach, then the phone in one of its own bags (phoneOffPref),
+   then the fewest litres; when no such set exists, the
    whole typical setup, and the plan says what is over. The
    bags go into this plan only (and the trip setup made from it): the plan before is kept as a setup, and Undo takes them away. */
+/* On a day ride the phone is the map and the emergency call, so it should ride where it is reached (review of PR 92, I3). The frozen
+   selection packs it late, after the repair kit, and its MUST_REACH leaves it out; this reads only where that selection put it in a
+   trial plan: 1 when the phone is carried and its bag is not one of its own preferred bags (KIT's pref), else 0. */
+function phoneOffPref(P){
+  const k=kitById('phone'),e=((P && P.items && P.items.phone) || [])[0],u=e && P.units[e[0]];
+  return k && u && !k.pref.includes(u.pos) ? 1 : 0;
+}
+/* An afternoon ride (owner, 9 Nov 2026: "No one on an afternoon ride uses the seat pack. It's always top tube and frame bag, and mostly
+   only one, and one bottle of water."): a trip of 0 nights whose riding time (dayRideHours) is within the hard pace's day (PACE.hard,
+   8 hours, "dawn to dusk"). Beyond that it is a very long single push, and the proposal below is the touring one. */
+function afternoonRide(){ return S.nights === 0 && dayRideHours() <= PACE.hard.hours; }
+// The afternoon ride's bags: one of the top tube bag and the frame bag (each frame size the one bottle allows, smallest first), then
+// both, then each of those with a seat pack (and the seat pack alone), the first group with a set that leaves nothing over; within it
+// the fewest out of reach, the phone in its own bags, the fewest bags, the fewest litres. Null when none holds the day kit.
+function afternoonBags(base,withIds){
+  const fit=bikeFit(S.bikeProfile),top=TOP_ORDER.find(sl => fit.topMounts[sl]),topBag=top ? {pos:'top',slot:top,L:POSITIONS.top.defL} : null;
+  const frames=[];
+  if(!fit.frameBag.none) withInputs({bags:[...S.bags,...withIds(base)]},() => {
+    for(let i=minShapeIdx();i <= 2;i++){ const L=frameShapeL(i); if(!frames.some(f => f.L === L)) frames.push({pos:'frame',L,...(i === minShapeIdx() ? {} : {shape:i})}); }
+  });
+  const one=[...(topBag ? [[topBag]] : []),...frames.map(f => [f])],two=topBag ? frames.map(f => [topBag,f]) : [];
+  const seat={pos:'seat',L:POSITIONS.seat.defL};
+  for(const group of [one,two,[[seat],...one,...two].map(s => s[0] === seat ? s : [...s,seat])]){
+    const fits=group.map(more => {
+      const bags=withIds([...base,...more]),all=[...S.bags,...bags],trial=freshPlan({bags:all,placements:null});
+      return {bags,over:trial.spill.length,out:trial.reach.outOfReach.length,phone:phoneOffPref(trial),n:more.length,L:withInputs({bags:all},() => ratedTotal())};
+    }).filter(s => !s.over).sort((a,b) => a.out-b.out || a.phone-b.phone || a.n-b.n || a.L-b.L);
+    if(fits.length) return fits[0].bags;
+  }
+  return null;
+}
 function proposedTripBags(){
-  const fit=bikeFit(S.bikeProfile),uid=n => S.nextUid+n,own=S.bags.filter(b => isBottle(b.pos));
-  const base=['st','dt'].filter(sl => fit.cages[sl] && !own.some(b => b.slot === sl)).map(sl => ({pos:BOTTLE_SPOTS[sl].pos,slot:sl,L:bottleDefaultFor(BOTTLE_SPOTS[sl].pos,BOTTLE_SPOTS[sl].defL)}));
+  const fit=bikeFit(S.bikeProfile),uid=n => S.nextUid+n,own=S.bags.filter(b => isBottle(b.pos)),afternoon=afternoonRide();
+  // an afternoon ride: one bottle, on the down tube where it mounts (the roomiest), and none added beside a bottle the plan has
+  const slots=['st','dt'].filter(sl => fit.cages[sl] && !own.some(b => b.slot === sl));
+  const base=(afternoon ? (own.length ? [] : slots.slice(-1)) : slots).map(sl => ({pos:BOTTLE_SPOTS[sl].pos,slot:sl,L:bottleDefaultFor(BOTTLE_SPOTS[sl].pos,BOTTLE_SPOTS[sl].defL)}));
+  const withIds=list => list.map((b,i) => ({uid:uid(i),...b}));
+  const day=afternoon ? afternoonBags(base,withIds) : null;
+  if(day) return day;
   const top=TOP_ORDER.find(sl => fit.topMounts[sl]);
   if(top) base.push({pos:'top',slot:top,L:POSITIONS.top.defL});
   const extras=['frame','seat','bar'].filter(p => p !== 'frame' || !fit.frameBag.none);
-  const withIds=list => list.map((b,i) => ({uid:uid(i),...b}));
   const frameL=withInputs({bags:[...S.bags,...withIds(base)]},() => frameShapeL(minShapeIdx()));
   const sets=[];
   for(let m=0;m < 1 << extras.length;m++){
     const more=extras.filter((p,i) => m & 1 << i).map(p => ({pos:p,L:p === 'frame' ? frameL : POSITIONS[p].defL}));
     const bags=withIds([...base,...more]),all=[...S.bags,...bags];
     const trial=freshPlan({bags:all,placements:null});
-    sets.push({bags,over:trial.spill.length,out:trial.reach.outOfReach.length,L:withInputs({bags:all},() => ratedTotal()),n:more.length});
+    sets.push({bags,over:trial.spill.length,out:trial.reach.outOfReach.length,phone:phoneOffPref(trial),L:withInputs({bags:all},() => ratedTotal()),n:more.length});
   }
-  // nothing over, then the fewest must-reach items out of reach (the selection's own reach rule), then the fewest litres and bags
-  const fits=sets.filter(s => !s.over).sort((a,b) => a.out-b.out || a.L-b.L || a.n-b.n);
+  // nothing over, then the fewest must-reach items out of reach (the selection's own reach rule), then the phone in a bag it is meant
+  // for (its own pref: the top tube or frame bag; review of PR 92, I3), then the fewest litres and bags
+  const fits=sets.filter(s => !s.over).sort((a,b) => a.out-b.out || a.phone-b.phone || a.L-b.L || a.n-b.n);
   return (fits[0] || sets[sets.length-1]).bags;
 }
 // "2 bottle cages, a top tube bag and a seat pack"
