@@ -19,9 +19,9 @@ test('[HON-BANNED] no day-end sleep line uses a banned word; every key is a Trip
   }
 });
 
-test('[TRIP-NOT-READY-WORD] the day-end sleep lines never call the trip ready, safe or complete; "Get ready offline" is the only use of "ready"', () => {
+test('[TRIP-NOT-READY-WORD] the day-end sleep lines never call the trip ready, safe or complete; "Prepare this route" is the only use of "ready"', () => {
   for (const [key, s] of texts()) {
-    expect(/\b(ready|safe|complete|completed|done|finished)\b/i.test(s.replace(/Get ready offline/gi, '')), `${key}: ${s}`).toBe(false);
+    expect(/\b(ready|safe|complete|completed|done|finished)\b/i.test(s.replace(/Prepare this route/gi, '')), `${key}: ${s}`).toBe(false);
     expect(/\bprepared\b/i.test(s), `${key}: ${s}`).toBe(false);
   }
 });
