@@ -187,9 +187,19 @@ export type SunSource = (lat: number, lon: number, ridingDate: string) => SunTim
 /** Section 3.3's stay types. */
 export type Stay = 'camping' | 'mixed' | 'accommodation';
 
+/** Where one day ends (owner's ruling of 9 Nov 2026): a saved sleep place, or none (placeId null: the planned end, at `km`). */
+export type TripStop = { placeId: string | null; km: Km; name: string | null; town: string | null; by: 'auto' | 'rider' };
+/**
+ * The day ends chosen for one route and one plan: `basis` holds the planned ends (equal effort) they were chosen for, one per
+ * night, and `days` the stop of each. Any other route or plan has none (core/route/day-stops.ts).
+ */
+export type TripStops = { routeId: string; basis: Km[]; days: TripStop[] };
+
 export type Trip = {
   route: Route; departureDate: string | null; startTime: string /* HH:MM */; flatKph: number; stay: Stay; campWaterL: number;
   pace?: 'steady' | 'sporting' | 'hard'; // only the basis line names it (section 6.12)
+  /** Where the days end, once places are saved (owner, 9 Nov 2026). The route's stages already end there. */
+  stops?: TripStops;
 };
 
 export type Profile = {
