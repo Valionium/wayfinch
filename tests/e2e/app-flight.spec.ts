@@ -1,4 +1,4 @@
-// The whole app in flight mode (plan Task 23): a fresh phone adds a GPX on Trip, taps Get ready offline on a stub network, and
+// The whole app in flight mode (plan Task 23): a fresh phone adds a GPX on Trip, taps Prepare this route on a stub network, and
 // opens the app again with no network. Then every screen, offline and as an installed app, both themes (the projects), with the
 // automatic accessibility checks, 44 px targets and a name on every control; and opening_hours stays off the first screen.
 import AxeBuilder from '@axe-core/playwright';
@@ -47,7 +47,7 @@ async function aheadWithFix(page: Page): Promise<void> {
   await expect(page.locator('[data-card]')).toHaveCount(6);
 }
 
-/** A fresh phone: the GPX through Trip's own file input, then the Get ready offline button, on the stub network. */
+/** A fresh phone: the GPX through Trip's own file input, then the Prepare this route button, on the stub network. */
 async function riderPrepares(page: Page): Promise<void> {
   await locationOnRoute(page);
   app = await loadApp(page);
@@ -58,7 +58,7 @@ async function riderPrepares(page: Page): Promise<void> {
     name: 'heidelberg-strasbourg.gpx', mimeType: 'application/gpx+xml', buffer: Buffer.from(await fixtureGpx('heidelberg-strasbourg')),
   });
   await expect(page.locator('[data-summary]')).toBeVisible();
-  await page.locator('[data-getready]').getByRole('button', { name: 'Get ready offline' }).click();
+  await page.locator('[data-getready]').getByRole('button', { name: 'Prepare this route' }).click();
   await expect(page.locator('[data-getready]')).toContainText(/places/, { timeout: 180_000 });
   await expect(page.locator('[data-getready] [aria-busy="true"]')).toHaveCount(0, { timeout: 180_000 });
   // The worker holds the whole site before the network goes.

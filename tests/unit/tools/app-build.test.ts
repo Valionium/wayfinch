@@ -326,7 +326,7 @@ test('[BC-SOURCES-PRIVATE] the built Bike care chunk holds no "http": where each
   for (const f of files(on).filter((x) => x.endsWith('.js'))) expect(text(on, f).includes('parktool.com'), f).toBe(false);
 });
 
-// The guided Trip, part 1 (design of 8 Nov 2026): the steps, the trip line and Ahead before Get ready offline come with chunks of
+// The guided Trip, part 1 (design of 8 Nov 2026): the steps, the trip line and Ahead before Prepare this route come with chunks of
 // their own (the trip details and the departure date, the stops on the profile), so the first screen does not grow.
 // 145,678 bytes is the first screen's figure on main (a62695c) at the branch point; the rule is that it may not rise above it.
 test("[TRIP-GUIDED-FIRST] the guided Trip adds nothing to the first screen: at or below main's figure at the branch point", () => {
@@ -345,7 +345,7 @@ test("[AH-P4-FIRST] En route's findings add nothing to the first screen: at or b
   const figures = measure(on);
   const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
   // The empty state's lines and Trip's chunk-only words are not in it.
-  expect(first.includes('It works offline, from what Get ready offline saves')).toBe(false);
+  expect(first.includes('It works offline, from what Prepare this route saves')).toBe(false);
   expect(first.includes('Plan from A to B')).toBe(false);
   console.log(`AH-P4-FIRST: first screen ${figures.firstJsGzip} bytes gzipped`);
   expect(figures.firstJsGzip).toBeLessThanOrEqual(145_378);
@@ -379,4 +379,18 @@ test("[TRIP-REMOVE-FIRST] Remove this trip adds nothing to the first screen: at 
   expect(lazy.filter((f) => text(on, f).includes('trip-remove-title')).length).toBe(1);
   console.log(`TRIP-REMOVE-FIRST: first screen ${figures.firstJsGzip} bytes gzipped`);
   expect(figures.firstJsGzip).toBeLessThanOrEqual(145_036);
+});
+
+// Prepare this route (owner's choice, 9 Nov 2026): the new name, the line under the button and the tabs' subtitles. The subtitles'
+// words (en-subtitles.ts) and the line (en-trip.ts) are not in the first screen, which may not rise above main's figure.
+// 144,741 bytes is the first screen's figure on main (4f9cddc) at the branch point.
+test("[PREP-FIRST] Prepare this route adds nothing to the first screen: at or below main's figure; the subtitles and the line are lazy", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  expect(first.includes('While you ride: the next water, food, sleep and weather')).toBe(false);
+  expect(first.includes('Plan before you ride')).toBe(false);
+  expect(first.includes('a town-to-town route is enough')).toBe(false);
+  expect(first.includes('keeps them on your phone, so En route works without signal')).toBe(false);
+  console.log(`PREP-FIRST: first screen ${figures.firstJsGzip} bytes gzipped`);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(144_741);
 });

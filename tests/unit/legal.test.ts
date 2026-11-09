@@ -219,8 +219,8 @@ describe('the legal pages on a phone: only markup and style changed', () => {
       // The bar's words are the one top bar's of every tool (owner's list of 7 Nov 2026, items 8 and 9); every other character as it was.
       const text = textOfFile(`public/legal/${name}/index.html`).replace(/\s+/g, ' ').trim();
       expect(text.startsWith(`${TL.toolsBack} `)).toBe(true);
-      // The tab's new name, "En route" for "Ahead" (owner's finding M, 8 Nov 2026), is the privacy page's one change of words.
-      const got = sha256(text.replace(TL.toolsBack, '← Wayfinch').replace('(Trip, En route, Tools, You)', '(Trip, Ahead, Tools, You)'));
+      // The tab's new name, "En route" for "Ahead" (owner's finding M, 8 Nov 2026), is one of the privacy page's two changes of words; the other is "Prepare this route" for "Get ready offline" (owner's choice, 9 Nov 2026).
+      const got = sha256(text.replace(TL.toolsBack, '← Wayfinch').replace('(Trip, En route, Tools, You)', '(Trip, Ahead, Tools, You)').replaceAll('Prepare this route', 'Get ready offline'));
       expect(got === hash ? 'same' : `different: ${got}`).toBe('same');
     });
   }

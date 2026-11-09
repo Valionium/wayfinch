@@ -12,7 +12,7 @@ import { readSettings, writeSettings } from '../../../src/store/settings.ts';
 import { readTrip, replaceRoute, saveTrip } from '../../../src/store/trip.ts';
 
 /**
- * Get ready offline for real, on this page's own network. Without `weather` the weather service is left out (Task 10 has its
+ * Prepare this route for real, on this page's own network. Without `weather` the weather service is left out (Task 10 has its
  * tests); with it, the forecast is asked for as the app asks, and the test answers it on the page's network.
  */
 const prepare = (o: { sleepMs?: number; weather?: boolean; atMs?: number } = {}) => prepareTrip({

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// Ahead before Get ready offline (guided Trip design §2.3, owner's answer 7): what the route alone gives, a card with its own Get
-// ready offline button, and one muted line on each card that needs what Get ready offline saves.
+// Ahead before Prepare this route (guided Trip design §2.3, owner's answer 7): what the route alone gives, a card with its own Get
+// ready offline button, and one muted line on each card that needs what Prepare this route saves.
 import { afterEach, describe, expect, test } from 'vitest';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
@@ -16,14 +16,14 @@ afterEach(() => { render(null, host); });
 
 const trip = (v: ReturnType<typeof viewOf>): AheadTrip => { if (v.kind !== 'trip') throw new Error(v.kind); return v; };
 const text = (): string => host.textContent ?? '';
-/** The morning of the departure day, with the route and nothing Get ready offline saves: no places, no saved stretch, no forecast. */
+/** The morning of the departure day, with the route and nothing Prepare this route saves: no places, no saved stretch, no forecast. */
 const bare = () => rainyStop({ now: `${FRI} 07:30`, positions: [], spots: [], savedKm: [], forecast: null, roofs: [], rescuePoints: [] });
 const until = async (check: () => boolean, what: string): Promise<void> => {
   for (let i = 0; i < 400 && !check(); i++) await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
   if (!check()) throw new Error(`waited for ${what}`);
 };
 
-describe('Ahead before Get ready offline', () => {
+describe('Ahead before Prepare this route', () => {
   test('[AH-BEFORE-READY] the shell tells a route with nothing saved from one with places, a saved stretch or a forecast', () => {
     expect(trip(viewOf(bare())).beforeReady).toBe(true);
     expect(trip(viewOf(rainyStop({ now: `${FRI} 07:30`, positions: [] }))).beforeReady).toBe(false);
@@ -31,7 +31,7 @@ describe('Ahead before Get ready offline', () => {
     expect(trip(viewOf(rainyStop({ now: `${FRI} 07:30`, positions: [], spots: [], savedKm: [] }))).beforeReady).toBe(false);
   });
 
-  test('[AH-BEFORE-READY] a card at the top asks for Get ready offline and says why; what the route alone gives shows, the rest says "After Get ready offline"', async () => {
+  test('[AH-BEFORE-READY] a card at the top asks for Prepare this route and says why; what the route alone gives shows, the rest says "After Prepare this route"', async () => {
     const v = trip(viewOf(bare()));
     await show(v, fakeActions().actions);
     await until(() => host.querySelector('[data-need-ready] button') !== null, 'the card');
@@ -63,7 +63,7 @@ describe('Ahead before Get ready offline', () => {
     for (const s of [W.appAheadNeedTitle, W.appAheadNeedBody, W.appAheadNeedUntil, W.appAheadAfterReady, W.appAheadStopsAfter]) expect(bannedHits(s)).toEqual([]);
   });
 
-  test('[AH-BEFORE-READY] its Get ready offline is the same prepare as Trip\'s, with the same progress, and Ahead reads again once it ends', async () => {
+  test('[AH-BEFORE-READY] its Prepare this route is the same prepare as Trip\'s, with the same progress, and Ahead reads again once it ends', async () => {
     const { actions, calls } = fakeActions();
     let finish: () => void = () => undefined;
     const ended = new Promise<void>((r) => { finish = r; });
@@ -121,7 +121,7 @@ describe('What the review of PR 73 found', () => {
     expect(host.querySelector('[data-card="water"] .ah-toggle')).not.toBeNull();
   });
 
-  test('[AH-BEFORE-READY] Ahead\'s Get ready offline is the prepare it was given: the same callbacks reach it', async () => {
+  test('[AH-BEFORE-READY] Ahead\'s Prepare this route is the prepare it was given: the same callbacks reach it', async () => {
     const seen: unknown[] = [];
     const prepare: AheadActions['getReady'] = async (a, b) => { seen.push(a, b); return []; };
     const shell = browserAhead({ now: () => new Date(), geolocation: () => undefined, online: () => false, fetch: () => Promise.reject(new Error('no')), share: null, writeClipboard: null, prepare });

@@ -82,6 +82,7 @@ export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken
 
   return (
     <section aria-label={old ? TF.appTripReplaceHeading : TF.appTripAddTitle}>
+      <p class="muted" data-choose-hint>{TR.appTripChooseHint}</p>
       <div data-add-route>
         <label class="btn btn-primary file-pick">
           {TF.appTripPickGpx}

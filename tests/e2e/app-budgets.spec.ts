@@ -137,7 +137,7 @@ test('[PERF-SCREEN] the 800 km fixture with its 3,998 places, measured and repor
   expect(out.cold).toBeLessThanOrEqual(2000);
 });
 
-test('[PERF-PREP-800] Get ready offline on the 800 km fixture and its places: at most 20 s of processing, the network a local stand-in', async ({ page }) => {
+test('[PERF-PREP-800] Prepare this route on the 800 km fixture and its places: at most 20 s of processing, the network a local stand-in', async ({ page }) => {
   app = await loadApp(page);
   const times: number[] = [];
   for (let run = 0; run < 3; run += 1) {
