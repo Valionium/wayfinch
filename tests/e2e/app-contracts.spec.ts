@@ -354,16 +354,18 @@ test('[TRIP-DAY-BAGS] the owner\'s day ride in a real browser: no bike, no bags 
   await expect(page.locator('#handoffText')).toContainText('November · 0 nights has no bags, so it is not used');
   await page.locator('#handoffPlan').click();
   await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator('#handoffText')).toContainText('a bottle cage, a top tube bag, a frame bag and a seat pack');
-  // an afternoon ride: one bottle, the top tube bag and the frame bag, and the seat pack only for what they cannot hold, here the
-  // insulated jacket a cold November day calls for (owner, 9 Nov 2026); the phone in the frame bag (review of PR 92, I3)
+  await expect(page.locator('#handoffText')).toContainText('a bottle cage, a top tube bag and a frame bag');
+  // an afternoon ride: one bottle, the top tube bag and the frame bag, no seat pack; the jacket a cold November day calls for is worn
+  // and one spare tube rides (owner, 9 Nov 2026: "Worn, one spare tube"); the phone in the frame bag (review of PR 92, I3)
   const state = await page.evaluate(`(() => { const A = currentPlan(); return { pos: S.bags.map(b => b.pos), spill: A.spill.length, out: A.reach.outOfReach.length,
     kit: ['docs','cash','phone','snacks','lock','bank'].map(id => carrying(id)), km: Math.round(planRoute().distanceKm),
     phone: A.units[A.items.phone[0][0]].pos }; })()`);
-  expect(state).toEqual({ pos: ['bottle', 'top', 'frame', 'seat'], spill: 0, out: 0, kit: [true, true, true, true, false, false], km: 40, phone: 'frame' });
+  expect(state).toEqual({ pos: ['bottle', 'top', 'frame'], spill: 0, out: 0, kit: [true, true, true, true, false, false], km: 40, phone: 'frame' });
   await expect(page.locator('#smallOver')).toBeHidden();
-  await expect(page.locator('#smallBags h3')).toHaveText(['Top tube bag', 'Frame bag', 'Seat pack']);
+  await expect(page.locator('#smallBags h3')).toHaveText(['Top tube bag', 'Frame bag']);
   await expect(page.locator('#smallWater')).toHaveText('Water: one bottle (0.75 L) in the frame cage. Refill on the way.');
+  await expect(page.locator('#smallWear')).toHaveText('Wear: insulated jacket.');
+  await expect(page.locator('#smallBags li', { hasText: 'Spare tube' })).toHaveText('Spare tube');
   // the footer: the legal link stays reachable, in plain type; no Load Check tagline (review of PR 92, M6)
   await expect(page.locator('.sitefoot>span')).toBeHidden();
   await expect(page.locator('#legalBtn')).toBeVisible();

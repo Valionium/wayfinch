@@ -2190,6 +2190,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <p class="small-over" id="smallOver" hidden></p>
       <div id="smallBagList"></div>
       <p class="small-water" id="smallWater"></p>
+      <p class="small-water" id="smallWear" hidden></p>
     </div>
     <div class="small-foot" id="smallFoot" hidden><button class="small-full" id="smallFull" type="button">Open the full Bag planner</button>
       <p>The same plan, with every step and setting.</p></div>
@@ -4149,6 +4150,14 @@ function dayRideTemp(c){
 }
 // The temperature the insulated jacket and the long gloves are packed by: the riding hours' on a day ride, else the cold night's.
 function warmLayerTemp(c, nights = S.nights){ return nights === 0 ? dayRideTemp(c) : (c ? c.nightCold : null); }
+/* On a day ride the insulated jacket the day calls for is worn, not packed (owner, 9 Nov 2026: "Worn, one spare tube"): it is in no
+   bag and adds no litres; the small view says "Wear: insulated jacket." A night or more packs it as before. */
+function dayRideWearsJacket(){ const c=tripClimate(); return S.nights === 0 && c.nightCold != null && dayRideTemp(c) < 11; }
+// A day ride's one spare tube (same ruling): the frozen KIT item is "Spare tubes ×2", so the day kit sizes it as one, half its litres
+// and weight, through the planner's own size of an item (S.custom), unless the rider set a size of their own.
+const DAY_TUBE={L:0.35,kg:0.18,rigid:0};
+const isDayTube=c => !!c && c.L === DAY_TUBE.L && c.kg === DAY_TUBE.kg && (c.rigid || 0) === 0;
+function oneSpareTube(){ if(S.nights === 0 && S.kit.tubes && !S.custom.tubes && qtyOf(kitById('tubes')) === 1) S.custom.tubes={...DAY_TUBE}; }
 /* Water without bottle cages (owner: "at least water"): when the plan will have no bottle, neither its own nor the cages the day ride's
    proposal adds on the bike's in-frame mounts (proposedTripBags), the day's water goes in a bag, placed by the frozen selection. */
 function dayRideNeedsBagWater(){
@@ -4161,7 +4170,8 @@ function dayRideKit(){
   const sunMonth=(S.place && S.place.lat < 0) ? (S.month+6)%12 : S.month;
   return {docs:true,cash:true,phone:true,snacks:true,firstaid:true,rain:true,lock:false,
     food:hours > PACE.steady.hours,bank:hours > PACE.sporting.hours,
-    puffy:known && warm < 11,gloves:known && warm < 5,rainpants:known && c.wetChance > 33,water:dayRideNeedsBagWater(),
+    puffy:false,gloves:known && warm < 5,   // the jacket worn, not packed (dayRideWearsJacket)
+    rainpants:known && c.wetChance > 33,water:dayRideNeedsBagWater(),
     shades:sunMonth >= 2 && sunMonth <= 9,sun:sunMonth >= 3 && sunMonth <= 8};
 }
 function applyTripKitDefaults(){
@@ -8327,7 +8337,7 @@ function audit(){
   if(!has('rain') && known) M('Rain jacket', `Roughly ${c.wetChance}% of days see rain here in ${MONTHS[S.month]}. Over ${n+1} days, expect to need it.`, ['rain']);
   // a day ride: by the riding hours' temperature (owner, 9 Nov 2026); a night or more: by the cold night, as before
   const warm = warmLayerTemp(c, n);
-  if(!has('puffy') && known && warm < 11)
+  if(!has('puffy') && known && warm < 11 && n > 0)   // a day ride wears it (owner, 9 Nov 2026: "Worn, one spare tube")
     M('Insulated jacket', n === 0
       ? `Over the riding hours a cold day here is about ${warm}°C. An insulated jacket keeps you warm at a stop, or while a repair holds you up.`
       : `Nights drop to about ${c.nightCold}°C on the cold end. Being cold in the evening is the single most common reason people cut a first tour short.`, ['puffy']);
@@ -8467,7 +8477,7 @@ function haveClimate(){ const c = tripClimate(); return c && c.nightCold != null
 function weatherKit(c){
   if(!c || c.nightCold == null) return [];
   const a = [], warm = warmLayerTemp(c);   // a day ride: the riding hours' temperature (owner, 9 Nov 2026)
-  if(warm < 11) a.push(['an insulated jacket', 2.0]);
+  if(warm < 11 && S.nights !== 0) a.push(['an insulated jacket', 2.0]);   // a day ride wears it: no room in a bag
   if(warm < 5)  a.push(['long gloves', 0.3]);
   if(c.nightCold < 2 && camping()) a.push(['a warmer sleep system', 3.0]);
   if(c.wetChance > 28) a.push(['dry bags', 0.3]);
@@ -8482,8 +8492,9 @@ function climateConsequence(contentOnly=false){
   // the mildest thing Germany offers: the Rhine valley in July
   const base = weatherKit(climate('rhein', 6)).map(x => x[0]);
   const extra = mine.filter(x => !base.includes(x[0]));
+  const wear=dayRideWearsJacket() ? '<p>On a day ride this cold, wear an insulated jacket: it is worn, not packed.</p>' : '';
   if(!extra.length){
-    const explanation='<p>These conditions add no extra cold-weather items beyond the mild-weather baseline. A colder month or higher route can change that.</p>';
+    const explanation='<p>These conditions add no extra cold-weather items beyond the mild-weather baseline. A colder month or higher route can change that.</p>'+wear;
     return contentOnly ? explanation : infoHelp('Why the place matters', explanation);
   }
   const L = extra.reduce((s,a)=>s+a[1],0).toFixed(1);
@@ -8493,7 +8504,7 @@ function climateConsequence(contentOnly=false){
   const heights=(c.both ? [c.placeA?.elev,c.placeB?.elev] : [c.place?.elev]).filter(Number.isFinite);
   const heightText=heights.length ? `${heights.length>1 ? `${Math.min(...heights)}–${Math.max(...heights)}` : heights[0]} m and ` : '';
   const cold=S.nights === 0 ? `around ${dayRideTemp(c)}°C over the riding hours on a cold day` : `around ${c.nightCold}°C on cold nights`;
-  const explanation=`<p>${heightText}${cold} make ${list} worth allowing for — about <b>${L} L</b> more than the mild-weather baseline.</p><p>This is a seasonal packing guide, not a forecast.</p>`;
+  const explanation=`<p>${heightText}${cold} make ${list} worth allowing for — about <b>${L} L</b> more than the mild-weather baseline.</p>${wear}<p>This is a seasonal packing guide, not a forecast.</p>`;
   return contentOnly ? explanation : infoHelp('Why the place matters', explanation);
 }
 
@@ -12161,7 +12172,7 @@ function renderSmallBags(A){
   }
   const m=getChecklistModel(A || currentPlan());
   // the water in a bag reads as what it is here: a bottle (KIT's name speaks of bottle cages the bike may not have)
-  const name=row => row.id === 'water' ? 'Water bottle' : `${row.name}${row.quantity > 1 && !kitById(row.id)?.perDay ? ' ×'+row.quantity : ''}`;
+  const name=row => row.id === 'water' ? 'Water bottle' : row.id === 'tubes' && isDayTube(S.custom.tubes) ? 'Spare tube' : `${row.name}${row.quantity > 1 && !kitById(row.id)?.perDay ? ' ×'+row.quantity : ''}`;
   const bags=m.groups.filter(g => g.id !== 'overflow' && g.id !== 'unassigned');
   // each bag a heading and its list, no landmark of its own (review of PR 92, M5)
   $('smallBagList').innerHTML=bags.map(g => `<div class="small-bag"><h3>${htmlEsc(g.title)}</h3><ul>${
@@ -12177,6 +12188,9 @@ function renderSmallBags(A){
   $('smallWater').textContent=count ? `Water: ${cages}${inBag ? ' and '+inBag : ''}. Refill on the way.`
     : inBag ? `Water: ${inBag}, since this ${noMounts ? 'bike has no bottle cage mounts' : 'plan has no bottle cage'}.`
     : 'Water: no bottle cage in this plan.';
+  // the jacket the day calls for, worn (owner, 9 Nov 2026); packed by the rider, it is in a bag's list instead
+  const wear=dayRideWearsJacket() && !carrying('puffy');
+  $('smallWear').hidden=!wear; $('smallWear').textContent=wear ? 'Wear: insulated jacket.' : '';
   const out=m.groups.filter(g => g.id === 'overflow' || g.id === 'unassigned').flatMap(g => g.items);
   const long=out.some(row => row.tooLong);
   $('smallOver').hidden=!out.length;
@@ -12308,6 +12322,7 @@ async function planTripBags(){
     showHandoffBar('The route from Wayfinch could not be read. Your plan is unchanged.',{apply:true,plan:true,reuse:!!HANDOFF.reuse});
     return false;
   }
+  if(!HANDOFF.long) oneSpareTube();   // a day ride's one spare tube (owner, 9 Nov 2026), before its bags are sized
   const proposed=gearBags().length ? null : proposedTripBags();   // nothing mounted to start from: the smallest setup that holds the kit
   if(proposed){ S.bags=[...S.bags,...proposed]; S.nextUid=Math.max(S.nextUid,...proposed.map(b => b.uid+1)); }
   S.packed={}; keepPlan({load:null}); currentPlan();   // packed afresh by the frozen selection, for this trip
