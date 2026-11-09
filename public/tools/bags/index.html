@@ -12054,7 +12054,7 @@ async function planTripBags(){
   TRIP_BAGS.undo=tripBagsUndo(undo,[saved,before].filter(Boolean));
   const passed=base ? null : passedFoundation();
   showHandoffBar(`Planned for ${name}: a new trip setup${base ? ' from '+base.name : ''}${proposed ? ` with ${bagsInWords(proposed)}` : ''}${HANDOFF.long ? ', opened at Bags' : ''}.${
-    passed ? ` ${passed.name} has no bags, so it is not used.` : ''}${before ? ' Your plan before is kept as a setup.' : ''}${
+    passed ? ` Your general setup ${passed.name} has no bags, so it is not used.` : ''}${before ? ' Your plan before is kept as a setup.' : ''}${
     stored ? '' : tripSetupsNotStored(before ? 2 : 1)}`,{undo:true});
   return true;
 }
