@@ -107,8 +107,11 @@ test('[GA-PROGRESS] a search longer than 300 ms shows "Trying N options…", and
 test('[GA-PROGRESS] the real R3 search hands the page back after every 20 trials at most, and a tap during it gets its response within 1 s (phone stand-in included; review of PR 60, I3)', async ({ page }) => {
   await planner(page);
   await tourer(page);
-  // counted in the page: trials run, the trial count at each hand-back (a zero-delay timer), long tasks, and a tap's wait
+  // counted in the page: trials run, the trial count at each hand-back (a zero-delay timer), long tasks, and a tap's wait. A new search is a
+  // boundary as a hand-back is: the trials an earlier search ran after its last hand-back (it finished or was dropped there) are its own, not
+  // the new search's first slice (the flake of CI run 42579810188: 2 leftover + 20 = 22).
   await page.evaluate(`window.__adv = { trials: 0, yields: [], longest: 0, tap: null };
+    runAdvisor = ((f) => (...a) => { window.__adv.yields.push(window.__adv.trials); return f(...a); })(runAdvisor);
     advisorTrial = ((f) => (...a) => { window.__adv.trials++; return f(...a); })(advisorTrial);
     window.setTimeout = ((st) => (fn, ms, ...a) => { if (!ms && ADVISOR_RUN > 0) window.__adv.yields.push(window.__adv.trials); return st(fn, ms, ...a); })(window.setTimeout);
     new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__adv.longest = Math.max(window.__adv.longest, e.duration); }).observe({ type: 'longtask', buffered: false });
