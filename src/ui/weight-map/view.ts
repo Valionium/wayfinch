@@ -1,23 +1,34 @@
 // The bag planner's weight map (weight map and bag shapes design, 1.4 to 1.7): served as /tools/bags/weightmap.js, loaded on the first
-// press of "Show weight map". Your weight and the ideal for the same kilos share one fixed scale; the difference is opt-in. Each map's
-// canvas is decoration (aria-hidden): its picture's name is the sentence under it, which carries the whole message without colour.
-import type { Anchors, P } from '../../core/bike/art.ts';
-import { blur, diffLine, FULL, GRID, idealItems, shareLine, splat, zoneShares } from '../../core/bike/weightmap.ts';
+// press of "Show weight map". Your weight and the ideal share one fixed scale; the difference is opt-in. The ideal is the rider's own
+// setup packed for the best balance the planner found, with panniers or without (the owner's finding G, 8 Nov 2026): the page works it out and hands it
+// over. Each map's canvas is decoration (aria-hidden): its picture's name is the sentence under it, which carries the whole message
+// without colour. The page never jumps (finding G): the switches sit above the maps and are built once, every later change is made in
+// place, and the difference is added and taken away at the end.
+import type { P } from '../../core/bike/art.ts';
+import { blur, diffLine, FULL, GRID, shareLine, splat, zoneShares } from '../../core/bike/weightmap.ts';
 import type { MapItem } from '../../core/bike/weightmap.ts';
 import { WM } from '../../core/wording/en-weightmap.ts';
+
+/**
+ * The ideal the page worked out: the bags it uses (own, own plus two panniers, own without the panniers), or why there is none. `more`:
+ * the added panniers also take the things the plan leaves over, so it carries more kilos than yours (review of PR 78, m1).
+ */
+export type Ideal = { kind: 'own' | 'added' | 'removed'; items: MapItem[]; same: boolean; more?: boolean } | { why: keyof typeof WM.why };
+export type Which = 'with' | 'without';
 
 export type MapInput = {
   /** Each packed bag (and bottle, and the rack deck's load) with its kilos and its outline as the rig draws it. */
   items: MapItem[];
-  anchors: Anchors;
-  ideal: { rack: boolean; frame: boolean; top: boolean };
-  /** The rig's bike, its SVG markup without the bags. */
+  /** The drawing's units per millimetre (the anchors' scale). */
+  scale: number;
+  /** The rig's bike without its colour, its SVG markup without the bags. */
   bike: string;
-  shape: Parameters<typeof idealItems>[3];
-  pairOffset?: Record<string, P>;
+  ideal: Ideal;
+  which: Which;
   /** Show where yours differs (opt-in). */
   diff: boolean;
   onDiff: (on: boolean) => void;
+  onIdeal: (which: Which) => void;
 };
 
 const PX = 2;
@@ -39,12 +50,13 @@ function axis(px: number, cells: number): [Int32Array, Float32Array] {
 }
 
 /** Paints one map: the theme's three-step ramp (lightness always one way), or the difference's teal, grey and orange; contour lines. */
-export function paint(canvas: HTMLCanvasElement, F: Float32Array, diff: boolean, colours: number[][]): void {
+export function paint(canvas: HTMLCanvasElement, F: Float32Array | null, diff: boolean, colours: number[][]): void {
   const ctx = canvas.getContext?.('2d');
   if (!ctx) return;
   const [W, H] = [GRID.w * GRID.cell * PX, GRID.h * GRID.cell * PX];
   canvas.width = W;
   canvas.height = H;
+  if (!F) return; // no ideal: the bike alone
   const [c0, c1, c2, cn, cp, cz, ink] = colours;
   const mix = (a: number[], b: number[], t: number) => a.map((v, i) => v + (b[i]! - v) * t);
   // the colours, worked out once: 256 steps from the low end to full (and from -full to +full on the difference)
@@ -78,43 +90,80 @@ export function paint(canvas: HTMLCanvasElement, F: Float32Array, diff: boolean,
   ctx.putImageData(img, 0, 0);
 }
 
-/** Draws the weight map into `host`. */
+const card = (id: string) => `<figure class="wm-card" data-card="${id}"><figcaption></figcaption><div class="wm-wrap"><canvas aria-hidden="true"></canvas>`
+  + `<svg viewBox="${VB}" role="img"></svg></div><p class="wm-sum"></p></figure>`;
+
+/** The frame, built once per host: caption, the switches, then the maps and the key. */
+function frame(host: HTMLElement): HTMLElement {
+  const maps = host.querySelector<HTMLElement>(':scope > .wm-maps');
+  if (maps) return maps;
+  host.innerHTML = `<p class="wm-cap">${esc(WM.caption)}</p><div class="wm-ctrl"><div class="wm-ideal" role="group" aria-label="${esc(WM.switchLabel)}">`
+    + `<button type="button" class="wm-with">${esc(WM.switchWith)}</button><button type="button" class="wm-without">${esc(WM.switchWithout)}</button></div>`
+    + '<button type="button" class="wm-diff"></button></div>'
+    + `<div class="wm-maps">${card('y')}${card('i')}</div>`
+    + `<div class="wm-key"><div class="wm-bar" aria-hidden="true"></div><p>${esc(WM.key)}</p><p>${esc(WM.keyNote)}</p></div>`;
+  return host.querySelector<HTMLElement>(':scope > .wm-maps')!;
+}
+
+type Card = { title: string; sub: string; line: string; art: string; field: Float32Array | null; diff: boolean; note?: string };
+
+/** One map's card, filled in place: its title, the bike and the bags' outlines over the painted field, and its sentence. */
+function fill(el: Element, c: Card, colours: number[][], bike: string): void {
+  // a note (already the best balance) goes in the caption, the figure's own name, so the side-by-side rows stay level
+  el.querySelector('figcaption')!.innerHTML = `<b>${esc(c.title)}</b> <span>${esc(c.sub)}</span>${c.note ? ` <span class="wm-same">${esc(c.note)}</span>` : ''}`;
+  const svg = el.querySelector('svg')!;
+  svg.setAttribute('aria-label', `${c.title}. ${c.line}`);
+  svg.innerHTML = bike + c.art;
+  const sum = el.querySelector('.wm-sum')!;
+  sum.textContent = c.line;
+  // the sentence is the picture's name, so read once; unless it says why there is no map (then it is the one thing to read)
+  if (c.field) sum.setAttribute('aria-hidden', 'true');
+  else sum.removeAttribute('aria-hidden');
+  paint(el.querySelector('canvas')!, c.field, c.diff, colours);
+}
+
+/** Draws the weight map into `host`, changing in place whatever is already there. */
 export function render(host: HTMLElement, input: MapInput): void {
-  const { items, anchors: a } = input;
+  const { items, ideal } = input;
   const total = items.reduce((t, i) => t + i.kg, 0);
   if (!(total > 0)) { host.innerHTML = `<p class="wm-note">${esc(WM.nothing)}</p>`; return; }
-  const ideal = idealItems(total, a, input.ideal, input.shape, input.pairOffset);
-  const Fy = blur(splat(items, a.scale));
-  const Fi = blur(splat(ideal, a.scale));
-  const [zy, zi] = [zoneShares(items), zoneShares(ideal)];
   // the theme's colours, read once (before the markup changes, so the page's style is worked out at most once)
   const style = getComputedStyle(host);
   const colours = ['--wm0', '--wm1', '--wm2', '--wmneg', '--wmpos', '--wmzero', '--ink'].map((n) => {
     const v = style.getPropertyValue(n).trim();
     return [1, 3, 5].map((i) => parseInt(v.slice(i, i + 2), 16) || 0);
   });
-  const outline = (list: MapItem[]) => list.map((i) => `<polygon class="wm-bag${i.pos === 'pack' ? ' wm-back' : ''}" points="${pts(i.outline)}"/>`).join('');
-  const backs = items.filter((i) => i.pos === 'pack').map((i) => {
-    const xs = i.outline.map((p) => p[0]);
-    return `<text class="wm-label" x="${r1((Math.min(...xs) + Math.max(...xs)) / 2)}" y="${r1(Math.min(...i.outline.map((p) => p[1])) - 2.5)}" text-anchor="middle">${esc(WM.back)}</text>`;
-  }).join('');
-  const panel = (id: string, title: string, sub: string, line: string, art: string) =>
-    `<figure class="wm-card"><figcaption><b>${esc(title)}</b> <span>${esc(sub)}</span></figcaption><div class="wm-wrap"><canvas data-wm="${id}" aria-hidden="true"></canvas>`
-    + `<svg viewBox="${VB}" role="img" aria-label="${esc(`${title}. ${line}`)}">${input.bike}${art}</svg></div><p class="wm-sum" aria-hidden="true">${esc(line)}</p></figure>`;
-  // a press of the difference's button redraws the whole map: the button keeps the keyboard's focus
-  const focused = !!document.activeElement?.classList.contains('wm-diff') && host.contains(document.activeElement);
-  host.innerHTML = `<p class="wm-cap">${esc(WM.caption)}</p><div class="wm-maps">`
-    + panel('y', WM.yours, WM.yoursSub(total.toFixed(1)), shareLine(zy), outline(items) + backs)
-    + panel('i', WM.ideal, WM.idealSub, shareLine(zi), outline(ideal))
-    + (input.diff ? panel('d', WM.diff, WM.diffSub, diffLine(zy, zi), '') : '')
-    + `</div><button type="button" class="wm-diff">${esc(input.diff ? WM.diffHide : WM.diffShow)}</button>`
-    + `<div class="wm-key"><div class="wm-bar" aria-hidden="true"></div><p>${esc(WM.key)}</p><p>${esc(WM.keyNote)}</p>`
-    + (input.diff ? `<div class="wm-bar wm-bar-diff" aria-hidden="true"></div><p>${esc(WM.diffKey)}</p>` : '') + '</div>';
-  const fields: Record<string, [Float32Array, boolean]> = { y: [Fy, false], i: [Fi, false], d: [Fy.map((v, n) => v - Fi[n]!), true] };
-  host.querySelectorAll<HTMLCanvasElement>('canvas[data-wm]').forEach((c) => { const f = fields[c.dataset.wm!]!; paint(c, f[0], f[1], colours); });
-  const button = host.querySelector<HTMLButtonElement>('.wm-diff');
-  if (button) {
-    button.onclick = () => input.onDiff(!input.diff);
-    if (focused) button.focus();
-  }
+  const maps = frame(host);
+  const art = (list: MapItem[]) => list.map((i) => `<polygon class="wm-bag${i.pos === 'pack' ? ' wm-back' : ''}" points="${pts(i.outline)}"/>`).join('')
+    + list.filter((i) => i.pos === 'pack').map((i) => {
+      const xs = i.outline.map((p) => p[0]);
+      return `<text class="wm-label" x="${r1((Math.min(...xs) + Math.max(...xs)) / 2)}" y="${r1(Math.min(...i.outline.map((p) => p[1])) - 2.5)}" text-anchor="middle">${esc(WM.back)}</text>`;
+    }).join('');
+  const Fy = blur(splat(items, input.scale));
+  const zy = zoneShares(items);
+  const has = 'items' in ideal;
+  const Fi = has ? blur(splat(ideal.items, input.scale)) : null;
+  const zi = has ? zoneShares(ideal.items) : null;
+  const why = has ? '' : WM.why[ideal.why];
+  const [yc, ic] = [maps.querySelector('[data-card="y"]')!, maps.querySelector('[data-card="i"]')!];
+  fill(yc, { title: WM.yours, sub: WM.yoursSub(total.toFixed(1)), line: shareLine(zy), art: art(items), field: Fy, diff: false }, colours, input.bike);
+  fill(ic, { title: input.which === 'with' ? WM.idealWith : WM.idealWithout, sub: has ? WM.idealSub[ideal.kind === 'added' && ideal.more ? 'addedMore' : ideal.kind] : '', line: has ? shareLine(zi!) : why,
+    art: has ? art(ideal.items) : '', field: Fi, diff: false, ...(has && ideal.same ? { note: WM.idealSame } : {}) }, colours, input.bike);
+  // the difference: added at the end and taken away again, so nothing above it moves
+  let dc = maps.querySelector('[data-card="d"]');
+  if (input.diff && !dc) { maps.insertAdjacentHTML('beforeend', card('d')); dc = maps.querySelector('[data-card="d"]'); }
+  if (!input.diff && dc) { dc.remove(); dc = null; }
+  if (dc) fill(dc, { title: WM.diff, sub: WM.diffSub, line: has ? diffLine(zy, zi!) : why, art: '', field: Fi ? Fy.map((v, n) => v - Fi[n]!) : null, diff: true }, colours, input.bike);
+  const key = host.querySelector('.wm-key')!;
+  key.querySelectorAll('.wm-bar-diff, .wm-key-diff').forEach((e) => e.remove());
+  if (input.diff) key.insertAdjacentHTML('beforeend', `<div class="wm-bar wm-bar-diff" aria-hidden="true"></div><p class="wm-key-diff">${esc(WM.diffKey)}</p>`);
+  // the switches: the same elements every time, so the focus stays where the rider left it
+  const button = (s: string) => host.querySelector<HTMLButtonElement>(s)!;
+  const [withB, withoutB, diffB] = [button('.wm-with'), button('.wm-without'), button('.wm-diff')];
+  withB.setAttribute('aria-pressed', String(input.which === 'with'));
+  withoutB.setAttribute('aria-pressed', String(input.which === 'without'));
+  withB.onclick = () => { if (input.which !== 'with') input.onIdeal('with'); };
+  withoutB.onclick = () => { if (input.which !== 'without') input.onIdeal('without'); };
+  diffB.textContent = input.diff ? WM.diffHide : WM.diffShow;
+  diffB.onclick = () => input.onDiff(!input.diff);
 }

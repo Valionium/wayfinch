@@ -359,9 +359,11 @@ test('[WM-PAGE] Show weight map: off by default, weightmap.js only on the first 
   await expect(cards.nth(0).locator('.wm-sum')).toContainText('Of the weighted load:');
   await expect(cards.nth(0).locator('svg')).toHaveAttribute('aria-label', /^Your weight\. Of the weighted load: /);
   await expect(cards.nth(0).locator('canvas')).toHaveAttribute('aria-hidden', 'true');
-  // the backpack is its own patch, labelled; the ideal carries nothing on the back
+  // the backpack is its own patch, labelled; the ideal (the rider's own setup since the owner's finding G, 8 Nov 2026, no longer a
+  // fixed profile with nothing on the back) never has more on the back than yours
   await expect(cards.nth(0).locator('.wm-label')).toHaveText(['on your back']);
-  await expect(cards.nth(1).locator('.wm-sum')).toContainText(' 0% on your back');
+  const back = async (n: number) => Number(/(\d+)% on your back/.exec((await cards.nth(n).locator('.wm-sum').textContent()) ?? '')![1]);
+  expect(await back(1)).toBeLessThanOrEqual(await back(0));
   // painted: the canvas holds the map
   const painted = await cards.nth(0).locator('canvas').evaluate((c: HTMLCanvasElement) => c.width > 0 && c.getContext('2d')!.getImageData(c.width / 2, c.height / 2, 1, 1).data[3] === 255);
   expect(painted).toBe(true);
@@ -397,4 +399,162 @@ test('[WM-PAGE] Show weight map: off by default, weightmap.js only on the first 
   await expect(cards).toHaveCount(3);
   expect(loads).toHaveLength(1);
   expect(errors).toEqual([]);
+});
+
+// The owner's finding G (8 Nov 2026): "Show where yours differs" near the bottom made the page jump.
+test('[WM-STILL] the weight map never moves the page: near the bottom of the window, the difference and the ideal switch keep the scroll and the button where they were', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page);
+  await page.evaluate("S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'frame', L:6 }]; S.nextUid = 4; S.decks = { bar:false, rack:false }; go(3)");
+  await page.locator('#rigWeightMap').click();
+  const cards = page.locator('#weightMap .wm-card');
+  await expect(cards).toHaveCount(2);
+  await expect(page.locator('#weightMap .wm-without')).toHaveAttribute('aria-pressed', 'true'); // no panniers in the plan: without first
+  const steps: [string, () => Promise<void>][] = [
+    ['.wm-diff', () => expect(cards).toHaveCount(3)],
+    ['.wm-with', () => expect(page.locator('#weightMap .wm-with')).toHaveAttribute('aria-pressed', 'true')],
+    ['.wm-diff', () => expect(cards).toHaveCount(2)],
+    ['.wm-without', () => expect(page.locator('#weightMap .wm-without')).toHaveAttribute('aria-pressed', 'true')],
+  ];
+  for (const [sel, changed] of steps) {
+    const button = page.locator(`#weightMap ${sel}`);
+    // the button just above the bottom of the window, where the owner pressed it
+    await button.evaluate((el) => { window.scrollBy(0, el.getBoundingClientRect().bottom - window.innerHeight + 12); });
+    const before = await button.evaluate((el) => [el.getBoundingClientRect().top, window.scrollY]);
+    await button.click();
+    await changed();
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const after = await button.evaluate((el) => [el.getBoundingClientRect().top, window.scrollY]);
+    expect(Math.abs(after[0]! - before[0]!), `${sel}: the button stays where it was`).toBeLessThanOrEqual(1);
+    expect(Math.abs(after[1]! - before[1]!), `${sel}: the page does not scroll`).toBeLessThanOrEqual(1);
+    expect(await page.evaluate((s) => document.activeElement?.matches(`#weightMap ${s}`), sel), `${sel}: focus stays on it`).toBe(true);
+  }
+  // the ideal with panniers: two panniers on the plan without them, drawn in the ideal, and the plan itself unchanged
+  await page.locator('#weightMap .wm-with').click();
+  await expect(cards.nth(1).locator('figcaption')).toContainText('Ideal with panniers');
+  await expect(cards.nth(1).locator('figcaption')).toContainText('two 20 L panniers');
+  expect(await page.evaluate("S.bags.some(b => b.pos === 'rack')")).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+// Review of PR 78, m4: the switch row (a pressed pair and "Show where yours differs") at the narrowest phone, in both themes.
+test('[WM-STILL] at 320 px, light and dark: the weight map\'s switches wrap without a sideways scroll, every button at least 44 px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await planner(page);
+    await page.evaluate("S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'frame', L:6 }]; S.nextUid = 4; S.decks = { bar:false, rack:false }; go(3)");
+    await page.locator('#rigWeightMap').click();
+    await expect(page.locator('#weightMap .wm-card')).toHaveCount(2);
+    for (const sel of ['.wm-with', '.wm-without', '.wm-diff']) {
+      const b = (await page.locator(`#weightMap ${sel}`).boundingBox())!;
+      expect(Math.min(b.width, b.height), `${scheme}: ${sel} is at least 44 px`).toBeGreaterThanOrEqual(44);
+      expect(b.x + b.width, `${scheme}: ${sel} inside the window`).toBeLessThanOrEqual(320);
+    }
+    await page.locator('#weightMap .wm-diff').click();
+    await expect(page.locator('#weightMap .wm-card')).toHaveCount(3);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), `${scheme}: no sideways scroll`).toBeLessThanOrEqual(320);
+  }
+});
+
+// The owner's decision of 8 Nov 2026 (weight map design §7): the bag planner balances by itself at the packing check, with one quiet
+// line and Undo; advisor.js is loaded for it there.
+const BAL_BAGS = "S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:13 }, { uid:3, pos:'frame', L:4.5 }, { uid:4, pos:'top', L:1, slot:'front' }, { uid:5, pos:'fork', L:3, pair:true }]; S.nextUid = 6; S.decks = { bar:false, rack:false };";
+test("[BAL-LINE] at the packing check the plan is balanced with one line and Undo; Undo brings back the packing before the balance; a saved balance packs the same after a reload", async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page);
+  const advisorLoads: string[] = [];
+  page.on('request', (r) => { if (r.url().endsWith('/tools/bags/advisor.js')) advisorLoads.push(r.url()); });
+  // the bags saved and read back once, as the page stores them, so a reload later re-plans nothing of its own
+  await page.evaluate(`${BAL_BAGS} go(2); flushDraft()`);
+  await page.reload({ waitUntil: 'load' });
+  await expect(page.locator('#rigBike svg.bk')).toBeVisible();
+  await page.evaluate('go(3)');
+  const own = await page.evaluate('JSON.stringify(currentPlan().items)');
+  expect(await page.evaluate('!!window.WayfinchAdvisor')).toBe(false); // nothing loaded before the packing check
+  await page.evaluate('go(4)');
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click(); // the weight question, skipped
+  const line = page.locator('#resultBox .balance-line');
+  await expect(line).toContainText('Packed for better balance:');
+  await expect(line).toHaveAttribute('role', 'status');
+  expect(advisorLoads.length).toBe(1);
+  expect(await page.evaluate('JSON.stringify(currentPlan().items)')).not.toBe(own);
+  expect(await page.evaluate('JSON.stringify(S.placements.items) === JSON.stringify(currentPlan().items)')).toBe(true);
+  const balanced = await page.evaluate('JSON.stringify(currentPlan().items)');
+  const undo = line.getByRole('button', { name: 'Undo' });
+  const box = (await undo.boundingBox())!;
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  await undo.click();
+  await expect(line).toHaveText('Back to the packing before this balance.');
+  expect(await page.evaluate('JSON.stringify(currentPlan().items)')).toBe(own);
+  // another visit: what Undo put back is not remembered, so the same balance is offered again, with its line (BAL-STORED)
+  await page.evaluate('flushDraft()');
+  await page.reload({ waitUntil: 'load' });
+  await expect(page.locator('#rigBike svg.bk')).toBeVisible();
+  await page.evaluate('go(4)');
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
+  await expect(page.locator('#resultBox .sec').first()).toBeVisible();
+  await expect(page.locator('#resultBox .balance-line')).toContainText('Packed for better balance:');
+  expect(await page.evaluate('JSON.stringify(currentPlan().items)')).toBe(balanced);
+  // the balance saved: a reload packs the same, with nothing more to move and no line
+  await page.evaluate('flushDraft()');
+  await page.reload({ waitUntil: 'load' });
+  await expect(page.locator('#rigBike svg.bk')).toBeVisible();
+  await page.evaluate('go(4)');
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
+  await expect(page.locator('#resultBox .sec').first()).toBeVisible();
+  expect(await page.evaluate('JSON.stringify(currentPlan().items)')).toBe(balanced);
+  await expect(page.locator('#resultBox .balance-line')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+// Review of PR 79, I1: a thing ticked as packed where the balance put it is never moved back by Undo.
+test('[BAL-KEEPS] a thing the balance moved, ticked as packed in the packing check: Undo is not offered and the line says why; unticked, Undo is back', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page);
+  await page.evaluate(`${BAL_BAGS} go(3)`);
+  const own = await page.evaluate('JSON.stringify(currentPlan().items)');
+  await page.evaluate('go(4)');
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
+  const line = page.locator('#resultBox .balance-line');
+  await expect(line.getByRole('button', { name: 'Undo' })).toBeVisible();
+  const m = (await page.evaluate('BALANCE.last.moves[0]')) as { id: string; to: string };
+  const balanced = await page.evaluate('JSON.stringify(currentPlan().items)');
+  // the rider packs it where the balance put it and ticks it
+  const tick = async (): Promise<void> => {
+    const box = page.locator(`#resultBox [data-tick="${m.id}"]`).first();
+    if (!(await box.isVisible())) await box.locator('xpath=ancestor::details[1]/summary').click();
+    await box.click();
+  };
+  await tick();
+  expect(await page.evaluate(`!!S.packed[${JSON.stringify(m.id)}]`)).toBe(true);
+  await expect(line).toContainText('You have started packing it this way, so it stays.');
+  await expect(line.getByRole('button', { name: 'Undo' })).toHaveCount(0);
+  expect(await page.evaluate('JSON.stringify(currentPlan().items)')).toBe(balanced);
+  expect(await page.evaluate(`currentPlan().items[${JSON.stringify(m.id)}][0][0]`)).toBe(m.to);
+  // unticked: Undo is back and brings the packing before the balance back
+  await tick();
+  expect(await page.evaluate(`!!S.packed[${JSON.stringify(m.id)}]`)).toBe(false);
+  await line.getByRole('button', { name: 'Undo' }).click();
+  await expect(line).toHaveText('Back to the packing before this balance.');
+  expect(await page.evaluate('JSON.stringify(currentPlan().items)')).toBe(own);
+  expect(errors).toEqual([]);
+});
+
+test('[BAL-LINE] at 320 px, light and dark: the line wraps without a sideways scroll and its Undo is at least 44 px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await planner(page);
+    await page.evaluate(`${BAL_BAGS} go(4)`);
+    const line = page.locator('#resultBox .balance-line');
+    await expect(line).toContainText('Packed for better balance:');
+    const b = (await line.getByRole('button', { name: 'Undo' }).boundingBox())!;
+    expect(b.height, `${scheme}: Undo is at least 44 px`).toBeGreaterThanOrEqual(44);
+    expect(b.x + b.width, `${scheme}: Undo inside the window`).toBeLessThanOrEqual(320);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), `${scheme}: no sideways scroll`).toBeLessThanOrEqual(320);
+  }
 });

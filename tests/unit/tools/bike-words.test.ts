@@ -20,7 +20,7 @@ test('[LC-WORDS] no word of §8\'s list nor of the bag planner\'s own stricter l
   const limits = words.filter(([, w]) => w.limit);
   expect(limits.length).toBeGreaterThanOrEqual(4);
   for (const [key, w] of limits) expect(w.text, key).toContain('you entered');
-  for (const key of ['lookHint', 'lookNone', 'lookNotSet', 'lookMore', 'lookPhoto', 'lookUndo', 'lookGuessBars', 'lookGuessEbike', 'photoChoose', 'photoTap', 'photoUse', 'photoNote', 'swapNote', 'useShown']) {
+  for (const key of ['lookHint', 'lookNone', 'lookNotSet', 'lookMore', 'lookPhoto', 'lookUndo', 'lookGuessBars', 'lookGuessEbike', 'photoChoose', 'photoTap', 'photoUse', 'photoNote', 'swapNote', 'addedChosen']) {
     expect(words.some(([k]) => k === key), key).toBe(true);
   }
   // the dialog's own markup, Look's section included

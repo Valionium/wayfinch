@@ -17,7 +17,9 @@ function deck(which){
   // the deck sits where bike.js anchors it for this bike (sub-project 6, Task 3), no longer at fixed points
   const svg=nodes.get('bagLayer').innerHTML,x=run(`String(r2(rigAnchors().${which==='bar'?'barDeck':'rackTop'}.x))`).replace('.','\.');
   const groups=[...svg.matchAll(/<g class="([^"]*)"([^>]*)>([\s\S]*?)<\/g>/g)];
-  const g=groups.find(m=>m[1].split(/\s+/).includes('deck')&&new RegExp(`class="bag-shell" x="${x}"`).test(m[3]));
+  // once the kit is chosen the bar's straps are drawn on the roll itself (the owner's finding G, 8 Nov 2026, BK-BAR-STRAPS): found by
+  // their own class there, by the anchor's x elsewhere
+  const g=groups.find(m=>m[1].split(/\s+/).includes('deck')&&(which==='bar'&&m[1].split(/\s+/).includes('deck-bar')||new RegExp(`class="bag-shell" x="${x}"`).test(m[3])));
   if(!g)return null;
   const label=svg.match(new RegExp(`<text class="([^"]*)"[^>]*>${which==='bar'?'STRAPS':'DECK'}<\\/text>`));
   return {classes:new Set(g[1].split(/\s+/)),attributes:g[2],body:g[3],labelClasses:new Set((label?.[1]||'').split(/\s+/))};

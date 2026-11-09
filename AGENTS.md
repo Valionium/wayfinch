@@ -78,7 +78,7 @@ The co-pilot's side is `src/ui/trip/handoff.ts` (Trip's Plan bags for this trip;
 | Command | Runs |
 | --- | --- |
 | `npm run fast` | types, lint, the tests touched by this change with 25 runs per property, 100 simulator scenarios and the rule check |
-| `npm run qa` | Load Check's 39 QA suites, one line each; exit 0 only if all pass. `LC_PAGE` and `LC_WORKER` override the page and the old worker. Retired suites and why: `qa/RETIRED.md` |
+| `npm run qa` | Load Check's 40 QA suites, one line each; exit 0 only if all pass. `LC_PAGE` and `LC_WORKER` override the page and the old worker. Retired suites and why: `qa/RETIRED.md` |
 | `npm run build` | writes `dist/`: the page (with the switch off, `releases/load-check-root.html` at `/`), `/offline-worker.js`, `_headers`, `build.json`. `--launch=on|off`, `--out=`, `--emergency`. With `--launch=on` it also runs Vite for the app shell and copies `public/`; with it off, no Vite runs and the output is what it was before the app existed |
 | `npm run e2e` | the browser tests in `tests/e2e` (Chromium, phone and laptop size). The old site in them comes from the tag `load-check-zip-2026-10-30` |
 | `node tools/deploy-check.mjs --build dist/build.json --origin <url>` | does the live site serve this build? Exit 1 if not. Read-only. `--self --origin <url>` compares the site with its own `build.json`; the other modes are for the workflows, listed at the top of the file |

@@ -227,6 +227,8 @@ body{
 .draftbar .linky{margin-left:auto}
 .draftbar.quiet{border-color:var(--line)}
 #bikeFollowUndo{min-height:44px;margin-left:0}
+.balance-line{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin:0 0 12px;font-size:13px;color:var(--muted);line-height:1.45}
+.balance-line .linky{min-height:44px}
 .result-save{margin:0 0 15px}
 .result-save span,.save-message{font-size:12px;color:var(--muted);line-height:1.45}
 .save-message{display:block;margin-top:8px;color:var(--amber)}
@@ -403,8 +405,16 @@ button.go.small{font-size:15px;padding:9px 16px;flex:0 0 auto}
 .bk-far{opacity:.62}
 .bagg.ghost .bk-detail{display:none}
 /* the weight map, under the rig once the kit is chosen */
-.wm-show,.wm-diff{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--muted-dim);border-radius:8px;padding:8px 12px;min-height:44px;margin-top:10px;cursor:pointer}
-.wm-show:focus-visible,.wm-diff:focus-visible{outline:2px solid var(--blaze);outline-offset:2px}
+.wm-show,.wm-diff,.wm-ideal button{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--muted-dim);border-radius:8px;padding:8px 12px;min-height:44px;margin-top:10px;cursor:pointer}
+.wm-show:focus-visible,.wm-diff:focus-visible,.wm-ideal button:focus-visible{outline:2px solid var(--blaze);outline-offset:2px}
+/* the switches sit above the maps, so nothing they change ever moves them (the owner's finding G, 8 Nov 2026) */
+.wm-ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:0 10px;margin-bottom:10px}
+.wm-ideal{display:inline-flex}
+.wm-ideal button{margin-right:-1px}
+.wm-ideal button:first-child{border-radius:8px 0 0 8px}
+.wm-ideal button:last-child{border-radius:0 8px 8px 0}
+.wm-ideal button[aria-pressed="true"]{background:var(--panel-hi);border-color:var(--ink);font-weight:600}
+.wm-same{display:block;margin-top:2px}
 .rig-wm{margin-top:10px}
 .wm-maps{display:grid;gap:10px;grid-template-columns:1fr}
 @media (min-width:700px){
@@ -1586,9 +1596,9 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .look-picker input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
 .look-status{margin:4px 0;font-size:13px;color:var(--muted);min-height:1.2em}
 #lookUndo{min-height:44px}
-.look-chip.hidden,.bike-look.hidden,#lookUndo.hidden,#bikeDetailsBack.hidden,#bikeSwapUndo.hidden,#bikeUseShown.hidden,.bike-swap.hidden{display:none}
+.look-chip.hidden,.bike-look.hidden,#lookUndo.hidden,#bikeDetailsBack.hidden,#bikeSwapUndo.hidden,.bike-swap.hidden{display:none}
 .bike-swap{margin:6px 0;font-size:14px}
-#bikeSwapUndo,#bikeUseShown{min-height:44px}
+#bikeSwapUndo{min-height:44px}
 #bikeLook .look-picker input[type=color]{min-height:24px;min-width:24px;height:24px}
 /* Look's extras (owner's wish, 5 Nov 2026): frame pattern, its colours, the fork, rim depth. Built by renderLookChoices from bike.js. */
 .lx-swatch,.lx-chip{position:relative;display:flex;align-items:center;gap:8px;min-height:44px;min-width:44px;padding:0 10px;box-sizing:border-box;
@@ -2169,7 +2179,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         <div class="fit-quick-result" id="fitQuickResult" role="status" aria-live="polite"></div>
         <div class="bike-profile-status" id="bikeProfileStatus" role="status" aria-live="polite"></div>
         <p class="bike-swap hidden" id="bikeSwapNote" role="status"></p>
-        <div class="bike-profile-actions"><button class="linky hidden" id="bikeSwapUndo" type="button"></button><button class="go small hidden" id="bikeUseShown" type="button"></button></div>
+        <div class="bike-profile-actions"><button class="linky hidden" id="bikeSwapUndo" type="button"></button></div>
       </section>
       <section class="bike-look" id="bikeLook" aria-labelledby="bikeLookTitle">
         <h3 id="bikeLookTitle" tabindex="-1">Look</h3>
@@ -3072,8 +3082,7 @@ const BIKE_WORDING={
   swapNote:{text:'This plan now uses the new bike. {name} was only in this plan, so it is kept: Undo brings it back.'},
   swapUndo:{text:'Undo: bring back {name}'},
   swapUndone:{text:'{name} is back in this plan, as it was.'},
-  useShown:{text:'Use this bike for this plan'},
-  usingShown:{text:'Using {name} for this plan.'},
+  addedChosen:{text:'Saved {name}. It is now the bike for your plan, in every tool.'},
   backTrip:{text:'Back to Trip'},backTools:{text:'Back to Tools'},backYou:{text:'Back to You'},backTyre:{text:'Back to Tyre pressure'},
   backCare:{text:'Back to Bike care'},backAdvisor:{text:'Back to the Gear advisor'},
   // A bike chosen in Wayfinch's Tools moves the plan to it when this page opens (sub-project 11, decision 3): one quiet line and Undo.
@@ -3318,9 +3327,6 @@ function renderBikeProfiles(force=false){
   $('bikeFollowUndo').classList.toggle('hidden',!follow);
   $('bikeFollowUndo').disabled=!ready;
   $('bikeFollowBar').classList.toggle('hidden',!follow && !BIKE_FOLLOW_MESSAGE);
-  $('bikeUseShown').textContent=bikeWord('useShown');
-  $('bikeUseShown').classList.toggle('hidden',!linkHoldsBike() || !BIKE_PROFILE_EDITOR_ID);
-  $('bikeUseShown').disabled=!ready;
   renderBikeKitSummary();
 }
 // The line after a move to the bike chosen in Tools; "Without a bike" moves the plan to no bike, the standard bike.
@@ -3385,7 +3391,9 @@ async function saveBikeProfile(event){
   if(index<0 && BIKE_PROFILES.length>=MAX_BIKE_PROFILES){BIKE_PROFILE_MESSAGE='You have 20 saved bikes. Update or remove one before adding another.';renderBikeProfiles();return false;}
   BIKE_PROFILE_BUSY=true;BIKE_FORM_DIRTY=false;BIKE_PROFILE_MESSAGE='Saving bike…';
   if(index<0)BIKE_PROFILES.push(p);else BIKE_PROFILES[index]=p;
-  const keepPlan=linkHoldsBike();   // opened from the co-pilot: saved, and the plan keeps its own bike
+  // opened from the co-pilot: saved, and the plan keeps its own bike; a bike added there becomes the plan's (the owner's finding H)
+  const adding=LINK_ADDS && index<0,keepPlan=linkHoldsBike() && !adding;
+  if(adding)LINK_ADDS=false;
   if(keepPlan){BIKE_PROFILE_EDITOR_ID=p.id;LOOK_NEW=null;}else useBikeProfile(p);
   let librarySaved=false,currentSaved=keepPlan;
   try{librarySaved=await bikeStoreSet(BIKE_PROFILE_KEY,BIKE_PROFILES.map(normaliseBikeProfile));if(!keepPlan)currentSaved=await persistBikeProfileSelection();}
@@ -3439,6 +3447,9 @@ function initialiseBikeProfiles(){
 let LOOK_OPENING=null,LOOK_CHANGED=false,LOOK_NEW=null,LOOK_MESSAGE='',LOOK_PICKER_TIMER=null,LOOK_RETRY=null,LOOK_CREATING=false;
 // LINK_BIKE: Bike details was opened from the co-pilot. BIKE_SWAPS: plan bikes in no saved list that a tap replaced, newest last.
 let LINK_BIKE=false;const BIKE_SWAPS=[];
+// LINK_ADDS: opened from the co-pilot to add a bike (#bike-details=new, or New bike there). Its first save also makes it the plan's
+// bike, the chosen bike in every tool (the owner's finding H, 8 Nov 2026); a saved bike opened from a link stays that bike only.
+let LINK_ADDS=false;
 let BIKE_FOLLOW_MESSAGE='';   // what the line at the top says after its Undo; gone with the rider's next change of the plan's bike
 // A bike opened from the co-pilot (#bike-details=...) is that bike only while it is not the plan's: no tap in it changes the plan's bike.
 function linkHoldsBike(){return LINK_BIKE && !(BIKE_PROFILE_EDITOR_ID && S.bikeProfile && S.bikeProfile.id===BIKE_PROFILE_EDITOR_ID);}
@@ -3472,35 +3483,25 @@ async function saveShownBike(){
   const p=readBikeProfileEditor();if(!p)return false;
   const i=BIKE_PROFILES.findIndex(b=>b.id===p.id);
   if(i<0 && BIKE_PROFILES.length>=MAX_BIKE_PROFILES){BIKE_PROFILE_MESSAGE='You have 20 saved bikes. Update or remove one before adding another.';renderBikeProfiles();return false;}
+  const adding=LINK_ADDS && i<0;   // a bike added from the co-pilot: saved, and the plan's bike from now on
   if(i<0)BIKE_PROFILES.push(p);else BIKE_PROFILES[i]=p;
   if(LOOK_OPENING && LOOK_OPENING.forId==='')LOOK_OPENING.forId=p.id;   // the new bike's first tap: Undo stays with it
   BIKE_PROFILE_EDITOR_ID=p.id;LOOK_NEW=null;
   BIKE_PROFILE_MESSAGE=bikeWord('lookSavedBike',{name:p.name});
-  BIKE_PROFILE_BUSY=true;BIKE_FORM_DIRTY=false;renderBikeProfiles();
-  let ok=false;try{ok=await persistSavedBikes();}catch(e){}
+  BIKE_PROFILE_BUSY=true;BIKE_FORM_DIRTY=false;
+  if(adding){LINK_ADDS=false;useBikeProfile(p);}else renderBikeProfiles();
+  let ok=false;try{ok=await persistSavedBikes();if(adding)ok=(await persistBikeProfileSelection()) && ok;}catch(e){}
   BIKE_PROFILE_BUSY=false;
+  if(adding && ok)BIKE_PROFILE_MESSAGE=bikeWord('addedChosen',{name:p.name});
   if(!ok && BIKE_PROFILE_MESSAGE!==BIKE_NEWER_MESSAGE)BIKE_PROFILE_MESSAGE='Saved for this session only; Export to keep it.';
   if($('bikeSavedSelect'))$('bikeSavedSelect').value=p.id;
   renderBikeProfiles();renderLook();return ok;
 }
-// The plain way, from a link, to put the bike shown on the plan.
-async function useShownBike(){
-  if(BIKE_PROFILE_BUSY || !DRAFT_READY)return false;
-  const issue=bikeEditorIssue();if(issue){BIKE_PROFILE_MESSAGE=issue;renderBikeProfiles();return false;}
-  const p=readBikeProfileEditor();if(!p)return false;
-  const i=BIKE_PROFILES.findIndex(b=>b.id===p.id);
-  if(i<0 && BIKE_PROFILES.length>=MAX_BIKE_PROFILES){BIKE_PROFILE_MESSAGE='You have 20 saved bikes. Update or remove one before adding another.';renderBikeProfiles();return false;}
-  if(i<0)BIKE_PROFILES.push(p);else BIKE_PROFILES[i]=p;
-  BIKE_PROFILE_BUSY=true;BIKE_FORM_DIRTY=false;useBikeProfile(p);
-  let ok=false;try{ok=await persistSavedBikes();ok=(await persistBikeProfileSelection()) && ok;}catch(e){}
-  BIKE_PROFILE_BUSY=false;
-  BIKE_PROFILE_MESSAGE=ok ? bikeWord('usingShown',{name:p.name}) : 'Using this bike for this session. Check the working-plan save status or Export before closing.';
-  renderBikeProfiles();rememberLookOpening();renderLook();return ok;
-}
 // New bike, in Bike details: an empty form, and a fresh start for Undo.
 function startNewBike(){
+  if(LINK_BIKE)LINK_ADDS=true;   // a bike added in Bike details opened from the co-pilot is added from there
   fillBikeProfileForm(null);$('bikeSavedSelect').value='';$('bikeRemovePrompt').classList.add('hidden');
-  BIKE_PROFILE_MESSAGE='Enter another bike, then use its details or save it for next time. Your current plan keeps its bike until you apply the change.';
+  BIKE_PROFILE_MESSAGE=LINK_BIKE ? 'Enter another bike. Once it is saved, it is the bike for your plan.' : 'Enter another bike, then use its details or save it for next time. Your current plan keeps its bike until you apply the change.';
   renderBikeProfiles();rememberLookOpening();renderLook();$('bikeName').focus({preventScroll:true});
 }
 // The flags a fragment can carry, read exactly: #dev, #quiet, or both joined with &. A bike id never counts as one.
@@ -3851,7 +3852,6 @@ function initialiseLook(){
   // Another bike shown is a fresh start for Undo.
   $('bikeSavedSelect').addEventListener('change',()=>{rememberLookOpening();renderLook();});
   $('bikeSwapUndo').onclick=()=>{undoBikeSwap();$('bikeDetailsTitle').focus({preventScroll:true});};
-  $('bikeUseShown').onclick=useShownBike;
   renderLook();
 }
 
@@ -3948,10 +3948,10 @@ function openBikeDetailsFromLink(hash=location.hash){
   if(!inThisPage(href))setWayfinchBack(href);   // the Gear advisor is in this page: Back to Wayfinch keeps going to Wayfinch
   $('bikeDetailsBack').href=href;$('bikeDetailsBack').textContent=bikeWord(key);$('bikeDetailsBack').classList.remove('hidden');
   openBikeDetails($('rigBikeDetails'),link.section==='look' ? 'look' : 'frame');
-  LINK_BIKE=true;
+  LINK_BIKE=true;LINK_ADDS=false;
   if(plan)fillBikeProfileForm(plan);
   else if(saved){fillBikeProfileForm(saved);$('bikeSavedSelect').value=saved.id;}
-  else if(link.id==='new' || !S.bikeProfile){fillBikeProfileForm(null);$('bikeSavedSelect').value='';LOOK_NEW=null;}
+  else if(link.id==='new' || !S.bikeProfile){fillBikeProfileForm(null);$('bikeSavedSelect').value='';LOOK_NEW=null;LINK_ADDS=true;}
   // an id nobody has, with a bike in the plan: the plan's bike, so nothing is lost and nothing new is made
   else fillBikeProfileForm(S.bikeProfile);
   renderBikeProfiles();
@@ -3998,7 +3998,7 @@ function closeBikeDetails(){
   const back=LINK_BIKE ? $('bikeDetailsBack').href : null;
   closeLookPhoto();flushLookPicker();if(LOOK_RIM_TIMER!==null)flushLookRim();
   LOOK_CHANGED=false;LOOK_MESSAGE='';LINK_BIKE=false;$('lookUndo').classList.add('hidden');$('bikeDetailsBack').classList.add('hidden');
-  $('bikeUseShown').classList.add('hidden');
+  LINK_ADDS=false;
   root.classList.add('hidden');endDialog(root);
   if(back)returnToWayfinch(back);
 }
@@ -5405,6 +5405,8 @@ function allocate(){ return selectBags(); }
 const PLAN_SCREEN_KEYS = ['placements','step','adv','onlyOn','justSaved','recallOpen','fbOpen','fbSent','packed','packOpen','pollOn','pollStep',
   'devMode','pendingSaveName','pendingSaveNote','theme','editMode','gpx','frameErr'];
 let PLAN_CACHE = { sig:null, plan:null, placements:null }, PLAN_TRIAL = 0, PLAN_PLACED_AGAIN = false;
+// The automatic balancing's own state (weight map design §7); its functions are by the weight map's.
+const BALANCE = { checked:null, pins:null, last:null, reverted:null, undone:new Set(), failed:false };
 
 function planSignature(){
   return JSON.stringify([S, KIT.filter(k => k.added)], function(key, value){
@@ -8524,12 +8526,15 @@ function writeLoadSummary(always = false){
 // The rig's bike (spec 7.4, "Bags and anchors"): drawn by bike.js from the plan's bike and bags, without the bags themselves.
 // The page draws the bags, tags and tap targets from the anchors, where the bike says they go. Which mounts exist is bikeFit's,
 // the one frame-fit rule the plan uses, so a spot is offered exactly where a bag can go.
-function rigArt(){
+// `neutral`: the same bike without its colour or paint, for the weight maps (the owner's finding G, 8 Nov 2026): its shape, bars and
+// e-bike kept, its own ids, so it never clashes with the rig's.
+function rigArt(neutral = false){
   const B = bikeModule(); if(!B) return RIG_FALLBACK;
-  const fit = bikeFit(S.bikeProfile), view = planBagView(), bike = B.normaliseBike(S.bikeProfile);
+  const fit = bikeFit(S.bikeProfile), view = planBagView(), own = B.normaliseBike(S.bikeProfile);
+  const bike = neutral && own && own.look ? { ...own, look:{ ...own.look, colour:null, paint:null } } : own;
   const spec = { ...B.resolveBikeSpec(bike, view),
     mounts:{ st:!!fit.cages.st, dt:!!fit.cages.dt, un:!!fit.cages.un, top:!!(fit.topMounts.front || fit.topMounts.rear), frame:!fit.frameBag.none } };
-  return B.bikeArt(spec, null, { theme:bikeTheme(), idPrefix:'rig' }, bike && bike.look && bike.look.paint || null);
+  return B.bikeArt(spec, null, { theme:bikeTheme(), idPrefix:neutral ? 'wm' : 'rig' }, !neutral && bike && bike.look && bike.look.paint || null);
 }
 function rigAnchors(){ const r = rigArt(); return r ? r.anchors : null; }
 
@@ -8611,6 +8616,23 @@ function bagShapeOf(pos, L, litres, slot){
   return B && B.bagShape && L && L.p ? B.bagShape(pos, L.p, litres, { slot:slot || null, frame:pos === 'frame' ? L.pts : undefined }) : null;
 }
 const shapeTurn = s => s.rot ? ` transform="rotate(${r2(s.rot)} ${r2(s.c[0])} ${r2(s.c[1])})"` : '';
+// The bar's straps on the front roll (the owner's finding G, 8 Nov 2026): what they hold lies along the roll's top, turned with it, and
+// two straps wrap round both. From the roll's outline: its middle, its axis (bike.js draws it running forward and up), its radius.
+function barStrapsOnRoll(outlines){
+  if(!outlines.length) return null;
+  const o = outlines.reduce((a, b) => Math.max(...b.map(p => p[0])) > Math.max(...a.map(p => p[0])) ? b : a);
+  const xs0 = o.map(p => p[0]), ys0 = o.map(p => p[1]);   // the roll is symmetric: its box's middle is its own
+  const cx = (Math.min(...xs0) + Math.max(...xs0)) / 2, cy = (Math.min(...ys0) + Math.max(...ys0)) / 2;
+  const u = [8 / 8.62, -3.2 / 8.62], n = [-u[1], u[0]];   // along the roll, and across it (downwards)
+  const along = o.map(p => (p[0] - cx) * u[0] + (p[1] - cy) * u[1]), r = Math.max(...o.map(p => Math.abs((p[0] - cx) * n[0] + (p[1] - cy) * n[1])));
+  const len = (Math.max(...along) - Math.min(...along)) * 0.55, h = 3.4, up = r + h / 2 - 0.2;
+  const m = [cx - n[0] * up, cy - n[1] * up];
+  const strap = t => { const a = [cx + u[0] * t - n[0] * (r + h + 0.6), cy + u[1] * t - n[1] * (r + h + 0.6)], b = [cx + u[0] * t + n[0] * (r + 0.8), cy + u[1] * t + n[1] * (r + 0.8)];
+    return `M${r2(a[0])},${r2(a[1])} L${r2(b[0])},${r2(b[1])}`; };
+  const xs = o.map(p => p[0]);
+  return { x:r2(m[0] - len / 2), y:r2(m[1] - h / 2), w:r2(len), h, cx:r2(m[0]), cy:r2(m[1]), deg:r2(Math.atan2(u[1], u[0]) * 180 / Math.PI),
+    straps:`${strap(-len * 0.28)} ${strap(len * 0.28)}`, tag:[r2(Math.min(296, Math.max(...xs) + 3)), r2(Math.min(147, cy + 2))] };
+}
 function shellShape(s, pct, bare){
   const id = 'cl'+(clipN++), b = s.box, fh = Math.max(0, (b.h + 2) * pct);
   return { def:`<clipPath id="${id}"><path d="${s.d}"/></clipPath>`,
@@ -8694,7 +8716,7 @@ function frameShapeGlyph(b){
 
 /* ---- The weight map (design of 8 Nov 2026): /tools/bags/weightmap.js (window.WayfinchWeightMap), loaded on the first press of Show
    weight map, never before. A view of the plan, not data: nothing of it is saved. It reads each bag where the rig draws it. ---- */
-const WEIGHT_MAP = { on:false, diff:false, drawn:'' };
+const WEIGHT_MAP = { on:false, diff:false, drawn:'', which:null };   // which: the ideal the rider switched to, null for the plan's
 let WEIGHT_MAP_SCRIPT = null, RIG_OUTLINES = {};
 function loadWeightMap(){
   if(window.WayfinchWeightMap) return Promise.resolve(window.WayfinchWeightMap);
@@ -8706,21 +8728,183 @@ function loadWeightMap(){
   });
   return WEIGHT_MAP_SCRIPT;
 }
-// Each packed bag, bottle and the rack deck's load with its kilos and its outline as drawn; the ideal's fixed profile needs to know
-// whether a rack is fitted (panniers or the rack deck in the plan), a frame bag fits and the top tube takes a bag.
+// The ideal (the owner's finding G, 8 Nov 2026): the rider's own things in the rider's own bags, in the best arrangement the planner
+// allows: advisor.js's balancing (WM-BALANCE) over this page's own packing, each trial a hand placement more on planWith's copies, so
+// the frozen rules are only ever called and nothing of the plan changes. With panniers and without, the one matching the plan first.
+const IDEAL_PANNIER_L = 20;
+let IDEAL_CACHE = { key:null, value:null };
+const idealFirst = () => S.bags.some(b => b.pos === 'rack') || hasDeck('rack') ? 'with' : 'without';
+// The ideal's bags: the plan's own; with panniers on a plan that has none, a pair of 20 L panniers added (not on a bike set to no rack
+// mounts, unless the plan has a rack); without panniers, the plan's taken away.
+function idealSetup(which){
+  const has = S.bags.some(b => b.pos === 'rack');
+  if(which === 'with' && !has){
+    if(advisorNoMounts() && !hasDeck('rack')) return { why:'mounts' };
+    return { kind:'added', bags:[...S.bags, { uid:S.nextUid, pos:'rack', L:IDEAL_PANNIER_L, pair:true }] };
+  }
+  if(which === 'without' && has) return { kind:'removed', bags:S.bags.filter(b => b.pos !== 'rack') };
+  return { kind:'own', bags:S.bags };
+}
+// A plan as the balancing reads it, while the trial's inputs are in place: each item placed whole in one bag (food, which fills the
+// gaps, and bottles stay as the planner has them), the bags in use with their free litres, and the plan's kilos per bag for the map.
+function balancePacking(plan){
+  const pieces = [], rooms = [];
+  plan.slots.forEach(s => {
+    if(isBottle(s.pos)) return;
+    // fillL: the food's litres, which the re-pack places last around a hand placement (review of PR 78, I1)
+    const fillL = s.items.reduce((t, k) => { const kit = kitById(k.id); return t + (kit && kit.divisible ? k.vol : 0); }, 0);
+    rooms.push({ key:s.key, pos:s.pos, freeL:s.left, fillL:+fillL.toFixed(2) });
+    const by = new Map();
+    s.items.forEach(k => { const kit = kitById(k.id); if(kit && kit.divisible) return;
+      const v = by.get(k.id) || { kg:0, L:0 }; v.kg += placedKg(k); v.L += k.vol; by.set(k.id, v); });
+    by.forEach((v, id) => { if((plan.items[id] || []).length === 1) pieces.push({ id, kg:+v.kg.toFixed(3), L:+v.L.toFixed(2), unit:s.key, pos:s.pos }); });
+  });
+  return { result:advisorResult(plan), pieces, rooms, state:{ v:1, basis:plan.basis, inUse:plan.inUse, items:plan.items },
+    slots:plan.slots.map(s => ({ key:s.key, pos:s.pos, kg:weightIn(s) })), spill:plan.spill.map(k => k.id), overL:plan.summary.overL };
+}
+function idealTrial(bags, pins, placements){
+  return planWith({ bags:bags.map(({ hand, ...b }) => ({ ...b })), decks:{ ...S.decks }, pinned:{ ...S.pinned, ...pins }, placements }, balancePacking);
+}
+// Where a bag of the ideal is drawn: as the rig draws it, or, for a bag the rig does not show (the panniers added), where it would.
+function idealOutline(key, bags){
+  if(RIG_OUTLINES[key]) return RIG_OUTLINES[key].outline;
+  const [uid, idx] = String(key).split('-'), b = bags.find(x => String(x.uid) === uid); if(!b) return null;
+  const n = bags.filter(x => x.pos === b.pos).flatMap(physical).length;
+  let L = layout(b.pos, +idx, n, frameShapeIdx(bags.find(x => x.pos === 'frame')), b.slot, rigAnchors()); if(!L) return null;
+  if(+idx > 0 && !slotsFor(b.pos)){ const o = pairOffset(b.pos); L = shiftShape(L, o[0], o[1]); }
+  const s = bagShapeOf(b.pos, L, +b.L, b.slot);
+  return s ? s.outline : null;
+}
+function idealFor(which){
+  const setup = idealSetup(which);
+  if(setup.why) return { why:setup.why };
+  const start = idealTrial(setup.bags, {}, setup.kind === 'own' ? S.placements : null);
+  if(setup.kind === 'removed'){
+    const mine = currentPlan(), spilled = new Set(mine.spill.map(k => k.id));
+    if(start.overL > mine.summary.overL + 0.005 || start.spill.some(id => !spilled.has(id))) return { why:'room' };
+  }
+  const out = window.WayfinchAdvisor.balance(start, (pins, from) => idealTrial(setup.bags, pins, from.state), { fixed:Object.keys(S.pinned || {}) });
+  // The search keeps its promises from its own start; an ideal with other bags must also keep the rider's plan's: no more litres on
+  // the back and nothing more out of reach (review of PR 78, I2), else it says why instead.
+  if(setup.kind !== 'own'){
+    const mine = advisorResult(currentPlan()), got = out.packing.result;
+    if(got.backL > mine.backL + 0.005 || got.outOfReach > mine.outOfReach) return { why:setup.kind === 'removed' ? 'back' : 'backWith' };
+  }
+  const items = out.packing.slots.filter(s => s.kg > 0).map(s => ({ pos:s.pos, kg:s.kg, outline:idealOutline(s.key, setup.bags) }))
+    .filter(i => i.outline && i.outline.length >= 3);
+  // more: the added panniers also take things the plan leaves over, so the ideal carries more kilos than yours (review of PR 78, m1)
+  const more = out.packing.slots.reduce((t, s) => t + s.kg, 0) > currentPlan().slots.reduce((t, s) => t + weightIn(s), 0) + 0.005;
+  return { kind:setup.kind, items, same:setup.kind === 'own' && !out.moves.length && !out.partial, more, balanced:out };
+}
+// Worked out again only when the plan, its placements or the choice changed.
+function weightMapIdeal(which){
+  const key = JSON.stringify([which, planSignature(), S.placements, S.nextUid]);
+  if(IDEAL_CACHE.key !== key) IDEAL_CACHE = { key, value:idealFor(which) };
+  return IDEAL_CACHE.value;
+}
+
+/* ---- Automatic balancing (the owner's decision of 8 Nov 2026, weight map design §7): at the packing step, on top of the planner's own
+   packing (the frozen rules, called and never changed), advisor.js's balancing in the rider's own bags, no new bag. It is applied only
+   when it is clearly better (Better handling's score lower by the advisor's MIN_GAIN_SCORE or more), with one line and Undo, and it is
+   stored as kept placements (S.placements, through keepPlan). ---- */
+// BALANCE (declared by PLAN_CACHE). checked: the kept placements last looked at, as JSON, so each plan is looked at once; pins: the hand
+// placements then; last: the balance
+// on show, with the planner's own placements it replaced (Undo); reverted: the placements Undo brought back, while the line says so;
+// undone: things the rider put back with Undo, never moved by the balancing again in this visit
+// (not stored: a later visit may offer the same balance again, with its line and Undo).
+// What stays where it is: the rider's hand placements, things ticked as packed, things put back with Undo, and every must-reach thing
+// that is within reach now.
+function balanceFixed(start){
+  const ids = new Set([...Object.keys(S.pinned || {}), ...Object.keys(S.packed || {}).filter(id => S.packed[id]), ...BALANCE.undone]);
+  start.pieces.forEach(p => { const k = kitById(p.id); if(k && isMustReach(k) && reachableFor(k, p.pos)) ids.add(p.id); });
+  return [...ids];
+}
+// Looks at the plan once after each change, at the packing step only (where the line shows); true when a balance was applied.
+function autoBalancePlan(){
+  if(PLAN_TRIAL || TRIAL || S.step !== 4 || !DRAFT_READY || DRAFT_FROZEN) return false;
+  const plan = currentPlan(), sig = JSON.stringify(S.placements), pins = JSON.stringify(S.pinned || {});
+  if(!S.placements || sig === BALANCE.checked) return false;
+  const W = window.WayfinchAdvisor;
+  if(!W || !W.autoBalance){
+    if(!BALANCE.failed) loadAdvisor().then(() => { if(S.step === 4 && !TRIAL){ renderResult(); drawRig(); } }, () => { BALANCE.failed = true; });
+    return false;
+  }
+  // a step the rider made by hand (a move, a forgotten placement) is the rider's own: it is not balanced
+  const byHand = BALANCE.pins !== null && BALANCE.pins !== pins;
+  BALANCE.checked = sig; BALANCE.pins = pins;
+  if(byHand) return false;
+  const before = S.placements, start = idealTrial(S.bags, {}, before);
+  const out = W.autoBalance(start, (p, from) => idealTrial(S.bags, p, from.state), { fixed:balanceFixed(start) });
+  if(!out.apply) return false;
+  const replan = plan.notes.replan;
+  keepPlan({ load:out.balanced.packing.state });
+  const now = currentPlan();
+  if(replan) now.notes.replan = replan;
+  BALANCE.checked = JSON.stringify(S.placements); BALANCE.reverted = null;
+  // the line names the moves that do the most first: kilos times the drop of the handling weight (the lighter half of a swap last)
+  const kg = new Map(out.balanced.packing.pieces.map(p => [p.id, p.kg])), posOf = new Map(start.rooms.map(r => [r.key, r.pos]));
+  const worth = m => (kg.get(m.id) || 0) * ((W.WEIGHTS[posOf.get(m.from)] || 0) - (W.WEIGHTS[posOf.get(m.to)] || 0));
+  const moves = [...out.balanced.moves].sort((a, b) => worth(b) - worth(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  BALANCE.last = { placements:S.placements, before, moves, gain:out.gain, balanced:out.balanced.packing.state };
+  return true;
+}
+// The balancing's memory belongs to one plan: a plan loaded (My plans, a working plan, another tab's) and Start again are looked at
+// afresh, as a first look (review of PR 79, m3).
+function resetBalance(){
+  BALANCE.checked = null; BALANCE.pins = null; BALANCE.last = null; BALANCE.reverted = null; BALANCE.undone = new Set();
+}
+// Undo is offered while nothing it would move back is ticked as packed: a thing the rider packed where the balance put it is never moved
+// back under the tick (review of PR 79, I1). Unticked, Undo is offered again.
+const balancePacked = last => last.moves.some(m => S.packed && S.packed[m.id]);
+// Undo: the packing before the balance back; what moved is kept where it was from now on, in this visit.
+function undoBalance(){
+  const last = BALANCE.last;
+  if(!last || last.placements !== S.placements || balancePacked(last)) return false;
+  last.moves.forEach(m => BALANCE.undone.add(m.id));
+  BALANCE.last = null;
+  keepPlan({ load:last.before });
+  currentPlan();
+  BALANCE.checked = JSON.stringify(S.placements); BALANCE.reverted = S.placements;
+  return true;
+}
+// The one quiet line, while the plan is the one it speaks of.
+function balanceLine(){
+  const last = BALANCE.last;
+  if(last && last.placements === S.placements){
+    const A = currentPlan();
+    // a kit name with its first letter lowered unless it is a capital word ("ID, cards, insurance"); a thing the rider added as typed
+    const named = k => !k ? null : k.added ? k.name : k.name.replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase());
+    const said = last.moves.map(m => { const k = kitById(m.id), s = A.slots.find(x => x.key === m.to);
+      return (named(k) || m.id) + (s ? ' to the ' + unitLabel(s).toLowerCase() : ''); });
+    const shown = said.length > 3 ? [...said.slice(0, 2), `${said.length - 2} more things`] : said;
+    const list = htmlEsc(said.length < 2 ? said[0] : shown.slice(0, -1).join(', ') + ' and ' + shown[shown.length - 1]);
+    if(balancePacked(last)) return `<div class="balance-line" role="status"><span>Packed for better balance: ${list}. You have started packing it this way, so it stays.</span></div>`;
+    return `<div class="balance-line" role="status"><span>Packed for better balance: ${list} ·</span> <button class="linky" type="button" data-balance-undo="1">Undo</button></div>`;
+  }
+  // after an earlier balance the packing before this one still carries its moves, so the line says what it is (review of PR 79, m1)
+  if(BALANCE.reverted && BALANCE.reverted === S.placements) return `<div class="balance-line" role="status"><span>Back to the packing before this balance.</span></div>`;
+  return '';
+}
+// The kit on the rack deck, where the deck is drawn.
+function deckMapItem(a){
+  const kg = deckClaims().reduce((t, k) => t + itemKg(k), 0), d = a.rackTop;
+  return kg > 0 ? [{ pos:'deck', kg, outline:[[d.x, d.y], [d.x + d.w, d.y], [d.x + d.w, d.y + d.h], [d.x, d.y + d.h]] }] : [];
+}
+// Each packed bag, bottle and the rack deck's load with its kilos and its outline as drawn; the ideal for the switch's choice; the bike
+// without its colour (WM-NEUTRAL). Needs bike.js and advisor.js.
 function weightMapInput(){
-  const B = bikeModule(), a = rigAnchors(); if(!B || !B.bagShape || !a) return null;
-  const items = [], fit = bikeFit(S.bikeProfile);
+  const B = bikeModule(), a = rigAnchors(); if(!B || !B.bagShape || !a || !window.WayfinchAdvisor) return null;
+  const items = [];
   currentPlan().slots.forEach(s => { const o = RIG_OUTLINES[s.key], kg = (s.items || []).reduce((t, k) => t + placedKg(k), 0);
     if(o && kg > 0) items.push({ pos:o.pos, kg, outline:o.outline }); });
-  const deck = deckClaims().reduce((t, k) => t + itemKg(k), 0), d = a.rackTop;
-  if(deck > 0) items.push({ pos:'deck', kg:deck, outline:[[d.x, d.y], [d.x + d.w, d.y], [d.x + d.w, d.y + d.h], [d.x, d.y + d.h]] });
-  const art = rigArt();
-  return { items, anchors:a, shape:B.bagShape, pairOffset:B.PAIR_OFFSET, diff:WEIGHT_MAP.diff,
-    // panniers in the ideal when a rack is fitted or the bike has pannier mounts (the coordinator's ruling of 8 Nov, review of PR 71, I1)
-    ideal:{ rack:S.bags.some(b => b.pos === 'rack') || hasDeck('rack') || !!S.bikeProfile && S.bikeProfile.rackMounts === 'yes', frame:!fit.frameBag.none, top:!!(fit.topMounts.front || fit.topMounts.rear) },
+  items.push(...deckMapItem(a));
+  const which = WEIGHT_MAP.which || idealFirst(), found = weightMapIdeal(which);
+  const ideal = found.why ? { why:found.why } : { kind:found.kind, items:[...found.items, ...deckMapItem(a)], same:found.same, more:found.more };
+  const art = rigArt(true);
+  return { items, scale:a.scale, ideal, which, diff:WEIGHT_MAP.diff,
     bike:art ? art.svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '') : '',
-    onDiff:on => { WEIGHT_MAP.diff = on; drawWeightMap(); } };
+    onDiff:on => { WEIGHT_MAP.diff = on; drawWeightMap(); },
+    onIdeal:w => { WEIGHT_MAP.which = w; drawWeightMap(); } };
 }
 function drawWeightMap(){
   const button = $('rigWeightMap'), box = $('weightMap'); if(!button || !box) return;
@@ -8731,13 +8915,15 @@ function drawWeightMap(){
   button.onclick = () => { WEIGHT_MAP.on = !WEIGHT_MAP.on; WEIGHT_MAP.drawn = ''; drawWeightMap(); };
   box.hidden = !on;
   if(!on) return;
-  const input = weightMapInput(); if(!input) return;
-  // drawn again only when the plan, the theme or the difference changed
-  const key = JSON.stringify([input.items, input.ideal, input.diff, bikeTheme(), input.bike]);
-  if(key === WEIGHT_MAP.drawn) return;
-  WEIGHT_MAP.drawn = key;
-  loadWeightMap().then(M => { if(WEIGHT_MAP.on && WEIGHT_MAP.drawn === key) M.render(box, input); })
-    .catch(() => { WEIGHT_MAP.drawn = ''; box.textContent = 'The weight map could not be loaded. Check the connection and press Show weight map again.'; });
+  Promise.all([loadWeightMap(), loadAdvisor()]).then(([M]) => {
+    if(!WEIGHT_MAP.on) return;
+    const input = weightMapInput(); if(!input) return;
+    // drawn again only when the plan, the theme, the ideal or the difference changed
+    const key = JSON.stringify([input.items, input.which, IDEAL_CACHE.key, input.diff, bikeTheme(), input.bike]);
+    if(key === WEIGHT_MAP.drawn) return;
+    WEIGHT_MAP.drawn = key;
+    M.render(box, input);
+  }).catch(() => { WEIGHT_MAP.drawn = ''; box.textContent = 'The weight map could not be loaded. Check the connection and press Show weight map again.'; });
 }
 
 // The bike at the back of the rig, redrawn on its own when only the look or the theme changed.
@@ -8753,7 +8939,7 @@ function drawRig(){
   const A=currentPlan(), { slots } = A;
   const loadedRackDeck=showFill && deckClaims().length>0;
   clipN = 0; RIG_OUTLINES = {};
-  const defs = [], art = [], tags = [];
+  const defs = [], art = [], tags = [], barRolls = [];
   const fb = S.bags.find(b => b.pos === 'frame');
   const frameSmall = frameShapeIdx(fb);
   const bike = rigArt(), anchors = bike ? bike.anchors : null;
@@ -8830,6 +9016,7 @@ function drawRig(){
       if(b.idx > 0 && !slots_) L = shiftShape(L, PAIR_OFF[0], PAIR_OFF[1]);
       const sh = shellOf(L, pct, pos, +b.L, b.slot);
       defs.push(sh.def);
+      if(pos === 'bar'){ const bs = bagShapeOf(pos, L, +b.L, b.slot); if(bs) barRolls.push(bs.outline); }
       const shp = s && bagShapeOf(pos, L, +b.L, b.slot);
       if(shp) RIG_OUTLINES[s.key] = { pos, outline:shp.outline };
       const canBump = !removing && (POSITIONS[pos].pairable && !b.pair || pos === 'frame');
@@ -8883,7 +9070,16 @@ function drawRig(){
     const deckEmpty=showFill && on && !(which==='rack' && loadedRackDeck);
     const deckIdle=showFill && on && which==='bar' && !slots.some(s=>s.pos==='bar');
     const cls = on ? `deck${deckEmpty?' deck-empty':''}${deckIdle?' idle':''}` : 'deck ghostdeck';
-    art.push(`<g class="bagg ${cls}${editing && (removing ? on : true) ? (removing ? ' removable' : ' addable') : ''}"${act}>` +
+    // Once the kit is chosen, the bar's straps are drawn on the roll itself (the owner's finding G, 8 Nov 2026): what they hold lies along
+    // the roll's top and two straps wrap round both. While editing they stay at their own spot, where their tap target is.
+    const roll = which === 'bar' && stage > 2 && on ? barStrapsOnRoll(barRolls) : null;
+    if(roll){
+      art.push(`<g class="bagg ${cls} deck-bar"><rect class="bag-shell" x="${roll.x}" y="${roll.y}" width="${roll.w}" height="${roll.h}" rx="1.5" transform="rotate(${roll.deg} ${roll.cx} ${roll.cy})"/>` +
+        `<path class="strapline" d="${roll.straps}"/></g>`);
+      tags.push(`<text class="bag-tag active deck-tag${deckEmpty?' deck-empty':''}" x="${roll.tag[0]}" y="${roll.tag[1]}" text-anchor="start">STRAPS</text>`);
+      return;
+    }
+    art.push(`<g class="bagg ${cls}${which === 'bar' ? ' deck-bar' : ''}${editing && (removing ? on : true) ? (removing ? ' removable' : ' addable') : ''}"${act}>` +
       `<rect class="bag-shell" x="${D.x}" y="${D.y}" width="${D.w}" height="${D.h}" rx="1.5"/>` +
       `<path class="strapline" d="M${r2(D.x-2)},${r2(D.y+D.h*0.34)} h${r2(D.w+4)} M${r2(D.x-2)},${r2(D.y+D.h*0.72)} h${r2(D.w+4)}"/>` +
       (editing && H ? hitRect(H.box) : '') + `</g>`);
@@ -10152,7 +10348,7 @@ function mountedEmptySentence(slots){
 }
 // Start again: a full re-plan that also clears ticks and hand placements.
 function startAgain(){
-  S.pinned = {}; S.packed = {}; S.packOpen = null;
+  S.pinned = {}; S.packed = {}; S.packOpen = null; resetBalance();
   keepPlan({ replan:true, why:'startAgain' });
 }
 function panniersReason(rack){
@@ -10167,6 +10363,7 @@ function panniersBikeBags(unused){
   return usableUnits().some(u => u.pos !== 'rack' && !POSITIONS[u.pos].onBody) ? 'Your bikepacking bags all stay mounted.' : '';
 }
 function renderResult(){
+  autoBalancePlan();
   renderNightsSuggestion();
   const resultFocus=typeof captureFocus === 'function' ? captureFocus($('s4')) : null;
   $('modeBar').querySelectorAll('button').forEach(b =>
@@ -10713,7 +10910,7 @@ function renderResult(){
     roomTip = cf.picks.length + ' would fit';
   }
 
-  const paint = () => (
+  const paint = () => (balanceLine() +
     sec(true, 'Missing', weatherReady
         ? (miss.length ? miss.length + ' to fix' : 'all clear')
         : (miss.length ? miss.length + ' to fix · weather unchecked' : 'weather unchecked'),
@@ -10879,6 +11076,11 @@ function renderResult(){
   $('resultBox').querySelectorAll('[data-forget]').forEach(b => b.onclick = () => keepPlace(() => {
     forgetPlacement(b.dataset.forget);
     renderResult(); drawRig();
+  }));
+  $('resultBox').querySelectorAll('[data-balance-undo]').forEach(b => b.onclick = () => keepPlace(() => {
+    if(!undoBalance()) return;
+    renderResult(); drawRig();
+    $('stepTitle4')?.focus?.({ preventScroll:true });
   }));
   $('resultBox').querySelectorAll('[data-replan]').forEach(b => b.onclick = () => keepPlace(() => {
     keepPlan({ replan:true, why:'asked' });
@@ -11890,6 +12092,7 @@ function restorePlan(p, draft, restoreSettings=true){
   });
   // A stored null is a plan without bags; anything else unusable is an older or foreign save (design 8.4).
   keepPlan({ load:p.placements, placedAgain:savedPlacements !== null && !p.placements });
+  resetBalance();
   // Saved trips keep the component snapshot they used, even when a reusable
   // profile with the same id has since been edited or deleted.
   persistBikeProfileSelection();

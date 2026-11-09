@@ -41,14 +41,16 @@ async function onYouAtBikes(page: Page): Promise<void> {
   await expect(page.locator('[data-bikes]')).toBeInViewport();
 }
 
-test('[BK-RETURN] from You: Edit, a new colour, Use this bike for this plan, Update saved bike, then the cross: You at the bikes, the change shown, no extra step back', async ({ page }) => {
+// "Use this bike for this plan" is gone (the owner's finding H, 8 Nov 2026): Edit changes that saved bike, the plan keeps its own.
+test('[BK-RETURN] from You: Edit, a new colour, Update saved bike, then the cross: You at the bikes, the change shown, no extra step back', async ({ page }) => {
   await wayfinch(page, '#/you');
   await expect(youBike(page, 'Town bike')).toBeVisible();
   const before = await page.evaluate(() => history.length);
   await tapInto(page, youBike(page, 'Town bike').getByRole('link', { name: /Edit/ }));
+  await expect(page.locator('#bikeDetailsBox').getByRole('button', { name: 'Use this bike for this plan' })).toHaveCount(0);
   await swatch(page, 'Red').click();
-  await page.locator('#bikeUseShown').click();
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfile')!).id)).toBe('bike_town');
+  await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles')!) as { id: string; look: { colour: string } | null }[]).find((b) => b.id === 'bike_town')?.look?.colour)).toBe('#c62f2a');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfile')!).id)).toBe('bike_blue');
   await moreDetails(page);
   await page.locator('#bikeSave').click();
   await expect(page.locator('#bikeSave')).toHaveText('Update saved bike');
@@ -56,7 +58,8 @@ test('[BK-RETURN] from You: Edit, a new colour, Use this bike for this plan, Upd
   await onYouAtBikes(page);
   const town = youBike(page, 'Town bike');
   await expect(town.locator('.bk-paint.bk-frame').first()).toHaveAttribute('stroke', '#c62f2a');
-  await expect(town).toContainText('In your plan');
+  await expect(town).not.toContainText('In your plan');
+  await expect(youBike(page, 'Blue tourer')).toContainText('In your plan');
   // the bag planner is ahead in the history, not behind: one step back does not open it again
   expect(await page.evaluate(() => history.length)).toBe(before + 1);
   await page.goBack();
@@ -74,6 +77,25 @@ test('[BK-RETURN] from You: Add a bike, named and saved, then Escape: You at the
   await page.keyboard.press('Escape');
   await onYouAtBikes(page);
   await expect(youBike(page, 'Gravel').locator('.bk-paint.bk-frame').first()).toHaveAttribute('stroke', '#e46b1f');
+});
+
+test('[BK-ADD-CHOSEN] from You: Add a bike, a colour tapped: saved, In your plan on You, and Tools shows it as the chosen bike straight away', async ({ page }) => {
+  await wayfinch(page, '#/you');
+  await tapInto(page, page.getByRole('link', { name: 'Add a bike' }));
+  await swatch(page, 'Orange').click();
+  await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles') ?? '[]') as unknown[]).length)).toBe(3);
+  const added = await page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles')!) as { id: string }[])[2]!.id);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfile')!).id)).toBe(added);
+  await expect(page.locator('#bikeProfileStatus')).toContainText('now the bike for your plan');
+  await page.locator('#bikeDetailsClose').click();
+  await onYouAtBikes(page);
+  const row = page.locator('li.you-bike').first();
+  await expect(row).toContainText('In your plan');
+  await expect(row.locator('.bk-paint.bk-frame').first()).toHaveAttribute('stroke', '#e46b1f');
+  // Tools: the bike line names it and the Bag planner card draws it, not the grey standard bike
+  await page.evaluate(() => { location.hash = '#/tools'; });
+  await expect(page.locator('#tools-bike')).toHaveValue(added);
+  await expect(page.locator('section.card', { has: page.getByRole('heading', { name: 'Bag planner', exact: true }) }).locator('.bk-paint.bk-frame').first()).toHaveAttribute('stroke', '#e46b1f');
 });
 
 test('[BK-RETURN] from You: a new colour, then the browser\'s Back: You at the bikes, the change shown', async ({ page }) => {
