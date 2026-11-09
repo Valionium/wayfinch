@@ -1603,12 +1603,16 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 /* 6 px wider than the options on each side: a checked ring (3 px) or a focus ring (4 px) that scrolls under the panel stays under it
    (owner's try-out, 5 Nov 2026). The dialog's body has 12-16 px of room on each side. */
 .look-preview{position:sticky;top:-16px;z-index:2;background:var(--panel);padding:6px 6px 4px;margin:0 -6px 6px;border-bottom:1px solid var(--line)}
-.look-preview svg{display:block;width:100%;max-width:420px;height:auto;margin:0 auto}
-/* while the close-up shows, the bike moves to the left at the width renderForkZoom works out, and the close-up sits on its right */
-.look-preview.with-zoom svg{width:var(--look-bike-w,100%);margin:var(--look-bike-y,0px) 0 0 var(--look-bike-x,0px)}
+.look-preview svg{display:block;width:100%;max-width:420px;height:auto;margin:0 auto;transform-origin:0 0;transition:transform .32s ease}
+/* while the close-up shows, the bike moves to the left at the size layoutForkZoom works out, and the close-up sits on its right; a
+   transform, so the bike glides there and back (owner, 9 Nov 2026) and nothing below moves; with reduced motion it is there at once */
+.look-preview.with-zoom svg{transform:translate(var(--look-bike-x,0px),var(--look-bike-y,0px)) scale(var(--look-bike-k,1))}
 /* The fork close-up (owner, 7 Nov 2026): the preview's drawing cut to the fork, 2.5 times as large (its width is set from the cut) */
-/* It shows inside the drawing's area, on the bike's right, while the Fork part is on screen below the drawing, to that part's end. */
-.look-fork-zoom{position:sticky;z-index:3;box-sizing:border-box;margin-left:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+/* It shows inside the drawing's area, on the bike's right, while the Fork part is on screen below the drawing, to that part's end, from
+   the moment that part comes on screen, before any tap (owner, 9 Nov 2026); it fades in and out with the bike's glide. */
+.look-fork-zoom{position:sticky;z-index:3;box-sizing:border-box;margin-left:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden;
+  pointer-events:none;opacity:0;visibility:hidden;transform:scale(.9);transform-origin:100% 50%;transition:opacity .32s ease,transform .32s ease,visibility 0s linear .32s}
+.look-fork-zoom.shown{opacity:1;visibility:visible;transform:none;transition:opacity .32s ease,transform .32s ease,visibility 0s}
 .look-fork-zoom svg{display:block;width:100%;height:auto}
 .look-guess{margin:0 0 8px;color:var(--muted);font-size:13px;min-height:1.2em}
 .bike-look fieldset{border:0;padding:0;margin:0 0 10px}
@@ -3743,8 +3747,10 @@ function renderLook(){
   $('lookPhoto').classList.remove('hidden');
   $('lookPhoto').setAttribute('aria-expanded',String(!!LOOK_PHOTO));
   followShownBike();
-  const t=lookTarget(),look=currentLook()||{colour:null,bars:null,ebike:null},bike=lookPreviewBike();
-  const view=t.kind==='plan' ? planBagView() : null,art=bikeDrawing(bike,view,{theme:bikeTheme()}),spec=art.spec,guess=[];
+  const look=currentLook()||{colour:null,bars:null,ebike:null},bike=lookPreviewBike();
+  // Personalising is about the bike alone (owner's video, 9 Nov 2026): Look draws it with no bags, bottles, decks or rack, even when
+  // it is the plan's bike, which the rig behind still draws with them.
+  const art=bikeDrawing(bike,null,{theme:bikeTheme()}),spec=art.spec,guess=[];
   box.innerHTML=art.svg;   // drawn by bikeDrawing, the function the drawing-set check covers
   if(!look.bars)guess.push(bikeWord('lookGuessBars',{value:spec.bars.value}));
   if(look.ebike===null)guess.push(bikeWord('lookGuessEbike',{value:spec.ebike.value ? 'yes' : 'no'}));
@@ -3755,7 +3761,7 @@ function renderLook(){
   check('lookBars',look.bars||'');
   check('lookEbike',look.ebike===null ? '' : String(look.ebike));
   syncLookExtras(look);
-  renderForkZoom(bike,view,art);
+  renderForkZoom(bike,art);
   $('lookPickerChip').classList.toggle('on',!!look.colour && !swatch);
   if(look.colour && document.activeElement!==$('lookPicker'))$('lookPicker').value=look.colour;
   const ready=typeof DRAFT_READY!=='undefined' && DRAFT_READY;
@@ -3764,12 +3770,13 @@ function renderLook(){
   $('lookUndo').classList.toggle('hidden',!LOOK_CHANGED && !(swap && BIKE_PROFILE_EDITOR_ID===swap.newId));
   $('lookStatus').textContent=LOOK_MESSAGE;
 }
-// The fork close-up (owner, 7 Nov 2026): while the fork has colours of its own, the same drawing cut to the fork, 2.5 times the preview's
-// size, so each tap on its colours shows where it lands. A second picture of the bike: hidden from screen readers, and never named for the
-// glide (the preview is). Owner, 9 Nov 2026: it sits inside the drawing's area, on the right, and the bike moves to the left so both fit
-// side by side; it shows while the Fork part is on screen below the drawing, to that part's end (the drawing's area is sticky in Look).
+// The fork close-up (owner, 7 Nov 2026): the same drawing cut to the fork, 2.5 times the preview's size, so each tap on its colours
+// shows where it lands. A second picture of the bike: hidden from screen readers, and never named for the glide (the preview is).
+// Owner, 9 Nov 2026: it sits inside the drawing's area, on the right, and the bike moves to the left so both fit side by side; it shows
+// while the Fork part is on screen below the drawing, to that part's end (the drawing's area is sticky in Look), from the moment that
+// part scrolls into view, before any tap (owner's video, 9 Nov 2026), and the bike glides between alone and beside it.
 const FORK_ZOOM=2.5;
-let FORK_CUT=null;   // the close-up's cut of the drawing, {w, h} in the drawing's units, while the fork has colours of its own
+let FORK_CUT=null;   // the close-up's cut of the drawing, {w, h} in the drawing's units, while there is a drawing
 // The bike's width beside the close-up: the close-up no taller than the bike alone (so the area keeps its height and nothing below
 // moves while scrolling), both side by side within the area, and the bike never larger than alone.
 function forkZoomBikeWidth(areaW,gap,cut){
@@ -3779,36 +3786,40 @@ function forkZoomBikeWidth(areaW,gap,cut){
 function layoutForkZoom(){
   const stage=$('lookPreview'),zoom=$('lookForkZoom');
   if(!stage || !zoom || !stage.classList || !zoom.classList)return;
-  let show=!!FORK_CUT && !!zoom.innerHTML;
+  const drawn=!!FORK_CUT && !!zoom.innerHTML;
+  let show=drawn;
   const set=$('lookForkSet'),body=$('bikeDetailsBody');
-  if(typeof stage.getBoundingClientRect!=='function'){zoom.classList.toggle('hidden',!show);return;}
+  if(typeof stage.getBoundingClientRect!=='function'){zoom.classList.toggle('hidden',!show);zoom.classList.toggle('shown',show);return;}
   if(show && set && body){
     const f=set.getBoundingClientRect(),s=stage.getBoundingClientRect(),b=body.getBoundingClientRect();
     show=f.height>0 && f.bottom>s.bottom+1 && f.top<b.bottom;
   }
-  zoom.classList.toggle('hidden',!show);
+  // Laid out whenever there is a drawing, shown or not, so it fades out where it was and fades in where it goes.
+  zoom.classList.toggle('hidden',!drawn);
+  zoom.classList.toggle('shown',show);
   stage.classList.toggle('with-zoom',show);
-  if(!show){['--look-bike-w','--look-bike-x','--look-bike-y'].forEach(k=>stage.style.removeProperty(k));stage.style.minHeight='';return;}
+  if(!drawn)return;
   // The drawing (#lookPreview, which holds only the drawing) and the close-up, its next sibling, are both sticky in Look: the close-up
-  // is pulled up over the drawing's right part by its margins (taking no room of its own) and sticks the moment the drawing does.
+  // is pulled up over the drawing's right part by its margins (taking no room of its own) and sticks the moment the drawing does. The
+  // bike keeps its own place and size in the page and is moved and shrunk by a transform, so the area keeps its height.
   const cs=getComputedStyle(stage),num=k=>parseFloat(cs[k])||0,GAP=10;
-  const areaW=stage.clientWidth-num('paddingLeft')-num('paddingRight'),innerH=Math.min(areaW,420)*150/320;
+  const areaW=stage.clientWidth-num('paddingLeft')-num('paddingRight'),aloneW=Math.min(areaW,420),innerH=aloneW*150/320;
   const bikeW=forkZoomBikeWidth(areaW,GAP,FORK_CUT),zoomW=FORK_CUT.w*FORK_ZOOM*bikeW/320+2,zoomH=FORK_CUT.h*FORK_ZOOM*bikeW/320+2;
   const side=Math.max(0,(areaW-bikeW-GAP-zoomW)/2),panelH=num('paddingTop')+innerH+num('paddingBottom')+num('borderBottomWidth');
   const down=num('paddingTop')+(innerH-zoomH)/2,after=num('marginBottom');   // the close-up's top within the drawing's area
-  stage.style.setProperty('--look-bike-w',r2(bikeW)+'px');
-  stage.style.setProperty('--look-bike-x',r2(side)+'px');
-  stage.style.setProperty('--look-bike-y',r2((innerH-bikeW*150/320)/2)+'px');
-  stage.style.minHeight=r2(cs.boxSizing==='border-box' ? panelH : innerH)+'px';
+  const k=aloneW>0 ? bikeW/aloneW : 1;
+  stage.style.setProperty('--look-bike-k',String(Math.round(k*10000)/10000));
+  stage.style.setProperty('--look-bike-x',r2(side-(areaW-aloneW)/2)+'px');
+  stage.style.setProperty('--look-bike-y',r2(innerH*(1-k)/2)+'px');
   Object.assign(zoom.style,{width:r2(zoomW)+'px',top:r2(parseFloat(cs.top)+down)+'px',marginRight:r2(side)+'px',
     marginTop:r2(-(after+panelH-down))+'px',marginBottom:r2(after+panelH-down-zoomH)+'px'});
 }
 let FORK_LAYOUT_FRAME=0;
 function queueForkLayout(){ if(FORK_LAYOUT_FRAME)return; FORK_LAYOUT_FRAME=requestAnimationFrame(()=>{FORK_LAYOUT_FRAME=0;layoutForkZoom();}); }
-function renderForkZoom(bike,view,art){
+function renderForkZoom(bike,art){
   const box=$('lookForkZoom');if(!box)return;
-  const show=!!lookPaint().fork && !!art && !!art.anchors;
-  const zoom=show ? bikeDrawing(bike,view,{theme:bikeTheme(),idPrefix:'bkz'}) : null;
+  const show=!!art && !!art.anchors;   // the fork as the frame too: the close-up is there before any tap (owner, 9 Nov 2026)
+  const zoom=show ? bikeDrawing(bike,null,{theme:bikeTheme(),idPrefix:'bkz'}) : null;
   if(!zoom){FORK_CUT=null;box.innerHTML='';layoutForkZoom();return;}
   const p=art.anchors.points,x=Math.max(0,p.headBottom[0]-22),y=Math.max(0,p.headTop[1]-6);
   const w=Math.min(320-x,p.front[0]-p.headBottom[0]+40),h=Math.min(150-y,p.front[1]-p.headTop[1]+14);
