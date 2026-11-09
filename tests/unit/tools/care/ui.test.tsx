@@ -201,7 +201,7 @@ test('[BC-SCREEN] using the screen writes nothing: tabs, filters, search and ope
   expect(host.querySelector('h2')!.textContent).toBe(C.careTitle);
 });
 
-test('[BC-FOCUS] opening the screen puts the focus on its title', async () => {
+test('[BC-SCREEN] opening the screen puts the focus on its title', async () => {
   await mount(world([bike('bike_a', 'Gravel')]));
   expect(document.activeElement).toBe(host.querySelector('h2'));
 });
