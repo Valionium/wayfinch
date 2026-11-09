@@ -35,7 +35,8 @@ const check=(value,message)=>{assert.ok(value,message);checks++;};
   check((await run('importAll("界".repeat(Math.floor(MAX_IMPORT_BYTES/3)+1))')).includes('64 MiB'),'UTF-8 byte bound matches File.size for multibyte text');
   check(q.html.includes('if(f.size > MAX_IMPORT_BYTES)') && q.html.includes("$('impMsg').textContent = IMPORT_SIZE_MESSAGE"),'file picker and parser use identical limits');
   const excess=await run('importAll(JSON.stringify({setups:Array.from({length:22},(_,i)=>qaSetup(i+100))}))');
-  check(run('SETUPS.length===20') && /Skipped 22 setups/.test(excess),'over-capacity setup cards are bounded and explicitly reported');
+  // 20 trip setups are here already; the trip setups' limit is 40 (the owner's answer of 8 Nov 2026, 20 general and 40 trip setups)
+  check(run('SETUPS.length===40') && /Skipped 2 setups/.test(excess),'over-capacity setup cards are bounded and explicitly reported');
   const hostile=await run(`importAll('{"settings":{"theme":"dark"},"__proto__":{"polluted":true},"setups":[null,{},42],"feedback":[{},null]}')`);
   check(/Skipped 5 invalid/.test(hostile) && run('({}).polluted===undefined'),'malformed entries and prototype keys are discarded');
   run('DRAFT_READY=true;DRAFT_READ_KIND="browser";DRAFT_SIGNATURE=JSON.stringify(captureDraft());initialiseDraftSaveStatus();S.nights=8;');
@@ -121,7 +122,7 @@ const check=(value,message)=>{assert.ok(value,message);checks++;};
   for(const t of setupTabs)t.run('DRAFT_READY=true;snapshotSetup=(name)=>normaliseSetup({...captureDraft(),id:newSetupId(),name,saved:"2026-10-03",predicted:{mounted:35,kit:31,spare:4,spilled:0,kg:14}});');
   await sa.run('saveSetup("From tab A","")');
   await sb.run('saveSetup("From tab B","")');
-  const names=JSON.parse(shared.values.get('loadcheck:setups')||sa.store.values.get('loadcheck:setups')).map(x=>x.name).sort();
+  const names=JSON.parse(sa.run('JSON.stringify(storedSetupsLocal())')).map(x=>x.name).sort();   // as the page reads its two lists
   check(names.join('|')==='From tab A|From tab B','rule 6: saving a setup keeps the setups another tab saved');
   check(sa.run('SETUPS.length')===2,'rule 6: the other tab follows the setups list without writing');
   console.log(JSON.stringify({suite:'storage',checks,maximal20SetupExportBytes:run('qaBytes'),reportsRoundTripped:750}));
