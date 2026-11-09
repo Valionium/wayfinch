@@ -5,7 +5,9 @@
 
 export const TR = {
   appTripKeepFreshWhy: 'Updates only the weather, when the app opens with signal and a newer forecast exists. Places update only when you ask.',
-  appAbNote: 'The words you search for go to a place-search service. Planning sends the start and end points to a bike router.',
+  appAbNote: 'Type a town, an address (street and number), or a named place such as a station, campsite or hotel. The words you type go only to two place-search services: Open-Meteo for towns and Photon (OpenStreetMap) for addresses and named places. Nothing you type is stored. Planning sends the start and end points to a bike router.',
+  appAbHint: 'Search needs signal. It asks once when you press Search.',
+  appAbList: 'Places found',
   appTripPrepareLine: 'Fetches places, opening hours, heights and weather for this route and keeps them on your phone, so En route works without signal.',
   appTripSettingsStageNote: 'Changing nights, pace or speed changes the days of your route.',
   appTripChooseHint: 'For exact planning, upload your GPX. For a rough bag plan, a town-to-town route is enough.',
@@ -21,7 +23,7 @@ export const TR = {
   appTripIphoneAsk: 'On an iPhone or iPad, first add Wayfinch to your home screen (Share, then Add to Home Screen), open it from there and use Prepare this route in that app. Safari can remove what a browser tab saved after seven days without a visit.',
   appTripPartial: 'Some steps did not finish. The answers use what was saved and name what is missing. Try again when you have signal.',
   appAbNone: 'No bike router answered, so no route was planned. Plan it in another app and add it as a GPX file.',
-  appAbSearchFailed: "The search services did not answer. Check your connection and try again.",
-  appAbNoResults: 'Nothing found. Try another spelling, or a larger town nearby.',
+  appAbSearchFailed: "Search needs signal, and the search services did not answer. Check your connection and try again.",
+  appAbNoResults: 'Nothing found. Try another spelling, add the town to an address, or search a larger town nearby.',
   appTripHeightsPending: 'This route has no heights. Prepare this route looks them up (Open-Meteo, Copernicus data).',
 };

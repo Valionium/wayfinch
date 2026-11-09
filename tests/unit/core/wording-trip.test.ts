@@ -5,7 +5,7 @@ import { bannedHits } from '../../fixtures/banned.ts';
 
 test('[HON-BANNED] no string of Trip\'s own chunk words uses a banned word; every key is an app key, and none is also in en.ts', () => {
   const strings = Object.entries(TR);
-  expect(strings.length).toBe(20);
+  expect(strings.length).toBe(22);
   for (const [key, text] of strings) {
     expect(key).toMatch(/^app(Trip|Ab)[A-Z]/);
     expect(typeof text).toBe('string');
