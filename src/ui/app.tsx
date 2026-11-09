@@ -1,6 +1,6 @@
 // The app's shell: the update bar, the current screen and the four tabs (spec section 3.1).
 // The screens are placeholders until their groups arrive; the shell already opens on Trip when no trip runs.
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import type { FunctionComponent } from 'preact';
 import { W } from '../core/wording/en.ts';
 import { AheadScreen } from './ahead/ahead.tsx';
@@ -101,41 +101,14 @@ function Screen({ name }: { name: ScreenName }) {
   );
 }
 
-/** Sets `--wf-update-h` on the root to the bar's real height (the note makes it two or three lines taller), as back-bar.ts does for its bar. */
-function UpdateBarOpen({ updater }: { updater: Updater }) {
-  const bar = useRef<HTMLDivElement>(null);
-  const note = updater.note.value;
-  useEffect(() => {
-    const el = bar.current;
-    if (!el) return undefined;
-    const root = document.documentElement;
-    let height = -1;
-    const measure = (): void => {
-      if (el.offsetHeight !== height) { height = el.offsetHeight; root.style.setProperty('--wf-update-h', `${height}px`); }
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    window.addEventListener('orientationchange', measure);
-    let watch: ResizeObserver | null = null;
-    try { if (typeof ResizeObserver === 'function') { watch = new ResizeObserver(measure); watch.observe(el); } } catch { watch = null; }
-    try { void document.fonts?.ready.then(measure, () => undefined); } catch { /* no font loading to wait for */ }
-    return () => {
-      window.removeEventListener('resize', measure);
-      window.removeEventListener('orientationchange', measure);
-      watch?.disconnect();
-      root.style.removeProperty('--wf-update-h');
-    };
-  }, [note]);
+function UpdateBar({ updater }: { updater: Updater }) {
+  if (!updater.ready.value) return null;
   return (
-    <div class="update-bar" ref={bar}>
-      <button type="button" class="btn btn-primary" onClick={() => void updater.apply()}>{W.appUpdateReady}</button>
-      {note ? <p role="status">{note}</p> : null}
+    <div class="update-bar" ref={(el) => { if (el) void import('./bar-h.ts').then((m) => m.trackHeight(el)); }}>
+      <button type="button" class="btn btn-primary" onClick={updater.apply}>{W.appUpdateReady}</button>
+      {updater.note.value ? <p role="status">{updater.note.value}</p> : null}
     </div>
   );
-}
-
-function UpdateBar({ updater }: { updater: Updater }) {
-  return updater.ready.value ? <UpdateBarOpen updater={updater} /> : null;
 }
 
 export function App({ updater = null }: { updater?: Updater | null }) {
