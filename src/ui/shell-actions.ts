@@ -14,6 +14,7 @@ import { usableFlatKph } from '../core/engines/pace.ts';
 import { zoneLookupOf } from '../core/engines/tripday.ts';
 import { waterNow } from '../core/engines/water.ts';
 import { thunderNear } from '../core/engines/shelter.ts';
+import { shownScreen } from '../core/screen/from-start.ts';
 import { buildScreen } from '../core/screen/screen.ts';
 import type { Km, Position, Route, ScreenInputs } from '../core/types.ts';
 import { showKm, W } from '../core/wording/en.ts';
@@ -135,15 +136,9 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     const now = i.now;
     const real = buildScreen(i);
     realScreen = real.screen;
-    let built = real;
-    // No position to choose first (owner's finding K, 8 Nov 2026): on a trip day with none to count from, the answers count from
-    // the route start (km 0), as on day 1, and say so; Emergency keeps the real day's card. After the day's ride the real screen
-    // stays (it plans tomorrow from tonight's stop and says there is no position).
+    // No position to choose first (owner's finding K): from km 0 on a trip day before the ride (from-start.ts).
+    const built = shownScreen(i, real);
     const r = real.screen;
-    if (r.positionLine === null && r.phase === 'before-ride' && r.ride.startKm > 0) {
-      built = buildScreen({ ...i, trip: { ...i.trip, departureDate: r.ride.date }, positions: [], dayStarts: [] });
-      built.screen.chips.emergency = r.chips.emergency;
-    }
     const s = built.screen;
     const p = real.parts.position;
     // While Ahead asks which pass, Emergency already shows the fix as it came (review of PR 53, I1): it never waits on a question.
