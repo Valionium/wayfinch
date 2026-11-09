@@ -92,3 +92,47 @@ for (const [width, height] of [[360, 640], [1280, 720]] as [number, number][]) {
     if (r.backTop !== null && !r.backAway) expect(r.backTop).toBeGreaterThanOrEqual(r.barBottom - 1);
   });
 }
+
+// With a note showing (two or three sentences, en.ts appUpdateNotSaved) the bar is much taller than one line: the back bar and a focused field
+// must still sit below it, not under it (review of PR 105).
+const NOTE = 'Your data could not be saved on this device, so the update was not applied. Export it, then try again.';
+for (const [width, height] of [[320, 640], [360, 640], [1280, 720]] as [number, number][]) {
+  for (const route of ['tools/tyre', 'ahead', 'trip', 'you']) {
+    test(`[UPDATE-BAR-NOTE] ${width} x ${height} #/${route}: with a note showing, the back link and a focused field are not under the update bar`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await fakeWaitingWorker(page);
+      app = await loadApp(page);
+      await page.goto(`${app.origin}/#/${route}`);
+      await expect(page.getByRole('button', { name: PROMPT, exact: true })).toBeVisible();
+      if (route === 'tools/tyre') await expect(page.locator('.wf-bar-app a')).toBeVisible(); // the tool loads lazily: add the probes after it
+      await page.evaluate((note) => {
+        const p = document.createElement('p'); p.setAttribute('role', 'status'); p.textContent = note; document.querySelector('.update-bar')!.append(p);
+        const pad = document.createElement('div'); pad.style.height = '3000px'; document.querySelector('main.screen')!.append(pad);
+        const input = document.createElement('input'); input.id = 'probe-field'; input.setAttribute('aria-label', 'probe');
+        input.style.cssText = 'position:absolute;left:16px;top:1020px;height:30px;width:100px'; document.body.style.position = 'relative'; document.body.append(input);
+      }, NOTE);
+      await page.waitForTimeout(300);
+      await page.evaluate(() => window.scrollTo(0, 1000));
+      await page.waitForTimeout(300);
+      await page.evaluate(() => window.scrollTo(0, 960)); // a short scroll up brings the back bar back
+      await page.waitForTimeout(500);
+      // The back bar slides in over 0.2 s (slower on a throttled phone): poll until it has settled, then it must be the hit target.
+      const linkState = (): Promise<boolean | null> => page.evaluate(() => {
+        const link = document.querySelector('.wf-bar-app a') as HTMLElement | null;
+        if (!link || document.querySelector('.wf-bar')?.classList.contains('wf-bar-away')) return null;
+        const b = link.getBoundingClientRect(); const top = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+        return top === link || link.contains(top);
+      });
+      const hasBackBar = await page.evaluate(() => document.querySelector('.wf-bar-app a') !== null);
+      if (hasBackBar) await expect.poll(linkState, { message: 'the back link is covered (or the back bar never came back) ' + JSON.stringify(await page.evaluate(() => ({ cls: document.querySelector('.wf-bar')?.className, y: scrollY, top: document.querySelector('.wf-bar')?.getBoundingClientRect().top, upd: document.querySelector('.update-bar')?.getBoundingClientRect().bottom, v: getComputedStyle(document.documentElement).getPropertyValue('--wf-update-h') }))), timeout: 5000 }).toBe(true);
+      await page.evaluate(() => (document.getElementById('probe-field') as HTMLElement).focus());
+      await page.waitForTimeout(500);
+      const field = await page.evaluate(() => {
+        const f = document.getElementById('probe-field')!.getBoundingClientRect();
+        const bar = document.querySelector('.update-bar')!.getBoundingClientRect();
+        return { top: f.top, barBottom: bar.bottom };
+      });
+      expect(field.top, 'the focused field is under the update bar').toBeGreaterThanOrEqual(field.barBottom - 1);
+    });
+  }
+}

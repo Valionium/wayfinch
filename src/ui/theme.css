@@ -137,7 +137,8 @@ button, a { font: inherit; }
 .btn-primary { background: var(--blaze); border-color: var(--blaze); color: var(--ground); font-weight: 600; }
 
 /* Sticky, above the screen's own sticky back bar (which sits just below it, back-bar.css), so the button is never scrolled away or covered. */
-.update-bar { position: sticky; top: 0; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.update-bar { position: sticky; top: 0; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: calc(8px + env(safe-area-inset-top)) 16px 8px; background: var(--panel); border-bottom: 1px solid var(--line); }
+html:has(.update-bar) { scroll-padding-top: calc(var(--wf-update-h, 61px) + 8px); }
 .update-bar p { margin: 0; color: var(--muted); }
 
 /* Tools tab and the tyre screen */
