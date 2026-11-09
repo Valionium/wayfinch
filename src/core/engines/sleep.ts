@@ -196,9 +196,7 @@ export function sleepAnswer(f: SleepFacts): Answer {
   const schedule = night ? nowSchedule(ride, f.trip, f.now, env) : f.schedule;
   const target = night ? ride.tonightKm ?? ride.stopKm : ride.stopKm;
   // The place the rider's day ends at, chosen in Trip (owner, 9 Nov 2026): marked as the stop for the night.
-  const stops = f.trip.stops;
-  const ownStop = stops && stops.routeId === route.id && Array.isArray(stops.days)
-    ? stops.days.find((d) => d.placeId !== null && Math.abs(d.km - target) <= NEAR_STOP_KM)?.placeId ?? null : null;
+  const ownStop = f.trip.stops?.routeId === route.id ? f.trip.stops.days.find((d) => Math.abs(d.km - target) <= NEAR_STOP_KM)?.placeId : undefined;
 
   const ridingOf = (side: Side, m: RouteMatch): number =>
     ridingMin(route, side === 'behind' ? ride.behindFromKm : schedule.startKm, m.km, flat, schedule.r)
