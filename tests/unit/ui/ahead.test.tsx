@@ -230,20 +230,18 @@ describe('cards', () => {
     expect(kmField()).toBeNull(); // closed by the rider
   });
 
-  test('[AH-FIRST-USE] on a phone the picker of first use closes when answers first show, unless the rider has started using it', async () => {
+  test('[AH-FIRST-USE] on a phone with no position the answers show and the picker starts closed (AH-FROM-START); opened and typed into, a fix arriving leaves the typing alone', async () => {
     const { actions } = fakeActions();
-    // The shell now shows answers with no position too (AH-FROM-START, owner's finding K); a view without them is handed in here.
-    const none: AheadTrip = { ...trip(viewOf(rainyStop({ now: `${SAT} 09:00`, positions: [] }))), answers: false };
+    const none = trip(viewOf(rainyStop({ now: `${SAT} 09:00`, positions: [] })));
     const found = trip(viewOf(rainyStop({ now: `${SAT} 09:00`, positions: [pos({ km: 3, at: `${SAT} 09:00` })] })));
-    expect([none.answers, found.answers]).toEqual([false, true]);
+    expect([none.answers, found.answers]).toEqual([true, true]);
     const kmField = () => host.querySelector<HTMLInputElement>('#ah-picker input[type=number]');
-    // Untouched: a position closes it, as section 3.2's returning screen has it.
     await show(none, actions);
-    expect(kmField()).not.toBeNull();
-    await act(async () => { render(<AheadScreen view={found} actions={actions} />, host); });
     expect(kmField()).toBeNull();
+    expect(host.querySelectorAll('[data-card]')).toHaveLength(6);
+    expect(host.querySelector('[data-update-position]')).not.toBeNull();
     // Being typed into: a fix arriving then leaves the picker and the typing alone.
-    await show(none, actions);
+    await click(buttonNamed('Set position by hand'));
     kmField()!.focus();
     await typeInto(kmField()!, '4');
     await act(async () => { render(<AheadScreen view={found} actions={actions} />, host); });
@@ -626,7 +624,7 @@ describe('degraded', () => {
     expect(await dialled(buttonNamed(W.emergencyCall, card))).toBe('tel:112');
   });
 
-  test('[AH-FIRST-USE] no position on a trip day after day 1: Update position and the answers from km 0 (AH-FROM-START, owner\'s finding K); before the trip, day 1\'s answers show', async () => {
+  test('[AH-FIRST-USE] no position on a trip day after day 1: Update position and the answers from the start of today\'s stage (AH-FROM-START, owner\'s finding K, ruling I1); before the trip, day 1\'s answers show', async () => {
     const day2 = trip(viewOf(rainyStop({ now: `${SAT} 09:00`, positions: [] })));
     expect(day2.answers).toBe(true);
     await show(day2, fakeActions().actions);
@@ -634,7 +632,8 @@ describe('degraded', () => {
     expect(host.querySelectorAll('[data-card]')).toHaveLength(6);
     expect(host.querySelector('[data-strip]')).not.toBeNull();
     expect(host.querySelector('[data-update-position]')).not.toBeNull();
-    expect(host.querySelector('.ah-notes')!.textContent).toContain(W.routeNoPositionFromStart);
+    expect(day2.screen.ride.startKm).toBe(70);
+    expect(host.querySelector('.ah-notes')!.textContent).toContain(W.routeFromStageStart(70));
 
     const before = trip(viewOf(rainyStop({ now: '2026-10-15 18:00', positions: [] })));
     expect(before.screen.phase).toBe('before-trip');

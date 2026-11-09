@@ -1,7 +1,7 @@
 // Ahead, the stop screen (spec section 3.2), top to bottom: the position line, the notes, the route strip, the six cards and the
 // chips. It reads only the screen and the plain facts beside it, and calls one actions object: it computes no answer and sends
-// nothing. Before a position exists, and with no day-1 plan, it shows only Update position and the manual picker (section 3.2,
-// First use); the Emergency chip stays in every state.
+// nothing. With no position it shows its answers all the same, from the start of today's stage, and says so (AH-FROM-START, the
+// owner's finding K); the Emergency chip stays in every state.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { CardName } from '../../core/screen/screen.ts';
 import { W } from '../../core/wording/en.ts';
@@ -59,20 +59,13 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
   const [sharing, setSharing] = useState(false);
   // On a computer (the rail layout) the picker is open from the start, with no position asked for (spec 9.2).
   const rail = railSignal.value;
-  const [pickerOpen, setPickerOpen] = useState(!v.answers || rail);
+  const [pickerOpen, setPickerOpen] = useState(rail);
   // Set once the rider starts on the open picker (a key, a slider move, a pick; a focus alone is not); only the rider closes it then.
   const pickerUse = useRef(false);
   const setPicker = (open: boolean): void => { pickerUse.current = false; setPickerOpen(open); };
-  // First use opens the picker; on a phone, answers showing for the first time close it again, unless the rider has started on it.
-  // Otherwise only the rider closes it, or their own Update position while it is unused (below): not the clock, a fix from elsewhere
-  // or a re-read (each makes a new position line, which the effect watched before, so the picker shut each minute with the typing
-  // in it), and not the effect's own run after the first paint, which closed it again under an early tap.
-  const hadAnswers = useRef(v.answers);
-  useEffect(() => {
-    if (hadAnswers.current === v.answers) return;
-    hadAnswers.current = v.answers;
-    if (v.answers && !railSignal.peek() && !pickerUse.current) setPickerOpen(false);
-  }, [v.answers]);
+  // The answers show with no position too (AH-FROM-START), so on a phone the picker starts closed. Only the rider closes it, or their
+  // own Update position while it is unused (below): not the clock, a fix from elsewhere or a re-read (each makes a new position line,
+  // and a picker that followed it shut each minute with the typing in it).
   // A position set with the picker closes it on a phone; on a computer it stays open, ready for the next (spec 9.2).
   const pickerUsed = (): void => { if (!railSignal.peek()) setPicker(false); };
   // On a phone, a position kept from Update position closes a picker the rider opened but has not used, so the notes, the strip and
@@ -116,12 +109,12 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
     </section>
   ) : null;
   return (
-    <div class="ahead" data-ahead={v.answers ? 'answers' : 'first-use'} onKeyDown={onKeyDown}>
+    <div class="ahead" data-ahead="answers" onKeyDown={onKeyDown}>
       <EmergencyLink onOpen={() => { actions.freshen(); setChip('emergency'); }} />
       <div class="ah-main">
         {v.beforeReady ? need : null}
         {v.notice ? <p class="notice" role="status">{v.notice}</p> : null}
-        {v.answers ? <PositionLine v={v} onShare={() => { actions.freshen(); setSharing(true); }} /> : <p>{W.appAheadFirstUse}</p>}
+        <PositionLine v={v} onShare={() => { actions.freshen(); setSharing(true); }} />
         {sharing && s.shareText !== null ? (
           <ShareSheet
             id="progress" title={W.appAheadShare} text={s.shareText} mapText={s.shareMapText} mapLink={v.mapLink} old={v.shareOld}
@@ -129,19 +122,15 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
           />
         ) : null}
         <PositionControls v={v} actions={actions} pickerOpen={pickerOpen} onPicker={setPicker} pickerUse={pickerUse} onPickerUsed={pickerUsed} onFixKept={fixKept} rail={rail} />
-        {v.answers ? (
-          <>
-            {s.notes.length > 0 ? <ul class="ah-notes notice">{s.notes.map((n, i) => <li key={i}>{n}</li>)}</ul> : null}
-            {v.badSpeed ? <p class="notice"><a href="#/trip">{W.appAheadSpeedLink}</a></p> : null}
-            <RouteStrip strip={s.strip} bike={v.bike} onOpen={openCard} onSetPosition={rail ? (km) => void actions.setManual(km) : undefined} stopsLater={v.beforeReady} unconfirmed={!v.confirmed} />
-          </>
-        ) : null}
+        {s.notes.length > 0 ? <ul class="ah-notes notice">{s.notes.map((n, i) => <li key={i}>{n}</li>)}</ul> : null}
+        {v.badSpeed ? <p class="notice"><a href="#/trip">{W.appAheadSpeedLink}</a></p> : null}
+        <RouteStrip strip={s.strip} bike={v.bike} onOpen={openCard} onSetPosition={rail ? (km) => void actions.setManual(km) : undefined} stopsLater={v.beforeReady} unconfirmed={!v.confirmed} />
         {v.beforeReady ? null : need}
       </div>
-      {v.answers ? <TopicCards screen={s} open={open} onToggle={toggle} v={v} actions={actions} onShelter={() => openChip('shelter')} later={v.beforeReady ? AFTER_READY : NONE} /> : null}
+      <TopicCards screen={s} open={open} onToggle={toggle} v={v} actions={actions} onShelter={() => openChip('shelter')} later={v.beforeReady ? AFTER_READY : NONE} />
       <div class="ah-below">
         {/* Before Get ready offline only Emergency: the other chips answer from saved places too (AH-BEFORE-READY). */}
-        <ChipRow shown={v.answers && !v.beforeReady ? CHIP_ORDER : ['emergency']} open={chip} onOpen={openChip} />
+        <ChipRow shown={v.beforeReady ? ['emergency'] : CHIP_ORDER} open={chip} onOpen={openChip} />
         {chip ? <ChipPanel chip={chip} screen={s} canShare={v.canShare} actions={actions} onClose={() => setChip(null)} position={v.position} /> : null}
       </div>
     </div>

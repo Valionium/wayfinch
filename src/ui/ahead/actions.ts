@@ -20,8 +20,8 @@ export type Town = { name: string; km: Km };
 export type AheadTrip = {
   kind: 'trip';
   screen: Screen;
-  /** Whether the answers show. The shell always sets it now (AH-FROM-START); false gives only the button and the picker. */
-  answers: boolean;
+  /** The answers always show, with or without a position: no position is needed to see the route (AH-FROM-START). */
+  answers: true;
   /** A position is kept and shown: until then the bike on the strip shows as not confirmed (AH-FROM-START). */
   confirmed: boolean;
   lengthKm: Km;

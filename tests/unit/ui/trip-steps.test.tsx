@@ -450,3 +450,37 @@ describe('After the launch, part 4 (the owner\'s preview check of 8 Nov 2026)', 
     expect([...step('go').querySelectorAll('a')].filter((a) => a.textContent === W.appTripOpenAhead)).toHaveLength(1);
   });
 });
+
+describe('What the review of PR 82 found', () => {
+  test('[TRIP-NEED-STEP] after a Get ready offline that saved places but not the weather, Trip and En route agree that it is no longer needed first', async () => {
+    const { browserAhead } = await import('../../../src/ui/shell-actions.ts');
+    const steps = (): StepReport[] => stepNames.map((s) => ({ step: s, ok: s !== 'weather', note: s === 'weather' ? W.appPrepNoConnection : null }));
+    const partial: Partial<TripServices> = {
+      prepare: async () => {
+        const trip = (await readTrip())!;
+        const db = await openDb();
+        for (let i = 0; i < 3; i++) await db.put('places', { id: `node/${i}`, kind: 'water' });
+        await savePrepared(trip.route.id, { at: NOW, steps: steps(), build: { id: 'b', builtAt: '2026-10-28', countries: {} }, forecastFetchedAt: null, baselineYears: null });
+        return steps();
+      },
+    };
+    const enRoute = async (): Promise<boolean> => {
+      const shell = browserAhead({ now: () => NOW, geolocation: () => undefined, online: () => false, fetch: () => Promise.reject(new Error('no network')), share: null, writeClipboard: null });
+      const stop = shell.start();
+      await until(() => shell.view.value.kind === 'trip', 'En route');
+      const v = shell.view.value;
+      stop();
+      return v.kind === 'trip' && v.beforeReady;
+    };
+    const tripSays = (): boolean => step('getready').textContent!.includes(W.appAheadNeedTitle);
+    await withRoute(services(partial));
+    expect([tripSays(), await enRoute()]).toEqual([true, true]);
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes(W.appTripMissingHeading), 'what was not saved');
+    await until(() => !tripSays(), 'Trip to follow');
+    expect([tripSays(), await enRoute()]).toEqual([false, false]);
+    // The step is not done: what is missing is named, with Try again.
+    expect(step('getready').dataset.state).not.toBe('done');
+    expect(buttonIn(step('getready'), W.appTripRetryButton)).toBeDefined();
+  });
+});

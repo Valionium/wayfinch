@@ -5,8 +5,7 @@ import AxeBuilder from '@axe-core/playwright';
 import fc from 'fast-check';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { shownScreen } from '../../src/core/screen/from-start.ts';
-import type { Screen } from '../../src/core/screen/screen.ts';
+import { buildScreen, type Screen } from '../../src/core/screen/screen.ts';
 import type { Answer } from '../../src/core/types.ts';
 import { scenario } from '../gen/scenario.ts';
 import { decodeCase, encodeCase } from '../sim/harness.ts';
@@ -64,8 +63,7 @@ for (const seed of SEEDS) {
   test(`[AH-SIM-SCREENS] seed ${seed}: the page shows the screen's words, fits 360 and 1280 px, and passes the accessibility checks`, async ({ page }) => {
     const inputs = fc.sample(scenario(), { seed, numRuns: 1 })[0]!;
     const json = encodeCase({ id: 'AH-SIM-SCREENS', seed, replayPath: '', message: '', inputs });
-    // What En route shows: screen()'s own, or from km 0 on a trip day with no position (AH-FROM-START, owner's finding K).
-    const screen = shownScreen(decodeCase(json).inputs).screen;
+    const screen = buildScreen(decodeCase(json).inputs).screen;
     app = await loadApp(page, { launch: true, testHooks: true });
     await page.waitForFunction(() => '__wf' in window);
     for (const width of WIDTHS) {

@@ -14,7 +14,6 @@ import { usableFlatKph } from '../core/engines/pace.ts';
 import { zoneLookupOf } from '../core/engines/tripday.ts';
 import { waterNow } from '../core/engines/water.ts';
 import { thunderNear } from '../core/engines/shelter.ts';
-import { shownScreen } from '../core/screen/from-start.ts';
 import { buildScreen } from '../core/screen/screen.ts';
 import type { Km, Position, Route, ScreenInputs } from '../core/types.ts';
 import { showKm, W } from '../core/wording/en.ts';
@@ -129,18 +128,12 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     return run;
   };
 
-  /** The screen of the real day, as screen() built it: what the store keeps after a read (its day start, the route end). */
-  let realScreen: AheadTrip['screen'] | null = null;
-
   const present = (i: ScreenInputs): void => {
     const now = i.now;
-    const real = buildScreen(i);
-    realScreen = real.screen;
-    // No position to choose first (owner's finding K): from km 0 on a trip day before the ride (from-start.ts).
-    const built = shownScreen(i, real);
-    const r = real.screen;
+    // With no position the answers show all the same, from the start of today's stage as screen() plans it (AH-FROM-START).
+    const built = buildScreen(i);
     const s = built.screen;
-    const p = real.parts.position;
+    const p = built.parts.position;
     // While Ahead asks which pass, Emergency already shows the fix as it came (review of PR 53, I1): it never waits on a question.
     if (pendingFix && pendingKm !== null) {
       try {
@@ -172,7 +165,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       }
     }
     const next: AheadTrip = {
-      kind: 'trip', screen: s, answers: true, confirmed: r.positionLine !== null, lengthKm: i.trip.route.lengthKm, towns: townsOf(i),
+      kind: 'trip', screen: s, answers: true, confirmed: s.positionLine !== null, lengthKm: i.trip.route.lengthKm, towns: townsOf(i),
       bike: bikeSource.peek().bike, stillAboutL, badSpeed: !usableFlatKph(i.trip.flatKph),
       approximateHelp: p !== null && p.source === 'gps' && !(p.accuracyM <= APPROXIMATE_HELP_M),
       shareOld, mapLink: readMapLink(), canShare: deps.share !== null, position, weatherSay, weatherBusy, notice,
@@ -243,10 +236,10 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       return;
     }
     present(read);
-    const kept = realScreen;
-    if (view.peek().kind === 'trip' && kept) {
+    const shown = view.peek();
+    if (shown.kind === 'trip') {
       const routeId = read.trip.route.id;
-      void inTurn(() => keepAfterScreen(kept, at, routeId)).catch(() => undefined);
+      void inTurn(() => keepAfterScreen(shown.screen, at, routeId)).catch(() => undefined);
     }
   };
 

@@ -192,7 +192,7 @@ test('[DAY-NO-ROUTE-POS] with no position at all: stage 2, from the stage start 
   expect(r.dayStartKm).toBe(20.4);
   expect(r.startKm).toBe(20.4);
   expect(r.stopKm).toBe(49.2);
-  expect(noteFor(r)).toBe('from the stage start at km 20.4');
+  expect(noteFor(r)).toBe("From the start of today's stage (km 20.4), position not confirmed. Update position for answers from where you are.");
 });
 
 const pastStopTrip = tripOf(flatRoute(120.9, { stageEnds: [23.9, 53.7, 93.4] }));

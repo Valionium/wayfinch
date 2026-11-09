@@ -36,7 +36,7 @@ export const W = {
   routePastStop: (which: 'today' | 'tomorrow', km: number): string =>
     `Your position lies past ${which === 'today' ? "today's" : "tomorrow's"} stop at km ${showKm(km)}. Times assume you rejoin the route there.`,
   routeFromTonightNoPosition: (km: number): string => `from tonight's stop at km ${showKm(km)}; no position`,
-  routeFromStageStart: (km: number): string => `from the stage start at km ${showKm(km)}`,
+  routeFromStageStart: (km: number): string => `From the start of today's stage (km ${showKm(km)}), position not confirmed. Update position for answers from where you are.`,
   routeTonightIsEnd: (km: number): string => `Tonight's stop is the end of your route (km ${showKm(km)})`,
   routePositionKm: (km: string, length: string): string => `km ${km} of ${length}`,
   routePositionNear: (town: string): string => `near ${town}`,
@@ -54,7 +54,7 @@ export const W = {
   routeFarOffNote: 'You are more than 5 km from the route, so these answers are approximate.',
   routeNoDateNote: 'No departure date yet, so the answers give distances only. Set it in Trip.',
   routeStampHere: 'here',
-  routeNoPositionFromStart: 'No position yet: these answers count from the route start (km 0). Update position for answers from where you are.',
+  routeNoPositionFromStart: "From the start of today's stage (km 0), position not confirmed. Update position for answers from where you are.",
   routeStripDayOne: 'Day 1',
   routeStripToday: 'Today',
   routeStripTomorrow: (day: string): string => (day === '' ? 'Tomorrow' : `Tomorrow, ${day}`),
@@ -996,7 +996,6 @@ export const W = {
   appAheadNoPosition: "That reading couldn't be used as a position. Try again, or set your position by hand.",
   appAheadNotKept: 'That position was not kept: the route changed, or it lies outside the route.',
   // The which-pass question's words are in en-ask.ts, loaded with Update position's tap (after the launch, 7 Nov 2026).
-  appAheadFirstUse: "Update your position, or set it by hand, to see what's ahead.",
   appAheadManualToggle: 'Set position by hand',
   appAheadManualTitle: 'Set your position by hand',
   appAheadManualStrip: 'Along the route',

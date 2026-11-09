@@ -163,12 +163,12 @@ test('[TRIP-FIRST] a prepared trip with no date and no month does not count as r
 
 // The owner's screenshots of 8 Nov 2026 (finding L): the stops and their "+2" hung below the profile over "Day 1 · 38.7 km" and the
 // first line of the opened list. Each project runs this in its own theme; the widths are walked here.
-test('[TRIP-STOPS-ROOM] the stops on the height profile never cover the text below it, at every width, with the list open', async ({ page }) => {
+test('[TRIP-STOPS-ROOM] the stops on the height profile never cover the text below it, at every width from 320 px, with the list open', async ({ page }) => {
   test.setTimeout(180_000);
   app = await loadApp(page);
   const later = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10);
   // Two routes with stops at low points of the line, where the icons hung below the profile on main.
-  for (const [id, width] of [['loop', 360], ['loop', 600], ['loop', 840], ['sunday-holiday', 1024], ['sunday-holiday', 1280], ['sunday-holiday', 360]] as const) {
+  for (const [id, width] of [['loop', 320], ['loop', 360], ['loop', 600], ['loop', 840], ['sunday-holiday', 1024], ['sunday-holiday', 1280], ['sunday-holiday', 360]] as const) {
     await preparedTrip(page, id, { departureDate: later, places: true });
     await page.setViewportSize({ width, height: 900 });
     await page.goto(`${app.origin}/#/trip`, { waitUntil: 'domcontentloaded' });
