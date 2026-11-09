@@ -138,7 +138,7 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
 function EmergencyJump({ open, onJump }: { open: boolean; onJump: () => void }) {
   return (
     <p class="ah-emergency-jump">
-      <button type="button" class="ah-emergency-top" data-emergency-top aria-controls={open ? 'chip-emergency' : undefined} onClick={onJump}>
+      <button type="button" class="ah-emergency-top" data-emergency-top aria-label={W.appAheadEmergencyTopName} aria-controls={open ? 'chip-emergency' : undefined} onClick={onJump}>
         {W.appAheadEmergencyTop}<span aria-hidden="true"> ↓</span>
       </button>
     </p>

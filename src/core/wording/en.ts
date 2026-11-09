@@ -1025,6 +1025,8 @@ export const W = {
   appAheadToTrip: 'Add a route in Trip',
   appAheadEmptyBody: 'En route shows what lies ahead on your route: the next water, food and sleep places, the weather and the daylight. It works offline, from what Get ready offline saves on this phone.',
   appAheadEmergencyTop: 'Emergency',
+  // The link's spoken name: the chip at the bottom is called Emergency too, and opens and closes the panel (review of PR 76, M3).
+  appAheadEmergencyTopName: 'Go to Emergency',
   appAheadBikeUnconfirmed: 'Position not confirmed',
   // Ahead before Get ready offline (guided Trip design §2.3).
   appAheadNeedTitle: 'En route needs Get ready offline',

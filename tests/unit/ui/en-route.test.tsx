@@ -95,6 +95,18 @@ describe('an Emergency link at the top (item B)', () => {
     const top = host.querySelector<HTMLButtonElement>('[data-emergency-top]')!;
     expect(top).not.toBeNull();
     expect(top.textContent).toContain(W.appAheadChipEmergency);
+    // Its spoken name differs from the chip's, which opens and closes the panel; it holds the words it shows (review of PR 76, M3).
+    const chipButton = buttonNamed(W.appAheadChipEmergency, host.querySelector('.ah-chips')!);
+    const spoken = (b: Element): string => {
+      if (b.getAttribute('aria-label')) return b.getAttribute('aria-label')!.trim();
+      const c = b.cloneNode(true) as Element;
+      for (const h of [...c.querySelectorAll('[aria-hidden="true"]')]) h.remove();
+      return (c.textContent ?? '').trim();
+    };
+    const name = spoken(top);
+    expect(name).not.toBe(spoken(chipButton));
+    expect(name).toContain(W.appAheadEmergencyTop);
+    expect(bannedHits(name)).toEqual([]);
     // It names the panel it controls once the panel is there, never an id that names nothing.
     expect(top.getAttribute('aria-controls')).toBeNull();
     // It comes first: before the position line and the strip.

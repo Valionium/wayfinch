@@ -140,7 +140,7 @@ export function TripScreen({ services }: { services: TripServices }) {
   const offer = installOffer.value;
   const trip = snap?.trip ?? null;
   // Get ready offline is done once a run ended with every step through; one with a step missing stays the step to do.
-  const readyDone = snap?.prepared ? snap.prepared.steps.every((x) => x.ok) : false;
+  const readyDone = snap?.prepared ? snap.prepared.steps.length > 0 && snap.prepared.steps.every((x) => x.ok) : false;
   const suggested: StepName = snap?.running && trip ? 'go' : !trip ? 'route' : !readyDone ? 'getready' : 'bags';
   // Only Get ready offline and Bags need a route (design §2.2).
   const openStep: StepName = chosen !== null && (trip !== null || chosen === 'route' || chosen === 'go') ? chosen : suggested;

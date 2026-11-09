@@ -478,6 +478,17 @@ describe('After the launch, part 4a (owner\'s preview check, 8 Nov 2026)', () =>
     expect(step('go').textContent).toContain(W.appTripGoLater);
   });
 
+  test('[TRIP-GO-AFTER-READY] a stored record with no steps at all is not done: step 2 is not marked done and Go carries no extra Open En route', async () => {
+    await withRoute(services());
+    const trip = (await readTrip())!;
+    await savePrepared(trip.route.id, { at: NOW, steps: [], build: null, forecastFetchedAt: null, baselineYears: null });
+    await show(services());
+    await until(() => host.querySelector('[data-step="go"]') !== null, 'the steps');
+    // The two places that decide "Get ready offline is done" agree (review of PR 76, M4): step 2's own note says it is not.
+    expect(step('getready').getAttribute('data-state')).not.toBe('done');
+    expect(host.querySelector('.trip-go-open')).toBeNull();
+  });
+
   test('[TRIP-STOPS-ROOM] every stop icon, its "+N" badge included, stays inside the profile\'s own box, at the top of a climb and at the lowest point', async () => {
     const svc = await withRoute(services(preparing()));
     await click(buttonIn(step('getready'), W.appTripGetReadyButton));
