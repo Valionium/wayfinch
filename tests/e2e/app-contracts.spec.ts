@@ -405,6 +405,17 @@ test('[TRIP-DAY-BAGS] in the full planner the day ride\'s tube reads as one tube
   await page.evaluate('S.adv = true; go(3); renderKit();');
   await expect(page.locator('.kititem[data-k="tubes"] .kn')).toHaveText('Spare tube (one, for a day ride)');
   await expect(page.locator('.reset[data-reset="tubes"]')).toHaveText('Reset to two tubes, 0.7 L');
+  // nowhere a rider can read or hear does the one-tube day kit say "×2" (review of PR 100, B1): the Kit and Check steps, the per-bag
+  // lists, the move and reach lists, the quantity buttons and the bag popover, read as text and as accessible names
+  const seen = async () => page.evaluate(() => [document.body.innerText, ...[...document.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label'))].join(' | '));
+  const texts = [await seen()];
+  await page.evaluate('go(4); renderResult();');
+  texts.push(await seen());
+  await page.evaluate('openBagPop((P => P.items.tubes[0][0])(currentPlan()))');
+  texts.push(await seen());
+  const all = texts.join(' | ');
+  expect(all).toContain('Spare tube (one, for a day ride)');
+  expect(all).not.toMatch(/Spare tubes ×2/);
   expect(errors).toEqual([]);
 });
 
