@@ -1,0 +1,105 @@
+// The parts guide in words (care pictures design of 7 November 2026, section 4.1): each part's name as the cards use it and two to four
+// plain sentences on what it is and does; the tags of parts only some bikes have; the sheet's own words; and each guide close-up's name
+// and description (design 2.5). Loaded only with the guide's sheet, under the banned-words test (tests/unit/core/parts/guide.test.ts).
+import type { PartId, PartTag } from '../parts/guide.ts';
+import type { PictureWords } from './en-care-pictures.ts';
+
+export type PartWords = { name: string; text: string };
+
+export const PART_WORDS: Readonly<Record<PartId, PartWords>> = {
+  frame: { name: 'Frame', text: "The frame is the bike's main body: the tubes that join the saddle, the handlebar and the wheels. Most bolts and the bottle cages are fixed to it." },
+  fork: { name: 'Fork', text: "The fork holds the front wheel and turns with the handlebar. Its top tube, the steerer, runs up through the frame's head tube to the stem." },
+  headset: { name: 'Headset', text: "The headset is the pair of bearings at the top and the bottom of the frame's head tube, which let the fork and the handlebar turn. When it is loose, the front of the bike knocks as you brake." },
+  stem: { name: 'Stem', text: "The stem joins the handlebar to the fork's steerer. Its bolts clamp both, to the torque printed on the stem." },
+  handlebar: { name: 'Handlebar', text: 'The handlebar steers the bike and holds the brake levers and the gear shifters. Drop bars curve down at the front; flat bars run straight across.' },
+  seatpost: { name: 'Seatpost and its clamp', text: "The seatpost holds the saddle and slides into the frame's seat tube. The clamp at the top of the seat tube holds the post at its height." },
+  hub: { name: 'Hub', text: 'The hub is the middle of the wheel. It turns on bearings round the axle, and the spokes run from it to the rim.' },
+  'wheel-qr': { name: "The wheel's quick release", text: 'The quick release is a thin rod through the hub, with a lever at one end and a nut at the other. Closing the lever clamps the wheel in the frame or the fork.' },
+  'thru-axle': { name: 'Thru-axle', text: 'A thru-axle is a thick axle that goes through the fork or the frame and the hub, and screws into the far side. Many bikes with disc brakes have one in place of a quick release.' },
+  spokes: { name: 'Spokes and nipples', text: 'Spokes are the thin wires between the hub and the rim. Each is held at the rim by a small nut, the nipple; turning it with a spoke key tightens or loosens the spoke.' },
+  rim: { name: 'Rim', text: "The rim is the wheel's outer hoop: the tyre sits on it and the spokes pull on it. With rim brakes, the pads grip its sides." },
+  dropouts: { name: 'Dropouts', text: "The dropouts are the slots at the ends of the fork and of the frame where a wheel's axle sits. The wheel has to sit all the way in them, straight." },
+  tyre: { name: 'Tyre', text: 'The tyre is the rubber cover on the rim that meets the road. With tubes, an inner tube inside it holds the air; a tubeless tyre holds the air itself, with sealant inside.' },
+  bead: { name: 'Tyre bead', text: "The bead is the tyre's edge on each side, with a strong wire or fibre inside. It hooks into the rim and holds the tyre on." },
+  tube: { name: 'Inner tube', text: 'The inner tube is the rubber ring inside the tyre that holds the air, filled through its valve. Tubeless tyres have none, but a spare tube can still get you home.' },
+  valve: { name: 'Valve (Presta, Schrader)', text: 'The valve is where you pump the air in; it comes through a hole in the rim. A Presta valve is thin, with a small nut on its tip to undo before pumping; a Schrader valve is wider, like a car\'s, with a pin in the middle.' },
+  'tubeless-valve': { name: 'Tubeless valve', text: 'A tubeless valve is fixed in the rim on its own, held by a nut, with a rubber base that seals against the rim. To fit a spare tube, take it out first.' },
+  'brake-lever': { name: 'Brake lever', text: 'The brake lever on the handlebar pulls the brake on, through a cable or the fluid in a hose. On drop bars it hangs from the hood at the front of the bar; on flat bars it sits just ahead of the grip.' },
+  'rim-brake': { name: 'Rim brake (caliper or V-brake)', text: "A rim brake squeezes its pads onto the rim's sides. Road bikes have a caliper above the tyre; flat-bar bikes mostly have V-brakes, two tall arms joined by the cable." },
+  pads: { name: 'Brake pads', text: "Brake pads are the blocks that grip when you brake: on the rim's sides with rim brakes, on the disc with disc brakes. Worn pads brake weakly and can scrape." },
+  'brake-qr': { name: "The brake's quick release", text: "The brake's quick release opens a rim brake wider, so a wheel can come out past the tyre or a bent rim can turn. On a road caliper it is a small lever on the brake; on a V-brake you lift the curved metal tube out of its holder. Until it is closed again, that brake works much less." },
+  barrel: { name: 'Barrel adjuster', text: "A barrel adjuster is the ridged barrel where a brake or gear cable's casing ends. Turning it changes how tight the cable is: unscrewing it a little pulls the cable tighter." },
+  caliper: { name: 'Disc brake caliper', text: "The caliper is the disc brake's body, bolted beside the disc, with a pad on each side of it. Its two bolts take the torque printed on the caliper." },
+  disc: { name: 'Brake disc', text: 'The brake disc is the metal disc bolted to the hub, which the pads grip. Keep oil and fingers off it: oil on the disc or the pads makes the brake weak.' },
+  'pad-adjuster': { name: 'Pad adjuster (cable disc)', text: "Cable disc brakes have pad adjuster knobs or bolts on the caliper. Turning one in moves its pad closer to the disc, to take up the pads' wear." },
+  chain: { name: 'Chain', text: 'The chain carries your pedalling from the chainring to the rear sprockets. It wears with use, so it needs oil and, in time, a new chain.' },
+  'quick-link': { name: 'Quick link', text: "A quick link is a chain link that joins two chain ends by hand, and clicks shut under load. It has to match the chain's number of speeds." },
+  chainring: { name: 'Chainring and crank', text: 'The chainring is the toothed ring at the pedals that pulls the chain; the crank is the arm from its middle to the pedal. Some bikes have two or three chainrings.' },
+  cassette: { name: 'Rear sprockets (cassette)', text: 'The rear sprockets, or cassette, are the stack of toothed rings on the rear wheel. The rear derailleur moves the chain between them to change gear.' },
+  derailleur: { name: 'Rear derailleur', text: 'The rear derailleur hangs below the rear sprockets and moves the chain across them as you shift. Its two small wheels also keep the chain taut.' },
+  hanger: { name: 'Derailleur hanger', text: 'The hanger is the small metal plate between the frame and the rear derailleur. It is made to bend in a fall instead of the frame, and a bent one makes the gears skip.' },
+  'gear-cable': { name: 'Gear cable and housing', text: 'The gear cable is the thin wire from the shifter that moves the derailleur or the hub gears; the housing is the casing it runs in. A frayed cable or a kinked housing makes shifting slow.' },
+  'hub-gears': { name: 'Hub gears', text: 'Hub gears are inside a large rear hub, sealed from dirt, with one sprocket outside. A cable from the shifter changes gear inside the hub.' },
+  battery: { name: 'Battery and its contacts', text: "An e-bike's battery powers the motor; it sits on or inside the down tube, or on the rack. Its metal contacts have to be clean and dry, and the battery has to click into its holder." },
+  display: { name: 'Display and remote', text: 'The display on the handlebar shows your speed, the battery and the level of help; the remote by the grip changes the level. On many e-bikes the power button is on the display or the remote, on others on the battery.' },
+  stanchions: { name: 'Fork legs (stanchions)', text: 'The stanchions are the smooth upper legs of a suspension fork, which slide into the lower legs as the fork moves. Dirt on them wears the seals, so keep them clean.' },
+};
+
+export const TAG_WORDS: Readonly<Record<PartTag, string>> = {
+  rim: 'rim brakes', disc: 'disc brakes', 'cable-disc': 'cable disc brakes', tubeless: 'tubeless tyres', derailleur: 'derailleur gears',
+  'hub-gears': 'hub gears', ebike: 'a motor', suspension: 'suspension forks',
+};
+
+export const PG = {
+  close: 'Close',
+  back: 'Back',
+  mixed: 'Not to be mixed up with',
+  onlyOn: (tag: string) => `Only on bikes with ${tag}`,
+  whereYours: 'Where it is on your bike',
+  whereWould: 'Where it would be on your bike',
+  whereTypical: 'Where it is on a typical bike',
+  notOnYours: 'Not on your bike, as you described it.',
+  marker: (name: string) => `${name}, marked on the bike`,
+  partOpen: (name: string) => `${name}: what it is and where`,
+};
+
+// Each close-up of the guide in words (design 2.5): a one-sentence name, and what it shows in two to four sentences, its labels repeated.
+// The guide also shows some step pictures (the brake's quick release, the barrel adjuster, the pad adjuster, the quick link, the battery):
+// their words are in en-care-pictures.ts.
+export const GUIDE_PICTURE_WORDS: Readonly<Record<string, PictureWords>> = {
+  'pg-frame': { name: 'The frame of a bike, marked.', description: 'A whole bike from the drive side, front to the right, its frame marked "frame": the top tube, the down tube, the seat tube, the head tube and the stays to the rear wheel. The wheels, fork, saddle and handlebar are drawn faintly around it. A line under it says "Drive side, front to the right".' },
+  'pg-fork': { name: 'A fork seen from the front.', description: 'A fork seen from the front, marked "fork": two legs from the crown down to the axle, either side of the tyre. Above the crown, its top tube, marked "steerer", runs up into the head tube.' },
+  'pg-headset': { name: 'The headset: bearings at the top and the bottom of the head tube.', description: 'The head tube from the drive side, front to the right, with the stem on top and the fork below. The bearings at its top and its bottom are marked, both labelled "headset". The stem is labelled "stem".' },
+  'pg-stem': { name: 'The stem, between the steerer and the handlebar.', description: 'The head tube from the drive side, front to the right. On top, the stem, marked "stem", clamps the fork\'s steerer with two bolts and reaches forward to the handlebar, which is seen end-on and labelled "handlebar".' },
+  'pg-bar-drop': { name: 'A drop handlebar from the side.', description: 'A drop handlebar seen from the side, front to the right, marked "drop bar": from the stem it runs forward, then curves down and back. The rubber hood on top of the curve, where the brake lever hangs, is labelled "hood".' },
+  'pg-bar-flat': { name: 'A flat handlebar from above.', description: 'A flat handlebar seen from above, forward is up, marked "flat bar", straight across with the stem in the middle. Rubber grips sit at its ends, one labelled "grip", with the brake levers just ahead of them.' },
+  'pg-seatpost': { name: 'The seatpost and the clamp that holds it.', description: 'The top of the seat tube from the drive side. The seatpost, marked "seatpost", rises out of it to the saddle. A ring round the top of the seat tube, with a bolt at the back, is marked "clamp".' },
+  'pg-hub': { name: 'The hub in the middle of the wheel.', description: 'The middle of a wheel seen from behind: the axle between the two fork ends, and on it the hub, marked "hub", a tube with a flange at each end. Spokes run up from the flanges to the rim.' },
+  'pg-wheel-qr': { name: "The wheel's quick release: a lever and a nut on a thin rod.", description: 'The hub seen from behind, between the two fork ends. A thin rod runs through the hub, with a lever at one end, labelled "lever", lying closed along the fork, and a nut at the other end, labelled "nut".' },
+  'pg-thru-axle': { name: 'A thru-axle through the fork and the hub.', description: 'The hub seen from behind, between the two fork ends. A thick axle, marked "thru-axle", runs through both fork ends and the hub, with a handle at one end and a thread at the other.' },
+  'pg-spokes': { name: 'A spoke and its nipple at the rim.', description: 'Part of a wheel near the rim, labelled "rim", with spokes running down towards the hub. One spoke is marked "spoke", and the small nut that holds it in the rim is marked "nipple".' },
+  'pg-rim': { name: 'The rim, the wheel cut through.', description: 'The wheel cut through: the tyre on top, labelled "tyre", and the rim under it, marked "rim", with a hook on each side that holds the tyre\'s edges. A spoke nipple sits at the bottom of the rim.' },
+  'pg-tyre': { name: 'The tyre, the wheel cut through.', description: 'The wheel cut through: the tyre, marked "tyre", arches over the inner tube from one side of the rim to the other, thickest at its tread on top. The rim below is labelled "rim".' },
+  'pg-bead': { name: "The tyre's beads in the rim's hooks.", description: 'The wheel cut through. The two edges of the tyre, marked "bead", sit in the hooks on each side of the rim, labelled "rim".' },
+  'pg-tube': { name: 'The inner tube inside the tyre.', description: 'The wheel cut through. Inside the tyre, a ring of rubber, marked "inner tube", fills the space and rests on the rim, labelled "rim".' },
+  'pg-valves': { name: 'A Presta valve and a Schrader valve.', description: 'Two valves standing through the rim. On the left, labelled "Presta", a thin valve with a nut against the rim and a narrow tip with a small nut on its end. On the right, labelled "Schrader", a wider valve threaded at the top; a small picture above shows its end from above, with a pin in the middle.' },
+  'pg-tubeless-valve': { name: 'A tubeless valve fixed in the rim.', description: 'The rim, labelled "rim", cut through at the valve. The valve, marked "tubeless valve", has a rubber base that sits in the middle of the rim and a stem through the rim. A nut on the stem below the rim, labelled "nut", holds it tight.' },
+  'pg-lever-drop': { name: 'The brake lever on a drop handlebar.', description: 'A drop handlebar from the side, front to the right. The rubber hood sits on top of the bar\'s curve, labelled "hood", and the brake lever, marked "brake lever", hangs from it in front of the curve.' },
+  'pg-lever-flat': { name: 'The brake lever on a flat handlebar.', description: 'The right end of a flat handlebar seen from above, forward is up. The brake lever, marked "brake lever", is clamped to the bar and reaches out just ahead of the grip, labelled "grip". The gear shifter sits beside the lever\'s clamp.' },
+  'pg-caliper-rim': { name: 'A road rim brake caliper from the front.', description: 'The front brake seen from the front: the caliper, marked "caliper", is bolted to the fork above the tyre, its two arms reaching down either side of the tyre to the pads at the rim. The cable, the barrel adjuster and the small quick-release lever sit on one side. Lines say "Front brake, seen from the front".' },
+  'pg-vbrake': { name: 'A V-brake from behind.', description: 'A V-brake seen from behind: two tall arms, marked "V-brake", stand either side of the tyre with a pad on each. The cable runs across the top through a short curved metal tube, labelled "curved tube", that sits in a holder on one arm.' },
+  'pg-pads-rim': { name: "A rim brake's pads at the rim.", description: 'The front rim brake seen from the front. At the ends of its two arms, the pads, marked "pads", sit either side of the rim, labelled "rim", just below the tyre.' },
+  'pg-pads-disc': { name: "A disc brake's pads either side of the disc.", description: 'A disc brake seen from above: the disc runs across the picture, edge-on, labelled "disc". Inside the brake\'s body, a pad on each side of the disc is marked "pads".' },
+  'pg-disc-caliper': { name: 'The disc brake caliper beside the disc.', description: "A brake disc seen from the bike's left side, labelled \"disc\". The caliper, marked \"caliper\", sits over the edge of the disc on its mount, with the hose running from it." },
+  'pg-disc': { name: 'The brake disc on the hub.', description: "The brake disc seen from the bike's left side, marked \"disc\": a metal ring with holes in it, joined to the hub by curved arms. The caliper over its edge is labelled \"caliper\"." },
+  'pg-chain': { name: 'A length of chain from the side.', description: 'A straight length of chain seen from the side, marked "chain": outer plates and inner plates in turn, joined by pins with rollers on them. A line under it says "Seen from the side".' },
+  'pg-chainring': { name: 'The chainring and the crank.', description: 'The drive side at the pedals. A large toothed ring, marked "chainring", is held by four arms to the middle, and the crank, marked "crank", runs from the middle down to the pedal, labelled "pedal".' },
+  'pg-cassette': { name: 'The rear sprockets on the rear wheel.', description: 'The rear wheel\'s drive side, front to the right. Six toothed rings, from small to large, sit round the axle, marked "rear sprockets", with the chain over one of them and the rear derailleur below.' },
+  'pg-derailleur': { name: 'The rear derailleur below the rear sprockets.', description: 'The rear wheel\'s drive side, front to the right. Below the rear sprockets hangs the rear derailleur, marked "rear derailleur": a body hung from the frame and a cage round two small wheels, with the chain running through it.' },
+  'pg-hanger': { name: 'The derailleur hanger between the frame and the derailleur.', description: 'The rear wheel\'s drive side, front to the right. A small plate, marked "hanger", runs from the frame\'s end at the axle down to the bolt that holds the rear derailleur, labelled "rear derailleur".' },
+  'pg-dropout': { name: "The rear dropout with the axle in its slot.", description: 'The rear wheel\'s drive side, front to the right, where the frame\'s stays meet. The plate at their end, marked "dropout", has a slot open at the bottom, in which the axle sits, labelled "axle".' },
+  'pg-gear-cable': { name: 'The gear cable and its housing at the rear derailleur.', description: 'The rear wheel\'s drive side, front to the right. A casing, marked "housing", loops from a stop on the frame into the back of the rear derailleur, and the bare wire, marked "cable", runs on from it to a bolt on the derailleur.' },
+  'pg-hub-gears': { name: 'A hub gear: a large rear hub with one sprocket.', description: 'The rear hub seen from behind, between the frame\'s two ends: a large hub, marked "hub gears", with spokes running up from it. On the bike\'s right sits a single sprocket, labelled "sprocket", and beside it a small box where the gear cable comes in.' },
+  'pg-display': { name: "An e-bike's display and remote on the handlebar.", description: 'A flat handlebar seen from above, forward is up. In the middle, over the stem, sits a screen, marked "display". Near the left grip, a small box with buttons is marked "remote".' },
+  'pg-stanchions': { name: "A suspension fork's upper legs.", description: 'A suspension fork seen from the front. Below the crown, two smooth upper legs, marked "stanchions", slide into wider lower legs, labelled "lower legs", which reach down to the axle, joined across the tyre by an arch.' },
+};
