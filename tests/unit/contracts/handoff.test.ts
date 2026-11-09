@@ -1033,7 +1033,7 @@ describe('[TRIP-DAY-POCKETS] a day ride counts the jersey and bib shorts pockets
   test('both pockets on by default; only small, light things go in them, within each pocket\'s room; they are in no bag, and the litres add up', async () => {
     for (const date of ['2026-04-15', '2026-07-20', '2026-11-15']) {
       const p = await planned(date);
-      expect(p.json('S.pockets'), date).toEqual({ jersey: true, bib: true });
+      expect(p.json('S.pockets'), date).toMatchObject({ jersey: true, bib: true });
       const places = p.json<Places>('pocketPlaces()');
       expect(places.phone, date).toBeDefined();   // the phone rides in a pocket
       const room = { jersey: 0, bib: 0 };
@@ -1084,7 +1084,7 @@ describe('[TRIP-DAY-POCKETS] a day ride counts the jersey and bib shorts pockets
     const jersey = Object.entries(p.json<Places>('pocketPlaces()')).filter(([, w]) => w === 'jersey').map(([id]) => id);
     expect(jersey.length).toBeGreaterThan(0);
     p.page.run(`setPocket('jersey',false)`);
-    expect(p.json('S.pockets')).toEqual({ jersey: false, bib: true });
+    expect(p.json('S.pockets')).toMatchObject({ jersey: false, bib: true });
     const now = p.json<Places>('pocketPlaces()');
     for (const id of jersey) {
       expect(now[id] === 'jersey', id).toBe(false);
@@ -1094,13 +1094,48 @@ describe('[TRIP-DAY-POCKETS] a day ride counts the jersey and bib shorts pockets
     }
     // stored with the plan, in the planner's own draft, and read back exactly
     const draft = p.json<{ pockets: unknown }>('captureDraft()');
-    expect(draft.pockets).toEqual({ jersey: false, bib: true });
+    expect(draft.pockets).toMatchObject({ jersey: false, bib: true });
     p.page.run(`S.pockets={jersey:true,bib:true};restorePlan(${JSON.stringify(draft)},true)`);
-    expect(p.json('S.pockets')).toEqual({ jersey: false, bib: true });
+    expect(p.json('S.pockets')).toEqual(draft.pockets);
     // both off: nothing in pockets, the switches still there to turn them back on
     p.page.run(`setPocket('bib',false)`);
     expect(p.json('pocketPlaces()')).toEqual({});
     expect(String(p.page.nodes.get('smallPockets')!.innerHTML)).toMatch(/data-pocket="jersey"/);
+  });
+
+  test('a switch, off or on, plans the day ride\'s bags again by the same rule and the line says so; hand placements stay; bags the rider changed are never re-sized', async () => {
+    // coordinator's decision, 10 Nov 2026: turning a pocket off or on is the rider's own visible action
+    const p = await planned('2026-11-15');
+    const gear = () => p.json<Array<{ uid: number; pos: string; L: number }>>('gearBags().map(b=>({uid:b.uid,pos:b.pos,L:b.L}))');
+    const before = gear();
+    const frame = before.find((b) => b.pos === 'frame')!;
+    expect(frame).toBeDefined();
+    // a hand placement: the multitool into the frame bag
+    p.page.run(`S.pinned.tool='${frame.uid}-0';`);
+    expect(p.json('recordOfPin("tool")')).toBe('kept');
+    p.page.run(`setPocket('jersey',false)`);
+    const off = gear();
+    // the same rule: the 1.2 L top tube bag first, the half frame bag only for what is still over, the seat pack last; nothing over
+    expect(off.filter((b) => b.pos === 'top').map((b) => b.L)).toEqual([1.2]);
+    expect(p.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+    // a bag that stays keeps its number, so the hand placement into it stays
+    expect(off.find((b) => b.pos === 'frame')?.uid).toBe(frame.uid);
+    expect(p.json('S.pinned.tool')).toBe(`${frame.uid}-0`);
+    expect(p.json('recordOfPin("tool")')).toBe('kept');
+    const words = () => String(p.page.nodes.get('smallPockets')!.innerHTML).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    expect(words()).toContain('Bags planned again for your pockets:');
+    expect(bannedHits(words())).toEqual([]);
+    // on again: the bags of before
+    p.page.run(`setPocket('jersey',true)`);
+    expect(gear().map(({ pos, L }) => ({ pos, L }))).toEqual(before.map(({ pos, L }) => ({ pos, L })));
+    expect(p.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+    // a size the rider set by hand: the bags stay as the rider set them, the line says so
+    p.page.run(`(b=>{b.L=5;b.userL=true;})(S.bags.find(b=>b.pos==='frame'))`);
+    const mine = gear();
+    p.page.run(`setPocket('bib',false)`);
+    expect(gear()).toEqual(mine);
+    expect(words()).toContain('Your bags stay as you set them.');
+    expect(words()).not.toContain('Bags planned again');
   });
 
   test('a saved plan without pockets reopens without them; a night, no pockets', async () => {

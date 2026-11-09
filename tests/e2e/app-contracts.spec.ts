@@ -394,7 +394,8 @@ test('[TRIP-DAY-BAGS] the owner\'s day ride in a real browser: no bike, no bags 
   await expect(page.getByRole('switch', { name: 'Jersey pockets' })).not.toBeChecked();
   await expect(page.getByRole('switch', { name: 'Jersey pockets' })).toBeFocused();
   await expect(page.locator('#smallPockets')).not.toContainText('In your jersey pockets');
-  expect(await page.evaluate('captureDraft().pockets')).toEqual({ jersey: false, bib: true });
+  expect(await page.evaluate('captureDraft().pockets')).toMatchObject({ jersey: false, bib: true });
+  await expect(page.locator('#smallPockets')).toContainText('Bags planned again for your pockets:');
   await page.keyboard.press('Space');
   await expect(page.getByRole('switch', { name: 'Jersey pockets' })).toBeChecked();
   await expect(page.locator('#smallOver')).toBeHidden();

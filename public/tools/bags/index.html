@@ -12323,7 +12323,7 @@ function pocketsHtml(){
   const P=pocketPlaces(),and=a => a.length < 2 ? a[0] : a.slice(0,-1).join(', ')+' and '+a[a.length-1];
   const line=[...POCKETS].reverse().map(p => ({p,ids:Object.keys(P).filter(id => P[id] === p.id)})).filter(g => g.ids.length)
     .map(g => `In your ${g.p.name}: ${and(g.ids.map(id => POCKET_NAMES[id]))}.`).join(' ');
-  return (line ? `<p class="small-water">${htmlEsc(line)}</p>` : '')+`<div class="pocket-switches" role="group" aria-label="Pockets">${
+  return (line ? `<p class="small-water">${htmlEsc(line)}</p>` : '')+(POCKET_NOTE ? `<p class="small-water" role="status">${htmlEsc(POCKET_NOTE)}</p>` : '')+`<div class="pocket-switches" role="group" aria-label="Pockets">${
     [...POCKETS].reverse().map(p => `<label class="pocket-switch"><input type="checkbox" role="switch" data-pocket="${p.id}"${S.pockets && S.pockets[p.id] ? ' checked' : ''}> ${p.label}</label>`).join('')}</div>`;
 }
 function renderPockets(){
@@ -12337,10 +12337,37 @@ function renderPockets(){
     if(kept) box.querySelector(`[data-pocket="${kept}"]`)?.focus?.({preventScroll:true});
   }
 }
-// A switch: what that pocket held goes back into the bags (or is named as over); stored with the plan.
+/* A switch is the rider's own visible action (coordinator's decision, 10 Nov 2026): when the plan's bags are still exactly the ones the
+   day ride proposed (S.pockets.sized), they are planned again by the same rule, the 1.2 L top tube bag first, the half frame bag only
+   for what is still over, the seat pack last, and the line says so. A bag that stays keeps its number, so a hand placement into it
+   stays; the rider's other placements are kept as records. Bags the rider has changed are never re-sized: what no longer fits is named
+   as any overflow. Stored with the plan. */
+const dayBagsKey=() => S.bags.filter(b => !isBottle(b.pos)).map(b => `${b.pos}:${b.L}${b.shape !== undefined ? '/'+b.shape : ''}${b.userL ? '!' : ''}`).sort().join(',');
+let POCKET_NOTE='';
+function resizeDayBags(){
+  const keep=S.bags.filter(b => isBottle(b.pos)),old=S.bags.filter(b => !isBottle(b.pos)),start=S.nextUid;
+  const withIds=list => list.map((b,i) => ({uid:start+i,...b}));
+  const day=withInputs({bags:keep},() => afternoonBags([],withIds));
+  if(!day) return null;
+  const used=new Set(),bags=day.bags.map(b => {
+    const was=old.find(o => o.pos === b.pos && !used.has(o.uid));
+    if(!was) return b;
+    used.add(was.uid); return {...b,uid:was.uid};
+  });
+  day.leave.forEach(id => { S.kit[id]=false; S.kitTouched[id]=true; });
+  S.bags=[...keep,...bags]; S.nextUid=Math.max(S.nextUid,...bags.map(b => b.uid+1));
+  return bags;
+}
 function setPocket(id,on){
   if(!S.pockets || !POCKETS.some(p => p.id === id)) return false;
+  const resize=typeof S.pockets.sized === 'string' && S.pockets.sized === dayBagsKey();
   S.pockets={...S.pockets,[id]:!!on};
+  POCKET_NOTE='';
+  if(resize && pocketsCounted()){
+    const bags=resizeDayBags();
+    S.pockets.sized=dayBagsKey();
+    if(bags) POCKET_NOTE=`Bags planned again for your pockets: ${bagsInWords(bags)}.`;
+  } else if(typeof S.pockets.sized === 'string') POCKET_NOTE='Your bags stay as you set them.';
   queueDraftSave();
   if(S.step === 4) renderResult(); else renderSmallBags();
   renderPockets(); drawRig();
@@ -12527,6 +12554,7 @@ async function planTripBags(){
   // what a day ride leaves at home to fit beside the bottle (owner, 9 Nov 2026): unticked in this plan, and Undo brings it back
   if(proposal) proposal.leave.forEach(id => { S.kit[id]=false; S.kitTouched[id]=true; });
   if(proposed){ S.bags=[...S.bags,...proposed]; S.nextUid=Math.max(S.nextUid,...proposed.map(b => b.uid+1)); }
+  if(S.pockets && proposed) S.pockets.sized=dayBagsKey();   // the bags a pocket switch may plan again (coordinator, 10 Nov 2026)
   S.packed={}; keepPlan({load:null}); currentPlan();   // packed afresh by the frozen selection, for this trip
   if(!HANDOFF.long) SMALL_VIEW=true;   // before Check opens, so nothing else asks over the small view
   go(HANDOFF.long ? 2 : 4);   // a long trip at Bags; a day ride at Check, where the small view shows
@@ -12686,7 +12714,7 @@ function capturePlan(){
     gpx:S.gpx ? JSON.parse(JSON.stringify(S.gpx)) : null,
     routeSnapshot:captureRouteSnapshot(),
     placements:(currentPlan(), S.placements), carried:{ ...S.carried },
-    ...(S.pockets ? { pockets:{ jersey:S.pockets.jersey === true, bib:S.pockets.bib === true } } : {}),
+    ...(S.pockets ? { pockets:{ jersey:S.pockets.jersey === true, bib:S.pockets.bib === true, ...(typeof S.pockets.sized === 'string' ? { sized:S.pockets.sized } : {}) } } : {}),
     pinned:{ ...S.pinned }, packed:{ ...S.packed }, mode:S.mode, nextUid:S.nextUid,
     step:S.step, nightsAuto:false, baseNights:S.baseNights == null ? S.nights : S.baseNights,
     adv:S.adv, onlyOn:S.onlyOn, editMode:S.editMode,
@@ -13052,7 +13080,8 @@ function normalisePlan(p){
     step:dataInteger(p.step,1,4,1),nightsAuto:false,baseNights:dataInteger(p.baseNights,0,30,nights),
     adv:p.adv === true,onlyOn:p.onlyOn === true,editMode:p.editMode === 'remove' ? 'remove' : 'add',
     pendingSaveName:dataText(p.pendingSaveName,160),pendingSaveNote:dataText(p.pendingSaveNote,2000),
-    ...(dataObject(p.pockets) ? {pockets:{jersey:p.pockets.jersey === true,bib:p.pockets.bib === true}} : {}),
+    ...(dataObject(p.pockets) ? {pockets:{jersey:p.pockets.jersey === true,bib:p.pockets.bib === true,
+      ...(typeof p.pockets.sized === 'string' && p.pockets.sized.length <= 400 && /^[a-zU0-9.:,\/!]*$/.test(p.pockets.sized) ? {sized:p.pockets.sized} : {})}} : {}),
     settings:normaliseSettings(p.settings),
     updatedAt:dataDate(p.updatedAt)};
 }
@@ -13194,6 +13223,7 @@ function restorePlan(p, draft, restoreSettings=true){
   });
   // the pockets of a day ride, as the plan holds them; a plan without them has none (owner, 9 Nov 2026)
   if(p.pockets) S.pockets={...p.pockets}; else delete S.pockets;
+  POCKET_NOTE='';
   // A stored null is a plan without bags; anything else unusable is an older or foreign save (design 8.4).
   keepPlan({ load:p.placements, placedAgain:savedPlacements !== null && !p.placements });
   resetBalance();
