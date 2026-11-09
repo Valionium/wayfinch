@@ -291,5 +291,58 @@ test('[BAL-AUTO] in slices: the packing check asks for the balance, says "Checki
   assert.equal(json('BALANCE.run===qaStale'),false,'and was dropped');
 });
 
+// Review of PR 89, C2: Try in Bag planner while the search ran, then Remove: the search was dropped for the trial, yet the plan Remove
+// brought back counted as looked at, so it was never balanced in this visit.
+test('[BAL-STORED] a search dropped unfinished (Try in Bag planner, then Remove) leaves the plan to be looked at again: the restored plan is balanced',()=>{
+  plan(SETS.bikepacking);
+  const own=json('S.placements');
+  json('autoBalancePlan({later:true})');
+  run('balanceSlice(BALANCE.run)');
+  assert.equal(json('!!BALANCE.run'),true,'the search under way');
+  run(`TRIAL={before:{bags:S.bags,decks:S.decks,placements:S.placements,nextUid:S.nextUid,step:4,baseNights:S.baseNights,stepPrev:S.step_prev,cache:PLAN_CACHE},uids:[]};
+    S.bags=[...S.bags,{uid:S.nextUid,pos:'rack',L:20,pair:true,trial:true}];S.nextUid++;currentPlan()`);
+  run('balanceSlice(BALANCE.run)');
+  assert.equal(json('BALANCE.run'),null,'dropped for the trial');
+  // go() is the page's step change (stubbed here, as in qa/advisor.cjs); then the packing check's own look, as renderResult (a no-op in
+  // this VM) starts it
+  run("if(typeof go!=='function')var go=n=>{S.step_prev=S.step;S.step=n;};removeTrial();autoBalancePlan({later:true})");
+  assert.deepEqual(json('S.placements'),own,'Remove brings the plan back');
+  assert.equal(json('!!BALANCE.run'),true,'the restored plan is looked at again');
+  while(json('!!BALANCE.run'))run('balanceSlice(BALANCE.run)');
+  assert.match(json('balanceLine()'),/Packed for better balance/,'and balanced');
+});
+
+// Review of PR 89, C1: the weight map's line named must-reach things for a gain the balancing takes without moving them. They are named
+// only when, with them held as the balancing holds them, less than MIN_GAIN_SCORE is to be had, and freeing them gives MIN_GAIN_SCORE
+// or more; a plan the balancing has yet to balance never blames them.
+test('[WM-NOTE] the line names the rider\'s things only for a gain that holding them costs: never on a plan the balancing can still balance without moving them',()=>{
+  const MIN=json('window.WayfinchAdvisor.MIN_GAIN_SCORE');
+  const NOTE=`(()=>{IDEAL_CACHE={key:null,value:null};const f=weightMapIdeal(true);const s=idealTrial(S.bags,{},S.placements);
+    const held=window.WayfinchAdvisor.autoBalance(s,(p,x)=>idealTrial(S.bags,p,x.state),balanceOptions(s));
+    return {text:f.note&&f.note.text,groups:f.note?f.note.groups.length:0,gain:f.gain,held:held.gain};})()`;
+  for(const [name,bags] of Object.entries(SETS)){
+    // the planner's own packing, not balanced yet (a plan stored before the wider look, or reopened before the balance lands)
+    plan(bags,{rack:bags.some(b=>b.pos==='rack')});
+    const before=json(NOTE);
+    if(before.held>=MIN)assert.equal(before.groups,0,`${name}: the balancing can take ${before.held} itself, so nothing of the rider's is blamed (${before.text})`);
+    // balanced: whatever the line names, holding it costs the gain
+    json('autoBalancePlan()');
+    const after=json(NOTE);
+    if(after.groups)assert.ok(after.held<MIN&&after.gain>=MIN,`${name}: named for ${after.gain}, with ${after.held} to be had while they are held (${after.text})`);
+  }
+  // a hand placement that does cost the balance: the bike lock in a backpack, put there by hand
+  plan([...SETS.bikepacking,{uid:6,pos:'pack',L:10}],{},"S.pinned={lock:'6-0'}");
+  json('autoBalancePlan()');
+  const lock=json(NOTE);
+  assert.match(lock.text,/^Your hand placement in the backpack \(bike lock\) puts more weight on your back\./);
+  assert.ok(lock.held<MIN&&lock.gain>=MIN);
+  // must-reach things that do cost it: bikepacking bags on the page's starting kit, balanced
+  plan(SETS.bikepacking,{},fresh());
+  json('autoBalancePlan()');
+  const reach=json(NOTE);
+  assert.match(reach.text,/^Your must-reach things in the frame bag \([^)]+\) take room there that heavier things could use\./);
+  assert.ok(reach.held<MIN&&reach.gain>=MIN);
+});
+
 for(const [name,fn] of tests){fn();passed++;console.log('ok',name);}
 console.log(`${passed} automatic balancing tests passed`);

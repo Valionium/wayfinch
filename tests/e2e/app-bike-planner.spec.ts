@@ -589,6 +589,48 @@ test('[BAL-AUTO] at the packing check the balancing runs in slices: "Checking th
   expect(errors).toEqual([]);
 });
 
+// Review of PR 89, C2 and C1: a plan reopened at the packing check, stored in the planner's own packing, was never balanced (the page
+// drew it before the draft was ready), and the weight map's line then blamed the rider's must-reach things for the balance not taken.
+test('[BAL-STORED] a plan reopened at the packing check in the planner\'s own packing is balanced at its first look, and the weight map\'s line blames nothing the balancing could take itself', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page);
+  await page.evaluate(`(async () => { ${BAL_BAGS} go(2); go(3); S.step = 4; currentPlan(); await flushDraft(); })()`);
+  await page.reload({ waitUntil: 'load' });
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click(); // the weight question, skipped
+  await expect(page.locator('#resultBox .balance-line')).toContainText('Packed for better balance:', { timeout: 30_000 });
+  const line = page.locator('#weightLine');
+  await expect(line).not.toHaveText('Checking the balance…', { timeout: 30_000 });
+  // whatever the line names, the balancing cannot take that gain with them held
+  const left = await page.evaluate(`(() => { const s = idealTrial(S.bags, {}, S.placements);
+    return window.WayfinchAdvisor.autoBalance(s, (p, f) => idealTrial(S.bags, p, f.state), balanceOptions(s)).apply; })()`);
+  expect(left, 'nothing clearly better left for the balancing').toBe(false);
+  expect(errors).toEqual([]);
+});
+
+// Review of PR 89, I1: the small view (guided Trip, part 2) hides the packing check, so a balance landing there was silent and reshuffled
+// the list. It shows the balance's line at the top of its list, with Undo, in the small view's own look.
+test('[BAL-LINE] the small view shows the balance\'s line at the top of its list, with Undo; nothing else of the packing check comes back', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page);
+  await page.evaluate(`${BAL_BAGS} go(2); go(3); SMALL_VIEW = true; go(4); setSmallView(true)`);
+  const line = page.locator('#packingChecklist .balance-line');
+  await expect(line).toBeVisible();
+  await expect(line).toContainText('Packed for better balance:', { timeout: 30_000 });
+  const undo = line.getByRole('button', { name: 'Undo' });
+  await expect(undo).toBeVisible();
+  expect((await undo.boundingBox())!.height, 'Undo is at least 44 px').toBeGreaterThanOrEqual(44);
+  await expect(page.locator('#resultBox')).toBeHidden();
+  await expect(page.locator('#weightBlock')).toBeHidden();
+  await expect(page.locator('#packingChecklist .packing-groups')).toBeVisible();
+  const balanced = await page.evaluate('JSON.stringify(currentPlan().items)');
+  await undo.click();
+  await expect(page.locator('#packingChecklist .balance-line')).toHaveText('Back to the packing before this balance.');
+  expect(await page.evaluate('JSON.stringify(currentPlan().items)')).not.toBe(balanced);
+  expect(errors).toEqual([]);
+});
+
 test('[BAL-KEEPS] a thing the balance moved, ticked as packed in the packing check: Undo is not offered and the line says why; unticked, Undo is back', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));

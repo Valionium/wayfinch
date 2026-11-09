@@ -172,6 +172,32 @@ test('[PERF-BIKE] [PERF-SCREEN] the phone stand-in really is slowed: the same wo
   expect(median(slowed) / median(plain)).toBeGreaterThanOrEqual(2.5);
 });
 
+// Review of PR 89, I2: the task in which the balance landed took 256–273 ms on the phone stand-in. From the moment the packing check is
+// drawn until the balance's line is there, no task of the page reaches 200 ms.
+test('[PERF-BAL] the balancing at the packing check on the phone stand-in: no task of 200 ms or more from the drawn packing check until its line lands', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/tools/bags/' });
+  await page.evaluate("S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:13 }, { uid:3, pos:'frame', L:4.5 }, { uid:4, pos:'top', L:1, slot:'front' }, { uid:5, pos:'fork', L:3, pair:true }]; S.nextUid = 6; S.decks = { bar:false, rack:false }; go(2); go(3)");
+  // advisor.js loaded beforehand, so what is measured is the search and its landing
+  await page.evaluate('loadAdvisor()');
+  const r = await page.evaluate(`(async () => {
+    go(4);
+    if (!document.getElementById('maxWeightBox').classList.contains('hidden')) document.getElementById('mwClose').click();
+    // from the next task on: the one go(4) ran in is the packing check's own drawing, measured by the step's budgets
+    await new Promise((res) => setTimeout(res, 0));
+    const tasks = [];
+    const obs = new PerformanceObserver((l) => { for (const e of l.getEntries()) tasks.push(Math.round(e.duration)); });
+    obs.observe({ type: 'longtask' });
+    const line = () => (document.querySelector('#resultBox .balance-line') || {}).textContent || '';
+    while (!/^Packed for better balance/.test(line())) await new Promise((res) => setTimeout(res, 20));
+    // the tasks that draw it again, after the landing
+    await new Promise((res) => setTimeout(res, 300));
+    obs.disconnect();
+    return tasks;
+  })()`) as number[];
+  report('PERF-BAL', r.length ? r : [0]);
+  expect(Math.max(0, ...r), `the long tasks: ${r.join(', ')} ms`).toBeLessThan(200);
+});
+
 test('[PERF-WM] the weight map paints in 50 ms or less a map on the phone stand-in: yours and the ideal together in 100 ms', async ({ page }) => {
   app = await loadApp(page, { launch: true, path: '/tools/bags/' });
   // the map is at the packing check, behind "Show the map" once the line has its answer (the owner's decision of 9 Nov 2026)

@@ -401,20 +401,21 @@ test('[WM-NOTE] the line names the hand placements and must-reach things the bes
     assert.doesNotMatch(n.text,/better balance is possible/,`${name}: no line beyond the owner's two kinds`);
     return n;
   };
-  // the must-reach things in a full frame bag take the room heavier things could use
-  rig(bike,[{uid:1,pos:'seat',L:14},{uid:2,pos:'frame',L:4.5},{uid:3,pos:'bar',L:13}],4,{});
-  const sfb=check('seat, frame and bar');
-  assert.ok(sfb.groups.some(g=>g.kind==='reach'),'seat, frame and bar: must-reach things named');
-  assert.match(sfb.text,/^Your must-reach things in the frame bag \([^)]+\) take room there that heavier things could use\./);
+  // each plan balanced first, as the packing check does: the line speaks of what the balancing leaves (review of PR 89, C1)
+  const settle=()=>run('DRAFT_READY=true;BALANCE.checked=null;BALANCE.pins=null;BALANCE.run=null;autoBalancePlan();IDEAL_CACHE={key:null,value:null}');
+  // bikepacking bags, balanced: what the line says, if anything, holds (with this suite's kit the balancing leaves only a few hundredths;
+  // qa/auto-balance.cjs names must-reach things on the page's starting kit)
+  rig(bike,SETS.bikepacking,4,{});settle();
+  check('bikepacking');
   // a hand placement: the heaviest thing of the frame bag put in the seat pack by hand
   const heavy=json(`(()=>{const f=weightMapIdeal(true);const p=f.start.pieces.filter(p=>p.pos==='frame').sort((a,b)=>b.kg-a.kg)[0];return p&&p.id;})()`);
-  run(`S.pinned={${JSON.stringify(heavy)}:'1-0'};S.placements=null;currentPlan();drawRig()`);
+  run(`S.pinned={${JSON.stringify(heavy)}:'1-0'};S.placements=null;currentPlan();drawRig()`);settle();
   assert.equal(json(`currentPlan().items[${JSON.stringify(heavy)}][0][0]`),'1-0','the planner keeps the hand placement');
   const hand=check('a hand placement in the seat pack');
   assert.ok(hand.groups.length&&hand.groups[0].kind==='hand',`a hand placement named first (${hand.text})`);
   assert.match(hand.text,/^Your hand placement in the seat pack \([^)]+\) puts more weight at the rear\./);
   run('S.pinned={};S.placements=null');
-  for(const [name,bags] of Object.entries(SETS)){rig(bike,bags,4,{rack:bags.some(b=>b.pos==='rack')});check(name);}
+  for(const [name,bags] of Object.entries(SETS)){rig(bike,bags,4,{rack:bags.some(b=>b.pos==='rack')});check(name);settle();check(name+', balanced');}
   rig(bike,[{uid:1,pos:'pack',L:30}],4,{});
   assert.equal(check('a backpack alone').text,DEFAULT_LINE);
   assert.ok(seen.has('default')&&seen.has('groups'),`the lines seen: ${[...seen]}`);
