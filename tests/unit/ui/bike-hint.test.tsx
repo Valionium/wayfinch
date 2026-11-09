@@ -100,6 +100,19 @@ describe('the card on Trip', () => {
     expect(card()).toBeNull();
   });
 
+  test('[HINT-SMALL] Later tapped before the card has written its letter (a slow phone): the key keeps small, never written over', async () => {
+    // Rendered without act, so the effect that writes the card's letter waits, as it does on a slow phone; the rider taps Later meanwhile.
+    render(<TripBike bike={NO_BIKE} trip={false} />, host);
+    expect(key()).toBeNull();
+    localStorage.setItem(HINT_KEY, 's');
+    // Preact runs it after the next frame, or 100 ms at the latest.
+    await new Promise((r) => setTimeout(r, 200));
+    expect(key()).toContain('s');
+    render(null, host);
+    await trip(NO_BIKE);
+    expect(card()).toBeNull();
+  });
+
   test('[HINT-SMALL] a tap on Make it yours or the drawing counts as seen: back without saving, the line is small', async () => {
     for (const which of [0, 1]) {
       localStorage.clear();

@@ -28,7 +28,9 @@ export function TripBike({ bike, trip }: { bike: BikeSource; trip: boolean | nul
   const h = bikeHint(bike.known.length > 0, at.used ?? before, key);
   at.line ||= h.line;
   useEffect(() => {
-    if (trip !== null && h.key !== key) writeHint(h.key);
+    // Letters are only ever added: merged with the key as it is now, so a Later tapped before this ran is never written over.
+    const now = readHint();
+    if (trip !== null && withLetters(now, h.key) !== now) writeHint(withLetters(now, h.key));
     if (at.line && !said) import('../../core/wording/en-hint.ts').then((m) => setSaid(m.HN.hintEveryTool), () => undefined);
   });
   return h.hint === 'new' ? (
