@@ -267,9 +267,16 @@ body.lc-small #smallBalance .balance-line{font-size:14px;margin:8px 0 0}
 /* the plan's line and its Undo: quiet, one line under the top bar */
 body.lc-small #handoffBar:not(.hidden){border:0;background:none;padding:8px 0 0;margin:0;color:var(--muted);font-size:14px;gap:4px 12px}
 body.lc-small #handoffBar .linky{margin-left:0;min-height:44px;font-family:inherit;font-size:14px;letter-spacing:0;text-transform:none;font-weight:600}
+/* the footer: the legal link stays, in the small view's own plain type; the Load Check tagline goes (review of PR 92, M6) */
+body.lc-small .sitefoot>span{display:none}
+body.lc-small .sitefoot{font-family:inherit;letter-spacing:0;margin-top:8px}
+body.lc-small .sitefoot .linky{min-height:44px;font-family:inherit;font-size:14px;letter-spacing:0;text-transform:none;color:var(--muted)}
+body.lc-small .sitefoot .linky:hover{color:var(--ink)}
 @media screen and (min-width:1100px){
   body.lc-small .planner-cols{display:block;max-width:620px;margin:0 auto}
-  body.lc-small .small-head,body.lc-small #handoffBar:not(.hidden){max-width:620px;margin-left:auto;margin-right:auto}
+  body.lc-small .small-head,body.lc-small #handoffBar:not(.hidden),body.lc-small .sitefoot{max-width:620px;margin-left:auto;margin-right:auto}
+  /* "← Back to Trip" starts where the column starts (review of PR 92, M7); the bar's line still runs the full width */
+  body.lc-small .guide-launch-row{padding-left:calc((100% - 620px) / 2);padding-right:calc((100% - 620px) / 2)}
 }
 .setupgroup{margin:14px 0}.setupgroup>h3{font-family:var(--disp);font-weight:600;font-size:16px;margin:0 0 2px}
 .setuphint{font-size:13px;color:var(--muted);margin:0 0 8px}
@@ -1603,12 +1610,16 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 /* 6 px wider than the options on each side: a checked ring (3 px) or a focus ring (4 px) that scrolls under the panel stays under it
    (owner's try-out, 5 Nov 2026). The dialog's body has 12-16 px of room on each side. */
 .look-preview{position:sticky;top:-16px;z-index:2;background:var(--panel);padding:6px 6px 4px;margin:0 -6px 6px;border-bottom:1px solid var(--line)}
-.look-preview svg{display:block;width:100%;max-width:420px;height:auto;margin:0 auto}
-/* while the close-up shows, the bike moves to the left at the width renderForkZoom works out, and the close-up sits on its right */
-.look-preview.with-zoom svg{width:var(--look-bike-w,100%);margin:var(--look-bike-y,0px) 0 0 var(--look-bike-x,0px)}
+.look-preview svg{display:block;width:100%;max-width:420px;height:auto;margin:0 auto;transform-origin:0 0;transition:transform .32s ease}
+/* while the close-up shows, the bike moves to the left at the size layoutForkZoom works out, and the close-up sits on its right; a
+   transform, so the bike glides there and back (owner, 9 Nov 2026) and nothing below moves; with reduced motion it is there at once */
+.look-preview.with-zoom svg{transform:translate(var(--look-bike-x,0px),var(--look-bike-y,0px)) scale(var(--look-bike-k,1))}
 /* The fork close-up (owner, 7 Nov 2026): the preview's drawing cut to the fork, 2.5 times as large (its width is set from the cut) */
-/* It shows inside the drawing's area, on the bike's right, while the Fork part is on screen below the drawing, to that part's end. */
-.look-fork-zoom{position:sticky;z-index:3;box-sizing:border-box;margin-left:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+/* It shows inside the drawing's area, on the bike's right, while the Fork part is on screen below the drawing, to that part's end, from
+   the moment that part comes on screen, before any tap (owner, 9 Nov 2026); it fades in and out with the bike's glide. */
+.look-fork-zoom{position:sticky;z-index:3;box-sizing:border-box;margin-left:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden;
+  pointer-events:none;opacity:0;visibility:hidden;transform:scale(.9);transform-origin:100% 50%;transition:opacity .32s ease,transform .32s ease,visibility 0s linear .32s}
+.look-fork-zoom.shown{opacity:1;visibility:visible;transform:none;transition:opacity .32s ease,transform .32s ease,visibility 0s}
 .look-fork-zoom svg{display:block;width:100%;height:auto}
 .look-guess{margin:0 0 8px;color:var(--muted);font-size:13px;min-height:1.2em}
 .bike-look fieldset{border:0;padding:0;margin:0 0 10px}
@@ -2183,6 +2194,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <p class="small-over" id="smallOver" hidden></p>
       <div id="smallBagList"></div>
       <p class="small-water" id="smallWater"></p>
+      <p class="small-water" id="smallWear" hidden></p>
     </div>
     <div class="small-foot" id="smallFoot" hidden><button class="small-full" id="smallFull" type="button">Open the full Bag planner</button>
       <p>The same plan, with every step and setting.</p></div>
@@ -3743,8 +3755,10 @@ function renderLook(){
   $('lookPhoto').classList.remove('hidden');
   $('lookPhoto').setAttribute('aria-expanded',String(!!LOOK_PHOTO));
   followShownBike();
-  const t=lookTarget(),look=currentLook()||{colour:null,bars:null,ebike:null},bike=lookPreviewBike();
-  const view=t.kind==='plan' ? planBagView() : null,art=bikeDrawing(bike,view,{theme:bikeTheme()}),spec=art.spec,guess=[];
+  const look=currentLook()||{colour:null,bars:null,ebike:null},bike=lookPreviewBike();
+  // Personalising is about the bike alone (owner's video, 9 Nov 2026): Look draws it with no bags, bottles, decks or rack, even when
+  // it is the plan's bike, which the rig behind still draws with them.
+  const art=bikeDrawing(bike,null,{theme:bikeTheme()}),spec=art.spec,guess=[];
   box.innerHTML=art.svg;   // drawn by bikeDrawing, the function the drawing-set check covers
   if(!look.bars)guess.push(bikeWord('lookGuessBars',{value:spec.bars.value}));
   if(look.ebike===null)guess.push(bikeWord('lookGuessEbike',{value:spec.ebike.value ? 'yes' : 'no'}));
@@ -3755,7 +3769,7 @@ function renderLook(){
   check('lookBars',look.bars||'');
   check('lookEbike',look.ebike===null ? '' : String(look.ebike));
   syncLookExtras(look);
-  renderForkZoom(bike,view,art);
+  renderForkZoom(bike,art);
   $('lookPickerChip').classList.toggle('on',!!look.colour && !swatch);
   if(look.colour && document.activeElement!==$('lookPicker'))$('lookPicker').value=look.colour;
   const ready=typeof DRAFT_READY!=='undefined' && DRAFT_READY;
@@ -3764,12 +3778,13 @@ function renderLook(){
   $('lookUndo').classList.toggle('hidden',!LOOK_CHANGED && !(swap && BIKE_PROFILE_EDITOR_ID===swap.newId));
   $('lookStatus').textContent=LOOK_MESSAGE;
 }
-// The fork close-up (owner, 7 Nov 2026): while the fork has colours of its own, the same drawing cut to the fork, 2.5 times the preview's
-// size, so each tap on its colours shows where it lands. A second picture of the bike: hidden from screen readers, and never named for the
-// glide (the preview is). Owner, 9 Nov 2026: it sits inside the drawing's area, on the right, and the bike moves to the left so both fit
-// side by side; it shows while the Fork part is on screen below the drawing, to that part's end (the drawing's area is sticky in Look).
+// The fork close-up (owner, 7 Nov 2026): the same drawing cut to the fork, 2.5 times the preview's size, so each tap on its colours
+// shows where it lands. A second picture of the bike: hidden from screen readers, and never named for the glide (the preview is).
+// Owner, 9 Nov 2026: it sits inside the drawing's area, on the right, and the bike moves to the left so both fit side by side; it shows
+// while the Fork part is on screen below the drawing, to that part's end (the drawing's area is sticky in Look), from the moment that
+// part scrolls into view, before any tap (owner's video, 9 Nov 2026), and the bike glides between alone and beside it.
 const FORK_ZOOM=2.5;
-let FORK_CUT=null;   // the close-up's cut of the drawing, {w, h} in the drawing's units, while the fork has colours of its own
+let FORK_CUT=null;   // the close-up's cut of the drawing, {w, h} in the drawing's units, while there is a drawing
 // The bike's width beside the close-up: the close-up no taller than the bike alone (so the area keeps its height and nothing below
 // moves while scrolling), both side by side within the area, and the bike never larger than alone.
 function forkZoomBikeWidth(areaW,gap,cut){
@@ -3779,36 +3794,40 @@ function forkZoomBikeWidth(areaW,gap,cut){
 function layoutForkZoom(){
   const stage=$('lookPreview'),zoom=$('lookForkZoom');
   if(!stage || !zoom || !stage.classList || !zoom.classList)return;
-  let show=!!FORK_CUT && !!zoom.innerHTML;
+  const drawn=!!FORK_CUT && !!zoom.innerHTML;
+  let show=drawn;
   const set=$('lookForkSet'),body=$('bikeDetailsBody');
-  if(typeof stage.getBoundingClientRect!=='function'){zoom.classList.toggle('hidden',!show);return;}
+  if(typeof stage.getBoundingClientRect!=='function'){zoom.classList.toggle('hidden',!show);zoom.classList.toggle('shown',show);return;}
   if(show && set && body){
     const f=set.getBoundingClientRect(),s=stage.getBoundingClientRect(),b=body.getBoundingClientRect();
     show=f.height>0 && f.bottom>s.bottom+1 && f.top<b.bottom;
   }
-  zoom.classList.toggle('hidden',!show);
+  // Laid out whenever there is a drawing, shown or not, so it fades out where it was and fades in where it goes.
+  zoom.classList.toggle('hidden',!drawn);
+  zoom.classList.toggle('shown',show);
   stage.classList.toggle('with-zoom',show);
-  if(!show){['--look-bike-w','--look-bike-x','--look-bike-y'].forEach(k=>stage.style.removeProperty(k));stage.style.minHeight='';return;}
+  if(!drawn)return;
   // The drawing (#lookPreview, which holds only the drawing) and the close-up, its next sibling, are both sticky in Look: the close-up
-  // is pulled up over the drawing's right part by its margins (taking no room of its own) and sticks the moment the drawing does.
+  // is pulled up over the drawing's right part by its margins (taking no room of its own) and sticks the moment the drawing does. The
+  // bike keeps its own place and size in the page and is moved and shrunk by a transform, so the area keeps its height.
   const cs=getComputedStyle(stage),num=k=>parseFloat(cs[k])||0,GAP=10;
-  const areaW=stage.clientWidth-num('paddingLeft')-num('paddingRight'),innerH=Math.min(areaW,420)*150/320;
+  const areaW=stage.clientWidth-num('paddingLeft')-num('paddingRight'),aloneW=Math.min(areaW,420),innerH=aloneW*150/320;
   const bikeW=forkZoomBikeWidth(areaW,GAP,FORK_CUT),zoomW=FORK_CUT.w*FORK_ZOOM*bikeW/320+2,zoomH=FORK_CUT.h*FORK_ZOOM*bikeW/320+2;
   const side=Math.max(0,(areaW-bikeW-GAP-zoomW)/2),panelH=num('paddingTop')+innerH+num('paddingBottom')+num('borderBottomWidth');
   const down=num('paddingTop')+(innerH-zoomH)/2,after=num('marginBottom');   // the close-up's top within the drawing's area
-  stage.style.setProperty('--look-bike-w',r2(bikeW)+'px');
-  stage.style.setProperty('--look-bike-x',r2(side)+'px');
-  stage.style.setProperty('--look-bike-y',r2((innerH-bikeW*150/320)/2)+'px');
-  stage.style.minHeight=r2(cs.boxSizing==='border-box' ? panelH : innerH)+'px';
+  const k=aloneW>0 ? bikeW/aloneW : 1;
+  stage.style.setProperty('--look-bike-k',String(Math.round(k*10000)/10000));
+  stage.style.setProperty('--look-bike-x',r2(side-(areaW-aloneW)/2)+'px');
+  stage.style.setProperty('--look-bike-y',r2(innerH*(1-k)/2)+'px');
   Object.assign(zoom.style,{width:r2(zoomW)+'px',top:r2(parseFloat(cs.top)+down)+'px',marginRight:r2(side)+'px',
     marginTop:r2(-(after+panelH-down))+'px',marginBottom:r2(after+panelH-down-zoomH)+'px'});
 }
 let FORK_LAYOUT_FRAME=0;
 function queueForkLayout(){ if(FORK_LAYOUT_FRAME)return; FORK_LAYOUT_FRAME=requestAnimationFrame(()=>{FORK_LAYOUT_FRAME=0;layoutForkZoom();}); }
-function renderForkZoom(bike,view,art){
+function renderForkZoom(bike,art){
   const box=$('lookForkZoom');if(!box)return;
-  const show=!!lookPaint().fork && !!art && !!art.anchors;
-  const zoom=show ? bikeDrawing(bike,view,{theme:bikeTheme(),idPrefix:'bkz'}) : null;
+  const show=!!art && !!art.anchors;   // the fork as the frame too: the close-up is there before any tap (owner, 9 Nov 2026)
+  const zoom=show ? bikeDrawing(bike,null,{theme:bikeTheme(),idPrefix:'bkz'}) : null;
   if(!zoom){FORK_CUT=null;box.innerHTML='';layoutForkZoom();return;}
   const p=art.anchors.points,x=Math.max(0,p.headBottom[0]-22),y=Math.max(0,p.headTop[1]-6);
   const w=Math.min(320-x,p.front[0]-p.headBottom[0]+40),h=Math.min(150-y,p.front[1]-p.headTop[1]+14);
@@ -4123,8 +4142,8 @@ function tripKitDefaults(nights=S.nights,sleep=S.sleep,bike=S.bikeProfile){
    water and a top tube bag and the essentials like IDs, a candy bar or cash"). A day ride planned here alone keeps the starting list
    the bag selection's own cases were measured with (qa/bag-selection.cjs, LC-SEL-09 and the rest).
    The essentials:
-   the essentials, sized to the day's riding time, with layers and sun kit by the packing check's own weather and season rules (audit),
-   so the check never asks for what the start left out. The riding time is the planner's own: the route's hours for the day (distance
+   the essentials, sized to the day's riding time, with layers, rain trousers and sun kit by the packing check's own weather and season
+   rules (audit; the warm layers by the riding hours' temperature, dayRideTemp), so the check never asks for what the start left out. The riding time is the planner's own: the route's hours for the day (distance
    and climbing at the loaded speed), else the pace's hours. A lock is the check's from the first night; a day of meals and the power
    bank only for a long day (over the steady pace's half day, over the sporting pace's full day); ride snacks always. */
 function dayRideHours(){
@@ -4132,18 +4151,52 @@ function dayRideHours(){
   const h=r ? r.effectiveExact / r.loadedKph : NaN;   // the whole route in one day, whatever nights the plan has now
   return Number.isFinite(h) ? h : PACE[S.pace || 'sporting'].hours;
 }
+/* The warm layers of a day ride (0 nights) go by the day, not the night (owner, 9 Nov 2026: "Yes, by day temp"). The riding hours run
+   from the morning into the afternoon, so their temperature is taken halfway between the cold end of the night's low (the packing
+   guide's own cold figure) and the usual high of the day, from the same climate figures (tripClimate). A night or more keeps the
+   cold-night rule. Without a day figure, the night's. */
+function dayRideTemp(c){
+  if(!c || c.nightCold == null) return null;
+  return c.dayMean == null ? c.nightCold : Math.round((c.nightCold + c.dayMean) / 2);
+}
+// The temperature the insulated jacket and the long gloves are packed by: the riding hours' on a day ride, else the cold night's.
+function warmLayerTemp(c, nights = S.nights){ return nights === 0 ? dayRideTemp(c) : (c ? c.nightCold : null); }
+/* On a day ride the insulated jacket is worn, not packed (owner, 9 Nov 2026: "Worn, one spare tube"), and only when the riding hours
+   are below 8 °C (owner, 9 Nov 2026: "Below 8 °C"); from 8 °C it is neither worn nor packed, the day kit's rain jacket being the light
+   layer. It is in no bag and adds no litres; the small view says "Wear: insulated jacket." A night or more packs it as before. */
+const DAY_JACKET_BELOW=8;
+function dayRideWearsJacket(){ const c=tripClimate(); return S.nights === 0 && c.nightCold != null && dayRideTemp(c) < DAY_JACKET_BELOW; }
+// A day ride's one spare tube (same ruling): the frozen KIT item is "Spare tubes ×2", so the day kit sizes it as one, half its litres
+// and weight, through the planner's own size of an item (S.custom), unless the rider set a size of their own.
+const DAY_TUBE={L:0.35,kg:0.18,rigid:0};
+const isDayTube=c => !!c && c.L === DAY_TUBE.L && c.kg === DAY_TUBE.kg && (c.rigid || 0) === 0;
+function oneSpareTube(){ if(S.nights === 0 && S.kit.tubes && !S.custom.tubes && qtyOf(kitById('tubes')) === 1) S.custom.tubes={...DAY_TUBE}; }
+// The day size is the planner's, not the rider's (review of PR 95, I1): while the trip is a day ride the item reads as one tube for a
+// day ride and carries no "yours"; once the trip has nights the size goes again (applyTripKitDefaults), two tubes under KIT's name.
+const dayTubeNow=() => S.nights === 0 && isDayTube(S.custom.tubes);
+function kitName(k){ return k && k.id === 'tubes' && dayTubeNow() ? 'Spare tube (one, for a day ride)' : k.name; }
+function kitSizeIsRiders(k){ return isTweaked(k) && !(k.id === 'tubes' && isDayTube(S.custom.tubes)); }
+/* Water without bottle cages (owner: "at least water"): when the plan will have no bottle, neither its own nor the cages the day ride's
+   proposal adds on the bike's in-frame mounts (proposedTripBags), the day's water goes in a bag, placed by the frozen selection. */
+function dayRideNeedsBagWater(){
+  if(liveBottles().length) return false;
+  const fit=bikeFit(S.bikeProfile);
+  return !!gearBags().length || !['st','dt'].some(sl => fit.cages[sl]);
+}
 function dayRideKit(){
-  const c=tripClimate(),known=c.nightCold!=null,hours=dayRideHours();
+  const c=tripClimate(),known=c.nightCold!=null,hours=dayRideHours(),warm=dayRideTemp(c);
   const sunMonth=(S.place && S.place.lat < 0) ? (S.month+6)%12 : S.month;
   return {docs:true,cash:true,phone:true,snacks:true,firstaid:true,rain:true,lock:false,
     food:hours > PACE.steady.hours,bank:hours > PACE.sporting.hours,
-    puffy:known && c.nightCold < 11,gloves:known && c.nightCold < 5,
+    puffy:false,gloves:known && warm < 5,   // the jacket worn, not packed (dayRideWearsJacket)
+    rainpants:known && c.wetChance > 33,water:dayRideNeedsBagWater(),
     shades:sunMonth >= 2 && sunMonth <= 9,sun:sunMonth >= 3 && sunMonth <= 8};
 }
 function applyTripKitDefaults(){
   const defaults=tripKitDefaults();
   S.kitTouched=S.kitTouched || {};
   for(const [id,selected] of Object.entries(defaults))if(!S.kitTouched[id])S.kit[id]=selected && !bikeRepairAlternative(id);
+  if(S.nights > 0 && isDayTube(S.custom.tubes)) delete S.custom.tubes;   // a day ride's one tube: two again with nights
 }
 function bikeRepairAlternative(id){
   if(!['brakecable','gearcable','shiftcharger'].includes(id))return null;
@@ -5858,7 +5911,7 @@ function advisorOldBag(s, input){
 // new bag ("Put the tent on your rack, no new bag needed"); else a rack to fit. `inList`: the words inside a longer line.
 // What the planner's own deck placement puts on the rack deck with these bags and decks.
 function advisorDecked(bags, decks, input){ return withInputs(advisorChanges(bags, decks, input.context), () => deckedIds()); }
-const advisorDeckItems = (s, input) => advisorList(advisorDecked(advisorTrialBags(s, input), s.decks, input).map(id => (kitById(id) || { name:id }).name.toLowerCase()));
+const advisorDeckItems = (s, input) => advisorList(advisorDecked(advisorTrialBags(s, input), s.decks, input).map(id => (kitById(id) ? kitName(kitById(id)) : id).toLowerCase()));
 function advisorDeckText(s, input, inList){
   const items = advisorDeckItems(s, input), own = advisorRackFitted(input);
   if(inList) return own ? (items ? advisorWord('deckOwnPlus', { items }) : advisorWord('deckOwnPlusBare')) : (items ? advisorWord('deckNew', { items }) : advisorWord('deckNewBare')).replace(/^./, c => c.toLowerCase());
@@ -5905,7 +5958,7 @@ function advisorBagView(bags, decks, input){
 function advisorMoves(s, input){
   const base = advisorBase(input), bags = advisorTrialBags(s, input);
   const a = advisorPlan(base.bags, base.decks, input), b = advisorPlan(bags, s.decks, input);
-  const diff = planDiff(a, b), name = id => (kitById(id) || { name:id }).name;
+  const diff = planDiff(a, b), name = id => (kitById(id) ? kitName(kitById(id)) : id);
   const where = (keys, list) => {
     const labels = [...new Set(String(keys).split(',').filter(Boolean).map(k => {
       const bag = list.find(x => String(x.uid) === k.split('-')[0]); return bag ? POSITIONS[bag.pos].label.toLowerCase() : null;
@@ -6030,7 +6083,7 @@ function advisorAnswerHtml(answer, input){
   else {
     const c = answer.closest, lines = [advisorWord('nothing')];
     if(c){
-      const left = [c.result.overL > 0 ? `${+c.result.overL.toFixed(1)} L` : '', c.result.spillIds.map(id => (kitById(id) || { name:id }).name).join('; ')].filter(Boolean);
+      const left = [c.result.overL > 0 ? `${+c.result.overL.toFixed(1)} L` : '', c.result.spillIds.map(id => kitById(id) ? kitName(kitById(id)) : id).join('; ')].filter(Boolean);
       lines.push(advisorWord('closest', { what:advisorWhat(c, input) }));
       if(left.length) lines.push(advisorWord('stillOver', { what:left.join(': ') }));
     } else lines.push(advisorWord('closestNone'));
@@ -6495,7 +6548,7 @@ function rainAccess(A){
   const selected=activeKit().filter(k=>k.rainkit);
   const unplaced=A.spill.filter(k=>k.rainkit),buried=[];
   A.slots.forEach(s=>{s.items.forEach(k=>{
-    if(k.rainkit&&!reachableFor(k,s.pos))buried.push({n:k.name,w:POSITIONS[s.pos].label.toLowerCase(),byHand:!!k.pinned});
+    if(k.rainkit&&!reachableFor(k,s.pos))buried.push({n:kitName(k),w:POSITIONS[s.pos].label.toLowerCase(),byHand:!!k.pinned});
   });});
   const ready=selected.length>0 && !unplaced.length && !buried.length && selected.every(k=>
     A.slots.some(s=>reachableFor(k,s.pos) && s.items.some(item=>item.id===k.id)));
@@ -6508,7 +6561,7 @@ function getChecklistModel(A=currentPlan()){
   const selected=activeKit(),byId=new Map(),groups=[],byGroup=new Map();
   selected.forEach(k=>{
     const quantity=k.perDay?foodDays():qtyOf(k);
-    byId.set(k.id,{id:k.id,name:k.name,category:k.cat,quantity,
+    byId.set(k.id,{id:k.id,name:kitName(k),category:k.cat,quantity,
       quantityLabel:k.perDay?`${quantity} riding day${quantity===1?'':'s'}`:quantity>1?`${quantity} ×`:'',
       packed:!!S.packed[k.id],L:itemL(k),kg:itemKg(k),rigidCm:rigidOf(k),placements:[],
       placementLabel:'',note:'',bikeReference:bikeRepairReference(k.id),status:'unassigned',tooLong:false});
@@ -6597,7 +6650,7 @@ function getChecklistModel(A=currentPlan()){
   return {tripLabel,tripDetails,bikeProfile:normaliseBikeProfile(S.bikeProfile),modeLabel:S.mode==='light'?'Lightweight kit':'Comfort kit',groups,items,
     totals:{items:items.length,packed,remaining:items.length-packed,L:+items.reduce((n,row)=>n+row.L,0).toFixed(2),
       kg:+items.reduce((n,row)=>n+row.kg,0).toFixed(3)},warnings,
-    leftAtHome:lightDroppedList().map(k=>({id:k.id,name:k.name})),
+    leftAtHome:lightDroppedList().map(k=>({id:k.id,name:kitName(k)})),
     bottles:liveBottles().map(b=>({label:bagLabel(b)+(b.slot && BOTTLE_SPOTS[b.slot]?` — ${BOTTLE_SPOTS[b.slot].name}`:''),L:b.L}))};
 }
 
@@ -6641,13 +6694,13 @@ function incomingFor(A, key){
       const full = kitById(k.id); if(!full || !fits(full)) return;
       const from=A.slots.filter(x=>x.key!==key && x.items.some(i=>i.id===k.id)).map(unitLabel);
       if(A.spill.some(x=>x.id===k.id))from.push('the overflow');
-      out.push({ id:k.id, name:k.name, vol:itemL(full), from:from.join(', ') });
+      out.push({ id:k.id, name:kitName(k), vol:itemL(full), from:from.join(', ') });
     });
   });
   A.spill.forEach(k => {
     if(k.part || out.some(x=>x.id===k.id)) return;
     const full = kitById(k.id); if(!full || !fits(full)) return;
-    out.push({ id:k.id, name:k.name, vol:itemL(full), from:'the overflow' });
+    out.push({ id:k.id, name:kitName(k), vol:itemL(full), from:'the overflow' });
   });
   return out.sort((a,b) => b.vol - a.vol).slice(0, 8);
 }
@@ -6661,7 +6714,7 @@ function strapOptions(res){
   const cand = [];
   res.slots.forEach(s => s.items.forEach(k => {
     if(!k.part && STRAPPABLE.includes(k.id) && k.vol > 0.2)
-      cand.push({ id:k.id, name:k.name, vol:k.vol, from:POSITIONS[s.pos].label.toLowerCase() });
+      cand.push({ id:k.id, name:kitName(k), vol:k.vol, from:POSITIONS[s.pos].label.toLowerCase() });
   }));
   cand.sort((a,b) => b.vol - a.vol);
   return { decks, cand };
@@ -6693,7 +6746,7 @@ function comfortFill(res){
       const spot = free.sort((a,b) => b.left - a.left).find(f => f.left >= L && fitsLength(k, f));
       if(!spot) return;
       spot.left = +(spot.left - L).toFixed(2);
-      picks.push({ id:k.id, name:k.name, L, where:POSITIONS[spot.pos].label.toLowerCase() });
+      picks.push({ id:k.id, name:kitName(k), L, where:POSITIONS[spot.pos].label.toLowerCase() });
     });
   return { picks, freeL, emptyBags, addedL:+picks.reduce((s,p)=>s+p.L,0).toFixed(1) };
 }
@@ -6761,7 +6814,7 @@ function fixSuggestion(){
     // Leaving something behind is a kept step, so no selection runs here.
     const r = planWith({ remove:[...drop.map(d => d.id), k.id] }), v = vol(r);
     if(v < over - 0.01){
-      drop.push({ id:k.id, name:k.name, L:itemL(k), kg:itemKg(k) });
+      drop.push({ id:k.id, name:kitName(k), L:itemL(k), kg:itemKg(k) });
       res = r; over = v;
     }
   }
@@ -8301,10 +8354,13 @@ function audit(){
     M('Electronic shifting charger or spare battery',"Check your system's charge range for this trip and take its compatible charger, charging lead or spare battery as appropriate. A phone charging cable alone may not work; check controller batteries separately.",['shiftcharger']);
 
   if(!has('rain') && known) M('Rain jacket', `Roughly ${c.wetChance}% of days see rain here in ${MONTHS[S.month]}. Over ${n+1} days, expect to need it.`, ['rain']);
-  if(!has('puffy') && known && c.nightCold < 11)
+  // a day ride: by the riding hours' temperature (owner, 9 Nov 2026); a night or more: by the cold night, as before
+  const warm = warmLayerTemp(c, n);
+  if(!has('puffy') && known && warm < 11 && n > 0)   // a day ride wears it (owner, 9 Nov 2026: "Worn, one spare tube")
     M('Insulated jacket', `Nights drop to about ${c.nightCold}°C on the cold end. Being cold in the evening is the single most common reason people cut a first tour short.`, ['puffy']);
-  if(!has('gloves') && known && c.nightCold < 5)
-    M('Long gloves', `Mornings near ${c.nightCold}°C. Cold hands stop you braking properly on descents.`, ['gloves']);
+  if(!has('gloves') && known && warm < 5)
+    M('Long gloves', n === 0 ? `Riding near ${warm}°C on a cold day. Cold hands stop you braking properly on descents.`
+      : `Mornings near ${c.nightCold}°C. Cold hands stop you braking properly on descents.`, ['gloves']);
 
   if(camping() && !has('quilt'))
     M('A sleep system', 'Camping is selected but there is nothing to sleep in.', ['quilt']);
@@ -8437,9 +8493,9 @@ function haveClimate(){ const c = tripClimate(); return c && c.nightCold != null
 
 function weatherKit(c){
   if(!c || c.nightCold == null) return [];
-  const a = [];
-  if(c.nightCold < 11) a.push(['an insulated jacket', 2.0]);
-  if(c.nightCold < 5)  a.push(['long gloves', 0.3]);
+  const a = [], warm = warmLayerTemp(c);   // a day ride: the riding hours' temperature (owner, 9 Nov 2026)
+  if(warm < 11 && S.nights !== 0) a.push(['an insulated jacket', 2.0]);   // a day ride wears it: no room in a bag
+  if(warm < 5)  a.push(['long gloves', 0.3]);
   if(c.nightCold < 2 && camping()) a.push(['a warmer sleep system', 3.0]);
   if(c.wetChance > 28) a.push(['dry bags', 0.3]);
   if(c.wetChance > 33) a.push(['rain trousers', 0.8]);
@@ -8453,8 +8509,9 @@ function climateConsequence(contentOnly=false){
   // the mildest thing Germany offers: the Rhine valley in July
   const base = weatherKit(climate('rhein', 6)).map(x => x[0]);
   const extra = mine.filter(x => !base.includes(x[0]));
+  const wear=dayRideWearsJacket() ? '<p>On a day ride this cold, wear an insulated jacket: it is worn, not packed.</p>' : '';
   if(!extra.length){
-    const explanation='<p>These conditions add no extra cold-weather items beyond the mild-weather baseline. A colder month or higher route can change that.</p>';
+    const explanation='<p>These conditions add no extra cold-weather items beyond the mild-weather baseline. A colder month or higher route can change that.</p>'+wear;
     return contentOnly ? explanation : infoHelp('Why the place matters', explanation);
   }
   const L = extra.reduce((s,a)=>s+a[1],0).toFixed(1);
@@ -8463,7 +8520,8 @@ function climateConsequence(contentOnly=false){
     : extra[0][0];
   const heights=(c.both ? [c.placeA?.elev,c.placeB?.elev] : [c.place?.elev]).filter(Number.isFinite);
   const heightText=heights.length ? `${heights.length>1 ? `${Math.min(...heights)}–${Math.max(...heights)}` : heights[0]} m and ` : '';
-  const explanation=`<p>${heightText}around ${c.nightCold}°C on cold nights make ${list} worth allowing for — about <b>${L} L</b> more than the mild-weather baseline.</p><p>This is a seasonal packing guide, not a forecast.</p>`;
+  const cold=S.nights === 0 ? `around ${dayRideTemp(c)}°C over the riding hours on a cold day` : `around ${c.nightCold}°C on cold nights`;
+  const explanation=`<p>${heightText}${cold} make ${list} worth allowing for — about <b>${L} L</b> more than the mild-weather baseline.</p>${wear}<p>This is a seasonal packing guide, not a forecast.</p>`;
   return contentOnly ? explanation : infoHelp('Why the place matters', explanation);
 }
 
@@ -8989,7 +9047,7 @@ function weightMapIdeal(now = false){
 // balancing leaves where they are), nothing at all.
 const NOTE_ZONES = { front:'at the front', rear:'at the rear', centre:'in the middle', body:'on your back' };
 // a kit name with its first letter lowered unless it is a capital word ("ID, cards, insurance"); a thing the rider added as typed
-const kitWord = k => !k ? null : k.added ? k.name : k.name.replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase());
+const kitWord = k => !k ? null : k.added ? k.name : kitName(k).replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase());
 const noteList = names => names.length > 3 ? `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`
   : names.length < 2 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 function noteSentence(g){
@@ -9172,7 +9230,7 @@ function balanceLine(){
   if(last && samePlacements(last.placements, S.placements)){
     const A = currentPlan();
     // a kit name with its first letter lowered unless it is a capital word ("ID, cards, insurance"); a thing the rider added as typed
-    const named = k => !k ? null : k.added ? k.name : k.name.replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase());
+    const named = k => !k ? null : k.added ? k.name : kitName(k).replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase());
     const said = last.moves.map(m => { const k = kitById(m.id), s = A.slots.find(x => x.key === m.to);
       return (named(k) || m.id) + (s ? ' to the ' + unitLabel(s).toLowerCase() : ''); });
     const shown = said.length > 3 ? [...said.slice(0, 2), `${said.length - 2} more things`] : said;
@@ -10029,7 +10087,7 @@ function removingBag(b, remove){
   const ids = Object.keys(S.pinned).filter(id => gone.some(u => u.key === S.pinned[id]));
   ids.forEach(id => delete S.pinned[id]);
   bagMoveStatus(ids.length ? `Removing the ${unitLabel(gone[0]).toLowerCase()} also forgets where you put the ${
-    listOf(ids.map(id => (kitById(id) ? kitById(id).name : id).toLowerCase()))}.` : '');
+    listOf(ids.map(id => (kitById(id) ? kitName(kitById(id)) : id).toLowerCase()))}.` : '');
 }
 function removeBag(uid){
   const b = S.bags.find(x => x.uid === uid); if(!b) return;
@@ -10299,7 +10357,7 @@ function renderBags(){
   }
   const claims = deckClaims();
   if(claims.length) $('bagList').insertAdjacentHTML('beforeend',
-    `<div class="finding note" style="margin-top:10px"><b>The rack top takes ${htmlEsc(claims.map(k=>k.name.toLowerCase()).join(' and '))}</b>
+    `<div class="finding note" style="margin-top:10px"><b>The rack top takes ${htmlEsc(claims.map(k=>kitName(k).toLowerCase()).join(' and '))}</b>
      <p>${claims.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L strapped outside bags. ${infoHelp('How rack-top kit is counted','<p>Selected items that can be strapped to the rack top are counted as carried kit, but do not use space inside bags. Check that they are secured and protected from weather.</p>')}</p></div>`);
 
   $('bagList').querySelectorAll('.bagrow').forEach(r => {
@@ -10395,7 +10453,7 @@ function revealKitItem(id){
   S.onlyOn = false;
   $('kitFindOut').classList.add('hidden');
   $('kitFind').value = '';
-  $('kitFindStatus').textContent = `${k.name} is ${S.kit[id] ? 'selected' : 'not selected'}.${
+  $('kitFindStatus').textContent = `${kitName(k)} is ${S.kit[id] ? 'selected' : 'not selected'}.${
     k.camp && !camping() ? ' It is shown here, but camping kit is not counted for this accommodation trip.' : ' Use its checkbox to change what you are taking.'}`;
   renderKit();
   const row = Array.from($('kitList').querySelectorAll('.kititem')).find(el => el.dataset.k === id);
@@ -10481,7 +10539,7 @@ function renderFind(){
   const exact = names.has(q);
   out.classList.remove('hidden');
   out.innerHTML =
-    already.map(k => `<button class="findrow" data-find="${htmlEsc(k.id)}"><span>${htmlEsc(k.name)}</span><em>Already on your list · ${S.kit[k.id] ? 'selected' : 'not selected'} · show item</em></button>`).join('') +
+    already.map(k => `<button class="findrow" data-find="${htmlEsc(k.id)}"><span>${htmlEsc(kitName(k))}</span><em>Already on your list · ${S.kit[k.id] ? 'selected' : 'not selected'} · show item</em></button>`).join('') +
     hits.map(c => `<button class="findrow" data-add="${htmlEsc(encodeURIComponent(JSON.stringify(c)))}">
         <span>Add ${htmlEsc(c.n)}</span><em>${CAT_LABEL[c.c]} · typical ${c.L} L · ${c.kg} kg</em></button>`).join('') +
     (exact ? '' : `<button class="findrow custom" data-custom="1">
@@ -10539,20 +10597,20 @@ function renderKit(){
             <label>Volume <input type="number" inputmode="decimal" step="any" min="0" max="100" value="${baseL(k)}" data-num="${htmlEsc(k.id)}:L"> L</label>
             <label>Weight <input type="number" inputmode="decimal" step="any" min="0" max="100" value="${baseKg(k)}" data-num="${htmlEsc(k.id)}:kg"> kg</label>
             <label>Longest <input type="number" inputmode="decimal" step="any" min="0" max="200" value="${rigidOf(k)}" data-num="${htmlEsc(k.id)}:rigid"> cm</label>
-            ${isTweaked(k) ? `<button class="reset" data-reset="${htmlEsc(k.id)}">Reset to ${k.L} L${k.rigid?` · ${k.rigid} cm`:''}</button>` : `<span class="deflt">typical for this item</span>`}
+            ${isTweaked(k) ? `<button class="reset" data-reset="${htmlEsc(k.id)}">Reset to ${kitSizeIsRiders(k) ? '' : 'two tubes, '}${k.L} L${k.rigid?` · ${k.rigid} cm`:''}</button>` : `<span class="deflt">typical for this item</span>`}
           </div></div>` : '';
         return `<div class="kitwrap${S.adv&&on?' open':''}">
           <div class="kititem ${on?'on':'off'}" data-k="${htmlEsc(k.id)}">
             <button type="button" class="kit-toggle" data-toggle-kit="${htmlEsc(k.id)}" role="checkbox" aria-checked="${!!on}">
             <span class="kitbox" aria-hidden="true"></span>
-            <span class="kn">${htmlEsc(k.name)}${k.perDay?` <em class="dim">(${foodDays()} day${foodDays()>1?'s':''}${resupplying()?', then resupply':''})</em>`:''}${isTweaked(k)?' <em class="tag">yours</em>':''}${k.added?' <em class="atag">added</em>':k.comfort?' <em class="ctag">comfort</em>':''}</span>
+            <span class="kn">${htmlEsc(kitName(k))}${k.perDay?` <em class="dim">(${foodDays()} day${foodDays()>1?'s':''}${resupplying()?', then resupply':''})</em>`:''}${kitSizeIsRiders(k)?' <em class="tag">yours</em>':''}${k.added?' <em class="atag">added</em>':k.comfort?' <em class="ctag">comfort</em>':''}</span>
             </button>
             ${on && k.perDay ? `<span class="foodsel">${
               [[1,'1 day'],[2,'2 days'],['all','whole trip']].map(([v,lab]) =>
                 `<button data-fd="${v}" aria-pressed="${String(S.foodMode)===String(v)}">${lab}</button>`).join('')
             }</span>` : ''}
             ${on && k.qtyable && !k.perDay ? `<span class="qty" data-q="${htmlEsc(k.id)}">
-              <button data-qd="-1" aria-label="Fewer ${htmlEsc(k.name)}">−</button><b>×${qtyOf(k)}</b><button data-qd="1" aria-label="More ${htmlEsc(k.name)}">+</button>
+              <button data-qd="-1" aria-label="Fewer ${htmlEsc(kitName(k))}">−</button><b>×${qtyOf(k)}</b><button data-qd="1" aria-label="More ${htmlEsc(kitName(k))}">+</button>
             </span>` : ''}
             <span class="kv">${itemL(k)} L · ${itemKg(k)} kg${rigidOf(k)?` · ${rigidOf(k)} cm`:''}</span>
           </div>${on ? adv : ''}</div>`;
@@ -10766,7 +10824,7 @@ function renderResult(){
   const stripped = lightDroppedList();
   const strippedNote = stripped.length
     ? `<div class="finding cut"><b>Lightweight has left ${stripped.length} thing${stripped.length>1?'s':''} at home</b>
-       <p>${htmlEsc(listOf(stripped.map(k => k.name)))} — <b>${stripped.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L</b>
+       <p>${htmlEsc(listOf(stripped.map(k => kitName(k))))} — <b>${stripped.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L</b>
        and ${stripped.reduce((s,k)=>s+itemKg(k),0).toFixed(1)} kg. Switch to <b>Comfortable</b> to bring them back.
        ${infoHelp('How Lightweight changes the load','<p>Lightweight excludes eligible comfort items from the carried kit while leaving their checkboxes selected. Comfortable includes them again. Safety items are not removed by this mode.</p>')}</p></div>`
     : '';
@@ -10964,7 +11022,7 @@ function renderResult(){
 
   /* --- reach --- */
   const reachable = [], buried = [];
-  slots.forEach(s => s.items.forEach(k => { if(!k.part) (reachableFor(k, s.pos) ? reachable : buried).push(k.name); }));
+  slots.forEach(s => s.items.forEach(k => { if(!k.part) (reachableFor(k, s.pos) ? reachable : buried).push(kitName(k)); }));
   let reach = slots.length ? '' : `<div class="finding miss"><b>Nothing is mounted</b>
     <p>There are no bags on the bike, so there is nothing to reach for. Add some in step two and this becomes a real answer.</p></div>`;
   reach += `<div class="reachgrid">
@@ -10975,10 +11033,10 @@ function renderResult(){
   const opensWhere = opensHere.length > 1 ? opensHere.slice(0,-1).join(', ') + ' or ' + opensHere[opensHere.length-1] : opensHere[0];
   const noOpener = 'You have no bag that opens in place. A top tube bag is about 1 L and takes almost all of this — the cheapest upgrade on the list, and the only one worth buying before a bigger seat pack.';
   const tooLongToReach = k => opensHere.length > 0 && rigidOf(k) > 0 && !usableUnits().some(u => POSITIONS[u.pos].accessible && fitsLength(k, u));
-  const reachName = (k, byHand) => htmlEsc(k.name) + (tooLongToReach(k) ? ' (too long)' : '') + (byHand ? ' (you moved it there)' : '');
+  const reachName = (k, byHand) => htmlEsc(kitName(k)) + (tooLongToReach(k) ? ' (too long)' : '') + (byHand ? ' (you moved it there)' : '');
   const {unplaced:rainUnplaced,buried:rainBuried,ready:rainReady}=rainAccess(A);
   if(rainUnplaced.length) reach += `<div class="finding miss"><b>Some rain kit has no fitting bag</b>
-    <p>${htmlEsc([...new Set(rainUnplaced.map(k=>k.name))].join(', '))} still needs a place. Check the overflow in <b>Where it goes</b> and make room in an accessible bag.</p></div>`;
+    <p>${htmlEsc([...new Set(rainUnplaced.map(k=>kitName(k)))].join(', '))} still needs a place. Check the overflow in <b>Where it goes</b> and make room in an accessible bag.</p></div>`;
   if(rainBuried.length) reach += `<div class="finding miss"><b>Your rain kit is out of reach</b>
     <p>${rainBuried.map(r=>htmlEsc(r.n)+(r.byHand?' (you moved it there)':'')).join(', ')} — in the ${[...new Set(rainBuried.map(r=>r.w))].join(' and ')}. It takes a few minutes to unstrap and repack a ${rainBuried[0].w}, and in that time you are already soaked. ${opensHere.length ? `Rain shell, dry socks and overshoes belong in the ${opensWhere}, where you stop once and are moving again in thirty seconds.` : noOpener}</p></div>`;
   else if(rainReady) reach += `<div class="finding note"><b>Rain kit is where it should be</b>
@@ -11003,7 +11061,7 @@ function renderResult(){
       <p>You reach for this mid-ride, and that bag does not open without emptying it first. ${opensHere.length ? 'Move something dense out of a reachable bag to make room.' : noOpener}</p></div>`).join('');
   }
   const otherNoBag = A.reach.noBag.map(kitById).filter(k => !k.rainkit);
-  if(otherNoBag.length) reach += `<div class="finding miss"><b>${htmlEsc(listOf(otherNoBag.map(k=>k.name)).replace(/^./,c=>c.toUpperCase()))} ${otherNoBag.length>1?'have':'has'} no fitting bag</b>
+  if(otherNoBag.length) reach += `<div class="finding miss"><b>${htmlEsc(listOf(otherNoBag.map(k=>kitName(k))).replace(/^./,c=>c.toUpperCase()))} ${otherNoBag.length>1?'have':'has'} no fitting bag</b>
     <p>You reach for ${otherNoBag.length>1?'these':'this'} mid-ride. Check the overflow in <b>Where it goes</b>.</p></div>`;
 
   /* --- allocation --- */
@@ -11016,7 +11074,7 @@ function renderResult(){
   const movedByBag = {};
   (replanNote ? replanNote.movedPacked : []).forEach(id => {
     const key = (A.items[id] || [[null]])[0][0];
-    (movedByBag[key] = movedByBag[key] || []).push((kitById(id) || { name:id }).name.toLowerCase());
+    (movedByBag[key] = movedByBag[key] || []).push((kitById(id) ? kitName(kitById(id)) : id).toLowerCase());
   });
   const packedLines = Object.entries(movedByBag).map(([key, names]) => {
     const s = A.slots.find(x => x.key === key);
@@ -11027,7 +11085,7 @@ function renderResult(){
         <button class="linky" data-replan="1">Re-plan</button></div>` : '');
   // Hand placements that can't be kept are never silent (design 7.4).
   const notKeptHtml = A.hand.notKept.map(n => {
-    const k = kitById(n.id), name = k ? k.name : n.id, many = /s$| and |×/.test(name);
+    const k = kitById(n.id), name = k ? kitName(k) : n.id, many = /s$| and |×/.test(name);
     const unit = usableUnits().find(u => u.key === n.key), bag = unit ? 'the ' + unitLabel(unit).toLowerCase() : 'that bag';
     const now = A.slots.find(s => s.key === n.nowIn);
     const why = n.reason === 'too long' ? `${htmlEsc(name)} ${many ? 'are' : 'is'} too long for ${bag}.`
@@ -11043,8 +11101,8 @@ function renderResult(){
     const done = !!S.packed[k.id], isSeat = (slots.find(s => s.key === slotKey) || {}).pos === 'seat';
     return `<li class="${done?'packed':''}">
       <button class="tickbox${done?' on':''}" data-tick="${htmlEsc(k.id)}" aria-pressed="${done}"
-        aria-label="${htmlEsc((done?'Packed: ':'Not packed yet: ')+k.name+(k.part?' — complete item, including all shares':''))}"${!DRAFT_READY?' disabled':''}></button>
-      <span class="il">${htmlEsc(k.name)}${placedQuantity(k)?` <em class="dim">(${placedQuantity(k)})</em>`:''}${k.part?' <em class="dim">(split)</em>':''}${
+        aria-label="${htmlEsc((done?'Packed: ':'Not packed yet: ')+kitName(k)+(k.part?' — complete item, including all shares':''))}"${!DRAFT_READY?' disabled':''}></button>
+      <span class="il">${htmlEsc(kitName(k))}${placedQuantity(k)?` <em class="dim">(${placedQuantity(k)})</em>`:''}${k.part?' <em class="dim">(split)</em>':''}${
         k.pinned?' <em class="dim moved">moved</em>':''}${
         k.rainkit?' <em class="dim">pack last, so it is on top</em>':''}${
         isSeat && isHeavy(k)?` <em class="dim seatnote">${k.id==='bank'?BANK_SEAT_NOTE:HEAVY_SEAT_NOTE}</em>`:''}${
@@ -11059,7 +11117,7 @@ function renderResult(){
     if(open === 'out'){
       const rows = s.items.filter(k => !k.part).map(k => {
         const t = moveTargets(A, s.key, k.id);
-        return `<li><span class="il">${htmlEsc(k.name)} <em class="pv">${itemL(k)} L${qtyOf(k)>1?' · all '+qtyOf(k):''}</em></span>
+        return `<li><span class="il">${htmlEsc(kitName(k))} <em class="pv">${itemL(k)} L${qtyOf(k)>1?' · all '+qtyOf(k):''}</em></span>
           <span class="movers">${t.length
             ? t.map(x => `<button class="movechip" data-moveto="${htmlEsc(k.id)}|${htmlEsc(x.key)}">→ ${htmlEsc(x.label)}</button>`).join('')
             : '<em class="dim">nowhere else it fits</em>'}</span></li>`;
@@ -11103,7 +11161,7 @@ function renderResult(){
     if(!big) return;
     allocHtml += `<div class="pairnote" style="margin-top:-6px">
       ${POSITIONS[g[0].pos].label} pair sits at ${Math.round(f[0]*100)}% and ${Math.round(f[1]*100)}%.
-      ${infoHelp('How a bag pair is balanced',`<p><b>${htmlEsc(big.name)}</b> is ${big.vol} L in one piece. It cannot split, and no other swap improves this gap. An even split is only possible when the contents divide that way.</p>`)}</div>`;
+      ${infoHelp('How a bag pair is balanced',`<p><b>${htmlEsc(kitName(big))}</b> is ${big.vol} L in one piece. It cannot split, and no other swap improves this gap. An even split is only possible when the contents divide that way.</p>`)}</div>`;
   });
 
   if(spill.length) allocHtml += `<div class="alloc" style="border-color:var(--blaze)">
@@ -11117,13 +11175,13 @@ function renderResult(){
   slots.forEach(s => s.items.forEach(k => {
     if(k.part || !rigidOf(k)) return;
     const tighter = slots.filter(other => other.key !== s.key && bagMaxLength(other) && !fitsLength(k, other));
-    if(tighter.length) longPlaced.push({ name:k.name, cm:rigidOf(k), where:POSITIONS[s.pos].label.toLowerCase(),
+    if(tighter.length) longPlaced.push({ name:kitName(k), cm:rigidOf(k), where:POSITIONS[s.pos].label.toLowerCase(),
       blocked:tighter.map(other=>unitLabel(other).toLowerCase()) });
   }));
   const hasDeckAnywhere = hasDeck('bar') || hasDeck('rack');
   let lengthBody = activeKit().some(k => k.id === 'tent') ? `<div class="finding note"><p>${TENT_POLES_NOTE}</p></div>` : '';
   if(longSpill.length){
-    if(slots.length) lengthBody += longSpill.map(k => `<div class="finding miss"><b>${htmlEsc(k.name)} is ${rigidOf(k)} cm long and goes in none of your bags</b>
+    if(slots.length) lengthBody += longSpill.map(k => `<div class="finding miss"><b>${htmlEsc(kitName(k))} is ${rigidOf(k)} cm long and goes in none of your bags</b>
       <p>This is not a volume problem — there is room, but nothing you own is long enough inside. ${
         k.id === 'pad' ? 'A rolled foam mat is half a metre of unbendable cylinder. It was designed to be strapped on, not packed in.'
         : k.id === 'tent' ? 'It is the poles, not the fabric. Separate them from the body: the fabric squashes into any gap, and the poles ride along the top tube or down a fork leg.'
@@ -11184,14 +11242,14 @@ function renderResult(){
   if(so){
     const deckNames = so.decks.map(b => POSITIONS[b.pos].strapLabel.toLowerCase());
     if(claimed.length){
-      strapBody = `<div class="finding note"><b>Already up there: ${htmlEsc(claimed.map(k=>k.name.toLowerCase()).join(' and '))}</b>
+      strapBody = `<div class="finding note"><b>Already up there: ${htmlEsc(claimed.map(k=>kitName(k).toLowerCase()).join(' and '))}</b>
         <p>${claimed.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L carried outside. ${infoHelp('How strapped items are counted','<p>Items carried on the rack top or handlebar straps are excluded from the volume inside the bags. Only suitable items should be carried outside; protect them from rain and road spray and secure them clear of the wheels.</p>')}</p></div>`;
     }
     if(!so.cand.length && !claimed.length){
       strapBody = `<div class="emptyfind">You have ${deckNames.join(' and ')}, but nothing in your kit is suited to riding outside. Straps want things that shrug off rain and road spray — a mat, shoes, a towel, a tent body.</div>`;
     } else if(over && so.cand.length){
       const best = so.cand[0], trial = strapTrial(so.cand);
-      const strapNames = ids => listOf(ids.map(id => 'the ' + kitById(id).name.toLowerCase()));
+      const strapNames = ids => listOf(ids.map(id => 'the ' + kitName(kitById(id)).toLowerCase()));
       const bestClears = trial.bestOver <= 0;
       strapBody += `<div class="finding note"><b>Strap the ${htmlEsc(best.name.toLowerCase())} and ${bestClears ? 'it fits' : `you claw back ${best.vol} L — you would still be ${trial.bestOver} L over.`}</b>
         <p>It is in the ${best.from} right now. Moving it onto your ${deckNames[0]} frees that volume inside.
@@ -12130,13 +12188,26 @@ function renderSmallBags(A){
     bal.querySelectorAll('[data-balance-undo]').forEach(b => b.onclick = () => { if(!undoBalance()) return; renderResult(); drawRig(); $('smallTitle')?.focus?.({ preventScroll:true }); });
   }
   const m=getChecklistModel(A || currentPlan());
-  const name=row => `${row.name}${row.quantity > 1 && !kitById(row.id)?.perDay ? ' ×'+row.quantity : ''}`;
+  // the water in a bag reads as what it is here: a bottle (KIT's name speaks of bottle cages the bike may not have)
+  const name=row => row.id === 'water' ? 'Water bottle' : row.id === 'tubes' && isDayTube(S.custom.tubes) ? 'Spare tube' : `${row.name}${row.quantity > 1 && !kitById(row.id)?.perDay ? ' ×'+row.quantity : ''}`;
   const bags=m.groups.filter(g => g.id !== 'overflow' && g.id !== 'unassigned');
-  $('smallBagList').innerHTML=bags.map(g => `<section class="small-bag" aria-label="${htmlEsc(g.title)}"><h3>${htmlEsc(g.title)}</h3><ul>${
-    g.items.map(row => `<li>${htmlEsc(name(row))}</li>`).join('')}</ul></section>`).join('');
-  const L=+m.bottles.reduce((n,b) => n+(+b.L || 0),0).toFixed(2);
-  $('smallWater').textContent=m.bottles.length ? `Water: ${m.bottles.length === 1 ? 'one bottle' : m.bottles.length+' bottles'}, ${L} L.`
+  // each bag a heading and its list, no landmark of its own (review of PR 92, M5)
+  $('smallBagList').innerHTML=bags.map(g => `<div class="small-bag"><h3>${htmlEsc(g.title)}</h3><ul>${
+    g.items.map(row => `<li>${htmlEsc(name(row))}</li>`).join('')}</ul></div>`).join('');
+  // Water in one line: the bottles there are and where, never an amount sized to the ride (review of PR 92, M2); without a cage, the
+  // bag the selection put the water in (I2)
+  const L=+m.bottles.reduce((n,b) => n+(+b.L || 0),0).toFixed(2),count=m.bottles.length;
+  const inFrame=liveBottles().every(b => b.slot === 'st' || b.slot === 'dt');
+  const cages=count ? `${count === 1 ? 'one bottle' : count+' bottles'} (${L} L) in the ${inFrame ? 'frame' : 'bottle'} cage${count === 1 ? '' : 's'}` : '';
+  const bagWater=bags.find(g => g.items.some(row => row.id === 'water'));
+  const inBag=bagWater ? `a bottle in the ${bagWater.title.toLowerCase()}` : '';
+  const noMounts=!['st','dt','un'].some(sl => bikeFit(S.bikeProfile).cages[sl]);
+  $('smallWater').textContent=count ? `Water: ${cages}${inBag ? ' and '+inBag : ''}. Refill on the way.`
+    : inBag ? `Water: ${inBag}, since this ${noMounts ? 'bike has no bottle cage mounts' : 'plan has no bottle cage'}.`
     : 'Water: no bottle cage in this plan.';
+  // the jacket the day calls for, worn (owner, 9 Nov 2026); packed by the rider, it is in a bag's list instead
+  const wear=dayRideWearsJacket() && !carrying('puffy');
+  $('smallWear').hidden=!wear; $('smallWear').textContent=wear ? 'Wear: insulated jacket.' : '';
   const out=m.groups.filter(g => g.id === 'overflow' || g.id === 'unassigned').flatMap(g => g.items);
   const long=out.some(row => row.tooLong);
   $('smallOver').hidden=!out.length;
@@ -12160,28 +12231,65 @@ function tripFoundation(){ return tripFoundationOf(true); }
 // The general setup that would have been the foundation but has no bags; null when none was passed over.
 function passedFoundation(){ const any=tripFoundationOf(false); return any && !setupHasBags(any) ? any : null; }
 /* Bags for a trip whose plan has none (no foundation with bags, and no bag in the plan here): the smallest setup the planner's own rules
-   fill. A cage on each in-frame mount the bike has (water) and a top tube bag where it mounts one (the owner's minimum), then the part
+   fill. An afternoon ride (afternoonRide) first tries one bottle and the top tube and frame bags (afternoonBags). Otherwise a cage on each in-frame mount the bike has (water) and a top tube bag where it mounts one (the owner's minimum), then the part
    of the planner's own typical setup (frame bag, seat pack, handlebar roll, typicalSetup) with which the frozen selection (freshPlan,
-   read only) leaves nothing over, with the fewest must-reach items out of reach, then the fewest litres; when no such set exists, the
+   read only) leaves nothing over, with the fewest must-reach items out of reach, then the phone in one of its own bags (phoneOffPref),
+   then the fewest litres; when no such set exists, the
    whole typical setup, and the plan says what is over. The
    bags go into this plan only (and the trip setup made from it): the plan before is kept as a setup, and Undo takes them away. */
+/* On a day ride the phone is the map and the emergency call, so it should ride where it is reached (review of PR 92, I3). The frozen
+   selection packs it late, after the repair kit, and its MUST_REACH leaves it out; this reads only where that selection put it in a
+   trial plan: 1 when the phone is carried and its bag is not one of its own preferred bags (KIT's pref), else 0. */
+function phoneOffPref(P){
+  const k=kitById('phone'),e=((P && P.items && P.items.phone) || [])[0],u=e && P.units[e[0]];
+  return k && u && !k.pref.includes(u.pos) ? 1 : 0;
+}
+/* An afternoon ride (owner, 9 Nov 2026: "No one on an afternoon ride uses the seat pack. It's always top tube and frame bag, and mostly
+   only one, and one bottle of water."): a trip of 0 nights whose riding time (dayRideHours) is within the hard pace's day (PACE.hard,
+   8 hours, "dawn to dusk"). Beyond that it is a very long single push, and the proposal below is the touring one. */
+function afternoonRide(){ return S.nights === 0 && dayRideHours() <= PACE.hard.hours; }
+// The afternoon ride's bags: one of the top tube bag and the frame bag (each frame size the one bottle allows, smallest first), then
+// both, then each of those with a seat pack (and the seat pack alone), the first group with a set that leaves nothing over; within it
+// the fewest out of reach, the phone in its own bags, the fewest bags, the fewest litres. Null when none holds the day kit.
+function afternoonBags(base,withIds){
+  const fit=bikeFit(S.bikeProfile),top=TOP_ORDER.find(sl => fit.topMounts[sl]),topBag=top ? {pos:'top',slot:top,L:POSITIONS.top.defL} : null;
+  const frames=[];
+  if(!fit.frameBag.none) withInputs({bags:[...S.bags,...withIds(base)]},() => {
+    for(let i=minShapeIdx();i <= 2;i++){ const L=frameShapeL(i); if(!frames.some(f => f.L === L)) frames.push({pos:'frame',L,...(i === minShapeIdx() ? {} : {shape:i})}); }
+  });
+  const one=[...(topBag ? [[topBag]] : []),...frames.map(f => [f])],two=topBag ? frames.map(f => [topBag,f]) : [];
+  const seat={pos:'seat',L:POSITIONS.seat.defL};
+  for(const group of [one,two,[[seat],...one,...two].map(s => s[0] === seat ? s : [...s,seat])]){
+    const fits=group.map(more => {
+      const bags=withIds([...base,...more]),all=[...S.bags,...bags],trial=freshPlan({bags:all,placements:null});
+      return {bags,over:trial.spill.length,out:trial.reach.outOfReach.length,phone:phoneOffPref(trial),n:more.length,L:withInputs({bags:all},() => ratedTotal())};
+    }).filter(s => !s.over).sort((a,b) => a.out-b.out || a.phone-b.phone || a.n-b.n || a.L-b.L);
+    if(fits.length) return fits[0].bags;
+  }
+  return null;
+}
 function proposedTripBags(){
-  const fit=bikeFit(S.bikeProfile),uid=n => S.nextUid+n,own=S.bags.filter(b => isBottle(b.pos));
-  const base=['st','dt'].filter(sl => fit.cages[sl] && !own.some(b => b.slot === sl)).map(sl => ({pos:BOTTLE_SPOTS[sl].pos,slot:sl,L:bottleDefaultFor(BOTTLE_SPOTS[sl].pos,BOTTLE_SPOTS[sl].defL)}));
+  const fit=bikeFit(S.bikeProfile),uid=n => S.nextUid+n,own=S.bags.filter(b => isBottle(b.pos)),afternoon=afternoonRide();
+  // an afternoon ride: one bottle, on the down tube where it mounts (the roomiest), and none added beside a bottle the plan has
+  const slots=['st','dt'].filter(sl => fit.cages[sl] && !own.some(b => b.slot === sl));
+  const base=(afternoon ? (own.length ? [] : slots.slice(-1)) : slots).map(sl => ({pos:BOTTLE_SPOTS[sl].pos,slot:sl,L:bottleDefaultFor(BOTTLE_SPOTS[sl].pos,BOTTLE_SPOTS[sl].defL)}));
+  const withIds=list => list.map((b,i) => ({uid:uid(i),...b}));
+  const day=afternoon ? afternoonBags(base,withIds) : null;
+  if(day) return day;
   const top=TOP_ORDER.find(sl => fit.topMounts[sl]);
   if(top) base.push({pos:'top',slot:top,L:POSITIONS.top.defL});
   const extras=['frame','seat','bar'].filter(p => p !== 'frame' || !fit.frameBag.none);
-  const withIds=list => list.map((b,i) => ({uid:uid(i),...b}));
   const frameL=withInputs({bags:[...S.bags,...withIds(base)]},() => frameShapeL(minShapeIdx()));
   const sets=[];
   for(let m=0;m < 1 << extras.length;m++){
     const more=extras.filter((p,i) => m & 1 << i).map(p => ({pos:p,L:p === 'frame' ? frameL : POSITIONS[p].defL}));
     const bags=withIds([...base,...more]),all=[...S.bags,...bags];
     const trial=freshPlan({bags:all,placements:null});
-    sets.push({bags,over:trial.spill.length,out:trial.reach.outOfReach.length,L:withInputs({bags:all},() => ratedTotal()),n:more.length});
+    sets.push({bags,over:trial.spill.length,out:trial.reach.outOfReach.length,phone:phoneOffPref(trial),L:withInputs({bags:all},() => ratedTotal()),n:more.length});
   }
-  // nothing over, then the fewest must-reach items out of reach (the selection's own reach rule), then the fewest litres and bags
-  const fits=sets.filter(s => !s.over).sort((a,b) => a.out-b.out || a.L-b.L || a.n-b.n);
+  // nothing over, then the fewest must-reach items out of reach (the selection's own reach rule), then the phone in a bag it is meant
+  // for (its own pref: the top tube or frame bag; review of PR 92, I3), then the fewest litres and bags
+  const fits=sets.filter(s => !s.over).sort((a,b) => a.out-b.out || a.phone-b.phone || a.L-b.L || a.n-b.n);
   return (fits[0] || sets[sets.length-1]).bags;
 }
 // "2 bottle cages, a top tube bag and a seat pack"
@@ -12231,6 +12339,7 @@ async function planTripBags(){
     showHandoffBar('The route from Wayfinch could not be read. Your plan is unchanged.',{apply:true,plan:true,reuse:!!HANDOFF.reuse});
     return false;
   }
+  if(!HANDOFF.long) oneSpareTube();   // a day ride's one spare tube (owner, 9 Nov 2026), before its bags are sized
   const proposed=gearBags().length ? null : proposedTripBags();   // nothing mounted to start from: the smallest setup that holds the kit
   if(proposed){ S.bags=[...S.bags,...proposed]; S.nextUid=Math.max(S.nextUid,...proposed.map(b => b.uid+1)); }
   S.packed={}; keepPlan({load:null}); currentPlan();   // packed afresh by the frozen selection, for this trip
@@ -13508,7 +13617,7 @@ function setupComparisonRows(a,b){
   const kitValue=(s,id,k) => {
     if(!s.kit[id]) return 'Left at home';
     const c=s.custom[id] || k || {},q=s.qty[id] || 1;
-    let value=(k?.name || id)+' · '+(k?.cat || 'Custom item')+(q>1 ? ' ×'+q : '')+' · base '+c.L+' L each · base '+c.kg+' kg each'+(c.rigid ? ' · '+c.rigid+' cm long' : '');
+    let value=(id === 'tubes' && isDayTube(s.custom.tubes) && s.nights === 0 ? 'Spare tube (one, for a day ride)' : k?.name || id)+' · '+(k?.cat || 'Custom item')+(q>1 ? ' ×'+q : '')+' · base '+c.L+' L each · base '+c.kg+' kg each'+(c.rigid ? ' · '+c.rigid+' cm long' : '');
     if(s.pinned[id]){
       const bag=s.bags.flatMap(physical).find(unit => unit.key === s.pinned[id]);
       const owned=bag && (bag.bag || bag),label=owned && POSITIONS[owned.pos] ? POSITIONS[owned.pos].label : 'a bag';
@@ -13796,7 +13905,7 @@ async function recordNote(setupId, note){
 // The things most likely to be the culprit: whatever takes the most room.
 function bulkiest(n){
   return activeKit().filter(k => !k.perDay && itemL(k) >= 0.5)
-    .sort((a,b) => itemL(b) - itemL(a)).slice(0, n).map(k => k.name);
+    .sort((a,b) => itemL(b) - itemL(a)).slice(0, n).map(k => kitName(k));
 }
 
 async function recordFeedback(setupId, verdict, delta){
@@ -14500,8 +14609,8 @@ function openBagPop(key, fromButton=null){
       bagMaxLength(s) ? ' · inside length ' + bagMaxLength(s) + ' cm (' + (s.longestCm ? 'your measurement' : 'estimated') + ')' : ''}</em>`;
 
   const list = `<ul class="poplist">
-      ${solid.map(k => `<li><span>${htmlEsc(k.name)}${placedQuantity(k)?` <em class="ttag">${placedQuantity(k)}</em>`:''}${itemTag(k)}</span><span class="pv">${k.vol} L</span></li>`).join('')}
-      ${parts.map(k => `<li class="split"><span>${htmlEsc(k.name)} <em class="ttag">share</em></span><span class="pv">${k.vol} L</span></li>`).join('')}
+      ${solid.map(k => `<li><span>${htmlEsc(kitName(k))}${placedQuantity(k)?` <em class="ttag">${placedQuantity(k)}</em>`:''}${itemTag(k)}</span><span class="pv">${k.vol} L</span></li>`).join('')}
+      ${parts.map(k => `<li class="split"><span>${htmlEsc(kitName(k))} <em class="ttag">share</em></span><span class="pv">${k.vol} L</span></li>`).join('')}
       ${!s.items.length ? '<li><span class="dim">Empty — nothing needed to go in here</span></li>' : ''}
     </ul>
     <p class="popwhy">${P.takes}</p>`;
