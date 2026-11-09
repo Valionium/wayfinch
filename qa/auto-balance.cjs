@@ -12,11 +12,14 @@ const q=appVM();
 const {run}=q;
 const json=code=>JSON.parse(run(`JSON.stringify(${code})`));
 run('DRAFT_READY=true');
+// the kit as the page starts it (a test below takes a thing out; the tests added after it start from this kit again)
+const KIT0=JSON.stringify(json('S.kit')),NIGHTS0=json('S.nights');
+const fresh=(more='')=>`S.kit=${KIT0};S.nights=${NIGHTS0};${more}`;
 const bike={id:'qa_bal',fit:{style:'diamond-sloping',size:{kind:'letter',value:'M'}},look:{bars:'drop'},frontTyre:'47-584',rearTyre:'47-584'};
 // A plan at the packing step: these bags and decks, the kit as the page starts it, nothing kept yet.
 const plan=(bags,decks={},extra='')=>run(`(()=>{S.bikeProfile=normaliseBikeProfile(${JSON.stringify(bike)});S.bags=${JSON.stringify(bags)}.map(b=>({...b}));
   S.nextUid=1+Math.max(0,...S.bags.map(b=>b.uid));S.decks={bar:false,rack:false,...${JSON.stringify(decks)}};S.pinned={};S.packed={};S.placements=null;
-  BALANCE.checked=null;BALANCE.last=null;BALANCE.reverted=null;BALANCE.undone=new Set();BALANCE.pins=null;BALANCE.loaded=null;TRIAL=null;
+  BALANCE.checked=null;BALANCE.last=null;BALANCE.reverted=null;BALANCE.undone=new Set();BALANCE.pins=null;TRIAL=null;
   S.step=4;${extra};currentPlan();return true;})()`);
 const SETS={
   bikepacking:[{uid:1,pos:'seat',L:14},{uid:2,pos:'bar',L:13},{uid:3,pos:'frame',L:4.5},{uid:4,pos:'top',L:1,slot:'front'},{uid:5,pos:'fork',L:3,pair:true}],
@@ -116,25 +119,25 @@ test("[BAL-STORED] the balance is stored as kept placements: the plan read again
   assert.match(ojson('balanceLine()'),/Packed for better balance/);
 });
 
-test('[BAL-LINE] one quiet line names the moves with Undo; Undo restores the planner\'s own packing, says so, and the things put back are not moved again',()=>{
+test('[BAL-LINE] one quiet line names the moves with Undo; Undo restores the packing before the balance, says so, and the things put back are not moved again',()=>{
   plan(SETS.bikepacking);
   const own=json('currentPlan().items'),ownPlacements=json('S.placements');
   assert.equal(json('autoBalancePlan()'),true);
   const moves=json('BALANCE.last.moves');
   const line=json('balanceLine()');
   assert.match(line,/^<div class="balance-line" role="status"><span>Packed for better balance: [^<]+ ·<\/span> <button class="linky" type="button" data-balance-undo="1">Undo<\/button><\/div>$/);
-  const named=json(`BALANCE.last.moves.map(m=>kitById(m.id).name.toLowerCase())`);
+  const named=json(`BALANCE.last.moves.map(m=>kitById(m.id).name.replace(/^[A-Z](?![A-Z])/,c=>c.toLowerCase()))`);
   if(moves.length<=3)for(const n of named)assert.ok(line.includes(n),`the line names ${n}`);
   else assert.match(line,/\d+ more things/);
   // the moves that do the most come first; with more than three, the first two and how many more
   const shown=moves.length>3?2:moves.length;
-  assert.ok(json(`BALANCE.last.moves.slice(0,${shown}).every(m=>${JSON.stringify(line)}.includes(kitById(m.id).name.toLowerCase()+' to the '+unitLabel(currentPlan().slots.find(s=>s.key===m.to)).toLowerCase()))`),'and where each goes');
+  assert.ok(json(`BALANCE.last.moves.slice(0,${shown}).every(m=>${JSON.stringify(line)}.includes(kitById(m.id).name.replace(/^[A-Z](?![A-Z])/,c=>c.toLowerCase())+' to the '+unitLabel(currentPlan().slots.find(s=>s.key===m.to)).toLowerCase()))`),'and where each goes');
   if(moves.length>3)assert.ok(line.includes(`and ${moves.length-2} more things`));
   // Undo
   json('undoBalance()');
   assert.deepEqual(json('currentPlan().items'),own,"Undo: the planner's own packing");
   assert.deepEqual(json('S.placements.items'),ownPlacements.items);
-  assert.equal(json('balanceLine()'),'<div class="balance-line" role="status"><span>Back to the planner\'s own packing.</span></div>');
+  assert.equal(json('balanceLine()'),'<div class="balance-line" role="status"><span>Back to the packing before this balance.</span></div>');
   assert.equal(json('autoBalancePlan()'),false,'not balanced again at once');
   // a later change: the things put back stay where the planner put them
   const drop=json(`Object.keys(currentPlan().items).find(id=>!${JSON.stringify(moves.map(m=>m.id))}.includes(id)&&S.kit[id])`);
@@ -160,6 +163,80 @@ test('[BAL-LINE] a change made by hand (a move, a forgotten placement) is not ba
   run('S.bags=S.bags.filter(b=>b.pos!=="fork");S.pinned={};currentPlan()');
   assert.equal(json('currentPlan().notes.replan&&currentPlan().notes.replan.reason'),'bags');
   if(json('autoBalancePlan()'))assert.equal(json('currentPlan().notes.replan.reason'),'bags','the "placed afresh" note is kept');
+});
+
+// Review of PR 79, I1: a thing the rider ticked as packed where the balance put it is never moved back by Undo.
+test('[BAL-KEEPS] Undo never moves a thing ticked as packed: while a thing the balance moved is ticked, the line keeps the balance without Undo and says why; unticked, Undo is back',()=>{
+  for(const name of ['bikepacking','full bags and a backpack','touring']){
+    const bags=SETS[name];
+    plan(bags,{rack:bags.some(b=>b.pos==='rack')},fresh());
+    const own=json('currentPlan().items');
+    assert.equal(json('autoBalancePlan()'),true,name);
+    const m=json('BALANCE.last.moves[0]'),balanced=json('currentPlan().items');
+    // the rider packs it where the balance put it and ticks it (a tick is a screen key: the plan and the line stay)
+    run(`S.packed[${JSON.stringify(m.id)}]=true;currentPlan()`);
+    assert.equal(json('BALANCE.last.placements===S.placements'),true,`${name}: the plan is the balanced one`);
+    const line=json('balanceLine()');
+    assert.doesNotMatch(line,/data-balance-undo/,`${name}: no Undo while a moved thing is ticked`);
+    assert.match(line,/^<div class="balance-line" role="status"><span>Packed for better balance: [^<]+\. You have started packing it this way, so it stays\.<\/span><\/div>$/,`${name}: the line says why`);
+    assert.equal(json('undoBalance()'),false,`${name}: Undo does nothing`);
+    assert.deepEqual(json('currentPlan().items'),balanced,`${name}: nothing moved`);
+    assert.equal(json(`currentPlan().items[${JSON.stringify(m.id)}][0][0]`),m.to,`${name}: ${m.id} stays where it is packed`);
+    assert.equal(json(`S.packed[${JSON.stringify(m.id)}]`),true);
+    // unticked: Undo is offered again and brings the packing before back
+    run(`delete S.packed[${JSON.stringify(m.id)}];currentPlan()`);
+    assert.match(json('balanceLine()'),/data-balance-undo="1">Undo</,`${name}: Undo is back`);
+    assert.equal(json('undoBalance()'),true);
+    assert.deepEqual(json('currentPlan().items'),own,`${name}: the packing before the balance`);
+  }
+});
+
+// Review of PR 79, m1: after an earlier balance, the packing before this one still carries the earlier moves; the line says what it is.
+test('[BAL-LINE] Undo after a second balance says it goes back to the packing before this balance, and brings exactly that back',()=>{
+  plan(SETS['full bags and a backpack'],{},fresh('S.nights=2'));
+  assert.equal(json('autoBalancePlan()'),true,'a first balance');
+  run('S.kit.quilt=false;currentPlan()');
+  const before=json('currentPlan().items');
+  assert.equal(json('autoBalancePlan()'),true,'a second balance after the quilt is taken out');
+  assert.notDeepEqual(json('currentPlan().items'),before);
+  assert.equal(json('undoBalance()'),true);
+  assert.deepEqual(json('currentPlan().items'),before,'the packing just before this balance');
+  assert.equal(json('balanceLine()'),'<div class="balance-line" role="status"><span>Back to the packing before this balance.</span></div>');
+});
+
+// Review of PR 79, m2
+test('[BAL-LINE] the line keeps a name\'s capitals ("ID, cards, insurance") and a thing the rider added as typed; only a kit name\'s first letter is lowered',()=>{
+  plan(SETS.bikepacking,{},fresh());
+  run("KIT.push({id:'x_kindle',name:'Kindle',cat:'Person',L:0.3,kg:0.2,rigid:0,pref:prefFor('Person',0.3),qtyable:true,added:true,comfort:false,on:false});currentPlan()");
+  try{
+    const keys=json("(()=>{const A=currentPlan(),k=p=>A.slots.find(s=>s.pos===p).key;return {frame:k('frame'),bar:k('bar'),seat:k('seat')};})()");
+    run(`BALANCE.last={placements:S.placements,moves:[{id:'docs',from:'${keys.seat}',to:'${keys.frame}'},{id:'x_kindle',from:'${keys.seat}',to:'${keys.bar}'},{id:'lock',from:'${keys.bar}',to:'${keys.frame}'}]};BALANCE.reverted=null`);
+    const line=json('balanceLine()');
+    assert.ok(line.includes('Packed for better balance: ID, cards, insurance to the frame bag, Kindle to the handlebar roll and bike lock to the frame bag ·'),line);
+  }finally{run("KIT.splice(KIT.findIndex(k=>k.id==='x_kindle'),1);BALANCE.last=null;currentPlan()");}
+});
+
+// Review of PR 79, m3: the balancing's memory belongs to one plan.
+test('[BAL-STORED] a plan loaded after another and a plan started again are looked at afresh: balanced at their first look, with the line, and what Undo put back in the other plan is not held there',()=>{
+  // plan B has a hand placement; plan A, open before it, none, and the rider put A's balance back with Undo
+  plan(SETS.bikepacking,{},fresh("S.pinned={pot:'5-1'}"));
+  const other=json('capturePlan()');
+  plan(SETS.bikepacking,{},fresh());
+  assert.equal(json('autoBalancePlan()'),true);
+  assert.equal(json('undoBalance()'),true);
+  run(`restorePlan(${JSON.stringify(other)},false)`);
+  assert.equal(json('S.step'),4);
+  assert.equal(json('BALANCE.undone.size'),0,'nothing of plan A is held');
+  assert.equal(json('autoBalancePlan()'),true,'the loaded plan is balanced at its first look');
+  assert.match(json('balanceLine()'),/Packed for better balance/);
+  assert.equal(json('currentPlan().items.pot[0][0]'),'5-1','its hand placement stays');
+  // Start again clears the hand placements: a fresh plan, not a step made by hand
+  plan(SETS.bikepacking,{},fresh("S.pinned={pot:'5-1'}"));
+  assert.equal(json('autoBalancePlan()'),true);
+  run('startAgain();currentPlan()');
+  assert.equal(json('autoBalancePlan()'),true,'Start again is balanced at its first look');
+  assert.equal(json('currentPlan().notes.replan&&currentPlan().notes.replan.reason'),'startAgain','its note stays beside the line');
+  assert.match(json('balanceLine()'),/Packed for better balance/);
 });
 
 for(const [name,fn] of tests){fn();passed++;console.log('ok',name);}
