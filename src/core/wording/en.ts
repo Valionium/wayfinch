@@ -794,6 +794,7 @@ export const W = {
   appPrepZonesMissing: "The country borders couldn't be read, so this route's time zones and holidays are unknown.",
   appPrepHoursFailed: "Opening hours couldn't be worked out.",
   appPrepWeatherFailed: "The weather service didn't answer, so no forecast was saved.",
+  appPrepWait: (at: string): string => `The weather service asks for a minute's pause. Asking again at about ${at}; you can leave this screen meanwhile.`,
   appPrepNoPlaceData: (kms: string): string => `No place data for km ${kms}: outside the covered countries, or not saved. Refresh this stretch can fetch it.`,
   appPrepNewDataUnfinished: 'Newer map data could not all be fetched, so the earlier map data is kept. Prepare this route picks up where it stopped.',
   appPrepNewDataDropped: 'Newer map data could not be fetched in three tries, so it was given up and the earlier map data is kept.',

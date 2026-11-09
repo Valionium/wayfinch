@@ -2,9 +2,12 @@
 // heights and places is only what was done: looked-up heights are credited, a route without them says so.
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { RouteStop } from '../../core/screen/route-stops.ts';
+import { windowKm } from '../../core/engines/day-beds.ts';
+import type { DayBed } from '../../core/engines/day-beds.ts';
 import type { Route } from '../../core/types.ts';
 import { showKm, W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
+import { BD } from '../../core/wording/en-beds.ts';
 import { TF } from '../../core/wording/en-trip-fields.ts';
 import { Glyph, ICON_WORD, slotsOf } from '../ahead/strip.tsx';
 import { Card } from '../card.tsx';
@@ -61,7 +64,15 @@ function ProfileStops({ route, stops }: { route: Route; stops: RouteStop[] }) {
   );
 }
 
-export function RouteSummary({ snap, stops }: { snap: TripSnapshot; stops: TripServices['stops'] }) {
+/** The line under a day: where to sleep near its end, or that none is mapped there (TRIP-DAY-BEDS). */
+function bedLine(b: DayBed | undefined, dayKm: number): string | null {
+  if (!b || b.last) return null;
+  const w = showKm(windowKm(dayKm));
+  if (b.bed) return BD.appTripBedNear(b.bed.name, showKm(b.bed.km), b.bed.town);
+  return b.town ? BD.appTripBedTown(b.town.name, showKm(b.town.km), w) : BD.appTripBedNone(w);
+}
+
+export function RouteSummary({ snap, stops, beds }: { snap: TripSnapshot; stops: TripServices['stops']; beds?: TripServices['dayBeds'] }) {
   const { trip } = snap;
   // The stops come once Get ready offline has saved places: read again when the route, its days, its date, what was saved or the
   // forecast (Update weather moves the cover icons: review of PR 73, M2) change.
@@ -75,6 +86,14 @@ export function RouteSummary({ snap, stops }: { snap: TripSnapshot; stops: TripS
     stops().then((s) => { if (alive) setFound(s); }, () => { if (alive) setFound([]); });
     return () => { alive = false; };
   }, [key, stops]);
+  const [bedsFound, setBeds] = useState<DayBed[] | null>(null);
+  useEffect(() => {
+    setBeds(null);
+    if (!key || !beds) return undefined;
+    let alive = true;
+    beds().then((b) => { if (alive) setBeds(b); }, () => { if (alive) setBeds(null); });
+    return () => { alive = false; };
+  }, [key, beds]);
   if (!trip) return null;
   const s = summaryOf(trip, { day1LeaveBy: snap.day1LeaveBy });
   const missingHeights = trip.route.ascentM === null;
@@ -91,15 +110,20 @@ export function RouteSummary({ snap, stops }: { snap: TripSnapshot; stops: TripS
             {found && found.length > 0 ? <ProfileStops route={trip.route} stops={found} /> : null}
           </div>
         ) : <p class="muted">{TR.appTripProfileNone}</p>}
-        {ready ? null : <p class="muted">{W.appAheadStopsAfter}</p>}
+        {ready ? null : <p class="muted">{W.appAheadStopsAfter} {BD.appTripBedsAfter}</p>}
         {s.note ? <p class="notice">{s.note}</p> : null}
         <ol class="trip-days">
-          {s.stages.map((stage, i) => (
-            <li key={i}>
-              <span>{stage.text}</span>
-              <span class="muted trip-day-detail">{stage.detail}</span>
-            </li>
-          ))}
+          {s.stages.map((stage, i) => {
+            const day = trip.route.stages[i];
+            const bed = day && bedsFound ? bedLine(bedsFound.find((b) => b.day === day.day && b.endKm === day.endKm), day.endKm - day.startKm) : null;
+            return (
+              <li key={i}>
+                <span>{stage.text}</span>
+                <span class="muted trip-day-detail">{stage.detail}</span>
+                {bed ? <span class="muted trip-day-detail" data-day-bed>{bed}</span> : null}
+              </li>
+            );
+          })}
         </ol>
         {missingHeights ? <p class="muted">{TR.appTripHeightsPending}</p> : snap.heightsLookedUp ? <p class="muted">{W.appTripHeightsCredit}</p> : null}
         {trip.route.source === 'planned' || snap.prepared?.build ? <OsmCredit lead={TF.appTripOsmLead} date={packDate(snap.prepared?.build)} /> : null}
