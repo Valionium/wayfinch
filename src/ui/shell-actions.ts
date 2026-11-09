@@ -119,6 +119,9 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
   let here: Position | null = null;
   // What the last Get ready offline did not save, read with the inputs.
   let failedSteps: AheadTrip['failedSteps'] = [];
+  // A trip gone (Remove this trip, Delete co-pilot data, here or in another window): its routine stops and what was said for it goes.
+  let epoch = 0;
+  let watching: AbortController | null = null;
 
   // One write at a time, as on Trip: the store refuses a write over a version this window has not read.
   let queue: Promise<unknown> = Promise.resolve();
@@ -225,6 +228,13 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
     }
     // Only the newest read is shown: an older one that finishes late would bring back what was just changed.
     if (hooked || mine !== reading) return;
+    if (!read && !failed && inputs) {
+      epoch += 1;
+      watching?.abort();
+      pendingFix = pendingKm = null;
+      position = { kind: 'idle' };
+      weatherSay = notice = null;
+    }
     inputs = read;
     // A trip that could not be read is not "no route": the rider is told, and can try again.
     if (failed) {
@@ -284,7 +294,10 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
       const ask = import('./ask-swap.ts').then((m) => m, () => null);
       say({ kind: 'watching' });
       if (asking) freshen();
-      const fix = await watchBest(ROUTINE, deps.geolocation());
+      const mine = epoch;
+      watching = new AbortController();
+      const fix = await watchBest(ROUTINE, deps.geolocation(), undefined, watching.signal);
+      if (mine !== epoch) return false;
       if (isFailure(fix)) {
         const h = await words;
         say({ kind: 'said', text: h ? hereFailure(h, fix.kind) : FAILURE_TEXT[fix.kind] });

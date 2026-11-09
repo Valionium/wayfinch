@@ -17,8 +17,11 @@ export const isFailure = (x: Fix | Failure): x is Failure => 'kind' in x;
 type Timers = { setTimeout: (f: () => void, ms: number) => unknown; clearTimeout: (t: unknown) => void };
 const realTimers: Timers = { setTimeout: (f, ms) => globalThis.setTimeout(f, ms), clearTimeout: (t) => globalThis.clearTimeout(t as number) };
 
-/** Watches the position until a reading is good enough or the time is up, and gives the best one, or why there is none. */
-export function watchBest(o: WatchOptions, geo: Geolocation | undefined, timers: Timers = realTimers): Promise<Fix | Failure> {
+/**
+ * Watches the position until a reading is good enough or the time is up, and gives the best one, or why there is none. `stop` ends it
+ * at once (the trip it was for is gone).
+ */
+export function watchBest(o: WatchOptions, geo: Geolocation | undefined, timers: Timers = realTimers, stop?: AbortSignal): Promise<Fix | Failure> {
   if (!geo || typeof geo.watchPosition !== 'function') return Promise.resolve({ kind: 'unsupported' });
   return new Promise((resolve) => {
     let best: Fix | null = null;
@@ -36,6 +39,7 @@ export function watchBest(o: WatchOptions, geo: Geolocation | undefined, timers:
       resolve(x);
     };
     timer = timers.setTimeout(() => finish(best ?? { kind: lastError ?? 'timeout' }), o.timeoutMs);
+    stop?.addEventListener('abort', () => finish({ kind: 'timeout' }));
     try {
       id = geo.watchPosition(
         (p) => {
