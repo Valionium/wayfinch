@@ -256,6 +256,7 @@ button.go.small{font-size:15px;padding:9px 16px;flex:0 0 auto}
 .small-bag h3{font-family:inherit;font-size:16px;font-weight:600;letter-spacing:0;text-transform:none;margin:0 0 6px;color:var(--ink)}
 .small-bag ul{margin:0;padding:0 0 0 18px;line-height:1.7;font-size:15px;color:var(--ink)}
 .small-water{margin:0;padding:14px 0;border-top:1px solid var(--line);font-size:15px;color:var(--ink)}
+.small-left{color:var(--muted)}
 .small-over{margin:4px 0 10px;padding:10px 12px;border-left:3px solid var(--amber);background:var(--panel);font-size:15px;line-height:1.5;color:var(--ink)}
 .small-foot{margin:22px 0 28px}
 .small-foot p{margin:8px 0 0;color:var(--muted);font-size:13px}
@@ -2195,6 +2196,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <div id="smallBagList"></div>
       <p class="small-water" id="smallWater"></p>
       <p class="small-water" id="smallWear" hidden></p>
+      <p class="small-water small-left" id="smallLeft" hidden></p>
     </div>
     <div class="small-foot" id="smallFoot" hidden><button class="small-full" id="smallFull" type="button">Open the full Bag planner</button>
       <p>The same plan, with every step and setting.</p></div>
@@ -12215,6 +12217,9 @@ function renderSmallBags(A){
   // the jacket the day calls for, worn (owner, 9 Nov 2026); packed by the rider, it is in a bag's list instead
   const wear=dayRideWearsJacket() && !carrying('puffy');
   $('smallWear').hidden=!wear; $('smallWear').textContent=wear ? 'Wear: insulated jacket.' : '';
+  // what the day ride left at home to fit beside the bottle, in one quiet line (owner, 9 Nov 2026)
+  const left=dayLeftAtHome().map(id => kitName(kitById(id)).replace(/^[A-Z](?![A-Z])/,c => c.toLowerCase()));
+  $('smallLeft').hidden=!left.length; $('smallLeft').textContent=left.length ? `Left at home: ${listOf(left)}.` : '';
   const out=m.groups.filter(g => g.id === 'overflow' || g.id === 'unassigned').flatMap(g => g.items);
   const long=out.some(row => row.tooLong);
   $('smallOver').hidden=!out.length;
@@ -12255,25 +12260,60 @@ function phoneOffPref(P){
    only one, and one bottle of water."): a trip of 0 nights whose riding time (dayRideHours) is within the hard pace's day (PACE.hard,
    8 hours, "dawn to dusk"). Beyond that it is a very long single push, and the proposal below is the touring one. */
 function afternoonRide(){ return S.nights === 0 && dayRideHours() <= PACE.hard.hours; }
-// The afternoon ride's bags: one of the top tube bag and the frame bag (each frame size the one bottle allows, smallest first), then
-// both, then each of those with a seat pack (and the seat pack alone), the first group with a set that leaves nothing over; within it
-// the fewest out of reach, the phone in its own bags, the fewest bags, the fewest litres. Null when none holds the day kit.
+/* The afternoon ride's bags. A bottle in the frame's triangle gets the frame bag in the planner's half shape (FRAME_PRESETS' "half
+   frame", its litres from the bike's own frame fit), which leaves room for the bottle in the drawing too; a full or three-quarter frame
+   bag over a bottle is never proposed (owner, 9 Nov 2026: "the frame bag should be fitted accordingly to the bottle"). Without a bottle
+   in the triangle, each frame size from the smallest. The top tube bag in the sizes of DAY_TOP_SIZES. The order: nothing left at home
+   first, then the least essential things of DAY_LEAVE_ORDER one by one ("some not so essential things should be left out"); for each,
+   one bag (the top tube bag or the frame bag), then both; the first that leaves nothing over, within it the fewest out of reach, the
+   phone in its own bags, the fewest litres. Only when none of those holds the day kit, the seat pack too, with nothing left at home.
+   Returns {bags, leave} or null; the frozen selection is only read (freshPlan trials). */
+const DAY_TOP_SIZES=[1,1.5,2];
+/* What a day ride leaves at home first when the bags beside the bottle cannot hold everything, least essential first, each only when
+   the day does not ask for it, and never something the rider chose themselves (kitTouched). Never in it: water, ID and cards, cash, the
+   phone, the first aid kit, the repair kit, the rain jacket and the ride snacks. */
+const DAY_LEAVE_ORDER=[
+  {id:'cap',when:() => true},                                         // cap or buff
+  {id:'shades',when:c => !daySunny()},                                // sunglasses, unless the day is sunny (the sunscreen season)
+  {id:'gloves',when:c => !(dayRideTemp(c) < 5)},                      // layers the day's weather does not ask for
+  {id:'warmers',when:c => !(dayRideTemp(c) < DAY_JACKET_BELOW)},
+  {id:'shoecov',when:c => !(dayRideTemp(c) < 5) && !(c.wetChance > 33)},
+  {id:'base1',when:() => true},{id:'base2',when:() => true},{id:'socks',when:() => true},
+  {id:'rainpants',when:c => !(c.wetChance > 33)},                    // rain trousers when rain is not likely
+];
+// The sunscreen season of the hemisphere the ride is in (as dayRideKit's sunscreen).
+function daySunny(){ const m=(S.place && S.place.lat < 0) ? (S.month+6)%12 : S.month; return m >= 3 && m <= 8; }
+function dayLeavable(){
+  const c=tripClimate();
+  return c.nightCold == null ? [] : DAY_LEAVE_ORDER.filter(x => x.when(c) && S.kit[x.id] && !S.kitTouched[x.id]).map(x => x.id);
+}
+// What the day ride left at home: the things of DAY_LEAVE_ORDER its starting kit would carry that the plan does not (the small view's line).
+function dayLeftAtHome(){
+  if(S.nights !== 0) return [];
+  const start=tripKitDefaults();
+  return DAY_LEAVE_ORDER.map(x => x.id).filter(id => start[id] && !S.kit[id] && S.kitTouched[id]);
+}
 function afternoonBags(base,withIds){
-  const fit=bikeFit(S.bikeProfile),top=TOP_ORDER.find(sl => fit.topMounts[sl]),topBag=top ? {pos:'top',slot:top,L:POSITIONS.top.defL} : null;
+  const fit=bikeFit(S.bikeProfile),top=TOP_ORDER.find(sl => fit.topMounts[sl]);
+  const tops=top ? DAY_TOP_SIZES.map(L => ({pos:'top',slot:top,L})) : [];
   const frames=[];
   if(!fit.frameBag.none) withInputs({bags:[...S.bags,...withIds(base)]},() => {
-    for(let i=minShapeIdx();i <= 2;i++){ const L=frameShapeL(i); if(!frames.some(f => f.L === L)) frames.push({pos:'frame',L,...(i === minShapeIdx() ? {} : {shape:i})}); }
+    const min=minShapeIdx(),from=inTriangleCount() > 0 ? 2 : min;   // a bottle in the triangle: the half shape only
+    for(let i=from;i <= 2;i++){ const L=frameShapeL(i); if(!frames.some(f => f.L === L)) frames.push({pos:'frame',L,...(i === min ? {} : {shape:i})}); }
   });
-  const one=[...(topBag ? [[topBag]] : []),...frames.map(f => [f])],two=topBag ? frames.map(f => [topBag,f]) : [];
-  const seat={pos:'seat',L:POSITIONS.seat.defL};
-  for(const group of [one,two,[[seat],...one,...two].map(s => s[0] === seat ? s : [...s,seat])]){
-    const fits=group.map(more => {
-      const bags=withIds([...base,...more]),all=[...S.bags,...bags],trial=freshPlan({bags:all,placements:null});
-      return {bags,over:trial.spill.length,out:trial.reach.outOfReach.length,phone:phoneOffPref(trial),n:more.length,L:withInputs({bags:all},() => ratedTotal())};
-    }).filter(s => !s.over).sort((a,b) => a.out-b.out || a.phone-b.phone || a.n-b.n || a.L-b.L);
-    if(fits.length) return fits[0].bags;
+  const one=[...tops.map(t => [t]),...frames.map(f => [f])],two=tops.flatMap(t => frames.map(f => [t,f]));
+  const best=(group,kit) => group.map(more => {
+    const bags=withIds([...base,...more]),all=[...S.bags,...bags],trial=freshPlan({bags:all,placements:null,...(kit ? {kit} : {})});
+    return {bags,over:trial.spill.length,out:trial.reach.outOfReach.length,phone:phoneOffPref(trial),L:withInputs({bags:all},() => ratedTotal())};
+  }).filter(s => !s.over).sort((a,b) => a.out-b.out || a.phone-b.phone || a.L-b.L)[0] || null;
+  const leavable=dayLeavable();
+  for(let k=0;k <= leavable.length;k++){
+    const leave=leavable.slice(0,k),kit=k ? {...S.kit,...Object.fromEntries(leave.map(id => [id,false]))} : null;
+    for(const group of [one,two]){ const s=best(group,kit); if(s) return {bags:s.bags,leave}; }
   }
-  return null;
+  const seat={pos:'seat',L:POSITIONS.seat.defL};
+  const s=best([[seat],...one.map(x => [...x,seat]),...two.map(x => [...x,seat])].map(x => x),null);
+  return s ? {bags:s.bags,leave:[]} : null;
 }
 function proposedTripBags(){
   const fit=bikeFit(S.bikeProfile),uid=n => S.nextUid+n,own=S.bags.filter(b => isBottle(b.pos)),afternoon=afternoonRide();
@@ -12282,7 +12322,7 @@ function proposedTripBags(){
   const base=(afternoon ? (own.length ? [] : slots.slice(-1)) : slots).map(sl => ({pos:BOTTLE_SPOTS[sl].pos,slot:sl,L:bottleDefaultFor(BOTTLE_SPOTS[sl].pos,BOTTLE_SPOTS[sl].defL)}));
   const withIds=list => list.map((b,i) => ({uid:uid(i),...b}));
   const day=afternoon ? afternoonBags(base,withIds) : null;
-  if(day) return day;
+  if(day) return day;   // {bags, leave}
   const top=TOP_ORDER.find(sl => fit.topMounts[sl]);
   if(top) base.push({pos:'top',slot:top,L:POSITIONS.top.defL});
   const extras=['frame','seat','bar'].filter(p => p !== 'frame' || !fit.frameBag.none);
@@ -12297,7 +12337,7 @@ function proposedTripBags(){
   // nothing over, then the fewest must-reach items out of reach (the selection's own reach rule), then the phone in a bag it is meant
   // for (its own pref: the top tube or frame bag; review of PR 92, I3), then the fewest litres and bags
   const fits=sets.filter(s => !s.over).sort((a,b) => a.out-b.out || a.phone-b.phone || a.L-b.L || a.n-b.n);
-  return (fits[0] || sets[sets.length-1]).bags;
+  return {bags:(fits[0] || sets[sets.length-1]).bags,leave:[]};
 }
 // "2 bottle cages, a top tube bag and a seat pack"
 function bagsInWords(bags){
@@ -12347,7 +12387,10 @@ async function planTripBags(){
     return false;
   }
   if(!HANDOFF.long) oneSpareTube();   // a day ride's one spare tube (owner, 9 Nov 2026), before its bags are sized
-  const proposed=gearBags().length ? null : proposedTripBags();   // nothing mounted to start from: the smallest setup that holds the kit
+  const proposal=gearBags().length ? null : proposedTripBags();   // nothing mounted to start from: the smallest setup that holds the kit
+  const proposed=proposal ? proposal.bags : null;
+  // what a day ride leaves at home to fit beside the bottle (owner, 9 Nov 2026): unticked in this plan, and Undo brings it back
+  if(proposal) proposal.leave.forEach(id => { S.kit[id]=false; S.kitTouched[id]=true; });
   if(proposed){ S.bags=[...S.bags,...proposed]; S.nextUid=Math.max(S.nextUid,...proposed.map(b => b.uid+1)); }
   S.packed={}; keepPlan({load:null}); currentPlan();   // packed afresh by the frozen selection, for this trip
   if(!HANDOFF.long) SMALL_VIEW=true;   // before Check opens, so nothing else asks over the small view
