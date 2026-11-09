@@ -159,7 +159,7 @@ const sameBag = (a: Omit<BagIn, 'uid'>, b: BagIn) =>
 
 /**
  * The candidates of one phase of the search (design §3.1). `add`: one new thing at a free spot: a bag (a single or a pair), or the rack
- * deck (kind 'deck'). `swap`, for Better handling only: one of the rider's bags out (never one holding a hand placement, never a
+ * deck (kind 'deck'). `swap`, for Better handling (alone or with the other goal): one of the rider's bags out (never one holding a hand placement, never a
  * bottle), one in at any position then free. `add-two`: two new things at two different free spots, their sizes in lock step from each
  * range's low end, never the deck beside panniers (they bring it when the trip camps). `panniers`: whether this round of the search
  * offers panniers at all (the setup decides; see search.ts).
@@ -172,7 +172,7 @@ export function candidates(given: AdvisorInput, phase: 'add' | 'swap' | 'add-two
       for (const o of options(input, spot)) out.push(make(input, 'add', [o], null));
     }
   } else if (phase === 'swap') {
-    if (input.goal !== 'handling') return out;
+    if (input.goal === 'backpack') return out;   // Better handling, alone or with Get the backpack off (D)
     for (const out1 of input.bags) {
       if (out1.hand === true || NEVER_SWAPPED.has(out1.pos)) continue;
       const rest = input.bags.filter((b) => b !== out1);

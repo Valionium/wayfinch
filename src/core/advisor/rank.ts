@@ -26,19 +26,38 @@ export function handlingScore(r: TrialResult): number {
   return round2(sum);
 }
 
+/** Back litres at or under this are nothing on the back (rounding alone). */
+const NOTHING_ON_BACK_L = 0.005;
+
+/**
+ * Both goals at once (the owner's preview check of 8 Nov, D): one score, lower is better. Each goal's own value as a share of the plan's
+ * (`base`): the handling score, and the litres on the back, added with equal weight, so 1 is the plan as it stands on each goal and 0 is
+ * everything at its best. A back that is empty in the plan counts nothing (then both read as Better handling). Rounded to 0.0001.
+ */
+export function bothScore(base: TrialResult, r: TrialResult): number {
+  const h = handlingScore(base);
+  const hand = h > 0 ? handlingScore(r) / h : 0;
+  const back = base.backL > NOTHING_ON_BACK_L ? r.backL / base.backL : 0;
+  return Math.round((hand + back) * 10000) / 10000;
+}
+
 const KIND_ORDER: Record<Candidate['kind'], number> = { add: 0, 'add-two': 0, deck: 0, ahead: 0, swap: 1 };
 const byNumber = (a: number, b: number) => round2(a) - round2(b);
 
 /**
  * The order of suggestions for a goal, best first. Get the backpack off: fewer litres on the back, then fewer kilos there. Better
  * handling: the lower score. Ties (§3.3): fewer new bags, then fewer litres, then an addition before a swap. Values are compared to the
- * hundredth.
+ * hundredth. Both goals (D): the lower bothScore against `base`, the plan as it stands (to the ten-thousandth), then the handling
+ * score, then the litres on the back.
  */
-export function compareFor(goal: AdvisorInput['goal']): (a: Suggestion, b: Suggestion) => number {
+export function compareFor(goal: AdvisorInput['goal'], base?: TrialResult): (a: Suggestion, b: Suggestion) => number {
+  const both = (x: Suggestion) => (base ? bothScore(base, x.result) : 0);
   return (a, b) => {
     const onGoal = goal === 'backpack'
       ? byNumber(a.result.backL, b.result.backL) || byNumber(a.result.backKg, b.result.backKg)
-      : byNumber(a.score, b.score);
+      : goal === 'both'
+        ? Math.round((both(a) - both(b)) * 10000) || byNumber(a.score, b.score) || byNumber(a.result.backL, b.result.backL)
+        : byNumber(a.score, b.score);
     return onGoal || a.newBags - b.newBags || byNumber(a.litres, b.litres) || KIND_ORDER[a.kind] - KIND_ORDER[b.kind];
   };
 }
@@ -60,8 +79,8 @@ export function byOwnerOrder(a: Candidate, b: Candidate): number {
  * Minimal's order (owner, 7 Nov): the fewest new bags first, then the owner's order (top tube and frame bag, then seat pack, then
  * handlebar bag, then fork cages), then the goal's order.
  */
-export function compareMinimal(goal: AdvisorInput['goal']): (a: Suggestion, b: Suggestion) => number {
-  const onGoal = compareFor(goal);
+export function compareMinimal(goal: AdvisorInput['goal'], base?: TrialResult): (a: Suggestion, b: Suggestion) => number {
+  const onGoal = compareFor(goal, base);
   return (a, b) => a.newBags - b.newBags || byOwnerOrder(a, b) || onGoal(a, b);
 }
 

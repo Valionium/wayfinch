@@ -94,13 +94,14 @@ test('[GA-PROGRESS] a search longer than 300 ms shows "Trying N options…", and
   await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
   await expect(page.locator('#advisorProgress')).toBeVisible();
   await expect(page.locator('#advisorProgress')).toHaveText(/^Trying \d+ options…$/);
-  // a tap while it runs: the other goal is taken, and the search starts again for it (how fast: the test below)
+  // a tap while it runs: the other goal is taken too (both can be chosen together, the owner's D), and the search starts again for
+  // both (how fast: the test below)
   await box.locator('label.adv-choice', { hasText: 'Get the backpack off' }).click();
   await expect(box.locator('input[name="advGoal"][value="backpack"]')).toBeChecked();
-  expect(await page.evaluate('ADVISOR.goal')).toBe('backpack');
+  expect(await page.evaluate('ADVISOR.goal')).toBe('both');
   await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
   await expect(page.locator('#advisorProgress')).toBeHidden();
-  expect(await page.evaluate('ADVISOR.input.goal')).toBe('backpack');
+  expect(await page.evaluate('ADVISOR.input.goal')).toBe('both');
 });
 
 test('[GA-PROGRESS] the real R3 search hands the page back after every 20 trials at most, and a tap during it gets its response within 1 s (phone stand-in included; review of PR 60, I3)', async ({ page }) => {
@@ -213,8 +214,8 @@ test('[GA-SCREEN] at this window size and theme, offline: the steps are headings
   await expect(box.locator('input[name="advStyle"][value="panniers"]')).toBeEnabled();
   await expect(box.locator('#advNoMounts')).toHaveText('Your bike has no rack mounts, so no rack or panniers are offered.');
   await expect(box.locator('input[name="advStyle"][value="bags-first"]')).toBeChecked();   // the default
-  // the keyboard: from the dialog's close button, Tab into the styles, the arrow keys to choose
-  await box.locator('#advisorClose').focus();
+  // the keyboard: from the one top bar (the advisor is its own page, the owner's C and I), Tab into the styles, the arrow keys to choose
+  await page.locator('#backToWayfinch').focus();
   for (let i = 0; i < 4 && (await page.evaluate('document.activeElement.name')) !== 'advStyle'; i++) await page.keyboard.press('Tab');
   expect(await page.evaluate('document.activeElement.name')).toBe('advStyle');
   await page.keyboard.press('ArrowRight');
@@ -225,13 +226,13 @@ test('[GA-SCREEN] at this window size and theme, offline: the steps are headings
   await expect.poll(() => page.evaluate('ADVISOR.style')).toBe('bags');
   await page.keyboard.press('Tab');
   expect(await page.evaluate('document.activeElement.name')).toBe('advGoal');
-  await page.keyboard.press('ArrowRight');
-  await page.keyboard.press('ArrowLeft');
+  // the goals are checkboxes, one or both (the owner's D): Space ticks the first
+  await page.keyboard.press('Space');
   await expect.poll(() => page.evaluate('ADVISOR.goal')).toBe('handling');
   await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
   const cards = await box.locator('.adv-card').count();
   expect(cards).toBeGreaterThan(0);
-  // Tab on through the rest of the dialog: the switch, then each suggestion
+  // Tab on through the rest of the page: the other goal, the switch, then each suggestion
   const reached = new Set<string>();
   for (let i = 0; i < 20 && reached.size < cards + 1; i++) {
     await page.keyboard.press('Tab');
@@ -264,7 +265,8 @@ test('[GA-STEPS] in the browser: each choice is a labelled radio of at least 44 
   const box = page.locator('#advisorBox');
   await expect(box.locator('#advisorAnswer')).toHaveText('Choose all three steps to see what to get.');
   for (const name of ['Bikepacking bags only', 'Bags first, panniers only if needed', 'Panniers are fine', 'Better handling', 'Get the backpack off']) {
-    await expect(box.getByRole('radio', { name })).toHaveCount(1);
+    // the setups are radios; the two goals checkboxes, as both can be chosen together (the owner's D)
+    await expect(box.getByRole(/^(Better handling|Get the backpack off)$/.test(name) ? 'checkbox' : 'radio', { name })).toHaveCount(1);
     const h = await box.locator('label.adv-choice', { hasText: name }).evaluate((el) => el.getBoundingClientRect().height);
     expect(h, name).toBeGreaterThanOrEqual(44);
   }
@@ -375,7 +377,7 @@ test('[GA-TRY] [GA-TRIAL-NO-TRACE] [GA-KEEP] [GA-REMOVE] in the browser: Try in 
 
 // ---- The way in from Tools, and back (sub-project 13, group 3, Task 9) ----
 
-test('[GA-TOOLS-CARD] [GA-BACK] Tools\' Gear advisor card opens the advisor in the bag planner; closing it lands on Tools', async ({ page }) => {
+test('[GA-TOOLS-CARD] [GA-BACK] [GA-PAGE] Tools\' Gear advisor card opens the advisor in the bag planner, as its own page; the one top bar lands on Tools', async ({ page }) => {
   app = await loadApp(page, { launch: true, path: '/#/tools' });
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'load' });
@@ -384,8 +386,12 @@ test('[GA-TOOLS-CARD] [GA-BACK] Tools\' Gear advisor card opens the advisor in t
   await open.click();
   await page.waitForURL(/\/tools\/bags\//);
   await expect(page.locator('#advisorBox')).toBeVisible();
-  await expect(page.locator('#advisorBack')).toBeVisible();
-  await page.locator('#advisorClose').click();
+  // the way back is the one top bar of every tool (the owner's C): it goes to Tools
+  const bar = page.locator('#backToWayfinch');
+  await expect(bar).toBeVisible();
+  await expect(bar).toHaveText('← Back to Wayfinch');
+  await expect(bar).toHaveAttribute('href', '/#/tools');
+  await bar.click();
   await page.waitForURL((u) => u.pathname === '/' && u.hash === '#/tools');
   await expect(page.getByRole('link', { name: 'Open Gear advisor' })).toBeVisible();
 });
@@ -401,4 +407,157 @@ test('[GA-BACK] Bike details opened with back=advisor returns to the Gear adviso
   await expect(page.locator('#bikeDetailsBox')).toBeHidden();
   await expect(page.locator('#advisorBox')).toBeVisible();
   expect(new URL(page.url()).pathname).toBe('/tools/bags/');
+});
+
+// ---- After the launch, part 4 (the owner's preview check of 8 Nov: C, D, E, F, I) ----
+
+/** What of the bag planner a rider can see: its header, steps, rig and bars, the walkthrough's button. */
+const plannerShown = (page: Page) => page.evaluate(() => ['.mast', '#crumbs', '#plannerCols', '#rigSvg', '#trialBar', '#walkthroughOpen', '#s1', '#s2', '#s4']
+  .filter((sel) => { const el = document.querySelector(sel); if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; }));
+
+test('[GA-PAGE] from Tools, the Gear advisor is a page of its own at this size and theme: nothing of the planner shows, no dialog, the one top bar at its top, and with motion allowed the bike glides onto the advisor\'s drawing (Chromium)', async ({ page, browserName }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  // on every page this window opens: which element is named wf-bike when the page is revealed
+  await page.addInitScript(() => {
+    window.addEventListener('pagereveal', (e) => {
+      const named = [...document.querySelectorAll('*')].filter((el) => getComputedStyle(el).getPropertyValue('view-transition-name') === 'wf-bike');
+      sessionStorage.setItem('ga:vt', String(!!(e as Event & { viewTransition?: unknown }).viewTransition));
+      sessionStorage.setItem('ga:named', named.map((el) => (el.closest('#advisorGlide') ? 'advisor' : el.id || el.tagName)).join(','));
+    });
+  });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  app = await loadApp(page, { launch: true, path: '/#/tools' });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'load' });
+  await page.getByRole('link', { name: 'Open Gear advisor' }).click();
+  await page.waitForURL(/\/tools\/bags\//);
+  await expect(page.locator('#advisorBox')).toBeVisible();
+  await page.waitForFunction('typeof ADVISOR !== "undefined" && ADVISOR.open');
+  if (browserName === 'chromium') {
+    expect(await page.evaluate(() => sessionStorage.getItem('ga:vt')), 'a view transition').toBe('true');
+    expect(await page.evaluate(() => sessionStorage.getItem('ga:named')), 'the bike lands on the advisor, not on the rig').toBe('advisor');
+  }
+  expect(await plannerShown(page), 'nothing of the planner around or behind it').toEqual([]);
+  await expect(page.locator('#advisorGlide svg')).toBeVisible();
+  await expect(page.locator('[role="dialog"]:visible')).toHaveCount(0);
+  await expect(page.locator('#advisorTitle')).toHaveText('Gear advisor');
+  await expect(page.locator('#advisorBox')).not.toContainText('Which bag to get next');
+  await expect(page.getByRole('button', { name: /^(×|Close the Gear advisor)$/ })).toHaveCount(0);
+  const bar = page.locator('.wf-bar');
+  await expect(bar).toHaveCount(1);
+  await expect(bar).toBeVisible();
+  const top = await page.evaluate(() => ({ bar: document.querySelector('.wf-bar')!.getBoundingClientRect().bottom, title: document.getElementById('advisorTitle')!.getBoundingClientRect().top }));
+  expect(top.bar, 'the bar above the advisor').toBeLessThanOrEqual(top.title);
+  expect(await page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'no sideways scroll').toBe(true);
+  // the drawing the bike glides onto: decorative, the rider's bike with the plan's bags
+  expect(await page.locator('#advisorGlide').getAttribute('aria-hidden')).toBe('true');
+  // opened from Tools, no second way back: only the bar
+  await expect(page.locator('#advisorToPlan')).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('[GA-PAGE] opened in the bag planner, the advisor is its own page too, and Back to the Bag planner brings the planner back where the rider was', async ({ page }) => {
+  await planner(page);
+  await gravel(page);
+  await page.evaluate('go(2)');
+  await page.locator('#advisorAsk').scrollIntoViewIfNeeded();
+  const y = await page.evaluate('window.scrollY') as number;
+  await page.locator('#advisorAsk').click();
+  await expect(page.locator('#advisorBox')).toBeVisible();
+  expect(await plannerShown(page)).toEqual([]);
+  expect(await page.evaluate('window.scrollY'), 'the advisor starts at its top').toBe(0);
+  await page.getByRole('button', { name: 'Back to the Bag planner' }).click();
+  await expect(page.locator('#advisorBox')).toBeHidden();
+  await expect(page.locator('#plannerCols')).toBeVisible();
+  expect(Math.abs((await page.evaluate('window.scrollY') as number) - y), 'where the rider was').toBeLessThan(40);
+  await expect(page.locator('#advisorAsk')).toBeFocused();
+});
+
+test('[GA-BOTH] in the browser: both goals ticked together, the answer says how they are ranked; one untick, one goal again', async ({ page }) => {
+  await planner(page);
+  await gravel(page);
+  await page.evaluate("openAdvisor(document.getElementById('advisorAsk'))");
+  const box = page.locator('#advisorBox');
+  await box.locator('label.adv-choice', { hasText: 'Bikepacking bags only' }).click();
+  await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
+  await box.locator('label.adv-choice', { hasText: 'Get the backpack off' }).click();
+  await expect(box.getByRole('checkbox', { name: 'Better handling' })).toBeChecked();
+  await expect(box.getByRole('checkbox', { name: 'Get the backpack off' })).toBeChecked();
+  // the gravel plan carries nothing on the back: both read as Better handling, and the line says so (review of PR 81, M2)
+  await expect(page.locator('#advisorAnswer')).toContainText('With both goals and nothing on your back now, the suggestions are ranked as for Better handling.', { timeout: 30_000 });
+  expect(await page.evaluate('ADVISOR.input.goal')).toBe('both');
+  await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
+  await expect.poll(() => page.evaluate('ADVISOR.goal')).toBe('backpack');
+  await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
+  await expect(page.locator('#advisorAnswer')).not.toContainText('With both goals');
+});
+
+test('[GA-RETURN] in the browser: after Try in Bag planner, Back to the Gear advisor brings its answers and suggestions back; Remove it and Keep it as before; Start over clears it all', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page);
+  await gravel(page);
+  await page.evaluate('S.bikeProfile.maxWeightAsked = true; flushDraft()');
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY');
+  const before = await saved(page);
+  const bagsBefore = await page.evaluate('JSON.stringify(S.bags)');
+  await page.evaluate("location.hash = '#gear-advisor'");
+  const box = page.locator('#advisorBox');
+  await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
+  const tryIt = box.getByRole('button', { name: 'Try in Bag planner' }).first();
+  await expect(tryIt).toBeVisible({ timeout: 30_000 });
+  const cards = await box.locator('.adv-card h5').allTextContents();
+  await tryIt.click();
+  await expect(box).toBeHidden();
+  await expect(page.locator('#trialBar')).toBeVisible();
+  const back = page.getByRole('button', { name: 'Back to the Gear advisor' });
+  await expect(back).toBeVisible();
+  // during the trial: the advisor as it was, no new search
+  const run = await page.evaluate('ADVISOR_RUN');
+  await back.click();
+  await expect(box).toBeVisible();
+  expect(await box.locator('.adv-card h5').allTextContents()).toEqual(cards);
+  expect(await page.evaluate('ADVISOR_RUN')).toBe(run);
+  await expect(box.getByRole('checkbox', { name: 'Better handling' })).toBeChecked();
+  await expect(page.locator('#advisorAnswer')).toContainText('Keep or remove the bag you are trying first.');
+  await page.getByRole('button', { name: 'Back to the Bag planner' }).click();
+  await expect(page.locator('#trialBar')).toBeVisible();
+  // Remove it: no trace, as reviewed; and the way back stays
+  await page.getByRole('button', { name: 'Remove it' }).click();
+  await expect(page.locator('#trialBar')).toBeHidden();
+  expect(await page.evaluate('JSON.stringify(S.bags)')).toBe(bagsBefore);
+  await page.waitForTimeout(500);
+  expect(await saved(page)).toEqual(before);
+  await back.click();
+  expect(await box.locator('.adv-card h5').allTextContents()).toEqual(cards);
+  await expect(box.getByRole('button', { name: 'Try in Bag planner' }).first()).toBeVisible();
+  // Start over: the answers and the way back go
+  await page.getByRole('button', { name: 'Start over' }).click();
+  await expect(page.locator('#advisorAnswer')).toHaveText('Choose all three steps to see what to get.');
+  await expect(box.getByRole('checkbox', { name: 'Better handling' })).not.toBeChecked();
+  await page.getByRole('button', { name: 'Back to the Bag planner' }).click();
+  await expect(back).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('[GA-BIGGER] in the browser: nothing helps within Bikepacking bags only; Show a bigger change shows a rack and panniers, labelled as beyond the setup choice, with Try in Bag planner', async ({ page }) => {
+  await planner(page);
+  await page.evaluate(`S.bikeProfile = normaliseBikeProfile(${JSON.stringify(R3_BIKE)});
+    Object.assign(S, { nights: 4, sleep: 'camp', mode: 'comfort', decks: { bar: false, rack: false }, nextUid: 3, bags: [{ uid: 1, pos: 'pack', L: 50 }, { uid: 2, pos: 'seat', L: 8 }] });
+    applyTripKitDefaults();
+    S.custom = Object.fromEntries(KIT.filter(k => k.tiers).map(k => { const t = [...k.tiers].sort((a, b) => b.L - a.L || b.kg - a.kg)[0]; return [k.id, { L: t.L, kg: t.kg, rigid: t.rigid }]; }));`);
+  await page.evaluate("openAdvisor(document.getElementById('advisorAsk'))");
+  const box = page.locator('#advisorBox');
+  await box.locator('label.adv-choice', { hasText: 'Bikepacking bags only' }).click();
+  await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
+  const show = box.getByRole('button', { name: 'Show a bigger change' });
+  await expect(show).toBeVisible({ timeout: 60_000 });
+  await expect(box.locator('.adv-bigger')).toContainText('It goes beyond your setup choice, “Bikepacking bags only”, so it shows only if you ask.');
+  await show.click();
+  await expect(box.locator('.adv-bigger .adv-over')).toHaveText('Beyond your setup choice, “Bikepacking bags only”: it adds a rack and panniers.', { timeout: 60_000 });
+  await expect(box.locator('.adv-bigger .adv-card h5')).toContainText(/panniers?/i);
+  await expect(box.locator('.adv-bigger').getByRole('button', { name: 'Try in Bag planner' })).toBeVisible();
+  expect(await page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'no sideways scroll').toBe(true);
 });

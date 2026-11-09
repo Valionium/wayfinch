@@ -25,7 +25,9 @@ export type AdvisorInput = {
    * The setup the rider wants (the owner's ruling of 7 Nov): `bags` Bikepacking bags only (never panniers; a rack already fitted still
    * carries things on its deck), `bags-first` Bags first, panniers only if needed (the default), `panniers` Panniers are fine.
    */
-  style: Setup; goal: 'handling' | 'backpack';
+  style: Setup;
+  /** Better handling, Get the backpack off, or both at once (the owner's preview check of 8 Nov, D), ranked by rank.ts's bothScore. */
+  goal: 'handling' | 'backpack' | 'both';
   bags: BagIn[]; decks: Decks; camping: boolean; nextUid: number;
   /** Whether a rack is fitted, read from the plan before the setup applies (candidates.ts sets it; the page need not). */
   rackFitted?: boolean;

@@ -1463,6 +1463,9 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
   #rigSvg{view-transition-name:wf-bike}
   :root:has(#bikeDetailsBox:not(.hidden)) #rigSvg{view-transition-name:none}
   #bikeDetailsBox:not(.hidden) #lookPreview svg{view-transition-name:wf-bike}
+  /* the Gear advisor, its own page: its drawing is the one the bike glides onto (the owner's preview check of 8 Nov, I) */
+  :root.adv-page #rigSvg{view-transition-name:none}
+  :root.adv-page:not(:has(#bikeDetailsBox:not(.hidden))) #advisorGlide svg{view-transition-name:wf-bike}
 }
 /* Packing checklist: one checkbox means the complete named quantity. */
 .packing-checklist{margin:16px 0;border:1px solid var(--line);background:var(--panel);padding:14px;min-width:0}
@@ -1650,7 +1653,22 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 .packing-disclosure[open]>summary{border-bottom:1px solid var(--line-soft);padding-bottom:10px;margin-bottom:12px}
 @media(max-width:480px){.info-box{padding:8px}.info-card{max-height:min(560px,calc(100vh - 16px));max-height:min(560px,calc(100dvh - 16px))}.packing-disclosure>summary{grid-template-columns:minmax(0,1fr) 20px;gap:4px 10px}.packing-disclosure>summary b{grid-column:1;grid-row:1;font-size:22px}.packing-disclosure>summary em{grid-column:1;grid-row:2;text-align:left}.packing-disclosure>summary:after{grid-column:2;grid-row:1 / span 2}}
 /* The Gear advisor (sub-project 13): a view of the bag planner, built like Bike details; every choice a labelled radio of 44 px or more. */
-.advisor-box .bike-dialog-card{max-width:760px}
+/* Its own page (the owner's preview check of 8 Nov, I and C): while it is open the one top bar, the advisor and the footer show, nothing
+   of the planner around or behind it; its title is a plain heading, no box. */
+.adv-page .wrap>:not(.wf-bar):not(#advisorBox):not(.sitefoot):not(link):not(script){display:none!important}
+.adv-page #walkthroughOpen{display:none}
+.advisor-page{max-width:760px;margin:0 auto 24px;min-width:0}
+.advisor-page.hidden{display:none}
+.adv-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 12px;margin:10px 0 6px}
+.adv-head h2{font-family:var(--disp);font-size:28px;line-height:1.2;color:var(--ink);margin:0}
+.adv-head-actions{display:flex;flex-wrap:wrap;gap:4px 14px}
+.adv-head-actions .linky,#advisorReturnBar button{min-height:44px}
+.adv-glide svg{display:block;width:100%;max-width:320px;height:auto;margin:0 auto 8px}
+.adv-body{min-width:0}
+.adv-body h3{font-size:18px;color:var(--ink);margin:12px 0 8px}.adv-body h4{font-size:15px;color:var(--ink);margin:10px 0}
+.adv-bigger{margin:14px 0 0;padding:4px 12px 12px;border:1px dashed var(--line);border-radius:8px;min-width:0}
+.adv-bigger-show{min-height:44px;margin-top:6px}
+.adv-over{color:var(--ink)}
 .adv-bike{margin:0 0 12px}
 .adv-bike-line{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
 .adv-bike-line select{min-height:44px;max-width:100%;min-width:0;flex:1 1 180px}
@@ -1677,9 +1695,9 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 .adv-list{list-style:none;display:grid;gap:12px;margin:8px 0 0}
 .adv-card{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--panel);min-width:0}
 .adv-card:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.bike-dialog-body .adv-card h5{font-size:17px;margin:0 0 4px}
+.adv-body .adv-card h5{font-size:17px;margin:0 0 4px}
 .adv-kind{margin:12px 0 0}
-.bike-dialog-body .adv-kind>h4{font-size:16px;margin:14px 0 2px}
+.adv-body .adv-kind>h4,.adv-body .adv-bigger>h4{font-size:16px;margin:14px 0 2px}
 /* combinations side by side: a row that wraps into its own scroll at 360 px, never the page */
 .adv-combos{list-style:none;display:flex;gap:8px;margin:4px 0 10px;padding:0 0 4px;overflow-x:auto;max-width:100%;min-width:0}
 .adv-combos>li{flex:1 0 140px;max-width:240px;min-width:0}
@@ -1692,7 +1710,6 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 .adv-drawing svg{display:block;width:100%;max-width:420px;height:auto;margin:6px auto}
 .adv-why{font-size:14px;line-height:1.5;margin:6px 0}
 .adv-moves{margin:0 0 0 18px;font-size:14px;line-height:1.5}
-#advisorBack.hidden{display:none}
 @media(max-width:480px){.bike-dialog-box{padding:8px}.bike-dialog-card{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px)}.bike-dialog-head,.bike-dialog-body{padding:12px}.guide-launch-row{gap:12px}}
 .walkthrough-tip{margin-top:14px;border-left:3px solid var(--sage);padding-left:10px;font-size:14px;line-height:1.6;color:var(--muted)}
 .walkthrough-actions{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;margin-top:22px}
@@ -1840,6 +1857,9 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 </style>
 <!-- a number in the text never becomes a call on the first tap (owner's iPhone check, 6 Nov 2026) -->
 <meta name="format-detection" content="telephone=no">
+<!-- Opened as the Gear advisor (#gear-advisor, Tools' card), the first frame waits for the page's script, which shows the advisor as its
+     own page and draws the bike the glide from Tools lands on (the owner's preview check of 8 Nov, I). Any other visit renders as before. -->
+<script data-advisor-first-frame>if(/^#gear-advisor(&|$)/.test(location.hash)){const l=document.createElement('link');l.rel='expect';l.href='#advisorReady';l.setAttribute('blocking','render');document.head.appendChild(l);}</script>
 </head>
 <body>
 <div class="wrap">
@@ -1893,6 +1913,10 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <span id="trialText"></span>
     <button class="kitact" id="trialKeep" type="button"></button>
     <button class="linky" id="trialRemove" type="button"></button>
+  </div>
+  <div class="draftbar quiet hidden" id="advisorReturnBar">
+    <button class="kitact" id="advisorReturn" type="button"></button>
+    <span id="advisorReturnText"></span>
   </div>
 
   <div class="planner-cols" id="plannerCols">
@@ -2031,7 +2055,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <button class="addbag" id="addBag">+ Add a bag</button><button class="addbag" id="addBottle">+ Bottle cage</button>
       <span id="bagTotal"></span>
     </div>
-    <p class="adv-ask" id="advisorAskLine">Not happy with your bags? <button type="button" class="linky" id="advisorAsk" aria-haspopup="dialog" aria-controls="advisorBox">Ask the Gear advisor</button></p>
+    <p class="adv-ask" id="advisorAskLine">Not happy with your bags? <button type="button" class="linky" id="advisorAsk" aria-controls="advisorBox">Ask the Gear advisor</button></p>
     <div class="fbslot" data-fb="2"></div>
     <div class="nav">
       <button class="back" data-to="1">Back</button>
@@ -2116,6 +2140,17 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 
   </main>
   </div>
+  <section id="advisorBox" class="advisor-page hidden" aria-labelledby="advisorTitle">
+    <div class="adv-head"><h2 id="advisorTitle" tabindex="-1">Gear advisor</h2><div class="adv-head-actions"><button type="button" class="linky hidden" id="advisorToPlan">Back to the Bag planner</button><button type="button" class="linky" id="advisorRestart">Start over</button></div></div>
+    <div class="adv-body" id="advisorBody">
+      <div class="adv-glide" id="advisorGlide" aria-hidden="true"></div>
+      <div class="adv-bike" id="advisorBike"></div>
+      <div id="advisorSteps"></div>
+      <p class="adv-progress hidden" id="advisorProgress" role="status" aria-live="polite"></p>
+      <p class="sr-only" id="advisorStatus" role="status" aria-live="polite"></p>
+      <section class="adv-answer" id="advisorAnswer"></section>
+    </div>
+  </section>
   <footer class="sitefoot">
     <span>Load Check · a free tool, and its figures are estimates</span>
     <button class="linky" id="legalBtn" lang="de">Impressum &amp; Datenschutz</button>
@@ -2266,18 +2301,6 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <p class="hint">Find it on the frame sticker, in the manual or on the maker's website. Your own weight is not asked.</p>
       <p id="mwMessage" role="status" aria-live="polite"></p>
       <div class="bike-profile-actions"><button class="go small" id="mwSave" type="button">Save</button><button class="linky" id="mwSkip" type="button">Skip</button></div>
-    </div>
-  </section>
-</div>
-<div id="advisorBox" class="bike-dialog-box bike-details-box advisor-box hidden" role="dialog" aria-modal="true" aria-labelledby="advisorTitle">
-  <section class="bike-dialog-card">
-    <header class="bike-dialog-head"><div><h2 id="advisorTitle" tabindex="-1">Gear advisor</h2><p>Which bag to get next, for your riding and your bike: types and sizes, never brands.</p><a class="linky hidden" id="advisorBack" href="/#/tools"></a></div><button type="button" id="advisorClose" aria-label="Close the Gear advisor">×</button></header>
-    <div class="bike-dialog-body" id="advisorBody">
-      <div class="adv-bike" id="advisorBike"></div>
-      <div id="advisorSteps"></div>
-      <p class="adv-progress hidden" id="advisorProgress" role="status" aria-live="polite"></p>
-      <p class="sr-only" id="advisorStatus" role="status" aria-live="polite"></p>
-      <section class="adv-answer" id="advisorAnswer"></section>
     </div>
   </section>
 </div>
@@ -5598,7 +5621,7 @@ const ADVISOR_WORDING = {
   styleBags:{text:'Bikepacking bags only'}, styleBagsFirst:{text:'Bags first, panniers only if needed'}, stylePanniers:{text:'Panniers are fine'},
   noMounts:{text:"Your bike has no rack mounts, so no rack or panniers are offered."},
   rackKept:{text:'Your bike is set to no rack mounts, but your plan has a rack: it stays in these suggestions.'},
-  step2:{text:'2. What should get better'},
+  step2:{text:'2. What should get better (one or both)'},
   goalHandling:{text:'Better handling'}, goalBackpack:{text:'Get the backpack off'},
   step3:{text:'3. What you carry'},
   usingPlan:{text:'Using your packing: {n} items, {m} bags'},
@@ -5620,6 +5643,10 @@ const ADVISOR_WORDING = {
   movesKg:{text:'Moves {kg} kg from {from} to {to}.'}, fitsOver:{text:'Fits everything that was left over.'},
   lower:{text:'Puts the weight lower and nearer the middle of the bike.'},
   alreadyGood:{text:'Your bags already suit this; nothing to add.'},
+  // both goals at once (the owner's preview check of 8 Nov, D): how they are ranked, in the answer
+  goalBoth:{text:'With both goals, each suggestion is ranked by one score: how much better the handling gets plus how much comes off your back, each as a share of what you have now, counted equally.'},
+  goalBothEmpty:{text:'With both goals and nothing on your back now, the suggestions are ranked as for Better handling.'},
+  cannotReduceBoth:{text:'No bag within this style takes {min} L or more off your back or makes the handling better: {l} L stay on your back.'},
   // the search answers cannot-reduce when nothing takes MIN_GAIN_BACK_L (table.ts, decision 6) or more off the back; {min} is read from it
   cannotReduce:{text:'No bag within this style takes {min} L or more off your back: {l} L stay on your back.'},
   nothing:{text:'Nothing helps: no single bag, swap or pair of bags fits everything within this style.'},
@@ -5630,6 +5657,18 @@ const ADVISOR_WORDING = {
   minimal:{text:'Minimal'}, minimalIntro:{text:'The fewest new bags that do it.'},
   ahead:{text:'Looking ahead'}, aheadIntro:{text:'A set that covers more, even if Minimal does it today.'},
   aheadNone:{text:'No further bag would help much more than Minimal.'},
+  // a bigger change (the owner's preview check of 8 Nov, F): beyond the setup choice, shown only on a tap
+  bigger:{text:'A bigger change'}, biggerShow:{text:'Show a bigger change'},
+  biggerOffer:{text:'It goes beyond your setup choice, “{choice}”, so it shows only if you ask.'},
+  biggerOver:{text:'Beyond your setup choice, “{choice}”: {what}.'},
+  overPanniers:{text:'it adds panniers'}, overRack:{text:'it adds a rack'}, overRackPanniers:{text:'it adds a rack and panniers'},
+  overFirst:{text:'panniers, though bags alone do it'},
+  biggerNone:{text:'Even beyond your setup choice, nothing would help much more.'},
+  biggerNoneFit:{text:'Even beyond your setup choice, nothing makes everything fit.'},
+  // its own page, and the way back to it (the owner's preview check of 8 Nov, C, E and I)
+  returnTo:{text:'Back to the Gear advisor'}, returnKept:{text:'Your answers and its suggestions are kept until you start over.'},
+  again:{text:'Your plan changed since, so the Gear advisor looked again with your answers.'},
+  changedTrial:{text:'Your plan changed since these suggestions: keep or remove the bag you are trying, and the Gear advisor looks again.'},
   deckOwn:{text:'Put the {items} on your rack, no new bag needed'}, deckNew:{text:'A rack, with the {items} on its top deck'},
   deckOwnBare:{text:"Use your rack's top deck, no new bag needed"}, deckNewBare:{text:'A rack with a top deck'},
   deckOwnPlus:{text:"the {items} on your rack's top deck"}, deckOwnPlusBare:{text:"your rack's top deck"},
@@ -5661,7 +5700,10 @@ const ADVISOR_PROGRESS_MS = 300;
 const ADVISOR_SLICE_MS = 50;
 // Kilos moved below this are not worth a line of their own.
 const ADVISOR_MOVES_KG = 0.5;
-const ADVISOR = { open:false, style:null, styleTouched:false, goal:null, source:null, q:null, answer:null, input:null, error:'', back:null };
+// returnable: the way back after Try in Bag planner shows; stale and sig: whether the answer kept is still the plan's (E); bigger: the
+// bigger change asked for ({ done, s }; F).
+const ADVISOR = { open:false, style:null, styleTouched:false, goal:null, source:null, q:null, answer:null, input:null, error:'', back:null,
+  returnable:false, stale:false, sig:null, again:false, bigger:null };
 let ADVISOR_RUN = 0, ADVISOR_DONE = Promise.resolve(), ADVISOR_SCRIPT = null;
 
 function loadAdvisor(){
@@ -5793,7 +5835,7 @@ function advisorWhy(s, input){
   const to = Object.entries(d).filter(([, v]) => v > 0.05).sort((x, y) => y[1] - x[1]);
   const kg = +Math.min(to.reduce((n, [, v]) => n + v, 0), -from.reduce((n, [, v]) => n + v, 0)).toFixed(1);
   if(from.length && to.length && kg >= ADVISOR_MOVES_KG) out.push(advisorWord('movesKg', { kg, from:advisorList(from.map(([g]) => advisorWord(g))), to:advisorList(to.map(([g]) => advisorWord(g))) }));
-  else if(input.goal === 'handling' && !out.length) out.push(advisorWord('lower'));
+  else if(input.goal !== 'backpack' && !out.length) out.push(advisorWord('lower'));
   return out;
 }
 // "Your bike with fork cages, 2 × 5 L"; a swap: "Your bike with a 15 L handlebar roll instead of your 12 L handlebar roll"; the rack
@@ -5849,20 +5891,41 @@ function advisorTwoKindsHtml(answer, input){
     + (answer.ahead ? `<p class="adv-note">${advisorWord('aheadIntro')}</p>`
       + (alts.length ? advisorCombosHtml(aheads.map((s, k) => [s, n + k, aheadShown[k]]), input, 'Ahead') : '')
       + aheads.map((s, k) => `<div class="adv-sugg adv-ahead">${advisorCardHtml(s, input, n + k, aheadShown[k])}</div>`).join('')
-      : `<p class="adv-plain">${advisorWord('aheadNone')}</p>`) + '</section>';
+      : `<p class="adv-plain">${advisorWord('aheadNone')}</p>` + advisorBiggerHtml(answer, input)) + '</section>';
+}
+// A bigger change (the owner's preview check of 8 Nov, F): offered when Looking ahead finds nothing and the setup choice ruled out
+// something the bike can take (advisor.js decides); searched and shown only on the rider's tap, named as going beyond that choice.
+function advisorBiggerHtml(answer, input){
+  const mod = window.WayfinchAdvisor;
+  if(!mod || !mod.biggerOffered || !mod.biggerOffered(input, answer)) return '';
+  const choice = advisorWord(input.style === 'bags' ? 'styleBags' : 'styleBagsFirst'), B = ADVISOR.answer === answer ? ADVISOR.bigger : null;
+  let body = `<p class="adv-note">${htmlEsc(advisorWord('biggerOffer', { choice }))}</p>`;
+  if(!B) body += `<button type="button" class="kitact adv-bigger-show" id="advBigger">${advisorWord('biggerShow')}</button>`;
+  else if(B.done && !B.s) body = `<p class="adv-plain">${advisorWord(answer.kind === 'nothing-helps' ? 'biggerNoneFit' : 'biggerNone')}</p>`;
+  else if(B.done) body = `<p class="adv-note adv-over">${htmlEsc(advisorWord('biggerOver', { choice, what:advisorWord(advisorOverKey(B.s, input)) }))}</p>`
+    + `<div class="adv-sugg adv-ahead">${advisorCardHtml(B.s, input, advisorCards(answer).length - 1)}</div>`;
+  return `<section class="adv-bigger" aria-labelledby="advBigT"><h4 id="advBigT" tabindex="-1">${advisorWord('bigger')}</h4>${body}</section>`;
+}
+// What a bigger change goes beyond: under Bikepacking bags only its panniers or its rack; under Bags first, panniers though bags do it.
+function advisorOverKey(s, input){
+  if(input.style !== 'bags') return 'overFirst';
+  const panniers = s.add.some(b => b.pos === 'rack');
+  return !panniers ? 'overRack' : advisorRackFitted(input) ? 'overPanniers' : 'overRackPanniers';
 }
 function advisorAnswerHtml(answer, input){
   const notes = [];
+  if(ADVISOR.again && ADVISOR.answer === answer) notes.push(advisorWord(TRIAL ? 'changedTrial' : 'again'));
   if(input.fromQuestionnaire) notes.push(advisorWord('start'));
   if(input.style === 'bags' && input.bags.some(b => b.pos === 'rack')) notes.push(advisorWord('rackOut'));
   if(advisorNoMounts() && advisorRackFitted(input)) notes.push(advisorWord('rackKept'));
   if(answer.frameReason) notes.push(advisorWord('frameNone', { reason:answer.frameReason }));
   if(answer.partial) notes.push(advisorWord('partial', { n:answer.tried }));
+  if(answer.kind === 'suggestions' && input.goal === 'both') notes.push(advisorWord(advisorBase(input).result.backL > 0.005 ? 'goalBoth' : 'goalBothEmpty'));
   if(answer.kind === 'suggestions') notes.push(...(input.fromQuestionnaire ? [advisorWord('tryNeedsPlan')] : TRIAL ? [advisorWord('trialFirst')] : []));
   let body = '';
   if(answer.kind === 'suggestions') body = advisorTwoKindsHtml(answer, input);
   else if(answer.kind === 'already-good') body = `<p class="adv-plain">${advisorWord('alreadyGood')}</p>`;
-  else if(answer.kind === 'cannot-reduce') body = `<p class="adv-plain">${advisorWord('cannotReduce', { min:window.WayfinchAdvisor.MIN_GAIN_BACK_L, l:+answer.backL.toFixed(1) })}</p>`;
+  else if(answer.kind === 'cannot-reduce') body = `<p class="adv-plain">${advisorWord(input.goal === 'both' ? 'cannotReduceBoth' : 'cannotReduce', { min:window.WayfinchAdvisor.MIN_GAIN_BACK_L, l:+answer.backL.toFixed(1) })}</p>`;
   else {
     const c = answer.closest, lines = [advisorWord('nothing')];
     if(c){
@@ -5870,13 +5933,13 @@ function advisorAnswerHtml(answer, input){
       lines.push(advisorWord('closest', { what:advisorWhat(c, input) }));
       if(left.length) lines.push(advisorWord('stillOver', { what:left.join(': ') }));
     } else lines.push(advisorWord('closestNone'));
-    body = lines.map(l => `<p class="adv-plain">${htmlEsc(l)}</p>`).join('');
+    body = lines.map(l => `<p class="adv-plain">${htmlEsc(l)}</p>`).join('') + advisorBiggerHtml(answer, input);   // F: beyond the setup
   }
   return `<h3 id="advisorAnswerTitle">${advisorWord('answerTitle')}</h3>${notes.map(n => `<p class="adv-note">${htmlEsc(n)}</p>`).join('')}${body}`;
 }
 
 function advisorChoice(name, value, label, checked, opts = {}){
-  return `<label class="adv-choice${opts.pic ? ' adv-has-pic' : ''}"><input type="radio" name="${name}" value="${value}"${checked ? ' checked' : ''}${opts.disabled ? ' disabled' : ''}>`
+  return `<label class="adv-choice${opts.pic ? ' adv-has-pic' : ''}"><input type="${opts.type || 'radio'}" name="${name}" value="${value}"${checked ? ' checked' : ''}${opts.disabled ? ' disabled' : ''}>`
     + `${opts.pic || ''}<span>${htmlEsc(label)}</span></label>`;
 }
 function advisorGroup(id, label, html){ return `<p class="adv-sub" id="${id}">${htmlEsc(label)}</p><div class="adv-choices" role="radiogroup" aria-labelledby="${id}">${html}</div>`; }
@@ -5894,7 +5957,9 @@ function advisorStepsHtml(){
   const noMounts = advisorNoMounts() && !(A.source === 'plan' && advisorRackFitted({ bags:S.bags, decks:S.decks }));
   const styles = [['bags', 'styleBags'], ['bags-first', 'styleBagsFirst'], ['panniers', 'stylePanniers']].map(([v, k], i) =>
     advisorChoice('advStyle', v, advisorWord(k), A.style === v, { pic:advisorStylePic(v, i) })).join('');
-  const goals = [['handling', 'goalHandling'], ['backpack', 'goalBackpack']].map(([v, k]) => advisorChoice('advGoal', v, advisorWord(k), A.goal === v)).join('');
+  // the two goals, one or both (the owner's preview check of 8 Nov, D): checkboxes, each labelled
+  const goals = [['handling', 'goalHandling'], ['backpack', 'goalBackpack']].map(([v, k]) =>
+    advisorChoice('advGoal', v, advisorWord(k), A.goal === v || A.goal === 'both', { type:'checkbox' })).join('');
   let carried;
   if(A.source === 'plan'){
     const c = advisorPlanCounts();
@@ -5911,7 +5976,7 @@ function advisorStepsHtml(){
   return `<section class="adv-step" aria-labelledby="advStep1"><h3 id="advStep1">${advisorWord('step1')}</h3>`
     + `<div class="adv-choices adv-styles" role="radiogroup" aria-labelledby="advStep1">${styles}</div>`
     + (noMounts ? `<p class="adv-note" id="advNoMounts">${advisorWord('noMounts')}</p>` : '') + '</section>'
-    + `<section class="adv-step" aria-labelledby="advStep2"><h3 id="advStep2">${advisorWord('step2')}</h3><div class="adv-choices" role="radiogroup" aria-labelledby="advStep2">${goals}</div></section>`
+    + `<section class="adv-step" aria-labelledby="advStep2"><h3 id="advStep2">${advisorWord('step2')}</h3><div class="adv-choices" role="group" aria-labelledby="advStep2">${goals}</div></section>`
     + `<section class="adv-step" aria-labelledby="advStep3"><h3 id="advStep3">${advisorWord('step3')}</h3>${carried}</section>`;
 }
 // The planner's own bike line: its saved bikes; a pick is the planner's chooseSavedBike, so the plan's bike changes as it does there.
@@ -5946,7 +6011,7 @@ function renderAdvisor(){
   $('advisorSteps').innerHTML = advisorStepsHtml();
   renderAdvisorAnswer();
   if(!keep) return;
-  const el = keep.id ? $(keep.id) : [...box.querySelectorAll('input[type=radio]')].find(r => r.name === keep.name && r.value === keep.value);
+  const el = keep.id ? $(keep.id) : [...box.querySelectorAll('input[type=radio],input[type=checkbox]')].find(r => r.name === keep.name && r.value === keep.value);
   el?.focus?.({ preventScroll:true });
 }
 function advisorProgress(n){
@@ -5957,7 +6022,7 @@ function advisorProgress(n){
 // One search at a time: a newer choice drops the one under way. The search hands the page back after every slice of 20 trials.
 async function runAdvisor(){
   const id = ++ADVISOR_RUN;
-  ADVISOR.answer = null; ADVISOR.input = null; ADVISOR.error = '';
+  ADVISOR.answer = null; ADVISOR.input = null; ADVISOR.error = ''; ADVISOR.bigger = null; ADVISOR.stale = false; ADVISOR.sig = null;
   advisorProgress(null);
   renderAdvisorAnswer();
   if(!ADVISOR.open || !advisorComplete()) return;
@@ -5979,11 +6044,42 @@ async function runAdvisor(){
     if(id !== ADVISOR_RUN || !ADVISOR.open) return;
   }
   ADVISOR.answer = answer; ADVISOR.input = input;
+  // the plan this answer was found for, without a trial bag (review of PR 81, I1); an answer found during a trial is on the trial's plan
+  ADVISOR.sig = TRIAL ? null : planSignature();
   advisorProgress(null);
   renderAdvisorAnswer();
 }
+// The bigger change, on the rider's tap (F): searched in slices as the answer is, on the answer's own input; a newer choice drops it.
+async function runBigger(){
+  const id = ADVISOR_RUN, answer = ADVISOR.answer, mod = window.WayfinchAdvisor;
+  if(!ADVISOR.open || !answer || !ADVISOR.input || ADVISOR.bigger || !mod || !mod.biggerSteps) return;
+  let sliceStart = Date.now();
+  const input = { ...ADVISOR.input, handBack:() => Date.now() - sliceStart >= ADVISOR_SLICE_MS };
+  ADVISOR.bigger = { done:false, s:null };
+  renderAdvisorAnswer();
+  const steps = mod.biggerSteps(input, answer), started = Date.now();
+  let out;
+  for(;;){
+    const step = steps.next();
+    if(step.done){ out = step.value; break; }
+    if(Date.now() - started >= ADVISOR_PROGRESS_MS) advisorProgress(step.value);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    sliceStart = Date.now();
+    if(id !== ADVISOR_RUN || !ADVISOR.open || ADVISOR.answer !== answer) return;
+  }
+  ADVISOR.bigger = { done:true, s:out.bigger };
+  if(out.bigger) answer.bigger = out.bigger;
+  advisorProgress(null);
+  renderAdvisorAnswer();
+  const status = $('advisorStatus');
+  if(status) status.textContent = out.bigger ? advisorWord('bigger') + ': ' + advisorWhat(out.bigger, ADVISOR.input) : advisorWord(answer.kind === 'nothing-helps' ? 'biggerNoneFit' : 'biggerNone');
+  $('advBigT')?.focus?.({ preventScroll:true });
+}
+// Step 2's checkboxes as one goal: both ticked is both, one is that one, none is no goal yet (D).
+function advisorGoalOf(values){ const on = ['handling', 'backpack'].filter(v => values.includes(v)); return on.length === 2 ? 'both' : on[0] || null; }
 function setAdvisor(key, value){
   const A = ADVISOR;
+  A.again = false;
   if(!A.q) A.q = { riding:null, nights:S.nights, sleep:S.sleep === 'indoor' ? 'indoor' : 'camp', carry:null };
   if(key === 'style'){ A.style = value || null; A.styleTouched = !!value; }
   else if(key === 'goal') A.goal = value || null;
@@ -6006,9 +6102,29 @@ function advisorDecided(apply){
     if(ADVISOR.style !== before){ renderAdvisor(); ADVISOR_DONE = runAdvisor(); }
   }).catch(() => {});
 }
-function openAdvisor(opener = document.activeElement){
+// Its own page (the owner's preview check of 8 Nov, I): the planner's parts are not shown while it is open (the stylesheet's adv-page),
+// only the one top bar, the advisor and the footer; the page starts at its top, and closing it in this page brings the planner back where
+// it was.
+let ADVISOR_SCROLL = 0, ADVISOR_OPENER = null;
+function advisorPageOn(on){
+  document.documentElement.classList.toggle('adv-page', on);
+  $('advisorBox').classList.toggle('hidden', !on);
+}
+// The rider's bike with the plan's bags, at the top: the drawing the bike from Tools glides onto. Decorative; the bike line names it.
+function renderAdvisorGlide(){
+  const el = $('advisorGlide'); if(!el) return;
+  let view = null;
+  // read on copies (withInputs), as the cards' drawings are: drawing it never changes the plan or its kept placements
+  try { view = withoutTrial(() => withInputs({}, () => { const step = S.step; S.step = 4; try { return planBagView(); } finally { S.step = step; } })); } catch(e){ view = null; }
+  const art = bikeDrawing(S.bikeProfile, view, { theme:bikeTheme(), idPrefix:'advg' }, true);   // the bags as their real shapes, as on the rig
+  el.innerHTML = art ? art.svg.replace(/^<svg\b/, '<svg aria-hidden="true" focusable="false"') : '';
+}
+// Opened by a link (#gear-advisor, Tools' card), the page starts as the advisor before its first frame, so the glide lands on it and
+// nothing of the planner shows first; the view fills in once the plan is restored (openAdvisorFromLink).
+function advisorEarly(){ if(advisorLink(location.hash)){ advisorPageOn(true); renderAdvisorGlide(); } }
+// `kept`: the answer and its suggestions as they were, not searched again (the way back after Try in Bag planner, E).
+function openAdvisor(opener = document.activeElement, opts = {}){
   const A = ADVISOR, root = $('advisorBox');
-  A.open = true;
   if(!A.q) A.q = { riding:null, nights:S.nights, sleep:S.sleep === 'indoor' ? 'indoor' : 'camp', carry:null };
   if(!advisorHasPlan()) A.source = 'questionnaire'; else if(!A.source) A.source = 'plan';
   if(!A.style) advisorDecided(d => { if(!A.style) A.style = d.defaultSetup; });   // Bags first, the default (the owner, 7 Nov)
@@ -6016,21 +6132,64 @@ function openAdvisor(opener = document.activeElement){
     closeBagPop();
     if(!$('legalBox').classList.contains('hidden')) closeLegal();
     if(!$('walkthroughBox').classList.contains('hidden')) closeWalkthrough();
-    root.classList.remove('hidden');
-    beginDialog(root, true, closeAdvisor, opener);
   }
+  if(!A.open){ ADVISOR_SCROLL = window.scrollY || 0; ADVISOR_OPENER = opener; }
+  A.open = true;
+  advisorPageOn(true);
+  if(!opts.kept) A.again = false;
+  try { window.scrollTo(0, 0); } catch(e){}
+  $('advisorToPlan').classList.toggle('hidden', !!A.back);
+  renderAdvisorReturnBar();
+  renderAdvisorGlide();
   renderAdvisor();
   $('advisorTitle').focus({ preventScroll:true });
-  ADVISOR_DONE = runAdvisor();
+  if(!(opts.kept && A.answer)) ADVISOR_DONE = runAdvisor();
 }
-// Opened from Wayfinch (#gear-advisor&back=tools), closing it goes back there, as Bike details does.
+// Opened from Wayfinch (#gear-advisor&back=tools), closing it goes back there, as Bike details does; opened in this page, the planner
+// comes back where the rider left it.
 function closeAdvisor(){
   ADVISOR.open = false; ADVISOR_RUN++; advisorProgress(null);
-  const root = $('advisorBox'), back = ADVISOR.back;
-  ADVISOR.back = null; $('advisorBack').classList.add('hidden');
-  if(root.classList.contains('hidden')) return;
-  root.classList.add('hidden'); endDialog(root);
-  if(back) returnToWayfinch(back);
+  const root = $('advisorBox'), back = ADVISOR.back, opener = ADVISOR_OPENER;
+  ADVISOR.back = null; ADVISOR_OPENER = null;
+  // leaving for Wayfinch, the page stays the advisor until it goes: nothing of the planner flashes, and the bike glides back from its drawing
+  if(back){ returnToWayfinch(back); return; }
+  const was = !root.classList.contains('hidden');
+  advisorPageOn(false);
+  renderAdvisorReturnBar();
+  if(!was) return;
+  try { window.scrollTo(0, ADVISOR_SCROLL); } catch(e){}
+  const to = ADVISOR.returnable && ADVISOR.answer ? $('advisorReturn') : opener;
+  if(to && to.isConnected) to.focus?.({ preventScroll:true });
+}
+// The way back after Try in Bag planner (E): during the trial, and after Keep or Remove, until the rider starts over.
+function renderAdvisorReturnBar(){
+  const bar = $('advisorReturnBar'); if(!bar) return;
+  $('advisorReturn').textContent = advisorWord('returnTo');
+  $('advisorReturnText').textContent = advisorWord('returnKept');
+  bar.classList.toggle('hidden', !(ADVISOR.returnable && ADVISOR.answer && !ADVISOR.open));
+}
+// Back to the Gear advisor: its answers and suggestions as they were while the trial is on, or after Remove with the plan unchanged;
+// otherwise (kept, or the plan changed) the same answers searched again, and a line says so.
+// During the trial the answer stays as it was (a search now would count the trial bag); a line says when the plan has changed since.
+function returnToAdvisor(){
+  const same = !ADVISOR.stale && ADVISOR.sig !== null && ADVISOR.sig === withoutTrial(() => planSignature());
+  const kept = !!ADVISOR.answer && (!!TRIAL || same);
+  ADVISOR.back = null;
+  openAdvisor($('advisorReturn'), { kept });
+  ADVISOR.again = !same;
+  renderAdvisorAnswer();
+}
+// Start over: the rider's answers and the suggestions go, the way back with them; the setup is the default again.
+function restartAdvisor(){
+  ADVISOR_RUN++;
+  Object.assign(ADVISOR, { style:null, styleTouched:false, goal:null, q:null, answer:null, input:null, error:'', returnable:false, stale:false, sig:null, again:false, bigger:null });
+  ADVISOR.source = advisorHasPlan() ? 'plan' : 'questionnaire';
+  ADVISOR.q = { riding:null, nights:S.nights, sleep:S.sleep === 'indoor' ? 'indoor' : 'camp', carry:null };
+  advisorDecided(d => { if(!ADVISOR.style) ADVISOR.style = d.defaultSetup; });
+  renderAdvisor();
+  renderAdvisorReturnBar();
+  $('advisorTitle').focus({ preventScroll:true });
+  ADVISOR_DONE = runAdvisor();
 }
 function advisorLink(hash){
   const m = /^#gear-advisor((?:&[a-z]+=[^&]*)*)$/.exec(String(hash || ''));
@@ -6042,23 +6201,25 @@ function openAdvisorFromLink(hash = location.hash){
   const link = advisorLink(hash); if(!link) return false;
   try { history.replaceState(null, '', location.pathname + location.search); } catch(e){}
   if(link.back){
-    const [href, key] = BIKE_BACKS[link.back];
-    ADVISOR.back = href; setWayfinchBack(href);
-    $('advisorBack').href = href; $('advisorBack').textContent = bikeWord(key); $('advisorBack').classList.remove('hidden');
+    const [href] = BIKE_BACKS[link.back];
+    ADVISOR.back = href; setWayfinchBack(href);   // the one top bar goes there too
   }
   openAdvisor($('backToWayfinch'));
   return true;
 }
 function initialiseAdvisor(){
   const box = $('advisorBox');
-  $('advisorClose').onclick = closeAdvisor;
-  $('advisorBack').addEventListener('click', event => {
-    if(event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    event.preventDefault();
-    const href = event.currentTarget.href; ADVISOR.back = null; closeAdvisor(); returnToWayfinch(href);
+  $('advisorToPlan').onclick = closeAdvisor;
+  $('advisorRestart').onclick = restartAdvisor;
+  $('advisorReturn').onclick = returnToAdvisor;
+  // Escape leaves it, as it always has, when no dialog is open above it
+  document.addEventListener('keydown', event => {
+    if(event.key === 'Escape' && ADVISOR.open && !DIALOGS.length){ event.preventDefault(); closeAdvisor(); }
   });
+  // back in this page from Wayfinch's history after leaving it: the planner, as the address is the planner's
+  window.addEventListener('pageshow', event => { if(event.persisted && !ADVISOR.open) advisorPageOn(false); });
   box.addEventListener('click', event => {
-    if(event.target === box){ closeAdvisor(); return; }
+    if(event.target.closest?.('#advBigger')){ ADVISOR_DONE = runBigger(); return; }
     const sw = event.target.closest?.('#advSource'); if(sw) setAdvisor('source', sw.dataset.source);
     // a combination's sketch brings its card, the details (the owner's ruling on PR 61)
     const combo = event.target.closest?.('.adv-combo');
@@ -6070,7 +6231,8 @@ function initialiseAdvisor(){
   box.addEventListener('change', event => {
     const t = event.target;
     const keys = { advStyle:'style', advGoal:'goal', advRiding:'riding', advSleep:'sleep', advCarry:'carry' };
-    if(t.type === 'radio' && keys[t.name]) setAdvisor(keys[t.name], t.value);
+    if(t.type === 'checkbox' && t.name === 'advGoal') setAdvisor('goal', advisorGoalOf([...box.querySelectorAll('input[name="advGoal"]')].filter(x => x.checked).map(x => x.value)));
+    else if(t.type === 'radio' && keys[t.name]) setAdvisor(keys[t.name], t.value);
     else if(t.id === 'advNights') setAdvisor('nights', t.value);
     else if(t.id === 'advisorBikeSelect' && t.value){
       $('bikeSavedSelect').value = t.value;
@@ -6092,7 +6254,8 @@ function initialiseAdvisor(){
 // { before:{ bags, decks, placements, nextUid, step, baseNights }, label, uids (the trial's new bags), pendingOther } or null
 let TRIAL = null;
 // The cards of an answer, in the order their indexes run: Minimal's, then Looking ahead's set and its alternatives.
-const advisorCards = answer => !answer || answer.kind !== 'suggestions' ? [] : [...answer.items, ...(answer.ahead ? [answer.ahead, ...(answer.aheadAlts || [])] : [])];
+const advisorCards = answer => !answer ? [] : [...(answer.kind !== 'suggestions' ? [] : [...answer.items, ...(answer.ahead ? [answer.ahead, ...(answer.aheadAlts || [])] : [])]),
+  ...(answer.bigger ? [answer.bigger] : [])];
 const trialLine = () => TRIAL ? advisorWord('trialTrying', { bag:TRIAL.label }) : '';
 // A hand placement into a bag the plan of before does not have: one of the trial's, or one added during it (S.pinned names its unit,
 // "<uid>-<half>"); it goes with that bag (review of PR 68, M2).
@@ -6136,6 +6299,7 @@ function startTrial(s, input = ADVISOR.input){
   S.nextUid = Math.max(S.nextUid, ...bags.map(b => b.uid + 1));
   S.placements = null;
   ADVISOR.back = null;   // the planner stays: Try never goes back to Wayfinch
+  ADVISOR.returnable = true;   // and the way back to the advisor shows (E)
   closeAdvisor();
   renderTrialBar();
   go(4);
@@ -6148,6 +6312,7 @@ function keepTrial(){
   if(!TRIAL) return false;
   if(DRAFT_FROZEN || deletedSinceLoad()){ $('trialText').textContent = trialLine() + ' ' + advisorWord('trialConflict'); return false; }
   TRIAL = null; renderTrialBar();
+  ADVISOR.stale = true;   // the plan has the bag now: back in the advisor, the answers are searched again
   flushDraft();
   return true;
 }
@@ -6171,7 +6336,7 @@ function removeTrial(){
   return true;
 }
 // A plan restored over a trial (another tab's, a saved setup, an import, Undo of a route) ends it, keeping nothing of it.
-function endTrial(){ if(TRIAL){ TRIAL = null; renderTrialBar(); } }
+function endTrial(){ if(TRIAL){ TRIAL = null; renderTrialBar(); ADVISOR.stale = true; } }
 
 // Keep centilitres until the final display so small overflows never read as a fit.
 function packingSummary(A){
@@ -13512,6 +13677,7 @@ initialiseStableViewport();
 initialiseBikeProfiles();
 initialiseBikeDetails();
 initialiseAdvisor();
+advisorEarly();
 initialiseLook();
 S.month = new Date().getMonth();   // a new plan starts in the month the rider is in, not always in June
 $('month').innerHTML = MONTHS.map((m,i) => `<option value="${i}"${i===S.month?' selected':''}>${m}</option>`).join('');
@@ -14046,3 +14212,4 @@ function closeLegal(){
 }
 
 </script>
+<span id="advisorReady" hidden></span>
