@@ -147,6 +147,7 @@ export function TripScreen({ services }: { services: TripServices }) {
   const stateOf = (name: StepName, done: boolean): StepState => (done ? 'done' : name === suggested ? 'next' : 'later');
   const choose = (name: StepName) => () => { focusTo.current = name; setChosen(name); };
   const line = snap ? tripLineOf(trip, localIsoDate(snap.now, snap.zone)) : null;
+  const goLink = <p><a class="btn btn-primary" href="#/ahead">{W.appTripOpenAhead}</a></p>;
   return (
     <div class="trip" data-trip-loaded={snap ? 'true' : undefined} data-trip-drop ref={zone}>
       {/* Two panes on a wide screen: the bike, the trip line and the steps; then the route's summary (design §2.2). */}
@@ -168,6 +169,7 @@ export function TripScreen({ services }: { services: TripServices }) {
           <Step
             name="getready" n={2} title={W.appTripGetReadyTitle} state={stateOf('getready', readyDone)} open={openStep === 'getready'} canOpen={trip !== null}
             onOpen={choose('getready')} change={W.appTripUpdateButton} line={runningSignal.value ? W.appTripWorking : readyDone && snap ? savedLine(snap) : W.appTripGetReadyLater}
+            below={trip && !readyDone ? <p class="notice trip-need" data-need>{W.appAheadNeedTitle}</p> : null}
           >
             {snap?.trip ? (
               <GetReady
@@ -181,9 +183,13 @@ export function TripScreen({ services }: { services: TripServices }) {
             {services.handOff ? <PlanBags handOff={services.handOff} /> : null}
             <p><a class="btn" href="/tools/bags/">{W.appTripOpenBagPlanner}</a></p>
           </Step>
-          <Step name="go" n={4} title={W.appTripStepGo} state={stateOf('go', false)} open={openStep === 'go'} canOpen onOpen={choose('go')} line={W.appTripGoLater}>
+          {/* Open En route shows as soon as Get ready offline is done, whichever step is open (owner's finding J, 8 Nov 2026). */}
+          <Step
+            name="go" n={4} title={W.appTripStepGo} state={stateOf('go', false)} open={openStep === 'go'} canOpen onOpen={choose('go')} line={W.appTripGoLater}
+            below={readyDone && openStep !== 'go' ? goLink : null}
+          >
             <p>{W.appTripFlightMode}</p>
-            <p><a class="btn btn-primary" href="#/ahead">{W.appTripOpenAhead}</a></p>
+            {goLink}
           </Step>
         </ol>
         {offer ? <button type="button" class="btn" onClick={() => void promptInstall()}>{W.appTripInstall}</button> : null}

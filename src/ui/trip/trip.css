@@ -65,3 +65,4 @@ progress { width: 100%; accent-color: var(--blaze); }
 .trip-profile-stops { position: absolute; inset: 0; pointer-events: none; }
 .trip-stop-list { list-style: none; margin: 0 0 8px; padding: 0; font-size: 0.9375rem; }
 .trip-stop-list li { padding: 4px 0; border-top: 1px solid var(--line); }
+.trip-need { margin: 8px 0 0; }

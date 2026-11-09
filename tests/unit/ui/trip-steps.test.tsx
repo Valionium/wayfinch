@@ -403,3 +403,50 @@ describe('What the review of PR 73 found', () => {
     other.remove();
   });
 });
+
+describe('After the launch, part 4 (the owner\'s preview check of 8 Nov 2026)', () => {
+  const goLink = () => [...step('go').querySelectorAll('a')].find((a) => a.textContent === W.appTripOpenAhead) ?? null;
+
+  test('[TRIP-NEED-STEP] the Get ready offline step says En route needs it for as long as it is not done: open, folded, after a reload; then it goes', async () => {
+    expect(W.appAheadNeedTitle).toBe('En route needs Get ready offline');
+    const svc = await withRoute(services(preparing()));
+    expect(step('getready').textContent).toContain(W.appAheadNeedTitle);
+    // Not only in the message after the route was added: Trip shown again, without it, still says so.
+    await show(svc);
+    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    expect(host.querySelector('[data-added]')).toBeNull();
+    expect(step('getready').textContent).toContain(W.appAheadNeedTitle);
+    // Folded under another open step too.
+    await click(buttonIn(step('bags'), W.appTripStepBags));
+    expect(openSteps()).toEqual(['bags']);
+    expect(step('getready').textContent).toContain(W.appAheadNeedTitle);
+    await click(buttonIn(step('getready'), W.appTripGetReadyTitle));
+    await until(() => step('getready').querySelector('[data-getready]') !== null, 'the step again');
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes('12 places'), 'the result');
+    await until(() => !step('getready').textContent!.includes(W.appAheadNeedTitle), 'the note to go');
+    await show(svc);
+    expect(step('getready').textContent).not.toContain(W.appAheadNeedTitle);
+  });
+
+  test('[TRIP-NEED-STEP] with no route the step stays one grey line of what it will do', async () => {
+    await show();
+    expect(step('getready').textContent).toContain(W.appTripGetReadyLater);
+    expect(step('getready').textContent).not.toContain(W.appAheadNeedTitle);
+  });
+
+  test('[TRIP-GO-LINK] Open En route shows on Go as soon as Get ready offline is done, in the same visit, with Get ready\'s result still open', async () => {
+    expect(W.appTripOpenAhead).toBe('Open En route');
+    await withRoute(services(preparing()));
+    expect(goLink()).toBeNull();
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes('12 places'), 'the result');
+    expect(openSteps()).toEqual(['getready']);
+    await until(() => goLink() !== null, 'Open En route');
+    expect(goLink()!.getAttribute('href')).toBe('#/ahead');
+    expect(goLink()!.classList.contains('btn')).toBe(true);
+    // Only one, also once Go is opened.
+    await click(buttonIn(step('go'), W.appTripStepGo));
+    expect([...step('go').querySelectorAll('a')].filter((a) => a.textContent === W.appTripOpenAhead)).toHaveLength(1);
+  });
+});
