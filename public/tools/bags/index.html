@@ -12278,12 +12278,20 @@ function afternoonRide(){ return S.nights === 0 && dayRideHours() <= PACE.hard.h
 /* The afternoon ride's bags. A bottle in the frame's triangle gets the frame bag in the planner's half shape (FRAME_PRESETS' "half
    frame", its litres from the bike's own frame fit), which leaves room for the bottle in the drawing too; a full or three-quarter frame
    bag over a bottle is never proposed (owner, 9 Nov 2026: "the frame bag should be fitted accordingly to the bottle"). Without a bottle
-   in the triangle, each frame size from the smallest. The top tube bag in the sizes of DAY_TOP_SIZES. The order: nothing left at home
+   in the triangle, each frame size from the smallest. The top tube bag in its typical size, DAY_TOP_L, never grown to hold more:
+   what it does not hold goes in the half-shape frame bag beside the bottle, in the sizes up to DAY_HALF_MAX_L. The order: nothing left at home
    first, then the least essential things of DAY_LEAVE_ORDER one by one ("some not so essential things should be left out"); for each,
    one bag (the top tube bag or the frame bag), then both; the first that leaves nothing over, within it the fewest out of reach, the
    phone in its own bags, the fewest litres. Only when none of those holds the day kit, the seat pack too, with nothing left at home.
    Returns {bags, leave} or null; the frozen selection is only read (freshPlan trials). */
-const DAY_TOP_SIZES=[1,1.5,2];
+// The typical top tube bag (owner, 9 Nov 2026: a top tube bag is usually 1.2 L; a day ride was proposed a 2 L one). A typed size the
+// planner takes as any other; the full planner's own new top tube bag keeps POSITIONS.top.defL, which is frozen.
+const DAY_TOP_L=1.2;
+// What the 1.2 L top tube bag does not hold goes in the frame bag beside the bottle, which grows instead (owner, 9 Nov 2026: the extra
+// goes into the frame bag; half frame bags come in about 2.5 to 4.5 L): from the half shape's own size in steps of 0.5 L up to
+// DAY_HALF_MAX_L, never above the three-quarter shape's room. Only where the frame's details do not set the half shape's size: with
+// them, the frozen bagSpec takes the frame's own figure, so the half shape keeps it.
+const DAY_HALF_MAX_L=4.5;
 /* What a day ride leaves at home first when the bags beside the bottle cannot hold everything, least essential first, each only when
    the day does not ask for it, and never something the rider chose themselves (kitTouched). Never in it: water, ID and cards, cash, the
    phone, the first aid kit, the repair kit, the rain jacket and the ride snacks. */
@@ -12310,11 +12318,15 @@ function dayLeftAtHome(){
 }
 function afternoonBags(base,withIds){
   const fit=bikeFit(S.bikeProfile),top=TOP_ORDER.find(sl => fit.topMounts[sl]);
-  const tops=top ? DAY_TOP_SIZES.map(L => ({pos:'top',slot:top,L})) : [];
+  const tops=top ? [{pos:'top',slot:top,L:DAY_TOP_L}] : [];
   const frames=[];
   if(!fit.frameBag.none) withInputs({bags:[...S.bags,...withIds(base)]},() => {
     const min=minShapeIdx(),from=inTriangleCount() > 0 ? 2 : min;   // a bottle in the triangle: the half shape only
     for(let i=from;i <= 2;i++){ const L=frameShapeL(i); if(!frames.some(f => f.L === L)) frames.push({pos:'frame',L,...(i === min ? {} : {shape:i})}); }
+    if(from === 2 && !fit.details){
+      const cap=Math.min(DAY_HALF_MAX_L,frameShapeL(1));
+      for(let L=frameShapeL(2)+0.5;L <= cap+1e-9;L+=0.5) frames.push({pos:'frame',L:+L.toFixed(2),...(min === 2 ? {} : {shape:2})});
+    }
   });
   const one=[...tops.map(t => [t]),...frames.map(f => [f])],two=tops.flatMap(t => frames.map(f => [t,f]));
   const best=(group,kit) => group.map(more => {

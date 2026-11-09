@@ -827,7 +827,10 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
       const frame = p.json<{ L: number; shape?: number } | null>(`S.bags.find(b=>b.pos==='frame') || null`);
       expect(frame, date).not.toBeNull();
       expect(p.json<number>(`frameShapeIdx(S.bags.find(b=>b.pos==='frame'))`), date).toBe(2);
-      expect(frame!.L, date).toBe(p.json<number>('frameShapeL(2)'));
+      // the half shape's own size or, since the owner's rule of 9 Nov 2026 (the extra goes into the frame bag), a larger half frame bag up
+      // to 4.5 L where the frame's details do not set its size
+      expect(frame!.L, date).toBeGreaterThanOrEqual(p.json<number>('frameShapeL(2)'));
+      expect(frame!.L, date).toBeLessThanOrEqual(4.5);
       expect(p.json<string[]>('gearBags().map(b=>b.pos)').sort(), date).toEqual(['frame', 'top']);
       expect(p.json('currentPlan().spill.map(k=>k.id)'), date).toEqual([]);
       // nothing needed to be left at home for these rides
@@ -845,9 +848,11 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
   });
 
   test('when the day kit does not fit beside the bottle, the least essential things stay at home before any bag is added, and the small view says so in one line (owner, 9 Nov 2026)', async () => {
-    // the rider's own headphones make the kit a little too big for the top tube bag and the half frame bag
-    const p = await dayRide('2026-11-15');
-    p.page.run(`S.kit.buds=true;S.kitTouched.buds=true;`);
+    // the rider's own over-ear headphones (0.7 L, the rider's size) make the kit a little too big for the 1.2 L top tube bag and even the
+    // largest half frame bag (4.5 L). Since the frame bag beside the bottle grows (owner, 9 Nov 2026: the extra goes into the frame bag),
+    // the small earbuds of before fit without leaving anything at home, so the case is a bigger item, on a sunny April day.
+    const p = await dayRide('2026-04-15');
+    p.page.run(`S.kit.buds=true;S.kitTouched.buds=true;S.custom.buds={L:0.7,kg:0.3,rigid:0};`);
     await p.page.run('receiveHandoff()');
     const before = p.page.run('JSON.stringify(captureDraft())'), setups = p.page.run('JSON.stringify(SETUPS)');
     expect(await p.page.run('planTripBags()')).toBe(true);
@@ -868,6 +873,55 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
     expect(order[0]).toBe('cap');
     for (const id of ['water', 'docs', 'cash', 'phone', 'firstaid', 'tool', 'tubes', 'pump', 'levers', 'link', 'chaintl', 'patch', 'plugs', 'rain', 'snacks'])
       expect(order, id).not.toContain(id);
+  });
+
+  test('the day ride\'s top tube bag is the typical 1.2 L, never grown; what it does not hold goes in the half-shape frame bag beside the bottle, which grows to the smallest size that leaves nothing over, up to 4.5 L (owner, 9 Nov 2026: a top tube bag is usually 1.2 L; the extra goes into the frame bag)', async () => {
+    const tops = (p: Awaited<ReturnType<typeof dayRide>>) => p.json<number[]>(`S.bags.filter(b=>b.pos==='top').map(b=>b.L)`);
+    for (const date of ['2026-04-15', '2026-07-20', '2026-10-15', '2026-11-15']) {
+      // the owner's kind of ride, about 39 km: it was proposed a 2 L top tube bag
+      const { gpx } = await handedOff('loop', { nights: 0 }, date, 0.39);
+      const p = longPlanner(gpx);
+      p.page.run(`S.bags=[];S.nextUid=1;S.bikeProfile=null;S.kit={};S.kitTouched={};S.custom={};S.qty={};S.packed={};S.pinned={};applyTripKitDefaults();`);
+      await p.page.run('receiveHandoff()');
+      expect(await p.page.run('planTripBags()')).toBe(true);
+      expect(tops(p), date).toEqual([1.2]);
+      expect(p.json<string[]>('gearBags().map(b=>b.pos)').sort(), date).toEqual(['frame', 'top']);
+      expect(p.json('currentPlan().spill.map(k=>k.id)'), date).toEqual([]);
+      expect(p.json('currentPlan().reach.outOfReach'), date).toEqual([]);
+      // the frame bag beside the bottle, in the half shape, a size from the half shape's own up to 4.5 L, in steps of 0.5 L
+      expect(p.json<number>(`frameShapeIdx(S.bags.find(b=>b.pos==='frame'))`), date).toBe(2);
+      const half = p.json<number>(`withInputs({bags:S.bags.filter(b=>isBottle(b.pos))},()=>frameShapeL(2))`);
+      const L = p.json<number>(`S.bags.find(b=>b.pos==='frame').L`);
+      expect(L, date).toBeGreaterThan(half);
+      expect(L, date).toBeLessThanOrEqual(4.5);
+      expect(((L - half) * 2) % 1, date).toBe(0);
+      // the smallest such size: half a litre less and something is over
+      expect(p.json<number>(`(t=>t.spill.length+t.reach.outOfReach.length+phoneOffPref(t))(freshPlan({bags:S.bags.map(b=>b.pos==='frame'?{...b,L:b.L-0.5}:b),placements:null}))`), date).toBeGreaterThan(0);
+      expect(p.json('dayLeftAtHome()'), date).toEqual([]);
+      for (const id of ESSENTIALS) expect(p.json<boolean>(`carrying('${id}')`), `${date} ${id}`).toBe(true);
+      expect(p.json('SETUPS[0].bags'), date).toEqual(p.json('S.bags'));
+      // a longer afternoon ride, about 60 km: whatever else it needs, the top tube bag is still 1.2 L
+      const long = longPlanner((await handedOff('loop', { nights: 0 }, date, 0.6)).gpx);
+      long.page.run(`S.bags=[];S.nextUid=1;S.bikeProfile=null;S.kit={};S.kitTouched={};S.custom={};S.qty={};S.packed={};S.pinned={};applyTripKitDefaults();`);
+      await long.page.run('receiveHandoff()');
+      expect(await long.page.run('planTripBags()')).toBe(true);
+      expect(tops(long), `${date} 60 km`).toEqual([1.2]);
+      expect(long.json('currentPlan().spill.map(k=>k.id)'), `${date} 60 km`).toEqual([]);
+    }
+    // a bike whose frame details set the half shape's size (the frozen bagSpec reads it from the frame): the half bag keeps that size
+    const bike = await dayRide('2026-11-15');
+    bike.page.run(`S.bikeProfile=normaliseBikeProfile({id:'b_m',name:'Medium',fit:{style:'diamond-sloping',size:{kind:'letter',value:'M'},bolts:{st:'yes',dt:'yes'}}});applyTripKitDefaults();`);
+    await bike.page.run('receiveHandoff()');
+    expect(await bike.page.run('planTripBags()')).toBe(true);
+    // A medium frame's half shape is 3 L: with the 1.2 L top tube bag it cannot hold this day kit, so the proposal keeps its fallback, the
+    // seat pack (reported to the owner, 9 Nov 2026). Any top tube bag in it is 1.2 L, any frame bag the frame's own half size.
+    expect(tops(bike).every((L) => L === 1.2)).toBe(true);
+    expect(bike.json<string[]>('gearBags().map(b=>b.pos)')).toContain('seat');
+    const frame = bike.json<{ L: number } | null>(`S.bags.find(b=>b.pos==='frame') || null`);
+    if (frame) expect(frame.L).toBe(bike.json<number>(`withInputs({bags:S.bags.filter(b=>isBottle(b.pos))},()=>frameShapeL(2))`));
+    expect(bike.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+    // the full planner's own new top tube bag keeps its frozen size
+    expect(bike.json<number>('POSITIONS.top.defL')).toBe(1);
   });
 
   test('a day ride carries one spare tube, not two, and the small view names it so; a trip with a night keeps two (owner, 9 Nov 2026)', async () => {
