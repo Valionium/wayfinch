@@ -363,3 +363,81 @@ describe('review of 3 November: whole answers, days, heights', () => {
     expect(r.points.map((p) => p.eleM)).toEqual(recordedHeights);
   });
 });
+
+describe('long routes: polite to the limit all riders share (9 Nov 2026)', () => {
+  // The service counts one call per coordinate and refuses past 600 a minute, with this very answer (recorded 9 November).
+  const minuteLimit = (): Response => json(recorded('limit-minutely-429'), 429);
+  const hourLimit = (): Response => json({ error: true, reason: 'Hourly API request limit exceeded. Please try again in the next hour.' }, 429);
+  const pts = (n: number): { lat: number; lon: number }[] => Array.from({ length: n }, (_, i) => ({ lat: 49 + i / 1000, lon: 8.5 }));
+  const heights = (u: string): Response => json({ elevation: params(u).get('latitude')!.split(',').map((_, i) => 100 + i) });
+  const waits = (): { sleep: (ms: number) => Promise<void>; slept: number[] } => {
+    const slept: number[] = [];
+    return { slept, sleep: async (ms) => { slept.push(ms); } };
+  };
+
+  test('[WXR-POLITE] a 429 stops the height batches: nothing more is sent, and the heights that came stay', async () => {
+    let n = 0;
+    const f = stubFetch((u) => (++n === 3 ? minuteLimit() : heights(u)));
+    const out = await fetchElevation(pts(450), f);
+    expect(f.urls).toHaveLength(3);
+    expect(out.slice(0, 200).every((h) => h !== null)).toBe(true);
+    expect(out.slice(200).every((h) => h === null)).toBe(true);
+  });
+
+  test('[WXR-POLITE] with retry, a minute-limit 429 is waited out (a minute) and that batch asked once more; the next ones follow', async () => {
+    let n = 0;
+    const f = stubFetch((u) => (++n === 2 ? minuteLimit() : heights(u)));
+    const w = waits();
+    const out = await fetchElevation(pts(250), f, { sleep: w.sleep });
+    expect(w.slept).toHaveLength(1);
+    expect(w.slept[0]).toBeGreaterThanOrEqual(60_000);
+    expect(f.urls).toHaveLength(4);
+    expect(out.every((h) => h !== null)).toBe(true);
+  });
+
+  test('[WXR-POLITE] an hourly or daily limit is not waited for: nothing more is sent', async () => {
+    const f = stubFetch(hourLimit);
+    const w = waits();
+    const out = await fetchElevation(pts(250), f, { sleep: w.sleep });
+    expect(w.slept).toEqual([]);
+    expect(f.urls).toHaveLength(1);
+    expect(out.every((h) => h === null)).toBe(true);
+  });
+
+  test('[WXR-POLITE] with retry, a server error or a lost answer is asked again once after a short wait; twice failed leaves nulls', async () => {
+    let n = 0;
+    const once = stubFetch((u) => (++n === 1 ? json({}, 503) : n === 2 ? heights(u) : (() => { throw new DOMException('timed out', 'TimeoutError'); })()));
+    const w = waits();
+    const out = await fetchElevation(pts(150), once, { sleep: w.sleep });
+    expect(out.slice(0, 100).every((h) => h !== null)).toBe(true); // 503, then answered
+    expect(out.slice(100).every((h) => h === null)).toBe(true); // timed out twice
+    expect(once.urls).toHaveLength(4);
+    expect(w.slept).toHaveLength(2);
+    expect(w.slept.every((ms) => ms > 0 && ms <= 10_000)).toBe(true);
+  });
+
+  test('[WXR-POLITE] a slow answer is waited for, and is no failure', async () => {
+    const f = stubFetch(async (u) => { await new Promise((r) => setTimeout(r, 40)); return heights(u); });
+    const w = waits();
+    expect((await fetchElevation(pts(3), f, { sleep: w.sleep })).every((h) => h !== null)).toBe(true);
+    expect(f.urls).toHaveLength(1);
+    expect(w.slept).toEqual([]);
+  });
+
+  test('[WXR-POLITE] with retry, the forecast waits out a minute-limit 429 once; a second refusal is the refusal; without retry it asks once', async () => {
+    let n = 0;
+    const f = stubFetch(() => (++n === 1 ? minuteLimit() : json(forecastBody(2, { from: FROM, hours: 48 }))));
+    const w = waits();
+    const got = await fetchForecast(points(2), { days: 2, with15: false, fetch: f, now: nowFn, retry: { sleep: w.sleep } });
+    expect(got.grid).toHaveLength(2);
+    expect(f.urls).toHaveLength(2);
+    expect(f.urls[0]).toBe(f.urls[1]); // the very same request again
+    expect(w.slept[0]).toBeGreaterThanOrEqual(60_000);
+    const refusing = stubFetch(minuteLimit);
+    await expect(fetchForecast(points(2), { days: 2, with15: false, fetch: refusing, now: nowFn, retry: waits() })).rejects.toBeInstanceOf(WeatherServiceError);
+    expect(refusing.urls).toHaveLength(2);
+    const plain = stubFetch(minuteLimit);
+    await expect(fetchForecast(points(2), { days: 2, with15: false, fetch: plain, now: nowFn })).rejects.toBeInstanceOf(WeatherServiceError);
+    expect(plain.urls).toHaveLength(1); // Update weather's own spacing stands: one request
+  });
+});

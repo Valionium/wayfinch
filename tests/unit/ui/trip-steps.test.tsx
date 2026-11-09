@@ -7,6 +7,9 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import type { RouteStop } from '../../../src/core/screen/route-stops.ts';
+import type { DayBed } from '../../../src/core/engines/day-beds.ts';
+import { BD } from '../../../src/core/wording/en-beds.ts';
+import { showKm } from '../../../src/core/wording/en.ts';
 import { W } from '../../../src/core/wording/en.ts';
 import type { StepName, StepReport } from '../../../src/data/prepare.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
@@ -277,6 +280,33 @@ describe('The stops on the height profile (guided Trip design §6)', () => {
   test('[TRIP-STOPS] the real services read the stops from the store: none for a route with nothing saved, and nothing throws', async () => {
     const svc = await withRoute();
     await expect(svc.stops()).resolves.toEqual([]);
+  });
+
+  test('[TRIP-DAY-BEDS] before Get ready offline the days say they will name a place to sleep; after it each day but the last names one, or plainly none', async () => {
+    let asked = 0;
+    const beds = async (): Promise<DayBed[]> => {
+      asked += 1;
+      const stages = (await readTrip())!.route.stages;
+      return stages.map((s, i) => ({
+        day: s.day, endKm: s.endKm, last: i === stages.length - 1, town: i === 1 ? { name: 'Bingen', km: s.endKm + 2 } : null,
+        bed: i === 0 ? { name: 'Hotel Krone', km: s.endKm + 2.4, offRouteM: 120, kind: 'lodging' as const, town: 'Mainz' } : null,
+      }));
+    };
+    await withRoute(services({ ...preparing(), dayBeds: beds }));
+    const days = (await readTrip())!.route.stages;
+    expect(days.length).toBeGreaterThan(1);
+    const summary = (): Element => host.querySelector('[data-summary]')!;
+    expect(summary().textContent).toContain(BD.appTripBedsAfter);
+    expect(summary().querySelectorAll('[data-day-bed]')).toHaveLength(0);
+    expect(asked).toBe(0);
+    await click(buttonIn(step('getready'), W.appTripGetReadyButton));
+    await until(() => text().includes('12 places'), 'the result');
+    await until(() => summary().querySelectorAll('[data-day-bed]').length > 0, 'the day lines');
+    expect(summary().textContent).not.toContain(BD.appTripBedsAfter);
+    const lines = [...summary().querySelectorAll('.trip-days li')].map((li) => li.querySelector('[data-day-bed]')?.textContent ?? null);
+    expect(lines[0]).toBe(BD.appTripBedNear('Hotel Krone', showKm(days[0]!.endKm + 2.4), 'Mainz'));
+    expect(lines.at(-1)).toBeNull(); // the last day ends at the route's end
+    if (days.length > 2) expect(lines[1]).toContain('nearest town: Bingen');
   });
 });
 

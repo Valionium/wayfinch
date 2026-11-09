@@ -41,13 +41,44 @@ export const MODEL_PATHS: Record<string, string> = {
 /** The service refused or failed (`refused`), or answered with less than a whole forecast (`incomplete`). */
 export class WeatherServiceError extends Error {
   readonly kind: 'refused' | 'incomplete';
-  constructor(reason: string, kind: 'refused' | 'incomplete' = 'refused') {
+  /** How long to wait before asking once more, or null when asking again soon would not help (or is not polite). */
+  readonly againInMs: number | null;
+  /** The service's limit was reached (HTTP 429): nothing more is sent until the wait, if any, is over. */
+  readonly limited: boolean;
+  constructor(reason: string, kind: 'refused' | 'incomplete' = 'refused', o: { againInMs?: number | null; limited?: boolean } = {}) {
     super(reason);
     this.name = 'WeatherServiceError';
     this.kind = kind;
+    this.againInMs = o.againInMs ?? null;
+    this.limited = o.limited ?? false;
   }
 }
 const incomplete = (reason: string): WeatherServiceError => new WeatherServiceError(reason, 'incomplete');
+
+/**
+ * Waiting and asking again, for Get ready offline (9 Nov 2026). The free service's limits count for all riders together, and a
+ * minute's limit ends a minute later: one more try after that minute, or a few seconds after a server error or a lost answer.
+ * An hourly, daily or monthly limit is never waited for. Without it, each request is sent once (Update weather has its own spacing).
+ */
+export type Retry = { sleep: (ms: number) => Promise<void> };
+const MINUTE_LIMIT_WAIT_MS = 61_000;
+const SERVER_WAIT_MS = 3_000;
+
+async function refusalOf(response: Response): Promise<WeatherServiceError> {
+  if (response.status === 429) {
+    let reason = '';
+    try {
+      const body = (await response.json()) as unknown;
+      if (isRecord(body) && typeof body['reason'] === 'string') reason = body['reason'];
+    } catch {
+      /* no reason given */
+    }
+    // "Minutely API request limit exceeded. Please try again in one minute." The others name an hour, a day or a month.
+    const minute = reason === '' || /minute/i.test(reason);
+    return new WeatherServiceError('HTTP 429', 'refused', { limited: true, againInMs: minute ? MINUTE_LIMIT_WAIT_MS : null });
+  }
+  return new WeatherServiceError(`HTTP ${response.status}`, 'refused', { againInMs: response.status >= 500 ? SERVER_WAIT_MS : null });
+}
 
 const requestInit = (timeoutMs: number): RequestInit => ({
   // A copy from a cache, stamped with the time of this fetch, would be an old forecast shown as new.
@@ -59,13 +90,24 @@ async function getJson(f: FetchLike, url: string, timeoutMs: number): Promise<un
   try {
     response = await f(url, requestInit(timeoutMs));
   } catch {
-    throw new WeatherServiceError('no answer');
+    throw new WeatherServiceError('no answer', 'refused', { againInMs: SERVER_WAIT_MS });
   }
-  if (!response.ok) throw new WeatherServiceError(`HTTP ${response.status}`);
+  if (!response.ok) throw await refusalOf(response);
   try {
     return await response.json();
   } catch {
     throw new WeatherServiceError('not JSON');
+  }
+}
+
+/** As getJson; with `retry`, asked once more after the wait the refusal calls for. */
+async function askPolitely(f: FetchLike, url: string, timeoutMs: number, retry: Retry | undefined): Promise<unknown> {
+  try {
+    return await getJson(f, url, timeoutMs);
+  } catch (e) {
+    if (!retry || !(e instanceof WeatherServiceError) || e.againInMs === null) throw e;
+    await retry.sleep(e.againInMs);
+    return getJson(f, url, timeoutMs);
   }
 }
 
@@ -188,9 +230,9 @@ function checkWhole(hours: GridHour[], now: Date, days: number): void {
  * One request for the whole grid. Throws `WeatherServiceError` on anything but a whole answer for every point. `fetchedAt`
  * is when the request set out, so it never reads newer than it is. `runs` are the model runs read just before.
  */
-export async function fetchForecast(grid: GridPoint[], o: { days: number; with15: boolean; fetch: FetchLike; now?: () => Date; runs?: ModelRun[] }): Promise<StoredForecast> {
+export async function fetchForecast(grid: GridPoint[], o: { days: number; with15: boolean; fetch: FetchLike; now?: () => Date; runs?: ModelRun[]; retry?: Retry }): Promise<StoredForecast> {
   const fetchedAt = (o.now ?? (() => new Date()))();
-  const body = await getJson(o.fetch, forecastUrl(grid, o.days, o.with15), FORECAST_TIMEOUT_MS);
+  const body = await askPolitely(o.fetch, forecastUrl(grid, o.days, o.with15), FORECAST_TIMEOUT_MS, o.retry);
   const locations = Array.isArray(body) ? body : [body]; // one location comes back as a bare object
   if (isRecord(body) && body['error'] === true) throw new WeatherServiceError('error answer');
   if (locations.length !== grid.length) throw incomplete('wrong number of points');
@@ -223,18 +265,23 @@ export async function fetchModelRuns(f: FetchLike): Promise<ModelRun[]> {
   return runs.filter((r) => r !== null);
 }
 
-/** Heights, 3 decimals, at most 100 per request, one request at a time. A failed batch leaves nulls, never zeros. */
-export async function fetchElevation(points: { lat: number; lon: number }[], f: FetchLike): Promise<(number | null)[]> {
+/**
+ * Heights, 3 decimals, at most 100 per request, one request at a time. A failed batch leaves nulls, never zeros. The service
+ * counts each coordinate as a call: once it says its limit is reached, nothing more is sent. With `retry`, a minute's limit is
+ * waited out and that batch asked once more, and the rest follow.
+ */
+export async function fetchElevation(points: { lat: number; lon: number }[], f: FetchLike, retry?: Retry): Promise<(number | null)[]> {
   const out: (number | null)[] = new Array<number | null>(points.length).fill(null);
   for (let start = 0; start < points.length; start += ELEVATION_BATCH) {
     const batch = points.slice(start, start + ELEVATION_BATCH);
     try {
-      const body = await getJson(f, `${ELEVATION_URL}?latitude=${list(batch, 'lat', 3)}&longitude=${list(batch, 'lon', 3)}`, SMALL_TIMEOUT_MS);
+      const body = await askPolitely(f, `${ELEVATION_URL}?latitude=${list(batch, 'lat', 3)}&longitude=${list(batch, 'lon', 3)}`, SMALL_TIMEOUT_MS, retry);
       const heights = isRecord(body) ? body['elevation'] : null;
       if (!Array.isArray(heights) || heights.length !== batch.length) continue;
       heights.forEach((h: unknown, i) => { if (usable(h)) out[start + i] = h; });
-    } catch {
-      // This batch stays unknown.
+    } catch (e) {
+      // This batch stays unknown; past the service's limit, so do the rest.
+      if (e instanceof WeatherServiceError && e.limited) break;
     }
   }
   return out;

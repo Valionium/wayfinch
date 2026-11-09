@@ -31,7 +31,7 @@ import { checkConnectivity } from './connectivity.ts';
 import { downloadTiles, isStorageFull, STORAGE_FULL } from './packs/download.ts';
 import type { TileReport, TileStore } from './packs/download.ts';
 import { baselinePoints, forecastDaysFor, gridPoints } from './openmeteo.ts';
-import type { FetchLike, GridPoint } from './openmeteo.ts';
+import type { FetchLike, GridPoint, Retry } from './openmeteo.ts';
 import { withoutUnknownHolidays } from './overpass.ts';
 import { WEATHER_MODE } from './weather-mode.ts';
 
@@ -48,9 +48,9 @@ type Fetch = typeof globalThis.fetch;
 /** As openmeteo.ts's own functions take them. */
 export type PrepareDeps = {
   fetch: Fetch;
-  fetchForecast: (grid: GridPoint[], o: { days: number; with15: boolean; fetch: FetchLike; now?: () => Date; runs?: ModelRun[] }) => Promise<StoredForecast>;
+  fetchForecast: (grid: GridPoint[], o: { days: number; with15: boolean; fetch: FetchLike; now?: () => Date; runs?: ModelRun[]; retry?: Retry }) => Promise<StoredForecast>;
   fetchBaseline: (points: GridPoint[], months: number[], fetch: FetchLike) => Promise<Baseline>;
-  fetchElevation: (points: LatLng[], fetch: FetchLike) => Promise<(number | null)[]>;
+  fetchElevation: (points: LatLng[], fetch: FetchLike, retry?: Retry) => Promise<(number | null)[]>;
   /** The model-run check before the forecast (section 5, step 3). Its failure stops nothing. */
   fetchModelRuns?: (fetch: FetchLike) => Promise<ModelRun[]>;
   now: () => Date;
@@ -69,6 +69,16 @@ const HOURS_BATCH = 200;
 const WEATHER_GAP_MS = 30 * 60_000;
 /** Heights asked for no closer than this along the route; those between are interpolated (section 5). */
 const HEIGHT_STEP_KM = 0.2;
+/**
+ * At most this many heights for one route (9 Nov 2026). The service counts each one as a call, refuses past 600 a minute and
+ * shares its daily 10,000 among all riders: every 200 m of a 270 km route was 1,122, and the refusals took the forecast down
+ * too. 400 keep 200 m up to 80 km and about 680 m on 270 km (measured on Heidelberg to Cologne: 370 m of climbing on its hilly
+ * 60 km where 200 m gave 450 m), and leave the forecast and the archive room in the same minute.
+ */
+export const MAX_HEIGHT_POINTS = 400;
+const waitMs = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+/** A height asked for, by the coordinates the request sends. */
+const heightKey = (p: LatLng): string => `${p.lat.toFixed(3)},${p.lon.toFixed(3)}`;
 const SHELTER_KINDS: readonly Place['kind'][] = ['settlement', 'shelter'];
 const STATION_NEAR_KM = 0.1;
 
@@ -88,23 +98,42 @@ function rawOf(route: Route, ele: (i: number) => number | null): RawPoint[] {
   });
 }
 
-/** Heights for every point from a sample of those missing them, or null when any sample stays unanswered. */
-async function lookedUpHeights(route: Route, deps: PrepareDeps): Promise<(number | null)[] | null> {
+/**
+ * Heights for every point from a sample of those missing them, or null when any sample stays unanswered. What did come is kept
+ * for the route, so Try again asks only for the rest.
+ */
+async function lookedUpHeights(route: Route, deps: PrepareDeps, store: PreparedStore): Promise<(number | null)[] | null> {
   const pts = route.points;
-  const asked: number[] = [];
+  const sampled: number[] = [];
+  const step = Math.max(HEIGHT_STEP_KM, route.lengthKm / (MAX_HEIGHT_POINTS - 2));
   let lastKm = -Infinity;
   pts.forEach((p, i) => {
     if (p.ele !== null) return;
-    if (p.km - lastKm >= HEIGHT_STEP_KM || i === pts.length - 1) {
-      asked.push(i);
+    if (p.km - lastKm >= step || i === pts.length - 1) {
+      sampled.push(i);
       lastKm = p.km;
     }
   });
-  const answers = await deps.fetchElevation(asked.map((i) => ({ lat: pts[i]!.lat, lon: pts[i]!.lon })), deps.fetch);
-  if (answers.length !== asked.length || answers.some((h) => h === null || !Number.isFinite(h))) return null;
+  const kept = await store.readKeptHeights(route.id);
+  const keys = sampled.map((i) => heightKey(pts[i]!));
+  const ask = [...new Set(keys.filter((k) => !kept.has(k)))];
+  if (ask.length > 0) {
+    const at = new Map(sampled.map((i, n) => [keys[n]!, pts[i]!] as const));
+    const answers = await deps.fetchElevation(ask.map((k) => ({ lat: at.get(k)!.lat, lon: at.get(k)!.lon })), deps.fetch, { sleep: deps.sleep ?? waitMs });
+    let more = false;
+    ask.forEach((k, n) => {
+      const h = answers[n];
+      if (typeof h === 'number' && Number.isFinite(h)) {
+        kept.set(k, h);
+        more = true;
+      }
+    });
+    if (more) await store.keepHeights(route.id, kept);
+  }
+  if (keys.some((k) => !kept.has(k))) return null;
   const known = new Map<number, number>();
   pts.forEach((p, i) => { if (p.ele !== null) known.set(i, p.ele); });
-  asked.forEach((i, n) => known.set(i, answers[n]!));
+  sampled.forEach((i, n) => known.set(i, kept.get(keys[n]!)!));
   const anchors = [...known.keys()].sort((a, b) => a - b);
   let a = 0;
   return pts.map((p, i) => {
@@ -138,7 +167,7 @@ async function heightsStep(deps: PrepareDeps, store: PreparedStore, online: bool
       deps.onNotice?.(W.appPrepHeightsNotice);
       let heights: (number | null)[] | null = null;
       try {
-        heights = await lookedUpHeights(route, deps);
+        heights = await lookedUpHeights(route, deps, store);
       } catch {
         heights = null;
       }
@@ -385,6 +414,8 @@ async function weatherStep(deps: PrepareDeps, store: PreparedStore, online: bool
     const today = localIsoDate(now, startZoneOf(zones));
     const forecast = await deps.fetchForecast(grid, {
       days: forecastDaysFor(route, trip.departureDate, today), with15: deps.with15 ?? WEATHER_MODE === 'auto', fetch: deps.fetch, now: () => now, runs,
+      // Inside the turn reserved above: a minute's limit is waited out and the same request sent once more (9 Nov 2026).
+      retry: { sleep: deps.sleep ?? waitMs },
     });
     await store.saveForecast(route.id, runs.length > 0 && forecast.runs.length === 0 ? { ...forecast, runs } : forecast, now);
     return { step: 'weather', ok: true, note: null };

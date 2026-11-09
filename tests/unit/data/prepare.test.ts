@@ -11,6 +11,8 @@ import { haversineKm } from '../../../src/core/geo/haversine.ts';
 import { W } from '../../../src/core/wording/en.ts';
 import type { Baseline, Place, PlaceHours, RescuePoint, Roof, RouteMatch, ScreenInputs, StoredForecast, Trip } from '../../../src/core/types.ts';
 import { catchUpHours, prepareTrip } from '../../../src/data/prepare.ts';
+import { fetchElevation, fetchForecast } from '../../../src/data/openmeteo.ts';
+import { forecastBody, json, recorded } from '../../fixtures/openmeteo.ts';
 import type { PrepareDeps, StepReport } from '../../../src/data/prepare.ts';
 import { openDb } from '../../../src/store/db.ts';
 import { readInputs } from '../../../src/store/inputs.ts';
@@ -241,11 +243,12 @@ describe('heights', () => {
     const server = new PackServer(fixtureBuild('heidelberg-strasbourg'));
     const reports = await prepareTrip(depsFor(server, {
       onNotice: (text) => { order.push(`notice:${text}`); },
-      // A climb in the middle of the route, so the grid gains climb points.
+      // A climb in the middle of the route, so the grid gains climb points: set by the share of the route, as the number of heights
+      // asked now depends on its length (9 Nov 2026).
       fetchElevation: async (points) => {
         order.push('elevation');
         expect(points.length).toBeGreaterThan(10);
-        return points.map((_, i) => (i < points.length * 0.4 ? 300 - i * 0.2 : i < points.length * 0.5 ? 200 + (i - points.length * 0.4) * 8 : 100));
+        return points.map((_, i) => (i < points.length * 0.4 ? 300 - i * 0.2 : i < points.length * 0.5 ? 200 + (i / points.length - 0.4) * 5200 : 100));
       },
       fetchForecast: async (grid) => { order.push(`forecast:${grid.length}`); return forecast(); },
       fetchBaseline: async (points) => { order.push(`baseline:${points.length}`); return baseline(); },
@@ -308,6 +311,134 @@ describe('heights', () => {
     expect(after.ascentM).not.toBeNull();
     expect(after.lengthKm).toBeCloseTo(route.lengthKm, 6);
     expect(after.points.map((p) => p.km)).toEqual(route.points.map((p) => p.km));
+  });
+});
+
+describe('long routes (9 Nov 2026: Heidelberg to Cologne, 269.8 km, ended without heights and weather)', () => {
+  /** A fixture route with its heights taken away, as a planned route from a router that gives none. */
+  async function withoutHeights(id: Parameters<typeof fixtureTrip>[0], km = Infinity): Promise<Trip> {
+    const base = await fixtureTrip(id);
+    const points = base.route.points.filter((p) => p.km <= km).map((p) => ({ lat: p.lat, lon: p.lon, ele: null }));
+    const t: Trip = { ...base, route: await buildRoute(points, base.route.name, 'planned') };
+    await readTrip();
+    await saveTrip(t);
+    return t;
+  }
+  const query = (url: string): URLSearchParams => new URL(url).searchParams;
+  const ridge = (lat: number): number => 150 + Math.round(Math.abs(Math.sin(lat * 40)) * 300);
+
+  /**
+   * Open-Meteo as it answered on 9 November: one call per coordinate (a forecast location counts about 1.14 for 16 days), 600 a
+   * minute, then "Minutely API request limit exceeded" (recorded). The minute is the test's own clock, moved on by `sleep`.
+   */
+  function limitedService(server: PackServer): { deps: Partial<PrepareDeps>; asked: { kind: 'elevation' | 'forecast'; n: number }[]; refused: () => number } {
+    let clock = 0;
+    const spent: { at: number; calls: number }[] = [];
+    const asked: { kind: 'elevation' | 'forecast'; n: number }[] = [];
+    let refused = 0;
+    const inner = depsFor(server).fetch;
+    const fetcher: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const kind = url.startsWith('https://api.open-meteo.com/v1/elevation') ? 'elevation' : url.startsWith('https://api.open-meteo.com/v1/forecast') ? 'forecast' : null;
+      if (kind === null) return inner(input, init);
+      const lats = query(url).get('latitude')!.split(',');
+      const calls = kind === 'elevation' ? lats.length : lats.length * 1.14;
+      const used = spent.filter((s) => clock - s.at < 60_000).reduce((sum, s) => sum + s.calls, 0);
+      asked.push({ kind, n: lats.length });
+      if (used + calls > 600) {
+        refused++;
+        return json(recorded('limit-minutely-429'), 429);
+      }
+      spent.push({ at: clock, calls });
+      if (kind === 'elevation') return json({ elevation: lats.map((lat) => ridge(Number(lat))) });
+      const from = Math.floor(NOW.getTime() / 3_600_000) * 3600 - 8 * 3600;
+      return json(forecastBody(lats.length, { from, hours: 17 * 24 }));
+    };
+    return { asked, refused: () => refused, deps: { fetch: fetcher, fetchElevation, fetchForecast, sleep: async (ms) => { clock += ms; } } };
+  }
+
+  test('[PREP-HEIGHTS-BUDGET] an 800 km route without heights on a service limited like the real one: heights and weather are saved, climbing is known', async () => {
+    const before = await withoutHeights('multi-day-800');
+    expect(before.route.lengthKm).toBeGreaterThan(269.8);
+    const service = limitedService(new PackServer(fixtureBuild('multi-day-800')));
+    const reports = await prepareTrip(depsFor(new PackServer(fixtureBuild('multi-day-800')), service.deps), () => undefined);
+    expect(step(reports, 'heights')).toMatchObject({ ok: true, note: null });
+    expect(step(reports, 'weather')).toMatchObject({ ok: true, note: null });
+    expect(service.refused()).toBe(0);
+    const after = (await readTrip())!;
+    expect(after.route.ascentM).not.toBeNull();
+    expect(after.route.points.every((p) => p.ele !== null)).toBe(true);
+    expect((await readWeatherState())!.forecast).not.toBeNull();
+    // Frugal: the limits count for all riders together.
+    const heights = service.asked.filter((a) => a.kind === 'elevation');
+    expect(heights.reduce((n, a) => n + a.n, 0)).toBeLessThanOrEqual(400);
+    expect(heights.length).toBeLessThanOrEqual(4);
+    expect(service.asked.filter((a) => a.kind === 'forecast')).toHaveLength(1);
+  });
+
+  test('[PREP-HEIGHTS-BUDGET] a short route is asked every 200 m, as before; a long one at most 400 points, evenly along it', async () => {
+    const short = await withoutHeights('heidelberg-strasbourg', 40);
+    const asked: { lat: number; lon: number }[][] = [];
+    await prepareTrip(depsFor(new PackServer(fixtureBuild('heidelberg-strasbourg')), {
+      fetchElevation: async (points) => { asked.push(points); return points.map(() => 200); },
+    }), () => undefined);
+    expect(asked).toHaveLength(1);
+    expect(asked[0]!.length).toBeGreaterThanOrEqual(Math.floor(short.route.lengthKm / 0.3)); // the fixture's points lie about 80 m apart
+    expect(asked[0]!.length).toBeLessThanOrEqual(Math.ceil(short.route.lengthKm / 0.2) + 2);
+
+    freshStore();
+    const long = await withoutHeights('multi-day-800');
+    const kms: number[][] = [];
+    await prepareTrip(depsFor(new PackServer(fixtureBuild('multi-day-800')), {
+      fetchElevation: async (points) => {
+        kms.push(points.map((p) => long.route.points.find((q) => q.lat === p.lat && q.lon === p.lon)!.km));
+        return points.map(() => 200);
+      },
+    }), () => undefined);
+    const along = kms[0]!;
+    expect(along.length).toBeLessThanOrEqual(400);
+    expect(along.length).toBeGreaterThan(350);
+    expect(along[0]).toBe(0);
+    expect(along.at(-1)).toBe(long.route.lengthKm);
+    const gaps = along.slice(1).map((km, i) => km - along[i]!);
+    expect(Math.max(...gaps)).toBeLessThan((long.route.lengthKm / 400) * 1.6);
+  });
+
+  test('[PREP-HEIGHTS-RESUME] heights that came are kept when others did not; Try again asks only for the missing ones, then the route has its heights', async () => {
+    await withoutHeights('heidelberg-strasbourg');
+    const first: { lat: number; lon: number }[] = [];
+    const reports = await prepareTrip(depsFor(new PackServer(fixtureBuild('heidelberg-strasbourg')), {
+      fetchElevation: async (points) => { first.push(...points); return points.map((p, i) => (i < points.length / 2 ? ridge(p.lat) : null)); },
+    }), () => undefined);
+    expect(step(reports, 'heights').ok).toBe(false);
+    expect((await readTrip())!.route.ascentM).toBeNull(); // still unknown, never partly known
+    const missing = first.slice(Math.ceil(first.length / 2));
+
+    const again: { lat: number; lon: number }[] = [];
+    const retried = await prepareTrip(depsFor(new PackServer(fixtureBuild('heidelberg-strasbourg')), {
+      fetchElevation: async (points) => { again.push(...points); return points.map((p) => ridge(p.lat)); },
+    }), () => undefined);
+    expect(step(retried, 'heights')).toMatchObject({ ok: true, note: null });
+    expect(again).toEqual(missing);
+    const after = (await readTrip())!.route;
+    expect(after.ascentM).not.toBeNull();
+    expect(after.points.every((p) => p.ele !== null)).toBe(true);
+  });
+
+  test('[PREP-HEIGHTS-RESUME] heights kept for one route are never used for another', async () => {
+    await withoutHeights('heidelberg-strasbourg');
+    await prepareTrip(depsFor(new PackServer(fixtureBuild('heidelberg-strasbourg')), {
+      fetchElevation: async (points) => points.map((p, i) => (i === 0 ? null : ridge(p.lat))),
+    }), () => undefined);
+    const other = await fixtureTrip('heidelberg-strasbourg');
+    const reversed = await buildRoute([...other.route.points].reverse().map((p) => ({ lat: p.lat, lon: p.lon, ele: null })), 'back', 'planned');
+    await replaceRoute(reversed);
+    await saveTrip({ ...other, route: reversed });
+    const asked: { lat: number; lon: number }[] = [];
+    await prepareTrip(depsFor(new PackServer(fixtureBuild('heidelberg-strasbourg')), {
+      fetchElevation: async (points) => { asked.push(...points); return points.map(() => 200); },
+    }), () => undefined);
+    expect(asked.length).toBeGreaterThan(100); // all of them, none taken from the other route
   });
 });
 
