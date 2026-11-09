@@ -630,6 +630,13 @@ select:focus,input:focus,button:focus-visible{outline:2px solid var(--blaze);out
 .pick.recall{min-width:150px}
 .pick.recall b{font-family:var(--disp);font-weight:600;font-size:15px;letter-spacing:.02em}
 .pick.recall.has{border-color:var(--sage);background:var(--panel)}
+/* Start from one you have saved: general and trip setups in two labelled groups (owner, 9 Nov 2026); a general setup also carries a
+   solid bar on its left edge, so the kind shows on the button itself */
+.recallgroup{margin:4px 0 12px}
+.recallgrouphead{font-family:var(--body);font-size:15px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink);margin:0}
+.recallgrouphint{margin:0 0 6px;font-size:13px;color:var(--muted)}
+.recallgroup.general .pick.recall{border-left:4px solid var(--sage)}
+.recallgroup.trip .pick.recall{border-style:dashed;border-left-style:solid}
 .pickn.done{background:var(--sage);top:-6px;right:-6px;padding:0 5px}
 .recalldetail{
   display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;
@@ -2079,7 +2086,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <div class="bike-profile-card"><b id="bikeStepSummary">Bike repair details · optional</b><p>Use a bike profile for repair suggestions that match your tyres, brakes and drivetrain.</p><button class="kitact" type="button" id="bikeDetailsOpen" aria-haspopup="dialog" aria-controls="bikeDetailsBox">Bike details</button></div>
     <div class="recallwrap hidden" id="recallWrap">
       <div class="pickhead">Start from one you have saved</div>
-      <div class="picks" id="recallList"></div>
+      <div id="recallList"></div>
       <div id="recallDetail"></div>
     </div>
     <div class="pickwrap">
@@ -9899,14 +9906,19 @@ function renderRecall(){
   wrap.classList.toggle('hidden', !SETUPS.length);
   if(!SETUPS.length){ $('recallList').innerHTML = ''; $('recallDetail').innerHTML = ''; return; }
 
-  $('recallList').innerHTML = recallOrder(SETUPS).map(s => {
+  // the two kinds in two labelled groups (owner, 9 Nov 2026: unmistakable, for screen readers too), as in Saved setups
+  const pick = s => {
     const open = S.recallOpen === s.id;
-    const p = s.predicted || {};
     return `<button class="pick recall${open?' has':''}" data-recall="${htmlEsc(s.id)}">
       <b>${htmlEsc(s.name)}</b>
-      <i>${setupKind(s) === 'general' ? 'General · ' : ''}${MONTHS[s.trip.month].slice(0,3)} · ${plural(s.trip.nights)} · ${s.bags.length} bags</i>
+      <i>${MONTHS[s.trip.month].slice(0,3)} · ${plural(s.trip.nights)} · ${s.bags.length} bags</i>
       ${s.feedback ? `<span class="pickn done">✓</span>` : ''}</button>`;
-  }).join('');
+  };
+  const g = setupGroups(SETUPS);
+  const group = (kind, id, title, hint, list) => !list.length ? '' : `<div class="recallgroup ${kind}" role="group" aria-labelledby="${id}">
+      <h3 class="recallgrouphead" id="${id}">${title}</h3><p class="recallgrouphint">${hint}</p><div class="picks">${list.map(pick).join('')}</div></div>`;
+  $('recallList').innerHTML = group('general', 'recallGeneralTitle', 'General setups', 'The few you start trips from.', g.general)
+    + group('trip', 'recallTripTitle', 'Trip setups', 'Each one planned for one trip.', g.trip);
 
   const s = SETUPS.find(x => x.id === S.recallOpen);
   $('recallDetail').innerHTML = !s ? '' : (() => {
