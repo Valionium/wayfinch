@@ -175,7 +175,7 @@ function LimitInput({ id, label, required, value, min, onCommit, onPending, need
               ) : (
                 <>
                   <button type="button" class="btn btn-primary" onClick={() => { setUnit('bar'); evaluate(text, 'bar', true); }}>{W.tyreAskYesBar(String(note.alt.value))}</button>
-                  <button type="button" class="btn" onClick={() => evaluate(text, 'psi', false, true)}>{W.tyreAskNoPsi}</button>
+                  <button type="button" class="btn" onClick={() => evaluate(text, 'psi', false, true)}>{T.tyreAskNoPsi}</button>
                 </>
               )}
             </span>
@@ -369,7 +369,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
 
   const resetFor = (field: FieldName): string => {
     const f = fallback[field];
-    return f === 'bike' ? W.tyreBackToBike : f === 'plan' ? W.tyreBackToPlan : f === 'you' ? W.tyreBackToYou : W.tyreClear;
+    return f === 'bike' ? W.tyreBackToBike : f === 'plan' ? T.tyreBackToPlan : f === 'you' ? T.tyreBackToYou : W.tyreClear;
   };
   const choiceValue = <T extends string>(field: FieldName, value: T | 'unset'): T | undefined => (src[field] === 'assumed' || value === 'unset' ? undefined : value);
   const notes = result?.warningItems ?? [];
@@ -413,7 +413,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
           editor={<NumberInput key={`front-${key}`} id="tyre-front" label={W.tyreFrontWidthLabel} needed value={own('frontMm', v.front.printedMm)} assumed={v.front.printedMm} onCommit={(n) => change({ frontMm: n })} unit="mm" />} />
         <Field id={bikeKey('rear')} label={W.tyreRearWidthLabel} source={src.rearMm} needed="rear" valueText={`${v.rear.printedMm} mm`} resetLabel={resetFor('rearMm')} onReset={resetter('rearMm')}
           editor={<NumberInput key={`rear-${key}`} id="tyre-rear" label={W.tyreRearWidthLabel} needed value={own('rearMm', v.rear.printedMm)} assumed={v.rear.printedMm} onCommit={(n) => change({ rearMm: n })} unit="mm" />} />
-        {resolved.rearFollowsFront && (v.rimType === 'hookless' || v.rimType === 'unset') ? <p class="muted">{W.tyreRearLabelShort}: {W.tyreSameAsFront}</p> : null}
+        {resolved.rearFollowsFront && (v.rimType === 'hookless' || v.rimType === 'unset') ? <p class="muted">{T.tyreRearLabelShort}: {W.tyreSameAsFront}</p> : null}
         <Choice<RimType> id="tyre-rimtype" label={W.tyreRimTypeLabel} source={src.rimType} needed="rim" value={choiceValue('rimType', v.rimType)} onChange={(x) => change({ rimType: x })}
           options={[{ value: 'hooked', label: W.tyreRimHooked }, { value: 'hookless', label: W.tyreRimHookless }, { value: 'tubular', label: W.tyreRimTubular }]} />
       </section>
@@ -429,7 +429,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
             <ul>{result.refused.map((t) => <li key={t}>{t}</li>)}</ul>
           </>
         ) : null}
-        {blockedBy === null && result && result.incompatible ? <h3>{result.warningCodes.includes('rimUnset') ? W.tyreNeedRimTitle : W.tyreIncompatibleTitle}</h3> : null}
+        {blockedBy === null && result && result.incompatible ? <h3>{result.warningCodes.includes('rimUnset') ? T.tyreNeedRimTitle : W.tyreIncompatibleTitle}</h3> : null}
         {showFigures && front && rear ? (
           <>
             <div class="tyre-wheels">

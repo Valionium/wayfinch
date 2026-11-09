@@ -21,4 +21,10 @@ export const T = {
   // Moved from en.ts (7 Nov 2026, sub-project 12): they pay for Bike care's entry in the first screen.
   tyreIntro: 'An estimate for your setup, worked out on this phone from published tyre-drop data. It never goes above a limit you enter, and it sends nothing.',
   tyreMeasuredHelp: 'Wheel loads: with your gear on, ride-ready, put one wheel on a bathroom scale and the other on a block of the same height, then swap. Enter both.',
+  // Moved from en.ts (9 Nov 2026, care pictures part 2), shown only on this screen: room in the first screen for the parts guide.
+  tyreNeedRimTitle: 'No figure yet: tell us your rim type',
+  tyreRearLabelShort: 'Rear tyre width',
+  tyreBackToPlan: "Back to your bag plan's value",
+  tyreBackToYou: 'Back to the value from You',
+  tyreAskNoPsi: 'No, psi',
 };

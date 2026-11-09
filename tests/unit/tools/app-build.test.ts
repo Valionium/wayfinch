@@ -300,7 +300,7 @@ test("[TB-TOOLS-LAZY] the Tools screen (bike line, tyre card) is not among the f
 });
 
 // Sub-project 12, group 1: Bike care is a chunk of its own, loaded by a dynamic import like the tyre tool; its words (en-care.ts, with the
-// content) are not in the first screen. 145,054 bytes is main's first screen (d7289d1, built from origin/main); Bike care adds nothing to it; the
+// content) are not in the first screen. 145,036 bytes is main's first screen (d8dd2bd, measured 9 Nov; d7289d1 was given as 145,054); Bike care adds nothing to it; the
 // rule is that it may never rise above main's figure.
 test("[BC-CHUNK] Bike care is a lazy chunk; en-care is not in the first screen's files, and the first screen is at or below main's figure", () => {
   const figures = measure(on);
@@ -314,7 +314,7 @@ test("[BC-CHUNK] Bike care is a lazy chunk; en-care is not in the first screen's
   expect(first).toContain(`/${chunk[0]!.replace(/^assets\//, '')}`.slice(1));
   expect(text(on, 'index.html')).not.toContain(chunk[0]!);
   console.log(`BC-CHUNK: first screen ${figures.firstJsGzip} bytes gzipped, lazy ${figures.lazyJsGzip}`);
-  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_054);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_036);
 });
 
 // Care pictures, part 1 (design of 7 November 2026, section 5): each drawing is a file of its own, fetched when its step view opens; none is
@@ -336,7 +336,7 @@ test("[BC-PIC-LAZY] no picture is in the first screen's files, Bike care's chunk
   }
   // and no script carries a drawing's own markup
   expect(all.filter((f) => f.endsWith('.js') && text(on, f).includes('class="cp-')), 'a drawing in a script').toEqual([]);
-  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_054);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_036);
 });
 
 // The parts guide (care pictures design of 7 November 2026, sections 4 and 5): its sheet is a chunk of its own, loaded with the first tap
@@ -369,7 +369,7 @@ test("[PG-LAZY] the parts guide's sheet and words are a chunk of their own; each
   expect(wordsFile.length).toBe(1);
   expect(listed).toContain(`/${wordsFile[0]}`);
   console.log(`PG-LAZY: first screen ${figures.firstJsGzip} bytes gzipped, lazy ${figures.lazyJsGzip}`);
-  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_054);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_036);
 });
 
 test('[BC-SOURCES-PRIVATE] the built Bike care chunk holds no "http": where each fact came from never ships', () => {
