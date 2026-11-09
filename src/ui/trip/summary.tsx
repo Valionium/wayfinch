@@ -5,6 +5,7 @@ import type { RouteStop } from '../../core/screen/route-stops.ts';
 import type { Route } from '../../core/types.ts';
 import { showKm, W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
+import { TF } from '../../core/wording/en-trip-fields.ts';
 import { Glyph, ICON_WORD, slotsOf } from '../ahead/strip.tsx';
 import { Card } from '../card.tsx';
 import { OsmCredit } from './credit.tsx';
@@ -55,7 +56,7 @@ function ProfileStops({ route, stops }: { route: Route; stops: RouteStop[] }) {
         })}
       </div>
       {shown ? <ul class="trip-stop-list" id="trip-stop-list" data-stop-list>{shown.icons.map((s, i) => <li key={i}>{stopWords(s)}</li>)}</ul> : null}
-      <ul class="visually-hidden" aria-label={W.appTripStopsLabel} data-stops-all>{stops.map((s, i) => <li key={i}>{stopWords(s)}</li>)}</ul>
+      <ul class="visually-hidden" aria-label={TF.appTripStopsLabel} data-stops-all>{stops.map((s, i) => <li key={i}>{stopWords(s)}</li>)}</ul>
     </>
   );
 }
@@ -78,13 +79,13 @@ export function RouteSummary({ snap, stops }: { snap: TripSnapshot; stops: TripS
   const s = summaryOf(trip, { day1LeaveBy: snap.day1LeaveBy });
   const missingHeights = trip.route.ascentM === null;
   return (
-    <Card title={W.appTripSummaryTitle}>
+    <Card title={TF.appTripSummaryTitle}>
       <div data-summary>
         <p class="tool-line"><strong>{s.name}</strong></p>
         <p class="tool-line">{s.distance} · {s.climbing}</p>
         {s.profile ? (
           <div class={ready ? 'trip-profile-box trip-profile-room' : 'trip-profile-box'}>
-            <svg class="trip-profile" viewBox={`0 0 ${PROFILE_BOX.w} ${PROFILE_BOX.h}`} role="img" aria-label={W.appTripProfileLabel(s.profile.minM, s.profile.maxM)} preserveAspectRatio="none">
+            <svg class="trip-profile" viewBox={`0 0 ${PROFILE_BOX.w} ${PROFILE_BOX.h}`} role="img" aria-label={TF.appTripProfileLabel(s.profile.minM, s.profile.maxM)} preserveAspectRatio="none">
               <path d={s.profile.path} fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke" />
             </svg>
             {found && found.length > 0 ? <ProfileStops route={trip.route} stops={found} /> : null}
@@ -101,7 +102,7 @@ export function RouteSummary({ snap, stops }: { snap: TripSnapshot; stops: TripS
           ))}
         </ol>
         {missingHeights ? <p class="muted">{TR.appTripHeightsPending}</p> : snap.heightsLookedUp ? <p class="muted">{W.appTripHeightsCredit}</p> : null}
-        {trip.route.source === 'planned' || snap.prepared?.build ? <OsmCredit lead={W.appTripOsmLead} date={packDate(snap.prepared?.build)} /> : null}
+        {trip.route.source === 'planned' || snap.prepared?.build ? <OsmCredit lead={TF.appTripOsmLead} date={packDate(snap.prepared?.build)} /> : null}
         <p class="muted"><a href="/legal/licences/">{W.appTripLicences}</a></p>
       </div>
     </Card>

@@ -5721,6 +5721,8 @@ const ADVISOR_MOVES_KG = 0.5;
 const ADVISOR = { open:false, style:null, styleTouched:false, goal:null, source:null, q:null, answer:null, input:null, error:'', back:null,
   returnable:false, stale:false, sig:null, again:false, bigger:null };
 let ADVISOR_RUN = 0, ADVISOR_DONE = Promise.resolve(), ADVISOR_SCRIPT = null;
+// a delete request applied as the page loaded: the answers kept in this tab's history entry go too (GA-RELOAD; review of PR 87, I1)
+let ADVISOR_FORGET = false;
 
 function loadAdvisor(){
   if(window.WayfinchAdvisor) return Promise.resolve(window.WayfinchAdvisor);
@@ -6024,8 +6026,11 @@ function renderAdvisor(){
   const a = document.activeElement, box = $('advisorBox');
   const keep = a && box.contains && box.contains(a) ? (a.name ? { name:a.name, value:a.value } : a.id ? { id:a.id } : null) : null;
   $('advisorBike').innerHTML = advisorBikeHtml();
+  // the big drawing at the top is the plan's bike too: a change of bike (the Bike line here, or any other way) redraws it with the steps
+  if(ADVISOR.open && ADVISOR_GLIDE !== advisorGlideKey()) renderAdvisorGlide();
   $('advisorSteps').innerHTML = advisorStepsHtml();
   renderAdvisorAnswer();
+  if(ADVISOR.open) advisorAddress();
   if(!keep) return;
   const el = keep.id ? $(keep.id) : [...box.querySelectorAll('input[type=radio],input[type=checkbox]')].find(r => r.name === keep.name && r.value === keep.value);
   el?.focus?.({ preventScroll:true });
@@ -6127,8 +6132,22 @@ function advisorPageOn(on){
   $('advisorBox').classList.toggle('hidden', !on);
 }
 // The rider's bike with the plan's bags, at the top: the drawing the bike from Tools glides onto. Decorative; the bike line names it.
+// ADVISOR_GLIDE: the bike (and theme) it was last drawn for, so renderAdvisor draws it again whenever the plan's bike changed since.
+let ADVISOR_GLIDE = null;
+const advisorGlideKey = () => JSON.stringify([S.bikeProfile || null, bikeTheme()]);
+// The plan's bike or the theme changed under the open advisor without a tap in it (a bike followed on a return from the back/forward
+// cache, another tab's or the system's theme; review of PR 87, M1 and M2): the drawing, the Bike line, the sketches and the cards again,
+// and for another bike the answer searched again on it, with the rider's answers.
+function advisorFollow(){
+  if(!ADVISOR.open || ADVISOR_GLIDE === advisorGlideKey()) return;
+  let was = null; try { was = JSON.parse(ADVISOR_GLIDE)[0]; } catch(e){}
+  const bike = JSON.stringify(was) !== JSON.stringify(S.bikeProfile || null);
+  renderAdvisor();
+  if(bike) ADVISOR_DONE = runAdvisor();
+}
 function renderAdvisorGlide(){
   const el = $('advisorGlide'); if(!el) return;
+  ADVISOR_GLIDE = advisorGlideKey();
   let view = null;
   // read on copies (withInputs), as the cards' drawings are: drawing it never changes the plan or its kept placements
   try { view = withoutTrial(() => withInputs({}, () => { const step = S.step; S.step = 4; try { return planBagView(); } finally { S.step = step; } })); } catch(e){ view = null; }
@@ -6167,6 +6186,7 @@ function closeAdvisor(){
   ADVISOR.open = false; ADVISOR_RUN++; advisorProgress(null);
   const root = $('advisorBox'), back = ADVISOR.back, opener = ADVISOR_OPENER;
   ADVISOR.back = null; ADVISOR_OPENER = null;
+  advisorAddress();   // the planner's address again: a reload or a later visit through the history is the planner
   // leaving for Wayfinch, the page stays the advisor until it goes: nothing of the planner flashes, and the bike glides back from its drawing
   if(back){ returnToWayfinch(back); return; }
   const was = !root.classList.contains('hidden');
@@ -6213,9 +6233,35 @@ function advisorLink(hash){
   const params = {}; for(const part of m[1].split('&').filter(Boolean)){ const [k, v] = part.split('='); params[k] = v; }
   return { back:params.back !== 'advisor' && Object.hasOwn(BIKE_BACKS, params.back) ? params.back : null };
 }
+// While the advisor shows, the address names it with its way back (#gear-advisor&back=tools from Tools, #gear-advisor opened in this
+// page), so a reload stays on it and keeps that way back (the owner's video of 9 Nov 2026). The address is replaced, never pushed, so
+// the browser's Back goes where it went before. The rider's answers ride in this history entry's state (this tab only, never storage,
+// so they leave no trace there), and a reload asks them again on the plan as restored.
+function advisorAddress(){
+  const A = ADVISOR, open = A.open;
+  const back = open && A.back ? Object.keys(BIKE_BACKS).find(k => k !== 'advisor' && BIKE_BACKS[k][0] === A.back) : null;
+  const state = open ? { gearAdvisor:{ v:1, style:A.style, styleTouched:A.styleTouched, goal:A.goal, source:A.source, q:A.q } } : null;
+  try { history.replaceState(state, '', location.pathname + location.search + (open ? '#gear-advisor' + (back ? '&back=' + back : '') : '')); } catch(e){}
+}
+// The answers a reload brings back, each only while it is one the advisor still offers; the plan decides the rest as at any opening
+// (openAdvisor: the questionnaire when the plan has no bags, the default setup when none was chosen).
+function advisorRestore(state){
+  const s = dataObject(state) ? state.gearAdvisor : null;
+  if(!dataObject(s) || s.v !== 1) return;
+  const A = ADVISOR, pick = (v, list) => list.includes(v) ? v : null;
+  A.style = pick(s.style, ['bags', 'bags-first', 'panniers']); A.styleTouched = !!A.style && s.styleTouched === true;
+  A.goal = pick(s.goal, ['handling', 'backpack', 'both']);
+  A.source = pick(s.source, ['plan', 'questionnaire']);
+  const q = dataObject(s.q) ? s.q : null;
+  if(q) A.q = { riding:pick(q.riding, ['road', 'gravel', 'mtb', 'touring', 'everyday']), nights:dataInteger(q.nights, 0, 30, S.nights),
+    sleep:q.sleep === 'indoor' ? 'indoor' : 'camp', carry:pick(q.carry, ['light', 'average', 'lot']) };
+}
 function openAdvisorFromLink(hash = location.hash){
   const link = advisorLink(hash); if(!link) return false;
-  try { history.replaceState(null, '', location.pathname + location.search); } catch(e){}
+  // a delete applied as this page loaded (C-DELETE: a tab that never heard of it, discarded or restored): no answer comes back, and the
+  // entry's own are dropped (review of PR 87, I1)
+  if(!ADVISOR.open && ADVISOR_FORGET){ ADVISOR_FORGET = false; try { history.replaceState(null, '', location.href); } catch(e){} }
+  else if(!ADVISOR.open){ let state = null; try { state = history.state; } catch(e){} advisorRestore(state); }
   if(link.back){
     const [href] = BIKE_BACKS[link.back];
     ADVISOR.back = href; setWayfinchBack(href);   // the one top bar goes there too
@@ -11485,6 +11531,7 @@ function deletedSinceLoad(){
 function dropForDelete(){
   if(DELETED_ELSEWHERE) return;
   DELETED_ELSEWHERE=true; DRAFT_FROZEN=true; DRAFT_READY=false; clearTimeout(DRAFT_TIMER); DRAFT_TIMER=null;
+  if(ADVISOR.open){ ADVISOR.open=false; advisorAddress(); }   // the Gear advisor's answers in this tab's history go with the rest
   window.location.reload();
 }
 function readLocalJson(k){
@@ -11620,6 +11667,7 @@ function applyDeleteRequest(){
   } catch(e){}
   remove(DELETING_KEY);
   DELETE_SEEN=deleteMark();   // this tab's own delete
+  ADVISOR_FORGET=true;   // and the Gear advisor's answers in this tab's history (GA-RELOAD)
   return true;
 }
 /* ---- Contract 2: a trip from Wayfinch (spec 7.1) ----
@@ -12774,7 +12822,7 @@ function followOtherTabs(event){
 window.addEventListener('storage', followOtherTabs);
 // A hidden, frozen or cached tab may never have received the storage event (rule 8).
 document.addEventListener('visibilitychange', () => { if(document.hidden) flushDraft(); else { checkOtherTabs(); followThemeChoice(); } });
-window.addEventListener('pageshow', event => { checkOtherTabs(); followThemeChoice(); if(event.persisted) followBikeChoice(); });
+window.addEventListener('pageshow', event => { checkOtherTabs(); followThemeChoice(); if(event.persisted){ followBikeChoice(); advisorFollow(); } });
 window.addEventListener('pagehide', flushDraft);
 function showRecoveredDraft(){
   $('draftText').textContent = 'Your working plan was restored from this browser.';
@@ -14188,6 +14236,7 @@ function applyTheme(t){
   if(S.step >= 2) drawRig();          // the fill ramp is read from the stylesheet
   else paintRigBike();                // the frame's casing follows the theme
   if(typeof renderLook==='function')renderLook();
+  advisorFollow();                    // the Gear advisor's drawings, when it shows
 }
 function setTheme(t){ THEME_CHOSEN = true; S.theme = t; applyTheme(t); store.set('loadcheck:theme', t); noteThemeChoice(t); queueDraftSave(); }
 
