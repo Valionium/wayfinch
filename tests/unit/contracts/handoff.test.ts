@@ -251,9 +251,9 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     expect(setups.map((s) => s.name)).toEqual(['Heidelberg → Strasbourg, 12 Jun', expect.stringMatching(/^Before Heidelberg → Strasbourg, \d{1,2} [A-Z][a-z]{2}$/)]);
     expect(setups.every((s) => s.kind === undefined)).toBe(true);
     const before = json<Record<string, unknown>>('SETUPS[1]');
-    const kept = page.run(`(()=>{const p=normalisePlan(SETUPS[1]);return planSignature(p);})()`);
+    const kept = page.run(`(()=>{const p=normalisePlan(SETUPS[1]);return planSameKey(p);})()`);
     page.context.qaBefore = draftBefore;
-    expect(kept).toBe(page.run('planSignature(JSON.parse(qaBefore))'));
+    expect(kept).toBe(page.run('planSameKey(JSON.parse(qaBefore))'));
     expect(before.thumb).toBe('');
     const made = setups[0]!;
     expect(made.forRoute).toEqual({ hash: json('S.gpx.copilotRoute'), name: 'Heidelberg → Strasbourg', departureDate: '2026-06-12' });
