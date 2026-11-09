@@ -107,8 +107,22 @@ export function cutBeside(poly: P[], spot: Spot, L: number): P[] {
     if (area > most + 1e-9) { most = area; best = kept!; }
   };
   for (const d of TURNS) consider(clip(poly, side(lineAlong(d, keep))));
-  for (const l1 of sides) for (const l2 of sides) if (l1 !== l2) consider(notch(poly, l1, l2));
+  for (const l1 of sides) for (const l2 of sides) if (l1 !== l2) { const n = notch(poly, l1, l2); if (n && solid(n)) consider(n); }
   return most >= whole - 1e-9 ? poly : best;
+}
+
+/** A notched shape whose middle (the mean of its corners, where the bag planner's tap lands) is well inside it, never in the notch. */
+function solid(poly: P[]): boolean {
+  const m = poly.reduce<P>((s, p) => [s[0] + p[0] / poly.length, s[1] + p[1] / poly.length], [0, 0]);
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [a, b] = [poly[i]!, poly[j]!];
+    if ((a[1] > m[1]) !== (b[1] > m[1]) && m[0] < ((b[0] - a[0]) * (m[1] - a[1])) / (b[1] - a[1]) + a[0]) inside = !inside;
+    const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+    const t = Math.max(0, Math.min(1, ((m[0] - a[0]) * dx + (m[1] - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+    if (Math.hypot(a[0] + dx * t - m[0], a[1] + dy * t - m[1]) < 3) return false;
+  }
+  return inside;
 }
 
 const r2 = (n: number): number => Math.round(n * 100) / 100;
@@ -133,6 +147,9 @@ export function besideBottles(a: Anchors, bottles: readonly Bottle[]): Anchors {
     for (const b of inside) if (s.length >= 3) s = cutBeside(s, a.bottles[b.slot]!, b.L);
     return s === start ? pts : s.length >= 3 ? s.map((p) => `${r2(p[0])},${r2(p[1])}`).join(' ') : pts;
   }) as [string, string, string, string];
+  // the three-quarter bag never draws smaller than the half beside the same bottles: where its own cut kept less, it takes the half's
+  const pts = (s: string) => s.split(' ').map((q) => q.split(',').map(Number) as P);
+  if (areaOf(pts(shapes[1])) < areaOf(pts(shapes[2]))) shapes[1] = shapes[2];
   const boxes = shapes.map((pts, i) => (pts === a.frame!.shapes[i] ? a.frame!.boxes[i]! : boxOf(pts.split(' ').map((q) => q.split(',').map(Number) as P)))) as [Box, Box, Box, Box];
   const out: Anchors = { ...a, frame: { shapes, boxes } };
   if (!known) KEPT.set(a, (known = new Map()));
