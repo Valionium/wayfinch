@@ -12,7 +12,7 @@ import { add, at, deg, Path, Pic, pointsAt, poly, rot, rrect, scale, touches, wi
  */
 export function batteryRefit(where: 'in' | 'on'): Pic {
   const pic = new Pic(320, 220);
-  const k = 0.4, O: Pt = where === 'in' ? [52, 184] : [66, 196], A = 38;
+  const k = 0.4, O: Pt = where === 'in' ? [52, 184] : [66, 188], A = 38;
   const da: Pt = [Math.cos(deg(A)), -Math.sin(deg(A))], nb: Pt = [Math.sin(deg(A)), Math.cos(deg(A))];
   /** a mm along the down tube from the motor, b mm across it towards its underside. */
   const p = (a: number, b: number): Pt => add(O, add(scale(da, a * k), scale(nb, b * k)));
@@ -22,7 +22,7 @@ export function batteryRefit(where: 'in' | 'on'): Pic {
   const hv: Pt = [-Math.sin(deg(18)), -Math.cos(deg(18))], hn: Pt = [hv[1] * -1, hv[0]];
   const H = p(660, -6), hp = (s: number, t: number): Pt => add(H, add(scale(hv, s * k), scale(hn, t * k)));
   pic.path('cp-body', poly([hp(-110, -30), hp(400, -30), hp(400, 30), hp(-110, 30)]), { name: 'head-tube' });
-  const mc = p(-30, 8);
+  const mc = p(-30, 0);
   pic.path('cp-body', rrect(mc[0] - 58 * k, mc[1] - 52 * k, 116 * k, 104 * k, 22 * k), { name: 'motor' });
   pic.circle('cp-fine', mc, 18 * k);
   // the battery: seated (dashed) and swung out about its lower end
@@ -35,11 +35,12 @@ export function batteryRefit(where: 'in' | 'on'): Pic {
   const bat = poly(out);
   pic.path('cp-halostroke', bat);
   pic.path('cp-hi', bat, { name: 'battery' });
-  pic.path('cp-fine', poly([rot(p(a0 + 30, b0 + 12), pivot, swing), rot(p(a0 + 30, b1 - 12), pivot, swing)], false));
   pic.mark('seat-mark', poly(seated));
   pic.path('cp-ghost', poly(seated), { name: 'seated' });
-  // the catch at the upper end; the key lock beside it
-  const latch = p(a0 + L, where === 'in' ? b1 - 8 : b0 + 8);
+  // the catch at the upper end, which the battery's end clicks into; the key lock beside it
+  const cb = where === 'in' ? [b1 - 40, b1] : [-45 - 20, -45];
+  pic.path('cp-obj', poly([p(a0 + L, cb[0]!), p(a0 + L + 12, cb[0]!), p(a0 + L + 12, cb[1]!), p(a0 + L, cb[1]!)]), { name: 'catch' });
+  const latch = p(a0 + L + 6, (cb[0]! + cb[1]!) / 2);
   const lock = where === 'in' ? p(a0 + L + 30, 22) : p(a0 + L + 30, -28);
   pic.circle('cp-obj', lock, 8 * k, { name: 'lock' });
   pic.line('cp-fine', add(lock, [-4 * k, 0]), add(lock, [4 * k, 0]));
@@ -53,8 +54,9 @@ export function batteryRefit(where: 'in' | 'on'): Pic {
   else pic.turn(pivot, r, base + swing - span - 18, base + swing - span - 1.5);
   pic.label('cp-t', where === 'in' ? [150, 214] : [80, 100], 'battery', [0, 0], rot(p(a0 + 150, (b0 + b1) / 2 + face * 20), pivot, swing),
     where === 'in' ? undefined : 'end', 'leader');
-  pic.label('cp-th', where === 'in' ? [196, 40] : [312, 196], 'until it clicks', [0, 0], latch, 'end', 'leader-click');
-  pic.facts.push(pointsAt(pic, 'leader', 'battery'), pointsAt(pic, 'leader-click', 'seated', 1.5), within(pic, 'lock', 'down-tube'),
+  pic.label('cp-th', where === 'in' ? [196, 40] : [200, 160], 'until it clicks', [0, 0], latch, where === 'in' ? 'end' : undefined, 'leader-click');
+  pic.label('cp-t', where === 'in' ? [316, 92] : [316, 126], 'lock', [0, 0], add(lock, [5 * k, 5 * k]), 'end', 'leader-lock');
+  pic.facts.push(pointsAt(pic, 'leader', 'battery'), pointsAt(pic, 'leader-click', 'catch'), pointsAt(pic, 'leader-lock', 'lock'), touches(pic, 'catch', 'seated', 0.5), within(pic, 'lock', 'down-tube'),
     touches(pic, 'battery', 'seated', 0.5));
   pic.facts.push(where === 'in' ? within(pic, 'seat-mark', 'down-tube', 0.6) : touches(pic, 'seat-mark', 'down-tube', 0.5));
   pic.fact('the battery swings about its lower end', at(pic, 'the pivot', pivot, 'battery', 0.2).ok);

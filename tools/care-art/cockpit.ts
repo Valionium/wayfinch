@@ -18,7 +18,7 @@ const BAR_TS: Pt = [STEM * U[0], CLAMP_S + STEM * U[1]];
 const ang = (v: Pt): number => (Math.atan2(v[0], -v[1]) * 180) / Math.PI;
 const R_BAR = 15.9, R_CLAMP = 21;
 
-type FrontOpts = { hi?: 'headset' | 'stem' | 'clamp'; box?: Box; fork?: boolean; endOn?: boolean };
+type FrontOpts = { hi?: 'headset' | 'stem' | 'clamp'; box?: Box; fork?: boolean; tubes?: boolean; endOn?: boolean };
 
 /**
  * The front end from the bike's right side, front to the right: top and down tube, the tapered head tube with its two bearings inside
@@ -31,8 +31,10 @@ function frontEnd(pic: Pic, o: Pt, k: number, opt: FrontOpts = {}): { B: Pt; A: 
   const rear = (s: number): Pt => A(-24 - (7 * -s) / 150, s);
   const away = (p: Pt, a: number, l: number): Pt => [p[0] - l * Math.cos(deg(a)), p[1] + l * Math.sin(deg(a))];
   // the top tube leaves the head tube's back a little downhill, the down tube steeply; both run on out of the picture
-  pic.path('cp-body', poly(cut([rear(-14), rear(-58), away(rear(-58), 8, 400), away(rear(-14), 8, 400)])));
-  pic.path('cp-body', poly(cut([rear(-92), rear(-148), away(rear(-148), 42, 400), away(rear(-92), 42, 400)])));
+  if (opt.tubes !== false) {
+    pic.path('cp-body', poly(cut([rear(-14), rear(-58), away(rear(-58), 8, 400), away(rear(-14), 8, 400)])));
+    pic.path('cp-body', poly(cut([rear(-92), rear(-148), away(rear(-148), 42, 400), away(rear(-92), 42, 400)])));
+  }
   if (opt.fork !== false) {
     pic.path('cp-body', poly(cut([A(-8, -168), A(22, -168), A(44, -420), A(14, -420)])));
     pic.path('cp-body', poly(cut([A(-31, -150), A(31, -150), A(40, -158), A(36, -170), A(-26, -170), A(-34, -160)])), { name: 'crown' });
@@ -57,12 +59,12 @@ function frontEnd(pic: Pic, o: Pt, k: number, opt: FrontOpts = {}): { B: Pt; A: 
   const sa = (th: number): number => ang(sub(ring(1, th), B));
   const stem = new Path().M(A(-22, 17)).L(A(-22, 57)).L(A(18, 57)).L(ring(R_CLAMP, 126)).arcTo(B, sa(96), true).L(ring(R_BAR, 96))
     .arcTo(B, sa(264), false).L(ring(R_CLAMP, 264)).arcTo(B, sa(234), true).L(A(18, 17)).Z();
+  if (opt.hi === 'clamp') pic.circle('cp-halo', B, 34 * k);
   if (opt.hi === 'stem') pic.path('cp-halostroke', stem);
   pic.path(opt.hi === 'stem' ? 'cp-hi' : 'cp-obj', stem, { name: 'stem' });
   boltHead(pic, A(-15, 27), 4.5 * k, { name: 'pinch-1' });
   boltHead(pic, A(-15, 47), 4.5 * k, { name: 'pinch-2' });
   // the faceplate: the clamp's front half; a bolt head above the bar and one below it face forward
-  if (opt.hi === 'clamp') pic.circle('cp-halo', B, 34 * k);
   pic.path('cp-obj', band(B, R_BAR * k, R_CLAMP * k, sa(84), sa(-84)), { name: 'faceplate' });
   const uAng = (Math.atan2(S(1, 0)[1] - B[1], S(1, 0)[0] - B[0]) * 180) / Math.PI;
   pic.path('cp-obj', rbox(S(12.5, 18.6), 5 * k, 6.4 * k, uAng), { name: 'bolt-top' });
@@ -139,7 +141,7 @@ export function dropGuide(kind: 'bar' | 'lever'): Pic {
     pic.label('cp-th', [10, 190], 'drop bar', [12, 186], m(-30, 112), undefined, 'leader');
     pic.facts.push(pointsAt(pic, 'leader', 'bar'));
   } else {
-    pic.label('cp-th', [316, 192], 'brake lever', [314, 188], m(101, 60), 'end', 'leader');
+    pic.label('cp-th', [300, 192], 'brake lever', [298, 188], m(101, 60), 'end', 'leader');
     pic.facts.push(pointsAt(pic, 'leader', 'blade'));
   }
   pic.label('cp-t', [250, 40], 'hood', [252, 36], m(99, -30), undefined, 'leader-hood');
@@ -300,7 +302,7 @@ export function twistTest(kind: 'drop' | 'flat'): Pic {
   const p2 = panel(pic, 173, 144, '2', 'Press down');
   pic.ns = 'p2-';
   const k = flat ? 0.85 : 0.55, oo: Pt = flat ? [200, 150] : [207, 128];
-  const { B, ring } = frontEnd(pic, oo, k, { hi: 'clamp', box: p2, fork: false, endOn: flat });
+  const { B, ring } = frontEnd(pic, oo, k, { hi: 'clamp', box: p2, fork: false, tubes: !flat, endOn: flat });
   const mb = (x: number, y: number): Pt => [B[0] + k * x, B[1] + k * y];
   // the press: a hand on the hood (drop) or the grip (flat), an arrow down onto it
   let press: Pt;
@@ -312,12 +314,14 @@ export function twistTest(kind: 'drop' | 'flat'): Pic {
     press = mb(74, -64);
     pic.facts.push(touches(pic, 'hand', 'hood', 1));
   } else {
-    pic.path('cp-obj', tube(mb(4, -3), mb(42, 3), 10 * k), { name: 'blade' });
-    pic.path('cp-rubber', rrect(...mb(-44, -16), 30 * k, 32 * k, 10 * k), { name: 'grip' });
-    pic.path('cp-hand', new Path().M(mb(-56, -12)).Q(mb(-56, -32), mb(-36, -32)).L(mb(-16, -32)).Q(mb(2, -32), mb(2, -14)).L(mb(2, 8))
-      .Q(mb(2, 14), mb(-4, 14)).Q(mb(-10, 14), mb(-10, 8)).L(mb(-10, -16)).L(mb(-56, -16)).Z(), { name: 'hand' });
-    press = mb(-26, -32);
-    pic.facts.push(touches(pic, 'hand', 'grip', 1));
+    // the bar's near half from the clamp to its end: swept 9° back and 5° up from 100 mm out, so the grip (210 to 340 mm out) sits
+    // 17 to 38 mm behind the clamp and 10 to 21 mm above it
+    pic.path('cp-obj', tube(mb(0, 0), mb(-38, -21), 22.2 * k), { name: 'bar-half' });
+    pic.path('cp-rubber', tube(mb(-15, -9), mb(-42, -23), 32 * k), { name: 'grip' });
+    pic.path('cp-hand', new Path().M(mb(-60, -34)).Q(mb(-60, -56), mb(-38, -56)).L(mb(-18, -52)).Q(mb(2, -48), mb(0, -28)).L(mb(-2, -14))
+      .Q(mb(-4, -6), mb(-10, -8)).Q(mb(-14, -10), mb(-13, -18)).L(mb(-12, -30)).L(mb(-56, -36)).Z(), { name: 'hand' });
+    press = mb(-30, -55.2);
+    pic.facts.push(touches(pic, 'hand', 'grip', 1), touches(pic, 'bar-half', 'bar', 0));
   }
   pic.arrow([press[0], press[1] - 26], press);
   if (!flat) {
