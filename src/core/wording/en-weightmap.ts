@@ -1,32 +1,14 @@
 // The weight map's words (weight map and bag shapes design, 1.4 to 1.7). Only /tools/bags/weightmap.js carries them, loaded on the first
-// press of "Show weight map". A reference, never advice: the ideal is the rider's own bags and things packed for the best balance the
-// planner found (the owner's finding G, 8 Nov 2026; a careful search, not a proof, so the words say "found": review of PR 78, I1), never
-// "you should".
+// press of "Show the map" (at the packing check, the owner's decision of 9 Nov 2026). A reference, never advice: the ideal is the rider's
+// own bags and things packed for the best balance the planner found (the owner's finding G, 8 Nov 2026; a careful search, not a proof,
+// so the words say "found": review of PR 78, I1), never "you should".
 export const WM = {
   title: 'Weight map',
   yours: 'Your weight',
   yoursSub: (kg: string): string => `${kg} kg packed, as the plan has it`,
-  /** The ideal's two kinds, with and without panniers, and the switch between them. */
-  idealWith: 'Ideal with panniers',
-  idealWithout: 'Ideal without panniers',
-  switchLabel: 'Ideal',
-  switchWith: 'With panniers',
-  switchWithout: 'Without panniers',
-  /** Under the ideal's title: which bags it uses. The same things and kilos as yours, except `addedMore`: the panniers also take what is left over. */
-  idealSub: {
-    own: 'Your bags and things, packed for the best balance the planner found',
-    added: 'Your bags plus two 20 L panniers, packed for the best balance the planner found',
-    addedMore: 'Your bags plus two 20 L panniers, which also take the things left over, packed for the best balance the planner found',
-    removed: 'Your bags without the panniers, packed for the best balance the planner found',
-  },
-  idealSame: 'The planner found no better balance for these bags: no move or swap of one of your things helps.',
-  /** Why an ideal cannot be shown, in its place. */
-  why: {
-    mounts: 'Your bike is set to no rack mounts, so there is no ideal with panniers.',
-    room: 'Without the panniers your other bags cannot hold everything, so there is no ideal without them.',
-    back: 'Without the panniers some things would go on your back or out of reach, so there is no ideal without them.',
-    backWith: 'With two panniers added the planner would put more on your back or out of reach, so there is no ideal with them.',
-  },
+  /** The one ideal (the owner's decision of 9 Nov 2026): the rider's own bags and things, packed for the best balance found. */
+  ideal: 'Ideal',
+  idealSub: 'Your bags and things, packed for the best balance the planner found',
   diff: 'Where yours differs',
   diffSub: 'Yours minus the ideal',
   diffShow: 'Show where yours differs',

@@ -404,17 +404,14 @@ button.go.small{font-size:15px;padding:9px 16px;flex:0 0 auto}
 .bk-onbody .bk-detail,.bagg.onbody .bk-detail{stroke:var(--amber)}
 .bk-far{opacity:.62}
 .bagg.ghost .bk-detail{display:none}
-/* the weight map, under the rig once the kit is chosen */
-.wm-show,.wm-diff,.wm-ideal button{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--muted-dim);border-radius:8px;padding:8px 12px;min-height:44px;margin-top:10px;cursor:pointer}
-.wm-show:focus-visible,.wm-diff:focus-visible,.wm-ideal button:focus-visible{outline:2px solid var(--blaze);outline-offset:2px}
-/* the switches sit above the maps, so nothing they change ever moves them (the owner's finding G, 8 Nov 2026) */
+/* the weight map, under the rig at the packing check: one line, the map behind "Show the map" (the owner's decision of 9 Nov 2026) */
+.wm-line{font-size:13px;margin:10px 0 0;color:var(--muted)}
+.wm-line:focus{outline:none}
+.wm-line[aria-busy="true"]{opacity:.75}
+.wm-show,.wm-diff{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--muted-dim);border-radius:8px;padding:8px 12px;min-height:44px;margin-top:10px;cursor:pointer}
+.wm-show:focus-visible,.wm-diff:focus-visible{outline:2px solid var(--blaze);outline-offset:2px}
+/* the switch sits above the maps, so nothing it changes ever moves it (the owner's finding G, 8 Nov 2026) */
 .wm-ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:0 10px;margin-bottom:10px}
-.wm-ideal{display:inline-flex}
-.wm-ideal button{margin-right:-1px}
-.wm-ideal button:first-child{border-radius:8px 0 0 8px}
-.wm-ideal button:last-child{border-radius:0 8px 8px 0}
-.wm-ideal button[aria-pressed="true"]{background:var(--panel-hi);border-color:var(--ink);font-weight:600}
-.wm-same{display:block;margin-top:2px}
 .rig-wm{margin-top:10px}
 .wm-maps{display:grid;gap:10px;grid-template-columns:1fr}
 @media (min-width:700px){
@@ -1950,9 +1947,10 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
   </div>
 
   <main id="planMain">
-  <!-- the weight map (design of 8 Nov 2026): right under the drawing on a phone, beside it when wide; outside the rig, which must fit the window to stay in view -->
-  <div class="wm-block">
-    <button type="button" class="wm-show" id="rigWeightMap" aria-expanded="false" aria-controls="weightMap" hidden>Show weight map</button>
+  <!-- the weight map (design of 8 Nov 2026): right under the drawing on a phone, beside it when wide; outside the rig, which must fit the window to stay in view. Since the owner's decision of 9 Nov 2026 one line at the packing check, the map only behind "Show the map" -->
+  <div class="wm-block" id="weightBlock">
+    <p class="wm-line" id="weightLine" tabindex="-1" hidden></p>
+    <button type="button" class="wm-show" id="rigWeightMap" aria-expanded="false" aria-controls="weightMap" hidden>Show the map</button>
     <div class="rig-wm" id="weightMap" hidden></div>
   </div>
   <!-- STEP 1 -->
@@ -8714,9 +8712,11 @@ function frameShapeGlyph(b){
   </svg>`;
 }
 
-/* ---- The weight map (design of 8 Nov 2026): /tools/bags/weightmap.js (window.WayfinchWeightMap), loaded on the first press of Show
-   weight map, never before. A view of the plan, not data: nothing of it is saved. It reads each bag where the rig draws it. ---- */
-const WEIGHT_MAP = { on:false, diff:false, drawn:'', which:null };   // which: the ideal the rider switched to, null for the plan's
+/* ---- The weight map (design of 8 Nov 2026, slimmed by the owner's decision of 9 Nov 2026): at the packing check one line under the
+   drawing says how the plan's balance stands against the best arrangement the planner finds in the rider's own bags; only when they
+   differ, "Show the map" opens /tools/bags/weightmap.js (window.WayfinchWeightMap), loaded on that first press, never before. A view of
+   the plan, not data: nothing of it is saved. It reads each bag where the rig draws it. ---- */
+const WEIGHT_MAP = { on:false, diff:false, drawn:'' };
 let WEIGHT_MAP_SCRIPT = null, RIG_OUTLINES = {};
 function loadWeightMap(){
   if(window.WayfinchWeightMap) return Promise.resolve(window.WayfinchWeightMap);
@@ -8728,23 +8728,15 @@ function loadWeightMap(){
   });
   return WEIGHT_MAP_SCRIPT;
 }
-// The ideal (the owner's finding G, 8 Nov 2026): the rider's own things in the rider's own bags, in the best arrangement the planner
-// allows: advisor.js's balancing (WM-BALANCE) over this page's own packing, each trial a hand placement more on planWith's copies, so
-// the frozen rules are only ever called and nothing of the plan changes. With panniers and without, the one matching the plan first.
-const IDEAL_PANNIER_L = 20;
+// The ideal (the owner's finding G, 8 Nov 2026, and decision of 9 Nov): the rider's own things in the rider's own bags, in the best
+// arrangement the planner finds: advisor.js's balancing (WM-BALANCE) from the plan as it is, with its wider look (every single placement
+// of one thing, whichever way it weighs: review of PR 78, m-A), each trial a hand placement more on planWith's copies, so the frozen rules
+// are only ever called and nothing of the plan changes. The rider's hand placements and must-reach things may move in it: the line then
+// says which of them keep the load from it. One ideal: the with and without panniers switch is gone (the Gear advisor answers that).
+// The search runs in slices between frames, so the page never stalls: each slice runs it again with more trials, every trial
+// remembered, so it only adds new ones; at most IDEAL_TRIALS, then it answers with what it found (marked partial).
+const IDEAL_TRIALS = 200, IDEAL_SLICE = 8;
 let IDEAL_CACHE = { key:null, value:null };
-const idealFirst = () => S.bags.some(b => b.pos === 'rack') || hasDeck('rack') ? 'with' : 'without';
-// The ideal's bags: the plan's own; with panniers on a plan that has none, a pair of 20 L panniers added (not on a bike set to no rack
-// mounts, unless the plan has a rack); without panniers, the plan's taken away.
-function idealSetup(which){
-  const has = S.bags.some(b => b.pos === 'rack');
-  if(which === 'with' && !has){
-    if(advisorNoMounts() && !hasDeck('rack')) return { why:'mounts' };
-    return { kind:'added', bags:[...S.bags, { uid:S.nextUid, pos:'rack', L:IDEAL_PANNIER_L, pair:true }] };
-  }
-  if(which === 'without' && has) return { kind:'removed', bags:S.bags.filter(b => b.pos !== 'rack') };
-  return { kind:'own', bags:S.bags };
-}
 // A plan as the balancing reads it, while the trial's inputs are in place: each item placed whole in one bag (food, which fills the
 // gaps, and bottles stay as the planner has them), the bags in use with their free litres, and the plan's kilos per bag for the map.
 function balancePacking(plan){
@@ -8765,42 +8757,95 @@ function balancePacking(plan){
 function idealTrial(bags, pins, placements){
   return planWith({ bags:bags.map(({ hand, ...b }) => ({ ...b })), decks:{ ...S.decks }, pinned:{ ...S.pinned, ...pins }, placements }, balancePacking);
 }
-// Where a bag of the ideal is drawn: as the rig draws it, or, for a bag the rig does not show (the panniers added), where it would.
-function idealOutline(key, bags){
-  if(RIG_OUTLINES[key]) return RIG_OUTLINES[key].outline;
-  const [uid, idx] = String(key).split('-'), b = bags.find(x => String(x.uid) === uid); if(!b) return null;
-  const n = bags.filter(x => x.pos === b.pos).flatMap(physical).length;
-  let L = layout(b.pos, +idx, n, frameShapeIdx(bags.find(x => x.pos === 'frame')), b.slot, rigAnchors()); if(!L) return null;
-  if(+idx > 0 && !slotsFor(b.pos)){ const o = pairOffset(b.pos); L = shiftShape(L, o[0], o[1]); }
-  const s = bagShapeOf(b.pos, L, +b.L, b.slot);
-  return s ? s.outline : null;
+// The plan's handling score, as Better handling counts it (the advisor's WEIGHTS, to the hundredth).
+function idealScore(r){
+  const W = window.WayfinchAdvisor.WEIGHTS;
+  return Math.round(Object.entries(r.kgByPos).reduce((t, [p, kg]) => t + (kg || 0) * (W[p] || 0), 0) * 100) / 100;
 }
-function idealFor(which){
-  const setup = idealSetup(which);
-  if(setup.why) return { why:setup.why };
-  const start = idealTrial(setup.bags, {}, setup.kind === 'own' ? S.placements : null);
-  if(setup.kind === 'removed'){
-    const mine = currentPlan(), spilled = new Set(mine.spill.map(k => k.id));
-    if(start.overL > mine.summary.overL + 0.005 || start.spill.some(id => !spilled.has(id))) return { why:'room' };
-  }
-  const out = window.WayfinchAdvisor.balance(start, (pins, from) => idealTrial(setup.bags, pins, from.state), { fixed:Object.keys(S.pinned || {}) });
-  // The search keeps its promises from its own start; an ideal with other bags must also keep the rider's plan's: no more litres on
-  // the back and nothing more out of reach (review of PR 78, I2), else it says why instead.
-  if(setup.kind !== 'own'){
-    const mine = advisorResult(currentPlan()), got = out.packing.result;
-    if(got.backL > mine.backL + 0.005 || got.outOfReach > mine.outOfReach) return { why:setup.kind === 'removed' ? 'back' : 'backWith' };
-  }
-  const items = out.packing.slots.filter(s => s.kg > 0).map(s => ({ pos:s.pos, kg:s.kg, outline:idealOutline(s.key, setup.bags) }))
+// The search from the plan as it is: nothing held (the rider's hand placements and must-reach things may move, keeping every promise:
+// nothing more left over, on the back or out of reach), the things the planner split over bags tried whole too.
+function idealSearch(){
+  const start = idealTrial(S.bags, {}, S.placements), A = currentPlan(), seen = new WeakMap();
+  const trial = (pins, from) => {
+    let m = seen.get(from); if(!m) seen.set(from, m = new Map());
+    const k = JSON.stringify(pins);
+    if(!m.has(k)) m.set(k, idealTrial(S.bags, pins, from.state));
+    return m.get(k);
+  };
+  const extra = Object.keys(A.items).filter(id => (A.items[id] || []).length > 1 && !(kitById(id) || {}).divisible);
+  return { start, run:n => window.WayfinchAdvisor.balance(start, trial, { wide:true, extra, maxTrials:n }) };
+}
+function idealResult(out, start){
+  const gain = Math.round((idealScore(start.result) - idealScore(out.packing.result)) * 100) / 100;
+  const items = out.packing.slots.filter(s => s.kg > 0).map(s => ({ pos:s.pos, kg:s.kg, outline:RIG_OUTLINES[s.key] ? RIG_OUTLINES[s.key].outline : null }))
     .filter(i => i.outline && i.outline.length >= 3);
-  // more: the added panniers also take things the plan leaves over, so the ideal carries more kilos than yours (review of PR 78, m1)
-  const more = out.packing.slots.reduce((t, s) => t + s.kg, 0) > currentPlan().slots.reduce((t, s) => t + weightIn(s), 0) + 0.005;
-  return { kind:setup.kind, items, same:setup.kind === 'own' && !out.moves.length && !out.partial, more, balanced:out };
+  return { gain, partial:out.partial, items, balanced:out, start, note:balanceNote(out, start, gain) };
 }
-// Worked out again only when the plan, its placements or the choice changed.
-function weightMapIdeal(which){
-  const key = JSON.stringify([which, planSignature(), S.placements, S.nextUid]);
-  if(IDEAL_CACHE.key !== key) IDEAL_CACHE = { key, value:idealFor(which) };
-  return IDEAL_CACHE.value;
+const idealKey = () => JSON.stringify([planSignature(), S.placements]);
+function idealStep(c){
+  c.n = Math.min(IDEAL_TRIALS, c.n + IDEAL_SLICE);
+  const out = c.search.run(c.n);
+  if(!out.partial || c.n >= IDEAL_TRIALS) c.value = idealResult(out, c.search.start);
+}
+function idealSlice(c){
+  if(IDEAL_CACHE !== c || c.value || c.key !== idealKey()) return;   // a newer plan has its own search
+  idealStep(c);
+  if(c.value) drawWeightMap(); else setTimeout(() => idealSlice(c), 0);
+}
+// The ideal of the plan as it is now, or null while its search runs (now: run it to the end at once). Worked out again only when the
+// plan or its placements changed.
+function weightMapIdeal(now = false){
+  if(!window.WayfinchAdvisor || !window.WayfinchAdvisor.balance) return null;
+  const key = idealKey();
+  if(IDEAL_CACHE.key !== key){
+    IDEAL_CACHE = { key, value:null, search:idealSearch(), n:0 };
+    const c = IDEAL_CACHE;
+    if(!now) setTimeout(() => idealSlice(c), 0);
+  }
+  const c = IDEAL_CACHE;
+  while(now && !c.value) idealStep(c);
+  return c.value;
+}
+
+// The line under the drawing (the owner's decision of 9 Nov 2026), from the same search, never a guess: the default line when nothing the
+// search tries lowers the score by 0.01 or more (WM-BALANCE's step) and it finished; else which of the rider's hand placements and
+// must-reach things (within reach where they are) the best arrangement found puts elsewhere, by bag, and what that does there; with
+// none of them, that a better balance is possible. An unfinished search that found nothing says nothing.
+const NOTE_ZONES = { front:'at the front', rear:'at the rear', centre:'in the middle', body:'on your back' };
+// a kit name with its first letter lowered unless it is a capital word ("ID, cards, insurance"); a thing the rider added as typed
+const kitWord = k => !k ? null : k.added ? k.name : k.name.replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase());
+const noteList = names => names.length > 3 ? `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`
+  : names.length < 2 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+function noteSentence(g){
+  const W = window.WayfinchAdvisor.WEIGHTS, n = g.things.length, s = n > 1 ? '' : 's', zone = POSITIONS[g.pos].zone;
+  const slot = currentPlan().slots.find(x => x.key === g.unit), bag = (slot ? unitLabel(slot) : POSITIONS[g.pos].label).toLowerCase();
+  const who = g.kind === 'hand' ? `Your hand placement${n > 1 ? 's' : ''}` : `Your must-reach thing${n > 1 ? 's' : ''}`;
+  const effect = g.things.every(t => W[t.to] < W[g.pos] && POSITIONS[t.to].zone !== zone) ? `put${s} more weight ${NOTE_ZONES[zone]}`
+    : g.things.every(t => W[t.to] > W[g.pos]) ? `take${s} room there that heavier things could use`
+    : `keep${s} the load from its best balance`;
+  return `${who} in the ${bag} (${noteList(g.things.map(t => kitWord(kitById(t.id)) || t.id))}) ${effect}.`;
+}
+function balanceNote(out, start, gain){
+  if(gain < 0.01) return out.partial ? null : { text:'Your load is as balanced as your bags allow.', map:false, groups:[] };
+  const to = new Map(out.packing.pieces.map(p => [p.id, p])), pinned = S.pinned || {}, groups = [];
+  start.pieces.forEach(p => {
+    const q = to.get(p.id); if(!q || q.unit === p.unit) return;
+    const k = kitById(p.id);
+    const kind = pinned[p.id] === p.unit ? 'hand' : k && isMustReach(k) && reachableFor(k, p.pos) ? 'reach' : null;
+    if(!kind) return;
+    let g = groups.find(x => x.kind === kind && x.unit === p.unit);
+    if(!g) groups.push(g = { kind, unit:p.unit, pos:p.pos, things:[] });
+    g.things.push({ id:p.id, kg:p.kg, to:q.pos });
+  });
+  if(!groups.length){
+    const text = gain >= window.WayfinchAdvisor.MIN_GAIN_SCORE ? 'A better balance is possible with your own bags.' : 'A slightly better balance is possible with your own bags.';
+    return { text, map:true, groups };
+  }
+  const kg = g => g.things.reduce((t, x) => t + x.kg, 0);
+  groups.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'hand' ? -1 : 1) || kg(b) - kg(a) || (a.unit < b.unit ? -1 : a.unit > b.unit ? 1 : 0));
+  const said = groups.slice(0, 2).map(noteSentence);
+  if(groups.length > 2) said.push('Other hand placements and must-reach things of yours do too.');
+  return { text:said.join(' '), map:true, groups:groups.slice(0, 2) };
 }
 
 /* ---- Automatic balancing (the owner's decision of 8 Nov 2026, weight map design §7): at the packing step, on top of the planner's own
@@ -8890,40 +8935,65 @@ function deckMapItem(a){
   const kg = deckClaims().reduce((t, k) => t + itemKg(k), 0), d = a.rackTop;
   return kg > 0 ? [{ pos:'deck', kg, outline:[[d.x, d.y], [d.x + d.w, d.y], [d.x + d.w, d.y + d.h], [d.x, d.y + d.h]] }] : [];
 }
-// Each packed bag, bottle and the rack deck's load with its kilos and its outline as drawn; the ideal for the switch's choice; the bike
-// without its colour (WM-NEUTRAL). Needs bike.js and advisor.js.
+// Each packed bag, bottle and the rack deck's load with its kilos and its outline as drawn; the ideal; the bike without its colour
+// (WM-NEUTRAL). Needs bike.js and advisor.js, and the ideal's search done.
 function weightMapInput(){
-  const B = bikeModule(), a = rigAnchors(); if(!B || !B.bagShape || !a || !window.WayfinchAdvisor) return null;
+  const B = bikeModule(), a = rigAnchors(), found = weightMapIdeal(); if(!B || !B.bagShape || !a || !found) return null;
   const items = [];
   currentPlan().slots.forEach(s => { const o = RIG_OUTLINES[s.key], kg = (s.items || []).reduce((t, k) => t + placedKg(k), 0);
     if(o && kg > 0) items.push({ pos:o.pos, kg, outline:o.outline }); });
   items.push(...deckMapItem(a));
-  const which = WEIGHT_MAP.which || idealFirst(), found = weightMapIdeal(which);
-  const ideal = found.why ? { why:found.why } : { kind:found.kind, items:[...found.items, ...deckMapItem(a)], same:found.same, more:found.more };
   const art = rigArt(true);
-  return { items, scale:a.scale, ideal, which, diff:WEIGHT_MAP.diff,
+  return { items, scale:a.scale, ideal:{ items:[...found.items, ...deckMapItem(a)] }, diff:WEIGHT_MAP.diff,
     bike:art ? art.svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '') : '',
-    onDiff:on => { WEIGHT_MAP.diff = on; drawWeightMap(); },
-    onIdeal:w => { WEIGHT_MAP.which = w; drawWeightMap(); } };
+    onDiff:on => { WEIGHT_MAP.diff = on; drawWeightMap(); } };
 }
+// The line, "Show the map" and the map, at the packing check. The page never jumps (WM-STILL): when the block changes while it starts
+// above the top of the window (the rider has scrolled past it), the page moves by the same height, so what the rider reads stays where
+// it was; after a press the page's own viewport anchor keeps the pressed control in place instead.
 function drawWeightMap(){
-  const button = $('rigWeightMap'), box = $('weightMap'); if(!button || !box) return;
-  const offered = S.step >= 3 && !!bikeModule(), on = offered && WEIGHT_MAP.on;
-  button.hidden = !offered;
+  const block = $('weightBlock'), line = $('weightLine'), button = $('rigWeightMap'), box = $('weightMap');
+  if(!block || !line || !button || !box) return;
+  const before = typeof block.getBoundingClientRect === 'function' && !VIEWPORT_ANCHOR ? block.getBoundingClientRect() : null;
+  fillWeightMap(line, button, box);
+  if(before && before.top < 0){
+    const d = block.getBoundingClientRect().height - before.height;
+    if(Math.abs(d) > .5) window.scrollTo({ top:window.scrollY + d, left:window.scrollX, behavior:'instant' });
+  }
+}
+function fillWeightMap(line, button, box){
+  if(S.step !== 4 || !bikeModule() || WEIGHT_MAP.failed){ line.hidden = true; button.hidden = true; box.hidden = true; return; }
+  const ready = !!(window.WayfinchAdvisor && window.WayfinchAdvisor.balance);
+  if(!ready) loadAdvisor().then(() => drawWeightMap(), () => { WEIGHT_MAP.failed = true; drawWeightMap(); });
+  const found = ready ? weightMapIdeal() : null;
+  line.hidden = false;
+  if(!found){
+    // while the search runs: it says so; "Show the map" and the map stay as they were
+    line.textContent = 'Checking the balance…';
+    line.setAttribute('aria-busy', 'true');
+    return;
+  }
+  line.removeAttribute('aria-busy');
+  const note = found.note, map = !!(note && note.map), on = map && WEIGHT_MAP.on;
+  line.hidden = !note;
+  line.textContent = note ? note.text : '';
+  // the button goes when the plan reaches the best balance: focus on it moves to the line
+  if(!map && !button.hidden && document.activeElement === button && note) line.focus({ preventScroll:true });
+  button.hidden = !map;
   button.setAttribute('aria-expanded', on ? 'true' : 'false');
-  button.textContent = on ? 'Hide weight map' : 'Show weight map';
+  button.textContent = on ? 'Hide the map' : 'Show the map';
   button.onclick = () => { WEIGHT_MAP.on = !WEIGHT_MAP.on; WEIGHT_MAP.drawn = ''; drawWeightMap(); };
   box.hidden = !on;
   if(!on) return;
-  Promise.all([loadWeightMap(), loadAdvisor()]).then(([M]) => {
+  loadWeightMap().then(M => {
     if(!WEIGHT_MAP.on) return;
     const input = weightMapInput(); if(!input) return;
     // drawn again only when the plan, the theme, the ideal or the difference changed
-    const key = JSON.stringify([input.items, input.which, IDEAL_CACHE.key, input.diff, bikeTheme(), input.bike]);
+    const key = JSON.stringify([input.items, IDEAL_CACHE.key, input.diff, bikeTheme(), input.bike]);
     if(key === WEIGHT_MAP.drawn) return;
     WEIGHT_MAP.drawn = key;
     M.render(box, input);
-  }).catch(() => { WEIGHT_MAP.drawn = ''; box.textContent = 'The weight map could not be loaded. Check the connection and press Show weight map again.'; });
+  }).catch(() => { WEIGHT_MAP.drawn = ''; box.textContent = 'The weight map could not be loaded. Check the connection and press Show the map again.'; });
 }
 
 // The bike at the back of the rig, redrawn on its own when only the look or the theme changed.

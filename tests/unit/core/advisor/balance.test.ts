@@ -202,6 +202,34 @@ describe('balancing in the rider\'s own bags (weight map design §7)', () => {
     expect(out.partial).toBe(true);
     expect(MAX_BALANCE_TRIALS).toBeGreaterThanOrEqual(100);
   });
+
+  // Review of PR 78, m-A: a thing moved to a heavier place can still lower the score, since the re-pack then fills the room it leaves with
+  // heavier things (food here). The usual search never tries it; the wider look (the weight map's ideal, the owner's decision of 9 Nov) does.
+  test('[WM-BALANCE] the wider look: a bulky light thing out of the full frame bag lets the food in, though it sits heavier itself', () => {
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 3, reach: true }, { key: 's-0', pos: 'seat', cap: 14, reach: true }];
+    const items: FItem[] = [{ id: 'jacket', kg: 0.2, L: 3 }, { id: 'food', kg: 2, L: 3, food: true }];
+    const p = repacker(bags, items, { jacket: 'f-0' });
+    expect(balance(p.start, p.trial).moves).toEqual([]); // the usual search: nothing lighter to move to
+    const out = balance(p.start, p.trial, { wide: true });
+    expect(out.moves).toEqual([{ id: 'jacket', from: 'f-0', to: 's-0' }]);
+    expect(keepsPromises(p.start.result, out.packing.result)).toBe(true);
+    expect(handlingScore(out.packing.result)).toBeCloseTo(handlingScore(p.start.result) - (2 - 0.2) * (WEIGHTS.seat - WEIGHTS.frame), 2);
+    expect(out.partial).toBe(false);
+    expect(balance(p.start, p.trial, { wide: true })).toEqual(out);
+    // a hand placement is never part of it
+    expect(balance(p.start, p.trial, { wide: true, fixed: ['jacket'] }).moves).toEqual([]);
+  });
+
+  test('[WM-BALANCE] the wider look also places a thing the planner split over bags whole, and keeps it only when it helps', () => {
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 3, reach: true }, { key: 's-0', pos: 'seat', cap: 14, reach: true }];
+    const items: FItem[] = [{ id: 'jacket', kg: 0.2, L: 3 }, { id: 'food', kg: 2, L: 3, food: true }];
+    const p = repacker(bags, items, { jacket: 'f-0' });
+    const seen: string[] = [];
+    const trial = (pins: Record<string, string>) => { seen.push(JSON.stringify(pins)); return p.trial(pins); };
+    const out = balance(p.start, trial, { wide: true, extra: ['mat'] });
+    expect(seen).toContain(JSON.stringify({ jacket: 's-0', mat: 'f-0' }));
+    expect(out.pins).toEqual({ jacket: 's-0' }); // the mat (not a thing this stand-in packs) changes nothing, so it is not kept
+  });
 });
 
 // The owner's decision of 8 Nov 2026 (weight map design §7): the bag planner balances by itself, on top of its own packing, and only when

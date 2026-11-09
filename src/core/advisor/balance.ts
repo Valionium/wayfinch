@@ -63,13 +63,34 @@ function optionsOf(cur: Packing, fixed: ReadonlySet<string>): Option[] {
 }
 
 /**
+ * The wider look (review of PR 78, m-A): every single placement of one thing into another bag in use, whichever way it weighs and
+ * whatever the litres look like, and of each thing the planner split over bags (`extra`) whole into each bag. A thing moved to a heavier
+ * place can still lower the score: the re-pack then fills the room it leaves with heavier things. The trial decides; things in the
+ * lightest places and the bulkiest first.
+ */
+function widerOf(cur: Packing, fixed: ReadonlySet<string>, extra: readonly string[]): Option[] {
+  const out: (Option & { w: number; L: number })[] = [];
+  for (const p of cur.pieces) {
+    if (fixed.has(p.id)) continue;
+    for (const r of cur.rooms) if (r.key !== p.unit) out.push({ pins: { [p.id]: r.key }, gain: 0, name: `${p.id}>${r.key}`, w: WEIGHTS[p.pos], L: p.L });
+  }
+  const whole = new Set(cur.pieces.map((p) => p.id));
+  for (const id of extra) {
+    if (fixed.has(id) || whole.has(id)) continue;
+    for (const r of cur.rooms) out.push({ pins: { [id]: r.key }, gain: 0, name: `${id}>${r.key}`, w: Infinity, L: 0 });
+  }
+  return out.sort((a, b) => a.w - b.w || b.L - a.L || order(a.name, b.name));
+}
+
+/**
  * From `start`, moves one whole item into a bag in use whose position weighs less, or swaps two whole items so the heavier sits lighter
  * (most weighted kilos saved first), keeping one only when the trial keeps every promise and lowers the score by at least 0.01, until no
  * move or swap helps or MAX_BALANCE_TRIALS ran. `fixed` names the items that never move (the rider's hand placements). A move refused is
- * tried again only after another was kept. Every input the same, the same answer.
+ * tried again only after another was kept. `wide`: then also the wider look (widerOf), with `extra` the things split over bags. Every
+ * input the same, the same answer.
  */
 export function balance(start: Packing, trial: (pins: Record<string, string>, from: Packing) => Packing,
-  o: { fixed?: ReadonlySet<string> | readonly string[]; maxTrials?: number } = {}): Balanced {
+  o: { fixed?: ReadonlySet<string> | readonly string[]; maxTrials?: number; wide?: boolean; extra?: readonly string[] } = {}): Balanced {
   const fixed = new Set(o.fixed ?? []);
   const max = o.maxTrials ?? MAX_BALANCE_TRIALS;
   let failed = new Set<string>();
@@ -83,7 +104,8 @@ export function balance(start: Packing, trial: (pins: Record<string, string>, fr
   };
   for (;;) {
     let moved = false;
-    for (const x of optionsOf(cur, fixed)) {
+    // the wider look (o.wide) comes after every move and swap of the usual kind, so it is tried only once none of them helps
+    for (const x of [...optionsOf(cur, fixed), ...(o.wide ? widerOf(cur, fixed, o.extra ?? []) : [])]) {
       if (failed.has(x.name)) continue;
       if (tried >= max) return done(true);
       tried++;

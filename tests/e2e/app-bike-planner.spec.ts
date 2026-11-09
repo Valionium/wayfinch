@@ -334,19 +334,36 @@ test('[BK-SHAPES-PAGE] a tap on the middle of each drawn bag shape reaches that 
   }
 });
 
-test('[WM-PAGE] Show weight map: off by default, weightmap.js only on the first press, yours over the ideal on a phone, the difference opt-in, the backpack on your back', async ({ page }) => {
+// The owner's decision of 9 Nov 2026 (weight map design, "slim the weight map down"): at the packing check one line under the drawing,
+// the map only behind "Show the map" when the line says the plan differs from the best arrangement found in the rider's own bags.
+async function packingCheck(page: Page, bags: string): Promise<void> {
+  await page.evaluate(`${bags} go(2); go(3); go(4)`);
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click(); // the weight question, skipped
+  const line = page.locator('#weightLine');
+  await expect(line).toBeVisible();
+  await expect(line).not.toHaveText('Checking the balance…', { timeout: 30_000 });
+  await expect(line).not.toHaveAttribute('aria-busy', 'true');
+}
+const SMALL_BAGS = "S.bags = [{ uid:1, pos:'seat', L:5 }, { uid:2, pos:'bar', L:5 }, { uid:3, pos:'pack', L:30 }]; S.nextUid = 4; S.decks = { bar:false, rack:false };";
+const SBF_BAGS = "S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'frame', L:6 }]; S.nextUid = 4; S.decks = { bar:false, rack:false };";
+
+test('[WM-PAGE] the line at the packing check; Show the map off by default, weightmap.js only on its first press, yours over the ideal on a phone, the difference opt-in, the backpack on your back', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   const loads: string[] = [];
   page.on('request', (r) => { if (r.url().endsWith('/weightmap.js')) loads.push(r.url()); });
   await planner(page);
   // small bike bags, so the backpack carries some of the kit
-  await page.evaluate("S.bags = [{ uid:1, pos:'seat', L:5 }, { uid:2, pos:'bar', L:5 }, { uid:3, pos:'pack', L:30 }]; S.nextUid = 4; S.decks = { bar:false, rack:false }; go(2)");
+  await page.evaluate(`${SMALL_BAGS} go(2); go(3)`);
   const show = page.locator('#rigWeightMap');
-  await expect(show).toBeHidden(); // not before the kit is chosen
-  await page.evaluate('go(3)');
+  const line = page.locator('#weightLine');
+  await expect(line).toBeHidden(); // not before the packing check
+  await expect(show).toBeHidden();
+  await packingCheck(page, SMALL_BAGS);
+  // the rider's must-reach things keep the load from the best arrangement found: said, with the map a press away
+  await expect(line).toHaveText(/^Your must-reach things? in the /);
   await expect(show).toBeVisible();
-  await expect(show).toHaveText('Show weight map');
+  await expect(show).toHaveText('Show the map');
   await expect(show).toHaveAttribute('aria-expanded', 'false');
   await expect(page.locator('#weightMap')).toBeHidden();
   expect(loads).toHaveLength(0);
@@ -354,13 +371,15 @@ test('[WM-PAGE] Show weight map: off by default, weightmap.js only on the first 
   const cards = page.locator('#weightMap .wm-card');
   await expect(cards).toHaveCount(2);
   await expect(show).toHaveAttribute('aria-expanded', 'true');
+  await expect(show).toHaveText('Hide the map');
   expect(loads).toHaveLength(1);
   await expect(page.locator('#weightMap .wm-cap')).toContainText('weighted kilos');
+  await expect(page.locator('#weightMap .wm-ideal, #weightMap .wm-with, #weightMap .wm-without')).toHaveCount(0); // one ideal, no switch
+  await expect(cards.nth(1).locator('figcaption')).toHaveText('Ideal Your bags and things, packed for the best balance the planner found');
   await expect(cards.nth(0).locator('.wm-sum')).toContainText('Of the weighted load:');
   await expect(cards.nth(0).locator('svg')).toHaveAttribute('aria-label', /^Your weight\. Of the weighted load: /);
   await expect(cards.nth(0).locator('canvas')).toHaveAttribute('aria-hidden', 'true');
-  // the backpack is its own patch, labelled; the ideal (the rider's own setup since the owner's finding G, 8 Nov 2026, no longer a
-  // fixed profile with nothing on the back) never has more on the back than yours
+  // the backpack is its own patch, labelled; the ideal never has more on the back than yours
   await expect(cards.nth(0).locator('.wm-label')).toHaveText(['on your back']);
   const back = async (n: number) => Number(/(\d+)% on your back/.exec((await cards.nth(n).locator('.wm-sum').textContent()) ?? '')![1]);
   expect(await back(1)).toBeLessThanOrEqual(await back(0));
@@ -401,24 +420,36 @@ test('[WM-PAGE] Show weight map: off by default, weightmap.js only on the first 
   expect(errors).toEqual([]);
 });
 
-// The owner's finding G (8 Nov 2026): "Show where yours differs" near the bottom made the page jump.
-test('[WM-STILL] the weight map never moves the page: near the bottom of the window, the difference and the ideal switch keep the scroll and the button where they were', async ({ page }) => {
+test('[WM-NOTE] a load the search finds nothing better for: the one line, no map and nothing downloaded', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  const loads: string[] = [];
+  page.on('request', (r) => { if (r.url().endsWith('/weightmap.js')) loads.push(r.url()); });
+  await planner(page);
+  await packingCheck(page, "S.bags = [{ uid:1, pos:'pack', L:30 }]; S.nextUid = 2; S.decks = { bar:false, rack:false };");
+  await expect(page.locator('#weightLine')).toHaveText('Your load is as balanced as your bags allow.');
+  await expect(page.locator('#rigWeightMap')).toBeHidden();
+  await expect(page.locator('#weightMap')).toBeHidden();
+  expect(loads).toHaveLength(0);
+  expect(errors).toEqual([]);
+});
+
+// The owner's finding G (8 Nov 2026): "Show where yours differs" near the bottom made the page jump. Since 9 Nov the line can change
+// after the search: above the top of the window, the page moves with it, so what the rider reads stays put.
+test('[WM-STILL] the weight map never moves the page: near the bottom of the window, Show the map and the difference keep the scroll and the button where they were; the line changing above the window moves nothing in view', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await planner(page);
-  await page.evaluate("S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'frame', L:6 }]; S.nextUid = 4; S.decks = { bar:false, rack:false }; go(3)");
-  await page.locator('#rigWeightMap').click();
+  await packingCheck(page, SBF_BAGS);
+  await expect(page.locator('#rigWeightMap')).toBeVisible();
   const cards = page.locator('#weightMap .wm-card');
-  await expect(cards).toHaveCount(2);
-  await expect(page.locator('#weightMap .wm-without')).toHaveAttribute('aria-pressed', 'true'); // no panniers in the plan: without first
   const steps: [string, () => Promise<void>][] = [
-    ['.wm-diff', () => expect(cards).toHaveCount(3)],
-    ['.wm-with', () => expect(page.locator('#weightMap .wm-with')).toHaveAttribute('aria-pressed', 'true')],
-    ['.wm-diff', () => expect(cards).toHaveCount(2)],
-    ['.wm-without', () => expect(page.locator('#weightMap .wm-without')).toHaveAttribute('aria-pressed', 'true')],
+    ['#rigWeightMap', () => expect(cards).toHaveCount(2)],
+    ['#weightMap .wm-diff', () => expect(cards).toHaveCount(3)],
+    ['#weightMap .wm-diff', () => expect(cards).toHaveCount(2)],
   ];
   for (const [sel, changed] of steps) {
-    const button = page.locator(`#weightMap ${sel}`);
+    const button = page.locator(sel);
     // the button just above the bottom of the window, where the owner pressed it
     await button.evaluate((el) => { window.scrollBy(0, el.getBoundingClientRect().bottom - window.innerHeight + 12); });
     const before = await button.evaluate((el) => [el.getBoundingClientRect().top, window.scrollY]);
@@ -428,30 +459,38 @@ test('[WM-STILL] the weight map never moves the page: near the bottom of the win
     const after = await button.evaluate((el) => [el.getBoundingClientRect().top, window.scrollY]);
     expect(Math.abs(after[0]! - before[0]!), `${sel}: the button stays where it was`).toBeLessThanOrEqual(1);
     expect(Math.abs(after[1]! - before[1]!), `${sel}: the page does not scroll`).toBeLessThanOrEqual(1);
-    expect(await page.evaluate((s) => document.activeElement?.matches(`#weightMap ${s}`), sel), `${sel}: focus stays on it`).toBe(true);
+    expect(await page.evaluate((s) => document.activeElement?.matches(s), sel), `${sel}: focus stays on it`).toBe(true);
   }
-  // the ideal with panniers: two panniers on the plan without them, drawn in the ideal, and the plan itself unchanged
-  await page.locator('#weightMap .wm-with').click();
-  await expect(cards.nth(1).locator('figcaption')).toContainText('Ideal with panniers');
-  await expect(cards.nth(1).locator('figcaption')).toContainText('two 20 L panniers');
-  expect(await page.evaluate("S.bags.some(b => b.pos === 'rack')")).toBe(false);
+  // the line worked out again while the rider reads further down: the packing check's heading stays where it was
+  const heading = page.locator('#stepTitle4');
+  await heading.evaluate((el) => { window.scrollBy(0, el.getBoundingClientRect().top - 8); });
+  expect(await page.locator('#weightBlock').evaluate((el) => el.getBoundingClientRect().bottom)).toBeLessThan(0);
+  const top = await heading.evaluate((el) => el.getBoundingClientRect().top);
+  await page.evaluate('IDEAL_CACHE = { key:null, value:null }; drawWeightMap()');
+  await expect(page.locator('#weightLine')).toHaveText('Checking the balance…');
+  expect(Math.abs((await heading.evaluate((el) => el.getBoundingClientRect().top)) - top), 'while it checks').toBeLessThanOrEqual(1);
+  await expect(page.locator('#weightLine')).not.toHaveText('Checking the balance…', { timeout: 30_000 });
+  expect(Math.abs((await heading.evaluate((el) => el.getBoundingClientRect().top)) - top), 'with the line back').toBeLessThanOrEqual(1);
+  expect(await page.evaluate("S.bags.some(b => b.pos === 'rack')")).toBe(false); // nothing added to the plan
   expect(errors).toEqual([]);
 });
 
-// Review of PR 78, m4: the switch row (a pressed pair and "Show where yours differs") at the narrowest phone, in both themes.
-test('[WM-STILL] at 320 px, light and dark: the weight map\'s switches wrap without a sideways scroll, every button at least 44 px', async ({ page }) => {
+// Review of PR 78, m4: the weight map's buttons at the narrowest phone, in both themes; and the line wraps there.
+test('[WM-STILL] at 320 px, light and dark: the line wraps and the weight map\'s buttons sit without a sideways scroll, every button at least 44 px', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 });
   for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await planner(page);
-    await page.evaluate("S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'frame', L:6 }]; S.nextUid = 4; S.decks = { bar:false, rack:false }; go(3)");
+    await packingCheck(page, SBF_BAGS);
     await page.locator('#rigWeightMap').click();
     await expect(page.locator('#weightMap .wm-card')).toHaveCount(2);
-    for (const sel of ['.wm-with', '.wm-without', '.wm-diff']) {
-      const b = (await page.locator(`#weightMap ${sel}`).boundingBox())!;
+    for (const sel of ['#rigWeightMap', '#weightMap .wm-diff']) {
+      const b = (await page.locator(sel).boundingBox())!;
       expect(Math.min(b.width, b.height), `${scheme}: ${sel} is at least 44 px`).toBeGreaterThanOrEqual(44);
       expect(b.x + b.width, `${scheme}: ${sel} inside the window`).toBeLessThanOrEqual(320);
     }
+    const l = (await page.locator('#weightLine').boundingBox())!;
+    expect(l.x + l.width, `${scheme}: the line inside the window`).toBeLessThanOrEqual(320);
     await page.locator('#weightMap .wm-diff').click();
     await expect(page.locator('#weightMap .wm-card')).toHaveCount(3);
     expect(await page.evaluate(() => document.documentElement.scrollWidth), `${scheme}: no sideways scroll`).toBeLessThanOrEqual(320);

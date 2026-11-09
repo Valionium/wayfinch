@@ -174,7 +174,10 @@ test('[PERF-BIKE] [PERF-SCREEN] the phone stand-in really is slowed: the same wo
 
 test('[PERF-WM] the weight map paints in 50 ms or less a map on the phone stand-in: yours and the ideal together in 100 ms', async ({ page }) => {
   app = await loadApp(page, { launch: true, path: '/tools/bags/' });
-  await page.evaluate("S.bags = [{ uid:1, pos:'rack', L:20, pair:true }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'pack', L:12 }, { uid:4, pos:'seat', L:10 }, { uid:5, pos:'frame', L:6 }]; S.nextUid = 6; S.decks = { bar:false, rack:true }; go(2); go(3)");
+  // the map is at the packing check, behind "Show the map" once the line has its answer (the owner's decision of 9 Nov 2026)
+  await page.evaluate("S.bags = [{ uid:1, pos:'rack', L:20, pair:true }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'pack', L:12 }, { uid:4, pos:'seat', L:10 }, { uid:5, pos:'frame', L:6 }]; S.nextUid = 6; S.decks = { bar:false, rack:true }; go(2); go(3); go(4)");
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click(); // the weight question, skipped
+  await expect(page.locator('#weightLine')).not.toHaveText('Checking the balance…', { timeout: 30_000 });
   await page.locator('#rigWeightMap').click();
   await expect(page.locator('#weightMap .wm-card')).toHaveCount(2);
   const times = await page.evaluate(() => {
