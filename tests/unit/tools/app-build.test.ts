@@ -351,6 +351,22 @@ test("[AH-P4-FIRST] En route's findings add nothing to the first screen: at or b
   expect(figures.firstJsGzip).toBeLessThanOrEqual(145_378);
 });
 
+// The first-run bike hint (wish 17, design of 9 Nov 2026, section 7): the card on Trip is in the first screen, paid for by moving the tyre
+// tool's notes to en-tyre-notes.ts (its own chunk); its other words, the places seen and the "fits better" lines are in lazy chunks.
+// 145,036 bytes is the first screen's figure on main (d6f88eb) at the branch point; the rule is that it may not rise above it.
+test("[HINT-BYTES] the first-run card adds nothing to the first screen: at or below main's figure at the branch point; its other words are lazy", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  // The card and its words are there; the one-time line, the fits lines, the places seen and the moved tyre notes are not.
+  expect(first).toContain('Design your bike');
+  expect(first).toContain('copilot:bikeHint:v1');
+  for (const mark of ['Your bike is in every tool now', 'and its tyre sizes fill in here', 'a typical gravel bike', 'typcg', "Open SRAM's tyre pressure calculator", 'Other calculators differ from this one']) {
+    expect(first.includes(mark), mark).toBe(false);
+  }
+  console.log(`HINT-BYTES: first screen ${figures.firstJsGzip} bytes gzipped`);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_036);
+});
+
 // Remove this trip (owner's wish, 9 November 2026): its confirm step, its words and the store's removal are chunks of their own,
 // loaded with the Route step; En route's routine stopping when a trip goes is paid for in en.ts.
 // 145,036 bytes is the first screen's figure on main (d6f88eb), merged in after the review; the rule is that it may not rise above it.

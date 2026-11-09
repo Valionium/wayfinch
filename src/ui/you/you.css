@@ -16,3 +16,6 @@
 [data-import-preview] ul { margin: 4px 0 8px; padding-left: 1.25rem; }
 /* The import picker is the browser's own file control: its whole box is the target, at least 44 px tall (FLOW-CONTRAST). */
 #you-import { min-height: 44px; max-width: 100%; }
+/* No bike yet (wish 17): the small grey typical bike beside the line, then Add a bike. */
+.you-bike-none { margin: 0 0 12px; }
+.you-bike-none p { margin: 0; }

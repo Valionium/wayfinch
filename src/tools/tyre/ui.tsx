@@ -5,7 +5,11 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { T } from '../../core/wording/en-tyre.ts';
 import { W, shortMapDate } from '../../core/wording/en.ts';
+import { TN } from '../../core/wording/en-tyre-notes.ts';
+import { HN } from '../../core/wording/en-hint.ts';
 import { BackBar } from '../../ui/back-bar/back-bar.tsx';
+import { FitLine } from '../../ui/bike/fit-line.tsx';
+import { noteSeen } from '../../ui/bike/hint-seen.ts';
 import { Card, Notice } from '../../ui/card.tsx';
 import { choiceMadeIn, choiceVersion, noteBikeChoice } from '../../ui/tools/bike-choice.ts';
 import { checkLimit, tyreEstimate } from './core.ts';
@@ -26,7 +30,7 @@ import type { TyreServices } from './services.ts';
 
 const ASSUMED_WORDS: Record<FieldName, string> = {
   riderKg: W.tyreAssumedRider, bikeKg: W.tyreAssumedBike, bars: W.tyreAssumedBars, wheelBsdMm: W.tyreAssumedWheel, frontMm: W.tyreAssumedFront,
-  rearMm: W.tyreAssumedRear, casing: W.tyreAssumedCasing, setup: W.tyreAssumedSetup, rimType: W.tyreAssumedRimType, rimInnerMm: W.tyreAssumedRim,
+  rearMm: W.tyreAssumedRear, casing: W.tyreAssumedCasing, setup: W.tyreAssumedSetup, rimType: TN.tyreAssumedRimType, rimInnerMm: W.tyreAssumedRim,
   surface: W.tyreAssumedSurface, carriedKg: W.tyreAssumedNoLuggage,
 };
 
@@ -237,6 +241,8 @@ export function TyreScreen({ services }: { services: TyreServices }) {
   const [offer, setOffer] = useState<string | null>(null);
   const [offerFrom, setOfferFrom] = useState<'copilot' | 'load-check' | null>(null);   // where the offered bike was chosen, for its words
   const [gone, setGone] = useState<'next' | 'none' | null>(null);
+  // A place seen, for the first-run bike hint (wish 17).
+  useEffect(() => noteSeen('p'), []);
   const load = (k: string): { key: string; details: Details } => {
     const r = readStore(services.storage);
     return { key: k, details: r.ok ? entryOf(r.store, k).details : {} };
@@ -389,21 +395,23 @@ export function TyreScreen({ services }: { services: TyreServices }) {
           <option value={DEFAULT_KEY}>{saved.length ? T.tyreBikeWithout : W.tyreBikeNone}</option>
         </select>
       </label>
+      {/* With no saved bike, the "fits better" line under the bike box (wish 17, sketch 17c). */}
+      {saved.length === 0 ? <FitLine before={HN.hintFitTyre} after={HN.hintFitTyreAfter} back="tyre" /> : null}
       {offer && (offer === DEFAULT_KEY || host.bikes.some((b) => b.id === offer)) && offer !== key ? (
         <Notice>{offer === DEFAULT_KEY ? T.tyreBikeWithout : host.bikes.find((b) => b.id === offer)?.name} {offerFrom === 'load-check' ? T.tyreChosenInPlanner : T.tyreChosenElsewhere}{' '}
           <button type="button" class="btn" onClick={() => { touched.current = true; setOffer(null); setGone(null); setPending({}); setSession(load(offer)); }}>{T.tyreChosenSwitch}</button>
         </Notice>
       ) : null}
       {gone ? <Notice>{gone === 'next' ? T.tyreBikeGoneNext : T.tyreBikeGoneNone}</Notice> : null}
-      {!kept ? <Notice>{W.tyreNotSaved}</Notice> : null}
-      <p class="muted">{W.tyreSavedHere}</p>
+      {!kept ? <Notice>{TN.tyreNotSaved}</Notice> : null}
+      <p class="muted">{TN.tyreSavedHere}</p>
 
       {/* The three things a figure needs, first and together, and marked (the owner's device check, 5 November 2026). Every optional
           field follows the result. */}
       <section class="card tyre-needed" aria-labelledby="tyre-needed-title">
         <h2 id="tyre-needed-title">{T.tyreNeededTitle}</h2>
         <p>{T.tyreNeededIntro}</p>
-        <p class="muted">{W.tyreLimitHint}</p>
+        <p class="muted">{TN.tyreLimitHint}</p>
         <LimitInput key={`max-${key}`} id="tyre-max" label={W.tyreLimitMaxLabel} required needed="max" value={details.tyreMax} min={details.tyreMin} onPending={onPending}
           onCommit={(l) => change({ tyreMax: l ?? undefined })} />
         <p class="muted">{W.tyreLimitBothWheels}</p>
@@ -429,14 +437,14 @@ export function TyreScreen({ services }: { services: TyreServices }) {
             <ul>{result.refused.map((t) => <li key={t}>{t}</li>)}</ul>
           </>
         ) : null}
-        {blockedBy === null && result && result.incompatible ? <h3>{result.warningCodes.includes('rimUnset') ? W.tyreNeedRimTitle : W.tyreIncompatibleTitle}</h3> : null}
+        {blockedBy === null && result && result.incompatible ? <h3>{result.warningCodes.includes('rimUnset') ? TN.tyreNeedRimTitle : W.tyreIncompatibleTitle}</h3> : null}
         {showFigures && front && rear ? (
           <>
             <div class="tyre-wheels">
               <WheelFigure label={W.tyreFront} w={front} />
               <WheelFigure label={W.tyreRear} w={rear} />
             </div>
-            <p class="muted">{W.tyreRoundedNote}</p>
+            <p class="muted">{TN.tyreRoundedNote}</p>
           </>
         ) : null}
         {blockedBy === null && nearFigure.map((n) => (
@@ -448,7 +456,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         {blockedBy === null && result?.split ? (
           <p>
             {W.tyreSplit(...fmtPct(result.split.share))} {result.split.why}
-            <br /><span class="muted">{W.tyreSplitSensitivity}</span>
+            <br /><span class="muted">{TN.tyreSplitSensitivity}</span>
           </p>
         ) : null}
         {resolved.input && resolved.assumed.length ? <p class="tyre-assumed">{W.tyreAssumedList(resolved.assumed.map((f) => ASSUMED_WORDS[f]).join(', '))}</p> : null}
@@ -464,7 +472,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
             <ul>{result.decided.map((t) => <li key={t}>{t}</li>)}</ul>
           </>
         ) : null}
-        {resolved.input ? <p class="muted">{W.tyreEstimateNote}</p> : null}
+        {resolved.input ? <p class="muted">{TN.tyreEstimateNote}</p> : null}
       </section>
 
       <Card title={W.tyreLimitsMoreTitle}>
@@ -485,7 +493,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
           onReset={resetter('carriedKg')}
           editor={<>
             <NumberInput key={`load-${key}`} id="tyre-load" label={W.tyreLoadLabel} value={details.carriedKg} onCommit={(n) => change({ carriedKg: n })} unit="kg" />
-            <p class="muted">{src.carriedKg === 'entered' ? W.tyreLoadEnteredNote : W.tyreLoadNone}</p>
+            <p class="muted">{src.carriedKg === 'entered' ? TN.tyreLoadEnteredNote : TN.tyreLoadNone}</p>
           </>} />
       </Card>
 
@@ -529,10 +537,10 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         <p class="muted">{T.tyreHeatIntro}</p>
         <NumberInput key={`hp-${key}`} id="tyre-heat-pump" label={W.tyreHeatPumpLabel} signed value={details.heat?.pumpC} onCommit={(n) => changeHeat({ pumpC: n })} unit="°C" />
         <NumberInput key={`hm-${key}`} id="tyre-heat-max" label={W.tyreHeatMaxLabel} signed value={details.heat?.maxC} onCommit={(n) => changeHeat({ maxC: n })} unit="°C" />
-        <NumberInput key={`hh-${key}`} id="tyre-heat-pumph" label={W.tyrePumpHeightLabel} signed value={details.heat?.pumpHeightM} onCommit={(n) => changeHeat({ pumpHeightM: n })} unit="m" />
+        <NumberInput key={`hh-${key}`} id="tyre-heat-pumph" label={TN.tyrePumpHeightLabel} signed value={details.heat?.pumpHeightM} onCommit={(n) => changeHeat({ pumpHeightM: n })} unit="m" />
         <NumberInput key={`hv-${key}`} id="tyre-heat-high" label={W.tyreHighestLabel} signed value={details.heat?.highestM} onCommit={(n) => changeHeat({ highestM: n })} unit="m" />
         {!v.heat ? <p class="notice">{W.tyreHeatSkipped}</p> : null}
-        {v.heat && showFigures && front && rear && !front.heat?.advise && !rear.heat?.advise ? <p class="muted">{W.tyreHeatFits}</p> : null}
+        {v.heat && showFigures && front && rear && !front.heat?.advise && !rear.heat?.advise ? <p class="muted">{TN.tyreHeatFits}</p> : null}
       </Card>
 
       <Card title={W.tyreSectionMeasured}>
@@ -544,12 +552,12 @@ export function TyreScreen({ services }: { services: TyreServices }) {
 
       {resolved.input ? (
         <Card title={W.tyreSramTitle}>
-          <p>{W.tyreSramIntro}</p>
+          <p>{TN.tyreSramIntro}</p>
           <ul class="tyre-sram">
             {sramList(v).map((row) => <li key={row.label}><strong>{row.label}:</strong> {row.value}</li>)}
           </ul>
-          <p><a class="btn btn-primary" href={SRAM_URL} target="_blank" rel="noopener noreferrer">{W.tyreSramLink}</a></p>
-          <p class="muted">{W.tyreSramNothingSent} {W.tyreSramDiffer}</p>
+          <p><a class="btn btn-primary" href={SRAM_URL} target="_blank" rel="noopener noreferrer">{TN.tyreSramLink}</a></p>
+          <p class="muted">{W.tyreSramNothingSent} {TN.tyreSramDiffer}</p>
         </Card>
       ) : null}
     </div>

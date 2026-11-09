@@ -1,6 +1,7 @@
 // The tyre pressure estimate (spec section 7.2). Pure: no clock, no storage, no DOM. Its basis is Frank Berto's published 15% tyre-drop
 // data, fitted as a power law. It never exceeds a limit, and it never takes a formula from SRAM, SILCA or Rene Herse.
 import { W } from '../../core/wording/en.ts';
+import { TN } from '../../core/wording/en-tyre-notes.ts';
 import {
   BAR_PER_PSI, DEFAULT_SPLIT, DESIGN_WIDTHS, ETRTO_MIN, FIT_MAX_MM, FIT_MIN_MM, HOOKLESS_CAPS, HOOKLESS_MAX_BAR, LEVER,
   LIMIT_BAR, LIMIT_PSI, P15_COEFFICIENT, P15_EXPONENT, PSI_PER_BAR, RIM_MAX_MM, RIM_MIN_MM, WHEELS, WIDTH_MAX_MM, WIDTH_MIN_MM,
@@ -206,7 +207,7 @@ function chooseSplit(i: TyreInput): { frontKg: number; rearKg: number; split: Sp
   return {
     frontKg: s0 * total,
     rearKg: total - s0 * total,
-    split: { share: s0, source: 'default', why: placed && i.load.unplacedKg > 0 ? W.tyreWhyDefaultUnplaced : W.tyreWhyDefaultNoPlan },
+    split: { share: s0, source: 'default', why: placed && i.load.unplacedKg > 0 ? TN.tyreWhyDefaultUnplaced : W.tyreWhyDefaultNoPlan },
   };
 }
 
@@ -244,7 +245,7 @@ export function checkLimit(value: number, unit: Unit, o: { keepAsBar?: boolean; 
   }
   if (unit === 'bar' && value > LIMIT_BAR.max) return { status: 'rejected', reason: W.tyreLimitTooHighBar(String(value)) };
   if (unit === 'psi' && value > LIMIT_PSI.max) return { status: 'rejected', reason: W.tyreLimitTooHighPsi(String(value)) };
-  if (limitBar({ value, unit }) < LIMIT_BAR.min) return { status: 'rejected', reason: W.tyreLimitTooLow };
+  if (limitBar({ value, unit }) < LIMIT_BAR.min) return { status: 'rejected', reason: TN.tyreLimitTooLow };
   if (o.min && limitBar({ value, unit }) < limitBar(o.min)) return { status: 'rejected', reason: W.tyreLimitBelowMin };
   return { status: 'ok', limit: { value, unit } };
 }
@@ -293,7 +294,7 @@ function validate(i: TyreInput): string[] {
   if (!loads.every((n) => finitePositive(n, 0, 300))) out.push(W.tyreRefuseNumber(W.tyreWhatLoad));
   if (i.measured && !(finitePositive(i.measured.frontKg, 1, 300) && finitePositive(i.measured.rearKg, 1, 300))) out.push(W.tyreRefuseNumber(W.tyreWhatWheelLoads));
   if (!finitePositive(i.rimInnerMm, RIM_MIN_MM, RIM_MAX_MM)) out.push(W.tyreRefuseRim(Number.isFinite(i.rimInnerMm) ? fmt(i.rimInnerMm) : '?'));
-  if (!WHEELS.some((w) => w.bsdMm === i.wheelBsdMm)) out.push(W.tyreRefuseWheel);
+  if (!WHEELS.some((w) => w.bsdMm === i.wheelBsdMm)) out.push(TN.tyreRefuseWheel);
   for (const [label, t] of [[W.tyreFront, i.front], [W.tyreRear, i.rear]] as const) {
     if (!Number.isFinite(t.printedMm) || t.printedMm < WIDTH_MIN_MM || t.printedMm > WIDTH_MAX_MM) out.push(W.tyreRefuseWidth(label, Number.isFinite(t.printedMm) ? fmt(t.printedMm) : '?'));
     else if (t.caliperMm !== null && !finitePositive(t.caliperMm, 10, 110)) out.push(W.tyreRefuseCaliper(label));
@@ -301,17 +302,17 @@ function validate(i: TyreInput): string[] {
   if (!limitUsable(i.tyreMax)) out.push(W.tyreRefuseLimit(W.tyreWhatMax));
   if (i.tyreMin && !limitUsable(i.tyreMin)) out.push(W.tyreRefuseLimit(W.tyreWhatMin));
   if (i.rimMax && !limitUsable(i.rimMax)) out.push(W.tyreRefuseLimit(W.tyreWhatRimMax));
-  if (out.length === 0 && i.tyreMin && i.rimMax && limitBar(i.rimMax) < limitBar(i.tyreMin)) out.push(W.tyreRefuseMinMax);
+  if (out.length === 0 && i.tyreMin && i.rimMax && limitBar(i.rimMax) < limitBar(i.tyreMin)) out.push(TN.tyreRefuseMinMax);
   if (i.heat) {
     const h = i.heat;
     const temp = (n: number): boolean => Number.isFinite(n) && n >= -40 && n <= 60;
     const height = (n: number): boolean => Number.isFinite(n) && n >= -400 && n <= 9000;
     if (!temp(h.pumpC)) out.push(W.tyreRefuseTemp(W.tyreWhatPumpTemp));
-    if (!temp(h.maxC)) out.push(W.tyreRefuseTemp(W.tyreWhatMaxTemp));
+    if (!temp(h.maxC)) out.push(W.tyreRefuseTemp(TN.tyreWhatMaxTemp));
     if (!height(h.pumpHeightM)) out.push(W.tyreRefuseHeight(W.tyreWhatPumpHeight));
     if (!height(h.highestM)) out.push(W.tyreRefuseHeight(W.tyreWhatHighest));
   }
-  if (out.length === 0 && i.tyreMin && limitBar(i.tyreMin) > limitBar(i.tyreMax)) out.push(W.tyreRefuseMinMax);
+  if (out.length === 0 && i.tyreMin && limitBar(i.tyreMin) > limitBar(i.tyreMax)) out.push(TN.tyreRefuseMinMax);
   return out;
 }
 
@@ -319,7 +320,7 @@ const refusedResult = (refused: string[]): TyreResult =>
   ({ front: null, rear: null, split: null, decided: [], warnings: [], warningCodes: [], warningItems: [], needsWidth: false, incompatible: false, refused });
 
 const kindOfCap = (k: LimitKind, mm: number): string =>
-  k === 'tyre-max' ? W.tyreLimitTyreMax : k === 'rim-max' ? W.tyreLimitRimMax : k === 'hookless-5' ? W.tyreLimitHookless5 : W.tyreLimitHooklessWidth(fmt(mm, 0));
+  k === 'tyre-max' ? W.tyreLimitTyreMax : k === 'rim-max' ? W.tyreLimitRimMax : k === 'hookless-5' ? TN.tyreLimitHookless5 : W.tyreLimitHooklessWidth(fmt(mm, 0));
 
 /** The ISO 5775-1 minimums of old, used only when no sidewall minimum was entered. */
 const isoFloorBar = (printedMm: number, surface: Surface): number => (printedMm <= 25 ? 3.0 : surface === 'unpaved' ? 1.5 : 2.0);
@@ -438,26 +439,26 @@ export function tyreEstimate(input: TyreInput): TyreResult {
   // Warnings that are about the pairing, not the wheel.
   if (input.rimType === 'hookless') {
     flag('hooklessTss', W.tyreWarnHooklessTss);
-    if (withTube) flag('hooklessNeedsTubeless', W.tyreWarnHooklessTube);
+    if (withTube) flag('hooklessNeedsTubeless', TN.tyreWarnHooklessTube);
   }
   if (input.rimType === 'unset') flag('rimUnset', W.tyreWarnRimUnset);
-  if (input.rimType === 'tubular') flag('tubularNoCheck', W.tyreWarnTubular);
+  if (input.rimType === 'tubular') flag('tubularNoCheck', TN.tyreWarnTubular);
   if (input.rimType !== 'tubular') {
     const min = etrtoMinWidth(input.rimInnerMm);
-    if (min === null) flag('rimOutsideTable', W.tyreWarnRimOutside);
+    if (min === null) flag('rimOutsideTable', TN.tyreWarnRimOutside);
     else {
       const below = wheels.filter((w) => w.tyre.printedMm < min);
       if (below.length === 2) flag('belowEtrto', W.tyreWarnBelowEtrto('Tyre width', String(min)));
       else if (below.length === 1) flag('belowEtrto', W.tyreWarnBelowEtrto(`${below[0]!.label} tyre width`, String(min)));
     }
   }
-  if (wheels.some((w) => w.wEff < FIT_MIN_MM || w.wEff > FIT_MAX_MM)) flag('extrapolated', W.tyreWarnExtrapolated);
+  if (wheels.some((w) => w.wEff < FIT_MIN_MM || w.wEff > FIT_MAX_MM)) flag('extrapolated', TN.tyreWarnExtrapolated);
   const unknownRimOrWidth = codeSet.has('rimUnset');
-  if (incompatible) flag('incompatible', unknownRimOrWidth ? W.tyreWarnIncompatibleUnknown : W.tyreWarnIncompatible);
+  if (incompatible) flag('incompatible', unknownRimOrWidth ? TN.tyreWarnIncompatibleUnknown : TN.tyreWarnIncompatible);
   // "Fit a wider tyre" only where a real tyre width is what limits: not under the careful rule for an unset rim, and not when a tube's floor is the cause.
   if (!incompatible) {
     if (capReal) flag('capBinds', W.tyreWarnCapBinds);
-    if (capHookless) flag(codeSet.has('rimUnset') ? 'capRimUnset' : 'capBinds', codeSet.has('rimUnset') ? W.tyreWarnCapRimUnset : W.tyreWarnCapBinds);
+    if (capHookless) flag(codeSet.has('rimUnset') ? 'capRimUnset' : 'capBinds', codeSet.has('rimUnset') ? TN.tyreWarnCapRimUnset : W.tyreWarnCapBinds);
   }
   if (!incompatible) for (const [code, text] of heatNotes) flag(code, text);
 

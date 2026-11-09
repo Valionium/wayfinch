@@ -196,9 +196,14 @@ test('[BC-SCREEN] using the screen writes nothing: tabs, filters, search and ope
   await click(tasks()[0]!.querySelector('summary')!);
   await key(tab(C.careTabCare), 'ArrowRight');
   expect(mem.writes).toEqual([]);
-  // the back link goes to Tools, and the title is the screen's h2
-  expect(host.querySelector('a[href="#/tools"]')!.textContent).toBe(C.careBack);
+  // no Back button above the title (owner, 9 Nov 2026: the bottom bar's Tools goes back); the title is the screen's h2
+  expect(host.querySelector('a[href="#/tools"]')).toBeNull();
   expect(host.querySelector('h2')!.textContent).toBe(C.careTitle);
+});
+
+test('[BC-SCREEN] opening the screen puts the focus on its title', async () => {
+  await mount(world([bike('bike_a', 'Gravel')]));
+  expect(document.activeElement).toBe(host.querySelector('h2'));
 });
 
 test('[BC-FROM-YOU] #/tools/care is a screen (a ?bike= after it too); Tools has a Bike care card; each bike in You has Care for this bike', async () => {

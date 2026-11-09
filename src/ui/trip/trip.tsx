@@ -6,11 +6,11 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { localIsoDate } from '../../core/answers/time.ts';
 import { W } from '../../core/wording/en.ts';
 import { onChanged } from '../../store/changed.ts';
-import { BikeDrawing } from '../bike/drawing.tsx';
 import { bikeSource } from '../bike/live.ts';
 import { degradedSignal, noteTripFacts } from '../degraded.ts';
 import { installOffer, promptInstall } from '../install.ts';
 import { runningSignal } from './run-state.ts';
+import { TripBike } from './bike-hint.tsx';
 import { savedLine } from './saved-line.ts';
 import { lineKey, routeDoneLine, tripLineOf } from './model.ts';
 import { lazy } from '../lazy.tsx';
@@ -152,9 +152,7 @@ export function TripScreen({ services }: { services: TripServices }) {
     <div class="trip" data-trip-loaded={snap ? 'true' : undefined} data-trip-drop ref={zone}>
       {/* Two panes on a wide screen: the bike, the trip line and the steps; then the route's summary (design §2.2). */}
       <div class="trip-main">
-        <div class="trip-bike">
-          <BikeDrawing bike={bike.bike} summary={bike.summary} known={bike.known} back="trip" />
-        </div>
+        <TripBike bike={bike} trip={snap ? trip !== null : null} />
         {line ? <p class="trip-line" data-trip-line><strong>{line.name}</strong>{line.when ? <span>{line.when}</span> : null}</p> : null}
         {/* The shell says it already when the browser refuses storage outright; once is enough. */}
         {snap && !snap.available && !degradedSignal.value.includes('storageBlocked') ? <p class="notice" role="status">{W.appStorageBlocked}</p> : null}
@@ -192,7 +190,7 @@ export function TripScreen({ services }: { services: TripServices }) {
             {goLink}
           </Step>
         </ol>
-        {offer ? <button type="button" class="btn" onClick={() => void promptInstall()}>{W.appTripInstall}</button> : null}
+        {offer ? <button type="button" class="btn gap" onClick={() => void promptInstall()}>{W.appTripInstall}</button> : null}
       </div>
       <div class="trip-side">
         {snap ? <RouteSummary snap={snap} stops={services.stops} /> : null}

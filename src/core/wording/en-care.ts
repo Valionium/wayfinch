@@ -15,7 +15,6 @@ import type { CareKey, CareTask, CareValue, CarryItem, Part, RoadCard, Section }
 export const C = {
   careTitle: 'Bike care',
   careIntro: 'What to do to your bike, how often, and the signs that it is due. It works offline and keeps no record.',
-  careBack: 'Tools',
   careTabsLabel: 'Bike care',
   careTabCare: 'Care',
   careTabRoad: 'Roadside repairs',

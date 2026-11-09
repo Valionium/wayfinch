@@ -67,7 +67,7 @@ export const Y = {
 
   // ---- Bikes ----
   youBikesTitle: 'Your bikes',
-  youBikesNone: 'No bike yet. The bag planner keeps your bikes.',
+  youBikesNone: 'No bike yet. Add yours: its colour, tyres and bars. The Bag planner, Tyre pressure and Bike care then fit it.',
   youBikeUnnamed: 'Unnamed bike',
   youBikeInPlan: 'In your plan',
   youBikeInPlanNotSaved: 'In your plan, not saved',
