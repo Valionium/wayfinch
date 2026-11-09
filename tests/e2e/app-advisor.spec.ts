@@ -564,3 +564,123 @@ test('[GA-BIGGER] in the browser: nothing helps within Bikepacking bags only; Sh
   await expect(box.locator('.adv-bigger').getByRole('button', { name: 'Try in Bag planner' })).toBeVisible();
   expect(await page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), 'no sideways scroll').toBe(true);
 });
+
+// ---- The chosen bike and a reload (the owner's video of 9 Nov 2026, live main d7289d1, Android Chrome) ----
+
+/** Two saved bikes of different colours, the red one the plan's, as in the owner's video. */
+const savedBike = (id: string, name: string, colour: string) => ({ id, name, fit: { style: 'diamond-sloping', size: { kind: 'letter', value: 'M' }, bolts: { st: 'yes', dt: 'yes' } }, rackMounts: 'no', look: { colour, bars: 'drop', ebike: false } });
+const RED = savedBike('bike_3', 'My bike 3', '#c62f2a');
+const GREEN = savedBike('bike_1', 'My bike', '#2f7d4f');
+const TWO_BIKES = { 'loadcheck:bikeProfiles': JSON.stringify([GREEN, RED]), 'loadcheck:bikeProfile': JSON.stringify(RED) };
+/** The frame colour of the big drawing at the advisor's top, and of its first setup sketch. */
+const glideFrame = (page: Page) => page.locator('#advisorGlide .bk-paint.bk-frame').first();
+const sketchFrame = (page: Page) => page.locator('#advisorSteps .adv-styles svg.bk .bk-paint.bk-frame').first();
+/** The gravel plan's bags on the plan's own (saved) bike, saved as the working plan. */
+async function gravelBags(page: Page): Promise<void> {
+  await page.evaluate(`Object.assign(S, { nights: 2, sleep: 'camp', mode: 'comfort', decks: { bar: false, rack: false }, nextUid: 6,
+      bags: [{ uid: 1, pos: 'seat', L: 14 }, { uid: 2, pos: 'bar', L: 12 }, { uid: 3, pos: 'top', slot: 'front', L: 1 }, { uid: 4, pos: 'bottle', slot: 'dt', L: 0.75 }, { uid: 5, pos: 'bottle', slot: 'st', L: 0.75 }] });
+    applyTripKitDefaults(); S.bikeProfile.maxWeightAsked = true; flushDraft();`);
+}
+
+test('[GA-BIKE] the advisor\'s Bike select changes the plan\'s bike, and the big drawing at the top, the setup sketches and the answer follow it at once', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page, TWO_BIKES);
+  await gravelBags(page);
+  await page.evaluate("location.hash = '#gear-advisor'");
+  const box = page.locator('#advisorBox');
+  await expect(box).toBeVisible();
+  await expect(glideFrame(page)).toHaveAttribute('stroke', RED.look.colour);
+  await expect(sketchFrame(page)).toHaveAttribute('stroke', RED.look.colour);
+  await box.locator('label.adv-choice', { hasText: 'Bikepacking bags only' }).click();
+  await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
+  await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
+  const run = await page.evaluate('ADVISOR_RUN') as number;
+  await page.locator('#advisorBikeSelect').selectOption({ label: 'My bike' });
+  await expect.poll(() => page.evaluate('S.bikeProfile && S.bikeProfile.id')).toBe(GREEN.id);
+  await expect(glideFrame(page), 'the big drawing is the chosen bike').toHaveAttribute('stroke', GREEN.look.colour);
+  await expect(sketchFrame(page)).toHaveAttribute('stroke', GREEN.look.colour);
+  await expect(page.locator('#advisorBikeSelect')).toHaveValue(GREEN.id);
+  // the answer is searched again on the chosen bike, with the rider's choices kept
+  await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
+  expect(await page.evaluate('ADVISOR_RUN') as number).toBeGreaterThan(run);
+  await expect(box.locator('input[name="advStyle"][value="bags"]')).toBeChecked();
+  await expect(box.getByRole('checkbox', { name: 'Better handling' })).toBeChecked();
+  await expect(box.locator('.adv-card svg.bk .bk-paint.bk-frame').first()).toHaveAttribute('stroke', GREEN.look.colour);
+  // and back: the drawing follows every change, not only the first
+  await page.locator('#advisorBikeSelect').selectOption({ label: 'My bike 3' });
+  await expect(glideFrame(page)).toHaveAttribute('stroke', RED.look.colour);
+  expect(errors).toEqual([]);
+});
+
+test('[GA-RELOAD] [GA-BIKE] from Tools: a reload on the Gear advisor stays on it, on the bike chosen there, with its answers and the way back to Tools; the browser\'s Back still goes to Tools', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page, TWO_BIKES);
+  await gravelBags(page);
+  await page.goto(`${app!.origin}/#/tools`, { waitUntil: 'load' });
+  await page.getByRole('link', { name: 'Open Gear advisor' }).click();
+  await page.waitForURL(/\/tools\/bags\//);
+  const box = page.locator('#advisorBox');
+  await expect(box).toBeVisible();
+  await page.waitForFunction('typeof ADVISOR !== "undefined" && ADVISOR.open');
+  await expect(glideFrame(page)).toHaveAttribute('stroke', RED.look.colour);
+  await box.locator('label.adv-choice', { hasText: 'Bikepacking bags only' }).click();
+  await box.locator('label.adv-choice', { hasText: 'Better handling' }).click();
+  await page.locator('#advisorBikeSelect').selectOption({ label: 'My bike' });
+  await expect(glideFrame(page)).toHaveAttribute('stroke', GREEN.look.colour);
+  await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
+  const cards = await box.locator('.adv-card h5').allTextContents();
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY');
+  await expect(box, 'still the Gear advisor').toBeVisible();
+  expect(await page.evaluate('ADVISOR.open')).toBe(true);
+  expect(await plannerShown(page), 'not the planner\'s Trip step').toEqual([]);
+  await expect(page.locator('#draftBar')).toBeHidden();
+  await expect(glideFrame(page), 'the chosen bike').toHaveAttribute('stroke', GREEN.look.colour);
+  await expect(page.locator('#advisorBikeSelect')).toHaveValue(GREEN.id);
+  // the way back as it was: the one top bar to Tools, no Back to the Bag planner
+  await expect(page.locator('#backToWayfinch')).toHaveText('← Back to Wayfinch');
+  await expect(page.locator('#backToWayfinch')).toHaveAttribute('href', '/#/tools');
+  await expect(page.locator('#advisorToPlan')).toBeHidden();
+  // its answers, still valid for the plan, and the same suggestions
+  await expect(box.locator('input[name="advStyle"][value="bags"]')).toBeChecked();
+  await expect(box.getByRole('checkbox', { name: 'Better handling' })).toBeChecked();
+  await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
+  expect(await box.locator('.adv-card h5').allTextContents()).toEqual(cards);
+  // the browser's Back goes to Tools, as before
+  await page.goBack({ waitUntil: 'load' });
+  await page.waitForURL((u) => u.pathname === '/' && u.hash === '#/tools');
+  await expect(page.getByRole('link', { name: 'Open Gear advisor' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('[GA-RELOAD] opened in the bag planner: a reload stays on the Gear advisor with Back to the Bag planner and its answers; back in the planner, the address is the planner\'s again and a reload stays there; no step is added to the history', async ({ page }) => {
+  await planner(page, TWO_BIKES);
+  await gravelBags(page);
+  const length = await page.evaluate('history.length') as number;
+  await page.evaluate('go(2)');
+  await page.locator('#advisorAsk').click();
+  const box = page.locator('#advisorBox');
+  await expect(box).toBeVisible();
+  await box.locator('label.adv-choice', { hasText: 'Panniers are fine' }).click();
+  await box.locator('label.adv-choice', { hasText: 'Get the backpack off' }).click();
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY');
+  await expect(box, 'still the Gear advisor').toBeVisible();
+  expect(await plannerShown(page)).toEqual([]);
+  await expect(glideFrame(page)).toHaveAttribute('stroke', RED.look.colour);
+  await expect(page.getByRole('button', { name: 'Back to the Bag planner' })).toBeVisible();
+  await expect(box.locator('input[name="advStyle"][value="panniers"]')).toBeChecked();
+  await expect(box.getByRole('checkbox', { name: 'Get the backpack off' })).toBeChecked();
+  await expect(box.getByRole('checkbox', { name: 'Better handling' })).not.toBeChecked();
+  await page.getByRole('button', { name: 'Back to the Bag planner' }).click();
+  await expect(box).toBeHidden();
+  await expect(page.locator('#plannerCols')).toBeVisible();
+  expect(new URL(page.url()).hash, 'the planner\'s address').toBe('');
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY');
+  await expect(page.locator('#plannerCols')).toBeVisible();
+  await expect(box).toBeHidden();
+  expect(await page.evaluate('history.length'), 'no step added to the history').toBe(length);
+});
