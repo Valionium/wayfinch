@@ -62,7 +62,7 @@ const KEPT_LOCAL: Record<string, string> = {
   'someone-else': 'x',
 };
 
-/** A phone in the middle of a trip: everything Get ready offline and En route keep, the handoff, and all that is not the trip's. */
+/** A phone in the middle of a trip: everything Prepare this route and En route keep, the handoff, and all that is not the trip's. */
 async function tripPhone(): Promise<void> {
   await readTrip();
   await saveTrip(trip({ pace: 'hard' }));
@@ -315,7 +315,7 @@ test('[TRIP-REMOVE-WINDOWS] another window is told, reads no trip, and can not w
 
 const boundaryText = readFileSync(fileURLToPath(new URL('../../../public/data/boundaries.v1.json', import.meta.url)), 'utf8');
 
-test('[TRIP-REMOVE-WINDOWS] Get ready offline under way when the trip is removed: it stops at its next step and leaves nothing behind', async () => {
+test('[TRIP-REMOVE-WINDOWS] Prepare this route under way when the trip is removed: it stops at its next step and leaves nothing behind', async () => {
   const t = await fixtureTrip('heidelberg-strasbourg');
   await readTrip();
   await saveTrip(t);

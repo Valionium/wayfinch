@@ -1,5 +1,5 @@
 // Words only Trip's own chunks show: the trip settings' field names (the departure date, the nights and the trip details,
-// src/ui/trip/settings.tsx), the route's summary and its credits (summary.tsx, credit.tsx), Add a route (add-route.tsx) and Get ready offline's
+// src/ui/trip/settings.tsx), the route's summary and its credits (summary.tsx, credit.tsx), Add a route (add-route.tsx) and Prepare this route's
 // storage line (getready.tsx). Moved from en.ts as
 // they were, to make room on the first screen for Remove this trip (owner's wish, 9 November 2026). They follow the same rules as
 // en.ts: the banned-words test reads this object too (tests/unit/core/wording-remove.test.ts).

@@ -191,16 +191,16 @@ describe('degraded', () => {
     expect(texts(a)).toContain('Leave-by needs a departure date (Trip settings).');
   });
 
-  test('[LB-DEGRADED] not prepared: daylight only, "Shop hours need Get ready offline"', () => {
+  test('[LB-DEGRADED] not prepared: daylight only, "Shop hours need Prepare this route"', () => {
     const a = card({ sun: SUNSET_17, savedKm: [], spots: [...TAPS, { b: supermarket('Mo-Sa 08:00-12:00'), km: 30 }] });
-    expect(a.detail).toContain('Shop hours need Get ready offline');
+    expect(a.detail).toContain('Shop hours need Prepare this route');
     expect(a.title).toContain('about 11:15');
     expect(a.missing).toContain('hours');
   });
 
   test('[LB-DEGRADED] places but no prepared hours: the same', () => {
     const a = card({ sun: SUNSET_17, hours: [], spots: [...TAPS, { b: supermarket('Mo-Sa 08:00-12:00'), km: 30 }] });
-    expect(a.detail).toContain('Shop hours need Get ready offline');
+    expect(a.detail).toContain('Shop hours need Prepare this route');
   });
 
   test('[LB-DEGRADED] outside coverage: daylight only, "No place data here", missing places', () => {

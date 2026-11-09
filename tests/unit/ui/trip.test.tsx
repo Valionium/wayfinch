@@ -174,14 +174,14 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     expect((await readTrip())!.route.id).toBe(before.route.id);
   });
 
-  test('[TRIP-SUMMARY] a route without heights says climbing is unknown and that Get ready offline looks them up; once looked up, Copernicus is credited', async () => {
+  test('[TRIP-SUMMARY] a route without heights says climbing is unknown and that Prepare this route looks them up; once looked up, Copernicus is credited', async () => {
     await show();
     await pick(await fixtureGpx('loop', { heights: false }));
     await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
     expect(text()).toContain(W.appTripClimbingUnknown);
     expect(text()).toContain(TR.appTripHeightsPending);
     expect(text()).not.toContain(W.appTripHeightsCredit);
-    // What Get ready offline's heights step does: the same line with heights in it.
+    // What Prepare this route's heights step does: the same line with heights in it.
     const trip = (await readTrip())!;
     const withHeights = { ...trip, route: { ...trip.route, ascentM: 120, points: trip.route.points.map((p) => ({ ...p, ele: 150 })) } };
     const { saveTrip } = await import('../../../src/store/trip.ts');
@@ -215,7 +215,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
 
 const stepNames: StepName[] = ['heights', 'places', 'hours', 'weather', 'baseline', 'save'];
 
-/** A Get ready offline that ends as told, and leaves in the store what the real one would have. */
+/** A Prepare this route that ends as told, and leaves in the store what the real one would have. */
 function preparing(reports: (routeId: string) => StepReport[], o: { places?: number; weatherTo?: Date | null; at?: Date; seen?: string[]; notice?: string; fetchedAt?: Date; sourceDate?: string | null } = {}): Partial<TripServices> {
   return {
     prepare: async (onProgress, onNotice) => {
@@ -401,7 +401,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     const svc = services(preparing(allOk, { places: 1214, weatherTo: new Date('2026-10-16T12:00:00Z'), fetchedAt: new Date(NOW.getTime() - 2 * 3_600_000), sourceDate: '2026-10-25', seen, notice: W.appPrepHeightsNotice }));
     await show(svc);
     await pick(await fixtureGpx('loop'));
-    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    await until(() => host.querySelector('[data-getready]') !== null, 'Prepare this route');
     expect(text()).toContain(W.appTripNothingSaved);
     expect(text()).toContain(W.appTripFlightMode);
     await click(button(W.appTripGetReadyButton));
@@ -423,7 +423,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     }, { places: 0 });
     await show(services(fake));
     await pick(await fixtureGpx('loop'));
-    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    await until(() => host.querySelector('[data-getready]') !== null, 'Prepare this route');
     await click(button(W.appTripGetReadyButton));
     await until(() => text().includes(W.appPrepWeatherFailed), 'the failed step');
     expect(text()).toContain(W.appPrepStorageFull(6, 14));
@@ -436,16 +436,16 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     expect(host.querySelector('[hidden]')).toBeNull();
   });
 
-  test('[TRIP-GETREADY] a Get ready offline that throws is told as "this could not be saved", and the screen keeps working', async () => {
+  test('[TRIP-GETREADY] a Prepare this route that throws is told as "this could not be saved", and the screen keeps working', async () => {
     await show(services({ prepare: () => Promise.reject(new Error('boom')) }));
     await pick(await fixtureGpx('loop'));
-    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    await until(() => host.querySelector('[data-getready]') !== null, 'Prepare this route');
     await click(button(W.appTripGetReadyButton));
     await until(() => text().includes(W.appPrepSaveFailed), 'the sentence');
     expect(button(W.appTripGetReadyButton).disabled).toBe(false);
   });
 
-  test('[TRIP-NOT-READY-WORD] no string on Trip calls the trip ready, safe or complete; "Get ready offline" is the only use of "ready"', async () => {
+  test('[TRIP-NOT-READY-WORD] no string on Trip calls the trip ready, safe or complete; "Prepare this route" is the only use of "ready"', async () => {
     const trip = Object.entries(W).filter(([k]) => k.startsWith('appTrip') || k.startsWith('appAb'));
     expect(trip.length).toBeGreaterThan(40);
     const samples = (v: unknown): string[] => {
@@ -467,15 +467,15 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     for (const [key, value] of trip) {
       for (const s of samples(value)) {
         expect(bannedHits(s), `${key}: ${s}`).toEqual([]);
-        expect(/\b(ready|safe|complete|completed|done|finished)\b/i.test(s.replace(/Get ready offline/gi, '')), `${key}: ${s}`).toBe(false);
+        expect(/\b(ready|safe|complete|completed|done|finished)\b/i.test(s.replace(/Prepare this route/gi, '')), `${key}: ${s}`).toBe(false);
         expect(/\bprepared\b/i.test(s), `${key}: ${s}`).toBe(false);
       }
     }
     // And on the screen, in each state it can be in.
     await show();
     await pick(await fixtureGpx('loop'));
-    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
-    expect(text().replace(/Get ready offline/gi, '')).not.toMatch(/\b(ready|safe|complete)\b/i);
+    await until(() => host.querySelector('[data-getready]') !== null, 'Prepare this route');
+    expect(text().replace(/Prepare this route/gi, '')).not.toMatch(/\b(ready|safe|complete)\b/i);
   });
 
   test('[TRIP-IPHONE] on an iPhone in a browser tab, before the first download, Trip asks to add the app to the home screen; in the installed app, or where the page can\'t tell, it does not', async () => {
@@ -490,7 +490,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     const iphone = services({ env: { ...base.env, ...tab } });
     await show(iphone);
     await pick(await fixtureGpx('loop'));
-    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    await until(() => host.querySelector('[data-getready]') !== null, 'Prepare this route');
     expect(text()).toContain(TR.appTripIphoneAsk);
     expect(button(W.appTripGetReadyButton).disabled).toBe(false);
     // Once something is saved the ask is not repeated.
@@ -519,7 +519,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
   test('[TRIP-ATTRIBUTION] the credit is a link to the OpenStreetMap copyright page with the pack date; with no source date it says the build date honestly; Licences is one tap away', async () => {
     await show(services(preparing(allOk, { places: 2, sourceDate: '2026-10-25' })));
     await pick(await fixtureGpx('loop'));
-    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    await until(() => host.querySelector('[data-getready]') !== null, 'Prepare this route');
     await click(button(W.appTripGetReadyButton));
     await until(() => text().includes('map data of 25 Oct'), 'the credit');
     const credit = [...host.querySelectorAll('[data-summary] a')].find((a) => a.textContent === '© OpenStreetMap contributors')!;
@@ -531,7 +531,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     render(null, host);
     await show(services(preparing(allOk, { places: 2 })));
     await openStep('getready');
-    await click(button(/^(Update|Get ready offline)$/));
+    await click(button(/^(Update|Prepare this route)$/));
     await until(() => text().includes('map data from 28 Oct'), 'the build date');
     expect(text()).not.toContain('map data of');
   });
@@ -671,7 +671,7 @@ describe('What the review of group 5 found', () => {
     const fake = preparing(() => allOk().map((r) => (r.step === 'weather' ? { ...r, ok: false, note: W.appPrepNoConnection } : r)), { places: 5 });
     await show(services(fake));
     await pick(await fixtureGpx('loop'));
-    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    await until(() => host.querySelector('[data-getready]') !== null, 'Prepare this route');
     await click(button(W.appTripGetReadyButton));
     await until(() => text().includes(W.appTripMissingHeading), 'the first run');
     await pick(await fixtureGpx('alpine-pass'));
@@ -719,7 +719,7 @@ describe('What the review of group 5 found', () => {
     const stale = preparing(allOk, { places: 12, weatherTo: new Date('2026-10-04T12:00:00Z'), fetchedAt: new Date('2026-09-28T08:00:00Z'), at: NOW });
     await show(services(stale));
     await pick(await fixtureGpx('loop'));
-    await until(() => host.querySelector('[data-getready]') !== null, 'Get ready offline');
+    await until(() => host.querySelector('[data-getready]') !== null, 'Prepare this route');
     await click(button(W.appTripGetReadyButton));
     await until(() => text().includes('12 places'), 'the line');
     expect(text()).toContain('forecast ended Sunday');

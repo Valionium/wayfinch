@@ -2,6 +2,7 @@
 // ahead.tsx). The button is Trip's very prepare, through the actions object, with the same progress (run.tsx); once
 // it ends Ahead reads again. A chunk of its own: only a rider who has not run Get ready offline loads it.
 import { W } from '../../core/wording/en.ts';
+import { TR } from '../../core/wording/en-trip.ts';
 import { NotSaved, RunProgress, usePrepareRun } from '../trip/run.tsx';
 import type { AheadActions } from './actions.ts';
 
@@ -17,6 +18,7 @@ export function NeedReady({ actions, failed, before = true }: { actions: AheadAc
           {run.failure || missing.length > 0 ? W.appTripRetryButton : W.appTripGetReadyButton}
         </button>
       </p>
+      <p class="muted" data-prepare-line>{TR.appTripPrepareLine}</p>
       <RunProgress run={run} />
       {/* Without the card's own title (no longer before Get ready), "Not saved" is its title, in ahead.tsx. */}
       {run.progress ? null : <NotSaved failed={missing} head={before} />}
