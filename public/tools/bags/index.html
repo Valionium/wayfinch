@@ -4227,6 +4227,13 @@ function tripKitDefaults(nights=S.nights,sleep=S.sleep,bike=S.bikeProfile){
    bank only for a long day (over the steady pace's half day, over the sporting pace's full day); ride snacks always. */
 // A short day ride from Wayfinch's Trip: 0 nights within the steady pace's half day (4 hours), the day the kit needs no meals.
 function shortDayRide(){ return S.nights === 0 && !!(S.gpx && S.gpx.copilotRoute) && dayRideHours() <= PACE.steady.hours; }
+// What a short day ride puts on instead of packing (owner, 10 Nov 2026): the long gloves the day's temperature calls for, worn, and
+// the sunscreen of the sun season, put on before leaving; each only while the rider has not packed it.
+function shortDayPutOn(){
+  if(!shortDayRide()) return {gloves:false,sun:false};
+  const c=tripClimate(),sunMonth=(S.place && S.place.lat < 0) ? (S.month+6)%12 : S.month;
+  return {gloves:c.nightCold != null && dayRideTemp(c) < 5 && !carrying('gloves'),sun:sunMonth >= 3 && sunMonth <= 8 && !carrying('sun')};
+}
 function dayRideHours(){
   const r=typeof planRoute==='function' ? planRoute() : null;
   const h=r ? r.effectiveExact / r.loadedKph : NaN;   // the whole route in one day, whatever nights the plan has now
@@ -4269,11 +4276,14 @@ function dayRideKit(){
   const sunMonth=(S.place && S.place.lat < 0) ? (S.month+6)%12 : S.month;
   // no first aid kit on a short ride (owner, 10 Nov 2026: "No first aid kit for short ride"): the day of the steady pace's half day or
   // less, the same short day that needs no meals (shortDayRide)
-  return {docs:true,cash:true,phone:true,snacks:true,firstaid:hours > PACE.steady.hours,rain:true,lock:false,
+  // and on a short ride the sunscreen is put on before leaving and the long gloves are worn, not packed (owner, 10 Nov 2026; both said:
+  // shortDayPutOn)
+  const short=hours <= PACE.steady.hours;
+  return {docs:true,cash:true,phone:true,snacks:true,firstaid:!short,rain:true,lock:false,
     food:hours > PACE.steady.hours,bank:hours > PACE.sporting.hours,
-    puffy:false,gloves:known && warm < 5,   // the jacket worn, not packed (dayRideWearsJacket)
+    puffy:false,gloves:known && warm < 5 && !short,   // the jacket worn, not packed (dayRideWearsJacket)
     rainpants:known && c.wetChance > 33,water:dayRideNeedsBagWater(),
-    shades:sunMonth >= 3 && sunMonth <= 8,sun:sunMonth >= 3 && sunMonth <= 8};
+    shades:sunMonth >= 3 && sunMonth <= 8,sun:sunMonth >= 3 && sunMonth <= 8 && !short};
 }
 function applyTripKitDefaults(){
   const defaults=tripKitDefaults();
@@ -8579,7 +8589,7 @@ function audit(){
   const warm = warmLayerTemp(c, n);
   if(!has('puffy') && known && warm < 11 && n > 0)   // a day ride wears it (owner, 9 Nov 2026: "Worn, one spare tube")
     M('Insulated jacket', `Nights drop to about ${c.nightCold}°C on the cold end. Being cold in the evening is the single most common reason people cut a first tour short.`, ['puffy']);
-  if(!has('gloves') && known && warm < 5)
+  if(!has('gloves') && known && warm < 5 && !shortDayPutOn().gloves)
     M('Long gloves', n === 0 ? `Riding near ${warm}°C on a cold day. Cold hands stop you braking properly on descents.`
       : `Mornings near ${c.nightCold}°C. Cold hands stop you braking properly on descents.`, ['gloves']);
 
@@ -8622,7 +8632,7 @@ function audit(){
     M('Travel detergent', `${n+1} days is well past the point of packing clean clothes for each one. A tube of travel soap turns two base layers into an endless supply.`, ['detergent']);
   if(!has('meds') && !answered('meds') && n >= 5)
     M('Your own medication', 'Check that you have enough of any medication you normally use for the whole trip. Check pharmacy availability along your route before relying on a refill.', ['meds'], true);
-  if(!has('sun') && sunMonth >= 3 && sunMonth <= 8)
+  if(!has('sun') && sunMonth >= 3 && sunMonth <= 8 && !shortDayPutOn().sun)
     M('Sunscreen', 'Six hours a day facing the sky. Neck and the backs of your hands are what actually burn.', ['sun']);
 
   /* --- leave behind --- */
@@ -8730,7 +8740,10 @@ function climateConsequence(contentOnly=false){
   // the mildest thing Germany offers: the Rhine valley in July
   const base = weatherKit(climate('rhein', 6)).map(x => x[0]);
   const extra = mine.filter(x => !base.includes(x[0]));
-  const wear=dayRideWearsJacket() ? '<p>On a day ride this cold, wear an insulated jacket: it is worn, not packed.</p>' : '';
+  const on=shortDayPutOn();
+  const wear=(dayRideWearsJacket() ? '<p>On a day ride this cold, wear an insulated jacket: it is worn, not packed.</p>' : '')
+    +(on.gloves ? '<p>On a short day ride this cold, long gloves: worn, not packed.</p>' : '')
+    +(on.sun ? '<p>Sunscreen: put it on before you go; on a short day ride it is not packed.</p>' : '');
   if(!extra.length){
     const explanation='<p>These conditions add no extra cold-weather items beyond the mild-weather baseline. A colder month or higher route can change that.</p>'+wear;
     return contentOnly ? explanation : infoHelp('Why the place matters', explanation);
@@ -12690,8 +12703,10 @@ function renderSmallBags(A){
     : inBag ? `Water: ${inBag}, since this ${noMounts ? 'bike has no bottle cage mounts' : 'plan has no bottle cage'}.`
     : 'Water: no bottle cage in this plan.';
   // the jacket the day calls for, worn (owner, 9 Nov 2026); packed by the rider, it is in a bag's list instead
-  const wear=dayRideWearsJacket() && !carrying('puffy');
-  $('smallWear').hidden=!wear; $('smallWear').textContent=wear ? 'Wear: insulated jacket.' : '';
+  // and on a short ride the long gloves worn and the sunscreen put on before leaving (owner, 10 Nov 2026)
+  const on=shortDayPutOn(),worn=[...(dayRideWearsJacket() && !carrying('puffy') ? ['insulated jacket'] : []),...(on.gloves ? ['long gloves'] : [])];
+  const wear=[worn.length ? `Wear: ${worn.join(' and ')}.` : '',on.sun ? 'Put on before you go: sunscreen.' : ''].filter(Boolean).join(' ');
+  $('smallWear').hidden=!wear; $('smallWear').textContent=wear;
   // what the day ride left at home to fit beside the bottle, in one quiet line (owner, 9 Nov 2026)
   const left=dayLeftAtHome().map(id => kitName(kitById(id)).replace(/^[A-Z](?![A-Z])/,c => c.toLowerCase()));
   $('smallLeft').hidden=!left.length; $('smallLeft').textContent=left.length ? `Left at home: ${listOf(left)}.` : '';
