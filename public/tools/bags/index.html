@@ -6666,10 +6666,15 @@ function rainAccess(A){
 function getChecklistModel(A=currentPlan()){
   const model=checklistOfBags(A),inPocket=pocketPlaces(),ids=Object.keys(inPocket);
   // what rides in the pockets of a day ride (owner, 9 Nov 2026) is packed too: its own group, after the bags (review of PR 106, M1)
-  if(ids.length) model.groups.push({id:'pockets',title:'In your pockets',subtitle:'Carried in your jersey and bib shorts pockets, not in a bag.',
-    items:ids.map(id => { const k=kitById(id),quantity=qtyOf(k); return {id,name:kitName(k),category:k.cat,quantity,quantityLabel:quantity>1?`${quantity} ×`:'',
-      packed:!!S.packed[id],L:itemL(k),kg:itemKg(k),rigidCm:rigidOf(k),placements:[],placementLabel:inPocket[id] === 'jersey' ? 'Jersey pockets' : 'Bib shorts pocket',
-      note:'',bikeReference:bikeRepairReference(id),status:'placed',tooLong:false}; })});
+  if(!ids.length) return model;
+  const rows=ids.map(id => { const k=kitById(id),quantity=qtyOf(k); return {id,name:kitName(k),category:k.cat,quantity,quantityLabel:quantity>1?`${quantity} ×`:'',
+    packed:!!S.packed[id],L:itemL(k),kg:itemKg(k),rigidCm:rigidOf(k),placements:[],placementLabel:inPocket[id] === 'jersey' ? 'Jersey pockets' : 'Bib shorts pocket',
+    note:'',bikeReference:bikeRepairReference(id),status:'placed',tooLong:false}; });
+  model.groups.push({id:'pockets',title:'In your pockets',subtitle:'Carried in your jersey and bib shorts pockets, not in a bag.',items:rows});
+  // ticked and counted as any other row: the checklist is everything taken, so its totals hold the pockets too (re-check of PR 106, R2)
+  model.items=[...model.items,...rows];
+  const items=model.items,packed=items.filter(row => row.packed).length;
+  model.totals={items:items.length,packed,remaining:items.length-packed,L:+items.reduce((n,row) => n+row.L,0).toFixed(2),kg:+items.reduce((n,row) => n+row.kg,0).toFixed(3)};
   return model;
 }
 function checklistOfBags(A){
@@ -12388,8 +12393,9 @@ function renderPockets(){
    stays; the rider's other placements are kept as records. Bags the rider has changed are never re-sized: what no longer fits is named
    as any overflow. Stored with the plan. */
 // every field of every bag but its number, so a bag the rider changed in any way (an own size, an inside length) is the rider's (review of
-// PR 106, I1)
-const dayBagsKey=() => JSON.stringify(S.bags.filter(b => !isBottle(b.pos)).map(({uid,...b}) => b).sort((a,b) => a.pos < b.pos ? -1 : a.pos > b.pos ? 1 : 0));
+// PR 106, I1); fields by name, so reopening the plan, which orders them its own way, changes nothing (re-check of PR 106, R1)
+const dayBagsKey=() => JSON.stringify(S.bags.filter(b => !isBottle(b.pos))
+  .map(b => Object.keys(b).filter(k => k !== 'uid').sort().map(k => [k,b[k]])).sort((a,b) => JSON.stringify(a) < JSON.stringify(b) ? -1 : 1));
 let POCKET_NOTE='';
 function resizeDayBags(){
   const keep=S.bags.filter(b => isBottle(b.pos)),old=S.bags.filter(b => !isBottle(b.pos)),start=S.nextUid;

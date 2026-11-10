@@ -1235,6 +1235,33 @@ describe('[TRIP-DAY-POCKETS] a day ride counts the jersey and bib shorts pockets
     expect(readFileSync(join(process.cwd(), 'public', 'tools', 'bags', 'index.html'), 'utf8').split('pocketsLeftOut()').length - 1).toBeGreaterThanOrEqual(3);
   });
 
+  test('re-check of PR 106, R1: after the plan is reopened (a reload, Back to Trip and back), a switch still plans the proposed bags again', async () => {
+    const p = await planned('2026-11-15');
+    // reopening reads the plan back through the page's own normalising, which orders each bag's fields its own way
+    p.page.run('restorePlan(JSON.parse(JSON.stringify(captureDraft())),true)');
+    p.page.run(`setPocket('jersey',false)`);
+    const words = String(p.page.nodes.get('smallPockets')!.innerHTML).replace(/<[^>]+>/g, ' ');
+    expect(words).toContain('Bags planned again for your pockets:');
+    expect(words).not.toContain('Your bags stay as you set them.');
+  });
+
+  test('re-check of PR 106, R2: what rides in the pockets can be ticked in the packing checklist, and its totals count it', async () => {
+    const p = await planned('2026-11-15');
+    const places = Object.keys(p.json<Places>('pocketPlaces()'));
+    expect(places).toContain('rain');
+    const before = p.json<{ items: number; packed: number }>('getChecklistModel().totals');
+    const bags = p.json<number>(`getChecklistModel().groups.filter(g=>g.id!=='pockets').reduce((n,g)=>n+g.items.length,0)`);
+    expect(before.items).toBe(bags + places.length);
+    expect(p.json<string[]>('getChecklistModel().items.map(r=>r.id)')).toEqual(expect.arrayContaining(places));
+    expect(p.json<boolean>(`setPackedItem('rain',true)`)).toBe(true);
+    expect(p.json('S.packed.rain')).toBe(true);
+    const row = p.json<{ packed: boolean }>(`getChecklistModel().groups.find(g=>g.id==='pockets').items.find(r=>r.id==='rain')`);
+    expect(row.packed).toBe(true);
+    expect(p.json<number>('getChecklistModel().totals.packed')).toBe(before.packed + 1);
+    // stored with the plan, as any tick
+    expect(p.json('captureDraft().packed.rain')).toBe(true);
+  });
+
   test('a saved plan without pockets reopens without them; a night, no pockets', async () => {
     const p = await planned('2026-11-15');
     const draft = p.json<Record<string, unknown>>('captureDraft()');

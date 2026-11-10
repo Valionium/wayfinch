@@ -457,6 +457,14 @@ test('[TRIP-DAY-BAGS] in the full planner the day ride\'s tube reads as one tube
   const all = texts.join(' | ');
   expect(all).toContain('Spare tube (one, for a day ride)');
   expect(all).not.toMatch(/Spare tubes ×2/);
+  // what rides in the pockets is in the packing checklist and is ticked like any row (re-check of PR 106, R2)
+  await page.evaluate('closeBagPop(); go(4); renderResult(); document.querySelectorAll(".packing-disclosure").forEach(d => { d.open = true; });');
+  const rain = page.locator('[data-checklist-item="rain"]');
+  await expect(rain).toHaveCount(1);
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();   // the full planner's own question first
+  await rain.check();
+  await expect(page.locator('[data-checklist-item="rain"]')).toBeChecked();
+  expect(await page.evaluate('S.packed.rain === true')).toBe(true);
   expect(errors).toEqual([]);
 });
 
