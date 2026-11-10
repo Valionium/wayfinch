@@ -173,6 +173,7 @@ test('[FIT-LINE] the Bag planner and the Gear advisor with no bike: a line under
   await expect(page.locator('#bikeDetailsBox')).toBeVisible();
   await page.evaluate(() => { (document.getElementById('bikeMoreDetails') as HTMLDetailsElement).open = true; (document.getElementById('bikeLibraryPanel') as HTMLDetailsElement).open = true; });
   await page.locator('#bikeName').fill('Mine');
+  const runsBefore = await page.evaluate('ADVISOR_RUN') as number;
   await page.locator('#bikeSave').click();
   await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles') ?? '[]') as { name: string }[]).map((b) => b.name))).toEqual(['Mine']);
   await page.keyboard.press('Escape');
@@ -180,8 +181,40 @@ test('[FIT-LINE] the Bag planner and the Gear advisor with no bike: a line under
   await expect(fit).toBeHidden();
   await expect(page.locator('#advisorTitle')).toBeFocused();
   await expect(page.locator('#advisorBikeSelect')).toHaveValue(/.+/);
+  // the advisor searched again, on the saved bike (a newer run than before the save, an answer that has it), not the old answer kept
+  expect(await page.evaluate('ADVISOR_RUN') as number).toBeGreaterThan(runsBefore);
   await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
+  expect(await page.evaluate('S.bikeProfile && S.bikeProfile.name')).toBe('Mine');
+  expect(await page.evaluate('ADVISOR.sig === planSignature()')).toBe(true);
   // the page wrote none of the co-pilot's keys
   expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('copilot:')))).toEqual([]);
+  expect(problems).toEqual([]);
+});
+
+// A bike saved in Bike details and then removed in the same dialog brings the line back: closing it puts the focus on Add your bike.
+test('[FIT-LINE] a bike saved in Bike details and removed there again: the line is back and closing the dialog puts the focus on Add your bike', async ({ page }) => {
+  const problems = watch(page);
+  app = await loadApp(page, { launch: true, path: '/tools/bags/' });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY');
+  const line = page.locator('#planFitLine');
+  const add = line.getByRole('button', { name: 'Add your bike' });
+  await add.click();
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await page.evaluate(() => { (document.getElementById('bikeMoreDetails') as HTMLDetailsElement).open = true; (document.getElementById('bikeLibraryPanel') as HTMLDetailsElement).open = true; });
+  await page.locator('#bikeName').fill('Mine');
+  await page.locator('#bikeSave').click();
+  await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles') ?? '[]') as { name: string }[]).map((b) => b.name))).toEqual(['Mine']);
+  await expect(line).toBeHidden();
+  await page.locator('#bikeClear').click();   // the plan keeps its own copy of a removed bike, so the plan lets go of it too
+  await page.locator('#bikeSavedSelect').selectOption({ label: 'Mine' });
+  await page.locator('#bikeRemove').click();
+  await page.locator('#bikeRemoveConfirm').click();
+  await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles') ?? '[]') as unknown[]).length)).toBe(0);
+  await expect(line).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#bikeDetailsBox')).toBeHidden();
+  await expect(add).toBeFocused();
   expect(problems).toEqual([]);
 });
