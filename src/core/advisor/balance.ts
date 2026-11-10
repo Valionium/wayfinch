@@ -351,9 +351,19 @@ export function handlingFirst(start: Packing, trial: (pins: Record<string, strin
   const cross = movesOf(cur).filter((m) => !isWithin(m));
   if (cross.length < movesOf(cur).length) {
     if (tried >= budget) return out();
-    const next = cross.length ? trial(Object.fromEntries(cross.map((m) => [m.id, m.to])), start) : start;
+    const target = new Map(cross.map((m) => [m.id, m.to]));
+    let next = cross.length ? trial(Object.fromEntries(target), start) : start;
     if (cross.length) tried++;
-    if (cross.every((m) => mainBag(next, m.id) === m.to) && keepsPromises(start.result, next.result) && kept(next) && sides(next)) {
+    // a thing that found no room in its half of a pair goes to the other half (the moves within the pair made the room there)
+    const other = (key: string) => { const k = pairOf.get(key); return k === undefined ? undefined : [...pairOf].find(([u, v]) => v === k && u !== key)?.[0]; };
+    const missed = cross.filter((m) => mainBag(next, m.id) !== m.to && other(m.to));
+    if (missed.length) {
+      if (tried >= budget) return out();
+      for (const m of missed) target.set(m.id, other(m.to)!);
+      next = trial(Object.fromEntries(target), start);
+      tried++;
+    }
+    if (cross.every((m) => mainBag(next, m.id) === target.get(m.id)) && keepsPromises(start.result, next.result) && kept(next) && sides(next)) {
       if (handlingScore(next.result) > s0 - STEP + EPS) {
         const evened = evenOut(start);
         if (!evened) return out();

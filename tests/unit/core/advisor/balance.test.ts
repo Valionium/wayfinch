@@ -644,6 +644,18 @@ describe('"Handling first" (design of 10 Nov 2026)', () => {
     expect(out).toMatchObject({ apply: false, moves: [] });
   });
 
+  test("[HF-ORDER] a thing packed into a pair goes to whichever half has room, so the pair's other things need not swap sides for it", () => {
+    const bags: Bag[] = [{ key: 'k-0', pos: 'fork', cap: 2, reach: false, pair: 'k' }, { key: 'k-1', pos: 'fork', cap: 2, reach: false, pair: 'k' },
+      { key: 's-0', pos: 'seat', cap: 10, reach: false }];
+    const items: FItem[] = [{ id: 'lock', kg: 1.6, L: 2 }, { id: 'a', kg: 0.3, L: 1 }, { id: 'b', kg: 0.3, L: 1 }, { id: 'c', kg: 0.3, L: 1 }, { id: 'd', kg: 0.3, L: 1 }];
+    const p = keeper(bags, items, { lock: 's-0', a: 'k-0', b: 'k-0', c: 'k-1', d: 'k-1' });
+    const out = handlingFirst(p.start, p.trial, p.fresh);
+    expect(out.apply).toBe(true);
+    expect(['k-0', 'k-1']).toContain(unitOf(out.packing, 'lock'));
+    expect(out.moves.filter((m) => m.from.startsWith('k-') && m.to.startsWith('k-'))).toEqual([]);
+    expect(out.moves).toHaveLength(3);
+  });
+
   test('[HF-ORDER] a pair that cannot be made even at no cost is left as it is: no things to repack for a pair that stays uneven all the same', () => {
     const bags: Bag[] = [{ key: 'k-0', pos: 'fork', cap: 3, reach: false, pair: 'k' }, { key: 'k-1', pos: 'fork', cap: 3, reach: false, pair: 'k' }];
     const p = keeper(bags, [{ id: 'tent', kg: 1.3, L: 2 }, { id: 'pot', kg: 0.3, L: 0.5 }], { tent: 'k-0', pot: 'k-0' });
