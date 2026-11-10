@@ -2,10 +2,10 @@
 // of the three screens. It shows what a tap does (it switches to the mode the page is not in) and changes the one theme You changes,
 // through the same rule. A chunk of its own, loaded after the first screen (app.tsx): the button is placed over the corner, so
 // nothing moves when it arrives.
-import { useEffect, useState } from 'preact/hooks';
 import { TH } from '../core/wording/en-theme.ts';
 import { readSettings, writeSettings } from '../store/settings.ts';
-import { applyTheme, themeChoice } from './theme-apply.ts';
+import { useTheme } from './bike/drawing.tsx';
+import { applyTheme } from './theme-apply.ts';
 import { noteThemeChoice, themeNow } from './theme-choice.ts';
 
 /**
@@ -23,16 +23,7 @@ export async function setTheme(theme: 'light' | 'dark'): Promise<void> {
 }
 
 export function ThemeButton() {
-  const [, again] = useState(0);
-  // "Automatic" is the phone's own mode, which can change while the page is open.
-  useEffect(() => {
-    const query = matchMedia('(prefers-color-scheme: dark)');
-    const follow = (): void => again((n) => n + 1);
-    query.addEventListener('change', follow);
-    return () => query.removeEventListener('change', follow);
-  }, []);
-  const choice = themeChoice.value;
-  const dark = choice === 'auto' ? matchMedia('(prefers-color-scheme: dark)').matches : choice === 'dark';
+  const dark = useTheme() === 'dark';   // the theme shown: the rider's choice from either app, else the phone's, redrawn when either changes
   return (
     <button
       type="button" class="theme-btn" aria-label={dark ? TH.toLight : TH.toDark}
