@@ -27,7 +27,7 @@ export type MapInput = {
    * After Handling first (design of 10 Nov 2026, §3): the packing before the press. The maps are then Before (this) and After (`items`)
    * on the same fixed scale, with one sentence of what moved in place of the difference's switch.
    */
-  before?: { items: MapItem[] };
+  before?: { items: MapItem[]; note?: string };
   onDiff: (on: boolean) => void;
 };
 
@@ -157,7 +157,8 @@ export function render(host: HTMLElement, input: MapInput): void {
   if (diff) key.insertAdjacentHTML('beforeend', `<div class="wm-bar wm-bar-diff" aria-hidden="true"></div><p class="wm-key-diff">${esc(WM.diffKey)}</p>`);
   const moved = host.querySelector<HTMLElement>('.wm-moved')!;
   moved.hidden = !ba;
-  moved.textContent = ba ? movedLine(first, second) : '';
+  // the page's own sentence when the press only evened a pair (re-check of PR 117, N3)
+  moved.textContent = ba ? ba.note ?? movedLine(first, second) : '';
   // the switch: the same element every time, so the focus stays where the rider left it
   const diffB = host.querySelector<HTMLButtonElement>('.wm-diff')!;
   diffB.hidden = !!ba;

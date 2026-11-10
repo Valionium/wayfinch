@@ -9484,6 +9484,19 @@ const handlingAvailable = () => S.step === 4 && !SMALL_VIEW && !PLAN_TRIAL && !T
 const HANDLING_SLICE = 3;
 // A pair whose halves' fill differs by this much is uneven: the packing check's pair note says so; advisor.js's PAIR_UNEVEN is the same.
 const PAIR_NOTE_GAP = 0.22;
+// Each pair of the plan as shown: its two halves, how full each is, the gap; and each bag's kilos there (the map's Before).
+function shownPairList(A = currentPlan()){
+  const g = {};
+  A.slots.forEach(s => { if(countOf(s) > 1) (g[s.uid] = g[s.uid] || []).push(s); });
+  return Object.entries(g).filter(([, h]) => h.length === 2).map(([uid, h]) => {
+    const f = h.map(s => s.cap ? (s.cap - s.left) / s.cap : 0);
+    return { uid, pos:h[0].pos, fills:f, gap:Math.abs(f[0] - f[1]) };
+  });
+}
+const shownPairs = () => Object.fromEntries(shownPairList().map(p => [p.uid, p.gap]));
+const shownSlots = () => currentPlan().slots.map(s => ({ key:s.key, pos:s.pos, kg:weightIn(s) }));
+// "fork cages", "rear panniers"
+const pairWords = pos => POSITIONS[pos].label.toLowerCase() + 's';
 // The press. now: at once (the QA suites); otherwise in slices between frames, "Packing for handling…" meanwhile, so the page never
 // blocks (PERF-HF). True when the search started (now: when it packed something).
 function startHandling(o = {}){
@@ -9493,8 +9506,9 @@ function startHandling(o = {}){
   // the heaviest-first packing on the plan as it stands: its pins over the kept placements (the frozen packing's kept passes), each
   // trial remembered; a fresh re-plan (placements none) takes one task of over 200 ms on the phone stand-in (PERF-HF)
   const trial = rememberedTrial(), fresh = pins => trial(pins, start), extra = splitThings();
-  const run = { key:idealKey(), before, start, n:0, fixed:JSON.stringify([...fixed].sort()),
-    go:n => W.handlingFirst(start, trial, fresh, { fixed, extra, maxTrials:BALANCE_TRIALS, budget:n }) };
+  const run = { key:idealKey(), before, start, n:0, pairs:shownPairList(), fixed:JSON.stringify([...fixed].sort()),
+    // side to side and the map's Before from the plan as the rider sees it, its food split included (re-check of PR 117, N1)
+    shown:shownSlots(), go:n => W.handlingFirst(start, trial, fresh, { fixed, extra, maxTrials:BALANCE_TRIALS, budget:n, pairs:shownPairs() }) };
   resetHandling();
   BALANCE.run = null;
   if(o.now) return applyHandling(run, run.go(Infinity));
@@ -9532,7 +9546,8 @@ function applyHandling(run, out){
     const worth = m => { const p = was.get(m.id); return p ? p.kg * ((W.WEIGHTS[p.pos] || 0) - (W.WEIGHTS[to.get(m.id)] || 0)) : 0; };
     moves = [...out.moves].sort((a, b) => worth(b) - worth(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
-  HANDLING.last = { kind, placements:S.placements, before:run.before, start:run.start, after, moves, gain:out.gain, route:out.route };
+  HANDLING.last = { kind, placements:S.placements, before:run.before, start:run.start, shown:run.shown, after, moves, gain:out.gain, route:out.route,
+    pairs:run.pairs };
   // the automatic balancing looks at this packing as looked at, so it never undoes the press
   BALANCE.checked = JSON.stringify(S.placements); BALANCE.pins = JSON.stringify(S.pinned || {});
   BALANCE.last = null; BALANCE.reverted = null; BALANCE.run = null;
@@ -9575,12 +9590,20 @@ function handlingTips(last){
   if(fr && fr.full){
     const by = new Map();
     fr.outside.slice(0, 2).forEach(p => { const w = unitWord(p.unit); by.set(w, [...(by.get(w) || []), kitWord(kitById(p.id)) || p.id]); });
-    const said = [...by].map(([w, names], i) => i === 0
-      ? `the ${names.join(' and the ')} ride${names.length > 1 ? '' : 's'} in the ${w}` : `the ${names.join(' and the ')} in the ${w}`).join(', ');
+    // "the fork cage 1 holds the phone and the bike lock": no verb to agree with a name like "charger and cables" (re-check of PR 117, N4)
+    const said = [...by].map(([w, names], i) => `the ${w}${i === 0 ? ' holds' : ''} the ${names.join(' and the ')}`).join(', ');
     tips.push(`Your frame bag is full${fr.heaviest ? ' of the heaviest things' : ''}; ${said}.`);
     if(bigger && fr.moreKg >= 0.1) tips.push(`${FRAME_SHAPE_WORDS[bigger.shape] || 'A bigger frame bag'} would fit your frame and take about ${fr.moreKg.toFixed(1)} kg more of the heavy things. The Gear advisor can show it.`);
   }
+  // a pair still uneven after the press, said briefly (re-check of PR 117, N2); the pair note in the packing check says why
+  shownPairList(A).filter(p => p.gap >= PAIR_NOTE_GAP).forEach(p =>
+    tips.push(`The ${pairWords(p.pos)} stay uneven: ${p.fills.map(f => Math.round(f * 100)).join(' % and ')} % full.`));
   return tips;
+}
+// The pair a press evened (route even): the first pair uneven on screen before and even now.
+function evenedPair(last){
+  const now = new Map(shownPairList().map(p => [p.uid, p.gap]));
+  return (last.pairs || []).find(p => p.gap >= PAIR_NOTE_GAP && (now.get(p.uid) ?? 1) < PAIR_NOTE_GAP) || null;
 }
 // The line in the place of the balance line, its tips and "See all"; null when Handling first has nothing on show.
 function handlingLine(){
@@ -9593,7 +9616,9 @@ function handlingLine(){
     else {
       const said = last.moves.map(m => (kitWord(kitById(m.id)) || m.id) + ' to the ' + unitWord(m.to));
       const shown = said.length > 3 ? [...said.slice(0, 2), `${said.length - 2} more things`] : said;
-      text = 'Packed for handling: ' + (said.length < 2 ? said[0] : shown.slice(0, -1).join(', ') + ' and ' + shown[shown.length - 1]);
+      // a press that only evened a pair says so (re-check of PR 117, N3)
+      const evened = last.route === 'even' ? evenedPair(last) : null;
+      text = `Packed for handling${evened ? `, to even the ${pairWords(evened.pos)}` : ''}: ` + (said.length < 2 ? said[0] : shown.slice(0, -1).join(', ') + ' and ' + shown[shown.length - 1]);
       const packed = handlingPacked(last), sep = SMALL_VIEW ? '' : ' ·';
       if(packed) text += '. You have started packing it this way, so it stays.';
       const all = said.length > 3 ? ` <button class="linky" type="button" data-handling-all="1" aria-expanded="${HANDLING.all}" aria-controls="hfAll">See all</button>` : '';
@@ -9629,8 +9654,13 @@ function fillHandling(){
 function handlingBefore(){
   const last = HANDLING.last;
   if(!last || last.kind !== 'packed' || !samePlacements(last.placements, S.placements)) return null;
-  return last.start.slots.filter(s => s.kg > 0).map(s => ({ pos:s.pos, kg:s.kg, outline:RIG_OUTLINES[s.key] ? RIG_OUTLINES[s.key].outline : null }))
+  return (last.shown || last.start.slots).filter(s => s.kg > 0).map(s => ({ pos:s.pos, kg:s.kg, outline:RIG_OUTLINES[s.key] ? RIG_OUTLINES[s.key].outline : null }))
     .filter(i => i.outline && i.outline.length >= 3);
+}
+// The map's sentence after a press that only evened a pair (re-check of PR 117, N3).
+function handlingMapNote(){
+  const last = HANDLING.last, p = last && last.route === 'even' ? evenedPair(last) : null;
+  return p ? { note:`The same kilos, spread more evenly between the two ${pairWords(p.pos)}.` } : {};
 }
 // The line's buttons: "See all" opens the list in place, the focus staying on it; Undo, then the step's title.
 function wireHandlingLine(root, title, keep = fn => fn()){
@@ -9660,7 +9690,7 @@ function weightMapInput(){
   items.push(...deckMapItem(a));
   const art = rigArt(true), before = handlingBefore();
   return { items, scale:a.scale, ideal:{ items:[...found.items, ...deckMapItem(a)] }, diff:WEIGHT_MAP.diff,
-    ...(before ? { before:{ items:[...before, ...deckMapItem(a)] } } : {}),
+    ...(before ? { before:{ items:[...before, ...deckMapItem(a)], ...handlingMapNote() } } : {}),
     bike:art ? art.svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '') : '',
     onDiff:on => { WEIGHT_MAP.diff = on; drawWeightMap(); } };
 }

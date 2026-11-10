@@ -193,7 +193,8 @@ test('[HF-FULL] a full frame bag is said in one line; a bigger frame bag is poin
   press();
   assert.deepEqual(json('S.bags'),bags,'the bags as they were');
   const half=line();
-  assert.match(half,/<li>Your frame bag is full( of the heaviest things)?; the [^<]+ ride[s]? in the [^<]+\.<\/li>/);
+  // re-check of PR 117, N4: "the <bag> holds …", so a thing named "charger and cables" reads right
+  assert.match(half,/<li>Your frame bag is full( of the heaviest things)?; the [^<]+ holds the [^<]+\.<\/li>/);
   assert.match(half,/<li>A (full|three-quarter) frame bag would fit your frame and take about \d+\.\d kg more of the heavy things\. The Gear advisor can show it\.<\/li>/);
   // the full frame bag: full perhaps, but no bigger one to point to
   plan([{uid:1,pos:'seat',L:14},{uid:2,pos:'bar',L:13},{uid:3,pos:'frame',L:6,shape:0},{uid:4,pos:'fork',L:3,pair:true}]);
@@ -227,9 +228,11 @@ test('[HF-AIR] the packing tips: the heaviest things low in the frame bag; an ou
 test('[HF-KEEPS] side to side on the full kit: no pair ends uneven by the pair note\'s measure that was even, none more uneven; every move named',()=>{
   assert.equal(json('window.WayfinchAdvisor.PAIR_UNEVEN'),json('PAIR_NOTE_GAP'),'one measure: the pair note\'s');
   const fills=()=>json(`(()=>{const g={};currentPlan().slots.forEach(s=>{if(countOf(s)>1)(g[s.uid]=g[s.uid]||[]).push((s.cap-s.left)/s.cap);});return Object.values(g).filter(f=>f.length===2).map(f=>Math.abs(f[0]-f[1]));})()`);
-  for(const [name,bags,decks] of [['touring',[{uid:1,pos:'rack',L:20,pair:true},{uid:2,pos:'bar',L:9},{uid:3,pos:'frame',L:6}],{rack:true}],
-    ['bikepacking',SETS.bikepacking,{}]]){
-    plan(bags,decks,'',true,FULLKIT);
+  // re-check of PR 117, N1: the small kit with food and snacks, a day ride, light: the fork cages shown at 76 % and 56 % went to 78 % and 53 %
+  const N1=[{uid:1,pos:'rack',L:15,pair:true},{uid:2,pos:'fork',L:3,pair:true},{uid:3,pos:'frame',L:4.5},{uid:4,pos:'bar',L:9}];
+  for(const [name,bags,decks,extra,kit] of [['touring',[{uid:1,pos:'rack',L:20,pair:true},{uid:2,pos:'bar',L:9},{uid:3,pos:'frame',L:6}],{rack:true},'',FULLKIT],
+    ['bikepacking',SETS.bikepacking,{},'',FULLKIT],['panniers and fork cages, a light day ride',N1,{rack:true},"S.kit.food=true;S.kit.snacks=true;S.nights=0;S.mode='light'",KIT0]]){
+    plan(bags,decks,extra,true,kit);
     const before=fills();
     press();
     const after=fills();
@@ -239,6 +242,10 @@ test('[HF-KEEPS] side to side on the full kit: no pair ends uneven by the pair n
     });
     const l=line();
     assert.doesNotMatch(l,/undefined/,name);
+    // re-check of PR 117, N2: a pair that stays uneven is said so, under the line
+    if(after.some(g=>g>=PAIR_GAP))assert.match(l,/<li>The [a-z ]+ stay uneven: \d+ % and \d+ % full\.<\/li>/,name);
+    // N3: a press that only evens a pair says so
+    if(json('HANDLING.last.route')==='even')assert.match(l,/Packed for handling, to even the [a-z ]+: /,name);
     if(json('HANDLING.last.kind')==='packed'){
       assert.ok(json('HANDLING.last.moves.length')>0,`${name}: applied with moves`);
       run('HANDLING.all=true');

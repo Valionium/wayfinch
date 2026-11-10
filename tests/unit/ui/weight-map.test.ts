@@ -86,6 +86,9 @@ describe("Handling first's Before and After", () => {
     expect(q<HTMLElement>('.wm-moved').hidden).toBe(false);
     expect(q<HTMLButtonElement>('.wm-diff').hidden).toBe(true);
     expect(q('.wm-diff')).toBe(diffB);
+    // a press that only evened a pair: the page's own sentence (re-check of PR 117, N3)
+    render(host, input({ before: { items: YOURS, note: 'The same kilos, spread more evenly between the two fork cages.' }, items: YOURS }));
+    expect(q('.wm-moved').textContent).toBe('The same kilos, spread more evenly between the two fork cages.');
     render(host, input());
     expect(cards().map((c) => c.querySelector('figcaption b')!.textContent)).toEqual([WM.yours, WM.ideal]);
     expect(q<HTMLButtonElement>('.wm-diff').hidden).toBe(false);
