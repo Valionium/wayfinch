@@ -4225,7 +4225,7 @@ function dayRideKit(){
     food:hours > PACE.steady.hours,bank:hours > PACE.sporting.hours,
     puffy:false,gloves:known && warm < 5,   // the jacket worn, not packed (dayRideWearsJacket)
     rainpants:known && c.wetChance > 33,water:dayRideNeedsBagWater(),
-    shades:sunMonth >= 2 && sunMonth <= 9,sun:sunMonth >= 3 && sunMonth <= 8};
+    shades:sunMonth >= 3 && sunMonth <= 8,sun:sunMonth >= 3 && sunMonth <= 8};
 }
 function applyTripKitDefaults(){
   const defaults=tripKitDefaults();
@@ -8465,7 +8465,7 @@ function audit(){
     M('Toothbrush and paste', 'The wash kit covers soap and a razor. This is the one people discover missing at the end of day one.', ['teeth']);
   if(!has('underwear') && n >= 2)
     M('Spare underwear', 'Cycling shorts are worn without any, but everything off the bike needs some. 100 g.', ['underwear']);
-  if(!has('shades') && sunMonth >= 2 && sunMonth <= 9)
+  if(!has('shades') && (n === 0 ? sunMonth >= 3 && sunMonth <= 8 : sunMonth >= 2 && sunMonth <= 9))   // a day ride's season is the sunscreen's (daySunny); a longer trip keeps March to October
     M('Sunglasses', 'Six hours a day facing the sky, plus grit off the road and flies at eye height on descents.', ['shades']);
   if(!has('pads') && n >= 7){
     const rim=bike.brakes==='rim',disc=['hydraulic-disc','cable-disc'].includes(bike.brakes);
