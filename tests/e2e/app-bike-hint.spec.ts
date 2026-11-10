@@ -191,7 +191,6 @@ test('[FIT-LINE] the Bag planner and the Gear advisor with no bike: a line under
   expect(problems).toEqual([]);
 });
 
-<<<<<<< HEAD
 // Try a colour (wish 17, design of 9 Nov 2026, section 4.2; owner's answer 3): the card keeps the dots' row, so nothing moves when they
 // arrive; a tap paints the frame at once; Make it yours carries the colour into Bike details, picked and not saved.
 test('[HINT-COLOUR] five dots of 44 px in a row the card keeps, nothing moves when they load; a tap paints the bike; Make it yours opens Bike details with that colour picked and nothing saved', async ({ page }) => {
@@ -238,7 +237,9 @@ test('[HINT-COLOUR] five dots of 44 px in a row the card keeps, nothing moves wh
   // Wayfinch's own keys are as they were when Make it yours was tapped (the hint key's letters only grow by the tap, as before)
   const now = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('copilot:') && k !== 'copilot:bikeHint:v1'));
   expect(now).toEqual((JSON.parse(before) as [string, string][]).map(([k]) => k).filter((k) => k.startsWith('copilot:') && k !== 'copilot:bikeHint:v1'));
-=======
+  expect(problems).toEqual([]);
+});
+
 // A bike saved in Bike details and then removed in the same dialog brings the line back: closing it puts the focus on Add your bike.
 test('[FIT-LINE] a bike saved in Bike details and removed there again: the line is back and closing the dialog puts the focus on Add your bike', async ({ page }) => {
   const problems = watch(page);
@@ -264,6 +265,5 @@ test('[FIT-LINE] a bike saved in Bike details and removed there again: the line 
   await page.keyboard.press('Escape');
   await expect(page.locator('#bikeDetailsBox')).toBeHidden();
   await expect(add).toBeFocused();
->>>>>>> origin/main
   expect(problems).toEqual([]);
 });
