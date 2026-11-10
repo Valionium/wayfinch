@@ -5,6 +5,7 @@
 import type { Anchors, P } from '../bike/art.ts';
 import { bikeArt } from '../bike/art.ts';
 import { drawnFor, partPoint } from '../bike/part-points.ts';
+import type { Motor } from '../bike/normalise.ts';
 import type { BikeSpec, BikeType, Mark } from '../bike/spec.ts';
 import { resolveBikeSpec } from '../bike/spec.ts';
 import type { Style } from '../bike/templates.ts';
@@ -25,8 +26,11 @@ const TYPICAL: Record<BikeType, Typical> = {
   fat: { rim: 559, mm: 100, style: 'diamond-sloping', bars: 'flat', fork: 'rigid' },
 };
 
-/** The typical bike of a type (gravel where none is known): no colour, size M, every detail open to what a card needs. */
-export function typeSpec(type: BikeType | null): BikeSpec {
+/**
+ * The typical bike of a type (gravel where none is known): no colour, size M, every detail open to what a card needs. `motor`: where the
+ * rider's e-bike has its motor, when they said (a hub); else at the cranks.
+ */
+export function typeSpec(type: BikeType | null, motor: Motor | null = null): BikeSpec {
   const t = TYPICAL[type ?? 'gravel'];
   const base = resolveBikeSpec(null, null);
   const d = <T>(value: T, mark: Mark = 'default') => ({ value, mark });
@@ -35,7 +39,7 @@ export function typeSpec(type: BikeType | null): BikeSpec {
     type: d(type ?? 'gravel', type ? 'guessed' : 'default'),
     rimMm: d(t.rim), frontMm: d(t.mm), rearMm: d(t.mm), style: d(t.style), size: d('M'),
     points: d(framePoints(t.style, 'M')), bars: d(t.bars), fork: d(t.fork), brakes: d('disc'), drive: d('derailleur'),
-    rack: d(false), ebike: d(false), colour: d(null),
+    rack: d(false), ebike: d(false), motor: d(motor ?? 'cranks', motor ? 'entered' : 'default'), colour: d(null),
   };
 }
 
@@ -61,8 +65,8 @@ const shows = (spec: BikeSpec, id: PartId): boolean => partPoint(spec, bikeArt(s
  * borrowed where the drawing lacks it, as long as no part before it is lost (a card naming rim brakes first, then disc brakes, draws rim
  * brakes). With `tapped` not on that bike, the bike borrows it too, so the tapped part always shows where any bike has it.
  */
-export function cardSpec(type: BikeType | null, applies: Conditions, parts: readonly PartId[], tapped: PartId | null = null): BikeSpec {
-  let spec = withConditions(typeSpec(type), applies);
+export function cardSpec(type: BikeType | null, applies: Conditions, parts: readonly PartId[], tapped: PartId | null = null, motor: Motor | null = null): BikeSpec {
+  let spec = withConditions(typeSpec(type, motor), applies);
   const kept: PartId[] = [];
   for (const id of parts) {
     if (!shows(spec, id)) {
@@ -167,15 +171,11 @@ export function inkMarkup(svg: string, classes: readonly string[], cls: string, 
 }
 
 /**
- * The view's copy of the drawing: bikeArt's markup with its outer name taken off (the view names the drawing itself) and, on an e-bike,
- * the motor drawn round, as a housing round the crank axle (owner's note of 9 November 2026: most e-bike motors sit there, round).
+ * The view's copy of the drawing: bikeArt's markup with its outer name taken off (the view names the drawing itself). An e-bike's motor
+ * is bikeArt's own (PR 109): round at the cranks, or the hub the rider said.
  */
-export function viewMarkup(svg: string, anchors: Anchors): string {
-  const k = anchors.scale / 0.11;
-  const [x, y] = anchors.points.bb;
-  return svg
-    .replace(/ role="img" aria-label="[^"]*"/, ' aria-hidden="true" focusable="false"')
-    .replace(/<rect class="bk-motor"[^>]*\/>/, `<circle class="bk-motor bv-motor" cx="${r2(x)}" cy="${r2(y)}" r="${r2(6.4 * k)}"/>`);
+export function viewMarkup(svg: string): string {
+  return svg.replace(/ role="img" aria-label="[^"]*"/, ' aria-hidden="true" focusable="false"');
 }
 
 // ---- the part of the drawing in view ----

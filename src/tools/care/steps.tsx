@@ -86,6 +86,12 @@ function Before({ source }: { source: StepSource }) {
 function Pictures({ shown, view }: { shown: Shown[]; view: string }) {
   const ready = shown.filter((p) => pictureReady(p.id));
   const [pick, setPick] = useState<string | null>(null);
+  // the pressed button leaves the row as its picture shows (final review of PR 72, M1): focus goes to the one that switches back
+  const [back, setBack] = useState<string | null>(null);
+  const row = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (back) row.current?.querySelector<HTMLButtonElement>(`button[data-pic="${back}"]`)?.focus();
+  }, [back, pick]);
   if (ready.length === 0) return null;
   const now = ready.find((p) => p.id === pick) ?? ready[0]!;
   const others = ready.filter((p) => p !== now && p.kind);
@@ -93,11 +99,11 @@ function Pictures({ shown, view }: { shown: Shown[]; view: string }) {
     <div class="care-pics">
       <Picture key={now.id} id={now.id} view={view} />
       {others.length > 0 ? (
-        <div class="care-kinds" role="group" aria-label={SWITCH_WORDS.other}>
+        <div class="care-kinds" role="group" aria-label={SWITCH_WORDS.other} ref={row}>
           <span class="care-kinds-label" aria-hidden="true">{SWITCH_WORDS.other}:</span>
           {others.map((p) => (
-            <button key={p.id} type="button" class="btn care-kind" aria-label={SWITCH_WORDS.show(KIND_WORDS[p.kind!] ?? p.kind!)}
-              onClick={() => setPick(p.id)}>{KIND_WORDS[p.kind!] ?? p.kind}</button>
+            <button key={p.id} type="button" class="btn care-kind" data-pic={p.id} aria-label={SWITCH_WORDS.show(KIND_WORDS[p.kind!] ?? p.kind!)}
+              onClick={() => { setBack(now.id); setPick(p.id); }}>{KIND_WORDS[p.kind!] ?? p.kind}</button>
           ))}
         </div>
       ) : null}
@@ -187,6 +193,8 @@ export function StepView({ source, bike = null, addHref = null, onClose }: {
   const details = pictureDetails(bike);
   const pictures = shownSteps.map((i) => picturesFor(source.item.id, i, details));
   const parts = cardParts(source.item.id, source.item.steps, shownSteps);
+  // the rider's bike, for its type and where its motor is, and nothing else (the owner's answer 1)
+  const own = bike ? resolveBikeSpec(bike, null) : null;
   const tools = source.kind === 'road'
     ? source.item.carry.map((id) => CARRY.find((x) => x.id === id)?.name).filter(Boolean).join('; ')
     : source.item.tools === 'none' ? '' : source.item.tools;
@@ -293,7 +301,7 @@ export function StepView({ source, bike = null, addHref = null, onClose }: {
         )}
       </div>
       {part !== null && BikeView ? (
-        <BikeView key={part} tapped={part === 'card' ? null : part} type={riderType(bike ? resolveBikeSpec(bike, null) : null)} details={details}
+        <BikeView key={part} tapped={part === 'card' ? null : part} type={riderType(own)} motor={own?.motor.mark === 'entered' ? own.motor.value : null} details={details}
           addHref={addHref} card={{ id: source.item.id, name, applies: source.item.applies, parts, tools }} onClose={closePart} />
       ) : null}
     </dialog>

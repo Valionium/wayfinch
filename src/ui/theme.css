@@ -81,8 +81,12 @@ button, a { font: inherit; }
 :focus-visible { outline: 3px solid var(--blaze); outline-offset: 2px; }
 
 .shell { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
-.screen { flex: 1; padding: 16px 16px 24px; max-width: 40rem; width: 100%; margin: 0 auto; }
-.screen h1 { font-size: 1.75rem; margin-bottom: 12px; }
+/* The one div under the shell holds the update bar and the screen: no box of their own on a phone (the shell's column), one column beside the rail on wide screens. */
+.shell > div { display: contents; }
+.screen { flex: 1; padding: 16px 16px 24px; max-width: 40rem; width: 100%; margin: 0 auto; position: relative; }
+/* The colour mode button: the top right corner of Ahead, Trip and Tools, the same at every width; the title leaves it room. */
+.theme-btn { position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); cursor: pointer; }
+.screen h1 { font-size: 1.75rem; margin-bottom: 12px; padding-right: 52px; }
 .tab-sub { margin: -6px 0 12px; }
 
 .tabs {
@@ -134,7 +138,9 @@ button, a { font: inherit; }
 }
 .btn-primary { background: var(--blaze); border-color: var(--blaze); color: var(--ground); font-weight: 600; }
 
-.update-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+/* Sticky, above the screen's own sticky back bar (which sits just below it, back-bar.css), so the button is never scrolled away or covered. */
+.update-bar { position: sticky; top: 0; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: calc(8px + env(safe-area-inset-top)) 16px 8px; background: var(--panel); border-bottom: 1px solid var(--line); }
+html:has(.update-bar) { scroll-padding-top: calc(var(--wf-update-h, 61px) + 8px); }
 .update-bar p { margin: 0; color: var(--muted); }
 
 /* Tools tab and the tyre screen */

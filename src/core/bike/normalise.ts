@@ -23,7 +23,9 @@ export type Fork = { kind: 'own'; colour: string } | { kind: 'fade'; pair: numbe
   | { kind: 'pattern'; pattern: ForkPattern; pair: number; colours?: [string, string] };
 /** `colours` are the second and third; `pair` is one of the six fade pairs; a rim depth is 15 to 60 mm. */
 export type Paint = { pattern: Pattern; colours: [string | null, string | null]; fork: Fork | null; rimMm: number | null };
-export type Look = { colour: string | null; bars: Bars | null; ebike: boolean | null; paint?: Paint };
+/** Where an e-bike's motor is (owner, 9 Nov 2026): stored only as an answer, so a bike from before keeps its bytes; none is at the cranks. */
+export type Motor = 'cranks' | 'rear-hub' | 'front-hub';
+export type Look = { colour: string | null; bars: Bars | null; ebike: boolean | null; motor?: Motor; paint?: Paint };
 export type WheelWord = '700c' | '650b' | '650c' | '29' | '27.5' | '26';
 export type Geometry = {
   at: string | null; maker: string; model: string; year: number | null; size: string; wheel: WheelWord | null;
@@ -173,11 +175,12 @@ function paintOf(v: unknown): Paint | null {
 function lookOf(value: unknown): Look | null {
   if (!isObject(value)) return null;
   const paint = paintOf(value.paint);
+  const motor = oneOf<Motor | ''>(value.motor, ['cranks', 'rear-hub', 'front-hub'], '');
   const look: Look = {
     colour: hexOf(value.colour), bars: value.bars === 'drop' || value.bars === 'flat' || value.bars === 'other' ? value.bars : null,
-    ebike: typeof value.ebike === 'boolean' ? value.ebike : null, ...(paint ? { paint } : {}),
+    ebike: typeof value.ebike === 'boolean' ? value.ebike : null, ...(motor ? { motor } : {}), ...(paint ? { paint } : {}),
   };
-  return look.colour === null && look.bars === null && look.ebike === null && !paint ? null : look;
+  return look.colour === null && look.bars === null && look.ebike === null && !motor && !paint ? null : look;
 }
 
 function geometryOf(value: unknown): Geometry | null {

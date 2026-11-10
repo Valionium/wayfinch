@@ -9,6 +9,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { bikeArt } from '../../core/bike/art.ts';
 import type { P } from '../../core/bike/art.ts';
 import { PART_PLACES } from '../../core/bike/part-points.ts';
+import type { Motor } from '../../core/bike/normalise.ts';
 import type { BikeType } from '../../core/bike/spec.ts';
 import type { PictureDetails } from '../../core/care/pictures.ts';
 import type { Conditions } from '../../core/care/types.ts';
@@ -48,7 +49,9 @@ export type ViewCard = { id: string; name: string; applies: Conditions; parts: r
  * `type`: the rider's bike type, or null (the typical gravel bike); `details`: what orders a part's close-ups (the guide's own rule);
  * `addHref`: where "Add your bike" goes, or null where the rider has a bike or chose none.
  */
-export type ViewProps = { card: ViewCard; tapped: PartId | null; type: BikeType | null; details: PictureDetails; addHref: string | null; onClose: () => void };
+export type ViewProps = {
+  card: ViewCard; tapped: PartId | null; type: BikeType | null; motor?: Motor | null; details: PictureDetails; addHref: string | null; onClose: () => void;
+};
 
 const r2 = (n: number): number => Math.round(n * 100) / 100;
 const ARROW = 7;
@@ -92,8 +95,8 @@ function layerMarkup(svg: string, spots: readonly [PartId, Spot][], tapped: Part
 type Zoom = { z: number; centre: P };
 
 /** The drawing with its labels, measured to its box's width, and the zoom buttons. */
-function Drawing({ card, tapped, type, onTap }: { card: ViewCard; tapped: PartId | null; type: BikeType | null; onTap: (id: PartId) => void }) {
-  const spec = cardSpec(type, card.applies, card.parts, tapped);
+function Drawing({ card, tapped, type, motor, onTap }: { card: ViewCard; tapped: PartId | null; type: BikeType | null; motor: Motor | null; onTap: (id: PartId) => void }) {
+  const spec = cardSpec(type, card.applies, card.parts, tapped, motor);
   const { svg, anchors } = bikeArt(spec, null, { idPrefix: 'bv' });
   const k = anchors.scale / 0.11;
   const spots = card.parts.flatMap((id): [PartId, Spot][] => { const s = partSpot(id, spec, anchors); return s ? [[id, s]] : []; });
@@ -174,7 +177,7 @@ function Drawing({ card, tapped, type, onTap }: { card: ViewCard; tapped: PartId
   // Zooming in by a button goes towards the tapped part.
   const zoomTo = (z: number): void => setZ(z, hot && z > zoom.z ? hot.at : centreNow);
 
-  const inner = viewMarkup(svg, anchors).replace(/^<svg[^>]*>|<\/svg>$/g, '');
+  const inner = viewMarkup(svg).replace(/^<svg[^>]*>|<\/svg>$/g, '');
   const layer = layerMarkup(svg, spots, tapped, k);
   const named = spots.filter(([id]) => card.parts.includes(id)).map(([id]) => PART_SHORT[id].toLowerCase());
   const label = PG.drawing(TYPE_WORD[spec.type.value], named.join(', '), tapped && hot ? PART_SHORT[tapped].toLowerCase() : null, zoom.z > 1);
@@ -277,7 +280,7 @@ function Entry({ id, details, back, onMixed, drawn, focus }: {
   );
 }
 
-export function BikeView({ card, tapped: first, type, details, addHref, onClose }: ViewProps) {
+export function BikeView({ card, tapped: first, type, motor = null, details, addHref, onClose }: ViewProps) {
   const box = useRef<HTMLDialogElement>(null);
   const title = useRef<HTMLHeadingElement>(null);
   // The tapped part, and the parts opened from "Not to be mixed up with" after it (Back goes along them).
@@ -318,7 +321,7 @@ export function BikeView({ card, tapped: first, type, details, addHref, onClose 
     e.stopPropagation();
     if (e.key === 'Escape') { e.preventDefault(); close(false); }
   };
-  const spec = cardSpec(type, card.applies, card.parts, tapped);
+  const spec = cardSpec(type, card.applies, card.parts, tapped, motor);
   const drawn = tapped === null || partSpot(tapped, spec, bikeArt(spec, null, { idPrefix: 'bv' }).anchors) !== null;
   const typeWord = TYPE_WORD[type ?? 'gravel'];
 
@@ -332,7 +335,7 @@ export function BikeView({ card, tapped: first, type, details, addHref, onClose 
         </div>
         <button type="button" class="care-steps-icon" aria-label={PG.close} onClick={() => close(false)}>✕</button>
       </div>
-      <Drawing card={card} tapped={tapped} type={type} onTap={tap} />
+      <Drawing card={card} tapped={tapped} type={type} motor={motor} onTap={tap} />
       <p class="muted bv-about">
         {type ? PG.yourType(typeWord) : PG.typical(typeWord)}
         {addHref ? <> <a href={addHref}>{PG.add}</a> {PG.addAfter}</> : null}

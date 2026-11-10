@@ -124,27 +124,35 @@ test('[BV-SPOT] on every template and size a part stands out where the drawing h
   }
 });
 
-test("[BV-MOTOR] on an e-bike the view draws the motor round, as a housing round the crank axle, where the drawing has its box (owner's note of 9 November 2026); bikeArt itself is untouched", () => {
+test("[BV-MOTOR] on an e-bike the view draws bikeArt's own round motor (PR 109): at the cranks, round the crank axle, unless the rider said a hub; the view's copy only loses the drawing's name", () => {
+  const circleAt = (svg: string): [number, number] | null => {
+    const m = /<circle class="bk-motor" cx="([\d.]+)" cy="([\d.]+)"/.exec(svg);
+    return m ? [Number(m[1]), Number(m[2])] : null;
+  };
+  const r = (n: number) => Math.round(n * 100) / 100;
   const spec = cardSpec('trekking', { ebike: ['yes'] }, ['battery']);
   const { svg, anchors } = bikeArt(spec, null);
-  expect(svg).toMatch(/<rect class="bk-motor"/);
-  const view = viewMarkup(svg, anchors);
-  expect(view).not.toMatch(/<rect class="bk-motor"/);
-  const m = /<circle class="bk-motor bv-motor" cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"\/>/.exec(view)!;
-  expect([Number(m[1]), Number(m[2])]).toEqual(anchors.points.bb.map((n) => Math.round(n * 100) / 100));
-  // drawn where the box was: before the chainring and crank, which stay in front of it
-  expect(view.indexOf('bv-motor')).toBeLessThan(view.indexOf('class="bk-ring"'));
-  expect(view).toContain('aria-hidden="true"');
+  expect(circleAt(svg)).toEqual(anchors.points.bb.map(r));
+  expect(svg).not.toMatch(/<rect class="bk-motor"/);
+  // drawn under the chainring and crank, which stay in front of it
+  expect(svg.indexOf('bk-motor')).toBeLessThan(svg.indexOf('class="bk-ring"'));
+  // the rider's rear-hub motor
+  const hub = cardSpec('trekking', { ebike: ['yes'] }, ['battery'], null, 'rear-hub');
+  const h = bikeArt(hub, null);
+  expect(circleAt(h.svg)).toEqual([r(h.anchors.wheels.rear.cx), r(h.anchors.wheels.rear.cy)]);
+  const view = viewMarkup(svg);
+  expect(view.replace(' aria-hidden="true" focusable="false"', '')).toBe(svg.replace(/ role="img" aria-label="[^"]*"/, ''));
   expect(view).not.toContain('role="img"');
 });
 
-// A pin of today's drawing (design 8): every template, size, handlebar, e-bike and theme, byte for byte as it was before the bike view.
-test("[BV-ART-SAME] bikeArt's output for every template is byte for byte what it was before the bike view", () => {
+// A pin of today's drawing (design 8): every template, size, handlebar, e-bike and theme, byte for byte as main draws it. Re-pinned to
+// main's drawing after PRs 108 and 109 (frame bag beside the bottle; the motor round, at the cranks or a hub), owner-approved work.
+test("[BV-ART-SAME] bikeArt's output for every template is byte for byte main's: the bike view never changes it", () => {
   const h = createHash('sha256');
   for (const style of STYLES) for (const size of SIZES) for (const bars of ['drop', 'flat', 'other']) for (const ebike of [false, true]) {
     for (const theme of ['dark', 'light'] as const) h.update(bikeArt(resolveBikeSpec(setBike(style, size, bars, ebike), null), null, { theme }).svg);
   }
-  expect(h.digest('hex')).toBe('947d78ae2f38374e033619fa81830ab37f83c9dba2c871370b98b982417e6a5e');
+  expect(h.digest('hex')).toBe('9ac684596d898e3e34b3b291fb21ad1b54fd553464e01559ffa71931ab692611');
 });
 
 const items = [...ROAD_CARDS, ...CARE_TASKS];

@@ -630,6 +630,9 @@ test('[BAL-LINE] the small view shows the balance\'s line at the top of its list
   const undo = line.getByRole('button', { name: 'Undo' });
   await expect(undo).toBeVisible();
   expect((await undo.boundingBox())!.height, 'Undo is at least 44 px').toBeGreaterThanOrEqual(44);
+  // the small view's own link style (as its plan line's Undo and the footer links), and no stray separator before it
+  expect(await undo.evaluate((el) => { const c = getComputedStyle(el); return [c.textTransform, c.letterSpacing, /mono|courier/i.test(c.fontFamily)]; })).toEqual(['none', 'normal', false]);
+  await expect(line).not.toContainText('·');
   await expect(page.locator('#resultBox')).toBeHidden();
   await expect(page.locator('#weightBlock')).toBeHidden();
   await expect(page.locator('#smallBagList')).toBeVisible();
@@ -686,4 +689,38 @@ test('[BAL-LINE] at 320 px, light and dark: the line wraps without a sideways sc
     expect(b.x + b.width, `${scheme}: Undo inside the window`).toBeLessThanOrEqual(320);
     expect(await page.evaluate(() => document.documentElement.scrollWidth), `${scheme}: no sideways scroll`).toBeLessThanOrEqual(320);
   }
+});
+
+// The owner's ruling of 9 Nov 2026: the full planner's three-quarter frame bag is never drawn over the bottle beside it in the triangle.
+declare const S: { bags: { pos: string; uid: number }[] };
+/** How many points of a grid over the drawn bottle (its cage, the bottle and its cap) lie inside the drawn frame bag (0: side by side). */
+async function frameOverBottle(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const uid = S.bags.find((b) => b.pos === 'frame')?.uid;
+    const shell = document.querySelector(`#bagLayer g.bagg.owned[data-bump="${uid}"] .bag-shell`) as SVGGeometryElement | null;
+    const parts = [...document.querySelectorAll('#bottleLayer g.btl:not(.ghost) rect')] as SVGRectElement[];
+    if (!shell || parts.length === 0) return -1;
+    let n = 0;
+    for (const r of parts) {
+      const toShell = shell.getScreenCTM()!.inverse().multiply(r.getScreenCTM()!);
+      const [x, y, w, h] = ['x', 'y', 'width', 'height'].map((a) => +r.getAttribute(a)!);
+      for (let i = 0; i <= 8; i++) for (let j = 0; j <= 16; j++) if (shell.isPointInFill(new DOMPoint(x! + (w! * i) / 8, y! + (h! * j) / 16).matrixTransform(toShell))) n++;
+    }
+    return n;
+  });
+}
+test('[BK-FRAME-BESIDE] the full planner\'s three-quarter frame bag is drawn beside its one bottle, never over it, on the seat tube or the down tube, editing and at the packing check', async ({ page }) => {
+  await planner(page);
+  for (const slot of ['st', 'dt']) {
+    await page.evaluate(`S.bags = [{ uid:1, pos:'frame', L:4.5 }, { uid:2, pos:'bottle', slot:'${slot}', L:0.75 }]; S.nextUid = 3; S.decks = { bar:false, rack:false }; go(2); drawRig()`);
+    expect(await page.evaluate("frameShapeIdx(S.bags.find(b => b.pos === 'frame'))"), slot).toBe(1);   // the three-quarter bag, the plan unchanged
+    expect(await page.evaluate('S.bags.length'), slot).toBe(2);
+    expect(await frameOverBottle(page), `${slot}: editing`).toBe(0);
+    await page.evaluate('go(3); go(4)');
+    expect(await frameOverBottle(page), `${slot}: packing check`).toBe(0);
+  }
+  // the half beside two bottles, as before: side by side
+  await page.evaluate("S.bags = [{ uid:1, pos:'frame', L:3 }, { uid:2, pos:'bottle', slot:'st', L:0.75 }, { uid:3, pos:'bottle', slot:'dt', L:0.75 }]; S.nextUid = 4; S.decks = { bar:false, rack:false }; go(2); drawRig()");
+  expect(await page.evaluate("frameShapeIdx(S.bags.find(b => b.pos === 'frame'))")).toBe(2);
+  expect(await frameOverBottle(page)).toBe(0);
 });

@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { T, TM } from '../../../src/core/wording/en-tyre.ts';
+import { W } from '../../../src/core/wording/en.ts';
 import { bannedHits } from '../../fixtures/banned.ts';
 
 test('[HON-BANNED] no string of the tyre screen\'s own words uses a banned word, and every key starts with "tyre"', () => {
@@ -11,15 +12,16 @@ test('[HON-BANNED] no string of the tyre screen\'s own words uses a banned word,
   }
 });
 
-// Five more words moved from en.ts on 9 Nov 2026 (care pictures, part 2) to make room in the first screen: under the same check. One of
-// them, tyreNeedRimTitle, main moved the same day into TN (en-tyre-notes.ts, checked there); merging main, the four others stay here,
-// with tyreLimitBothWheels moved later that day for the same reason (care pictures redo). Main then moved three of the four into TF
-// (en-tyre-labels.ts, checked there); merging main, two stay here: tyreAskNoPsi and tyreLimitBothWheels.
-test('[HON-BANNED] the tyre screen words moved on 9 Nov use no banned word, and every key starts with "tyre"', () => {
-  const strings = Object.entries(TM);
-  expect(strings.length).toBe(2);
-  for (const [key, text] of strings) {
+// Three words moved from en.ts on 10 Nov 2026 (care pictures) to pay in the first screen for Bike care's two optional bike details:
+// the same banned-words check, every template called with sample values, none left behind in en.ts.
+test('[HON-BANNED] the tyre screen words moved on 10 Nov use no banned word, every key starts with "tyre", and none is still in en.ts', () => {
+  const entries = Object.entries(TM);
+  expect(entries.length).toBe(3);
+  for (const [key, value] of entries) {
     expect(key).toMatch(/^tyre[A-Z]/);
+    expect(key in W, key).toBe(false);
+    const text = (value as (...a: string[]) => string)('2.5', '3.0');
+    expect(text.trim()).not.toBe('');
     expect(bannedHits(text, false), `${key}: ${text}`).toEqual([]);
   }
 });

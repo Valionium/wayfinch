@@ -23,11 +23,13 @@ export const T = {
   tyreMeasuredHelp: 'Wheel loads: with your gear on, ride-ready, put one wheel on a bathroom scale and the other on a block of the same height, then swap. Enter both.',
 };
 
-// Moved from en.ts (9 Nov 2026, care pictures part 2), shown only on the tyre screen: room in the first screen for the parts guide.
-// Its own object, so T keeps its pinned set (HON-BANNED reads both).
-// Main later moved three of its first words into TF (en-tyre-labels.ts, 9 Nov 2026); merging main, they live there only.
+/**
+ * Three more of the tyre screen's own words, moved from en.ts (care pictures, 10 Nov 2026) as they were: Bike care's two optional bike
+ * details (the wheel axle, the rim brake) cost the first screen about 60 bytes, and these pay for them. Under the same check as T
+ * (tests/unit/core/wording-tyre.test.ts).
+ */
 export const TM = {
-  tyreAskNoPsi: 'No, psi',
-  // and one more (care pictures redo, 9 Nov 2026): main's first screen came within 3 bytes of this branch's
-  tyreLimitBothWheels: 'This one maximum is used for both wheels. If your front and rear tyres have different maximums, enter the lower one.',
+  tyreWindow: (lo: string, hi: string): string => `Aim for ${lo} to ${hi} bar. The lower end is the careful end.`,
+  tyreWindowOne: (value: string): string => `Aim for ${value} bar. Lower is the careful side.`,
+  tyreSplit: (front: string, rear: string): string => `Weight split: ${front}% front, ${rear}% rear.`,
 };

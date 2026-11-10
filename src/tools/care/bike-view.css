@@ -43,7 +43,6 @@ dialog.part-sheet::backdrop { background: var(--ground); opacity: 0.6; }
 .bv-ring.bv-ink, .bv-ring.bv-hot { fill: var(--panel); stroke-width: 1.2; }
 .bv-ring.bv-halo { fill: var(--blaze); stroke: none; }
 .bv-dash { stroke-dasharray: 2.2 1.6; }
-.bv-motor { fill: var(--panel); stroke: var(--line); stroke-width: 1.4; }
 .bv-leader { stroke: var(--muted); stroke-width: 0.9; }
 .bv-dot { fill: var(--ink); }
 .bv-arrow line { stroke: var(--blaze); stroke-width: 2.25; stroke-linecap: round; }
