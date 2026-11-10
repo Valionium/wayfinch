@@ -203,6 +203,8 @@ test('[HINT-COLOUR] five dots of 44 px in a row the card keeps, nothing moves wh
   expect(after.height).toBeLessThanOrEqual(230);
   const gpx = page.getByText('Choose a GPX file').first();
   expect((await gpx.boundingBox())!.y + 44).toBeLessThanOrEqual(page.viewportSize()!.height);
+  // on a phone the whole Choose a GPX file button is above the tab bar
+  if (page.viewportSize()!.width < 768) { const g = (await gpx.boundingBox())!; expect(g.y + g.height).toBeLessThanOrEqual((await page.locator('nav.tabs').boundingBox())!.y); }
   const names = ['Teal', 'Red', 'Blue', 'Yellow', 'Black'];
   for (const name of names) {
     const dot = group.getByRole('button', { name, exact: true });
