@@ -22,12 +22,3 @@ export const T = {
   tyreIntro: 'An estimate for your setup, worked out on this phone from published tyre-drop data. It never goes above a limit you enter, and it sends nothing.',
   tyreMeasuredHelp: 'Wheel loads: with your gear on, ride-ready, put one wheel on a bathroom scale and the other on a block of the same height, then swap. Enter both.',
 };
-
-// Moved from en.ts (9 Nov 2026, care pictures part 2), shown only on the tyre screen: room in the first screen for the parts guide.
-// Its own object, so T keeps its pinned set (HON-BANNED reads both).
-// Main later moved three of its first words into TF (en-tyre-labels.ts, 9 Nov 2026); merging main, they live there only.
-export const TM = {
-  tyreAskNoPsi: 'No, psi',
-  // and one more (care pictures redo, 9 Nov 2026): main's first screen came within 3 bytes of this branch's
-  tyreLimitBothWheels: 'This one maximum is used for both wheels. If your front and rear tyres have different maximums, enter the lower one.',
-};

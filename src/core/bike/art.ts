@@ -76,7 +76,7 @@ export function fillColour(pct: number, theme: 'dark' | 'light' = 'dark'): strin
 }
 
 /** Sutherland–Hodgman against one half-plane: keeps the points where `side` is at most 0. */
-function clip(poly: P[], side: (p: P) => number): P[] {
+export function clip(poly: P[], side: (p: P) => number): P[] {
   const out: P[] = [];
   for (let i = 0; i < poly.length; i += 1) {
     const a = poly[i]!;
@@ -279,6 +279,9 @@ function bikeParts(spec: BikeSpec, g: Geometry, fr: ReturnType<typeof frameOf>):
   const wf = spec.frontMm.value * g.k;
   out.push(wheel(g.rear, g.rr, g.rimR, wr), wheel(g.front, g.rf, g.rimR, wf));
   out.push(path('bk-spokes', `${spokes(g.rear, g.rimR, 0)} ${spokes(g.front, g.rimR, 1)}`, 0.45));
+  // An e-bike's hub motor (owner, 9 Nov 2026): a fat round hub at that wheel's centre, under the cog and chain that drive it.
+  const motor = spec.ebike.value ? spec.motor.value : null;
+  if (motor && motor !== 'cranks') out.push(circle('bk-motor', motor === 'rear-hub' ? g.rear : g.front, 8 * k));
   // Rack, behind the wheel's near side.
   if (spec.rack.value) {
     const y = g.rear[1] - g.rr - 3;
@@ -325,7 +328,8 @@ function bikeParts(spec: BikeSpec, g: Geometry, fr: ReturnType<typeof frameOf>):
     const centre = add(c, mul(up, 3.3 * k));
     const [w, h] = [38 * k, 5.6 * k];
     out.push(`<rect class="bk-battery"${attr('x', centre[0] - w / 2)}${attr('y', centre[1] - h / 2)}${attr('width', w)}${attr('height', h)}${attr('rx', 2.2 * k)} transform="rotate(${r2(deg(Math.atan2(dir[1], dir[0])))} ${r2(centre[0])} ${r2(centre[1])})"/>`);
-    out.push(`<rect class="bk-motor"${attr('x', g.bb[0] - 5 * k)}${attr('y', g.bb[1] - 4.6 * k)}${attr('width', 12.5 * k)}${attr('height', 10.5 * k)}${attr('rx', 3 * k)}/>`);
+    // a mid-drive: a round housing round the crank axle, under the chainring and the crank
+    if (motor === 'cranks') out.push(circle('bk-motor', g.bb, 7 * k));
   }
   const forkD = spec.fork.value === 'suspension'
     ? `M${pt(g.headBottom)} L${pt(g.front)}`
@@ -439,7 +443,6 @@ function anchorsOf(spec: BikeSpec, g: Geometry, fr: ReturnType<typeof frameOf>, 
     dt: spec.mounts.dt ? spot(fr.down, fr.down.c ? 0.5 : 0.4, 1) : null,
     un: spec.mounts.un ? spot(fr.down, fr.down.c ? 0.32 : 0.36, -1) : null,
   };
-  if (bottles.st) bottles.st = { ...bottles.st, rot: bottles.st.rot };
   const stack = (b: Placed, n: number, gap: number): Placed => {
     if (n <= 1) return b;
     const step = Math.min(b.h + gap, Math.max(4, (b.y - 1) / (n - 1)));
@@ -594,9 +597,8 @@ const NAME = '{{label}}';
 export function bikeArt(spec: BikeSpec, bags: BagView | null, options: ArtOptions = {}): { svg: string; anchors: Anchors; label: string } {
   const colour = spec.colour.value;
   const label = labelOf(spec);
-  const m = spec.mounts;
-  // What the drawing is made of, without its colour. The frame points follow from style and size (geometry is empty in this release).
-  const key = `${spec.type.value}|${spec.rimMm.value}|${spec.frontMm.value}|${spec.rearMm.value}|${spec.style.value}|${spec.size.value}|${spec.bars.value}|${spec.fork.value}|${spec.brakes.value}|${spec.drive.value}|${spec.rack.value}|${spec.ebike.value}|${colour ? 1 : 0}|${m.st}${m.dt}${m.un}${m.top}${m.frame}|${options.theme ?? 'dark'}|${options.idPrefix ?? 'bk'}|${bags ? JSON.stringify(bags) : ''}`;
+  // What the drawing is made of, without its colour: the whole spec but whether there is one, the options and the bags.
+  const key = JSON.stringify([{ ...spec, colour: !!colour }, options.theme ?? 'dark', options.idPrefix ?? 'bk', bags]);
   let hit = RECENT.find((r) => r.key === key);
   if (!hit) {
     const plain: BikeSpec = { ...spec, colour: { value: colour ? PAINT : null, mark: spec.colour.mark } };

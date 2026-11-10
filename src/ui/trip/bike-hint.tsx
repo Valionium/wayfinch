@@ -3,6 +3,7 @@
 // details from the card, two places seen (hint-seen.ts) or data already on the phone make it today's one line for good; a saved bike
 // makes it gone, and the first return after it says once that the bike is in every tool now (its words load only then).
 import { useEffect, useRef, useState } from 'preact/hooks';
+import type { Swatch } from '../../core/bike/colour.ts';
 import { bikeHint, withLetters } from '../../core/bike/hint.ts';
 import { WB } from '../../core/wording/en-bike.ts';
 import { W } from '../../core/wording/en.ts';
@@ -19,8 +20,12 @@ const small = (): void => writeHint(withLetters(readHint(), 's'));
  */
 export function TripBike({ bike, trip }: { bike: BikeSource; trip: boolean | null }) {
   const [said, setSaid] = useState('');
+  // Try a colour (design section 4.2): the dots load while idle, on the card only, into the row kept for them; the colour tried is
+  // this visit's only, never saved
+  const [Dots, setDots] = useState<typeof import('./colour-dots.tsx').ColourDots | null>(null);
+  const [tried, setTried] = useState<Swatch | null>(null);
   const [, redo] = useState(0);
-  const at = useRef<{ used?: boolean; line?: boolean; had?: boolean; seen?: boolean; gone?: boolean }>({}).current;
+  const at = useRef<{ used?: boolean; line?: boolean; had?: boolean; seen?: boolean; gone?: boolean; dots?: boolean }>({}).current;
   const box = useRef<HTMLDivElement>(null);
   const before = usedBefore() || bike.summary !== null;
   // A trip removed in this visit (Remove this trip): Trip starts over, so the hint is settled again, and the one-time line, already
@@ -41,15 +46,21 @@ export function TripBike({ bike, trip }: { bike: BikeSource; trip: boolean | nul
     if (trip !== null && !at.gone && withLetters(now, h.key) !== now) writeHint(withLetters(now, h.key));
     at.seen ||= !!readHint();
     if (at.line && !said) import('../../core/wording/en-hint.ts').then((m) => setSaid(m.HN.hintEveryTool), () => undefined);
+    if (h.hint === 'new' && !at.dots) {
+      at.dots = true;
+      (typeof requestIdleCallback === 'function' ? requestIdleCallback : setTimeout)(() => import('./colour-dots.tsx').then((m) => setDots(() => m.ColourDots), () => undefined));
+    }
   });
+  const colour = tried ? `&colour=${tried.name.toLowerCase()}` : '';
   return h.hint === 'new' ? (
     <section class="trip-bike bike-hint" aria-labelledby="bike-hint" onClick={(e) => { if ((e.target as Element).closest('a')) small(); }}>
-      <BikeDrawing bike={null} summary={null} back="trip" caption={false} />
+      <BikeDrawing bike={null} summary={null} back="trip" caption={false} tryColour={tried} />
       <h2 id="bike-hint">{W.bikeHintTitle}</h2>
       <p>{W.bikeHintBody}</p>
+      <div class="bike-hint-dots">{Dots ? <Dots tried={tried} pick={setTried} /> : null}</div>
       <p class="bike-hint-acts">
         {/* At Bike details' top, Your frame, where frame style and size are entered (owner, 9 Nov 2026: "Open it at size and frame type"). */}
-        <a href={bikeDetailsHref('new', 'trip')}>{WB.bikeMakeItYours}</a>
+        <a href={bikeDetailsHref('new', 'trip') + colour}>{WB.bikeMakeItYours}</a>
         {/* Focus goes on to the line's Add your bike, so keyboard and screen reader users are not lost. */}
         <button type="button" aria-label={W.bikeHintLaterName} onClick={() => { small(); redo(1); setTimeout(() => box.current?.querySelector<HTMLElement>('figcaption a')?.focus()); }}>{W.bikeHintLater}</button>
       </p>

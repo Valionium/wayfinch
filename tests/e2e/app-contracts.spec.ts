@@ -370,11 +370,34 @@ test('[TRIP-DAY-BAGS] the owner\'s day ride in a real browser: no bike, no bags 
   await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('#handoffText')).toContainText('a bottle cage, a top tube bag and a frame bag');
   // an afternoon ride: one bottle, the top tube bag and the frame bag, no seat pack; the jacket a cold November day calls for is worn
-  // and one spare tube rides (owner, 9 Nov 2026: "Worn, one spare tube"); the phone in the frame bag (review of PR 92, I3)
+  // and one spare tube rides (owner, 9 Nov 2026: "Worn, one spare tube"); the phone in the bib shorts pocket, the pockets counted as
+  // carried room (owner, 9 Nov 2026), so in no bag
   const state = await page.evaluate(`(() => { const A = currentPlan(); return { pos: S.bags.map(b => b.pos), spill: A.spill.length, out: A.reach.outOfReach.length,
     kit: ['docs','cash','phone','snacks','lock','bank'].map(id => carrying(id)), km: Math.round(planRoute().distanceKm),
-    phone: A.units[A.items.phone[0][0]].pos }; })()`);
-  expect(state).toEqual({ pos: ['bottle', 'top', 'frame'], spill: 0, out: 0, kit: [true, true, true, true, false, false], km: 40, phone: 'top' });   // the 2 L top tube bag beside the half frame bag holds it
+    phone: A.items.phone ? A.units[A.items.phone[0][0]].pos : pocketPlaces().phone }; })()`);
+  expect(state).toEqual({ pos: ['bottle', 'top', 'frame'], spill: 0, out: 0, kit: [true, true, true, true, false, false], km: 40, phone: 'bib' });
+  // the typical 1.2 L top tube bag, never grown; the half frame bag beside the bottle for what is still over, up to 4.5 L (owner, 9 Nov 2026:
+  // a top tube bag is usually 1.2 L, the extra goes into the frame bag, the frame bag only when really necessary)
+  expect(await page.evaluate(`S.bags.filter(b => b.pos === 'top').map(b => b.L)`)).toEqual([1.2]);
+  const frameL = await page.evaluate(`S.bags.find(b => b.pos === 'frame').L`) as number;
+  expect(frameL).toBeGreaterThanOrEqual(3);
+  expect(frameL).toBeLessThanOrEqual(4.5);
+  // the pockets: one plain line, and two switches of 44 px, on, that the keyboard reaches
+  await expect(page.locator('#smallPockets')).toContainText('In your bib shorts pocket: phone');
+  for (const name of ['Jersey pockets', 'Bib shorts pockets']) {
+    const sw = page.getByRole('switch', { name });
+    await expect(sw).toBeChecked();
+    expect((await page.locator('#smallPockets .pocket-switch', { hasText: name }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+  await page.getByRole('switch', { name: 'Jersey pockets' }).focus();
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('switch', { name: 'Jersey pockets' })).not.toBeChecked();
+  await expect(page.getByRole('switch', { name: 'Jersey pockets' })).toBeFocused();
+  await expect(page.locator('#smallPockets')).not.toContainText('In your jersey pockets');
+  expect(await page.evaluate('captureDraft().pockets')).toMatchObject({ jersey: false, bib: true });
+  await expect(page.locator('#smallPockets')).toContainText('Bags planned again for your pockets:');
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('switch', { name: 'Jersey pockets' })).toBeChecked();
   await expect(page.locator('#smallOver')).toBeHidden();
   // the frame bag leaves room for the bottle: the half shape, and in the drawing bag and bottle side by side (owner, 9 Nov 2026)
   expect(await page.evaluate(`frameShapeIdx(S.bags.find(b => b.pos === 'frame'))`)).toBe(2);
@@ -434,6 +457,14 @@ test('[TRIP-DAY-BAGS] in the full planner the day ride\'s tube reads as one tube
   const all = texts.join(' | ');
   expect(all).toContain('Spare tube (one, for a day ride)');
   expect(all).not.toMatch(/Spare tubes ×2/);
+  // what rides in the pockets is in the packing checklist and is ticked like any row (re-check of PR 106, R2)
+  await page.evaluate('closeBagPop(); go(4); renderResult(); document.querySelectorAll(".packing-disclosure").forEach(d => { d.open = true; });');
+  const rain = page.locator('[data-checklist-item="rain"]');
+  await expect(rain).toHaveCount(1);
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();   // the full planner's own question first
+  await rain.check();
+  await expect(page.locator('[data-checklist-item="rain"]')).toBeChecked();
+  expect(await page.evaluate('S.packed.rain === true')).toBe(true);
   expect(errors).toEqual([]);
 });
 

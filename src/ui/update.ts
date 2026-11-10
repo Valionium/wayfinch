@@ -2,7 +2,7 @@
 // every window has closed; the page never reloads by itself. The tap saves first, then asks the waiting worker to take over,
 // and the window reloads only when the new worker has taken control.
 import { signal } from '@preact/signals';
-import { W } from '../core/wording/en.ts';
+import type { U } from '../core/wording/en-update.ts';
 
 export const UPDATE_CHECK_MS = 3_600_000; // at most hourly
 export const UPDATE_APPLY_WAIT_MS = 10_000;
@@ -66,9 +66,10 @@ export function createUpdater(env: UpdaterEnv) {
     }
     applying = true;
     note.value = '';
-    const finish = (message: string) => {
+    const finish = async (key?: keyof typeof U) => {
       applying = false;
-      note.value = message;
+      // If the words chunk cannot be fetched, a short plain line still tells the rider the update did not go through.
+      note.value = key ? await import('../core/wording/en-update.ts').then((m) => m.U[key], () => 'Update not applied.') : '';
     };
     let saved = false;
     try {
@@ -76,12 +77,12 @@ export function createUpdater(env: UpdaterEnv) {
     } catch {
       saved = false;
     }
-    if (!saved) return finish(W.appUpdateNotSaved);
+    if (!saved) return finish('notSaved');
     const waiting = registration?.waiting;
-    if (!waiting) return finish('');
+    if (!waiting) return finish();
     const timer = setTimeout(() => {
       env.serviceWorker.removeEventListener('controllerchange', reload);
-      finish(W.appUpdateNotYet);
+      void finish('notYet');
     }, UPDATE_APPLY_WAIT_MS);
     const reload = () => {
       clearTimeout(timer);
@@ -93,7 +94,7 @@ export function createUpdater(env: UpdaterEnv) {
     } catch {
       clearTimeout(timer);
       env.serviceWorker.removeEventListener('controllerchange', reload);
-      finish(W.appUpdateFailed);
+      void finish('failed');
     }
   }
 

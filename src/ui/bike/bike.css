@@ -23,7 +23,8 @@
 .bk-ring, .bk-cog, .bk-hubgear, .bk-rotor { fill: none; stroke: var(--line); }
 .bk-chain, .bk-belt, .bk-mech, .bk-rack { fill: none; stroke: var(--line); stroke-linecap: round; stroke-linejoin: round; }
 .bk-caliper, .bk-crank, .bk-post, .bk-bar, .bk-grip { fill: none; stroke: var(--line); stroke-linecap: round; stroke-linejoin: round; }
-.bk-saddle, .bk-hood, .bk-motor { fill: var(--line); }
+.bk-saddle, .bk-hood { fill: var(--line); }
+.bk-motor { fill: var(--line); stroke: var(--muted); stroke-width: 0.6; }
 .bk-battery { fill: var(--line); stroke: var(--muted); stroke-width: 0.6; }
 .bk-shock, .bk-seal { fill: none; stroke: var(--muted); stroke-linecap: round; }
 

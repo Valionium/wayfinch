@@ -3,7 +3,7 @@
 import { effect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
-import { T, TM } from '../../core/wording/en-tyre.ts';
+import { T } from '../../core/wording/en-tyre.ts';
 import { W, shortMapDate } from '../../core/wording/en.ts';
 import { TF } from '../../core/wording/en-tyre-labels.ts';
 import { TN } from '../../core/wording/en-tyre-notes.ts';
@@ -28,6 +28,7 @@ import { WHEELS } from './tables.ts';
 export { browserServices } from './services.ts';
 export type { TyreServices } from './services.ts';
 import type { TyreServices } from './services.ts';
+import { TC } from '../../core/wording/en-tyre-calc.ts';
 
 const ASSUMED_WORDS: Record<FieldName, string> = {
   riderKg: TF.tyreAssumedRider, bikeKg: TF.tyreAssumedBike, bars: TF.tyreAssumedBars, wheelBsdMm: W.tyreAssumedWheel, frontMm: TF.tyreAssumedFront,
@@ -105,7 +106,7 @@ function NumberInput({ id, label, value, onCommit, unit, assumed, signed = false
         }}
       />
       {unit ? <span class="muted">{unit}</span> : null}
-      {value === undefined && text.trim() === '' && assumed !== undefined ? <span class="muted">{W.tyreAssumedTag(`${assumed}${unit ? ' ' + unit : ''}`)}</span> : null}
+      {value === undefined && text.trim() === '' && assumed !== undefined ? <span class="muted">{TC.tyreAssumedTag(`${assumed}${unit ? ' ' + unit : ''}`)}</span> : null}
       {bad ? <span class="tyre-error" id={`${id}-err`} role="alert">{TF.tyreNotANumber}</span> : null}
     </label>
   );
@@ -146,7 +147,7 @@ function LimitInput({ id, label, required, value, min, onCommit, onPending, need
   const evaluate = (t: string, u: Unit, keepAsBar: boolean, keepAsPsi = false): void => {
     const n = parseNumber(t);
     if (t.trim() === '') { setNote(null); onCommit(null); return; }
-    if (n === null) { setNote({ kind: 'reject', text: W.tyreLimitNotNumber }); onCommit(null); return; }
+    if (n === null) { setNote({ kind: 'reject', text: TC.tyreLimitNotNumber }); onCommit(null); return; }
     const c = checkLimit(n, u, { keepAsBar, keepAsPsi, min });
     if (c.status === 'ok') { setNote(null); onCommit(c.limit); }
     else if (c.status === 'ask') { setNote({ kind: 'ask', text: c.question, alt: c.alt }); onCommit(null); }
@@ -179,8 +180,8 @@ function LimitInput({ id, label, required, value, min, onCommit, onPending, need
                 </>
               ) : (
                 <>
-                  <button type="button" class="btn btn-primary" onClick={() => { setUnit('bar'); evaluate(text, 'bar', true); }}>{W.tyreAskYesBar(String(note.alt.value))}</button>
-                  <button type="button" class="btn" onClick={() => evaluate(text, 'psi', false, true)}>{TM.tyreAskNoPsi}</button>
+                  <button type="button" class="btn btn-primary" onClick={() => { setUnit('bar'); evaluate(text, 'bar', true); }}>{TC.tyreAskYesBar(String(note.alt.value))}</button>
+                  <button type="button" class="btn" onClick={() => evaluate(text, 'psi', false, true)}>{TC.tyreAskNoPsi}</button>
                 </>
               )}
             </span>
@@ -220,7 +221,7 @@ function WheelFigure({ label, w }: { label: string; w: Wheel }) {
       <h3>{label}</h3>
       <p class="tyre-big">{W.tyreFrontBackBar(bar2(w.bar))}</p>
       <p class="tyre-psi">{W.tyrePsiValue(String(w.psi))}</p>
-      {w.heat?.advise ? <p class="tyre-heat"><strong>{W.tyreHeatPumpLine(bar2(w.heat.pumpToBar), String(w.heat.pumpToPsi))}</strong></p> : null}
+      {w.heat?.advise ? <p class="tyre-heat"><strong>{TC.tyreHeatPumpLine(bar2(w.heat.pumpToBar), String(w.heat.pumpToPsi))}</strong></p> : null}
       {w.heat?.advise ? null : <p class="muted">{lo === hi ? W.tyreWindowOne(hi) : W.tyreWindow(lo, hi)}</p>}
     </div>
   );
@@ -376,7 +377,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
 
   const resetFor = (field: FieldName): string => {
     const f = fallback[field];
-    return f === 'bike' ? W.tyreBackToBike : f === 'plan' ? TF.tyreBackToPlan : f === 'you' ? TF.tyreBackToYou : W.tyreClear;
+    return f === 'bike' ? W.tyreBackToBike : f === 'plan' ? TF.tyreBackToPlan : f === 'you' ? TF.tyreBackToYou : TC.tyreClear;
   };
   const choiceValue = <T extends string>(field: FieldName, value: T | 'unset'): T | undefined => (src[field] === 'assumed' || value === 'unset' ? undefined : value);
   const notes = result?.warningItems ?? [];
@@ -415,14 +416,14 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         <p class="muted">{TN.tyreLimitHint}</p>
         <LimitInput key={`max-${key}`} id="tyre-max" label={W.tyreLimitMaxLabel} required needed="max" value={details.tyreMax} min={details.tyreMin} onPending={onPending}
           onCommit={(l) => change({ tyreMax: l ?? undefined })} />
-        <p class="muted">{TM.tyreLimitBothWheels}</p>
-        {bike?.unreadFront && src.frontMm === 'assumed' ? <p class="muted">{W.tyreCouldntRead(bike.unreadFront)}</p> : null}
-        {bike?.unreadRear && src.rearMm === 'assumed' ? <p class="muted">{W.tyreCouldntRead(bike.unreadRear)}</p> : null}
+        <p class="muted">{TC.tyreLimitBothWheels}</p>
+        {bike?.unreadFront && src.frontMm === 'assumed' ? <p class="muted">{TC.tyreCouldntRead(bike.unreadFront)}</p> : null}
+        {bike?.unreadRear && src.rearMm === 'assumed' ? <p class="muted">{TC.tyreCouldntRead(bike.unreadRear)}</p> : null}
         <Field id={bikeKey('front')} label={W.tyreFrontWidthLabel} source={src.frontMm} needed="front" valueText={`${v.front.printedMm} mm`} resetLabel={resetFor('frontMm')} onReset={resetter('frontMm')}
           editor={<NumberInput key={`front-${key}`} id="tyre-front" label={W.tyreFrontWidthLabel} needed value={own('frontMm', v.front.printedMm)} assumed={v.front.printedMm} onCommit={(n) => change({ frontMm: n })} unit="mm" />} />
         <Field id={bikeKey('rear')} label={W.tyreRearWidthLabel} source={src.rearMm} needed="rear" valueText={`${v.rear.printedMm} mm`} resetLabel={resetFor('rearMm')} onReset={resetter('rearMm')}
           editor={<NumberInput key={`rear-${key}`} id="tyre-rear" label={W.tyreRearWidthLabel} needed value={own('rearMm', v.rear.printedMm)} assumed={v.rear.printedMm} onCommit={(n) => change({ rearMm: n })} unit="mm" />} />
-        {resolved.rearFollowsFront && (v.rimType === 'hookless' || v.rimType === 'unset') ? <p class="muted">{TF.tyreRearLabelShort}: {W.tyreSameAsFront}</p> : null}
+        {resolved.rearFollowsFront && (v.rimType === 'hookless' || v.rimType === 'unset') ? <p class="muted">{TF.tyreRearLabelShort}: {TC.tyreSameAsFront}</p> : null}
         <Choice<RimType> id="tyre-rimtype" label={W.tyreRimTypeLabel} source={src.rimType} needed="rim" value={choiceValue('rimType', v.rimType)} onChange={(x) => change({ rimType: x })}
           options={[{ value: 'hooked', label: W.tyreRimHooked }, { value: 'hookless', label: W.tyreRimHookless }, { value: 'tubular', label: W.tyreRimTubular }]} />
       </section>
@@ -430,8 +431,8 @@ export function TyreScreen({ services }: { services: TyreServices }) {
       <section class="card tyre-result" aria-live="polite" aria-labelledby="tyre-result-title" ref={resultRef}>
         <h2 id="tyre-result-title">{TF.tyreResultTitle}</h2>
         {!resolved.input ? <p>{W.tyreNeedMax}</p> : null}
-        {blockedBy !== null ? <p class="notice">{W.tyrePendingLimit(blockedBy)}</p> : null}
-        {blockedBy === null && result?.needsWidth ? <p class="notice">{resolved.sources.rimType === 'assumed' ? W.tyreNeedTwo : W.tyreNeedWidthOnly}</p> : null}
+        {blockedBy !== null ? <p class="notice">{TC.tyrePendingLimit(blockedBy)}</p> : null}
+        {blockedBy === null && result?.needsWidth ? <p class="notice">{resolved.sources.rimType === 'assumed' ? TC.tyreNeedTwo : TC.tyreNeedWidthOnly}</p> : null}
         {blockedBy === null && result && result.refused.length ? (
           <>
             <h3>{TF.tyreRefusedTitle}</h3>
@@ -451,7 +452,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         {blockedBy === null && nearFigure.map((n) => (
           <p class="tyre-cap-note" key={n.code}>
             {n.text}
-            {n.code === 'rimUnset' ? <> <button type="button" class="btn" onClick={() => change({ rimType: 'hooked' })}>{W.tyreMyRimHooked}</button> <span class="muted">{W.tyreRimUnsure}</span></> : null}
+            {n.code === 'rimUnset' ? <> <button type="button" class="btn" onClick={() => change({ rimType: 'hooked' })}>{TC.tyreMyRimHooked}</button> <span class="muted">{TC.tyreRimUnsure}</span></> : null}
           </p>
         ))}
         {blockedBy === null && result?.split ? (
@@ -476,7 +477,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         {resolved.input ? <p class="muted">{TN.tyreEstimateNote}</p> : null}
       </section>
 
-      <Card title={W.tyreLimitsMoreTitle}>
+      <Card title={TC.tyreLimitsMoreTitle}>
         <LimitInput key={`min-${key}`} id="tyre-min" label={W.tyreLimitMinLabel} required={false} value={details.tyreMin} onPending={onPending}
           onCommit={(l) => change({ tyreMin: l })} />
         <LimitInput key={`rim-${key}`} id="tyre-rimmax" label={W.tyreLimitRimLabel} required={false} value={details.rimMax} min={details.tyreMin} onPending={onPending}

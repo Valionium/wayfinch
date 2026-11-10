@@ -32,6 +32,7 @@ const look = fc.record({
   colour: fc.oneof(fc.constantFrom('#2563B8', '#1d1d1f', '#F4F4F2', 'red', '#12345', '#1234567', null)),
   bars: oneOfOr(['drop', 'flat', 'other']),
   ebike: fc.constantFrom(true, false, 'yes', null),
+  motor: oneOfOr(['cranks', 'rear-hub', 'front-hub']),
 }, { requiredKeys: [] });
 
 const geometry = fc.record({

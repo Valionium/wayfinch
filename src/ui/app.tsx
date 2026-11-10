@@ -104,8 +104,8 @@ function Screen({ name }: { name: ScreenName }) {
 function UpdateBar({ updater }: { updater: Updater }) {
   if (!updater.ready.value) return null;
   return (
-    <div class="update-bar">
-      <button type="button" class="btn btn-primary" onClick={() => void updater.apply()}>{W.appUpdateReady}</button>
+    <div class="update-bar" ref={(el) => { if (el) void import('./bar-h.ts').then((m) => m.trackHeight(el)); }}>
+      <button type="button" class="btn btn-primary" onClick={updater.apply}>{W.appUpdateReady}</button>
       {updater.note.value ? <p role="status">{updater.note.value}</p> : null}
     </div>
   );
@@ -116,8 +116,10 @@ export function App({ updater = null }: { updater?: Updater | null }) {
   const active = tabOf(current);
   return (
     <div class="shell">
-      {updater ? <UpdateBar updater={updater} /> : null}
-      <Screen name={current} />
+      <div>
+        {updater ? <UpdateBar updater={updater} /> : null}
+        <Screen name={current} />
+      </div>
       <nav class="tabs" aria-label={W.appNavLabel}>
         {TABS.map((tab) => (
           <a key={tab.name} class="tab" href={`#/${tab.name}`} aria-current={tab.name === active ? 'page' : undefined}>{tab.label}</a>
