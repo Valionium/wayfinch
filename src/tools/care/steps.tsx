@@ -83,6 +83,12 @@ function Before({ source }: { source: StepSource }) {
 function Pictures({ shown, view }: { shown: Shown[]; view: string }) {
   const ready = shown.filter((p) => pictureReady(p.id));
   const [pick, setPick] = useState<string | null>(null);
+  // the pressed button leaves the row as its picture shows (final review of PR 72, M1): focus goes to the one that switches back
+  const [back, setBack] = useState<string | null>(null);
+  const row = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (back) row.current?.querySelector<HTMLButtonElement>(`button[data-pic="${back}"]`)?.focus();
+  }, [back, pick]);
   if (ready.length === 0) return null;
   const now = ready.find((p) => p.id === pick) ?? ready[0]!;
   const others = ready.filter((p) => p !== now && p.kind);
@@ -90,11 +96,11 @@ function Pictures({ shown, view }: { shown: Shown[]; view: string }) {
     <div class="care-pics">
       <Picture key={now.id} id={now.id} view={view} />
       {others.length > 0 ? (
-        <div class="care-kinds" role="group" aria-label={SWITCH_WORDS.other}>
+        <div class="care-kinds" role="group" aria-label={SWITCH_WORDS.other} ref={row}>
           <span class="care-kinds-label" aria-hidden="true">{SWITCH_WORDS.other}:</span>
           {others.map((p) => (
-            <button key={p.id} type="button" class="btn care-kind" aria-label={SWITCH_WORDS.show(KIND_WORDS[p.kind!] ?? p.kind!)}
-              onClick={() => setPick(p.id)}>{KIND_WORDS[p.kind!] ?? p.kind}</button>
+            <button key={p.id} type="button" class="btn care-kind" data-pic={p.id} aria-label={SWITCH_WORDS.show(KIND_WORDS[p.kind!] ?? p.kind!)}
+              onClick={() => { setBack(now.id); setPick(p.id); }}>{KIND_WORDS[p.kind!] ?? p.kind}</button>
           ))}
         </div>
       ) : null}

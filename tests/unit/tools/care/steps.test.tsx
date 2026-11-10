@@ -418,6 +418,23 @@ test("[BC-PIC-SWITCH] \"Other kinds\" offers each other kind with one tap; a tap
   expect(dialog()!.querySelector('.care-step .care-kinds')).toBeNull();
 });
 
+// Final review of PR 72, M1: the pressed "Other kinds" button leaves the row as its picture shows, so focus must not fall to the page body; it
+// goes to the button that switches back to the kind just shown.
+test('[BC-PIC-SWITCH] after a tap on another kind, focus is on the button that switches back, never the page body', async () => {
+  await brakeStep5(rimBike('flat'));
+  await shown(1);
+  const caliper = [...dialog()!.querySelectorAll<HTMLButtonElement>('.care-step .care-kinds button')].find((b) => b.textContent === KIND_WORDS.caliper)!;
+  caliper.focus();
+  await click(caliper);
+  const now = document.activeElement as HTMLElement;
+  expect(now).not.toBe(document.body);
+  expect(now.closest('.care-kinds')).not.toBeNull();
+  expect(now.textContent).toBe(KIND_WORDS['v-brake']);
+  // and back again: focus on the caliper's button
+  await click(now);
+  expect((document.activeElement as HTMLElement).textContent).toBe(KIND_WORDS.caliper);
+});
+
 test('[BC-STEP-LINES] the snapped-spoke card shows a disc bike the disc line only, a rim bike the rim lines only, and with no bike every line, the disc line first', async () => {
   const spoke = card('spoke-snapped');
   const lines = async (kv: KeyValueStore): Promise<string[]> => {
