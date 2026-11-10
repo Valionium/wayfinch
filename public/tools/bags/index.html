@@ -459,6 +459,12 @@ body.lc-small #planFitLine{display:none!important}
 .wm-line[aria-busy="true"]{opacity:.75}
 .wm-show,.wm-diff{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--muted-dim);border-radius:8px;padding:8px 12px;min-height:44px;margin-top:10px;cursor:pointer}
 .wm-show:focus-visible,.wm-diff:focus-visible{outline:2px solid var(--blaze);outline-offset:2px}
+.wm-show[aria-disabled="true"]{opacity:.6;cursor:default}
+.wm-hint{font-size:13px;margin:6px 0 0;color:var(--muted)}
+.wm-moved{font-size:13px;margin:0;color:var(--ink)}
+/* Handling first's moves ("See all") and tips under its line (design of 10 Nov 2026) */
+.hf-all,.hf-tips{margin:-6px 0 12px;padding-left:18px;font-size:13px;color:var(--muted);line-height:1.45}
+.hf-all li,.hf-tips li{margin:2px 0;overflow-wrap:anywhere}
 /* the switch sits above the maps, so nothing it changes ever moves it (the owner's finding G, 8 Nov 2026) */
 .wm-ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:0 10px;margin-bottom:10px}
 .rig-wm{margin-top:10px}
@@ -2018,6 +2024,9 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
   <div class="wm-block" id="weightBlock">
     <p class="wm-line" id="weightLine" tabindex="-1" hidden></p>
     <button type="button" class="wm-show" id="rigWeightMap" aria-expanded="false" aria-controls="weightMap" hidden>Show the map</button>
+    <!-- Handling first (design of 10 Nov 2026): beside "Show the map" once advisor.js is here; its line goes where the balance line is -->
+    <button type="button" class="wm-show" id="rigHandling" aria-describedby="handlingHint" hidden>Handling first</button>
+    <p class="wm-hint" id="handlingHint" hidden>Heaviest things low and in the middle, even if some bags stay part empty.</p>
     <div class="rig-wm" id="weightMap" hidden></div>
   </div>
   <!-- STEP 1 -->
@@ -9081,14 +9090,21 @@ function balancePacking(plan){
     if(isBottle(s.pos)) return;
     // fillL: the food's litres, which the re-pack places last around a hand placement (review of PR 78, I1)
     const fillL = s.items.reduce((t, k) => { const kit = kitById(k.id); return t + (kit && kit.divisible ? k.vol : 0); }, 0);
-    rooms.push({ key:s.key, pos:s.pos, freeL:s.left, fillL:+fillL.toFixed(2) });
+    rooms.push({ key:s.key, pos:s.pos, freeL:s.left, fillL:+fillL.toFixed(2), capL:s.cap });
     const by = new Map();
     s.items.forEach(k => { const kit = kitById(k.id); if(kit && kit.divisible) return;
       const v = by.get(k.id) || { kg:0, L:0 }; v.kg += placedKg(k); v.L += k.vol; by.set(k.id, v); });
     by.forEach((v, id) => { if((plan.items[id] || []).length === 1) pieces.push({ id, kg:+v.kg.toFixed(3), L:+v.L.toFixed(2), unit:s.key, pos:s.pos }); });
   });
-  return { result:advisorResult(plan), pieces, rooms, state:{ v:1, basis:plan.basis, inUse:plan.inUse, items:plan.items },
+  // result.items: each thing's bags and litres, food included, so Handling first keeps a ticked thing exactly where it is
+  return { result:{ ...advisorResult(plan), items:whereOf(plan) }, pieces, rooms, state:{ v:1, basis:plan.basis, inUse:plan.inUse, items:plan.items },
     slots:plan.slots.map(s => ({ key:s.key, pos:s.pos, kg:weightIn(s) })), spill:plan.spill.map(k => k.id), overL:plan.summary.overL };
+}
+// Each thing's bags and litres in a plan, food included (the kept placements leave food to the re-pack).
+function whereOf(plan){
+  const out = {};
+  plan.slots.forEach(s => s.items.forEach(k => (out[k.id] = out[k.id] || []).push([s.key, +(+k.vol).toFixed(2)])));
+  return out;
 }
 function idealTrial(bags, pins, placements){
   return planWith({ bags:bags.map(({ hand, ...b }) => ({ ...b })), decks:{ ...S.decks }, pinned:{ ...S.pinned, ...pins }, placements }, balancePacking);
@@ -9338,6 +9354,7 @@ function applyBalance(run){
 // afresh, as a first look (review of PR 79, m3).
 function resetBalance(){
   BALANCE.run = null; BALANCE.held = null; BALANCE.checked = null; BALANCE.pins = null; BALANCE.last = null; BALANCE.reverted = null; BALANCE.undone = new Set();
+  resetHandling();   // Handling first's answer belongs to one plan too
 }
 // Undo is offered while nothing it would move back is ticked as packed: a thing the rider packed where the balance put it is never moved
 // back under the tick (review of PR 79, I1). Unticked, Undo is offered again.
@@ -9358,6 +9375,8 @@ function undoBalance(){
 const samePlacements = (a, b) => a === b || (!!a && !!b && JSON.stringify(a) === JSON.stringify(b));
 // The one quiet line, while the plan is the one it speaks of; while the search runs, that it does.
 function balanceLine(){
+  // after a press of Handling first, its line in this place (design of 10 Nov 2026, §3)
+  const handling = handlingLine(); if(handling !== null) return handling;
   if(BALANCE.loading && S.step === 4 && !TRIAL || BALANCE.run && BALANCE.run.key === idealKey()) return '<div class="balance-line" role="status" aria-busy="true"><span>Checking the balance…</span></div>';
   const last = BALANCE.last;
   if(last && samePlacements(last.placements, S.placements)){
@@ -9375,6 +9394,181 @@ function balanceLine(){
   if(BALANCE.reverted && samePlacements(BALANCE.reverted, S.placements)) return `<div class="balance-line" role="status"><span>Back to the packing before this balance.</span></div>`;
   return '';
 }
+/* ---- "Handling first" (design of 10 Nov 2026, the owner's answers of 10 Nov): the rider's one press at the packing check packs by weight,
+   as far as the bags allow: advisor.js's handlingFirst over the frozen packing (idealTrial/planWith, as the automatic balancing), the
+   densest things into the frame bag and the other low, central spots first. Stored as kept placements (S.placements, through keepPlan):
+   nothing new is stored. It never runs by itself, never changes the bags, and is not in the small view. ---- */
+// run: the search under way; last: the answer on show (placements: the plan it speaks of; before: the placements before the press, for
+// Undo; start: that packing as the search read it, for the map's Before); reverted: what Undo brought back; all: "See all" open.
+const HANDLING = { run:null, last:null, reverted:null, all:false };
+const resetHandling = () => { HANDLING.run = null; HANDLING.last = null; HANDLING.reverted = null; HANDLING.all = false; };
+// What stays where it is: hand placements, things ticked as packed, must-reach things within reach. Things put back with an automatic
+// balance's Undo may move now: the rider asked for it (design §4.5).
+function handlingFixed(start){
+  const ids = new Set([...Object.keys(S.pinned || {}), ...Object.keys(S.packed || {}).filter(id => S.packed[id])]);
+  start.pieces.forEach(p => { const k = kitById(p.id); if(k && isMustReach(k) && reachableFor(k, p.pos)) ids.add(p.id); });
+  return [...ids];
+}
+const handlingAvailable = () => S.step === 4 && !SMALL_VIEW && !PLAN_TRIAL && !TRIAL && DRAFT_READY && !DRAFT_FROZEN && !!S.placements
+  && !!(window.WayfinchAdvisor && window.WayfinchAdvisor.handlingFirst);
+const HANDLING_SLICE = 3;
+// The press. now: at once (the QA suites); otherwise in slices between frames, "Packing for handling…" meanwhile, so the page never
+// blocks (PERF-HF). True when the search started (now: when it packed something).
+function startHandling(o = {}){
+  if(!handlingAvailable()) return false;
+  currentPlan();
+  const before = S.placements, start = idealTrial(S.bags, {}, before), fixed = handlingFixed(start), W = window.WayfinchAdvisor;
+  // the heaviest-first packing on the plan as it stands: its pins over the kept placements (the frozen packing's kept passes), each
+  // trial remembered; a fresh re-plan (placements none) takes one task of over 200 ms on the phone stand-in (PERF-HF)
+  const trial = rememberedTrial(), fresh = pins => trial(pins, start), extra = splitThings();
+  const run = { key:idealKey(), before, start, n:0, fixed:JSON.stringify([...fixed].sort()),
+    go:n => W.handlingFirst(start, trial, fresh, { fixed, extra, maxTrials:BALANCE_TRIALS, budget:n }) };
+  resetHandling();
+  BALANCE.run = null;
+  if(o.now) return applyHandling(run, run.go(Infinity));
+  HANDLING.run = run;
+  setTimeout(() => handlingSlice(run), 0);
+  return true;
+}
+function handlingSlice(run){
+  if(HANDLING.run !== run) return;
+  if(PLAN_TRIAL || TRIAL || S.step !== 4 || DRAFT_FROZEN || run.key !== idealKey()){ HANDLING.run = null; return; }
+  run.n += HANDLING_SLICE;
+  const out = run.go(run.n);
+  if(!out.done){ setTimeout(() => handlingSlice(run), 0); return; }
+  HANDLING.run = null;
+  // something ticked as packed while it ran: that is the rider's now, so it is worked out again with it kept
+  if(JSON.stringify([...handlingFixed(run.start)].sort()) !== run.fixed){ startHandling(); return; }
+  applyHandling(run, out);
+  setTimeout(() => {
+    if(S.step === 4 && typeof renderResult === 'function' && $('resultBox')) holdResult(() => renderResult());
+    setTimeout(drawRig, 0);
+  }, 0);
+}
+function applyHandling(run, out){
+  const W = window.WayfinchAdvisor;
+  const kind = out.apply ? 'packed' : out.held ? 'held' : 'already';
+  let moves = [], after = run.start;
+  if(out.apply){
+    const replan = currentPlan().notes.replan;
+    keepPlan({ load:out.packing.state });
+    const now = currentPlan();
+    if(replan) now.notes.replan = replan;
+    after = out.packing;
+    // the moves that do the most first: kilos times the drop of the handling weight
+    const was = new Map(run.start.pieces.map(p => [p.id, p])), to = new Map(out.packing.pieces.map(p => [p.id, p.pos]));
+    const worth = m => { const p = was.get(m.id); return p ? p.kg * ((W.WEIGHTS[p.pos] || 0) - (W.WEIGHTS[to.get(m.id)] || 0)) : 0; };
+    moves = [...out.moves].sort((a, b) => worth(b) - worth(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  }
+  HANDLING.last = { kind, placements:S.placements, before:run.before, start:run.start, after, moves, gain:out.gain };
+  // the automatic balancing looks at this packing as looked at, so it never undoes the press
+  BALANCE.checked = JSON.stringify(S.placements); BALANCE.pins = JSON.stringify(S.pinned || {});
+  BALANCE.last = null; BALANCE.reverted = null; BALANCE.run = null;
+  return out.apply;
+}
+// Undo is offered while nothing it would move back is ticked as packed: any ticked thing whose bags or litres the press changed, food
+// included (the plan's items, which hold the food the kept placements leave to the re-pack).
+function handlingPacked(last){
+  const was = last.start.result.items || {}, now = whereOf(currentPlan());
+  return Object.keys(S.packed || {}).some(id => S.packed[id] && JSON.stringify(was[id] || null) !== JSON.stringify(now[id] || null));
+}
+function undoHandling(){
+  const last = HANDLING.last;
+  if(!last || last.kind !== 'packed' || !samePlacements(last.placements, S.placements) || handlingPacked(last)) return false;
+  HANDLING.last = null; HANDLING.all = false;
+  keepPlan({ load:last.before });
+  currentPlan();
+  BALANCE.checked = JSON.stringify(S.placements); BALANCE.pins = JSON.stringify(S.pinned || {});
+  HANDLING.reverted = S.placements;
+  return true;
+}
+const unitWord = key => { const s = currentPlan().slots.find(x => x.key === key) || usableUnits().find(u => u.key === key);
+  return s ? unitLabel(s).toLowerCase() : 'another bag'; };
+const FRAME_SHAPE_WORDS = ['A full frame bag', 'A three-quarter frame bag', 'A half frame bag'];
+const fullWords = f => f < 0.15 ? 'nearly empty' : f < 0.29 ? 'about a quarter full' : f < 0.42 ? 'about a third full' : 'under half full';
+// The tips under the line (design §3, §5): only those that apply to the plan as it is now.
+function handlingTips(last){
+  const A = currentPlan(), W = window.WayfinchAdvisor, tips = [];
+  const frame = A.slots.filter(s => s.pos === 'frame');
+  if(frame.some(s => s.items.length)) tips.push('Frame bag: pack the heaviest things at the bottom, near the down tube.');
+  A.slots.filter(s => (s.pos === 'seat' || s.pos === 'bar') && s.cap > 0 && s.items.length).forEach(s => {
+    const f = (s.cap - s.left) / s.cap;
+    if(f < 0.5) tips.push(`${unitLabel(s)} ${fullWords(f)}: roll it down and pull the straps tight so it does not sway.`);
+  });
+  const b = S.bags.find(x => x.pos === 'frame'), room = last.after.rooms.find(r => r.pos === 'frame');
+  const fit = bikeFit(S.bikeProfile), cur = b ? frameShapeIdx(b) : null;
+  const bigger = b && room && !fit.wedge && !fit.frameBag.none ? fit.frameBag.shapes.filter(e => e.shape >= minShapeIdx() && e.shape < cur && e.L > b.L + 0.05)[0] : null;
+  const fr = W.frameRoom ? W.frameRoom(last.after, { fixed:handlingFixed(last.after), extraL:bigger && b.L > 0 ? (bigger.L - b.L) * (room.capL || b.L) / b.L : 0 }) : null;
+  if(fr && fr.full){
+    const by = new Map();
+    fr.outside.slice(0, 2).forEach(p => { const w = unitWord(p.unit); by.set(w, [...(by.get(w) || []), kitWord(kitById(p.id)) || p.id]); });
+    const said = [...by].map(([w, names], i) => i === 0
+      ? `the ${names.join(' and the ')} ride${names.length > 1 ? '' : 's'} in the ${w}` : `the ${names.join(' and the ')} in the ${w}`).join(', ');
+    tips.push(`Your frame bag is full${fr.heaviest ? ' of the heaviest things' : ''}; ${said}.`);
+    if(bigger && fr.moreKg >= 0.1) tips.push(`${FRAME_SHAPE_WORDS[bigger.shape] || 'A bigger frame bag'} would fit your frame and take about ${fr.moreKg.toFixed(1)} kg more of the heavy things. The Gear advisor can show it.`);
+  }
+  return tips;
+}
+// The line in the place of the balance line, its tips and "See all"; null when Handling first has nothing on show.
+function handlingLine(){
+  if(HANDLING.run && HANDLING.run.key === idealKey()) return '<div class="balance-line hf-line" role="status" aria-busy="true"><span>Packing for handling…</span></div>';
+  const last = HANDLING.last;
+  if(last && samePlacements(last.placements, S.placements)){
+    let text, tail = '', list = '';
+    if(last.kind === 'already') text = 'Already packed for handling: the heavy things sit as low and central as your bags allow.';
+    else if(last.kind === 'held') text = 'Nothing moved: a better spread would move something you ticked as packed.';
+    else {
+      const said = last.moves.map(m => (kitWord(kitById(m.id)) || m.id) + ' to the ' + unitWord(m.to));
+      const shown = said.length > 3 ? [...said.slice(0, 2), `${said.length - 2} more things`] : said;
+      text = 'Packed for handling: ' + (said.length < 2 ? said[0] : shown.slice(0, -1).join(', ') + ' and ' + shown[shown.length - 1]);
+      const packed = handlingPacked(last), sep = SMALL_VIEW ? '' : ' ·';
+      if(packed) text += '. You have started packing it this way, so it stays.';
+      const all = said.length > 3 ? ` <button class="linky" type="button" data-handling-all="1" aria-expanded="${HANDLING.all}" aria-controls="hfAll">See all</button>` : '';
+      if(!packed) tail = `${all}${all ? sep : ''} <button class="linky" type="button" data-handling-undo="1">Undo</button>`;
+      else tail = all;
+      if(tail) text += sep;
+      if(all) list = `<ul class="hf-all" id="hfAll"${HANDLING.all ? '' : ' hidden'}>${last.moves.map(m =>
+        `<li>${htmlEsc((kitWord(kitById(m.id)) || m.id).replace(/^./, c => c.toUpperCase()))}: from the ${htmlEsc(unitWord(m.from))} to the ${htmlEsc(unitWord(m.to))}</li>`).join('')}</ul>`;
+    }
+    const tips = handlingTips(last);
+    return `<div class="balance-line hf-line" role="status"><span>${htmlEsc(text)}</span>${tail}</div>${list}`
+      + (tips.length ? `<ul class="hf-tips">${tips.map(t => `<li>${htmlEsc(t)}</li>`).join('')}</ul>` : '');
+  }
+  if(HANDLING.reverted && samePlacements(HANDLING.reverted, S.placements)) return '<div class="balance-line" role="status"><span>Back to the packing before Handling first.</span></div>';
+  return null;
+}
+// The button under the drawing, beside "Show the map", once advisor.js is here (it loads at the packing step).
+function fillHandling(){
+  const b = $('rigHandling'), hint = $('handlingHint'); if(!b || !hint) return;
+  const show = handlingAvailable();
+  b.hidden = !show; hint.hidden = !show;
+  const busy = !!(HANDLING.run || BALANCE.run || BALANCE.loading);
+  b.setAttribute('aria-disabled', busy ? 'true' : 'false');
+  b.onclick = () => {
+    if(b.getAttribute('aria-disabled') === 'true' || !startHandling()) return;
+    holdResult(() => renderResult()); drawWeightMap();
+  };
+}
+// The map's Before, after a press that moved things: the packing before it, each bag where the rig draws it.
+function handlingBefore(){
+  const last = HANDLING.last;
+  if(!last || last.kind !== 'packed' || !samePlacements(last.placements, S.placements)) return null;
+  return last.start.slots.filter(s => s.kg > 0).map(s => ({ pos:s.pos, kg:s.kg, outline:RIG_OUTLINES[s.key] ? RIG_OUTLINES[s.key].outline : null }))
+    .filter(i => i.outline && i.outline.length >= 3);
+}
+// The line's buttons: "See all" opens the list in place, the focus staying on it; Undo, then the step's title.
+function wireHandlingLine(root, title, keep = fn => fn()){
+  root.querySelectorAll('[data-handling-all]').forEach(b => b.onclick = () => {
+    HANDLING.all = !HANDLING.all;
+    b.setAttribute('aria-expanded', String(HANDLING.all));
+    const list = root.querySelector('#hfAll'); if(list) list.hidden = !HANDLING.all;
+  });
+  root.querySelectorAll('[data-handling-undo]').forEach(b => b.onclick = () => keep(() => {
+    if(!undoHandling()) return;
+    renderResult(); drawRig();
+    title()?.focus?.({ preventScroll:true });
+  }));
+}
 // The kit on the rack deck, where the deck is drawn.
 function deckMapItem(a){
   const kg = deckClaims().reduce((t, k) => t + itemKg(k), 0), d = a.rackTop;
@@ -9388,8 +9582,9 @@ function weightMapInput(){
   currentPlan().slots.forEach(s => { const o = RIG_OUTLINES[s.key], kg = (s.items || []).reduce((t, k) => t + placedKg(k), 0);
     if(o && kg > 0) items.push({ pos:o.pos, kg, outline:o.outline }); });
   items.push(...deckMapItem(a));
-  const art = rigArt(true);
+  const art = rigArt(true), before = handlingBefore();
   return { items, scale:a.scale, ideal:{ items:[...found.items, ...deckMapItem(a)] }, diff:WEIGHT_MAP.diff,
+    ...(before ? { before:{ items:[...before, ...deckMapItem(a)] } } : {}),
     bike:art ? art.svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '') : '',
     onDiff:on => { WEIGHT_MAP.diff = on; drawWeightMap(); } };
 }
@@ -9401,6 +9596,7 @@ function drawWeightMap(){
   if(!block || !line || !button || !box) return;
   const before = typeof block.getBoundingClientRect === 'function' && !VIEWPORT_ANCHOR ? block.getBoundingClientRect() : null;
   fillWeightMap(line, button, box);
+  fillHandling();
   if(before && before.top < 0){
     const d = block.getBoundingClientRect().height - before.height;
     if(Math.abs(d) > .5) window.scrollTo({ top:window.scrollY + d, left:window.scrollX, behavior:'instant' });
@@ -9423,7 +9619,8 @@ function fillWeightMap(line, button, box){
     return;
   }
   line.removeAttribute('aria-busy');
-  const note = found.note, map = !!(note && note.map), on = map && WEIGHT_MAP.on;
+  // after a press of Handling first that moved things, the map shows Before over After (design of 10 Nov 2026, §3)
+  const note = found.note, map = !!(note && note.map) || !!handlingBefore(), on = map && WEIGHT_MAP.on;
   line.hidden = !note;
   line.textContent = note ? note.text : '';
   // the button goes when the plan reaches the best balance: focus on it moves to the line
@@ -9438,7 +9635,7 @@ function fillWeightMap(line, button, box){
     if(!WEIGHT_MAP.on) return;
     const input = weightMapInput(); if(!input) return;
     // drawn again only when the plan, the theme, the ideal or the difference changed
-    const key = JSON.stringify([input.items, IDEAL_CACHE.key, input.diff, bikeTheme(), input.bike]);
+    const key = JSON.stringify([input.items, IDEAL_CACHE.key, input.diff, bikeTheme(), input.bike, input.before || null]);
     if(key === WEIGHT_MAP.drawn) return;
     WEIGHT_MAP.drawn = key;
     M.render(box, input);
@@ -11610,6 +11807,7 @@ function renderResult(){
     renderResult(); drawRig();
     $('stepTitle4')?.focus?.({ preventScroll:true });
   }));
+  wireHandlingLine($('resultBox'), () => $('stepTitle4'), keepPlace);
   $('resultBox').querySelectorAll('[data-replan]').forEach(b => b.onclick = () => keepPlace(() => {
     keepPlan({ replan:true, why:'asked' });
     renderResult(); drawRig();
@@ -12330,6 +12528,7 @@ function renderSmallBags(A){
   if(bal){
     bal.innerHTML=balanceLine();
     bal.querySelectorAll('[data-balance-undo]').forEach(b => b.onclick = () => { if(!undoBalance()) return; renderResult(); drawRig(); $('smallTitle')?.focus?.({ preventScroll:true }); });
+    wireHandlingLine(bal, () => $('smallTitle'));
   }
   const m=getChecklistModel(A || currentPlan());
   // the water in a bag reads as what it is here: a bottle (KIT's name speaks of bottle cages the bike may not have)

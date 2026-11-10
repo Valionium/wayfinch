@@ -24,4 +24,12 @@ export const WM = {
   diffKey: 'Teal: less than ideal. Grey: about the same. Orange: more than ideal.',
   back: 'on your back',
   nothing: 'Nothing is packed yet, so there is no weight to show.',
+  /** Handling first (design of 10 Nov 2026): the packing before the press over the packing after it. */
+  before: 'Before',
+  beforeSub: (kg: string): string => `${kg} kg packed, before Handling first`,
+  after: 'After',
+  afterSub: 'Packed for handling, the same kilos',
+  moved: (kg: string, from: 'back' | 'rear' | 'middle' | 'front', to: 'back' | 'rear' | 'middle' | 'front'): string =>
+    `${kg} kg moved ${({ back: 'off your back', rear: 'from the rear', middle: 'from the middle', front: 'from the front' })[from]} ${({ back: 'onto your back', rear: 'to the rear', middle: 'to the middle', front: 'to the front' })[to]}.`,
+  sameZones: 'Each part of the bike carries about the same kilos as before; the heavier things sit in better spots within it.',
 } as const;

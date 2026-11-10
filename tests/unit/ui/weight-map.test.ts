@@ -69,3 +69,28 @@ describe('one ideal, the rider\'s own bags (the owner\'s decision of 9 Nov 2026)
     expect(JSON.stringify(WM)).not.toMatch(/panniers|you should/i);
   });
 });
+
+// "Handling first" (design of 10 Nov 2026, §3): after a press, Before over After on the same fixed scale, with one sentence of what
+// moved instead of the difference's switch; before any press (or once the plan changed) the map is as before, its switch the same element.
+describe("Handling first's Before and After", () => {
+  test('[HF-MAP] with the packing before the press: Before and After, their sentences, one line of what moved, no difference; without it, yours and the ideal again', () => {
+    render(host, input());
+    const diffB = q<HTMLButtonElement>('.wm-diff');
+    render(host, input({ before: { items: YOURS }, items: IDEAL, diff: true }));
+    expect(cards()).toHaveLength(2);
+    expect(cards().map((c) => c.querySelector('figcaption b')!.textContent)).toEqual([WM.before, WM.after]);
+    expect(cards()[0]!.querySelector('figcaption span')!.textContent).toBe(WM.beforeSub('5.0'));
+    expect(cards()[1]!.querySelector('figcaption span')!.textContent).toBe(WM.afterSub);
+    expect(cards()[1]!.querySelector('svg')!.getAttribute('aria-label')).toMatch(new RegExp(`^${WM.after}\\. Of the weighted load: `));
+    expect(q('.wm-moved').textContent).toBe('3.0 kg moved from the rear to the middle.');
+    expect(q('.wm-moved').hidden).toBe(false);
+    expect(q<HTMLButtonElement>('.wm-diff').hidden).toBe(true);
+    expect(q('.wm-diff')).toBe(diffB);
+    render(host, input());
+    expect(cards().map((c) => c.querySelector('figcaption b')!.textContent)).toEqual([WM.yours, WM.ideal]);
+    expect(q<HTMLButtonElement>('.wm-diff').hidden).toBe(false);
+    expect(q('.wm-moved').hidden).toBe(true);
+    expect(q('.wm-diff')).toBe(diffB);
+  });
+});
+
