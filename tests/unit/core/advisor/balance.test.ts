@@ -450,7 +450,11 @@ describe('"Handling first" (design of 10 Nov 2026)', () => {
       expect(s).toBeLessThanOrEqual(handlingScore(balance(p.start, p.trial, { fixed, wide: true }).packing.result));
       expect(keepsPromises(p.start.result, out.packing.result)).toBe(true);
       if (!out.apply) { expect(out.packing).toBe(p.start); expect(out.moves).toEqual([]); expect(out.gain).toBe(0); }
-      else expect(out.gain).toBeGreaterThanOrEqual(0.01);
+      else {
+        expect(out.gain).toBeGreaterThanOrEqual(0.01);
+        // where it ends, the usual search finds nothing more: a second press does not move things for the search's sake
+        expect(balance(out.packing, p.trial, { fixed, wide: true }).moves).toEqual([]);
+      }
       for (const id of fixed) expect(unitOf(out.packing, id)).toBe(unitOf(p.start, id));
     }), { numRuns: 300, seed: 20261110 });
   });
