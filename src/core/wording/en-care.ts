@@ -22,6 +22,8 @@ export const C = {
   careRoadCheckFirst: 'Check first',
   careRideOn: 'Ride on?',
   careRoadCarry: 'What to carry for this',
+  careWhere: 'What is it, where is it?',
+  careLessUsual: (type: string) => `less usual on a ${type} bike`,
   careCarryTitle: 'What to carry',
   careSearchLabel: 'Search',
   careSearchHint: 'For example squeak, chain or bleed',
