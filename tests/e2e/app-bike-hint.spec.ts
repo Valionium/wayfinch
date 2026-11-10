@@ -267,3 +267,22 @@ test('[FIT-LINE] a bike saved in Bike details and removed there again: the line 
   await expect(add).toBeFocused();
   expect(problems).toEqual([]);
 });
+
+// Review of PR 111, I1: on a 320 px phone the Route step's Choose a GPX file stays as clear of the tab bar as before the dots; there the
+// dots give way (the card's room goes to the Route step, design section 4.1), and at 360 px they show with the button still clear.
+test('[HINT-COLOUR] 320 × 640 and 360 × 640: the whole Choose a GPX file button is above the tab bar; at 320 px the card has no dots', async ({ page }) => {
+  for (const width of [320, 360]) {
+    await page.setViewportSize({ width, height: 640 });
+    app = await loadApp(page);
+    const card = page.getByRole('region', { name: 'Design your bike' });
+    await expect(card).toBeVisible();
+    if (width === 360) await expect(card.getByRole('group', { name: 'Try a colour' })).toBeVisible();
+    else { await page.waitForTimeout(800); await expect(card.getByRole('group', { name: 'Try a colour' })).toBeHidden(); }
+    const g = (await page.getByText('Choose a GPX file').first().boundingBox())!;
+    const bar = (await page.locator('nav.tabs').boundingBox())!;
+    expect(g.y + g.height, `${width} px`).toBeLessThanOrEqual(bar.y);
+    expect(await noSideways(page)).toBe(true);
+    await app.close();
+    app = undefined;
+  }
+});

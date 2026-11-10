@@ -88,10 +88,12 @@ progress { width: 100%; accent-color: var(--blaze); }
 .bike-hint-acts button { background: none; border: 0; color: var(--muted); font: inherit; font-size: 0.9375rem; text-decoration: underline; text-underline-offset: 2px; padding: 0 6px; cursor: pointer; }
 .bike-hint-done { margin: 4px 0 0; font-size: 0.9375rem; }
 /* Try a colour (wish 17, design section 4.2): the row is kept from the first frame, so nothing moves when the dots arrive */
-.bike-hint-dots { grid-column: 1 / -1; min-height: 44px; margin: -6px 0 -2px; }
+.bike-hint-dots { grid-column: 1 / -1; min-height: 44px; margin: -10px 0 -2px; }
+/* On a 320 px phone the dots give way: the card keeps its height of before, so Choose a GPX file stays clear of the tab bar (review of PR 111) */
+@media (max-width: 339px) { .bike-hint-dots { display: none; } }
 .bike-hint-try { display: flex; flex-wrap: wrap; }
 .bike-hint-try button { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; background: none; border: 0; border-radius: 50%; cursor: pointer; }
-.bike-hint-try span { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line); }
+.bike-hint-try span { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--muted); }
 .bike-hint-try [aria-pressed='true'] span { outline: 2px solid var(--ink); outline-offset: 3px; }
 .bike-hint-try button:focus-visible { outline: 2px solid var(--blaze); outline-offset: -2px; }
 /* Kept in the page while its words load, so a screen reader says them when they arrive (review of PR 90, M1). */
