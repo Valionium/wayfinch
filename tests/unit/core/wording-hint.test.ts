@@ -7,7 +7,7 @@ import { bannedHits } from '../../fixtures/banned.ts';
 // The first-run bike hint (wish 17): its lazy words, and the card's own on the first screen, never ask, press or promise.
 test('[HON-BANNED] no word of the first-run bike hint uses a banned word or presses the rider; every lazy key starts with "hint" and none is also in en.ts', () => {
   const strings = Object.entries(HN);
-  expect(strings.length).toBe(8);
+  expect(strings.length).toBe(9);   // + "Try a colour", the colour dots' group (owner's answer 3 of 9 Nov 2026)
   for (const [key, text] of strings) {
     expect(key).toMatch(/^hint[A-Z]/);
     expect(key in W, key).toBe(false);

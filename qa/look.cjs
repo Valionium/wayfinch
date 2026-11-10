@@ -672,6 +672,31 @@ test('[THEME-SYNC] the bag planner stamps its choice just after a future-dated W
   assert.equal(JSON.parse(p.stored('loadcheck:theme:v1')).at,new Date(Date.parse(ahead)+1).toISOString());
 });
 
+// Try a colour on Wayfinch's first-run card (wish 17, design of 9 Nov 2026, section 4.2): Make it yours carries &colour=<swatch> into
+// Bike details, where a new bike opens with that colour picked; nothing is saved until the rider saves. A saved bike never takes it.
+test('[HINT-COLOUR] #bike-details=new&...&colour=teal opens a new bike with Teal picked and nothing written; Save keeps it; an unknown colour, or the link of a saved bike, picks nothing',async()=>{
+  assert.equal(page().json(`bikeDetailsLink('#bike-details=new&back=trip&colour=teal').colour`),'#1f7f80');
+  for(const bad of ['mauve','','%23ff0000','TEAL'])assert.equal(page().json(`bikeDetailsLink('#bike-details=new&back=trip&colour=${bad}').colour`),null,bad);
+  const n=page({plan:null,library:[]});
+  assert.equal(n.run(`openBikeDetailsFromLink('#bike-details=new&back=trip&colour=teal')`),true);
+  assert.equal(n.json('currentLook().colour'),'#1f7f80','picked');
+  assert.equal(stroke(n),'#1f7f80','the drawing in Bike details shows it');
+  assert.ok(!n.writes.some(k=>k.startsWith('loadcheck:')),'nothing is saved by opening');
+  assert.equal(n.stored('loadcheck:bikeProfiles'),'[]');
+  // the rider names it and saves: the colour is the bike's
+  n.run("document.getElementById('bikeName').value='Mine'");
+  await n.run('saveBikeProfile()');
+  for(let i=0;i<4;i++){await n.settle();await new Promise(r=>setTimeout(r,5));}
+  const lib=JSON.parse(n.stored('loadcheck:bikeProfiles'));
+  assert.equal(lib.length,1);
+  assert.equal(lib[0].look.colour,'#1f7f80');
+  // a saved bike opened from a link with a colour: its own look stays, nothing written
+  const s=page();
+  s.run(`openBikeDetailsFromLink('#bike-details=${OTHER.id}&back=trip&colour=teal')`);
+  assert.equal(s.json('currentLook()'),null,'the own look of the saved bike, none');
+  assert.ok(!s.writes.some(k=>k.startsWith('loadcheck:')));
+});
+
 (async()=>{
   for(const [name,fn] of tests){await fn();passed++;console.log('ok',name);}
   console.log(`${passed} look tests passed`);

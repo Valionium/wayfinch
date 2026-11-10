@@ -3,6 +3,7 @@
 // over 150 ms where motion is allowed (bike.css); any other change redraws within the same frame.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { bagViewOf, bikeArt, captionOf, resolveBikeSpec } from '../../core/bike/index.ts';
+import type { Swatch } from '../../core/bike/colour.ts';
 import type { BikeRecord } from '../../core/bike/normalise.ts';
 import type { LoadSummary } from '../../core/types.ts';
 import { W } from '../../core/wording/en.ts';
@@ -67,9 +68,11 @@ export type BikeDrawingProps = {
   caption?: boolean;
   /** Every bike id the bag planner holds: a summary naming another bike draws no bags. */
   known?: readonly string[];
+  /** A colour tried on the first-run card: drawn, and carried into Bike details, never saved. */
+  tryColour?: Swatch | null;
 };
 
-export function BikeDrawing({ bike, summary, size = 'large', back, caption = true, known }: BikeDrawingProps) {
+export function BikeDrawing({ bike, summary, size = 'large', back, caption = true, known, tryColour }: BikeDrawingProps) {
   const theme = useTheme();
   const [prefix] = useState(() => `bk${(drawings += 1)}-`);
   const look = bike?.look?.paint;
@@ -80,11 +83,11 @@ export function BikeDrawing({ bike, summary, size = 'large', back, caption = tru
   // Drawn again only when what it is drawn from changes.
   const { spec, art, words } = useMemo(() => {
     const plan = size === 'large' ? bagViewOf(summary, bike, known ?? (bike ? [bike.id] : [])) : null;
-    const s = resolveBikeSpec(bike, plan);
+    const r = resolveBikeSpec(bike, plan), s = tryColour ? { ...r, colour: { value: tryColour.hex, mark: 'entered' as const } } : r;
     const o = { theme, idPrefix: prefix };
     return { spec: s, art: look && extras ? extras.paintedArt(s, plan, o, look) : bikeArt(s, plan, o), words: captionOf(s, bike, plan) };
-  }, [bike, summary, known, size, theme, prefix, ready]);
-  const href = bikeDetailsHref(bike?.id ?? 'new', back, 'look');
+  }, [bike, summary, known, size, theme, prefix, ready, tryColour]);
+  const href = bikeDetailsHref(bike?.id ?? 'new', back, 'look') + (tryColour ? `&colour=${tryColour.name.toLowerCase()}` : '');
   const box = useRef<HTMLSpanElement>(null);
   const last = useRef({ svg: '' });
   useLayoutEffect(() => {
