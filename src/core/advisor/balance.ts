@@ -276,7 +276,8 @@ export function handlingFirst(start: Packing, trial: (pins: Record<string, strin
           if (est < gap - EPS && (!step || est < step.est - EPS || (Math.abs(est - step.est) <= EPS && order(x.id, step.id) < 0))) step = { id: x.id, to: empty.key, est, gap };
         }
       }
-      if (!step) return cur;
+      // kept only when an uneven pair ends even: steps that leave it uneven all the same would be things to repack for nothing
+      if (!step) return [...pairGaps(from)].some(([k, g]) => g >= PAIR_UNEVEN && (pairGaps(cur).get(k) ?? g) < PAIR_UNEVEN) ? cur : from;
       if (tried >= budget) return null;
       const next = trial({ [step.id]: step.to }, cur);
       tried++;
@@ -332,14 +333,13 @@ export function handlingFirst(start: Packing, trial: (pins: Record<string, strin
   const posOf = new Map([...start.rooms, ...cur.rooms].map((r) => [r.key, r.pos]));
   const split = new Set((o.extra ?? []).filter((id) => !start.pieces.some((x) => x.id === id)));
   const kgOf = (id: string) => (cur.pieces.find((x) => x.id === id) ?? start.pieces.find((x) => x.id === id))?.kg ?? 0;
-  // a put-back keeps the score, the frame bag's kilos, every promise, every kept thing, and each pair at least as even as it now is
+  // a put-back keeps the score, the frame bag's kilos, every promise, every kept thing, and the side to side rule (an evened pair is
+  // evened again afterwards)
   const putBack = (pins: Record<string, string>): boolean => {
     const next = trial(pins, cur);
     tried++;
-    const gaps = pairGaps(cur), now = pairGaps(next);
     if (Object.entries(pins).every(([id, key]) => next.pieces.find((x) => x.id === id)?.unit === key) && keepsPromises(start.result, next.result)
-      && kept(next) && sides(next) && handlingScore(next.result) <= handlingScore(cur.result) && frameKg(next) >= frameKg(cur) - EPS
-      && [...now].every(([k, g]) => g < PAIR_UNEVEN || g <= (gaps.get(k) ?? g) + EPS)) { cur = next; return true; }
+      && kept(next) && sides(next) && handlingScore(next.result) <= handlingScore(cur.result) && frameKg(next) >= frameKg(cur) - EPS) { cur = next; return true; }
     return false;
   };
   // the moves of one pair from one half to the other, put back together (review of PRs 116/117, I2), then each move on its own, the

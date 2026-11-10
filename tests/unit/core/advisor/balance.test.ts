@@ -628,6 +628,13 @@ describe('"Handling first" (design of 10 Nov 2026)', () => {
     expect(gaps(kept.packing).get('k')!).toBeLessThanOrEqual(gaps(p.start).get('k')!);
   });
 
+  test('[HF-ORDER] a pair that cannot be made even at no cost is left as it is: no things to repack for a pair that stays uneven all the same', () => {
+    const bags: Bag[] = [{ key: 'k-0', pos: 'fork', cap: 3, reach: false, pair: 'k' }, { key: 'k-1', pos: 'fork', cap: 3, reach: false, pair: 'k' }];
+    const p = keeper(bags, [{ id: 'tent', kg: 1.3, L: 2 }, { id: 'pot', kg: 0.3, L: 0.5 }], { tent: 'k-0', pot: 'k-0' });
+    expect(gaps(p.start).get('k')!).toBeGreaterThanOrEqual(PAIR_UNEVEN); // 83 % and 0 %; the pot over leaves 67 % and 17 %
+    expect(handlingFirst(p.start, p.trial, p.fresh)).toMatchObject({ apply: false, moves: [] });
+  });
+
   // Review of PRs 116/117, I1: a thing split over bags that the search packs whole moved without being listed.
   test('[HF-ORDER] a thing split over bags and packed whole is in the moves, from the bag that held most of it; a press with no thing to move applies nothing', () => {
     const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 4, reach: true }, { key: 's-0', pos: 'seat', cap: 14, reach: false }];
