@@ -429,6 +429,17 @@ describe('"Handling first" (design of 10 Nov 2026)', () => {
     expect(out.moves.map((m) => m.id)).not.toContain('spork');
   });
 
+  test('[HF-ORDER] a move that changes nothing is put back even when a search ran out of its trials', () => {
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 2, reach: true }, { key: 'k-0', pos: 'fork', cap: 3, reach: false },
+      { key: 'k-1', pos: 'fork', cap: 3, reach: false }, { key: 's-0', pos: 'seat', cap: 14, reach: false }];
+    const items: FItem[] = [{ id: 'cap', kg: 0.5, L: 1 }, { id: 'wash', kg: 0.5, L: 1 }, { id: 'lock', kg: 1.6, L: 2 }, { id: 'spork', kg: 0.02, L: 0.05 }];
+    const p = keeper(bags, items, { cap: 'f-0', wash: 'f-0', lock: 's-0', spork: 'k-1' });
+    const out = handlingFirst(p.start, p.trial, p.fresh, { maxTrials: 1 });
+    expect(out.partial).toBe(true);
+    expect(out.route).toBe('heaviest');
+    expect(unitOf(out.packing, 'spork')).toBe('k-1');
+  });
+
   test('[HF-NEVER-WORSE] never a higher score than the plan as it stands or than the usual search; nothing to gain: nothing applied', () => {
     const POS: Pos[] = ['frame', 'top', 'fork', 'bar', 'seat', 'rack', 'pack'];
     const arb = fc.record({
@@ -502,7 +513,8 @@ describe('"Handling first" (design of 10 Nov 2026)', () => {
     const p = keeper(bags, items, Object.fromEntries(items.map((it) => [it.id, 's-0'])));
     const cut = handlingFirst(p.start, p.trial, p.fresh, { maxTrials: 3 });
     expect(cut.partial).toBe(true);
-    expect(cut.tried).toBeLessThanOrEqual(2 * 3 + 1);
+    // each search at most 3, the heaviest-first packing one, then one trial per move to put back
+    expect(cut.tried).toBeLessThanOrEqual(2 * 3 + 1 + cut.moves.length);
     expect(handlingScore(cut.packing.result)).toBeLessThanOrEqual(handlingScore(p.start.result));
     const whole = handlingFirst(p.start, p.trial, p.fresh);
     expect(whole.partial).toBe(false);

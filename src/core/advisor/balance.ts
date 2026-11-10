@@ -228,17 +228,15 @@ export function handlingFirst(start: Packing, trial: (pins: Record<string, strin
   const movesOf = (p: Packing): Move[] => p.pieces.filter((x) => was.has(x.id) && was.get(x.id)!.unit !== x.unit)
     .map((x) => ({ id: x.id, from: was.get(x.id)!.unit, to: x.unit }));
   let cur = best.packing;
-  if (!partial) {
-    // the moves that do the least first: kilos times the drop of the handling weight
-    const to = new Map(cur.pieces.map((p) => [p.id, p.pos]));
-    const worth = (m: Move) => { const p = was.get(m.id)!; return p.kg * (WEIGHTS[p.pos] - WEIGHTS[to.get(m.id)!]); };
-    for (const m of movesOf(cur).sort((a, b) => worth(a) - worth(b) || order(a.id, b.id))) {
-      if (tried >= budget) return none(false, true, false);
-      const next = trial({ [m.id]: m.from }, cur);
-      tried++;
-      if (next.pieces.find((x) => x.id === m.id)?.unit === m.from && keepsPromises(start.result, next.result) && kept(next)
-        && handlingScore(next.result) <= handlingScore(cur.result) && frameKg(next) >= frameKg(cur) - EPS) cur = next;
-    }
+  // the moves that do the least first: kilos times the drop of the handling weight (also after a search that ran out of its trials)
+  const to = new Map(cur.pieces.map((p) => [p.id, p.pos]));
+  const worth = (m: Move) => { const p = was.get(m.id)!; return p.kg * (WEIGHTS[p.pos] - WEIGHTS[to.get(m.id)!]); };
+  for (const m of movesOf(cur).sort((a, b) => worth(a) - worth(b) || order(a.id, b.id))) {
+    if (tried >= budget) return none(false, true, false);
+    const next = trial({ [m.id]: m.from }, cur);
+    tried++;
+    if (next.pieces.find((x) => x.id === m.id)?.unit === m.from && keepsPromises(start.result, next.result) && kept(next)
+      && handlingScore(next.result) <= handlingScore(cur.result) && frameKg(next) >= frameKg(cur) - EPS) cur = next;
   }
   const gain = Math.round((s0 - handlingScore(cur.result)) * 100) / 100;
   return { apply: true, packing: cur, moves: movesOf(cur), gain, route: best.route, held: false, tried, partial, done: true };
