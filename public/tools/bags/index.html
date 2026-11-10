@@ -4043,7 +4043,9 @@ function bikeDetailsLink(hash){
   const params={};for(const part of m[2].split('&').filter(Boolean)){const [k,v]=part.split('=');params[k]=v;}
   let id;try{id=decodeURIComponent(m[1]);}catch(e){return null;}
   if(!dataId(id))return null;   // a bike id, or new
-  return {id,back:Object.hasOwn(BIKE_BACKS,params.back) ? params.back : 'you',section:params.section==='look' ? 'look' : 'top'};
+  // a colour tried on Wayfinch's first-run card (wish 17, design of 9 Nov 2026, section 4.2): one of Look's own swatches, by its name
+  const tried=params.colour && window.WayfinchBike ? window.WayfinchBike.SWATCHES.find(s=>s.name.toLowerCase()===params.colour) : null;
+  return {id,back:Object.hasOwn(BIKE_BACKS,params.back) ? params.back : 'you',section:params.section==='look' ? 'look' : 'top',colour:tried ? tried.hex : null};
 }
 // Opens that bike without applying it to the plan (a saved bike, or the plan's own when the id matches); `new` starts a new one.
 // The fragment is removed after, so a reload or Back does not open it again.
@@ -4058,7 +4060,8 @@ function openBikeDetailsFromLink(hash=location.hash){
   LINK_BIKE=true;LINK_ADDS=false;
   if(plan)fillBikeProfileForm(plan);
   else if(saved){fillBikeProfileForm(saved);$('bikeSavedSelect').value=saved.id;}
-  else if(link.id==='new' || !S.bikeProfile){fillBikeProfileForm(null);$('bikeSavedSelect').value='';LOOK_NEW=null;LINK_ADDS=true;}
+  // a new bike starts with the colour tried on the card picked, not saved: Save, or a tap in Look, keeps it (a saved bike never takes it)
+  else if(link.id==='new' || !S.bikeProfile){fillBikeProfileForm(null);$('bikeSavedSelect').value='';LOOK_NEW=link.colour ? normaliseLook({colour:link.colour}) : null;LINK_ADDS=true;}
   // an id nobody has, with a bike in the plan: the plan's bike, so nothing is lost and nothing new is made
   else fillBikeProfileForm(S.bikeProfile);
   renderBikeProfiles();

@@ -185,3 +185,50 @@ test('[FIT-LINE] the Bag planner and the Gear advisor with no bike: a line under
   expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('copilot:')))).toEqual([]);
   expect(problems).toEqual([]);
 });
+
+// Try a colour (wish 17, design of 9 Nov 2026, section 4.2; owner's answer 3): the card keeps the dots' row, so nothing moves when they
+// arrive; a tap paints the frame at once; Make it yours carries the colour into Bike details, picked and not saved.
+test('[HINT-COLOUR] five dots of 44 px in a row the card keeps, nothing moves when they load; a tap paints the bike; Make it yours opens Bike details with that colour picked and nothing saved', async ({ page }) => {
+  const problems = watch(page);
+  await page.addInitScript(() => { (window as unknown as { requestIdleCallback: unknown }).requestIdleCallback = (f: () => void) => setTimeout(f, 600); });
+  app = await loadApp(page);
+  const card = page.getByRole('region', { name: 'Design your bike' });
+  await expect(card).toBeVisible();
+  const first = (await card.boundingBox())!;
+  const group = card.getByRole('group', { name: 'Try a colour' });
+  await expect(group).toBeVisible();
+  // the same height before and after the dots arrived: their row was kept
+  const after = (await card.boundingBox())!;
+  expect(Math.abs(after.height - first.height)).toBeLessThanOrEqual(0.5);
+  expect(after.height).toBeLessThanOrEqual(230);
+  const gpx = page.getByText('Choose a GPX file').first();
+  expect((await gpx.boundingBox())!.y + 44).toBeLessThanOrEqual(page.viewportSize()!.height);
+  const names = ['Teal', 'Red', 'Blue', 'Yellow', 'Black'];
+  for (const name of names) {
+    const dot = group.getByRole('button', { name, exact: true });
+    await expect(dot).toHaveAttribute('aria-pressed', 'false');
+    const b = (await dot.boundingBox())!;
+    expect(b.height).toBeGreaterThanOrEqual(44);
+    expect(b.width).toBeGreaterThanOrEqual(44);
+  }
+  expect(await noSideways(page)).toBe(true);
+  const results = await new AxeBuilder({ page }).include('.bike-hint').analyze();
+  expect(results.violations).toEqual([]);
+  // by keyboard: Teal, pressed, paints the frame
+  await group.getByRole('button', { name: 'Teal', exact: true }).focus();
+  await page.keyboard.press('Space');
+  await expect(group.getByRole('button', { name: 'Teal', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(card.locator('.bk-paint.bk-frame').first()).toHaveAttribute('stroke', '#1f7f80');
+  const before = await page.evaluate(() => JSON.stringify(Object.keys(localStorage).sort().map((k) => [k, localStorage.getItem(k)])));
+  await card.getByRole('link', { name: 'Make it yours' }).click();
+  await page.waitForURL(/\/tools\/bags\//);
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  // Teal is picked in Look, on the drawing there, and nothing is saved until the rider saves
+  await expect(page.locator('#lookSwatches input:checked')).toHaveCount(1);
+  expect(await page.locator('#lookSwatches label:has(input:checked)').innerText()).toMatch(/Teal/);
+  expect(await page.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles'))).toBeNull();
+  // Wayfinch's own keys are as they were when Make it yours was tapped (the hint key's letters only grow by the tap, as before)
+  const now = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('copilot:') && k !== 'copilot:bikeHint:v1'));
+  expect(now).toEqual((JSON.parse(before) as [string, string][]).map(([k]) => k).filter((k) => k.startsWith('copilot:') && k !== 'copilot:bikeHint:v1'));
+  expect(problems).toEqual([]);
+});
