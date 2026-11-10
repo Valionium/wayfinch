@@ -6251,7 +6251,11 @@ function renderFitLines(){
     }
     line.hidden = !show;
     // a bike saved in Bike details opened from here hides the line: closing it puts the focus on what stays
-    if(!show) for(const d of DIALOGS) if(d.returnFocus && d.returnFocus === $(add)) d.returnFocus = $(then);
+    // and if that bike is removed there again, the line is back and the focus goes back to its button
+    for(const d of DIALOGS){
+      if(!show && d.returnFocus && d.returnFocus === $(add)){ d.returnFocus = $(then); d.fitLineFrom = add; }
+      else if(show && d.fitLineFrom === add && d.returnFocus === $(then)){ d.returnFocus = $(add); d.fitLineFrom = null; }
+    }
   }
 }
 // Re-drawn on every choice; the focused control is found again by its name and value (radios) or id, so the keyboard keeps its place.
