@@ -13,9 +13,10 @@ import type { Pos, TrialResult } from './types.ts';
 export type Piece = { id: string; kg: number; L: number; unit: string; pos: Pos };
 /**
  * A bag in use that may take an item: its unit key, its position and the litres still free in it. `fillL`: the litres in it of what the
- * planner's re-pack places last around the whole items (food fills the gaps), which a hand placement can take.
+ * planner's re-pack places last around the whole items (food fills the gaps), which a hand placement can take. `capL`: the litres the
+ * bag holds in all (Handling first's heaviest-first packing counts from it; without it, the free litres, the food's and the whole items').
  */
-export type Room = { key: string; pos: Pos; freeL: number; fillL?: number };
+export type Room = { key: string; pos: Pos; freeL: number; fillL?: number; capL?: number };
 /** A packing as the search reads it; `state` is the page's own (its kept placements), handed back to the next trial untouched. */
 export type Packing = { result: TrialResult; pieces: Piece[]; rooms: Room[]; state?: unknown };
 export type Move = { id: string; from: string; to: string };
@@ -136,4 +137,137 @@ export function autoBalance(start: Packing, trial: (pins: Record<string, string>
   const balanced = balance(start, trial, o);
   const gain = Math.round((handlingScore(start.result) - handlingScore(balanced.packing.result)) * 100) / 100;
   return { apply: balanced.moves.length > 0 && gain >= MIN_GAIN_SCORE - EPS, balanced, gain };
+}
+
+// "Handling first" (design of 10 Nov 2026, the owner's answers §10): one press of the rider's packs by weight, as far as the bags allow.
+// The best spots in order are Better handling's table, lightest first (frame bag, top tube bag, fork cages, panniers, bar roll, seat
+// pack), the frame bag first among equal weights; never the back.
+const spotOrder = (a: Room, b: Room) => WEIGHTS[a.pos] - WEIGHTS[b.pos] || Number(a.pos !== 'frame') - Number(b.pos !== 'frame') || order(a.key, b.key);
+
+/**
+ * The heaviest-first packing's pins (design §4.3): the things to keep stay in their bags (their litres counted there first); every other
+ * whole thing, densest first (kilos per litre, ties by kilos), into the best spot that still has room for it. A thing with no such room
+ * gets no pin: the planner's own packing places it.
+ */
+export function heaviestFirst(start: Packing, fixed: Iterable<string> = []): Record<string, string> {
+  const keep = new Set(fixed);
+  const left = new Map(start.rooms.map((r) => [r.key,
+    r.capL ?? r.freeL + (r.fillL ?? 0) + start.pieces.filter((p) => p.unit === r.key).reduce((t, p) => t + p.L, 0)]));
+  const pins: Record<string, string> = {};
+  for (const p of start.pieces) {
+    if (!keep.has(p.id) || !left.has(p.unit)) continue;
+    pins[p.id] = p.unit;
+    left.set(p.unit, left.get(p.unit)! - p.L);
+  }
+  const spots = start.rooms.filter((r) => r.pos !== 'pack').sort(spotOrder);
+  const free = start.pieces.filter((p) => !keep.has(p.id) && p.kg > 0 && p.L > 0)
+    .sort((a, b) => b.kg / b.L - a.kg / a.L || b.kg - a.kg || order(a.id, b.id));
+  for (const p of free) {
+    const r = spots.find((x) => left.get(x.key)! + EPS >= p.L);
+    if (!r) continue;
+    pins[p.id] = r.key;
+    left.set(r.key, left.get(r.key)! - p.L);
+  }
+  return pins;
+}
+
+/**
+ * `route`: which packing won (null: nothing better). `held`: something better was found, but it would move a thing to keep that is no
+ * single piece (food or a thing split over bags, ticked as packed), so nothing is applied. `partial`: a search ran out of its trials.
+ * `done`: everything ran within the budget; when not, nothing is applied and the caller runs it again with a larger one.
+ */
+export type HandledFirst = {
+  apply: boolean; packing: Packing; moves: Move[]; gain: number; route: 'search' | 'heaviest' | null; held: boolean; tried: number;
+  partial: boolean; done: boolean;
+};
+
+/**
+ * Handling first (design §4): from `start`, the plan as it stands, the usual search with its wider look run to the end (every gain
+ * taken, however small), and the heaviest-first packing (`fresh`: the planner's own packing with these pins) with the same search run
+ * from it; whichever has the lower score, a tie to more kilos in the frame bag. Kept only when it keeps every promise of `start`, leaves
+ * every thing to keep (`fixed`) with exactly its bags and litres, and lowers the score by 0.01 or more: never worse than the plan. Then
+ * each move that changes nothing (the score and the frame bag's kilos the same) is put back, so the rider repacks less. `trial` and
+ * `extra` as for balance; each search at most `maxTrials`. `budget`: all trials at most this many (the page's slices, its trials
+ * remembered, so each run adds only new ones). Every input the same, the same answer.
+ */
+export function handlingFirst(start: Packing, trial: (pins: Record<string, string>, from: Packing) => Packing,
+  fresh: (pins: Record<string, string>) => Packing,
+  o: { fixed?: ReadonlySet<string> | readonly string[]; extra?: readonly string[]; maxTrials?: number; budget?: number } = {}): HandledFirst {
+  const fixed = new Set(o.fixed ?? []);
+  const max = o.maxTrials ?? MAX_BALANCE_TRIALS, budget = o.budget ?? Infinity;
+  let tried = 0;
+  const none = (held: boolean, partial: boolean, done: boolean): HandledFirst =>
+    ({ apply: false, packing: start, moves: [], gain: 0, route: null, held, tried, partial, done });
+  // one search within what is left of the budget; null when the budget ran out first
+  const search = (from: Packing): Balanced | null => {
+    const n = Math.min(max, budget - tried);
+    const b = balance(from, trial, { fixed, wide: true, extra: o.extra ?? [], maxTrials: n });
+    tried += b.tried;
+    return b.partial && n < max ? null : b;
+  };
+  const usual = search(start);
+  if (!usual || tried >= budget) return none(false, true, false);
+  const firstPacked = fresh(heaviestFirst(start, fixed));
+  tried++;
+  let heavy: Balanced | null = null;
+  if (keepsPromises(start.result, firstPacked.result)) {
+    heavy = search(firstPacked);
+    if (!heavy) return none(false, true, false);
+  }
+  const partial = usual.partial || !!heavy?.partial;
+  const s0 = handlingScore(start.result);
+  const frameKg = (p: Packing) => p.result.kgByPos.frame ?? 0;
+  const kept = (p: Packing) => [...fixed].every((id) => JSON.stringify(start.result.items[id] ?? null) === JSON.stringify(p.result.items[id] ?? null));
+  const better = [{ route: 'search' as const, packing: usual.packing }, ...(heavy ? [{ route: 'heaviest' as const, packing: heavy.packing }] : [])]
+    .filter((c) => keepsPromises(start.result, c.packing.result) && handlingScore(c.packing.result) <= s0 - STEP + EPS);
+  const ok = better.filter((c) => kept(c.packing))
+    .sort((a, b) => handlingScore(a.packing.result) - handlingScore(b.packing.result) || frameKg(b.packing) - frameKg(a.packing));
+  const best = ok[0];
+  if (!best) return none(better.length > 0, partial, true);
+  const was = new Map(start.pieces.map((p) => [p.id, p]));
+  const movesOf = (p: Packing): Move[] => p.pieces.filter((x) => was.has(x.id) && was.get(x.id)!.unit !== x.unit)
+    .map((x) => ({ id: x.id, from: was.get(x.id)!.unit, to: x.unit }));
+  let cur = best.packing;
+  if (!partial) {
+    // the moves that do the least first: kilos times the drop of the handling weight
+    const to = new Map(cur.pieces.map((p) => [p.id, p.pos]));
+    const worth = (m: Move) => { const p = was.get(m.id)!; return p.kg * (WEIGHTS[p.pos] - WEIGHTS[to.get(m.id)!]); };
+    for (const m of movesOf(cur).sort((a, b) => worth(a) - worth(b) || order(a.id, b.id))) {
+      if (tried >= budget) return none(false, true, false);
+      const next = trial({ [m.id]: m.from }, cur);
+      tried++;
+      if (next.pieces.find((x) => x.id === m.id)?.unit === m.from && keepsPromises(start.result, next.result) && kept(next)
+        && handlingScore(next.result) <= handlingScore(cur.result) && frameKg(next) >= frameKg(cur) - EPS) cur = next;
+    }
+  }
+  const gain = Math.round((s0 - handlingScore(cur.result)) * 100) / 100;
+  return { apply: true, packing: cur, moves: movesOf(cur), gain, route: best.route, held: false, tried, partial, done: true };
+}
+
+/** The frame bag after Handling first (design §5). Null when the plan has none. */
+export type FrameRoom = { full: boolean; heaviest: boolean; outside: Piece[]; moreKg: number };
+
+/**
+ * `full`: no whole thing outside the frame bag fits its free litres; `heaviest`: and every thing in it is at least as dense as the densest
+ * one outside; `outside`: the things outside, densest first; `moreKg`: the kilos of them (but what is to be kept, `fixed`) that `extraL`
+ * more litres would take, densest first, to the tenth.
+ */
+export function frameRoom(p: Packing, o: { fixed?: Iterable<string>; extraL?: number } = {}): FrameRoom | null {
+  const rooms = p.rooms.filter((r) => r.pos === 'frame');
+  if (!rooms.length) return null;
+  const keys = new Set(rooms.map((r) => r.key)), freeL = Math.max(...rooms.map((r) => r.freeL));
+  const dense = (x: Piece) => x.kg / x.L;
+  const inside = p.pieces.filter((x) => keys.has(x.unit));
+  const outside = p.pieces.filter((x) => !keys.has(x.unit) && x.kg > 0 && x.L > 0)
+    .sort((a, b) => dense(b) - dense(a) || b.kg - a.kg || order(a.id, b.id));
+  const full = outside.length > 0 && outside.every((x) => x.L > freeL + EPS);
+  const heaviest = full && inside.length > 0 && inside.every((x) => x.L > 0 && dense(x) + EPS >= dense(outside[0]!));
+  const keep = new Set(o.fixed ?? []);
+  let room = freeL + (o.extraL ?? 0), moreKg = 0;
+  if ((o.extraL ?? 0) > 0) for (const x of outside) {
+    if (keep.has(x.id) || x.L > room + EPS) continue;
+    room -= x.L;
+    moreKg += x.kg;
+  }
+  return { full, heaviest, outside, moreKg: Math.round(moreKg * 10) / 10 };
 }
