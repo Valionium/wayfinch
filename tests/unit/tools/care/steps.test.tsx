@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { idsOf, STEP_PICTURES } from '../../../../src/core/care/pictures.ts';
 import { KIND_WORDS, stepTitlesFrom, SWITCH_WORDS, type PictureWords } from '../../../../src/core/wording/en-care-pictures.ts';
 import CARE_WORDS from '../../../../src/core/wording/en-care-pictures.json';
@@ -60,7 +60,10 @@ beforeEach(async () => {
   Object.assign(lock, { asked: 0, released: 0, held: false, current: null, late: false, waiting: [] });
   fakeWakeLock();
 });
-afterEach(() => { render(null, host); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { act(() => { render(null, host); }); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+// Preact runs the effects of a render made outside act (a picture that arrived after its fetch) in a timer of its own, 100 ms on; the jsdom
+// window must still be there when it fires, or the run ends with "cancelAnimationFrame is not defined" after every test has passed.
+afterAll(() => new Promise((r) => setTimeout(r, 150)));
 
 const memory = (initial: Record<string, string> = {}) => {
   const data = new Map(Object.entries(initial));
@@ -364,7 +367,7 @@ const rimBike = (bars: string | null, rimBrake?: string) => memory({
 }).kv;
 /** Brake rubbing, step 5 ("Open the brake's quick release"), for the bike in `kv`. */
 async function brakeStep5(kv: KeyValueStore): Promise<void> {
-  render(null, host);
+  act(() => { render(null, host); });
   await mount(kv);
   await openCard('brake-rub-rim');
   for (let i = 0; i < 5; i += 1) await click(button(C.careStepsNext)!);
@@ -412,7 +415,7 @@ test("[BC-PIC-SWITCH] \"Other kinds\" offers each other kind with one tap; a tap
   expect(imgNames()).toEqual([PICTURE_WORDS['brake-qr-open']!.name]);
   expect(kindButtons()).toEqual([KIND_WORDS['v-brake'], KIND_WORDS.hydraulic]);
   // the caliper bolts: one picture, one kind, no switch
-  render(null, host);
+  act(() => { render(null, host); });
   await mount();
   await openCard('brake-rub-disc');
   for (let i = 0; i < 3; i += 1) await click(button(C.careStepsNext)!);
@@ -440,7 +443,7 @@ test('[BC-PIC-SWITCH] after a tap on another kind, focus is on the button that s
 test('[BC-STEP-LINES] the snapped-spoke card shows a disc bike the disc line only, a rim bike the rim lines only, and with no bike every line, the disc line first', async () => {
   const spoke = card('spoke-snapped');
   const lines = async (kv: KeyValueStore): Promise<string[]> => {
-    render(null, host);
+    act(() => { render(null, host); });
     await mount(kv);
     await openCard('spoke-snapped');
     if (button(C.careStepsAll)!.getAttribute('aria-pressed') !== 'true') await click(button(C.careStepsAll)!);
@@ -466,7 +469,7 @@ test('[BC-STEP-LINES] the step count is of the steps the bike sees, and a step f
   expect(counter()).toBe(C.careStepsCount(2, 3));
   await settle();
   expect(heading().textContent).toBe('Disc brakes only: check the wheel spins clear');
-  render(null, host);
+  act(() => { render(null, host); });
   await mount(rimBike('drop'));
   await openCard('spoke-snapped');
   await click(button(C.careStepsNext)!);
@@ -478,7 +481,7 @@ test('[BC-STEP-LINES] the step count is of the steps the bike sees, and a step f
   await click(button(C.careStepsNext)!);
   await settle();
   expect(heading().textContent).toBe('Rim brakes only: close the brake again');
-  render(null, host);
+  act(() => { render(null, host); });
   await mount();
   await openCard('spoke-snapped');
   await click(button(C.careStepsNext)!);
@@ -622,7 +625,7 @@ test("[PG-SHEET-BIKE] the view draws a typical bike of the rider's type, never t
   await vi.waitFor(() => expect(sheet()!.querySelectorAll('.care-pic [role="img"]').length).toBe(2), { timeout: 3000 });
   expect([...sheet()!.querySelectorAll('.care-pic [role="img"]')].map((i) => i.getAttribute('aria-label'))).toEqual([vbrake, caliper]);
   // a disc card: the caliper stands out; its mix-up, the rim brake, is borrowed onto the drawing when opened
-  render(null, host);
+  act(() => { render(null, host); });
   await mount(memory({
     'loadcheck:bikeProfiles': JSON.stringify([{ id: 'bike_d', name: 'Disc', brakes: 'hydraulic-disc' }]),
     'loadcheck:bikeProfile': JSON.stringify({ id: 'bike_d', name: 'Disc' }),
@@ -725,7 +728,7 @@ test('[BV-ZOOM] a card whose parts sit close together opens zoomed in on them; W
   // wheel: review of PR 107, M3)
   expect(zoomed()).toBe(false);
   await click(sheetButton('Close')!);
-  render(null, host);
+  act(() => { render(null, host); });
   await mount();
   await openCard('chain-broken');
   await click(where()[0]!);
