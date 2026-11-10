@@ -474,3 +474,44 @@ test('[LC-WIDE-COLS] a toolbar that hides on scroll (up to 80 px of window heigh
     app = undefined;
   }
 });
+
+// The Bike line at the drawing (wish 15, 10 Nov 2026): beside the drawing when wide, at the top of the steps' column, as the "fits
+// better" line; never in the rig, so the sticky rig keeps its place and its size, and still fits the window.
+test('[TB-PAGE-CHOOSER-FIT] wide: the Bike line beside the drawing at the top of the steps\' column; the rig keeps its place and size, a pick moves nothing, and it still sticks at 1100 x 560', async ({ page }) => {
+  const bike = (id: string, name: string, colour: string) => ({ id, name, fit: { style: 'diamond-sloping', size: { kind: 'letter', value: 'M' } }, look: { colour, bars: 'drop', ebike: false } });
+  const bikes = [bike('bike_a', 'Trail Bike', '#2563b8'), bike('bike_b', 'Gravel', '#c62f2a')];
+  for (const [w, h] of [[1100, 560], [1280, 720]] as const) {
+    await planner(page, w, h);
+    await page.evaluate((b) => { localStorage.setItem('loadcheck:bikeProfiles', JSON.stringify(b)); localStorage.setItem('loadcheck:bikeProfile', JSON.stringify(b[0])); }, bikes);
+    await page.reload({ waitUntil: 'load' });
+    await ready(page);
+    await page.evaluate("S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'frame', L:6 }, { uid:3, pos:'bar', L:12 }, { uid:4, pos:'rack', L:15, pair:true }, { uid:5, pos:'bottle', slot:'dt', L:0.75 }, { uid:6, pos:'fork', L:3, pair:true }]; S.nextUid = 7; go(2); go(3); go(4)");
+    if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
+    await page.waitForTimeout(300);
+    const select = page.locator('#planBikeSelect');
+    await expect(select).toBeVisible();
+    const rig = await box(page.locator('#rigBox'));
+    const s = await box(select);
+    expect(s.x, `${w}`).toBeGreaterThanOrEqual(rig.x + rig.width);
+    expect(s.y - rig.y, `${w}`).toBeLessThan(80);   // at the top, beside the drawing
+    expect(s.height, `${w}`).toBeGreaterThanOrEqual(44);
+    // the same rig without the line: nothing of it moved for it
+    await page.evaluate(() => { document.getElementById('planBike')!.hidden = true; window.dispatchEvent(new Event('resize')); });
+    await page.waitForTimeout(100);
+    expect(await box(page.locator('#rigBox')), `${w}`).toEqual(rig);
+    await page.evaluate(() => { document.getElementById('planBike')!.hidden = false; window.dispatchEvent(new Event('resize')); });
+    await select.selectOption('bike_b');
+    await expect.poll(() => page.evaluate('S.bikeProfile.id')).toBe('bike_b');
+    await page.waitForTimeout(300);
+    const after = await box(page.locator('#rigBox'));
+    expect([after.x, after.y, after.width], `${w}`).toEqual([rig.x, rig.y, rig.width]);
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
+    await page.waitForTimeout(200);
+    const facts = await page.evaluate(() => { const r = document.getElementById('rigBox')!; return { sticky: getComputedStyle(r).position === 'sticky', bottom: r.getBoundingClientRect().bottom, height: innerHeight }; });
+    expect(facts.sticky, `${w} x ${h}`).toBe(true);
+    expect(facts.bottom, `${w} x ${h}`).toBeLessThanOrEqual(facts.height);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await app!.close();
+    app = undefined;
+  }
+});
