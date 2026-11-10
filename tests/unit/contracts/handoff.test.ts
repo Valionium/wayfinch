@@ -687,6 +687,26 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
     expect(long.json<string[]>('audit().miss.flatMap(m=>m.ids)')).toEqual([]);
   });
 
+  test('sunglasses on a day ride are April to September: the start, the packing check and what the day leaves at home agree (review of PR 103)', async () => {
+    for (const [date, packed] of [['2026-03-20', false], ['2026-04-10', true], ['2026-09-20', true], ['2026-10-10', false]] as const) {
+      const ride = await dayRide(date);
+      await ride.page.run('receiveHandoff()');
+      await ride.page.run('planTripBags()');
+      expect([date, ride.json<boolean>("carrying('shades')"), ride.json<boolean>('daySunny()')]).toEqual([date, packed, packed]);
+      expect([date, ride.json<string[]>('audit().miss.flatMap(m=>m.ids)').includes('shades')]).toEqual([date, false]);
+    }
+  });
+
+  test('a multi-day trip keeps its own sunglasses season: March and October, with sunglasses not packed, still get the reminder (review of PR 113)', async () => {
+    for (const [date, asked] of [['2026-03-20', true], ['2026-10-10', true]] as const) {
+      const { gpx } = await handedOff('loop', { nights: 2 }, date, 0.4);
+      const p = longPlanner(gpx);
+      await p.page.run('receiveHandoff()');
+      p.page.run("S.kit.shades=false;S.kitTouched.shades=true;");
+      expect([date, p.json<number>('S.nights') > 0, p.json<boolean>("carrying('shades')"), p.json<string[]>('audit().miss.flatMap(m=>m.ids)').includes('shades')]).toEqual([date, true, false, asked]);
+    }
+  });
+
   test('a hot July day ride packs no insulated jacket and no long gloves, and the check does not ask for them; a night out keeps the night rule (owner, 9 Nov 2026; review of PR 92, I1)', async () => {
     const jul = await dayRide('2026-07-20');
     await jul.page.run('receiveHandoff()');
