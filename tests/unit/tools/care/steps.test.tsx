@@ -9,6 +9,7 @@ import { idsOf, STEP_PICTURES } from '../../../../src/core/care/pictures.ts';
 import { KIND_WORDS, stepTitlesFrom, SWITCH_WORDS, type PictureWords } from '../../../../src/core/wording/en-care-pictures.ts';
 import CARE_WORDS from '../../../../src/core/wording/en-care-pictures.json';
 import { C, CARE_TASKS, CARRY, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
+import { PART_SHORT } from '../../../../src/core/wording/en-part-names.ts';
 import { ALL_STEPS_KEY } from '../../../../src/tools/care/steps.tsx';
 import { CareScreen } from '../../../../src/tools/care/ui.tsx';
 import { readHost } from '../../../../src/tools/tyre/host.ts';
@@ -256,7 +257,8 @@ test('[BC-PIC-NONE] a step with no picture shows its text alone, with no empty f
   for (let i = 0; i <= at; i += 1) await click(button(C.careStepsNext)!);
   await settle();
   expect(page()).toContain(c.steps[at]);
-  expect(dialog()!.querySelectorAll('.care-step figure, .care-step [role="img"], .care-step svg').length).toBe(0);
+  // (the "What is it, where is it?" button's small bike, bike view design 2.1, is no picture)
+  expect(dialog()!.querySelectorAll('.care-step figure, .care-step [role="img"], .care-step svg:not(.care-where-bike)').length).toBe(0);
   expect(dialog()!.querySelector('.care-step')!.classList.contains('care-step-pic')).toBe(false);
   // and the before-you-start page has none either
   await click(button(C.careStepsClose)!);
@@ -522,13 +524,20 @@ test('[BC-STEPS-AWAKE] the page showing again while the first ask is still open 
   expect(lock.held).toBe(false);
 });
 
-// ---- The parts guide (care pictures design 4.2): a part's name in a step opens its entry as a sheet over the step view ----
+// ---- The bike view (design of 9 November 2026; the parts guide of care pictures design 4 grown into it): a part's name in a step, or the
+// "What is it, where is it?" button under every step, opens it over the step view ----
 const sheet = () => document.querySelector<HTMLDialogElement>('dialog.part-sheet');
 const partLink = (text: string) => [...dialog()!.querySelectorAll<HTMLButtonElement>('.care-step .care-part')].find((b) => b.textContent === text) ?? null;
 const sheetButton = (name: string) => [...sheet()!.querySelectorAll('button')].find((b) => b.textContent === name || b.getAttribute('aria-label') === name) ?? null;
 const sheetOpen = async () => { await vi.waitFor(() => expect(sheet()).not.toBeNull(), { timeout: 3000 }); await settle(); };
+const entryName = () => sheet()!.querySelector('.bv-entry h3')?.textContent ?? null;
+const listButton = (name: string) => [...sheet()!.querySelectorAll<HTMLButtonElement>('.bv-parts button')].find((b) => b.textContent === name) ?? null;
+const pressed = () => [...sheet()!.querySelectorAll('.bv-parts button[aria-pressed="true"]')].map((b) => b.textContent);
+const drawing = () => sheet()!.querySelector('.bv-canvas[role="img"]')!;
+const labels = () => [...sheet()!.querySelectorAll<SVGGElement>('.bv-label')].map((g) => g.dataset.part!);
+const where = () => [...dialog()!.querySelectorAll<HTMLButtonElement>('.care-where')];
 
-test("[PG-SHEET-OPEN] a part's name in a step is a button that reads as the text; a tap opens its entry over the step, focus on its name; Close returns focus to the name, the step view stays", async () => {
+test("[PG-SHEET-OPEN] a part's name in a step is a button that reads as the text; a tap opens the bike view over the step with that part's entry, focus on the view's title; Close returns focus to the name, the step view stays", async () => {
   const push = vi.spyOn(history, 'pushState');
   await brakeStep5(rimBike('drop'));
   const step = card('brake-rub-rim').steps[4]!;
@@ -540,8 +549,12 @@ test("[PG-SHEET-OPEN] a part's name in a step is a button that reads as the text
   await sheetOpen();
   const s = sheet()!;
   expect(s.open).toBe(true);
-  expect(s.querySelector('h2')!.textContent).toBe("The brake's quick release");
+  // the view is named for the card; its title has the focus; the tapped part's entry below the drawing
+  expect(s.getAttribute('aria-label')).toBe(`Where to find: ${card('brake-rub-rim').problem}`);
+  expect(s.querySelector('h2')!.textContent).toBe(card('brake-rub-rim').problem);
   expect(document.activeElement).toBe(s.querySelector('h2'));
+  expect(entryName()).toBe("The brake's quick release");
+  expect(pressed()).toEqual(['Brake quick release']);
   expect(push.mock.calls.at(-1)![0]).toMatchObject({ careSteps: 'brake-rub-rim', carePart: 'brake-qr' });
   expect(s.textContent).toContain('Only on bikes with rim brakes');
   const back = vi.mocked(history.back).mock.calls.length;
@@ -553,7 +566,7 @@ test("[PG-SHEET-OPEN] a part's name in a step is a button that reads as the text
   expect(document.activeElement).toBe(partLink("brake's quick release"));
 });
 
-test('[PG-SHEET-KEYS] in the sheet, Escape closes the sheet alone and the arrows leave the steps where they are; the back gesture closes the sheet and leaves the step view', async () => {
+test('[PG-SHEET-KEYS] in the view, Escape closes it alone and the arrows leave the steps where they are; the back gesture closes it and leaves the step view', async () => {
   await brakeStep5(rimBike('drop'));
   await click(partLink("brake's quick release")!);
   await sheetOpen();
@@ -563,7 +576,7 @@ test('[PG-SHEET-KEYS] in the sheet, Escape closes the sheet alone and the arrows
   await act(() => { s.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); });
   expect(sheet()).toBeNull();
   expect(dialog()!.open).toBe(true);
-  // back gesture: the sheet's entry is left for the step view's own
+  // back gesture: the view's entry is left for the step view's own
   await click(partLink("brake's quick release")!);
   await sheetOpen();
   await act(() => { history.replaceState({ careSteps: 'brake-rub-rim' }, ''); window.dispatchEvent(new PopStateEvent('popstate', { state: { careSteps: 'brake-rub-rim' } })); });
@@ -571,33 +584,44 @@ test('[PG-SHEET-KEYS] in the sheet, Escape closes the sheet alone and the arrows
   expect(dialog()!.open).toBe(true);
 });
 
-test("[PG-SHEET-MIXED] Not to be mixed up with swaps the entry, and Back brings the first one again", async () => {
+test('[PG-SHEET-MIXED] Not to be mixed up with swaps the entry, its name taking the focus, and Back brings the first one again', async () => {
   await brakeStep5(rimBike('drop'));
   await click(partLink("brake's quick release")!);
   await sheetOpen();
   expect(sheet()!.textContent).toContain('Not to be mixed up with');
   await click(sheetButton("The wheel's quick release")!);
-  expect(sheet()!.querySelector('h2')!.textContent).toBe("The wheel's quick release");
-  expect(document.activeElement).toBe(sheet()!.querySelector('h2'));
+  expect(entryName()).toBe("The wheel's quick release");
+  expect(document.activeElement).toBe(sheet()!.querySelector('.bv-entry h3'));
+  // the swapped part stands out on the drawing too
+  expect(sheet()!.querySelector('.bv-label-hot')!.getAttribute('data-part')).toBe('wheel-qr');
   await click(sheetButton('Back')!);
-  expect(sheet()!.querySelector('h2')!.textContent).toBe("The brake's quick release");
+  expect(entryName()).toBe("The brake's quick release");
   expect(sheetButton('Back')).toBeNull();
 });
 
-test("[PG-SHEET-BIKE] the entry draws the rider's bike with the part marked, and its close-ups with the bike's own first; a part the bike was told not to have has no drawing", async () => {
+test("[PG-SHEET-BIKE] the view draws a typical bike of the rider's type, never the rider's own colour or details (owner's answer 1); the close-ups with the bike's own first; a part the card's bike lacks is borrowed when tapped", async () => {
   const caliper = PICTURE_WORDS['brake-qr-open']!.name;
   const vbrake = PICTURE_WORDS['vbrake-open']!.name;
-  await brakeStep5(rimBike('flat'));
+  // a red road bike (28 mm tyres) with flat bars and rim brakes
+  await brakeStep5(memory({
+    'loadcheck:bikeProfiles': JSON.stringify([{ id: 'bike_a', name: 'Mine', brakes: 'rim', frontTyre: '28-622', rearTyre: '28-622', look: { colour: '#d02020', bars: 'flat', ebike: false } }]),
+    'loadcheck:bikeProfile': JSON.stringify({ id: 'bike_a', name: 'Mine' }),
+  }).kv);
   await click(partLink("brake's quick release")!);
   await sheetOpen();
-  const where = sheet()!.querySelector('.pg-bike[role="img"]')!;
-  expect(where.getAttribute('aria-label')).toBe("The brake's quick release, marked on the bike");
-  expect(where.querySelector('svg.bk')!.getAttribute('aria-hidden')).toBe('true');
-  expect(where.querySelectorAll('.pg-marker circle').length).toBe(2);
-  expect(sheet()!.textContent).toContain('Where it is on your bike');
+  const art = drawing();
+  expect(art.getAttribute('aria-label')).toContain('A typical road bike, greyed out.');
+  expect(art.getAttribute('aria-label')).toContain('Marked: brake quick release.');
+  expect(art.querySelector('svg')!.getAttribute('aria-hidden')).toBe('true');
+  expect(art.innerHTML).not.toMatch(/d02020|bk-paint/i);
+  expect(sheet()!.querySelector('.bv-about')!.textContent).toBe("A typical road bike, your bike's type.");
+  // a road bike's drop bars, not the rider's flat bars
+  expect(art.querySelector('.bk-hood')).not.toBeNull();
+  expect(art.querySelector('.bk-grip')).toBeNull();
+  // the close-ups still follow the rider's brakes (the guide's rule): a V-brake's first on flat bars
   await vi.waitFor(() => expect(sheet()!.querySelectorAll('.care-pic [role="img"]').length).toBe(2), { timeout: 3000 });
   expect([...sheet()!.querySelectorAll('.care-pic [role="img"]')].map((i) => i.getAttribute('aria-label'))).toEqual([vbrake, caliper]);
-  // a bike with disc brakes entered: the caliper bolts' step names the caliper; the rim brake (a mix-up) is not on it
+  // a disc card: the caliper stands out; its mix-up, the rim brake, is borrowed onto the drawing when opened
   render(null, host);
   await mount(memory({
     'loadcheck:bikeProfiles': JSON.stringify([{ id: 'bike_d', name: 'Disc', brakes: 'hydraulic-disc' }]),
@@ -607,23 +631,115 @@ test("[PG-SHEET-BIKE] the entry draws the rider's bike with the part marked, and
   for (let i = 0; i < 3; i += 1) await click(button(C.careStepsNext)!);
   await click(partLink('caliper')!);
   await sheetOpen();
-  expect(sheet()!.querySelector('.pg-bike[role="img"]')).not.toBeNull();
+  expect(sheet()!.querySelector('.bv-label-hot')!.getAttribute('data-part')).toBe('caliper');
   await click(sheetButton('Rim brake (caliper, V-brake or hydraulic)')!);
-  expect(sheet()!.querySelector('.pg-bike')).toBeNull();
-  expect(sheet()!.textContent).toContain('Not on your bike, as you described it.');
+  expect(entryName()).toBe('Rim brake (caliper, V-brake or hydraulic)');
+  expect(sheet()!.querySelector('.bv-label-hot')!.getAttribute('data-part')).toBe('rim-brake');
+  expect(sheet()!.textContent).not.toContain('Not on this drawing.');
 });
 
-test('[PG-SHEET-OPEN] with no bike the entry shows the typical bike; All steps carries the same part names', async () => {
+test('[PG-SHEET-OPEN] with no bike the view shows the typical gravel bike and "Add your bike"; every part a step names is a link; All steps carries the same part names', async () => {
   await mount();
   await openCard('puncture-tube');
   await click(button(C.careStepsNext)!);
   await click(button(C.careStepsNext)!);
-  // T2 (9 November 2026) names the rim first: the dip in the middle of the rim
-  expect([...dialog()!.querySelectorAll('.care-step .care-part')].map((b) => b.textContent)).toEqual(['rim', 'tyre bead', 'tube']);
+  // every part named in the step, in the text's order (the owner's wish: every part name is a link)
+  expect([...dialog()!.querySelectorAll('.care-step .care-part')].map((b) => b.textContent)).toEqual(['tyre', 'rim', 'tyre bead', 'spoke', 'tube']);
   await click(partLink('tyre bead')!);
   await sheetOpen();
-  expect(sheet()!.textContent).toContain('Where it is on a typical bike');
+  expect(sheet()!.querySelector('.bv-about')!.textContent).toBe('A typical gravel bike. Add your bike and this shows your type of bike.');
+  expect(sheet()!.querySelector('.bv-about a')!.getAttribute('href')).toBe('/tools/bags/#bike-details=new&back=care');
   await click(sheetButton('Close')!);
   await click(button(C.careStepsAll)!);
   expect(dialog()!.querySelectorAll('.care-step-list .care-part').length).toBeGreaterThan(5);
+});
+
+test('[BV-BUTTON] "What is it, where is it?" sits under the text on every screen of a card, the card\'s parts below it; it opens the view with no part tapped, focus on its title, and gives the focus back', async () => {
+  await mount();
+  const c = card('puncture-tube');
+  await openCard(c.id);
+  const screens = c.steps.length + 2;
+  for (let i = 0; i < screens; i += 1) {
+    expect(where().length, `screen ${i}`).toBe(1);
+    const b = where()[0]!;
+    expect(b.querySelector('.care-where-name')!.textContent).toBe(C.careWhere);
+    // under the text: the screen's words come before it
+    expect(b.previousElementSibling, `screen ${i}`).not.toBeNull();
+    if (i < screens - 1) await click(button(C.careStepsNext)!);
+  }
+  expect(where()[0]!.querySelector('.care-where-parts')!.textContent).toBe('Disc caliper, brake lever, tyre, rim, tyre bead, spokes, inner tube, valve, brake disc, brake pads');
+  const b = where()[0]!;
+  expect(b.getAttribute('aria-haspopup')).toBe('dialog');
+  await click(b);
+  await sheetOpen();
+  expect(pressed()).toEqual([]);
+  expect(sheet()!.querySelector('.bv-label-hot')).toBeNull();
+  expect(sheet()!.querySelector('.bv-hint')!.textContent).toBe('Tap a name, here or on the bike, to see what it is.');
+  expect(document.activeElement).toBe(sheet()!.querySelector('h2'));
+  expect(sheet()!.querySelector('.bv-tools')!.textContent).toContain('Tools for this card: Spare tube');
+  await click(sheetButton('Close')!);
+  expect(document.activeElement).toBe(where()[0]);
+  // in All steps: one button, after Before you start; a task whose steps name no part has none
+  await click(button(C.careStepsAll)!);
+  expect(where().length).toBe(1);
+  expect(where()[0]!.closest('.care-step-before')).not.toBeNull();
+  await click(button(C.careStepsDone)!);
+  await openTask('belt-rinse');
+  expect(where().length).toBe(0);
+});
+
+test("[BV-VIEW] the card's parts as buttons and as labels on the drawing; a tap on either moves the one blaze part there, said politely; the labels are not offered to the keyboard", async () => {
+  await mount();
+  await openCard('brake-rub-disc');
+  await click(where()[0]!);
+  await sheetOpen();
+  const parts = [...sheet()!.querySelectorAll('.bv-parts button')].map((b) => b.textContent);
+  expect(parts).toEqual(['Thru-axle', 'Wheel quick release', 'Dropouts', 'Brake pads', 'Disc caliper', 'Brake lever', 'Pad adjuster', 'Brake disc']);
+  expect(sheet()!.querySelector('.bv-parts')!.getAttribute('aria-label')).toBe('Parts in this card');
+  // each label is one of the card's parts, inside the hidden picture, and none can take the focus
+  expect(labels().length).toBeGreaterThan(3);
+  for (const id of labels()) expect(parts).toContain(PART_SHORT[id as keyof typeof PART_SHORT]);
+  expect(sheet()!.querySelectorAll('.bv-label [tabindex], .bv-label a, .bv-label button').length).toBe(0);
+  await click(listButton('Disc caliper')!);
+  expect(pressed()).toEqual(['Disc caliper']);
+  expect(entryName()).toBe('Disc brake caliper');
+  expect(sheet()!.querySelectorAll('.bv-label-hot').length).toBe(1);
+  expect(sheet()!.querySelector('.bv-arrow')).not.toBeNull();
+  expect(sheet()!.querySelector('[aria-live="polite"]')!.textContent).toMatch(/^Disc caliper: /);
+  // the caliper is on the far side: its label says so
+  expect(sheet()!.querySelector('.bv-label[data-part="caliper"]')!.textContent).toBe('DISC CALIPER(other side)');
+  const other = labels().find((id) => id !== 'caliper')!;
+  const label = sheet()!.querySelector<SVGGElement>(`.bv-label[data-part="${other}"]`)!;
+  await act(() => { label.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+  expect(pressed()).toEqual([PART_SHORT[other as keyof typeof PART_SHORT]]);
+  expect(sheet()!.querySelectorAll('.bv-label-hot').length).toBe(1);
+});
+
+test('[BV-ZOOM] a card whose parts sit close together opens zoomed in on them; Whole bike, Zoom in and Zoom out are buttons; a card spread over the bike opens whole', async () => {
+  await mount();
+  await openCard('ebike-no-power');
+  await click(where()[0]!);
+  await sheetOpen();
+  const zoomed = () => sheet()!.querySelector('.bv-canvas')!.classList.contains('bv-zoomed');
+  // this card names the frame, which spans the bike (the puncture card, once spread by its warning's brake lever, now opens on its
+  // wheel: review of PR 107, M3)
+  expect(zoomed()).toBe(false);
+  await click(sheetButton('Close')!);
+  render(null, host);
+  await mount();
+  await openCard('chain-broken');
+  await click(where()[0]!);
+  await sheetOpen();
+  expect(zoomed()).toBe(true);
+  expect(drawing().getAttribute('aria-label')).toContain('Zoomed in.');
+  expect(sheetButton('Zoom out')!.disabled).toBe(false);
+  await click(sheetButton('Whole bike')!);
+  expect(zoomed()).toBe(false);
+  expect(sheetButton('Zoom out')!.disabled).toBe(true);
+  expect(sheetButton('Whole bike')!.disabled).toBe(true);
+  await click(sheetButton('Zoom in')!);
+  expect(zoomed()).toBe(true);
+  const box = sheet()!.querySelector('.bv-art')!.getAttribute('viewBox');
+  await click(sheetButton('Zoom in')!);
+  expect(sheet()!.querySelector('.bv-art')!.getAttribute('viewBox')).not.toBe(box);
 });

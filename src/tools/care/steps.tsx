@@ -6,10 +6,13 @@ import type { BikeRecord } from '../../core/bike/normalise.ts';
 import { careDetails } from '../../core/care/fit.ts';
 import { stepsShown } from '../../core/care/lines.ts';
 import { pictureDetails, picturesFor, type Shown } from '../../core/care/pictures.ts';
-import { linkSegments, STEP_PARTS } from '../../core/parts/links.ts';
+import { resolveBikeSpec } from '../../core/bike/spec.ts';
+import { cardParts, linkSegments, STEP_PARTS } from '../../core/parts/links.ts';
 import type { PartId } from '../../core/parts/guide.ts';
 import type { CareTask, RoadCard } from '../../core/care/types.ts';
+import { riderType } from '../../core/care/type-order.ts';
 import { C, CARRY, WHO_LABEL } from '../../core/wording/en-care.ts';
+import { partsLine } from '../../core/wording/en-part-names.ts';
 import { KIND_WORDS, SWITCH_WORDS } from '../../core/wording/en-care-pictures.ts';
 import { loadPictures, Picture, pictureReady, stepTitle } from './picture.tsx';
 
@@ -108,8 +111,31 @@ function Pictures({ shown, view }: { shown: Shown[]; view: string }) {
   );
 }
 
-type Sheet = typeof import('./parts-sheet.tsx').PartSheet;
-type OnPart = (part: PartId, from: HTMLButtonElement) => void;
+type Sheet = typeof import('./bike-view.tsx').BikeView;
+type OnPart = (part: PartId | null, from: HTMLButtonElement) => void;
+
+/** Loads the bike view's chunk and its words once; the same promise for every caller (Bike care starts it while idle). */
+let viewChunk: Promise<Sheet | null> | null = null;
+export const loadBikeView = (): Promise<Sheet | null> => (viewChunk ??= import('./bike-view.tsx').then(
+  async (m) => (await m.loadWords() ? m.BikeView : (viewChunk = null)),
+  () => (viewChunk = null), // not loaded (offline before it was cached): the text stays, and the next tap tries again
+));
+
+/**
+ * The button under a step's text (design 2.1; the owner's answer 6 (a)): the card's parts on a second line; it opens the bike view
+ * with no part tapped yet. Same place on every screen of the card.
+ */
+function WhereButton({ parts, onPart }: { parts: readonly PartId[]; onPart: OnPart }) {
+  if (parts.length === 0) return null;
+  return (
+    <button type="button" class="btn care-where" aria-haspopup="dialog" onClick={(e) => onPart(null, e.currentTarget)}>
+      <svg class="care-where-bike" viewBox="0 0 28 16" aria-hidden="true" focusable="false">
+        <circle cx="6" cy="10" r="5" /><circle cx="22" cy="10" r="5" /><path d="M6 10 L11 4 L19 4 L22 10 M11 4 L14 10 L19 4 M14 10 L6 10" />
+      </svg>
+      <span class="care-where-words"><span class="care-where-name">{C.careWhere}</span><span class="care-where-parts">{partsLine(parts)}</span></span>
+    </button>
+  );
+}
 
 /**
  * A step's text with its part names as buttons that open the parts guide (design 4.2): the first mention of each, from the wording data
@@ -138,22 +164,23 @@ function endOf(source: StepSource): { title: string; body: preact.ComponentChild
  * `bike`: the chosen bike (null for none): its details pick each picture's kind (care pictures redo, section 2) and which brake lines show
  * (T9), and the parts guide draws it with the part marked (the app's default bike when null).
  */
-export function StepView({ source, bike = null, onClose }: { source: StepSource; bike?: BikeRecord | null; onClose: () => void }) {
+export function StepView({ source, bike = null, addHref = null, onClose }: {
+  source: StepSource; bike?: BikeRecord | null; addHref?: string | null; onClose: () => void;
+}) {
   const box = useRef<HTMLDialogElement>(null);
   const head = useRef<HTMLHeadingElement>(null);
   const [at, setAt] = useState(0);
   const [all, setAll] = useState(readAll);
   const [, setReady] = useState(0);
-  // The parts guide's sheet: its own chunk, loaded with the first tap on a part name; the name tapped gets focus back when it closes.
-  const [part, setPart] = useState<PartId | null>(null);
-  const [PartSheet, setSheet] = useState<Sheet | null>(null);
+  // The bike view: its own chunk, loaded with the first tap on a part name or the button (or before, while Bike care was idle); the name
+  // or button tapped gets focus back when it closes. `part` is the tapped part, 'card' for the button (no part tapped yet), else null.
+  const [part, setPart] = useState<PartId | 'card' | null>(null);
+  const [BikeView, setView] = useState<Sheet | null>(null);
   const partFrom = useRef<HTMLButtonElement | null>(null);
   const openPart: OnPart = (id, from) => {
     partFrom.current = from;
-    if (PartSheet) { setPart(id); return; }
-    void import('./parts-sheet.tsx').then(async (m) => {
-      if (await m.loadWords()) { setSheet(() => m.PartSheet); setPart(id); }
-    }, () => { /* not loaded (offline before it was cached): the text stays */ });
+    if (BikeView) { setPart(id ?? 'card'); return; }
+    void loadBikeView().then((v) => { if (v) { setView(() => v); setPart(id ?? 'card'); } });
   };
   const closePart = (): void => { setPart(null); partFrom.current?.focus(); };
   // the steps that show for this bike, as indexes into the card's steps: pictures and part names keep their own step's index
@@ -165,6 +192,12 @@ export function StepView({ source, bike = null, onClose }: { source: StepSource;
   const titleId = `care-steps-title-${source.item.id}`;
   const details = pictureDetails(bike);
   const pictures = shownSteps.map((i) => picturesFor(source.item.id, i, details));
+  const parts = cardParts(source.item.id, source.item.steps, shownSteps);
+  // the rider's bike, for its type and where its motor is, and nothing else (the owner's answer 1)
+  const own = bike ? resolveBikeSpec(bike, null) : null;
+  const tools = source.kind === 'road'
+    ? source.item.carry.map((id) => CARRY.find((x) => x.id === id)?.name).filter(Boolean).join('; ')
+    : source.item.tools === 'none' ? '' : source.item.tools;
 
   const close = (fromBack: boolean): void => {
     if (!fromBack) history.back();
@@ -236,7 +269,7 @@ export function StepView({ source, bike = null, onClose }: { source: StepSource;
         {all ? (
           <div class="care-step care-step-list">
             <h2 ref={head} tabIndex={-1} class="care-step-h">{C.careStepsAll}</h2>
-            <section class="care-step-before"><h3>{C.careStepsBefore}</h3><Before source={source} /></section>
+            <section class="care-step-before"><h3>{C.careStepsBefore}</h3><Before source={source} /><WhereButton parts={parts} onPart={openPart} /></section>
             {steps.map((s, i) => (
               <section key={i} class="care-step-all">
                 <Pictures shown={pictures[i]!} view={`a${i}`} />
@@ -252,6 +285,7 @@ export function StepView({ source, bike = null, onClose }: { source: StepSource;
             <div class="care-step-words">
               <h2 ref={head} tabIndex={-1} class="care-step-h">{onStep ? stepTitle(source.item.id, shownSteps[at - 1]!) ?? C.careStepN(at) : label}</h2>
               {at === 0 ? <Before source={source} /> : onStep ? <StepText id={source.item.id} at={shownSteps[at - 1]!} text={steps[at - 1]!} onPart={openPart} /> : end!.body}
+              <WhereButton parts={parts} onPart={openPart} />
             </div>
           </div>
         )}
@@ -266,7 +300,10 @@ export function StepView({ source, bike = null, onClose }: { source: StepSource;
           </>
         )}
       </div>
-      {part !== null && PartSheet ? <PartSheet key={part} part={part} bike={bike} onClose={closePart} /> : null}
+      {part !== null && BikeView ? (
+        <BikeView key={part} tapped={part === 'card' ? null : part} type={riderType(own)} motor={own?.motor.mark === 'entered' ? own.motor.value : null} details={details}
+          addHref={addHref} card={{ id: source.item.id, name, applies: source.item.applies, parts, tools }} onClose={closePart} />
+      ) : null}
     </dialog>
   );
 }
