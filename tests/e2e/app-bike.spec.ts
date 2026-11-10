@@ -110,34 +110,49 @@ test('[BK-NOTHING-REQUIRED] broken bike and plan data: every screen opens, the t
   expect(problems).toEqual([]);
 });
 
-test('[PERF-BIKE] one bike with a full bikepacking rig is drawn within 20 ms on the phone stand-in, in the page (median of three)', async ({ page }) => {
+test('[PERF-BIKE] one bike with a full bikepacking rig is drawn within 20 ms on the phone stand-in, in the page (median of twelve)', async ({ page }) => {
   // Drawn: the spec, the drawing, the DOM and its layout, as on each tap once the bike is on screen. The first, cold drawing is
   // reported beside it; it belongs to the screen's first paint, which PERF-OFFLINE-2S covers.
+  // Steady sampling, the same budget and the same work per draw: four discarded warm-up draws, an idle moment and a settled frame
+  // before timing, then twelve timed draws instead of three (each still a new bike), and their median must be 20 ms or less. A frame's
+  // pause between draws keeps the page's own pending work (a style pass, a paint, the worker) out of the timed span, as on a rider's tap.
   app = await loadApp(page, { launch: true, path: '/#/tools' });
   // A quiet page, as when a rider taps: the offline worker has finished copying the site.
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.waitForLoadState('networkidle');
   await page.addScriptTag({ url: '/tools/bags/bike.js' });
-  const times = await page.evaluate(({ record, bags }) => {
+  const WARMUP = 4;
+  const times = await page.evaluate(async ({ record, bags, warmup, timed }) => {
     const B = (window as unknown as { WayfinchBike: Record<string, (...a: unknown[]) => { svg: string }> }).WayfinchBike;
     const host = document.createElement('div');
     host.style.width = '360px';
     document.body.append(host);
-    const out: number[] = [];
-    // Each draw a new bike (handlebar, e-bike), so none is a repaint of the one before.
-    for (const [colour, bars, ebike] of [['#1d1d1f', 'drop', false], ['#4b4f54', 'flat', false], ['#2f7d4f', 'other', false], ['#c62f2a', 'drop', true], ['#2563b8', 'flat', true]]) {
+    const frame = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+    const idle = () => new Promise<void>((r) => { if ('requestIdleCallback' in window) window.requestIdleCallback(() => r(), { timeout: 500 }); else setTimeout(r, 50); });
+    // Each draw a new bike (handlebar, e-bike), so none is a repaint of the one before: five looks in turn, no two alike in a row.
+    const looks = [['#1d1d1f', 'drop', false], ['#4b4f54', 'flat', false], ['#2f7d4f', 'other', false], ['#c62f2a', 'drop', true], ['#2563b8', 'flat', true]];
+    const draw = (n: number) => {
+      const [colour, bars, ebike] = looks[n % looks.length]!;
       const bikeRecord = B.normaliseBike!(JSON.parse(JSON.stringify({ ...record, look: { colour, bars, ebike } })));
       const t0 = performance.now();
       host.innerHTML = B.bikeArt!(B.resolveBikeSpec!(bikeRecord, bags), bags).svg;
       (host.querySelector('svg') as SVGSVGElement).getBBox(); // style and layout, as a drawing on screen needs
-      out.push(performance.now() - t0);
+      return performance.now() - t0;
+    };
+    const out: number[] = [];
+    for (let n = 0; n < warmup + timed; n++) {
+      if (n === 1 || n === warmup) { await idle(); await frame(); } // the screen's own second draw as it settles; then a settled frame before timing
+      else if (n > warmup) await frame();
+      out.push(draw(n));
     }
     host.remove();
     return out;
-  }, { record: bike, bags: bagSets.sets.bikepacking });
-  const [cold, , ...taps] = times; // the first two draws are the screen's own: one cold, one as it settles
-  const median = [...taps].sort((a, b) => a! - b!)[1]!;
-  test.info().annotations.push({ type: 'PERF-BIKE', description: `first ${cold!.toFixed(1)} ms; then ${taps.map((t) => t!.toFixed(1)).join(', ')} ms, median ${median.toFixed(1)} ms` });
-  console.log(`PERF-BIKE ${test.info().project.name}: first ${cold!.toFixed(1)} ms; then ${taps.map((t) => t!.toFixed(1)).join(', ')} ms, median ${median.toFixed(1)} ms`);
+  }, { record: bike, bags: bagSets.sets.bikepacking, warmup: WARMUP, timed: 12 });
+  const cold = times[0]!;
+  const taps = times.slice(WARMUP); // the first four draws are the screen's own and warm-up; the twelve after them are timed
+  const sorted = [...taps].sort((a, b) => a - b);
+  const median = (sorted[taps.length / 2 - 1]! + sorted[taps.length / 2]!) / 2;
+  test.info().annotations.push({ type: 'PERF-BIKE', description: `first ${cold.toFixed(1)} ms; then ${taps.map((t) => t.toFixed(1)).join(', ')} ms, median ${median.toFixed(1)} ms` });
+  console.log(`PERF-BIKE ${test.info().project.name}: first ${cold.toFixed(1)} ms; then ${taps.map((t) => t.toFixed(1)).join(', ')} ms, median ${median.toFixed(1)} ms`);
   expect(median).toBeLessThanOrEqual(20);
 });
