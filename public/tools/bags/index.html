@@ -265,6 +265,7 @@ button.small-full:hover{border-color:var(--muted)}
 body.lc-small header.mast,body.lc-small #crumbs,body.lc-small #walkthroughInvite,body.lc-small #walkthroughOpen,body.lc-small #draftBar,body.lc-small .wm-block,body.lc-small #rigTools,body.lc-small #rigTrip,body.lc-small #rigFoot,body.lc-small #rigLegend{display:none!important}
 body.lc-small #s4>:not(#smallBags):not(#smallFoot){display:none!important}
 body.lc-small #smallBalance .balance-line{font-size:14px;margin:8px 0 0}
+body.lc-small #smallBalance .linky{font-family:inherit;font-size:14px;letter-spacing:0;text-transform:none;font-weight:600}
 /* the plan's line and its Undo: quiet, one line under the top bar */
 body.lc-small #handoffBar:not(.hidden){border:0;background:none;padding:8px 0 0;margin:0;color:var(--muted);font-size:14px;gap:4px 12px}
 body.lc-small #handoffBar .linky{margin-left:0;min-height:44px;font-family:inherit;font-size:14px;letter-spacing:0;text-transform:none;font-weight:600}
@@ -6213,7 +6214,11 @@ function renderFitLines(){
     }
     line.hidden = !show;
     // a bike saved in Bike details opened from here hides the line: closing it puts the focus on what stays
-    if(!show) for(const d of DIALOGS) if(d.returnFocus && d.returnFocus === $(add)) d.returnFocus = $(then);
+    // and if that bike is removed there again, the line is back and the focus goes back to its button
+    for(const d of DIALOGS){
+      if(!show && d.returnFocus && d.returnFocus === $(add)){ d.returnFocus = $(then); d.fitLineFrom = add; }
+      else if(show && d.fitLineFrom === add && d.returnFocus === $(then)){ d.returnFocus = $(add); d.fitLineFrom = null; }
+    }
   }
 }
 // Re-drawn on every choice; the focused control is found again by its name and value (radios) or id, so the keyboard keeps its place.
@@ -9309,7 +9314,7 @@ function balanceLine(){
     const shown = said.length > 3 ? [...said.slice(0, 2), `${said.length - 2} more things`] : said;
     const list = htmlEsc(said.length < 2 ? said[0] : shown.slice(0, -1).join(', ') + ' and ' + shown[shown.length - 1]);
     if(balancePacked(last)) return `<div class="balance-line" role="status"><span>Packed for better balance: ${list}. You have started packing it this way, so it stays.</span></div>`;
-    return `<div class="balance-line" role="status"><span>Packed for better balance: ${list} ·</span> <button class="linky" type="button" data-balance-undo="1">Undo</button></div>`;
+    return `<div class="balance-line" role="status"><span>Packed for better balance: ${list}${SMALL_VIEW ? '' : ' ·'}</span> <button class="linky" type="button" data-balance-undo="1">Undo</button></div>`;
   }
   // after an earlier balance the packing before this one still carries its moves, so the line says what it is (review of PR 79, m1)
   if(BALANCE.reverted && samePlacements(BALANCE.reverted, S.placements)) return `<div class="balance-line" role="status"><span>Back to the packing before this balance.</span></div>`;

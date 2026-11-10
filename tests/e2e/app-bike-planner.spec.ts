@@ -630,6 +630,9 @@ test('[BAL-LINE] the small view shows the balance\'s line at the top of its list
   const undo = line.getByRole('button', { name: 'Undo' });
   await expect(undo).toBeVisible();
   expect((await undo.boundingBox())!.height, 'Undo is at least 44 px').toBeGreaterThanOrEqual(44);
+  // the small view's own link style (as its plan line's Undo and the footer links), and no stray separator before it
+  expect(await undo.evaluate((el) => { const c = getComputedStyle(el); return [c.textTransform, c.letterSpacing, /mono|courier/i.test(c.fontFamily)]; })).toEqual(['none', 'normal', false]);
+  await expect(line).not.toContainText('·');
   await expect(page.locator('#resultBox')).toBeHidden();
   await expect(page.locator('#weightBlock')).toBeHidden();
   await expect(page.locator('#smallBagList')).toBeVisible();
