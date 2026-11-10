@@ -173,6 +173,7 @@ test('[FIT-LINE] the Bag planner and the Gear advisor with no bike: a line under
   await expect(page.locator('#bikeDetailsBox')).toBeVisible();
   await page.evaluate(() => { (document.getElementById('bikeMoreDetails') as HTMLDetailsElement).open = true; (document.getElementById('bikeLibraryPanel') as HTMLDetailsElement).open = true; });
   await page.locator('#bikeName').fill('Mine');
+  const runsBefore = await page.evaluate('ADVISOR_RUN') as number;
   await page.locator('#bikeSave').click();
   await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles') ?? '[]') as { name: string }[]).map((b) => b.name))).toEqual(['Mine']);
   await page.keyboard.press('Escape');
@@ -180,12 +181,17 @@ test('[FIT-LINE] the Bag planner and the Gear advisor with no bike: a line under
   await expect(fit).toBeHidden();
   await expect(page.locator('#advisorTitle')).toBeFocused();
   await expect(page.locator('#advisorBikeSelect')).toHaveValue(/.+/);
+  // the advisor searched again, on the saved bike (a newer run than before the save, an answer that has it), not the old answer kept
+  expect(await page.evaluate('ADVISOR_RUN') as number).toBeGreaterThan(runsBefore);
   await expect(page.locator('#advisorAnswer h3')).toHaveText('What to get', { timeout: 30_000 });
+  expect(await page.evaluate('S.bikeProfile && S.bikeProfile.name')).toBe('Mine');
+  expect(await page.evaluate('ADVISOR.sig === planSignature()')).toBe(true);
   // the page wrote none of the co-pilot's keys
   expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('copilot:')))).toEqual([]);
   expect(problems).toEqual([]);
 });
 
+<<<<<<< HEAD
 // Try a colour (wish 17, design of 9 Nov 2026, section 4.2; owner's answer 3): the card keeps the dots' row, so nothing moves when they
 // arrive; a tap paints the frame at once; Make it yours carries the colour into Bike details, picked and not saved.
 test('[HINT-COLOUR] five dots of 44 px in a row the card keeps, nothing moves when they load; a tap paints the bike; Make it yours opens Bike details with that colour picked and nothing saved', async ({ page }) => {
@@ -232,5 +238,32 @@ test('[HINT-COLOUR] five dots of 44 px in a row the card keeps, nothing moves wh
   // Wayfinch's own keys are as they were when Make it yours was tapped (the hint key's letters only grow by the tap, as before)
   const now = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('copilot:') && k !== 'copilot:bikeHint:v1'));
   expect(now).toEqual((JSON.parse(before) as [string, string][]).map(([k]) => k).filter((k) => k.startsWith('copilot:') && k !== 'copilot:bikeHint:v1'));
+=======
+// A bike saved in Bike details and then removed in the same dialog brings the line back: closing it puts the focus on Add your bike.
+test('[FIT-LINE] a bike saved in Bike details and removed there again: the line is back and closing the dialog puts the focus on Add your bike', async ({ page }) => {
+  const problems = watch(page);
+  app = await loadApp(page, { launch: true, path: '/tools/bags/' });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY');
+  const line = page.locator('#planFitLine');
+  const add = line.getByRole('button', { name: 'Add your bike' });
+  await add.click();
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await page.evaluate(() => { (document.getElementById('bikeMoreDetails') as HTMLDetailsElement).open = true; (document.getElementById('bikeLibraryPanel') as HTMLDetailsElement).open = true; });
+  await page.locator('#bikeName').fill('Mine');
+  await page.locator('#bikeSave').click();
+  await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles') ?? '[]') as { name: string }[]).map((b) => b.name))).toEqual(['Mine']);
+  await expect(line).toBeHidden();
+  await page.locator('#bikeClear').click();   // the plan keeps its own copy of a removed bike, so the plan lets go of it too
+  await page.locator('#bikeSavedSelect').selectOption({ label: 'Mine' });
+  await page.locator('#bikeRemove').click();
+  await page.locator('#bikeRemoveConfirm').click();
+  await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles') ?? '[]') as unknown[]).length)).toBe(0);
+  await expect(line).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#bikeDetailsBox')).toBeHidden();
+  await expect(add).toBeFocused();
+>>>>>>> origin/main
   expect(problems).toEqual([]);
 });
