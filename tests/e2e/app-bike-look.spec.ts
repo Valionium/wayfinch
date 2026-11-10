@@ -432,3 +432,67 @@ for (const [seedName, bike] of RING_SEEDS) test(`[LC-LOOK-RING] every Look contr
   expect(await check('Tab')).toBeGreaterThan(8);
   expect(await check('Shift+Tab')).toBeGreaterThan(8);
 });
+
+// Two kinds of e-bike motor (owner, 9 Nov 2026): for an e-bike, Look asks where the motor is; the drawing follows at once, in the
+// planner and in Wayfinch; only an answer is stored, and the export and an import keep it.
+test('[BK-MOTOR] an e-bike\'s "Where is the motor?": at the cranks, in the rear hub or in the front hub, drawn at once in both apps, stored only as an answer', async ({ page }) => {
+  await look(page, seed(BLUE));
+  const set = page.locator('#lookMotorSet');
+  const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfile')!).look as Record<string, unknown>);
+  const motorAt = (where: string) => page.evaluate((w) => {
+    const m = [...document.querySelectorAll(`${w} svg.bk .bk-motor`)];
+    const hubs = [...document.querySelectorAll(`${w} svg.bk circle.bk-hub`)];
+    return { n: m.length, tag: m[0]?.tagName, x: Number(m[0]?.getAttribute('cx')), rear: Number(hubs[0]?.getAttribute('cx')), front: Number(hubs[1]?.getAttribute('cx')) };
+  }, where);
+  // not an e-bike: no question, no motor
+  await expect(set).toBeHidden();
+  expect((await motorAt('#lookPreview')).n).toBe(0);
+  // an e-bike: the question, Not set chosen, the motor drawn at the cranks and said to be guessed
+  await page.locator('#lookEbike label', { hasText: /^Yes$/ }).click();
+  await expect(set).toBeVisible();
+  const group = page.getByRole('radiogroup', { name: 'Where is the motor?' });
+  await expect(group.getByRole('radio')).toHaveCount(4);
+  for (const name of ['At the cranks', 'In the rear hub', 'In the front hub', 'Not set']) await expect(group.getByRole('radio', { name })).toHaveCount(1);
+  await expect(group.getByRole('radio', { name: 'Not set' })).toBeChecked();
+  for (const box of await page.locator('#lookMotor label').evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return { h: r.height, w: r.width, text: el.textContent!.trim() }; }))) {
+    expect(box.h, box.text).toBeGreaterThanOrEqual(44);
+    expect(box.w, box.text).toBeGreaterThanOrEqual(44);
+  }
+  await expect(page.locator('#lookGuess')).toContainText('Motor: at the cranks · guessed');
+  let m = await motorAt('#lookPreview');
+  expect(m).toMatchObject({ n: 1, tag: 'circle' });
+  expect(Object.keys(await stored())).not.toContain('motor');
+  // in the rear hub: stored, drawn at the rear wheel's centre in Look and on the rig behind
+  await page.locator('#lookMotor label', { hasText: /^In the rear hub$/ }).click();
+  await expect.poll(async () => (await stored()).motor).toBe('rear-hub');
+  m = await motorAt('#lookPreview');
+  expect(m.x).toBeCloseTo(m.rear, 1);
+  await expect.poll(async () => { const r = await motorAt('#rigBike'); return r.n === 1 && Math.abs(r.x - r.rear) < 0.1; }).toBe(true);
+  await expect(page.locator('#lookGuess')).not.toContainText('Motor');
+  // by keyboard: the front hub
+  await group.getByRole('radio', { name: 'In the rear hub' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(async () => (await stored()).motor).toBe('front-hub');
+  m = await motorAt('#lookPreview');
+  expect(m.x).toBeCloseTo(m.front, 1);
+  // the export carries it, and an import brings it back
+  const file = await page.evaluate('exportAll()') as string;
+  expect(JSON.parse(file).bikeProfiles[0].look.motor).toBe('front-hub');
+  // Wayfinch draws the hub motor too
+  await page.goto(`${app!.origin}/#/trip`, { waitUntil: 'load' });
+  await expect(page.locator('.bike-large svg.bk').first()).toBeVisible();
+  m = await motorAt('.bike-large');
+  expect(m.n).toBe(1);
+  expect(m.x).toBeCloseTo(m.front, 1);
+  // back in the planner: Not set takes the answer away; e-bike No hides the question and draws no motor
+  await look(page, seed({ ...BLUE, look: { ...BLUE.look, ebike: true, motor: 'rear-hub' } }));
+  await expect(page.getByRole('radiogroup', { name: 'Where is the motor?' }).getByRole('radio', { name: 'In the rear hub' })).toBeChecked();
+  await page.locator('#lookMotor label', { hasText: /^Not set$/ }).click();
+  await expect.poll(async () => Object.keys(await stored())).not.toContain('motor');
+  await page.locator('#lookEbike label', { hasText: /^No$/ }).click();
+  await expect(set).toBeHidden();
+  expect((await motorAt('#lookPreview')).n).toBe(0);
+  // an import of the earlier file brings the front hub back
+  expect(await page.evaluate(`importAll(${JSON.stringify(file)})`)).toBeTruthy();
+  await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles')!) as { look: { motor?: string } }[]).map((b) => b.look.motor))).toContain('front-hub');
+});
