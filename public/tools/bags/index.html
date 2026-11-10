@@ -414,6 +414,15 @@ body.lc-small .sitefoot .linky:hover{color:var(--ink)}
 .fit-line{margin:8px 0 12px;font-size:13px;line-height:1.45;color:var(--muted);overflow-wrap:anywhere}
 .fit-line .linky{display:inline-flex;align-items:center;min-height:44px;vertical-align:middle;font-family:inherit;font-size:inherit;letter-spacing:0;text-transform:none;font-weight:600}
 body.lc-small #planFitLine{display:none!important}
+/* the Bike line at the drawing (wish 15, 10 Nov 2026): as the Gear advisor's Bike line, its select a 44 px target; never in the rig */
+.plan-bike{margin:8px 0 12px}
+.plan-bike-line{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
+.plan-bike-line select{min-height:44px;max-width:100%;min-width:0;flex:1 1 180px}
+.plan-bike-swap{margin:0;font-size:13px;line-height:1.45;color:var(--muted);overflow-wrap:anywhere}
+#planBikeSwapText:not(:empty){display:inline-block;margin-top:6px}
+.plan-bike-swap .linky{display:inline-flex;align-items:center;min-height:44px;vertical-align:middle;font-family:inherit;font-size:inherit;letter-spacing:0;text-transform:none;font-weight:600}
+.plan-bike-swap .linky[hidden]{display:none}
+body.lc-small #planBike{display:none!important}
 .bg-line{fill:none;stroke:var(--line);stroke-width:2.4;stroke-linecap:round}
 .bg-wheel{fill:none;stroke:var(--line);stroke-width:2.4}
 /* The bike from bike.js (spec 7.4): its bk-* parts on this page's tokens, as .bg-line and .bg-wheel were. Stroke widths come with
@@ -2012,6 +2021,11 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
   </div>
 
   <main id="planMain">
+  <!-- the Bike line (wish 15): the saved bikes and Without a bike, as Tools' line; under the drawing on a phone, beside it when wide, as the "fits better" line, so the rig keeps its size -->
+  <div class="plan-bike" id="planBike" hidden>
+    <label class="plan-bike-line" for="planBikeSelect"><span>Bike</span><select id="planBikeSelect"></select></label>
+    <p class="plan-bike-swap" role="status"><span id="planBikeSwapText"></span> <button class="linky" type="button" id="planBikeUndo" hidden></button></p>
+  </div>
   <!-- the "fits better" line (wish 17): under the drawing on a phone, beside it when wide, as the weight map, so the rig still fits the window -->
   <p class="fit-line" id="planFitLine" hidden></p>
   <!-- the weight map (design of 8 Nov 2026): right under the drawing on a phone, beside it when wide; outside the rig, which must fit the window to stay in view. Since the owner's decision of 9 Nov 2026 one line at the packing check, the map only behind "Show the map" -->
@@ -3179,7 +3193,9 @@ const BIKE_WORDING={
   // The "fits better" lines (wish 17, design of 9 Nov 2026, section 5): the words before Add your bike and after it; the Gear
   // advisor's own are in its table. A fact about the result shown, never a request.
   fitAdd:{text:'Add your bike'},
-  fitPlanner:{text:'Drawn as a typical gravel bike, size M.'},fitPlannerAfter:{text:'and the frame bag fits your frame.'}
+  fitPlanner:{text:'Drawn as a typical gravel bike, size M.'},fitPlannerAfter:{text:'and the frame bag fits your frame.'},
+  // The Bike line at the drawing (wish 15): its last choice, the standard bike, in Tools' words.
+  chooserWithout:{text:'Without a bike'}
 };
 const bikeWord=(key,values={})=>BIKE_WORDING[key].text.replace(/\{(\w+)\}/g,(m,k)=>values[k]??m);
 const FIT_STYLE_NAMES={unknown:'Not sure','diamond-level':'Diamond, level top tube','diamond-sloping':'Diamond, sloping top tube',compact:'Compact',trapeze:'Trapeze',mixte:'Mixte','step-through':'Step-through','full-suspension':'Full suspension'};
@@ -6261,6 +6277,52 @@ function renderFitLines(){
       else if(show && d.fitLineFrom === add && d.returnFocus === $(then)){ d.returnFocus = $(add); d.fitLineFrom = null; }
     }
   }
+  renderBikeChooser();
+}
+/* ---- The Bike line at the drawing (wish 15, 10 Nov 2026): "Bike <name> ▾" with the saved bikes and Without a bike, as Tools' line, while
+   at least one bike is saved (with none, the "fits better" line above stays). A pick is the planner's own Use saved bike
+   (chooseSavedBike), Without a bike its No bike (clearBikeProfile): the plan's bike, its kit, its record and the swap's Undo change
+   exactly as in Bike details; bags, decks and placements are never touched. A plan bike in no saved list is listed first as itself;
+   once a pick here has replaced it, Undo shows under the line, as it does in Bike details. ---- */
+const CHOOSER_PLAN = ':plan', CHOOSER_NONE = ':none';   // never a bike id, which has no colon
+let CHOOSER_SWAP = null, CHOOSER_OPTIONS = null;   // the swap a pick here made (its Undo shows under the line while it is live); the options drawn
+function bikeChooserValue(){
+  const cur = S.bikeProfile;
+  return !cur ? CHOOSER_NONE : BIKE_PROFILES.some(b => b.id === cur.id) ? cur.id : CHOOSER_PLAN;
+}
+function renderBikeChooser(){
+  const box = $('planBike'), select = $('planBikeSelect'); if(!box || !select) return;
+  if(!select.onchange){
+    select.onchange = () => chooseBikeHere(select.value);
+    $('planBikeUndo').onclick = () => { if(undoBikeSwap()){ CHOOSER_SWAP = null; renderBikeChooser(); select.focus?.({ preventScroll:true }); } };
+  }
+  const show = FIT_LINES_READY && BIKE_PROFILES.length > 0;
+  box.hidden = !show;
+  if(show){
+    const value = bikeChooserValue();
+    const opts = [...(value === CHOOSER_PLAN ? [[CHOOSER_PLAN, S.bikeProfile.name]] : []), ...BIKE_PROFILES.map(b => [b.id, b.name]), [CHOOSER_NONE, bikeWord('chooserWithout')]];
+    const html = opts.map(([v, name]) => `<option value="${htmlEsc(v)}">${htmlEsc(name)}</option>`).join('');
+    // the options are written only when they change, so a select with the focus (or open) keeps it
+    if(CHOOSER_OPTIONS !== html){ select.innerHTML = html; CHOOSER_OPTIONS = html; }
+    if(select.value !== value) select.value = value;
+  }
+  const swap = liveBikeSwap(), live = show && !!swap && swap === CHOOSER_SWAP;
+  $('planBikeSwapText').textContent = live ? bikeWord('swapNote', { name:swap.prev.name }) : '';
+  $('planBikeUndo').textContent = live ? bikeWord('swapUndo', { name:swap.prev.name }) : '';
+  $('planBikeUndo').hidden = !live;
+}
+async function chooseBikeHere(value){
+  // the moment a bike change is under way, or before the draft is read: nothing changes, and the line shows the plan's bike again
+  if(BIKE_PROFILE_BUSY || !DRAFT_READY || (value !== CHOOSER_NONE && !BIKE_PROFILES.some(b => b.id === value))){ renderBikeChooser(); return false; }
+  const before = BIKE_SWAPS[BIKE_SWAPS.length - 1];
+  let done;
+  if(value === CHOOSER_NONE) done = clearBikeProfile();
+  else { $('bikeSavedSelect').value = value; done = chooseSavedBike(); }
+  const after = BIKE_SWAPS[BIKE_SWAPS.length - 1];
+  if(after && after !== before) CHOOSER_SWAP = after;
+  let saved = false; try { saved = await done; } catch(e){}
+  renderBikeChooser();
+  return saved;
 }
 // Re-drawn on every choice; the focused control is found again by its name and value (radios) or id, so the keyboard keeps its place.
 function renderAdvisor(){
