@@ -4225,6 +4225,15 @@ function tripKitDefaults(nights=S.nights,sleep=S.sleep,bike=S.bikeProfile){
    rules (audit; the warm layers by the riding hours' temperature, dayRideTemp), so the check never asks for what the start left out. The riding time is the planner's own: the route's hours for the day (distance
    and climbing at the loaded speed), else the pace's hours. A lock is the check's from the first night; a day of meals and the power
    bank only for a long day (over the steady pace's half day, over the sporting pace's full day); ride snacks always. */
+// A short day ride from Wayfinch's Trip: 0 nights within the steady pace's half day (4 hours), the day the kit needs no meals.
+function shortDayRide(){ return S.nights === 0 && !!(S.gpx && S.gpx.copilotRoute) && dayRideHours() <= PACE.steady.hours; }
+// What a short day ride puts on instead of packing (owner, 10 Nov 2026): the long gloves the day's temperature calls for, worn, and
+// the sunscreen of the sun season, put on before leaving; each only while the rider has not packed it.
+function shortDayPutOn(){
+  if(!shortDayRide()) return {gloves:false,sun:false};
+  const c=tripClimate(),sunMonth=(S.place && S.place.lat < 0) ? (S.month+6)%12 : S.month;
+  return {gloves:c.nightCold != null && dayRideTemp(c) < 5 && !carrying('gloves'),sun:sunMonth >= 3 && sunMonth <= 8 && !carrying('sun')};
+}
 function dayRideHours(){
   const r=typeof planRoute==='function' ? planRoute() : null;
   const h=r ? r.effectiveExact / r.loadedKph : NaN;   // the whole route in one day, whatever nights the plan has now
@@ -4265,11 +4274,16 @@ function dayRideNeedsBagWater(){
 function dayRideKit(){
   const c=tripClimate(),known=c.nightCold!=null,hours=dayRideHours(),warm=dayRideTemp(c);
   const sunMonth=(S.place && S.place.lat < 0) ? (S.month+6)%12 : S.month;
-  return {docs:true,cash:true,phone:true,snacks:true,firstaid:true,rain:true,lock:false,
+  // no first aid kit on a short ride (owner, 10 Nov 2026: "No first aid kit for short ride"): the day of the steady pace's half day or
+  // less, the same short day that needs no meals (shortDayRide)
+  // and on a short ride the sunscreen is put on before leaving and the long gloves are worn, not packed (owner, 10 Nov 2026; both said:
+  // shortDayPutOn)
+  const short=hours <= PACE.steady.hours;
+  return {docs:true,cash:true,phone:true,snacks:true,firstaid:!short,rain:true,lock:false,
     food:hours > PACE.steady.hours,bank:hours > PACE.sporting.hours,
-    puffy:false,gloves:known && warm < 5,   // the jacket worn, not packed (dayRideWearsJacket)
+    puffy:false,gloves:known && warm < 5 && !short,   // the jacket worn, not packed (dayRideWearsJacket)
     rainpants:known && c.wetChance > 33,water:dayRideNeedsBagWater(),
-    shades:sunMonth >= 3 && sunMonth <= 8,sun:sunMonth >= 3 && sunMonth <= 8};
+    shades:sunMonth >= 3 && sunMonth <= 8,sun:sunMonth >= 3 && sunMonth <= 8 && !short};
 }
 function applyTripKitDefaults(){
   const defaults=tripKitDefaults();
@@ -4692,14 +4706,17 @@ function carrying(id){ const k = kitById(id); return !!S.kit[id] && !(k && light
    still has room for it: the bib shorts pocket (0.5 L, things of 0.2 L or less, such as the phone), then the jersey's three back
    pockets (2.1 L in all, about 0.7 L each, things of 0.6 L or less, such as the ride snacks or a mini pump, and by kind a packable
    rain jacket of up to 1.2 L: owner, 10 Nov 2026, a packable rain jacket and a mini pump may go in the jersey's back pockets);
-   nothing over 0.35 kg. What does not fit stays in the bags. ---- */
+   nothing over 0.35 kg. What does not fit stays in the bags. The sunglasses never go in a bag (owner, 10 Nov 2026: "Sunglasses are
+   in jersey pocket or attached to helmet"): in the jersey pockets when they are on and have room, else on the helmet. ---- */
 const POCKETS=[{id:'bib',L:0.5,itemL:0.2,label:'Bib shorts pockets',name:'bib shorts pocket'},{id:'jersey',L:2.1,itemL:0.6,label:'Jersey pockets',name:'jersey pockets',kinds:{rain:1.2}}];
 // The pockets' line names things shortly (KIT's "ID, cards, insurance" would read as three things in a list).
-const POCKET_NAMES={phone:'phone',snacks:'ride snacks',rain:'rain jacket',pump:'pump',warmers:'arm and leg warmers',gloves:'long gloves',docs:'ID and cards',cash:'cash',cap:'cap or buff'};
+const POCKET_NAMES={shades:'sunglasses',phone:'phone',snacks:'ride snacks',rain:'rain jacket',pump:'pump',warmers:'arm and leg warmers',gloves:'long gloves',docs:'ID and cards',cash:'cash',cap:'cap or buff'};
 const POCKET_KG=0.35;
-const POCKET_ITEMS=['phone','snacks','rain','pump','warmers','gloves','docs','cash','cap'];
+const POCKET_ITEMS=['phone','snacks','rain','pump','warmers','gloves','docs','cash','cap','shades'];
+// things that go only in some pockets, and where they go when those have no room (they are carried, never in a bag)
+const POCKET_ONLY={shades:'jersey'},POCKET_ELSE={shades:'helmet'};
 function pocketsCounted(){ return !!S.pockets && S.nights === 0 && afternoonRide(); }
-// {kit id: 'jersey' | 'bib'} for what rides in a pocket now
+// {kit id: 'jersey' | 'bib' | 'helmet'} for what rides in a pocket (or on the helmet) now
 function pocketPlaces(){
   const out={};
   if(!S.pockets || !pocketsCounted()) return out;
@@ -4707,8 +4724,9 @@ function pocketPlaces(){
   for(const id of POCKET_ITEMS){
     const k=kitById(id);
     if(!k || !S.kit[id] || (k.camp && !camping()) || lightDropped(k) || itemKg(k) > POCKET_KG + 1e-9) continue;
-    const L=itemL(k),p=POCKETS.find(p => L <= ((p.kinds && p.kinds[id]) || p.itemL) + 1e-9 && L <= room[p.id] + 1e-9);
+    const L=itemL(k),p=POCKETS.find(p => (!POCKET_ONLY[id] || POCKET_ONLY[id] === p.id) && L <= ((p.kinds && p.kinds[id]) || p.itemL) + 1e-9 && L <= room[p.id] + 1e-9);
     if(p){ out[id]=p.id; room[p.id]=+(room[p.id]-L).toFixed(2); }
+    else if(POCKET_ELSE[id]) out[id]=POCKET_ELSE[id];
   }
   return out;
 }
@@ -6746,9 +6764,11 @@ function getChecklistModel(A=currentPlan()){
   // what rides in the pockets of a day ride (owner, 9 Nov 2026) is packed too: its own group, after the bags (review of PR 106, M1)
   if(!ids.length) return model;
   const rows=ids.map(id => { const k=kitById(id),quantity=qtyOf(k); return {id,name:kitName(k),category:k.cat,quantity,quantityLabel:quantity>1?`${quantity} ×`:'',
-    packed:!!S.packed[id],L:itemL(k),kg:itemKg(k),rigidCm:rigidOf(k),placements:[],placementLabel:inPocket[id] === 'jersey' ? 'Jersey pockets' : 'Bib shorts pocket',
+    packed:!!S.packed[id],L:itemL(k),kg:itemKg(k),rigidCm:rigidOf(k),placements:[],placementLabel:inPocket[id] === 'jersey' ? 'Jersey pockets' : inPocket[id] === 'helmet' ? 'On your helmet' : 'Bib shorts pocket',
     note:'',bikeReference:bikeRepairReference(id),status:'placed',tooLong:false}; });
-  model.groups.push({id:'pockets',title:'In your pockets',subtitle:'Carried in your jersey and bib shorts pockets, not in a bag.',items:rows});
+  const helmet=ids.some(id => inPocket[id] === 'helmet');
+  model.groups.push({id:'pockets',title:helmet ? 'In your pockets and on your helmet' : 'In your pockets',
+    subtitle:helmet ? 'Carried in your jersey and bib shorts pockets or on your helmet, not in a bag.' : 'Carried in your jersey and bib shorts pockets, not in a bag.',items:rows});
   // ticked and counted as any other row: the checklist is everything taken, so its totals hold the pockets too (re-check of PR 106, R2)
   model.items=[...model.items,...rows];
   const items=model.items,packed=items.filter(row => row.packed).length;
@@ -8569,7 +8589,7 @@ function audit(){
   const warm = warmLayerTemp(c, n);
   if(!has('puffy') && known && warm < 11 && n > 0)   // a day ride wears it (owner, 9 Nov 2026: "Worn, one spare tube")
     M('Insulated jacket', `Nights drop to about ${c.nightCold}°C on the cold end. Being cold in the evening is the single most common reason people cut a first tour short.`, ['puffy']);
-  if(!has('gloves') && known && warm < 5)
+  if(!has('gloves') && known && warm < 5 && !shortDayPutOn().gloves)
     M('Long gloves', n === 0 ? `Riding near ${warm}°C on a cold day. Cold hands stop you braking properly on descents.`
       : `Mornings near ${c.nightCold}°C. Cold hands stop you braking properly on descents.`, ['gloves']);
 
@@ -8587,7 +8607,7 @@ function audit(){
     M('Dry bags', `Wet climate — around ${c.rainDays} rain days a month. Most bikepacking bags are water-resistant, not waterproof. Your sleep system must stay dry.`, ['drybags']);
 
   if(!has('docs')) M('ID and insurance card', 'Needed at any campsite reception and any doctor.', ['docs']);
-  if(!has('firstaid')) M('First aid kit', 'Road rash and blisters, mostly. Small kit is fine.', ['firstaid']);
+  if(!has('firstaid') && !shortDayRide()) M('First aid kit', 'Road rash and blisters, mostly. Small kit is fine.', ['firstaid']);
   if(!has('cash') && n >= 2)
     M('Cash', germanStops
       ? 'For rural stops in Germany, carry some euros in small notes. Check payment options at campsites and small shops instead of relying entirely on cards.'
@@ -8612,7 +8632,7 @@ function audit(){
     M('Travel detergent', `${n+1} days is well past the point of packing clean clothes for each one. A tube of travel soap turns two base layers into an endless supply.`, ['detergent']);
   if(!has('meds') && !answered('meds') && n >= 5)
     M('Your own medication', 'Check that you have enough of any medication you normally use for the whole trip. Check pharmacy availability along your route before relying on a refill.', ['meds'], true);
-  if(!has('sun') && sunMonth >= 3 && sunMonth <= 8)
+  if(!has('sun') && sunMonth >= 3 && sunMonth <= 8 && !shortDayPutOn().sun)
     M('Sunscreen', 'Six hours a day facing the sky. Neck and the backs of your hands are what actually burn.', ['sun']);
 
   /* --- leave behind --- */
@@ -8720,7 +8740,10 @@ function climateConsequence(contentOnly=false){
   // the mildest thing Germany offers: the Rhine valley in July
   const base = weatherKit(climate('rhein', 6)).map(x => x[0]);
   const extra = mine.filter(x => !base.includes(x[0]));
-  const wear=dayRideWearsJacket() ? '<p>On a day ride this cold, wear an insulated jacket: it is worn, not packed.</p>' : '';
+  const on=shortDayPutOn();
+  const wear=(dayRideWearsJacket() ? '<p>On a day ride this cold, wear an insulated jacket: it is worn, not packed.</p>' : '')
+    +(on.gloves ? '<p>On a short day ride this cold, long gloves: worn, not packed.</p>' : '')
+    +(on.sun ? '<p>Sunscreen: put it on before you go; on a short day ride it is not packed.</p>' : '');
   if(!extra.length){
     const explanation='<p>These conditions add no extra cold-weather items beyond the mild-weather baseline. A colder month or higher route can change that.</p>'+wear;
     return contentOnly ? explanation : infoHelp('Why the place matters', explanation);
@@ -12680,8 +12703,10 @@ function renderSmallBags(A){
     : inBag ? `Water: ${inBag}, since this ${noMounts ? 'bike has no bottle cage mounts' : 'plan has no bottle cage'}.`
     : 'Water: no bottle cage in this plan.';
   // the jacket the day calls for, worn (owner, 9 Nov 2026); packed by the rider, it is in a bag's list instead
-  const wear=dayRideWearsJacket() && !carrying('puffy');
-  $('smallWear').hidden=!wear; $('smallWear').textContent=wear ? 'Wear: insulated jacket.' : '';
+  // and on a short ride the long gloves worn and the sunscreen put on before leaving (owner, 10 Nov 2026)
+  const on=shortDayPutOn(),worn=[...(dayRideWearsJacket() && !carrying('puffy') ? ['insulated jacket'] : []),...(on.gloves ? ['long gloves'] : [])];
+  const wear=[worn.length ? `Wear: ${worn.join(' and ')}.` : '',on.sun ? 'Put on before you go: sunscreen.' : ''].filter(Boolean).join(' ');
+  $('smallWear').hidden=!wear; $('smallWear').textContent=wear;
   // what the day ride left at home to fit beside the bottle, in one quiet line (owner, 9 Nov 2026)
   const left=dayLeftAtHome().map(id => kitName(kitById(id)).replace(/^[A-Z](?![A-Z])/,c => c.toLowerCase()));
   $('smallLeft').hidden=!left.length; $('smallLeft').textContent=left.length ? `Left at home: ${listOf(left)}.` : '';
@@ -12695,7 +12720,8 @@ function renderSmallBags(A){
 function pocketsHtml(){
   const P=pocketPlaces(),and=a => a.length < 2 ? a[0] : a.slice(0,-1).join(', ')+' and '+a[a.length-1];
   const line=[...POCKETS].reverse().map(p => ({p,ids:Object.keys(P).filter(id => P[id] === p.id)})).filter(g => g.ids.length)
-    .map(g => `In your ${g.p.name}: ${and(g.ids.map(id => POCKET_NAMES[id]))}.`).join(' ');
+    .map(g => `In your ${g.p.name}: ${and(g.ids.map(id => POCKET_NAMES[id]))}.`)
+    .concat(Object.keys(P).filter(id => P[id] === 'helmet').map(id => `On your helmet: ${POCKET_NAMES[id]}.`)).join(' ');
   return (line ? `<p class="small-water">${htmlEsc(line)}</p>` : '')+(POCKET_NOTE ? `<p class="small-water" role="status">${htmlEsc(POCKET_NOTE)}</p>` : '')+`<div class="pocket-switches" role="group" aria-label="Pockets">${
     [...POCKETS].reverse().map(p => `<label class="pocket-switch"><input type="checkbox" role="switch" data-pocket="${p.id}"${S.pockets && S.pockets[p.id] ? ' checked' : ''}> ${p.label}</label>`).join('')}</div>`;
 }
@@ -12704,7 +12730,8 @@ function pocketsLeftOut(){
   const ids=Object.keys(pocketPlaces());
   if(!ids.length) return '';
   const L=+ids.reduce((n,id) => n+itemL(kitById(id)),0).toFixed(2),kg=+ids.reduce((n,id) => n+itemKg(kitById(id)),0).toFixed(2);
-  return `<p>Not counted here: what rides in your jersey and bib shorts pockets (${L} L, ${kg} kg).</p>`;
+  const helmet=ids.some(id => pocketPlaces()[id] === 'helmet');
+  return `<p>Not counted here: what rides in your jersey and bib shorts pockets${helmet ? ' or on your helmet' : ''} (${L} L, ${kg} kg).</p>`;
 }
 function renderPockets(){
   const on=pocketsCounted();
@@ -12754,6 +12781,8 @@ function setPocket(id,on){
     const bags=resizeDayBags();
     S.pockets.sized=dayBagsKey();
     if(bags) POCKET_NOTE=`Bags planned again for your pockets: ${bagsInWords(bags)}.`;
+    // packed afresh, as the proposal sized them (the hand placements still hold): a kept arrangement could leave over what these bags hold
+    keepPlan({load:null});
   } else if(typeof S.pockets.sized === 'string') POCKET_NOTE='Your bags stay as you set them.';
   queueDraftSave();
   if(S.step === 4) renderResult(); else renderSmallBags();
