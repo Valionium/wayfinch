@@ -22,3 +22,14 @@ export const T = {
   tyreIntro: 'An estimate for your setup, worked out on this phone from published tyre-drop data. It never goes above a limit you enter, and it sends nothing.',
   tyreMeasuredHelp: 'Wheel loads: with your gear on, ride-ready, put one wheel on a bathroom scale and the other on a block of the same height, then swap. Enter both.',
 };
+
+/**
+ * Three more of the tyre screen's own words, moved from en.ts (care pictures, 10 Nov 2026) as they were: Bike care's two optional bike
+ * details (the wheel axle, the rim brake) cost the first screen about 60 bytes, and these pay for them. Under the same check as T
+ * (tests/unit/core/wording-tyre.test.ts).
+ */
+export const TM = {
+  tyreWindow: (lo: string, hi: string): string => `Aim for ${lo} to ${hi} bar. The lower end is the careful end.`,
+  tyreWindowOne: (value: string): string => `Aim for ${value} bar. Lower is the careful side.`,
+  tyreSplit: (front: string, rear: string): string => `Weight split: ${front}% front, ${rear}% rear.`,
+};
