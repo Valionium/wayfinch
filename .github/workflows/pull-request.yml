@@ -74,11 +74,42 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - uses: actions/cache@v5
+      # Playwright's browsers and its system libraries, each cached by the installed Playwright version (a miss costs one download).
+      # Why: `install --with-deps` ran apt on every job, and when Azure's Ubuntu mirror was slow that took 6-10 minutes before any test.
+      - id: pw
+        run: |
+          echo "version=$(node -p "require('./node_modules/playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "image=${ImageVersion:-none}" >> "$GITHUB_OUTPUT"
+      - id: pw-browsers
+        uses: actions/cache/restore@v5
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - run: npx playwright install --with-deps chromium firefox
+          key: playwright-browsers-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium-firefox
+      - if: steps.pw-browsers.outputs.cache-hit != 'true'
+        run: npx playwright install chromium firefox
+      - if: steps.pw-browsers.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.pw-browsers.outputs.cache-primary-key }}
+      - id: pw-debs
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/pw-debs
+          key: playwright-debs-${{ steps.pw.outputs.image }}-${{ steps.pw.outputs.version }}-chromium-firefox
+      - name: System libraries for the browsers
+        run: |
+          if [ "${{ steps.pw-debs.outputs.cache-hit }}" = true ] && sudo dpkg -i ~/pw-debs/*.deb; then
+            echo "Installed from the cached packages."
+          else
+            npx playwright install-deps chromium firefox
+            mkdir -p ~/pw-debs && cp /var/cache/apt/archives/*.deb ~/pw-debs/ || true
+          fi
+      - if: steps.pw-debs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/pw-debs
+          key: ${{ steps.pw-debs.outputs.cache-primary-key }}
       - run: npm run build
       # A part that ran no test at all fails: an empty shard once went green.
       - run: |
@@ -99,7 +130,42 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps webkit
+      # Playwright's browsers and its system libraries, each cached by the installed Playwright version (a miss costs one download).
+      # Why: `install --with-deps` ran apt on every job, and when Azure's Ubuntu mirror was slow that took 6-10 minutes before any test.
+      - id: pw
+        run: |
+          echo "version=$(node -p "require('./node_modules/playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "image=${ImageVersion:-none}" >> "$GITHUB_OUTPUT"
+      - id: pw-browsers
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ steps.pw.outputs.version }}-webkit
+      - if: steps.pw-browsers.outputs.cache-hit != 'true'
+        run: npx playwright install webkit
+      - if: steps.pw-browsers.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.pw-browsers.outputs.cache-primary-key }}
+      - id: pw-debs
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/pw-debs
+          key: playwright-debs-${{ steps.pw.outputs.image }}-${{ steps.pw.outputs.version }}-webkit
+      - name: System libraries for the browsers
+        run: |
+          if [ "${{ steps.pw-debs.outputs.cache-hit }}" = true ] && sudo dpkg -i ~/pw-debs/*.deb; then
+            echo "Installed from the cached packages."
+          else
+            npx playwright install-deps webkit
+            mkdir -p ~/pw-debs && cp /var/cache/apt/archives/*.deb ~/pw-debs/ || true
+          fi
+      - if: steps.pw-debs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/pw-debs
+          key: ${{ steps.pw-debs.outputs.cache-primary-key }}
       - run: npx playwright test --project=app-webkit-smoke
         env:
           WAYFINCH_WEBKIT: '1'
