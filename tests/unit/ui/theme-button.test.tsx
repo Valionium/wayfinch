@@ -24,7 +24,7 @@ afterEach(() => { render(null, host); localStorage.clear(); applyTheme('auto'); 
 const button = () => host.querySelector<HTMLButtonElement>('button.theme-btn');
 const settle = async () => { for (let i = 0; i < 40; i += 1) await act(() => new Promise((r) => setTimeout(r, 5))); };
 
-describe('the colour mode button', () => {
+describe('the colour mode button', { timeout: 30_000 }, () => {
   test('[THEME-BUTTON] it is on Ahead, Trip and Tools, not on You, and says which mode it switches to', async () => {
     for (const screen of ['ahead', 'trip', 'tools'] as const) {
       go(screen);

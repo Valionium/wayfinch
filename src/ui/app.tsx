@@ -66,7 +66,7 @@ function MovedCardSlot() {
     if (!movedCardDue()) return;
     import('./moved-card.tsx').then((m) => setCard(() => m.MovedCard), () => undefined);
   }, []);
-  return Card ? <Card /> : null;
+  return Card && <Card />;
 }
 
 /** Ahead reads the store only while it is shown; another window's change re-reads it. */
@@ -99,7 +99,7 @@ function UpdateBar({ updater }: { updater: Updater }) {
   return (
     <div class="update-bar" ref={(el) => { if (el) void import('./bar-h.ts').then((m) => m.trackHeight(el)); }}>
       <button type="button" class="btn btn-primary" onClick={updater.apply}>{W.appUpdateReady}</button>
-      {updater.note.value ? <p role="status">{updater.note.value}</p> : null}
+      {updater.note.value && <p role="status">{updater.note.value}</p>}
     </div>
   );
 }
@@ -110,7 +110,7 @@ export function App({ updater = null }: { updater?: Updater | null }) {
   return (
     <div class="shell">
       <div>
-        {updater ? <UpdateBar updater={updater} /> : null}
+        {updater && <UpdateBar updater={updater} />}
         <Screen name={current} />
       </div>
       <nav class="tabs" aria-label={W.appNavLabel}>
