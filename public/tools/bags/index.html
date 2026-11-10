@@ -422,7 +422,8 @@ body.lc-small #planFitLine{display:none!important}
 .bk-paint{stroke-linecap:round;stroke-linejoin:round}
 .bk-ring,.bk-cog,.bk-hubgear,.bk-rotor{fill:none;stroke:var(--line)}
 .bk-chain,.bk-belt,.bk-mech,.bk-rack,.bk-caliper,.bk-crank,.bk-post,.bk-bar,.bk-grip{fill:none;stroke:var(--line);stroke-linecap:round;stroke-linejoin:round}
-.bk-saddle,.bk-hood,.bk-motor{fill:var(--line)}
+.bk-saddle,.bk-hood{fill:var(--line)}
+.bk-motor{fill:var(--line);stroke:var(--muted);stroke-width:.6}
 .bk-battery{fill:var(--line);stroke:var(--muted);stroke-width:.6}
 .bk-shock,.bk-seal{fill:none;stroke:var(--muted);stroke-linecap:round}
 .bk-shell{fill:var(--panel-hi);stroke:var(--muted-dim);stroke-width:1.3}
@@ -2281,6 +2282,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         <fieldset id="lookRimSet"><legend id="lookRimTitle">Rims</legend><div class="lx-rim" id="lookRimBox"></div></fieldset>
         <fieldset><legend id="lookBarsTitle">Handlebar</legend><div class="look-chips" id="lookBars" role="radiogroup" aria-labelledby="lookBarsTitle"></div></fieldset>
         <fieldset><legend id="lookEbikeTitle">E-bike</legend><div class="look-chips" id="lookEbike" role="radiogroup" aria-labelledby="lookEbikeTitle"></div></fieldset>
+        <fieldset id="lookMotorSet" hidden><legend id="lookMotorTitle">Where is the motor?</legend><div class="look-chips" id="lookMotor" role="radiogroup" aria-labelledby="lookMotorTitle"></div></fieldset>
         <p class="look-status" id="lookStatus" role="status" aria-live="polite"></p>
         <button type="button" class="linky hidden" id="lookUndo"></button>
       </section>
@@ -2998,6 +3000,7 @@ function normaliseMaxWeight(value){
 // The look extras (owner's wish, 5 Nov 2026): frame pattern, second and third colours, the fork, rim depth. Read as bike.js reads them
 // (src/core/bike/normalise.ts): an invalid field drops only itself, nothing set is none, and the bike format stays 2.
 const LOOK_PATTERNS=['solid','fade-h','fade-v','split','blocks','shift','panel','marble','stripes','speckle','camo','sparkle','chrome','carbon'];
+const LOOK_MOTORS=['cranks','rear-hub','front-hub'];
 const lookHex=v=>typeof v==='string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : null;
 function normalisePaint(v){
   if(!dataObject(v))return null;
@@ -3012,8 +3015,10 @@ function normalisePaint(v){
 function normaliseLook(value){
   if(!dataObject(value))return null;
   const paint=normalisePaint(value.paint);
-  const look={colour:lookHex(value.colour),bars:['drop','flat','other'].includes(value.bars) ? value.bars : null,ebike:typeof value.ebike==='boolean' ? value.ebike : null,...(paint ? {paint} : {})};
-  return look.colour===null && look.bars===null && look.ebike===null && !paint ? null : look;
+  // where an e-bike's motor is (owner, 9 Nov 2026): only an answer is stored, so a bike from before keeps its bytes; none is at the cranks
+  const motor=LOOK_MOTORS.includes(value.motor) ? value.motor : '';
+  const look={colour:lookHex(value.colour),bars:['drop','flat','other'].includes(value.bars) ? value.bars : null,ebike:typeof value.ebike==='boolean' ? value.ebike : null,...(motor ? {motor} : {}),...(paint ? {paint} : {})};
+  return look.colour===null && look.bars===null && look.ebike===null && !motor && !paint ? null : look;
 }
 function normaliseGeometry(value){
   if(!dataObject(value))return null;
@@ -3137,6 +3142,8 @@ const BIKE_WORDING={
   lookDrop:{text:'Drop'},lookFlat:{text:'Flat'},lookOther:{text:'Other'},lookYes:{text:'Yes'},lookNo:{text:'No'},
   lookGuessBars:{text:'Handlebar: {value} · guessed'},
   lookGuessEbike:{text:'E-bike: {value} · guessed'},
+  lookMotorCranks:{text:'At the cranks'},lookMotorRear:{text:'In the rear hub'},lookMotorFront:{text:'In the front hub'},
+  lookGuessMotor:{text:'Motor: at the cranks · guessed'},
   lookSavedBike:{text:'Saved to {name}. Your plan keeps its own bike.'},
   photoChoose:{text:'Choose or take a photo'},
   photoTap:{text:'Tap your frame where the paint shows best.'},
@@ -3589,6 +3596,8 @@ function lookFromTaps(look,taps){
 }
 const LOOK_BARS=[['drop','lookDrop'],['flat','lookFlat'],['other','lookOther'],['','lookNotSet']];
 const LOOK_EBIKE=[['true','lookYes'],['false','lookNo'],['','lookNotSet']];
+const LOOK_MOTOR=[['cranks','lookMotorCranks'],['rear-hub','lookMotorRear'],['front-hub','lookMotorFront'],['','lookNotSet']];
+let LOOK_MOTOR_CHIPS='';
 // The bike Bike details shows: the plan's, a saved one opened without applying it, or none yet (a new bike).
 function lookTarget(){
   const id=BIKE_PROFILE_EDITOR_ID;
@@ -3616,6 +3625,7 @@ function renderLookChoices(){
   const chips=(name,list)=>list.map(([v,key])=>`<label class="look-chip"><input type="radio" name="${name}" value="${v}"><span>${htmlEsc(bikeWord(key))}</span></label>`).join('');
   $('lookBars').innerHTML=chips('lookBars',LOOK_BARS);
   $('lookEbike').innerHTML=chips('lookEbike',LOOK_EBIKE);
+  LOOK_MOTOR_CHIPS=chips('lookMotor',LOOK_MOTOR);$('lookMotorSet').hidden=true;$('lookMotor').innerHTML='';
   $('lookPickerText').textContent=bikeWord('lookMore');
   $('lookPhoto').textContent=bikeWord('lookPhoto');
   $('lookUndo').textContent=bikeWord('lookUndo');
@@ -3776,12 +3786,20 @@ function renderLook(){
   box.innerHTML=art.svg;   // drawn by bikeDrawing, the function the drawing-set check covers
   if(!look.bars)guess.push(bikeWord('lookGuessBars',{value:spec.bars.value}));
   if(look.ebike===null)guess.push(bikeWord('lookGuessEbike',{value:spec.ebike.value ? 'yes' : 'no'}));
+  if(look.ebike===true && !look.motor)guess.push(bikeWord('lookGuessMotor'));
   $('lookGuess').textContent=guess.join(' · ');
   const swatch=lookSwatches().some(w=>w.hex===look.colour);
   const check=(name,value)=>document.querySelectorAll?.(`input[name="${name}"]`).forEach(r=>{r.checked=r.value===value;});
   check('lookColour',look.colour===null ? '' : swatch ? look.colour : '\u0000');
   check('lookBars',look.bars||'');
   check('lookEbike',look.ebike===null ? '' : String(look.ebike));
+  // only for an e-bike, its chips in the page only then; an answer given before stays on the bike, shown again when it is one
+  const motorShown=look.ebike===true;
+  if($('lookMotorSet').hidden===motorShown){
+    $('lookMotor').innerHTML=motorShown ? LOOK_MOTOR_CHIPS : '';$('lookMotorSet').hidden=!motorShown;
+    const ready=typeof DRAFT_READY!=='undefined' && DRAFT_READY;document.querySelectorAll?.('#lookMotor input').forEach(i=>{i.disabled=!ready;});
+  }
+  check('lookMotor',look.motor||'');
   syncLookExtras(look);
   renderForkZoom(bike,art);
   $('lookPickerChip').classList.toggle('on',!!look.colour && !swatch);
@@ -3950,6 +3968,7 @@ function initialiseLook(){
   $('lookSwatches').addEventListener('change',e=>{if(e.target.name==='lookColour')setLook({colour:e.target.value || null});});
   $('lookBars').addEventListener('change',e=>{if(e.target.name==='lookBars')setLook({bars:e.target.value || null});});
   $('lookEbike').addEventListener('change',e=>{if(e.target.name==='lookEbike')setLook({ebike:e.target.value==='' ? null : e.target.value==='true'});});
+  $('lookMotor').addEventListener('change',e=>{if(e.target.name==='lookMotor')setLook({motor:e.target.value || null});});
   $('lookPicker').addEventListener('input',lookPickerInput);
   $('lookPicker').addEventListener('change',flushLookPicker);
   $('lookUndo').onclick=undoLook;
@@ -8441,7 +8460,7 @@ function audit(){
     M('Toothbrush and paste', 'The wash kit covers soap and a razor. This is the one people discover missing at the end of day one.', ['teeth']);
   if(!has('underwear') && n >= 2)
     M('Spare underwear', 'Cycling shorts are worn without any, but everything off the bike needs some. 100 g.', ['underwear']);
-  if(!has('shades') && sunMonth >= 3 && sunMonth <= 8)
+  if(!has('shades') && (n === 0 ? sunMonth >= 3 && sunMonth <= 8 : sunMonth >= 2 && sunMonth <= 9))   // a day ride's season is the sunscreen's (daySunny); a longer trip keeps March to October
     M('Sunglasses', 'Six hours a day facing the sky, plus grit off the road and flies at eye height on descents.', ['shades']);
   if(!has('pads') && n >= 7){
     const rim=bike.brakes==='rim',disc=['hydraulic-disc','cable-disc'].includes(bike.brakes);

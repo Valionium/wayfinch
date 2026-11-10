@@ -1,6 +1,6 @@
 // resolveBikeSpec (spec section 7.4): one value per part, each marked entered, guessed or default, from the bike and the plan.
 // With no bike and no plan, the result is a gravel bike, 700c x 40 mm, diamond sloping, size M.
-import type { Bars, BikeRecord, SizeLetter } from './normalise.ts';
+import type { Bars, BikeRecord, Motor, SizeLetter } from './normalise.ts';
 import { framePoints } from './templates.ts';
 import type { FramePoints, Style } from './templates.ts';
 import { parseTyre } from './tyres.ts';
@@ -36,6 +36,8 @@ export type BikeSpec = {
   drive: Part<'derailleur' | 'hub' | 'belt' | 'chain'>;
   rack: Part<boolean>;
   ebike: Part<boolean>;
+  /** Where an e-bike's motor is: at the cranks unless the rider said a hub. */
+  motor: Part<Motor>;
   colour: Part<string | null>;
   /** Where the frame takes bottles and bags, as the bag planner decides it. */
   mounts: { st: boolean; dt: boolean; un: boolean; top: boolean; frame: boolean };
@@ -115,6 +117,7 @@ export function resolveBikeSpec(bike: BikeRecord | null, plan: PlanView | null):
     bars, fork, brakes, drive,
     rack: rack ? part(true, 'entered') : part(false, 'default'),
     ebike: typeof bike?.look?.ebike === 'boolean' ? part(bike.look.ebike, 'entered') : part(false, 'default'),
+    motor: part(bike?.look?.motor ?? 'cranks', bike?.look?.motor ? 'entered' : 'default'),
     colour: bike?.look?.colour ? part(bike.look.colour, 'entered') : part(null, 'default'),
     mounts: mountsOf(bike, letter),
   };
