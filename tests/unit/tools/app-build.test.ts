@@ -300,7 +300,7 @@ test("[TB-TOOLS-LAZY] the Tools screen (bike line, tyre card) is not among the f
 });
 
 // Sub-project 12, group 1: Bike care is a chunk of its own, loaded by a dynamic import like the tyre tool; its words (en-care.ts, with the
-// content) are not in the first screen. 145,054 bytes is main's first screen (d7289d1, built from origin/main); Bike care adds nothing to it; the
+// content) are not in the first screen. 145,036 bytes is main's first screen (d8dd2bd, measured 9 Nov; d7289d1 was given as 145,054); Bike care adds nothing to it; the
 // rule is that it may never rise above main's figure.
 test("[BC-CHUNK] Bike care is a lazy chunk; en-care is not in the first screen's files, and the first screen is at or below main's figure", () => {
   const figures = measure(on);
@@ -314,7 +314,68 @@ test("[BC-CHUNK] Bike care is a lazy chunk; en-care is not in the first screen's
   expect(first).toContain(`/${chunk[0]!.replace(/^assets\//, '')}`.slice(1));
   expect(text(on, 'index.html')).not.toContain(chunk[0]!);
   console.log(`BC-CHUNK: first screen ${figures.firstJsGzip} bytes gzipped, lazy ${figures.lazyJsGzip}`);
-  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_054);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_036);
+});
+
+// Care pictures, part 1 (design of 7 November 2026, section 5): each drawing is a file of its own, fetched when its step view opens; none is
+// in the first screen's files, in Bike care's chunk or in any JavaScript, and each is precached for offline use.
+test("[BC-PIC-LAZY] no picture is in the first screen's files, Bike care's chunk or any script; each is a precached file of its own, and the first screen stays at its figure", () => {
+  const figures = measure(on);
+  const dir = join(REPO, 'src', 'tools', 'care', 'pictures');
+  const pictures = readdirSync(dir).filter((f) => f.endsWith('.svg'));
+  expect(pictures.length).toBeGreaterThan(0);
+  const all = files(on);
+  const listed = Object.keys(buildJson(on).files);
+  for (const p of pictures) {
+    const bytes = readFileSync(join(dir, p));
+    const where = all.filter((f) => readFileSync(join(on, f)).equals(bytes));
+    expect(where.length, p).toBe(1);
+    expect(where[0], p).toMatch(/^assets\/.+\.svg$/);
+    expect(listed, p).toContain(`/${where[0]}`);
+    expect(figures.firstFiles, p).not.toContain(where[0]);
+  }
+  // and no script carries a drawing's own markup
+  expect(all.filter((f) => f.endsWith('.js') && text(on, f).includes('class="cp-')), 'a drawing in a script').toEqual([]);
+  // their words: a data file of its own, precached, in no script (the redo of 9 November 2026, as the guide's words, PG-LAZY)
+  const said = 'Look at the gaps against a light background';
+  expect(all.filter((f) => f.endsWith('.js') && text(on, f).includes(said)), 'the words in a script').toEqual([]);
+  const wordsFile = all.filter((f) => f.endsWith('.json') && f.startsWith('assets/') && text(on, f).includes(said));
+  expect(wordsFile.length).toBe(1);
+  expect(listed).toContain(`/${wordsFile[0]}`);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_036);
+});
+
+// The parts guide (care pictures design of 7 November 2026, sections 4 and 5): its sheet is a chunk of its own, loaded with the first tap
+// on a part name, never with the first screen or Bike care's own chunk; each close-up is a precached file of its own, like the steps'.
+test("[PG-LAZY] the parts guide's sheet and words are a chunk of their own; each close-up is a precached file outside the first screen; the first screen stays at main's figure", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
+  const mark = 'Not to be mixed up with';
+  expect(first.includes(mark)).toBe(false);
+  const sheet = lazy.filter((f) => text(on, f).includes(mark));
+  expect(sheet.length).toBe(1);
+  // not in Bike care's own chunk
+  expect(text(on, sheet[0]!).includes('care-filters')).toBe(false);
+  const dir = join(REPO, 'src', 'tools', 'care', 'parts');
+  const all = files(on);
+  const listed = Object.keys(buildJson(on).files);
+  for (const p of readdirSync(dir).filter((f) => f.endsWith('.svg'))) {
+    const bytes = readFileSync(join(dir, p));
+    const where = all.filter((f) => readFileSync(join(on, f)).equals(bytes));
+    expect(where.length, p).toBe(1);
+    expect(where[0], p).toMatch(/^assets\/.+\.svg$/);
+    expect(listed, p).toContain(`/${where[0]}`);
+    expect(figures.firstFiles, p).not.toContain(where[0]);
+  }
+  // its words: a data file of its own, precached, in no script
+  const said = "The frame is the bike's main body";
+  expect(all.filter((f) => f.endsWith('.js') && text(on, f).includes(said)), 'the words in a script').toEqual([]);
+  const wordsFile = all.filter((f) => f.endsWith('.json') && f.startsWith('assets/') && text(on, f).includes(said));
+  expect(wordsFile.length).toBe(1);
+  expect(listed).toContain(`/${wordsFile[0]}`);
+  console.log(`PG-LAZY: first screen ${figures.firstJsGzip} bytes gzipped, lazy ${figures.lazyJsGzip}`);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(145_036);
 });
 
 test('[BC-SOURCES-PRIVATE] the built Bike care chunk holds no "http": where each fact came from never ships', () => {

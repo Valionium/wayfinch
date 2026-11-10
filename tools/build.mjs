@@ -96,6 +96,28 @@ async function compileWorker(buildId, precache) {
 }
 
 /**
+ * Bike care's drawings (src/tools/care/pictures and parts, made by tools/care-art): each a file of its own under /assets/care/, named by
+ * its id and a hash of its bytes (so the year-long cache of /assets/ never serves an old drawing), and their index at /care-pictures.json
+ * (id to address), which the step view and the parts guide fetch first. No script lists them: each address in a script cost the lazy
+ * JavaScript about 20 bytes gzipped (PERF-JS-LAZY). Precached with every other file.
+ */
+function writeCarePictures(target) {
+  const index = {};
+  mkdirSync(join(target, 'assets', 'care'), { recursive: true });
+  for (const folder of ['pictures', 'parts']) {
+    const dir = join(ROOT, 'src', 'tools', 'care', folder);
+    for (const file of readdirSync(dir).filter((f) => f.endsWith('.svg')).sort()) {
+      const bytes = readFileSync(join(dir, file)), id = file.slice(0, -4);
+      if (index[id]) throw new Error(`Two care drawings are called ${id}.`);
+      const name = `assets/care/${id}-${sha256(bytes).slice(0, 10)}.svg`;
+      writeFileSync(join(target, name), bytes);
+      index[id] = `/${name}`;
+    }
+  }
+  writeFileSync(join(target, 'care-pictures.json'), `${JSON.stringify(sorted(index))}\n`);
+}
+
+/**
  * Builds the site into `out`.
  * `extraFiles` ({ 'assets/x.js': bytes }) are written and precached like any other file; only tests use it so far.
  * `pagePath` is the page served at / with the switch off (the frozen copy); a test may build a site around another page. `vite` lets a test watch for the one step only the launch runs.
@@ -127,6 +149,7 @@ export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = 
     writeImprint(target);
     // The one top bar of the bag planner and the legal pages (src/ui/back-bar/): /back-bar.js and /back-bar.css, precached with the rest.
     writeBackBar(target);
+    writeCarePictures(target);
     mkdirSync(join(target, 'tools', 'bags'), { recursive: true });
     writeFileSync(join(target, 'tools', 'bags', 'bike.js'), await compileBikeScript());
     // The photo colour picker, loaded only when a rider taps From a photo; precached like every other file.

@@ -81,6 +81,36 @@ describe("a bike as the bag planner stores it (spec section 7.1's table), read r
     expect(JSON.stringify(normaliseBike(JSON.parse(JSON.stringify(before))))).toBe(JSON.stringify(before));
   });
 
+  // Care pictures redo (owner's answers 1 and 2 of 9 November 2026): the wheel's axle, and on rim brakes which kind, stored only as an answer.
+  test("[TB-DETAILS-AXLE] axle (thru, qr, nuts) and rimBrake (caliper, v-brake, hydraulic) keep each listed answer; Not sure, anything else or a missing field is no field; no other field changes", () => {
+    const base = normaliseBike({ ...clone(full), brakes: 'rim' })!;
+    const rest = (b: Json): Json => { const others = { ...b }; delete others.axle; delete others.rimBrake; return others; };
+    for (const axle of ['thru', 'qr', 'nuts'] as const) {
+      const got = normaliseBike({ ...clone(full), brakes: 'rim', axle })!;
+      expect(got.axle, axle).toBe(axle);
+      expect(rest(got), axle).toEqual(rest(base));
+    }
+    for (const rimBrake of ['caliper', 'v-brake', 'hydraulic'] as const) {
+      const got = normaliseBike({ ...clone(full), brakes: 'rim', rimBrake })!;
+      expect(got.rimBrake, rimBrake).toBe(rimBrake);
+      expect(rest(got), rimBrake).toEqual(rest(base));
+      // kept as answered whatever the brakes; Bike care reads it only with rim brakes (pictureDetails)
+      expect(normaliseBike({ ...clone(full), brakes: 'hydraulic-disc', rimBrake })!.rimBrake).toBe(rimBrake);
+    }
+    for (const odd of [{ axle: 'unknown', rimBrake: 'unknown' }, { axle: 'QR' }, { axle: true }, { axle: 12 }, { rimBrake: 'disc' }, { rimBrake: null }, {}]) {
+      const got = normaliseBike({ ...clone(full), brakes: 'rim', ...odd })!;
+      expect(got, JSON.stringify(odd)).not.toHaveProperty('axle');
+      expect(got, JSON.stringify(odd)).not.toHaveProperty('rimBrake');
+      expect(rest(got), JSON.stringify(odd)).toEqual(rest(base));
+    }
+    // a bike stored before them gains no field and keeps its bytes (LC-MOVE-PLANS); the two come last, after rackMounts, as on the page
+    const before = normaliseBike({ id: 'bike_bare', brakes: 'rim' })!;
+    expect(Object.keys(before)).not.toContain('axle');
+    expect(JSON.stringify(normaliseBike(JSON.parse(JSON.stringify(before))))).toBe(JSON.stringify(before));
+    const keys = Object.keys(normaliseBike({ id: 'bike_x', brakes: 'rim', suspension: 'none', rackMounts: 'no', axle: 'qr', rimBrake: 'caliper' })!);
+    expect(keys.slice(keys.indexOf('rackMounts'), keys.indexOf('rackMounts') + 3)).toEqual(['rackMounts', 'axle', 'rimBrake']);
+  });
+
   test('[BK-NORMALISE] a block with nothing set is null; a colour is stored in lower case; numbers round as the page rounds', () => {
     const bike = clone(full) as Json;
     bike.look = { colour: '#2563B8', bars: null, ebike: null };

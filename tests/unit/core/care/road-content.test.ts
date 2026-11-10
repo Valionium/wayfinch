@@ -92,15 +92,17 @@ test('[BC-ROAD] the figure check is pinned to its field: a figure moved to anoth
   const moved = { ...card, rideOn: 'Fine if it holds air.', steps: card.steps.map((s, i) => (i === 0 ? `${s} Stop if the tyre has a cut or bulge.` : s)) };
   expect(cardMissing(moved)).toEqual(['rideOn: Stop if the tyre has a cut or bulge']);
   const rub = ROAD_CARDS.find((c) => c.id === 'brake-rub-rim')!;
-  expect(cardMissing({ ...rub, steps: rub.steps.map((s, i) => (i === 4 ? 'Open the quick release and ride.' : s)) })).toEqual(["step4: Open the brake's quick release only if you must and ride slowly", 'step4: Until you close it again, this brake works much less: ride slowly and use the other brake.']);
+  expect(cardMissing({ ...rub, steps: rub.steps.map((s, i) => (i === 4 ? 'Open the quick release and ride.' : s)) })).toEqual(['step4: Rim bent and still rubbing', "step4: open the brake's quick release only if you must and ride slowly", 'step4: Until you close it again, this brake works much less: ride slowly and use the other brake.']);
 });
 
 test('[BC-ROAD] nothing that could hurt a rider: no flame, solvent, penetrating oil, forcing a wheel straight, or a lever used as a tyre lever', () => {
   const hazards = /\b(flame|burn(ing|t)?|lighter|solvent|degreaser|spirit|penetrating|petrol|white spirit|straighten|hammer)\b|force (it|the|a)\b|hit (it|the) .*ground|quick.release (lever )?(as|for) (a )?(tyre )?lever/i;
   for (const c of ROAD_CARDS) for (const text of [c.problem, c.checkFirst, c.rideOn, ...c.steps, ...c.words]) expect(text, c.id).not.toMatch(hazards);
   for (const c of CARRY) expect(c.name, c.id).not.toMatch(hazards);
-  // the unsourced centring-screw detail is cut (decision 6): the draft's "no source found"
-  expect(ROAD_CARDS.find((c) => c.id === 'brake-rub-rim')!.steps.join(' ')).not.toMatch(/centring screw/i);
+  // the centring screw, cut in PR 59 as unsourced (decision 6), is back with its source (care pictures redo, T10, owner's approval of
+  // 9 November 2026): Park Tool's dual-pivot and linear-pull service pages
+  expect(ROAD_CARDS.find((c) => c.id === 'brake-rub-rim')!.steps.join(' ')).toMatch(/centring screw/i);
+  expect(SOURCES['brake-rub-rim']!.urls).toEqual(expect.arrayContaining(['https://www.parktool.com/en-us/blog/repair-help/dual-pivot-brake-service', 'https://www.parktool.com/en-us/blog/repair-help/linear-pull-brake-service']));
 });
 
 test('[BC-CARRY] the draft\'s carry items, in its order and words; the clean cloth is back (PR 59 review I3); ids start "carry-" and are unique', () => {
@@ -142,12 +144,14 @@ test("[BC-ROAD] every card that opens the brake's quick release says it works mu
   const spoke = ROAD_CARDS.find((c) => c.id === 'spoke-snapped')!;
   // rim brakes only: disc riders get their own step, and no step tells everybody to open a brake release
   expect(spoke.steps.filter((s) => /quick release/i.test(s)).every((s) => /^Rim brakes:/.test(s))).toBe(true);
-  expect(spoke.steps.some((s) => s.startsWith('Disc brakes: check the wheel turns without touching the brake'))).toBe(true);
+  // the disc brake needs no opening: the disc sits on the hub (care pictures redo, T8, owner's approval of 9 November 2026)
+  expect(spoke.steps.some((s) => s.startsWith('Disc brakes: the brake needs no opening.'))).toBe(true);
 });
 
 test('[BC-ROAD] a step that wipes names a cloth the card carries; the disc card never touches the disc with fingers (review of PR 59, I3)', () => {
   const wiping = ROAD_CARDS.filter((c) => c.steps.some((s) => /\bwipe\b/i.test(s)));
-  expect(wiping.map((c) => c.id)).toEqual(['brake-weak-rim', 'brake-weak-disc', 'ebike-no-power']);
+  // T18 (care pictures redo, 9 November 2026): the torn tyre wipes the sealant off round the cut, so it carries the cloth too
+  expect(wiping.map((c) => c.id)).toEqual(['brake-weak-rim', 'brake-weak-disc', 'tyre-torn', 'ebike-no-power']);
   for (const c of wiping) expect(c.carry, c.id).toContain('carry-cloth');
   expect(ROAD_CARDS.find((c) => c.id === 'brake-weak-disc')!.steps.join(' ')).toContain('Never touch the disc or pads with your fingers');
 });
@@ -172,7 +176,9 @@ test('[BC-ROAD] bolt-loose puts the carbon warning first, and tightens only to t
 
 test("[BC-ROAD] a tubeless tyre's spare tube needs the whole tubeless valve out, not only its core (review of PR 59, I2)", () => {
   const steps = ROAD_CARDS.find((c) => c.id === 'puncture-tubeless')!.steps.join(' ');
-  expect(steps).toContain('remove the tubeless valve');
+  // T5 (care pictures redo, the owner's approval of 9 November 2026): the valve and any metal-tipped plug come out first
+  expect(steps).toContain('take out the tubeless valve');
+  expect(steps).toContain('any plug with a metal tip');
   expect(steps).not.toMatch(/valve core/i);
 });
 

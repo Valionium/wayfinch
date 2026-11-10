@@ -28,7 +28,8 @@ async function seed(page: Page, bikes: unknown[], chosen: string | null): Promis
   }, [bikes, chosen ? choice(chosen) : null] as const);
   await page.reload({ waitUntil: 'domcontentloaded' });
 }
-const task = (page: Page, id: string) => page.locator(`details.care-task[data-id="${id}"]`);
+// Since the review of PR 72 (I4) a task or card in the list is one button that opens its full-screen step view at once.
+const task = (page: Page, id: string) => page.locator(`.care-task[data-id="${id}"]`);
 const errorsOf = (page: Page): string[] => {
   const errors: string[] = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -85,21 +86,25 @@ test("[BC-BIKE-GONE] switching bike on the Care screen's own bike line refits th
   expect(errors).toEqual([]);
 });
 
-test('[BC-SCREEN] every task open, at the project size and at 200% text: no sideways scroll; steps stay a numbered list', async ({ page }) => {
+test('[BC-SCREEN] every task, at the project size and at 200% text: no sideways scroll; a task opens its steps, numbered in All steps', async ({ page }) => {
   app = await loadApp(page, { launch: true, path: '/#/tools/care' });
   await seed(page, [U], null);
-  await expect(page.locator('details.care-task').first()).toBeVisible();
+  await expect(page.locator('.care-task').first()).toBeVisible();
   for (const zoom of ['100%', '200%']) {
-    await page.evaluate((z) => { document.documentElement.style.fontSize = z; for (const d of document.querySelectorAll('details')) d.open = true; }, zoom);
+    await page.evaluate((z) => { document.documentElement.style.fontSize = z; }, zoom);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), zoom).toBe(true);
-    for (const d of await page.locator('details.care-task').all()) {
+    for (const d of await page.locator('.care-task').all()) {
       const box = (await d.boundingBox())!;
       expect(box.x + box.width, zoom).toBeLessThanOrEqual(page.viewportSize()!.width + 0.5);
     }
   }
-  expect(await page.locator('details.care-task ol > li').count()).toBeGreaterThan(30);
+  await task(page, 'brakes-pads-disc').locator('.care-open').click();
+  await page.getByRole('button', { name: 'All steps' }).click();
+  await expect(page.getByRole('dialog').locator('.care-step-all')).toHaveCount(5);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   // every task shows, the conditioned ones tagged, and the quiet line leads to the bike's details
-  await expect(page.locator('details.care-task')).toHaveCount(48);
+  await expect(page.locator('.care-task')).toHaveCount(48);
   await expect(page.getByRole('link', { name: "Tell us your brakes, tyres… to hide what doesn't apply" })).toHaveAttribute('href', '/tools/bags/#bike-details=bike_u&back=care');
   // the tablist and the filters have names
   await expect(page.getByRole('tablist', { name: 'Bike care' })).toBeVisible();
@@ -110,7 +115,7 @@ test('[BC-SCREEN] every task open, at the project size and at 200% text: no side
 test('[BC-SCREEN] Tab reaches every tab, filter, task and link; each task opens with Enter and Space', async ({ page }) => {
   app = await loadApp(page, { launch: true, path: '/#/tools/care' });
   await seed(page, [U], null);
-  await expect(page.locator('details.care-task')).toHaveCount(48);
+  await expect(page.locator('.care-task')).toHaveCount(48);
   await page.getByRole('link', { name: 'Tools', exact: true }).first().focus();
   const reached: string[] = [];
   for (let i = 0; i < 90; i += 1) {
@@ -118,28 +123,32 @@ test('[BC-SCREEN] Tab reaches every tab, filter, task and link; each task opens 
     const here = await page.evaluate(() => {
       const el = document.activeElement as HTMLElement | null;
       if (!el || !el.closest('.care')) return null;
-      const t = el.closest('details.care-task') as HTMLElement | null;
-      return el.tagName === 'SUMMARY' && t ? `task:${t.dataset.id}` : `${el.getAttribute('role') ?? el.tagName.toLowerCase()}:${(el.textContent ?? '').trim() || el.id}`;
+      const t = el.closest('.care-task') as HTMLElement | null;
+      return el.classList.contains('care-open') && t ? `task:${t.dataset.id}` : `${el.getAttribute('role') ?? el.tagName.toLowerCase()}:${(el.textContent ?? '').trim() || el.id}`;
     });
     if (here) reached.push(here);
   }
   for (const want of ['tab:Care', 'tab:Roadside repairs', 'input:care-search', "a:Tell us your brakes, tyres… to hide what doesn't apply"]) expect(reached, want).toContain(want);
   for (const part of ['Chain', 'Brakes', 'Tyres', 'Gears', 'Wheels', 'Suspension', 'E-bike', 'Frame & bolts']) expect(reached, part).toContain(`button:${part}`);
-  const ids = await page.locator('details.care-task').evaluateAll((ds) => ds.map((d) => (d as HTMLElement).dataset.id!));
+  const ids = await page.locator('.care-task').evaluateAll((ds) => ds.map((d) => (d as HTMLElement).dataset.id!));
   for (const id of ids) expect(reached, id).toContain(`task:${id}`);
-  // Enter opens one task, Space another
-  await task(page, ids[0]!).locator('summary').focus();
+  // Enter opens one task's steps, Space another's; Escape closes and focus is back on the task
+  await task(page, ids[0]!).locator('.care-open').focus();
   await page.keyboard.press('Enter');
-  await expect(task(page, ids[0]!)).toHaveAttribute('open', '');
-  await task(page, ids[1]!).locator('summary').focus();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(task(page, ids[0]!).locator('.care-open')).toBeFocused();
+  await task(page, ids[1]!).locator('.care-open').focus();
   await page.keyboard.press('Space');
-  await expect(task(page, ids[1]!)).toHaveAttribute('open', '');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   // the arrow keys move between the tabs
   await page.getByRole('tab', { name: 'Care' }).focus();
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('tab', { name: 'Roadside repairs' })).toBeFocused();
   await expect(page.getByRole('tab', { name: 'Roadside repairs' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('details.care-road').first()).toBeVisible();
+  await expect(page.locator('.care-road').first()).toBeVisible();
 });
 
 test('[BC-SCREEN] Bike care opens offline after one visit, and works there', async ({ page }) => {
@@ -153,20 +162,20 @@ test('[BC-SCREEN] Bike care opens offline after one visit, and works there', asy
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Bike care', level: 2 })).toBeVisible();
   await expect(task(page, 'brakes-pads-disc')).toBeVisible();
-  await page.getByRole('button', { name: 'Brakes' }).click();
-  await expect(page.locator('details.care-task')).toHaveCount(7);
+  await page.getByRole('group', { name: 'Parts' }).getByRole('button', { name: 'Brakes' }).click(); // tasks are buttons now too
+  await expect(page.locator('.care-task')).toHaveCount(7);
   await page.getByLabel('Search').fill('lube');
   await expect(page.getByText('Nothing matches.')).toBeVisible();
   await page.getByRole('button', { name: 'Clear search and filter' }).click();
-  await expect(page.locator('details.care-task')).toHaveCount(35);
+  await expect(page.locator('.care-task')).toHaveCount(35);
   // the Roadside tab and the carry list work offline too
   await page.getByRole('tab', { name: 'Roadside repairs' }).click();
-  await expect(page.locator('details.care-road[data-id="puncture-tubeless"]')).toBeVisible();
+  await expect(page.locator('.care-road[data-id="puncture-tubeless"]')).toBeVisible();
   await expect(page.locator('.care-carry li[data-id="carry-plug-kit"]')).toBeVisible();
 });
 
 // ---- Roadside repairs and What to carry (sub-project 12, group 3) ----
-const card = (page: Page, id: string) => page.locator(`details.care-road[data-id="${id}"]`);
+const card = (page: Page, id: string) => page.locator(`.care-road[data-id="${id}"]`);
 const roadTab = (page: Page) => page.getByRole('tab', { name: 'Roadside repairs' });
 
 test('[BC-ROAD] the Roadside tab fits the chosen bike; every card open, at the project size and at 200% text: no sideways scroll; steps stay numbered; carry list at the bottom', async ({ page }) => {
@@ -189,22 +198,30 @@ test('[BC-ROAD] the Roadside tab fits the chosen bike; every card open, at the p
   await expect(page.locator('.care-carry li[data-id="carry-patch-kit"]')).toHaveCount(0);
   // a bike with nothing told: every card, the conditioned ones tagged; the shop line only on brakes, wheels and bolts
   await page.selectOption('#tools-bike', 'bike_u');
-  await expect(page.locator('details.care-road')).toHaveCount(12);
-  await expect(card(page, 'puncture-tube').locator('summary')).toContainText('if you have inner tubes');
+  await expect(page.locator('.care-road')).toHaveCount(12);
+  await expect(card(page, 'puncture-tube').locator('.care-open')).toContainText('if you have inner tubes');
   for (const zoom of ['100%', '200%']) {
-    await page.evaluate((z) => { document.documentElement.style.fontSize = z; for (const d of document.querySelectorAll('details')) d.open = true; }, zoom);
+    await page.evaluate((z) => { document.documentElement.style.fontSize = z; }, zoom);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), zoom).toBe(true);
-    for (const d of await page.locator('details.care-road').all()) {
+    for (const d of await page.locator('.care-road').all()) {
       const box = (await d.boundingBox())!;
       expect(box.x + box.width, zoom).toBeLessThanOrEqual(page.viewportSize()!.width + 0.5);
     }
   }
-  expect(await page.locator('details.care-road ol > li').count()).toBeGreaterThan(50);
-  expect(await page.locator('details.care-road', { hasText: 'If unsure, a shop.' }).count()).toBe(6);
+  // a critical card's steps end with the shop line, a puncture's do not
+  await page.evaluate(() => { localStorage.setItem('copilot:careAllSteps:v1', '1'); });
+  await card(page, 'brake-rub-rim').locator('.care-open').click();
+  await expect(page.getByRole('dialog').locator('.care-step-all')).toHaveCount(6);
+  await expect(page.getByRole('dialog').getByText('If unsure, a shop.')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await card(page, 'puncture-tube').locator('.care-open').click();
+  await expect(page.getByRole('dialog').getByText('Ride on?')).toBeVisible();
+  await expect(page.getByRole('dialog').getByText('If unsure, a shop.')).toHaveCount(0);
+  await page.keyboard.press('Escape');
   await expect(page.getByRole('heading', { name: 'What to carry', level: 3 })).toBeVisible();
   expect(await page.locator('.care-carry li').count()).toBe(14);
   const below = await page.evaluate(() => {
-    const cards = document.querySelectorAll('details.care-road');
+    const cards = document.querySelectorAll('.care-road');
     const list = document.querySelector('.care-carry')!;
     return !!(cards[cards.length - 1]!.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING);
   });
@@ -212,7 +229,7 @@ test('[BC-ROAD] the Roadside tab fits the chosen bike; every card open, at the p
   expect(errors).toEqual([]);
 });
 
-test('[BC-ROAD-SEARCH] "puncture" in the Care tab lists the puncture cards under Roadside repairs; a tap opens the Roadside tab at that card, open and focused', async ({ page }) => {
+test('[BC-ROAD-SEARCH] "puncture" in the Care tab lists the puncture cards under Roadside repairs; a tap opens the Roadside tab and that card\'s steps; closed, focus is on the card', async ({ page }) => {
   const errors = errorsOf(page);
   app = await loadApp(page, { launch: true, path: '/#/tools/care' });
   await seed(page, [U], null);
@@ -221,10 +238,10 @@ test('[BC-ROAD-SEARCH] "puncture" in the Care tab lists the puncture cards under
   await expect(page.locator('.care-road-hit')).toHaveCount(2);
   await page.getByRole('button', { name: 'Puncture (tubeless)' }).click();
   await expect(roadTab(page)).toHaveAttribute('aria-selected', 'true');
-  await expect(card(page, 'puncture-tubeless')).toHaveAttribute('open', '');
-  await expect(card(page, 'puncture-tubeless').locator('summary')).toBeFocused();
-  await expect(card(page, 'puncture-tube')).not.toHaveAttribute('open', '');
-  await expect(card(page, 'puncture-tubeless').getByText('Ride on?')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Puncture (tubeless)' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(card(page, 'puncture-tubeless').locator('.care-open')).toBeFocused();
   expect(errors).toEqual([]);
 });
 
@@ -238,18 +255,148 @@ test('[BC-ROAD] by keyboard: Tab reaches every card and the tabs; Enter and Spac
     await page.keyboard.press('Tab');
     const here = await page.evaluate(() => {
       const el = document.activeElement as HTMLElement | null;
-      const c = el?.closest('details.care-road') as HTMLElement | null;
-      return el && el.tagName === 'SUMMARY' && c ? c.dataset.id! : null;
+      const c = el?.closest('.care-road') as HTMLElement | null;
+      return el && el.classList.contains('care-open') && c ? c.dataset.id! : null;
     });
     if (here) reached.push(here);
   }
-  const ids = await page.locator('details.care-road').evaluateAll((ds) => ds.map((d) => (d as HTMLElement).dataset.id!));
+  const ids = await page.locator('.care-road').evaluateAll((ds) => ds.map((d) => (d as HTMLElement).dataset.id!));
   expect(ids.length).toBe(12);
   for (const id of ids) expect(reached, id).toContain(id);
-  await card(page, ids[0]!).locator('summary').focus();
+  await card(page, ids[0]!).locator('.care-open').focus();
   await page.keyboard.press('Enter');
-  await expect(card(page, ids[0]!)).toHaveAttribute('open', '');
-  await card(page, ids[1]!).locator('summary').focus();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await card(page, ids[1]!).locator('.care-open').focus();
   await page.keyboard.press('Space');
-  await expect(card(page, ids[1]!)).toHaveAttribute('open', '');
+  await expect(page.getByRole('dialog')).toBeVisible();
+});
+
+// ---- The step view and its pictures (care pictures design of 7 November 2026, part 1) ----
+const openSteps = async (page: Page, id: string, name: string) => {
+  await roadTab(page).click();
+  await card(page, id).locator('.care-open').click();
+  await expect(page.getByRole('dialog', { name })).toBeVisible();
+};
+
+test('[BC-STEPS-LAYOUT] the step view fills the screen; on a phone the picture sits above the text, from 720 px beside it; the bottom bar never covers the text; no sideways scroll at 200% text', async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [U], null);
+  // a card with pictures (care pictures redo, batch 1: the puncture cards' pictures are not yet redrawn)
+  await openSteps(page, 'brake-rub-disc', 'Disc brake rubbing');
+  const dialog = page.getByRole('dialog');
+  const box = (await dialog.boundingBox())!;
+  const view = page.viewportSize()!;
+  expect(Math.round(box.width)).toBe(view.width);
+  expect(Math.round(box.height)).toBe(view.height);
+  await page.getByRole('button', { name: 'Next' }).click();
+  // step 1, the wheel seated: its kind follows the axle, the other kinds one tap away as 44 px buttons [BC-PIC-SWITCH]
+  await expect(dialog.getByRole('img', { name: 'A thru-axle: push the wheel fully in, then tighten the axle firmly.' })).toBeVisible();
+  const kinds = dialog.getByRole('group', { name: 'Other kinds' });
+  await expect(kinds.getByRole('button')).toHaveCount(2);
+  for (const b of await kinds.getByRole('button').all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await kinds.getByRole('button', { name: 'Show Quick release' }).click();
+  await expect(dialog.getByRole('img', { name: 'A quick release: push the wheel fully in, then close the lever firmly.' })).toBeVisible();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(dialog.locator('.care-steps-count')).toHaveText('Step 2 of 5');
+  const img = dialog.getByRole('img', { name: 'A thin gap between each pad and the disc.' });
+  await expect(img).toBeVisible();
+  const pic = (await img.boundingBox())!;
+  const words = (await dialog.locator('.care-step-t').boundingBox())!;
+  if (view.width < 720) {
+    expect(pic.y + pic.height).toBeLessThanOrEqual(words.y);
+    expect(pic.width).toBeGreaterThan(view.width - 48);
+    expect(pic.height).toBeLessThanOrEqual(view.height * 0.45 + 1);
+  } else {
+    expect(pic.x + pic.width).toBeLessThanOrEqual(words.x);
+    expect(Math.abs(pic.y - words.y)).toBeLessThan(80);
+  }
+  for (const zoom of ['100%', '200%']) {
+    await page.evaluate((z) => { document.documentElement.style.fontSize = z; }, zoom);
+    expect(await page.evaluate(() => document.querySelector('.care-steps-body')!.scrollWidth <= window.innerWidth), zoom).toBe(true);
+    // the text ends above the bottom bar once scrolled to the end
+    await dialog.locator('.care-steps-body').evaluate((b) => { b.scrollTop = b.scrollHeight; });
+    const text = (await dialog.locator('.care-step-t').boundingBox())!;
+    const bar = (await dialog.locator('.care-steps-nav').boundingBox())!;
+    expect(text.y + text.height, zoom).toBeLessThanOrEqual(bar.y + 0.5);
+    for (const b of await dialog.locator('.care-steps-nav button').all()) expect((await b.boundingBox())!.height, zoom).toBeGreaterThanOrEqual(48);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('[BC-STEPS-BACK] in a real browser the back gesture closes the step view in one go and Bike care stays; the picture loads offline after one visit', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [U], null);
+  await expect.poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBe(1);
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+  await goOffline(page);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await openSteps(page, 'brake-rub-disc', 'Disc brake rubbing');
+  for (let i = 0; i < 4; i += 1) await page.getByRole('button', { name: 'Next' }).click();
+  await page.goBack();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/tools\/care$/);
+  await expect(page.getByRole('heading', { name: 'Bike care', level: 2 })).toBeVisible();
+  await expect(card(page, 'brake-rub-disc').locator('.care-open')).toBeFocused();
+  // offline, the drawing still comes
+  await card(page, 'brake-rub-disc').locator('.care-open').click();
+  await expect(page.locator('.care-step-h')).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.care-steps-count')).toHaveText('Step 1 of 5');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.care-steps-count')).toHaveText('Step 2 of 5');
+  await expect(page.getByRole('dialog').getByRole('img', { name: 'A thin gap between each pad and the disc.' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/tools\/care$/);
+});
+
+// ---- The parts guide (care pictures design of 7 November 2026, section 4) ----
+test("[PG-SHEET-OPEN] a part's name opens its entry: a bottom sheet on a phone, a side panel when wide; the bike drawn with the part marked, its close-ups; no sideways scroll at 200% text; Escape and the back gesture close the sheet alone", async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [A], 'bike_a');
+  await openSteps(page, 'brake-rub-rim', 'Brake rubbing');
+  for (let i = 0; i < 5; i += 1) await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.locator('.care-steps-count')).toHaveText('Step 5 of 6');
+  const link = page.locator('.care-step .care-part', { hasText: "brake's quick release" });
+  await link.click();
+  const sheet = page.getByRole('dialog', { name: "The brake's quick release" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole('heading', { name: "The brake's quick release" })).toBeFocused();
+  await expect(sheet.getByRole('img', { name: "The brake's quick release, marked on the bike" })).toBeVisible();
+  await expect(sheet.locator('.care-pic [role="img"]')).toHaveCount(2);
+  const box = (await sheet.boundingBox())!;
+  const view = page.viewportSize()!;
+  if (view.width < 720) {
+    expect(Math.round(box.width)).toBe(view.width);
+    expect(Math.abs(box.y + box.height - view.height)).toBeLessThan(2);
+  } else {
+    expect(box.width).toBeLessThanOrEqual(441);
+    expect(Math.abs(box.x + box.width - view.width)).toBeLessThan(2);
+  }
+  for (const zoom of ['100%', '200%']) {
+    await page.evaluate((z) => { document.documentElement.style.fontSize = z; }, zoom);
+    expect(await page.evaluate(() => { const s = document.querySelector('dialog.part-sheet')!; return s.scrollWidth <= s.clientWidth + 1; }), zoom).toBe(true);
+    for (const b of await sheet.locator('.pg-swap, .care-steps-icon').all()) expect((await b.boundingBox())!.height, zoom).toBeGreaterThanOrEqual(44);
+  }
+  await page.evaluate(() => { document.documentElement.style.fontSize = ''; });
+  await page.keyboard.press('Escape');
+  await expect(page.locator('dialog.part-sheet')).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Brake rubbing' })).toBeVisible();
+  await expect(link).toBeFocused();
+  // the back gesture: the sheet goes, the step view stays at its step
+  await link.click();
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole('button', { name: "The wheel's quick release" }).click();
+  // the dialog is named by the entry it shows now
+  await expect(page.getByRole('dialog', { name: "The wheel's quick release" }).getByRole('heading', { level: 2 })).toHaveText("The wheel's quick release");
+  await page.goBack();
+  await expect(page.locator('dialog.part-sheet')).toHaveCount(0);
+  await expect(page.locator('.care-steps-count')).toHaveText('Step 5 of 6');
+  await expect(page).toHaveURL(/#\/tools\/care$/);
+  expect(errors).toEqual([]);
 });

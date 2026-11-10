@@ -212,21 +212,23 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
     urls: [
       'https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know',
       'https://www.roadbikerider.com/be-a-hero-on-rides-d3/',
-      'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot',
-    ],
-    note: 'Book pp. 48-49 and 84-85: the order of work, how to find the hole, pinch-flat slits, patch glue timing, a second check of tyre and rim, the pinched-tube check (book, more careful); p. 209: patch or replace the tube.',
+      'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot', 'https://www.parktool.com/en-us/blog/repair-help/tire-and-tube-removal-and-installation', 'https://www.schwalbe.com/AEROTHAN-GLUELESS-PATCHES'],
+    note: 'Book pp. 48-49 and 84-85: the order of work, how to find the hole, pinch-flat slits, patch glue timing, a second check of tyre and rim, the pinched-tube check (book, more careful); p. 209: patch or replace the tube. Care pictures redo (approved by the owner, 9 November 2026): T1, Shimano manuals: with the wheel out a squeezed hydraulic lever pushes the pistons out; T2, Park Tool: push the bead to the middle of the rim first; T3, Schwalbe and Tubolito: glue patches do not hold on TPU tubes; T4 guides the disc between the pads.',
   },
   'puncture-tubeless': {
-    urls: ['https://www.wtb.com/blogs/wtb/how-to-plug-a-puncture-on-a-tubeless-bicycle-tire', 'https://theproscloset.com/blogs/news/how-to-tubeless-tire-plug'],
-    note: "Not covered by the owner's book pages. Step 6 says to remove the tubeless valve (ruling I2 on PR 59: the draft said only the valve core, which leaves the valve in the rim); no public page could be read for how, so no detail is added.",
+    urls: ['https://www.wtb.com/blogs/wtb/how-to-plug-a-puncture-on-a-tubeless-bicycle-tire', 'https://theproscloset.com/blogs/news/how-to-tubeless-tire-plug', 'https://www.performancebike.com/dynaplug-unpacked/cp1498'],
+    note: "Not covered by the owner's book pages. Step 6 says to remove the tubeless valve (ruling I2 on PR 59: the draft said only the valve core, which leaves the valve in the rim); no public page could be read for how, so no detail is added. T5 (care pictures redo, 9 November 2026): a plug with a metal tip comes out before a tube goes in, or it can hole the tube (Dynaplug).",
   },
   'chain-broken': {
     urls: [
       'https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know',
       'https://www.roadbikerider.com/be-a-hero-on-rides-d3/',
       'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot',
+      'https://www.parktool.com/en-us/product/master-link-pliers-mlp-1-2',
+      'https://dealers.bike.shimano.com/product/509187/shimano-cycling-sm-cn910-quick-link',
+      'https://www.bike-components.de/en/SRAM/PowerLock-Chain-12-speed-Master-Link-p69115/',
     ],
-    note: 'Book p. 159: join with a link or pin, then flex the joined link sideways to find a stiff one (book, more careful); p. 215: twisted links and a damaged chain are replaced; p. 48: the repair kit has a chain tool.',
+    note: 'Book p. 159: join with a link or pin, then flex the joined link sideways to find a stiff one (book, more careful); p. 215: twisted links and a damaged chain are replaced; p. 48: the repair kit has a chain tool. T6 (care pictures redo, 9 November 2026): a quick link is two plates, each with a pin and a keyhole slot, and must match the chain: its speeds and, for SRAM Flattop and T-Type chains, their own link (Park Tool, Shimano, SRAM).',
   },
   'spoke-snapped': {
     urls: [
@@ -234,48 +236,49 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
       'https://www.roadbikerider.com/be-a-hero-on-rides-d3/',
       'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot',
     ],
-    note: "Book p. 49: tape the broken spoke or wrap it round a neighbour; pp. 208-209: broken spokes make the wheel wobble. Opening the brake's quick release is the draft's step 2, now for rim brakes only, named as the brake's own lever, with the weaker-brake caution and a step to close it again (rulings C1 and I1 on PR 59); \"more than a few spokes\" became \"more than one spoke\" (M1). The disc-brake step (\"check the wheel turns without touching the brake; if it rubs, ride slowly\") is the coordinator\'s wording and has no source: flagged for the owner at O5 (the real risk on a disc bike may be the rim touching the frame or fork).",
+    note: "Book p. 49: tape the broken spoke or wrap it round a neighbour; pp. 208-209: broken spokes make the wheel wobble. Opening the brake's quick release is the draft's step 2, now for rim brakes only, named as the brake's own lever, with the weaker-brake caution and a step to close it again (rulings C1 and I1 on PR 59); \"more than a few spokes\" became \"more than one spoke\" (M1). The disc-brake step is the care pictures redo's T8 (owner's approval of 9 November 2026): the disc sits on the hub, so a wobbly rim never touches the brake; Park Tool: tie the broken spoke to a neighbour so it does not flop and scratch the frame (T7). Research note docs/research/2026-11-09-modern-bike-mechanisms.md, sections 1.1 and 4.",
   },
   'brake-rub-rim': {
-    urls: ['https://www.sheldonbrown.com/rim-brakes.html'],
-    note: "Book p. 209: re-seat the wheel, the tyre bead (book, more careful). The draft's centring step and its centring-screw aside had no source and are cut (decision 6); the card sends the rider to a shop to have the brake centred (ruling on PR 59, M6).",
+    urls: ['https://www.sheldonbrown.com/rim-brakes.html', 'https://www.parktool.com/en-us/blog/repair-help/dual-pivot-brake-service', 'https://www.parktool.com/en-us/blog/repair-help/linear-pull-brake-service'],
+    note: "Book p. 209: re-seat the wheel, the tyre bead (book, more careful). The centring step, cut in PR 59 for want of a source, is back as the care pictures redo's T10 (owner's approval of 9 November 2026): Park Tool's dual-pivot page (the centring screw on one arm moves both pads; some calipers have none) and linear-pull page (a spring screw on each arm). T11 says when to open the brake's release: a bent rim that still rubs.",
   },
   'brake-rub-disc': {
     urls: [
       'https://www.parktool.com/en-us/blog/repair-help/mechanical-disc-brake-alignment',
       'https://www.parktool.com/en-int/blog/repair-help/hydraulic-disc-brake-alignment',
     ],
-    note: 'Book p. 213: bent disc, caliper not centred, pads too close; p. 121: loosen, centre, tighten, squeeze the lever several times. The draft\'s "snug the bolts" is replaced by the printed torque, or even tightening until the caliper no longer moves, and a brake test (the coordinator\'s ruling on PR 59, 7 Nov).',
+    note: 'Book p. 213: bent disc, caliper not centred, pads too close; p. 121: loosen, centre, tighten, squeeze the lever several times. The draft\'s "snug the bolts" is replaced by the printed torque, or even tightening until the caliper no longer moves, and a brake test (the coordinator\'s ruling on PR 59, 7 Nov). Care pictures redo (approved by the owner, 9 November 2026): T12 names the thru-axle (most disc bikes have one; research note section 2) and the quick release of the wheel (PR 59, C1); T13 gives the direction to turn the pad adjuster; T14 asks about the lever squeezed with the wheel out (Shimano: the pistons come out; research note section 1.1).',
   },
   'brake-weak-rim': {
     urls: ['https://www.sheldonbrown.com/rim-brakes.html'],
-    note: 'Book p. 211: cleaning, cable and pads; the brake quick release and loose pads (book, more careful); p. 110: a scraping noise means worn pads.',
+    note: 'Book p. 211: cleaning, cable and pads; the brake quick release and loose pads (book, more careful); p. 110: a scraping noise means worn pads. T15 (care pictures redo, 9 November 2026): unscrewing the barrel draws the cable tighter (Park Tool, dual-pivot service); hydraulic rim brakes have no barrel.',
   },
   'brake-weak-disc': {
     urls: [
       'https://www.parktool.com/en-us/blog/repair-help/disc-brake-pad-removal-installation',
       'https://www.parktool.com/en-us/blog/repair-help/mechanical-disc-brake-alignment',
     ],
-    note: 'Book p. 213: oil, worn pads, air in the system (pumping firms the lever when air is in it); p. 120: a grinding noise as the worn-pad sign (book, more careful). "Never touch the disc or pads with your fingers" (the coordinator\'s ruling I3 on PR 59): book p. 120, gloves for the disc braking surfaces.',
+    note: 'Book p. 213: oil, worn pads, air in the system (pumping firms the lever when air is in it); p. 120: a grinding noise as the worn-pad sign (book, more careful). "Never touch the disc or pads with your fingers" (the coordinator\'s ruling I3 on PR 59): book p. 120, gloves for the disc braking surfaces. T16 (care pictures redo, 9 November 2026): the Park Tool mechanical page: many calipers have one pad adjuster, some one each side; pad wear is taken up with the pad adjuster, never the barrel.',
   },
   'gears-skipping': {
-    urls: ['https://www.parktool.com/en-us/product/chain-wear-indicator-cc-3-2'],
-    note: 'Book pp. 214-215: stiff links (flex them sideways), worn parts, bent cage or derailleur, dirty chain; pp. 148 and 159: wrong cable tension makes the chain rattle or slip, a stiff link jumps on the rear gears.',
+    urls: ['https://www.parktool.com/en-us/product/chain-wear-indicator-cc-3-2', 'https://theradavist.com/shimano-grx-12-speed-gravel-group-review'],
+    note: 'Book pp. 214-215: stiff links (flex them sideways), worn parts, bent cage or derailleur, dirty chain; pp. 148 and 159: wrong cable tension makes the chain rattle or slip, a stiff link jumps on the rear gears. T17 (care pictures redo, 9 November 2026): electronic gears (SRAM AXS, Shimano Di2) have no gear cable and no barrel adjuster; where a cable gear barrel sits varies, on the rear derailleur on Shimano GRX mechanical (The Radavist).',
   },
   'bolt-loose': {
     urls: ['https://dedhambike.com/articles/torque-table-pg186.htm', 'https://www.cyclingnews.com/features/torque-wrenches-why-you-need-one-and-how-to-use-them'],
     note: 'Book p. 40: the twist test (twist the part to see whether it still moves; never twist carbon parts) and a torque wrench for carbon (book, more careful); p. 206: bar and stem bolts tight. Carbon bolt torque: 4-6 Nm general vs 5.4/6.2/8.8 Nm by maker, so the card says to follow the printed number. The draft\'s "tighten by feel until firm" is unsourced (draft section 6) and is replaced by the printed torque, or, without a wrench, even tightening a little at a time until the part passes the twist test (the coordinator\'s ruling R1 on PR 59, after I4).',
   },
   'tyre-torn': {
-    urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know', 'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot'],
-    note: 'Book p. 48: the repair kit carries a piece of old tyre, about 5 square cm, as a boot.',
+    urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know', 'https://www.mec.ca/en/product/5048-270/park-tool-tb-2-emergency-tire-boot', 'https://www.parktool.com/en-int/blog/calvins-corner/repairing-on-the-ride'],
+    note: 'Book p. 48: the repair kit carries a piece of old tyre, about 5 square cm, as a boot. T18 (care pictures redo, 9 November 2026): a boot needs the pressure of a tube to stay in place, so a tubeless tyre gets a tube too, its valve and any metal-tipped plug out first and the sealant wiped off (Park Tool); the card carries the clean cloth for that wipe (review of PR 59, I3).',
   },
   'ebike-no-power': {
     urls: [
       'https://www.ternbicycles.com/be/support/kb/349039/how-troubleshoot-bosch-ebike-system-tern-bikes',
       'https://helpcenter.velo-de-ville.com/en/support/solutions/articles/80001185577-error-patterns-solutions-for-bosch-shimano',
+      'https://www.manualslib.com/manual/2912956/Bosch-Bdu336y.html?page=85',
     ],
-    note: 'Book p. 215: charge, battery and plugs seated, dirty contacts; the book cleans with a damp cloth and dries fully.',
+    note: 'Book p. 215: charge, battery and plugs seated, dirty contacts; the book cleans with a damp cloth and dries fully. Care pictures redo (approved by the owner, 9 November 2026): T19, switch the system off before taking the battery out, refit until it clicks, lock with the key (Bosch PowerTube instructions); some light e-bikes have a battery that only comes out with tools, which stays in. T20, the battery\'s own button where it has one; on Bosch\'s smart system the main button can be on the handlebar remote or the top tube (Tern\'s Bosch guide).',
   },
 
   // ---- What to carry (group 3) ----
@@ -299,8 +302,8 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
     note: 'Book p. 48: a piece of old tyre, about 5 square cm.',
   },
   'carry-quick-link': {
-    urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know'],
-    note: "Book p. 159: links that open without tools exist and join by hand; the book's repair kit lists a chain tool, not a link.",
+    urls: ['https://www.active.com/cycling/articles/5-roadside-repairs-you-need-to-know', 'https://dealers.bike.shimano.com/product/509187/shimano-cycling-sm-cn910-quick-link'],
+    note: "Book p. 159: links that open without tools exist and join by hand; the book's repair kit lists a chain tool, not a link. T21 (care pictures redo, 9 November 2026): the link must match the chain's speeds and make, and most 12-speed links (Shimano, SRAM, KMC) are for one use only.",
   },
   'carry-chain-tool': { urls: [], note: 'Book pp. 24 and 48: a chain tool is in the repair kit.' },
   'carry-multi-tool': {
