@@ -108,7 +108,7 @@ test("[PG-WORDS] each part has a name and two to four plain sentences; the tags 
     expect(sentences(w.text), `${id}: ${w.text}`).toBeLessThanOrEqual(4);
     for (const t of [w.name, w.text]) expect(bannedHits(t, false), `${id}: ${t}`).toEqual([]);
   }
-  const sheet = [...Object.values(TAG_WORDS), ...Object.values(PG).map((v) => (typeof v === 'function' ? v('Rim') : v))];
+  const sheet = [...Object.values(TAG_WORDS), ...Object.values(PG).map((v) => (typeof v === 'function' ? (v as (...a: unknown[]) => string)('Rim', 'tyre, rim', 'rim', true) : v))];
   for (const t of sheet) expect(bannedHits(t, false), t).toEqual([]);
   for (const [id, w] of Object.entries(GUIDE_PICTURE_WORDS)) {
     expect(sentences(w.name), id).toBe(1);
@@ -143,15 +143,16 @@ test('[PG-FILES] every guide close-up is used by a part and has words; theme cla
   }
 });
 
-test("[PG-LINKS] every roadside card lists its steps' part names; each is in its step, at most three a step, each opens a guide part", () => {
-  expect(Object.keys(STEP_PARTS).sort()).toEqual(ROAD_CARDS.map((c) => c.id).sort());
+// The bike view (design of 9 November 2026, 2.1): every part a step names is a link, in the Care tasks too; the limit of three a step is
+// gone (the owner's wish, "every part name is a link").
+test("[PG-LINKS] every roadside card and Care task lists its steps' part names; each is in its step as a word of its own, each opens a guide part", () => {
+  expect(Object.keys(STEP_PARTS).sort()).toEqual([...ROAD_CARDS, ...CARE_TASKS].map((c) => c.id).sort());
   const items = new Map([...ROAD_CARDS, ...CARE_TASKS].map((x) => [x.id, x.steps] as const));
   let links = 0;
   for (const [id, steps] of Object.entries(STEP_PARTS)) {
     const text = items.get(id)!;
     expect(steps.length, id).toBe(text.length);
     steps.forEach((step, i) => {
-      expect(step.length, `${id} ${i + 1}`).toBeLessThanOrEqual(3);
       const segs = linkSegments(text[i]!, step);
       expect(segs.map((s) => (typeof s === 'string' ? s : s.text)).join(''), `${id} ${i + 1}`).toBe(text[i]);
       const linked = segs.filter((s) => typeof s !== 'string');
@@ -163,11 +164,40 @@ test("[PG-LINKS] every roadside card lists its steps' part names; each is in its
       links += step.length;
     });
   }
-  expect(links).toBeGreaterThan(40);
+  expect(links).toBeGreaterThan(250);
+  // the tools are not parts: "levers" in a tyre card are tyre levers
+  expect(STEP_PARTS['puncture-tube']![1]!.map(([, p]) => p)).not.toContain('brake-lever');
+  expect(STEP_PARTS['tyres-replace']![3]!.map(([, p]) => p)).not.toContain('brake-lever');
+  // review of PR 107, M4: no link inside a hyphenated word ("disc-brake cleaner"); "gear levers" are not brake levers; a tubeless
+  // task's valve core is the tubeless valve's; "handlebar remote" is the remote alone
+  for (const [id, steps] of Object.entries(STEP_PARTS)) {
+    steps.forEach((step, i) => {
+      for (const seg of linkSegments(items.get(id)![i]!, step)) if (typeof seg !== 'string') expect(seg.text, `${id} ${i + 1}`).not.toMatch(/-$|^-/);
+    });
+    const text = items.get(id)!;
+    steps.forEach((step, i) => {
+      let at = 0;
+      for (const seg of linkSegments(text[i]!, step)) {
+        if (typeof seg === 'string') { at += seg.length; continue; }
+        expect(/[-A-Za-z0-9]/.test(text[i]![at - 1] ?? ' ') || /[-A-Za-z0-9]/.test(text[i]![at + seg.text.length] ?? ' '), `${id} ${i + 1}: ${seg.text}`).toBe(false);
+        at += seg.text.length;
+      }
+    });
+  }
+  expect(linkSegments(items.get('brakes-squeal')![0]!, STEP_PARTS['brakes-squeal']![0]!).filter((s) => typeof s !== 'string').map((s) => (s as { text: string }).text)).toEqual(['pads', 'disc']);
+  expect(items.get('brakes-squeal')![0]!.indexOf('wipe the disc')).toBeGreaterThan(0);
+  expect(STEP_PARTS['frame-bolts-check']![3]!.map(([, p]) => p)).not.toContain('brake-lever');
+  expect(STEP_PARTS['tyres-sealant-check']![1]).toEqual([['valve core', 'tubeless-valve']]);
+  expect(STEP_PARTS['ebike-no-power']![2]!.map(([, p]) => p)).not.toContain('handlebar');
+  expect(STEP_PARTS['chain-wear-check']![0]).toEqual([['chainring', 'chainring'], ['rear gear', 'cassette'], ['chain', 'chain']]);
 });
 
 test('[PG-LINKS] a part name is linked at its first mention only, and words that would overlap are left as text', () => {
   expect(linkSegments('the tube and the tube', [['tube', 'tube']])).toEqual(['the ', { text: 'tube', part: 'tube' }, ' and the tube']);
   expect(linkSegments('pad adjuster', [['pad adjuster', 'pad-adjuster'], ['pad', 'pads']])).toEqual([{ text: 'pad adjuster', part: 'pad-adjuster' }]);
   expect(linkSegments('no parts here', [['rim', 'rim']])).toEqual(['no parts here']);
+  // a word stands as a word of its own: "chain" is not the start of "chainring", so its first mention is the next
+  expect(linkSegments('the chainring and the chain', [['chain', 'chain']])).toEqual(['the chainring and the ', { text: 'chain', part: 'chain' }]);
+  expect(linkSegments('pad adjuster, then the pad', [['pad adjuster', 'pad-adjuster'], ['pad', 'pads']]))
+    .toEqual([{ text: 'pad adjuster', part: 'pad-adjuster' }, ', then the ', { text: 'pad', part: 'pads' }]);
 });
