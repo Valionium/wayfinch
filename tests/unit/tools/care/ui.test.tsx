@@ -365,9 +365,11 @@ test("[BC-ROAD] a card that depends on a Not sure detail carries its tag; the sc
   expect(carryIds()).toContain('carry-plug-kit');
   expect(carryIds()).not.toContain('carry-patch-kit');
   expect(roadIds()).toContain('ebike-no-power');
-  // an old bike with nothing told: every card, each conditioned one tagged
+  // an old bike with nothing told: every card, each conditioned one tagged; its 30 mm tyres make it a road bike, which sorts the cards
+  // usual on a road bike first, the tubeless puncture after them (bike view design 4, the owner's answer 5 (a)): none is hidden
   await act(() => { select.value = 'bike_u'; select.dispatchEvent(new Event('change', { bubbles: true })); });
-  expect(roadIds()).toEqual(ROAD_CARDS.map((c) => c.id));
+  expect([...roadIds()].sort()).toEqual(ROAD_CARDS.map((c) => c.id).sort());
+  expect(roadIds()).toEqual([...ROAD_CARDS.map((c) => c.id).filter((id) => id !== 'puncture-tubeless'), 'puncture-tubeless']);
   expect(road().find((d) => d.dataset.id === 'puncture-tube')!.querySelector('.care-open .muted')!.textContent).toBe('if you have inner tubes');
   expect(road().find((d) => d.dataset.id === 'bolt-loose')!.querySelector('.care-open .muted')).toBeNull();
   expect(road().find((d) => d.dataset.id === 'brake-rub-disc')!.querySelector('.care-open .muted')!.textContent).toBe('if you have disc brakes');
@@ -441,4 +443,26 @@ test('[BC-ROAD-SEARCH] with no bike, each search hit carries its tag beside it: 
   const line = (name: string) => hits().find((h) => h.textContent === name)!.closest('li')!;
   expect(line('Puncture (tubeless)').querySelector('.muted')!.textContent).toBe('if you have tubeless tyres');
   expect(line('Puncture (inner tube)').querySelector('.muted')!.textContent).toBe('if you have inner tubes');
+});
+
+test("[BV-ORDER] on a road bike (30 mm tyres, nothing else told) the cards and tasks usual on road bikes come first; the others follow, greyed, still buttons, said in words; with no bike nothing is greyed", async () => {
+  await mount(world([bike('bike_u', 'Old one', {})]));
+  // Care: within its section, a tubeless task after the others, greyed
+  const sealant = tasks().find((d) => d.dataset.id === 'tyres-sealant-check')!;
+  expect(sealant.classList.contains('care-other-type')).toBe(true);
+  expect(sealant.querySelector('.care-open')!.tagName).toBe('BUTTON');
+  expect(sealant.querySelector('.visually-hidden')!.textContent).toBe(` (${C.careLessUsual('road')})`);
+  const month = taskIds().filter((id) => CARE_TASKS.find((t) => t.id === id)!.section === 'month');
+  expect(month.indexOf('tyres-sealant-check')).toBeGreaterThan(month.indexOf('wheels-hubs-check'));
+  expect(tasks().find((d) => d.dataset.id === 'chain-lube')!.classList.contains('care-other-type')).toBe(false);
+  // Roadside: the tubeless puncture last, greyed
+  await openRoad();
+  expect(roadIds().at(-1)).toBe('puncture-tubeless');
+  expect(road().at(-1)!.classList.contains('care-other-type')).toBe(true);
+  expect(road().filter((d) => d.classList.contains('care-other-type')).length).toBe(1);
+  render(null, host);
+  await mount(world([]));
+  expect(host.querySelectorAll('.care-other-type').length).toBe(0);
+  await openRoad();
+  expect(host.querySelectorAll('.care-other-type').length).toBe(0);
 });
