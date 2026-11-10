@@ -345,14 +345,22 @@ export function handlingFirst(start: Packing, trial: (pins: Record<string, strin
   // the moves of one pair from one half to the other, put back together (review of PRs 116/117, I2), then each move on its own, the
   // moves that do the least first: kilos times the drop of the handling weight; a split thing packed whole stays as it is
   const isWithin = (m: Move) => !split.has(m.id) && pairOf.get(m.from) !== undefined && pairOf.get(m.from) === pairOf.get(m.to);
-  // first the other moves alone, on the plan as it stands: the moves from one half of a pair to the other then go, when that is no worse
+  // a move from one half of a pair to the other only where side to side needs it, never for score (the coordinator's ruling on review
+  // I2): the other moves alone, on the plan as it stands; when they hold everything without the pair's moves, the pair's moves go, and
+  // a gain that came only from them goes with them
   const cross = movesOf(cur).filter((m) => !isWithin(m));
   if (cross.length < movesOf(cur).length) {
     if (tried >= budget) return out();
-    const next = trial(Object.fromEntries(cross.map((m) => [m.id, m.to])), start);
-    tried++;
-    if (cross.every((m) => mainBag(next, m.id) === m.to) && keepsPromises(start.result, next.result) && kept(next) && sides(next)
-      && handlingScore(next.result) <= handlingScore(cur.result) + EPS && frameKg(next) >= frameKg(cur) - EPS) cur = next;
+    const next = cross.length ? trial(Object.fromEntries(cross.map((m) => [m.id, m.to])), start) : start;
+    if (cross.length) tried++;
+    if (cross.every((m) => mainBag(next, m.id) === m.to) && keepsPromises(start.result, next.result) && kept(next) && sides(next)) {
+      if (handlingScore(next.result) > s0 - STEP + EPS) {
+        const evened = evenOut(start);
+        if (!evened) return out();
+        return evened !== start ? finish(evened, 'even') : none(false, partial, true);
+      }
+      cur = next;
+    }
   }
   const within = movesOf(cur).filter(isWithin);
   for (const k of [...new Set(within.map((m) => pairOf.get(m.from)!))].sort(order)) {

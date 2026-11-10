@@ -628,6 +628,22 @@ describe('"Handling first" (design of 10 Nov 2026)', () => {
     expect(gaps(kept.packing).get('k')!).toBeLessThanOrEqual(gaps(p.start).get('k')!);
   });
 
+  // The coordinator's ruling on review I2: a move from one half of a pair to the other only where side to side needs it, never for score.
+  test('[HF-ORDER] a move from one half of a pair to the other is never kept for score alone (here the re-pack rewards it): nothing applied', () => {
+    const bags: Bag[] = [{ key: 'r-0', pos: 'rack', cap: 10, reach: false, pair: 'r' }, { key: 'r-1', pos: 'rack', cap: 10, reach: false, pair: 'r' }];
+    const items: FItem[] = [{ id: 'lock', kg: 1.6, L: 2 }, { id: 'tent', kg: 1.3, L: 3 }, { id: 'quilt', kg: 0.8, L: 3 }, { id: 'pot', kg: 0.3, L: 0.5 },
+      { id: 'stove', kg: 0.5, L: 1.5 }];
+    const p = keeper(bags, items, { lock: 'r-0', tent: 'r-0', quilt: 'r-1', pot: 'r-1', stove: 'r-1' });
+    // the re-pack rewards a fuller first half (as the page's food fill did)
+    const reward = (x: Packing): Packing => {
+      const r0 = x.rooms.find((r) => r.key === 'r-0')!;
+      if ((r0.capL! - r0.freeL) / r0.capL! < 0.55 - 1e-9) return x;
+      return { ...x, result: { ...x.result, kgByPos: { ...x.result.kgByPos, rack: (x.result.kgByPos.rack ?? 0) - 0.05, frame: 0.05 } } };
+    };
+    const out = handlingFirst(p.start, (pins, from) => reward(p.trial(pins, from)), (pins) => reward(p.fresh(pins)));
+    expect(out).toMatchObject({ apply: false, moves: [] });
+  });
+
   test('[HF-ORDER] a pair that cannot be made even at no cost is left as it is: no things to repack for a pair that stays uneven all the same', () => {
     const bags: Bag[] = [{ key: 'k-0', pos: 'fork', cap: 3, reach: false, pair: 'k' }, { key: 'k-1', pos: 'fork', cap: 3, reach: false, pair: 'k' }];
     const p = keeper(bags, [{ id: 'tent', kg: 1.3, L: 2 }, { id: 'pot', kg: 0.3, L: 0.5 }], { tent: 'k-0', pot: 'k-0' });
