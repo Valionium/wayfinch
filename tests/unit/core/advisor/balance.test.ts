@@ -1,5 +1,6 @@
+import fc from 'fast-check';
 import { describe, expect, test } from 'vitest';
-import { autoBalance, balance, keepsPromises, MAX_BALANCE_TRIALS } from '../../../../src/core/advisor/balance.ts';
+import { autoBalance, balance, frameRoom, handlingFirst, heaviestFirst, keepsPromises, MAX_BALANCE_TRIALS, PAIR_UNEVEN } from '../../../../src/core/advisor/balance.ts';
 import type { Packing } from '../../../../src/core/advisor/balance.ts';
 import { handlingScore } from '../../../../src/core/advisor/rank.ts';
 import type { Pos, TrialResult } from '../../../../src/core/advisor/types.ts';
@@ -7,7 +8,7 @@ import { MIN_GAIN_SCORE, WEIGHTS } from '../../../../src/core/advisor/table.ts';
 
 // A stand-in packer: the plan's own assignment, with the pins on top (a pin into a bag with too little room stays where it was, as the
 // planner's "not kept"). Must-reach items count out of reach in a bag the rider cannot reach while riding.
-type Bag = { key: string; pos: Pos; cap: number; reach: boolean };
+type Bag = { key: string; pos: Pos; cap: number; reach: boolean; pair?: string };
 type Item = { id: string; kg: number; L: number; reach?: boolean };
 function packer(bags: Bag[], items: Item[], plan: Record<string, string>) {
   let calls = 0;
@@ -42,7 +43,7 @@ function packer(bags: Bag[], items: Item[], plan: Record<string, string>) {
 // A stand-in closer to the planner's kept plan: every pinned item is taken out first, then placed in its pinned bag when it fits there
 // (else back where it was, else left over), and food (`food`) is no piece: it fills the gaps last, lightest position first, and what
 // does not fit is left over. A bag's free litres are what is left after the food; `fillL` is the food's litres in it.
-type FItem = Item & { food?: boolean };
+type FItem = Item & { food?: boolean; split?: [string, string, number] };
 const order = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 function repacker(bags: Bag[], items: FItem[], plan: Record<string, string>) {
   const bag = (key: string) => bags.find((b) => b.key === key)!;
@@ -284,5 +285,421 @@ describe('automatic balancing (weight map design §7)', () => {
     expect(out.gain).toBeCloseTo((2 - 0.2) * (WEIGHTS.seat - WEIGHTS.frame), 2);
     // what the rider keeps where it is stays there, wider look or not
     expect(autoBalance(p.start, p.trial, { wide: true, fixed: ['jacket'] }).apply).toBe(false);
+  });
+});
+
+// "Handling first" (design of 10 Nov 2026, the owner's answers §10): one press packs by weight, the densest things into the best spots
+// (frame bag, top tube bag, fork cages, panniers, bar roll, seat pack; never the back), taking every gain however small. It tries the
+// usual search run to the end and a heaviest-first packing (then the search from there), keeps whichever handles better, and is never
+// worse than the plan as it stands.
+// A stand-in closer to the page's two packings: `trial` keeps everything where the packing it starts from has it and places a pin only
+// where it then fits (the kept plan's passes 1 and 2); `fresh` is the planner's own packing with the pins placed first, the rest where the
+// plan has them when they fit, else in the bag with the most free litres. Food is no piece and fills the gaps last, lightest position
+// first. `items` in the result: each thing's bags and litres, as plan.items has them.
+function keeper(bags: Bag[], items: FItem[], plan: Record<string, string>) {
+  const bag = (key: string) => bags.find((b) => b.key === key)!;
+  const byLight = [...bags].sort((a, b) => WEIGHTS[a.pos] - WEIGHTS[b.pos] || order(a.key, b.key));
+  const solid = items.filter((it) => !it.food);
+  const pack = (at: Record<string, string>, pins: Record<string, string>, pinsFirst: boolean): Packing => {
+    const left = new Map(bags.map((b) => [b.key, b.cap]));
+    const where: Record<string, string> = {};
+    const fits = (key: string | undefined, L: number) => !!key && left.has(key) && left.get(key)! + 1e-9 >= L;
+    const put = (id: string, key: string, L: number) => { where[id] = key; left.set(key, left.get(key)! - L); };
+    // a thing the plan splits over two bags (`split`: the bags and the litres in the first) stays split unless pinned whole
+    const parts = solid.filter((it) => it.split && !(it.id in pins));
+    for (const it of parts) { left.set(it.split![0], left.get(it.split![0])! - it.split![2]); left.set(it.split![1], left.get(it.split![1])! - (it.L - it.split![2])); }
+    const pinned = solid.filter((it) => it.id in pins), rest = solid.filter((it) => !(it.id in pins) && !it.split);
+    const spillIds: string[] = [];
+    let overL = 0;
+    const placeRest = (it: FItem) => {
+      const roomiest = [...bags].sort((a, b) => left.get(b.key)! - left.get(a.key)! || order(a.key, b.key)).map((b) => b.key);
+      const key = [at[it.id], ...roomiest].find((k) => fits(k, it.L));
+      if (key) put(it.id, key, it.L); else { spillIds.push(it.id); overL += it.L; }
+    };
+    const placePinned = (it: FItem) => { if (fits(pins[it.id], it.L)) put(it.id, pins[it.id]!, it.L); else placeRest(it); };
+    if (pinsFirst) { pinned.forEach(placePinned); rest.forEach(placeRest); } else { rest.forEach(placeRest); pinned.forEach(placePinned); }
+    const kgByPos: Partial<Record<Pos, number>> = {};
+    const add = (p: Pos, kg: number) => { kgByPos[p] = +((kgByPos[p] ?? 0) + kg).toFixed(4); };
+    const fill = new Map(bags.map((b) => [b.key, 0]));
+    const out: Record<string, unknown[]> = {};
+    for (const it of solid) if (where[it.id]) { add(bag(where[it.id]!).pos, it.kg); out[it.id] = [[where[it.id], 1, it.L]]; }
+    for (const it of parts) {
+      const [a, b, la] = it.split!;
+      add(bag(a).pos, (it.kg * la) / it.L); add(bag(b).pos, (it.kg * (it.L - la)) / it.L);
+      out[it.id] = [[a, 1, la], [b, 1, +(it.L - la).toFixed(2)]];
+    }
+    for (const it of items.filter((x) => x.food)) {
+      let need = it.L;
+      const entries: unknown[] = [];
+      for (const b of byLight) {
+        const take = Math.min(need, left.get(b.key)!);
+        if (take <= 1e-9) continue;
+        left.set(b.key, left.get(b.key)! - take); fill.set(b.key, fill.get(b.key)! + take); add(b.pos, (it.kg * take) / it.L); need -= take;
+        entries.push([b.key, 1, +take.toFixed(2)]);
+      }
+      out[it.id] = entries;
+      overL += need;
+    }
+    const onBack = solid.filter((it) => where[it.id] && bag(where[it.id]!).pos === 'pack');
+    const result: TrialResult = {
+      overL: +overL.toFixed(2), spillIds,
+      backL: +(onBack.reduce((t, x) => t + x.L, 0) + bags.filter((b) => b.pos === 'pack').reduce((t, b) => t + fill.get(b.key)!, 0)).toFixed(2),
+      backKg: onBack.reduce((t, x) => t + x.kg, 0),
+      outOfReach: solid.filter((it) => it.reach && where[it.id] && !bag(where[it.id]!).reach).length, kgByPos, items: out,
+    };
+    return {
+      result,
+      pieces: solid.filter((it) => where[it.id]).map((it) => ({ id: it.id, kg: it.kg, L: it.L, unit: where[it.id]!, pos: bag(where[it.id]!).pos })),
+      rooms: bags.map((b) => ({ key: b.key, pos: b.pos, freeL: +left.get(b.key)!.toFixed(2), fillL: +fill.get(b.key)!.toFixed(2), capL: b.cap, ...(b.pair ? { pair: b.pair } : {}) })),
+      state: where,
+    };
+  };
+  return {
+    start: pack(plan, {}, false),
+    trial: (pins: Record<string, string>, from: Packing) => pack(from.state as Record<string, string>, pins, false),
+    fresh: (pins: Record<string, string>) => pack(plan, pins, true),
+  };
+}
+const unitOf = (p: Packing, id: string) => p.pieces.find((x) => x.id === id)?.unit;
+// each pair's gap in how full its two halves are (the page's pair note calls 0.22 or more uneven)
+const gaps = (p: Packing) => {
+  const by = new Map<string, number[]>();
+  for (const r of p.rooms) if (r.pair) by.set(r.pair, [...(by.get(r.pair) ?? []), (r.capL! - r.freeL) / r.capL!]);
+  return new Map([...by].filter(([, f]) => f.length === 2).map(([k, f]) => [k, Math.abs(f[0]! - f[1]!)]));
+};
+
+describe('"Handling first" (design of 10 Nov 2026)', () => {
+  test('[HF-ORDER] the heaviest-first packing pins the densest things into the best spots first: frame bag, top tube bag, fork cages, panniers, bar roll, seat pack, never the back', () => {
+    const bags: Bag[] = [
+      { key: 's-0', pos: 'seat', cap: 14, reach: false }, { key: 'b-0', pos: 'bar', cap: 10, reach: true },
+      { key: 'k-0', pos: 'fork', cap: 2, reach: false }, { key: 'f-0', pos: 'frame', cap: 2.5, reach: true },
+      { key: 't-0', pos: 'top', cap: 1, reach: true }, { key: 'p-0', pos: 'pack', cap: 20, reach: true },
+    ];
+    const items: FItem[] = [
+      { id: 'lock', kg: 0.9, L: 0.8 }, { id: 'tools', kg: 0.5, L: 0.5 }, { id: 'bank', kg: 0.35, L: 0.4 }, { id: 'stove', kg: 0.5, L: 1.5 },
+      { id: 'pot', kg: 0.3, L: 1 }, { id: 'tent', kg: 1.3, L: 5 }, { id: 'quilt', kg: 0.8, L: 5 }, { id: 'puffy', kg: 0.35, L: 2 },
+    ];
+    const p = keeper(bags, items, { lock: 's-0', tools: 's-0', bank: 'b-0', stove: 's-0', pot: 'p-0', tent: 'b-0', quilt: 's-0', puffy: 'p-0' });
+    // by kilos per litre: lock 1.125, tools 1.0, bank 0.875, stove 0.33, pot 0.3, tent 0.26, puffy 0.175, quilt 0.16; each into the best
+    // spot that still has room for it
+    expect(heaviestFirst(p.start)).toEqual({
+      lock: 'f-0', tools: 'f-0', bank: 'f-0', // 1.7 L of the frame bag's 2.5
+      stove: 'k-0',                            // 1.5 L: not in the frame bag's 0.8 L left, nor the top tube bag's 1 L; the fork cage
+      pot: 't-0',                              // 1 L: the top tube bag
+      tent: 'b-0', puffy: 'b-0',               // the bar roll's 10 L: the tent and the puffy (the quilt no longer fits there)
+      quilt: 's-0',                            // the seat pack; nothing to the back
+    });
+    // the things it is told to keep stay in their bags, and their litres are counted there first
+    expect(heaviestFirst(p.start, ['tent'])).toMatchObject({ tent: 'b-0', lock: 'f-0', tools: 'f-0', bank: 'f-0', puffy: 'b-0', quilt: 's-0' });
+    // a tie of the weight: the frame bag before a bottle cage
+    const two: Bag[] = [{ key: 'a-0', pos: 'bottle', cap: 1, reach: true }, { key: 'f-0', pos: 'frame', cap: 2, reach: true }, { key: 's-0', pos: 'seat', cap: 10, reach: false }];
+    const q = keeper(two, [{ id: 'lock', kg: 0.9, L: 0.8 }], { lock: 's-0' });
+    expect(heaviestFirst(q.start)).toEqual({ lock: 'f-0' });
+  });
+
+  test('[HF-ORDER] it finds what the step-by-step search misses: one dense thing for two light ones in a full frame bag', () => {
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 2, reach: true }, { key: 's-0', pos: 'seat', cap: 14, reach: false }];
+    const items: FItem[] = [{ id: 'cap', kg: 0.5, L: 1 }, { id: 'wash', kg: 0.5, L: 1 }, { id: 'lock', kg: 1.6, L: 2 }];
+    const p = keeper(bags, items, { cap: 'f-0', wash: 'f-0', lock: 's-0' });
+    expect(balance(p.start, p.trial, { wide: true }).moves).toEqual([]); // no single move or swap helps
+    const out = handlingFirst(p.start, p.trial, p.fresh);
+    expect(out.apply).toBe(true);
+    expect(out.route).toBe('heaviest');
+    expect(out.moves).toEqual([{ id: 'cap', from: 'f-0', to: 's-0' }, { id: 'wash', from: 'f-0', to: 's-0' }, { id: 'lock', from: 's-0', to: 'f-0' }]);
+    expect(out.gain).toBe(Math.round((handlingScore(p.start.result) - handlingScore(out.packing.result)) * 100) / 100);
+    expect(out.gain).toBeCloseTo(0.6 * (WEIGHTS.seat - WEIGHTS.frame), 2);
+    expect(keepsPromises(p.start.result, out.packing.result)).toBe(true);
+    expect(out.partial).toBe(false);
+  });
+
+  test('[HF-ORDER] it takes every gain, however small: a move worth 0.04 points, which the automatic balancing leaves', () => {
+    const bags: Bag[] = [{ key: 't-0', pos: 'top', cap: 1, reach: true }, { key: 'b-0', pos: 'bar', cap: 10, reach: true }];
+    const p = keeper(bags, [{ id: 'cash', kg: 0.04, L: 0.05 }], { cash: 'b-0' });
+    expect(autoBalance(p.start, p.trial).apply).toBe(false);
+    const out = handlingFirst(p.start, p.trial, p.fresh);
+    expect(out).toMatchObject({ apply: true, gain: 0.04, moves: [{ id: 'cash', from: 'b-0', to: 't-0' }] });
+  });
+
+  test('[HF-ORDER] a tie of the score goes to the one with more kilos in the frame bag', () => {
+    // the search finds the bottle cage first (its name sorts first); the heaviest-first packing the frame bag: the same score
+    const bags: Bag[] = [{ key: 'b-0', pos: 'bottle', cap: 1, reach: true }, { key: 'f-0', pos: 'frame', cap: 2, reach: true }, { key: 's-0', pos: 'seat', cap: 10, reach: false }];
+    const p = keeper(bags, [{ id: 'lock', kg: 0.9, L: 0.8 }], { lock: 's-0' });
+    expect(unitOf(balance(p.start, p.trial, { wide: true }).packing, 'lock')).toBe('b-0');
+    const out = handlingFirst(p.start, p.trial, p.fresh);
+    expect(out.route).toBe('heaviest');
+    expect(unitOf(out.packing, 'lock')).toBe('f-0');
+  });
+
+  test('[HF-ORDER] a move that changes nothing is put back: fewer things to repack for the same score', () => {
+    // two fork cages; the heaviest-first packing puts the spork in the first, the plan had it in the second: the same weight
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 2, reach: true }, { key: 'k-0', pos: 'fork', cap: 3, reach: false },
+      { key: 'k-1', pos: 'fork', cap: 3, reach: false }, { key: 's-0', pos: 'seat', cap: 14, reach: false }];
+    const items: FItem[] = [{ id: 'cap', kg: 0.5, L: 1 }, { id: 'wash', kg: 0.5, L: 1 }, { id: 'lock', kg: 1.6, L: 2 }, { id: 'spork', kg: 0.02, L: 0.05 }];
+    const p = keeper(bags, items, { cap: 'f-0', wash: 'f-0', lock: 's-0', spork: 'k-1' });
+    expect(heaviestFirst(p.start).spork).toBe('k-0');
+    const out = handlingFirst(p.start, p.trial, p.fresh);
+    expect(out.route).toBe('heaviest');
+    expect(unitOf(out.packing, 'spork')).toBe('k-1');
+    expect(out.moves.map((m) => m.id)).not.toContain('spork');
+  });
+
+  test('[HF-ORDER] a move that changes nothing is put back even when a search ran out of its trials', () => {
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 2, reach: true }, { key: 'k-0', pos: 'fork', cap: 3, reach: false },
+      { key: 'k-1', pos: 'fork', cap: 3, reach: false }, { key: 's-0', pos: 'seat', cap: 14, reach: false }];
+    const items: FItem[] = [{ id: 'cap', kg: 0.5, L: 1 }, { id: 'wash', kg: 0.5, L: 1 }, { id: 'lock', kg: 1.6, L: 2 }, { id: 'spork', kg: 0.02, L: 0.05 }];
+    const p = keeper(bags, items, { cap: 'f-0', wash: 'f-0', lock: 's-0', spork: 'k-1' });
+    const out = handlingFirst(p.start, p.trial, p.fresh, { maxTrials: 1 });
+    expect(out.partial).toBe(true);
+    expect(out.route).toBe('heaviest');
+    expect(unitOf(out.packing, 'spork')).toBe('k-1');
+  });
+
+  test('[HF-NEVER-WORSE] never a higher score than the plan as it stands or than the usual search; nothing to gain: nothing applied', () => {
+    const POS: Pos[] = ['frame', 'top', 'fork', 'bar', 'seat', 'rack', 'pack'];
+    const arb = fc.record({
+      bags: fc.uniqueArray(fc.record({ pos: fc.constantFrom(...POS), cap: fc.integer({ min: 1, max: 14 }), reach: fc.boolean() }), { minLength: 2, maxLength: 5, selector: (b) => b.pos }),
+      items: fc.array(fc.record({ kg: fc.integer({ min: 1, max: 150 }), L: fc.integer({ min: 1, max: 60 }), reach: fc.boolean(), at: fc.nat() }), { minLength: 1, maxLength: 9 }),
+      food: fc.option(fc.record({ kg: fc.integer({ min: 1, max: 30 }), L: fc.integer({ min: 1, max: 30 }) }), { nil: undefined }),
+      fixed: fc.array(fc.nat(), { maxLength: 2 }),
+      pair: fc.boolean(),
+    });
+    fc.assert(fc.property(arb, (c) => {
+      const bags: Bag[] = c.bags.map((b, i) => ({ key: `${i}-0`, pos: b.pos, cap: b.cap, reach: b.reach }));
+      // a pair: the first bag's twin, its other half
+      if (c.pair && bags[0]!.pos !== 'frame' && bags[0]!.pos !== 'top') { bags[0]!.pair = 'P'; bags.push({ ...bags[0]!, key: '0-1' }); }
+      const items: FItem[] = c.items.map((x, i) => ({ id: `i${i}`, kg: x.kg / 100, L: x.L / 10, reach: x.reach }));
+      if (c.food) items.push({ id: 'food', kg: c.food.kg / 10, L: c.food.L / 10, food: true });
+      const plan = Object.fromEntries(c.items.map((x, i) => [`i${i}`, bags[x.at % bags.length]!.key]));
+      const p = keeper(bags, items, plan);
+      const fixed = [...new Set(c.fixed.map((n) => p.start.pieces[n % Math.max(1, p.start.pieces.length)]?.id).filter((x): x is string => !!x))];
+      const out = handlingFirst(p.start, p.trial, p.fresh, { fixed });
+      const s = handlingScore(out.packing.result);
+      expect(s).toBeLessThanOrEqual(handlingScore(p.start.result));
+      // the usual search, held to the same side to side rule (review of PRs 116/117, C1)
+      const even = (x: Packing) => [...gaps(p.start)].every(([k, g]) => { const n = gaps(x).get(k)!; return g < PAIR_UNEVEN ? n < PAIR_UNEVEN : n <= g + 1e-9; });
+      expect(s).toBeLessThanOrEqual(handlingScore(balance(p.start, p.trial, { fixed, wide: true, keep: even }).packing.result));
+      expect(keepsPromises(p.start.result, out.packing.result)).toBe(true);
+      if (!out.apply) { expect(out.packing).toBe(p.start); expect(out.moves).toEqual([]); expect(out.gain).toBe(0); }
+      else {
+        // applied for a better score, or for a pair evened out
+        const evened = [...gaps(p.start)].some(([k, g]) => (gaps(out.packing).get(k) ?? g) < g - 1e-9);
+        expect(out.gain >= 0.01 || evened).toBe(true);
+        expect(out.moves.length).toBeGreaterThan(0);
+        // where it ends, the usual search finds nothing more: a second press does not move things for the search's sake
+        expect(balance(out.packing, p.trial, { fixed, wide: true, keep: even }).moves).toEqual([]);
+      }
+      for (const id of fixed) expect(unitOf(out.packing, id)).toBe(unitOf(p.start, id));
+      // side to side: an even pair stays even, an uneven one never gets more uneven
+      for (const [k, g] of gaps(p.start)) {
+        const now = gaps(out.packing).get(k)!;
+        if (g < PAIR_UNEVEN) expect(now).toBeLessThan(PAIR_UNEVEN); else expect(now).toBeLessThanOrEqual(g + 1e-9);
+      }
+    }), { numRuns: 300, seed: 20261110 });
+  });
+
+  test('[HF-KEEPS] what it is told to keep never moves, every promise is kept, and the same input gives the same answer', () => {
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 2, reach: true }, { key: 'b-0', pos: 'bar', cap: 10, reach: true },
+      { key: 's-0', pos: 'seat', cap: 14, reach: false }, { key: 'p-0', pos: 'pack', cap: 20, reach: true }];
+    const items: FItem[] = [{ id: 'cap', kg: 0.5, L: 1 }, { id: 'wash', kg: 0.5, L: 1 }, { id: 'lock', kg: 1.6, L: 2 },
+      { id: 'snacks', kg: 0.3, L: 0.5, reach: true }];
+    const p = keeper(bags, items, { cap: 'f-0', wash: 'f-0', lock: 's-0', snacks: 'p-0' });
+    // the cap ticked as packed in the frame bag: the lock can no longer go there; the snacks stay within reach
+    const out = handlingFirst(p.start, p.trial, p.fresh, { fixed: ['cap'] });
+    expect(out.apply).toBe(true);
+    expect(unitOf(out.packing, 'cap')).toBe('f-0');
+    expect(unitOf(out.packing, 'lock')).not.toBe('f-0');
+    expect(out.moves.map((m) => m.id)).not.toContain('cap');
+    expect(out.packing.result.outOfReach).toBe(0);
+    expect(keepsPromises(p.start.result, out.packing.result)).toBe(true);
+    expect(handlingFirst(p.start, p.trial, p.fresh, { fixed: ['cap'] })).toEqual(out);
+    // free: the lock into the frame bag, the snacks off the back but within reach, nothing more on the back
+    const free = handlingFirst(p.start, p.trial, p.fresh);
+    expect(unitOf(free.packing, 'lock')).toBe('f-0');
+    expect(unitOf(free.packing, 'snacks')).toBe('b-0');
+    expect(keepsPromises(p.start.result, free.packing.result)).toBe(true);
+    expect(handlingScore(free.packing.result)).toBeLessThan(handlingScore(out.packing.result));
+  });
+
+  test('[HF-KEEPS] a kept thing that is no single piece (food ticked as packed) keeps its bags and litres: a better spread that moves it is not applied, and the answer says it is held', () => {
+    // the jacket out of the full frame bag lets the food in (the wider look), but the food is ticked as packed where it is
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 3, reach: true }, { key: 's-0', pos: 'seat', cap: 14, reach: true }];
+    const items: FItem[] = [{ id: 'jacket', kg: 0.2, L: 3 }, { id: 'food', kg: 2, L: 3, food: true }];
+    const p = keeper(bags, items, { jacket: 'f-0' });
+    expect(handlingFirst(p.start, p.trial, p.fresh).apply).toBe(true);
+    const out = handlingFirst(p.start, p.trial, p.fresh, { fixed: ['food'] });
+    expect(out).toMatchObject({ apply: false, held: true, moves: [], gain: 0 });
+    expect(out.packing).toBe(p.start);
+    // nothing to gain at all: not held
+    const none = keeper(bags, [{ id: 'lock', kg: 0.9, L: 0.8 }], { lock: 'f-0' });
+    expect(handlingFirst(none.start, none.trial, none.fresh)).toMatchObject({ apply: false, held: false, route: null });
+  });
+
+  test('[HF-NEVER-WORSE] within the trials it is given: each search at most maxTrials, the answer marked partial when one ran out', () => {
+    const items: FItem[] = Array.from({ length: 30 }, (_, i) => ({ id: `i${String(i).padStart(2, '0')}`, kg: 0.3 + i / 100, L: 0.2 }));
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 3, reach: true }, { key: 'b-0', pos: 'bar', cap: 12, reach: true }, { key: 's-0', pos: 'seat', cap: 14, reach: false }];
+    const p = keeper(bags, items, Object.fromEntries(items.map((it) => [it.id, 's-0'])));
+    const cut = handlingFirst(p.start, p.trial, p.fresh, { maxTrials: 3 });
+    expect(cut.partial).toBe(true);
+    // each search at most 3, the heaviest-first packing one, then one trial per move to put back
+    expect(cut.tried).toBeLessThanOrEqual(2 * 3 + 1 + cut.moves.length);
+    expect(handlingScore(cut.packing.result)).toBeLessThanOrEqual(handlingScore(p.start.result));
+    const whole = handlingFirst(p.start, p.trial, p.fresh);
+    expect(whole.partial).toBe(false);
+    expect(whole.done).toBe(true);
+    expect(handlingScore(whole.packing.result)).toBeLessThanOrEqual(handlingScore(cut.packing.result));
+  });
+
+  // [PERF-HF]: the page runs it in slices, each with a few more trials; the trials it ran before are remembered, so each slice adds only
+  // new ones, and the page applies nothing until the answer is done.
+  test('[HF-NEVER-WORSE] in slices: with a budget of trials it is done only once everything ran within it, nothing applied before, and then the same answer as in one go', () => {
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 2, reach: true }, { key: 'k-0', pos: 'fork', cap: 3, reach: false },
+      { key: 'k-1', pos: 'fork', cap: 3, reach: false }, { key: 's-0', pos: 'seat', cap: 14, reach: false }];
+    const items: FItem[] = [{ id: 'cap', kg: 0.5, L: 1 }, { id: 'wash', kg: 0.5, L: 1 }, { id: 'lock', kg: 1.6, L: 2 }, { id: 'spork', kg: 0.02, L: 0.05 },
+      { id: 'tent', kg: 1.3, L: 5 }, { id: 'food', kg: 1.4, L: 2.4, food: true }];
+    const p = keeper(bags, items, { cap: 'f-0', wash: 'f-0', lock: 's-0', spork: 'k-1', tent: 's-0' });
+    // the caller's memory of trials, as the page's rememberedTrial: by where it starts and its pins
+    let ran = 0;
+    const seen = new WeakMap<Packing, Map<string, Packing>>(), fresh = new Map<string, Packing>();
+    const trial = (pins: Record<string, string>, from: Packing) => {
+      let m = seen.get(from); if (!m) seen.set(from, m = new Map());
+      const k = JSON.stringify(pins); if (!m.has(k)) { ran++; m.set(k, p.trial(pins, from)); }
+      return m.get(k)!;
+    };
+    const anew = (pins: Record<string, string>) => { const k = JSON.stringify(pins); if (!fresh.has(k)) { ran++; fresh.set(k, p.fresh(pins)); } return fresh.get(k)!; };
+    const once = handlingFirst(p.start, p.trial, p.fresh);
+    expect(once.done).toBe(true);
+    let n = 0, out;
+    for (;;) {
+      n += 8;
+      const before = ran;
+      out = handlingFirst(p.start, trial, anew, { budget: n });
+      expect(ran - before, 'each slice adds at most its own trials').toBeLessThanOrEqual(8);
+      expect(out.tried).toBeLessThanOrEqual(n);
+      if (out.done) break;
+      expect(out).toMatchObject({ apply: false, moves: [], gain: 0 });
+      expect(out.packing).toBe(p.start);
+      expect(n).toBeLessThan(1000);
+    }
+    expect(n, 'more than one slice').toBeGreaterThan(8);
+    expect(JSON.stringify(out)).toBe(JSON.stringify(once));
+  });
+
+  // Review of PRs 116/117, C1: the heaviest-first packing stacked one rear pannier to 100 % and left the other at 1 % for a 0.04 gain.
+  test('[HF-KEEPS] side to side: a pair even at the start stays even (the pair note\'s 0.22), even when stacking one half would score a little better', () => {
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 2, reach: true }, { key: 'r-0', pos: 'rack', cap: 10, reach: false, pair: 'r' },
+      { key: 'r-1', pos: 'rack', cap: 10, reach: false, pair: 'r' }];
+    const items: FItem[] = [{ id: 'cap', kg: 0.5, L: 1 }, { id: 'wash', kg: 0.5, L: 1 }, { id: 'lock', kg: 1.6, L: 2 }, { id: 'tent', kg: 1.3, L: 3 },
+      { id: 'quilt', kg: 0.8, L: 3 }, { id: 'stove', kg: 0.5, L: 1.5 }, { id: 'water', kg: 0.8, L: 0.75 }];
+    const p = keeper(bags, items, { cap: 'f-0', wash: 'f-0', lock: 'r-0', tent: 'r-0', quilt: 'r-1', stove: 'r-1', water: 'r-1' });
+    // a packing that rewards an almost empty half (as the page's food re-pack did): 0.05 kg more in the frame bag's weight
+    const stacked = (x: Packing): Packing => {
+      const r1 = x.rooms.find((r) => r.key === 'r-1')!;
+      if ((r1.capL! - r1.freeL) / r1.capL! >= 0.4) return x;
+      const kg = { ...x.result.kgByPos, rack: (x.result.kgByPos.rack ?? 0) - 0.05, frame: (x.result.kgByPos.frame ?? 0) + 0.05 };
+      return { ...x, result: { ...x.result, kgByPos: kg } };
+    };
+    const trial = (pins: Record<string, string>, from: Packing) => stacked(p.trial(pins, from));
+    const fresh = (pins: Record<string, string>) => stacked(p.fresh(pins));
+    expect(gaps(p.start).get('r')!).toBeLessThan(PAIR_UNEVEN);
+    const out = handlingFirst(p.start, trial, fresh);
+    expect(out.apply).toBe(true);
+    expect(unitOf(out.packing, 'water')).toBe('f-0');
+    expect(gaps(out.packing).get('r')!).toBeLessThan(PAIR_UNEVEN);
+    expect(keepsPromises(p.start.result, out.packing.result)).toBe(true);
+    // no move only from one half of the pair to the other
+    expect(out.moves.filter((m) => m.from.startsWith('r-') && m.to.startsWith('r-'))).toEqual([]);
+  });
+
+  test('[HF-KEEPS] side to side: an uneven pair is never made more uneven, and a press evens it out when it can, with nothing else to gain', () => {
+    const bags: Bag[] = [{ key: 'k-0', pos: 'fork', cap: 3, reach: false, pair: 'k' }, { key: 'k-1', pos: 'fork', cap: 3, reach: false, pair: 'k' },
+      { key: 's-0', pos: 'seat', cap: 6, reach: false }];
+    const items: FItem[] = [{ id: 'pot', kg: 0.3, L: 1 }, { id: 'stove', kg: 0.5, L: 1.5 }, { id: 'tubes', kg: 0.35, L: 0.4 }, { id: 'quilt', kg: 0.8, L: 5 }];
+    const p = keeper(bags, items, { pot: 'k-0', stove: 'k-0', tubes: 'k-0', quilt: 's-0' });
+    expect(gaps(p.start).get('k')!).toBeGreaterThanOrEqual(PAIR_UNEVEN); // 97 % and 0 %
+    const out = handlingFirst(p.start, p.trial, p.fresh);
+    expect(out.apply).toBe(true);
+    expect(out.gain).toBe(0);
+    expect(gaps(out.packing).get('k')!).toBeLessThan(gaps(p.start).get('k')!);
+    expect(out.moves.length).toBeGreaterThan(0);
+    expect(out.moves.every((m) => m.from === 'k-0' && m.to === 'k-1')).toBe(true);
+    // a thing kept where it is stays, and the pair is evened with the others
+    const kept = handlingFirst(p.start, p.trial, p.fresh, { fixed: ['stove'] });
+    expect(unitOf(kept.packing, 'stove')).toBe('k-0');
+    expect(gaps(kept.packing).get('k')!).toBeLessThanOrEqual(gaps(p.start).get('k')!);
+  });
+
+  // The coordinator's ruling on review I2: a move from one half of a pair to the other only where side to side needs it, never for score.
+  test('[HF-ORDER] a move from one half of a pair to the other is never kept for score alone (here the re-pack rewards it): nothing applied', () => {
+    const bags: Bag[] = [{ key: 'r-0', pos: 'rack', cap: 10, reach: false, pair: 'r' }, { key: 'r-1', pos: 'rack', cap: 10, reach: false, pair: 'r' }];
+    const items: FItem[] = [{ id: 'lock', kg: 1.6, L: 2 }, { id: 'tent', kg: 1.3, L: 3 }, { id: 'quilt', kg: 0.8, L: 3 }, { id: 'pot', kg: 0.3, L: 0.5 },
+      { id: 'stove', kg: 0.5, L: 1.5 }];
+    const p = keeper(bags, items, { lock: 'r-0', tent: 'r-0', quilt: 'r-1', pot: 'r-1', stove: 'r-1' });
+    // the re-pack rewards a fuller first half (as the page's food fill did)
+    const reward = (x: Packing): Packing => {
+      const r0 = x.rooms.find((r) => r.key === 'r-0')!;
+      if ((r0.capL! - r0.freeL) / r0.capL! < 0.55 - 1e-9) return x;
+      return { ...x, result: { ...x.result, kgByPos: { ...x.result.kgByPos, rack: (x.result.kgByPos.rack ?? 0) - 0.05, frame: 0.05 } } };
+    };
+    const out = handlingFirst(p.start, (pins, from) => reward(p.trial(pins, from)), (pins) => reward(p.fresh(pins)));
+    expect(out).toMatchObject({ apply: false, moves: [] });
+  });
+
+  test("[HF-ORDER] a thing packed into a pair goes to whichever half has room, so the pair's other things need not swap sides for it", () => {
+    const bags: Bag[] = [{ key: 'k-0', pos: 'fork', cap: 2, reach: false, pair: 'k' }, { key: 'k-1', pos: 'fork', cap: 2, reach: false, pair: 'k' },
+      { key: 's-0', pos: 'seat', cap: 10, reach: false }];
+    const items: FItem[] = [{ id: 'lock', kg: 1.6, L: 2 }, { id: 'a', kg: 0.3, L: 1 }, { id: 'b', kg: 0.3, L: 1 }, { id: 'c', kg: 0.3, L: 1 }, { id: 'd', kg: 0.3, L: 1 }];
+    const p = keeper(bags, items, { lock: 's-0', a: 'k-0', b: 'k-0', c: 'k-1', d: 'k-1' });
+    const out = handlingFirst(p.start, p.trial, p.fresh);
+    expect(out.apply).toBe(true);
+    expect(['k-0', 'k-1']).toContain(unitOf(out.packing, 'lock'));
+    expect(out.moves.filter((m) => m.from.startsWith('k-') && m.to.startsWith('k-'))).toEqual([]);
+    expect(out.moves).toHaveLength(3);
+  });
+
+  test('[HF-ORDER] a pair that cannot be made even at no cost is left as it is: no things to repack for a pair that stays uneven all the same', () => {
+    const bags: Bag[] = [{ key: 'k-0', pos: 'fork', cap: 3, reach: false, pair: 'k' }, { key: 'k-1', pos: 'fork', cap: 3, reach: false, pair: 'k' }];
+    const p = keeper(bags, [{ id: 'tent', kg: 1.3, L: 2 }, { id: 'pot', kg: 0.3, L: 0.5 }], { tent: 'k-0', pot: 'k-0' });
+    expect(gaps(p.start).get('k')!).toBeGreaterThanOrEqual(PAIR_UNEVEN); // 83 % and 0 %; the pot over leaves 67 % and 17 %
+    expect(handlingFirst(p.start, p.trial, p.fresh)).toMatchObject({ apply: false, moves: [] });
+  });
+
+  // Review of PRs 116/117, I1: a thing split over bags that the search packs whole moved without being listed.
+  test('[HF-ORDER] a thing split over bags and packed whole is in the moves, from the bag that held most of it; a press with no thing to move applies nothing', () => {
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 4, reach: true }, { key: 's-0', pos: 'seat', cap: 14, reach: false }];
+    const items: FItem[] = [{ id: 'tent', kg: 1.3, L: 3, split: ['f-0', 's-0', 1] }, { id: 'pot', kg: 0.3, L: 1 }];
+    const p = keeper(bags, items, { pot: 'f-0' });
+    expect(p.start.pieces.map((x) => x.id)).toEqual(['pot']);
+    const out = handlingFirst(p.start, p.trial, p.fresh, { extra: ['tent'] });
+    expect(out.apply).toBe(true);
+    expect(out.moves).toContainEqual({ id: 'tent', from: 's-0', to: 'f-0' });
+    // a better score with no thing in another bag (only food the re-pack shifted): not applied
+    const lighter = (x: Packing): Packing => ({ ...x, result: { ...x.result, kgByPos: { ...x.result.kgByPos, seat: (x.result.kgByPos.seat ?? 0) - 0.5 } } });
+    const q = keeper(bags, [{ id: 'pot', kg: 0.3, L: 1 }], { pot: 's-0' });
+    const none = handlingFirst(q.start, (pins, from) => lighter({ ...q.start, state: from.state }), () => lighter(q.start));
+    expect(none).toMatchObject({ apply: false, moves: [] });
+  });
+
+  test('[HF-FULL] the frame bag: full when nothing outside it fits its free litres, "of the heaviest things" only when all in it are at least as dense as the densest thing outside, and the kilos a bigger one would take', () => {
+    const bags: Bag[] = [{ key: 'f-0', pos: 'frame', cap: 2, reach: true }, { key: 'k-0', pos: 'fork', cap: 3, reach: false }, { key: 's-0', pos: 'seat', cap: 14, reach: false }];
+    const items: FItem[] = [{ id: 'lock', kg: 1.6, L: 1.8 }, { id: 'stove', kg: 0.5, L: 1.5 }, { id: 'pot', kg: 0.3, L: 1 }, { id: 'quilt', kg: 0.8, L: 5 }];
+    const p = keeper(bags, items, { lock: 'f-0', stove: 'k-0', pot: 'k-0', quilt: 's-0' });
+    const r = frameRoom(p.start)!;
+    expect(r.full).toBe(true); // 0.2 L left: none of the others fits
+    expect(r.heaviest).toBe(true);
+    expect(r.outside.map((x) => x.id)).toEqual(['stove', 'pot', 'quilt']); // densest first
+    expect(r.moreKg).toBe(0);
+    // 3 L more: the stove (1.5 L) and the pot (1 L) in the 3.2 L, densest first; the quilt not
+    expect(frameRoom(p.start, { extraL: 3 })!.moreKg).toBe(0.8);
+    // a thing to keep is not counted as one that would move
+    expect(frameRoom(p.start, { extraL: 3, fixed: ['stove'] })!.moreKg).toBe(0.3);
+    // a light thing kept in the frame bag: full, but not of the heaviest things
+    const q = keeper(bags, [{ id: 'cap', kg: 0.1, L: 1.9 }, { id: 'stove', kg: 0.5, L: 1.5 }], { cap: 'f-0', stove: 'k-0' });
+    expect(frameRoom(q.start)).toMatchObject({ full: true, heaviest: false });
+    // room left for the pot: not full
+    const roomy = keeper(bags, [{ id: 'lock', kg: 0.9, L: 0.8 }, { id: 'pot', kg: 0.3, L: 1 }], { lock: 'f-0', pot: 'k-0' });
+    expect(frameRoom(roomy.start)!.full).toBe(false);
+    // no frame bag: nothing to say
+    const none = keeper([{ key: 's-0', pos: 'seat', cap: 14, reach: false }], [{ id: 'pot', kg: 0.3, L: 1 }], { pot: 's-0' });
+    expect(frameRoom(none.start)).toBeNull();
   });
 });
