@@ -358,3 +358,67 @@ describe('the places seen and the "fits better" lines', () => {
     expect([...host.querySelectorAll('a')].some((a) => a.textContent === Y.youBikeAdd)).toBe(true);
   });
 });
+
+// Try a colour (wish 17, design of 9 Nov 2026, section 4.2; owner's answer 3: five dots, as the last pull request): five swatches of
+// Look's own list under the card's sentence; a tap paints the frame at once and nothing is saved; Make it yours carries the colour.
+describe('try a colour on the card', () => {
+  const dots = () => [...host.querySelectorAll<HTMLButtonElement>('.bike-hint-dots button')];
+  const loaded = async () => { for (let i = 0; i < 30 && !dots().length; i += 1) await settle(); };
+  const hrefs = () => [...card()!.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+  const PLAIN = ['/tools/bags/#bike-details=new&back=trip&section=look', '/tools/bags/#bike-details=new&back=trip'];
+
+  test('[HINT-COLOUR] the card keeps the dots\' row from its first frame; loaded while idle, a group "Try a colour" of five named buttons, none pressed', async () => {
+    await act(() => { render(<TripBike bike={NO_BIKE} trip={false} />, host); });
+    const row = host.querySelector('.bike-hint-dots');
+    expect(row).not.toBeNull();
+    await loaded();
+    // the same row, filled: nothing above or below it moves
+    expect(host.querySelector('.bike-hint-dots')).toBe(row);
+    const group = row!.querySelector('[role=group]')!;
+    expect(group.getAttribute('aria-label')).toBe(HN.hintTryColour);
+    expect(HN.hintTryColour).toBe('Try a colour');
+    expect(dots().map((b) => b.getAttribute('aria-label'))).toEqual(['Teal', 'Red', 'Blue', 'Yellow', 'Black']);
+    expect(dots().every((b) => b.getAttribute('aria-pressed') === 'false' && b.type === 'button')).toBe(true);
+    // the row comes after the sentence and before Make it yours and Later
+    const sentence = [...card()!.querySelectorAll('p')].find((p) => p.textContent === W.bikeHintBody)!;
+    expect(sentence.compareDocumentPosition(row!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(row!.compareDocumentPosition(card()!.querySelector('.bike-hint-acts')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  test('[HINT-COLOUR] a tap paints the frame at once and Make it yours and the drawing carry the colour; nothing is written; tapped again, the grey bike', async () => {
+    await trip(NO_BIKE);
+    await loaded();
+    const stored = () => JSON.stringify(Object.keys(localStorage).sort().map((k) => [k, localStorage.getItem(k)]));
+    const before = stored();
+    expect(hrefs()).toEqual(PLAIN);
+    await act(() => { dots()[0]!.click(); });
+    expect(host.querySelector('.bk-paint')!.getAttribute('stroke')).toBe('#1f7f80');
+    expect(dots()[0]!.getAttribute('aria-pressed')).toBe('true');
+    expect(hrefs()).toEqual(PLAIN.map((h) => `${h}&colour=teal`));
+    expect(host.querySelector('.bike-tap')!.getAttribute('aria-label')).toMatch(/teal/i);
+    await act(() => { dots()[2]!.click(); });
+    expect(dots().map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'true', 'false', 'false']);
+    expect([...host.querySelectorAll('.bk-paint')].every((p) => p.getAttribute('stroke') === '#2563b8')).toBe(true);
+    expect(hrefs()).toEqual(PLAIN.map((h) => `${h}&colour=blue`));
+    await act(() => { dots()[2]!.click(); });
+    expect(host.querySelector('.bk-paint')).toBeNull();
+    expect(hrefs()).toEqual(PLAIN);
+    // nothing is saved: not the hint key, not a bike
+    expect(stored()).toBe(before);
+    expect(card()).not.toBeNull();
+  });
+
+  test('[HINT-COLOUR] only on the card: the small line and a saved bike have no dots and load none', async () => {
+    writeHint('s');
+    await trip(NO_BIKE);
+    await settle();
+    expect(card()).toBeNull();
+    expect(host.querySelector('.bike-hint-dots')).toBeNull();
+    render(null, host);
+    localStorage.clear();
+    await trip(saved());
+    await settle();
+    expect(host.querySelector('.bike-hint-dots')).toBeNull();
+  });
+});

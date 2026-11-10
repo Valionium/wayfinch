@@ -12,6 +12,7 @@ import type { TyreServices } from '../../../../src/tools/tyre/ui.tsx';
 import { App } from '../../../../src/ui/app.tsx';
 import { go } from '../../../../src/ui/nav.ts';
 import { ToolsScreen } from '../../../../src/ui/tools/tools.tsx';
+import { TC } from '../../../../src/core/wording/en-tyre-calc.ts';
 
 const NOW = new Date('2026-11-03T10:00:00Z');
 const host = document.createElement('div');
@@ -76,7 +77,7 @@ describe('the tyre screen', () => {
     await type(labelled(W.tyreLimitMaxLabel), '5');
     // With only the maximum, the rim type and width are unknown: friendly words, not an error.
     expect(figures()).toEqual([]);
-    expect(host.textContent).toContain(W.tyreNeedTwo);
+    expect(host.textContent).toContain(TC.tyreNeedTwo);
     expect(host.textContent).not.toContain('do not fit together');
     await hooked();
     expect(figures().length).toBe(2);
@@ -210,20 +211,20 @@ describe('the tyre screen', () => {
     await mount(services(mem, 110));
     await type(labelled(W.tyreLimitMaxLabel), '2.5');
     const text = host.textContent ?? '';
-    expect(text).toContain(W.tyreWarnCapBinds);
+    expect(text).toContain(TC.tyreWarnCapBinds);
     expect(text).toContain('held down by your tyre');
     expect(text).toContain(W.tyreHeadingWhy);
     expect(text).toMatch(/Weight split: \d+% front, \d+% rear\./);
-    expect(text).toContain(W.tyreWhyLever);
+    expect(text).toContain(TC.tyreWhyLever);
     // A hookless rim from the bike says what it needs.
-    expect(text).toContain(W.tyreWarnHooklessTss);
+    expect(text).toContain(TC.tyreWarnHooklessTss);
     // The split is shown also with nothing set but the maximum.
     render(null, host);
     await mount(services(memory()));
     await hooked();
     await type(labelled(W.tyreLimitMaxLabel), '5');
     expect(host.textContent).toMatch(/Weight split: 45% front, 55% rear\./);
-    expect(host.textContent).toContain(W.tyreWhyDefaultNoPlan);
+    expect(host.textContent).toContain(TC.tyreWhyDefaultNoPlan);
   });
 
   test('[TY-UI-WARNINGS] a refused width is said in words and no figure is shown', async () => {
@@ -253,9 +254,9 @@ describe('the extras', () => {
     await hooked();
     await type(labelled(W.tyreLimitMaxLabel), '6');
     await type(labelled(W.tyreMeasuredFrontLabel), '40');
-    expect(host.textContent).not.toContain(W.tyreWhyMeasured);
+    expect(host.textContent).not.toContain(TC.tyreWhyMeasured);
     await type(labelled(W.tyreMeasuredRearLabel), '60');
-    expect(host.textContent).toContain(W.tyreWhyMeasured);
+    expect(host.textContent).toContain(TC.tyreWhyMeasured);
     expect(host.textContent).toMatch(/Weight split: 40% front, 60% rear\./);
     await type(labelled(W.tyreCaliperFrontLabel), '35.5');
     expect(host.textContent).toContain('effective width 35.5 mm');
@@ -324,7 +325,7 @@ describe('review findings, on the screen', () => {
     await type(labelled(W.tyreLimitRimLabel), '65');
     expect(host.textContent).toContain('Did you mean 65 psi?');
     expect(figures()).toEqual([]);
-    expect(resultText()).toContain(W.tyrePendingLimit(W.tyreLimitRimLabel));
+    expect(resultText()).toContain(TC.tyrePendingLimit(W.tyreLimitRimLabel));
     await click(host.querySelectorAll('button')[[...host.querySelectorAll('button')].findIndex((b) => b.textContent === 'Yes, 65 psi')]!);
     expect(figures().length).toBe(2);
     await type(labelled(W.tyreLimitRimLabel), '170');
@@ -360,7 +361,7 @@ describe('review findings, on the screen', () => {
 
   test('[TY-UI-WARNINGS] I3: the one maximum is said to apply to both wheels', async () => {
     await mount(services(memory()));
-    expect(host.textContent).toContain(W.tyreLimitBothWheels);
+    expect(host.textContent).toContain(TC.tyreLimitBothWheels);
   });
 
   test('[TY-UI-WARNINGS] I4: the screen with no figure prints no pressure number', async () => {
@@ -391,7 +392,7 @@ describe('review findings, on the screen', () => {
     expect(rimRadios.length).toBe(3);
     expect(rimRadios.some((r) => r.checked)).toBe(false);
     expect(figures()).toEqual([]); // width not set either: asked for, with no figure
-    expect(resultText()).toContain(W.tyreNeedTwo);
+    expect(resultText()).toContain(TC.tyreNeedTwo);
     expect(resultText()).not.toContain('do not fit together');
     expect(readStore(mem.kv).ok && Object.values((readStore(mem.kv) as { store: { entries: Record<string, { last: unknown }> } }).store.entries).every((e) => e.last === null)).toBe(true);
     await type(labelled(W.tyreFrontWidthLabel), '32');
@@ -399,11 +400,11 @@ describe('review findings, on the screen', () => {
     const big = figures().map((t) => Number((t ?? '').replace(' bar', '')));
     expect(big.length).toBe(2);
     expect(Math.max(...big)).toBeLessThanOrEqual(4.5); // the 32 mm hookless row
-    expect(resultText()).toContain(W.tyreWarnRimUnset);
-    expect(host.querySelector('.tyre-wheels')?.parentElement?.textContent).toContain(W.tyreWarnRimUnset);
-    await click(button(W.tyreMyRimHooked));
+    expect(resultText()).toContain(TC.tyreWarnRimUnset);
+    expect(host.querySelector('.tyre-wheels')?.parentElement?.textContent).toContain(TC.tyreWarnRimUnset);
+    await click(button(TC.tyreMyRimHooked));
     expect((host.querySelector('input[name="tyre-rimtype"][value="hooked"]') as HTMLInputElement).checked).toBe(true);
-    expect(resultText()).not.toContain(W.tyreWarnRimUnset);
+    expect(resultText()).not.toContain(TC.tyreWarnRimUnset);
   });
 
   test('[TY-UI-FROM-BIKE] I6: an assumed choice can be confirmed by tapping it, and a bike\'s choice is labelled', async () => {
@@ -424,7 +425,7 @@ describe('review findings, on the screen', () => {
   test('[TY-UI-FROM-BIKE] M7: Clear, not "Back to your bike\'s value", when no bike supplies the field', async () => {
     await mount(services(memory()));
     await type(labelled(W.tyreRiderLabel), '80');
-    expect(button(W.tyreClear)).toBeDefined();
+    expect(button(TC.tyreClear)).toBeDefined();
     expect(host.textContent).not.toContain(W.tyreBackToBike);
   });
 
@@ -452,7 +453,7 @@ describe('review findings, on the screen', () => {
     expect(figures().length).toBe(2);
     await type(labelled(W.tyreLimitMinLabel), '4');
     await type(labelled(W.tyreLimitRimLabel), '3');
-    expect(host.textContent).toContain(W.tyreLimitBelowMin);
+    expect(host.textContent).toContain(TC.tyreLimitBelowMin);
     expect(figures()).toEqual([]);
   });
 });
@@ -463,9 +464,9 @@ describe('re-check findings, on the screen', () => {
   test('[TY-UI-REQUIRED] R1 and R5: a hooked rim may keep an assumed width; a hookless one asks for it, in one or two things', async () => {
     await mount(services(memory()));
     await type(labelled(W.tyreLimitMaxLabel), '7');
-    expect(resultText()).toContain(W.tyreNeedTwo);
+    expect(resultText()).toContain(TC.tyreNeedTwo);
     await click(host.querySelector('input[name="tyre-rimtype"][value="hookless"]')!);
-    expect(resultText()).toContain(W.tyreNeedWidthOnly);
+    expect(resultText()).toContain(TC.tyreNeedWidthOnly);
     expect(figures()).toEqual([]);
     await type(labelled(W.tyreFrontWidthLabel), '28');
     expect(figures().length).toBe(2);
@@ -479,17 +480,17 @@ describe('re-check findings, on the screen', () => {
     await mount(services(memory()));
     await type(labelled(W.tyreLimitMaxLabel), '7');
     await type(labelled(W.tyreFrontWidthLabel), '30');
-    expect(resultText()).toContain(W.tyreWarnRimUnset);
-    expect(resultText()).toContain(W.tyreRimUnsure);
-    expect(host.textContent).toContain(W.tyreSameAsFront);
+    expect(resultText()).toContain(TC.tyreWarnRimUnset);
+    expect(resultText()).toContain(TC.tyreRimUnsure);
+    expect(host.textContent).toContain(TC.tyreSameAsFront);
     await type(labelled(W.tyreRearWidthLabel), '45');
-    expect(host.textContent).not.toContain(W.tyreSameAsFront);
+    expect(host.textContent).not.toContain(TC.tyreSameAsFront);
   });
 
   test('[TY-UI-FROM-BIKE] R2: a bike tyre text that cannot be read is shown, not used', async () => {
     const odd = { ...bike, frontTyre: '28 x 1 1/2', pressure: { wheel: '700c', rim: 'hooked' } };
     await mount(services(memory({ ...LOADCHECK, 'loadcheck:bikeProfiles': JSON.stringify([odd]), 'loadcheck:bikeProfile': JSON.stringify(odd) })));
-    expect(host.textContent).toContain(W.tyreCouldntRead('28 x 1 1/2'));
+    expect(host.textContent).toContain(TC.tyreCouldntRead('28 x 1 1/2'));
     expect([...host.querySelectorAll('.tyre-from')].some((e) => (e.textContent ?? '').includes(W.tyreFrontWidthLabel))).toBe(false);
   });
 
@@ -532,7 +533,7 @@ describe('re-check findings, on the screen', () => {
       // Then the answer, then everything optional.
       expect(cards[1]!.classList.contains('tyre-result')).toBe(true);
       const optional = cards.slice(2).map((c) => c.querySelector('h2')?.textContent);
-      expect(optional.slice(0, 7)).toEqual([W.tyreLimitsMoreTitle, W.tyreSectionRider, W.tyreSectionBars, W.tyreSectionTyres, W.tyreSectionRim, W.tyreSectionSurface, W.tyreSectionHeat]);
+      expect(optional.slice(0, 7)).toEqual([TC.tyreLimitsMoreTitle, W.tyreSectionRider, W.tyreSectionBars, W.tyreSectionTyres, W.tyreSectionRim, W.tyreSectionSurface, W.tyreSectionHeat]);
       expect(optional).toContain(W.tyreSectionMeasured);
     }
   });

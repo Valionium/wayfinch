@@ -9,6 +9,7 @@ import {
   LIMIT_BAR, LIMIT_PSI, P15_COEFFICIENT, P15_EXPONENT, PSI_PER_BAR, RIM_MAX_MM, RIM_MIN_MM, WHEELS, WIDTH_MAX_MM, WIDTH_MIN_MM,
 } from './tables.ts';
 import type { Pos } from './tables.ts';
+import { TC } from '../../core/wording/en-tyre-calc.ts';
 
 export type { Pos } from './tables.ts';
 export type Unit = 'bar' | 'psi';
@@ -197,19 +198,19 @@ export function leverSplit(l: Leverage): { frontKg: number; rearKg: number; shar
 function chooseSplit(i: TyreInput): { frontKg: number; rearKg: number; split: Split } {
   if (i.measured) {
     const total = i.measured.frontKg + i.measured.rearKg;
-    return { frontKg: i.measured.frontKg, rearKg: i.measured.rearKg, split: { share: i.measured.frontKg / total, source: 'measured', why: W.tyreWhyMeasured } };
+    return { frontKg: i.measured.frontKg, rearKg: i.measured.rearKg, split: { share: i.measured.frontKg / total, source: 'measured', why: TC.tyreWhyMeasured } };
   }
   const placed = i.load.byPositionKg;
   if (placed && i.load.unplacedKg <= 0) {
     const s = leverSplit({ riderKg: i.riderKg, bikeKg: i.bikeKg, byPositionKg: placed, emptyLuggageKg: i.load.emptyLuggageKg, bars: i.bars });
-    return { frontKg: s.frontKg, rearKg: s.rearKg, split: { share: s.share, source: 'lever', why: W.tyreWhyLever } };
+    return { frontKg: s.frontKg, rearKg: s.rearKg, split: { share: s.share, source: 'lever', why: TC.tyreWhyLever } };
   }
   const total = i.riderKg + i.bikeKg + i.load.unplacedKg + (i.load.emptyLuggageKg ?? 0) + Object.values(placed ?? {}).reduce((a, b) => a + (b ?? 0), 0);
   const s0 = DEFAULT_SPLIT[i.bars];
   return {
     frontKg: s0 * total,
     rearKg: total - s0 * total,
-    split: { share: s0, source: 'default', why: placed && i.load.unplacedKg > 0 ? TN.tyreWhyDefaultUnplaced : W.tyreWhyDefaultNoPlan },
+    split: { share: s0, source: 'default', why: placed && i.load.unplacedKg > 0 ? TN.tyreWhyDefaultUnplaced : TC.tyreWhyDefaultNoPlan },
   };
 }
 
@@ -237,18 +238,18 @@ export type LimitCheck =
  * below the minimum, is rejected. `keepAsBar` is the rider's answer "no, bar".
  */
 export function checkLimit(value: number, unit: Unit, o: { keepAsBar?: boolean; keepAsPsi?: boolean; min?: Limit | null }): LimitCheck {
-  if (!Number.isFinite(value) || value <= 0) return { status: 'rejected', reason: W.tyreLimitNotNumber };
+  if (!Number.isFinite(value) || value <= 0) return { status: 'rejected', reason: TC.tyreLimitNotNumber };
   if (unit === 'bar' && value > LIMIT_BAR.queryAbove && !o.keepAsBar) {
     return { status: 'ask', question: W.tyreDidYouMean(String(value)), asPsi: { value, unit: 'psi' }, alt: { value, unit: 'psi' } };
   }
   // The other way round: a number that small in psi is far likelier to be bar.
   if (unit === 'psi' && value < LIMIT_PSI.queryBelow && !o.keepAsPsi) {
-    return { status: 'ask', question: W.tyreDidYouMeanBar(String(value)), asPsi: { value, unit: 'psi' }, alt: { value, unit: 'bar' } };
+    return { status: 'ask', question: TC.tyreDidYouMeanBar(String(value)), asPsi: { value, unit: 'psi' }, alt: { value, unit: 'bar' } };
   }
-  if (unit === 'bar' && value > LIMIT_BAR.max) return { status: 'rejected', reason: W.tyreLimitTooHighBar(String(value)) };
-  if (unit === 'psi' && value > LIMIT_PSI.max) return { status: 'rejected', reason: W.tyreLimitTooHighPsi(String(value)) };
+  if (unit === 'bar' && value > LIMIT_BAR.max) return { status: 'rejected', reason: TC.tyreLimitTooHighBar(String(value)) };
+  if (unit === 'psi' && value > LIMIT_PSI.max) return { status: 'rejected', reason: TC.tyreLimitTooHighPsi(String(value)) };
   if (limitBar({ value, unit }) < LIMIT_BAR.min) return { status: 'rejected', reason: TN.tyreLimitTooLow };
-  if (o.min && limitBar({ value, unit }) < limitBar(o.min)) return { status: 'rejected', reason: W.tyreLimitBelowMin };
+  if (o.min && limitBar({ value, unit }) < limitBar(o.min)) return { status: 'rejected', reason: TC.tyreLimitBelowMin };
   return { status: 'ok', limit: { value, unit } };
 }
 
@@ -290,20 +291,20 @@ interface Cap { kind: LimitKind; limit: Limit | null; bar: number }
 function validate(i: TyreInput): string[] {
   const out: string[] = [];
   const finitePositive = (n: number, lo: number, hi: number): boolean => Number.isFinite(n) && n >= lo && n <= hi;
-  if (!finitePositive(i.riderKg, 20, 350)) out.push(W.tyreRefuseNumber(TF.tyreWhatRider));
-  if (!finitePositive(i.bikeKg, 1, 150)) out.push(W.tyreRefuseNumber(TF.tyreWhatBike));
+  if (!finitePositive(i.riderKg, 20, 350)) out.push(TC.tyreRefuseNumber(TF.tyreWhatRider));
+  if (!finitePositive(i.bikeKg, 1, 150)) out.push(TC.tyreRefuseNumber(TF.tyreWhatBike));
   const loads = [i.load.unplacedKg, i.load.emptyLuggageKg ?? 0, ...Object.values(i.load.byPositionKg ?? {}).map((n) => n ?? 0)];
-  if (!loads.every((n) => finitePositive(n, 0, 300))) out.push(W.tyreRefuseNumber(W.tyreWhatLoad));
-  if (i.measured && !(finitePositive(i.measured.frontKg, 1, 300) && finitePositive(i.measured.rearKg, 1, 300))) out.push(W.tyreRefuseNumber(TF.tyreWhatWheelLoads));
-  if (!finitePositive(i.rimInnerMm, RIM_MIN_MM, RIM_MAX_MM)) out.push(W.tyreRefuseRim(Number.isFinite(i.rimInnerMm) ? fmt(i.rimInnerMm) : '?'));
+  if (!loads.every((n) => finitePositive(n, 0, 300))) out.push(TC.tyreRefuseNumber(TC.tyreWhatLoad));
+  if (i.measured && !(finitePositive(i.measured.frontKg, 1, 300) && finitePositive(i.measured.rearKg, 1, 300))) out.push(TC.tyreRefuseNumber(TF.tyreWhatWheelLoads));
+  if (!finitePositive(i.rimInnerMm, RIM_MIN_MM, RIM_MAX_MM)) out.push(TC.tyreRefuseRim(Number.isFinite(i.rimInnerMm) ? fmt(i.rimInnerMm) : '?'));
   if (!WHEELS.some((w) => w.bsdMm === i.wheelBsdMm)) out.push(TN.tyreRefuseWheel);
   for (const [label, t] of [[W.tyreFront, i.front], [W.tyreRear, i.rear]] as const) {
-    if (!Number.isFinite(t.printedMm) || t.printedMm < WIDTH_MIN_MM || t.printedMm > WIDTH_MAX_MM) out.push(W.tyreRefuseWidth(label, Number.isFinite(t.printedMm) ? fmt(t.printedMm) : '?'));
-    else if (t.caliperMm !== null && !finitePositive(t.caliperMm, 10, 110)) out.push(W.tyreRefuseCaliper(label));
+    if (!Number.isFinite(t.printedMm) || t.printedMm < WIDTH_MIN_MM || t.printedMm > WIDTH_MAX_MM) out.push(TC.tyreRefuseWidth(label, Number.isFinite(t.printedMm) ? fmt(t.printedMm) : '?'));
+    else if (t.caliperMm !== null && !finitePositive(t.caliperMm, 10, 110)) out.push(TC.tyreRefuseCaliper(label));
   }
-  if (!limitUsable(i.tyreMax)) out.push(W.tyreRefuseLimit(TF.tyreWhatMax));
-  if (i.tyreMin && !limitUsable(i.tyreMin)) out.push(W.tyreRefuseLimit(TF.tyreWhatMin));
-  if (i.rimMax && !limitUsable(i.rimMax)) out.push(W.tyreRefuseLimit(TF.tyreWhatRimMax));
+  if (!limitUsable(i.tyreMax)) out.push(TC.tyreRefuseLimit(TF.tyreWhatMax));
+  if (i.tyreMin && !limitUsable(i.tyreMin)) out.push(TC.tyreRefuseLimit(TF.tyreWhatMin));
+  if (i.rimMax && !limitUsable(i.rimMax)) out.push(TC.tyreRefuseLimit(TF.tyreWhatRimMax));
   if (out.length === 0 && i.tyreMin && i.rimMax && limitBar(i.rimMax) < limitBar(i.tyreMin)) out.push(TN.tyreRefuseMinMax);
   if (i.heat) {
     const h = i.heat;
@@ -322,7 +323,7 @@ const refusedResult = (refused: string[]): TyreResult =>
   ({ front: null, rear: null, split: null, decided: [], warnings: [], warningCodes: [], warningItems: [], needsWidth: false, incompatible: false, refused });
 
 const kindOfCap = (k: LimitKind, mm: number): string =>
-  k === 'tyre-max' ? TF.tyreLimitTyreMax : k === 'rim-max' ? TF.tyreLimitRimMax : k === 'hookless-5' ? TN.tyreLimitHookless5 : W.tyreLimitHooklessWidth(fmt(mm, 0));
+  k === 'tyre-max' ? TF.tyreLimitTyreMax : k === 'rim-max' ? TF.tyreLimitRimMax : k === 'hookless-5' ? TN.tyreLimitHookless5 : TC.tyreLimitHooklessWidth(fmt(mm, 0));
 
 /** The ISO 5775-1 minimums of old, used only when no sidewall minimum was entered. */
 const isoFloorBar = (printedMm: number, surface: Surface): number => (printedMm <= 25 ? 3.0 : surface === 'unpaved' ? 1.5 : 2.0);
@@ -333,7 +334,7 @@ export function tyreEstimate(input: TyreInput): TyreResult {
   const wEffs: number[] = [];
   for (const t of [input.front, input.rear]) {
     const w = t.caliperMm ?? effectiveWidth(t.printedMm, input.rimInnerMm);
-    if (w === null || !Number.isFinite(w) || w < 10) return refusedResult([W.tyreRefuseWidth(t === input.front ? W.tyreFront : W.tyreRear, fmt(t.printedMm))]);
+    if (w === null || !Number.isFinite(w) || w < 10) return refusedResult([TC.tyreRefuseWidth(t === input.front ? W.tyreFront : W.tyreRear, fmt(t.printedMm))]);
     wEffs.push(w);
   }
 
@@ -393,7 +394,7 @@ export function tyreEstimate(input: TyreInput): TyreResult {
       const noStep = (floorB !== null && bar < floorB) || (floorP !== null && psi < floorP);
       if (noStep && floorBar !== null && floorBar <= cap.bar) {
         incompatible = true;
-        flag('noStep', W.tyreWarnNoStep(label));
+        flag('noStep', TC.tyreWarnNoStep(label));
       }
 
       // Heat and altitude: how high the gauge may read at the pump so that the warmest, highest moment stays at or under the cap.
@@ -409,10 +410,10 @@ export function tyreEstimate(input: TyreInput): TyreResult {
       }
 
       const limit: LimitKind | null = capped ? cap.kind : raised ? floorKind : null;
-      decided.push(W.tyreDecidedEstimate(label, fmt(loadKg), fmt(wEff)));
-      if (capped) decided.push(W.tyreDecidedCap(label, kindOfCap(cap.kind, tyre.printedMm)));
+      decided.push(TC.tyreDecidedEstimate(label, fmt(loadKg), fmt(wEff)));
+      if (capped) decided.push(TC.tyreDecidedCap(label, kindOfCap(cap.kind, tyre.printedMm)));
       else if (raised) {
-        decided.push(W.tyreDecidedFloor(label, input.tyreMin ? TF.tyreFloorTyreMin : W.tyreFloorIso(fmt(floorBar!, 1))));
+        decided.push(TC.tyreDecidedFloor(label, input.tyreMin ? TF.tyreFloorTyreMin : TC.tyreFloorIso(fmt(floorBar!, 1))));
       }
 
       // Warnings per wheel.
@@ -420,10 +421,10 @@ export function tyreEstimate(input: TyreInput): TyreResult {
         const m = input.tyreMin;
         // The figure as shown, and the low end of the window, not only the estimate.
         if (estimate < limitBar(m) || bar < limitIn(m, 'bar') || psi < limitIn(m, 'psi')) {
-          flag('belowSidewallMin', W.tyreWarnBelowSidewallMin(label));
+          flag('belowSidewallMin', TC.tyreWarnBelowSidewallMin(label));
         }
       }
-      if (!withTube && estimate < 1) flag('belowOneBar', W.tyreWarnBelowOneBar(label));
+      if (!withTube && estimate < 1) flag('belowOneBar', TC.tyreWarnBelowOneBar(label));
       if (capped) { if (cap.kind === 'tyre-max' || cap.kind === 'rim-max') capReal = true; else capHookless = true; }
 
       return {
@@ -440,10 +441,10 @@ export function tyreEstimate(input: TyreInput): TyreResult {
 
   // Warnings that are about the pairing, not the wheel.
   if (input.rimType === 'hookless') {
-    flag('hooklessTss', W.tyreWarnHooklessTss);
+    flag('hooklessTss', TC.tyreWarnHooklessTss);
     if (withTube) flag('hooklessNeedsTubeless', TN.tyreWarnHooklessTube);
   }
-  if (input.rimType === 'unset') flag('rimUnset', W.tyreWarnRimUnset);
+  if (input.rimType === 'unset') flag('rimUnset', TC.tyreWarnRimUnset);
   if (input.rimType === 'tubular') flag('tubularNoCheck', TN.tyreWarnTubular);
   if (input.rimType !== 'tubular') {
     const min = etrtoMinWidth(input.rimInnerMm);
@@ -459,8 +460,8 @@ export function tyreEstimate(input: TyreInput): TyreResult {
   if (incompatible) flag('incompatible', unknownRimOrWidth ? TN.tyreWarnIncompatibleUnknown : TN.tyreWarnIncompatible);
   // "Fit a wider tyre" only where a real tyre width is what limits: not under the careful rule for an unset rim, and not when a tube's floor is the cause.
   if (!incompatible) {
-    if (capReal) flag('capBinds', W.tyreWarnCapBinds);
-    if (capHookless) flag(codeSet.has('rimUnset') ? 'capRimUnset' : 'capBinds', codeSet.has('rimUnset') ? TN.tyreWarnCapRimUnset : W.tyreWarnCapBinds);
+    if (capReal) flag('capBinds', TC.tyreWarnCapBinds);
+    if (capHookless) flag(codeSet.has('rimUnset') ? 'capRimUnset' : 'capBinds', codeSet.has('rimUnset') ? TN.tyreWarnCapRimUnset : TC.tyreWarnCapBinds);
   }
   if (!incompatible) for (const [code, text] of heatNotes) flag(code, text);
 

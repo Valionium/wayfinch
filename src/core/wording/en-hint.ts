@@ -12,4 +12,6 @@ export const HN = {
   hintFitTyreAfter: 'and its tyre sizes fill in here.',
   hintFitCare: 'For any bike: everything shows.',
   hintFitCareAfter: 'and only what fits it shows.',
+  // the card's colour dots (design section 4.2): the group's name; each dot is named by its swatch
+  hintTryColour: 'Try a colour',
 };
