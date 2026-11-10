@@ -56,15 +56,8 @@ const TABS: { name: TabName; label: string }[] = [
   { name: 'you', label: W.appTabYou },
 ];
 
-// What the tab is for, under its heading: its words load after the first screen; the line's room is kept meanwhile.
-const TabSubtitle = lazy(() => import('./tab-subtitle.tsx').then((m) => m.TabSubtitle), () => null);
-
-const TITLES: Record<TabName, string> = {
-  ahead: W.appTabAhead,
-  trip: W.appTabTrip,
-  tools: W.appTabTools,
-  you: W.appTabYou,
-};
+// What the tab is for, under its heading, and the colour mode button over its corner: loaded after the first screen (tab-top.tsx).
+const TabTop = lazy(() => import('./tab-top.tsx').then((m) => m.TabTop), () => null);
 
 /** The moved card, loaded only for a rider it is due to: a chunk of its own, so the first screen stays within its budget. */
 function MovedCardSlot() {
@@ -87,16 +80,16 @@ function Screen({ name }: { name: ScreenName }) {
   const tab = tabOf(name);
   return (
     <main class="screen" id="main" data-screen={name}>
-      <h1>{TITLES[tab]}</h1>
-      {tab === 'trip' || tab === 'ahead' ? <TabSubtitle tab={tab} /> : null}
+      <h1>{TABS.find((t) => t.name === tab)!.label}</h1>
+      <TabTop name={name} />
       {kindsOnScreen(degradedSignal.value, tab).map((kind) => <Degraded key={kind} kind={kind} />)}
       <MovedCardSlot />
-      {name === 'ahead' ? <AheadHost /> : null}
-      {name === 'trip' ? <TripScreen services={tripServices} /> : null}
-      {name === 'tools' ? <ToolsScreen services={tyreServices} /> : null}
-      {tab === 'you' ? <YouHost /> : null}
-      {name === 'tools/tyre' ? <TyreScreen services={tyreServices} /> : null}
-      {name === 'tools/care' ? <CareScreen services={tyreServices} /> : null}
+      {name === 'ahead' && <AheadHost />}
+      {name === 'trip' && <TripScreen services={tripServices} />}
+      {name === 'tools' && <ToolsScreen services={tyreServices} />}
+      {tab === 'you' && <YouHost />}
+      {name === 'tools/tyre' && <TyreScreen services={tyreServices} />}
+      {name === 'tools/care' && <CareScreen services={tyreServices} />}
     </main>
   );
 }
