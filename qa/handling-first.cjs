@@ -13,12 +13,14 @@ const q=appVM();
 const {run}=q;
 const json=code=>JSON.parse(run(`JSON.stringify(${code})`));
 run('DRAFT_READY=true');
+// the page's own starting kit, for the one full-kit mix (review of PRs 116/117, M3)
+const FULLKIT=JSON.stringify(json('S.kit'));
 // a smaller kit than the page's own, so each press runs a few hundred trials less (the QA suites run within LC-QA-ALL's time)
 const KIT0=JSON.stringify(Object.fromEntries(['tent','quilt','pad','stove','pot','lock','tool','pump','bank','puffy','rain','firstaid','wash','camp','tubes','phone'].map(k=>[k,true]))),NIGHTS0=json('S.nights');
 const bike={id:'qa_hf',fit:{style:'diamond-sloping',size:{kind:'letter',value:'M'}},look:{bars:'drop'},frontTyre:'47-584',rearTyre:'47-584'};
 // A plan at the packing step: these bags and decks, the kit as the page starts it, nothing kept yet; with `balanced`, the automatic
 // balancing as the page applies it at the first look (it takes its time, so only where a test needs it).
-const plan=(bags,decks={},extra='',balanced=false)=>run(`(()=>{S.kit=${KIT0};S.nights=${NIGHTS0};S.foodMode=2;S.mode='comfort';SMALL_VIEW=false;
+const plan=(bags,decks={},extra='',balanced=false,kit=KIT0)=>run(`(()=>{S.kit=${kit};S.nights=${NIGHTS0};S.foodMode=2;S.mode='comfort';SMALL_VIEW=false;
   S.bikeProfile=normaliseBikeProfile(${JSON.stringify(bike)});S.bags=${JSON.stringify(bags)}.map(b=>({...b}));
   S.nextUid=1+Math.max(0,...S.bags.map(b=>b.uid));S.decks={bar:false,rack:false,...${JSON.stringify(decks)}};S.pinned={};S.packed={};S.placements=null;
   resetBalance();TRIAL=null;DRAFT_FROZEN=false;S.step=4;${extra};currentPlan();${balanced?'autoBalancePlan();':''}return true;})()`);
@@ -28,6 +30,9 @@ const SETS={
   'seat, bar and frame 6':[{uid:1,pos:'seat',L:14},{uid:2,pos:'bar',L:9},{uid:3,pos:'frame',L:6}],
   touring:[{uid:1,pos:'rack',L:20,pair:true},{uid:2,pos:'bar',L:9},{uid:3,pos:'bottle',slot:'dt',L:0.75},{uid:4,pos:'pack',L:12}],
 };
+const PAIR_GAP=json('PAIR_NOTE_GAP');
+// a plan where a press moves food (review of PRs 116/117, M2)
+const FOOD_BAGS=[{uid:1,pos:'seat',L:14},{uid:2,pos:'bar',L:9},{uid:3,pos:'frame',L:6}];
 const SCORE=`(r=>Math.round(Object.entries(r.kgByPos).reduce((t,[p,k])=>t+(k||0)*window.WayfinchAdvisor.WEIGHTS[p],0)*100)/100)(advisorResult(currentPlan()))`;
 const state=()=>json(`JSON.stringify([S.bags,S.pinned,S.kit,S.decks,S.qty,S.mode,S.packed])`);
 const press=()=>json('startHandling({now:true})');
@@ -46,7 +51,8 @@ test('[HF-STORED] a press is stored as kept placements only: the bags, kit and h
     assert.ok(json(SCORE)<=before,`${name}: never worse (${before} to ${json(SCORE)})`);
     if(!did){assert.match(line(),/Already packed for handling|Nothing moved/,name);continue;}
     packed++;
-    assert.ok(json(SCORE)<=before-0.01,`${name}: better`);
+    // better, or (review of PRs 116/117, C1) a pair evened out at no cost
+    assert.ok(json(SCORE)<=before-0.01||json('HANDLING.last.route')==='even',`${name}: better or a pair evened`);
     const items=json('currentPlan().items'),placements=json('S.placements');
     assert.deepEqual(json('capturePlan().placements'),placements,`${name}: the draft carries the packing`);
     // no automatic balance on top: it looks at the new packing and stays quiet
@@ -101,15 +107,17 @@ test('[HF-UNDO] Undo brings back exactly the packing before the press and says s
     assert.match(line(),/^<div class="balance-line" role="status"><span>Back to the packing before Handling first\.<\/span><\/div>$/);
     assert.equal(json('autoBalancePlan()'),false,`${name}: the automatic balancing leaves the packing Undo brought back`);
   }
-  // food ticked as packed holds Undo back too, when the press moved food
-  plan(SETS['seat, bar and frame 6'],{},'S.kit.food=true');
+  // food ticked as packed holds Undo back too, when the press moved food (review of PRs 116/117, M2: a plan where it does)
+  plan(FOOD_BAGS,{},'S.kit.food=true');
   const food=json('whereOf(currentPlan()).food||null');
   assert.ok(food,'food in the plan');
   assert.equal(press(),true);
-  if(JSON.stringify(json('whereOf(currentPlan()).food||null'))!==JSON.stringify(food)){
-    run('S.packed.food=true;currentPlan()');
-    assert.equal(json('undoHandling()'),false,'ticked food: no Undo');
-  }
+  assert.notDeepEqual(json('whereOf(currentPlan()).food||null'),food,'the press moved food');
+  run('S.packed.food=true;currentPlan()');
+  assert.doesNotMatch(line(),/data-handling-undo/,'ticked food: no Undo');
+  assert.equal(json('undoHandling()'),false,'ticked food: Undo does nothing');
+  run('delete S.packed.food;currentPlan()');
+  assert.equal(json('undoHandling()'),true);
 });
 
 test('[HF-LINE] one line in the place of the balance line: the moves that do the most first, "See all" for a long list, Undo; "Already packed" when there is nothing to gain',()=>{
@@ -152,9 +160,17 @@ test('[HF-LINE] in slices: "Packing for handling…" while the search runs, the 
   assert.equal(json('startHandling()'),true);
   assert.deepEqual(json('S.placements'),own,'nothing applied at once');
   assert.match(line(),/Packing for handling…/);
+  // the button says so and takes no second press (review of PRs 116/117, c)
+  run('fillHandling()');
+  assert.equal(q.nodes.get('rigHandling').textContent,'Packing for handling…');
+  const running=json('HANDLING.run.key');
+  assert.equal(json('startHandling()'),false,'a second press while it runs does nothing');
+  assert.equal(json('HANDLING.run.key'),running);
   let slices=0;
   while(json('!!HANDLING.run')){run('handlingSlice(HANDLING.run)');slices++;assert.ok(slices<400,'the search ends');}
   assert.ok(slices>=2,`run in slices (${slices})`);
+  run('fillHandling()');
+  assert.equal(q.nodes.get('rigHandling').textContent,'Handling first');
   const sliced=json('currentPlan().items');
   plan(SETS.bikepacking);
   press();
@@ -185,19 +201,50 @@ test('[HF-FULL] a full frame bag is said in one line; a bigger frame bag is poin
   assert.doesNotMatch(line(),/would fit your frame/);
 });
 
-test('[HF-AIR] the packing tips: the heaviest things low in the frame bag; an outer bag under half full is rolled down and strapped tight',()=>{
-  plan([{uid:1,pos:'seat',L:16},{uid:2,pos:'bar',L:13},{uid:3,pos:'frame',L:6},{uid:4,pos:'fork',L:3,pair:true}]);
+test('[HF-AIR] the packing tips: the heaviest things low in the frame bag; an outer bag (seat pack, bar roll, pannier, fork cage) under half full is rolled down and strapped tight',()=>{
+  let air=0,pairs=0;
+  for(const bags of [[{uid:1,pos:'seat',L:16},{uid:2,pos:'bar',L:13},{uid:3,pos:'frame',L:6},{uid:4,pos:'fork',L:5,pair:true}],
+    [{uid:1,pos:'rack',L:25,pair:true},{uid:2,pos:'bar',L:9},{uid:3,pos:'frame',L:6}]]){
+  plan(bags,{rack:bags.some(b=>b.pos==='rack')});
   press();
   const l=line();
   assert.match(l,/<li>Frame bag: pack the heaviest things at the bottom, near the down tube\.<\/li>/);
-  const fill=json(`currentPlan().slots.filter(s=>s.pos==='seat'||s.pos==='bar').map(s=>[unitLabel(s),(s.cap-s.left)/s.cap])`);
-  let air=0;
-  for(const [name,f] of fill){
+  const fill=json(`currentPlan().slots.filter(s=>['seat','bar','rack','fork'].includes(s.pos)&&s.items.length).map(s=>[unitLabel(s),(s.cap-s.left)/s.cap,s.pos])`);
+  for(const [name,f,pos] of fill){
+    if(f<0.5&&(pos==='rack'||pos==='fork'))pairs++;
     const tip=new RegExp(`<li>${name} (nearly empty|about a quarter full|about a third full|under half full): roll it down and pull the straps tight so it does not sway\\.</li>`);
     if(f<0.5){assert.match(l,tip,`${name}, ${Math.round(f*100)}% full`);air++;}
     else assert.doesNotMatch(l,tip);
   }
-  assert.ok(air>=1,'a part-empty bag in this plan');
+  }
+  assert.ok(air>=1,'a part-empty bag in these plans');
+  assert.ok(pairs>=1,'a part-empty pannier or fork cage among them');
+});
+
+// Review of PRs 116/117, C1 and I1: on the page's own full kit, rear panniers, bar roll and frame bag with the rack deck, after the
+// automatic balancing, a press left one pannier at 100 % and the other at 1 %. Each pair now stays as even as the pair note asks
+// (PAIR_UNEVEN, the page's own measure), every move is named, and nothing reads "undefined".
+test('[HF-KEEPS] side to side on the full kit: no pair ends uneven by the pair note\'s measure that was even, none more uneven; every move named',()=>{
+  assert.equal(json('window.WayfinchAdvisor.PAIR_UNEVEN'),json('PAIR_NOTE_GAP'),'one measure: the pair note\'s');
+  const fills=()=>json(`(()=>{const g={};currentPlan().slots.forEach(s=>{if(countOf(s)>1)(g[s.uid]=g[s.uid]||[]).push((s.cap-s.left)/s.cap);});return Object.values(g).filter(f=>f.length===2).map(f=>Math.abs(f[0]-f[1]));})()`);
+  for(const [name,bags,decks] of [['touring',[{uid:1,pos:'rack',L:20,pair:true},{uid:2,pos:'bar',L:9},{uid:3,pos:'frame',L:6}],{rack:true}],
+    ['bikepacking',SETS.bikepacking,{}]]){
+    plan(bags,decks,'',true,FULLKIT);
+    const before=fills();
+    press();
+    const after=fills();
+    before.forEach((g,i)=>{
+      if(g<PAIR_GAP)assert.ok(after[i]<PAIR_GAP,`${name}: an even pair stays even (${g.toFixed(2)} to ${after[i].toFixed(2)})`);
+      else assert.ok(after[i]<=g+1e-9,`${name}: an uneven pair gets no more uneven (${g.toFixed(2)} to ${after[i].toFixed(2)})`);
+    });
+    const l=line();
+    assert.doesNotMatch(l,/undefined/,name);
+    if(json('HANDLING.last.kind')==='packed'){
+      assert.ok(json('HANDLING.last.moves.length')>0,`${name}: applied with moves`);
+      run('HANDLING.all=true');
+      assert.equal(((line().match(/<ul class="hf-all"[^>]*>(.*?)<\/ul>/)||['',''])[1].match(/<li>/g)||[]).length||json('HANDLING.last.moves.length'),json('HANDLING.last.moves.length'));
+    }
+  }
 });
 
 test('[HF-SMALL] not in the small view, nor before the packing step, during a trial or on a draft another tab froze',()=>{

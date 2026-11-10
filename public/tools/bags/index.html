@@ -9159,7 +9159,8 @@ function balancePacking(plan){
     if(isBottle(s.pos)) return;
     // fillL: the food's litres, which the re-pack places last around a hand placement (review of PR 78, I1)
     const fillL = s.items.reduce((t, k) => { const kit = kitById(k.id); return t + (kit && kit.divisible ? k.vol : 0); }, 0);
-    rooms.push({ key:s.key, pos:s.pos, freeL:s.left, fillL:+fillL.toFixed(2), capL:s.cap });
+    // pair: both halves of a pair (fork cages, panniers), so Handling first keeps the sides even (review of PRs 116/117, C1)
+    rooms.push({ key:s.key, pos:s.pos, freeL:s.left, fillL:+fillL.toFixed(2), capL:s.cap, ...(countOf(s) > 1 ? { pair:String(s.uid) } : {}) });
     const by = new Map();
     s.items.forEach(k => { const kit = kitById(k.id); if(kit && kit.divisible) return;
       const v = by.get(k.id) || { kg:0, L:0 }; v.kg += placedKg(k); v.L += k.vol; by.set(k.id, v); });
@@ -9481,10 +9482,12 @@ function handlingFixed(start){
 const handlingAvailable = () => S.step === 4 && !SMALL_VIEW && !PLAN_TRIAL && !TRIAL && DRAFT_READY && !DRAFT_FROZEN && !!S.placements
   && !!(window.WayfinchAdvisor && window.WayfinchAdvisor.handlingFirst);
 const HANDLING_SLICE = 3;
+// A pair whose halves' fill differs by this much is uneven: the packing check's pair note says so; advisor.js's PAIR_UNEVEN is the same.
+const PAIR_NOTE_GAP = 0.22;
 // The press. now: at once (the QA suites); otherwise in slices between frames, "Packing for handling…" meanwhile, so the page never
 // blocks (PERF-HF). True when the search started (now: when it packed something).
 function startHandling(o = {}){
-  if(!handlingAvailable()) return false;
+  if(!handlingAvailable() || HANDLING.run) return false;   // one press at a time
   currentPlan();
   const before = S.placements, start = idealTrial(S.bags, {}, before), fixed = handlingFixed(start), W = window.WayfinchAdvisor;
   // the heaviest-first packing on the plan as it stands: its pins over the kept placements (the frozen packing's kept passes), each
@@ -9529,7 +9532,7 @@ function applyHandling(run, out){
     const worth = m => { const p = was.get(m.id); return p ? p.kg * ((W.WEIGHTS[p.pos] || 0) - (W.WEIGHTS[to.get(m.id)] || 0)) : 0; };
     moves = [...out.moves].sort((a, b) => worth(b) - worth(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
-  HANDLING.last = { kind, placements:S.placements, before:run.before, start:run.start, after, moves, gain:out.gain };
+  HANDLING.last = { kind, placements:S.placements, before:run.before, start:run.start, after, moves, gain:out.gain, route:out.route };
   // the automatic balancing looks at this packing as looked at, so it never undoes the press
   BALANCE.checked = JSON.stringify(S.placements); BALANCE.pins = JSON.stringify(S.pinned || {});
   BALANCE.last = null; BALANCE.reverted = null; BALANCE.run = null;
@@ -9560,7 +9563,8 @@ function handlingTips(last){
   const A = currentPlan(), W = window.WayfinchAdvisor, tips = [];
   const frame = A.slots.filter(s => s.pos === 'frame');
   if(frame.some(s => s.items.length)) tips.push('Frame bag: pack the heaviest things at the bottom, near the down tube.');
-  A.slots.filter(s => (s.pos === 'seat' || s.pos === 'bar') && s.cap > 0 && s.items.length).forEach(s => {
+  // the outer bags: seat pack, bar roll, panniers and fork cages (design §3)
+  A.slots.filter(s => ['seat', 'bar', 'rack', 'fork'].includes(s.pos) && s.cap > 0 && s.items.length).forEach(s => {
     const f = (s.cap - s.left) / s.cap;
     if(f < 0.5) tips.push(`${unitLabel(s)} ${fullWords(f)}: roll it down and pull the straps tight so it does not sway.`);
   });
@@ -9613,6 +9617,9 @@ function fillHandling(){
   b.hidden = !show; hint.hidden = !show;
   const busy = !!(HANDLING.run || BALANCE.run || BALANCE.loading);
   b.setAttribute('aria-disabled', busy ? 'true' : 'false');
+  // while a press runs, the button says so (review of PRs 116/117, c); the focus stays on it
+  const text = HANDLING.run ? 'Packing for handling…' : 'Handling first';
+  if(b.textContent !== text) b.textContent = text;
   b.onclick = () => {
     if(b.getAttribute('aria-disabled') === 'true' || !startHandling()) return;
     holdResult(() => renderResult()); drawWeightMap();
@@ -11549,13 +11556,13 @@ function renderResult(){
       </div>
       ${panel}</div>`;
   }).join('');
-  // a pair that still comes out lopsided is usually one indivisible item's fault
+  // a pair that still comes out lopsided is usually one indivisible item's fault (PAIR_NOTE_GAP: Handling first keeps pairs to it too)
   const pairs = {};
   slots.forEach(s => { (pairs[s.uid] = pairs[s.uid] || []).push(s); });
   Object.values(pairs).forEach(g => {
     if(g.length !== 2) return;
     const f = g.map(s => s.cap ? (s.cap - s.left) / s.cap : 0);
-    if(Math.abs(f[0] - f[1]) < 0.22) return;
+    if(Math.abs(f[0] - f[1]) < PAIR_NOTE_GAP) return;
     const fuller = f[0] > f[1] ? g[0] : g[1];
     const big = fuller.items.filter(k => !k.part).map(k=>({...k,vol:+(k.vol/(k.units||1)).toFixed(2)})).sort((a,b) => b.vol - a.vol)[0];
     if(!big) return;
