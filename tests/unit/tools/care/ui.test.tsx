@@ -3,8 +3,11 @@
 // another tab. It writes nothing.
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
-import { afterEach, beforeEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { C, CARE_TASKS, CARRY, PART_LABEL, ROAD_CARDS, SECTION_LABEL, SECTIONS } from '../../../../src/core/wording/en-care.ts';
+import { ALL_STEPS_KEY } from '../../../../src/tools/care/steps.tsx';
+import { careDetails } from '../../../../src/core/care/fit.ts';
+import { stepsShown } from '../../../../src/core/care/lines.ts';
 import { CareScreen } from '../../../../src/tools/care/ui.tsx';
 import { readHost } from '../../../../src/tools/tyre/host.ts';
 import type { TyreServices } from '../../../../src/tools/tyre/services.ts';
@@ -16,8 +19,13 @@ import { BIKE_CHOICE_KEY } from '../../../../src/ui/tools/bike-choice.ts';
 const NOW = new Date('2026-11-07T10:00:00Z');
 const host = document.createElement('div');
 document.body.append(host);
-afterEach(() => { render(null, host); });
-beforeEach(() => { go('tools/care'); });
+afterEach(() => { render(null, host); vi.restoreAllMocks(); });
+beforeEach(() => {
+  go('tools/care');
+  localStorage.clear();
+  // the step view's Close takes its history entry back; here that is only counted
+  vi.spyOn(history, 'back').mockImplementation(() => {});
+});
 
 function memory(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial));
@@ -38,7 +46,8 @@ const world = (bikes: unknown[], extra: Record<string, string> = {}): Mem => mem
 const choice = (bikeId: string | null) => JSON.stringify({ app: 'copilot', kind: 'bike-choice', v: 1, bikeId, at: '2026-11-07T09:00:00.000Z' });
 const mount = async (mem: Mem) => { await act(() => { render(<CareScreen services={services(mem)} />, host); }); };
 
-const tasks = () => [...host.querySelectorAll<HTMLElement>('details.care-task')];
+// Since the review of PR 72 (I4) a task or card in the list is one button that opens its step view; its words are there.
+const tasks = () => [...host.querySelectorAll<HTMLElement>('.care-task')];
 const taskIds = () => tasks().map((d) => d.dataset.id!);
 const headings = () => [...host.querySelectorAll('h3')].map((h) => h.textContent);
 const tab = (name: string) => [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((t) => t.textContent === name)!;
@@ -51,6 +60,16 @@ const key = async (el: HTMLElement, k: string) => { await act(() => { el.dispatc
 const oracle = (d: Record<string, string | null>): string[] => CARE_TASKS.filter((t) => Object.entries(t.applies).every(([k, vals]) => d[k] === null || (vals as string[]).includes(d[k]!))).map((t) => t.id);
 const ANSWERED_DETAILS = { brakes: 'rim', tyres: 'tubes', drive: 'chain', gears: 'derailleur', shifting: 'cable', suspension: 'none', ebike: 'no' };
 const TRAIL_DETAILS = { brakes: 'hydraulic-disc', tyres: 'tubeless', drive: 'chain', gears: 'derailleur', shifting: 'cable', suspension: 'full', ebike: 'no' };
+/** A task's or card's words, read from its step view in All steps, which is then closed. */
+async function stepsOf(item: HTMLElement): Promise<{ text: string; steps: string[] }> {
+  localStorage.setItem(ALL_STEPS_KEY, '1');
+  await click(item.querySelector<HTMLElement>('.care-open')!);
+  const d = host.querySelector('dialog.care-steps')!;
+  const out = { text: d.textContent!, steps: [...d.querySelectorAll('.care-step-all .care-step-t')].map((x) => x.textContent!) };
+  await click([...d.querySelectorAll<HTMLElement>('button')].find((b) => b.getAttribute('aria-label') === C.careStepsClose)!);
+  expect(host.querySelector('dialog.care-steps')).toBeNull();
+  return out;
+}
 const tellUs = () => [...host.querySelectorAll('a')].find((a) => a.textContent === C.careTellUs) ?? null;
 
 test('[BC-TABS] two tabs, Care and Roadside repairs, in a named tablist; one selected, arrows, Home and End move; only its panel shows', async () => {
@@ -67,7 +86,7 @@ test('[BC-TABS] two tabs, Care and Roadside repairs, in a named tablist; one sel
   expect(tab(C.careTabRoad).getAttribute('aria-selected')).toBe('true');
   expect(document.activeElement).toBe(tab(C.careTabRoad));
   expect(panel(tab(C.careTabCare)).hidden).toBe(true);
-  expect(panel(tab(C.careTabRoad)).querySelectorAll('details.care-road').length).toBe(ROAD_CARDS.length);
+  expect(panel(tab(C.careTabRoad)).querySelectorAll('.care-road').length).toBe(ROAD_CARDS.length);
   await key(tab(C.careTabRoad), 'ArrowRight'); // wraps
   expect(tab(C.careTabCare).getAttribute('aria-selected')).toBe('true');
   await key(tab(C.careTabCare), 'End');
@@ -80,25 +99,25 @@ test('[BC-TABS] two tabs, Care and Roadside repairs, in a named tablist; one sel
   expect(panel(tab(C.careTabCare)).hidden).toBe(false);
 });
 
-test('[BC-TABS] with no bike every task shows, each an h3 section in design order, a task a details with its name and tags', async () => {
+test('[BC-TABS] with no bike every task shows, each an h3 section in design order, a task a button with its name and tags that opens its steps', async () => {
   await mount(world([]));
   expect(taskIds()).toEqual(CARE_TASKS.map((t) => t.id));
   const order = SECTIONS.filter((s) => CARE_TASKS.some((t) => t.section === s)).map((s) => SECTION_LABEL[s]);
   expect(headings()).toEqual(order);
   const disc = tasks().find((d) => d.dataset.id === 'brakes-pads-disc')!;
-  expect(disc.querySelector('summary')!.textContent).toContain('Check the disc brake pads and replace if worn');
-  expect(disc.querySelector('summary .muted')!.textContent).toBe('if you have disc brakes');
-  // opened: signs, steps as a numbered list, tools and time, who, and the shop line for a critical task
-  const body = disc.textContent!;
+  expect(disc.querySelector('.care-open')!.textContent).toContain('Check the disc brake pads and replace if worn');
+  expect(disc.querySelector('.care-open .muted')!.textContent).toBe('if you have disc brakes');
+  // opened: signs, its steps, tools and time, who, and the shop line for a critical task
+  const { text: body, steps } = await stepsOf(disc);
   expect(body).toContain(C.careSigns);
-  expect(disc.querySelectorAll('ol > li').length).toBe(5);
+  expect(steps.length).toBe(5);
   expect(body).toContain('torch, hex keys, new pads');
   expect(body).toContain(C.careTime(20, 20));
   expect(body).toContain('Yourself if you have done it before; otherwise shop');
   expect(body).toContain(C.careUnsure);
-  const lube = tasks().find((d) => d.dataset.id === 'chain-lube')!;
-  expect(lube.textContent).not.toContain(C.careUnsure);
-  expect(lube.textContent).toContain(C.careAlsoWet);
+  const lube = (await stepsOf(tasks().find((d) => d.dataset.id === 'chain-lube')!)).text;
+  expect(lube).not.toContain(C.careUnsure);
+  expect(lube).toContain(C.careAlsoWet);
 });
 
 test('[BC-FILTER] a filter keeps the section order and shows only that part; one at a time; a second tap clears it', async () => {
@@ -153,7 +172,7 @@ test('[BC-TELL-US] shown with a Not sure detail, leading to the bike\'s details 
   expect(taskIds()).toEqual(oracle(ANSWERED_DETAILS));
   for (const id of ['brakes-pads-rim', 'brakes-rim-wipe', 'chain-lube', 'gears-cables-look', 'gears-indexing', 'tyres-pressure']) expect(taskIds(), id).toContain(id);
   for (const id of ['brakes-pads-disc', 'brakes-hydraulic-bleed', 'tyres-sealant-topup', 'belt-inspect', 'gears-hub-oil', 'susp-fork-service', 'ebike-service', 'gears-electronic-battery']) expect(taskIds(), id).not.toContain(id);
-  expect(host.querySelectorAll('summary .muted').length).toBe(0);
+  expect(host.querySelectorAll('.care-open .muted').length).toBe(0);
   render(null, host);
   await mount(world([]));
   expect(tellUs()).toBeNull();
@@ -193,7 +212,7 @@ test('[BC-SCREEN] using the screen writes nothing: tabs, filters, search and ope
   await mount(mem);
   await click(filter(PART_LABEL.chain));
   await type('oil');
-  await click(tasks()[0]!.querySelector('summary')!);
+  await stepsOf(tasks()[0]!);
   await key(tab(C.careTabCare), 'ArrowRight');
   expect(mem.writes).toEqual([]);
   // no Back button above the title (owner, 9 Nov 2026: the bottom bar's Tools goes back); the title is the screen's h2
@@ -252,7 +271,7 @@ test('[BC-SCREEN] every rendered task says "If unsure, a shop." exactly when it 
   expect(tasks().length).toBe(CARE_TASKS.length);
   for (const d of tasks()) {
     const t = CARE_TASKS.find((x) => x.id === d.dataset.id)!;
-    expect(d.textContent!.includes(C.careUnsure), t.id).toBe(t.critical);
+    expect((await stepsOf(d)).text.includes(C.careUnsure), t.id).toBe(t.critical);
   }
   expect(CARE_TASKS.filter((t) => t.critical).length).toBeGreaterThanOrEqual(4);
 });
@@ -260,15 +279,15 @@ test('[BC-SCREEN] every rendered task says "If unsure, a shop." exactly when it 
 test('[BC-TELL-US] a single-speed bike sees hub gear oil once, tagged "If your hub has gears"; a hub-gear bike on cables sees it untagged (coordinator\'s ruling R3)', async () => {
   await mount(world([bike('bike_a', 'Fixie', { ...ANSWERED, drive: 'chain-hub', shifting: 'none' })]));
   const oil = () => tasks().find((d) => d.dataset.id === 'gears-hub-oil');
-  expect(oil()!.querySelector('summary .muted')!.textContent).toBe('If your hub has gears');
+  expect(oil()!.querySelector('.care-open .muted')!.textContent).toBe('If your hub has gears');
   render(null, host);
   await mount(world([bike('bike_a', 'Town', { ...ANSWERED, drive: 'chain-hub', shifting: 'cable' })]));
   expect(oil()).toBeDefined();
-  expect(oil()!.querySelector('summary .muted')).toBeNull();
+  expect(oil()!.querySelector('.care-open .muted')).toBeNull();
 });
 
 // ---- Roadside repairs and What to carry (sub-project 12, group 3: Tasks 6 and 7) ----
-const road = () => [...host.querySelectorAll<HTMLElement>('details.care-road')] as HTMLDetailsElement[];
+const road = () => [...host.querySelectorAll<HTMLElement>('.care-road')];
 const roadIds = () => road().map((d) => d.dataset.id!);
 const carry = () => [...host.querySelectorAll<HTMLElement>('.care-carry li')];
 const carryIds = () => carry().map((li) => li.dataset.id!);
@@ -283,10 +302,11 @@ test("[BC-ROAD] with no bike the Roadside tab lists every card in the draft's or
   expect(roadIds()).toEqual(ROAD_CARDS.map((c) => c.id));
   for (const d of road()) {
     const c = ROAD_CARDS.find((x) => x.id === d.dataset.id)!;
-    expect(d.querySelector('summary')!.textContent, c.id).toContain(c.problem);
-    const body = d.textContent!;
+    expect(d.querySelector('.care-open')!.textContent, c.id).toContain(c.problem);
+    const { text: body, steps } = await stepsOf(d);
     expect(body, c.id).toContain(`${C.careRoadCheckFirst}: ${c.checkFirst}`);
-    expect([...d.querySelectorAll('ol > li')].map((li) => li.textContent), c.id).toEqual(c.steps);
+    // with no bike, brakes are Not sure: every line shows, a disc line before a rim line (care pictures redo, T9)
+    expect(steps, c.id).toEqual(stepsShown(c.id, c.steps.length, careDetails(null)).map((i) => c.steps[i]));
     expect(body, c.id).toContain(C.careRideOn);
     expect(body, c.id).toContain(c.rideOn);
     expect(body, c.id).toContain(C.careRoadCarry);
@@ -294,7 +314,7 @@ test("[BC-ROAD] with no bike the Roadside tab lists every card in the draft's or
     expect(body.includes(C.careUnsure), c.id).toBe(c.critical);
   }
   // the first tab's tasks are not in this panel
-  expect(host.querySelectorAll('#care-panel-road details.care-task').length).toBe(0);
+  expect(host.querySelectorAll('#care-panel-road .care-task').length).toBe(0);
 });
 
 test("[BC-CARRY] at the bottom of the Roadside tab, What to carry is a plain list of every item with no bike, in the content's order, tagged when it depends on a Not sure detail; no ticks", async () => {
@@ -348,9 +368,9 @@ test("[BC-ROAD] a card that depends on a Not sure detail carries its tag; the sc
   // an old bike with nothing told: every card, each conditioned one tagged
   await act(() => { select.value = 'bike_u'; select.dispatchEvent(new Event('change', { bubbles: true })); });
   expect(roadIds()).toEqual(ROAD_CARDS.map((c) => c.id));
-  expect(road().find((d) => d.dataset.id === 'puncture-tube')!.querySelector('summary .muted')!.textContent).toBe('if you have inner tubes');
-  expect(road().find((d) => d.dataset.id === 'bolt-loose')!.querySelector('summary .muted')).toBeNull();
-  expect(road().find((d) => d.dataset.id === 'brake-rub-disc')!.querySelector('summary .muted')!.textContent).toBe('if you have disc brakes');
+  expect(road().find((d) => d.dataset.id === 'puncture-tube')!.querySelector('.care-open .muted')!.textContent).toBe('if you have inner tubes');
+  expect(road().find((d) => d.dataset.id === 'bolt-loose')!.querySelector('.care-open .muted')).toBeNull();
+  expect(road().find((d) => d.dataset.id === 'brake-rub-disc')!.querySelector('.care-open .muted')!.textContent).toBe('if you have disc brakes');
 });
 
 test('[BC-ROAD-SEARCH] "puncture" in the Care tab lists both puncture cards under "Roadside repairs", below the Care results; with no query no cards show', async () => {
@@ -392,16 +412,16 @@ test('[BC-ROAD-SEARCH] the part filter limits the cards too; a filter and a sear
   expect([...host.querySelectorAll('button')].filter((b) => b.textContent === C.careClear).length).toBe(1);
 });
 
-test('[BC-ROAD-SEARCH] a tap on a card in the Care results opens the Roadside tab at that card, open and focused', async () => {
+test("[BC-ROAD-SEARCH] a tap on a card in the Care results opens the Roadside tab and that card's step view; closed, focus is on that card", async () => {
   await mount(world([]));
   await type('puncture');
   await click(hits().find((h) => h.textContent === 'Puncture (tubeless)')!);
   expect(tab(C.careTabRoad).getAttribute('aria-selected')).toBe('true');
-  const card = road().find((d) => d.dataset.id === 'puncture-tubeless')!;
-  expect(card.open).toBe(true);
-  expect(document.activeElement).toBe(card.querySelector('summary'));
-  // the other cards stay closed
-  expect(road().filter((d) => d.open).map((d) => d.dataset.id)).toEqual(['puncture-tubeless']);
+  const d = host.querySelector('dialog.care-steps')!;
+  expect(host.querySelector(`#${d.getAttribute('aria-labelledby')}`)!.textContent).toBe('Puncture (tubeless)');
+  await click([...d.querySelectorAll<HTMLElement>('button')].find((b) => b.getAttribute('aria-label') === C.careStepsClose)!);
+  const card = road().find((x) => x.dataset.id === 'puncture-tubeless')!;
+  expect(document.activeElement).toBe(card.querySelector('.care-open'));
 });
 
 test('[BC-ROAD] using the Roadside tab writes nothing: opening cards, switching tabs, searching for a card', async () => {
@@ -409,7 +429,7 @@ test('[BC-ROAD] using the Roadside tab writes nothing: opening cards, switching 
   await mount(mem);
   await type('puncture');
   await click(hits()[0]!);
-  await click(road()[0]!.querySelector('summary')!);
+  await stepsOf(road()[0]!);
   await click(tab(C.careTabCare));
   await openRoad();
   expect(mem.writes).toEqual([]);

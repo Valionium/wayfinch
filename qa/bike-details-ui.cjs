@@ -134,6 +134,33 @@ reset();
   check(get('bikeSuspension').value==='unknown' && get('bikeRackMounts').value==='unknown','[TB-DETAILS-FORM] a bike from before shows Not sure');
   app.run('fillBikeProfileForm(null)');
 }
+// Care pictures redo (owner's answers 1 and 2 of 9 November 2026): Wheel axle and, with rim brakes only, Rim brake type, after Rack mounts.
+{
+  const more=html.slice(html.indexOf('id="bikeMoreDetails"'),html.indexOf('</form>',html.indexOf('id="bikeProfileForm"')));
+  const at=id=>more.indexOf('id="'+id+'"');
+  const options=id=>{const m=more.match(new RegExp('<select id="'+id+'"[^>]*>(.*?)</select>'));return m ? [...m[1].matchAll(/<option value="([^"]*)">([^<]*)<\/option>/g)].map(o=>[o[1],o[2]]) : [];};
+  const labels=JSON.parse(app.run('JSON.stringify(BIKE_PROFILE_LABELS)'));
+  for(const [key,id,name] of [['axle','bikeAxle','Wheel axle'],['rimBrake','bikeRimBrake','Rim brake type']]){
+    check(new RegExp('<label for="'+id+'">'+name+'<select id="'+id+'"').test(more),'[TB-DETAILS-AXLE] '+name+' is a select with its own label');
+    check(JSON.stringify(options(id))===JSON.stringify(Object.entries(labels[key] || {})) && options(id)[0]?.[0]==='unknown' && options(id)[0]?.[1]==='Not sure','[TB-DETAILS-AXLE] '+name+' offers its labels, Not sure first');
+    check(at(id)>at('bikeRackMounts') && at(id)<at('bikeChainField'),'[TB-DETAILS-AXLE] '+name+' comes after Rack mounts');
+    check(app.run(`BIKE_PROFILE_INPUTS.${key}`)===id,'[TB-DETAILS-AXLE] '+name+' is read and filled with the other details');
+  }
+  const hint=more.match(/<p class="hint" id="bikeAxleHint">([^<]*)<\/p>/);
+  check(hint && /thick axle/.test(hint[1]) && /<select id="bikeAxle" aria-describedby="bikeAxleHint">/.test(more),'[TB-DETAILS-AXLE] the axle hint, tied to its select');
+  app.run('fillBikeProfileForm(null)');
+  check(get('bikeAxle').value==='unknown' && get('bikeRimBrake').value==='unknown','[TB-DETAILS-AXLE] a new bike starts at Not sure');
+  const hidden=()=>get('bikeRimBrakeField').classList.contains('hidden');
+  check(hidden(),'[TB-DETAILS-AXLE] Rim brake type is hidden while the brakes are not rim brakes');
+  app.run(`fillBikeProfileForm(normaliseBikeProfile({id:'filled',brakes:'rim',axle:'nuts',rimBrake:'hydraulic'}))`);
+  check(get('bikeAxle').value==='nuts' && get('bikeRimBrake').value==='hydraulic' && !hidden(),'[TB-DETAILS-AXLE] a saved bike with rim brakes fills both and shows Rim brake type');
+  check(/\$\('bikeBrakes'\)\.onchange=bikeProfileFieldVisibility;/.test(html),'[TB-DETAILS-AXLE] a change of brake type sets which fields show');
+  get('bikeBrakes').value='hydraulic-disc';app.run('bikeProfileFieldVisibility()');
+  check(hidden(),'[TB-DETAILS-AXLE] choosing disc brakes hides Rim brake type at once');
+  get('bikeBrakes').value='rim';app.run('bikeProfileFieldVisibility()');
+  check(!hidden(),'[TB-DETAILS-AXLE] and choosing rim brakes shows it again');
+  app.run('fillBikeProfileForm(null)');
+}
 // Saving them: on the saved bike and the plan's bike, after a reload too; back to Not sure stores no field.
 async function detailsSave(){
   const {appVM:tab,sharedStore}=require('./app-vm.cjs');
@@ -158,6 +185,14 @@ async function detailsSave(){
   check(await a.run('saveBikeProfile()')===true,'[TB-DETAILS-SAVE] the bike saves again');
   await a.run('BIKE_PROFILE_WRITES');
   check(![library(),current()].some(b=>'suspension' in b || 'rackMounts' in b),'[TB-DETAILS-SAVE] back to Not sure stores no field');
+  set('bikeAxle','thru');set('bikeRimBrake','caliper');
+  check(await a.run('saveBikeProfile()')===true,'[TB-DETAILS-AXLE] the bike saves with an axle and a rim brake type');
+  await a.run('BIKE_PROFILE_WRITES');
+  check(library().axle==='thru' && library().rimBrake==='caliper' && current().axle==='thru' && current().rimBrake==='caliper','[TB-DETAILS-AXLE] both are on the saved bike and on loadcheck:bikeProfile');
+  set('bikeBrakes','cable-disc');
+  check(await a.run('saveBikeProfile()')===true,'[TB-DETAILS-AXLE] saved again with disc brakes');
+  await a.run('BIKE_PROFILE_WRITES');
+  check(library().axle==='thru' && library().brakes==='cable-disc' && library().rimBrake==='caliper','[TB-DETAILS-AXLE] with disc brakes both stay as answered (the field is hidden; Bike care reads it only with rim brakes)');
 }
 // Moved here from the retired pressure-tool-markup and pressure-tool suites (sub-project 6, Task 6): what they guarded
 // besides the tyre helper. Unique ids; the bike weight in the form with its label and help; Use these bike details keeps the repair
