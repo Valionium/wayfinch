@@ -786,6 +786,8 @@ test('[HF-LINE] the owner\'s sequence: a press turns the button into the way bac
   await settled(page);
   await expect(button).toHaveText(BACK);
   await expect(button).toHaveAttribute('aria-disabled', 'false');
+  // review of PR 121, R2: the way back is not described by the hint of the press
+  await expect(button).not.toHaveAttribute('aria-describedby', /.+/);
   await expect(page.getByRole('button', { name: 'Handling first', exact: true })).toHaveCount(0);
   await expect(map).toBeVisible();
   // (2) the map opens and closes
@@ -794,12 +796,24 @@ test('[HF-LINE] the owner\'s sequence: a press turns the button into the way bac
   await expect(page.locator('#weightMap .wm-card')).toHaveCount(2, { timeout: 30_000 });
   await map.click();
   await expect(map).toHaveText('Show the map');
+  // review of PR 121, R3: an open map drops Before and After at once on the way back, never shows them for the plan before
+  await map.click();
+  await expect(page.locator('#weightMap .wm-card figcaption b')).toHaveText(['Before', 'After'], { timeout: 30_000 });
+  const titles = await button.evaluate((b) => { (b as HTMLElement).click(); return [...document.querySelectorAll('#weightMap .wm-card figcaption b')].map((t) => t.textContent); });
+  expect(titles).not.toContain('Before');
+  await settled(page);
+  await map.click();
+  await expect(map).toHaveText('Show the map');
+  await button.click();
+  await expect(line).toContainText('Packed for handling', { timeout: 60_000 });
+  await settled(page);
   // (3) the way back: exactly the packing before, "Handling first" again, the map button still there
   await button.click();
   await expect(line).toHaveText('Back to the packing before Handling first.');
   expect(await page.evaluate('JSON.stringify(S.placements)')).toBe(before);
   await settled(page);
   await expect(button).toHaveText('Handling first');
+  await expect(button).toHaveAttribute('aria-describedby', 'handlingHint');
   await expect(map).toBeVisible();
   // (4) again and again: each press packs, each way back returns; never stuck, the map button always there
   for (let i = 0; i < 2; i++) {
@@ -833,10 +847,13 @@ test('[HF-LINE] "Already packed for handling": the line and the map button, no b
   if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
   const button = page.locator('#rigHandling');
   await expect(button).toHaveAttribute('aria-disabled', 'false', { timeout: 60_000 });
-  await button.click();
+  // by keyboard (review of PR 121, R1): the button goes, the focus goes to the line, never to the page
+  await button.focus();
+  await page.keyboard.press('Enter');
   await expect(page.locator('#resultBox .hf-line')).toContainText('Already packed for handling', { timeout: 60_000 });
   await settled(page);
   await expect(button).toBeHidden();
+  await expect(page.locator('#resultBox .hf-line')).toBeFocused();
   await expect(page.locator('#handlingHint')).toBeHidden();
   await expect(page.locator('#rigWeightMap')).toBeVisible();
   // the plan changes: the button is back
