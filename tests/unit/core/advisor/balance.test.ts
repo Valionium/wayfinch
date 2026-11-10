@@ -656,6 +656,22 @@ describe('"Handling first" (design of 10 Nov 2026)', () => {
     expect(out.moves).toHaveLength(3);
   });
 
+  // Re-check of PR 117, N1: the page's start packing can split food otherwise than the plan on screen; side to side is measured against
+  // the plan as the rider sees it (`pairs`), not the re-read start.
+  test('[HF-KEEPS] side to side against the plan as shown: a pair even on screen stays even, though the start packing read it uneven', () => {
+    const bags: Bag[] = [{ key: 'k-0', pos: 'fork', cap: 3, reach: false, pair: 'k' }, { key: 'k-1', pos: 'fork', cap: 3, reach: false, pair: 'k' },
+      { key: 's-0', pos: 'seat', cap: 10, reach: false }];
+    const items: FItem[] = [{ id: 'tent', kg: 1.3, L: 2 }, { id: 'pot', kg: 0.3, L: 0.5 }, { id: 'lock', kg: 1.6, L: 1 }];
+    const p = keeper(bags, items, { tent: 'k-0', pot: 'k-0', lock: 's-0' });
+    expect(gaps(p.start).get('k')!).toBeGreaterThanOrEqual(PAIR_UNEVEN); // 83 % and 0 % as read; even (0.1) on screen
+    // the pot ticked as packed: the lock into the empty cage would leave 83 % and 33 %, and nothing can even that out
+    const read = handlingFirst(p.start, p.trial, p.fresh, { fixed: ['pot'] });
+    expect(gaps(read.packing).get('k')!).toBeGreaterThanOrEqual(PAIR_UNEVEN); // what the read start alone would allow
+    const out = handlingFirst(p.start, p.trial, p.fresh, { fixed: ['pot'], pairs: { k: 0.1 } });
+    expect(out.apply === false || gaps(out.packing).get('k')! < PAIR_UNEVEN).toBe(true);
+    expect(out.apply).toBe(false);
+  });
+
   test('[HF-ORDER] a pair that cannot be made even at no cost is left as it is: no things to repack for a pair that stays uneven all the same', () => {
     const bags: Bag[] = [{ key: 'k-0', pos: 'fork', cap: 3, reach: false, pair: 'k' }, { key: 'k-1', pos: 'fork', cap: 3, reach: false, pair: 'k' }];
     const p = keeper(bags, [{ id: 'tent', kg: 1.3, L: 2 }, { id: 'pot', kg: 0.3, L: 0.5 }], { tent: 'k-0', pot: 'k-0' });

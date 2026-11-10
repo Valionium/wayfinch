@@ -95,3 +95,17 @@ export function diffLine(yours: Zones, ideal: Zones): string {
   d.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
   return d.length ? `${d.map(([k, v]) => WM.points(Math.abs(v), v > 0, WM.zone[k])).join(', ')}.` : WM.close;
 }
+
+/**
+ * Handling first's one sentence under Before and After (design of 10 Nov 2026, §3): the plain kilos that left the zone that lost most for
+ * the zone that gained most (the smaller of the two), to the tenth; each zone keeping its kilos (under 0.05 kg either way), said so.
+ */
+export function movedLine(before: readonly MapItem[], after: readonly MapItem[]): string {
+  const keys = ['back', 'rear', 'middle', 'front'] as const;
+  const kg = (list: readonly MapItem[]) => keys.map((k) => list.filter((i) => (ZONE[i.pos] ?? 'middle') === k).reduce((t, i) => t + i.kg, 0));
+  const [a, b] = [kg(before), kg(after)];
+  const d = keys.map((k, i) => [k, b[i]! - a[i]!] as const);
+  const lost = d.filter((x) => x[1] < -0.05).sort((x, y) => x[1] - y[1])[0], won = d.filter((x) => x[1] > 0.05).sort((x, y) => y[1] - x[1])[0];
+  return lost && won ? WM.moved(Math.min(-lost[1], won[1]).toFixed(1), lost[0], won[0]) : WM.sameZones;
+}
+

@@ -4,7 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { HANDLING_WEIGHTS } from '../../../../src/core/advisor/handling.ts';
 import { WEIGHTS } from '../../../../src/core/advisor/table.ts';
 import type { P } from '../../../../src/core/bike/art.ts';
-import { blur, diffLine, FULL, GRID, shareLine, splat, zoneShares } from '../../../../src/core/bike/weightmap.ts';
+import { blur, diffLine, FULL, GRID, movedLine, shareLine, splat, zoneShares } from '../../../../src/core/bike/weightmap.ts';
 import { balance } from '../../../../src/core/advisor/balance.ts';
 import type { Packing } from '../../../../src/core/advisor/balance.ts';
 import { handlingScore } from '../../../../src/core/advisor/rank.ts';
@@ -81,5 +81,18 @@ describe('the weight map (design section 1)', () => {
       const texts = typeof value === 'string' ? [value] : typeof value === 'function' ? [String((value as (...a: unknown[]) => string)(3, true, 'in the middle'))] : Object.values(value as object).map(String);
       for (const t of texts) expect(bannedHits(t), key).toEqual([]);
     }
+  });
+});
+
+// "Handling first" (design of 10 Nov 2026, §3): after a press the map shows Before over After, with one sentence of what moved.
+describe("Handling first's Before and After", () => {
+  test('[HF-MAP] one sentence: the kilos that left the zone that lost most for the zone that gained most; the same zones, said so', () => {
+    const it = (pos: string, kg: number) => ({ pos, kg, outline: [] as P[] });
+    expect(movedLine([it('seat', 3), it('pack', 2)], [it('frame', 2.1), it('seat', 0.9), it('pack', 2)])).toBe('2.1 kg moved from the rear to the middle.');
+    expect(movedLine([it('pack', 1.5), it('bar', 1)], [it('fork', 1), it('frame', 1.5)])).toBe('1.5 kg moved off your back to the middle.');
+    // seat pack to panniers, bar roll to fork cages: each zone keeps its kilos
+    expect(movedLine([it('seat', 2), it('bar', 1)], [it('rack', 2), it('fork', 1)])).toBe(WM.sameZones);
+    expect(movedLine([], [])).toBe(WM.sameZones);
+    for (const t of [WM.before, WM.after, WM.afterSub, WM.beforeSub('4.0'), WM.sameZones, WM.moved('2.1', 'rear', 'middle')]) expect(bannedHits(t)).toEqual([]);
   });
 });
