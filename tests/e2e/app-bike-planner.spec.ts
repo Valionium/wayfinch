@@ -765,6 +765,103 @@ test('[HF-LINE] at 320 px, light and dark: the button, its hint and its line wra
   }
 });
 
+// The owner's preview of main a7122fa (10 Nov 2026): after a press a second "Handling first" stood beside "Show the map"; a second press
+// hid the map button, a third greyed out and left it gone. The owner's rulings: after a press the button turns into "Back to the
+// planner's packing" (it does what Undo does), and the map button is there after every press; "Already packed" has no button of its own.
+const BACK = "Back to the planner's packing";
+async function settled(page: Page): Promise<void> {
+  await expect(page.locator('#rigHandling')).not.toHaveText('Packing for handling…', { timeout: 60_000 });
+  await expect(page.locator('#weightLine')).not.toHaveText('Checking the balance…', { timeout: 60_000 });
+}
+test('[HF-LINE] the owner\'s sequence: a press turns the button into the way back, the map button stays through every press, Back and Undo, and nothing gets stuck', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page);
+  await handlingReady(page);
+  const button = page.locator('#rigHandling'), map = page.locator('#rigWeightMap'), line = page.locator('#resultBox .balance-line').first();
+  const before = await page.evaluate('JSON.stringify(S.placements)');
+  // (1) press: the line, then the way back and the map button; never a second "Handling first"
+  await button.click();
+  await expect(line).toContainText('Packed for handling', { timeout: 60_000 });
+  await settled(page);
+  await expect(button).toHaveText(BACK);
+  await expect(button).toHaveAttribute('aria-disabled', 'false');
+  // review of PR 121, R2: the way back is not described by the hint of the press
+  await expect(button).not.toHaveAttribute('aria-describedby', /.+/);
+  await expect(page.getByRole('button', { name: 'Handling first', exact: true })).toHaveCount(0);
+  await expect(map).toBeVisible();
+  // (2) the map opens and closes
+  await map.click();
+  await expect(map).toHaveText('Hide the map');
+  await expect(page.locator('#weightMap .wm-card')).toHaveCount(2, { timeout: 30_000 });
+  await map.click();
+  await expect(map).toHaveText('Show the map');
+  // review of PR 121, R3: an open map drops Before and After at once on the way back, never shows them for the plan before
+  await map.click();
+  await expect(page.locator('#weightMap .wm-card figcaption b')).toHaveText(['Before', 'After'], { timeout: 30_000 });
+  const titles = await button.evaluate((b) => { (b as HTMLElement).click(); return [...document.querySelectorAll('#weightMap .wm-card figcaption b')].map((t) => t.textContent); });
+  expect(titles).not.toContain('Before');
+  await settled(page);
+  await map.click();
+  await expect(map).toHaveText('Show the map');
+  await button.click();
+  await expect(line).toContainText('Packed for handling', { timeout: 60_000 });
+  await settled(page);
+  // (3) the way back: exactly the packing before, "Handling first" again, the map button still there
+  await button.click();
+  await expect(line).toHaveText('Back to the packing before Handling first.');
+  expect(await page.evaluate('JSON.stringify(S.placements)')).toBe(before);
+  await settled(page);
+  await expect(button).toHaveText('Handling first');
+  await expect(button).toHaveAttribute('aria-describedby', 'handlingHint');
+  await expect(map).toBeVisible();
+  // (4) again and again: each press packs, each way back returns; never stuck, the map button always there
+  for (let i = 0; i < 2; i++) {
+    await button.click();
+    await expect(line).toContainText('Packed for handling', { timeout: 60_000 });
+    await settled(page);
+    await expect(button).toHaveText(BACK);
+    await expect(map).toBeVisible();
+    await button.click();
+    await expect(line).toHaveText('Back to the packing before Handling first.');
+    await settled(page);
+    await expect(button).toHaveText('Handling first');
+    await expect(button).toHaveAttribute('aria-disabled', 'false');
+    await expect(map).toBeVisible();
+  }
+  // the line's own Undo does the same and leaves the same buttons
+  await button.click();
+  await expect(line).toContainText('Packed for handling', { timeout: 60_000 });
+  await settled(page);
+  await line.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('#resultBox .balance-line').first()).toHaveText('Back to the packing before Handling first.');
+  await settled(page);
+  await expect(button).toHaveText('Handling first');
+  await expect(map).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('[HF-LINE] "Already packed for handling": the line and the map button, no button to press again', async ({ page }) => {
+  await planner(page);
+  await page.evaluate("S.bags = [{ uid:1, pos:'rack', L:20, pair:true }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'bottle', slot:'dt', L:0.75 }, { uid:4, pos:'pack', L:12 }]; S.nextUid = 5; S.decks = { bar:false, rack:true }; S.mode = 'light'; go(2); go(3); go(4)");
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
+  const button = page.locator('#rigHandling');
+  await expect(button).toHaveAttribute('aria-disabled', 'false', { timeout: 60_000 });
+  // by keyboard (review of PR 121, R1): the button goes, the focus goes to the line, never to the page
+  await button.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#resultBox .hf-line')).toContainText('Already packed for handling', { timeout: 60_000 });
+  await settled(page);
+  await expect(button).toBeHidden();
+  await expect(page.locator('#resultBox .hf-line')).toBeFocused();
+  await expect(page.locator('#handlingHint')).toBeHidden();
+  await expect(page.locator('#rigWeightMap')).toBeVisible();
+  // the plan changes: the button is back
+  await page.evaluate("S.bags.push({ uid:9, pos:'top', L:1, slot:'front' }); S.nextUid = 10; renderResult(); drawRig()");
+  await expect(button).toHaveText('Handling first', { timeout: 30_000 });
+  await expect(button).toBeVisible();
+});
+
 test('[HF-SMALL] the small view of a day ride has no Handling first button', async ({ page }) => {
   await planner(page);
   await page.evaluate(`${HF_BAGS} go(2); go(3); SMALL_VIEW = true; go(4); setSmallView(true)`);

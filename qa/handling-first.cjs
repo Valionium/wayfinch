@@ -169,8 +169,9 @@ test('[HF-LINE] in slices: "Packing for handling…" while the search runs, the 
   let slices=0;
   while(json('!!HANDLING.run')){run('handlingSlice(HANDLING.run)');slices++;assert.ok(slices<400,'the search ends');}
   assert.ok(slices>=2,`run in slices (${slices})`);
+  // done: the button is the way back (the owner's ruling of 10 Nov 2026, preview of main a7122fa)
   run('fillHandling()');
-  assert.equal(q.nodes.get('rigHandling').textContent,'Handling first');
+  assert.equal(q.nodes.get('rigHandling').textContent,json('HANDLING.last.kind')==='packed'?"Back to the planner's packing":'Handling first');
   const sliced=json('currentPlan().items');
   plan(SETS.bikepacking);
   press();

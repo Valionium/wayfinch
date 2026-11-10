@@ -464,7 +464,7 @@ body.lc-small #planBike{display:none!important}
 .bagg.ghost .bk-detail{display:none}
 /* the weight map, under the rig at the packing check: one line, the map behind "Show the map" (the owner's decision of 9 Nov 2026) */
 .wm-line{font-size:13px;margin:10px 0 0;color:var(--muted)}
-.wm-line:focus{outline:none}
+.wm-line:focus,.hf-line:focus{outline:none}
 .wm-line[aria-busy="true"]{opacity:.75}
 .wm-show,.wm-diff{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--muted-dim);border-radius:8px;padding:8px 12px;min-height:44px;margin-top:10px;cursor:pointer}
 .wm-show:focus-visible,.wm-diff:focus-visible{outline:2px solid var(--blaze);outline-offset:2px}
@@ -9636,17 +9636,39 @@ function handlingLine(){
   return null;
 }
 // The button under the drawing, beside "Show the map", once advisor.js is here (it loads at the packing step).
+// The owner's rulings of 10 Nov 2026 (preview of main a7122fa): after a press that packed, the button is the way back ("Back to the
+// planner's packing", what Undo does); after "Already packed" (or a press held by a tick) there is no button, the line says it all; after
+// the way back, or once the plan changed, it is "Handling first" again. One element throughout, so the focus stays on it.
+const HANDLING_BACK = "Back to the planner's packing";
+const handlingOnShow = () => !!(HANDLING.last && samePlacements(HANDLING.last.placements, S.placements));
+// after a press: its answer on show, or the packing the way back brought back (the map button stays there in both)
+const handlingPressed = () => handlingOnShow() || !!(HANDLING.reverted && samePlacements(HANDLING.reverted, S.placements));
 function fillHandling(){
   const b = $('rigHandling'), hint = $('handlingHint'); if(!b || !hint) return;
   const show = handlingAvailable();
-  b.hidden = !show; hint.hidden = !show;
+  const last = handlingOnShow() ? HANDLING.last : null;
+  const back = !HANDLING.run && !!last && last.kind === 'packed' && !handlingPacked(last);
+  const gone = !show || (!HANDLING.run && !!last && !back);
+  // the button going while it has the focus: the focus goes to its line, never to the page (review of PR 121, R1)
+  const line = gone && document.activeElement === b ? document.querySelector('#resultBox .hf-line') : null;
+  b.hidden = gone;
+  if(line){ line.setAttribute('tabindex', '-1'); line.focus({ preventScroll:true }); }
+  hint.hidden = !show || HANDLING.run || !!last;
+  // described by the hint only while the hint is there (R2)
+  if(hint.hidden) b.removeAttribute('aria-describedby'); else b.setAttribute('aria-describedby', 'handlingHint');
   const busy = !!(HANDLING.run || BALANCE.run || BALANCE.loading);
   b.setAttribute('aria-disabled', busy ? 'true' : 'false');
   // while a press runs, the button says so (review of PRs 116/117, c); the focus stays on it
-  const text = HANDLING.run ? 'Packing for handling…' : 'Handling first';
+  const text = HANDLING.run ? 'Packing for handling…' : back ? HANDLING_BACK : 'Handling first';
   if(b.textContent !== text) b.textContent = text;
   b.onclick = () => {
-    if(b.getAttribute('aria-disabled') === 'true' || !startHandling()) return;
+    if(b.getAttribute('aria-disabled') === 'true') return;
+    if(back){
+      if(!undoHandling()) return;
+      holdResult(() => renderResult()); drawRig();
+      return;
+    }
+    if(!startHandling()) return;
     holdResult(() => renderResult()); drawWeightMap();
   };
 }
@@ -9718,6 +9740,8 @@ function fillWeightMap(line, button, box){
   }
   const found = ready ? weightMapIdeal() : null;
   line.hidden = false;
+  // Before and After no longer the plan's (the way back, Undo): dropped at once, never shown for the plan before (review of PR 121, R3)
+  if(!handlingBefore() && box.querySelector('.wm-moved:not([hidden])')){ box.textContent = ''; WEIGHT_MAP.drawn = ''; }
   if(!found){
     // while the search runs: it says so; "Show the map" and the map stay as they were
     line.textContent = 'Checking the balance…';
@@ -9726,7 +9750,8 @@ function fillWeightMap(line, button, box){
   }
   line.removeAttribute('aria-busy');
   // after a press of Handling first that moved things, the map shows Before over After (design of 10 Nov 2026, §3)
-  const note = found.note, map = !!(note && note.map) || !!handlingBefore(), on = map && WEIGHT_MAP.on;
+  // after a press of Handling first the map button is always there (the owner's ruling of 10 Nov 2026)
+  const note = found.note, map = !!(note && note.map) || !!handlingBefore() || handlingPressed(), on = map && WEIGHT_MAP.on;
   line.hidden = !note;
   line.textContent = note ? note.text : '';
   // the button goes when the plan reaches the best balance: focus on it moves to the line
