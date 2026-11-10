@@ -691,6 +691,89 @@ test('[BAL-LINE] at 320 px, light and dark: the line wraps without a sideways sc
   }
 });
 
+// "Handling first" (design of 10 Nov 2026, the owner's answers of 10 Nov): a button under the drawing, beside "Show the map", at the
+// packing check; one press packs by weight, its line where the balance line is, with "See all", its tips and Undo; the map then shows
+// Before and After. Not in the small view.
+const HF_BAGS = "S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:13 }, { uid:3, pos:'frame', L:3, shape:2 }, { uid:4, pos:'fork', L:3, pair:true }]; S.nextUid = 5; S.decks = { bar:false, rack:false };";
+async function handlingReady(page: Page): Promise<void> {
+  await page.evaluate(`${HF_BAGS} go(2); go(3); go(4)`);
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click(); // the weight question, skipped
+  await expect(page.locator('#rigHandling')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#rigHandling')).toHaveAttribute('aria-disabled', 'false', { timeout: 30_000 });
+}
+test('[HF-LINE] Handling first: the button beside "Show the map", its line with "See all" and Undo, the map Before and After, and Undo brings the packing before back', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await planner(page);
+  expect(await page.evaluate("document.getElementById('rigHandling').hidden")).toBe(true); // nothing before the packing check
+  await handlingReady(page);
+  await expect(page.locator('#handlingHint')).toHaveText('Heaviest things low and in the middle, even if some bags stay part empty.');
+  const button = page.locator('#rigHandling');
+  expect((await button.boundingBox())!.height, 'the button is at least 44 px').toBeGreaterThanOrEqual(44);
+  const before = await page.evaluate('JSON.stringify(S.placements)');
+  const bags = await page.evaluate('JSON.stringify(S.bags)');
+  // the keyboard: focus and Enter
+  await button.focus();
+  await page.keyboard.press('Enter');
+  const line = page.locator('#resultBox .hf-line');
+  await expect(line).toContainText('Packed for handling:', { timeout: 60_000 });
+  await expect(line).toHaveAttribute('role', 'status');
+  expect(await page.evaluate('JSON.stringify(S.bags)'), 'the bags never change').toBe(bags);
+  expect(await page.evaluate('JSON.stringify(S.placements)')).not.toBe(before);
+  await expect(page.locator('#resultBox .hf-tips')).toContainText('Frame bag: pack the heaviest things at the bottom, near the down tube.');
+  // See all opens the list in place
+  const all = line.getByRole('button', { name: 'See all' });
+  if (await all.count()) {
+    await expect(all).toHaveAttribute('aria-expanded', 'false');
+    await all.click();
+    await expect(all).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('#hfAll')).toBeVisible();
+    expect(await page.locator('#hfAll li').count()).toBe(await page.evaluate('HANDLING.last.moves.length'));
+  }
+  // the map: Before and After
+  await expect(page.locator('#rigWeightMap')).toBeVisible({ timeout: 30_000 });
+  await page.locator('#rigWeightMap').click();
+  await expect(page.locator('#weightMap .wm-card figcaption b')).toHaveText(['Before', 'After'], { timeout: 30_000 });
+  await expect(page.locator('#weightMap .wm-moved')).toHaveText(/ kg moved |about the same kilos/);
+  await expect(page.locator('#weightMap .wm-diff')).toBeHidden();
+  // Undo: exactly the packing before
+  const undo = line.getByRole('button', { name: 'Undo' });
+  expect((await undo.boundingBox())!.height, 'Undo is at least 44 px').toBeGreaterThanOrEqual(44);
+  await undo.click();
+  await expect(page.locator('#resultBox .balance-line')).toHaveText('Back to the packing before Handling first.');
+  expect(await page.evaluate('JSON.stringify(S.placements)')).toBe(before);
+  expect(errors).toEqual([]);
+});
+
+test('[HF-LINE] at 320 px, light and dark: the button, its hint and its line wrap without a sideways scroll, every button at least 44 px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await planner(page);
+    await handlingReady(page);
+    await page.locator('#rigHandling').click();
+    const line = page.locator('#resultBox .hf-line');
+    await expect(line).toContainText('Packed for handling:', { timeout: 60_000 });
+    for (const sel of ['#rigHandling', '#resultBox .hf-line button']) {
+      for (const b of await page.locator(sel).all()) {
+        const box = (await b.boundingBox())!;
+        expect(box.height, `${scheme}: ${sel} is at least 44 px`).toBeGreaterThanOrEqual(44);
+        expect(box.x + box.width, `${scheme}: ${sel} inside the window`).toBeLessThanOrEqual(320);
+      }
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth), `${scheme}: no sideways scroll`).toBeLessThanOrEqual(320);
+  }
+});
+
+test('[HF-SMALL] the small view of a day ride has no Handling first button', async ({ page }) => {
+  await planner(page);
+  await page.evaluate(`${HF_BAGS} go(2); go(3); SMALL_VIEW = true; go(4); setSmallView(true)`);
+  await expect(page.locator('#smallBagList')).toBeVisible();
+  await page.waitForFunction('!!window.WayfinchAdvisor', null, { timeout: 30_000 });
+  await expect(page.locator('#rigHandling')).toBeHidden();
+  expect(await page.evaluate('handlingAvailable()')).toBe(false);
+});
+
 // The owner's ruling of 9 Nov 2026: the full planner's three-quarter frame bag is never drawn over the bottle beside it in the triangle.
 declare const S: { bags: { pos: string; uid: number }[] };
 /** How many points of a grid over the drawn bottle (its cage, the bottle and its cap) lie inside the drawn frame bag (0: side by side). */

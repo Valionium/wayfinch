@@ -161,10 +161,10 @@ export function pairGaps(p: Packing): Map<string, number> {
   return new Map([...by].filter(([, f]) => f.length === 2).map(([k, f]) => [k, Math.abs(f[0]! - f[1]!)]));
 }
 
-/** Side to side (review of PRs 116/117, C1): a pair even in `start` stays even; an uneven one gets no more uneven. */
-function sidesKept(start: Packing, p: Packing): boolean {
+/** Side to side (review of PRs 116/117, C1): a pair even in `base` (its gaps) stays even; an uneven one gets no more uneven. */
+function sidesKept(base: ReadonlyMap<string, number>, p: Packing): boolean {
   const now = pairGaps(p);
-  for (const [k, g] of pairGaps(start)) {
+  for (const [k, g] of base) {
     const n = now.get(k);
     if (n !== undefined && (g < PAIR_UNEVEN ? n >= PAIR_UNEVEN : n > g + EPS)) return false;
   }
@@ -234,12 +234,12 @@ function mainBag(p: Packing, id: string): string | null {
  * moves of one pair from one half to the other together first, then one by one), so the rider repacks less, and an uneven pair is evened
  * out where a thing can go to the emptier half at no cost (also with nothing else to gain). Applied only with a thing to move, every
  * thing whose main bag changes listed (a split thing packed whole too). `trial` and `extra` as for balance; each search at most
- * `maxTrials`. `budget`: all trials at most this many (the page's slices, its trials remembered, so each run adds only new ones). Every
+ * `maxTrials`. `pairs`: each pair's gap in the plan as the rider sees it, the side to side baseline (default: `start`'s). `budget`: all trials at most this many (the page's slices, its trials remembered, so each run adds only new ones). Every
  * input the same, the same answer.
  */
 export function handlingFirst(start: Packing, trial: (pins: Record<string, string>, from: Packing) => Packing,
   fresh: (pins: Record<string, string>) => Packing,
-  o: { fixed?: ReadonlySet<string> | readonly string[]; extra?: readonly string[]; maxTrials?: number; budget?: number } = {}): HandledFirst {
+  o: { fixed?: ReadonlySet<string> | readonly string[]; extra?: readonly string[]; maxTrials?: number; budget?: number; pairs?: Record<string, number> } = {}): HandledFirst {
   const fixed = new Set(o.fixed ?? []);
   const max = o.maxTrials ?? MAX_BALANCE_TRIALS, budget = o.budget ?? Infinity;
   let tried = 0;
@@ -249,7 +249,11 @@ export function handlingFirst(start: Packing, trial: (pins: Record<string, strin
   const s0 = handlingScore(start.result);
   const frameKg = (p: Packing) => p.result.kgByPos.frame ?? 0;
   const kept = (p: Packing) => [...fixed].every((id) => JSON.stringify(start.result.items[id] ?? null) === JSON.stringify(p.result.items[id] ?? null));
-  const sides = (p: Packing) => sidesKept(start, p);
+  // side to side measured against the plan as the rider sees it (`pairs`, each pair's gap there: re-check of PR 117, N1), else `start`
+  const base = new Map([...pairGaps(start), ...Object.entries(o.pairs ?? {})]);
+  const sides = (p: Packing) => sidesKept(base, p);
+  // a pair evened out at no cost counts only where it was uneven on screen
+  const evenedOnScreen = (p: Packing) => [...base].some(([k, g]) => g >= PAIR_UNEVEN && (pairGaps(p).get(k) ?? g) < PAIR_UNEVEN);
   // one search within what is left of the budget; null when the budget ran out first
   const search = (from: Packing): Balanced | null => {
     const n = Math.min(max, budget - tried);
@@ -325,7 +329,7 @@ export function handlingFirst(start: Packing, trial: (pins: Record<string, strin
     // nothing scores better: a pair evened out is still worth the press
     const evened = evenOut(start);
     if (!evened) return out();
-    if (evened !== start) return finish(evened, 'even');
+    if (evened !== start && evenedOnScreen(evened) && sides(evened)) return finish(evened, 'even');
     return none(better.length > 0, partial, true);
   }
   let cur = best.packing;
@@ -367,7 +371,7 @@ export function handlingFirst(start: Packing, trial: (pins: Record<string, strin
       if (handlingScore(next.result) > s0 - STEP + EPS) {
         const evened = evenOut(start);
         if (!evened) return out();
-        return evened !== start ? finish(evened, 'even') : none(false, partial, true);
+        return evened !== start && evenedOnScreen(evened) && sides(evened) ? finish(evened, 'even') : none(false, partial, true);
       }
       cur = next;
     }

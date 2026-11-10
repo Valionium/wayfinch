@@ -6,7 +6,7 @@
 // (finding G): the switch sits above the maps and is built once, every later change is made in place, and the difference is added and
 // taken away at the end.
 import type { P } from '../../core/bike/art.ts';
-import { blur, diffLine, FULL, GRID, shareLine, splat, zoneShares } from '../../core/bike/weightmap.ts';
+import { blur, diffLine, FULL, GRID, movedLine, shareLine, splat, zoneShares } from '../../core/bike/weightmap.ts';
 import type { MapItem } from '../../core/bike/weightmap.ts';
 import { WM } from '../../core/wording/en-weightmap.ts';
 
@@ -23,6 +23,11 @@ export type MapInput = {
   ideal: Ideal;
   /** Show where yours differs (opt-in). */
   diff: boolean;
+  /**
+   * After Handling first (design of 10 Nov 2026, §3): the packing before the press. The maps are then Before (this) and After (`items`)
+   * on the same fixed scale, with one sentence of what moved in place of the difference's switch.
+   */
+  before?: { items: MapItem[]; note?: string };
   onDiff: (on: boolean) => void;
 };
 
@@ -92,7 +97,7 @@ const card = (id: string) => `<figure class="wm-card" data-card="${id}"><figcapt
 function frame(host: HTMLElement): HTMLElement {
   const maps = host.querySelector<HTMLElement>(':scope > .wm-maps');
   if (maps) return maps;
-  host.innerHTML = `<p class="wm-cap">${esc(WM.caption)}</p><div class="wm-ctrl"><button type="button" class="wm-diff"></button></div>`
+  host.innerHTML = `<p class="wm-cap">${esc(WM.caption)}</p><div class="wm-ctrl"><button type="button" class="wm-diff"></button><p class="wm-moved" hidden></p></div>`
     + `<div class="wm-maps">${card('y')}${card('i')}</div>`
     + `<div class="wm-key"><div class="wm-bar" aria-hidden="true"></div><p>${esc(WM.key)}</p><p>${esc(WM.keyNote)}</p></div>`;
   return host.querySelector<HTMLElement>(':scope > .wm-maps')!;
@@ -130,23 +135,33 @@ export function render(host: HTMLElement, input: MapInput): void {
       const xs = i.outline.map((p) => p[0]);
       return `<text class="wm-label" x="${r1((Math.min(...xs) + Math.max(...xs)) / 2)}" y="${r1(Math.min(...i.outline.map((p) => p[1])) - 2.5)}" text-anchor="middle">${esc(WM.back)}</text>`;
     }).join('');
-  const Fy = blur(splat(items, input.scale));
-  const zy = zoneShares(items);
-  const Fi = blur(splat(ideal.items, input.scale));
-  const zi = zoneShares(ideal.items);
+  // after Handling first: Before and After in the two cards, no difference (the switch hidden, the same element)
+  const ba = input.before;
+  const first = ba ? ba.items : items, second = ba ? items : ideal.items;
+  const Fy = blur(splat(first, input.scale));
+  const zy = zoneShares(first);
+  const Fi = blur(splat(second, input.scale));
+  const zi = zoneShares(second);
   const [yc, ic] = [maps.querySelector('[data-card="y"]')!, maps.querySelector('[data-card="i"]')!];
-  fill(yc, { title: WM.yours, sub: WM.yoursSub(total.toFixed(1)), line: shareLine(zy), art: art(items), field: Fy, diff: false }, colours, input.bike);
-  fill(ic, { title: WM.ideal, sub: WM.idealSub, line: shareLine(zi), art: art(ideal.items), field: Fi, diff: false }, colours, input.bike);
+  const firstKg = first.reduce((t, i) => t + i.kg, 0).toFixed(1);
+  fill(yc, { title: ba ? WM.before : WM.yours, sub: ba ? WM.beforeSub(firstKg) : WM.yoursSub(total.toFixed(1)), line: shareLine(zy), art: art(first), field: Fy, diff: false }, colours, input.bike);
+  fill(ic, { title: ba ? WM.after : WM.ideal, sub: ba ? WM.afterSub : WM.idealSub, line: shareLine(zi), art: art(second), field: Fi, diff: false }, colours, input.bike);
+  const diff = input.diff && !ba;
   // the difference: added at the end and taken away again, so nothing above it moves
   let dc = maps.querySelector('[data-card="d"]');
-  if (input.diff && !dc) { maps.insertAdjacentHTML('beforeend', card('d')); dc = maps.querySelector('[data-card="d"]'); }
-  if (!input.diff && dc) { dc.remove(); dc = null; }
+  if (diff && !dc) { maps.insertAdjacentHTML('beforeend', card('d')); dc = maps.querySelector('[data-card="d"]'); }
+  if (!diff && dc) { dc.remove(); dc = null; }
   if (dc) fill(dc, { title: WM.diff, sub: WM.diffSub, line: diffLine(zy, zi), art: '', field: Fy.map((v, n) => v - Fi[n]!), diff: true }, colours, input.bike);
   const key = host.querySelector('.wm-key')!;
   key.querySelectorAll('.wm-bar-diff, .wm-key-diff').forEach((e) => e.remove());
-  if (input.diff) key.insertAdjacentHTML('beforeend', `<div class="wm-bar wm-bar-diff" aria-hidden="true"></div><p class="wm-key-diff">${esc(WM.diffKey)}</p>`);
+  if (diff) key.insertAdjacentHTML('beforeend', `<div class="wm-bar wm-bar-diff" aria-hidden="true"></div><p class="wm-key-diff">${esc(WM.diffKey)}</p>`);
+  const moved = host.querySelector<HTMLElement>('.wm-moved')!;
+  moved.hidden = !ba;
+  // the page's own sentence when the press only evened a pair (re-check of PR 117, N3)
+  moved.textContent = ba ? ba.note ?? movedLine(first, second) : '';
   // the switch: the same element every time, so the focus stays where the rider left it
   const diffB = host.querySelector<HTMLButtonElement>('.wm-diff')!;
+  diffB.hidden = !!ba;
   diffB.textContent = input.diff ? WM.diffHide : WM.diffShow;
   diffB.onclick = () => input.onDiff(!input.diff);
 }
