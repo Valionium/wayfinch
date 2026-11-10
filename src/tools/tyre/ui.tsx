@@ -3,7 +3,7 @@
 import { effect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
-import { T } from '../../core/wording/en-tyre.ts';
+import { T, TM } from '../../core/wording/en-tyre.ts';
 import { W, shortMapDate } from '../../core/wording/en.ts';
 import { TF } from '../../core/wording/en-tyre-labels.ts';
 import { TN } from '../../core/wording/en-tyre-notes.ts';
@@ -222,7 +222,7 @@ function WheelFigure({ label, w }: { label: string; w: Wheel }) {
       <p class="tyre-big">{W.tyreFrontBackBar(bar2(w.bar))}</p>
       <p class="tyre-psi">{W.tyrePsiValue(String(w.psi))}</p>
       {w.heat?.advise ? <p class="tyre-heat"><strong>{TC.tyreHeatPumpLine(bar2(w.heat.pumpToBar), String(w.heat.pumpToPsi))}</strong></p> : null}
-      {w.heat?.advise ? null : <p class="muted">{lo === hi ? W.tyreWindowOne(hi) : W.tyreWindow(lo, hi)}</p>}
+      {w.heat?.advise ? null : <p class="muted">{lo === hi ? TM.tyreWindowOne(hi) : TM.tyreWindow(lo, hi)}</p>}
     </div>
   );
 }
@@ -457,7 +457,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         ))}
         {blockedBy === null && result?.split ? (
           <p>
-            {W.tyreSplit(...fmtPct(result.split.share))} {result.split.why}
+            {TM.tyreSplit(...fmtPct(result.split.share))} {result.split.why}
             <br /><span class="muted">{TN.tyreSplitSensitivity}</span>
           </p>
         ) : null}

@@ -155,5 +155,27 @@ const check=(value,message)=>{assert.ok(value,message);checks++;};
     await run(`importAll(${JSON.stringify(JSON.stringify(exported))})`);
     check(run('BIKE_PROFILES[0].suspension==="full" && BIKE_PROFILES[0].rackMounts==="no"'),'[TB-DETAILS-READ] import keeps both');
   }
+  // Care pictures redo (owner's answers 1 and 2 of 9 November 2026): the wheels' axle, and with rim brakes their kind; answers only
+  {
+    const read=raw=>JSON.parse(run(`JSON.stringify(normaliseBikeProfile(${JSON.stringify(raw)}))`));
+    for(const axle of ['thru','qr','nuts'])check(read({id:'a',axle}).axle===axle,'[TB-DETAILS-AXLE] axle '+axle+' reads back');
+    for(const rimBrake of ['caliper','v-brake','hydraulic']){
+      check(read({id:'r',brakes:'rim',rimBrake}).rimBrake===rimBrake,'[TB-DETAILS-AXLE] rim brake '+rimBrake+' reads back with rim brakes');
+      check(read({id:'r',brakes:'hydraulic-disc',rimBrake}).rimBrake===rimBrake,'[TB-DETAILS-AXLE] and is kept as answered with other brakes (Bike care reads it only with rim brakes)');
+    }
+    for(const odd of [{axle:'unknown',rimBrake:'unknown'},{axle:'QR'},{axle:12},{rimBrake:'disc'},{}]){
+      const got=read({id:'o',brakes:'rim',...odd});
+      check(!('axle' in got) && !('rimBrake' in got),'[TB-DETAILS-AXLE] '+JSON.stringify(odd)+' is no field: Not sure');
+    }
+    const plain=read({id:'p',name:'P',brakes:'rim'}),both=read({id:'p',name:'P',brakes:'rim',axle:'qr',rimBrake:'v-brake'});
+    const rest={...both};delete rest.axle;delete rest.rimBrake;
+    check(JSON.stringify(rest)===JSON.stringify(plain),'[TB-DETAILS-AXLE] no other field changes');
+    run(`renderBikeProfiles=()=>{};SETUPS=[];S.bikeProfile=normaliseBikeProfile(${JSON.stringify(both)});BIKE_PROFILES=[S.bikeProfile];`);
+    const exported=JSON.parse(run('exportAll()'));
+    check(exported.bikeProfiles[0].axle==='qr' && exported.bikeProfiles[0].rimBrake==='v-brake' && exported.draft.bikeProfile.axle==='qr','[TB-DETAILS-AXLE] export carries both');
+    run('BIKE_PROFILES=[];SETUPS=[];');
+    await run(`importAll(${JSON.stringify(JSON.stringify(exported))})`);
+    check(run('BIKE_PROFILES[0].axle==="qr" && BIKE_PROFILES[0].rimBrake==="v-brake"'),'[TB-DETAILS-AXLE] import keeps both');
+  }
   console.log(JSON.stringify({suite:'bike-profile-storage',checks}));
 })().catch(error=>{console.error(error);process.exitCode=1;});

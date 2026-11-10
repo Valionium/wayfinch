@@ -35,8 +35,9 @@ test('[GA-SIZE] advisor.js builds, sets window.WayfinchAdvisor, and is under 20 
   // default and the questionnaire's mapping (the owner's ruling of 7 Nov)
   // biggerOffered and biggerSteps: the bigger change (the owner's preview check of 8 Nov, F)
   // balance: the balancing in the rider's own bags, the weight map's ideal (the owner's finding G, 8 Nov)
-  // handlingFirst and frameRoom: the Bag planner's Handling first button and its frame bag lines (design of 10 Nov 2026)
-  expect(Object.keys(api).sort()).toEqual(['DECIDED', 'MIN_GAIN_BACK_L', 'MIN_GAIN_SCORE', 'SIZE_RANGES', 'WEIGHTS', 'advise', 'adviseSteps', 'autoBalance', 'balance', 'biggerOffered', 'biggerSteps', 'frameRoom', 'handlingFirst']);
+  // handlingFirst and frameRoom: the Bag planner's Handling first button and its frame bag lines (design of 10 Nov 2026); PAIR_UNEVEN: the
+  // page's pair note reads it (review of PRs 116/117, C1)
+  expect(Object.keys(api).sort()).toEqual(['DECIDED', 'MIN_GAIN_BACK_L', 'MIN_GAIN_SCORE', 'PAIR_UNEVEN', 'SIZE_RANGES', 'WEIGHTS', 'advise', 'adviseSteps', 'autoBalance', 'balance', 'biggerOffered', 'biggerSteps', 'frameRoom', 'handlingFirst']);
   expect(api.MIN_GAIN_BACK_L).toBe(MIN_GAIN_BACK_L);
   expect(JSON.parse(JSON.stringify(api.DECIDED))).toEqual(DECIDED);
   expect(Object.isFrozen(api)).toBe(true);
