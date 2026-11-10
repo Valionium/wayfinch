@@ -407,6 +407,106 @@ test('[TB-PAGE-FOLLOWS] I3: a visit through a Bike details link never follows; s
   assert.ok(/if\(\s*!\s*(\w+)\s*\)\s*followBikeChoice\(\)/.test(init.slice(link,follow+20)),'and the follow runs only when it opened nothing');
 });
 
+// The Bike line at the drawing (wish 15, 10 Nov 2026): "Bike <name> ▾" under the drawing on a phone, beside it when wide, with the
+// saved bikes and Without a bike, as Tools' line. A pick there is the planner's own chooseSavedBike, Without a bike its clearBikeProfile:
+// the plan's bike changes exactly as it does in Bike details, with the same record and the same Undo.
+const chooser=p=>{p.run('FIT_LINES_READY=true;renderBikeProfiles(true)');return p.context.document.getElementById('planBikeSelect');};
+const options=sel=>[...sel.innerHTML.matchAll(/<option value="([^"]*)">([^<]*)<\/option>/g)].map(m=>[m[1],m[2]]);
+const planState=p=>p.run('JSON.stringify([S.bikeProfile,S.kit,S.kitTouched,S.bags,S.decks,S.placements,S.nextUid,S.step])');
+const pick=async(p,value)=>{p.context.document.getElementById('planBikeSelect').value=value;await p.run('chooseBikeHere(document.getElementById("planBikeSelect").value)');await p.settle();};
+
+test('[TB-PAGE-CHOOSER] with saved bikes, the line lists them in their order and Without a bike, the plan\'s bike chosen; with none, or before the bikes are read, it is hidden',()=>{
+  const p=page();
+  p.run('renderBikeProfiles(true)');
+  assert.equal(p.context.document.getElementById('planBike').hidden,true,'hidden until the bikes and the plan are read, so nothing flashes');
+  const sel=chooser(p);
+  assert.equal(p.context.document.getElementById('planBike').hidden,false,'shown');
+  assert.deepEqual(options(sel),[['bike_a','Trail Bike'],['bike_b','Gravel'],['bike_c','Commuter'],[':none','Without a bike']]);
+  assert.equal(sel.value,'bike_a','the plan\'s bike');
+  assert.equal(p.html.includes('<label class="plan-bike-line" for="planBikeSelect"><span>Bike</span>'),true,'a visible label, Bike, as Tools\' line');
+  const none=page({plan:null});chooser(none);
+  assert.equal(none.context.document.getElementById('planBikeSelect').value,':none','no plan bike: Without a bike');
+  const empty=page({plan:null,library:[]});chooser(empty);
+  assert.equal(empty.context.document.getElementById('planBike').hidden,true,'no saved bike: no line (the "fits better" line stays)');
+  assert.equal(empty.context.document.getElementById('planFitLine').hidden,false,'and the "fits better" line shows');
+  // a name is text, never markup
+  const odd=page({library:[A,{...B,name:'<b>Big & "red"</b>'}]});
+  assert.deepEqual(options(chooser(odd))[1],['bike_b','&lt;b&gt;Big &amp; &quot;red&quot;&lt;/b&gt;']);
+});
+
+test('[TB-PAGE-CHOOSER] a pick is chooseSavedBike: the plan, its kit and the record exactly as Bike details\' Use saved bike; bags, decks and placements untouched',async()=>{
+  const here=page(),there=page();
+  for(const p of [here,there])p.run("S.bags=[{uid:1,pos:'seat',L:14},{uid:2,pos:'frame',L:6}];S.nextUid=3;S.decks={bar:true,rack:false}");
+  here.run('var qaChooses=0;const qaChoose=chooseSavedBike;chooseSavedBike=function(...a){qaChooses++;return qaChoose.apply(this,a);};');
+  chooser(here);
+  const before=JSON.parse(planState(here));
+  await pick(here,'bike_b');
+  there.run("document.getElementById('bikeSavedSelect').value='bike_b'");await there.run('chooseSavedBike()');await there.settle();
+  assert.equal(here.json('qaChooses'),1,'through chooseSavedBike');
+  assert.equal(planState(here),planState(there),'the same plan as Bike details\' path');
+  const after=JSON.parse(planState(here));
+  assert.equal(after[0].id,'bike_b');
+  assert.deepEqual(after.slice(3),before.slice(3),'bags, decks, placements, next bag number and step as they were');
+  assert.equal(here.count(KEY),1);assert.equal(here.mine().bikeId,'bike_b','the page\'s own record, once');
+  assert.equal(JSON.parse(here.stored('loadcheck:bikeProfile')).id,'bike_b','the plan\'s bike is stored');
+  assert.equal(here.writes.filter(k=>!k.startsWith('loadcheck:')).length,0,'this page writes only its own storage');
+  assert.equal(here.context.document.getElementById('planBikeSelect').value,'bike_b');
+  // Without a bike is clearBikeProfile: the standard bike, the record null, the saved bikes kept
+  await pick(here,':none');
+  there.run('clearBikeProfile()');await there.settle();
+  assert.equal(planState(here),planState(there),'the same plan as Bike details\' No bike');
+  assert.equal(plan(here),null);assert.equal(here.mine().bikeId,null);
+  assert.equal(here.json('BIKE_PROFILES.length'),3,'no saved bike removed');
+  assert.equal(here.context.document.getElementById('planBikeSelect').value,':none');
+  assert.equal(here.context.document.getElementById('planBikeUndo').hidden,true,'a saved bike replaced needs no Undo, as in Bike details');
+});
+
+test('[TB-PAGE-CHOOSER] a plan bike in no saved list is listed first as itself; a pick keeps it with the usual Undo line under the Bike line, and Undo brings it back',async()=>{
+  const D={id:'bike_d',name:'Only in this plan',fit:{style:'compact'},look:{colour:'#2563b8',bars:'drop',ebike:false}};
+  const p=page({plan:D});
+  const sel=chooser(p);
+  assert.deepEqual(options(sel)[0],[':plan','Only in this plan']);
+  assert.equal(sel.value,':plan');
+  const before=planState(p);
+  await pick(p,'bike_c');
+  assert.equal(plan(p),'bike_c');
+  assert.equal(p.context.document.getElementById('planBikeUndo').hidden,false,'Undo shows under the line');
+  assert.equal(p.text('planBikeSwapText'),'This plan now uses the new bike. Only in this plan was only in this plan, so it is kept: Undo brings it back.');
+  assert.equal(p.text('planBikeUndo'),'Undo: bring back Only in this plan');
+  assert.equal(options(sel).some(([v])=>v===':plan'),false,'the kept bike is no longer offered: Undo brings it back');
+  p.run("document.getElementById('planBikeUndo').onclick()");await p.settle();
+  assert.equal(planState(p),before,'the plan as it was, its kit too');
+  assert.equal(p.mine().bikeId,'bike_d','the record follows Undo');
+  assert.equal(p.context.document.getElementById('planBikeUndo').hidden,true);
+  assert.equal(p.text('planBikeSwapText'),'');
+  assert.equal(sel.value,':plan');
+});
+
+test('[TB-PAGE-CHOOSER] while a bike change is under way, or the draft is not read, a pick changes nothing and the line shows the plan\'s bike again',async()=>{
+  for(const flag of ['BIKE_PROFILE_BUSY=true','DRAFT_READY=false']){
+    const p=page();chooser(p);
+    p.run(flag);
+    const before=planState(p);
+    await pick(p,'bike_b');
+    assert.equal(planState(p),before,flag);
+    assert.equal(p.count(KEY),0,flag+': nothing written');
+    assert.equal(p.context.document.getElementById('planBikeSelect').value,'bike_a',flag);
+  }
+  // an id that is no saved bike (removed in another tab meanwhile) changes nothing
+  const p=page();chooser(p);const before=planState(p);
+  await pick(p,'bike_zz');
+  assert.equal(planState(p),before);assert.equal(p.count(KEY),0);
+});
+
+test('[TB-PAGE-CHOOSER] the line sits in the steps\' column before the "fits better" line, never in the sticky rig; the small view hides it; its words are the page\'s own',()=>{
+  const p=page();
+  const html=p.html,at=html.indexOf('id="planBike"'),main=html.indexOf('<main id="planMain">'),fit=html.indexOf('id="planFitLine"');
+  assert.ok(main>0 && at>main && at<fit,'in main, before the "fits better" line');
+  assert.ok(html.indexOf('id="rigBox"')<main,'the rig closes before main');
+  assert.ok(/body\.lc-small #planBike\{display:none!important\}/.test(html),'hidden in the small view');
+  assert.equal(p.run("bikeWord('chooserWithout')"),'Without a bike','as in Tools');
+});
+
 (async()=>{
   for(const [name,fn] of tests){await fn();passed++;console.log('ok',name);}
   console.log(`${passed} bike-choice tests passed`);
