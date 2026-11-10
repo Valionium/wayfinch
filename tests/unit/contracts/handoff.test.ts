@@ -602,7 +602,8 @@ async function dayRide(date: string, opts: { route?: Parameters<typeof loadFixtu
   p.page.run(`S.bags=[];S.nextUid=1;S.bikeProfile=null;S.kit={};S.kitTouched={};S.custom={};S.qty={};S.packed={};S.pinned={};applyTripKitDefaults();`);
   return p;
 }
-const ESSENTIALS = ['docs', 'cash', 'phone', 'snacks', 'tool', 'pump', 'levers', 'firstaid', 'rain'];
+// the first aid kit is not among them on a short day ride (owner, 10 Nov 2026: "No first aid kit for short ride"; TRIP-DAY-SHORT)
+const ESSENTIALS = ['docs', 'cash', 'phone', 'snacks', 'tool', 'pump', 'levers', 'rain'];
 describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (owner, 9 Nov 2026)', () => {
   test('a general setup with no bags is never the foundation; the bar says why it was passed over, and that setup stays byte for byte', async () => {
     const { page, json } = await dayRide('2026-11-15');
@@ -654,7 +655,8 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
     for (const id of ESSENTIALS) expect(on(nov, id), id).toBe(true);
     expect(on(nov, 'tubes') || on(nov, 'plugs')).toBe(true);
     // a short ride: no lock, no power bank, no day of meals (ride snacks instead), nothing for the night
-    for (const id of ['lock', 'bank', 'food', 'base1', 'socks', 'wash', 'teeth', 'cables', 'towel', 'quilt', 'tent'])
+    // and, a short ride, no first aid kit (owner, 10 Nov 2026: "No first aid kit for short ride")
+    for (const id of ['lock', 'bank', 'food', 'firstaid', 'base1', 'socks', 'wash', 'teeth', 'cables', 'towel', 'quilt', 'tent'])
       expect(on(nov, id), id).toBe(false);
     expect(nov.json<number>('planRoute().hoursDay')).toBeLessThan(4);
     // the packing check asks for nothing the start left out, and the layers are exactly what its rules ask for: for a day ride by
@@ -878,13 +880,14 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
   });
 
   test('when the day kit does not fit beside the bottle, the least essential things stay at home before any bag is added, and the small view says so in one line (owner, 9 Nov 2026)', async () => {
-    // the rider's own over-ear headphones (0.7 L, the rider's size) make the kit a little too big for the 1.2 L top tube bag and even the
-    // largest half frame bag (4.5 L). Since the frame bag beside the bottle grows (owner, 9 Nov 2026: the extra goes into the frame bag),
-    // the small earbuds of before fit without leaving anything at home, so the case is a bigger item, on a sunny April day.
+    // the rider's own light down jacket, packed (1.5 L, the rider's size), makes the kit a little too big for the 1.2 L top tube bag and
+    // even the largest half frame bag (4.5 L). Since the frame bag beside the bottle grows (owner, 9 Nov 2026: the extra goes into the
+    // frame bag) and a short ride packs no first aid kit (owner, 10 Nov 2026), smaller things fit without leaving anything at home, so the
+    // case is a bigger item, on a sunny April day.
     // A rider whose plan has both pockets off (owner, 9 Nov 2026: two switches the rider can turn off): with them on, the cap rides in a
     // pocket and nothing needs to stay at home.
     const p = await dayRide('2026-04-15');
-    p.page.run(`S.kit.buds=true;S.kitTouched.buds=true;S.custom.buds={L:0.7,kg:0.3,rigid:0};S.pockets={jersey:false,bib:false};`);
+    p.page.run(`S.kit.puffy=true;S.kitTouched.puffy=true;S.custom.puffy={L:1.5,kg:0.3,rigid:0};S.pockets={jersey:false,bib:false};`);
     await p.page.run('receiveHandoff()');
     const before = p.page.run('JSON.stringify(captureDraft())'), setups = p.page.run('JSON.stringify(SETUPS)');
     expect(await p.page.run('planTripBags()')).toBe(true);
@@ -892,7 +895,7 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
     expect(p.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
     expect(p.json('dayLeftAtHome()')).toEqual(['cap']);
     expect(p.json<boolean>(`carrying('cap')`)).toBe(false);
-    expect(p.json<boolean>(`carrying('buds')`)).toBe(true);   // the rider's own choice stays
+    expect(p.json<boolean>(`carrying('puffy')`)).toBe(true);   // the rider's own choice stays
     for (const id of ESSENTIALS) expect(p.json<boolean>(`carrying('${id}')`), id).toBe(true);
     expect(p.json<boolean>('$("smallLeft").hidden')).toBe(false);
     expect(String(p.page.nodes.get('smallLeft')!.textContent)).toBe('Left at home: cap or buff.');
@@ -1294,5 +1297,54 @@ describe('[TRIP-DAY-POCKETS] a day ride counts the jersey and bib shorts pockets
     expect(bike.json<string[]>('gearBags().map(b=>b.pos)')).not.toContain('seat');
     expect(bike.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
     expect(bike.json<number[]>(`S.bags.filter(b=>b.pos==='top').map(b=>b.L)`)).toEqual([1.2]);
+  });
+});
+
+// The owner's answers of 10 Nov 2026 to the review's 39 km questions: "No first aid kit for short ride", and "Sunglasses are in jersey
+// pocket or attached to helmet".
+describe('[TRIP-DAY-SHORT] a short day ride packs no first aid kit; on a day ride the sunglasses ride in the jersey or on the helmet, never in a bag (owner, 10 Nov 2026)', () => {
+  const planned = async (date: string, share = 0.39, setup = '', route?: Parameters<typeof loadFixtureRoute>[0]) => {
+    const { gpx } = await handedOff(route ?? 'loop', { nights: 0 }, date, share);
+    const p = longPlanner(gpx);
+    p.page.run(`S.bags=[];S.nextUid=1;S.bikeProfile=null;S.kit={};S.kitTouched={};S.custom={};S.qty={};S.packed={};S.pinned={};${setup}applyTripKitDefaults();`);
+    await p.page.run('receiveHandoff()');
+    expect(await p.page.run('planTripBags()')).toBe(true);
+    return p;
+  };
+
+  test('a day ride of half a day or less (the steady pace\'s 4 hours, the day that needs no meals) packs no first aid kit, and the packing check does not ask for one; a longer day ride keeps it', async () => {
+    for (const date of ['2026-04-15', '2026-07-20', '2026-11-15']) {
+      const p = await planned(date);
+      expect(p.json<number>('dayRideHours()'), date).toBeLessThanOrEqual(p.json<number>('PACE.steady.hours'));
+      expect(p.json<boolean>(`carrying('firstaid')`), date).toBe(false);
+      expect(p.json<string[]>('audit().miss.flatMap(m=>m.ids)'), date).not.toContain('firstaid');
+      expect(p.json<string[]>('audit().miss.flatMap(m=>m.ids)'), date).toEqual([]);
+    }
+    // the whole Heidelberg to Strasbourg route in one day: far more than 4 hours, so the first aid kit rides
+    const long = await planned('2026-07-20', 1, '', 'heidelberg-strasbourg');
+    expect(long.json<number>('dayRideHours()')).toBeGreaterThan(long.json<number>('PACE.steady.hours'));
+    expect(long.json<boolean>(`carrying('firstaid')`)).toBe(true);
+    // a rider who ticks it on a short ride keeps it: it is the rider's choice
+    const own = await planned('2026-07-20', 0.39, `S.kit.firstaid=true;S.kitTouched.firstaid=true;`);
+    expect(own.json<boolean>(`carrying('firstaid')`)).toBe(true);
+  });
+
+  test('the sunglasses never go in a bag: in the jersey pockets when they have room, else on the helmet, said in the line; with the jersey pockets off, on the helmet', async () => {
+    const p = await planned('2026-07-20');
+    expect(p.json<boolean>(`carrying('shades')`)).toBe(true);
+    const where = p.json<string>('pocketPlaces().shades');
+    expect(['jersey', 'helmet']).toContain(where);
+    expect(p.json<string[]>('Object.keys(currentPlan().items)')).not.toContain('shades');
+    const words = () => String(p.page.nodes.get('smallPockets')!.innerHTML).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    if (where === 'helmet') expect(words()).toContain('On your helmet: sunglasses.');
+    else expect(words()).toMatch(/In your jersey pockets: [^.]*sunglasses/);
+    p.page.run(`setPocket('jersey',false)`);
+    expect(p.json('pocketPlaces().shades')).toBe('helmet');
+    expect(p.json<string[]>('Object.keys(currentPlan().items)')).not.toContain('shades');
+    expect(words()).toContain('On your helmet: sunglasses.');
+    // listed as carried in the packing checklist, not in a bag
+    const row = p.json<{ placementLabel: string }>(`getChecklistModel().groups.find(g=>g.id==='pockets').items.find(r=>r.id==='shades')`);
+    expect(row.placementLabel).toBe('On your helmet');
+    expect(bannedHits(words())).toEqual([]);
   });
 });
