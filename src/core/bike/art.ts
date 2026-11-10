@@ -76,7 +76,7 @@ export function fillColour(pct: number, theme: 'dark' | 'light' = 'dark'): strin
 }
 
 /** Sutherland–Hodgman against one half-plane: keeps the points where `side` is at most 0. */
-function clip(poly: P[], side: (p: P) => number): P[] {
+export function clip(poly: P[], side: (p: P) => number): P[] {
   const out: P[] = [];
   for (let i = 0; i < poly.length; i += 1) {
     const a = poly[i]!;
