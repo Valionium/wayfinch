@@ -6661,6 +6661,15 @@ function rainAccess(A){
 // One tick represents the complete selected item (including its quantity or all
 // food shares). Keep every physical placement, but count the canonical ID once.
 function getChecklistModel(A=currentPlan()){
+  const model=checklistOfBags(A),inPocket=pocketPlaces(),ids=Object.keys(inPocket);
+  // what rides in the pockets of a day ride (owner, 9 Nov 2026) is packed too: its own group, after the bags (review of PR 106, M1)
+  if(ids.length) model.groups.push({id:'pockets',title:'In your pockets',subtitle:'Carried in your jersey and bib shorts pockets, not in a bag.',
+    items:ids.map(id => { const k=kitById(id),quantity=qtyOf(k); return {id,name:kitName(k),category:k.cat,quantity,quantityLabel:quantity>1?`${quantity} ×`:'',
+      packed:!!S.packed[id],L:itemL(k),kg:itemKg(k),rigidCm:rigidOf(k),placements:[],placementLabel:inPocket[id] === 'jersey' ? 'Jersey pockets' : 'Bib shorts pocket',
+      note:'',bikeReference:bikeRepairReference(id),status:'placed',tooLong:false}; })});
+  return model;
+}
+function checklistOfBags(A){
   const selected=activeKit(),byId=new Map(),groups=[],byGroup=new Map();
   selected.forEach(k=>{
     const quantity=k.perDay?foodDays():qtyOf(k);
@@ -8825,7 +8834,7 @@ function loadSummary(now = new Date()){
     bags:{ count:positions.length, positions, items },
     decks:{ bar:deck('bar'), rack:deck('rack') },
     water:{ bottles:bottlesNow, cageL, extraL, totalL:r2(cageL + extraL) },
-    weight:{ kitKg:r2(activeKit().reduce((n, k) => n + itemKg(k), 0)), cageWaterKg:r2(cageL), carriedKg:carriedKg(A),
+    weight:{ kitKg:r2([...activeKit(),...Object.keys(pocketPlaces()).map(kitById)].reduce((n, k) => n + itemKg(k), 0)), cageWaterKg:r2(cageL), carriedKg:carriedKg(A),
       bikeKg:bike ? bike.pressure.bikeKg : null, emptyLuggageKg:bagsOwn === undefined ? null : bagsOwn,
       byPositionKg, unplacedKg:A.unplacedKg },
     kit:{ waterFilter:activeKit().some(k => filterNames.test(k.name)) } };
@@ -10925,9 +10934,9 @@ function renderResult(){
       : (() => { const owned = usableUnits().length, empty = mountedEmptySentence(slots);
           return `Your kit goes into ${holding} of your ${owned} bag${owned>1?'s':''} — ${mounted} L mounted, ${Math.abs(d)} L spare.${empty ? ' ' + empty : ''}`; })()}</p>
     <div class="meters">
-      <div class="meter"><b>${kit} L</b><span>Kit volume ${infoHelp('How kit volume is counted','<p>The total uses your selected kit, quantities, packed sizes and food carried between resupply stops. Lightweight mode leaves eligible comfort items at home. Typical packed volumes vary by brand and compression.</p>')}</span></div>
+      <div class="meter"><b>${kit} L</b><span>Kit volume ${infoHelp('How kit volume is counted','<p>The total uses your selected kit, quantities, packed sizes and food carried between resupply stops. Lightweight mode leaves eligible comfort items at home. Typical packed volumes vary by brand and compression.</p>'+pocketsLeftOut())}</span></div>
       <div class="meter"><b>${mounted} L</b><span>Usable bag space ${infoHelp('Why usable space is lower than the labels',`<p>Bags are counted at ${Math.round(packEff()*100)} per cent of their labelled size to allow for seams, closures and awkward shapes. You own ${ratedTotal()} L of labelled bag capacity; this result counts only the mounted bags.</p><p>“It fits” means the selected kit fits within this estimated usable volume and the entered length limits. Check your actual bags and gear: their shape, opening and compression affect the fit.</p>`)}</span></div>
-      <div class="meter"><b>${(kitKg()+waterL()).toFixed(1)} kg</b><span>Kit + water ${infoHelp('What the packing weight includes',`<p>This adds selected kit and carried food to water in your bottle cages${waterL()?' (counted full)':''}. It excludes the bike, rider and empty luggage.</p>`)}</span></div>
+      <div class="meter"><b>${(kitKg()+waterL()).toFixed(1)} kg</b><span>Kit + water ${infoHelp('What the packing weight includes',`<p>This adds selected kit and carried food to water in your bottle cages${waterL()?' (counted full)':''}. It excludes the bike, rider and empty luggage.</p>${pocketsLeftOut()}`)}</span></div>
     </div></div>${firstFixes({weatherReady,miss,over,fix,routeFailed,spill,stranded})}${resultConfidence(c)}${weatherNote}${routeNote}`;
   $('verdictBox').querySelectorAll('[data-result-jump]').forEach(button=>button.onclick=()=>jumpToResult(button.dataset.resultJump));
 
@@ -12317,7 +12326,7 @@ function renderSmallBags(A){
   const m=getChecklistModel(A || currentPlan());
   // the water in a bag reads as what it is here: a bottle (KIT's name speaks of bottle cages the bike may not have)
   const name=row => row.id === 'water' ? 'Water bottle' : row.id === 'tubes' && isDayTube(S.custom.tubes) ? 'Spare tube' : `${row.name}${row.quantity > 1 && !kitById(row.id)?.perDay ? ' ×'+row.quantity : ''}`;
-  const bags=m.groups.filter(g => g.id !== 'overflow' && g.id !== 'unassigned');
+  const bags=m.groups.filter(g => g.id !== 'overflow' && g.id !== 'unassigned' && g.id !== 'pockets');
   // each bag a heading and its list, no landmark of its own (review of PR 92, M5)
   $('smallBagList').innerHTML=bags.map(g => `<div class="small-bag"><h3>${htmlEsc(g.title)}</h3><ul>${
     g.items.map(row => `<li>${htmlEsc(name(row))}</li>`).join('')}</ul></div>`).join('');
@@ -12352,6 +12361,13 @@ function pocketsHtml(){
   return (line ? `<p class="small-water">${htmlEsc(line)}</p>` : '')+(POCKET_NOTE ? `<p class="small-water" role="status">${htmlEsc(POCKET_NOTE)}</p>` : '')+`<div class="pocket-switches" role="group" aria-label="Pockets">${
     [...POCKETS].reverse().map(p => `<label class="pocket-switch"><input type="checkbox" role="switch" data-pocket="${p.id}"${S.pockets && S.pockets[p.id] ? ' checked' : ''}> ${p.label}</label>`).join('')}</div>`;
 }
+// The kit figures of the packing check count the bags; with the pockets of a day ride they say so (review of PR 106, M2).
+function pocketsLeftOut(){
+  const ids=Object.keys(pocketPlaces());
+  if(!ids.length) return '';
+  const L=+ids.reduce((n,id) => n+itemL(kitById(id)),0).toFixed(2),kg=+ids.reduce((n,id) => n+itemKg(kitById(id)),0).toFixed(2);
+  return `<p>Not counted here: what rides in your jersey and bib shorts pockets (${L} L, ${kg} kg).</p>`;
+}
 function renderPockets(){
   const on=pocketsCounted();
   for(const id of ['smallPockets','pocketsBox']){
@@ -12368,18 +12384,24 @@ function renderPockets(){
    for what is still over, the seat pack last, and the line says so. A bag that stays keeps its number, so a hand placement into it
    stays; the rider's other placements are kept as records. Bags the rider has changed are never re-sized: what no longer fits is named
    as any overflow. Stored with the plan. */
-const dayBagsKey=() => S.bags.filter(b => !isBottle(b.pos)).map(b => `${b.pos}:${b.L}${b.shape !== undefined ? '/'+b.shape : ''}${b.userL ? '!' : ''}`).sort().join(',');
+// every field of every bag but its number, so a bag the rider changed in any way (an own size, an inside length) is the rider's (review of
+// PR 106, I1)
+const dayBagsKey=() => JSON.stringify(S.bags.filter(b => !isBottle(b.pos)).map(({uid,...b}) => b).sort((a,b) => a.pos < b.pos ? -1 : a.pos > b.pos ? 1 : 0));
 let POCKET_NOTE='';
 function resizeDayBags(){
   const keep=S.bags.filter(b => isBottle(b.pos)),old=S.bags.filter(b => !isBottle(b.pos)),start=S.nextUid;
   const withIds=list => list.map((b,i) => ({uid:start+i,...b}));
   const day=withInputs({bags:keep},() => afternoonBags([],withIds));
   if(!day) return null;
-  const used=new Set(),bags=day.bags.map(b => {
-    const was=old.find(o => o.pos === b.pos && !used.has(o.uid));
-    if(!was) return b;
-    used.add(was.uid); return {...b,uid:was.uid};
+  // each position keeps its bag's number across re-plans, also through a re-plan that takes the bag away, so a hand placement into it
+  // (S.pinned, by number) holds again when the bag comes back (review of PR 106, I2)
+  const known={...(S.pockets.uids || {}),...Object.fromEntries(old.map(b => [b.pos,b.uid]))},taken=new Set(keep.map(b => b.uid));
+  const bags=day.bags.map(b => {
+    const uid=known[b.pos];
+    if(!Number.isInteger(uid) || taken.has(uid)) return b;
+    taken.add(uid); return {...b,uid};
   });
+  S.pockets.uids=Object.fromEntries(Object.entries({...known,...Object.fromEntries(bags.map(b => [b.pos,b.uid]))}).filter(([,u]) => Number.isInteger(u)));
   day.leave.forEach(id => { S.kit[id]=false; S.kitTouched[id]=true; });
   S.bags=[...keep,...bags]; S.nextUid=Math.max(S.nextUid,...bags.map(b => b.uid+1));
   return bags;
@@ -12740,7 +12762,8 @@ function capturePlan(){
     gpx:S.gpx ? JSON.parse(JSON.stringify(S.gpx)) : null,
     routeSnapshot:captureRouteSnapshot(),
     placements:(currentPlan(), S.placements), carried:{ ...S.carried },
-    ...(S.pockets ? { pockets:{ jersey:S.pockets.jersey === true, bib:S.pockets.bib === true, ...(typeof S.pockets.sized === 'string' ? { sized:S.pockets.sized } : {}) } } : {}),
+    ...(S.pockets ? { pockets:{ jersey:S.pockets.jersey === true, bib:S.pockets.bib === true, ...(typeof S.pockets.sized === 'string' ? { sized:S.pockets.sized } : {}),
+      ...(S.pockets.uids ? { uids:{ ...S.pockets.uids } } : {}) } } : {}),
     pinned:{ ...S.pinned }, packed:{ ...S.packed }, mode:S.mode, nextUid:S.nextUid,
     step:S.step, nightsAuto:false, baseNights:S.baseNights == null ? S.nights : S.baseNights,
     adv:S.adv, onlyOn:S.onlyOn, editMode:S.editMode,
@@ -13107,7 +13130,8 @@ function normalisePlan(p){
     adv:p.adv === true,onlyOn:p.onlyOn === true,editMode:p.editMode === 'remove' ? 'remove' : 'add',
     pendingSaveName:dataText(p.pendingSaveName,160),pendingSaveNote:dataText(p.pendingSaveNote,2000),
     ...(dataObject(p.pockets) ? {pockets:{jersey:p.pockets.jersey === true,bib:p.pockets.bib === true,
-      ...(typeof p.pockets.sized === 'string' && p.pockets.sized.length <= 400 && /^[a-zU0-9.:,\/!]*$/.test(p.pockets.sized) ? {sized:p.pockets.sized} : {})}} : {}),
+      ...(typeof p.pockets.sized === 'string' && p.pockets.sized.length <= 4000 ? {sized:p.pockets.sized} : {}),
+      ...(dataObject(p.pockets.uids) ? {uids:Object.fromEntries(Object.entries(p.pockets.uids).filter(([pos,u]) => Object.hasOwn(POSITIONS,pos) && dataInteger(u,1,1000000000) !== null))} : {})}} : {}),
     settings:normaliseSettings(p.settings),
     updatedAt:dataDate(p.updatedAt)};
 }

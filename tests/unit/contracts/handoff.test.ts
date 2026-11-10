@@ -1185,6 +1185,56 @@ describe('[TRIP-DAY-POCKETS] a day ride counts the jersey and bib shorts pockets
     expect(shell.json<string[]>('Object.keys(currentPlan().items)')).toContain('rain');
   });
 
+  test('review of PR 106, I1: a bag the rider measured (its inside length) is the rider\'s: a switch never re-plans it, and the line says so', async () => {
+    const p = await planned('2026-11-15');
+    p.page.run(`S.bags.find(b=>b.pos==='frame').longestCm=28;`);
+    const mine = p.json('S.bags');
+    p.page.run(`setPocket('jersey',false)`);
+    expect(p.json('S.bags')).toEqual(mine);
+    const words = String(p.page.nodes.get('smallPockets')!.innerHTML).replace(/<[^>]+>/g, ' ');
+    expect(words).toContain('Your bags stay as you set them.');
+    p.page.run(`setPocket('jersey',true)`);
+    expect(p.json('S.bags')).toEqual(mine);
+  });
+
+  test('review of PR 106, I2: a hand placement survives a switch that takes its bag away and a later one that brings it back', async () => {
+    // the reviewer's case: a saved medium frame (half frame bag fixed at 3 L), the multitool placed in the frame bag by hand
+    const p = await planned('2026-11-15', 0.39, `S.bikeProfile=normaliseBikeProfile({id:'b_m',name:'Medium',fit:{style:'diamond-sloping',size:{kind:'letter',value:'M'},bolts:{st:'yes',dt:'yes'}}});`);
+    const frame = p.json<number>(`S.bags.find(b=>b.pos==='frame').uid`);
+    p.page.run(`S.pinned.tool='${frame}-0';`);
+    expect(p.json('recordOfPin("tool")')).toBe('kept');
+    p.page.run(`setPocket('jersey',false)`);
+    p.page.run(`setPocket('jersey',true)`);
+    // the bags of before, the frame bag under its own number, and the multitool in it again
+    expect(p.json<number>(`S.bags.find(b=>b.pos==='frame').uid`)).toBe(frame);
+    expect(p.json('S.pinned.tool')).toBe(`${frame}-0`);
+    expect(p.json('recordOfPin("tool")')).toBe('kept');
+    expect(p.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+    // the numbers a switch keeps for this come back from the draft too
+    const draft = p.json<{ pockets: { uids?: Record<string, number> } }>('captureDraft()');
+    expect(draft.pockets.uids?.frame).toBe(frame);
+  });
+
+  test('review of PR 106, M1 and M2: the packing checklist lists what rides in the pockets, and the kit figures say the pockets are not in them', async () => {
+    const p = await planned('2026-11-15');
+    const places = p.json<Places>('pocketPlaces()');
+    const groups = p.json<Array<{ id: string; title: string; items: Array<{ id: string; placementLabel: string }> }>>('getChecklistModel().groups');
+    const pockets = groups.find((g) => g.id === 'pockets')!;
+    expect(pockets.title).toBe('In your pockets');
+    expect(pockets.items.map((r) => r.id).sort()).toEqual(Object.keys(places).sort());
+    for (const row of pockets.items) expect(row.placementLabel, row.id).toBe(places[row.id] === 'jersey' ? 'Jersey pockets' : 'Bib shorts pocket');
+    // the small view names them in its own line, not as a bag
+    expect(String(p.page.nodes.get('smallBagList')!.innerHTML)).not.toContain('In your pockets');
+    // the kit's weight sent to Wayfinch is the whole kit, the pockets included; what the bike carries stays the bags'
+    const all = p.json<number>(`+KIT.filter(k=>carrying(k.id)).reduce((n,k)=>n+itemKg(k),0).toFixed(2)`);
+    expect(p.json<number>('loadSummary().weight.kitKg')).toBeCloseTo(all, 2);
+    // the full planner's kit figures say what they leave out
+    const pocketL = +Object.keys(places).reduce((n, id) => n + p.json<number>(`itemL(kitById('${id}'))`), 0).toFixed(2);
+    expect(p.json<string>('pocketsLeftOut()')).toContain(`Not counted here: what rides in your jersey and bib shorts pockets (${pocketL} L,`);
+    // both of the packing check's kit figures, Kit volume and Kit + water, carry that line in their explanation
+    expect(readFileSync(join(process.cwd(), 'public', 'tools', 'bags', 'index.html'), 'utf8').split('pocketsLeftOut()').length - 1).toBeGreaterThanOrEqual(3);
+  });
+
   test('a saved plan without pockets reopens without them; a night, no pockets', async () => {
     const p = await planned('2026-11-15');
     const draft = p.json<Record<string, unknown>>('captureDraft()');
