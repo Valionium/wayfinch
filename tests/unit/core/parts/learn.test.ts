@@ -10,6 +10,7 @@ import { GUIDE } from '../../../../src/core/parts/guide.ts';
 import { EDGES, extrasMarkup, GROUPS, groupOf, hasPart, KINDS, kindBike, LEARN_PARTS, learnSpot, linksOf, NEW_PARTS, ownBike, partsOf, pickAt, spotDistance, stepOf, STEPS, tagOf } from '../../../../src/core/parts/learn.ts';
 import type { LearnBike, LearnId } from '../../../../src/core/parts/learn.ts';
 import { GROUP_NAMES, KIND_NAMES, LN, LN_DOES, nameOf, tagWords } from '../../../../src/core/wording/en-learn.ts';
+import { LL } from '../../../../src/core/wording/en-learn-link.ts';
 import { PART_SHORT } from '../../../../src/core/wording/en-part-names.ts';
 import { bannedHits } from '../../../fixtures/banned.ts';
 import { setBike, SIZES, STYLES } from '../bike/drawing-set.ts';
@@ -42,6 +43,7 @@ test('[BL-WORDS] every name, sentence, heading, tag and line of the page has no 
   const texts = [
     ...ALL.map(nameOf), ...Object.values(LN_DOES), ...Object.values(GROUP_NAMES), ...Object.values(KIND_NAMES),
     ...ALL.flatMap((id) => (tagOf(id) ? [tagWords(tagOf(id)!)] : [])),
+    ...Object.values(LL),
     ...Object.values(LN).map((v) => (typeof v === 'function' ? (v as (...a: string[]) => string)('x', 'y', 'z') : v)),
   ];
   for (const t of texts) expect(bannedHits(t), t).toEqual([]);

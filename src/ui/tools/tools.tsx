@@ -7,6 +7,7 @@ import { HN } from '../../core/wording/en-hint.ts';
 import { W } from '../../core/wording/en.ts';
 import { savedBikeIds, toolBike } from '../../tools/tyre/choice.ts';
 import { TL } from '../../core/wording/en-tools.ts';
+import { LL } from '../../core/wording/en-learn-link.ts';
 import { readStore } from '../../tools/tyre/storage.ts';
 import type { LastResult } from '../../tools/tyre/storage.ts';
 import type { TyreServices } from '../../tools/tyre/services.ts';
@@ -100,9 +101,9 @@ function ToolsCards({ services }: { services: TyreServices }) {
         <p class="tool-line">{GA.advisorCardLine}</p>
         <a class="btn btn-primary" href={ADVISOR_HREF} onClick={() => noteSeen('g')}>{W.tyreCardOpen}<span class="visually-hidden"> {GA.advisorCardTitle}</span></a>
       </Card>
-      <Card title={TL.toolsLearnTitle}>
-        <p class="muted">{TL.toolsLearnBody}</p>
-        <a class="btn btn-primary" href={LEARN_HREF}>{W.tyreCardOpen}<span class="visually-hidden"> {TL.toolsLearnTitle}</span></a>
+      <Card title={LL.learnCardTitle}>
+        <p class="muted">{LL.learnCardBody}</p>
+        <a class="btn btn-primary" href={LEARN_HREF}>{W.tyreCardOpen}<span class="visually-hidden"> {LL.learnCardTitle}</span></a>
       </Card>
     </>
   );

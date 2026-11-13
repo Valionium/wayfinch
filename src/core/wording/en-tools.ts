@@ -6,7 +6,4 @@ export const TL = {
   toolsNoBike: 'No bike chosen. The Bag planner uses a standard bike.',
   // The one top bar of every tool and the legal pages (owner's list, items 8 and 9): the same words everywhere, static pages included.
   toolsBack: '← Back to Wayfinch',
-  // Tools' card for How a bike is built (design of 14 Nov 2026); the page's own words are in en-learn.ts, in its chunk.
-  toolsLearnTitle: 'How a bike is built',
-  toolsLearnBody: 'Learn the parts of a bike and how they fit together.',
 };
