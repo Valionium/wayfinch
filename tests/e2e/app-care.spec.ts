@@ -212,7 +212,8 @@ test('[BC-ROAD] the Roadside tab fits the chosen bike; every card open, at the p
   // a critical card's steps end with the shop line, a puncture's do not
   await page.evaluate(() => { localStorage.setItem('copilot:careAllSteps:v1', '1'); });
   await card(page, 'brake-rub-rim').locator('.care-open').click();
-  await expect(page.getByRole('dialog').locator('.care-step-all')).toHaveCount(6);
+  // the kind of rim brake not told: both centring lines (BC-HYDRO-RIM-CENTRE), 7 steps
+  await expect(page.getByRole('dialog').locator('.care-step-all')).toHaveCount(7);
   await expect(page.getByRole('dialog').getByText('If unsure, a shop.')).toBeVisible();
   await page.keyboard.press('Escape');
   await card(page, 'puncture-tube').locator('.care-open').click();
