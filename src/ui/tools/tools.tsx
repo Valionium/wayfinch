@@ -17,12 +17,30 @@ import { Card } from '../card.tsx';
 import { BagCard, DRAWN_KEY } from './bag-card.tsx';
 import { BikeLine } from './bike-line.tsx';
 import { choiceVersion } from './bike-choice.ts';
+import { lazy } from '../lazy.tsx';
+
+// How a bike is built (design of 14 Nov 2026): Tools' own page at #/tools?learn, a chunk of its own loaded from here. An address under
+// Tools rather than a screen of the shell's, so the first screen carries nothing of it (its budget never rises).
+const LearnScreen = lazy(() => import('../../tools/learn/ui.tsx').then((m) => m.LearnScreen));
+export const LEARN_HREF = '#/tools?learn';
+const learnShown = (): boolean => typeof location !== 'undefined' && location.hash === LEARN_HREF;
+
+/** Tools: its cards, or How a bike is built while the address says so. */
+export function ToolsScreen({ services }: { services: TyreServices }) {
+  const [learn, setLearn] = useState(learnShown);
+  useEffect(() => {
+    const on = (): void => setLearn(learnShown());
+    window.addEventListener('hashchange', on);
+    return () => window.removeEventListener('hashchange', on);
+  }, []);
+  return learn ? <LearnScreen services={services} /> : <ToolsCards services={services} />;
+}
 
 // The advisor in the bag planner; closing it comes back here (GA-BACK).
 const ADVISOR_HREF = '/tools/bags/#gear-advisor&back=tools';
 const trimBar = (n: number): string => String(Number(n.toFixed(2)));
 
-export function ToolsScreen({ services }: { services: TyreServices }) {
+function ToolsCards({ services }: { services: TyreServices }) {
   // The bag planner's bikes and plan may change in another tab, or while the phone was elsewhere: read them again when told and when the
   // page shows again (as the tyre tool does), so a removed bike is never offered and the cards follow the plan.
   const [tick, redraw] = useState(0);
@@ -81,6 +99,10 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
       <Card title={GA.advisorCardTitle}>
         <p class="tool-line">{GA.advisorCardLine}</p>
         <a class="btn btn-primary" href={ADVISOR_HREF} onClick={() => noteSeen('g')}>{W.tyreCardOpen}<span class="visually-hidden"> {GA.advisorCardTitle}</span></a>
+      </Card>
+      <Card title={TL.toolsLearnTitle}>
+        <p class="muted">{TL.toolsLearnBody}</p>
+        <a class="btn btn-primary" href={LEARN_HREF}>{W.tyreCardOpen}<span class="visually-hidden"> {TL.toolsLearnTitle}</span></a>
       </Card>
     </>
   );

@@ -1097,6 +1097,21 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - the bike's type sorts the cards and tasks, never hides one: those usual on the rider's type first, the others after them, slightly greyed and still a button, said in words to screen readers; a detail the rider told decides alone; with no type nothing moves (the owner's answer 5 (a)) [BV-ORDER]
 - every part has a short name for its label and button, and the view's and button's words have no banned word [BV-WORDS]
 
+## Tool: How a bike is built (design of 14 November 2026; the owner's wish and choice "Explore + build-up" of 14 November)
+
+- the page knows the guide's 36 parts and 19 more (the frame's tubes, rear shock, bottom bracket, crank, pedal, front derailleur, belt, brake cable or hose, shifter, grips, bar tape, seat clamp, saddle, motor), each once, with its step of the build, its group in the list (frame and fork, wheels, drivetrain, brakes, cockpit, saddle, e-bike), a short name (the guide's own for its parts) and one or two sentences on what it does [BL-PARTS]
+- every name, sentence, heading, tag and line of the page has no banned word [BL-WORDS]
+- "connects to" goes both ways, names only parts the bike has, and every part on a bike connects to another there [BL-LINKS]
+- the type switch offers the rider's bike (in its own colours) and typical road, gravel, touring, city (step-through, hub gears, rim brakes), mountain hardtail and full suspension, fat and e-bikes (plain); a road or touring bike with a derailleur has a front derailleur, drop bars bar tape, other bars grips, disc brakes thru-axles, rim brakes quick releases [BL-KINDS]
+- every part a bike has stands on the shared drawing, untouched, for every template, size, bar, brake and drive: its point inside the drawing and on the part as drawn, or on the two pieces the page alone draws (front derailleur, front brake cable) [BL-POINTS]
+- a tap on the drawing picks the part drawn nearest, within 24 px, the frame's tubes before the frame; a tap on empty ground picks nothing [BL-PICK]
+- Tools has a "How a bike is built" card, its last; it opens the page at #/tools?learn (the Tools tab lit, its title focused), from the Tools chunk, so the first screen carries nothing of it; the Tools tab goes back to the cards; the page writes nothing [BL-OPEN]
+- a tap on the drawing or a label marks the part in blaze with an arrow from its label and shows its name, what it does, which bikes have it, and what it connects to, each a button that jumps there [BL-TAP]
+- every part the bike has is a button under its group's heading (pressed when picked): a pick keeps the focus, is said politely, and names the marked part in the drawing's name; the drawing's labels are hidden from screen readers [BL-LIST]
+- switching the bike shows that bike's parts only; a picked part the new bike lacks is dropped [BL-SWITCH]
+- the zoom buttons zoom towards the picked part and back to the whole bike [BL-ZOOM]
+- at 320 px and wide, in both themes: no sideways scroll, every target at least 44 px, nothing axe objects to; it opens offline [BL-PHONE]
+
 ## Tool: Gear advisor, the search (sub-project 13, group 1)
 
 - the add phase holds each bag type at each size of SIZE_RANGES (frame bags: the bike's own shapes at their litres), fork cages and panniers each as a single (one bag) and as a pair (two bags), as separate suggestions (the owner, 7 Nov); taken positions are skipped; the top tube's second slot is offered when the first is taken; a size the planner's bagSpec refuses is dropped, and a seat pack size the seat gap calls unlikely is dropped (decision 9); new bags take uids from nextUid; panniers put the rack deck on when the trip camps; a pair counts as two new bags, and a rack to fit (for its deck, or for panniers when none is fitted) as one more (DECIDED.newRackCounts); on an XS or S frame with no measured seat gap every seat pack carries the planner's own small-frame caution (bagSpec's seat note) [GA-CANDIDATES]
