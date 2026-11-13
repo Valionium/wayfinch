@@ -7,6 +7,7 @@ import { PT } from '../wording/en-paint.ts';
 import { WB as W } from '../wording/en-bike.ts';
 import { bikeArt } from './art.ts';
 import type { Anchors, ArtOptions, P } from './art.ts';
+import { besideBottles } from './beside.ts';
 import { CASING_MIN_CONTRAST, CASINGS, casingFor, contrastRatio, darkCasing, hexToOklab, nearestSwatchName } from './colour.ts';
 import type { CasingTone } from './colour.ts';
 import type { Fork, ForkPattern, Paint, Pattern } from './normalise.ts';
@@ -353,6 +354,31 @@ function paintLabel(label: string, colour: string | null, u: ReturnType<typeof u
  * frame, stays and fork take their pattern, the rims a carbon band of the given depth at the drawing's scale, and the casing keeps
  * owner's ruling A for every colour shown.
  */
+/**
+ * Trip's and Tools' drawing (drawing.tsx loads this chunk for a bike with a look or a plan with bags): paintedArt, with the plan's frame bag
+ * cut beside its bottles as the full planner draws it (beside.ts). Only the frame bag's polygon and its fill change; the plan does not.
+ */
+export function tripArt(spec: BikeSpec, bags: BagView | null, options: ArtOptions = {}, paint: Paint | null = null): { svg: string; anchors: Anchors; label: string } {
+  const art = paintedArt(spec, bags, options, paint);
+  const item = bags?.items.find((i) => i.pos === 'frame');
+  const whole = art.anchors.frame;
+  if (!bags || !item || !whole) return art;
+  const cut = besideBottles(art.anchors, bags.bottles).frame!;
+  const shape = Math.max(0, Math.min(3, Math.round(item.shape ?? 0)));
+  const [from, to, box, was] = [whole.shapes[shape], cut.shapes[shape], cut.boxes[shape]!, whole.boxes[shape]!];
+  const at = art.svg.indexOf(`<polygon points="${from}"/></clipPath>`);
+  if (from === to || at < 0) return art;
+  const id = art.svg.slice(art.svg.lastIndexOf('id="', at) + 4, art.svg.indexOf('"', art.svg.lastIndexOf('id="', at) + 4));
+  const r2 = (n: number): number => Math.round(n * 100) / 100;
+  // the fill keeps its share of the bag's height, in the new box (art.ts shellPoly)
+  const fill = new RegExp(`(clip-path="url\(#${id}\)") x="[^"]*" y="[^"]*" width="[^"]*" height="([^"]*)"`);
+  const svg = art.svg.split(`points="${from}"`).join(`points="${to}"`).replace(fill, (_m, c: string, h: string) => {
+    const fh = was.h > 0 ? (Number(h) / was.h) * box.h : 0;
+    return `${c} x="${r2(box.x)}" y="${r2(box.y + box.h - fh)}" width="${r2(box.w)}" height="${r2(fh)}"`;
+  });
+  return { ...art, svg };
+}
+
 export function paintedArt(spec: BikeSpec, bags: BagView | null, options: ArtOptions = {}, paint: Paint | null = null): { svg: string; anchors: Anchors; label: string } {
   const art = bikeArt(spec, bags, options);
   if (!paint) return art;

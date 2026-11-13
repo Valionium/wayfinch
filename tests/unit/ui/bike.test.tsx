@@ -255,3 +255,35 @@ describe('the look extras on the co-pilot (review of PR 46, I1)', () => {
     expect(stroke('bk-frame')).toBe('#2f7d4f');
   });
 });
+
+describe('the Trip drawing beside the plan\'s bottles (owner, 9 Nov 2026, PR 108 for the full planner)', () => {
+  test('[BK-FRAME-BESIDE-SMALL] a day-ride plan with a down-tube bottle and a frame bag: Trip\'s drawing draws the same cut frame bag as the full planner for the same plan, not the whole shape', async () => {
+    const { bikeArt: plannerArt, resolveBikeSpec: plannerSpec } = await import('../../../src/core/bike/planner.ts');
+    const { bikeArt: ownArt } = await import('../../../src/core/bike/art.ts');
+    const { resolveBikeSpec } = await import('../../../src/core/bike/spec.ts');
+    const day = { ...full, bikeId: bike.id, nights: 0, bags: { count: 1, positions: ['frame'], items: [{ pos: 'frame', L: 4.5, shape: 1, fill: 0.5 }] },
+      decks: { bar: null, rack: null }, water: { ...full.water, bottles: [{ slot: 'dt', L: 0.75 }] } } as unknown as LoadSummary;
+    const plan = bagViewOf(day, bike)!;
+    const whole = ownArt(resolveBikeSpec(bike, plan), plan).anchors.frame!.shapes[1];
+    const cut = plannerArt(plannerSpec(bike, plan), plan).anchors.frame!.shapes[1];
+    expect(cut).not.toBe(whole);
+    show(<BikeDrawing bike={bike} summary={day} back="trip" />);
+    await vi.waitFor(() => expect(host.querySelector('.bk-bag polygon.bk-shell')?.getAttribute('points')).toBe(cut));
+    expect(host.querySelector('.bk-bag polygon.bk-shell')!.getAttribute('points')).not.toBe(whole);
+    // the clip of the fill follows the cut too, and the plan's own numbers are untouched
+    expect(host.querySelector('clipPath polygon')!.getAttribute('points')).toBe(cut);
+    expect(host.querySelector('.bk-bag .bk-fill')).not.toBeNull();
+    expect((day as unknown as { bags: { items: unknown[] } }).bags.items).toEqual([{ pos: 'frame', L: 4.5, shape: 1, fill: 0.5 }]);
+  });
+
+  test('[BK-FRAME-BESIDE-SMALL] no bottle in the triangle: the drawing is the drawing it was', async () => {
+    const { tripArt } = await import('../../../src/core/bike/paint.ts');
+    const { bikeArt: ownArt } = await import('../../../src/core/bike/art.ts');
+    const { resolveBikeSpec } = await import('../../../src/core/bike/spec.ts');
+    for (const bottles of [[], [{ slot: 'un', L: 0.75 }]]) {
+      const plan = { items: [{ pos: 'frame', L: 4.5, shape: 1, fill: 0.5 }], decks: { bar: null, rack: null }, bottles } as unknown as NonNullable<ReturnType<typeof bagViewOf>>;
+      const spec = resolveBikeSpec(bike, plan);
+      expect(tripArt(spec, plan).svg).toBe(ownArt(spec, plan).svg);
+    }
+  });
+});

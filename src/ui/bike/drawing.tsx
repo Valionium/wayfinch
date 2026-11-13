@@ -37,7 +37,8 @@ export function useTheme(): Theme {
 }
 
 let drawings = 0;
-// The look extras (patterns, fork, rims) are their own chunk, loaded only for a bike that has them: the first screen never carries them.
+// The look extras (patterns, fork, rims) and the frame bag's cut beside a bottle (as the full planner draws it) are their own chunk, loaded only
+// for a bike that has them or a plan: the first screen never carries them.
 let extras: typeof import('../../core/bike/paint.ts') | undefined;
 // The casing's tone may move with the colour (the dark theme's, BK-DARK-CRISP): it is repainted in place too.
 const unnamed = (svg: string): string => svg.replace(/ aria-label="[^"]*"/, '').replace(/class="bk-casing[^"]*"/g, 'class="bk-casing"');
@@ -78,14 +79,14 @@ export function BikeDrawing({ bike, summary, size = 'large', back, caption = tru
   const look = bike?.look?.paint;
   const [ready, setReady] = useState(0);
   useEffect(() => {
-    if (look && !extras) import('../../core/bike/paint.ts').then((m) => { extras = m; setReady(1); }, () => {});
-  }, [look]);
+    if ((look || summary) && !extras) import('../../core/bike/paint.ts').then((m) => { extras = m; setReady(1); }, () => 0);
+  }, [look, summary]);
   // Drawn again only when what it is drawn from changes.
   const { spec, art, words } = useMemo(() => {
     const plan = size === 'large' ? bagViewOf(summary, bike, known ?? (bike ? [bike.id] : [])) : null;
     const r = resolveBikeSpec(bike, plan), s = tryColour ? { ...r, colour: { value: tryColour.hex, mark: 'entered' as const } } : r;
     const o = { theme, idPrefix: prefix };
-    return { spec: s, art: look && extras ? extras.paintedArt(s, plan, o, look) : bikeArt(s, plan, o), words: captionOf(s, bike, plan) };
+    return { spec: s, art: extras ? extras.tripArt(s, plan, o, look) : bikeArt(s, plan, o), words: captionOf(s, bike, plan) };
   }, [bike, summary, known, size, theme, prefix, ready, tryColour]);
   const href = bikeDetailsHref(bike?.id ?? 'new', back, 'look') + (tryColour ? `&colour=${tryColour.name.toLowerCase()}` : '');
   const box = useRef<HTMLSpanElement>(null);
