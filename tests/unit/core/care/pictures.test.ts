@@ -82,9 +82,9 @@ test("[BC-PIC-DETAILS] the brake's release follows the kind of rim brake, never 
   expect(ids('spoke-snapped', 1, D({ brakes: 'rim', rimBrake: 'hydraulic', bars: 'flat' }))).toEqual(['hydro-rim-open', 'brake-qr-open', 'vbrake-open']);
   expect(ids('spoke-snapped', 1, D({ brakes: 'rim', rimBrake: 'caliper', bars: 'flat' }))).toEqual(['brake-qr-open', 'vbrake-open', 'hydro-rim-open']);
   // kind not told: bars only break the tie (drop-bar levers cannot pull V-brakes); no bars told, the caliper first
-  expect(ids('brake-rub-rim', 5, D({ brakes: 'rim', bars: 'flat' }))).toEqual(['vbrake-close', 'brake-qr-close', 'hydro-rim-close']);
-  expect(ids('brake-rub-rim', 5, D({ brakes: 'rim', bars: 'drop' }))[0]).toBe('brake-qr-close');
-  expect(ids('brake-rub-rim', 5, D())[0]).toBe('brake-qr-close');
+  expect(ids('brake-rub-rim', 6, D({ brakes: 'rim', bars: 'flat' }))).toEqual(['vbrake-close', 'brake-qr-close', 'hydro-rim-close']);
+  expect(ids('brake-rub-rim', 6, D({ brakes: 'rim', bars: 'drop' }))[0]).toBe('brake-qr-close');
+  expect(ids('brake-rub-rim', 6, D())[0]).toBe('brake-qr-close');
   // a hydraulic rim brake has no centring screw: no picture of one
   expect(ids('brake-rub-rim', 3, D({ brakes: 'rim', rimBrake: 'hydraulic' }))).toEqual(['rim-centre-caliper', 'rim-centre-vbrake']);
   expect(picturesFor('brake-rub-rim', 3, D({ brakes: 'rim', rimBrake: 'v-brake' })).map((p) => p.kind)).toEqual(['v-brake', 'caliper']);
