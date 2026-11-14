@@ -190,12 +190,34 @@ describe('the card on Trip', () => {
 });
 
 describe('after the first bike', () => {
+  test('[TRIP-BIKE-NAME] a saved bike is named on Trip as in Tools: "<name> · Bike details", to its Bike details; a plan-only bike keeps "Make it yours"', async () => {
+    await trip(saved(), true);
+    const caption = host.querySelector('.trip-bike figcaption')!;
+    expect(W.bikeDetailsLink).toBe('Bike details');
+    expect(caption.textContent).toBe('Trail Bike · Bike details');
+    expect(caption.querySelector('a')!.textContent).toBe('Bike details');
+    expect(caption.querySelector('a')!.getAttribute('href')).toBe('/tools/bags/#bike-details=bike_a&back=trip&section=look');
+    expect(host.querySelector('.trip-bike a.bike-tap')!.getAttribute('aria-label')).toMatch(/\. Bike details$/);
+    expect(caption.textContent).not.toContain(WB.bikeMakeItYours);
+    // the name is the saved list's, as Tools' bike line shows it
+    localStorage.setItem('loadcheck:bikeProfiles', JSON.stringify([{ ...BIKE, name: 'Sweep gravel' }]));
+    refreshBikeSource();
+    await trip(bikeSource.value, true);
+    expect(host.querySelector('.trip-bike figcaption')!.textContent).toBe('Sweep gravel · Bike details');
+    // the plan's bike in no saved list: the drawing's own caption, as before
+    localStorage.setItem('loadcheck:bikeProfiles', '[]');
+    refreshBikeSource();
+    await trip(bikeSource.value, true);
+    expect(host.querySelector('.trip-bike figcaption')!.textContent).toContain(WB.bikeMakeItYours);
+  });
+
   test('[HINT-GONE] a saved bike: today\'s caption, and for this one return a polite line that the bike is in every tool now; never again', async () => {
     await trip(NO_BIKE);
     render(null, host);
     await trip(saved());
     expect(card()).toBeNull();
-    expect(host.querySelector('.trip-bike figcaption')!.textContent).toContain(WB.bikeMakeItYours);
+    // a saved bike is named, as Tools names it (sweep 2 of 15 Nov 2026, #5; was "… · Make it yours")
+    expect(host.querySelector('.trip-bike figcaption')!.textContent).toBe(`${BIKE.name} · ${W.bikeDetailsLink}`);
     const line = host.querySelector('.bike-hint-done')!;
     expect(line.getAttribute('role')).toBe('status');
     await settle();

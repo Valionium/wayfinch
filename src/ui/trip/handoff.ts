@@ -5,6 +5,7 @@ import type { Place } from '../../core/places/types.ts';
 import type { Route, Stay, Trip } from '../../core/types.ts';
 import { haversineKm } from '../../core/geo/haversine.ts';
 import { W } from '../../core/wording/en.ts';
+import { HO } from '../../core/wording/en-handoff.ts';
 import { planStages } from '../../core/route/stages.ts';
 import { dayStopOf } from '../../core/route/day-stops.ts';
 import { DEFAULT_SETTINGS } from '../../store/rules.ts';
@@ -89,8 +90,8 @@ const byteLength = (s: string): number => new TextEncoder().encode(s).length;
 /** Why a route can't be handed off, in the rider's words; null when it can. */
 export function handoffRefusal(route: Route, gpx: string | null): string | null {
   if (route.points.length < 2) return W.appHandoffNoRoute;
-  if (route.points.length > HANDOFF_MAX_POINTS) return W.appHandoffTooManyPoints;
-  if (gpx !== null && byteLength(gpx) > HANDOFF_MAX_BYTES) return W.appHandoffTooLarge;
+  if (route.points.length > HANDOFF_MAX_POINTS) return HO.appHandoffTooManyPoints;
+  if (gpx !== null && byteLength(gpx) > HANDOFF_MAX_BYTES) return HO.appHandoffTooLarge;
   return null;
 }
 
@@ -126,14 +127,14 @@ export async function handOffTrip(trip: Trip, settings: Settings, deps: HandoffD
   try {
     await deps.putRecord({ id, gpx, createdAt });
   } catch {
-    return { ok: false, reason: W.appHandoffNotKept };
+    return { ok: false, reason: HO.appHandoffNotKept };
   }
   const envelope: HandoffEnvelope = { app: 'copilot', kind: 'handoff', v: 1, id, createdAt };
   try {
     deps.storage.setItem(HANDOFF_KEY, JSON.stringify(envelope));
   } catch (e) {
     await deps.deleteRecord(id).catch(() => undefined);
-    return { ok: false, reason: (e as { name?: string } | null)?.name === 'QuotaExceededError' ? W.appHandoffStorageFull : W.appHandoffNotKept };
+    return { ok: false, reason: (e as { name?: string } | null)?.name === 'QuotaExceededError' ? HO.appHandoffStorageFull : HO.appHandoffNotKept };
   }
   deps.go(handoffHref(id));
   return { ok: true, id };

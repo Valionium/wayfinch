@@ -47,7 +47,25 @@ describe('Place search by address and named place', () => {
     const { fetch: f, seen } = fakeFetch({ [PHOTON]: street });
     const hits = await searchPlace('Hauptstraße Heidelberg', f);
     expect(hostsOf(seen)).toEqual(['photon.komoot.io']);
-    expect(hits).toMatchObject([{ name: 'Hauptstraße', where: '69117 Heidelberg, Baden-Württemberg, Germany', kind: 'residential' }]);
+    // no raw map class for a street (sweep 2 of 15 Nov 2026, #8; it said "residential" before)
+    expect(hits).toMatchObject([{ name: 'Hauptstraße', where: '69117 Heidelberg, Baden-Württemberg, Germany' }]);
+    expect(hits[0]!.kind).toBeUndefined();
+  });
+
+  test('[AB-HIT-KIND] a street, square or road hit says no raw map class (pedestrian, residential, tertiary); a station or a camp site still says what it is', async () => {
+    const roads = { features: ['pedestrian', 'residential', 'tertiary', 'primary', 'living_street'].map((v, i) => feature({ name: `Piazza ${i}`, postcode: '00186', city: 'Rome', country: 'Italy', osm_key: 'highway', osm_value: v }, [12.47 + i / 100, 41.9])) };
+    const hits = await searchPlace('Piazza Navona', fakeFetch({ [PHOTON]: roads }).fetch);
+    expect(hits).toHaveLength(5);
+    for (const h of hits) expect(h.kind, h.name).toBeUndefined();
+    expect((await searchPlace('Heidelberg Hauptbahnhof', fakeFetch({ [PHOTON]: station }).fetch))[0]!.kind).toBe('station');
+    expect((await searchPlace('Camping Haide Heidelberg', fakeFetch({ [PHOTON]: campsite }).fetch))[0]!.kind).toBe('camp site');
+  });
+
+  // Review of PR 160, m-3: only the road and area classes go; a bus stop, a rest area or services keep their words.
+  test('[AB-HIT-KIND] a bus stop, a rest area and services on a road still say what they are', async () => {
+    const kinds = { features: ['bus_stop', 'rest_area', 'services'].map((v, i) => feature({ name: `Bismarckplatz ${i}`, postcode: '69115', city: 'Heidelberg', country: 'Germany', osm_key: 'highway', osm_value: v }, [8.69 + i / 100, 49.41])) };
+    const hits = await searchPlace('Bismarckplatz Heidelberg', fakeFetch({ [PHOTON]: kinds }).fetch);
+    expect(hits.map((h) => h.kind)).toEqual(['bus stop', 'rest area', 'services']);
   });
 
   test('a station is found by its name, with its street and number apart from its name', async () => {
