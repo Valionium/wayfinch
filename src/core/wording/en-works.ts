@@ -15,7 +15,7 @@ export const TOPIC_STEPS: Readonly<Record<WorkTopic, readonly string[]>> = {
   cranks: [
     'The bottom bracket is a pair of bearings at the frame\'s lowest point. An axle, the spindle, runs through them and joins the two cranks.',
     'The cranks point opposite ways, so one pedal is up when the other is down. A push on a pedal turns its crank round, like a lever.',
-    'The chainring is fixed to the right crank, so each turn of the cranks turns it once. Its teeth pull the chain, or on some bikes a belt.',
+    'On most bikes the chainring is fixed to the right crank, so each turn of the cranks turns it once. Its teeth pull the chain, or on some bikes a belt.',
     'Each pedal screws into its crank and turns on its own bearings. The left pedal\'s thread runs the other way, so pedalling does not unscrew it.',
     'On an e-bike with the motor at the cranks, the motor takes the bottom bracket\'s place. The cranks turn in it, and it adds its push to yours.',
   ],
@@ -27,14 +27,14 @@ export const TOPIC_STEPS: Readonly<Record<WorkTopic, readonly string[]>> = {
     'A big chainring or a small cog gives a hard gear: each turn takes you further, but needs more force. Hub gears change the ratio inside the hub as well.',
   ],
   gears: [
-    'You move the shifter, and it pulls or lets out the gear cable: a steel wire that slides inside a casing.',
-    'The cable swings the rear derailleur sideways. Its top wheel leads the chain onto a bigger cog for an easier gear, or a smaller one for a harder gear. Keep pedalling: the chain only moves across while it turns.',
+    'You move the shifter. On cable gears, it pulls or lets out the gear cable: a steel wire that slides inside a casing.',
+    'The cable, or on electronic gears a small motor, swings the rear derailleur sideways. Its top wheel leads the chain onto a bigger cog for an easier gear, or a smaller one for a harder gear. Keep pedalling: the chain only moves across while it turns.',
     'With two or three chainrings, a front derailleur pushes the chain from one ring to the next. A smaller ring makes pedalling easier, a bigger one harder.',
     'Hub gears shift inside the rear hub, where small gears are sealed in. The chain stays on one sprocket, so you can shift standing still.',
     'Electronic gears have no gear cable. The shifter sends a signal, by wire or by radio, to a small motor that shifts the gears. A battery powers it.',
   ],
   freehub: [
-    'The rear gears slide onto the freehub, a part of the rear hub. It drives the wheel one way and turns freely the other way.',
+    'With derailleur gears, the rear gears usually slide onto the freehub, a part of the rear hub. It drives the wheel one way and turns freely the other way.',
     'Inside, small spring-loaded catches called pawls lock into teeth in the hub as you pedal, so the chain turns the wheel. Some hubs use two toothed rings instead.',
     'Stop pedalling and the wheel turns faster than the gears. The catches slide over the teeth: that is the ticking many bikes make as they roll.',
     'So the pedals can stay still while the wheel rolls on. A fixed-gear bike has no freehub: its pedals turn whenever the wheel does.',
@@ -65,5 +65,6 @@ export const LW = {
 
 /** "Step n of N: <topic>", as Build-up names its steps. */
 export const worksHeading = (topic: WorkTopic, i: number): string => LN.step(i + 1, TOPIC_STEPS[topic].length, TOPIC_NAMES[topic]);
-/** What a turn of the steps says politely: the heading and the step's words. */
-export const worksSaid = (topic: WorkTopic, i: number): string => `${worksHeading(topic, i)}. ${TOPIC_STEPS[topic][i]}`;
+/** What a turn of the steps says politely: the heading, the step's words, and the line for a part the bike shown lacks (review of PR 157, M3). */
+export const worksSaid = (topic: WorkTopic, i: number, missing: { part: LearnId; kind: LearnKind } | null = null): string =>
+  `${worksHeading(topic, i)}. ${TOPIC_STEPS[topic][i]}${missing ? ` ${LW.none(missing.part, missing.kind)}` : ''}`;

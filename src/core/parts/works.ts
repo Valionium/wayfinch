@@ -32,18 +32,21 @@ export const WORK_STEPS: Readonly<Record<WorkTopic, readonly WorkStep[]>> = {
     { parts: ['hub-gears', 'shifter'], key: 'hub-gears' },
     { parts: ['shifter', 'derailleur', 'hub-gears'] },
   ],
+  // the rear gears or the hub gears, never the hub: its label is the front hub's (review of PR 157, I2). Step 1 is about derailleur
+  // gears, so a hub-gear bike is told it has no rear derailleur, never that it has no rear gears (C1).
   freehub: [
-    { parts: ['cassette', 'hub'], key: 'cassette' },
-    { parts: ['hub', 'cassette', 'chain'] },
-    { parts: ['hub', 'cassette'] },
-    { parts: ['pedal', 'crank', 'hub'] },
+    { parts: ['cassette', 'derailleur'], key: 'derailleur' },
+    { parts: ['cassette', 'hub-gears', 'chain'] },
+    { parts: ['cassette', 'hub-gears'] },
+    { parts: ['pedal', 'crank', 'cassette', 'hub-gears'] },
     { parts: ['hub-gears'], key: 'hub-gears' },
   ],
   brakes: [
     { parts: ['brake-lever', 'brake-cable'] },
     { parts: ['caliper', 'disc', 'pads', 'rim-brake'] },
     { parts: ['pads', 'disc', 'rim-brake'] },
-    { parts: ['brake-cable', 'barrel', 'pad-adjuster', 'caliper'] },
+    // no barrel adjuster: learn.ts gives every bike one (the gear cable's), so a hydraulic bike would show one (review of PR 157, M5)
+    { parts: ['brake-cable', 'pad-adjuster', 'caliper', 'rim-brake'] },
     { parts: ['brake-lever', 'brake-cable', 'caliper'] },
   ],
   pressure: [

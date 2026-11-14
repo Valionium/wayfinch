@@ -8,7 +8,9 @@ import type { LearnBike, LearnId } from '../../core/parts/learn.ts';
 import { LN, nameOf } from '../../core/wording/en-learn.ts';
 import { LW, TOPIC_NAMES, TOPIC_STEPS, worksHeading, worksSaid } from '../../core/wording/en-works.ts';
 
-export { stepMarked, worksHeading, worksSaid };
+export { stepMarked, worksHeading };
+/** What the page says politely for a step of this bike: with its line for a part the bike lacks. */
+export const sayStep = (bike: LearnBike, topic: WorkTopic, i: number): string => worksSaid(topic, i, missingOf(bike, topic, i));
 export const stepCount = (topic: WorkTopic): number => WORK_STEPS[topic].length;
 
 export function TopicPick({ topic, onTopic }: { topic: WorkTopic; onTopic: (t: WorkTopic) => void }) {

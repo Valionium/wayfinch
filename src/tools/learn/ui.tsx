@@ -124,24 +124,40 @@ export function LearnScreen({ services }: { services: TyreServices }) {
   useEffect(() => {
     if (!works || wk) return undefined;
     let alive = true;
-    import('./works.tsx').then((m) => { worksChunk = m; if (alive) { setWk(m); setSaid(m.worksSaid(topic, wi)); } }, () => { if (alive) setWkFailed(true); });
+    import('./works.tsx').then((m) => { worksChunk = m; if (alive) { setWk(m); setSaid(m.sayStep(bike, topic, wi)); } }, () => { if (alive) setWkFailed(true); });
     return () => { alive = false; };
   }, [works, wk, wkTry]);
   const stepper = build ? { at: i, count: steps.length } : works && wk ? { at: wi, count: wCount } : null;
+  // A turn that takes away the focused part button or link (it is not in the new step) hands the focus to Next, never to the page
+  // (review of PR 157, I3; Build-up and How it works alike).
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    if (document.activeElement === null || document.activeElement === document.body) nextBtn.current?.focus();
+  });
   const turn = (to: number): void => {
     const count = stepper?.count ?? 1;
     const n = (to + count) % count;
     setPicked(null);
     if (works && wk) {
       setWat(n);
-      setSaid(wk.worksSaid(topic, n));
+      setSaid(wk.sayStep(bike, topic, n));
     } else {
       setAt(n);
       setSaid(`${LN.step(n + 1, steps.length, STEP_NAMES[steps[n]!])}. ${STEP_LINES[stepLine(bike, steps[n]!)]}`);
     }
     if (n === 0 && document.activeElement === backBtn.current) nextBtn.current?.focus();
+    refocus.current = true;
   };
-  const onTopic = (t: WorkTopic): void => { setTopic(t); setWat(0); setPicked(null); if (wk) setSaid(wk.worksSaid(t, 0)); };
+  const onTopic = (t: WorkTopic): void => { setTopic(t); setWat(0); setPicked(null); if (wk) setSaid(wk.sayStep(bike, t, 0)); };
+  // Another bike shown: the step is said again, with or without its line for a part this bike lacks (review of PR 157, M3).
+  const shownKind = useRef(kind);
+  useEffect(() => {
+    if (shownKind.current === kind) return;
+    shownKind.current = kind;
+    if (works && wk) setSaid(wk.sayStep(bike, topic, wi));
+  }, [kind]);
   const onKey = (e: KeyboardEvent): void => {
     if (!stepper || (e.target as Element | null)?.closest?.('select, input')) return;
     if (e.key === 'ArrowRight' && stepper.at < stepper.count - 1) { e.preventDefault(); turn(stepper.at + 1); }
@@ -176,7 +192,7 @@ export function LearnScreen({ services }: { services: TyreServices }) {
       ) : null}
       <div class="bl-modes" role="group" aria-label={LN.modes}>
         {MODES.map((m) => (
-          <button key={m} type="button" class="btn bl-mode" aria-pressed={mode === m} onClick={() => { setMode(m); setPicked(null); if (m === 'works' && wk) setSaid(wk.worksSaid(topic, wi)); }}>{MODE_NAMES[m]}</button>
+          <button key={m} type="button" class="btn bl-mode" aria-pressed={mode === m} onClick={() => { setMode(m); setPicked(null); if (m === 'works' && wk) setSaid(wk.sayStep(bike, topic, wi)); }}>{MODE_NAMES[m]}</button>
         ))}
       </div>
       <div class={`bl-main${build || works ? ' bl-main-build' : ''}`} onKeyDown={(e) => onKey(e as unknown as KeyboardEvent)}>
