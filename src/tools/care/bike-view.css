@@ -30,6 +30,9 @@ dialog.part-sheet::backdrop { background: var(--ground); opacity: 0.6; }
 .bv-figure { margin: 4px -16px 0; }
 .bv-canvas { position: relative; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .bv-canvas.bv-zoomed { touch-action: none; cursor: grab; }
+/* No tap highlight on the drawing or anything in it (the owner's report of 14 Nov 2026 on the learn page's drawing, the same kind): the
+   tapped part is marked in blaze; the part buttons keep the focus ring. */
+.bv-canvas, .bv-canvas * { -webkit-tap-highlight-color: transparent; }
 .bv-svg { display: block; width: 100%; height: auto; }
 .bv-art { overflow: hidden; }
 .bv-bike { opacity: 0.7; }

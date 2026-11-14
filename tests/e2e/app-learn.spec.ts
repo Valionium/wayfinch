@@ -233,3 +233,27 @@ test('[BL-FOCUS] the Tools tab from the page shows Tools from its top, the focus
   await expect(page.getByRole('link', { name: 'Open How a bike is built' })).toBeFocused();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
 });
+
+// The owner's report of 14 Nov 2026: a tap on a part marked it, but the whole drawing flashed as one blue box for a moment. The drawing's
+// hand cursor is inherited by all it holds, and a phone's tap highlight covers the outermost element showing it: the whole drawing.
+const CLEAR = 'rgba(0, 0, 0, 0)';
+test('[BL-NO-FLASH] a tap on the drawing flashes no box: no tap highlight on the drawing or anything in it; the keyboard\'s focus ring is on the part button, never the drawing', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools?learn' });
+  await expect(page.locator('.bl-label').first()).toBeVisible();
+  const flash = await page.evaluate(() => ['.bl-canvas', '.bl-svg', '.bl-art', '.bl-bike', '.bl-label', '.bl-tap', '.bl-label text']
+    .map((s) => { const el = document.querySelector(s); return `${s} ${el ? getComputedStyle(el).getPropertyValue('-webkit-tap-highlight-color') : 'missing'}`; }));
+  expect(flash).toEqual(['.bl-canvas', '.bl-svg', '.bl-art', '.bl-bike', '.bl-label', '.bl-tap', '.bl-label text'].map((s) => `${s} ${CLEAR}`));
+  // a tap on the drawing marks the part and never takes the focus
+  await tapOnDrawing(page, 'saddle');
+  await expect(page.locator('.bl-name')).toHaveText('Saddle');
+  expect(await page.evaluate(() => document.activeElement?.closest('.bl-canvas') ?? null)).toBeNull();
+  // the keyboard: the part button shows the ring; the drawing has none and is never a stop
+  await page.keyboard.press('Shift');
+  await part(page, 'chain').focus();
+  const ring = await page.evaluate(() => {
+    const b = document.activeElement as HTMLElement;
+    const c = document.querySelector<HTMLElement>('.bl-canvas')!;
+    return { visible: b.matches(':focus-visible'), button: getComputedStyle(b).outlineStyle, canvas: getComputedStyle(c).outlineStyle, stop: c.tabIndex };
+  });
+  expect(ring).toEqual({ visible: true, button: 'solid', canvas: 'none', stop: -1 });
+});
