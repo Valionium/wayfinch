@@ -155,8 +155,8 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
     note: "Source: software interval: book p. 207; other fixed interval: no source found Book: p. 207: differs: book says software updates every 6 months; the draft's yearly guess is replaced; moved from Every year. Round 2: not covered by the new pages",
   },
   'brakes-hydraulic-bleed': {
-    urls: ['https://www.parktool.com/blog/repair-help/shimano-hydraulic-brake-service-and-adjustment'],
-    note: "Source: book p. 213 Book: p. 213: agrees (bleed when spongy; refill with the same fluid; mineral oil never mixed); the book gives no interval. Round 2: not covered by the new pages Group 2: the draft's interval (every 1-2 years) was its own guess and the book gives none, so the interval is cut: the task sits under When you notice, with its signs. Review of PR 67, M8: \"fluid old\" is cut from the signs (it needs an interval).",
+    urls: ['https://www.parktool.com/blog/repair-help/shimano-hydraulic-brake-service-and-adjustment', 'https://www.tartybikes.co.uk/hydro_rim_brake_spares/magura_royal_blood_mineral_oil/c5p2075.html'],
+    note: "Source: book p. 213 Book: p. 213: agrees (bleed when spongy; refill with the same fluid; mineral oil never mixed); the book gives no interval. Round 2: not covered by the new pages Group 2: the draft's interval (every 1-2 years) was its own guess and the book gives none, so the interval is cut: the task sits under When you notice, with its signs. Review of PR 67, M8: \"fluid old\" is cut from the signs (it needs an interval). The owner's ruling of 14 November 2026: with the fluid Not sure, step 2 also names Magura's mineral oil (Tartybikes: Magura Royal Blood mineral oil is for Magura's disc brakes and the HS33 and HS11 rim brakes; brakes-hydro-rim-spongy's Magura HS33 manual: never DOT fluid).",
   },
   'brakes-cable-disc-service': {
     urls: ['https://www.parktool.com/en-us/blog/repair-help/mechanical-disc-brake-alignment'],
