@@ -73,7 +73,7 @@ function* ownBikes(): Generator<{ name: string; bike: LearnBike }> {
   // a road and a mountain bike, a step-through and a full-suspension frame: every line's kind of bike, with every brake, drive and axle answer
   for (const [style, tyre] of [['diamond-sloping', '28-622'], ['diamond-sloping', '60-622'], ['step-through', '40-622'], ['full-suspension', '60-622']] as const) {
     for (const brakes of ['unknown', 'hydraulic-disc', 'cable-disc', 'rim', 'other']) for (const drive of ['unknown', 'derailleur', 'chain-hub', 'belt']) {
-      for (const axle of [undefined, 'thru', 'qr', 'nuts']) for (const [bars, ebike, motor, shifting] of [['drop', false, undefined, 'cable'], ['flat', true, 'cranks', 'electronic'], ['other', true, 'rear-hub', 'cable']] as const) {
+      for (const axle of [undefined, 'thru', 'qr', 'nuts']) for (const [bars, ebike, motor, shifting] of [['drop', false, undefined, 'cable'], ['flat', true, 'cranks', 'electronic'], ['other', true, 'rear-hub', 'cable'], ['drop', false, undefined, 'none']] as const) {
         const r = setBike(style, 'M', bars, ebike, [tyre, tyre], null, { brakes, drive, shifting, ...(axle ? { axle } : {}) });
         if (motor) r.look = { ...r.look!, motor };
         yield { name: `${style} ${tyre} ${brakes} ${drive} ${axle} ${bars}${ebike ? ` e-bike ${motor}` : ''} ${shifting}`, bike: ownBike(resolveBikeSpec(r, null), r) };
