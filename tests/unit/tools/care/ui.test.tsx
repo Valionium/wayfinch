@@ -610,6 +610,21 @@ test('[BC-FIT-LINE] Show all is not remembered: the screen opened again fits the
   }
 });
 
+// The owner's ruling of 14 November 2026 (BC-BLEED-MAGURA), on screen: Brake fluid Not sure names Magura's mineral oil beside Shimano's and SRAM's.
+test('[BC-BLEED-MAGURA] on screen: hydraulic disc brakes with the fluid Not sure, and no bike, show the bleed saying Magura uses mineral oil; a told fluid does not', async () => {
+  for (const m of [world([bike('bike_h', 'Hydro', { brakes: 'hydraulic-disc' })]), world([])]) {
+    render(null, host);
+    await mount(m);
+    const steps = (await stepsOf(tasks().find((d) => d.dataset.id === 'brakes-hydraulic-bleed')!)).steps;
+    expect(steps).toContain('Shimano uses mineral oil, SRAM uses DOT fluid, Magura uses mineral oil too; never mix.');
+  }
+  render(null, host);
+  await mount(world([bike('bike_h', 'Hydro', HYDRO_E)]));
+  const told = (await stepsOf(tasks().find((d) => d.dataset.id === 'brakes-hydraulic-bleed')!)).steps.join(' ');
+  expect(told).toMatch(/mineral oil, never DOT fluid/);
+  expect(told).not.toMatch(/Magura/);
+});
+
 test('[BC-STEP-WORDS] on screen: the bleed names the bike\'s fluid; under Show all a card that does not fit the bike opens as for no bike, one that fits as for the bike', async () => {
   await mount(world([bike('bike_h', 'Hydro', HYDRO_E)]));
   const bleed = await stepsOf(tasks().find((d) => d.dataset.id === 'brakes-hydraulic-bleed')!);

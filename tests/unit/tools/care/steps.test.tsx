@@ -662,6 +662,28 @@ test('[PG-SHEET-OPEN] with no bike the view shows the typical gravel bike and "A
   expect(dialog()!.querySelectorAll('.care-step-list .care-part').length).toBeGreaterThan(5);
 });
 
+// The owner's ruling of 14 November 2026: the wheel is linked in every card and task as in the puncture card (PG-WHEEL-LINKS), here on screen.
+test('[PG-WHEEL-LINKS] on screen: a card\'s and a task\'s first mention of the wheel is a button among its other part names; a tap opens the bike view at the wheel', async () => {
+  await mount();
+  await openCard('tyre-torn');
+  await click(button(C.careStepsNext)!);
+  expect(dialog()!.querySelector('.care-step-t')!.textContent).toBe(card('tyre-torn').steps[0]);
+  expect([...dialog()!.querySelectorAll('.care-step .care-part')].map((b) => b.textContent)).toEqual(['wheel', 'tube', 'tubeless valve']);
+  const link = partLink('wheel')!;
+  expect(link.tagName).toBe('BUTTON');
+  expect(link.getAttribute('aria-haspopup')).toBe('dialog');
+  await click(link);
+  await sheetOpen();
+  expect(sheet()!.querySelector('.bv-label-hot')!.getAttribute('data-part')).toBe('wheel');
+  expect(entryName()).toBe('Wheel');
+  await click(sheetButton('Close')!);
+  expect(document.activeElement).toBe(partLink('wheel'));
+  await click(button(C.careStepsClose)!);
+  await openTask('wheels-wobble');
+  await click(button(C.careStepsNext)!);
+  expect([...dialog()!.querySelectorAll('.care-step .care-part')].map((b) => b.textContent)).toEqual(['wheel', 'dropouts']);
+});
+
 test('[BV-BUTTON] "What is it, where is it?" sits under the text on every screen of a card, the card\'s parts below it; it opens the view with no part tapped, focus on its title, and gives the focus back', async () => {
   await mount();
   const c = card('puncture-tube');
@@ -704,7 +726,8 @@ test("[BV-VIEW] the card's parts as buttons and as labels on the drawing; a tap 
   await click(where()[0]!);
   await sheetOpen();
   const parts = [...sheet()!.querySelectorAll('.bv-parts button')].map((b) => b.textContent);
-  expect(parts).toEqual(['Thru-axle', 'Wheel quick release', 'Dropouts', 'Brake pads', 'Disc caliper', 'Brake lever', 'Pad adjuster', 'Brake disc']);
+  // the wheel, linked in the card's first step since the owner's ruling of 14 November 2026 (PG-WHEEL-LINKS), in the text's order
+  expect(parts).toEqual(['Thru-axle', 'Wheel quick release', 'Wheel', 'Dropouts', 'Brake pads', 'Disc caliper', 'Brake lever', 'Pad adjuster', 'Brake disc']);
   expect(sheet()!.querySelector('.bv-parts')!.getAttribute('aria-label')).toBe('Parts in this card');
   // each label is one of the card's parts, inside the hidden picture, and none can take the focus
   expect(labels().length).toBeGreaterThan(3);
