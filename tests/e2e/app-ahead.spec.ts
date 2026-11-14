@@ -112,6 +112,22 @@ test('[AH-EMERGENCY] offline after a reload: 112, the fallback line and the coor
   }
 });
 
+test('[AH-EMERGENCY] the Source link is at least 44 px high at 320 and 1280 px, and named "Source of these emergency numbers" (review of #169, m2 and m3)', async ({ page }) => {
+  await ahead(page);
+  for (const width of [320, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    const chip = page.locator('.ah-chips').getByRole('button', { name: 'Emergency', exact: true });
+    if ((await page.locator('#chip-emergency').count()) === 0) await chip.click();
+    const source = page.locator('#chip-emergency').getByRole('link', { name: 'Source of these emergency numbers', exact: true });
+    await expect(source).toBeVisible();
+    await expect(source).toHaveText('Source');
+    const box = (await source.boundingBox())!;
+    expect(box.height, `${width} px`).toBeGreaterThanOrEqual(43.5);
+    expect(box.width, `${width} px`).toBeGreaterThanOrEqual(43.5);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${width} px`).toBe(true);
+  }
+});
+
 /** The opener's box and, once it is tapped, the call link's, both in page coordinates; and what lies under the old box now. */
 async function openAndMeasure(page: Page, opener: ReturnType<Page['locator']>) {
   await opener.scrollIntoViewIfNeeded();
