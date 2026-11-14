@@ -195,10 +195,17 @@ function meteoHits(answer: unknown): FoundPlace[] {
 
 const PHOTON_KEYS = ['place', 'natural', 'water', 'waterway', 'mountain_pass', 'boundary'];
 
-/** What a hit is, in words: Photon's own value (`camp_site`), shown only when it is not a plain town or an unnamed building. */
+/** The road kinds a rider reads (a bus stop is not a road class): kept for a road hit. */
+const ROAD_WORDS = ['bus stop', 'rest area', 'services'];
+
+/**
+ * What a hit is, in words: Photon's own value (`camp_site`), shown only when it is not a plain town, an unnamed building or a street,
+ * square or road, whose map class (pedestrian, residential, tertiary) means nothing to a rider (sweep 2 of 15 Nov 2026, #8); a bus stop,
+ * a rest area and services on a road keep their words (review of PR 160, m-3).
+ */
 const kindOf = (key: unknown, value: unknown): string | undefined => {
   const v = clean(value, 40).replace(/_/g, ' ');
-  return key === 'place' || v === '' || v === 'yes' ? undefined : v;
+  return key === 'place' || (key === 'highway' && !ROAD_WORDS.includes(v)) || v === '' || v === 'yes' ? undefined : v;
 };
 
 /** Hits from Photon. `broad`: an address or a named place was asked for, so streets, house numbers, stations and the like stay. */
