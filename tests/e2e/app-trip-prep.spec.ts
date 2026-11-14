@@ -77,6 +77,19 @@ test("[TRIP-PREP-ITEMS] [TRIP-PREP-LINKS] a three-day trip on the sample bike: B
   await expect(page.locator('.care')).toContainText(String(sample[0]!['name']));
 });
 
+test('[TRIP-PREP-LINKS] the repair kit opens Bike care at Roadside repairs, What to carry, with the bike chosen; Bike care opened again starts at its top', async ({ page }) => {
+  await prepStep(page);
+  await page.getByRole('link', { name: 'In Bike care: Pack a repair kit that fits your bike. Bike care lists one under Roadside repairs, What to carry.', exact: true }).click();
+  await expect(page.getByRole('tab', { name: 'Roadside repairs' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'What to carry', level: 3 })).toBeFocused();
+  await expect(page.locator('.care')).toContainText(String(sample[0]!['name']));
+  // the mark is used once: Bike care opened another way starts on Care, its title focused
+  await page.goto(`${app!.origin}/#/tools`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => { location.hash = '#/tools/care'; });
+  await expect(page.getByRole('heading', { name: 'Bike care', level: 2 })).toBeFocused();
+  await expect(page.getByRole('tab', { name: 'Care', exact: true })).toHaveAttribute('aria-selected', 'true');
+});
+
 test('[TRIP-PREP-ITEMS] a day ride has the two every-ride checks and no night', async ({ page }) => {
   await prepStep(page, { nights: 0 });
   expect(await ids(page)).toEqual(['brakes-lever-test', 'tyres-pressure', 'kit', 'charge', 'forecast', 'tell']);
@@ -102,6 +115,24 @@ test('[TRIP-PREP-TICKS] a tick, by tap or by keyboard, stays after a reload for 
   await expect(box(page, 'kit')).toBeChecked();
   await expect(box(page, 'brakes-lever-test')).toBeChecked();
   await expect(box(page, 'charge')).not.toBeChecked();
+});
+
+test('[TRIP-PREP-TICKS] [TRIP-REMOVE] a tick, then Remove this trip, then the same route again: the list starts unticked', async ({ page }) => {
+  const trip = await prepStep(page);
+  await page.locator('[data-prep-item="kit"] label').click();
+  await expect(box(page, 'kit')).toBeChecked();
+  expect(JSON.parse((await allLocal(page))[KEY]!)).toEqual({ route: trip.route.id, ticked: ['kit'] });
+  await page.getByRole('button', { name: 'Remove this trip', exact: true }).click();
+  await page.getByRole('alertdialog', { name: 'Remove this trip?' }).getByRole('button', { name: 'Remove trip', exact: true }).click();
+  await expect(page.locator('[data-trip-line]')).toHaveText('No trip yet');
+  expect((await allLocal(page))[KEY]).toBeUndefined();
+  // the very same route (the same id) added again
+  const again = await preparedTrip(page, 'heidelberg-strasbourg', { nights: 2, departureDate: inDays(3) });
+  expect(again.route.id).toBe(trip.route.id);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await openPrep(page);
+  await expect(box(page, 'kit')).not.toBeChecked();
+  expect((await allLocal(page))[KEY]).toBeUndefined();
 });
 
 test('[TRIP-PREP-FIT] keyboard and screen reader reach every box and link; 44 px targets; 320 px to wide, both themes, no sideways scroll, no accessibility violations', async ({ page }) => {

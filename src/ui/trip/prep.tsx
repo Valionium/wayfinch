@@ -33,7 +33,11 @@ export function BeforeYouGo({ snap }: { snap: Pick<TripSnapshot, 'trip'> }) {
     setState({ route, notKept: kept === null, ticked: shown });
   };
 
-  const linkOf = (it: PrepItem) => (it.link === 'care' ? <a class="prep-link" href={careHref} aria-label={PR.prepInCareLabel(it.text)}>{PR.prepInCare}</a> : null);
+  // The repair kit opens Bike care at Roadside repairs, What to carry: a one-time mark Bike care reads as it opens (tools/care/ui.tsx).
+  const toCarry = (): void => { try { sessionStorage.setItem('wf:careCarry', '1'); } catch { /* Bike care opens at its top */ } };
+  const linkOf = (it: PrepItem) => (it.link === 'care'
+    ? <a class="prep-link" href={careHref} aria-label={PR.prepInCareLabel(it.text)} onClick={it.id === 'kit' ? toCarry : undefined}>{PR.prepInCare}</a>
+    : null);
 
   return (
     <section class="prep" aria-labelledby="prep-title" data-prep>
