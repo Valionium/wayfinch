@@ -6,7 +6,8 @@ import { showKm, W } from '../wording/en.ts';
 import { latestPosition, usablePosition } from './locate.ts';
 import { coverLine, coverOfSpot, finalOrder, hoursLookup, hoursNotWorkedOut, insideRadius, isCover, missingFor, newestMapDate, reachKm, shortMapDate, spotsOf, zoneOfSpot, type NotCover, type Spot, type StopFacts } from './covers.ts';
 import { usableFlatKph, type Schedule } from './pace.ts';
-import { chipRide, nowSchedule } from './tripday.ts';
+import { fromNowNote } from './help.ts';
+import { chipRide, nowSchedule, zoneLookupOf } from './tripday.ts';
 import { hourClass } from './weather-classes.ts';
 import { isStale, weatherWindows } from './weather.ts';
 import { gridOf, hoursTouching, onTheRide, pointNearKm, pointNearPosition, routeForecast, type GridPoint } from './weather-windows.ts';
@@ -62,12 +63,11 @@ const withoutPasses = (list: Spot[], from: number): Spot[] => {
     });
 };
 
-function entryOf(spot: Spot, r: Cover | NotCover, f: StopFacts, arrival: Date, where: string, thunder: boolean, unworked: boolean): ShelterEntry {
+function entryOf(spot: Spot, r: Cover | NotCover, f: StopFacts, arrival: Date, where: string, ahead: boolean, thunder: boolean, unworked: boolean): ShelterEntry {
   const covered = isCover(r);
   const roofy = thunder && covered && r.coverClass > 2;
   const cover = covered ? { ...r, lightning: roofy } : null;
   const tz = zoneOfSpot(spot, f);
-  const ahead = where.startsWith('+');
   const parts = ahead ? [where, formatAbout(arrival, tz)] : [where];
   if (!covered) parts.push(r.notCover);
   if (roofy) parts.push(W.weatherNoLightningProtection);
@@ -85,13 +85,13 @@ export function shelterEntries(f: StopFacts, at: Date, thunder: boolean): Shelte
   const spots = spotsOf(f);
   const { startKm, behindFromKm } = f.ride;
 
-  const side = (list: Spot[], from: number, arrivalOf: (s: Spot) => Date, whereOf: (s: Spot) => string): { covers: ShelterEntry[]; rest: ShelterEntry[] } => {
+  const side = (list: Spot[], from: number, ahead: boolean, arrivalOf: (s: Spot) => Date, whereOf: (s: Spot) => string): { covers: ShelterEntry[]; rest: ShelterEntry[] } => {
     const covers: ShelterEntry[] = [];
     const rest: ShelterEntry[] = [];
     for (const spot of withoutPasses(list, from)) {
       const arrival = arrivalOf(spot);
       const r = coverOfSpot(spot, arrival, null, hoursOf);
-      const entry = (): ShelterEntry => entryOf(spot, r, f, arrival, whereOf(spot), thunder, hoursNotWorkedOut(spot, arrival, hoursOf));
+      const entry = (): ShelterEntry => entryOf(spot, r, f, arrival, whereOf(spot), ahead, thunder, hoursNotWorkedOut(spot, arrival, hoursOf));
       if (isCover(r)) covers.push(entry());
       else if (r.listed) rest.push(entry());
     }
@@ -100,11 +100,11 @@ export function shelterEntries(f: StopFacts, at: Date, thunder: boolean): Shelte
 
   const inside = spots.filter((s) => insideRadius(f.ride, s.match.km));
   const ahead = side(
-    spots.filter((s) => s.match.km >= startKm && !insideRadius(f.ride, s.match.km)), startKm,
+    spots.filter((s) => s.match.km >= startKm && !insideRadius(f.ride, s.match.km)), startKm, true,
     (s) => schedule.atPlace(s.match), (s) => W.weatherStampAhead(showKm(s.match.km - startKm)),
   );
   const behind = side(
-    spots.filter((s) => s.match.km < behindFromKm && !insideRadius(f.ride, s.match.km)), behindFromKm,
+    spots.filter((s) => s.match.km < behindFromKm && !insideRadius(f.ride, s.match.km)), behindFromKm, false,
     (s) => schedule.behind(s.match), (s) => W.waterBack(showKm(behindFromKm - s.match.km)),
   );
 
@@ -118,7 +118,7 @@ export function shelterEntries(f: StopFacts, at: Date, thunder: boolean): Shelte
     const arrival = schedule.atPlace(spot.match);
     const r = coverOfSpot(spot, arrival, null, hoursOf);
     if (!isCover(r) && !r.listed) return [];
-    const e = entryOf(spot, r, f, arrival, W.waterNearYou, thunder, hoursNotWorkedOut(spot, arrival, hoursOf));
+    const e = entryOf(spot, r, f, arrival, W.waterNearYou, false, thunder, hoursNotWorkedOut(spot, arrival, hoursOf));
     return [{ ...e, cover: null, item: { ...e.item, stamp: { km: spot.match.km }, status: 'unknown' as const } }];
   }).slice(0, NEAREST);
   return [...firsts, ...nearest, ...marked, ...near];
@@ -145,6 +145,6 @@ export function shelterChip(facts: StopFacts, thunder: boolean): Answer {
   const title = thunder ? W.shelterThunderTitle : first ? W.shelterNearest(showKm(first.spot.match.km)) : W.shelterNone;
   return makeAnswer({
     topic: 'help', status: thunder ? 'warning' : first ? 'fine' : 'unknown', title, stamp: first ? first.item.stamp : null,
-    detail: thunder ? W.weatherNoLightningProtection : '', items: list.map((e) => e.item), basis, freshness, missing,
+    detail: [...(thunder ? [W.weatherNoLightningProtection] : []), ...fromNowNote(f.ride, f.now, zoneLookupOf(f.routeZones)(f.ride.startKm).timeZone)].join(' '), items: list.map((e) => e.item), basis, freshness, missing,
   });
 }
