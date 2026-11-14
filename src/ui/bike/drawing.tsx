@@ -95,7 +95,7 @@ export function BikeDrawing({ bike, summary, size = 'large', back, caption = tru
     if (box.current) paint(box.current, last.current, art.svg, spec.colour.value);
   });
   return (
-    <figure class={`bike bike-${size}`} data-art={extras ? 'full' : undefined}>
+    <figure class={`bike bike-${size}`}>
       <a class="bike-tap" href={href} aria-label={W.bikeTapName(art.label, words.action)}>
         <span class="bike-art" ref={box} />
       </a>
