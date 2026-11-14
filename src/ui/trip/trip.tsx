@@ -12,7 +12,7 @@ import { installOffer, promptInstall } from '../install.ts';
 import { runningSignal } from './run-state.ts';
 import { TripBike } from './bike-hint.tsx';
 import { savedLine } from './saved-line.ts';
-import { lineKey, routeDoneLine, tripLineOf } from './model.ts';
+import { lineKey, routeDoneLine, suggestedNights, tripLineOf } from './model.ts';
 import { lazy } from '../lazy.tsx';
 import type { TripServices, TripSnapshot } from './services.ts';
 import './trip.css';
@@ -146,8 +146,9 @@ export function TripScreen({ services }: { services: TripServices }) {
   const trip = snap?.trip ?? null;
   // Get ready offline is done once a run ended with every step through; one with a step missing stays the step to do.
   const readyDone = snap?.prepared ? snap.prepared.steps.every((x) => x.ok) : false;
-  // Bags is done once the bag planner holds a plan (sweep of 14 Nov 2026, #5): its line is the Tools card's.
-  const plan = bike.summary && !('empty' in bike.summary) ? bike.summary : null;
+  // Bags is done once the bag planner holds a plan for this trip's nights (sweep of 14 Nov 2026, #5; review M3): its line is the
+  // Tools card's. A plan made for other nights is not this trip's.
+  const plan = trip && snap && bike.summary && !('empty' in bike.summary) && bike.summary.nights === (snap.settings.nights ?? suggestedNights(trip)) ? bike.summary : null;
   const suggested: StepName = snap?.running && trip ? 'go' : !trip ? 'route' : !readyDone ? 'getready' : plan ? 'go' : 'bags';
   // Only Get ready offline and Bags need a route (design §2.2).
   const openStep: StepName = chosen !== null && (trip !== null || chosen === 'route' || chosen === 'go') ? chosen : suggested;

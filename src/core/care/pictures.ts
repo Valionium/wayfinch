@@ -22,8 +22,12 @@ export type StepPicture = string | Kinds | null;
 export type PictureDetails = {
   brakes: CareDetails['brakes']; rimBrake: RimKind | null; axle: AxleKind | null; shifting: CareDetails['shifting']; bars: Bars | null;
 };
-/** One picture to show, with its kind ('caliper', 'thru', …) where it is one of several; the first of a step's list is shown. */
-export type Shown = { id: string; kind: string | null };
+/**
+ * One picture to show, with its kind ('caliper', 'thru', …) where it is one of several; the first of a step's list is shown. `assumed`:
+ * a picture drawn for one kind only (a hydraulic disc's pad spacer, cable gears' barrel), shown while the bike's detail that decides it
+ * is Not sure, so the step says which kind it is for (live-site sweep of 14 November 2026, item 46).
+ */
+export type Shown = { id: string; kind: string | null; assumed?: true };
 
 /** The brake's quick release, by the kind of rim brake (redo, answer 2): only on rim-brake steps, never on a disc brake's. */
 const RIM_OPEN: Kinds = { by: 'rim-brake', pictures: { caliper: 'brake-qr-open', 'v-brake': 'vbrake-open', hydraulic: 'hydro-rim-open' } };
@@ -48,7 +52,8 @@ export const STEP_PICTURES: Readonly<Record<string, readonly StepPicture[]>> = {
   'puncture-tubeless': [null, null, 'tubeless-plug', null, null, null, null],
   'tyre-torn': [null, 'tyre-boot', null, null],
   'spoke-snapped': ['spoke-wrap', RIM_OPEN, null, null, RIM_CLOSE],
-  'brake-rub-rim': [WHEEL_SEAT, null, null, RIM_CENTRE, RIM_OPEN, RIM_CLOSE],
+  // the hydraulic rim brake's own centring step (owner's ruling of 14 November 2026) has no picture: no honest drawing of it exists
+  'brake-rub-rim': [WHEEL_SEAT, null, null, RIM_CENTRE, null, RIM_OPEN, RIM_CLOSE],
   'brake-rub-disc': [WHEEL_SEAT, 'pad-gap', 'disc-bolts', null, null],
   'brake-weak-rim': [null, RIM_CLOSE, BRAKE_BARREL, null, null],
   'brake-weak-disc': [null, null, 'disc-pad-adjust', null, null],
@@ -87,9 +92,10 @@ export function picturesFor(id: string, step: number, d: PictureDetails): Shown[
   if (entry === null) return [];
   if (typeof entry === 'string') return [{ id: entry, kind: null }];
   const pics = entry.pictures as Partial<Record<string, string>>;
-  return kindOrder(entry.by, d).flatMap((kind) => {
+  const assumed = (entry.by === 'brakes' && d.brakes === null) || (entry.by === 'shifting' && d.shifting === null);
+  return kindOrder(entry.by, d).flatMap((kind): Shown[] => {
     const id = pics[kind];
-    return id ? [{ id, kind }] : [];
+    return id ? [assumed ? { id, kind, assumed: true } : { id, kind }] : [];
   });
 }
 
