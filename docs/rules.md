@@ -1386,3 +1386,8 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - at 320 px, 360 px and wide, in both themes: every tile and the Back to all details button at least 44 px, no sideways scroll with the tiles shown or any group open [BK-TILES-A11Y]
 - an entry Use these bike details or Save refuses opens the tile that holds it and takes the focus (the bike weight, the maximum weight or what it includes, the frame number, the triangle's first missing or wrong side, saddle to tyre, the bar roll's width), so the message's "highlighted above" is there; a missing name opens Saved bikes on the name [BK-TILES-REFUSED]
 - each way in opens the tile it is about: the drawing's link Look, the focus on its heading; a new bike (Add a bike, Make it yours, Add your bike) Quick start, the focus on its first frame picture; the weight check's Bike details Weights; a bike of the rider's (You, Edit; Bike care; Trip), the rig, step 2's Bike details and Kit's Review bike details every tile, the focus on the first [BK-TILES-START]
+
+## Bag planner: the trip entered once (the owner's ruling of 14 Nov 2026; sweep of 14 Nov, finding 28)
+
+- with a trip from Wayfinch in the plan (its route handed over), step one, Ride, shows the trip on one line, where, when and how many nights, with the GPX by its name, and Change, which opens today's fields with every value as it was; the fold and Change store nothing; a plan without a trip from Wayfinch shows the step as before [LC-RIDE-FOLD]
+- Comfortable or Lightweight is chosen at the start of Kit, before the kit list, no longer on Check; the Check follows the choice [LC-MODE-KIT]
