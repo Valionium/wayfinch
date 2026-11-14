@@ -12,11 +12,11 @@ import './finder.css';
 /** The type whose drawing the rider opened last: back from How a bike is built, the focus goes to its link. This visit only. */
 let followed: FinderType | null = null;
 
-
 const EVENTS = ['storage', 'pageshow', 'copilot:deleted'];
 const firstRadio = (root: HTMLElement | null, q: Question): HTMLInputElement | null | undefined => root?.querySelector<HTMLInputElement>(`input[name="bf-${q}"]`);
 
-export function FinderScreen() {
+/** `back`: Tools came here straight from How a bike is built (the phone's back), not from its card. */
+export function FinderScreen({ back }: { back: boolean }) {
   const [answers, setAnswers] = useState<Answers>(readAnswers);
   // A complete set kept from an earlier visit shows its list at once.
   const [shown, setShown] = useState(() => complete(answers));
@@ -28,9 +28,9 @@ export function FinderScreen() {
   const toList = useRef(false);
 
   useEffect(() => {
-    const back = followed;
+    const type = back ? followed : null;
     followed = null;
-    const link = back ? root.current?.querySelector<HTMLAnchorElement>(`a[data-finder-learn="${back}"]`) : null;
+    const link = type ? root.current?.querySelector<HTMLAnchorElement>(`a[data-finder-learn="${type}"]`) : null;
     if (link) link.focus(); else title.current?.focus();
   }, []);
   // Another tab's change, Delete co-pilot data here or there, a return from the back/forward cache: read again, so a deleted answer never

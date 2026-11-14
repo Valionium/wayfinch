@@ -60,7 +60,8 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
     was.current = page;
   }, [page]);
   if (page === 'learn') return <LearnScreen key={shown.kind} services={services} kind={shown.kind} />;
-  return page === 'finder' ? <FinderScreen /> : <ToolsCards services={services} />;
+  // Straight from How a bike is built to the finder is the phone's back (the page has no link there): the finder then focuses the link followed.
+  return page === 'finder' ? <FinderScreen back={was.current === 'learn'} /> : <ToolsCards services={services} />;
 }
 
 // The advisor in the bag planner; closing it comes back here (GA-BACK).

@@ -108,6 +108,14 @@ test('[BF-LEARN] each type opens its own drawing in How a bike is built (Explore
   await expect(page).toHaveURL(/#\/tools\?finder$/);
   await expect(types(page).first().locator('h4')).toHaveText('Touring bike');
   await expect(link).toBeFocused();
+  // to its drawing again, then Tools and the card: the finder opens at its title, not at a link followed earlier
+  await link.click();
+  await expect(page.getByLabel('Bike to show')).toHaveValue('touring');
+  await page.locator('nav.tabs a', { hasText: 'Tools' }).click();
+  await expect(page.getByRole('link', { name: 'Open How a bike is built' })).toBeFocused();
+  await page.getByRole('link', { name: 'Open Find a bike type' }).click();
+  await expect(page.getByRole('heading', { name: 'Find a bike type', level: 2 })).toBeFocused();
+  await expect(types(page).first().locator('h4')).toHaveText('Touring bike');
   // the plain address still opens How a bike is built as before
   await page.goto(`${app.origin}/#/tools?learn`);
   await expect(page.getByLabel('Bike to show')).toHaveValue('gravel');
