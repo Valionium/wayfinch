@@ -30,7 +30,7 @@ export const C = {
   careSearchLabel: 'Search',
   careSearchHint: 'For example squeak, chain or bleed',
   careFiltersLabel: 'Parts',
-  careTellUs: "Tell us your brakes, tyres… to hide what doesn't apply",
+  careTellUs: "Tell us your brakes, tyres… in Bike details to hide what doesn't apply",
   // What the list fits (the owner's wish of 14 November 2026): the line at the top, and its button that lifts the fit and brings it back
   careFitShowing: (what: string): string => `Showing what fits your bike: ${what}.`,
   careFitAll: 'Showing everything, for every bike.',

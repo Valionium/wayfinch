@@ -5,6 +5,7 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { C, CARE_TASKS, CARRY, PART_LABEL, ROAD_CARDS, SECTION_LABEL, SECTIONS } from '../../../../src/core/wording/en-care.ts';
+import { CL } from '../../../../src/core/wording/en-care-link.ts';
 import { ALL_STEPS_KEY } from '../../../../src/tools/care/steps.tsx';
 import { careDetails } from '../../../../src/core/care/fit.ts';
 import { stepsShown } from '../../../../src/core/care/lines.ts';
@@ -541,4 +542,13 @@ test('[BC-STEP-WORDS] on screen: the bleed names the bike\'s fluid; under Show a
   const rim = await stepsOf(road().find((d) => d.dataset.id === 'brake-rub-rim')!);
   const card = ROAD_CARDS.find((c) => c.id === 'brake-rub-rim')!;
   expect(rim.steps).toEqual(stepsShown(card.id, card.steps.length, careDetails(null)).map((i) => card.steps[i]!));
+});
+
+// The live-site sweep of 14 November 2026, items 44 and 47: the words say what fits depends on (the bike's details) and where the
+// "Tell us" link goes (the bag planner's Bike details).
+test('[BC-TELL-US] the "Tell us" link says it opens Bike details; the Tools card says the list is fitted to the bike\'s details', async () => {
+  await mount(world([bike('bike_a', 'Gravel', { brakes: 'rim' })]));
+  expect(tellUs()!.textContent).toMatch(/\bin Bike details\b/);
+  expect(tellUs()!.getAttribute('href')).toBe(bikeDetailsHref('bike_a', 'care'));
+  expect(CL.careCardBody).toMatch(/fitted to your bike's details/);
 });
