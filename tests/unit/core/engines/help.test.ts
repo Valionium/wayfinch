@@ -489,6 +489,19 @@ describe('sweep of 14 Nov 2026', () => {
     expect(itemAt(a, 96).detail).toContain('not mapped as a hospital · emergency department not known');
     expect(itemAt(a, 96).status).toBe('unknown');
   });
+  test('[EM-PHARMACY] a private hospital with a department never hides a public one further on: both listed, the public one first (re-check of #140)', () => {
+    const closed = hospital({ name: 'Privatklinik', tags: { healthcare: 'hospital', access: 'private' } });
+    const open = hospital({ name: 'Kreiskrankenhaus', tags: { healthcare: 'hospital' } });
+    const a = chip('pharmacy', { moment: riding(100), spots: [{ b: closed, km: 101 }, { b: open, km: 106 }] });
+    expect(a.items.map((i) => i.stamp?.km)).toEqual([106, 101]);
+    expect(itemAt(a, 106).status).toBe('fine');
+  });
+  test('[EM-PHARMACY] healthcare=yes on a hospital is a hospital, not "not mapped as a hospital" (re-check of #140)', () => {
+    const yes = hospital({ name: 'Spital', tags: { healthcare: 'yes' } });
+    const d = itemAt(chip('pharmacy', { moment: riding(100), spots: [{ b: yes, km: 104 }] }), 104).detail!;
+    expect(d).toContain('emergency department mapped');
+    expect(d).not.toContain('not mapped as a hospital');
+  });
   test('[EM-PHARMACY] a hospital mapped access=private or no stays listed, its department said, with "check before going"; a private pharmacy or halt does not (review of #140, I3)', () => {
     const closed = hospital({ name: 'Bundeswehrkrankenhaus', tags: { healthcare: 'hospital', access: 'private' } });
     const a = chip('pharmacy', { moment: riding(100), spots: [{ b: closed, km: 104 }, { b: pharmacy(null, { name: 'Intern', tags: { access: 'private' } }), km: 102 }] });

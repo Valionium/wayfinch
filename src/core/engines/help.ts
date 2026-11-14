@@ -62,7 +62,7 @@ const specialityList = (p: Place): string[] => (p.tags['healthcare:speciality'] 
 const specialist = (p: Place): boolean => {
   const care = p.tags['healthcare']?.trim().toLowerCase();
   const list = specialityList(p);
-  return (!!care && care !== 'hospital') || (list.length > 0 && list.every((x) => NON_ACUTE.test(x)));
+  return (!!care && care !== 'hospital' && care !== 'yes') || (list.length > 0 && list.every((x) => NON_ACUTE.test(x)));
 };
 const mappedYes = (p: Place): boolean => p.tags['emergency'] === 'yes';
 const departmentYes = (p: Place): boolean => mappedYes(p) && !specialist(p);
@@ -97,7 +97,7 @@ const GROUPS: Record<HelpKind, Group[]> = {
   pharmacy: [
     { what: W.helpWordPharmacy, counts: isKind('pharmacy'), hasHours: true },
     {
-      what: W.helpWordHospital, counts: (p) => p.kind === 'hospital' && p.tags['emergency'] !== 'no', preferred: departmentYes,
+      what: W.helpWordHospital, counts: (p) => p.kind === 'hospital' && p.tags['emergency'] !== 'no', preferred: (p) => departmentYes(p) && !closedAccess(p.tags['access']),
       lines: hospitalLines,
       status: (p) => (departmentYes(p) && !closedAccess(p.tags['access']) ? 'fine' : 'unknown'),
     },
