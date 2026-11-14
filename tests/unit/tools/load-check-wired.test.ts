@@ -47,6 +47,8 @@ const KEPT = [
   'handling-first',
   // free play without Trip's route (the owner's wish 3, design of 14 Nov 2026)
   'free-play',
+  // Bike details as tiles (the owner's wish of 14 Nov 2026)
+  'bike-tiles',
 ].map((n) => `${n}.cjs`).sort();
 const RETIRED = ['tyre-pressure', 'pressure-tool-markup', 'pressure-tool', 'ui-pressure-layout'];
 
