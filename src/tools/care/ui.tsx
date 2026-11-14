@@ -105,6 +105,18 @@ function TaskItem({ task, details, onSteps, other = null }: { task: Fitted<CareT
   );
 }
 
+/** The mark Trip's Before you leave sets for What to carry (ui/trip/prep.tsx); taken once. A `wf:*` key of this tab only. */
+const CARRY_MARK = 'wf:careCarry';
+function takeCarryMark(): boolean {
+  try {
+    const asked = sessionStorage.getItem(CARRY_MARK) === '1';
+    sessionStorage.removeItem(CARRY_MARK);
+    return asked;
+  } catch {
+    return false;
+  }
+}
+
 export function CareScreen({ services }: { services: TyreServices }) {
   // The bag planner may change its bikes in another tab (a bike deleted: the chosen one falls back, sub-project 11) or while the phone was
   // elsewhere: read them again when told and when the page shows again, as Tools does.
@@ -130,7 +142,9 @@ export function CareScreen({ services }: { services: TyreServices }) {
     return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('pageshow', onShow); document.removeEventListener('visibilitychange', onVisible); };
   }, []);
 
-  const [tab, setTab] = useState<Tab>('care');
+  // Trip's Before you leave asks for What to carry (Trip prep's repair kit): a one-time mark in this tab, read once as the screen opens.
+  const [carryAsked] = useState(takeCarryMark);
+  const [tab, setTab] = useState<Tab>(carryAsked ? 'road' : 'care');
   const [query, setQuery] = useState('');
   const [part, setPart] = useState<Part | null>(null);
   const [openCard, setOpenCard] = useState<string | null>(null);
@@ -141,8 +155,9 @@ export function CareScreen({ services }: { services: TyreServices }) {
   // Closed: focus goes back to the button that opened it, in the same commit that removes the steps: a key pressed at once (Escape, then Tab) starts from the task, never from the page body.
   useLayoutEffect(() => { if (steps === null && opener.current) { opener.current.focus(); opener.current = null; } }, [steps]);
   const title = useRef<HTMLHeadingElement>(null);
-  // Opening the screen puts the focus on its title (no Back button above it any more).
-  useEffect(() => { title.current?.focus(); }, []);
+  const carryTitle = useRef<HTMLHeadingElement>(null);
+  // Opening the screen puts the focus on its title (no Back button above it any more); asked for What to carry, on that heading.
+  useEffect(() => { (carryAsked ? carryTitle : title).current?.focus(); }, []);
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ care: null, road: null });
 
   const bike = chosenBike(services);
@@ -247,7 +262,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
               <RoadItem key={c.id} card={c} details={details} onSteps={openSteps} other={usual ? null : type} />
             ))}
             <section class="care-section">
-              <h3>{C.careCarryTitle}</h3>
+              <h3 tabIndex={-1} ref={carryTitle}>{C.careCarryTitle}</h3>
               <ul class="care-carry">
                 {carryList.map((c) => (
                   <li key={c.id} data-id={c.id}>{c.name} <Tags item={c} details={details} /></li>
