@@ -843,23 +843,42 @@ test('[HF-LINE] the owner\'s sequence: a press turns the button into the way bac
   expect(errors).toEqual([]);
 });
 
-// The owner's ruling of 14 Nov 2026 (sweep #33): this load is as balanced as its bags allow, and a press only said "Already packed for
-// handling"; the button is not offered then (the line after a press is still checked in qa/handling-first.cjs, HF-KEEPS).
-test('[HF-LINE] [LC-HF-HIDE] a load already as balanced as the bags allow: the line says so, no Handling first button and no hint; with any other line the button is there', async ({ page }) => {
+// The owner's ruling of 14 Nov 2026 (sweep #33; review of PR 173, I1): on this load, as balanced as its bags allow, a press only said
+// "Already packed for handling"; once the press's own search has come back with nothing to move, the button is not offered.
+test('[HF-LINE] [LC-HF-HIDE] a load a press cannot change: the line says it is as balanced as the bags allow, and once the press\'s own search is back there is no Handling first and no hint', async ({ page }) => {
   await planner(page);
   await page.evaluate(SIX_NIGHTS + "S.bags = [{ uid:1, pos:'rack', L:20, pair:true }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'bottle', slot:'dt', L:0.75 }, { uid:4, pos:'pack', L:12 }]; S.nextUid = 5; S.decks = { bar:false, rack:true }; S.mode = 'light'; go(2); go(3); go(4)");
   if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
-  const button = page.locator('#rigHandling'), line = page.locator('#weightLine');
-  await expect(line).toHaveText('Your load is as balanced as your bags allow.', { timeout: 60_000 });
+  await expect(page.locator('#weightLine')).toHaveText('Your load is as balanced as your bags allow.', { timeout: 60_000 });
+  await page.waitForFunction('HANDLING_PROBE.key !== null && HANDLING_PROBE.nothing === true', null, { timeout: 60_000 });
+  await settled(page);
+  await expect(page.locator('#rigHandling')).toBeHidden();
+  await expect(page.locator('#handlingHint')).toBeHidden();
+  await expect(page.locator('#rigWeightMap')).toBeHidden();   // nothing to show on the map either: the plan is the best found
+});
+
+// The same load while the press's own search has not come back (the button is offered until then): the press says "Already packed for
+// handling", the button goes and the focus goes to its line (review of PR 121, R1), the map button stays; a plan changed gives it back.
+test('[HF-LINE] "Already packed for handling": the line and the map button, no button to press again', async ({ page }) => {
+  await planner(page);
+  await page.evaluate('handlingNothing = () => false');   // its own search not back yet
+  await page.evaluate(SIX_NIGHTS + "S.bags = [{ uid:1, pos:'rack', L:20, pair:true }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'bottle', slot:'dt', L:0.75 }, { uid:4, pos:'pack', L:12 }]; S.nextUid = 5; S.decks = { bar:false, rack:true }; S.mode = 'light'; go(2); go(3); go(4)");
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
+  const button = page.locator('#rigHandling');
+  await expect(button).toHaveAttribute('aria-disabled', 'false', { timeout: 60_000 });
+  // by keyboard (review of PR 121, R1): the button goes, the focus goes to the line, never to the page
+  await button.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#resultBox .hf-line')).toContainText('Already packed for handling', { timeout: 60_000 });
   await settled(page);
   await expect(button).toBeHidden();
+  await expect(page.locator('#resultBox .hf-line')).toBeFocused();
   await expect(page.locator('#handlingHint')).toBeHidden();
-  // the plan changes: the button is there exactly when the line says something else
+  await expect(page.locator('#rigWeightMap')).toBeVisible();
+  // the plan changes: the button is back
   await page.evaluate("S.bags.push({ uid:9, pos:'top', L:1, slot:'front' }); S.nextUid = 10; renderResult(); drawRig()");
-  await expect(line).not.toHaveText('Checking the balance…', { timeout: 30_000 });
-  await settled(page);
-  const best = (await line.textContent()) === 'Your load is as balanced as your bags allow.';
-  if (best) await expect(button).toBeHidden(); else await expect(button).toBeVisible();
+  await expect(button).toHaveText('Handling first', { timeout: 30_000 });
+  await expect(button).toBeVisible();
 });
 
 test('[HF-SMALL] the small view of a day ride has no Handling first button', async ({ page }) => {

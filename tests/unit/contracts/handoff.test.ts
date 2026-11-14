@@ -135,6 +135,19 @@ describe('[C-HANDOFF-UNDO] Undo and Cancel', () => {
     expect(page.run('undoHandoff()')).toBe(false); // once
   });
 
+  // review of PR 173, m3: Apply's Undo never makes a number the rider entered since into nights not entered again
+  test('[LC-NIGHTS-EMPTY] nights not entered, Apply, then a number typed: Undo keeps the rider\'s number as entered', async () => {
+    const { gpx } = await handedOff('alpine-pass', { nights: 3 });
+    const { page, json } = planner(gpx);
+    page.run('S.nights=2;S.nightsOpen=2;');   // not entered: the plan has the suggested 2
+    await page.run('receiveHandoff()');
+    expect(await page.run('applyHandoff()')).toBe(true);
+    expect(json('[S.nights,nightsOpenNow()]')).toEqual([3, false]);
+    page.run("nightsTyped('2')");
+    expect(page.run('undoHandoff()')).toBe(true);
+    expect(json('[S.nights,nightsOpenNow()]')).toEqual([2, false]);
+  });
+
   test('Undo after Apply with nothing done since restores the plan byte for byte; Cancel changes nothing but the answer', async () => {
     const { gpx } = await handedOff('alpine-pass', { nights: 1, pace: 'hard' });
     const a = planner(gpx);

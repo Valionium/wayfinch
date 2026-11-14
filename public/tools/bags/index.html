@@ -231,7 +231,9 @@ body{
 #draftBar.restored{border:0;background:none;padding:0;margin:0 0 8px;font-size:12px;color:var(--muted)}
 .handoff-more{flex:1 1 100%;font-size:13px}
 .handoff-more[hidden]{display:none}
-.handoff-more summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--ink)}
+.handoff-more summary{min-height:44px;display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.handoff-more summary::before{content:'▸';text-decoration:none}
+.handoff-more[open] summary::before{content:'▾'}
 .handoff-more p{margin:0 0 4px}
 .newplan-row{margin:12px 0 0}
 .newplan-row .linky{min-height:44px}
@@ -10023,6 +10025,32 @@ function startHandling(o = {}){
   setTimeout(() => handlingSlice(run), 0);
   return true;
 }
+/* Whether a press would move nothing ("Already packed for handling"), worked out by the press's own search on the plan as it is, in
+   slices between frames, once per plan and ticks (review of PR 173, I1: "as balanced as your bags allow" alone is no proof, since a press
+   takes smaller gains and evens pairs). Nothing is applied or stored. now: at once (the QA suites). */
+const HANDLING_PROBE = { key:null, nothing:false };
+function handlingNothing(now = false){
+  const key = JSON.stringify([idealKey(), Object.keys(S.packed || {}).filter(id => S.packed[id]).sort()]), p = HANDLING_PROBE;
+  if(p.key === key) return p.nothing;
+  p.key = key; p.nothing = false;
+  currentPlan();
+  const start = idealTrial(S.bags, {}, S.placements), fixed = handlingFixed(start), W = window.WayfinchAdvisor;
+  const trial = rememberedTrial(), fresh = pins => trial(pins, start), extra = splitThings(), pairs = shownPairs();
+  const go = n => W.handlingFirst(start, trial, fresh, { fixed, extra, maxTrials:BALANCE_TRIALS, budget:n, pairs });
+  const done = out => { p.nothing = !out.apply && !out.held; return p.nothing; };
+  if(now) return done(go(Infinity));
+  let n = 0;
+  const slice = () => {
+    if(p.key !== key) return;   // the plan changed: its own probe decides
+    if(PLAN_TRIAL || TRIAL || S.step !== 4 || DRAFT_FROZEN || HANDLING.run){ p.key = null; return; }
+    n += HANDLING_SLICE;
+    const out = go(n);
+    if(!out.done){ setTimeout(slice, 0); return; }
+    if(done(out) && S.step === 4) drawWeightMap();
+  };
+  setTimeout(slice, 0);
+  return false;
+}
 function handlingSlice(run){
   if(HANDLING.run !== run) return;
   if(PLAN_TRIAL || TRIAL || S.step !== 4 || DRAFT_FROZEN || run.key !== idealKey()){ HANDLING.run = null; return; }
@@ -10155,10 +10183,11 @@ function fillHandling(){
   const show = handlingAvailable();
   const last = handlingOnShow() ? HANDLING.last : null;
   const back = !HANDLING.run && !!last && last.kind === 'packed' && !handlingPacked(last);
-  // the load already as balanced as the bags allow, its line says so: a press could change nothing, so there is no button (the owner's
-  // ruling of 14 Nov 2026, sweep #33); the ideal is the one the line was drawn from, never a search started here
+  // the load already as balanced as the bags allow, its line says so, and a press would move nothing: no button (the owner's ruling of
+  // 14 Nov 2026, sweep #33; review of PR 173, I1); the line is the one the ideal was drawn from, and the press's own search decides
   const ready = show && !HANDLING.run && !handlingPressed() && !!window.WayfinchAdvisor.balance && !(BALANCE.run && BALANCE.run.key === idealKey());
-  const found = ready && IDEAL_CACHE.key === idealKey() ? IDEAL_CACHE.value : null, best = !!(found && found.note && found.note.best);
+  const found = ready && IDEAL_CACHE.key === idealKey() ? IDEAL_CACHE.value : null;
+  const best = !!(found && found.note && found.note.best) && handlingNothing();
   const gone = !show || best || (!HANDLING.run && !!last && !back);
   // the button going while it has the focus: the focus goes to its line, never to the page (review of PR 121, R1)
   const line = gone && document.activeElement === b ? document.querySelector('#resultBox .hf-line') || (best ? $('weightLine') : null) : null;
@@ -10777,7 +10806,9 @@ function renderNightsSuggestion(){
   const pending=routePending(),profile=pending ? null : planRoute(),P=profile?.distanceKm>0 ? profile : null;
   // nights not entered (the owner's ruling of 14 Nov 2026, sweep #32): one line says what the plan uses until the rider enters a number
   const open=nightsOpenNow(),stays=open ? '' : ' Your chosen number stays unchanged.';
-  const planned=P ? `Planned with the suggested ${plural(S.nights)} until you enter nights.` : 'Planned as a day ride until you enter nights.';
+  // a day ride whatever the reason (a 0-night suggestion, the route still measured), and the planner's limit named as such (review of PR 173, m1, m2)
+  const capped=!!P && P.suggestedNights>30 && S.nights===30;
+  const planned=S.nights === 0 || !P ? 'Planned as a day ride until you enter nights.' : capped ? `Planned with ${plural(S.nights)}, this planner’s limit, until you enter nights.` : `Planned with the suggested ${plural(S.nights)} until you enter nights.`;
   let value='—',hint='Choose both ends or upload a GPX for a suggestion.'+stays;
   if(pending){value='Calculating…';hint='The route is being measured.'+stays;}
   else if(P){
@@ -10789,9 +10820,9 @@ function renderNightsSuggestion(){
   trip?.classList.toggle('hidden',!pending && !P);
   [help,check].forEach(el=>el?.classList.toggle('hidden',!pending && !P && !open));
   if(trip)trip.innerHTML=`<span>Suggested:</span><b>${htmlEsc(value)}</b>`;
-  if(help)help.innerHTML=P ? `${open ? planned : 'Your chosen number stays unchanged.'} ${infoHelp('How suggested nights are calculated', `<p>${htmlEsc(hint)}</p>`)}` : htmlEsc(open && !pending ? planned : hint);
-  if(check)check.innerHTML=P ? `Suggested: ${htmlEsc(value)}${P.ascent == null ? ' · distance only' : ''}${P.suggestedNights>30 ? ' · above the 30-night limit' : ''} · ${open ? 'planned with them until you enter nights' : 'your choice stays'} ${infoHelp('How suggested nights are calculated',`<p>${htmlEsc(hint)}</p>`)}` :
-    pending ? `Suggested nights: calculating…${open ? '' : ' · your choice stays'}` : open ? 'Planned as a day ride until you enter nights' : 'Suggested nights: — · add a route in Ride';
+  if(help)help.innerHTML=P ? `${open ? planned : 'Your chosen number stays unchanged.'} ${infoHelp('How suggested nights are calculated', `<p>${htmlEsc(hint)}</p>`)}` : htmlEsc(open && (!pending || S.nights === 0) ? planned : hint);
+  if(check)check.innerHTML=P ? `Suggested: ${htmlEsc(value)}${P.ascent == null ? ' · distance only' : ''}${P.suggestedNights>30 ? ' · above the 30-night limit' : ''} · ${open ? (S.nights === 0 ? 'planned as a day ride until you enter nights' : capped ? `planned with ${plural(S.nights)} until you enter nights` : 'planned with them until you enter nights') : 'your choice stays'} ${infoHelp('How suggested nights are calculated',`<p>${htmlEsc(hint)}</p>`)}` :
+    pending ? `Suggested nights: calculating…${open ? (S.nights === 0 ? ' · planned as a day ride until you enter nights' : '') : ' · your choice stays'}` : open ? 'Planned as a day ride until you enter nights' : 'Suggested nights: — · add a route in Ride';
 }
 
 // Estimated daily effort, split across the number of days the rider chose.
@@ -13081,6 +13112,8 @@ function showHandoffBar(text,{apply=false,undo=false,plan=false,reuse=false,more
   WEIGHT_PROMPT_BLOCKS.handoffBar=apply;
   renderFreePlayBar();   // free play is offered only once the trip is in and planned (review of PR 146, C1)
 }
+// After a tap that hides the bar's buttons (Undo), the focus goes to its line, never to the page (review of PR 173, I3).
+function handoffLineFocus(){ const t=$('handoffText'); if(!t) return; t.setAttribute('tabindex','-1'); t.focus({preventScroll:true}); }
 // True when a handoff waits for the rider's answer.
 async function receiveHandoff(){
   const id=handoffFragmentId();
@@ -13562,6 +13595,7 @@ async function undoTripBags(){
   TRIP_BAGS.undo=null;
   if(tripWorkKey(captureDraft()) !== u.after){
     showHandoffBar('Nothing is undone: your plan has changed since it was planned for this trip, so your changes and the setups stay.');
+    handoffLineFocus();
     return false;
   }
   const was=S.bikeProfile ? S.bikeProfile.id : null;
@@ -13577,6 +13611,7 @@ async function undoTripBags(){
   showHandoffBar(`Undone: your plan is as it was${gone.length ? `, and ${gone.length === 1 ? 'the setup' : 'the setups'} made for this trip ${gone.length === 1 ? 'is' : 'are'} gone` : ''}.${
     changed.length ? ` Kept, because you changed ${changed.length === 1 ? 'it' : 'them'} since: ${changed.map(s => s.name).join(', ')}.` : ''}${
     stored ? '' : ` The change did not reach storage (it may be full), so ${gone.length === 1 ? 'that setup' : 'those setups'} may come back after a reload.`}`);
+  handoffLineFocus();
   return true;
 }
 
@@ -13595,7 +13630,9 @@ function undoHandoff(){
   const {before,after}=HANDOFF.undo,same=(a,b) => JSON.stringify(a) === JSON.stringify(b);
   currentPlan();
   const notPlacedSince=same(S.placements,after.placements);
-  for(const k of HANDOFF_TRIP_FIELDS) if(same(S[k] === undefined ? null : S[k],after.trip[k])) S[k]=before.trip[k];
+  // the nights not entered come back only with the nights Apply set: a number the rider entered since stays entered (review of PR 173, m3)
+  const nightsBack=same(S.nights,after.trip.nights);
+  for(const k of HANDOFF_TRIP_FIELDS) if((k !== 'nightsOpen' || nightsBack) && same(S[k] === undefined ? null : S[k],after.trip[k])) S[k]=before.trip[k];
   if(same({gpx:S.gpx,place:S.place,place2:S.place2},after.route)){
     cancelGPXLoad();
     S.gpx=before.route.gpx; S.place=before.route.place; S.place2=before.route.place2;
@@ -13612,6 +13649,7 @@ function undoHandoff(){
   syncGPXControl(); renderClimate(); renderBags(); renderKit(); if(S.step === 4) renderResult(); drawRig();
   HANDOFF.undo=null; queueDraftSave();
   showHandoffBar('Undone: the route and trip settings from Wayfinch are taken back. What you changed since stays.');
+  handoffLineFocus();
   return true;
 }
 function cancelHandoff(){

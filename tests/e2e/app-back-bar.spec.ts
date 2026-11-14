@@ -65,6 +65,7 @@ for (const where of PAGES) {
       await expect.poll(() => shown(bar), `${where.path} away`).toBe(0);
       // still in the page for a screen reader: not hidden, the link a link
       await expect(bar.getByRole('link', { name: where.text.slice(2) })).toHaveCount(1);
+      if (where.text === '← Back to Wayfinch') await expect(page.getByRole('link', { name: 'Back to Wayfinch' })).toHaveCount(1);   // never a second
       // a little scroll up: back at once, whole
       await wheel(page, -120);
       await expect.poll(() => shown(bar), `${where.path} back`).toBe(1);

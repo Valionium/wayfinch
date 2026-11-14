@@ -52,6 +52,12 @@ test('[LC-HAND-ATONCE] a fresh planner opened by Plan bags for this trip plans a
   await expect(page.locator('#s2')).toBeVisible();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:handoff-done')!).outcome)).toBe('applied');
   expect((await page.locator('#handoffUndo').boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // Undo by keyboard: the plan back, and the focus on the bar's line that says so, never the page (review of PR 173, I3)
+  await page.locator('#handoffUndo').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#handoffText')).toContainText('Undone');
+  await expect(page.locator('#handoffText')).toBeFocused();
+  await expect(page.locator('#handoffText')).toBeInViewport();
   expect(errors).toEqual([]);
 });
 

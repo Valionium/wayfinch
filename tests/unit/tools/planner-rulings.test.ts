@@ -83,6 +83,26 @@ describe('[LC-NIGHTS-EMPTY] a fresh planner\'s Nights out starts empty (the owne
     expect(String(node(page, 'nights').value)).toBe('');
     expect(page.run('JSON.stringify(captureDraft())')).toBe(open);
   });
+
+  // review of PR 173, m1 and m2: the line names the figure the plan uses, and every day ride of an empty field is said as one
+  test('above 30 nights the line names the planner\'s limit, never "the suggested 30"; a 0-night suggestion and a route still measured are day rides, said so', () => {
+    const page = appVM();
+    page.run("routePending=()=>false;planRoute=()=>({distanceKm:2400,suggestedNights:35,flat:25,pace:{hours:6},ascent:9000});followNights();renderNightsSuggestion();");
+    expect(json(page, '[S.nights,nightsOpenNow()]')).toEqual([30, true]);
+    const limit = words(node(page, 'nightsSuggestionHint').innerHTML);
+    expect(limit).toMatch(/^Planned with 30 nights, this planner’s limit, until you enter nights\./);
+    expect(limit).not.toMatch(/the suggested 30/);
+    expect(words(node(page, 'nightsSuggestion').innerHTML)).toBe('Suggested: 35 nights');
+    const zero = appVM();
+    zero.run("routePending=()=>false;planRoute=()=>({distanceKm:30,suggestedNights:0,flat:25,pace:{hours:6},ascent:200});followNights();renderNightsSuggestion();");
+    expect(json(zero, '[S.nights,nightsOpenNow()]')).toEqual([0, true]);
+    expect(words(node(zero, 'nightsSuggestionHint').innerHTML)).toMatch(/^Planned as a day ride until you enter nights\./);
+    expect(words(node(zero, 'checkNightsSuggestion').innerHTML)).toMatch(/^Suggested: 0 nights · planned as a day ride until you enter nights/);
+    const measuring = appVM();
+    measuring.run("S.place={lat:49.4,lon:8.7,name:'A'};S.place2={lat:49.3,lon:8.4,name:'B'};routePending=()=>true;followNights();renderNightsSuggestion();");
+    expect(json(measuring, '[S.nights,nightsOpenNow()]')).toEqual([0, true]);
+    expect(words(node(measuring, 'nightsSuggestionHint').innerHTML)).toBe('Planned as a day ride until you enter nights.');
+  });
 });
 
 describe('[LC-WT-NOPOP] the bike\'s maximum-weight box never opens by itself (the owner\'s ruling of 14 Nov 2026, sweep #34)', () => {
@@ -100,7 +120,7 @@ describe('[LC-WT-NOPOP] the bike\'s maximum-weight box never opens by itself (th
   });
 });
 
-describe('[LC-HF-HIDE] Handling first is not offered when the load is as balanced as the bags allow (the owner\'s ruling of 14 Nov 2026, sweep #33)', () => {
+describe('[LC-HF-HIDE] Handling first is not offered when it can change nothing (the owner\'s ruling of 14 Nov 2026, sweep #33)', () => {
   const KIT0 = JSON.stringify(Object.fromEntries(['tent', 'quilt', 'pad', 'stove', 'pot', 'lock', 'tool', 'pump', 'bank', 'puffy', 'rain', 'firstaid', 'wash', 'camp', 'tubes', 'phone'].map((k) => [k, true])));
   const SETS = [
     [{ uid: 1, pos: 'seat', L: 14 }, { uid: 2, pos: 'bar', L: 13 }, { uid: 3, pos: 'frame', L: 4.5 }, { uid: 4, pos: 'top', L: 1, slot: 'front' }, { uid: 5, pos: 'fork', L: 3, pair: true }],
@@ -108,24 +128,36 @@ describe('[LC-HF-HIDE] Handling first is not offered when the load is as balance
     [{ uid: 1, pos: 'seat', L: 14 }, { uid: 2, pos: 'bar', L: 9 }, { uid: 3, pos: 'frame', L: 6 }],
     [{ uid: 1, pos: 'rack', L: 20, pair: true }, { uid: 2, pos: 'bar', L: 9 }, { uid: 3, pos: 'bottle', slot: 'dt', L: 0.75 }, { uid: 4, pos: 'pack', L: 12 }],
   ];
-  test('the button and its hint go exactly while the weight map\'s line says "Your load is as balanced as your bags allow."; otherwise it is there', () => {
+  // review of PR 173, I1: the line is no proof; a press of Handling first takes smaller gains and evens pairs, so the button goes only when
+  // its own search, the one a press runs, finds nothing to move
+  test('the button and its hint go only while the line says "Your load is as balanced as your bags allow." and a press would move nothing ("Already packed"); a plan a press still packs keeps them', () => {
     const page = appVM();
     page.run('DRAFT_READY=true');
-    const seen = new Set<boolean>();
-    for (const balanced of [true, false]) for (const nights of [0, 6]) for (const bags of SETS) {
+    const seen = new Set<string>();
+    for (const balanced of [true, false]) for (const nights of [0, 2, 6]) for (const bags of SETS) {
+      const label = `${nights} nights, ${bags.length} bags${balanced ? ', balanced' : ''}`;
       page.run(`(()=>{S.kit=${KIT0};S.nights=${nights};S.foodMode=2;S.mode='comfort';SMALL_VIEW=false;
         S.bikeProfile=normaliseBikeProfile({id:'qa_hf',fit:{style:'diamond-sloping',size:{kind:'letter',value:'M'}},look:{bars:'drop'}});
         S.bags=${JSON.stringify(bags)}.map(b=>({...b}));S.nextUid=9;S.decks={bar:false,rack:${bags.some((b) => b.pos === 'rack')}};S.pinned={};S.packed={};S.placements=null;
         resetBalance();TRIAL=null;DRAFT_FROZEN=false;S.step=4;currentPlan();${balanced ? 'autoBalancePlan();' : ''}})()`);
       const note = json<{ text: string; best?: boolean } | null>(page, 'weightMapIdeal(true).note');
       const best = note?.text === 'Your load is as balanced as your bags allow.';
-      expect(!!note?.best, `${nights} nights, ${bags.length} bags`).toBe(best);
+      expect(!!note?.best, label).toBe(best);
+      const nothing = json<boolean>(page, 'handlingNothing(true)');   // the press's own search, at once (the page runs it in slices)
       page.run('fillHandling()');
-      expect(node(page, 'rigHandling').hidden, `${nights} nights, ${bags.length} bags: the button`).toBe(best);
-      if (best) expect(node(page, 'handlingHint').hidden, `${nights} nights, ${bags.length} bags: its hint`).toBe(true);
-      seen.add(best);
+      const hidden = node(page, 'rigHandling').hidden === true;
+      expect(hidden, `${label}: the button`).toBe(best && nothing);
+      if (hidden) expect(node(page, 'handlingHint').hidden, `${label}: its hint`).toBe(true);
+      // and the press agrees: where the button is gone it packs nothing; where the line says balanced but it is there, a press packs
+      const packed = json<boolean>(page, 'startHandling({now:true})'), kind = json<string | null>(page, 'HANDLING.last && HANDLING.last.kind');
+      if (hidden) expect([packed, kind], label).toEqual([false, 'already']);
+      if (best && !hidden) expect(packed, `${label}: a press packs`).toBe(true);
+      seen.add(`${best}:${hidden}`);
     }
-    expect([...seen].sort()).toEqual([false, true]);   // both kinds of plan were checked
+    // the reviewer's plans (6 nights, seat 14 + bar 9 + frame 6, balanced; the touring set): "as balanced", yet a press packs, so the button stays
+    expect(seen.has('true:false')).toBe(true);
+    expect(seen.has('true:true')).toBe(true);
+    expect(seen.has('false:false')).toBe(true);
   }, 120_000);
 });
 
