@@ -1,6 +1,7 @@
 // The OpenStreetMap credit (spec section 10): wherever OpenStreetMap data, routes or search results show, with a link to the
 // copyright page and, when the data has one, its date. Visible without a tap.
 import { W } from '../../core/wording/en.ts';
+import { TR } from '../../core/wording/en-trip.ts';
 import { TF } from '../../core/wording/en-trip-fields.ts';
 
 export const OSM_COPYRIGHT = 'https://www.openstreetmap.org/copyright';
@@ -19,7 +20,7 @@ export const GEONAMES = 'https://www.geonames.org/';
 export function GeoNamesCredit() {
   return (
     <p class="muted">
-      {W.appTripOsmSearch}<a href={GEONAMES} target="_blank" rel="noopener noreferrer">{TF.appTripGeoNamesLink}</a>{TF.appTripGeoNamesLicence}.
+      {TR.appTripOsmSearch}<a href={GEONAMES} target="_blank" rel="noopener noreferrer">{TF.appTripGeoNamesLink}</a>{TF.appTripGeoNamesLicence}.
     </p>
   );
 }

@@ -14,6 +14,10 @@ import { addPosition, backToToday, confirmWater, keptPositions, readPlanTomorrow
 import { readSettings, writeSettings } from '../../../src/store/settings.ts';
 import { readTrip, replaceRoute, saveTrip } from '../../../src/store/trip.ts';
 import { at, pos, sun, testTrip, zonesOf } from '../../fixtures/build.ts';
+import { zonesOrDevice } from '../../../src/store/rules.ts';
+
+/** Zones read as none: the phone's own zone stands in, as before Prepare this route (sweep of 14 Nov 2026, #1; was []). */
+const NO_ZONES = zonesOrDevice([]);
 
 beforeEach(freshStore);
 afterEach(() => { vi.restoreAllMocks(); });
@@ -118,13 +122,13 @@ describe('finding 2: damaged records', () => {
       const db = await openDb();
       await db.put('meta', bad, ZONES_META);
       expect(await addPosition(good, NOW, ID), JSON.stringify(bad)).toEqual({ kept: true });
-      expect((await works()).routeZones, JSON.stringify(bad)).toEqual([]);
+      expect((await works()).routeZones, JSON.stringify(bad)).toEqual(NO_ZONES);
       expect(await keepAfterScreen(ride({ day: '2026-10-18', km: 3 }), NOW, ID)).toBeUndefined();
     }
     freshStore();
     await onTrip();
     await (await openDb()).put('meta', [span, { ...span, timeZone: 'Not/AZone' }], ZONES_META);
-    expect((await works()).routeZones).toEqual([]);
+    expect((await works()).routeZones).toEqual(NO_ZONES);
   });
 
   test('[ST-KEEP-DAYSTART] the other damaged small records read as none; the good ones stay', async () => {
@@ -544,16 +548,16 @@ describe('re-check R2: zones', () => {
     await db.put('meta', [{ ...span, toKm: Infinity }], ZONES_META);
     expect((await readInputs(NOW))!.routeZones).toEqual([{ ...span, toKm: Infinity }]);
     await db.put('meta', [{ ...span, toKm: Number.NaN }], ZONES_META);
-    expect((await readInputs(NOW))!.routeZones).toEqual([]);
+    expect((await readInputs(NOW))!.routeZones).toEqual(NO_ZONES);
     await db.put('meta', [{ ...span, fromKm: -Infinity }], ZONES_META);
-    expect((await readInputs(NOW))!.routeZones).toEqual([]);
+    expect((await readInputs(NOW))!.routeZones).toEqual(NO_ZONES);
   });
 
   test('[ST-RETENTION] a damaged start span never moves the start zone to the next span', async () => {
     await onTrip();
     const tokyo = { fromKm: 100, toKm: 300, timeZone: 'Asia/Tokyo', holidayZone: null, country: 'JP' };
     await (await openDb()).put('meta', [{ ...span, toKm: 100, timeZone: 'Not/AZone' }, tokyo], ZONES_META);
-    expect((await readInputs(NOW))!.routeZones).toEqual([]);
+    expect((await readInputs(NOW))!.routeZones).toEqual(NO_ZONES);
   });
 });
 

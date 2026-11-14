@@ -146,6 +146,16 @@ const goodZone = (z: unknown): z is ZoneSpan => isRecord(z) && finite(z.fromKm) 
 /** All or none: without one span the next would quietly become the zone of that stretch, or of the riding date. The route then reads as not prepared. */
 export const usableZones = (raw: unknown): ZoneSpan[] => (Array.isArray(raw) && raw.every(goodZone) ? raw : []);
 
+/** The phone's own zone. */
+export const deviceZone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+/**
+ * The zones times and dates are told in: the stored ones, or until Prepare this route has found them the phone's own, as the
+ * departure date was set (sweep of 14 Nov 2026, #1), never UTC. Nothing is dropped by date on it: keptPositions reads the stored ones.
+ */
+export const zonesOrDevice = (spans: ZoneSpan[]): ZoneSpan[] => (spans.length > 0 ? spans
+  : [{ fromKm: 0, toKm: Infinity, timeZone: deviceZone(), holidayZone: null, country: '' }]);
+
 export const usableSavedKm = (raw: unknown): ScreenInputs['savedKm'] => (Array.isArray(raw)
   ? raw.filter((s): s is ScreenInputs['savedKm'][number] => isRecord(s) && finite(s.fromKm) && finite(s.toKm))
   : []);
