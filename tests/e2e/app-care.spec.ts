@@ -144,8 +144,9 @@ test('[BC-SCREEN] Tab reaches every tab, filter, task and link; each task opens 
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  // focus goes back to the task once the screen has settled; a focus moved before that would be taken from it
-  await expect(task(page, ids[1]!).locator('.care-open')).toBeFocused();
+  // Tab at once after Escape moves on from the task just closed: the focus was already back on it
+  await page.keyboard.press('Tab');
+  expect(await page.evaluate(() => (document.activeElement?.closest('.care-task') as HTMLElement | null)?.dataset.id)).toBe(ids[2]);
   // the arrow keys move between the tabs
   await page.getByRole('tab', { name: 'Care' }).focus();
   await page.keyboard.press('ArrowRight');
