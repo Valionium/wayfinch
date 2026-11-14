@@ -269,6 +269,9 @@ test('[FIT-LINE] a bike saved in Bike details and removed there again: the line 
   await page.locator('#bikeRemoveConfirm').click();
   await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles') ?? '[]') as unknown[]).length)).toBe(0);
   await expect(line).toBeVisible();
+  // Escape in the open Saved bikes tile goes back to the tiles (the owner, 14 Nov 2026); the next one closes the dialog
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#bikeLibraryPanel')).toBeHidden();
   await page.keyboard.press('Escape');
   await expect(page.locator('#bikeDetailsBox')).toBeHidden();
   await expect(add).toBeFocused();

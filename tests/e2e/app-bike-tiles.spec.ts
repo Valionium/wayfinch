@@ -107,6 +107,15 @@ test('[BK-TILES-OPEN] the tiles open one group at a time, its fields only, the f
   await expect(tile(page, 'Saved bikes')).toHaveAttribute('aria-expanded', 'true');
   await expect(tile(page, 'Weights')).toBeHidden();
   await expect(page.locator('#bikeName')).toBeVisible();
+  // a tile tapped and, before its toggle event comes, a group opened by code: the later one stays open, alone (CI of abfa861)
+  await page.locator('#bikeLibraryPanel .bd-back').click();
+  await page.evaluate(() => {
+    (document.querySelector('#bikeTiles .bd-tile[aria-controls="bikeLookGroup"]') as HTMLButtonElement).click();
+    (document.getElementById('bikeLibraryPanel') as HTMLDetailsElement).open = true;
+  });
+  await expect(page.locator('#bikeName')).toBeVisible();
+  await expect(page.locator('details.bd-group[open]')).toHaveCount(1);
+  await expect(tile(page, 'Saved bikes')).toHaveAttribute('aria-expanded', 'true');
   expect(errors).toEqual([]);
 });
 

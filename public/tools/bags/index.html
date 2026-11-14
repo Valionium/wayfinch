@@ -3310,15 +3310,17 @@ function renderBikeTiles(){
   }
   $('bikeTiles').classList.toggle('bd-one-open',tiles.some(tile=>tile.getAttribute('aria-expanded')==='true'));
 }
+let BIKE_TILE_LAST='';   // the group a tile opened last: its own toggle event, which comes later, then closes nothing opened since
 function openBikeTile(panel,focus=true){
   document.querySelectorAll('details.bd-group').forEach(group=>{if(group.id!==panel && group.open)group.open=false;});
-  $(panel).open=true;renderBikeTiles();
+  BIKE_TILE_LAST=panel;$(panel).open=true;renderBikeTiles();
   if(focus){
     const first=[...$(panel).querySelectorAll('input,select,textarea,button')].find(el=>el.getClientRects().length>0 && !el.disabled);
     first?.focus();
   }
 }
 function closeBikeTile(panel){
+  if(BIKE_TILE_LAST===panel)BIKE_TILE_LAST='';
   $(panel).open=false;renderBikeTiles();
   document.querySelector(`#bikeTiles .bd-tile[aria-controls="${panel}"]`)?.focus();
 }
@@ -3331,7 +3333,9 @@ function initialiseBikeTiles(){
   const panel=$('bikeProfilePanel');   // the grid, Quick start, Look and the details
   panel.addEventListener('click',event=>{const back=event.target.closest?.('.bd-back');if(back)closeBikeTile(back.dataset.panel);});
   document.querySelectorAll('details.bd-group').forEach(group=>group.addEventListener('toggle',()=>{
-    if(group.open)document.querySelectorAll('details.bd-group').forEach(other=>{if(other!==group && other.open)other.open=false;});
+    // a group the page's own code opened (`.open=true`) closes the others; one a tile opened has done so already
+    if(group.open && group.id!==BIKE_TILE_LAST){BIKE_TILE_LAST=group.id;document.querySelectorAll('details.bd-group').forEach(other=>{if(other!==group && other.open)other.open=false;});}
+    else if(!group.open && group.id===BIKE_TILE_LAST)BIKE_TILE_LAST='';
     // Look lays out its drawing by measuring it, which a closed group cannot: it draws again once open
     if(group.open && group.id==='bikeLookGroup')renderLook();
     renderBikeTiles();
