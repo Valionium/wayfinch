@@ -1,4 +1,5 @@
 import { defineConfig } from '@playwright/test';
+import type { Project } from '@playwright/test';
 
 // Chromium for the handover tests (sub-project 4), and the app's own projects below (sub-project 5).
 // No retries: a flaky handover is a finding, not noise. List reporter only, and no page dumps in the log (the page isn't printed).
@@ -20,6 +21,7 @@ const KEEP_FAILED = process.env.CI ? { trace: { mode: 'retain-on-failure', snaps
 // AH-CALL-CONFIRM, AH-NO-AUTO-POS, PRIV-NOTHING-SENT; never on a laptop). The other parts set WAYFINCH_PHONE_APART and leave them out.
 const PHONE = ['app-phone', 'app-phone-light'];
 const phoneApart = process.env.WAYFINCH_PHONE_APART === '1';
+const apart = (projects: Project[]): Project[] => projects.filter((p) => !(phoneApart && PHONE.includes(p.name ?? '')));
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -36,7 +38,7 @@ export default defineConfig({
     trace: 'off',
     video: 'off',
   },
-  projects: [
+  projects: apart([
     { name: 'chromium-phone', testIgnore: APP_SPECS, use: { viewport: { width: 360, height: 640 } } },
     { name: 'chromium-laptop', testIgnore: APP_SPECS, use: { viewport: { width: 1280, height: 720 } } },
     // The app: the phone stand-in (360 x 640, the processor slowed to a quarter, §4.5), a laptop, each in both themes.
@@ -54,5 +56,5 @@ export default defineConfig({
     ...(process.env.WAYFINCH_WEBKIT
       ? [{ name: 'app-webkit-smoke', testMatch: /app-smoke\.spec\.ts/, use: { browserName: 'webkit' as const, viewport: { width: 390, height: 844 } } }]
       : []),
-  ].filter((p) => !(phoneApart && PHONE.includes(p.name))),
+  ]),
 });
