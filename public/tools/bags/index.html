@@ -1663,16 +1663,13 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .look-swatch:has(input:focus-visible),.look-chip:has(input:focus-visible),.look-chip:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .look-dot{flex:none;width:22px;height:22px;border-radius:50%;border:1px solid var(--muted)}
 .look-dot.none{background:transparent;border-style:dashed}
-.look-picker input[type=color]{flex:none;width:24px;height:24px;padding:0;border:1px solid var(--muted);border-radius:50%;background:none;cursor:pointer;-webkit-appearance:none;appearance:none;overflow:hidden}
-.look-picker input[type=color]::-webkit-color-swatch-wrapper{padding:0}
-.look-picker input[type=color]::-webkit-color-swatch{border:none;border-radius:50%}
-.look-picker input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
+/* More colours (wish 4, 14 Nov 2026): our own grid, in colours.js; the chip's dot shows every colour until the bike has one of the grid's */
+.look-picker .look-dot{background:conic-gradient(#c62f2a,#e46b1f,#f1c232,#2f7d4f,#1f7f80,#2563b8,#6b3fa0,#d6619b,#c62f2a)}
 .look-status{margin:4px 0;font-size:13px;color:var(--muted);min-height:1.2em}
 #lookUndo{min-height:44px}
 .look-chip.hidden,.bike-look.hidden,#lookUndo.hidden,#bikeDetailsBack.hidden,#bikeSwapUndo.hidden,.bike-swap.hidden{display:none}
 .bike-swap{margin:6px 0;font-size:14px}
 #bikeSwapUndo{min-height:44px}
-#bikeLook .look-picker input[type=color]{min-height:24px;min-width:24px;height:24px}
 /* Look's extras (owner's wish, 5 Nov 2026): frame pattern, its colours, the fork, rim depth. Built by renderLookChoices from bike.js. */
 .lx-swatch,.lx-chip{position:relative;display:flex;align-items:center;gap:8px;min-height:44px;min-width:44px;padding:0 10px;box-sizing:border-box;
   border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:14px;background:transparent;color:inherit;font-family:inherit}
@@ -2296,9 +2293,10 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         <fieldset><legend id="lookColourTitle">Colour</legend>
           <div class="look-swatches" id="lookSwatches" role="radiogroup" aria-labelledby="lookColourTitle"></div>
           <div class="look-more">
-            <label class="look-chip look-picker" id="lookPickerChip" for="lookPicker"><input type="color" id="lookPicker" value="#2563b8"><span id="lookPickerText"></span></label>
+            <button type="button" class="look-chip look-picker" id="lookPickerChip" aria-expanded="false" aria-controls="lookColoursBox"><span class="look-dot" id="lookPickerDot"></span><span id="lookPickerText"></span></button>
             <button type="button" class="look-chip hidden" id="lookPhoto" aria-controls="lookPhotoBox"></button>
           </div>
+          <div id="lookColoursBox"></div>
           <div id="lookPhotoBox"></div>
         </fieldset>
         <fieldset id="lookPatternSet"><legend id="lookPatternTitle">Frame pattern</legend>
@@ -3186,6 +3184,9 @@ const BIKE_WORDING={
   lookNone:{text:'None'},
   lookNotSet:{text:'Not set'},
   lookMore:{text:'More colours'},
+  coloursDone:{text:'Done'},
+  coloursOwn:{text:'Your own colour, close to {name}'},
+  coloursFailed:{text:'More colours could not be opened. Reload the page and try again.'},
   lookPhoto:{text:'From a photo'},
   lookUndo:{text:'Undo'},
   lookUndone:{text:'Back to how it looked.'},
@@ -3857,9 +3858,10 @@ function renderLook(){
   syncLookExtras(look);
   renderForkZoom(bike,art);
   $('lookPickerChip').classList.toggle('on',!!look.colour && !swatch);
-  if(look.colour && document.activeElement!==$('lookPicker'))$('lookPicker').value=look.colour;
+  $('lookPickerDot').style.background=look.colour && !swatch ? look.colour : '';
+  if(LOOK_COLOURS)LOOK_COLOURS.show(look.colour);
   const ready=typeof DRAFT_READY!=='undefined' && DRAFT_READY;
-  if(LOOK_READY!==ready){LOOK_READY=ready;document.querySelectorAll?.('#bikeLook input').forEach(i=>{i.disabled=!ready;});}
+  if(LOOK_READY!==ready){LOOK_READY=ready;document.querySelectorAll?.('#bikeLook input').forEach(i=>{i.disabled=!ready;});$('lookPickerChip').disabled=!ready;}
   const swap=liveBikeSwap();
   $('lookUndo').classList.toggle('hidden',!LOOK_CHANGED && !(swap && BIKE_PROFILE_EDITOR_ID===swap.newId));
   $('lookStatus').textContent=LOOK_MESSAGE;
@@ -3985,15 +3987,17 @@ function undoLook(){
   writeLook(LOOK_OPENING.look);LOOK_CHANGED=false;LOOK_MESSAGE=bikeWord('lookUndone');renderLook();
   $('lookUndo').classList.add('hidden');$('bikeLookTitle').focus({preventScroll:true});
 }
-// The phone's own picker paints while it moves and stores once it settles; closing the dialog stores what is left.
-function lookPickerInput(){
-  setLook({colour:String($('lookPicker').value).toLowerCase()},false);
+// More colours' arrow moves paint at once and store once they settle; a tap, closing the grid or the dialog stores what is left.
+let LOOK_PICKER_HEX=null;
+function lookPickerInput(hex){
+  LOOK_PICKER_HEX=String(hex).toLowerCase();
+  setLook({colour:LOOK_PICKER_HEX},false);
   clearTimeout(LOOK_PICKER_TIMER);LOOK_PICKER_TIMER=setTimeout(flushLookPicker,400);
 }
 function flushLookPicker(){
   if(LOOK_PICKER_TIMER===null)return;
   clearTimeout(LOOK_PICKER_TIMER);LOOK_PICKER_TIMER=null;
-  setLook({colour:String($('lookPicker').value).toLowerCase()});
+  setLook({colour:LOOK_PICKER_HEX});
 }
 // A control taken by keyboard shows its whole focus ring (4 px around it, or around its label) between the bike's panel, which stays
 // in view above Look, and the dialog's lower edge. The browser brings the control itself into view, not the ring, and not past the
@@ -4023,8 +4027,7 @@ function initialiseLook(){
   $('lookBars').addEventListener('change',e=>{if(e.target.name==='lookBars')setLook({bars:e.target.value || null});});
   $('lookEbike').addEventListener('change',e=>{if(e.target.name==='lookEbike')setLook({ebike:e.target.value==='' ? null : e.target.value==='true'});});
   $('lookMotor').addEventListener('change',e=>{if(e.target.name==='lookMotor')setLook({motor:e.target.value || null});});
-  $('lookPicker').addEventListener('input',lookPickerInput);
-  $('lookPicker').addEventListener('change',flushLookPicker);
+  $('lookPickerChip').onclick=toggleLookColours;
   $('lookUndo').onclick=undoLook;
   $('lookPhoto').onclick=openLookPhoto;
   initialiseLookExtras();
@@ -4033,6 +4036,40 @@ function initialiseLook(){
   $('bikeSavedSelect').addEventListener('change',()=>{rememberLookOpening();renderLook();});
   $('bikeSwapUndo').onclick=()=>{undoBikeSwap();$('bikeDetailsTitle').focus({preventScroll:true});};
   renderLook();
+}
+
+/* ---- More colours (wish 4, design of 14 Nov 2026): our own grid of 65 named colours in place of the browser's colour input,
+   /tools/bags/colours.js, loaded on the first tap and precached with the page. A tap keeps the colour as a swatch tap does. ---- */
+let LOOK_COLOURS=null,LOOK_COLOURS_SCRIPT=null;
+function loadColours(){
+  if(window.WayfinchColours)return Promise.resolve(window.WayfinchColours);
+  if(!LOOK_COLOURS_SCRIPT)LOOK_COLOURS_SCRIPT=new Promise((resolve,reject)=>{
+    const script=document.createElement('script');script.src='colours.js';
+    script.onload=()=>window.WayfinchColours ? resolve(window.WayfinchColours) : reject(Error('no picker'));
+    script.onerror=()=>{LOOK_COLOURS_SCRIPT=null;script.remove();reject(Error('not loaded'));};
+    document.head.appendChild(script);
+  });
+  return LOOK_COLOURS_SCRIPT;
+}
+async function toggleLookColours(){
+  if(LOOK_COLOURS){closeLookColours(true);return;}
+  let module;
+  try{module=await loadColours();}catch(e){LOOK_MESSAGE=bikeWord('coloursFailed');renderLook();return;}
+  if(LOOK_COLOURS || $('bikeDetailsBox').classList.contains('hidden'))return;
+  if(LOOK_PHOTO){closeLookPhoto();renderLook();}
+  LOOK_COLOURS=module.openColours($('lookColoursBox'),{
+    words:{title:bikeWord('lookMore'),done:bikeWord('coloursDone'),own:name=>bikeWord('coloursOwn',{name})},
+    current:(currentLook()||{colour:null}).colour,
+    onPick:(hex,settle)=>{if(!settle){lookPickerInput(hex);return;}clearTimeout(LOOK_PICKER_TIMER);LOOK_PICKER_TIMER=null;setLook({colour:String(hex).toLowerCase()});},
+    onClose:()=>closeLookColours(true)});
+  $('lookPickerChip').setAttribute('aria-expanded','true');
+  LOOK_COLOURS.focus();
+}
+function closeLookColours(toChip){
+  const picker=LOOK_COLOURS;if(!picker)return;
+  LOOK_COLOURS=null;flushLookPicker();picker.close();
+  $('lookPickerChip').setAttribute('aria-expanded','false');
+  if(toChip)$('lookPickerChip').focus({preventScroll:true});
 }
 
 /* ---- From a photo (spec 7.4, section 10): /tools/bags/bike-photo.js, loaded on the first tap and precached with the page. The photo
@@ -4053,6 +4090,7 @@ async function openLookPhoto(){
   let module;
   try{module=await loadBikePhoto();}catch(e){LOOK_MESSAGE=bikeWord('photoFailed');renderLook();return;}
   if(LOOK_PHOTO || $('bikeDetailsBox').classList.contains('hidden'))return;
+  closeLookColours(false);
   const words={choose:bikeWord('photoChoose'),tap:bikeWord('photoTap'),use:bikeWord('photoUse'),again:bikeWord('photoAgain'),
     close:bikeWord('photoClose'),loupe:bikeWord('photoLoupe'),failed:bikeWord('photoFailed')};
   const note=document.createElement('p');note.className='photo-note';note.textContent=bikeWord('photoNote');
@@ -4179,7 +4217,7 @@ function closeBikeDetailsSoftly(){
 function closeBikeDetails(){
   const root=$('bikeDetailsBox');if(root.classList.contains('hidden'))return;
   const back=LINK_BIKE ? $('bikeDetailsBack').href : null;
-  closeLookPhoto();flushLookPicker();if(LOOK_RIM_TIMER!==null)flushLookRim();
+  closeLookPhoto();closeLookColours(false);flushLookPicker();if(LOOK_RIM_TIMER!==null)flushLookRim();
   LOOK_CHANGED=false;LOOK_MESSAGE='';LINK_BIKE=false;$('lookUndo').classList.add('hidden');$('bikeDetailsBack').classList.add('hidden');
   LINK_ADDS=false;
   root.classList.add('hidden');endDialog(root);
