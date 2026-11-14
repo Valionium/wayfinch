@@ -713,8 +713,6 @@ export const W = {
 
   // ---- Trip (sub-project 5, group 5): add a route, the summary, settings, Prepare this route, A to B. No word here calls a trip ready, safe or complete. ----
   appTripUnnamed: 'Unnamed route',
-  appTripFileFailed: "That file could not be read. Nothing was changed.",
-  appTripUnchanged: 'Your current route is unchanged.',
   appTripReplaceYes: 'Replace route',
   appTripReplaceCancel: 'Cancel',
   appTripDistance: (km: string): string => `${km} km`,
