@@ -97,6 +97,28 @@ test('[BC-STEP-WORDS] a hydraulic brake step names the bike\'s fluid and says ne
   expect(spongy.steps.map((_, i) => textOf(spongy.id, i, unsure))).toEqual(spongy.steps);
 });
 
+// The owner's ruling of 14 November 2026: with the brake fluid Not sure, the bleed's step that names Shimano's mineral oil and SRAM's DOT
+// fluid also says Magura uses mineral oil (Magura's hydraulic disc and rim brakes alike: Royal Blood). A told fluid's words stay as they were.
+test("[BC-BLEED-MAGURA] the brake fluid Not sure (or no bike): the bleed's step naming Shimano's and SRAM's fluids also says Magura uses mineral oil; a told fluid's step as before", () => {
+  const bleed = CARE_TASKS.find((t) => t.id === 'brakes-hydraulic-bleed')!;
+  const step = bleed.steps.findIndex((s) => /Shimano/.test(s) && /SRAM/.test(s));
+  expect(step).toBe(1);
+  for (const b of [null, bike({}), bike({ brakes: 'hydraulic-disc' }), bike({ brakes: 'rim', rimBrake: 'hydraulic' })]) {
+    expect(textOf(bleed.id, step, b), JSON.stringify(b?.brakes ?? null)).toBe('Shimano uses mineral oil, SRAM uses DOT fluid, Magura uses mineral oil too; never mix.');
+  }
+  // every step of a card or task that names Shimano's and SRAM's fluids as the content has it says Magura's too
+  for (const it of [...CARE_TASKS, ...ROAD_CARDS]) {
+    for (const s of it.steps) if (/Shimano/.test(s) && /SRAM/.test(s) && /mineral oil/.test(s)) expect(s, it.id).toMatch(/Magura uses mineral oil/);
+  }
+  // a told fluid: the bike's own fluid and the maker cross-check, word for word as before the ruling
+  const told = {
+    mineral: "Your bike's details say mineral oil: use only mineral oil, never DOT fluid. Shimano usually uses mineral oil, SRAM usually DOT fluid: if that does not match your brakes, check the lever or caliper.",
+    dot: "Your bike's details say DOT fluid: use only DOT fluid, never mineral oil. Shimano usually uses mineral oil, SRAM usually DOT fluid: if that does not match your brakes, check the lever or caliper.",
+  } as const;
+  for (const fluid of ['mineral', 'dot'] as const) expect(textOf(bleed.id, step, bike({ brakes: 'hydraulic-disc', brakeFluid: fluid }))).toBe(told[fluid]);
+  expect(bannedHits(bleed.steps[step]!, false)).toEqual([]);
+});
+
 test('[BC-STEP-WORDS] electronic gears get the shifting battery instead of the cable\'s barrel adjuster, cable gears the barrel only; not told, both', () => {
   const card = ROAD_CARDS.find((c) => c.id === 'gears-skipping')!;
   const step = card.steps.findIndex((s) => /barrel adjuster/.test(s));
