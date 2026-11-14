@@ -6,7 +6,7 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterAll, afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { idsOf, STEP_PICTURES } from '../../../../src/core/care/pictures.ts';
-import { KIND_WORDS, stepTitlesFrom, SWITCH_WORDS, type PictureWords } from '../../../../src/core/wording/en-care-pictures.ts';
+import { IF_WORDS, KIND_WORDS, stepTitlesFrom, SWITCH_WORDS, type PictureWords } from '../../../../src/core/wording/en-care-pictures.ts';
 import CARE_WORDS from '../../../../src/core/wording/en-care-pictures.json';
 import { C, CARE_TASKS, CARRY, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
 import { PART_SHORT } from '../../../../src/core/wording/en-part-names.ts';
@@ -365,12 +365,16 @@ const rimBike = (bars: string | null, rimBrake?: string) => memory({
   'loadcheck:bikeProfiles': JSON.stringify([{ id: 'bike_a', name: 'Mine', brakes: 'rim', ...(rimBrake ? { rimBrake } : {}), ...(bars ? { look: { colour: null, bars, ebike: false } } : {}) }]),
   'loadcheck:bikeProfile': JSON.stringify({ id: 'bike_a', name: 'Mine' }),
 }).kv;
-/** Brake rubbing, step 5 ("Open the brake's quick release"), for the bike in `kv`. */
+/**
+ * Brake rubbing's step "Open the brake's quick release", for the bike in `kv`: step 5 when the kind of rim brake is told, step 6 when not
+ * (both centring lines show then, the hydraulic rim brake's own since the owner's ruling of 14 November 2026, BC-HYDRO-RIM-CENTRE).
+ */
 async function brakeStep5(kv: KeyValueStore): Promise<void> {
   act(() => { render(null, host); });
   await mount(kv);
   await openCard('brake-rub-rim');
   for (let i = 0; i < 5; i += 1) await click(button(C.careStepsNext)!);
+  if (!dialog()!.querySelector('.care-step-t')!.textContent!.startsWith('Rim bent')) await click(button(C.careStepsNext)!);
 }
 const imgNames = () => [...dialog()!.querySelectorAll('.care-step [role="img"]')].map((i) => i.getAttribute('aria-label'));
 
@@ -543,7 +547,8 @@ const where = () => [...dialog()!.querySelectorAll<HTMLButtonElement>('.care-whe
 test("[PG-SHEET-OPEN] a part's name in a step is a button that reads as the text; a tap opens the bike view over the step with that part's entry, focus on the view's title; Close returns focus to the name, the step view stays", async () => {
   const push = vi.spyOn(history, 'pushState');
   await brakeStep5(rimBike('drop'));
-  const step = card('brake-rub-rim').steps[4]!;
+  // with the kind of rim brake not told both centring lines show, so the quick release is the sixth step (BC-HYDRO-RIM-CENTRE)
+  const step = card('brake-rub-rim').steps[5]!;
   expect(dialog()!.querySelector('.care-step-t')!.textContent).toBe(step);
   const link = partLink("brake's quick release")!;
   expect(link.tagName).toBe('BUTTON');
@@ -565,7 +570,7 @@ test("[PG-SHEET-OPEN] a part's name in a step is a button that reads as the text
   expect(sheet()).toBeNull();
   expect(vi.mocked(history.back).mock.calls.length).toBe(back + 1);
   expect(dialog()!.open).toBe(true);
-  expect(counter()).toBe(C.careStepsCount(5, 6));
+  expect(counter()).toBe(C.careStepsCount(6, 7));
   expect(document.activeElement).toBe(partLink("brake's quick release"));
 });
 
@@ -575,7 +580,7 @@ test('[PG-SHEET-KEYS] in the view, Escape closes it alone and the arrows leave t
   await sheetOpen();
   const s = sheet()!;
   await act(() => { s.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); });
-  expect(counter()).toBe(C.careStepsCount(5, 6));
+  expect(counter()).toBe(C.careStepsCount(6, 7));
   await act(() => { s.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); });
   expect(sheet()).toBeNull();
   expect(dialog()!.open).toBe(true);
@@ -670,7 +675,8 @@ test('[BV-BUTTON] "What is it, where is it?" sits under the text on every screen
     expect(b.previousElementSibling, `screen ${i}`).not.toBeNull();
     if (i < screens - 1) await click(button(C.careStepsNext)!);
   }
-  expect(where()[0]!.querySelector('.care-where-parts')!.textContent).toBe('Disc caliper, brake lever, tyre, rim, tyre bead, spokes, inner tube, valve, brake disc, brake pads');
+  // the owner's ruling of 14 November 2026: the wheel (its rim), the tyre and the tube first, the rest in the text's order (BV-FIRST-PARTS)
+  expect(where()[0]!.querySelector('.care-where-parts')!.textContent).toBe('Rim, tyre, inner tube, disc caliper, brake lever, tyre bead, spokes, valve, brake disc, brake pads');
   const b = where()[0]!;
   expect(b.getAttribute('aria-haspopup')).toBe('dialog');
   await click(b);
@@ -745,4 +751,37 @@ test('[BV-ZOOM] a card whose parts sit close together opens zoomed in on them; W
   const box = sheet()!.querySelector('.bv-art')!.getAttribute('viewBox');
   await click(sheetButton('Zoom in')!);
   expect(sheet()!.querySelector('.bv-art')!.getAttribute('viewBox')).not.toBe(box);
+});
+
+// The live-site sweep of 14 November 2026, item 46: "Take the wheel off" with no bike shows the pad spacer of a hydraulic disc brake;
+// it now says it is for those brakes, above the picture; a bike with hydraulic disc brakes sees no such line.
+test('[BC-PIC-IF] the puncture card\'s first step says its pad spacer picture is for hydraulic disc brakes while the brakes are not told', async () => {
+  await mount();
+  await openCard('puncture-tube');
+  await click(button(C.careStepsNext)!);
+  await shown(1);
+  const line = dialog()!.querySelector('.care-pic-if');
+  expect(line?.textContent).toBe(IF_WORDS['hydraulic-disc']);
+  // before the picture, inside the step
+  expect(line!.compareDocumentPosition(dialog()!.querySelector('.care-steps-body [role="img"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  act(() => { render(null, host); });
+  await mount(memory({
+    'loadcheck:bikeProfiles': JSON.stringify([{ id: 'bike_h', name: 'Hydro', brakes: 'hydraulic-disc', tyres: 'tubes' }]),
+    'loadcheck:bikeProfile': JSON.stringify({ id: 'bike_h', name: 'Hydro' }),
+  }).kv);
+  await openCard('puncture-tube');
+  await click(button(C.careStepsNext)!);
+  await shown(1);
+  expect(dialog()!.querySelector('.care-pic-if')).toBeNull();
+});
+
+// Review of PR 131, m1: opened, Lube the chain says its rain-or-mud condition once (the step view's "And always after rain or mud."),
+// not also in its name.
+test('[BC-TAGS-ONCE] opened, Lube the chain says "rain or mud" once', async () => {
+  await mount();
+  localStorage.setItem(ALL_STEPS_KEY, '1');
+  await click(host.querySelector<HTMLElement>('.care-task[data-id="chain-lube"] .care-open')!);
+  const text = dialog()!.textContent!;
+  expect(text.match(/rain or mud/g)?.length).toBe(1);
+  expect(text).toContain(C.careAlsoWet);
 });

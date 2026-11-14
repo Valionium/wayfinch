@@ -218,6 +218,8 @@ function Drawing({ card, tapped, type, motor, onTap }: { card: ViewCard; tapped:
             const b = l.box;
             return (
               <g key={id} class={`bv-label${id === tapped ? ' bv-label-hot' : ''}`} data-part={id} onClick={() => onTap(id)}>
+                {/* the pill's whole box is its own (NEXT task 4, item 3): its round ends leave corners a neighbour's tap area took */}
+                <rect class="bv-pill-box" x={b.x} y={b.y} width={b.w} height={b.h} />
                 <rect class="bv-pill" x={b.x} y={b.y} width={b.w} height={b.h} rx={b.h / 2} />
                 <text x={b.x + 6} y={b.y + b.h / 2} dominant-baseline="central" style={{ fontSize: `${size}px` }}>
                   {PART_SHORT[id].toUpperCase()}{side(s) ? <tspan class="bv-side" dx="4" style={{ fontSize: `${size - 1}px` }}>({side(s)})</tspan> : null}

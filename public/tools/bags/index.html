@@ -274,8 +274,8 @@ body.lc-small #s4>:not(#smallBags):not(#smallFoot){display:none!important}
 body.lc-small #smallBalance .balance-line{font-size:14px;margin:8px 0 0}
 body.lc-small #smallBalance .linky{font-family:inherit;font-size:14px;letter-spacing:0;text-transform:none;font-weight:600}
 /* the plan's line and its Undo: quiet, one line under the top bar */
-body.lc-small #handoffBar:not(.hidden){border:0;background:none;padding:8px 0 0;margin:0;color:var(--muted);font-size:14px;gap:4px 12px}
-body.lc-small #handoffBar .linky{margin-left:0;min-height:44px;font-family:inherit;font-size:14px;letter-spacing:0;text-transform:none;font-weight:600}
+body.lc-small #handoffBar:not(.hidden),body.lc-small #weatherBar:not(.hidden){border:0;background:none;padding:8px 0 0;margin:0;color:var(--muted);font-size:14px;gap:4px 12px}
+body.lc-small #handoffBar .linky,body.lc-small #weatherBar .linky{margin-left:0;min-height:44px;font-family:inherit;font-size:14px;letter-spacing:0;text-transform:none;font-weight:600}
 /* the footer: the legal link stays, in the small view's own plain type; the Load Check tagline goes (review of PR 92, M6) */
 body.lc-small .sitefoot>span{display:none}
 body.lc-small .sitefoot{font-family:inherit;letter-spacing:0;margin-top:8px}
@@ -283,7 +283,7 @@ body.lc-small .sitefoot .linky{min-height:44px;font-family:inherit;font-size:14p
 body.lc-small .sitefoot .linky:hover{color:var(--ink)}
 @media screen and (min-width:1100px){
   body.lc-small .planner-cols{display:block;max-width:620px;margin:0 auto}
-  body.lc-small .small-head,body.lc-small #handoffBar:not(.hidden),body.lc-small .sitefoot{max-width:620px;margin-left:auto;margin-right:auto}
+  body.lc-small .small-head,body.lc-small #handoffBar:not(.hidden),body.lc-small #weatherBar:not(.hidden),body.lc-small .sitefoot{max-width:620px;margin-left:auto;margin-right:auto}
   /* "← Back to Trip" starts where the column starts (review of PR 92, M7); the bar's line still runs the full width */
   body.lc-small .guide-launch-row{padding-left:calc((100% - 620px) / 2);padding-right:calc((100% - 620px) / 2)}
 }
@@ -1981,6 +1981,10 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <button class="linky" id="handoffCancel" type="button">Cancel</button>
     <button class="linky hidden" id="handoffUndo" type="button">Undo</button>
   </div>
+  <div class="draftbar hidden" id="weatherBar" role="status">
+    <span id="weatherText" tabindex="-1"></span>
+    <button class="linky hidden" id="weatherUndo" type="button">Undo</button>
+  </div>
   <div class="draftbar hidden" id="offlineAgainBar" role="status">
     <span id="offlineAgainText">Your offline copy is no longer on this device. Tap Make available offline to keep the bag planner with you again.</span>
     <button class="kitact" id="offlineAgainSave" type="button">Make available offline</button>
@@ -2381,14 +2385,15 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
           <label for="bikeFrontTyre">Front tyre size<input id="bikeFrontTyre" type="text" maxlength="120" placeholder="e.g. 40-622 (700 × 40C)"></label>
           <label for="bikeRearTyre">Rear tyre size<input id="bikeRearTyre" type="text" maxlength="120" placeholder="e.g. 40-622 (700 × 40C)"></label>
           <p class="bike-profile-wide">Copy sizes from the tyre sidewalls. A spare tube needs the right wheel/tyre size and valve; front and rear may differ.</p>
-          <label for="bikeBrakes">Brake type<select id="bikeBrakes"><option value="unknown">Not set</option><option value="hydraulic-disc">Hydraulic disc</option><option value="cable-disc">Cable disc</option><option value="rim">Rim brakes</option><option value="other">Other</option></select></label>
+          <label for="bikeBrakes">Brake type<select id="bikeBrakes"><option value="unknown">Not sure</option><option value="hydraulic-disc">Hydraulic disc</option><option value="cable-disc">Cable disc</option><option value="rim">Rim brakes</option><option value="other">Other</option></select></label>
           <label for="bikePads">Brake pad / block reference<input id="bikePads" type="text" maxlength="120" placeholder="Exact part or model; note front/rear if different"></label>
           <label for="bikeDrive">Drivetrain<select id="bikeDrive"><option value="unknown">Not set</option><option value="derailleur">Chain + derailleur</option><option value="chain-hub">Chain + hub gears / single speed</option><option value="belt">Belt drive</option></select></label>
-          <label for="bikeShifting">Shifting<select id="bikeShifting"><option value="unknown">Not set</option><option value="cable">Cable operated</option><option value="electronic">Electronic</option><option value="none">No external shifting cable</option></select></label>
+          <label for="bikeShifting">Shifting<select id="bikeShifting"><option value="unknown">Not sure</option><option value="cable">Cable operated</option><option value="electronic">Electronic</option><option value="none">No gears</option></select></label>
           <label for="bikeSuspension">Suspension<select id="bikeSuspension"><option value="unknown">Not sure</option><option value="none">None</option><option value="front">Front fork</option><option value="full">Full suspension</option></select></label>
           <div class="bike-profile-field"><label for="bikeRackMounts">Rack mounts<select id="bikeRackMounts" aria-describedby="bikeRackMountsHint"><option value="unknown">Not sure</option><option value="yes">Yes</option><option value="no">No</option></select></label><p class="hint" id="bikeRackMountsHint">Small threaded holes near the rear axle and on the seat stays, for a rack.</p></div>
           <div class="bike-profile-field"><label for="bikeAxle">Wheel axle<select id="bikeAxle" aria-describedby="bikeAxleHint"><option value="unknown">Not sure</option><option value="thru">Thru-axle</option><option value="qr">Quick release</option><option value="nuts">Axle nuts</option></select></label><p class="hint" id="bikeAxleHint">What holds each wheel: a thick axle screwed through the fork, a thin rod with a lever, or nuts.</p></div>
           <div class="bike-profile-field" id="bikeRimBrakeField"><label for="bikeRimBrake">Rim brake type<select id="bikeRimBrake"><option value="unknown">Not sure</option><option value="caliper">Road caliper</option><option value="v-brake">V-brake</option><option value="hydraulic">Hydraulic rim brake</option></select></label></div>
+          <div class="bike-profile-field" id="bikeBrakeFluidField"><label for="bikeBrakeFluid">Brake fluid<select id="bikeBrakeFluid" aria-describedby="bikeBrakeFluidHint"><option value="unknown">Not sure</option><option value="mineral">Mineral oil</option><option value="dot">DOT fluid</option></select></label><p class="hint" id="bikeBrakeFluidHint">It is named on the brake lever or caliper, or in the manual. Never mix them.</p></div>
           <label id="bikeChainField" for="bikeChain">Chain / quick-link reference<input id="bikeChain" type="text" maxlength="120" placeholder="Brand, chain family and speed / part number"></label>
           <label id="bikeHangerField" for="bikeHanger">Derailleur hanger reference<input id="bikeHanger" type="text" maxlength="120" placeholder="Frame-specific part or hanger type"></label>
           <label class="bike-profile-wide" for="bikeNotes">Bike notes <span class="hint">optional</span><textarea id="bikeNotes" rows="3" maxlength="1000" placeholder="e.g. valve length, spare battery or unusual tools"></textarea></label>
@@ -2930,16 +2935,18 @@ let BIKE_PROFILE_WRITES=Promise.resolve();
 const BIKE_PROFILE_LABELS={
   tyres:{unknown:'Not set',tubes:'With inner tubes',tubeless:'Tubeless',other:'Tubular / other'},
   valve:{unknown:'Not set',presta:'Presta',schrader:'Schrader',dunlop:'Dunlop',other:'Other'},
-  brakes:{unknown:'Not set','hydraulic-disc':'Hydraulic disc','cable-disc':'Cable disc',rim:'Rim brakes',other:'Other'},
+  brakes:{unknown:'Not sure','hydraulic-disc':'Hydraulic disc','cable-disc':'Cable disc',rim:'Rim brakes',other:'Other'},
   drive:{unknown:'Not set',derailleur:'Chain + derailleur','chain-hub':'Chain + hub gears / single speed',belt:'Belt drive'},
-  shifting:{unknown:'Not set',cable:'Cable operated',electronic:'Electronic',none:'No external shifting cable'},
+  shifting:{unknown:'Not sure',cable:'Cable operated',electronic:'Electronic',none:'No gears'},
   suspension:{unknown:'Not sure',none:'None',front:'Front fork',full:'Full suspension'},
   rackMounts:{unknown:'Not sure',yes:'Yes',no:'No'},
   // Care pictures redo (owner's answers 1 and 2 of 9 November 2026): the wheels' axle, and with rim brakes their kind
   axle:{unknown:'Not sure',thru:'Thru-axle',qr:'Quick release',nuts:'Axle nuts'},
   rimBrake:{unknown:'Not sure',caliper:'Road caliper','v-brake':'V-brake',hydraulic:'Hydraulic rim brake'},
+  // the owner's wish of 14 November 2026: with hydraulic brakes (a hydraulic disc or a hydraulic rim brake), their fluid
+  brakeFluid:{unknown:'Not sure',mineral:'Mineral oil',dot:'DOT fluid'},
 };
-const BIKE_PROFILE_ANSWERS=['suspension','rackMounts','axle','rimBrake'];
+const BIKE_PROFILE_ANSWERS=['suspension','rackMounts','axle','rimBrake','brakeFluid'];
 const BIKE_PROFILE_TEXT={name:100,frontTyre:120,rearTyre:120,padType:120,chainType:120,hangerType:120,notes:1000};
 function normalisePressureBike(value){
   const p=dataObject(value) ? value : {};
@@ -3142,7 +3149,7 @@ function persistBikeProfileSelection(){
 }
 const BIKE_PROFILE_INPUTS={name:'bikeName',tyres:'bikeTyres',frontTyre:'bikeFrontTyre',rearTyre:'bikeRearTyre',
   valve:'bikeValve',brakes:'bikeBrakes',padType:'bikePads',drive:'bikeDrive',shifting:'bikeShifting',
-  suspension:'bikeSuspension',rackMounts:'bikeRackMounts',axle:'bikeAxle',rimBrake:'bikeRimBrake',chainType:'bikeChain',hangerType:'bikeHanger',notes:'bikeNotes'};
+  suspension:'bikeSuspension',rackMounts:'bikeRackMounts',axle:'bikeAxle',rimBrake:'bikeRimBrake',brakeFluid:'bikeBrakeFluid',chainType:'bikeChain',hangerType:'bikeHanger',notes:'bikeNotes'};
 // Of the tyre fields only the bike's weight is edited here (spec 7.1 item 3); the rest of bikeProfile.pressure is kept as it was saved.
 const BIKE_WEIGHT_INPUT='bikeBaseKg';
 function bikeProfileFieldVisibility(){
@@ -3150,6 +3157,8 @@ function bikeProfileFieldVisibility(){
   $('bikeChainField').classList.toggle('hidden',drive==='belt');
   $('bikeHangerField').classList.toggle('hidden',['belt','chain-hub'].includes(drive));
   $('bikeRimBrakeField').classList.toggle('hidden',$('bikeBrakes').value!=='rim');
+  const brakes=$('bikeBrakes').value;
+  $('bikeBrakeFluidField').classList.toggle('hidden',!(brakes==='hydraulic-disc' || brakes==='rim' && $('bikeRimBrake').value==='hydraulic'));
 }
 // ---- Bike details: the Frame and Maximum weight sections (spec 7.1, 7.4) ----
 // Every sentence the dialog shows about the frame or the weight limit, in one table the wording check reads (limit: true = states a result against the entered limit).
@@ -3559,6 +3568,7 @@ function initialiseBikeProfiles(){
   $('bikeNew').onclick=startNewBike;
   $('bikeDrive').onchange=bikeProfileFieldVisibility;
   $('bikeBrakes').onchange=bikeProfileFieldVisibility;
+  $('bikeRimBrake').onchange=bikeProfileFieldVisibility;
   $('bikeRemove').onclick=()=>{const p=BIKE_PROFILES.find(b=>b.id===$('bikeSavedSelect').value);if(!p)return;$('bikeRemoveQuestion').textContent=`Remove ${p.name} from saved bikes? Plans using it keep their own copy.`;$('bikeRemovePrompt').classList.remove('hidden');};
   $('bikeRemoveCancel').onclick=()=>{$('bikeRemovePrompt').classList.add('hidden');$('bikeRemove').focus({preventScroll:true});};
   $('bikeRemoveConfirm').onclick=removeSavedBike;
@@ -6131,7 +6141,9 @@ function advisorWhy(s, input){
   const left = +r.backL.toFixed(1);   // litres that round to nothing are nothing on the back
   // the back's change is what comes off less what goes in: when other things go in, both are said, never "stay there" (#40)
   const flow = off >= 0.1 ? advisorBackFlow(s, input) : null;
-  if(flow && flow.on >= 0.1) out.push(advisorWord('backSwap', { off:flow.off, on:flow.on, left, was:+base.backL.toFixed(1) }));
+  // the figures as shown add up: each rounded once, what goes in worked out from the shown ones (review of PR 137, m1)
+  const was = +base.backL.toFixed(1), on = flow ? +(left - was + flow.off).toFixed(1) : 0;
+  if(flow && flow.on >= 0.1 && on >= 0.1) out.push(advisorWord('backSwap', { off:flow.off, on, left, was }));
   else if(off >= 0.1) out.push(left === 0 ? advisorWord('backAll', { l:off }) : advisorWord('backSome', { l:off, left }));
   const d = {};
   new Set([...Object.keys(base.kgByPos), ...Object.keys(r.kgByPos)]).forEach(p => {
@@ -7269,18 +7281,58 @@ function ensureClimate(place, month){
 }
 /* Measured figures that land bring the kit they call for (rain trousers, warm layers) at once, as the next start would: only kit the
    rider never touched (applyTripKitDefaults). Before, it came only at the next start or at Kit, so the small view of a day ride listed
-   a plan without the rain trousers while the packing check said they were over (sweep 14 Nov 2026, #24). Not the rider's work, so
-   Plan bags for this trip's Undo still holds; while the rider has not worked on that plan since, it is packed afresh, as Plan bags packs
-   it (#25: the kept packing left more over than Re-plan's). */
+   a plan without the rain trousers while the packing check said they were over (sweep 14 Nov 2026, #24). Never silently (the
+   coordinator's ruling on the review of PR 135, I2): a line names exactly what was added and taken out, with Undo. Not the rider's work,
+   so Plan bags for this trip's Undo still holds; a plan Plan bags has just made, with nothing ticked since, is packed afresh, as Plan
+   bags packs it (#25); any other plan keeps its packing, so no ticked thing moves without a word (m1). Weather that lands while Plan
+   bags for this trip is making the plan is part of making it: no line of its own, the plan's own Undo covers it; what lands after the
+   plan is made is said once the plan is there (review of PR 135, N1, m5). A second landing adds to the first line, from the same
+   starting point, while the rider has changed nothing (m6). */
+const WEATHER_KIT={undo:null,pending:false};
+// the rider's work the Undo must not undo: the kit, the bags, hand placements and ticks (the automatic balancing's packing is not)
+const weatherKitKey=() => JSON.stringify([S.kit,S.kitTouched,S.bags,S.pinned,S.packed]);
+function showWeatherBar(text,undo=false){
+  const bar=$('weatherBar'); if(!bar) return;
+  $('weatherText').textContent=text;
+  $('weatherUndo').classList.toggle('hidden',!undo);
+  bar.classList.toggle('hidden',!text);
+}
 function climateKitFollows(){
-  const was=JSON.stringify(S.kit),undo=TRIP_BAGS.undo,kept=undo && tripWorkKey(captureDraft()) === undo.after;
+  if(TRIP_BAGS.hold){ WEATHER_KIT.pending=true; return false; }   // Plan bags for this trip takes it in (planTripBagsHeld), or says it after
+  const prev=WEATHER_KIT.undo && weatherKitKey() === WEATHER_KIT.undo.after ? WEATHER_KIT.undo : null;
+  const was={...S.kit},touched={...(S.kitTouched || {})},placements=S.placements,undo=TRIP_BAGS.undo,kept=undo && tripWorkKey(captureDraft()) === undo.after;
   applyTripKitDefaults();
-  if(JSON.stringify(S.kit) === was) return false;
-  if(kept){ keepPlan({load:null}); undo.after=tripWorkKey(captureDraft()); }
+  if(![...new Set([...Object.keys(was),...Object.keys(S.kit)])].some(id => !!was[id] !== !!S.kit[id])) return false;
+  if(kept && undo.fresh && !Object.values(S.packed || {}).some(Boolean)) keepPlan({load:null});
+  if(kept) undo.after=tripWorkKey(captureDraft());
+  // what changed since the first landing the rider has not answered (m6)
+  const from=prev ? prev.kit : was;
+  const ids=[...new Set([...Object.keys(from),...Object.keys(S.kit)])].filter(id => !!from[id] !== !!S.kit[id] && kitById(id));
+  const names=on => ids.filter(id => !!S.kit[id] === on).map(id => kitWord(kitById(id)));
+  const added=names(true),out=names(false);
+  WEATHER_KIT.undo=ids.length ? {ids,kit:from,touched:prev ? prev.touched : touched,placements:prev ? prev.placements : placements,after:weatherKitKey()} : null;
+  showWeatherBar(ids.length ? `Measured weather for ${MONTHS[S.month]} came in: ${[added.length ? listOf(added)+' added' : '',out.length ? listOf(out)+' taken out' : ''].filter(Boolean).join('; ')}.` : '',!!ids.length);
   if(S.step === 3) renderKit();
   drawRig(); queueDraftSave();
   return true;
 }
+// Undo puts back what the weather changed, as the rider's own choice (touched), so no later start changes it again; the packing too.
+function undoWeatherKit(){
+  const u=WEATHER_KIT.undo; if(!u) return false;
+  WEATHER_KIT.undo=null;
+  if(weatherKitKey() !== u.after){ showWeatherBar('Nothing is undone: your plan has changed since.'); return false; }
+  const undo=TRIP_BAGS.undo,kept=undo && tripWorkKey(captureDraft()) === undo.after;
+  S.kitTouched=S.kitTouched || {};
+  u.ids.forEach(id => { S.kit[id]=!!u.kit[id]; S.kitTouched[id]=true; });
+  keepPlan({load:u.placements});
+  if(kept) undo.after=tripWorkKey(captureDraft());
+  showWeatherBar(`Back to the kit before the measured weather: ${listOf(u.ids.map(id => kitWord(kitById(id))))}.`);
+  if(S.step === 3) renderKit();
+  if(S.step === 4) renderResult(); else renderSmallBags();
+  drawRig(); queueDraftSave();
+  return true;
+}
+$('weatherUndo').onclick=() => { undoWeatherKit(); $('weatherText')?.focus?.({preventScroll:true}); };
 function failedClimatePlaces(){
   const places = [S.place, S.place2, routeHigh()].filter(Boolean);
   return places.filter(p => CLIMATE[climateKey(p.lat, p.lon, S.month)]?.source === 'failed');
@@ -12699,7 +12751,7 @@ async function putHandoffTripIn(){
    the trip goes in as Apply puts it in; the kit the rider never touched follows the trip, the bags are packed afresh by the
    frozen selection and the ticks start empty; it is saved as a new trip setup for the route and Bags opens. A general setup is
    never changed. Undo goes back to the plan that was there and takes the setups it made away. A day ride keeps Apply. */
-const TRIP_BAGS={undo:null};
+const TRIP_BAGS={undo:null,hold:false};
 function handoffLong(t){ return !!t && Number.isInteger(t.nights) && t.nights >= 1; }
 // Every trip that says its nights can be planned so; a day ride (0 nights) then opens the small view (the owner's answer 4).
 function handoffPlannable(t){ return !!t && Number.isInteger(t.nights) && t.nights >= 0; }
@@ -12765,10 +12817,15 @@ function renderSmallBags(A){
   const long=out.some(row => row.tooLong);
   // each with the litres that have no place, the packing check's own figure (sweep 14 Nov 2026, #24: say plainly what does not fit)
   const overL=row => { const o=row.placements.find(p => p.kind === 'overflow'); return +(o ? o.L : row.L).toFixed(2); };
-  const one=out.length === 1;
-  $('smallOver').hidden=!out.length;
-  $('smallOver').textContent=out.length ? `Does not fit in these bags: ${out.map(row => `${name(row)} (${overL(row)} L)`).join(', ')}${
-    long ? ', too long for them' : ''}. Wear ${one ? 'it' : 'them'} or leave ${one ? 'it' : 'them'} at home. Open the full Bag planner to add a bag or a bigger one.` : '';
+  const one=out.length === 1,it=one ? 'it' : 'them';
+  // a thing partly in a bag: the litres over are "of it" (review of PR 135, m3); the advice is the packing check's own
+  const part=row => row.placements.some(p => p.kind !== 'overflow');
+  const overText=out.length ? `Does not fit in these bags: ${out.map(row => `${name(row)} (${overL(row)} L${part(row) ? ' of it' : ''})`).join(', ')}${
+    long ? ', too long for them' : ''}. Wear ${it}, strap ${it} outside or leave ${it} at home. Open the full Bag planner to add a bag or a bigger one.` : '';
+  // set only when it changes: a status line is read again whenever its text is set (review of PR 135, m2)
+  const over=$('smallOver');
+  if(over.hidden !== !out.length) over.hidden=!out.length;
+  if(over.textContent !== overText) over.textContent=overText;
 }
 // The pockets' line and switches (owner, 9 Nov 2026): "In your jersey pockets: …", and Jersey pockets and Bib shorts pockets to turn off.
 // with its question (sweep 14 Nov 2026, #30): which pockets, and what unticking one does; `box` keeps the two boxes' ids apart
@@ -13020,7 +13077,21 @@ async function planTripBags(){
     showHandoffBar(`${setupKindFullMessage('trip',needed)} Then plan bags for ${name} again, or use only the route.`,{apply:true,plan:true,reuse:!!HANDOFF.reuse});
     return false;
   }
-  HANDOFF.busy=true; showHandoffBar(`Planning bags for ${name}…`);
+  HANDOFF.busy=true; showHandoffBar(`Planning bags for ${name}…`); showWeatherBar('');
+  // the pressed button goes with the bar's buttons: the focus goes to the bar's line, never to the page (review of PR 135, m4)
+  if(document.activeElement === $('handoffPlan')){ $('handoffText').setAttribute('tabindex','-1'); $('handoffText').focus({preventScroll:true}); }
+  /* Nothing is written while the trip goes in and its weather is awaited (review of PR 135, I1): the plan from before is stored first,
+     and a tab hidden or closed during the wait keeps it as the stored plan. The new plan is saved once it is made. */
+  await flushDraft();
+  TRIP_BAGS.hold=true;
+  try { return await planTripBagsHeld(t,name,undo,wasBike,before); } finally {
+    TRIP_BAGS.hold=false;
+    // weather that came in after the wait, while the plan was being stored: said now, on the plan as made, with its Undo (review of PR 135, N1)
+    if(WEATHER_KIT.pending){ WEATHER_KIT.pending=false; if(climateKitFollows()){ if(S.step === 4) renderResult(); else renderSmallBags(); } }
+    queueDraftSave();
+  }
+}
+async function planTripBagsHeld(t,name,undo,wasBike,before){
   const base=tripFoundation();
   if(base){ restorePlan(base,false); planBikeChosen(wasBike); }
   if(!await putHandoffTripIn()){
@@ -13054,7 +13125,7 @@ async function planTripBags(){
   writeHandoffDone('applied'); dropHandoffFragment(); setWayfinchBack('/#/trip');
   queueDraftSave(); renderRecall();
   if(!HANDOFF.long) setSmallView(true);
-  TRIP_BAGS.undo=tripBagsUndo(undo,[saved,before].filter(Boolean));
+  TRIP_BAGS.undo={...tripBagsUndo(undo,[saved,before].filter(Boolean)),fresh:true};   // fresh: this tap packed it (climateKitFollows)
   const passed=base ? null : passedFoundation();
   showHandoffBar(`Planned for ${name}: a new trip setup${base ? ' from '+base.name : ''}${proposed ? ` with ${bagsInWords(proposed)}` : ''}${HANDOFF.long ? ', opened at Bags' : ''}.${
     passed ? ` Your general setup ${passed.name} has no bags, so it is not used.` : ''}${before ? ' Your plan before is kept as a setup.' : ''}${
@@ -13093,6 +13164,7 @@ async function undoTripBags(){
   }
   const was=S.bikeProfile ? S.bikeProfile.id : null;
   if(SMALL_VIEW) setSmallView(false);
+  WEATHER_KIT.undo=null; showWeatherBar('');
   restorePlan(JSON.parse(u.draft),true,false); planBikeChosen(was);
   // the setups it made go, unless the rider changed one since; any other change to the list since stays
   const changed=SETUPS.filter(s => u.made.includes(s.id) && JSON.stringify(s) !== u.bodies[s.id]);
@@ -13825,6 +13897,7 @@ function saveDraftInBrowser(value){
 // Every draft write passes here. During a trial a queued save waits (decision 7); a hidden or closing tab (flushDraft) still saves, the
 // plan without the trial bag (captureDraft), so the rider's other changes are kept and nothing of the trial is.
 function persistDraft(serial, flushing = false){
+  if(TRIP_BAGS.hold) return DRAFT_WRITES;   // Plan bags for this trip under way: the plan from before stays stored (review of PR 135, I1)
   DRAFT_LATEST_SERIAL=serial;
   if(DRAFT_FROZEN || deletedSinceLoad()) return DRAFT_WRITES;
   if(TRIAL && !flushing){ TRIAL.pendingOther = serial !== DRAFT_SIGNATURE; return DRAFT_WRITES; }

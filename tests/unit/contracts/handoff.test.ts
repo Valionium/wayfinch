@@ -1053,9 +1053,10 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
   });
 });
 
-/** The weather archive's answer for every year asked: 30 days, `wet` of them with rain (1 mm or more), 2 to 9 °C. It lands once `hold` settles. */
-function weatherLands(page: VM, wet: number, hold: Promise<unknown> = Promise.resolve()) {
-  const daily = { temperature_2m_min: Array.from({ length: 30 }, () => 2), temperature_2m_max: Array.from({ length: 30 }, () => 9),
+/** The weather archive's answer for every year asked: 30 days, `wet` of them with rain (1 mm or more), `min` to `max` °C (2 to 9). It lands
+ *  once `hold` settles. */
+function weatherLands(page: VM, wet: number, hold: Promise<unknown> = Promise.resolve(), min = 2, max = 9) {
+  const daily = { temperature_2m_min: Array.from({ length: 30 }, () => min), temperature_2m_max: Array.from({ length: 30 }, () => max),
     precipitation_sum: Array.from({ length: 30 }, (_, i) => (i < wet ? 3 : 0)) };
   page.context.fetch = async (url: string) => {
     if (!String(url).includes('archive-api')) throw new Error('offline');
@@ -1064,6 +1065,16 @@ function weatherLands(page: VM, wet: number, hold: Promise<unknown> = Promise.re
   };
 }
 const ticks = (ms = 20) => new Promise((r) => setTimeout(r, ms));
+/** Classes that hold, on the harness's elements (its own classList keeps none): call before the page touches them. */
+function classes(page: VM, ...ids: string[]) {
+  for (const id of ids) {
+    page.run(`$('${id}')`);
+    const set = new Set<string>(['hidden']);
+    (page.nodes.get(id) as unknown as { classList: unknown }).classList = { add: (c: string) => set.add(c), remove: (c: string) => set.delete(c), contains: (c: string) => set.has(c),
+      toggle: (c: string, on?: boolean) => { const v = on ?? !set.has(c); if (v) set.add(c); else set.delete(c); return v; } };
+  }
+}
+const shown = (page: VM, id: string) => !(page.nodes.get(id) as unknown as { classList: { contains: (c: string) => boolean } }).classList.contains('hidden');
 
 // The sweep of 14 Nov 2026, #24: the small view listed the top tube bag and nothing more, while the full planner's Check for the same plan
 // said "0.8 litres over · Rain trousers". The bags were sized before the measured weather of the trip came in (17 rain days in November
@@ -1072,6 +1083,7 @@ describe('[TRIP-SMALL-OVER] a day ride\'s bags are sized with the trip\'s weathe
   test('the measured weather that comes in while the bags are planned is in the plan: the rain trousers it calls for have a place, nothing is over', async () => {
     const p = await dayRide('2026-11-15');
     weatherLands(p.page, 17, ticks(30));   // in 30 ms: within the few seconds the planning waits for the weather
+    classes(p.page, 'weatherBar', 'weatherUndo');
     await p.page.run('receiveHandoff()');
     expect(await p.page.run('planTripBags()')).toBe(true);
     expect(p.json<string>('tripClimate().source')).toBe('measured');
@@ -1081,12 +1093,20 @@ describe('[TRIP-SMALL-OVER] a day ride\'s bags are sized with the trip\'s weathe
     expect(String(p.page.nodes.get('smallBagList')!.innerHTML)).toContain('Rain trousers');
     // the trip setup made for the route holds the same kit
     expect(p.json<boolean>('SETUPS[0].kit.rainpants')).toBe(true);
+    // weather that lands during the wait is part of making the plan: no line or Undo of its own, Plan bags' Undo covers it (review of
+    // PR 135, N1: that Undo could never work)
+    expect(shown(p.page, 'weatherBar')).toBe(false);
+    expect(p.json('WEATHER_KIT.undo')).toBeNull();
+    expect(await p.page.run('undoWeatherKit()')).toBe(false);
+    expect(String(p.page.nodes.get('weatherText')!.textContent)).toBe('');
+    expect(await p.page.run('undoTripBags()')).toBe(true);
   });
 
   test('weather that comes in after the plan brings its kit in at once, as the next start would; the small view then names what does not fit, its litres and what to do; Undo still works', async () => {
     const p = await dayRide('2026-11-15');
     let land = () => {};
     weatherLands(p.page, 17, new Promise<void>((r) => { land = r; }));
+    classes(p.page, 'weatherBar', 'weatherUndo');
     p.page.run('CLIMATE_WAIT_MS=0;');   // a slow network: the planning does not wait for it
     await p.page.run('receiveHandoff()');
     expect(await p.page.run('planTripBags()')).toBe(true);
@@ -1103,12 +1123,132 @@ describe('[TRIP-SMALL-OVER] a day ride\'s bags are sized with the trip\'s weathe
     expect(p.json<boolean>('$("smallOver").hidden')).toBe(false);
     const line = String(p.page.nodes.get('smallOver')!.textContent);
     expect(line).toMatch(/^Does not fit in these bags: /);
-    for (const name of over) expect(line).toMatch(new RegExp(`${name} \\(\\d+(\\.\\d+)? L\\)`));
+    for (const name of over) expect(line).toMatch(new RegExp(`${name} \\(\\d+(\\.\\d+)? L( of it)?\\)`));
     expect(line).toMatch(/Open the full Bag planner/);
     expect(line).toMatch(/leave/);
     expect(bannedHits(line)).toEqual([]);
-    // the weather's kit is not the rider's work: Undo still takes the plan back
+    // never silently (the coordinator's ruling on the review of PR 135, I2): a line names exactly what the weather changed, with Undo
+    expect(shown(p.page, 'weatherBar')).toBe(true);
+    const said = String(p.page.nodes.get('weatherText')!.textContent);
+    expect(said).toBe('Measured weather for November came in: rain trousers added.');
+    expect(bannedHits(said)).toEqual([]);
+    expect(shown(p.page, 'weatherUndo')).toBe(true);
+    // its Undo works, also after the automatic balancing has packed the plan again: the rain trousers go, as the rider's own choice
+    p.page.run('keepPlan({load:null});currentPlan();');
+    expect(await p.page.run('undoWeatherKit()')).toBe(true);
+    expect(p.json<boolean>(`carrying('rainpants')`)).toBe(false);
+    expect(p.json<boolean>('S.kitTouched.rainpants')).toBe(true);
+    expect(String(p.page.nodes.get('weatherText')!.textContent)).toBe('Back to the kit before the measured weather: rain trousers.');
+    // the weather's kit is not the rider's work: Plan bags' Undo still takes the plan back
     expect(await p.page.run('undoTripBags()')).toBe(true);
+  });
+
+  test('a second landing adds to the first line from the same starting point; one that takes back what the first brought leaves no line (review of PR 135, m6)', async () => {
+    const p = await dayRide('2026-11-15');
+    let land = () => {};
+    weatherLands(p.page, 17, new Promise<void>((r) => { land = r; }));
+    classes(p.page, 'weatherBar', 'weatherUndo');
+    p.page.run('CLIMATE_WAIT_MS=0;');
+    await p.page.run('receiveHandoff()');
+    expect(await p.page.run('planTripBags()')).toBe(true);
+    land(); await ticks();
+    expect(String(p.page.nodes.get('weatherText')!.textContent)).toBe('Measured weather for November came in: rain trousers added.');
+    // another place's figures come in, drier: the rain trousers go again, so nothing changed from where the rider was
+    p.page.run(`Object.values(CLIMATE).forEach(c=>{c.rainDays=0;});climateKitFollows();`);
+    expect(p.json<boolean>(`carrying('rainpants')`)).toBe(false);
+    expect(shown(p.page, 'weatherBar')).toBe(false);
+    expect(p.json('WEATHER_KIT.undo')).toBeNull();
+  });
+
+  // Review of PR 135, I1: the plan from before must never be lost while the page waits for the weather. Nothing is written until the
+  // planning is done: a tab left or closed during the wait keeps the plan from before as the stored plan.
+  test('nothing is written while the weather is awaited: a tab closed during the wait keeps the plan from before, with or without a general setup', async () => {
+    for (const general of [false, true]) {
+      const p = await dayRide('2026-11-15');
+      p.page.run(`S.bags=[{uid:1,pos:'seat',L:10},{uid:2,pos:'frame',L:5}];S.nextUid=3;S.kit.cap=false;S.kitTouched.cap=true;SETUPS=[];`);
+      if (general) p.page.run(`SETUPS=[${qaSetup('g_one', { kind: 'general', name: 'General', bags: [{ uid: 1, pos: 'bar', L: 9 }] })}];S.bags.push({uid:3,pos:'top',slot:'front',L:1});S.nextUid=4;`);
+      await p.page.run('flushDraft()');   // the plan from before, saved as the page saves it
+      const before = p.page.run('planSameKey(captureDraft())');
+      let land = () => {};
+      weatherLands(p.page, 17, new Promise<void>((r) => { land = r; }));
+      await p.page.run('receiveHandoff()');
+      const planning = p.page.run('planTripBags()') as Promise<boolean>;
+      await ticks(800);
+      expect(p.json<boolean>('HANDOFF.busy'), `general ${general}`).toBe(true);   // still waiting for the weather
+      await p.page.run('flushDraft()');   // the tab is hidden or closed now
+      const stored = JSON.parse(p.page.values.get('loadcheck:draft')!);
+      expect(p.page.run(`planSameKey(${JSON.stringify(stored)})`), `general ${general}`).toBe(before);
+      land();
+      expect(await planning).toBe(true);
+      await ticks(400);
+      // once planned, the new plan is saved as usual
+      expect(p.page.run(`planSameKey(${p.page.values.get('loadcheck:draft')})`), `general ${general}`).toBe(p.page.run('planSameKey(captureDraft())'));
+    }
+  });
+
+  test('weather that comes in later and takes kit out says so too, and Undo puts it back as the rider\'s own choice, so it stays', async () => {
+    // about 60 km, over the steady pace's half day: the long gloves the model's cold November day calls for are packed
+    const { gpx } = await handedOff('loop', { nights: 0 }, '2026-11-15', 0.6);
+    const p = longPlanner(gpx);
+    classes(p.page, 'weatherBar', 'weatherUndo');
+    p.page.run(`S.bags=[];S.nextUid=1;S.bikeProfile=null;S.kit={};S.kitTouched={};S.custom={};S.qty={};S.packed={};S.pinned={};applyTripKitDefaults();CLIMATE_WAIT_MS=0;`);
+    let land = () => {};
+    weatherLands(p.page, 0, new Promise<void>((r) => { land = r; }), 7, 15);   // dry and mild
+    await p.page.run('receiveHandoff()');
+    expect(await p.page.run('planTripBags()')).toBe(true);
+    expect(p.json<boolean>(`carrying('gloves')`)).toBe(true);
+    land(); await ticks();
+    expect(p.json<boolean>(`carrying('gloves')`)).toBe(false);
+    expect(String(p.page.nodes.get('weatherText')!.textContent)).toBe('Measured weather for November came in: long gloves taken out.');
+    expect(await p.page.run('undoWeatherKit()')).toBe(true);
+    expect(p.json<boolean>(`carrying('gloves')`)).toBe(true);
+    expect(p.json<boolean>('S.kitTouched.gloves')).toBe(true);   // the rider's choice now: the next start keeps it
+    p.page.run('applyTripKitDefaults()');
+    expect(p.json<boolean>(`carrying('gloves')`)).toBe(true);
+    expect(String(p.page.nodes.get('weatherText')!.textContent)).toBe('Back to the kit before the measured weather: long gloves.');
+    expect(shown(p.page, 'weatherUndo')).toBe(false);
+  });
+
+  test('on a setup opened again (Open the setup made on …), late weather says what it changed and never repacks: ticked things stay where they are (review of PR 135, m1)', async () => {
+    // the trip setup a first Plan bags made for this route, on the planner's own weather model (no measured figures then)
+    const first = await dayRide('2026-11-15');
+    first.page.run('CLIMATE_WAIT_MS=0;');
+    weatherLands(first.page, 17, new Promise<void>(() => {}));
+    await first.page.run('receiveHandoff()');
+    expect(await first.page.run('planTripBags()')).toBe(true);
+    const made = first.page.run('JSON.stringify(SETUPS[0])') as string;
+    expect(JSON.parse(made).kit.rainpants).toBe(false);
+    // a later visit opens it again; the measured weather comes in after
+    const p = await dayRide('2026-11-15');
+    p.page.run(`SETUPS=[normaliseSetup(${made})];CLIMATE_WAIT_MS=0;`);
+    let land = () => {};
+    weatherLands(p.page, 17, new Promise<void>((r) => { land = r; }));
+    await p.page.run('receiveHandoff()');
+    expect(p.json<string | null>('HANDOFF.reuse')).toBe(JSON.parse(made).id);
+    expect(await p.page.run('reuseTripSetup()')).toBe(true);
+    p.page.run(`ensureClimate(S.place,S.month);ensureClimate(S.place2,S.month);currentPlan();S.packed={tool:true,docs:true};`);   // as the page's go() asks for the weather
+    const placements = p.page.run('JSON.stringify(S.placements)');
+    land(); await ticks();
+    expect(p.json<boolean>(`carrying('rainpants')`)).toBe(true);
+    expect(p.page.run('JSON.stringify(S.placements)')).toBe(placements);
+    expect(String(p.page.nodes.get('weatherText')!.textContent)).toBe('Measured weather for November came in: rain trousers added.');
+  });
+
+  test('the small view\'s line is set only when it changes, so a screen reader does not hear it again on every render (review of PR 135, m2); during the wait the focus stays on the bar (m4)', async () => {
+    const p = await dayRide('2026-11-15');
+    p.page.run(`S.kit.shoes=true;S.kitTouched.shoes=true;S.qty.shoes=9;`);
+    await p.page.run('receiveHandoff()');
+    let focused = 0;
+    (p.page.nodes.get('handoffText') as unknown as { focus: () => void }).focus = () => { focused++; };
+    p.page.run(`document.activeElement=$('handoffPlan');`);
+    expect(await p.page.run('planTripBags()')).toBe(true);
+    expect(focused).toBeGreaterThan(0);
+    const node = p.page.nodes.get('smallOver')! as { textContent: string };
+    let sets = 0, text = node.textContent;
+    Object.defineProperty(node, 'textContent', { get: () => text, set: (v: string) => { sets++; text = v; } });
+    p.page.run('renderSmallBags();renderSmallBags();');
+    expect(sets).toBe(0);
+    expect(text).toMatch(/Camp or spare shoes/);
   });
 });
 
@@ -1232,6 +1372,22 @@ describe('[TRIP-DAY-POCKETS] a day ride counts the jersey and bib shorts pockets
     p.page.run(`setPocket('bib',false)`);
     expect(p.json('pocketPlaces()')).toEqual({});
     expect(String(p.page.nodes.get('smallPockets')!.innerHTML)).toMatch(/data-pocket="jersey"/);
+  });
+
+  // Handover task 4, item 5 (the day-ride pockets of PR 123): the jersey pockets off bring the frame bag for what they held; back on, the
+  // frame bag goes away again and the bags are those of before.
+  test('the jersey pockets off on the 39 km ride bring the frame bag; back on, it goes away again and the bags are as before', async () => {
+    const p = await planned('2026-11-15');
+    const bags = () => p.json<Array<{ pos: string; L: number }>>('S.bags.map(b=>({pos:b.pos,L:b.L}))');
+    const before = bags();
+    expect(before.some((b) => b.pos === 'frame')).toBe(false);   // the top tube bag alone (owner, 10 Nov 2026)
+    p.page.run(`setPocket('jersey',false)`);
+    expect(bags().some((b) => b.pos === 'frame')).toBe(true);
+    expect(p.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+    p.page.run(`setPocket('jersey',true)`);
+    expect(bags().some((b) => b.pos === 'frame')).toBe(false);
+    expect(bags()).toEqual(before);
+    expect(p.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
   });
 
   test('a switch, off or on, plans the day ride\'s bags again by the same rule and the line says so; hand placements stay; bags the rider changed are never re-sized', async () => {
