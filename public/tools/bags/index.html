@@ -1663,16 +1663,13 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .look-swatch:has(input:focus-visible),.look-chip:has(input:focus-visible),.look-chip:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .look-dot{flex:none;width:22px;height:22px;border-radius:50%;border:1px solid var(--muted)}
 .look-dot.none{background:transparent;border-style:dashed}
-.look-picker input[type=color]{flex:none;width:24px;height:24px;padding:0;border:1px solid var(--muted);border-radius:50%;background:none;cursor:pointer;-webkit-appearance:none;appearance:none;overflow:hidden}
-.look-picker input[type=color]::-webkit-color-swatch-wrapper{padding:0}
-.look-picker input[type=color]::-webkit-color-swatch{border:none;border-radius:50%}
-.look-picker input[type=color]::-moz-color-swatch{border:none;border-radius:50%}
+/* More colours (wish 4, 14 Nov 2026): our own grid, in colours.js; the chip's dot shows every colour until the bike has one of the grid's */
+.look-picker .look-dot{background:conic-gradient(#c62f2a,#e46b1f,#f1c232,#2f7d4f,#1f7f80,#2563b8,#6b3fa0,#d6619b,#c62f2a)}
 .look-status{margin:4px 0;font-size:13px;color:var(--muted);min-height:1.2em}
 #lookUndo{min-height:44px}
 .look-chip.hidden,.bike-look.hidden,#lookUndo.hidden,#bikeDetailsBack.hidden,#bikeSwapUndo.hidden,.bike-swap.hidden{display:none}
 .bike-swap{margin:6px 0;font-size:14px}
 #bikeSwapUndo{min-height:44px}
-#bikeLook .look-picker input[type=color]{min-height:24px;min-width:24px;height:24px}
 /* Look's extras (owner's wish, 5 Nov 2026): frame pattern, its colours, the fork, rim depth. Built by renderLookChoices from bike.js. */
 .lx-swatch,.lx-chip{position:relative;display:flex;align-items:center;gap:8px;min-height:44px;min-width:44px;padding:0 10px;box-sizing:border-box;
   border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:14px;background:transparent;color:inherit;font-family:inherit}
@@ -2021,8 +2018,8 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <div class="bagpop hidden" id="bagPop"></div>
     <div class="tip hidden" id="rigTip"></div>
     <div class="rigtools hidden" id="rigTools">
-      <button id="rigMode" aria-pressed="false"><span class="dotm"></span><b>Remove</b></button>
-      <button id="rigReset">Reset</button>
+      <button id="rigMode" aria-pressed="false"><span class="dotm"></span><b>Remove a bag</b></button>
+      <button id="rigReset">Reset bags</button>
       <button id="rigBikeDetails" type="button" aria-haspopup="dialog" aria-controls="bikeDetailsBox">Bike details</button>
     </div>
     <div class="rig-trip hidden" id="rigTrip"></div>
@@ -2137,7 +2134,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <div class="eyebrow">Step two</div>
     <h2 class="lede" id="stepTitle2" tabindex="-1">Your bag cupboard</h2>
     <p class="sub">List the bags you own and their labelled sizes. You can add a second bag where the bike has another mounting spot. The check will suggest which bags to mount and which can stay at home.</p>
-    <div class="bike-profile-card"><b id="bikeStepSummary">Bike repair details · optional</b><p>Use a bike profile for repair suggestions that match your tyres, brakes and drivetrain.</p><button class="kitact" type="button" id="bikeDetailsOpen" aria-haspopup="dialog" aria-controls="bikeDetailsBox">Bike details</button></div>
+    <div class="bike-profile-card"><b id="bikeStepSummary">Bike repair details · optional</b><p>Use a bike profile for repair suggestions that match your tyres, brakes and drivetrain.</p><button class="kitact" type="button" id="bikeDetailsOpen" aria-haspopup="dialog" aria-controls="bikeDetailsBox">Repair details</button></div>
     <div class="recallwrap hidden" id="recallWrap">
       <div class="pickhead">Start from one you have saved</div>
       <div id="recallList"></div>
@@ -2226,7 +2223,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       </button>
     </div>
     <div class="result-save">
-      <button class="go small" id="quickSave">Save this plan</button>
+      <button class="go small" id="quickSave">Keep as a setup</button>
       <span id="quickSaveMsg">Your working plan is saved automatically in this browser.</span>
     </div>
     <div id="verdictBox"></div>
@@ -2296,9 +2293,10 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         <fieldset><legend id="lookColourTitle">Colour</legend>
           <div class="look-swatches" id="lookSwatches" role="radiogroup" aria-labelledby="lookColourTitle"></div>
           <div class="look-more">
-            <label class="look-chip look-picker" id="lookPickerChip" for="lookPicker"><input type="color" id="lookPicker" value="#2563b8"><span id="lookPickerText"></span></label>
+            <button type="button" class="look-chip look-picker" id="lookPickerChip" aria-expanded="false" aria-controls="lookColoursBox"><span class="look-dot" id="lookPickerDot"></span><span id="lookPickerText"></span></button>
             <button type="button" class="look-chip hidden" id="lookPhoto" aria-controls="lookPhotoBox"></button>
           </div>
+          <div id="lookColoursBox"></div>
           <div id="lookPhotoBox"></div>
         </fieldset>
         <fieldset id="lookPatternSet"><legend id="lookPatternTitle">Frame pattern</legend>
@@ -2927,6 +2925,8 @@ const S = {
   pendingSaveName:'', pendingSaveNote:'',
 };
 KIT.forEach(k => S.kit[k.id] = !!k.on);
+// The trip and choices a new plan starts with (planIsUntouched); its month is the one the rider is in (start-up sets it).
+const PLAN_START = { nights:S.nights, sleep:S.sleep, pace:S.pace, flatKph:S.flatKph, mode:S.mode, foodMode:S.foodMode };
 const BIKE_PROFILE_KEY='loadcheck:bikeProfiles',BIKE_PROFILE_CURRENT_KEY='loadcheck:bikeProfile',MAX_BIKE_PROFILES=20;
 let BIKE_PROFILES=[],BIKE_PROFILE_EDITOR_ID='',BIKE_PROFILE_FORM_READY=false,BIKE_PROFILE_BUSY=false,BIKE_PROFILE_MESSAGE='';
 let BIKE_PROFILE_WRITES=Promise.resolve();
@@ -3184,6 +3184,9 @@ const BIKE_WORDING={
   lookNone:{text:'None'},
   lookNotSet:{text:'Not set'},
   lookMore:{text:'More colours'},
+  coloursDone:{text:'Done'},
+  coloursOwn:{text:'Your own colour, close to {name}'},
+  coloursFailed:{text:'More colours could not be opened. Reload the page and try again.'},
   lookPhoto:{text:'From a photo'},
   lookUndo:{text:'Undo'},
   lookUndone:{text:'Back to how it looked.'},
@@ -3262,7 +3265,7 @@ function fitQuickResultText(){
     const L=Math.max(...fit.frameBag.shapes.map(e=>e.L));
     lines.push(`Frame bag: about ${L} L`+(fit.frameBag.shapes[0]?.source==='measured' ? ' (from your measurements)' : ' (estimate)'));
   }
-  const where={st:'inside the seat tube',dt:'inside the down tube',un:'under the down tube'},got=['st','dt','un'].filter(k=>fit.cages[k]);
+  const where={st:'on the seat tube',dt:'on the down tube',un:'under the down tube'},got=['st','dt','un'].filter(k=>fit.cages[k]);
   lines.push(got.length ? `Bottle cages: ${got.length} likely, ${got.map(k=>where[k]).join(' and ')} (estimate)` : 'Bottle cages: none likely (estimate)');
   lines.push(fit.topMounts.front || fit.topMounts.rear ? 'Room for a top-tube bag (estimate)' : 'Top-tube bag: probably no room (estimate)');
   return lines.concat([FIT_QUICK_FOOT]).join(FIT_QUICK_SEP);
@@ -3855,9 +3858,10 @@ function renderLook(){
   syncLookExtras(look);
   renderForkZoom(bike,art);
   $('lookPickerChip').classList.toggle('on',!!look.colour && !swatch);
-  if(look.colour && document.activeElement!==$('lookPicker'))$('lookPicker').value=look.colour;
+  $('lookPickerDot').style.background=look.colour && !swatch ? look.colour : '';
+  if(LOOK_COLOURS)LOOK_COLOURS.show(look.colour);
   const ready=typeof DRAFT_READY!=='undefined' && DRAFT_READY;
-  if(LOOK_READY!==ready){LOOK_READY=ready;document.querySelectorAll?.('#bikeLook input').forEach(i=>{i.disabled=!ready;});}
+  if(LOOK_READY!==ready){LOOK_READY=ready;document.querySelectorAll?.('#bikeLook input').forEach(i=>{i.disabled=!ready;});$('lookPickerChip').disabled=!ready;}
   const swap=liveBikeSwap();
   $('lookUndo').classList.toggle('hidden',!LOOK_CHANGED && !(swap && BIKE_PROFILE_EDITOR_ID===swap.newId));
   $('lookStatus').textContent=LOOK_MESSAGE;
@@ -3983,15 +3987,17 @@ function undoLook(){
   writeLook(LOOK_OPENING.look);LOOK_CHANGED=false;LOOK_MESSAGE=bikeWord('lookUndone');renderLook();
   $('lookUndo').classList.add('hidden');$('bikeLookTitle').focus({preventScroll:true});
 }
-// The phone's own picker paints while it moves and stores once it settles; closing the dialog stores what is left.
-function lookPickerInput(){
-  setLook({colour:String($('lookPicker').value).toLowerCase()},false);
+// More colours' arrow moves paint at once and store once they settle; a tap, closing the grid or the dialog stores what is left.
+let LOOK_PICKER_HEX=null;
+function lookPickerInput(hex){
+  LOOK_PICKER_HEX=String(hex).toLowerCase();
+  setLook({colour:LOOK_PICKER_HEX},false);
   clearTimeout(LOOK_PICKER_TIMER);LOOK_PICKER_TIMER=setTimeout(flushLookPicker,400);
 }
 function flushLookPicker(){
   if(LOOK_PICKER_TIMER===null)return;
   clearTimeout(LOOK_PICKER_TIMER);LOOK_PICKER_TIMER=null;
-  setLook({colour:String($('lookPicker').value).toLowerCase()});
+  setLook({colour:LOOK_PICKER_HEX});
 }
 // A control taken by keyboard shows its whole focus ring (4 px around it, or around its label) between the bike's panel, which stays
 // in view above Look, and the dialog's lower edge. The browser brings the control itself into view, not the ring, and not past the
@@ -4021,8 +4027,7 @@ function initialiseLook(){
   $('lookBars').addEventListener('change',e=>{if(e.target.name==='lookBars')setLook({bars:e.target.value || null});});
   $('lookEbike').addEventListener('change',e=>{if(e.target.name==='lookEbike')setLook({ebike:e.target.value==='' ? null : e.target.value==='true'});});
   $('lookMotor').addEventListener('change',e=>{if(e.target.name==='lookMotor')setLook({motor:e.target.value || null});});
-  $('lookPicker').addEventListener('input',lookPickerInput);
-  $('lookPicker').addEventListener('change',flushLookPicker);
+  $('lookPickerChip').onclick=toggleLookColours;
   $('lookUndo').onclick=undoLook;
   $('lookPhoto').onclick=openLookPhoto;
   initialiseLookExtras();
@@ -4031,6 +4036,40 @@ function initialiseLook(){
   $('bikeSavedSelect').addEventListener('change',()=>{rememberLookOpening();renderLook();});
   $('bikeSwapUndo').onclick=()=>{undoBikeSwap();$('bikeDetailsTitle').focus({preventScroll:true});};
   renderLook();
+}
+
+/* ---- More colours (wish 4, design of 14 Nov 2026): our own grid of 65 named colours in place of the browser's colour input,
+   /tools/bags/colours.js, loaded on the first tap and precached with the page. A tap keeps the colour as a swatch tap does. ---- */
+let LOOK_COLOURS=null,LOOK_COLOURS_SCRIPT=null;
+function loadColours(){
+  if(window.WayfinchColours)return Promise.resolve(window.WayfinchColours);
+  if(!LOOK_COLOURS_SCRIPT)LOOK_COLOURS_SCRIPT=new Promise((resolve,reject)=>{
+    const script=document.createElement('script');script.src='colours.js';
+    script.onload=()=>window.WayfinchColours ? resolve(window.WayfinchColours) : reject(Error('no picker'));
+    script.onerror=()=>{LOOK_COLOURS_SCRIPT=null;script.remove();reject(Error('not loaded'));};
+    document.head.appendChild(script);
+  });
+  return LOOK_COLOURS_SCRIPT;
+}
+async function toggleLookColours(){
+  if(LOOK_COLOURS){closeLookColours(true);return;}
+  let module;
+  try{module=await loadColours();}catch(e){LOOK_MESSAGE=bikeWord('coloursFailed');renderLook();return;}
+  if(LOOK_COLOURS || $('bikeDetailsBox').classList.contains('hidden'))return;
+  if(LOOK_PHOTO){closeLookPhoto();renderLook();}
+  LOOK_COLOURS=module.openColours($('lookColoursBox'),{
+    words:{title:bikeWord('lookMore'),done:bikeWord('coloursDone'),own:name=>bikeWord('coloursOwn',{name})},
+    current:(currentLook()||{colour:null}).colour,
+    onPick:(hex,settle)=>{if(!settle){lookPickerInput(hex);return;}clearTimeout(LOOK_PICKER_TIMER);LOOK_PICKER_TIMER=null;setLook({colour:String(hex).toLowerCase()});},
+    onClose:()=>closeLookColours(true)});
+  $('lookPickerChip').setAttribute('aria-expanded','true');
+  LOOK_COLOURS.focus();
+}
+function closeLookColours(toChip){
+  const picker=LOOK_COLOURS;if(!picker)return;
+  LOOK_COLOURS=null;flushLookPicker();picker.close();
+  $('lookPickerChip').setAttribute('aria-expanded','false');
+  if(toChip)$('lookPickerChip').focus({preventScroll:true});
 }
 
 /* ---- From a photo (spec 7.4, section 10): /tools/bags/bike-photo.js, loaded on the first tap and precached with the page. The photo
@@ -4051,6 +4090,7 @@ async function openLookPhoto(){
   let module;
   try{module=await loadBikePhoto();}catch(e){LOOK_MESSAGE=bikeWord('photoFailed');renderLook();return;}
   if(LOOK_PHOTO || $('bikeDetailsBox').classList.contains('hidden'))return;
+  closeLookColours(false);
   const words={choose:bikeWord('photoChoose'),tap:bikeWord('photoTap'),use:bikeWord('photoUse'),again:bikeWord('photoAgain'),
     close:bikeWord('photoClose'),loupe:bikeWord('photoLoupe'),failed:bikeWord('photoFailed')};
   const note=document.createElement('p');note.className='photo-note';note.textContent=bikeWord('photoNote');
@@ -4177,7 +4217,7 @@ function closeBikeDetailsSoftly(){
 function closeBikeDetails(){
   const root=$('bikeDetailsBox');if(root.classList.contains('hidden'))return;
   const back=LINK_BIKE ? $('bikeDetailsBack').href : null;
-  closeLookPhoto();flushLookPicker();if(LOOK_RIM_TIMER!==null)flushLookRim();
+  closeLookPhoto();closeLookColours(false);flushLookPicker();if(LOOK_RIM_TIMER!==null)flushLookRim();
   LOOK_CHANGED=false;LOOK_MESSAGE='';LINK_BIKE=false;$('lookUndo').classList.add('hidden');$('bikeDetailsBack').classList.add('hidden');
   LINK_ADDS=false;
   root.classList.add('hidden');endDialog(root);
@@ -11572,7 +11612,7 @@ function renderResult(){
 
   /* --- bags you can leave --- */
   const leaveList = [...unused.map(u=>({u, why:'Never opened — your other bags took everything.'})),
-                     ...barely.map(s=>({u:s, why:`Only ${(s.cap-s.left).toFixed(1)} of ${s.cap.toFixed(1)} L used.`}))]
+                     ...barely.map(s=>({u:s, why:`Only ${+(s.cap-s.left).toFixed(2)} of ${+s.cap.toFixed(2)} L used.`}))]
                     .filter(x=>x.u);
   const seen=new Set(); const leaveU = leaveList.filter(x=>!seen.has(x.u.key)&&seen.add(x.u.key));
   const racksOwned = usableUnits().filter(u => u.pos === 'rack').length;
@@ -11621,7 +11661,7 @@ function renderResult(){
   const reachName = (k, byHand) => htmlEsc(kitName(k)) + (tooLongToReach(k) ? ' (too long)' : '') + (byHand ? ' (you moved it there)' : '');
   const {unplaced:rainUnplaced,buried:rainBuried,ready:rainReady}=rainAccess(A);
   if(rainUnplaced.length) reach += `<div class="finding miss"><b>Some rain kit has no fitting bag</b>
-    <p>${htmlEsc([...new Set(rainUnplaced.map(k=>kitName(k)))].join(', '))} still needs a place. Check the overflow in <b>Where it goes</b> and make room in an accessible bag.</p></div>`;
+    <p>Still without a place: ${htmlEsc([...new Set(rainUnplaced.map(k=>kitName(k)))].join(', '))}. Check the overflow in <b>Where it goes</b> and make room in an accessible bag.</p></div>`;
   if(rainBuried.length) reach += `<div class="finding miss"><b>Your rain kit is out of reach</b>
     <p>${rainBuried.map(r=>htmlEsc(r.n)+(r.byHand?' (you moved it there)':'')).join(', ')} — in the ${[...new Set(rainBuried.map(r=>r.w))].join(' and ')}. It takes a few minutes to unstrap and repack a ${rainBuried[0].w}, and in that time you are already soaked. ${opensHere.length ? `Rain shell, dry socks and overshoes belong in the ${opensWhere}, where you stop once and are moving again in thirty seconds.` : noOpener}</p></div>`;
   else if(rainReady) reach += `<div class="finding note"><b>Rain kit is where it should be</b>
@@ -11695,7 +11735,8 @@ function renderResult(){
       <span class="pv">${k.vol} L</span></li>`;
   };
   let allocHtml = slots.map(s => {
-    const used = +(s.cap - s.left).toFixed(1), full = s.left < s.cap*0.06;
+    // litres to 2 decimals, as the plan's own figures (sweep 14 Nov 2026, #26: a 1.06 L bag read "0.9 / 1.1 L" here and in its popover)
+    const used = +(s.cap - s.left).toFixed(2), full = s.left < s.cap*0.06;
     const kg = weightIn(s);
     const open = (S.packOpen && S.packOpen.key === s.key) ? S.packOpen.mode : null;
     let panel = '';
@@ -11712,7 +11753,7 @@ function renderResult(){
         <ul class="movelist">${rows || '<li><span class="dim">Nothing in here to move.</span></li>'}</ul></div>`;
     } else if(open === 'in'){
       const cand = incomingFor(A, s.key);
-      panel = `<div class="packpanel"><p>${s.left.toFixed(1)} L still free in here.
+      panel = `<div class="packpanel"><p>${+s.left.toFixed(2)} L still free in here.
         These would fit, and each is already somewhere else — moving one empties space there instead.</p>
         <ul class="movelist">${cand.length
           ? cand.map(c => `<li><span class="il">${htmlEsc(c.name)} <em class="pv">${c.vol} L</em>
@@ -11721,7 +11762,7 @@ function renderResult(){
           : '<li><span class="dim">Nothing else would fit in the space that is left.</span></li>'}</ul></div>`;
     }
     return `<div class="alloc">
-      <div class="alloc-h"><b>${unitLabel(s)}</b><em class="${full?'full':''}">${used} / ${s.cap.toFixed(1)} L · ${kg.toFixed(1)} kg</em></div>
+      <div class="alloc-h"><b>${unitLabel(s)}</b><em class="${full?'full':''}">${used} / ${+s.cap.toFixed(2)} L · ${kg.toFixed(1)} kg</em></div>
       <div class="alloc-why">${POSITIONS[s.pos].accessible?'<span class="reachdot">Reachable</span> · ':''}${POSITIONS[s.pos].takes}</div>
       ${s.pos === 'bar' && s.items.length ? `<div class="alloc-why">${BAR_LOAD_ADVICE}</div>` : ''}
       <ul>${!s.items.length ? '<li><span class="dim">Empty</span></li>' : s.pos !== 'seat' ? s.items.map(k => line(k, s.key)).join('')
@@ -11895,7 +11936,7 @@ function renderResult(){
       miss.length ? 'red' : (weatherReady ? 'green' : 'amber'),
       (weatherReady ? '' : `<div class="emptyfind">Weather checks are incomplete. ${S.place ? 'Figures for part of the trip are unavailable.' : 'Choose a place in step one.'}</div>`) +
       (miss.length ? miss.map(m=>`<div class="finding miss"><b>${m.t}</b><p>${m.d}</p>${actBtn(m)}</div>`).join('')
-                   : (weatherReady ? '<div class="emptyfind">Nothing essential missing. Unusual — check it twice.</div>' : ''))) +
+                   : (weatherReady ? '<div class="emptyfind">Nothing essential missing.</div>' : ''))) +
     sec(over, 'Leave it behind',
       over ? (fix && fix.cleared ? 'drop ' + fix.drop.length + ' and it fits' : 'still over')
            : (stripped.length ? stripped.length + ' left at home' : (cut.length ? cut.length + ' items' : 'lean list')),
@@ -12699,7 +12740,7 @@ async function receiveHandoff(){
   if(handoffPlannable(t)){
     const base=tripFoundation(),reuse=HANDOFF.reuse && SETUPS.find(x => x.id === HANDOFF.reuse),held=setupHoldingPlan(),passed=passedFoundation();
     const from=base ? 'from your general setup '+base.name : gearBags().length ? 'from the plan here now' : 'starting from the fewest bags that hold the kit';
-    showHandoffBar(`A trip from Wayfinch: ${name}${HANDOFF.long ? '' : ', a day ride'}. Plan bags for this trip? A new trip setup gets ${handoffChanges(t)}, with the bags and kit predicted for it, ${from}${HANDOFF.long ? '' : ', and shows your bike with its bags'}.${passed ? ` Your general setup ${passed.name} has no bags, so it is not used.` : ''} ${held ? `Your plan now is already saved as ${held.name}.` : 'Your plan now is kept as a setup.'}${
+    showHandoffBar(`A trip from Wayfinch: ${name}${HANDOFF.long ? '' : ', a day ride'}. Plan bags for this trip? A new trip setup gets ${handoffChanges(t)}, with the bags and kit predicted for it, ${from}${HANDOFF.long ? '' : ', and shows your bike with its bags'}.${passed ? ` Your general setup ${passed.name} has no bags, so it is not used.` : ''}${held ? ` Your plan now is already saved as ${held.name}.` : planIsUntouched() ? '' : ' Your plan now is kept as a setup.'}${
       reuse ? ` Or open the setup made on ${setupDay(reuse)} for this route.` : ''}${heights}`,{apply:true,plan:true,reuse:!!reuse});
   } else showHandoffBar(`A trip from Wayfinch: ${name}. Apply it to this plan? It sets ${handoffChanges(t)}; your bags, kit and bike stay as they are.${heights}`,{apply:true});
   return true;
@@ -12825,12 +12866,13 @@ function renderSmallBags(A){
   if(over.textContent !== overText) over.textContent=overText;
 }
 // The pockets' line and switches (owner, 9 Nov 2026): "In your jersey pockets: …", and Jersey pockets and Bib shorts pockets to turn off.
-function pocketsHtml(){
+// with its question (sweep 14 Nov 2026, #30): which pockets, and what unticking one does; `box` keeps the two boxes' ids apart
+function pocketsHtml(box='check'){
   const P=pocketPlaces(),and=a => a.length < 2 ? a[0] : a.slice(0,-1).join(', ')+' and '+a[a.length-1];
   const line=[...POCKETS].reverse().map(p => ({p,ids:Object.keys(P).filter(id => P[id] === p.id)})).filter(g => g.ids.length)
     .map(g => `In your ${g.p.name}: ${and(g.ids.map(id => POCKET_NAMES[id]))}.`)
     .concat(Object.keys(P).filter(id => P[id] === 'helmet').map(id => `On your helmet: ${POCKET_NAMES[id]}.`)).join(' ');
-  return (line ? `<p class="small-water">${htmlEsc(line)}</p>` : '')+(POCKET_NOTE ? `<p class="small-water" role="status">${htmlEsc(POCKET_NOTE)}</p>` : '')+`<div class="pocket-switches" role="group" aria-label="Pockets">${
+  return (line ? `<p class="small-water">${htmlEsc(line)}</p>` : '')+(POCKET_NOTE ? `<p class="small-water" role="status">${htmlEsc(POCKET_NOTE)}</p>` : '')+`<p class="small-water pocket-ask" id="pocketAsk-${box}">You ride with these pockets. Untick one and what rides there goes in a bag.</p><div class="pocket-switches" role="group" aria-labelledby="pocketAsk-${box}">${
     [...POCKETS].reverse().map(p => `<label class="pocket-switch"><input type="checkbox" role="switch" data-pocket="${p.id}"${S.pockets && S.pockets[p.id] ? ' checked' : ''}> ${p.label}</label>`).join('')}</div>`;
 }
 // The kit figures of the packing check count the bags; with the pockets of a day ride they say so (review of PR 106, M2).
@@ -12846,7 +12888,7 @@ function renderPockets(){
   for(const id of ['smallPockets','pocketsBox']){
     const box=$(id); if(!box) continue;
     const a=document.activeElement,kept=a && box.contains && box.contains(a) && a.dataset ? a.dataset.pocket : null;
-    box.hidden=!on; box.innerHTML=on ? pocketsHtml() : '';
+    box.hidden=!on; box.innerHTML=on ? pocketsHtml(id === 'smallPockets' ? 'small' : 'check') : '';
     if(!on) continue;
     box.querySelectorAll('[data-pocket]').forEach(i => { i.onchange=() => setPocket(i.dataset.pocket,i.checked); });
     if(kept) box.querySelector(`[data-pocket="${kept}"]`)?.focus?.({preventScroll:true});
@@ -13040,8 +13082,18 @@ function planSameKey(p){
 function todayDay(){ const n=new Date(); return `${n.getDate()} ${MONTHS[n.getMonth()].slice(0,3)}`; }
 // The plan here, as a trip setup with no thumbnail (the drawing is made from the plan when shown), unless a saved setup holds it.
 function setupHoldingPlan(){ const sig=planSameKey(captureDraft()); return SETUPS.find(s => planSameKey(s) === sig) || null; }
+/* A plan with nothing of the rider's in it: the trip, mode and food mode a new plan starts with, no pockets, no bag, no route or place,
+   no deck, no kit touched, sized, counted, added, placed by hand, ticked or carried. It is not kept as a setup before a trip is planned (sweep 14 Nov 2026, #31: "Before … · 0 bags", a plan the rider
+   never made); Undo still brings it back, from the draft taken before the tap. */
+function planIsUntouched(){
+  const none=o => !o || !Object.keys(o).length;
+  // the trip, the mode and the food mode as a new plan starts them, and no pockets (review of PR 141, m1)
+  const started=Object.keys(PLAN_START).every(k => S[k] === PLAN_START[k]) && !S.departureDate && S.month === new Date().getMonth() && !S.pockets;
+  return started && !S.bags.length && !S.gpx && !S.place && !S.place2 && !(S.decks && (S.decks.bar || S.decks.rack)) && none(S.kitTouched) && none(S.custom)
+    && none(S.qty) && none(S.pinned) && none(S.packed) && none(S.carried) && !KIT.some(k => k.added);
+}
 function keepPlanBefore(){
-  if(setupHoldingPlan()) return null;
+  if(setupHoldingPlan() || planIsUntouched()) return null;
   const raw={...snapshotSetup(`Before ${HANDOFF.name}, ${todayDay()}`,''),thumb:''};
   return normaliseSetup(raw) || raw;   // as it reads back from storage, so Undo knows it unchanged after another tab's write (review of PR 80, m-3)
 }
@@ -15363,7 +15415,7 @@ function openBagPop(key, fromButton=null){
   if(fromList && $('rigBox').scrollIntoView) $('rigBox').scrollIntoView({block:'center'});
   const returnFocus=fromList ? {root:resultList,saved:captureFocus(resultList,fromButton)} : {root:svg,saved:captureFocus(svg) || captureFocus(svg,opener)};
 
-  const used = +(s.cap - s.left).toFixed(1);
+  const used = +(s.cap - s.left).toFixed(2);
   const pct = s.cap > 0 ? (s.cap - s.left) / s.cap : 0;
   const pctFull = Math.round(pct * 100);
   const kg = weightIn(s);
@@ -15375,7 +15427,7 @@ function openBagPop(key, fromButton=null){
 
   const head = `
     <b>${htmlEsc(geo.label)}</b>
-    <span>${used} / ${s.cap.toFixed(1)} L · ${kg.toFixed(1)} kg</span>
+    <span>${used} / ${+s.cap.toFixed(2)} L · ${kg.toFixed(1)} kg</span>
     <div class="popbar"><i style="width:${Math.min(100,pctFull)}%;background:${fillColour(pct)}"></i></div>
     <em>${pctFull}% full · ${P.accessible ? 'opens at the roadside' : 'stop and unpack'}${
       bagMaxLength(s) ? ' · inside length ' + bagMaxLength(s) + ' cm (' + (s.longestCm ? 'your measurement' : 'estimated') + ')' : ''}</em>`;
