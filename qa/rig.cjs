@@ -164,8 +164,13 @@ test('[LC-RIG-TAPS] with no bike.js the rig still shows a bike, the bags and eve
   assert.ok(bare.run('currentPlan().slots.length')>0);
 });
 
-test('[LC-RIG-SAME-PLAN] a bike without frame details plans byte-identically to the frozen root copy, and drawing the rig changes nothing',()=>{
-  const old=appVM({page:path.join(__dirname,'..','releases','load-check-root.html'),bike:false});
+test('[LC-RIG-SAME-PLAN] a bike without frame details plans byte-identically to the frozen root copy (its deck rule read as today\'s), and drawing the rig changes nothing',()=>{
+  // The root copy keeps the deck rule of before the owner's decision of 7 Nov 2026 (the sleeping bag rides on the rack deck too). It is
+  // compared here with that one line read as today's, the only difference the plans may have; the file itself is never changed.
+  const oldDeck="const DECK_CLAIMS = ['tent','pad'];",newDeck="const DECK_CLAIMS = ['tent','pad','quilt'];";
+  const old=appVM({page:path.join(__dirname,'..','releases','load-check-root.html'),bike:false,
+    edit:html=>{assert.equal(html.split(oldDeck).length,2,'the root copy has its deck rule once');return html.replace(oldDeck,newDeck);}});
+  assert.equal(q.run('JSON.stringify(DECK_CLAIMS)'),old.run('JSON.stringify(DECK_CLAIMS)'),'the page has today\'s deck rule');
   const snapshot=(vm,code)=>vm.run(`(()=>{${code};const A=currentPlan();
     return JSON.stringify({slots:A.slots,inUse:A.inUse,items:A.items,overflow:A.overflow,summary:packingSummary(A),
       specs:S.bags.map(b=>bagSpec(b)),cap:capL(),rated:ratedTotal(),water:waterL(),kit:kitL()});})()`);

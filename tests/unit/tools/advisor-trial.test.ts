@@ -54,8 +54,11 @@ function riderSetup(r: Rider): string {
     if(k.length&&b.length)S.pinned={[k[${r.hand}%k.length].id]:b[${r.hand}%b.length].uid+'-0'};}`;
   return `S.bags=${JSON.stringify(bags)};S.nextUid=${bags.length + 1};S.decks={bar:${r.barDeck},rack:${r.rackDeck}};S.nights=${r.nights};S.sleep='${r.sleep}';
     S.placements=null;S.pinned={};S.packed={};S.qty={};applyTripKitDefaults();${CARRY[r.carry as keyof typeof CARRY]}${hand}S.step=2;S.baseNights=S.nights;
-    ${r.drift ? 'currentPlan();S.nights=(S.nights+2)%6;{const k=KIT.find(k=>!S.kit[k.id]&&!k.added&&!k.divisible);if(k)S.kit[k.id]=true;}currentPlan();' : ''}`;
+    ${r.drift ? `currentPlan();S.nights=(S.nights+2)%6;${DRIFT_ADD}${DRIFT_ADD}currentPlan();` : ''}`;
 }
+// The drift's kit change: one more kit item, twice. One was enough until the sleeping bag rode on the rack deck too (the owner's decision
+// of 7 Nov 2026): with it out of the bags, fewer kept plans drift from a fresh one (22 of this seed's riders, under the 25 checked below).
+const DRIFT_ADD = '{const k=KIT.find(k=>!S.kit[k.id]&&!k.added&&!k.divisible);if(k)S.kit[k.id]=true;}';
 
 test('[GA-TRY-SAME] [GA-TRIAL-NO-TRACE] [GA-KEEP] [GA-REMOVE] over 200 generated riders, for every suggestion: Try gives exactly the suggestion\'s items, overflow and back litres; a closing tab writes nothing of it; after Remove, S, the kept plan, every loadcheck:* key and an export are byte for byte as before; and with 0-3 other changes during one more trial, Remove leaves every loadcheck:* key (the summary included) and an export as those changes alone would, and Keep saves the kept bags and their summary', () => {
   // A: the rider's page, where the trials run. B: the same rider's page, given the same other changes but no trial.

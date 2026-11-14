@@ -10,7 +10,11 @@ assert(fixtures.length>0,'no selection fixtures: refusing an empty set');
 const {runFixture}=require('./fixtures/selection/steps.cjs');
 const kit=planKit();
 // [LC-FREEZE-01] Design 13: a hash over every frozen datum. Any edit to these fails here and needs the owner's approval and new fixtures.
-const FROZEN_FINGERPRINT='d6269efcc251e3e5df0a818402d2a71e4413c3a398a9cbdd2afa312833ab0215';
+// Changed once, on the owner's decision of 7 Nov 2026: the sleeping bag ('quilt') joined DECK_CLAIMS (the rack deck).
+const FROZEN_FINGERPRINT='db07f75654fd19d487bdbf9755675654e7ee623356a83c0c7b1ca98bff7a5a67';
+// The fingerprint before that decision. [LC-DECK-ONLY]: with DECK_CLAIMS read back as it was, the hash is this one again, so the
+// sleeping bag on the deck is the only frozen datum that changed.
+const FINGERPRINT_BEFORE_DECK='d6269efcc251e3e5df0a818402d2a71e4413c3a398a9cbdd2afa312833ab0215';
 const crypto=require('node:crypto');
 const frozen=JSON.parse(kit.vm.run(`JSON.stringify({
   numbers:{PACK_EFF,COMFY_MARGIN,BULKY,FOOD_CAP},
@@ -24,6 +28,11 @@ const fingerprint=crypto.createHash('sha256').update(JSON.stringify(frozen)).dig
 if(process.env.PRINT_FINGERPRINT)console.log('fingerprint',fingerprint);
 assert.equal(fingerprint,FROZEN_FINGERPRINT,'LC-FREEZE-01: frozen behaviour data changed (design 13). Needs the owner\'s approval and new fixtures.');
 console.log('LC-FREEZE-01 ok');
+assert.deepEqual(frozen.lists.DECK_CLAIMS,['tent','pad','quilt'],'LC-DECK-ONLY: the rack deck claims the tent, the mat and the sleeping bag');
+const before={...frozen,lists:{...frozen.lists,DECK_CLAIMS:['tent','pad']}};
+assert.equal(crypto.createHash('sha256').update(JSON.stringify(before)).digest('hex'),FINGERPRINT_BEFORE_DECK,
+  'LC-DECK-ONLY: something frozen besides DECK_CLAIMS changed');
+console.log('LC-DECK-ONLY ok');
 
 let steps=0;
 for(const fixture of fixtures){

@@ -462,7 +462,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 
 - The page in git has the recorded hash, so it changes only on purpose (§7.1, §12) [LC-PAGE-LIVE]
 - The QA runner runs every suite in qa/ except its three helpers (§12) [LC-QA-ALL]
-- The frozen bag rules and their fixtures are unchanged (§7.1, §12) [LC-FREEZE-01]
+- The frozen bag rules and their fixtures are unchanged, but for the sleeping bag on the rack deck, the owner's decision of 7 Nov 2026 (§7.1, §12) [LC-FREEZE-01]
 - Until the launch, / serves releases/load-check-root.html, frozen at the first release's hash; the bag planner changes behind the switch (sub-project 6, Decision 2) [LC-ROOT-FROZEN]
 
 ## Builds, the new worker and the handover
@@ -920,7 +920,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - each drawing-set entry drawn through bike.js in the page and through bikeArt in Vitest gives the same SVG string (§7.4) [C-DRAWING-SET]
 - every style, size and bag combination of the drawing set: each tap target sits on its anchor, inside the view, no two overlapping (§7.4 Bags and anchors) [LC-RIG-ANCHORS]
 - every rig control that worked before still works: tag, quick-pick, deck, frame shape, focus dimming, keyboard (§7.1 item 11) [LC-RIG-TAPS]
-- the selection fixtures and LC-FREEZE-01 unchanged; a bike without frame details plans byte-identically; the load summary unchanged (§7.1) [LC-RIG-SAME-PLAN]
+- the selection fixtures and LC-FREEZE-01 unchanged; a bike without frame details plans byte-identically to the frozen root copy, its deck rule read as today's (the sleeping bag on the rack deck, 7 Nov 2026); the load summary unchanged (§7.1) [LC-RIG-SAME-PLAN]
 - safeDataThumb keeps the new bk-* classes and a hex stroke; a saved thumbnail keeps the colour, and a hostile string still fails (§7.4 Theme) [LC-RIG-THUMB]
 - every colour, bar and e-bike choice in Look is reachable with no text input, as a labelled radio or chip of at least 44 px (§7.4 Look) [LC-LOOK-TAPS]
 - a swatch tap changes the preview's frame stroke synchronously, drawn in 20 ms or less (§7.4 Look) [LC-LOOK-INSTANT]
@@ -1242,3 +1242,11 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - "Get ready offline" is called "Prepare this route" wherever a rider reads it (Trip's step and button, En route's cards and their button, notes, You, the privacy page); its ids, keys and function names stay; no wording module or the privacy page says "Get ready" (§3.3) [PREP-NAME]
 - under the Prepare this route button one line says what it fetches and why; Trip's heading has "Plan before you ride" and En route's "While you ride: the next water, food, sleep and weather" under it; the Route step says when to upload a GPX and when a town-to-town route is enough; their words are in lazy modules (§3.3) [PREP-LINE]
 - they add nothing to the first screen's JavaScript: at or below main's figure at the branch point, 144,741 bytes gzipped (4f9cddc) (§4.5) [PREP-FIRST]
+
+## Bag planner: the sleeping bag on the rack deck (the owner's decision of 7 Nov 2026)
+
+- camping with the rack deck on, the sleeping bag rides on the rack top deck with the tent and the mat (`DECK_CLAIMS`), never in a bag; the deck has no limit, so all three ride there at once; its kilos are the deck's in the weight map, at the rear for Handling first, in the rack's kilos of Wayfinch's summary and in the Gear advisor's deck; the deck off, an indoor trip or the sleeping bag unticked: as before [LC-DECK-QUILT]
+- a kept plan whose bags still hold the sleeping bag with the deck on (kept before this decision, or by an older page): the sleeping bag goes up on the deck, everything else stays where it was, a note says so once with the bag it left, and a hand placement of it waits, kept, while the deck holds it [LC-DECK-NOTE]
+- the rider reads the deck's kit as a list ("sleeping quilt or bag, sleeping mat and tent", never "and … and") in The rack top takes and Already up there; under a pannier the rack deck's line names the sleeping bag, in a dry bag (`POSITIONS` unchanged) [LC-DECK-WORDS]
+- the frozen bag rules differ from those before this decision by `DECK_CLAIMS` alone: with it read back as `['tent','pad']`, the fingerprint is the old one [LC-DECK-ONLY]
+- the Gear advisor's rack deck suggestion offers the sleeping bag with the tent and the mat ("Put the sleeping quilt or bag, sleeping mat and tent on your rack, no new bag needed"), and its moves take the sleeping bag to the rack top deck [GA-DECK-QUILT]

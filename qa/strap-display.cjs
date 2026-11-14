@@ -131,4 +131,77 @@ test('outside suggestions explain the omitted handlebar roll prerequisite',()=>{
   check(!nodes.get('resultBox').innerHTML.includes('Mount your handlebar roll before using its straps.'),'standalone rack deck does not require a handlebar roll');
 });
 
+// ---- The owner's decision of 7 Nov 2026: a sleeping bag may go on the rack deck, like the tent and the mat ----
+const seat={uid:3,pos:'seat',L:14},rackBag={uid:4,pos:'rack',L:20};
+const kgOf=ids=>run(`+${JSON.stringify(ids)}.reduce((n,id)=>n+itemKg(kitById(id)),0).toFixed(2)`);
+const near=(a,b)=>Math.abs(a-b)<0.005;
+
+test('[LC-DECK-QUILT] camping with the rack deck on, the sleeping bag rides on the rack top deck with the tent and the mat: never in a bag, all three at once, its kilos the deck\'s',()=>{
+  render({bags:[frame,seat],kit:{quilt:true,tent:true,pad:true,pump:true},decks:{bar:false,rack:true}});
+  check(run('JSON.stringify(deckedIds())')==='["quilt","pad","tent"]','the sleeping bag, the mat and the tent, in the kit list\'s order: the deck has no limit, so none waits for room');
+  check(run('allocate().slots.every(s=>s.items.every(k=>k.id!=="quilt"))'),'the sleeping bag is in no bag');
+  check(run('!currentPlan().items.quilt'),'nor in the plan\'s placements');
+  check(run('near=(a,b)=>Math.abs(a-b)<0.005;near(kitL(),+activeKit().filter(k=>!["quilt","pad","tent"].includes(k.id)).reduce((s,k)=>s+itemL(k),0).toFixed(2))'),'the litres inside leave the three out');
+  const three=kgOf(['quilt','pad','tent']);
+  check(near(run('deckMapItem(rigAnchors()).reduce((t,i)=>t+i.kg,0)'),three),'the weight map\'s deck carries their kilos');
+  check(near(run('advisorResult(currentPlan()).kgByPos.deck'),three),'so does the Gear advisor\'s deck');
+  check(near(run('loadByZone(currentPlan().slots).rear')-run('currentPlan().slots.filter(s=>POSITIONS[s.pos].zone==="rear").reduce((t,s)=>t+weightIn(s),0)'),three),'Handling first counts them at the rear');
+  check(run('loadSummary().decks.rack')==='loaded'&&near(run('loadSummary().weight.byPositionKg.rack'),three),'Wayfinch\'s summary: the rack deck loaded, its kilos the rack\'s');
+  const d=deck('rack');
+  check(d&&!d.classes.has('deck-empty'),'the rig draws the deck loaded');
+  // the sleeping bag alone loads the deck
+  render({bags:[frame,seat],kit:{quilt:true,pump:true},decks:{bar:false,rack:true}});
+  check(run('JSON.stringify(deckedIds())')==='["quilt"]'&&!deck('rack').classes.has('deck-empty'),'the sleeping bag alone is a loaded deck');
+  // and as before everywhere else
+  render({bags:[frame,seat],kit:{quilt:true,tent:true,pad:true,pump:true},decks:{bar:false,rack:false}});
+  check(run('deckedIds().length===0&&!!currentPlan().items.quilt'),'deck off: the sleeping bag is in a bag');
+  render({bags:[frame,seat],kit:{quilt:true,tent:true,pad:true,pump:true},sleep:'indoor',decks:{bar:false,rack:true}});
+  check(run('deckedIds().length===0'),'an indoor trip: nothing on the deck');
+  render({bags:[frame,seat],kit:{tent:true,pad:true,pump:true},decks:{bar:false,rack:true}});
+  check(run('JSON.stringify(deckedIds())')==='["pad","tent"]','the sleeping bag unticked: the mat and the tent, as before');
+});
+
+test('[LC-DECK-WORDS] the rider reads the three as a list: the rack top note and Already up there; the rack\'s deck line names the sleeping bag, in a dry bag',()=>{
+  render({step:2,bags:[frame,seat,rackBag],kit:{quilt:true,tent:true,pad:true,pump:true},decks:{bar:false,rack:true}});
+  run('renderBags();');
+  const list=nodes.get('bagList').innerHTML;
+  check(list.includes('<b>The rack top takes sleeping quilt or bag, sleeping mat and tent</b>'),'the rack top note, a list');
+  check(list.includes(`<p>${run('activeKit().filter(k=>["quilt","pad","tent"].includes(k.id)).reduce((s,k)=>s+itemL(k),0).toFixed(1)')} L strapped outside bags.`),'with their litres');
+  check(list.includes('<i class="deckline">tent, sleeping mat and sleeping bag (in a dry bag) live up here, panniers or not</i>'),'the rack\'s deck line');
+  check(run('POSITIONS.rack.strapNote')==='tent and sleeping mat live up here, panniers or not','POSITIONS itself unchanged');
+  render({bags:[frame,seat],kit:{quilt:true,tent:true,pad:true,pump:true},decks:{bar:false,rack:true}});
+  run('renderResult();');
+  check(nodes.get('resultBox').innerHTML.includes('<b>Already up there: sleeping quilt or bag, sleeping mat and tent</b>'),'Already up there, a list');
+  check(!/ and [^<]* and /.test((nodes.get('resultBox').innerHTML.match(/<b>Already up there: [^<]*<\/b>/)||[''])[0]),'never "and … and"');
+});
+
+test('[LC-DECK-NOTE] a kept plan from before, with the sleeping bag in a bag and the deck on: the sleeping bag goes up on the deck, everything else stays where it was, and a note says so once',()=>{
+  // a plan as the page before this rule kept it with the rack deck on: the tent and the mat on the deck, the sleeping bag in the seat pack
+  render({bags:[frame,seat],kit:{quilt:true,tent:true,pad:true,pump:true,rain:true,puffy:true,cap:true,socks:true},decks:{bar:false,rack:false}});
+  run('S.pinned={};S.placements=null;currentPlan();');
+  const fresh=JSON.parse(run('JSON.stringify(S.placements)'));
+  check(fresh.items.quilt&&fresh.items.tent&&fresh.items.pad,'with the deck off all three are in bags');
+  const stored={...fresh,basis:{...fresh.basis,rackDeck:true},items:Object.fromEntries(Object.entries(fresh.items).filter(([id])=>!['tent','pad'].includes(id)))};
+  const from=stored.items.quilt.map(e=>e[0]);
+  context.qaStored=JSON.stringify(stored);
+  run('S.decks={bar:false,rack:true};keepPlan({load:JSON.parse(qaStored)});');
+  const plan=JSON.parse(run('JSON.stringify((()=>{const a=currentPlan();return {items:a.items,notes:a.notes,decked:deckedIds()};})())'));
+  check(!plan.items.quilt&&plan.decked.includes('quilt'),'the sleeping bag is on the deck');
+  for(const [id,entries] of Object.entries(stored.items))if(id!=='quilt'&&id!=='food')
+    check(JSON.stringify(plan.items[id])===JSON.stringify(entries),`${id} stays where it was`);
+  check(plan.notes.replan&&plan.notes.replan.reason==='deckRule'&&JSON.stringify(plan.notes.replan.toDeck)===JSON.stringify([{id:'quilt',from}]),'the note names the sleeping bag and its bag');
+  run('renderResult();');
+  const bagName=run(`unitLabel(usableUnits().find(u=>u.key===${JSON.stringify(from[0])})).toLowerCase()`);
+  check(nodes.get('resultBox').innerHTML.includes(`<div class="finding note"><p>Your sleeping quilt or bag now rides on the rack top deck, as the planner now packs a camping trip with the rack deck on. It was in the ${bagName}; everything else stays where it was.</p></div>`),'the rider reads it');
+  check(run('JSON.stringify(S.placements.items.quilt||null)')==='null','the kept plan is stored without it');
+  // once: the next change, or the plan read again from what is stored now, has no note
+  run('keepPlan({load:JSON.parse(JSON.stringify(S.placements))});');
+  check(run('currentPlan().notes.replan')===null,'opened again: no note');
+  // a hand placement of the sleeping bag waits, kept, while the deck holds it, and is back with the deck off
+  run(`S.decks={bar:false,rack:false};S.pinned={quilt:${JSON.stringify(from[0])}};currentPlan();S.decks={bar:false,rack:true};currentPlan();`);
+  check(run('recordOfPin("quilt")')==='dormant'&&run('S.pinned.quilt')===from[0],'deck on: the hand placement is kept, waiting');
+  run('S.decks={bar:false,rack:false};currentPlan();');
+  check(run('currentPlan().items.quilt[0][0]')===from[0],'deck off: the sleeping bag is back where the rider put it');
+});
+
 console.log(JSON.stringify({suite:'strap-display',cases,checks,scope:'actual allocation and emitted SVG plus scoped colour/thumbnail rules; no browser rendering'}));
