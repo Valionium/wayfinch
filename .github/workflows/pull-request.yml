@@ -52,17 +52,19 @@ jobs:
       - run: npm ci
       - run: npm run qa
 
-  # The browser tests in four parts side by side (plan Task 23: over 6 minutes in one; three parts grew to 9-12 minutes and were
+  # The browser tests in parts side by side (plan Task 23: over 6 minutes in one; three parts grew to 9-12 minutes and were
   # cut off at their limit with no failing test), and the budgets alone, so nothing else runs on the machine while they are timed.
-  # The job limit is 15 so a slow browser install cannot cut a part off. The check a merge needs stays `browser`, which waits
-  # for every part in this matrix.
+  # The two phone projects (processor slowed to a quarter) have four parts of their own with one worker, so no second test shares
+  # the machine (the owner's choice of 15 November 2026: a slowed page that shared it sometimes stopped answering for a minute);
+  # every other project runs in two parts with two workers. The job limit is 15 so a slow browser install cannot cut a part off.
+  # The check a merge needs stays `browser`, which waits for every part in this matrix.
   browser-shard:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        part: ['1/4', '2/4', '3/4', '4/4', 'budgets']
+        part: ['1/2', '2/2', 'phone 1/4', 'phone 2/4', 'phone 3/4', 'phone 4/4', 'budgets']
     env:
       WAYFINCH_SHARDED: '1'
     steps:
@@ -113,11 +115,23 @@ jobs:
       - run: npm run build
       # A part that ran no test at all fails: an empty shard once went green.
       - run: |
-          if [ "${{ matrix.part }}" = budgets ]; then npx playwright test --project=app-budgets --reporter=list,json
-          else npx playwright test --shard=${{ matrix.part }} --grep-invert '\[PERF-' --reporter=list,json; fi
+          part="${{ matrix.part }}"
+          if [ "$part" = budgets ]; then npx playwright test --project=app-budgets --reporter=list,json
+          elif [ "${part#phone }" != "$part" ]; then
+            npx playwright test --project=app-phone --project=app-phone-light --workers=1 --shard="${part#phone }" --grep-invert '\[PERF-' --reporter=list,json
+          else WAYFINCH_PHONE_APART=1 npx playwright test --shard="$part" --grep-invert '\[PERF-' --reporter=list,json; fi
           node -e "const s = require('./pw.json').stats; if (!(s.expected + s.unexpected + s.flaky > 0)) { console.error('This part ran no test.'); process.exit(1); }"
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: pw.json
+      # A failed part keeps what Playwright saved of its failed tests (the trace and screenshot of playwright.config.ts) for a week:
+      # `gh run download <run id>` fetches it, `npx playwright show-trace <trace.zip>` opens it.
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ strategy.job-index }}
+          path: test-results
+          retention-days: 7
+          if-no-files-found: ignore
   # WebKit's smoke set (plan Decision 1): it runs on every pull request, is not a required check, and `browser` does not wait for it.
   webkit-smoke:
     runs-on: ubuntu-latest
