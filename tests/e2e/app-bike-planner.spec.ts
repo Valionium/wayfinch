@@ -118,9 +118,9 @@ test('[LC-LOOK-TAPS] every Look choice is a labelled tap target of at least 44 p
   // nothing changed yet: no Undo, and no Back link when Bike details was not opened from the co-pilot
   await expect(page.locator('#lookUndo')).toBeHidden();
   await expect(page.locator('#bikeDetailsBack')).toBeHidden();
-  const picker = await page.locator('#lookPicker').boundingBox();
+  const picker = await page.locator('#lookPickerDot').boundingBox();
   expect(Math.abs(picker!.width - picker!.height)).toBeLessThan(1); // the picker's own swatch is a round dot
-  const targets = look.locator('label.look-swatch, label.look-chip');
+  const targets = look.locator('label.look-swatch, label.look-chip, #lookPickerChip');
   expect(await targets.count()).toBe(17 + 1 + 4 + 3);
   for (const box of await targets.evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return { w: r.width, h: r.height, text: el.textContent!.trim() }; }))) {
     expect(box.h, box.text).toBeGreaterThanOrEqual(44);

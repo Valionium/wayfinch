@@ -51,7 +51,7 @@ function SettingsCard({ services, snap, reload }: { services: YouServices; snap:
           </div>
         ) : null}
         {problem ? <p class="field-problem" role="alert">{problem}</p> : null}
-        <p class="muted" data-you-install>{Y.youInstallAndroid}</p>
+        {typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent) ? <p class="muted" data-you-install>{Y.youInstallAndroid}</p> : null}
       </div>
     </Card>
   );

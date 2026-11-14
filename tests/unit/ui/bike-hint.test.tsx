@@ -338,7 +338,7 @@ describe('the places seen and the "fits better" lines', () => {
     go('tools');
     await act(() => { render(<ToolsScreen services={services(memory({ 'loadcheck:bikeProfiles': '[]' }))} />, host); });
     const line = host.querySelector<HTMLElement>('.bike-line[data-hint-line]')!;
-    expect(line.textContent).toBe('Bike: a typical gravel bike · Add yours');
+    expect(line.textContent).toBe('Bike: a typical gravel bike · Add your bike');
     expect(line.querySelector('a')!.getAttribute('href')).toBe('/tools/bags/#bike-details=new&back=tools');
     render(null, host);
     localStorage.setItem('loadcheck:bikeProfile', JSON.stringify(BIKE));

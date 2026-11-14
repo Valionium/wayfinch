@@ -1,10 +1,11 @@
 // Water learning (spec sections 3.5 and 6.3): the status of the personal factor, and the post-ride report. The report is worked
 // out in `core` (reportRide); this only collects the answers and shows what comes back.
-import { useState } from 'preact/hooks';
+import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { REPORT_TEMPS } from '../../core/engines/ride-report.ts';
 import type { ReportTemp, RideOutcome } from '../../core/engines/ride-report.ts';
 import { uncertainty } from '../../core/engines/water-base.ts';
 import { W } from '../../core/wording/en.ts';
+import { YR } from '../../core/wording/en-ride-refuse.ts';
 import { Y } from '../../core/wording/en-you.ts';
 import { Card } from '../card.tsx';
 import type { YouServices, YouSnapshot } from './services.ts';
@@ -33,6 +34,14 @@ export function LearnCard({ services, snap, reload }: { services: YouServices; s
   const [hilly, setHilly] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [added, setAdded] = useState<Added | null>(null);
+  // The form's first field takes the focus as it opens; closed, the button that opened it has it back (sweep 14 Nov, 49).
+  const opener = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+  useLayoutEffect(() => {
+    if (open) document.getElementById('ride-hours')?.focus();
+    else if (wasOpen.current) opener.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
   const { profile } = snap;
 
   const submit = async (): Promise<void> => {
@@ -50,7 +59,7 @@ export function LearnCard({ services, snap, reload }: { services: YouServices; s
       ...(l === null ? {} : { massLossKg: l }), ...(s === null ? {} : { toiletStops: s }), hilly,
     }, profile, snap.settings.flatKph);
     if (!outcome.ok) {
-      setProblem({ short: W.appStoreRideShort, long: W.appStoreRideLong, intake: W.appStoreRideIntake, weighing: W.appStoreRideWeighing }[outcome.reason]);
+      setProblem({ short: W.appStoreRideShort, long: YR.appStoreRideLong, intake: W.appStoreRideIntake, weighing: YR.appStoreRideWeighing }[outcome.reason]);
       return;
     }
     if (refused) {
@@ -78,7 +87,7 @@ export function LearnCard({ services, snap, reload }: { services: YouServices; s
         </p>
         {snap.hillyRides > 0 ? <p class="muted" data-hilly-count>{Y.youLearnHilly(snap.hillyRides)}</p> : null}
         <p class="muted">{Y.youLearnIntro}</p>
-        {!open ? <button type="button" class="btn" onClick={() => setOpen(true)}>{Y.youRideOpen}</button> : (
+        {!open ? <button type="button" class="btn" ref={opener} onClick={() => setOpen(true)}>{Y.youRideOpen}</button> : (
           <form data-ride-form noValidate onSubmit={(e) => { e.preventDefault(); void submit(); }}>
             <div class="field">
               <label for="ride-hours">{Y.youRideHours}</label>
