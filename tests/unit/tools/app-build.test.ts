@@ -479,3 +479,15 @@ test("[PREP-FIRST] Prepare this route adds nothing to the first screen: at or be
   console.log(`PREP-FIRST: first screen ${figures.firstJsGzip} bytes gzipped`);
   expect(figures.firstJsGzip).toBeLessThanOrEqual(144_741);
 });
+
+// Trip prep, "Before you leave" in Trip's Prepare this route step (design of 15 November 2026): the list, its words and its ticks' key come
+// with that step's lazy chunk. 141,425 bytes is main's first screen at the branch point (16e828a); the first screen may not rise above it.
+test("[TRIP-PREP-FIRST] Before you leave adds nothing to the first screen: at or below main's figure; its list, words and key are a lazy chunk", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  for (const mark of ['copilot:tripPrep:v1', 'Pack a repair kit that fits your bike', 'data-prep-item']) expect(first.includes(mark), mark).toBe(false);
+  const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
+  expect(lazy.filter((f) => text(on, f).includes('data-prep-item') && text(on, f).includes('copilot:tripPrep:v1')).length).toBe(1);
+  console.log(`TRIP-PREP-FIRST: first screen ${figures.firstJsGzip} bytes gzipped, lazy ${figures.lazyJsGzip}`);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(141_425);
+});
