@@ -16,9 +16,10 @@ test('[BC-SEARCH-WORDS] "squeak" finds the chain lube and the brake pad tasks; "
   for (const id of held(['chain-lube', 'brakes-pads-disc', 'brakes-pads-rim'])) expect(squeak, id).toContain(id);
   expect(squeak).toEqual(['chain-dry-lube', 'brakes-pads-disc', 'brakes-pads-rim', 'chain-lube', 'brakes-squeal']);
   expect(held(['chain-lube', 'brakes-pads-disc', 'brakes-pads-rim']).length).toBe(3);
-  // the bleed itself, and the spongy-brake task that sends the rider to it
-  expect(held(['brakes-hydraulic-bleed', 'brakes-spongy']).length).toBe(2);
-  expect(find('bleed')).toEqual(['brakes-hydraulic-bleed', 'brakes-spongy']);
+  // the bleed itself, and the spongy-brake task that sends the rider to it; since the owner's ruling of 14 November 2026 also the
+  // hydraulic rim brake's spongy lever, which is a bleed too
+  expect(held(['brakes-hydraulic-bleed', 'brakes-spongy', 'brakes-hydro-rim-spongy']).length).toBe(3);
+  expect(find('bleed')).toEqual(['brakes-hydraulic-bleed', 'brakes-spongy', 'brakes-hydro-rim-spongy']);
   const chain = find('chain');
   const chainTasks = CARE_TASKS.filter((t) => t.part === 'chain').map((t) => t.id);
   expect(chainTasks.length).toBeGreaterThan(0);

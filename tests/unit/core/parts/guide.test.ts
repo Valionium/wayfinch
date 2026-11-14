@@ -1,4 +1,4 @@
-// The parts guide (care pictures design of 7 November 2026, section 4; the owner's answers of 8 November): 36 parts in six groups, each
+// The parts guide (care pictures design of 7 November 2026, section 4; the owner's answers of 8 November): 36 parts and the wheel in six groups, each
 // with words, close-ups that exist, mix-ups that exist; the part names in the roadside cards' steps that open it; the close-ups' files.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -28,11 +28,11 @@ const GUIDE_PICTURE_WORDS = checked.pictures;
 const PICTURE_WORDS: Record<string, unknown> = CARE_WORDS.pictures;
 const sentences = (t: string): number => t.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).length;
 
-test("[PG-DATA] the guide holds the design's 36 parts in its six groups, in order, each with words, close-ups and mix-ups that exist", () => {
+test("[PG-DATA] the guide holds the design's 36 parts and the wheel (the owner's ruling of 14 November 2026) in its six groups, in order, each with words, close-ups and mix-ups that exist", () => {
   expect(GUIDE.map((p) => p.id)).toEqual([...PART_PLACES]);
   const groups = new Map<string, number>();
   for (const p of GUIDE) groups.set(p.group, (groups.get(p.group) ?? 0) + 1);
-  expect([...groups]).toEqual([['steering', 6], ['wheels', 6], ['tyres', 5], ['brakes', 8], ['drive', 8], ['ebike', 3]]);
+  expect([...groups]).toEqual([['steering', 6], ['wheels', 7], ['tyres', 5], ['brakes', 8], ['drive', 8], ['ebike', 3]]);
   expect(checked).not.toBeNull();
   expect(Object.keys(PART_WORDS).sort()).toEqual([...PART_PLACES].sort());
   // the words file is checked whole: a part without its text is no file
@@ -53,6 +53,22 @@ test("[PG-DATA] the guide holds the design's 36 parts in its six groups, in orde
   // The design's two examples (4.1).
   expect(partById('brake-qr')!.mixed).toContain('wheel-qr');
   expect(partById('derailleur')!.mixed).toContain('hanger');
+});
+
+// The owner's ruling of 14 November 2026: the guide has a part called the wheel (the rim stood for it), first in the wheels group: what it
+// is (the hub, the spokes and the rim, with the tyre on the rim) and what it connects to (the dropouts, by a thru-axle, a quick release
+// or nuts); a beginner mixes it up with the rim, and the rim with it.
+test("[PG-WHEEL] the guide has the wheel, first of the wheels: its name, what it is and what it connects to; the rim and the wheel are each other's mix-up", () => {
+  const wheel = partById('wheel');
+  expect(wheel).toBeDefined();
+  expect(wheel!.group).toBe('wheels');
+  expect(GUIDE.filter((p) => p.group === 'wheels')[0]!.id).toBe('wheel');
+  expect(wheel!.tag).toBeUndefined();
+  expect(wheel!.mixed).toContain('rim');
+  expect(partById('rim')!.mixed).toContain('wheel');
+  const w = PART_WORDS.wheel;
+  expect(w.name).toBe('Wheel');
+  for (const part of ['hub', 'spokes', 'rim', 'tyre', 'dropouts', 'thru-axle', 'quick release', 'nuts']) expect(w.text, part).toContain(part);
 });
 
 const D = (o: Partial<PictureDetails> = {}): PictureDetails => ({ brakes: null, rimBrake: null, axle: null, shifting: null, bars: null, ...o });

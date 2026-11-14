@@ -5,7 +5,7 @@ import type { PartId } from '../parts/guide.ts';
 
 export const PART_SHORT: Readonly<Record<PartId, string>> = {
   frame: 'Frame', fork: 'Fork', headset: 'Headset', stem: 'Stem', handlebar: 'Handlebar', seatpost: 'Seatpost',
-  hub: 'Hub', 'wheel-qr': 'Wheel quick release', 'thru-axle': 'Thru-axle', spokes: 'Spokes', rim: 'Rim', dropouts: 'Dropouts',
+  wheel: 'Wheel', hub: 'Hub', 'wheel-qr': 'Wheel quick release', 'thru-axle': 'Thru-axle', spokes: 'Spokes', rim: 'Rim', dropouts: 'Dropouts',
   tyre: 'Tyre', bead: 'Tyre bead', tube: 'Inner tube', valve: 'Valve', 'tubeless-valve': 'Tubeless valve',
   'brake-lever': 'Brake lever', 'rim-brake': 'Rim brake', pads: 'Brake pads', 'brake-qr': 'Brake quick release', barrel: 'Barrel adjuster',
   caliper: 'Disc caliper', disc: 'Brake disc', 'pad-adjuster': 'Pad adjuster',
