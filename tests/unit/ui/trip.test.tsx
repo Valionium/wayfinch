@@ -10,6 +10,7 @@ import { planStages } from '../../../src/core/route/stages.ts';
 import { W } from '../../../src/core/wording/en.ts';
 import { TR } from '../../../src/core/wording/en-trip.ts';
 import { TF } from '../../../src/core/wording/en-trip-fields.ts';
+import { HO } from '../../../src/core/wording/en-handoff.ts';
 import type { StepName, StepReport } from '../../../src/data/prepare.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
 import { closeDb, openDb } from '../../../src/store/db.ts';
@@ -191,6 +192,24 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     await show(services());
     expect(text()).toContain(TF.appTripHeightsCredit);
     expect(text()).not.toContain(TR.appTripHeightsPending);
+  });
+
+  test('[CC-NOHEIGHT] a route without heights: Climb check opened says it once; the summary does not say it again under it (sweep 2 of 15 Nov, #3)', async () => {
+    const { CC } = await import('../../../src/core/wording/en-climb.ts');
+    await show();
+    await pick(await fixtureGpx('loop', { heights: false }));
+    await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
+    // folded: the summary's own line
+    expect(text()).toContain(TR.appTripHeightsPending);
+    const climb = host.querySelector<HTMLButtonElement>('[data-climb-check] button')!;
+    await act(async () => { climb.click(); });
+    await until(() => text().includes(CC.appClimbNoHeights), 'Climb check opened');
+    expect(text().split(CC.appClimbNoHeights).length - 1).toBe(1);
+    expect(text()).not.toContain(TR.appTripHeightsPending);
+    // closed again: the summary's line is back
+    await act(async () => { climb.click(); });
+    expect(text()).not.toContain(CC.appClimbNoHeights);
+    expect(text()).toContain(TR.appTripHeightsPending);
   });
 
   test('[TRIP-DAY1-LEAVEBY] the day before departure, Day 1 reads "Day 1 · N km · leave by about HH:MM", the very time of the Daylight card', async () => {
@@ -869,7 +888,7 @@ describe('Messages that must not be lost', () => {
 describe('Plan bags for this trip (Contract 2)', () => {
   test('[C-HANDOFF] with a route, Trip offers to plan bags for it; a tap hands the trip over, and a refusal is said in words', async () => {
     let calls = 0;
-    let answer: { ok: true; id: string } | { ok: false; reason: string } = { ok: false, reason: W.appHandoffStorageFull };
+    let answer: { ok: true; id: string } | { ok: false; reason: string } = { ok: false, reason: HO.appHandoffStorageFull };
     await show(services({ handOff: async () => { calls += 1; return answer; } }));
     expect(host.querySelector('[data-handoff]')).toBeNull(); // no route, nothing to hand over
     await pick(await fixtureGpx('loop'));
@@ -878,12 +897,12 @@ describe('Plan bags for this trip (Contract 2)', () => {
     await until(() => host.querySelector('[data-handoff]') !== null, 'the button');
     expect(text()).toContain(W.appHandoffNote);
     await click(button(W.appHandoffButton));
-    await until(() => text().includes(W.appHandoffStorageFull), 'the reason');
+    await until(() => text().includes(HO.appHandoffStorageFull), 'the reason');
     expect(calls).toBe(1);
     answer = { ok: true, id: 'a'.repeat(32) };
     await click(button(W.appHandoffButton));
-    await until(() => !text().includes(W.appHandoffStorageFull), 'the reason gone');
+    await until(() => !text().includes(HO.appHandoffStorageFull), 'the reason gone');
     expect(calls).toBe(2);
-    expect(bannedHits(`${W.appHandoffButton} ${W.appHandoffNote} ${W.appHandoffNoRoute} ${W.appHandoffTooManyPoints} ${W.appHandoffTooLarge} ${W.appHandoffStorageFull} ${W.appHandoffNotKept}`)).toEqual([]);
+    expect(bannedHits(`${W.appHandoffButton} ${W.appHandoffNote} ${W.appHandoffNoRoute} ${HO.appHandoffTooManyPoints} ${HO.appHandoffTooLarge} ${HO.appHandoffStorageFull} ${HO.appHandoffNotKept}`)).toEqual([]);
   });
 });

@@ -190,7 +190,8 @@ describe('train chip', () => {
       ],
     });
     expect(a.items.map((i) => i.stamp?.km)).toEqual([108, 102, 90]);
-    expect(a.title).toBe('Nearest halt: Halt, km 102');
+    // a halt is a station in the rider's words; railway jargon stays out (sweep 2 of 15 Nov 2026, #9; it said "Nearest halt" before)
+    expect(a.title).toBe('Nearest station: Halt, km 102');
   });
   test('[EM-TRAIN] distance and arrival next to sunset, with the label', () => {
     const f = facts({ moment: riding(100), spots: [{ b: station({ name: 'Main' }), km: 110, off: 500 }] });
@@ -434,8 +435,8 @@ describe('sweep of 14 Nov 2026', () => {
   });
   test('[EM-TRAIN] an unnamed stop is called unnamed, never by its kind as if that were its name (finding 14)', () => {
     const a = chip('train', { moment: riding(100), spots: [{ b: unnamed(station({ tags: { railway: 'halt' } })), km: 102, off: 752 }] });
-    expect(a.title).toBe('Nearest halt: no name mapped, km 102');
-    expect(itemAt(a, 102).label).toBe('Unnamed halt · km 102, 752 m off route');
+    expect(a.title).toBe('Nearest station: no name mapped, km 102');
+    expect(itemAt(a, 102).label).toBe('Unnamed station · km 102, 752 m off route');
   });
   test('[EM-PHARMACY] an unnamed hospital is called unnamed (finding 15)', () => {
     const plain = { atKm: (km: Km, o = {}) => ({ ...hospital().atKm(km, o), name: null, tags: { amenity: 'hospital' } }) };

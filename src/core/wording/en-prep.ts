@@ -9,6 +9,8 @@ export const PR = {
   prepForecast: 'The day before you leave, prepare this route again for a fresh forecast.',
   prepTell: 'Tell someone your route, where you plan to stop and when you expect to be back.',
   prepNight: "Check where you sleep the first night: open that night, and booked if it takes bookings.",
+  // the place Trip holds for night 1, named (sweep 2 of 15 Nov 2026, #6)
+  prepNightAt: (name: string): string => `Check where you sleep the first night (${name}): open that night, and booked if it takes bookings.`,
   prepInCare: 'In Bike care',
   prepInCareLabel: (what: string): string => `In Bike care: ${what}`,
   prepNotKept: 'That tick could not be kept on this phone. It shows until you leave this screen.',

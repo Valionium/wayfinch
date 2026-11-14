@@ -78,6 +78,26 @@ test('[TRIP-PREP-TICKS] a tick is kept on this phone for this route and shows ag
   expect(JSON.parse(localStorage.getItem(PREP_TICKS_KEY)!)).toEqual({ route: trip.route.id, ticked: ['kit'] });
 });
 
+// Sweep 2 of 15 Nov 2026, #6: today in the route's zone, as Trip's line reads it; night 1's held place by name; a stored tick stays.
+test('[TRIP-PREP-ITEMS] on the departure day (in the route\'s zone) there is no "the day before" line, the day before there is; night 1 is named; a stored forecast tick is kept', async () => {
+  const trip = testTrip({ departureDate: '2026-10-17' });
+  const basis = trip.route.stages.slice(0, -1).map((s) => s.endKm);
+  const held: Trip = { ...trip, stops: { routeId: trip.route.id, basis, days: basis.map((km, i) => ({ placeId: i === 0 ? 'p1' : null, km, name: i === 0 ? 'Campingpark Eberbach' : null, town: null, by: 'auto' as const })) } };
+  localStorage.setItem(PREP_TICKS_KEY, JSON.stringify({ route: trip.route.id, ticked: ['forecast', 'kit'] }));
+  const stored = localStorage.getItem(PREP_TICKS_KEY);
+  // 22:30 UTC on the 16th is 00:30 on the 17th in Berlin: the departure day
+  await act(() => { render(<BeforeYouGo snap={{ trip: held, now: new Date('2026-10-16T22:30:00Z'), zone: 'Europe/Berlin' }} />, host); });
+  expect(host.querySelector('[data-prep-item="forecast"]')).toBeNull();
+  expect(item('night').textContent).toContain(PR.prepNightAt('Campingpark Eberbach'));
+  expect(item('kit').querySelector('input')!.checked).toBe(true);
+  render(null, host);
+  // the same moment in New York is still the 16th: the day before
+  await act(() => { render(<BeforeYouGo snap={{ trip: held, now: new Date('2026-10-16T22:30:00Z'), zone: 'America/New_York' }} />, host); });
+  expect(item('forecast').querySelector('input')!.checked).toBe(true);
+  // nothing was written
+  expect(localStorage.getItem(PREP_TICKS_KEY)).toBe(stored);
+});
+
 test('[TRIP-PREP-ITEMS] with no trip there is no list', async () => {
   await act(() => { render(<BeforeYouGo snap={{ trip: null }} />, host); });
   expect(host.querySelector('[data-prep]')).toBeNull();

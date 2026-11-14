@@ -23,17 +23,24 @@ import type { TripServices, TripSnapshot } from './services.ts';
 // Climb check's list is a chunk of its own, loaded when the rider opens it (CC-TRIP).
 const ClimbList = lazy(() => import('./climb-check.tsx').then((m) => m.ClimbList));
 
-/** Climb check (CC-TRIP): one button under the days, folded until the rider opens it. An e-bike gets no walk judgement (CC-EBIKE). */
-function ClimbCheck({ trip }: { trip: Trip }) {
+/**
+ * Climb check (CC-TRIP): one button under the days, folded until the rider opens it. An e-bike gets no walk judgement (CC-EBIKE).
+ * `pending`: the route has no heights; the summary's line saying so follows, except while Climb check is open and says it (sweep 2 of
+ * 15 Nov 2026, #3: once, not twice).
+ */
+function ClimbCheck({ trip, pending }: { trip: Trip; pending: boolean }) {
   const [open, setOpen] = useState(false);
   const ebike = bikeSource.value.bike?.look?.ebike === true;
   return (
-    <div data-climb-check>
-      <button type="button" class="btn" aria-expanded={open ? 'true' : 'false'} aria-controls={open ? 'trip-climb-check' : undefined} onClick={() => setOpen(!open)}>{CC.appClimbButton}</button>
-      {open
-        ? <div id="trip-climb-check"><ClimbList route={trip.route} flatKph={trip.flatKph} ebike={ebike} /></div>
-        : <p class="muted">{CC.appClimbAbout}</p>}
-    </div>
+    <>
+      <div data-climb-check>
+        <button type="button" class="btn" aria-expanded={open ? 'true' : 'false'} aria-controls={open ? 'trip-climb-check' : undefined} onClick={() => setOpen(!open)}>{CC.appClimbButton}</button>
+        {open
+          ? <div id="trip-climb-check"><ClimbList route={trip.route} flatKph={trip.flatKph} ebike={ebike} /></div>
+          : <p class="muted">{CC.appClimbAbout}</p>}
+      </div>
+      {pending && !open ? <p class="muted">{TR.appTripHeightsPending}</p> : null}
+    </>
   );
 }
 
@@ -252,8 +259,8 @@ export function RouteSummary({ snap, stops, beds, settle = settleStops, choices 
           })}
         </ol>
         <p class="visually-hidden" role="status" aria-live="polite" data-stop-said>{said}</p>
-        <ClimbCheck trip={trip} />
-        {missingHeights ? <p class="muted">{TR.appTripHeightsPending}</p> : snap.heightsLookedUp ? <p class="muted">{TF.appTripHeightsCredit}</p> : null}
+        <ClimbCheck trip={trip} pending={missingHeights} />
+        {!missingHeights && snap.heightsLookedUp ? <p class="muted">{TF.appTripHeightsCredit}</p> : null}
         {trip.route.source === 'planned' || snap.prepared?.build ? <OsmCredit lead={TF.appTripOsmLead} date={packDate(snap.prepared?.build)} /> : null}
         <p class="muted"><a href="/legal/licences/">{W.appTripLicences}</a></p>
       </div>

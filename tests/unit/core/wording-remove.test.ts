@@ -29,6 +29,8 @@ test('[TRIP-REMOVE-ASK] the confirm step names what goes and what stays, in plai
   const goes = RT.appTripRemoveGoes('Fixture: Heidelberg to Strasbourg');
   expect(goes).toContain('“Fixture: Heidelberg to Strasbourg”');
   for (const part of ['route', 'date', 'nights', 'Prepare this route', 'places', 'opening hours', 'weather', 'map data', 'position', 'water', 'day plan', 'En route']) expect(goes).toContain(part);
+  // Before you leave's ticks go too (the coordinator's ruling on PR 155), so the ask says so (sweep 2 of 15 Nov 2026, #6)
+  expect(goes).toContain('Before you leave');
   for (const part of ['bikes', 'setups', 'Bag planner plans', 'rides', 'settings']) expect(RT.appTripRemoveStays).toContain(part);
   for (const [, s] of texts()) expect(s.split(/(?<=[.?:])\s/).every((sentence) => sentence.split(/\s+/).length <= 30), s).toBe(true);
 });
