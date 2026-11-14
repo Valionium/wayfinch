@@ -91,7 +91,7 @@ test('[TRIP-GPX] a real GPX file becomes the route: figures, profile and days sh
   await page.locator('input[type=file]').setInputFiles(await gpx('heidelberg-strasbourg'));
   const summary = page.locator('[data-summary]');
   await expect(summary).toContainText('Fixture: Heidelberg to Strasbourg');
-  await expect(summary).toContainText(/\d+(\.\d)? km · [\d,]+ m climbing/);
+  await expect(summary).toContainText(/\d+(\.\d)? km · [\d,]+ m up/);
   await expect(summary.locator('svg[role=img]')).toBeVisible();
   expect(await summary.locator('ol li').count()).toBeGreaterThanOrEqual(1);
   await expect(page.getByText('Day 1 ·').first()).toBeVisible();

@@ -1,6 +1,6 @@
 // Trip settings (spec section 3.3). Every field saves when it is changed; a value outside its range is refused with the range
 // named, and the field goes back to the last good value. Nothing here works out the days: the services re-plan them.
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
 import { TF } from '../../core/wording/en-trip-fields.ts';
@@ -59,13 +59,19 @@ export function Choice({ name, legend, value, options, onPick }: { name: string;
  * `when`: the departure date and the nights, which stay in the Route step; `details`: the trip details folded under it (guided Trip
  * design §2.2): start time, pace, flat speed, stay type, camp water and keep fresh.
  */
-export function TripSettings({ services, snap, reload, part }: { services: TripServices; snap: TripSnapshot; reload: () => Promise<void>; part: 'when' | 'details' | 'remove' }) {
+export function TripSettings({ services, snap, reload, part, focusDate = 0 }: {
+  services: TripServices; snap: TripSnapshot; reload: () => Promise<void>; part: 'when' | 'details' | 'remove';
+  /** Counts the trip line's Change date taps: each one puts the focus on the date (sweep of 14 Nov 2026, #3). */
+  focusDate?: number;
+}) {
   const { settings, trip } = snap;
   const [problems, setProblems] = useState<Partial<Record<string, string>>>({});
   const [startDraft, setStartDraft] = useFollowing(settings.startTime);
   const [dateDraft, setDateDraft] = useFollowing(trip?.departureDate ?? '');
   const dateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [fresh, setFresh] = useFollowing(settings.keepFresh);
+  const dateField = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (focusDate > 0) dateField.current?.focus(); }, [focusDate]);
 
   const save: Save = async (field, value) => {
     const result = await services.writeSettings({ [field]: value });
@@ -92,7 +98,7 @@ export function TripSettings({ services, snap, reload, part }: { services: TripS
           <div class="field">
             <label for="trip-date">{TF.appTripDeparture}</label>
             <input
-              id="trip-date" type="date" value={dateDraft}
+              id="trip-date" type="date" value={dateDraft} ref={dateField}
               onChange={(e) => {
                 // A date typed digit by digit passes through other dates: it is saved once it has settled, or when the field is left.
                 const v = e.currentTarget.value;
@@ -118,9 +124,9 @@ export function TripSettings({ services, snap, reload, part }: { services: TripS
                     setDateDraft('');
                     void setDate(null);
                   }}
-                >{W.appTripDateClear}</button>
+                >{TF.appTripDateClear}</button>
               </p>
-            ) : <p class="muted">{W.appTripDepartureNone}</p>}
+            ) : <p class="muted">{TF.appTripDepartureNone}</p>}
             {problem('date') ? <p class="field-problem" role="alert">{problem('date')}</p> : null}
           </div>
         ) : null}
@@ -129,7 +135,7 @@ export function TripSettings({ services, snap, reload, part }: { services: TripS
           placeholder={trip ? String(suggestedNights(trip)) : undefined} onCommit={(v) => save('nights', v)} problem={problem('nights')}
         />
         {trip ? <p class="muted">{TF.appTripNightsSuggested(suggestedNights(trip))}</p> : null}
-        {settings.nights !== null ? <button type="button" class="btn" onClick={() => void save('nights', null)}>{W.appTripNightsUseSuggested}</button> : null}
+        {settings.nights !== null ? <button type="button" class="btn" onClick={() => void save('nights', null)}>{TF.appTripNightsUseSuggested}</button> : null}
 
         {trip ? <p class="muted">{TR.appTripSettingsStageNote}</p> : null}
       </div>

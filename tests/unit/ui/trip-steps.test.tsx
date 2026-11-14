@@ -13,6 +13,7 @@ import { pointAtRouteKm } from '../../../src/core/geo/project.ts';
 import { placeAt } from '../../fixtures/places.ts';
 import { showKm } from '../../../src/core/wording/en.ts';
 import { W } from '../../../src/core/wording/en.ts';
+import { TF } from '../../../src/core/wording/en-trip-fields.ts';
 import type { StepName, StepReport } from '../../../src/data/prepare.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
 import { closeDb, openDb } from '../../../src/store/db.ts';
@@ -213,7 +214,7 @@ describe('The message after a route is added (owner\'s item 2)', () => {
     await withRoute(services(preparing(seen)));
     const name = (await readTrip())!.route.name;
     const said = host.querySelector<HTMLElement>('[data-added]')!;
-    expect(said.textContent).toContain(W.appTripAdded(name));
+    expect(said.textContent).toContain(TF.appTripAdded(name));
     expect(said.textContent).toContain(W.appTripNextGetReady);
     expect(step('getready').contains(said)).toBe(true);
     // The message's button is the step's one Prepare this route button, not a second one.
@@ -231,7 +232,7 @@ describe('The message after a route is added (owner\'s item 2)', () => {
     await click(buttonIn(host.querySelector('[data-replace]')!, W.appTripReplaceYes));
     await until(() => host.querySelector('[data-added]') !== null, 'the message');
     const name = (await readTrip())!.route.name;
-    expect(host.querySelector('[data-added]')!.textContent).toContain(`${W.appTripReplaced(name)} ${W.appTripNextGetReady}`);
+    expect(host.querySelector('[data-added]')!.textContent).toContain(`${TF.appTripReplaced(name)} ${W.appTripNextGetReady}`);
     expect(openSteps()).toEqual(['getready']);
   });
 });

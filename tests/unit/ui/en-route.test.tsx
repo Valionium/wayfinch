@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { emergencyCard } from '../../../src/core/engines/emergency.ts';
 import { buildScreen } from '../../../src/core/screen/screen.ts';
 import { W } from '../../../src/core/wording/en.ts';
+import { TF } from '../../../src/core/wording/en-trip-fields.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
 import { closeDb, openDb } from '../../../src/store/db.ts';
 import { readInputs } from '../../../src/store/inputs.ts';
@@ -76,7 +77,7 @@ describe('the name (finding M)', () => {
       expect(page, d.name).not.toMatch(/\bAhead\b/);
     }
     expect(readFileSync(join(legal, 'privacy/index.html'), 'utf8')).toContain('Trip, En route, Tools, You');
-    for (const s of [W.appTabAhead, W.appTripOpenAhead, W.appAheadNeedTitle, W.appAheadNeedUntil, W.appTripGoLater, W.appTripGetReadyLater, W.appTripNextGetReady, W.appTripDepartureNone]) {
+    for (const s of [W.appTabAhead, W.appTripOpenAhead, W.appAheadNeedTitle, W.appAheadNeedUntil, W.appTripGoLater, W.appTripGetReadyLater, W.appTripNextGetReady, TF.appTripDepartureNone]) {
       expect(s).toContain('En route');
       expect(bannedHits(s)).toEqual([]);
     }
