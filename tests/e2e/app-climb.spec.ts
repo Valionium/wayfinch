@@ -2,9 +2,14 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { planStages } from '../../src/core/route/stages.ts';
+import type { Trip } from '../../src/core/types.ts';
 import { fixtureGpx } from '../fixtures/gpx.ts';
 import { goOffline, loadApp, preparedTrip, removeBuilds } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
+import type { StoreInPage } from './fixtures/store-page.ts';
+
+declare const __store: StoreInPage;
 
 let app: LoadedApp | undefined;
 test.afterEach(async () => { await app?.close(); app = undefined; });
@@ -100,5 +105,29 @@ test('[CC-NOHEIGHT] a route without heights: no guess, Climb check points to Pre
   await expect(box).toContainText("Climb check needs the route's heights. Prepare this route looks them up.");
   await expect(box.getByRole('list')).toHaveCount(0);
   await expect(box).not.toContainText('estimate');
+  expect(problems).toEqual([]);
+});
+
+test("[CC-DAYS] a climb over a night names its days and where the day ends on it, as Trip's days", async ({ page }) => {
+  const problems = watch(page);
+  app = await loadApp(page);
+  const trip = await preparedTrip(page, 'alpine-pass', { departureDate: later() });
+  const stages = [...planStages(trip.route, { flatKph: 25, pace: 'steady', nights: 2 })];
+  await page.evaluate(async (s) => {
+    const t = (await __store.readTrip()) as Trip;
+    await __store.saveTrip({ ...t, route: { ...t.route, stages: s } });
+  }, stages);
+  const end = stages.find((s) => s.endKm > 0 && s.endKm < 36.2)!;
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto(`${app.origin}/#/trip`, { waitUntil: 'domcontentloaded' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const box = page.locator('[data-summary] [data-climb-check]');
+  await box.getByRole('button', { name: 'Climb check', exact: true }).click();
+  const item = box.getByRole('listitem').first();
+  await expect(item).toContainText(/^Days 1 to \d · km 0 to 36\.2/);
+  await expect(item).toContainText(`Day ${end.day} ends at km ${Math.round(end.endKm * 10) / 10}, partway up this climb.`);
+  // Trip's own day rows say the same: day 1 is shorter than the climb.
+  await expect(page.locator('[data-summary] .trip-days').first().locator('li').first()).toContainText(`Day 1 · ${Math.round(end.endKm * 10) / 10} km`);
+  await noSideways(page);
   expect(problems).toEqual([]);
 });

@@ -2,7 +2,8 @@
 // first, each with its riding time at the trip's flat speed and a plain judgement from its steepest 500 m. The climbs are
 // the route's own (CL-CLIMB, as En route's Climbing card reads them) and the time is the pace engine's, so Trip, En route and
 // Climb check give one figure. A route with a missing height has no climbs here either: unknown, never "none".
-import { ridingMin } from '../engines/pace.ts';
+import { MAX_FLAT_KPH, MIN_FLAT_KPH } from '../engines/pace.ts';
+import { effortProfile, LOAD_PENALTY } from '../route/stages.ts';
 import type { Climb, Km, Route } from '../types.ts';
 
 /** The steepest 500 m at this grade or more: steep, low gears with a loaded bike. */
@@ -37,6 +38,33 @@ export function climbLevel(steepestPct: number, ebike = false): ClimbLevel {
 /** Minutes as shown: to 5, never under 5. */
 export const shownClimbMin = (min: number): number => Math.max(5, Math.round(min / 5) * 5);
 
+/**
+ * Riding minutes between two kilometres at a flat speed, loaded, without breaks: the pace engine's `ridingMin` (engines/pace.ts),
+ * read here from the same effort profile at the same loaded speed. This lazy chunk does not import `ridingMin` itself, since the
+ * first screen would then have to export it and grow past its budget; [CC-TIME] holds the two equal. NaN for an unusable speed.
+ */
+function ridingMinutes(route: Route): (fromKm: Km, toKm: Km, flatKph: number) => number {
+  const { samples } = effortProfile(route);
+  const last = samples.length - 1;
+  const effortAt = (km: Km): number => {
+    if (last < 0) return Math.max(0, km);
+    if (km <= samples[0]!.kmExact) return samples[0]!.effortExact;
+    if (km >= samples[last]!.kmExact) return samples[last]!.effortExact;
+    let lo = 0;
+    let hi = last;
+    while (lo + 1 < hi) {
+      const mid = (lo + hi) >> 1;
+      if (samples[mid]!.kmExact <= km) lo = mid; else hi = mid;
+    }
+    const a = samples[lo]!;
+    const b = samples[hi]!;
+    const span = b.kmExact - a.kmExact;
+    return span > 0 ? a.effortExact + ((b.effortExact - a.effortExact) * (km - a.kmExact)) / span : a.effortExact;
+  };
+  return (fromKm, toKm, flatKph) =>
+    flatKph >= MIN_FLAT_KPH && flatKph <= MAX_FLAT_KPH ? (Math.abs(effortAt(toKm) - effortAt(fromKm)) * 60) / (flatKph * LOAD_PENALTY) : Number.NaN;
+}
+
 /** Long and steep rank high: gain times the average grade. */
 const hardness = (c: Climb): number => c.gainM * c.avgGradePct;
 
@@ -54,8 +82,9 @@ export function climbCheck(route: Route, o: { flatKph: number; ebike?: boolean }
     stages.length === 0 ? null : (stages.find((s) => km >= s.startKm && km < s.endKm) ?? stages[stages.length - 1]!).day;
   const lastDayOf = (km: Km): number | null =>
     stages.length === 0 ? null : (stages.find((s) => km > s.startKm && km <= s.endKm) ?? stages[stages.length - 1]!).day;
+  const riding = ridingMinutes(route);
   const climbs = found.slice(0, CLIMBS_SHOWN).map((c): CheckedClimb => {
-    const min = ridingMin(route, c.startKm, c.topKm, o.flatKph);
+    const min = riding(c.startKm, c.topKm, o.flatKph);
     return {
       startKm: c.startKm, topKm: c.topKm, lengthKm: c.topKm - c.startKm, gainM: c.gainM, avgGradePct: c.avgGradePct, steepestPct: c.steepest500mPct,
       ridingMin: Number.isFinite(min) ? min : null, level: climbLevel(c.steepest500mPct, o.ebike === true),
