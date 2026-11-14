@@ -750,6 +750,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - no thinning; passes through the same buildRoute [AB-FULL-GEOMETRY]
 - only the search text is sent; fallback both ways [AB-SEARCH]
 - Plan from A to B's form: the search hint once under Start and End, named by both fields (aria-describedby); the privacy note behind "What is sent?", word for word; after a pick or Change the focus goes to the next empty field, else to Plan the route; the pick prompt's status is in the page before any search and filled when the hits come; a hit's name keeps its parts apart (unseen commas); a busy Search is aria-disabled, stays focusable, and a press meanwhile sends nothing (sweep of 14 Nov 2026, #8, #9; NEXT task 6) [AB-FORM]
+- a French, Italian or Spanish street word (place, chemin, impasse, route, piazza, viale, corso, plaza), as a whole word, makes an address search; a name that only starts with one (Placerville, Piazzola sul Brenta) stays a town search, as Norwegen and Newcastle do (NEXT task 6) [AB-ADDRESS-WORDS]
 - no bike router answers: asks for a GPX [AB-NONE]
 
 ## App: Position

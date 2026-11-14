@@ -243,7 +243,7 @@ const isFeature = (q: string): boolean => FEATURE_WORD.test(withoutAccents(q)) |
 const viaMeteo = async (q: string, f: Fetch): Promise<FoundPlace[]> =>
   meteoHits(await getJson(f, `${METEO_URL}?name=${encodeURIComponent(q)}&count=${MAX_HITS}&language=en&format=json`, SEARCH_MS));
 
-const STREET_WORD = /(?:stra(?:ss|ß)e|str\.|weg|platz|allee|gasse|damm|ufer|chaussee|steig|pfad)(?![a-zäöüß])|\b(?:ring|street|road|avenue|lane|boulevard|rue|via|strada|calle|carrer|straat)\b/i;
+const STREET_WORD = /(?:stra(?:ss|ß)e|str\.|weg|platz|allee|gasse|damm|ufer|chaussee|steig|pfad)(?![a-zäöüß])|\b(?:ring|street|road|avenue|lane|boulevard|rue|via|strada|calle|carrer|straat|piazza|viale|corso|plaza|place|chemin|impasse|route)\b/i;
 const PLACE_WORD = /(?:bahnhof|camping|zeltplatz|hotel|pension|gasthof|gasthaus|herberge|hütte|huette|krankenhaus|supermarkt|haltestelle)|\b(?:hbf|bhf|station|gare|stazione|campsite|hostel|hut|refuge|restaurant|apotheke|pharmacy|supermarket|hospital|schloss|castle|museum)\b/i;
 
 /** Text that names a street, a house number, a postcode or a known kind of place: Photon gets it without the town filters. */
