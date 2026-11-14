@@ -272,7 +272,14 @@ describe('the Trip drawing beside the plan\'s bottles (owner, 9 Nov 2026, PR 108
     expect(host.querySelector('.bk-bag polygon.bk-shell')!.getAttribute('points')).not.toBe(whole);
     // the clip of the fill follows the cut too, and the plan's own numbers are untouched
     expect(host.querySelector('clipPath polygon')!.getAttribute('points')).toBe(cut);
-    expect(host.querySelector('.bk-bag .bk-fill')).not.toBeNull();
+    // the fill is the planner's: half the cut bag's height (0.5 full), standing on the cut bag's bottom, across its width
+    const box = plannerArt(plannerSpec(bike, plan), plan).anchors.frame!.boxes[1];
+    const fill = host.querySelector('.bk-bag .bk-fill')!;
+    const num = (a: string) => Number(fill.getAttribute(a));
+    expect(num('height')).toBeCloseTo(box.h * 0.5, 1);
+    expect(num('y') + num('height')).toBeCloseTo(box.y + box.h, 1);
+    expect(num('x')).toBeCloseTo(box.x, 1);
+    expect(num('width')).toBeCloseTo(box.w, 1);
     expect((day as unknown as { bags: { items: unknown[] } }).bags.items).toEqual([{ pos: 'frame', L: 4.5, shape: 1, fill: 0.5 }]);
   });
 
