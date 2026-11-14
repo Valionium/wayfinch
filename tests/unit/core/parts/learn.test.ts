@@ -93,6 +93,69 @@ test('[BL-KINDS] the type switch draws each kind as it usually is; the rider\'s 
   expect(hasPart(own({ drive: 'belt' }), 'chain')).toBe(false);
 });
 
+const recordOf = (fields: Record<string, unknown>) => setBike('diamond-sloping', 'M', 'drop', false, ['', ''], '#123456', fields);
+const ownOf = (fields: Record<string, unknown>, type?: string): LearnBike => {
+  const r = recordOf(type ? { ...fields, type } : fields);
+  return ownBike(resolveBikeSpec(r, null), r);
+};
+
+test('[BL-OWN] the rider\'s bike always has brakes and gears: brakes not set or of another kind show disc brakes, gears not set derailleur gears, each said plainly', () => {
+  for (const brakes of ['unknown', 'other'] as const) {
+    const b = ownOf({ brakes });
+    expect(b.spec.brakes.value, brakes).toBe('disc');
+    expect(b.shows?.brakes, brakes).toBe(brakes === 'unknown' ? 'unset' : 'other');
+    for (const p of ['brake-lever', 'brake-cable', 'caliper', 'disc', 'pads'] as const) expect(hasPart(b, p), `${brakes}: ${p}`).toBe(true);
+  }
+  for (const brakes of ['rim', 'hydraulic-disc', 'cable-disc']) expect(ownOf({ brakes }).shows?.brakes, brakes).toBeUndefined();
+  const gears = ownOf({ drive: 'unknown' });
+  expect(gears.spec.drive.value).toBe('derailleur');
+  expect(gears.shows?.drive).toBe('unset');
+  for (const p of ['cassette', 'derailleur', 'hanger', 'shifter', 'gear-cable'] as const) expect(hasPart(gears, p), p).toBe(true);
+  for (const drive of ['derailleur', 'chain-hub', 'belt']) expect(ownOf({ drive }).shows?.drive, drive).toBeUndefined();
+  // said plainly, with no banned word
+  for (const t of [LN.showsBrakes('unset'), LN.showsBrakes('other'), LN.showsDrive, LN.setThem]) expect(bannedHits(t), t).toEqual([]);
+  expect(LN.showsBrakes('unset')).toMatch(/brakes aren't set.*disc brakes/);
+  expect(LN.showsBrakes('other')).toMatch(/coaster|drum/);
+  expect(LN.showsDrive).toMatch(/gears aren't set.*derailleur/);
+});
+
+test('[BL-OWN] the rider\'s answers decide the axle, the pad adjuster and the gear cable; a belt bike has hub gears; hub gears keep the rear wheel on nuts', () => {
+  const has = (b: LearnBike, ...ids: LearnId[]) => ids.map((id) => hasPart(b, id));
+  expect(has(ownOf({ brakes: 'hydraulic-disc' }), 'thru-axle', 'wheel-qr')).toEqual([true, false]);
+  expect(has(ownOf({ brakes: 'rim' }), 'thru-axle', 'wheel-qr')).toEqual([false, true]);
+  expect(has(ownOf({ brakes: 'hydraulic-disc', axle: 'qr' }), 'thru-axle', 'wheel-qr')).toEqual([false, true]);
+  expect(has(ownOf({ brakes: 'rim', axle: 'thru' }), 'thru-axle', 'wheel-qr')).toEqual([true, false]);
+  expect(has(ownOf({ brakes: 'rim', axle: 'nuts' }), 'thru-axle', 'wheel-qr')).toEqual([false, false]);
+  expect(ownOf({ brakes: 'rim', axle: 'nuts' }).axle).toBe('nuts');
+  expect(has(ownOf({ brakes: 'hydraulic-disc' }), 'pad-adjuster')).toEqual([false]);
+  expect(has(ownOf({ brakes: 'cable-disc' }), 'pad-adjuster')).toEqual([true]);
+  expect(has(ownOf({ shifting: 'electronic' }), 'gear-cable', 'shifter')).toEqual([false, true]);
+  expect(has(ownOf({ shifting: 'cable' }), 'gear-cable')).toEqual([true]);
+  expect(has(ownOf({ drive: 'belt' }), 'belt', 'hub-gears', 'chain', 'cassette')).toEqual([true, true, false, false]);
+  expect(has(kindBike('city'), 'hub-gears', 'wheel-qr')).toEqual([true, true]);
+  expect(kindBike('city').rearNuts).toBe(true);
+  expect(ownOf({ drive: 'chain-hub', brakes: 'rim' }).rearNuts).toBe(true);
+  expect(ownOf({ drive: 'derailleur', brakes: 'rim' }).rearNuts).toBe(false);
+  expect(ownOf({ drive: 'chain-hub', brakes: 'rim', axle: 'thru' }).rearNuts).toBe(false);
+  // a belt bike's hub gears stand on its drawing too
+  const belt = ownOf({ drive: 'belt', brakes: 'hydraulic-disc' });
+  expect(learnSpot(belt, bikeArt(belt.spec, null).anchors, 'hub-gears')).not.toBeNull();
+});
+
+test('[BL-FACTS] the words say what is so on every bike: a quick link needs pliers to open and is often for one use; disc brakes work with either axle; the chainring and the belt as a belt bike has them', () => {
+  expect(LN_DOES['quick-link']).toMatch(/pliers/);
+  expect(LN_DOES['quick-link']).toMatch(/one use/);
+  expect(LN_DOES['quick-link']).not.toMatch(/by hand/);
+  expect(LN_DOES['thru-axle']).not.toMatch(/disc brakes need|need/);
+  expect(LN_DOES.chainring).toMatch(/belt/);
+  expect(LN_DOES.belt).not.toMatch(/rubber/);
+  expect(LN_DOES.fork).not.toMatch(/top tube/);
+  expect(LN_DOES['rim-brake']).toMatch(/beside/);
+  expect(LN_DOES.disc).toMatch(/lockring/);
+  expect(LN_DOES.shifter).toMatch(/bar ends/);
+  expect(LN_DOES['bottom-bracket']).toMatch(/motor/);
+});
+
 /** The drawing's own part each of the page's pieces is drawn over; the shifter's ring sits on the bar or the lever. */
 const ON: Partial<Record<LearnId, string>> = {
   'head-tube': 'bk-frame', 'top-tube': 'bk-frame', 'down-tube': 'bk-frame', 'seat-tube': 'bk-frame', chainstay: 'bk-stays', seatstay: 'bk-stays',
@@ -101,6 +164,12 @@ const ON: Partial<Record<LearnId, string>> = {
 
 function* bikes(): Generator<{ name: string; bike: LearnBike }> {
   for (const kind of KINDS) yield { name: kind, bike: kindBike(kind) };
+  // the rider's own, as the page reads them: every brake, drive, axle and shifting answer
+  for (const brakes of ['unknown', 'hydraulic-disc', 'cable-disc', 'rim', 'other']) for (const drive of ['unknown', 'derailleur', 'chain-hub', 'belt']) {
+    for (const axle of [undefined, 'thru', 'qr', 'nuts']) for (const shifting of ['unknown', 'electronic']) {
+      yield { name: `own ${brakes} ${drive} ${axle} ${shifting}`, bike: ownOf({ brakes, drive, shifting, ...(axle ? { axle } : {}) }) };
+    }
+  }
   for (const style of STYLES) for (const size of SIZES) for (const bars of ['drop', 'flat', 'other']) {
     for (const [brakes, drive, ebike] of [['rim', 'derailleur', false], ['hydraulic-disc', 'chain-hub', true], ['cable-disc', 'belt', false], ['unknown', 'unknown', false]] as const) {
       const spec = resolveBikeSpec(setBike(style, size, bars, ebike, ['', ''], null, { brakes, drive }), null);

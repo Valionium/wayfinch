@@ -1111,6 +1111,9 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - switching the bike shows that bike's parts only; a picked part the new bike lacks is dropped [BL-SWITCH]
 - the zoom buttons zoom towards the picked part and back to the whole bike [BL-ZOOM]
 - at 320 px and wide, in both themes: no sideways scroll, every target at least 44 px, nothing axe objects to; it opens offline [BL-PHONE]
+- the rider's bike always has brakes and gears: brakes not set or of another kind (a coaster or drum brake) are shown as disc brakes and gears not set as derailleur gears, each said plainly with a link to set them; the rider's axle (thru-axle, quick release, nuts), hydraulic discs (no pad adjuster) and electronic gears (no gear cable) decide what is shown; a belt bike has hub gears; hub gears keep the rear wheel on nuts (review of PR 127/128, I2 to I4) [BL-OWN]
+- the words say what is so on every bike: a quick link joins the chain without tools but usually needs pliers to open and is often for one use; disc brakes work with either axle; the chainring and the belt as a belt bike has them; brakes beside the rim, discs on a lockring, shifters on the bar ends, a mid-drive motor holding the cranks [BL-FACTS]
+- the focus never falls to the page: after a Connects-to button it goes to the part's name, when a zoom button turns itself off to the other way, and back from the page to Tools to its card's Open link [BL-FOCUS]
 
 ## Tool: Gear advisor, the search (sub-project 13, group 1)
 

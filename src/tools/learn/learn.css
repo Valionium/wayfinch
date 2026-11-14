@@ -67,3 +67,9 @@
 .bl-hint { margin: 8px 0; }
 .bl-list h3 { margin: 8px 0 4px; }
 .bl-group h4 { font-size: 1rem; margin: 12px 0 6px; }
+/* What the page shows for an answer the rider has not given, and the line that suggests zooming (review of PR 127/128). */
+.bl-shows { margin: 0 0 8px; }
+.bl-shows a { display: inline-flex; align-items: center; min-height: 44px; color: var(--blaze); font-weight: 600; }
+.bl-zoomhint { margin: 4px 0 0; font-size: 0.9375rem; text-align: right; }
+.bl-name:focus { outline: none; }
+.bl-name:focus-visible { outline: 2px solid var(--blaze); outline-offset: 2px; }

@@ -1,6 +1,6 @@
 // The Tools tab (spec section 3.4): the bag planner, with the rider's bike and its bags (section 3.7), and the tyre calculator, each
 // with its last result; then the Gear advisor (sub-project 13), which runs inside the bag planner page. It reads Load Check's summary and bikes and the tyre tool's own storage, and writes nothing.
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { CL } from '../../core/wording/en-care-link.ts';
 import { GA } from '../../core/wording/en-advisor.ts';
 import { HN } from '../../core/wording/en-hint.ts';
@@ -36,6 +36,12 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
     w.addEventListener('hashchange', on);
     return () => w.removeEventListener('hashchange', on);
   }, []);
+  // Back from the page to the cards: the focus goes to the card's Open link rather than the page's start (review of PR 127, M3).
+  const was = useRef(learn);
+  useEffect(() => {
+    if (was.current && !learn) document.querySelector<HTMLAnchorElement>(`a[href="${LEARN_HREF}"]`)?.focus();
+    was.current = learn;
+  }, [learn]);
   return learn ? <LearnScreen services={services} /> : <ToolsCards services={services} />;
 }
 

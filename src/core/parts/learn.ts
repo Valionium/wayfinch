@@ -4,6 +4,7 @@
 // does for the guide's. The two pieces the shared drawing does not draw (a front derailleur, a brake cable) are drawn by this page only.
 import type { Anchors, P } from '../bike/art.ts';
 import { partPoint } from '../bike/part-points.ts';
+import type { BikeRecord } from '../bike/normalise.ts';
 import type { BikeSpec, BikeType } from '../bike/spec.ts';
 import { framePoints } from '../bike/templates.ts';
 import type { Style } from '../bike/templates.ts';
@@ -78,8 +79,18 @@ export const EDGES: readonly (readonly [LearnId, LearnId])[] = [
 
 // ---- the bike ----
 
-/** The bike the page draws: its spec, and whether it has a front derailleur (the drawing has no chainring count). */
-export type LearnBike = { spec: BikeSpec; frontMech: boolean };
+/**
+ * The bike the page draws: its spec; whether it has a front derailleur (the drawing has no chainring count); how its wheels are held
+ * (`axle`: thru-axles, quick releases or nuts; `rearNuts`: hub gears' rear wheel on nuts) where it differs from the brakes' usual one;
+ * hydraulic discs (no pad adjuster) and electronic gears (no gear cable) where the rider said; and what the page shows in place of an
+ * answer the rider has not given (`shows`: disc brakes for brakes not set or of another kind, derailleur gears for gears not set).
+ */
+export type LearnBike = {
+  spec: BikeSpec; frontMech: boolean; axle?: 'thru' | 'qr' | 'nuts'; rearNuts?: boolean; hydraulic?: boolean; electronic?: boolean;
+  shows?: { brakes?: 'unset' | 'other'; drive?: 'unset' };
+};
+/** How the wheels are held: the rider's answer, else a thru-axle with disc brakes and a quick release with rim brakes (design choice 5). */
+export const axleOf = (bike: LearnBike): 'thru' | 'qr' | 'nuts' => bike.axle ?? (bike.spec.brakes.value === 'disc' ? 'thru' : 'qr');
 
 /** The type switch (design 2): the rider's own bike, or a typical bike of a kind. */
 export const KINDS = ['road', 'gravel', 'touring', 'city', 'mtb', 'full', 'fat', 'ebike'] as const;
@@ -92,7 +103,7 @@ export function kindBike(kind: LearnKind): LearnBike {
   const d = <T>(value: T) => ({ value, mark: 'default' as const });
   const style = (s: Style) => ({ style: d(s), points: d(framePoints(s, 'M')) });
   switch (kind) {
-    case 'city': return { spec: { ...base, ...style('step-through'), bars: d('other'), brakes: d('rim'), drive: d('hub'), frontMm: d(42), rearMm: d(42) }, frontMech: false };
+    case 'city': return { spec: { ...base, ...style('step-through'), bars: d('other'), brakes: d('rim'), drive: d('hub'), frontMm: d(42), rearMm: d(42) }, frontMech: false, rearNuts: true };
     case 'full': return { spec: { ...base, ...style('full-suspension'), rimMm: d(584), frontMm: d(60), rearMm: d(60) }, frontMech: false };
     case 'mtb': return { spec: { ...base, rimMm: d(622), frontMm: d(57), rearMm: d(57) }, frontMech: false };
     case 'ebike': return { spec: { ...base, ebike: d(true), motor: d('cranks') }, frontMech: false };
@@ -100,9 +111,33 @@ export function kindBike(kind: LearnKind): LearnBike {
   }
 }
 
-/** The rider's own bike: a front derailleur where road and touring bikes usually have two chainrings. */
-export function ownBike(spec: BikeSpec): LearnBike {
-  return { spec, frontMech: spec.drive.value === 'derailleur' && (spec.type.value === 'road' || spec.type.value === 'touring') };
+/**
+ * The rider's own bike, from its spec and record: a bike always has brakes and gears, so brakes not set or of another kind (a coaster
+ * or drum brake) are shown as disc brakes and gears not set as derailleur gears, each marked in `shows` for the page to say so. A front
+ * derailleur where road and touring bikes usually have two chainrings; the axle, hydraulic discs and electronic gears as the rider said.
+ */
+export function ownBike(spec: BikeSpec, record: BikeRecord | null = null): LearnBike {
+  const shows: NonNullable<LearnBike['shows']> = {};
+  let out = spec;
+  if (spec.brakes.value === 'none') {
+    shows.brakes = record?.brakes === 'other' ? 'other' : 'unset';
+    out = { ...out, brakes: { value: 'disc', mark: 'guessed' } };
+  }
+  if (out.drive.value === 'chain') {
+    shows.drive = 'unset';
+    out = { ...out, drive: { value: 'derailleur', mark: 'guessed' } };
+  }
+  const drive = out.drive.value;
+  const axle = record?.axle;
+  return {
+    spec: out,
+    frontMech: drive === 'derailleur' && (out.type.value === 'road' || out.type.value === 'touring'),
+    ...(axle ? { axle } : {}),
+    rearNuts: (drive === 'hub' || drive === 'belt') && axle !== 'thru' && axle !== 'qr',
+    ...(record?.brakes === 'hydraulic-disc' ? { hydraulic: true } : {}),
+    ...(record?.shifting === 'electronic' ? { electronic: true } : {}),
+    ...(shows.brakes || shows.drive ? { shows } : {}),
+  };
 }
 
 /** Whether the drawn bike has the part. */
@@ -115,14 +150,19 @@ export function hasPart(bike: LearnBike, id: LearnId): boolean {
     case 'top-tube': return style !== 'step-through' && style !== 'mixte';
     case 'shock': return style === FULL;
     case 'stanchions': return spec.fork.value === 'suspension';
-    case 'thru-axle': return brakes === 'disc';
-    case 'wheel-qr': return brakes !== 'disc';
+    case 'thru-axle': return axleOf(bike) === 'thru';
+    case 'wheel-qr': return axleOf(bike) === 'qr';
     case 'front-derailleur': return bike.frontMech && drive === 'derailleur';
     case 'chain': case 'quick-link': return drive !== 'belt';
     case 'belt': return drive === 'belt';
     case 'cassette': case 'derailleur': case 'hanger': return drive === 'derailleur';
-    case 'hub-gears': return drive === 'hub';
-    case 'caliper': case 'disc': case 'pad-adjuster': return brakes === 'disc';
+    // a belt runs to one rear sprocket, so its gears are in the hub
+    case 'hub-gears': return drive === 'hub' || drive === 'belt';
+    // a bike with one gear and no answer about it (a spec's plain chain) has nothing to shift; electronic gears have no gear cable
+    case 'shifter': return drive !== 'chain';
+    case 'gear-cable': return drive !== 'chain' && !bike.electronic;
+    case 'caliper': case 'disc': return brakes === 'disc';
+    case 'pad-adjuster': return brakes === 'disc' && !bike.hydraulic;
     case 'rim-brake': case 'brake-qr': return brakes === 'rim';
     case 'pads': case 'brake-lever': case 'brake-cable': return brakes !== 'none';
     case 'grips': return spec.bars.value !== 'drop';
@@ -263,6 +303,8 @@ export function learnSpot(bike: LearnBike, a: Anchors, id: LearnId): Spot | null
     }
     case 'seat-clamp': return ring(lerp(bb, seatTop, 0.96));
     case 'saddle': return ink(['bk-saddle'], add(saddle, [0, -4 * k]));
+    // a belt bike's hub gears: the drawing draws its one sprocket, and the gears are in the hub behind it
+    case 'hub-gears': return spec.drive.value === 'belt' ? ring(a.points.rear) : partSpot('hub-gears', spec, a);
     case 'motor': {
       const where = spec.motor.value;
       const c = where === 'cranks' ? bb : where === 'rear-hub' ? a.points.rear : a.points.front;
