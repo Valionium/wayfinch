@@ -66,7 +66,9 @@ test('[LC-COLOURS-PICK] a colour from before that is not in the grid loads uncha
   await expect(frame(page)).toHaveAttribute('stroke', '#a1b2c3');
   await expect(chip(page)).toHaveClass(/\bon\b/);
   await chip(page).click();
-  expect(await grid(page).locator('input:checked').count()).toBe(0);
+  // the owner's ruling of 14 Nov 2026: it is the one cell checked, Keep my colour, first; none of the 65
+  expect(await grid(page).locator('input:checked').count()).toBe(1);
+  await expect(grid(page).getByRole('radio', { name: 'Keep my colour' })).toBeChecked();
   await expect(page.locator('.wf-colours-name')).toHaveText('Your own colour, close to Silver');
   await page.keyboard.press('Escape');
   await expect(grid(page)).toBeHidden();
@@ -169,4 +171,58 @@ test('[LC-COLOURS-LAZY] colours.js loads only on the first tap of More colours, 
   await grid(page).locator('label', { hasText: /^Mint$/ }).click();
   await expect.poll(() => stored(page)).toMatch(/^#[0-9a-f]{6}$/);
   await context.setOffline(false);
+});
+
+// Keep my colour (the owner's ruling of 14 Nov 2026): a colour from before that is not in the grid has a cell of its own, first, so a rider
+// who tries a grid colour can choose it again with a tap; the arrows reach it; nothing is stored by opening the grid.
+test('[LC-COLOURS-KEEP] a colour from before: Keep my colour first, checked and focused; a grid tap saves, a tap on it saves it back; the arrows reach it; 44 px at 320 px', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.setViewportSize({ width: 320, height: 640 });
+  const own = { ...BLUE, look: { colour: '#a1b2c3', bars: 'drop', ebike: false } };
+  await look(page, { 'loadcheck:bikeProfile': JSON.stringify(own), 'loadcheck:bikeProfiles': JSON.stringify([own]) });
+  await chip(page).click();
+  const keep = grid(page).getByRole('radio', { name: 'Keep my colour' });
+  await expect(keep).toBeChecked();
+  await expect(keep).toBeFocused();
+  await expect(grid(page).getByRole('radio')).toHaveCount(66);
+  expect(await grid(page).getByRole('radio').first().evaluate((el) => (el as HTMLInputElement).value)).toBe('#a1b2c3');
+  // its cell: in the colour, 44 px or more, the mark an outline and a tick; nothing scrolls sideways
+  const cell = grid(page).locator('label:has(input:checked) .wf-colour');
+  const box = (await cell.boundingBox())!;
+  expect(box.width).toBeGreaterThanOrEqual(44);
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  const label = (await grid(page).locator('label:has(input:checked)').boundingBox())!;
+  expect(label.height).toBeGreaterThanOrEqual(44);
+  const mark = await cell.evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, outline: getComputedStyle(el).outlineStyle, tick: getComputedStyle(el, '::after').content }));
+  expect(mark.bg).toBe('rgb(161, 178, 195)');
+  expect(mark.outline).toBe('solid');
+  expect(mark.tick).not.toBe('none');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  expect(await page.locator('#bikeDetailsBody').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  // opening stored nothing
+  expect(await stored(page)).toBe('#a1b2c3');
+  // a grid tap saves; the own colour stays offered; a tap on it saves it back, as every Look tap does
+  await grid(page).locator('label', { hasText: /^Burgundy$/ }).click();
+  await expect.poll(() => stored(page)).toBe('#6b1d2a');
+  await expect(keep).not.toBeChecked();
+  await expect(keep).toHaveCount(1);
+  await grid(page).locator('label', { hasText: /^Keep my colour$/ }).click();
+  await expect.poll(() => stored(page)).toBe('#a1b2c3');
+  await expect(frame(page)).toHaveAttribute('stroke', '#a1b2c3');
+  await expect(keep).toBeChecked();
+  // the arrows: Right to White, Left back to it, each shown at once and stored once the rider pauses
+  await keep.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(grid(page).getByRole('radio', { name: 'White' })).toBeFocused();
+  await expect(frame(page)).toHaveAttribute('stroke', '#f4f4f2');
+  await page.keyboard.press('ArrowLeft');
+  await expect(keep).toBeFocused();
+  await expect(keep).toBeChecked();
+  await expect(frame(page)).toHaveAttribute('stroke', '#a1b2c3');
+  await expect.poll(() => stored(page)).toBe('#a1b2c3');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfiles')!)[0].look.colour)).toBe('#a1b2c3');
+  await page.keyboard.press('Escape');
+  await expect(chip(page)).toBeFocused();
+  expect(errors).toEqual([]);
 });

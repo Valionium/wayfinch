@@ -89,3 +89,121 @@ test('[LC-COLOURS-KEYS] focus() lands on the colour in use, else the first; Esca
   b.picker.focus();
   expect(b.nameOf(document.activeElement as HTMLInputElement)).toBe('White');
 });
+
+// Keep my colour (the owner's ruling of 14 Nov 2026): a colour from before that is not one of the 65 (a photo's, an older save's) gets
+// a cell of its own, first, checked while it is the colour in use, so a rider who tries a grid colour can choose it again. It is a radio
+// of the same group (one Tab stop), reached by the arrows; a tap on it is a pick like any other; nothing is picked by opening or show().
+const KEEP = { ...words, keep: 'Keep my colour' };
+function openKeep(current: string | null) {
+  const box = document.createElement('div');
+  document.body.appendChild(box);
+  const onPick = vi.fn<(hex: string, settle: boolean) => void>();
+  const onClose = vi.fn<() => void>();
+  const picker = openColours(box, { words: KEEP, current, onPick, onClose });
+  const visible = () => [...box.querySelectorAll<HTMLInputElement>('input[type=radio]')].filter((r) => !r.closest('label')!.hidden);
+  const nameOf = (r: Element | null) => ((r as HTMLInputElement | null)?.labels?.[0]?.textContent ?? '').trim();
+  const byName = (name: string) => visible().find((r) => nameOf(r) === name)!;
+  return { box, picker, visible, nameOf, byName, onPick, onClose };
+}
+
+test('[LC-COLOURS-KEEP] a colour outside the grid: "Keep my colour" first, in that colour, checked and marked, in the same group; the 65 after it; opening picks nothing', () => {
+  const k = openKeep('#a1b2c3');
+  const radios = k.visible();
+  expect(radios).toHaveLength(66);
+  expect(radios.map(k.nameOf)).toEqual(['Keep my colour', ...MORE_COLOURS.map((c) => c.name)]);
+  const keep = radios[0]!;
+  expect(keep.value).toBe('#a1b2c3');
+  expect(keep.checked).toBe(true);
+  expect(radios.filter((r) => r.checked)).toHaveLength(1);
+  expect(new Set(radios.map((r) => r.name)).size).toBe(1);
+  expect(keep.closest('[role=radiogroup]')).toBe(k.box.querySelector('[role=radiogroup]'));
+  const cell = keep.closest('label')!.querySelector<HTMLElement>('.wf-colour')!;
+  expect(cell.style.getPropertyValue('--c')).toBe('#a1b2c3');
+  expect(cell.classList.contains('on')).toBe(true);
+  // the line above the grid still says what it is
+  expect(k.box.querySelector('.wf-colours-name')!.textContent).toBe('Your own colour, close to Silver');
+  k.picker.focus();
+  expect(document.activeElement).toBe(keep);
+  expect(k.onPick).not.toHaveBeenCalled();
+  // a grid colour or none: no such cell
+  for (const current of ['#2563b8', null]) {
+    document.body.innerHTML = '';
+    const g = openKeep(current);
+    expect(g.visible(), String(current)).toHaveLength(65);
+    expect(g.visible().map(g.nameOf), String(current)).not.toContain('Keep my colour');
+  }
+});
+
+test('[LC-COLOURS-KEEP] after a grid pick it stays, unchecked, and a tap on it picks the colour again (settle true); show() follows the page and picks nothing', () => {
+  const k = openKeep('#a1b2c3');
+  k.byName('Burgundy').closest('label')!.click();
+  expect(k.onPick).toHaveBeenLastCalledWith('#6b1d2a', true);
+  // the page saves and redraws: show() with the new colour
+  k.picker.show('#6b1d2a');
+  expect(k.byName('Keep my colour').checked).toBe(false);
+  expect(k.byName('Burgundy').checked).toBe(true);
+  expect(k.visible()).toHaveLength(66);
+  k.byName('Keep my colour').closest('label')!.click();
+  expect(k.onPick).toHaveBeenLastCalledWith('#a1b2c3', true);
+  expect(k.byName('Keep my colour').checked).toBe(true);
+  expect(k.box.querySelector('.wf-colours-name')!.textContent).toBe('Your own colour, close to Silver');
+  // Undo in the page brings a grid colour, then the own colour back: show() checks each, calls nothing
+  k.onPick.mockClear();
+  k.picker.show('#2563b8');
+  k.picker.show('#a1b2c3');
+  expect(k.byName('Keep my colour').checked).toBe(true);
+  expect(k.onPick).not.toHaveBeenCalled();
+  // a grid opened on a grid colour gains the cell once the page shows a colour from outside it (a photo's)
+  document.body.innerHTML = '';
+  const g = openKeep('#2563b8');
+  g.picker.show('#123456');
+  expect(g.byName('Keep my colour').value).toBe('#123456');
+  expect(g.byName('Keep my colour').checked).toBe(true);
+  expect(g.onPick).not.toHaveBeenCalled();
+});
+
+test('[LC-COLOURS-KEEP] the arrows reach it: Right or Down from it to White; Left from White and Up from the first row back to it, each shown (settle false)', () => {
+  const k = openKeep('#a1b2c3');
+  const keep = k.byName('Keep my colour');
+  keep.focus();
+  expect(key(keep, 'ArrowRight')).toBe(false);
+  expect(k.nameOf(document.activeElement)).toBe('White');
+  expect(k.onPick).toHaveBeenLastCalledWith('#f4f4f2', false);
+  expect(key(document.activeElement!, 'ArrowLeft')).toBe(false);
+  expect(document.activeElement).toBe(keep);
+  expect(keep.checked).toBe(true);
+  expect(k.onPick).toHaveBeenLastCalledWith('#a1b2c3', false);
+  key(keep, 'ArrowDown');
+  expect(k.nameOf(document.activeElement)).toBe('White');
+  key(document.activeElement!, 'End');
+  expect(k.nameOf(document.activeElement)).toBe('Black');
+  key(document.activeElement!, 'ArrowUp');
+  expect(document.activeElement).toBe(keep);
+  // on it, the other moves stay on it and pick nothing more
+  k.onPick.mockClear();
+  for (const move of ['ArrowLeft', 'ArrowUp', 'Home', 'PageUp']) {
+    expect(key(keep, move), move).toBe(false);
+    expect(document.activeElement, move).toBe(keep);
+  }
+  expect(k.onPick).not.toHaveBeenCalled();
+  // a key that moves nothing is left to the browser
+  expect(key(keep, 'Tab')).toBe(true);
+  // without the cell (a grid colour), Up and Left at the first row stay put as before
+  document.body.innerHTML = '';
+  const g = openKeep('#f4f4f2');
+  const white = g.byName('White');
+  white.focus();
+  key(white, 'ArrowUp');
+  expect(document.activeElement).toBe(white);
+  key(white, 'ArrowLeft');
+  expect(document.activeElement).toBe(white);
+});
+
+test('[LC-COLOURS-KEEP] a page that passes no word for it (an older page) gets the grid as before: no such cell', () => {
+  const box = document.createElement('div');
+  document.body.appendChild(box);
+  openColours(box, { words, current: '#a1b2c3', onPick: vi.fn(), onClose: vi.fn() });
+  const shown = [...box.querySelectorAll<HTMLInputElement>('input[type=radio]')].filter((r) => !r.closest('label')!.hidden);
+  expect(shown).toHaveLength(65);
+  expect(shown.some((r) => r.checked)).toBe(false);
+});
