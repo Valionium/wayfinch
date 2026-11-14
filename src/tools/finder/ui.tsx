@@ -1,7 +1,7 @@
 // The Bike finder (design of 14 November 2026): Tools' page at #/tools?finder, its own chunk loaded from the Tools chunk. Five questions as
 // radios (the tyre tool's look), then the bike types that fit, best first, each with its reasons, what to look for and a link to its
 // drawing in How a bike is built. It keeps the answers in its one copilot:* key (answers.ts), and never changes a saved bike.
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { complete, findTypes, lookFor, missing, ORDER, QUESTIONS } from '../../core/finder/rank.ts';
 import type { AnswerKey, Answers, FinderType, Question } from '../../core/finder/rank.ts';
 import { FN, FN_ANSWERS, FN_LOOK, FN_LOOK_LABEL, FN_MIND, FN_MOTOR_TOO, FN_NEED, FN_QUESTIONS, FN_TYPES, FN_WHY } from '../../core/wording/en-finder.ts';
@@ -41,7 +41,10 @@ export function FinderScreen({ back }: { back: boolean }) {
     for (const t of EVENTS) w.addEventListener(t, again);
     return () => { for (const t of EVENTS) w.removeEventListener(t, again); };
   }, []);
-  useEffect(() => { if (toList.current) { toList.current = false; heading.current?.focus(); } });
+  // The focus goes to the list in the commit that draws it (a layout effect), and only once the heading is there: an effect left waiting for
+  // the next frame by an answer's render runs first when Show comes within that frame, and would take the request with no list to focus
+  // (the flake of 14 Nov 2026, CI of PRs 160 and 163).
+  useLayoutEffect(() => { if (toList.current && heading.current) { toList.current = false; heading.current.focus(); } });
 
   // The same words twice are said again: the second time they end in a no-break space, so the live line changes (review of PR 158, M2).
   const say = (t: string): void => setSaid((s) => (s === t ? `${t}\u00a0` : t));
