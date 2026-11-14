@@ -286,3 +286,31 @@ test('[HINT-COLOUR] 320 × 640 and 360 × 640: the whole Choose a GPX file butto
     app = undefined;
   }
 });
+
+// Review of PR 160, m-1: a rider's own bike name on Trip wraps within the screen and keeps the bike at most 120 px tall (TRIP-FIRST);
+// a long name shows two lines, and the whole of it stays in the page for a screen reader.
+test('[TRIP-BIKE-NAME] a long or unbroken bike name at 320 and 360 px: no sideways scroll, the bike at most 120 px tall, the whole name in the page', async ({ page }) => {
+  const problems = watch(page);
+  app = await loadApp(page);
+  const long = 'Touring bike with a long name the rider typed in full, kept as it was typed at home in the evening light'.slice(0, 100).trim();
+  for (const name of ['MySuperLongTouringBikeNameWithNoSpaces42', long]) {
+    for (const width of [320, 360]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.evaluate((n) => {
+        const bike = { id: 'bike_long', name: n, look: { colour: '#1f7a7a', bars: 'drop', ebike: false }, frontTyre: '40-622', rearTyre: '40-622', pressure: { wheel: '700c' } };
+        localStorage.setItem('loadcheck:bikeProfiles', JSON.stringify([bike]));
+        localStorage.setItem('loadcheck:bikeProfile', JSON.stringify(bike));
+      }, name);
+      await page.goto(`${app.origin}/#/trip`, { waitUntil: 'domcontentloaded' });
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      const figure = page.locator('.trip-bike figure');
+      await expect(figure.locator('figcaption a')).toHaveText('Bike details');
+      expect(await figure.locator('.bike-name').textContent(), `${width} px`).toBe(name);
+      expect(await noSideways(page), `${name} at ${width} px`).toBe(true);
+      expect((await figure.boundingBox())!.height, `${name} at ${width} px`).toBeLessThanOrEqual(120);
+      const link = (await figure.locator('figcaption a').boundingBox())!;
+      expect(link.x + link.width, `${name} at ${width} px`).toBeLessThanOrEqual(width);
+    }
+  }
+  expect(problems).toEqual([]);
+});

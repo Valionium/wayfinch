@@ -5,7 +5,9 @@
 .trip-bike .bike-tap { flex: 0 0 auto; }
 .trip-bike .bike-art { width: auto; max-width: none; margin: 0; }
 .trip-bike .bike-art .bk { width: auto; height: 84px; max-width: 52vw; }
-.trip-bike .bike-caption { flex: 1 1 auto; margin: 0; min-width: 0; }
+.trip-bike .bike-caption { flex: 1 1 auto; margin: 0; min-width: 0; overflow-wrap: anywhere; }
+/* A rider's own bike name (review of PR 160, m-1): two lines at most, so the bike stays within 120 px; the whole name stays in the page. */
+.trip-bike .bike-name { display: -webkit-inline-box; vertical-align: bottom; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 @media (max-width: 420px) {
   .trip-bike .bike-art .bk { height: 64px; }
   .trip-bike .bike-caption { font-size: 0.875rem; line-height: 1.3; }

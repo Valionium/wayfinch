@@ -95,11 +95,12 @@ function RoadItem({ card, details, onSteps, other = null }: { card: Fitted<RoadC
   );
 }
 
-function TaskItem({ task, details, onSteps, other = null }: { task: Fitted<CareTask>; details: CareDetails; onSteps: OnSteps; other?: Other }) {
+/** `name`: the task's name as its step view names it (review of PR 160, m-2: under Show all, for the bike when the task fits it). */
+function TaskItem({ task, name, details, onSteps, other = null }: { task: Fitted<CareTask>; name: string; details: CareDetails; onSteps: OnSteps; other?: Other }) {
   return (
     <div class={`care-task${other ? ' care-other-type' : ''}`} data-id={task.id}>
       <button type="button" class="care-open" aria-haspopup="dialog" onClick={(e) => onSteps({ kind: 'task', item: task }, e.currentTarget)}>
-        <span class="care-name">{taskName(task, details)}</span> <Tags item={task} details={details} /><Unusual type={other} />
+        <span class="care-name">{name}</span> <Tags item={task} details={details} /><Unusual type={other} />
       </button>
     </div>
   );
@@ -236,7 +237,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
             <section key={s} class="care-section">
               <h3>{SECTION_LABEL[s]}</h3>
               {byType(inSection, type, details).map(({ item: t, usual }) => (
-                <TaskItem key={t.id} task={t} details={details} onSteps={openSteps} other={usual ? null : type} />
+                <TaskItem key={t.id} task={t} name={taskName(t, fitOf(t.applies, own).show ? own : details)} details={details} onSteps={openSteps} other={usual ? null : type} />
               ))}
             </section>
           );

@@ -222,6 +222,18 @@ test('[BC-FORK-ONLY] with a front fork only, the fork wipe names the fork legs a
   expect(CARE_TASKS.find((t) => t.id === 'susp-wipe-stanchions')!.name).toBe('Wipe the fork legs and shock shaft');
 });
 
+// Review of PR 160, m-2: under Show all a task that fits the bike opens as for the bike, so the list names it so too.
+test('[BC-FORK-ONLY] under Show all, the fork wipe on a front-fork bike has the same name in the list and its steps', async () => {
+  const wipe = () => tasks().find((d) => d.dataset.id === 'susp-wipe-stanchions')!;
+  await mount(world([bike('bike_a', 'Trekking', { ...ANSWERED, suspension: 'front' })]));
+  await click(host.querySelector<HTMLElement>('.care-fit button')!);
+  expect(host.querySelector('.care-fit button')!.textContent).toBe(C.careFitMine);
+  const listed = wipe().querySelector('.care-name')!.textContent;
+  await click(wipe().querySelector<HTMLElement>('.care-open')!);
+  expect(host.querySelector('dialog.care-steps .care-steps-name')!.textContent).toBe(listed);
+  expect(listed).toBe('Wipe the fork legs');
+});
+
 test('[BC-TELL-US] the list fits the chosen bike, not the first one', async () => {
   const a = bike('bike_a', 'Gravel', ANSWERED);
   const b = bike('bike_b', 'Trail', { brakes: 'hydraulic-disc', tyres: 'tubeless', suspension: 'full', drive: 'derailleur', shifting: 'cable', look: { colour: null, bars: 'flat', ebike: false } });

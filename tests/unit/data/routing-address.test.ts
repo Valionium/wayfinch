@@ -61,6 +61,13 @@ describe('Place search by address and named place', () => {
     expect((await searchPlace('Camping Haide Heidelberg', fakeFetch({ [PHOTON]: campsite }).fetch))[0]!.kind).toBe('camp site');
   });
 
+  // Review of PR 160, m-3: only the road and area classes go; a bus stop, a rest area or services keep their words.
+  test('[AB-HIT-KIND] a bus stop, a rest area and services on a road still say what they are', async () => {
+    const kinds = { features: ['bus_stop', 'rest_area', 'services'].map((v, i) => feature({ name: `Bismarckplatz ${i}`, postcode: '69115', city: 'Heidelberg', country: 'Germany', osm_key: 'highway', osm_value: v }, [8.69 + i / 100, 49.41])) };
+    const hits = await searchPlace('Bismarckplatz Heidelberg', fakeFetch({ [PHOTON]: kinds }).fetch);
+    expect(hits.map((h) => h.kind)).toEqual(['bus stop', 'rest area', 'services']);
+  });
+
   test('a station is found by its name, with its street and number apart from its name', async () => {
     const { fetch: f, seen } = fakeFetch({ [PHOTON]: station });
     const hits = await searchPlace('Heidelberg Hauptbahnhof', f);
