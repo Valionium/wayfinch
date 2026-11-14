@@ -67,6 +67,11 @@ const specialist = (p: Place): boolean => {
 };
 const mappedYes = (p: Place): boolean => p.tags['emergency'] === 'yes';
 const departmentYes = (p: Place): boolean => mappedYes(p) && !specialist(p);
+/**
+ * With no speciality mapped (the packs before the healthcare tags, and wherever OSM lacks them), a name that says psychiatry,
+ * psychosomatics or rehabilitation only adds "check before going": never hidden, moved down or demoted (the owner's ruling of 14 Nov 2026).
+ */
+const namedClinic = (p: Place): boolean => specialityList(p).length === 0 && /ps[yi]chiatr|psychosomat|reha|r[ée]adapt|riabilit/i.test(p.name ?? '');
 /** A hospital mapped access=private or no stays listed, said plainly: in OSM that is often only who runs it (review of #140, I3). */
 const hospitalLines = (p: Place): string[] => {
   const list = specialityList(p);
@@ -75,7 +80,7 @@ const hospitalLines = (p: Place): string[] => {
     : [departmentYes(p) ? W.helpEmergencyDepartment : W.helpEmergencyUnknown];
   const access = p.tags['access'];
   const closed = closedAccess(access);
-  return [...lines, ...(closed ? [W.helpAccess(access!)] : []), ...(closed || (mappedYes(p) && specialist(p)) ? [W.helpCheckFirst] : [])];
+  return [...lines, ...(closed ? [W.helpAccess(access!)] : []), ...(closed || (mappedYes(p) && specialist(p)) || namedClinic(p) ? [W.helpCheckFirst] : [])];
 };
 
 const toiletsAccess = (p: Place): string | undefined => (p.kind === 'toilets' ? p.tags['access'] : p.tags['toilets:access'] ?? p.tags['access']);

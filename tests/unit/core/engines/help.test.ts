@@ -513,3 +513,76 @@ describe('sweep of 14 Nov 2026', () => {
     expect(t.items).toEqual([]);
   });
 });
+
+// The owner's ruling of 14 Nov 2026: until a pack carries healthcare:speciality (and wherever OSM lacks it), the name is the only hint.
+describe('a clinic known only by its name', () => {
+  const lines = (a: Answer, km: Km): string[] => itemAt(a, km).detail!.split(' · ');
+  const checks = (a: Answer, km: Km): number => lines(a, km).filter((x) => x === W.helpCheckFirst).length;
+  const bare = (name: string) => ({ atKm: (km: Km, o = {}) => ({ ...hospital({ name }).atKm(km, o), tags: { amenity: 'hospital' } }) });
+  test('[EM-CLINIC-NAME] the live shape of sweep 2 #2 in the Pharmacy list: its department still said, with "check before going"', () => {
+    // OSM relation 4505865 in the live packs (map data of 8-9 Nov): only amenity=hospital, emergency=yes; 623 m off route.
+    const a = chip('pharmacy', {
+      moment: riding(100),
+      spots: [{ b: hospital({ name: 'Klinik für Allgemeine Psychiatrie' }), km: 100.6, off: 623 }, { b: pharmacy(null, { name: 'Linden' }), km: 104 }],
+    });
+    const c = itemAt(a, 100.6);
+    expect(c.label).toBe('Klinik für Allgemeine Psychiatrie · km 100.6, 623 m off route');
+    expect(c.detail).toContain('emergency department mapped · check before going');
+    expect(checks(a, 100.6)).toBe(1);
+  });
+  test('[EM-CLINIC-NAME] a psychiatric, psychosomatic or rehabilitation clinic gets the line, in German, English, French and Italian', () => {
+    const names = [
+      'Klinik für Allgemeine Psychiatrie', 'Psychiatrisches Zentrum Nordbaden', 'Klinik für Psychosomatik', 'Rehaklinik am Kurpark', 'MEDIAN Reha-Zentrum',
+      'Kinderreha Wangen', "St Mary's Psychiatric Hospital", 'Rehabilitation Centre', 'Centre hospitalier psychiatrique', 'Centre de réadaptation',
+      'CENTRE DE RÉADAPTATION', 'Ospedale psichiatrico', 'Clinica di riabilitazione',
+    ];
+    for (const name of names) {
+      for (const b of [hospital({ name }), bare(name)]) {
+        const a = chip('pharmacy', { moment: riding(100), spots: [{ b, km: 104 }] });
+        expect(checks(a, 104), name).toBe(1);
+      }
+    }
+    expect(lines(chip('pharmacy', { moment: riding(100), spots: [{ b: bare('Rehaklinik'), km: 104 }] }), 104)).toContain('emergency department not known');
+  });
+  test('[EM-CLINIC-NAME] a general hospital whose name merely contains "Klinik" (or clinique, clinica) does not', () => {
+    for (const name of ['Klinikum Stuttgart', 'Kreisklinik Ebersberg', 'Universitätsklinikum Heidelberg', 'Klinik am Eichert', 'Clinique Saint-Jean', 'Clinica San Carlo', 'Kreiskrankenhaus']) {
+      const a = chip('pharmacy', { moment: riding(100), spots: [{ b: hospital({ name }), km: 104 }] });
+      expect(itemAt(a, 104).detail, name).not.toContain(W.helpCheckFirst);
+      expect(itemAt(a, 104).detail, name).toContain('emergency department mapped');
+    }
+  });
+  test('[EM-CLINIC-NAME] a speciality tag still decides: acute specialities stay a department, a non-acute one is a specialist clinic; the line never twice', () => {
+    const acute = hospital({ name: 'Klinik für Psychiatrie und Unfallchirurgie', tags: { healthcare: 'hospital', 'healthcare:speciality': 'trauma;surgery;psychiatry' } });
+    const psych = hospital({ name: 'Klinik für Allgemeine Psychiatrie', tags: { healthcare: 'hospital', 'healthcare:speciality': 'psychiatry' } });
+    const closed = hospital({ name: 'Rehaklinik', tags: { access: 'private' } });
+    const a = chip('pharmacy', { moment: riding(100), spots: [{ b: acute, km: 104 }, { b: psych, km: 96 }] });
+    expect(itemAt(a, 104).detail).toContain('emergency department mapped');
+    expect(itemAt(a, 104).detail).not.toContain(W.helpCheckFirst);
+    expect(itemAt(a, 104).status).toBe('fine');
+    expect(itemAt(a, 96).detail).toContain('specialist clinic: psychiatry · emergency mapped, maybe not for every case · check before going');
+    expect(checks(a, 96)).toBe(1);
+    const p = chip('pharmacy', { moment: riding(100), spots: [{ b: closed, km: 104 }] });
+    expect(itemAt(p, 104).detail).toContain('emergency department mapped · access: private · check before going');
+    expect(checks(p, 104)).toBe(1);
+  });
+  test('[EM-CLINIC-NAME] nothing is hidden, removed, moved down or demoted: the same places, order and statuses as under a plain name', () => {
+    const run = (clinic: string): Answer => chip('pharmacy', {
+      moment: riding(100),
+      spots: [
+        { b: hospital({ name: clinic }), km: 101 }, { b: hospital({ name: 'Kreiskrankenhaus' }), km: 106 },
+        { b: bare(`${clinic} Süd`), km: 99 }, { b: hospital({ name: 'Klinikum' }), km: 92 }, { b: pharmacy(null, { name: 'Linden' }), km: 103 },
+      ],
+    });
+    const named = run('Psychiatrisches Zentrum');
+    const neutral = run('Bezirkskrankenhaus');
+    const shape = (a: Answer) => a.items.map((i) => [i.stamp?.km, i.status]);
+    expect(shape(named)).toEqual(shape(neutral));
+    expect(named.status).toBe(neutral.status);
+    expect(named.items.map((i) => i.stamp?.km)).toEqual(expect.arrayContaining([101, 99]));
+    expect(itemAt(named, 101).status).toBe('fine');
+    expect(itemAt(named, 101).detail).toContain('emergency department mapped · check before going');
+    for (const km of [106, 92, 103]) {
+      if (named.items.some((i) => i.stamp?.km === km)) expect(itemAt(named, km).detail).toBe(itemAt(neutral, km).detail);
+    }
+  });
+});
