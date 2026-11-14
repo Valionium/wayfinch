@@ -57,7 +57,11 @@ const TABS: { name: TabName; label: string }[] = [
 ];
 
 // What the tab is for, under its heading, and the colour mode button over its corner: loaded after the first screen (tab-top.tsx).
-const TabTop = lazy(() => import('./tab-top.tsx').then((m) => m.TabTop), () => null);
+// Until it loads, the line's room is kept (no words, hidden from a screen reader), so what is below it does not move when it arrives.
+const TabTop = lazy(() => import('./tab-top.tsx').then((m) => m.TabTop), ({ name }) => {
+  const tab = tabOf(name);
+  return tab === 'trip' || tab === 'ahead' ? <p class="tab-sub tab-sub-hold" data-hold={tab} aria-hidden="true" /> : null;
+});
 
 /** The moved card, loaded only for a rider it is due to: a chunk of its own, so the first screen stays within its budget. */
 function MovedCardSlot() {
@@ -79,7 +83,7 @@ function AheadHost() {
 function Screen({ name }: { name: ScreenName }) {
   const tab = tabOf(name);
   return (
-    <main class="screen" id="main" data-screen={name}>
+    <main class="screen" id="main" tabIndex={-1} data-screen={name}>
       <h1>{TABS.find((t) => t.name === tab)!.label}</h1>
       <TabTop name={name} />
       {kindsOnScreen(degradedSignal.value, tab).map((kind) => <Degraded key={kind} kind={kind} />)}
@@ -109,6 +113,8 @@ export function App({ updater = null }: { updater?: Updater | null }) {
   const active = tabOf(current);
   return (
     <div class="shell">
+      {/* The tabs sit on the left at a wide width but last in the page; the first stop jumps past them. Not a #fragment link: the address is the router's. */}
+      <a class="skip-link" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById('main')?.focus(); }}>{W.appSkipToContent}</a>
       <div>
         {updater && <UpdateBar updater={updater} />}
         <Screen name={current} />

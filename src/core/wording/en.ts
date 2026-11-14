@@ -576,6 +576,7 @@ export const W = {
 
   // ---- The app's shell (sub-project 5): tabs, the update prompt, status words, shared lists and the degraded situations of section 8. ----
   appNavLabel: 'Main',
+  appSkipToContent: 'Skip to content',
   appTabAhead: 'En route',
   appTabTrip: 'Trip',
   appTabTools: 'Tools',
