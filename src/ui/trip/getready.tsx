@@ -4,7 +4,7 @@ import { W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
 import { TF } from '../../core/wording/en-trip-fields.ts';
 import { askForHomeScreen } from '../install.ts';
-import { BeforeYouGo } from './prep.tsx';
+import { BeforeYouGo, PrepBeside } from './prep.tsx';
 import { labelOf, NotSaved, RunProgress, usePrepareRun } from './run.tsx';
 import { savedLine } from './saved-line.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
@@ -13,9 +13,17 @@ import type { TripServices, TripSnapshot } from './services.ts';
  * The Get ready offline step's body. `lead` is the message after a route was added (owner's item 2): it carries the step's one
  * Get ready offline button until the first run. `onRun` tells the steps a run started, so the step stays open with its result.
  */
-export function GetReady({ services, snap, reload, lead = null, onRun }: {
-  services: TripServices; snap: TripSnapshot; reload: () => Promise<void>; lead?: string | null; onRun?: () => void;
-}) {
+type Props = { services: TripServices; snap: TripSnapshot; reload: () => Promise<void>; lead?: string | null; onRun?: () => void };
+
+/**
+ * The step's body; with the snapshot alone, what goes beside the folded step's Update instead: Before you leave (prep.tsx; the sweep
+ * of 15 Nov 2026, finding 1). Through this component, so Trip's code in the first screen names no lazy component more.
+ */
+export function GetReady(props: Props | { snap: TripSnapshot }) {
+  return 'services' in props ? <Body {...props} /> : <PrepBeside snap={props.snap} />;
+}
+
+function Body({ services, snap, reload, lead = null, onRun }: Props) {
   const run = usePrepareRun(services.prepare, reload);
   const { progress, reports } = run;
   // While a run is going (started here, on Ahead, or before the step was folded), a tap joins it: never a second run.

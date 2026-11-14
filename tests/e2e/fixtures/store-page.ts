@@ -8,6 +8,7 @@ import { deleteCopilotData } from '../../../src/store/export.ts';
 import { openDb } from '../../../src/store/db.ts';
 import { readInputs } from '../../../src/store/inputs.ts';
 import { addPosition } from '../../../src/store/positions.ts';
+import { savePrepared } from '../../../src/store/prepared.ts';
 import { readSettings, writeSettings } from '../../../src/store/settings.ts';
 import { readTrip, replaceRoute, saveTrip } from '../../../src/store/trip.ts';
 
@@ -25,7 +26,7 @@ const prepare = (o: { sleepMs?: number; weather?: boolean; atMs?: number } = {})
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, o.sleepMs ?? ms)),
 }, () => undefined);
 
-export const store = { prepare, screen, buildScreen, addPosition, deleteCopilotData, flushWrites, onChanged, openDb, readInputs, readSettings, readTrip, replaceRoute, saveTrip, writeSettings };
+export const store = { prepare, screen, buildScreen, addPosition, deleteCopilotData, flushWrites, onChanged, openDb, readInputs, readSettings, readTrip, replaceRoute, savePrepared, saveTrip, writeSettings };
 export type StoreInPage = typeof store;
 
 (window as unknown as { __store: StoreInPage }).__store = store;

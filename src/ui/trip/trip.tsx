@@ -177,7 +177,7 @@ export function TripScreen({ services }: { services: TripServices }) {
           <Step
             name="getready" n={2} title={W.appTripGetReadyTitle} state={stateOf('getready', readyDone)} open={openStep === 'getready'} canOpen={trip !== null}
             onOpen={choose('getready')} change={W.appTripUpdateButton} line={runningSignal.value ? W.appTripWorking : readyDone && snap ? savedLine(snap) : W.appTripGetReadyLater}
-            below={trip && snap?.nothingSaved ? <p class="notice trip-need" data-need>{W.appAheadNeedTitle}</p> : null}
+            below={trip && snap?.nothingSaved ? <p class="notice trip-need" data-need>{W.appAheadNeedTitle}</p> : null} beside={snap?.trip ? <GetReady snap={snap} /> : null}
           >
             {snap?.trip ? (
               <GetReady
