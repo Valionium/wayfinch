@@ -50,11 +50,20 @@ const GRAVEL = 'Handles gravel and easy trails.';
 const DAYS = 'Room for kit for several days.';
 const BALANCE = 'A good balance of speed and comfort.';
 
-/** Why a type fits, for each answer that counts for it (every positive point in the table has its line). */
+/** The line of a ground that needs its own type, for that type when only the ground speaks for it (review of PR 158, C1 and C2). */
+export const FN_NEED: Readonly<Record<string, string>> = {
+  'need:trails': 'Wide, knobbly tyres and suspension keep control on rocks and roots.',
+  'need:soft': 'Its tyres run at low pressure, so they float where others sink.',
+};
+
+/**
+ * Why a type fits, for each answer that counts for it (every positive point in the table has its line). A line for an answer other than the
+ * ground never names a ground, so it never disagrees with the rider's (review of PR 158, M1).
+ */
 export const FN_WHY: Readonly<Record<AnswerKey, Partial<Record<FinderType, string>>>> = {
   'rides:day': {
-    road: 'Light and quick for day rides.', gravel: 'Fun on day rides, on and off road.', city: 'Relaxed for an easy day out.',
-    mtb: 'A fun day out off-road.', full: 'A fun day out off-road.', ebike: 'Longer day rides with less effort.',
+    road: 'Light and quick for day rides.', gravel: 'Quick and fun on day rides.', city: 'Relaxed for an easy day out.',
+    mtb: 'Fun and sturdy for day rides.', full: 'Fun and sturdy for day rides.', ebike: 'Longer day rides with less effort.',
   },
   'rides:commute': {
     road: 'Quick for commuting.', gravel: 'Quick for commuting.', touring: 'Sturdy for daily commuting.',
@@ -65,8 +74,8 @@ export const FN_WHY: Readonly<Record<AnswerKey, Partial<Record<FinderType, strin
     mtb: 'Strong enough to tour; some have rack mounts.', ebike: 'The motor helps with a loaded bike.',
   },
   'rides:bikepacking': {
-    gravel: 'Room for a frame bag, a seat pack and a bar bag.', touring: 'Sturdy enough for bikepacking on easy tracks.',
-    mtb: 'Made for bikepacking on rough tracks.', full: 'Copes with rough trails when bikepacking.', fat: 'Bikepacking on sand, snow and soft ground.',
+    gravel: 'Room for a frame bag, a seat pack and a bar bag.', touring: 'Sturdy enough for bikepacking with bags.',
+    mtb: 'Strong and sturdy for bikepacking.', full: 'Comfortable on long bikepacking days.', fat: 'Sturdy for bikepacking, with room for bags.',
   },
   'ground:paved': {
     road: 'Narrow tyres roll fast on paved roads.', gravel: PAVED, touring: PAVED, city: 'Made for paved streets and paths.', ebike: PAVED,
@@ -88,13 +97,13 @@ export const FN_WHY: Readonly<Record<AnswerKey, Partial<Record<FinderType, strin
   'carry:days': {
     gravel: DAYS, touring: 'Carries kit for days on front and rear racks.', mtb: DAYS, fat: DAYS, ebike: 'The motor helps carry kit for days.',
   },
-  'pace:speed': { road: 'The fastest type on paved roads.', gravel: 'Quick, with drop bars.' },
+  'pace:speed': { road: 'Built for speed.', gravel: 'Quick, with drop bars.' },
   'pace:balance': {
     road: BALANCE, gravel: BALANCE, touring: BALANCE, city: BALANCE, mtb: BALANCE, ebike: BALANCE,
   },
   'pace:comfort': {
-    gravel: 'Wide tyres smooth rough roads.', touring: 'Comfortable over long days.', city: 'Upright and relaxed.',
-    mtb: 'A suspension fork smooths the bumps.', full: 'Suspension front and back: the most comfortable off-road.',
+    gravel: 'Wide tyres smooth the bumps.', touring: 'Comfortable over long days.', city: 'Upright and relaxed.',
+    mtb: 'A suspension fork smooths the bumps.', full: 'Suspension front and back: the most comfortable on bumps.',
     fat: 'Big soft tyres smooth the bumps.', ebike: 'Upright, and the motor takes the hills.',
   },
   'motor:yes': { ebike: 'You want a motor: it helps on hills, with loads and into the wind.' },
@@ -105,7 +114,7 @@ export const FN_WHY: Readonly<Record<AnswerKey, Partial<Record<FinderType, strin
 export const FN_MIND: Readonly<Record<AnswerKey, string>> = {
   'rides:commute': 'Heavier and slower for trips in town.',
   'rides:touring': 'Rack mounts are rare on this type.',
-  'rides:bikepacking': 'Less suited to rough tracks with bags.',
+  'rides:bikepacking': 'Less suited to bikepacking off-road.',
   'ground:paved': 'Knobbly tyres roll slower on paved roads.',
   'ground:mixed': 'Very wide tyres roll slower on paved parts.',
   'ground:gravel': 'Less suited to loose gravel and trails.',

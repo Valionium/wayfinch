@@ -53,9 +53,16 @@ test('[BF-OPEN] Tools has a Find a bike type card before How a bike is built; it
 test('[BF-FLOW] questions left: said, the focus on the first; all answered: the list, best first, the focus on its heading; a change updates it; Start again', async ({ page }) => {
   app = await loadApp(page, { launch: true, path: '/#/tools?finder' });
   const show = page.getByRole('button', { name: 'Show bike types' });
+  const said = () => page.locator('.bf-said').evaluate((e) => e.textContent);
   await show.click();
   await expect(page.locator('.bf-left')).toHaveText(/^5 questions left/);
   await expect(radio(page, 0, 'Day rides for fun or fitness')).toBeFocused();
+  // a second Show with the same count is said again: its text changes, so a screen reader hears it (review of PR 158, M2)
+  const once = await said();
+  await show.click();
+  await expect.poll(said).not.toBe(once);
+  await expect(page.locator('.bf-said')).toHaveText('5 questions left.');
+  await radio(page, 0, 'Day rides for fun or fitness').focus();
   // by keyboard: the arrows move along a question's answers and pick
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
@@ -84,6 +91,11 @@ test('[BF-FLOW] questions left: said, the focus on the first; all answered: the 
   await expect(radio(page, 4, 'Yes')).toBeFocused();
   await expect(page.locator('.bf-said')).toHaveText('The bike types are updated for your answers.');
   await expect(gravel.locator('.bf-look li').last()).toHaveText(/^Motor: /);
+  // a second change is said again (review of PR 158, M2)
+  const first = await said();
+  await radio(page, 4, 'Not sure').check();
+  await expect.poll(said).not.toBe(first);
+  await expect(page.locator('.bf-said')).toHaveText('The bike types are updated for your answers.');
   // Start again: every answer cleared, the list gone, the focus on the first question
   await page.getByRole('button', { name: 'Start again' }).click();
   await expect(types(page)).toHaveCount(0);

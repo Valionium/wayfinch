@@ -3,8 +3,8 @@
 // drawing in How a bike is built. It keeps the answers in its one copilot:* key (answers.ts), and never changes a saved bike.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { complete, findTypes, lookFor, missing, ORDER, QUESTIONS } from '../../core/finder/rank.ts';
-import type { Answers, FinderType, Question } from '../../core/finder/rank.ts';
-import { FN, FN_ANSWERS, FN_LOOK, FN_LOOK_LABEL, FN_MIND, FN_MOTOR_TOO, FN_QUESTIONS, FN_TYPES, FN_WHY } from '../../core/wording/en-finder.ts';
+import type { AnswerKey, Answers, FinderType, Question } from '../../core/finder/rank.ts';
+import { FN, FN_ANSWERS, FN_LOOK, FN_LOOK_LABEL, FN_MIND, FN_MOTOR_TOO, FN_NEED, FN_QUESTIONS, FN_TYPES, FN_WHY } from '../../core/wording/en-finder.ts';
 import { bikeDetailsHref } from '../../ui/bike/link.ts';
 import { clearAnswers, readAnswers, writeAnswers } from './answers.ts';
 import './finder.css';
@@ -43,17 +43,19 @@ export function FinderScreen({ back }: { back: boolean }) {
   }, []);
   useEffect(() => { if (toList.current) { toList.current = false; heading.current?.focus(); } });
 
+  // The same words twice are said again: the second time they end in a no-break space, so the live line changes (review of PR 158, M2).
+  const say = (t: string): void => setSaid((s) => (s === t ? `${t}\u00a0` : t));
   const pick = (q: Question, v: string): void => {
     const next = { ...answers, [q]: v } as Answers;
     setAnswers(next);
     writeAnswers(next);
-    if (shown) setSaid(FN.updated);
+    if (shown) say(FN.updated);
   };
   const show = (): void => {
     const gaps = missing(answers);
     if (gaps.length > 0) {
       setAsked(true);
-      setSaid(FN.left(gaps.length));
+      say(FN.left(gaps.length));
       firstRadio(root.current, gaps[0]!)?.focus();
       return;
     }
@@ -103,7 +105,7 @@ export function FinderScreen({ back }: { back: boolean }) {
               <li key={f.type} class="bf-type" data-finder-type={f.type}>
                 <h4>{FN_TYPES[f.type]}</h4>
                 <p class="bf-sub">{FN.why}</p>
-                <ul class="bf-why">{f.why.map((k) => <li key={k}>{FN_WHY[k]?.[f.type]}</li>)}</ul>
+                <ul class="bf-why">{f.why.map((k) => <li key={k}>{FN_WHY[k as AnswerKey]?.[f.type] ?? FN_NEED[k]}</li>)}</ul>
                 {f.mind ? <p class="bf-mind"><strong>{FN.mind}</strong> {FN_MIND[f.mind]}</p> : null}
                 <p class="bf-sub">{FN.look}</p>
                 <ul class="bf-look">

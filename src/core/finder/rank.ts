@@ -34,7 +34,7 @@ export const POINTS: Readonly<Record<string, readonly number[]>> = {
   'ground:mixed': [0, 3, 2, 1, 1, 0, -1, 1],
   'ground:gravel': [-2, 3, 1, -1, 2, 1, 0, 0],
   'ground:trails': [-3, -1, -2, -3, 3, 3, 1, -2],
-  'ground:soft': [-3, -1, -2, -3, 1, -1, 4, -2],
+  'ground:soft': [-3, -2, -2, -3, 1, -1, 4, -2],
   'carry:little': [1, 0, -1, 1, 1, 1, 0, 0],
   'carry:day': [0, 1, 1, 2, 0, 0, 0, 1],
   'carry:days': [-2, 2, 3, 0, 1, -1, 1, 1],
@@ -46,36 +46,56 @@ export const POINTS: Readonly<Record<string, readonly number[]>> = {
   'motor:unsure': [0, 0, 0, 0, 0, 0, 0, 1],
 };
 
+/**
+ * The ground that needs a type of its own (review of PR 158, C1 and C2): rough trails a mountain bike, sand or snow a fat bike. Those types
+ * are always listed, first, whatever the other answers say.
+ */
+export const NEEDS: Readonly<Partial<Record<Full['ground'], readonly FinderType[]>>> = { trails: ['mtb', 'full'], soft: ['fat'] };
+
 /** The questions not answered yet, in order. */
 export const missing = (a: Answers): Question[] => ORDER.filter((q) => !(QUESTIONS[q] as readonly string[]).includes(a[q] ?? ''));
 export const complete = (a: Answers): a is Full => missing(a).length === 0;
 
-/** One type that fits: its total, the answers for it (most points first, at most three) and the one most against it, if any. */
-export type Fit = { type: FinderType; total: number; why: AnswerKey[]; mind: AnswerKey | null };
+/**
+ * A reason: an answer that counts for the type, or `need:<ground>`, the line of a ground that needs the type, for a type the ground alone
+ * speaks for.
+ */
+export type Reason = AnswerKey | `need:${string}`;
+/**
+ * One type that fits: its total, its reasons (the answers for it, most points first, at most three) and the answer most against it, if any;
+ * `needed` when the ground needs it.
+ */
+export type Fit = { type: FinderType; total: number; why: Reason[]; mind: AnswerKey | null; needed: boolean };
 
 /**
- * The types that fit, best first, at most three. Left out: a type whose ground answer is -2 or less (not made for that ground), the e-bike
- * when the rider wants no motor, a type with fewer than two answers for it, a total of zero or less, or under half the best total. A tie
- * keeps TYPES' order.
+ * The types that fit, at most three: the types the ground needs (NEEDS) first, always; then the rest, best first. Left out: a type whose
+ * ground answer is -2 or less (not made for that ground), the e-bike when the rider wants no motor, and, unless the ground needs it, a type
+ * with fewer than two answers for it, a total of zero or less, or under half the best total. Best first: more points, then the better fit
+ * for the ground, then TYPES' order.
  */
 export function findTypes(a: Full): Fit[] {
+  const needs = NEEDS[a.ground] ?? [];
+  const ground = answerKey('ground', a.ground);
   const fits: Fit[] = [];
   TYPES.forEach((type, col) => {
     const given = ORDER.map((q) => answerKey(q, a[q]));
     const pts = (k: AnswerKey): number => POINTS[k]![col]!;
-    if (pts(answerKey('ground', a.ground)) <= -2 || (type === 'ebike' && a.motor === 'no')) return;
+    if (pts(ground) <= -2 || (type === 'ebike' && a.motor === 'no')) return;
+    const needed = needs.includes(type);
     const forIt = given.filter((k) => pts(k) > 0);
     const total = given.reduce((s, k) => s + pts(k), 0);
-    if (forIt.length < 2 || total <= 0) return;
-    // a stable sort keeps the question order on a tie
-    const why = [...forIt].sort((x, y) => pts(y) - pts(x)).slice(0, 3);
+    if (!needed && (forIt.length < 2 || total <= 0)) return;
+    // a stable sort keeps the question order on a tie; a type only its ground speaks for gets that ground's own line too
+    const why: Reason[] = [...forIt].sort((x, y) => pts(y) - pts(x)).slice(0, 3);
+    if (why.length < 2) why.push(`need:${a.ground}`);
     const against = given.filter((k) => pts(k) < 0);
     const mind = against.length ? against.reduce((lo, k) => (pts(k) < pts(lo) ? k : lo)) : null;
-    fits.push({ type, total, why, mind });
+    fits.push({ type, total, why, mind, needed });
   });
-  fits.sort((x, y) => y.total - x.total);
-  const best = fits[0]?.total ?? 0;
-  return fits.filter((f) => f.total * 2 >= best).slice(0, 3);
+  const fit = (f: Fit): number => POINTS[ground]![TYPES.indexOf(f.type)]!;
+  fits.sort((x, y) => Number(y.needed) - Number(x.needed) || y.total - x.total || fit(y) - fit(x));
+  const best = Math.max(...fits.map((f) => f.total));
+  return fits.filter((f) => f.needed || f.total * 2 >= best).slice(0, 3);
 }
 
 /** What to look for on a type: its tyres, mounts (for kit for several days, those that carry it), gears and brakes, then what it adds. */
