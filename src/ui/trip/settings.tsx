@@ -1,6 +1,10 @@
 // Trip settings (spec section 3.3). Every field saves when it is changed; a value outside its range is refused with the range
 // named, and the field goes back to the last good value. Nothing here works out the days: the services re-plan them.
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { carryOwn } from '../../core/route/day-stops.ts';
+import { planStages } from '../../core/route/stages.ts';
+import type { Pace } from '../../core/route/stages.ts';
+import type { Trip } from '../../core/types.ts';
 import { W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
 import { TF } from '../../core/wording/en-trip-fields.ts';
@@ -12,6 +16,19 @@ import { suggestedNights } from './model.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
 
 type Save = (field: keyof Settings, value: unknown) => Promise<boolean>;
+
+/**
+ * The line for a trip whose nights become `n`, '' when it held no stops: by the very rule the stops are settled by (carryOwn, the
+ * owner's ruling of 14 Nov 2026), every one of the rider's own stops is named, kept for its new night or not kept; a day ride names
+ * only what goes, and says nothing with automatic stops alone.
+ */
+function stopsLine(trip: Trip, n: number, pace: Pace): string {
+  const held = trip.stops?.routeId === trip.route.id ? trip.stops : undefined;
+  if (!held || !Array.isArray(held.days) || held.days.length === 0) return '';
+  const c = carryOwn(held, trip.route, [...planStages(trip.route, { flatKph: trip.flatKph, pace: trip.pace ?? pace, nights: n })]);
+  const lost = c.lost.map((l) => TF.appTripStopNight(l.stop.name, l.night, true)).join(', ');
+  return n > 0 || lost ? TF.appTripStopsNewNights(n, c.kept.map((k) => TF.appTripStopNight(k.stop.name, k.night)).join(', '), lost) : '';
+}
 
 // Remove this trip stands next to Change in the Route step's done row (owner, 9 Nov 2026): `part="remove"` of this chunk, with its
 // confirm step and its words, so the first screen carries no import of its own for it.
@@ -90,14 +107,13 @@ export function TripSettings({ services, snap, reload, part, focusDate = 0 }: {
     await reload();
   };
   const problem = (f: string): string | null => problems[f] || null;
-  // Other nights choose every night's stop afresh, the rider's own picks included (TRIP-DAY-STOPS): said once, here, when the trip
-  // had stops (review of PR 101, M4). A day ride has none to say.
+  // Other nights choose their stops again (TRIP-DAY-STOPS), keeping the rider's own that still fit (TRIP-STOPS-KEEP): said once,
+  // here, when the trip had stops (review of PR 101, M4).
   const saveNights = async (v: number | null): Promise<boolean> => {
     const was = trip ? settings.nights ?? suggestedNights(trip) : null;
     const ok = await save('nights', v);
     const now = trip ? v ?? suggestedNights(trip) : null;
-    const held = trip?.stops?.routeId === trip?.route.id ? trip?.stops : undefined;
-    setStopsSaid(ok && held && held.days.length > 0 && now !== null && now > 0 && now !== was ? TF.appTripStopsNewNights(now, held.days.some((d) => d.by === 'rider')) : '');
+    setStopsSaid(ok && trip && now !== null && now !== was ? stopsLine(trip, now, settings.pace) : '');
     return ok;
   };
 

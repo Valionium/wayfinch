@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-// A change of nights chooses every night's stop afresh (TRIP-DAY-STOPS: other nights choose afresh, the rider's picks for the old
-// plan are not carried over). Since PR 101's review (M4) it says so in one line beside the nights.
+// A change of nights chooses the nights' stops again (TRIP-DAY-STOPS); since the owner's ruling of 14 Nov 2026 the rider's own picks
+// that still fit are kept (TRIP-STOPS-KEEP). Since PR 101's review (M4) it says so in one line beside the nights.
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { planStages } from '../../../src/core/route/stages.ts';
 import type { Trip, TripStop } from '../../../src/core/types.ts';
+import { BD } from '../../../src/core/wording/en-beds.ts';
 import { TF } from '../../../src/core/wording/en-trip-fields.ts';
 import { DEFAULT_SETTINGS } from '../../../src/store/rules.ts';
 import type { Settings } from '../../../src/store/rules.ts';
@@ -40,11 +41,29 @@ async function setNights(snap: TripSnapshot, value: string, outcome: SettingsOut
 }
 
 describe('A change of nights says the stops are chosen afresh (review of PR 101, M4)', () => {
-  test('[TRIP-DAY-STOPS] with the rider\'s own stop: "New stops for 3 nights. Stops you chose for the old nights are not kept."', async () => {
+  // The owner's ruling of 14 Nov 2026: own stops that still fit are kept; one that is not is named, and the line says where to change
+  // them. (Before it: "New stops for 3 nights. Stops you chose for the old nights are not kept.")
+  test("[TRIP-STOPS-KEEP] 2 → 3 nights, the rider's own stop near no new night's end: named as not kept, and where to change a stop", async () => {
     const said = await setNights(snapOf([stop(92, 'rider'), stop(177, 'auto')]), '3');
-    expect(said).toBe(TF.appTripStopsNewNights(3, true));
-    expect(said).toBe('New stops for 3 nights. Stops you chose for the old nights are not kept.');
+    expect(said).toBe(TF.appTripStopsNewNights(3, '', TF.appTripStopNight('Camping 92', 1, true)));
+    expect(said).toBe('New stops for 3 nights. Not kept, as the nights now end elsewhere: Camping 92 (night 1 before). To change a stop, use Change stop under its day in Your route.');
+    expect(said).toContain(BD.appTripStopChange);
+    expect(said).toContain(TF.appTripSummaryTitle);
     expect(host.querySelector('[data-nights-stops]')!.getAttribute('role')).toBe('status');
+  });
+
+  test('[TRIP-STOPS-KEEP] 2 → 5 nights: the own stop is kept for the night it now ends near, said with that night; a kept No stop too', async () => {
+    expect(await setNights(snapOf([stop(92, 'rider'), stop(177, 'auto')]), '5'))
+      .toBe('New stops for 5 nights, keeping yours: Camping 92 (night 2). To change a stop, use Change stop under its day in Your route.');
+    const noStop: TripStop = { placeId: null, km: plan[1]!.endKm, name: null, town: null, by: 'rider' };
+    expect(await setNights(snapOf([stop(92, 'rider'), noStop]), '5'))
+      .toBe('New stops for 5 nights, keeping yours: Camping 92 (night 2), No stop (night 4). To change a stop, use Change stop under its day in Your route.');
+    expect(await setNights(snapOf([stop(92, 'rider'), noStop]), '3'))
+      .toBe('New stops for 3 nights. Not kept, as the nights now end elsewhere: Camping 92 (night 1 before), No stop (night 2 before). To change a stop, use Change stop under its day in Your route.');
+  });
+
+  test('[TRIP-STOPS-KEEP] a day ride has no nights: the own stops are named as not kept, never dropped without a word', async () => {
+    expect(await setNights(snapOf([stop(92, 'rider'), stop(177, 'auto')]), '0')).toBe('A day ride has no nights, so your stops are not kept: Camping 92 (night 1 before).');
   });
 
   test('[TRIP-DAY-STOPS] with automatic stops only: "New stops for 1 night."', async () => {
@@ -54,7 +73,8 @@ describe('A change of nights says the stops are chosen afresh (review of PR 101,
   test('[TRIP-DAY-STOPS] nothing is said with no stops yet, for the same number of nights, for a day ride, or when the change is refused', async () => {
     expect(await setNights(snapOf(null), '3')).toBe('');
     expect(await setNights(snapOf([stop(92, 'rider'), stop(177, 'auto')]), '2')).toBe('');
-    expect(await setNights(snapOf([stop(92, 'rider'), stop(177, 'auto')]), '0')).toBe('');
+    // a day ride with automatic stops only (with own stops it names them: TRIP-STOPS-KEEP, the owner's ruling of 14 Nov 2026)
+    expect(await setNights(snapOf([stop(92, 'auto'), stop(177, 'auto')]), '0')).toBe('');
     expect(await setNights(snapOf([stop(92, 'rider'), stop(177, 'auto')]), '3', { ok: false, reasons: { nights: 'no' }, note: null })).toBe('');
   });
 });

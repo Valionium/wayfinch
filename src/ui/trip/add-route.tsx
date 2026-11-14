@@ -41,7 +41,7 @@ export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken
       const out = await services.addRoute(found, old?.route ?? null);
       setRound((n) => n + 1);
       if (out.kind === 'same') setSaid(TF.appTripSameRoute);
-      else onAdded(`${out.kind === 'added' ? TF.appTripAdded(out.name) : out.dateNotSaved ? TF.appTripReplacedNoDate(out.name) : TF.appTripReplaced(out.name)} ${W.appTripNextGetReady}`);
+      else onAdded(`${out.kind === 'added' ? TF.appTripAdded(out.name) : out.dateNotSaved ? TF.appTripReplacedNoDate(out.name) : TF.appTripReplaced(out.name)} ${TF.appTripNextGetReady}`);
       await reload();
     } catch (e) {
       refused(reasonOf(e));

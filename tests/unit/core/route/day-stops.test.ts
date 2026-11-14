@@ -1,9 +1,9 @@
 // Days that end where the rider can sleep (owner's ruling of 9 Nov 2026: "the stop is saved, and it carries over to the Bag
 // planner and En route": Yes). The stage model's plan stays the basis; the stops move each day's end.
 import { describe, expect, test } from 'vitest';
-import { chooseStops, dayStopOf, endsOf, plannedEnds, stagesEndingAt, stopsHold, withStops } from '../../../../src/core/route/day-stops.ts';
+import { carryOwn, chooseStops, dayStopOf, endsOf, plannedEnds, stagesEndingAt, stopsHold, withStops } from '../../../../src/core/route/day-stops.ts';
 import { planStages } from '../../../../src/core/route/stages.ts';
-import type { Place, RouteMatch, TripStops } from '../../../../src/core/types.ts';
+import type { Place, RouteMatch, TripStop, TripStops } from '../../../../src/core/types.ts';
 import { flatRoute, pointAtKm } from '../../../fixtures/build.ts';
 import { placeAt } from '../../../fixtures/places.ts';
 import { loadFixtureRoute } from '../../../fixtures/packs/index.ts';
@@ -94,4 +94,59 @@ test('[TRIP-DAY-STOPS] a day\'s stop is read only where the trip\'s days end at 
   expect(dayStopOf(snapped, 2)).toBeNull(); // the last day ends at the route's end
   expect(dayStopOf({ route: { ...route, stages: plan }, stops }, 0)).toBeNull(); // planned again: not ending there now
   expect(dayStopOf({ route: { ...snapped.route, id: 'x' }, stops }, 0)).toBeNull();
+});
+
+// The owner's ruling of 14 Nov 2026: a change of nights keeps the rider's own stops where they still fit; only the other nights are
+// chosen again, and nothing the rider chose goes without a word. "Fit": near a new night's planned end, as near as that night's own
+// choices are (its window), so a kept stop is one the rider could have picked for it.
+describe('the rider\'s own stops on other nights', () => {
+  const own = (km: number, name: string | null): TripStop => ({ placeId: name ? `p-${km}` : null, km, name, town: null, by: 'rider' });
+  const auto = (km: number, name: string): TripStop => ({ placeId: `p-${km}`, km, name, town: null, by: 'auto' });
+  const nightsOf = (n: number) => [...planStages(route, { flatKph: 25, pace: 'sporting', nights: n })];
+  const ends = (n: number) => plannedEnds(nightsOf(n)).map((km) => Math.round(km * 1000) / 1000);
+  const old: TripStops = { routeId: route.id, basis: [90, 180], days: [own(92, 'Camping A'), auto(176, 'Hotel Auto')] };
+
+  test('[TRIP-STOPS-KEEP] 2 → 5 nights: an own stop near a new night\'s planned end is kept, for that night; an automatic one is not carried', () => {
+    expect(ends(5)).toEqual([45, 90, 135, 180, 225]);
+    const c = carryOwn(old, route, nightsOf(5));
+    expect(c.days).toEqual([null, own(92, 'Camping A'), null, null, null]);
+    expect(c.kept).toEqual([{ stop: own(92, 'Camping A'), night: 2, was: 1 }]);
+    expect(c.lost).toEqual([]);
+  });
+
+  test('[TRIP-STOPS-KEEP] 2 → 3 nights: an own stop near no new end is not kept, and is named with the night it had', () => {
+    expect(ends(3)).toEqual([67.5, 135, 202.5]);
+    const c = carryOwn(old, route, nightsOf(3));
+    expect(c.days).toEqual([null, null, null]);
+    expect(c.kept).toEqual([]);
+    expect(c.lost).toEqual([{ stop: own(92, 'Camping A'), night: 1 }]);
+  });
+
+  test('[TRIP-STOPS-KEEP] the window is the new night\'s own: 4.5 km on a 45 km day, so 94.4 km is kept for 90 and 94.6 km is not', () => {
+    expect(carryOwn({ ...old, days: [own(94.4, 'Near'), auto(176, 'X')] }, route, nightsOf(5)).kept.map((k) => k.night)).toEqual([2]);
+    expect(carryOwn({ ...old, days: [own(94.6, 'Far'), auto(176, 'X')] }, route, nightsOf(5)).lost.map((k) => k.stop.name)).toEqual(['Far']);
+  });
+
+  test('[TRIP-STOPS-KEEP] the rider\'s No stop is kept when a new night ends near its old end, at that new end; otherwise it is named as not kept', () => {
+    const none = { ...old, days: [auto(92, 'Camping Auto'), own(180, null)] };
+    expect(carryOwn(none, route, nightsOf(5))).toEqual({ days: [null, null, null, own(180, null), null], kept: [{ stop: own(180, null), night: 4, was: 2 }], lost: [] });
+    expect(carryOwn(none, route, nightsOf(3)).lost).toEqual([{ stop: own(180, null), night: 2 }]);
+  });
+
+  test("[TRIP-STOPS-KEEP] two own stops near the same new end: the first in the route's order keeps that night, the other is not kept", () => {
+    const two: TripStops = { routeId: route.id, basis: [90, 180], days: [own(88, 'Nearer'), own(93.9, 'Farther')] };
+    // (a record no screen makes: both near the new night 2 at 90 km)
+    const c = carryOwn(two, route, nightsOf(5));
+    expect(c.kept).toEqual([{ stop: own(88, 'Nearer'), night: 2, was: 1 }]);
+    expect(c.lost).toEqual([{ stop: own(93.9, 'Farther'), night: 2 }]);
+  });
+
+  test('[TRIP-STOPS-KEEP] a day ride has no nights: every own stop is named as not kept; the stops of this very plan, another route or none carry nothing', () => {
+    expect(carryOwn(old, route, nightsOf(0))).toEqual({ days: [], kept: [], lost: [{ stop: own(92, 'Camping A'), night: 1 }] });
+    expect(carryOwn(old, route, plan)).toEqual({ days: [null, null], kept: [], lost: [] });
+    expect(carryOwn({ ...old, routeId: 'other' }, route, nightsOf(5))).toEqual({ days: [null, null, null, null, null], kept: [], lost: [] });
+    expect(carryOwn(undefined, route, nightsOf(5)).kept).toEqual([]);
+    // a damaged record carries nothing and throws nothing
+    expect(carryOwn({ ...old, days: 'x' as unknown as TripStop[] }, route, nightsOf(5)).kept).toEqual([]);
+  });
 });

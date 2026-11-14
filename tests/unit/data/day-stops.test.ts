@@ -94,6 +94,30 @@ describe('day stops on the store', () => {
     expect(one.days).toEqual([expect.objectContaining({ name: 'Hotel D', by: 'auto' })]);
   });
 
+  // The owner's ruling of 14 Nov 2026: other nights keep the rider's own picks where they still fit; only the other nights are chosen.
+  test("[TRIP-STOPS-KEEP] 2 → 5 nights: the rider's own stop near a new night's end stays theirs, for that night; the others are chosen afresh", async () => {
+    await tripWithPlaces([['campsite', 92.4, 'Camping A'], ['lodging', 88, 'Hotel B'], ['lodging', 177, 'Hotel C'], ['campsite', 46, 'Camping E'], ['lodging', 135, 'Hotel D'], ['campsite', 224, 'Camping F']]);
+    await settleStops(NOW);
+    await settleStops(NOW, { day: 1, to: (await stopChoices(NOW, 1)).find((c) => c.name === 'Hotel B')! });
+    expect((await readTrip())!.stops!.days[0]).toMatchObject({ name: 'Hotel B', km: 88, by: 'rider' });
+    localStorage.setItem('copilot:settings', JSON.stringify({ nights: 5, pace: 'sporting', updatedAt: '2026-10-16T07:30:00.000Z' }));
+    const five = (await settleStops(NOW))!;
+    expect(five.basis.map(Math.round)).toEqual([45, 90, 135, 180, 225]);
+    expect(five.days.map((d) => [d.name, d.by])).toEqual([['Camping E', 'auto'], ['Hotel B', 'rider'], ['Hotel D', 'auto'], ['Hotel C', 'auto'], ['Camping F', 'auto']]);
+    const t = (await readTrip())!;
+    expect(t.stops).toEqual(five);
+    expect(t.route.stages.map((s) => s.endKm)).toEqual([46, 88, 135, 177, 224, 270]);
+  });
+
+  test('[TRIP-STOPS-KEEP] 2 → 3 nights: an own stop near no new end gives way to the place chosen for that night', async () => {
+    await tripWithPlaces([['campsite', 92.4, 'Camping A'], ['lodging', 86, 'Hotel B'], ['lodging', 177, 'Hotel C'], ['campsite', 68, 'Camping G'], ['lodging', 136, 'Hotel D'], ['campsite', 203, 'Camping H']]);
+    await settleStops(NOW);
+    await settleStops(NOW, { day: 1, to: (await stopChoices(NOW, 1)).find((c) => c.name === 'Hotel B')! });
+    localStorage.setItem('copilot:settings', JSON.stringify({ nights: 3, pace: 'sporting', updatedAt: '2026-10-16T07:30:00.000Z' }));
+    const three = (await settleStops(NOW))!;
+    expect(three.days.map((d) => [d.name, d.by])).toEqual([['Camping G', 'auto'], ['Hotel D', 'auto'], ['Camping H', 'auto']]);
+  });
+
   test('[TRIP-DAY-STOPS] never mixed between routes: a replaced route has none of the old stops; Remove this trip takes them', async () => {
     const trip = await tripWithPlaces([['campsite', 92.4, 'Camping A'], ['lodging', 177, 'Hotel C']]);
     await settleStops(NOW);

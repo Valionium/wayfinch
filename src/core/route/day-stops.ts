@@ -3,7 +3,7 @@
 // last ends at the saved sleep place that suits its planned end best (day-beds.ts chooses), or the rider's own choice, or at
 // the planned end when nothing is near or the rider chose "No stop". The days are then worked out as the stage model works out
 // its own: riding hours from the effort between the ends, climbing from the climbing between them.
-import { candidatesNear } from '../engines/day-beds.ts';
+import { candidatesNear, windowKm } from '../engines/day-beds.ts';
 import type { Nights } from '../engines/day-beds.ts';
 import type { Km, Place, Route, RouteMatch, Stage, Stay, TripStop, TripStops } from '../types.ts';
 import { effortProfile, LOAD_PENALTY } from './stages.ts';
@@ -79,6 +79,41 @@ export function chooseStops(route: Route, plan: Stage[], places: Place[], matche
     return best ? { placeId: best.placeId, km: best.km, name: best.name, town: best.town, by: 'auto' } : { placeId: null, km: s.endKm, name: null, town: null, by: 'auto' };
   });
   return { routeId: route.id, basis: plannedEnds(plan), days };
+}
+
+/**
+ * What became of the rider's own stops when the plan changed under them: `days`, one per night of the new plan, the own stop kept for
+ * it or null (chosen afresh); `kept` with its new night and its old (`was`), `lost` with its old night, both 1-based.
+ */
+export type Carried = { days: (TripStop | null)[]; kept: { stop: TripStop; night: number; was: number }[]; lost: { stop: TripStop; night: number }[] };
+
+/**
+ * The rider's own stops of another plan of the same route, carried to this one (the owner's ruling of 14 November 2026: other nights
+ * keep the rider's picks where they still fit). An own stop, a place or "No stop", fits a night whose planned end is near its kilometre,
+ * as near as that night's own choices are (candidatesNear's window), so a kept stop is one the rider could pick for it: the nearest
+ * such night, and a night keeps one, the first in the route's order. A kept "No stop" ends at the new planned end (a kept place is
+ * judged again for its new night by the caller). Every other own stop is lost, and named by the caller. Automatic stops are never
+ * carried. Stops of this very plan (they hold), of another route, or none: nothing to carry.
+ */
+export function carryOwn(stops: TripStops | undefined, route: Route, plan: Stage[]): Carried {
+  const nights = plan.slice(0, -1);
+  const out: Carried = { days: nights.map(() => null), kept: [], lost: [] };
+  const held: TripStops | undefined = stops;
+  if (!stops || stops.routeId !== route.id || !Array.isArray(stops.days) || stopsHold(held, route, plan)) return out;
+  stops.days.forEach((d, i) => {
+    if (d?.by !== 'rider') return;
+    const off = (s: Stage): number => Math.abs(d.km - s.endKm);
+    let j = -1;
+    nights.forEach((s, k) => { if (off(s) <= windowKm(s.endKm - s.startKm) + 1e-9 && (j < 0 || off(s) < off(nights[j]!))) j = k; });
+    if (j < 0 || out.days[j]) {
+      out.lost.push({ stop: d, night: i + 1 });
+      return;
+    }
+    const stop = d.placeId === null ? { ...d, km: nights[j]!.endKm } : d;
+    out.days[j] = stop;
+    out.kept.push({ stop, night: j + 1, was: i + 1 });
+  });
+  return out;
 }
 
 /** The route with its days ending at the stops, and the stops it carries. Null stops: the plan as it is. */

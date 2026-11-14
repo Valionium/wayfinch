@@ -772,7 +772,6 @@ export const W = {
   appTripOpenBagPlanner: 'Open the full Bag planner',
   appTripDetails: 'Trip details',
   appTripDetailsLine: (pace: string, kph: string, stay: string, start: string): string => `${pace} · ${kph} km/h · ${stay} · start ${start}`,
-  appTripNextGetReady: 'Next: Prepare this route, so En route can show water, food, sleep and weather.',
   // Contract 2: the trip to the bag planner (spec section 7.1). The route and the settings you set go; the bag planner asks first.
   appHandoffButton: 'Plan bags for this trip',
   appHandoffNote: 'Opens the bag planner with this route and your trip settings. It asks before it changes anything, and your bags stay as they are.',

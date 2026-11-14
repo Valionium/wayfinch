@@ -12,8 +12,17 @@ export const TF = {
   appTripNightsUseSuggested: 'Use the suggestion',
   appTripDepartureNone: 'No date yet. Without one, En route gives distances only and says why.',
   appTripDateClear: 'Clear the date',
-  // Other nights choose every stop afresh (TRIP-DAY-STOPS), said once beside the nights (review of PR 101, M4).
-  appTripStopsNewNights: (n: number, own: boolean): string => `New stops for ${n} ${n === 1 ? 'night' : 'nights'}.${own ? ' Stops you chose for the old nights are not kept.' : ''}`,
+  // Other nights choose their stops again (TRIP-DAY-STOPS), said once beside the nights (review of PR 101, M4); the rider's own that
+  // still fit are kept, and every own stop is named, kept or not, with where to change one (the owner's ruling of 14 Nov 2026,
+  // TRIP-STOPS-KEEP). `kept`, `lost`: the stops' words (appTripStopNight), joined, or '' for none. A day ride (0) names only what goes.
+  appTripStopsNewNights: (n: number, kept: string, lost: string): string => (n < 1
+    ? `A day ride has no nights, so your stops are not kept: ${lost}.`
+    : `New stops for ${n} ${n === 1 ? 'night' : 'nights'}${kept ? `, keeping yours: ${kept}` : ''}.${lost ? ` Not kept, as the nights now end elsewhere: ${lost}.` : ''}`
+      + (kept || lost ? ' To change a stop, use Change stop under its day in Your route.' : '')),
+  // one own stop: its name ("No stop" for the rider's No stop) and its night, the new one, or the old one (`before`)
+  appTripStopNight: (name: string | null, night: number, before?: boolean): string => `${name ?? 'No stop'} (night ${night}${before ? ' before' : ''})`,
+  // the line after a route is added, only Add a route's chunk says it (moved word for word from en.ts to keep the first screen at main's figure)
+  appTripNextGetReady: 'Next: Prepare this route, so En route can show water, food, sleep and weather.',
   appTripPace: 'Pace',
   appTripFlatKph: 'Flat speed, unloaded (km/h)',
   appTripStay: 'Stay type',

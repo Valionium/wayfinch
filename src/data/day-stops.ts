@@ -5,7 +5,7 @@
 // so every card, the forecast grid and the handoff read the same days.
 import { candidatesNear, closedThatNight } from '../core/engines/day-beds.ts';
 import type { BedChoice } from '../core/engines/day-beds.ts';
-import { chooseStops, stopsHold, withStops } from '../core/route/day-stops.ts';
+import { carryOwn, chooseStops, stopsHold, withStops } from '../core/route/day-stops.ts';
 import { sampleGrid } from '../core/route/grid.ts';
 import { planStages } from '../core/route/stages.ts';
 import type { ScreenInputs, Stage, Trip, TripStop, TripStops } from '../core/types.ts';
@@ -95,7 +95,10 @@ async function settling(now: Date, change: StopChange | undefined, o: { announce
   const { route } = trip;
   const plan = planOf(inputs);
   const fresh = plan.length > 1 && inputs.matches.length > 0 ? chooseStops(route, plan, inputs.places, inputs.matches, trip.stay, nightsOf(inputs)) : null;
-  const held = stopsHold(trip.stops, route, plan) ? trip.stops : null;
+  // Other nights on the same route keep the rider's own stops that still fit (the owner's ruling of 14 Nov 2026): judged as held ones,
+  // the other nights chosen afresh. The line beside the nights names what was kept and what was not (core carryOwn, the same rule).
+  const own = carryOwn(trip.stops, route, plan).days;
+  const held = stopsHold(trip.stops, route, plan) ? trip.stops : fresh && { ...fresh, days: fresh.days.map((d, i) => own[i] ?? d) };
   let next: TripStops | null;
   if (change && 'restore' in change) next = change.restore && stopsHold(change.restore, route, plan) ? judged(change.restore, fresh, inputs) : null;
   else next = held && fresh ? judged(held, fresh, inputs) : fresh;
