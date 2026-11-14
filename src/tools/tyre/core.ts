@@ -1,6 +1,6 @@
 // The tyre pressure estimate (spec section 7.2). Pure: no clock, no storage, no DOM. Its basis is Frank Berto's published 15% tyre-drop
 // data, fitted as a power law. It never exceeds a limit, and it never takes a formula from SRAM, SILCA or Rene Herse.
-import { W } from '../../core/wording/en.ts';
+import { TZ } from '../../core/wording/en-tyre-figures.ts';
 import { TF } from '../../core/wording/en-tyre-labels.ts';
 import { TN } from '../../core/wording/en-tyre-notes.ts';
 import { TW } from '../../core/wording/en-tyre-warn.ts';
@@ -241,7 +241,7 @@ export type LimitCheck =
 export function checkLimit(value: number, unit: Unit, o: { keepAsBar?: boolean; keepAsPsi?: boolean; min?: Limit | null }): LimitCheck {
   if (!Number.isFinite(value) || value <= 0) return { status: 'rejected', reason: TC.tyreLimitNotNumber };
   if (unit === 'bar' && value > LIMIT_BAR.queryAbove && !o.keepAsBar) {
-    return { status: 'ask', question: W.tyreDidYouMean(String(value)), asPsi: { value, unit: 'psi' }, alt: { value, unit: 'psi' } };
+    return { status: 'ask', question: TZ.tyreDidYouMean(String(value)), asPsi: { value, unit: 'psi' }, alt: { value, unit: 'psi' } };
   }
   // The other way round: a number that small in psi is far likelier to be bar.
   if (unit === 'psi' && value < LIMIT_PSI.queryBelow && !o.keepAsPsi) {
@@ -311,10 +311,10 @@ function validate(i: TyreInput): string[] {
     const h = i.heat;
     const temp = (n: number): boolean => Number.isFinite(n) && n >= -40 && n <= 60;
     const height = (n: number): boolean => Number.isFinite(n) && n >= -400 && n <= 9000;
-    if (!temp(h.pumpC)) out.push(W.tyreRefuseTemp(TF.tyreWhatPumpTemp));
-    if (!temp(h.maxC)) out.push(W.tyreRefuseTemp(TN.tyreWhatMaxTemp));
-    if (!height(h.pumpHeightM)) out.push(W.tyreRefuseHeight(TF.tyreWhatPumpHeight));
-    if (!height(h.highestM)) out.push(W.tyreRefuseHeight(TF.tyreWhatHighest));
+    if (!temp(h.pumpC)) out.push(TZ.tyreRefuseTemp(TF.tyreWhatPumpTemp));
+    if (!temp(h.maxC)) out.push(TZ.tyreRefuseTemp(TN.tyreWhatMaxTemp));
+    if (!height(h.pumpHeightM)) out.push(TZ.tyreRefuseHeight(TF.tyreWhatPumpHeight));
+    if (!height(h.highestM)) out.push(TZ.tyreRefuseHeight(TF.tyreWhatHighest));
   }
   if (out.length === 0 && i.tyreMin && limitBar(i.tyreMin) > limitBar(i.tyreMax)) out.push(TN.tyreRefuseMinMax);
   return out;

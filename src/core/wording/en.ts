@@ -26,8 +26,6 @@ export const W = {
 
   // ---- Route files (GPX) ----
   routeGpxTooLarge: 'Choose a GPX file of 20 MB or less.',
-  routeGpxTooManyPoints: 'This GPX has more than 200,000 points. Export a simplified track and try again.',
-  routeGpxTooManySections: 'This GPX has more than 500 separate sections. Export fewer sections and try again.',
   routeGpxUnreadable: 'That did not read as a GPX track or route with valid coordinates.',
   routeTrackTooLong: 'The track distance could not be processed. Try a shorter or simplified GPX.',
 
@@ -91,7 +89,6 @@ export const W = {
   waterSaltyFood: 'On a long hot ride, have some salty food.',
   waterColdReminder: 'In the cold you may feel less thirsty. Keep sipping.',
   waterOutsideRange: 'outside the validated range',
-  waterDayFlag: 'This day adds up to more than 11.4 L. Consider shorter or cooler stretches.',
 
   // ---- Water: the reach rule (section 6.3). `s` names a source or point; litres and kilometres come as shown. ----
   waterNotEnough: (s: string, litres: string): string => `Not enough water to reach ${s} with a reserve — you need about ${litres} L.`,
@@ -603,16 +600,12 @@ export const W = {
   appStorageBlocked: "This browser is not keeping Wayfinch's data. The app works for this visit only. Export what you need before you close it.",
   appNoSignalNoTrip: "No signal, and this trip is not prepared. Distance, climbing and daylight come from the route. Places and weather need a connection: prepare the trip while you are online.",
   // Tyre pressure (spec section 7.2): the calculation's words. Warnings are never silent changes.
-  tyreDidYouMean: (value: string): string => `Did you mean ${value} psi?`,
   // Tyre pressure: the screen and the Tools cards.
   tyreTitle: 'Tyre pressure',
   tyreBikeLabel: 'Bike',
   tyreBikeNone: 'No saved bike',
   tyreBikeInPlan: ' (in your plan)',
   tyreNeedMax: 'Enter the maximum pressure printed on your tyre to see a figure.',
-  tyreFrontBackBar: (value: string): string => `${value} bar`,
-  tyrePsiValue: (value: string): string => `${value} psi`,
-  tyreAssumedList: (list: string): string => `Not set yet, so assumed: ${list}. Set them for a better figure.`,
   tyreHeadingWhy: 'What decided these numbers',
   tyreIncompatibleTitle: 'No figure: these parts do not fit together',
   tyreSectionRider: 'Rider and load',
@@ -641,8 +634,6 @@ export const W = {
   tyreBagCardLine: (count: number, kg: string): string => `${count} ${count === 1 ? 'bag' : 'bags'} · ${kg} kg`,
   tyreBagCardAge: (date: string): string => `Saved ${date}`,
   // Extras: heat and altitude, weighed loads and calipered widths, the SRAM cross-check.
-  tyreRefuseTemp: (what: string): string => `${what} is not a usable temperature (−40 to 60 °C).`,
-  tyreRefuseHeight: (what: string): string => `${what} is not a usable height (−400 to 9000 m).`,
   tyreSectionHeat: 'Heat and altitude',
   tyreHeatSkipped: 'Heat and altitude are not checked. Enter the temperatures and the highest point to check.',
   tyreHeatPumpLabel: 'Temperature where you pump (°C)',
@@ -687,9 +678,7 @@ export const W = {
   appStoreThirstChoice: 'Thirst is less, average or more.',
   appStoreEbikeChoice: 'E-bike is yes or no.',
   appStoreRideShort: 'A ride under one hour is too short to learn from.',
-  appStoreRideLong: 'A ride over 16 hours is not taken in. Check the hours.',
   appStoreRideIntake: 'What you drank goes from 0 to 20 L.',
-  appStoreRideWeighing: 'Check the weighing: weight change within 10 kg, toilet stops from 0 to 30.',
 
   // ---- Prepare this route (sub-project 5): each step's note ----
   appPrepHeightsNotice: 'To work out the climbing, sampled points of this route go to the Open-Meteo elevation service, rounded to about 100 m.',
@@ -878,6 +867,7 @@ export const W = {
   appAheadChipShelter: 'Shelter',
   appAheadChipEmergency: 'Emergency',
   appAheadClose: 'Close',
+  appAheadSetCapacity: 'Set the water you can carry',
   appAheadWaterQuestion: 'How much water do you have?',
   appAheadWaterLitres: (l: string): string => `${l} L`,
   appAheadWaterCustom: 'Another amount (L)',
