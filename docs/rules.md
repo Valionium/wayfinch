@@ -1339,6 +1339,8 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - a plain link takes the accent colour of the theme, never the browser's blue or purple [SHELL-LINK]
 - the line under Trip's and En route's heading keeps its room before its words load: nothing below it moves when they arrive, at 320 to 1280 px [SHELL-SUB-STILL]
 - every legal page names the icon, so the browser does not ask for /favicon.ico [LEGAL-ICON]
+- no legal page (imprint, privacy notice, licences) shows the line "Drafted by an AI from the project's spec. Not legal advice." or its box (the owner's ruling of 14 Nov 2026, sweep 59). For maintainers, not on any page: the texts were drafted by an AI from the spec and are not legal advice (this note, and one in tools/build-legal.mjs) [LEGAL-NO-AI-LINE]
+- the imprint's "Art des Angebots" names Wayfinch, in German: a free, privately run bikepacking web app, with its Bag planner (formerly Load Check) for planning bike luggage; changed in the bag planner's own block, so the built imprint and the bag planner's Impressum say the same (PRIV-IMPRINT-SAME) [LEGAL-IMPRINT-WAYFINCH]
 
 ## Bag planner: free play without Trip's route (the owner's wish 3, design of 14 Nov 2026, 2026-11-14-bag-planner-free-play-design.md)
 
