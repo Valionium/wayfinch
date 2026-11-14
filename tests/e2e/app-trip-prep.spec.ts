@@ -1,0 +1,174 @@
+// Trip prep in a real browser (design of 15 November 2026): "Before you leave" at the end of Trip's Prepare this route step, on the real
+// store and the real build.
+// The list fits the bike and the trip, each item links where the app does it, and the ticks stay on this phone for this route.
+import { readFileSync } from 'node:fs';
+import AxeBuilder from '@axe-core/playwright';
+import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { loadApp, preparedTrip, removeBuilds } from './helpers.ts';
+import type { LoadedApp } from './helpers.ts';
+import type { Trip } from '../../src/core/types.ts';
+
+const json = (path: string) => JSON.parse(readFileSync(new URL(`../../contracts/${path}`, import.meta.url), 'utf8'));
+const sample = json('bike-library/sample.json') as Record<string, unknown>[];
+const full = json('load-summary/full.json') as Record<string, unknown>;
+// The sample's first bike: hydraulic discs, tubeless, a derailleur and a chain, cable shifting.
+const SEED: Record<string, string> = {
+  'loadcheck:bikeProfile': JSON.stringify(sample[0]),
+  'loadcheck:bikeProfiles': JSON.stringify(sample),
+  'loadcheck:summary:v1': JSON.stringify({ ...full, bikeId: sample[0]!.id }),
+};
+const ROUTE_NAME = 'Fixture: Heidelberg to Strasbourg';
+const KEY = 'copilot:tripPrep:v1';
+
+let app: LoadedApp | undefined;
+test.afterEach(async () => { await app?.close(); app = undefined; });
+test.afterAll(() => removeBuilds());
+
+const inDays = (n: number): string => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date(Date.now() + n * 86_400_000));
+
+/** The app with the sample bike and a trip of `nights` nights leaving in three days, on Trip with Prepare this route's step open. */
+async function prepStep(page: Page, opts: { nights?: number } = {}): Promise<Trip> {
+  app = await loadApp(page);
+  await page.evaluate((e) => { for (const [k, v] of Object.entries(e)) localStorage.setItem(k, v); }, SEED);
+  const trip = await preparedTrip(page, 'heidelberg-strasbourg', { nights: opts.nights ?? 2, departureDate: inDays(3) });
+  // A new load: a change of the address's hash alone would keep the screen that read the store before the trip was put in.
+  await page.goto(`${app.origin}/#/trip`, { waitUntil: 'domcontentloaded' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-trip-line]')).toContainText(ROUTE_NAME);
+  await openPrep(page);
+  return trip;
+}
+
+/** Prepare this route's step: open already while it is the step to do, otherwise from its title or its Update. */
+async function openPrep(page: Page): Promise<void> {
+  // the trip read first: before it, no step but Route can open
+  await expect(page.locator('[data-trip-line]')).toContainText(ROUTE_NAME);
+  const step = page.locator('[data-step="getready"]');
+  if ((await step.getAttribute('data-open')) !== 'true') await step.locator('.trip-step-open, .trip-step-change').click();
+  await expect(page.locator('[data-step="getready"] [data-prep]')).toBeVisible();
+}
+
+const items = (page: Page) => page.locator('[data-prep-item]');
+const ids = async (page: Page): Promise<string[]> => items(page).evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset['prepItem']!));
+const box = (page: Page, id: string) => page.locator(`[data-prep-item="${id}"] input[type=checkbox]`);
+const allLocal = (page: Page): Promise<Record<string, string>> => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).sort().map((k) => [k, localStorage.getItem(k)!])));
+
+test("[TRIP-PREP-ITEMS] [TRIP-PREP-LINKS] a three-day trip on the sample bike: Bike care's checks for it by name, the rest of the list, and each link goes where it is done", async ({ page }) => {
+  await prepStep(page);
+  const prep = page.locator('[data-prep]');
+  await expect(prep.getByRole('heading', { name: 'Before you leave', level: 3 })).toBeVisible();
+  expect(await ids(page)).toEqual(['brakes-lever-test', 'tyres-pressure', 'chain-wear-check', 'brakes-pads-disc', 'frame-bolts-check', 'kit', 'charge', 'forecast', 'tell', 'night']);
+  // the bike checks by Bike care's names, as tick boxes named by their words
+  for (const name of ['Test both brakes', 'Check the tyre pressure and look the tyres over', 'Check the chain for wear', 'Check the disc brake pads and replace if worn', 'Check the main bolts']) {
+    await expect(prep.getByRole('checkbox', { name, exact: true })).toBeVisible();
+  }
+  await expect(prep.getByRole('checkbox', { name: /rim brake pads/ })).toHaveCount(0);
+  await expect(prep).not.toContainText(/\bready\b|\bsafe\b|\d+ of \d+/i);
+  // done outside the app: telling someone (En route's Share progress needs a position on the route), charging, the first night
+  for (const id of ['tell', 'charge', 'night']) await expect(page.locator(`[data-prep-item="${id}"] a, [data-prep-item="${id}"] button`)).toHaveCount(0);
+  // the forecast is this step's own button, above the list: the item links nowhere else
+  await expect(page.locator('[data-prep-item="forecast"]')).toContainText('prepare this route again');
+  await expect(page.locator('[data-prep-item="forecast"] a, [data-prep-item="forecast"] button')).toHaveCount(0);
+  // a bike check: Bike care opens with this trip's bike chosen
+  await page.getByRole('link', { name: 'In Bike care: Test both brakes', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Bike care', level: 2 })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe('#/tools/care');
+  await expect(page.locator('.care')).toContainText(String(sample[0]!['name']));
+});
+
+test('[TRIP-PREP-LINKS] the repair kit opens Bike care at Roadside repairs, What to carry, with the bike chosen; Bike care opened again starts at its top', async ({ page }) => {
+  await prepStep(page);
+  await page.getByRole('link', { name: 'In Bike care: Pack a repair kit that fits your bike. Bike care lists one under Roadside repairs, What to carry.', exact: true }).click();
+  await expect(page.getByRole('tab', { name: 'Roadside repairs' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'What to carry', level: 3 })).toBeFocused();
+  await expect(page.locator('.care')).toContainText(String(sample[0]!['name']));
+  // the mark is used once: Bike care opened another way starts on Care, its title focused
+  await page.goto(`${app!.origin}/#/tools`, { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => { location.hash = '#/tools/care'; });
+  await expect(page.getByRole('heading', { name: 'Bike care', level: 2 })).toBeFocused();
+  await expect(page.getByRole('tab', { name: 'Care', exact: true })).toHaveAttribute('aria-selected', 'true');
+});
+
+test('[TRIP-PREP-ITEMS] a day ride has the two every-ride checks and no night', async ({ page }) => {
+  await prepStep(page, { nights: 0 });
+  expect(await ids(page)).toEqual(['brakes-lever-test', 'tyres-pressure', 'kit', 'charge', 'forecast', 'tell']);
+});
+
+test('[TRIP-PREP-TICKS] a tick, by tap or by keyboard, stays after a reload for this route; only its one key is written', async ({ page }) => {
+  const trip = await prepStep(page);
+  const before = await allLocal(page);
+  expect(before[KEY]).toBeUndefined();
+  await page.locator('[data-prep-item="kit"] label').click();
+  await expect(box(page, 'kit')).toBeChecked();
+  await box(page, 'charge').focus();
+  await page.keyboard.press('Space');
+  await expect(box(page, 'charge')).toBeChecked();
+  await page.keyboard.press('Space');
+  await expect(box(page, 'charge')).not.toBeChecked();
+  await box(page, 'brakes-lever-test').check();
+  const after = await allLocal(page);
+  expect(JSON.parse(after[KEY]!)).toEqual({ route: trip.route.id, ticked: ['kit', 'brakes-lever-test'] });
+  expect(Object.fromEntries(Object.entries(after).filter(([k]) => k !== KEY))).toEqual(before);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await openPrep(page);
+  await expect(box(page, 'kit')).toBeChecked();
+  await expect(box(page, 'brakes-lever-test')).toBeChecked();
+  await expect(box(page, 'charge')).not.toBeChecked();
+});
+
+test('[TRIP-PREP-TICKS] [TRIP-REMOVE] a tick, then Remove this trip, then the same route again: the list starts unticked', async ({ page }) => {
+  const trip = await prepStep(page);
+  await page.locator('[data-prep-item="kit"] label').click();
+  await expect(box(page, 'kit')).toBeChecked();
+  expect(JSON.parse((await allLocal(page))[KEY]!)).toEqual({ route: trip.route.id, ticked: ['kit'] });
+  await page.getByRole('button', { name: 'Remove this trip', exact: true }).click();
+  await page.getByRole('alertdialog', { name: 'Remove this trip?' }).getByRole('button', { name: 'Remove trip', exact: true }).click();
+  await expect(page.locator('[data-trip-line]')).toHaveText('No trip yet');
+  expect((await allLocal(page))[KEY]).toBeUndefined();
+  // the very same route (the same id) added again
+  const again = await preparedTrip(page, 'heidelberg-strasbourg', { nights: 2, departureDate: inDays(3) });
+  expect(again.route.id).toBe(trip.route.id);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await openPrep(page);
+  await expect(box(page, 'kit')).not.toBeChecked();
+  expect((await allLocal(page))[KEY]).toBeUndefined();
+});
+
+test('[TRIP-PREP-FIT] keyboard and screen reader reach every box and link; 44 px targets; 320 px to wide, both themes, no sideways scroll, no accessibility violations', async ({ page }) => {
+  await prepStep(page);
+  // Tab goes box, then its link, then the next box
+  await box(page, 'brakes-lever-test').focus();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'In Bike care: Test both brakes', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(box(page, 'tyres-pressure')).toBeFocused();
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    for (const width of [320, 360, 1280]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.locator('[data-prep]').scrollIntoViewIfNeeded();
+      for (const el of await page.locator('[data-prep] label, [data-prep] a, [data-prep] button').all()) {
+        const b = (await el.boundingBox())!;
+        const what = `${scheme} ${width}: ${await el.innerText()}`;
+        expect(b.height, what).toBeGreaterThanOrEqual(43.5);
+        expect(b.width, what).toBeGreaterThanOrEqual(43.5);
+        expect(b.x + b.width, what).toBeLessThanOrEqual(width);
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${scheme} ${width} px`).toBe(true);
+      // the links take the theme's accent, as every plain link does (SHELL-LINK), never the browser's blue
+      const colours = await page.evaluate(() => {
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--blaze)';
+        document.body.append(probe);
+        const want = getComputedStyle(probe).color;
+        probe.remove();
+        return { want, got: [...document.querySelectorAll('[data-prep] a')].map((a) => getComputedStyle(a).color) };
+      });
+      expect(colours.got.length).toBeGreaterThan(0);
+      expect([...new Set(colours.got)], `${scheme} ${width}`).toEqual([colours.want]);
+      const results = await new AxeBuilder({ page }).include('[data-prep]').analyze();
+      expect(results.violations.map((v) => `${scheme} ${width} ${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join('; ')}`)).toEqual([]);
+    }
+  }
+});
