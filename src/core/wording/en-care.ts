@@ -98,8 +98,8 @@ export function TAG_LABEL<K extends CareKey>(key: K, values: readonly CareValue[
 }
 
 // ---- What the list fits (the owner's wish of 14 November 2026) ----
-const FLUID_WORDS: Record<Fluid, string> = { mineral: 'mineral oil', dot: 'DOT fluid' };
 const RIM_WORDS: Record<RimKind, string> = { caliper: 'road caliper rim brakes', 'v-brake': 'V-brakes', hydraulic: 'hydraulic rim brakes' };
+const FLUID_WORDS: Record<Fluid, string> = { mineral: 'mineral oil', dot: 'DOT fluid' };
 /** A task for some kinds of rim brake only (CareTask.rimBrake), the kind Not sure: "if you have hydraulic rim brakes". */
 export const KIND_TAG = (kinds: readonly RimKind[]): string => `${C.careTagIf} ${kinds.map((k) => RIM_WORDS[k]).join(' or ')}`;
 
