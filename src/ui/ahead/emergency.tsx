@@ -45,6 +45,7 @@ export function EmergencyPanel({ card, canShare, actions, position }: { card: Em
           : <p><button type="button" class="btn" onClick={() => setSharing(true)}>{W.appAheadEmergencyShare}</button></p>
       ) : null}
       <Basis lines={card.basis} />
+      <p class="muted">{card.sources.map((s, i) => <span key={s}>{i > 0 ? ' · ' : ''}<a href={s} rel="noopener noreferrer" target="_blank">{i > 0 ? W.emergencyMountainSource : W.emergencySource}</a></span>)}</p>
     </div>
   );
 }

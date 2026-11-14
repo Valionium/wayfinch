@@ -3,6 +3,7 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { W } from '../../../src/core/wording/en.ts';
+import { TS } from '../../../src/core/wording/en-tyre-screen.ts';
 import { T } from '../../../src/core/wording/en-tyre.ts';
 import { TL } from '../../../src/core/wording/en-tools.ts';
 import { HN } from '../../../src/core/wording/en-hint.ts';
@@ -55,7 +56,7 @@ const lineSelect = () => host.querySelector('.bike-line select') as HTMLSelectEl
 const tyreSelect = () => host.querySelector('#tyre-bike') as HTMLSelectElement;
 const pickIn = async (sel: HTMLSelectElement, value: string) => { await act(() => { sel.value = value; sel.dispatchEvent(new Event('change', { bubbles: true })); }); };
 const options = (sel: HTMLSelectElement) => [...sel.options].map((o) => o.textContent);
-const maxField = () => [...host.querySelectorAll('label')].find((l) => l.textContent?.includes(W.tyreLimitMaxLabel))!.querySelector('input') as HTMLInputElement;
+const maxField = () => [...host.querySelectorAll('label')].find((l) => l.textContent?.includes(TS.tyreLimitMaxLabel))!.querySelector('input') as HTMLInputElement;
 
 describe('the choice, resolved', () => {
   const resolved = (mem: Mem) => toolBike(mem.kv, readHost(mem.kv, () => null), savedBikeIds(mem.kv));

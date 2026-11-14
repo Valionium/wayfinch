@@ -8,7 +8,7 @@ import type { Answer, AnswerItem, Baseline, Cover, DayRide, GridHour, Km, Missin
 import { showKm, W } from '../wording/en.ts';
 import { usablePosition } from './locate.ts';
 import { usableFlatKph, type Schedule } from './pace.ts';
-import { noteFor, zoneLookupOf } from './tripday.ts';
+import { cardNoteFor, zoneLookupOf } from './tripday.ts';
 import { detailFor, hourClass, modelsForRoute } from './weather-classes.ts';
 import { amountLine, chanceLine, dayStopsOf, gridOf, hourAt, hoursTouching, onTheRide, pointNearKm, pointNearPosition, rainWindows, ridePoints, routeForecast, shownKm, weekdayOf, windowWhen, type RidePoint } from './weather-windows.ts';
 
@@ -203,7 +203,8 @@ const shortDay = (t: Date, tz: string): string => {
   const w = wallClock(t, tz);
   return W.timeShortDay(weekdayOf(t, tz), w.day, W.timeMonth(w.month - 1));
 };
-const degrees = (c: number): string => String(Math.round(c) + 0);
+/** Whole degrees, a minus with a real minus sign (the owner's ruling of 14 Nov 2026). */
+const degrees = (c: number): string => String(Math.round(c) + 0).replace('-', '−');
 
 const kmRange = (w: RainWindow, lengthKm: Km): string => {
   const [a, b] = shownKm(w, lengthKm);
@@ -351,6 +352,7 @@ function nightItem(f: WeatherFacts, night: NightLow): AnswerItem {
     if (night.hail) parts.push(W.weatherHail);
   }
   const status: Status = outdoorStay(f) && night.thunderHours ? 'warning' : outdoorStay(f) && night.lowC !== null && night.lowC <= 0 ? 'action' : 'fine';
+  if (status === 'action') parts.push(W.weatherPackWarm(degrees(night.lowC!)));
   return { label, stamp: { km: night.km }, status, detail: parts.join(' · ') };
 }
 
@@ -465,7 +467,7 @@ export function weatherAnswer(f: WeatherFacts, windows: RainWindow[], plans: Rai
   const missing = new Set<Missing>(plans.flatMap((p) => p.missing));
   if (needsWeather) missing.add('weather');
 
-  const note = noteFor(f.ride);
+  const note = cardNoteFor(f.ride);
   const detail = [here?.line ?? '', note ?? ''].filter(Boolean).join(' ');
   return makeAnswer({
     topic: 'weather', status, title, stamp, detail, items, basis: basisOf(f, gap !== null || night.seasonal),

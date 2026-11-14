@@ -194,14 +194,18 @@ test('[WIDE-KEYS] arrows move along the strip, Enter sets a manual position, Esc
   await page.keyboard.press('Shift+ArrowRight');
   const at = Number(await ruler.getAttribute('aria-valuenow'));
   expect(at).toBeCloseTo(before + 12, 5);
-  // One action by that name: the ruler's button says what it sets, and the text is in the app's own font, not monospace.
-  await expect(page.getByRole('button', { name: 'Use this position' })).toHaveCount(1);
+  // One action by that name: the ruler's button says what it sets, and the text is in the app's own font, not monospace. The picker
+  // starts folded at every width since the owner's ruling of 14 Nov 2026 (sweep item 23), so it is opened for the count.
+  await expect(page.getByRole('button', { name: 'Use this position' })).toHaveCount(0);
   const read = page.locator('.ah-ruler-read');
   await expect(read.getByRole('button', { name: `Set position at km ${at}` })).toBeVisible();
   expect(await read.evaluate((el) => getComputedStyle(el).fontFamily + getComputedStyle(el.querySelector('button')!).fontFamily)).not.toMatch(/mono/i);
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-position-line]')).toContainText(`km ${at} of`);
   await expect(page.locator('[data-position-line]')).toContainText('set by hand');
+  // opened, the picker holds the one "Use this position"
+  await page.getByRole('button', { name: 'Set position by hand', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Use this position' })).toHaveCount(1);
 
   const toggle = page.locator('[data-card="food"] .ah-toggle');
   await toggle.click();
@@ -228,9 +232,14 @@ test('[WIDE-FOCUS] the focus always shows and is never under the bottom bar; the
     expect(state.outline).toBe(true);
     if (!state.nav) expect(state.bottom).toBeLessThanOrEqual(bar.y + 1);
   }
-  // Keyboard only at 1280: the kilometre, then Use this position.
+  // Keyboard only at 1280: Set position by hand (folded at every width since the owner's ruling of 14 Nov 2026), the kilometre, then
+  // Use this position.
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.reload({ waitUntil: 'domcontentloaded' });
+  const toggle = page.getByRole('button', { name: 'Set position by hand', exact: true });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await toggle.focus();
+  await page.keyboard.press('Enter');
   const km = page.locator('#ah-picker').getByLabel('Route kilometre');
   await km.focus();
   await page.keyboard.press('Control+A');
@@ -331,7 +340,9 @@ test('[WIDE-ZOOM] 1280 px at 400 % (320 CSS px wide) works on every screen, with
   }
 });
 
-test('[WIDE-COMPUTER-POS] in the rail layout Ahead opens with the picker open, asks for no position, and says a computer is approximate', async ({ page }) => {
+// The owner's ruling of 14 Nov 2026 (sweep item 23): Set your position by hand starts folded at every width, all three controls
+// inside (it was open from the start in the rail layout).
+test('[WIDE-COMPUTER-POS] in the rail layout Ahead opens with the picker folded, asks for no position, and says a computer is approximate; opened, it holds all three controls', async ({ page }) => {
   await page.addInitScript(() => {
     const w = window as unknown as { __geo: string[] };
     w.__geo = [];
@@ -341,8 +352,14 @@ test('[WIDE-COMPUTER-POS] in the rail layout Ahead opens with the picker open, a
   // With no position at all the day-1 answers show only on departure day before the ride (spec 3.2: first use is the button and the
   // picker alone), so the clock is fixed at dawn of the departure day instead of following the real time of day.
   await open(page, 1280, 720, 'ahead', { position: false, clock: `${today()}T05:00:00Z` });
-  await expect(page.locator('#ah-picker')).toBeVisible();
+  await expect(page.locator('#ah-picker')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Set position by hand', exact: true })).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByText('On a computer, this is usually approximate.')).toBeVisible();
+  await page.getByRole('button', { name: 'Set position by hand', exact: true }).click();
+  await expect(page.locator('#ah-picker input[type="range"]')).toHaveCount(1);
+  await expect(page.locator('#ah-picker input[type="number"]')).toHaveCount(1);
+  // the town list, or its line when no town is mapped
+  expect(await page.locator('#ah-picker select').count() + await page.locator('#ah-picker').getByText('No towns are saved for this route yet.', { exact: false }).count()).toBe(1);
   expect(await page.evaluate(() => (window as unknown as { __geo: string[] }).__geo)).toEqual([]);
   // On a phone-sized window none of it is added.
   await page.setViewportSize({ width: 360, height: 640 });

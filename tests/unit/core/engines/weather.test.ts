@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { latestPosition } from '../../../../src/core/engines/locate.ts';
 import { headwind, isStale, nightLow, stampLine, weatherAnswer, weatherStatus, weatherWindows, type WaitOrGo, type WeatherFacts } from '../../../../src/core/engines/weather.ts';
 import type { Answer, Baseline, ModelRun, StoredForecast } from '../../../../src/core/types.ts';
+import { W } from '../../../../src/core/wording/en.ts';
 import { bannedHits } from '../../../fixtures/banned.ts';
 import { at, flatRoute, pos, testTrip } from '../../../fixtures/build.ts';
 import { forecastOf, momentOf, SAT, stamps, SUN, type ForecastOpts, type Moment, type Spell } from './weather-helpers.ts';
@@ -213,7 +214,8 @@ describe('the title', () => {
     expect(answerOf(factsOf([GUST, LOW, NEXT], m)).title).toMatch(/^Gusts up to 70 km\/h/);
   });
   test('[WX-TITLE-ORDER] then the low', () => {
-    expect(answerOf(factsOf([LOW, NEXT], m)).title).toMatch(/^Night's low about -2 °C at km 150/);
+    // a real minus sign (the owner's ruling of 14 Nov 2026, sweep item 21; it was "-2")
+    expect(answerOf(factsOf([LOW, NEXT], m)).title).toMatch(/^Night's low about −2 °C at km 150/);
   });
   test('[WX-TITLE-ORDER] then the next window', () => {
     const a = answerOf(factsOf([NEXT], m));
@@ -535,5 +537,29 @@ describe('the stamp', () => {
   test('[WX-EXAMPLE] an invalid or missing stamp never throws', () => {
     expect(stampLine(null, 0, BER)).toBeNull();
     expect(stampLine({ km: 10, at: new Date(Number.NaN) }, 0, BER)).toBe('+10 km');
+  });
+});
+
+// The owner's rulings of 14 Nov 2026 for En route (sweep of 14 Nov, items 17 and 21).
+describe('cold nights and temperature ranges', () => {
+  test('[WX-ACTION] a night at or below 0 °C outdoors says what to do: "Night near −1 °C: pack warm layers"; no health advice beyond that', () => {
+    const a = answerOf(factsOf([{ km: 150, stamps: [`${SUN} 03:00`, `${SUN} 04:00`], t: -1 }], riding(120, '14:20')));
+    const night = a.items.find((i) => i.label.startsWith("Night's low"))!;
+    expect(night.status).toBe('action');
+    expect(night.detail).toContain('Night near −1 °C: pack warm layers');
+    expect(W.weatherPackWarm('−1')).toBe('Night near −1 °C: pack warm layers');
+    expect(/doctor|medical|hypotherm|health/i.test(W.weatherPackWarm('−1'))).toBe(false);
+    // a mild night asks for nothing
+    const mild = answerOf(factsOf([{ km: 150, stamps: [`${SUN} 03:00`], t: 6 }], riding(120, '14:20'))).items.find((i) => i.label.startsWith("Night's low"))!;
+    expect(mild.detail ?? '').not.toContain('pack warm layers');
+  });
+
+  test('[WX-HONEST] a temperature range reads "−1 to 1 °C", with a real minus sign, never "-1–1 °C"', () => {
+    expect(W.weatherTemps('−1', '1')).toBe('−1 to 1 °C');
+    expect(W.weatherTemps('3', '3')).toBe('3 °C');
+    const a = answerOf(factsOf([allDay({ km: 100, t: -1 }), allDay({ km: 130, t: 1 })], riding(100, '09:00')));
+    const text = [a.title, a.detail, ...a.items.map((i) => `${i.label} ${i.detail ?? ''}`)].join(' ');
+    expect(text).toMatch(/−1 to \d+ °C/);
+    expect(text).not.toMatch(/-\d+ °C|\d–-?\d+ °C/);
   });
 });

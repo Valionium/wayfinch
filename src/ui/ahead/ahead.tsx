@@ -59,9 +59,9 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
   const [open, setOpen] = useState<ReadonlySet<CardName>>(new Set());
   const [chip, setChip] = useState<ChipKey | null>(null);
   const [sharing, setSharing] = useState(false);
-  // On a computer (the rail layout) the picker is open from the start, with no position asked for (spec 9.2).
+  // Folded at every width, as on a phone (the owner's ruling of 14 Nov 2026, sweep item 23); on a computer no position is asked for (spec 9.2).
   const rail = railSignal.value;
-  const [pickerOpen, setPickerOpen] = useState(rail);
+  const [pickerOpen, setPickerOpen] = useState(false);
   // Set once the rider starts on the open picker (a key, a slider move, a pick; a focus alone is not); only the rider closes it then.
   const pickerUse = useRef(false);
   const setPicker = (open: boolean): void => { pickerUse.current = false; setPickerOpen(open); };

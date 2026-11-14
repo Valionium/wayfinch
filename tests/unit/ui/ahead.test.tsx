@@ -309,6 +309,8 @@ describe('cards', () => {
       const before = at(40);
       const after = at(141);
       await show(before, actions);
+      // folded at every width since the owner's ruling of 14 Nov 2026 (sweep item 23): the rider opens it first
+      await click(buttonNamed('Set position by hand'));
       expect(kmField()!.value).toBe(String(before.screen.ride.startKm));
       await focusOnly(kmField()!);
       await focusOnly(slider()!);
@@ -395,11 +397,30 @@ describe('cards', () => {
       await click(buttonNamed('Set position by hand'));
       await click(host.querySelector('[data-update-position]'));
       expect(kmField()).not.toBeNull();
-      // On a computer the picker stays open (spec 9.2).
+      // On a computer an opened picker stays open (spec 9.2); since the owner's ruling of 14 Nov 2026 it starts folded there too.
       railSignal.value = true;
       await show(at(40), actions);
+      expect(kmField()).toBeNull();
+      await click(buttonNamed('Set position by hand'));
       await click(host.querySelector('[data-update-position]'));
       expect(kmField()).not.toBeNull();
+    });
+
+    // The owner's ruling of 14 Nov 2026 (sweep item 23): "Set your position by hand" starts folded at every width, as on phones,
+    // with all three controls kept inside (it was open from the start on a computer).
+    test('[WIDE-COMPUTER-POS] [AH-MANUAL] on a computer the picker starts folded; opened, it holds the slider, the kilometre and the towns', async () => {
+      const { actions } = fakeActions();
+      railSignal.value = true;
+      const v = at(40);
+      await show(v, actions);
+      expect(host.querySelector('#ah-picker')).toBeNull();
+      const toggle = buttonNamed('Set position by hand');
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      await click(toggle);
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(slider()).not.toBeNull();
+      expect(kmField()).not.toBeNull();
+      if (v.towns.length > 0) expect(host.querySelector('#ah-picker select')).not.toBeNull();
     });
   });
 
@@ -648,6 +669,10 @@ describe('Emergency', () => {
     expect(card.textContent).toContain(W.emergencyFallback);
     expect(card.textContent).toContain(v.screen.chips.emergency.coords!);
     expect(() => buttonNamed('Share my location', card)).not.toThrow();
+    // the source as a link named "Source" (the owner's ruling of 14 Nov 2026, sweep item 22), to the source the table used
+    const source = [...card.querySelectorAll('a')].find((a) => a.textContent === W.emergencySource)!;
+    expect(source.getAttribute('href')).toBe(v.screen.chips.emergency.sources[0]);
+    expect(card.textContent).not.toMatch(/https?:/);
     // Its lines are facts: no "Unknown" beside the route kilometre or the settlement.
     expect(card.querySelectorAll('.badge')).toHaveLength(0);
   });
