@@ -1,6 +1,7 @@
 // Which Care tasks fit a bike (sub-project 12; design 3.3). The bike's stored details become Bike care's details by sub-project 11
 // decision 1's table.
 import type { BikeRecord } from '../bike/normalise.ts';
+import type { RimKind } from './pictures.ts';
 import type { CareDetails, CareKey, Conditions, Fitted } from './types.ts';
 
 /** Bike care's details of a bike; with no bike, every detail is Not sure (null). */
@@ -60,10 +61,24 @@ export function softTag(task: { soft?: { applies: Conditions; tag: string } }, d
   return null;
 }
 
+type Item = { applies: Conditions; rimBrake?: readonly RimKind[] };
+
+/**
+ * fitOf, and for a task for some kinds of rim brake only (CareTask.rimBrake) the bike's kind of rim brake (`rim`, read only with rim
+ * brakes; null when Not sure): rim brakes of another kind hide it; the kind Not sure tags its brakes, which the screen words by the kind.
+ * Left out, the kind is not read: the details alone decide, as for the cards and carry items, which never depend on it.
+ */
+export function fitBike(item: Item, d: CareDetails, rim?: RimKind | null): { show: boolean; tags: CareKey[] } {
+  const f = fitOf(item.applies, d);
+  if (rim === undefined || !f.show || !item.rimBrake || d.brakes !== 'rim') return f;
+  if (rim === null) return { show: true, tags: ['brakes', ...f.tags] };
+  return item.rimBrake.includes(rim) ? f : { show: false, tags: [] };
+}
+
 /** The items that fit, in the list's order, each with its tags. */
-export function fitted<T extends { applies: Conditions }>(list: readonly T[], d: CareDetails): Fitted<T>[] {
+export function fitted<T extends Item>(list: readonly T[], d: CareDetails, rim?: RimKind | null): Fitted<T>[] {
   return list.flatMap((item) => {
-    const f = fitOf(item.applies, d);
+    const f = fitBike(item, d, rim);
     return f.show ? [{ ...item, tags: f.tags }] : [];
   });
 }

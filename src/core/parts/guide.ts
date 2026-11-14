@@ -1,5 +1,5 @@
 // The parts guide (care pictures design of 7 November 2026, section 4; the owner's answers 1, 6, 7 and 8 of 8 November): the 36 parts the
-// cards name, as data that belongs to no one screen, so a later "how a bike works" shows the same entries. Each part's words are in
+// cards name and the wheel (the owner's ruling of 14 November 2026), as data that belongs to no one screen, so a later "how a bike works" shows the same entries. Each part's words are in
 // src/core/wording/en-parts.ts, its point on the rider's bike in src/core/bike/part-points.ts, its close-ups in src/tools/care/parts/.
 import { kindOrder, type PictureDetails } from '../care/pictures.ts';
 import type { PartPlace } from '../bike/part-points.ts';
@@ -31,11 +31,12 @@ export const GUIDE: readonly GuidePart[] = [
   g('stem', 'steering', ['pg-stem'], ['headset']),
   g('handlebar', 'steering', ['pg-bar-drop', 'pg-bar-flat'], [], undefined, 'bars'),
   g('seatpost', 'steering', []),
+  g('wheel', 'wheels', [], ['rim']),
   g('hub', 'wheels', ['pg-hub'], ['hub-gears']),
   g('wheel-qr', 'wheels', ['pg-wheel-qr'], ['brake-qr', 'thru-axle']),
   g('thru-axle', 'wheels', ['pg-thru-axle'], ['wheel-qr']),
   g('spokes', 'wheels', ['pg-spokes']),
-  g('rim', 'wheels', ['pg-rim'], ['bead']),
+  g('rim', 'wheels', ['pg-rim'], ['bead', 'wheel']),
   g('dropouts', 'wheels', ['pg-dropout-thru', 'pg-dropout-qr'], ['hanger'], undefined, 'axle'),
   g('tyre', 'tyres', ['pg-tyre'], ['tube']),
   g('bead', 'tyres', ['pg-bead'], ['rim']),

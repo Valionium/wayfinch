@@ -677,7 +677,7 @@ test('[BV-BUTTON] "What is it, where is it?" sits under the text on every screen
   }
   // the owner's rulings of 14 November 2026: the wheel (the guide's own wheel part), the tyre and the tube first, the rest in the text's
   // order (BV-FIRST-PARTS)
-  expect(where()[0]!.querySelector('.care-where-parts')!.textContent).toBe('Wheel, tyre, inner tube, disc caliper, brake lever, tyre bead, rim, spokes, valve, brake disc, brake pads');
+  expect(where()[0]!.querySelector('.care-where-parts')!.textContent).toBe('Wheel, tyre, inner tube, disc caliper, brake lever, rim, tyre bead, spokes, valve, brake disc, brake pads');
   const b = where()[0]!;
   expect(b.getAttribute('aria-haspopup')).toBe('dialog');
   await click(b);

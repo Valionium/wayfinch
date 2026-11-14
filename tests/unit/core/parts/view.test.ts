@@ -347,8 +347,8 @@ test("[BV-FIRST-PARTS] a card's parts start with its first parts from data (the 
     expect(parts.slice(0, 3), String(brakes)).toEqual(['wheel', 'tyre', 'tube']);
     expect(new Set(parts).size, String(brakes)).toBe(parts.length);
   }
-  expect(partsOf(tube, careDetails(null))).toEqual(['wheel', 'tyre', 'tube', 'caliper', 'brake-lever', 'bead', 'rim', 'spokes', 'valve', 'disc', 'pads']);
-  expect(partsLine(partsOf(tube, careDetails(null)))).toBe('Wheel, tyre, inner tube, disc caliper, brake lever, tyre bead, rim, spokes, valve, brake disc, brake pads');
+  expect(partsOf(tube, careDetails(null))).toEqual(['wheel', 'tyre', 'tube', 'caliper', 'brake-lever', 'rim', 'bead', 'spokes', 'valve', 'disc', 'pads']);
+  expect(partsLine(partsOf(tube, careDetails(null)))).toBe('Wheel, tyre, inner tube, disc caliper, brake lever, rim, tyre bead, spokes, valve, brake disc, brake pads');
   // every first-parts entry names a card that exists and only parts that card names, each once
   for (const [id, first] of Object.entries(FIRST_PARTS)) {
     const it = items.find((x) => x.id === id);

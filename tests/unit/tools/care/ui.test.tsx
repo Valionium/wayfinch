@@ -173,6 +173,11 @@ test('[BC-TELL-US] shown with a Not sure detail, leading to the bike\'s details 
   expect(taskIds()).toEqual(oracle(ANSWERED_DETAILS));
   for (const id of ['brakes-pads-rim', 'brakes-rim-wipe', 'chain-lube', 'gears-cables-look', 'gears-indexing', 'tyres-pressure']) expect(taskIds(), id).toContain(id);
   for (const id of ['brakes-pads-disc', 'brakes-hydraulic-bleed', 'tyres-sealant-topup', 'belt-inspect', 'gears-hub-oil', 'susp-fork-service', 'ebike-service', 'gears-electronic-battery']) expect(taskIds(), id).not.toContain(id);
+  // every detail answered carries no tag, but for the kind of rim brake (not a Bike care detail; the owner's ruling of 14 November 2026):
+  // the hydraulic rim brake's own task is tagged by its kind until the kind is told
+  expect([...host.querySelectorAll('.care-open .muted')].map((e) => e.textContent)).toEqual(['if you have hydraulic rim brakes']);
+  render(null, host);
+  await mount(world([bike('bike_a', 'Gravel', { ...ANSWERED, rimBrake: 'caliper' })]));
   expect(host.querySelectorAll('.care-open .muted').length).toBe(0);
   render(null, host);
   await mount(world([]));
@@ -596,9 +601,16 @@ test('[BC-FIT-RIM-KIND] a hydraulic rim brake sees its spongy-lever task, a V-br
   expect(taskIds()).toContain('brakes-hydro-rim-spongy');
   expect(taskIds()).toContain('gears-electronic-adjust');
   expect(tagOf('brakes-hydro-rim-spongy')).toBe('if you have hydraulic rim brakes');
-  // opened under Show all on a bike it does not fit: as for no bike, the content's own words
-  await click(host.querySelector<HTMLElement>('.care-task[data-id="brakes-hydro-rim-spongy"] .care-open')!);
-  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  render(null, host);
+  // opened under Show all on a bike it does not fit (hydraulic discs with DOT fluid): as for no bike, the content's own words, never
+  // "Your bike's details say DOT fluid" in a mineral-oil rim brake's steps
+  await mount(world([bike('bike_d', 'Disc', { brakes: 'hydraulic-disc', brakeFluid: 'dot' })]));
+  expect(taskIds()).not.toContain('brakes-hydro-rim-spongy');
+  await click(fitButton()!);
+  const task = CARE_TASKS.find((t) => t.id === 'brakes-hydro-rim-spongy')!;
+  const opened = await stepsOf(host.querySelector<HTMLElement>('.care-task[data-id="brakes-hydro-rim-spongy"]')!);
+  expect(opened.steps).toEqual(task.steps);
+  expect(opened.text).not.toMatch(/details say/);
   render(null, host);
   await mount(world([bike('bike_r', 'Rim', { brakes: 'rim' })]));
   expect(taskIds()).toContain('brakes-hydro-rim-spongy');

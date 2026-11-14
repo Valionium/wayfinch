@@ -100,6 +100,8 @@ export function TAG_LABEL<K extends CareKey>(key: K, values: readonly CareValue[
 // ---- What the list fits (the owner's wish of 14 November 2026) ----
 const FLUID_WORDS: Record<Fluid, string> = { mineral: 'mineral oil', dot: 'DOT fluid' };
 const RIM_WORDS: Record<RimKind, string> = { caliper: 'road caliper rim brakes', 'v-brake': 'V-brakes', hydraulic: 'hydraulic rim brakes' };
+/** A task for some kinds of rim brake only (CareTask.rimBrake), the kind Not sure: "if you have hydraulic rim brakes". */
+export const KIND_TAG = (kinds: readonly RimKind[]): string => `${C.careTagIf} ${kinds.map((k) => RIM_WORDS[k]).join(' or ')}`;
 
 /**
  * The bike's told details, in words, for the line "Showing what fits your bike: …": the brakes with their kind and, when hydraulic,
@@ -138,6 +140,12 @@ export const STEP_VARIANTS: Readonly<Record<string, Readonly<Record<number, Step
     1: { by: 'fluid', words: {
       mineral: "Your bike's details say mineral oil: use only mineral oil, never DOT fluid. Shimano usually uses mineral oil, SRAM usually DOT fluid: if that does not match your brakes, check the lever or caliper.",
       dot: "Your bike's details say DOT fluid: use only DOT fluid, never mineral oil. Shimano usually uses mineral oil, SRAM usually DOT fluid: if that does not match your brakes, check the lever or caliper.",
+    } },
+  },
+  'brakes-hydro-rim-spongy': {
+    2: { by: 'fluid', words: {
+      mineral: "Your bike's details say mineral oil: use only mineral oil, never DOT fluid. Magura rim brakes use mineral oil: if that does not match your brakes, check the brake's manual.",
+      dot: "Your bike's details say DOT fluid: use only DOT fluid, never mineral oil. Magura rim brakes use mineral oil: if that does not match your brakes, check the brake's manual.",
     } },
   },
   'brakes-spongy': {
@@ -705,6 +713,21 @@ export const CARE_TASKS: CareTask[] = [
     words: ['spongy', 'soft lever', 'air', 'bleed'], applies: { brakes: ['hydraulic-disc'] }, critical: true,
   },
   {
+    // the owner's ruling of 14 November 2026: the spongy brake and the bleed for a hydraulic rim brake (Magura HS33 manual: Royal Blood
+    // mineral oil only, never DOT; bleed when the lever is slow or spongy)
+    id: 'brakes-hydro-rim-spongy', name: 'Fix a spongy hydraulic rim brake', part: 'brakes', section: 'notice', alsoWet: false,
+    signs: 'lever feels soft or slow and goes to the bar',
+    steps: [
+      'Check pads are not worn out.',
+      'Check for fluid leaks.',
+      "Use the fluid the brake's manual names: Magura rim brakes use mineral oil. Never mix mineral oil and DOT fluid.",
+      'Bleed the brake, or take it to a shop.',
+    ],
+    tools: 'bleed kit, fluid, gloves', minutes: null, who: 'shop', why: 'Shop (needs a bleed kit; brakes are critical, a mistake can cause a crash)',
+    note: 'Do not ride until fixed.',
+    words: ['spongy', 'soft lever', 'bleed', 'brake fluid', 'magura', 'hydraulic rim brake'], applies: { brakes: ['rim'] }, rimBrake: ['hydraulic'], critical: true,
+  },
+  {
     id: 'chain-replace', name: 'Replace a worn chain', part: 'chain', section: 'notice', alsoWet: false,
     signs: 'gauge says worn, or the chain slips',
     steps: [
@@ -746,6 +769,21 @@ export const CARE_TASKS: CareTask[] = [
     tools: 'hex keys, small screwdriver', minutes: [15, 15], who: 'you', why: 'Yourself or shop',
     note: 'A bent hanger needs a shop.',
     words: ['skip', 'ghost shift', 'noisy gears', 'adjust gears', 'hanger', 'limit screw'], applies: { gears: ['derailleur'], shifting: ['cable'] }, critical: false,
+  },
+  {
+    // the owner's ruling of 14 November 2026: electronic gears have no cable to adjust; the maker's app or the shifter buttons set them
+    id: 'gears-electronic-adjust', name: 'Adjust electronic gears', part: 'gears', section: 'notice', alsoWet: false,
+    signs: 'slow shift, noise, skips between gears, or a shifter does nothing',
+    steps: [
+      'Check the shifting battery first, and charge it if it is low.',
+      "A wireless shifter that does nothing may need pairing again: see the maker's manual or app.",
+      "Fine-tune the rear derailleur with the maker's app or the shifter buttons, a small step at a time, while you test every gear.",
+      'Check the hanger is straight; a bent hanger needs a shop.',
+      'If it still shifts badly, take it to a shop.',
+    ],
+    tools: "charger, the maker's app", minutes: null, who: 'you', why: 'Yourself or shop',
+    note: null,
+    words: ['adjust gears', 'electronic shifting', 'di2', 'axs', 'pair', 'noisy gears', 'skip'], applies: { gears: ['derailleur'], shifting: ['electronic'] }, critical: false,
   },
   {
     id: 'wheels-wobble', name: 'Fix a wobbly wheel', part: 'wheels', section: 'notice', alsoWet: false,
