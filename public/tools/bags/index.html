@@ -75,7 +75,7 @@ body{
   font-family:var(--disp);font-weight:700;font-size:34px;
   letter-spacing:.045em;text-transform:uppercase;line-height:.95;
 }
-.mast h1 span{color:var(--blaze)}
+.mast h1>span{white-space:nowrap}
 .crumbs{display:flex;gap:0;flex-wrap:wrap;padding-bottom:2px}
 .crumbs button{
   background:none;border:none;border-bottom:2px solid var(--line);color:var(--muted-dim);
@@ -1938,9 +1938,29 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
   #printChecklist .bike-profile-details dt{font-weight:700;break-after:avoid}
   #printChecklist .bike-profile-details dd{margin:0 0 1.5mm;white-space:pre-wrap}
 }
+/* ---- Wayfinch's look for the header, its line and the step labels (the owner's ruling of 14 Nov 2026, "yes, make the Bag planner
+   look like Wayfinch"; sweep of 14 Nov, finding 27): the app's own Source Sans 3 (/tools/bags/font.css), plain case, the app's colour
+   tokens (the same names and values as here), its screen title, its tab labels and its theme button. Last in the sheet, so it wins at
+   every width; the layout stays the page's. ---- */
+:root{--wf-font:'Source Sans 3',system-ui,sans-serif}
+.mast h1{font-family:var(--wf-font);font-weight:700;font-size:28px;line-height:1.2;letter-spacing:0;text-transform:none;color:var(--ink)}
+.mast h1 .mast-app{font-weight:600;color:var(--muted)}
+.mast p{font-family:var(--wf-font);font-weight:400;font-size:16px;line-height:1.4;letter-spacing:0;text-transform:none;color:var(--muted);margin-top:4px}
+.crumbs button{font-family:var(--wf-font);font-weight:600;font-size:17px;line-height:1.2;letter-spacing:0;text-transform:none;color:var(--muted);padding:8px 10px}
+.crumbs button:hover{color:var(--ink)}
+.crumbs button[aria-current=step]{color:var(--ink);border-bottom-color:var(--blaze)}
+.themebtn{border-radius:8px;background:var(--panel);color:var(--ink)}
+.themebtn:hover{border-color:var(--blaze);color:var(--ink)}
+@media screen and (max-width:640px){
+  .mast h1{font-size:26px}
+  .crumbs button{font-size:16px;padding:10px 4px}
+}
 </style>
 <!-- a number in the text never becomes a call on the first tap (owner's iPhone check, 6 Nov 2026) -->
 <meta name="format-detection" content="telephone=no">
+<!-- Wayfinch's own Source Sans 3 for the header and the step labels (the owner's ruling of 14 Nov 2026): the launch build writes the
+     app's own @font-face rules into this file (tools/build.mjs, writePageFont), so the page draws the very files the app loads, precached. -->
+<link rel="stylesheet" href="/tools/bags/font.css">
 <!-- Opened as the Gear advisor (#gear-advisor, Tools' card), the first frame waits for the page's script, which shows the advisor as its
      own page and draws the bike the glide from Tools lands on (the owner's preview check of 8 Nov, I). Any other visit renders as before. -->
 <script data-advisor-first-frame>if(/^#gear-advisor(&|$)/.test(location.hash)){const l=document.createElement('link');l.rel='expect';l.href='#advisorReady';l.setAttribute('blocking','render');document.head.appendChild(l);}</script>
@@ -1949,19 +1969,19 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 <div class="wrap">
   <header class="mast">
     <div>
-      <h1>Load<span>·</span>Check</h1>
-      <p>Bikepacking · what you forgot, what to leave</p>
+      <h1><span class="mast-app">Wayfinch <span aria-hidden="true">·</span></span> <span>Bag planner</span></h1>
+      <p>What to take, where it goes, what to leave at home.</p>
     </div>
     <button class="themebtn" id="themeBtn" aria-label="Switch between light and dark"></button>
     <nav class="crumbs" id="crumbs" aria-label="Steps">
-      <button data-to="1">Trip</button><button data-to="2">Bags</button><button data-to="3">Kit</button><button data-to="4">Check</button>
+      <button data-to="1">Ride</button><button data-to="2">Bags</button><button data-to="3">Kit</button><button data-to="4">Check</button>
     </nav>
   </header>
   <!-- The one top bar of every tool (owner, 7 Nov 2026): it slides away while scrolling down and comes back on any scroll up. -->
   <link rel="stylesheet" href="/back-bar.css"><script src="/back-bar.js" defer></script>
   <div class="guide-launch-row wf-bar"><a class="back-wayfinch" id="backToWayfinch" href="/#/tools">← Back to Wayfinch</a><button class="linky" id="walkthroughOpen" type="button" aria-haspopup="dialog" aria-controls="walkthroughBox">Quick walkthrough</button></div>
   <aside class="guide-invite hidden" id="walkthroughInvite" aria-labelledby="walkthroughInviteTitle">
-    <div><b id="walkthroughInviteTitle">First time here?</b><p>A short guide to Trip, Bags, Kit and Check.</p></div>
+    <div><b id="walkthroughInviteTitle">First time here?</b><p>A short guide to Ride, Bags, Kit and Check.</p></div>
     <button class="kitact" id="walkthroughStart" type="button" aria-haspopup="dialog" aria-controls="walkthroughBox">Show me around</button>
     <button class="linky" id="walkthroughSkip" type="button">Not now</button>
   </aside>
@@ -2222,7 +2242,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         <button id="nUp" aria-label="One night more">+</button>
       </div>
       <button id="nRevert" class="nrevert hidden"></button>
-      <span class="check-night-suggestion" id="checkNightsSuggestion">Suggested nights: — · add a route in Trip</span>
+      <span class="check-night-suggestion" id="checkNightsSuggestion">Suggested nights: — · add a route in Ride</span>
     </div>
     <div id="nightsNote"></div>
     <div class="modebar" id="modeBar">
@@ -2257,7 +2277,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <div class="fbslot" data-fb="4"></div>
     <div class="nav">
       <button class="back" data-to="3">Adjust kit</button>
-      <button class="go" data-to="1">Back to trip</button>
+      <button class="go" data-to="1">Back to step one</button>
     </div>
   </section>
 
@@ -2276,8 +2296,8 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     </div>
   </section>
   <footer class="sitefoot">
-    <span>Load Check · a free tool, and its figures are estimates</span>
-    <button class="linky" id="legalBtn" lang="de">Impressum &amp; Datenschutz</button>
+    <span>Bag planner · a free tool, and its figures are estimates</span>
+    <button class="linky" id="legalBtn">Imprint and privacy</button>
   </footer>
 </div>
 <div id="bikeDetailsBox" class="bike-dialog-box bike-details-box hidden" role="dialog" aria-modal="true" aria-labelledby="bikeDetailsTitle">
@@ -7620,7 +7640,7 @@ function forecastSummary(){
     fetchedAt:dates.length ? Math.min(...dates) : null};
 }
 function forecastStatusText(f=forecastSummary()){
-  if(f.status === 'no-date') return 'No departure date selected. Add a date in Trip for a near-term forecast.';
+  if(f.status === 'no-date') return 'No departure date selected. Add a date in Ride for a near-term forecast.';
   if(f.status === 'no-place') return 'Choose a place to check the forecast for your departure date.';
   if(f.status === 'past') return 'The departure date is in the past. This panel shows forecasts, not past weather.';
   if(f.status === 'too-early') return `Departure is beyond the forecast window. Check again from ${forecastDateLabel(shiftCalendarDate(f.start,-15), true)}.`;
@@ -10524,7 +10544,7 @@ function renderNightsSuggestion(){
   if(trip)trip.innerHTML=`<span>Suggested nights</span><b>${htmlEsc(value)}</b>`;
   if(help)help.innerHTML=P ? `Your chosen number stays unchanged. ${infoHelp('How suggested nights are calculated', `<p>${htmlEsc(hint)}</p>`)}` : htmlEsc(hint);
   if(check)check.innerHTML=P ? `Suggested: ${htmlEsc(value)}${P.ascent == null ? ' · distance only' : ''}${P.suggestedNights>30 ? ' · above the 30-night limit' : ''} · your choice stays ${infoHelp('How suggested nights are calculated',`<p>${htmlEsc(hint)}</p>`)}` :
-    pending ? 'Suggested nights: calculating… · your choice stays' : 'Suggested nights: — · add a route in Trip';
+    pending ? 'Suggested nights: calculating… · your choice stays' : 'Suggested nights: — · add a route in Ride';
 }
 
 // Estimated daily effort, split across the number of days the rider chose.
@@ -11382,7 +11402,7 @@ function resultConfidence(c){
   const forecast=forecastSummary();
   const forecastNote=forecastWarnings(forecast,c).join(' ');
   const profile=routeProfile();
-  let route='No route calculated. Choose both ends in Trip, or load a GPX track.', routeDetail='';
+  let route='No route calculated. Choose both ends in Ride, or load a GPX track.', routeDetail='';
   if(profile){
     const numbers=`${profile.km} km · ${profile.ascent == null ? 'climbing unavailable' : profile.ascent+' m climbing'}`;
     if(profile.via === 'GPX'){
@@ -11399,11 +11419,11 @@ function resultConfidence(c){
       routeDetail='This follows a modelled corridor, not a verified cycling route.';
     }
   } else if(routePending()) route='Route calculation is still loading.';
-  else if(S.place && S.place2) route='Route calculation is unavailable. Retry in Trip or use a GPX track.';
+  else if(S.place && S.place2) route='Route calculation is unavailable. Retry in Ride or use a GPX track.';
   const places=[S.place,S.place2,routeHigh()].filter(Boolean);
   const climates=places.map(p => climateAt(p,S.month));
   const measured=climates.filter(x => x && x.source === 'measured').length;
-  let weather='Weather unchecked. Choose a place in Trip.';
+  let weather='Weather unchecked. Choose a place in Ride.';
   if(places.length){
     weather=measured === places.length
       ? `Historical records available for all ${places.length} checked place${places.length===1?'':'s'}.`
@@ -11489,7 +11509,7 @@ function renderResult(){
     (!highPoint || climateAt(highPoint, S.month).source === 'measured') && !weatherFailed;
   const weatherNote = weatherReady ? '' : weatherFailed
     ? `<div class="finding miss"><b>Measured weather unavailable</b>
-         <p>Some advice uses regional estimates where available. Return to Trip and retry the weather check.</p></div>`
+         <p>Some advice uses regional estimates where available. Return to Ride and retry the weather check.</p></div>`
     : S.place
     ? `<div class="finding miss"><b>Weather check unfinished</b>
          <p>Weather records for part of this trip have not loaded. Bag capacity is calculated;
@@ -11501,7 +11521,7 @@ function renderResult(){
   const routeFailed = !!(S.place && S.place2 && !S.gpx && ROUTE[routeKey(S.place, S.place2)]?.failed);
   const routeNote = routeFailed
     ? `<div class="finding miss"><b>Route calculation unavailable</b>
-         <p>Distance and climbing could not be checked. Return to Trip to retry or upload a GPX track.</p></div>` : '';
+         <p>Distance and climbing could not be checked. Return to Ride to retry or upload a GPX track.</p></div>` : '';
   const A = currentPlan();
   const { slots, spill, stranded, unused, barely } = A;
   const holding = slots.filter(s => s.items.length).length;
@@ -15287,7 +15307,7 @@ function bindRouteMap(profile){
 /* ==== 88-walkthrough.js ==== */
 const WALKTHROUGH_KEY='loadcheck:walkthrough:v1';
 const WALKTHROUGH_CARDS=[
-  {label:'Trip',title:'Tell us about the ride',
+  {label:'Ride',title:'Tell us about the ride',
    copy:'Choose your main place, month and number of nights. For a day ride, enter 0 nights. If you are staying overnight, choose camping, accommodation or a mixture.\n\nThese choices prepare a starting kit list and check seasonal weather for your trip.',
    optional:['Describe the trip in one line, then review the suggested changes before applying them.',
      'Add an end place or upload a GPX for distance and suggested daily stages.',
