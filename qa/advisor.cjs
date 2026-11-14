@@ -338,6 +338,66 @@ test('[GA-SCREEN] the answer is not a live region: one short status line says wh
   assert.equal(say({kind:'already-good',...common,partial:true}),'Your bags already suit this; nothing to add. This search stopped early.');
 });
 
+// The sweep of 14 Nov 2026, #40: "Fits everything that was left over. Takes 2.1 L off your back; 11.1 L stay there." beside a list that
+// moves the quilt, the mat and 30 more things off the backpack. The 2.1 L was the backpack's net change: the frozen selection fills the
+// room the new bags free in the backpack with what was left over, so far more came off and other things went in.
+test('[GA-WHY-AGREE] the why lines agree with the moves: litres off the back are what comes off, what goes onto the back in its place is said, the four figures as shown add up, "fits everything" only when nothing is over (sweep 14 Nov 2026, #40; review of PR 137, m1)',async()=>{
+  // the sweep's rider first (Gravel, 6 nights camping, average, Better handling, no bag plan), then other kits: the review found lines 0.1 L
+  // apart in 37 of 138 kits
+  const KITS=[{riding:'gravel',nights:6,sleep:'camp',carry:'average',goal:'handling'},{riding:'touring',nights:2,sleep:'indoor',carry:'lot',goal:'backpack'},
+    {riding:'road',nights:0,carry:'light',goal:'both'},{riding:'everyday',nights:2,sleep:'camp',carry:'average',goal:'both'},{riding:'mtb',nights:6,sleep:'camp',carry:'lot',goal:'handling'}];
+  let onto=0,p;
+  for(const kit of KITS){
+  p=page({setup:'S.bags=[];S.nextUid=1;',bike:null});
+  await ask(p,kit);
+  if(p.json('ADVISOR.answer.kind')!=='suggestions'){assert.notEqual(kit.riding,'gravel','the sweep rider gets suggestions');continue;}
+  const n=p.json('advisorCards(ADVISOR.answer).length');
+  for(let i=0;i<n;i++){
+    const f=p.json(`(()=>{const I=ADVISOR.input,s=advisorCards(ADVISOR.answer)[${i}],base=advisorBase(I);
+      const a=advisorPlan(base.bags,base.decks,I),b=advisorPlan(advisorTrialBags(s,I),s.decks,I);
+      const back=P=>{const m={};for(const sl of P.slots)if(POSITIONS[sl.pos].onBody)for(const k of sl.items||[])m[k.id]=(m[k.id]||0)+k.vol;return m;};
+      const A=back(a),B=back(b);let off=0,on=0;
+      for(const id of new Set([...Object.keys(A),...Object.keys(B)])){const d=(B[id]||0)-(A[id]||0);if(d>0)on+=d;else off-=d;}
+      return {off:+off.toFixed(1),on:+on.toFixed(1),was:+base.result.backL.toFixed(1),now:+s.result.backL.toFixed(1),
+        over:s.result.overL>0 || s.result.spillIds.length>0,why:advisorWhy(s,I).join(' ')};})()`);
+    const at=`${kit.riding} card ${i}`;
+    // the figures add up: what comes off less what goes on is the back's change
+    assert.ok(Math.abs(f.off-f.on-(f.was-f.now))<=0.15,`${at}: ${JSON.stringify(f)}`);
+    if(/Fits everything that was left over/.test(f.why))assert.equal(f.over,false,`${at}: fits everything only when nothing is over`);
+    const shown=/Takes ([\d.]+) L off your back and puts ([\d.]+) L of other things in its place: ([\d.]+) L on your back instead of ([\d.]+) L\./.exec(f.why);
+    if(shown){
+      const [A,B,C,D]=shown.slice(1).map(Number);
+      // as shown, to the tenth: what was, less what comes off, plus what goes in, is what is on the back then
+      assert.equal(+(D-A+B).toFixed(1),C,`${at}: ${f.why}`);
+      assert.equal(A,f.off,`${at}: what comes off`);
+      assert.ok(Math.abs(B-f.on)<=0.1+1e-9,`${at}: what goes in: ${f.why} ${JSON.stringify(f)}`);
+      assert.deepEqual([C,D],[f.now,f.was],`${at}: on the back then, and before`);
+    }
+    if(f.on>=0.1 && f.was-f.now>=0.1 && +(f.now-f.was+f.off).toFixed(1)>=0.1){
+      onto++;
+      assert.ok(shown,`${at}: what comes off and what goes in, both said: ${f.why} ${JSON.stringify(f)}`);
+      assert.ok(!/stay there/.test(f.why),`${at}: never "stay there" when other things went in: ${f.why}`);
+    }
+  }
+  }
+  assert.ok(onto>0,'the sweep\'s case: left-over kit goes into the backpack');
+  // #43: with no bag plan, the start says why it is a 15 L backpack and what gives a better answer
+  assert.ok(textOf(view(p).steps).includes('Starting from a 15 L backpack, holding what it can, since there is no bag plan yet. Plan your bags first for an answer on your own packing.'));
+  // with a plan, the questionnaire is the rider's choice: the start says only what it is
+  const q=page({setup:R2,bike:GRAVEL});
+  q.run('openAdvisor()');q.run(`setAdvisor('source','questionnaire')`);
+  assert.ok(textOf(view(q).steps).includes('Starting from a 15 L backpack, holding what it can.'));
+  assert.ok(!textOf(view(q).steps).includes('no bag plan yet'));
+});
+
+// #41: "Choose all three steps to see what to get." was read twice by a screen reader: the status line, then the same words beside it.
+test('[GA-SCREEN] "Choose all three steps" is shown once and read once: the visible hint is hidden from screen readers, which hear the status line (sweep 14 Nov 2026, #41)',()=>{
+  const p=page({setup:R2,bike:GRAVEL});
+  p.run('openAdvisor()');
+  assert.equal(p.context.document.getElementById('advisorStatus').textContent,'Choose all three steps to see what to get.');
+  assert.ok(/<p class="adv-hint" aria-hidden="true">Choose all three steps to see what to get\.<\/p>/.test(view(p).answer));
+});
+
 test('[GA-ANSWER] a bike whose rack mounts are Not sure (no field, as sub-project 11 stores it) and no rack fitted: every rack or pannier shown says "if your bike has rack mounts"',async()=>{
   const p=page({bike:BARE,setup:"S.bags=[{uid:1,pos:'pack',L:15}];S.nextUid=2;S.nights=2;S.sleep='camp';applyTripKitDefaults();"});
   assert.equal(p.json("advisorInput('bags-first','backpack').rackMounts"),null,'no field');

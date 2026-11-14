@@ -106,7 +106,7 @@ test('[BC-SCREEN] every task, at the project size and at 200% text: no sideways 
   await expect(page.getByRole('dialog')).toHaveCount(0);
   // every task shows, the conditioned ones tagged, and the quiet line leads to the bike's details
   await expect(page.locator('.care-task')).toHaveCount(48);
-  await expect(page.getByRole('link', { name: "Tell us your brakes, tyres… to hide what doesn't apply" })).toHaveAttribute('href', '/tools/bags/#bike-details=bike_u&back=care');
+  await expect(page.getByRole('link', { name: "Tell us your brakes, tyres… in Bike details to hide what doesn't apply" })).toHaveAttribute('href', '/tools/bags/#bike-details=bike_u&back=care');
   // the tablist and the filters have names
   await expect(page.getByRole('tablist', { name: 'Bike care' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Parts' })).toBeVisible();
@@ -129,7 +129,7 @@ test('[BC-SCREEN] Tab reaches every tab, filter, task and link; each task opens 
     });
     if (here) reached.push(here);
   }
-  for (const want of ['tab:Care', 'tab:Roadside repairs', 'input:care-search', "a:Tell us your brakes, tyres… to hide what doesn't apply"]) expect(reached, want).toContain(want);
+  for (const want of ['tab:Care', 'tab:Roadside repairs', 'input:care-search', "a:Tell us your brakes, tyres… in Bike details to hide what doesn't apply"]) expect(reached, want).toContain(want);
   for (const part of ['Chain', 'Brakes', 'Tyres', 'Gears', 'Wheels', 'Suspension', 'E-bike', 'Frame & bolts']) expect(reached, part).toContain(`button:${part}`);
   const ids = await page.locator('.care-task').evaluateAll((ds) => ds.map((d) => (d as HTMLElement).dataset.id!));
   for (const id of ids) expect(reached, id).toContain(`task:${id}`);
@@ -142,7 +142,10 @@ test('[BC-SCREEN] Tab reaches every tab, filter, task and link; each task opens 
   await task(page, ids[1]!).locator('.care-open').focus();
   await page.keyboard.press('Space');
   await expect(page.getByRole('dialog')).toBeVisible();
+  // Tab straight after Escape moves on from the task just closed: the focus was already back on it, not on the page body
   await page.keyboard.press('Escape');
+  await page.keyboard.press('Tab');
+  expect(await page.evaluate(() => (document.activeElement?.closest('.care-task') as HTMLElement | null)?.dataset.id)).toBe(ids[2]);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   // the arrow keys move between the tabs
   await page.getByRole('tab', { name: 'Care' }).focus();
@@ -212,7 +215,8 @@ test('[BC-ROAD] the Roadside tab fits the chosen bike; every card open, at the p
   // a critical card's steps end with the shop line, a puncture's do not
   await page.evaluate(() => { localStorage.setItem('copilot:careAllSteps:v1', '1'); });
   await card(page, 'brake-rub-rim').locator('.care-open').click();
-  await expect(page.getByRole('dialog').locator('.care-step-all')).toHaveCount(6);
+  // the kind of rim brake not told: both centring lines (BC-HYDRO-RIM-CENTRE), 7 steps
+  await expect(page.getByRole('dialog').locator('.care-step-all')).toHaveCount(7);
   await expect(page.getByRole('dialog').getByText('If unsure, a shop.')).toBeVisible();
   await page.keyboard.press('Escape');
   await card(page, 'puncture-tube').locator('.care-open').click();
@@ -361,8 +365,9 @@ test("[PG-SHEET-OPEN] a part's name opens the bike view: a bottom sheet on a pho
   app = await loadApp(page, { launch: true, path: '/#/tools/care' });
   await seed(page, [A], 'bike_a');
   await openSteps(page, 'brake-rub-rim', 'Brake rubbing');
-  for (let i = 0; i < 5; i += 1) await page.getByRole('button', { name: 'Next' }).click();
-  await expect(page.locator('.care-steps-count')).toHaveText('Step 5 of 6');
+  // the kind of rim brake not told: both centring lines show (BC-HYDRO-RIM-CENTRE), so the brake's quick release is step 6 of 7
+  for (let i = 0; i < 6; i += 1) await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.locator('.care-steps-count')).toHaveText('Step 6 of 7');
   const link = page.locator('.care-step .care-part', { hasText: "brake's quick release" });
   await link.click();
   const sheet = page.getByRole('dialog', { name: 'Where to find: Brake rubbing' });
@@ -397,7 +402,7 @@ test("[PG-SHEET-OPEN] a part's name opens the bike view: a bottom sheet on a pho
   await expect(sheet.getByRole('heading', { level: 3 })).toHaveText("The wheel's quick release");
   await page.goBack();
   await expect(page.locator('dialog.part-sheet')).toHaveCount(0);
-  await expect(page.locator('.care-steps-count')).toHaveText('Step 5 of 6');
+  await expect(page.locator('.care-steps-count')).toHaveText('Step 6 of 7');
   await expect(page).toHaveURL(/#\/tools\/care$/);
   expect(errors).toEqual([]);
 });
@@ -566,6 +571,48 @@ test("[BV-VIEW] a tap at the top, middle or bottom of any label's pill picks tha
   expect(errors).toEqual([]);
 });
 
+// NEXT task 4, item 3 (the owner's try-out): a tap at a pill's corner opens that pill's part too. The pill is round-ended, so its corners
+// lay outside the drawn shape, where a neighbour's 44 px tap area or the drawing took the tap: the whole pill's box is its own now.
+test("[BV-VIEW] a tap at any corner of a label's pill, or at its ends, picks that label's own part, on the busiest cards, and opens it", async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [U], null);
+  for (const [id, name] of [['puncture-tube', 'Puncture (inner tube)'], ['brake-rub-disc', 'Disc brake rubbing'], ['chain-broken', 'Broken chain']] as const) {
+    await openSteps(page, id, name);
+    await page.locator('.care-where').click();
+    const sheet = page.locator('dialog.part-sheet');
+    await expect(sheet.locator('.bv-label').first()).toBeVisible();
+    const hits = await page.evaluate(() => [...document.querySelectorAll<SVGGElement>('dialog.part-sheet .bv-label')].flatMap((g) => {
+      const r = g.querySelector('.bv-pill')!.getBoundingClientRect();
+      const points: [number, number][] = [[r.left + 1, r.top + 1], [r.right - 1, r.top + 1], [r.left + 1, r.bottom - 1], [r.right - 1, r.bottom - 1],
+        [r.left + 1, r.top + r.height / 2], [r.right - 1, r.top + r.height / 2]];
+      return points.map(([x, y]) => {
+        const el = document.elementFromPoint(x, y);
+        return `${g.dataset.part} at ${Math.round(x - r.left)},${Math.round(y - r.top)} -> ${el?.closest('[data-part]')?.getAttribute('data-part') ?? 'none'}`;
+      });
+    }));
+    expect(hits.filter((h) => { const [a, b] = h.split(' -> '); return a!.split(' at ')[0] !== b; }), id).toEqual([]);
+    // a real tap at a pill's top-left corner opens that part
+    const label = sheet.locator('.bv-label').nth(1);
+    const part = await label.getAttribute('data-part');
+    // the sheet's labels settle for a moment after it shows (one moved 7.6 px within 30 ms): click once the box is the same on two reads a frame apart
+    let box = (await label.locator('.bv-pill').boundingBox())!;
+    await expect.poll(async () => {
+      await page.evaluate(() => new Promise((done) => { requestAnimationFrame(done); }));
+      const next = (await label.locator('.bv-pill').boundingBox())!;
+      const same = next.x === box.x && next.y === box.y;
+      box = next;
+      return same;
+    }).toBe(true);
+    await page.mouse.click(box.x + 1, box.y + 1);
+    await expect(sheet.locator(`.bv-label[data-part="${part}"]`)).toHaveClass(/bv-label-hot/);
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('dialog.care-steps')).toHaveCount(0);
+  }
+  expect(errors).toEqual([]);
+});
+
 // Review of PR 107, I2: a mouse drag that ends outside the drawing ends the drag: the labels come back and a hover does not pan.
 test('[BV-ZOOM] a mouse drag of a zoomed drawing let go outside it ends there: the labels come back, and a hover after it moves nothing', async ({ page }) => {
   const errors = errorsOf(page);
@@ -597,5 +644,69 @@ test('[BV-ZOOM] a mouse drag of a zoomed drawing let go outside it ends there: t
   await page.mouse.move(box.x + 20, box.y + box.height / 2, { steps: 4 });
   await page.mouse.move(box.x + box.width - 20, box.y + box.height / 2, { steps: 4 });
   expect(await sheet.locator('.bv-art').getAttribute('viewBox')).toBe(before);
+  expect(errors).toEqual([]);
+});
+
+// The owner's wish of 14 November 2026: the brakes with their fluid and the gear shifting told in You's bike details fit Bike care, which
+// says so at the top; Show all lifts the fit and Fit to my bike brings it back, by keyboard too.
+test('[BC-FIT-LINE] brakes, brake fluid and shifting set in You\'s bike details fit Bike care, which names them; Show all, then Fit to my bike', async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/you' });
+  await seed(page, [U], 'bike_u');
+  // nothing told: no line, every task
+  await page.goto(`${app.origin}/#/tools/care`);
+  await expect(page.getByRole('heading', { name: 'Bike care', level: 2 })).toBeVisible();
+  await expect(page.locator('.care-fit')).toHaveCount(0);
+  await expect(task(page, 'brakes-pads-rim')).toBeVisible();
+  // You, Edit: the bag planner's Bike details, More details, Repair kit details
+  await page.goto(`${app.origin}/#/you`);
+  await page.locator('li.you-bike', { hasText: 'Old one' }).getByRole('link', { name: /Edit/ }).click();
+  await page.waitForURL(/\/tools\/bags\//);
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await page.locator('#bikeMoreDetails > summary').click();
+  await page.locator('#bikeRepairFields > summary').click();
+  await expect(page.locator('#bikeBrakeFluidField')).toBeHidden();
+  await page.getByRole('combobox', { name: /^Brake type/ }).selectOption('hydraulic-disc');
+  const fluid = page.getByRole('combobox', { name: /^Brake fluid/ });
+  await expect(fluid).toBeVisible();
+  await expect(fluid).toHaveValue('unknown');
+  await expect(page.locator('#bikeBrakeFluidHint')).toHaveText('It is named on the brake lever or caliper, or in the manual. Never mix them.');
+  await fluid.selectOption('mineral');
+  await page.getByRole('combobox', { name: /^Shifting/ }).selectOption('electronic');
+  await page.evaluate(() => { (document.getElementById('bikeLibraryPanel') as HTMLDetailsElement).open = true; });
+  await page.locator('#bikeSave').click();
+  await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles')!) as { id: string; brakeFluid?: string; shifting: string }[]).find((b) => b.id === 'bike_u'))).toMatchObject({ brakes: 'hydraulic-disc', brakeFluid: 'mineral', shifting: 'electronic' });
+  await page.locator('#bikeDetailsClose').click();
+  await page.waitForURL((u) => u.pathname === '/' && u.hash === '#/you');
+  await page.getByRole('link', { name: 'Care for this bike Old one' }).click();
+  await expect(page).toHaveURL(/#\/tools\/care$/);
+  const line = page.locator('.care-fit');
+  await expect(line).toContainText('Showing what fits your bike: hydraulic disc brakes (mineral oil), electronic gears.');
+  await expect(task(page, 'brakes-hydraulic-bleed')).toBeVisible();
+  await expect(task(page, 'gears-electronic-battery')).toBeVisible();
+  await expect(task(page, 'brakes-pads-rim')).toHaveCount(0);
+  await expect(task(page, 'gears-cables-look')).toHaveCount(0);
+  // no sideways scroll at 320 px with the line
+  await page.setViewportSize({ width: 320, height: 640 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  const showAll = line.getByRole('button', { name: 'Show all' });
+  expect((await showAll.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // by keyboard: the button takes Enter, keeps the focus, and the line says what is shown
+  await showAll.focus();
+  await page.keyboard.press('Enter');
+  await expect(line).toContainText('Showing everything, for every bike.');
+  const mine = line.getByRole('button', { name: 'Fit to my bike' });
+  await expect(mine).toBeFocused();
+  await expect(task(page, 'brakes-pads-rim')).toBeVisible();
+  await expect(task(page, 'gears-cables-look')).toBeVisible();
+  await page.keyboard.press('Space');
+  await expect(line).toContainText('Showing what fits your bike:');
+  await expect(line.getByRole('button', { name: 'Show all' })).toBeFocused();
+  await expect(task(page, 'brakes-pads-rim')).toHaveCount(0);
+  // the bleed names the bike's fluid
+  await task(page, 'brakes-hydraulic-bleed').locator('.care-open').click();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByRole('dialog')).toContainText('mineral oil, never DOT fluid');
   expect(errors).toEqual([]);
 });

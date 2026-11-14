@@ -1,8 +1,7 @@
 /* Colour tokens of spec section 3.6, taken from Load Check. Self-hosted fonts, Latin subsets only (OFL-1.1). */
-@font-face { font-family: 'Barlow'; font-weight: 400; font-style: normal; font-display: swap; src: url('@fontsource/barlow/files/barlow-latin-400-normal.woff2') format('woff2'); }
-@font-face { font-family: 'Barlow'; font-weight: 600; font-style: normal; font-display: swap; src: url('@fontsource/barlow/files/barlow-latin-600-normal.woff2') format('woff2'); }
-@font-face { font-family: 'Barlow Condensed'; font-weight: 600; font-style: normal; font-display: swap; src: url('@fontsource/barlow-condensed/files/barlow-condensed-latin-600-normal.woff2') format('woff2'); }
-@font-face { font-family: 'Barlow Condensed'; font-weight: 700; font-style: normal; font-display: swap; src: url('@fontsource/barlow-condensed/files/barlow-condensed-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Source Sans 3'; font-weight: 400; font-style: normal; font-display: swap; src: url('@fontsource/source-sans-3/files/source-sans-3-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Source Sans 3'; font-weight: 600; font-style: normal; font-display: swap; src: url('@fontsource/source-sans-3/files/source-sans-3-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Source Sans 3'; font-weight: 700; font-style: normal; font-display: swap; src: url('@fontsource/source-sans-3/files/source-sans-3-latin-700-normal.woff2') format('woff2'); }
 @font-face { font-family: 'IBM Plex Mono'; font-weight: 400; font-style: normal; font-display: swap; src: url('@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2') format('woff2'); }
 
 /* Dark is the default; the phone's own setting picks light, and data-theme overrides both. */
@@ -18,8 +17,8 @@
   --red: #F08067;
   --ice: #8CC9D4;
   --line: #3E4A36;
-  --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
-  --font-body: 'Barlow', system-ui, sans-serif;
+  --font-display: 'Source Sans 3', system-ui, sans-serif;
+  --font-body: 'Source Sans 3', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 }
 

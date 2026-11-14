@@ -23,7 +23,7 @@ import type { Place } from '../../core/places/types.ts';
 import { readInputs, SAVED_KM_META } from '../../store/inputs.ts';
 import { readPrepared, readStoredZones } from '../../store/prepared.ts';
 import type { PreparedRecord } from '../../store/prepared.ts';
-import { DEFAULT_SETTINGS, goodDate, usableSavedKm } from '../../store/rules.ts';
+import { DEFAULT_SETTINGS, deviceZone, goodDate, usableSavedKm, zonesOrDevice } from '../../store/rules.ts';
 import type { Settings } from '../../store/rules.ts';
 import { readSettings, writeSettings } from '../../store/settings.ts';
 import { readTrip, replaceRoute, RouteGoneError, sameLine, saveTrip } from '../../store/trip.ts';
@@ -150,9 +150,6 @@ async function storageMb(): Promise<number | null> {
   }
 }
 
-/** The device's own zone, only to say which day "today" is when a route is added. */
-const deviceZone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-
 /** Why the store refused or failed, in the rider's words. */
 export const reasonOf = (e: unknown): string => (e instanceof NewerDataError ? W.appStoreChangedElsewhere : e instanceof RefusedError ? e.message : W.appStoreNotKept);
 
@@ -197,7 +194,7 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
     if (!trip) return { ...nothing(at, settings, true), storageMb: await storageMb() };
     try {
       const prepared = await readPrepared();
-      const zone = zoneLookupOf(await readStoredZones())(0).timeZone;
+      const zone = zoneLookupOf(zonesOrDevice(await readStoredZones()))(0).timeZone;
       const { places, forecastTo, forecastFetchedAt, lastPositionAt, nothingSaved } = await counts();
       const today = localIsoDate(at, zone);
       let day1LeaveBy: string | null = null;

@@ -41,7 +41,7 @@ function PlaceChoice({ id, label, services, chosen, onChoose }: {
       <div class="field">
         <span class="field-label">{label}</span>
         <p class="tool-line">{chosen.name}<span class="muted">{[chosen.street, chosen.where].filter(Boolean).map((x) => ` · ${x}`).join('')}</span></p>
-        <button type="button" class="btn" onClick={() => { onChoose(null); setHits(null); }}>{W.appAbChange(label)}</button>
+        <button type="button" class="btn" onClick={() => { onChoose(null); setHits(null); }}>{`${TR.appAbChange} ${label.toLowerCase()}`}</button>
       </div>
     );
   }
@@ -58,7 +58,7 @@ function PlaceChoice({ id, label, services, chosen, onChoose }: {
       {hits && hits.length > 0 ? (
         <>
           <p class="muted" role="status">{TR.appAbPick}</p>
-          {hits.some((h) => h.source === 'osm') ? <OsmCredit lead={W.appTripOsmSearch} /> : null}
+          {hits.some((h) => h.source === 'osm') ? <OsmCredit lead={TR.appTripOsmSearch} /> : null}
           {hits.some((h) => h.source === 'geonames') ? <GeoNamesCredit /> : null}
           <ul class="hits" aria-label={`${TR.appAbList}: ${label}`}>
             {hits.map((h, i) => (

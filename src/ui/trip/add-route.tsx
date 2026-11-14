@@ -96,7 +96,7 @@ export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken
         {said ? <p role="status">{said}</p> : null}
         {pending && old ? (
           <div class="notice" role="alertdialog" aria-labelledby="trip-replace-title" data-replace>
-            <h3 id="trip-replace-title" tabIndex={-1} ref={asking}>{W.appTripReplaceTitle}</h3>
+            <h3 id="trip-replace-title" tabIndex={-1} ref={asking}>{TR.appTripReplaceTitle}</h3>
             <p>{TF.appTripReplaceBody(old.route.name, pending.route.name, showKm(pending.route.lengthKm))}</p>
             <div class="row">
               <button type="button" class="btn btn-primary" onClick={() => void commit(pending)}>{W.appTripReplaceYes}</button>
