@@ -1142,6 +1142,22 @@ describe('[TRIP-DAY-POCKETS] a day ride counts the jersey and bib shorts pockets
     expect(String(p.page.nodes.get('smallPockets')!.innerHTML)).toMatch(/data-pocket="jersey"/);
   });
 
+  // Handover task 4, item 5 (the day-ride pockets of PR 123): the jersey pockets off bring the frame bag for what they held; back on, the
+  // frame bag goes away again and the bags are those of before.
+  test('the jersey pockets off on the 39 km ride bring the frame bag; back on, it goes away again and the bags are as before', async () => {
+    const p = await planned('2026-11-15');
+    const bags = () => p.json<Array<{ pos: string; L: number }>>('S.bags.map(b=>({pos:b.pos,L:b.L}))');
+    const before = bags();
+    expect(before.some((b) => b.pos === 'frame')).toBe(false);   // the top tube bag alone (owner, 10 Nov 2026)
+    p.page.run(`setPocket('jersey',false)`);
+    expect(bags().some((b) => b.pos === 'frame')).toBe(true);
+    expect(p.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+    p.page.run(`setPocket('jersey',true)`);
+    expect(bags().some((b) => b.pos === 'frame')).toBe(false);
+    expect(bags()).toEqual(before);
+    expect(p.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+  });
+
   test('a switch, off or on, plans the day ride\'s bags again by the same rule and the line says so; hand placements stay; bags the rider changed are never re-sized', async () => {
     // coordinator's decision, 10 Nov 2026: turning a pocket off or on is the rider's own visible action. About 60 km, over 4 hours, so the
     // frame bag is proposed (the 39 km ride takes the top tube bag alone since the short-ride rulings)
