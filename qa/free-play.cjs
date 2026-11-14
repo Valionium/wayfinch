@@ -166,6 +166,32 @@ test('[FP-BACK] Back to the trip\'s plan puts back exactly the plan of before, a
   assert.ok(p.writes.includes('loadcheck:draft'),'an ordinary change is saved again');
 });
 
+// The deck note of the sleeping bag on the rack deck (PR 149) is the planner's own storage: free play writes none of it either.
+const DECK_NOTE='loadcheck:deck-note:v1';
+const OLD_PLAN=drop=>`S.decks={bar:false,rack:false};S.placements=null;currentPlan();qaOld=JSON.parse(JSON.stringify(S.placements));qaOld.basis.rackDeck=true;
+  ${JSON.stringify(['tent','pad',...drop])}.forEach(id=>delete qaOld.items[id]);S.decks={bar:false,rack:true};keepPlan({load:qaOld});currentPlan();`;
+test('[FP-NO-WRITE] [LC-DECK-NOTE] in free play the deck note is said but never written: the trip\'s plan\'s note still waits at Back, free play\'s own goes with it',async()=>{
+  const p=await page();
+  // the trip's plan: an old kept plan with the sleeping bag in a bag and the deck on, so its note waits in storage
+  p.run(OLD_PLAN([]));await p.run('flushDraft()');
+  const note=p.values.get(DECK_NOTE);
+  assert.ok(note&&JSON.parse(note).pending,'the trip\'s plan\'s note waits');
+  p.writes.length=0;const was=stored(p);
+  assert.equal(await p.run('startFreePlay()'),true);
+  p.run('S.step=4;');
+  assert.match(p.json('deckNoteHtml(4)'),/now rides on the rack top deck, in a dry bag/,'free play shows it, on the copy of the trip\'s plan');
+  // free play opens another old plan: its own note, in free play only
+  p.run(OLD_PLAN(['cap']));
+  assert.match(p.json('deckNoteHtml(4)'),/now rides on the rack top deck/,'free play\'s own note');
+  assert.equal(p.values.get(DECK_NOTE),note,'the note in storage is untouched');
+  assert.deepEqual(p.writes.filter(k=>k===DECK_NOTE),[],'never written in free play');
+  assert.deepEqual(planWrites(p),[],'nothing written');
+  assert.ok(stored(p)===was,'every stored value as before');
+  assert.equal(p.run('endFreePlay()'),true);
+  assert.equal(p.values.get(DECK_NOTE),note,'at Back the trip\'s plan\'s note still waits, as it was');
+  assert.deepEqual(p.writes.filter(k=>k===DECK_NOTE),[],'nor written at Back');
+});
+
 test('[FP-BACK] another tab\'s change to the trip\'s plan never lands on free play; Back takes the newer plan, as from any other tab',async()=>{
   const storage=sharedStore(),p=await page({storage}),other=appVM({storage});
   await p.run('startFreePlay()');
