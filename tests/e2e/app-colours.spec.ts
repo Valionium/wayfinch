@@ -67,8 +67,8 @@ test('[LC-COLOURS-PICK] a colour from before that is not in the grid loads uncha
   await expect(chip(page)).toHaveClass(/\bon\b/);
   await chip(page).click();
   // the owner's ruling of 14 Nov 2026: it is the one cell checked, Keep my colour, first; none of the 65
-  expect(await grid(page).locator('input:checked').count()).toBe(1);
   await expect(grid(page).getByRole('radio', { name: 'Keep my colour' })).toBeChecked();
+  expect(await grid(page).locator('input:checked').count()).toBe(1);
   await expect(page.locator('.wf-colours-name')).toHaveText('Your own colour, close to Silver');
   await page.keyboard.press('Escape');
   await expect(grid(page)).toBeHidden();
