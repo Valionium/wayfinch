@@ -104,3 +104,52 @@ describe('A change of nights says the stops are chosen afresh (review of PR 101,
     expect(await setNights(snapOf([stop(92, 'rider'), stop(177, 'auto')]), '3', { ok: false, reasons: { nights: 'no' }, note: null })).toBe('');
   });
 });
+
+// Review of the Trip PRs, M9 (sweep 2 of 15 Nov 2026): with the nights left to the suggestion, a pace or flat speed that changes the
+// suggested nights also plans the nights again (since the owner's rulings of 14 Nov 2026, around the rider's own stops). It says so,
+// as a change of nights does, beside those fields, through the same line with the new pace or speed (review of PRs 160 and 163, I-1).
+async function inDetails(snap: TripSnapshot, change: (root: HTMLElement) => void, outcome: SettingsOutcome = { ok: true, reasons: {}, note: null }, settle: Settle = async () => null): Promise<string> {
+  const services = { writeSettings: async () => outcome, env: { weatherMode: 'off' } } as unknown as TripServices;
+  await act(async () => { render(<TripSettings services={services} snap={snap} reload={async () => undefined} part="details" settle={settle} />, host); });
+  await act(async () => { change(host); });
+  await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+  return host.querySelector<HTMLElement>('[data-plan-stops]')?.textContent ?? '';
+}
+const speed = (value: string) => (root: HTMLElement): void => {
+  const input = root.querySelector<HTMLInputElement>('#trip-kph')!;
+  input.value = value;
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+};
+const pace = (value: string) => (root: HTMLElement): void => {
+  root.querySelector<HTMLInputElement>(`input[name="pace"][value="${value}"]`)!.click();
+};
+
+describe('A pace or flat speed that changes the suggested nights says the stops are chosen afresh (review of the Trip PRs, M9)', () => {
+  // The owner's rulings of 14 Nov 2026 change these words: the own stop is kept, and the line says so (was "… Stops you chose for the
+  // old nights are not kept.").
+  test("[TRIP-DAY-STOPS] [TRIP-STOPS-KEEP] a slower flat speed, nights left to the suggestion (2 → 3), with the rider's own stop: kept, and said so", async () => {
+    const said = await inDetails(snapOf([stop(92, 'rider'), stop(177, 'auto')], null), speed('15'));
+    expect(said).toBe(TF.appTripStopsNewNights(3, TF.appTripStopNight('Camping 92', 2), '', ''));
+    expect(said).toBe('New stops for 3 nights, keeping yours: Camping 92 (night 2). To change a stop, use Change stop under its day in Your route.');
+    expect(host.querySelector('[data-plan-stops]')!.getAttribute('role')).toBe('status');
+  });
+
+  test('[TRIP-DAY-STOPS] a pace that changes the suggested nights (2 → 3, 2 → 1) says so; automatic stops only: the first sentence', async () => {
+    expect(await inDetails(snapOf([stop(92, 'rider'), stop(177, 'auto')], null), pace('steady'))).toBe(TF.appTripStopsNewNights(3, TF.appTripStopNight('Camping 92', 2), '', ''));
+    // a faster pace with two own stops (2 → 1): the one between the two shortest days is named as not kept
+    act(() => render(null, host));
+    expect(await inDetails(snapOf([stop(92, 'rider'), stop(177, 'rider')], null), pace('hard'))).toBe('New stops for 1 night, keeping yours: Camping 177 (night 1). Not kept: Camping 92 (was night 1). To change a stop, use Change stop under its day in Your route.');
+    act(() => render(null, host));
+    expect(await inDetails(snapOf([stop(92, 'auto'), stop(177, 'auto')], null), pace('hard'))).toBe('New stops for 1 night.');
+  });
+
+  test('[TRIP-DAY-STOPS] nothing is said when the nights are set, the suggestion stays, there are no stops, or the change is refused', async () => {
+    // nights set by the rider: the days end where they did, the stops hold
+    expect(await inDetails(snapOf([stop(92, 'rider'), stop(177, 'auto')], 2), speed('15'))).toBe('');
+    expect(await inDetails(snapOf([stop(92, 'rider'), stop(177, 'auto')], 2), pace('steady'))).toBe('');
+    // 26 km/h still suggests 2 nights
+    expect(await inDetails(snapOf([stop(92, 'rider'), stop(177, 'auto')], null), speed('26'))).toBe('');
+    expect(await inDetails(snapOf(null, null), speed('15'))).toBe('');
+    expect(await inDetails(snapOf([stop(92, 'rider'), stop(177, 'auto')], null), speed('15'), { ok: false, reasons: { flatKph: 'no' }, note: null })).toBe('');
+  });
+});

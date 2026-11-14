@@ -115,13 +115,24 @@ export function TripSettings({ services, snap, reload, part, focusDate = 0, sett
     await reload();
   };
   const problem = (f: string): string | null => problems[f] || null;
-  // Other nights choose their stops again (TRIP-DAY-STOPS), keeping the rider's own that still fit (TRIP-STOPS-KEEP): said once,
-  // here, when the trip had stops (review of PR 101, M4).
+  // Other nights are planned around the rider's own stops (TRIP-DAY-STOPS, TRIP-STOPS-KEEP): said once, here, when the trip had
+  // stops (review of PR 101, M4).
   const saveNights = async (v: number | null): Promise<boolean> => {
     const was = trip ? settings.nights ?? suggestedNights(trip) : null;
     const ok = await save('nights', v);
     const now = trip ? v ?? suggestedNights(trip) : null;
     setStopsSaid(ok && trip && now !== null && now !== was ? await stopsLine(trip, now, settle) : '');
+    return ok;
+  };
+  // With the nights left to the suggestion, a pace or flat speed that changes it plans the nights again around the own stops too: said
+  // the same way, beside those fields (review of the Trip PRs, M9), through the same line with the new pace or speed (review of PRs
+  // 160 and 163, I-1).
+  const savePlan = async (field: 'pace' | 'flatKph', v: unknown): Promise<boolean> => {
+    const was = trip ? settings.nights ?? suggestedNights(trip) : null;
+    const ok = await save(field, v);
+    const next = ok && trip && settings.nights === null ? ({ ...trip, [field]: v } as Trip) : null;
+    const now = next ? suggestedNights(next) : null;
+    setStopsSaid(next && now !== null && now !== was ? await stopsLine(next, now, settle) : '');
     return ok;
   };
 
@@ -190,12 +201,13 @@ export function TripSettings({ services, snap, reload, part, focusDate = 0, sett
       </div>
 
       <Choice
-        name="pace" legend={TF.appTripPace} value={settings.pace} onPick={(v) => save('pace', v)}
+        name="pace" legend={TF.appTripPace} value={settings.pace} onPick={(v) => savePlan('pace', v)}
         options={[['steady', W.appTripPaceSteady], ['sporting', W.appTripPaceSporting], ['hard', W.appTripPaceHard]]}
       />
       {problem('pace') ? <p class="field-problem" role="alert">{problem('pace')}</p> : null}
 
-      <NumberField id="trip-kph" label={TF.appTripFlatKph} value={settings.flatKph} step="0.5" min={15} max={40} onCommit={(v) => save('flatKph', v ?? Number.NaN)} problem={problem('flatKph')} />
+      <NumberField id="trip-kph" label={TF.appTripFlatKph} value={settings.flatKph} step="0.5" min={15} max={40} onCommit={(v) => savePlan('flatKph', v ?? Number.NaN)} problem={problem('flatKph')} />
+      <p class="muted" role="status" data-plan-stops>{stopsSaid}</p>
 
       <Choice
         name="stay" legend={TF.appTripStay} value={settings.stay} onPick={(v) => save('stay', v)}

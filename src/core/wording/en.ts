@@ -412,7 +412,6 @@ export const W = {
   helpWordPharmacy: 'pharmacy',
   helpWordHospital: 'hospital',
   helpWordStation: 'station',
-  helpWordHalt: 'halt',
   helpWordToilets: 'toilets',
   helpToiletsAt: (name: string): string => `toilets at ${name}`,
   helpToiletsAtUnnamed: 'toilets at a place with no name mapped',
@@ -705,6 +704,8 @@ export const W = {
   appPrepRouteReplaced: 'The route was replaced, so this stopped.',
   // ---- Your bike (sections 3.7 and 7.4): its accessible name and caption are in en-bike.ts, so the bag planner's bike.js carries only those. ----
   bikeTapName: (label: string, action: string): string => `${label} ${action}`,
+  // Trip's caption for a saved bike: its name, as Tools' bike line shows it, then this link (sweep 2 of 15 Nov 2026, #5)
+  bikeDetailsLink: 'Bike details',
   // The first-run card on Trip (wish 17; the owner's wording of 9 Nov 2026). Its other words load with the tools (en-hint.ts).
   bikeHintTitle: 'Design your bike',
   bikeHintBody: "The app's answers are more accurate when it knows your bike's size and frame type.",
@@ -776,10 +777,6 @@ export const W = {
   appHandoffButton: 'Plan bags for this trip',
   appHandoffNote: 'Opens the bag planner with this route and your trip settings. It asks before it changes anything, and your bags stay as they are.',
   appHandoffNoRoute: 'Add a route first, then plan bags for it.',
-  appHandoffTooManyPoints: 'This route has more than 200,000 points, more than the bag planner reads. Add a simplified version of it to plan bags.',
-  appHandoffTooLarge: 'This route is over 20 MB as a file, more than the bag planner reads. Add a simplified version of it to plan bags.',
-  appHandoffStorageFull: "This phone's storage is full, so the route could not be passed on. Free some space, then try again.",
-  appHandoffNotKept: 'The route could not be passed on to the bag planner. Try again.',
   // Plan from A to B (spec section 7.1). Only the search text goes to the search services; only the two end points go to a bike router.
   appAbPlan: 'Plan the route',
   appAbName: (a: string, b: string): string => `${a} to ${b}`,

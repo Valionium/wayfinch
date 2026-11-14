@@ -36,7 +36,8 @@ const KIND_WORD = new Map<PlaceKind, string>([
 ]);
 
 const isKind = (...kinds: PlaceKind[]) => (p: Place): boolean => kinds.includes(p.kind);
-const wordOf = (p: Place): string => (p.kind === 'station' ? (p.tags['railway'] === 'halt' ? W.helpWordHalt : W.helpWordStation) : KIND_WORD.get(p.kind) ?? W.helpWordToilets);
+// A halt is a station in the rider's words (sweep 2 of 15 Nov 2026, #9): railway jargon stays out; the list still puts stations first.
+const wordOf = (p: Place): string => (p.kind === 'station' ? W.helpWordStation : KIND_WORD.get(p.kind) ?? W.helpWordToilets);
 const hasName = (p: Place): p is Place & { name: string } => typeof p.name === 'string' && p.name.trim() !== '';
 /**
  * A place with no name is called unnamed: its kind is never shown as if it were its name ("Nearest halt: halt"). Public
