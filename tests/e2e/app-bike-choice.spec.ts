@@ -48,7 +48,7 @@ async function bikeDetails(page: Page): Promise<void> {
   await page.locator('#s1 button[data-to="2"]').click();
   await page.locator('#bikeDetailsOpen').click();
   await expect(page.locator('#bikeDetailsBox')).toBeVisible();
-  await page.locator('#bikeLibraryPanel > summary').click();
+  await page.locator('#bikeTiles .bd-tile[aria-controls="bikeLibraryPanel"]').click();   // the Saved bikes tile (owner, 14 Nov 2026)
   await expect(page.locator('#bikeSavedSelect')).toBeVisible();
 }
 /** Bike details → Saved bikes → Use saved bike, as a rider picks one in the bag planner. */

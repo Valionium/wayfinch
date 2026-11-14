@@ -658,13 +658,13 @@ test('[BC-FIT-LINE] brakes, brake fluid and shifting set in You\'s bike details 
   await expect(page.getByRole('heading', { name: 'Bike care', level: 2 })).toBeVisible();
   await expect(page.locator('.care-fit')).toHaveCount(0);
   await expect(task(page, 'brakes-pads-rim')).toBeVisible();
-  // You, Edit: the bag planner's Bike details, More details, Repair kit details
+  // You, Edit: the bag planner's Bike details, More details, the Brakes and gears tile (owner, 14 Nov 2026: the brakes are the bike's)
   await page.goto(`${app.origin}/#/you`);
   await page.locator('li.you-bike', { hasText: 'Old one' }).getByRole('link', { name: /Edit/ }).click();
   await page.waitForURL(/\/tools\/bags\//);
   await expect(page.locator('#bikeDetailsBox')).toBeVisible();
   await page.locator('#bikeMoreDetails > summary').click();
-  await page.locator('#bikeRepairFields > summary').click();
+  await page.locator('#bikeTiles .bd-tile[aria-controls="bikeBrakesSection"]').click();
   await expect(page.locator('#bikeBrakeFluidField')).toBeHidden();
   await page.getByRole('combobox', { name: /^Brake type/ }).selectOption('hydraulic-disc');
   const fluid = page.getByRole('combobox', { name: /^Brake fluid/ });

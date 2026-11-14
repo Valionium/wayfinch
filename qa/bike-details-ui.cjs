@@ -28,7 +28,9 @@ reset();
 {
   const a=html.indexOf('id="bikeDetailsBox"'),b=html.indexOf('id="maxWeightBox"');
   const dlg=html.slice(a,b);
-  check(a>0 && a<b && dlg.includes('id="bikeFrameSection"') && dlg.includes('id="bikeMaxWeightSection"') && /Today's details/.test(dlg),'BK-UI-01 Frame, Maximum weight and Today\'s details');
+  // since the tiles (the owner's wish of 14 Nov 2026): the frame under Frame and fork, the maximum and the bike's own weight under Weights
+  const weights=dlg.indexOf('id="bikeMaxWeightSection"'),own=dlg.indexOf('id="bikeWeightFields"');
+  check(a>0 && a<b && dlg.includes('id="bikeFrameSection"') && weights>0 && own>weights && own<dlg.indexOf('id="bikeRepairFields"'),'BK-UI-01 Frame and fork, and Weights with the bike weight');
   // Look arrives at the launch (sub-project 6, Task 4), below the two-tap start; Geometry is still sub-project 9's.
   check(!/<h3[^>]*>\s*Geometry\b/i.test(dlg) && !/id="bikeGeometry/i.test(dlg),'BK-UI-01 no Geometry section');
   check(dlg.indexOf('id="bikeLook"')>dlg.indexOf('id="bikeQuick"') && dlg.indexOf('id="bikeLook"')<dlg.indexOf('id="bikeMoreDetails"'),'BK-UI-01 Look sits below the two-tap start');
@@ -143,7 +145,10 @@ reset();
   for(const [key,id,name] of [['axle','bikeAxle','Wheel axle'],['rimBrake','bikeRimBrake','Rim brake type']]){
     check(new RegExp('<label for="'+id+'">'+name+'<select id="'+id+'"').test(more),'[TB-DETAILS-AXLE] '+name+' is a select with its own label');
     check(JSON.stringify(options(id))===JSON.stringify(Object.entries(labels[key] || {})) && options(id)[0]?.[0]==='unknown' && options(id)[0]?.[1]==='Not sure','[TB-DETAILS-AXLE] '+name+' offers its labels, Not sure first');
-    check(at(id)>at('bikeRackMounts') && at(id)<at('bikeChainField'),'[TB-DETAILS-AXLE] '+name+' comes after Rack mounts');
+    // since the tiles (the owner's wish of 14 Nov 2026): Wheel axle under Wheels and tyres after the tyre sizes, Rim brake type under
+    // Brakes and gears after Brake type
+    const [group,after,next]=key==='axle' ? ['bikeWheelsSection','bikeRearTyre','bikeFrameSection'] : ['bikeBrakesSection','bikeBrakes','bikeWheelsSection'];
+    check(at(group)>0 && at(after)>at(group) && at(id)>at(after) && at(id)<at(next),'[TB-DETAILS-AXLE] '+name+' is under its tile, after '+after);
     check(app.run(`BIKE_PROFILE_INPUTS.${key}`)===id,'[TB-DETAILS-AXLE] '+name+' is read and filled with the other details');
   }
   const hint=more.match(/<p class="hint" id="bikeAxleHint">([^<]*)<\/p>/);

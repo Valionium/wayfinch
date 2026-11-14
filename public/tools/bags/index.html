@@ -1706,6 +1706,22 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .photo-modes{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 .photo-modes .look-chip[aria-pressed=true]{outline:2px solid var(--blaze);outline-offset:1px}
 .bike-more>summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600}
+/* Bike details as tiles (the owner's wish of 14 Nov 2026): two columns on a phone, four where the dialog is wide, all on one screen;
+   an open tile spans the row and the others step aside until it closes */
+.bike-more{container-type:inline-size}
+.bd-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+@container (min-width:560px){.bd-tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.bd-tile{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-width:0;min-height:64px;padding:10px 12px;
+  text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--ink);font:600 15px/1.25 var(--body);cursor:pointer;overflow-wrap:anywhere}
+.bd-tile:hover{border-color:var(--blaze)}
+.bd-state{font-weight:400;font-size:13px;color:var(--muted)}
+.bd-tiles.bd-one-open .bd-tile:not([aria-expanded=true]){display:none}
+.bd-tile[aria-expanded=true]{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px 12px;min-height:52px;border-color:var(--blaze)}
+.bd-tile[aria-expanded=true]::after{content:'×';content:'×' / '';margin-left:auto;font-size:22px;line-height:1;color:var(--muted)}
+.bike-tool-optional.bd-group{border:0;margin:0;padding:0}
+.bike-tool-optional.bd-group[open]{margin:0 0 12px}
+.bd-group>summary{display:none}
+.bd-back{display:inline-flex;align-items:center;min-height:44px}
 .fit-triangle{width:120px;color:var(--ink,#000)}
 .fitfixes{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 /* Calculation notes open in a small shared dialog without shifting the plan. */
@@ -2334,15 +2350,48 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       </section>
       <details class="bike-more" id="bikeMoreDetails"><summary>More details (optional)</summary>
       <p>Choose Use these bike details to use them in this plan. Saving a reusable bike is optional. Repair details can stay blank.</p>
-      <details class="bike-tool-optional" id="bikeLibraryPanel"><summary>Saved bikes · optional</summary>
-      <label for="bikeName">Bike name<input id="bikeName" type="text" maxlength="100" placeholder="A name for reuse"></label>
-      <label for="bikeSavedSelect">Saved bikes</label><select id="bikeSavedSelect"><option value="">Choose a saved bike…</option></select>
-      <div class="bike-profile-actions"><button class="go small" id="bikeUseSaved" type="button" disabled>Use saved bike</button><button class="linky" id="bikeNew" type="button">New bike</button><button class="linky" id="bikeRemove" type="button" disabled>Remove saved bike</button></div>
-      <div class="hidden" id="bikeRemovePrompt"><p id="bikeRemoveQuestion"></p><div class="bike-profile-actions"><button class="go small" id="bikeRemoveConfirm" type="button">Remove saved bike</button><button class="linky" id="bikeRemoveCancel" type="button">Keep bike</button></div></div>
+      <!-- The owner's wish of 14 Nov 2026: the details as tiles of a word or two, all on one screen; a tap opens only that group's
+           fields (each group a closed <details>, its summary hidden: the tile is its button), Back to all details closes it. -->
+      <div class="bd-tiles" id="bikeTiles" role="group" aria-label="Bike details">
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeBrakesSection"><span class="bd-name">Brakes and gears</span><span class="bd-state"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeWheelsSection"><span class="bd-name">Wheels and tyres</span><span class="bd-state"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeFrameSection"><span class="bd-name">Frame and fork</span><span class="bd-state"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeBoltsSection"><span class="bd-name">Bolts and mounts</span><span class="bd-state"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="fitMeasureBox"><span class="bd-name">Measurements</span><span class="bd-state"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeMaxWeightSection"><span class="bd-name">Weights</span><span class="bd-state"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeRepairFields"><span class="bd-name">Repair kit</span><span class="bd-state"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeLibraryPanel"><span class="bd-name">Saved bikes</span><span class="bd-state"></span></button>
+      </div>
+      <details class="bike-tool-optional bd-group" id="bikeLibraryPanel" aria-label="Saved bikes"><summary>Saved bikes</summary>
+        <label for="bikeName">Bike name<input id="bikeName" type="text" maxlength="100" placeholder="A name for reuse"></label>
+        <label for="bikeSavedSelect">Saved bikes</label><select id="bikeSavedSelect"><option value="">Choose a saved bike…</option></select>
+        <div class="bike-profile-actions"><button class="go small" id="bikeUseSaved" type="button" disabled>Use saved bike</button><button class="linky" id="bikeNew" type="button">New bike</button><button class="linky" id="bikeRemove" type="button" disabled>Remove saved bike</button></div>
+        <div class="hidden" id="bikeRemovePrompt"><p id="bikeRemoveQuestion"></p><div class="bike-profile-actions"><button class="go small" id="bikeRemoveConfirm" type="button">Remove saved bike</button><button class="linky" id="bikeRemoveCancel" type="button">Keep bike</button></div></div>
+        <button type="button" class="linky bd-back" data-panel="bikeLibraryPanel">Back to all details</button>
       </details>
       <form id="bikeProfileForm">
-      <section class="bike-section" id="bikeFrameSection" aria-labelledby="bikeFrameTitle">
-        <h3 id="bikeFrameTitle">Frame</h3>
+      <details class="bike-tool-optional bd-group" id="bikeBrakesSection" aria-label="Brakes and gears"><summary>Brakes and gears</summary>
+        <div class="bike-profile-grid">
+          <label for="bikeBrakes">Brake type<select id="bikeBrakes"><option value="unknown">Not sure</option><option value="hydraulic-disc">Hydraulic disc</option><option value="cable-disc">Cable disc</option><option value="rim">Rim brakes</option><option value="other">Other</option></select></label>
+          <div class="bike-profile-field" id="bikeRimBrakeField"><label for="bikeRimBrake">Rim brake type<select id="bikeRimBrake"><option value="unknown">Not sure</option><option value="caliper">Road caliper</option><option value="v-brake">V-brake</option><option value="hydraulic">Hydraulic rim brake</option></select></label></div>
+          <div class="bike-profile-field" id="bikeBrakeFluidField"><label for="bikeBrakeFluid">Brake fluid<select id="bikeBrakeFluid" aria-describedby="bikeBrakeFluidHint"><option value="unknown">Not sure</option><option value="mineral">Mineral oil</option><option value="dot">DOT fluid</option></select></label><p class="hint" id="bikeBrakeFluidHint">It is named on the brake lever or caliper, or in the manual. Never mix them.</p></div>
+          <label for="bikeDrive">Drivetrain<select id="bikeDrive"><option value="unknown">Not set</option><option value="derailleur">Chain + derailleur</option><option value="chain-hub">Chain + hub gears / single speed</option><option value="belt">Belt drive</option></select></label>
+          <label for="bikeShifting">Shifting<select id="bikeShifting"><option value="unknown">Not sure</option><option value="cable">Cable operated</option><option value="electronic">Electronic</option><option value="none">No gears</option></select></label>
+        </div>
+        <button type="button" class="linky bd-back" data-panel="bikeBrakesSection">Back to all details</button>
+      </details>
+      <details class="bike-tool-optional bd-group" id="bikeWheelsSection" aria-label="Wheels and tyres"><summary>Wheels and tyres</summary>
+        <div class="bike-profile-grid">
+          <label for="bikeTyres">Tyre setup<select id="bikeTyres"><option value="unknown">Not set</option><option value="tubes">With inner tubes</option><option value="tubeless">Tubeless</option><option value="other">Tubular / other</option></select></label>
+          <label for="bikeValve">Valve type<select id="bikeValve"><option value="unknown">Not set</option><option value="presta">Presta</option><option value="schrader">Schrader</option><option value="dunlop">Dunlop</option><option value="other">Other</option></select></label>
+          <label for="bikeFrontTyre">Front tyre size<input id="bikeFrontTyre" type="text" maxlength="120" placeholder="e.g. 40-622 (700 × 40C)"></label>
+          <label for="bikeRearTyre">Rear tyre size<input id="bikeRearTyre" type="text" maxlength="120" placeholder="e.g. 40-622 (700 × 40C)"></label>
+          <p class="bike-profile-wide">Copy sizes from the tyre sidewalls. A spare tube needs the right wheel/tyre size and valve; front and rear may differ.</p>
+          <div class="bike-profile-field"><label for="bikeAxle">Wheel axle<select id="bikeAxle" aria-describedby="bikeAxleHint"><option value="unknown">Not sure</option><option value="thru">Thru-axle</option><option value="qr">Quick release</option><option value="nuts">Axle nuts</option></select></label><p class="hint" id="bikeAxleHint">What holds each wheel: a thick axle screwed through the fork, a thin rod with a lever, or nuts.</p></div>
+        </div>
+        <button type="button" class="linky bd-back" data-panel="bikeWheelsSection">Back to all details</button>
+      </details>
+      <details class="bike-tool-optional bd-group" id="bikeFrameSection" aria-label="Frame and fork"><summary>Frame and fork</summary>
         <p>The planner adapts its bags to your frame. Leave anything you do not know empty: nothing is looked up from the bike's name.</p>
         <div class="bike-profile-grid">
           <label for="fitSizeLetter">Frame size<select id="fitSizeLetter"><option value="">Not set</option><option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option></select></label>
@@ -2350,66 +2399,63 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         </div>
         <p class="hint">For 2XS or 3XS choose XS; for 2XL choose XL.</p>
         <div class="bike-profile-grid">
+          <label for="bikeSuspension">Suspension<select id="bikeSuspension"><option value="unknown">Not sure</option><option value="none">None</option><option value="front">Front fork</option><option value="full">Full suspension</option></select></label>
+        </div>
+        <button type="button" class="linky bd-back" data-panel="bikeFrameSection">Back to all details</button>
+      </details>
+      <details class="bike-tool-optional bd-group" id="bikeBoltsSection" aria-label="Bolts and mounts"><summary>Bolts and mounts</summary>
+        <div class="bike-profile-grid">
           <label for="fitBoltSt">Bottle bolts on the seat tube, inside the frame<select id="fitBoltSt"><option value="unknown">Not sure</option><option value="yes">Yes</option><option value="no">No</option></select></label>
           <label for="fitBoltDt">Bottle bolts on the down tube, inside the frame<select id="fitBoltDt"><option value="unknown">Not sure</option><option value="yes">Yes</option><option value="no">No</option></select></label>
           <label for="fitBoltUn">Bottle bolts under the down tube<select id="fitBoltUn"><option value="unknown">Not sure</option><option value="yes">Yes</option><option value="no">No</option></select></label>
           <label for="fitTopTube" id="fitTopTubeField">Room for a top-tube bag<select id="fitTopTube"><option value="unknown">Not sure</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+          <div class="bike-profile-field"><label for="bikeRackMounts">Rack mounts<select id="bikeRackMounts" aria-describedby="bikeRackMountsHint"><option value="unknown">Not sure</option><option value="yes">Yes</option><option value="no">No</option></select></label><p class="hint" id="bikeRackMountsHint">Small threaded holes near the rear axle and on the seat stays, for a rack.</p></div>
         </div>
-        <details class="bike-tool-optional" id="fitMeasureBox"><summary>Measurements · optional</summary>
-          <p>Measure inside the frame, tube to tube: under the top tube, along the seat tube from the bottom bracket, and along the down tube from the bottom bracket. A geometry chart's figures are longer.</p>
-          <svg class="fit-triangle" viewBox="0 0 120 70" role="img" aria-label="The three inside lengths of the frame triangle"><polygon points="20,12 100,12 60,60" fill="none" stroke="currentColor" stroke-width="2"/><text x="60" y="8" text-anchor="middle" font-size="8">top</text><text x="28" y="40" font-size="8">seat</text><text x="86" y="40" font-size="8">down</text></svg>
-          <div class="bike-profile-grid">
-            <label for="fitTriTop">Top, cm<input id="fitTriTop" type="text" inputmode="decimal" autocomplete="off"></label>
-            <label for="fitTriSeat">Seat, cm<input id="fitTriSeat" type="text" inputmode="decimal" autocomplete="off"></label>
-            <label for="fitTriDown">Down, cm<input id="fitTriDown" type="text" inputmode="decimal" autocomplete="off"></label>
-          </div>
-          <label for="fitSeatGap">Saddle to rear tyre, cm<input id="fitSeatGap" type="text" inputmode="decimal" autocomplete="off"></label>
-          <p class="hint">With the saddle at riding height, measure straight down from the saddle rails to the top of the rear tyre.</p>
-          <label for="fitBarWidth">Usable width for a bar roll, cm<input id="fitBarWidth" type="text" inputmode="decimal" autocomplete="off"></label>
-          <p class="hint">Where the roll will sit, between the drops or brake levers, leaving room for your hands.</p>
-        </details>
-      </section>
-      <section class="bike-section" id="bikeMaxWeightSection" aria-labelledby="bikeMaxWeightTitle">
-        <h3 id="bikeMaxWeightTitle">Maximum weight</h3>
+        <button type="button" class="linky bd-back" data-panel="bikeBoltsSection">Back to all details</button>
+      </details>
+      <details class="bike-tool-optional bd-group" id="fitMeasureBox" aria-label="Measurements"><summary>Measurements</summary>
+        <p>Measure inside the frame, tube to tube: under the top tube, along the seat tube from the bottom bracket, and along the down tube from the bottom bracket. A geometry chart's figures are longer.</p>
+        <svg class="fit-triangle" viewBox="0 0 120 70" role="img" aria-label="The three inside lengths of the frame triangle"><polygon points="20,12 100,12 60,60" fill="none" stroke="currentColor" stroke-width="2"/><text x="60" y="8" text-anchor="middle" font-size="8">top</text><text x="28" y="40" font-size="8">seat</text><text x="86" y="40" font-size="8">down</text></svg>
+        <div class="bike-profile-grid">
+        <label for="fitTriTop">Top, cm<input id="fitTriTop" type="text" inputmode="decimal" autocomplete="off"></label>
+        <label for="fitTriSeat">Seat, cm<input id="fitTriSeat" type="text" inputmode="decimal" autocomplete="off"></label>
+        <label for="fitTriDown">Down, cm<input id="fitTriDown" type="text" inputmode="decimal" autocomplete="off"></label>
+        </div>
+        <label for="fitSeatGap">Saddle to rear tyre, cm<input id="fitSeatGap" type="text" inputmode="decimal" autocomplete="off"></label>
+        <p class="hint">With the saddle at riding height, measure straight down from the saddle rails to the top of the rear tyre.</p>
+        <label for="fitBarWidth">Usable width for a bar roll, cm<input id="fitBarWidth" type="text" inputmode="decimal" autocomplete="off"></label>
+        <p class="hint">Where the roll will sit, between the drops or brake levers, leaving room for your hands.</p>
+        <button type="button" class="linky bd-back" data-panel="fitMeasureBox">Back to all details</button>
+      </details>
+      <details class="bike-tool-optional bd-group" id="bikeMaxWeightSection" aria-label="Weights"><summary>Weights</summary>
+        <h4 class="bike-weight-heading">Maximum weight</h4>
         <div class="bike-profile-grid">
           <label for="fitMaxWeight">Your bike's maximum weight<span class="fit-pair"><input id="fitMaxWeight" type="text" inputmode="decimal" autocomplete="off"><select id="fitMaxUnit" aria-label="Unit of the maximum weight"><option value="kg">kg</option><option value="lb">lb</option></select></span></label>
           <label for="fitMaxIncludes">Does this figure include the bike?<select id="fitMaxIncludes"><option value="">Choose</option><option value="bike">Yes, rider, bike and luggage</option><option value="no-bike">No, rider and luggage only</option><option value="unsure">Not sure</option></select></label>
         </div>
         <p class="hint">Find it on the frame sticker, in the manual or on the maker's website. Your own weight is not asked.</p>
-      </section>
-      <h3 class="bike-section-title">Today's details</h3>
         <div class="bike-weight-fields" id="bikeWeightFields">
-          <h4 class="bike-weight-heading">Bike weight</h4>
-          <div class="bike-profile-grid">
-            <div class="bike-profile-field bike-profile-wide" id="bikeBaseField">
-              <div class="bike-field-heading"><label for="bikeBaseKg">Bike without luggage · kg</label><span data-info="What the bike weight includes">Include fitted racks and accessories. Leave empty bags, bottle shells and cages out if you will add their weight separately in the weight section below.</span></div>
-              <input id="bikeBaseKg" type="number" min="3" max="100" step="0.01" inputmode="decimal" placeholder="e.g. 11.5">
-            </div>
-          </div>
-        </div>
-        <details class="bike-tool-optional" id="bikeRepairFields"><summary>Repair kit details · optional</summary>
+        <h4 class="bike-weight-heading">Bike weight</h4>
         <div class="bike-profile-grid">
-                    <label for="bikeTyres">Tyre setup<select id="bikeTyres"><option value="unknown">Not set</option><option value="tubes">With inner tubes</option><option value="tubeless">Tubeless</option><option value="other">Tubular / other</option></select></label>
-          <label for="bikeValve">Valve type<select id="bikeValve"><option value="unknown">Not set</option><option value="presta">Presta</option><option value="schrader">Schrader</option><option value="dunlop">Dunlop</option><option value="other">Other</option></select></label>
-          <label for="bikeFrontTyre">Front tyre size<input id="bikeFrontTyre" type="text" maxlength="120" placeholder="e.g. 40-622 (700 × 40C)"></label>
-          <label for="bikeRearTyre">Rear tyre size<input id="bikeRearTyre" type="text" maxlength="120" placeholder="e.g. 40-622 (700 × 40C)"></label>
-          <p class="bike-profile-wide">Copy sizes from the tyre sidewalls. A spare tube needs the right wheel/tyre size and valve; front and rear may differ.</p>
-          <label for="bikeBrakes">Brake type<select id="bikeBrakes"><option value="unknown">Not sure</option><option value="hydraulic-disc">Hydraulic disc</option><option value="cable-disc">Cable disc</option><option value="rim">Rim brakes</option><option value="other">Other</option></select></label>
+        <div class="bike-profile-field bike-profile-wide" id="bikeBaseField">
+        <div class="bike-field-heading"><label for="bikeBaseKg">Bike without luggage · kg</label><span data-info="What the bike weight includes">Include fitted racks and accessories. Leave empty bags, bottle shells and cages out if you will add their weight separately in the weight section below.</span></div>
+        <input id="bikeBaseKg" type="number" min="3" max="100" step="0.01" inputmode="decimal" placeholder="e.g. 11.5">
+        </div>
+        </div>
+        </div>
+        <button type="button" class="linky bd-back" data-panel="bikeMaxWeightSection">Back to all details</button>
+      </details>
+      <details class="bike-tool-optional bd-group" id="bikeRepairFields" aria-label="Repair kit"><summary>Repair kit</summary>
+        <div class="bike-profile-grid">
           <label for="bikePads">Brake pad / block reference<input id="bikePads" type="text" maxlength="120" placeholder="Exact part or model; note front/rear if different"></label>
-          <label for="bikeDrive">Drivetrain<select id="bikeDrive"><option value="unknown">Not set</option><option value="derailleur">Chain + derailleur</option><option value="chain-hub">Chain + hub gears / single speed</option><option value="belt">Belt drive</option></select></label>
-          <label for="bikeShifting">Shifting<select id="bikeShifting"><option value="unknown">Not sure</option><option value="cable">Cable operated</option><option value="electronic">Electronic</option><option value="none">No gears</option></select></label>
-          <label for="bikeSuspension">Suspension<select id="bikeSuspension"><option value="unknown">Not sure</option><option value="none">None</option><option value="front">Front fork</option><option value="full">Full suspension</option></select></label>
-          <div class="bike-profile-field"><label for="bikeRackMounts">Rack mounts<select id="bikeRackMounts" aria-describedby="bikeRackMountsHint"><option value="unknown">Not sure</option><option value="yes">Yes</option><option value="no">No</option></select></label><p class="hint" id="bikeRackMountsHint">Small threaded holes near the rear axle and on the seat stays, for a rack.</p></div>
-          <div class="bike-profile-field"><label for="bikeAxle">Wheel axle<select id="bikeAxle" aria-describedby="bikeAxleHint"><option value="unknown">Not sure</option><option value="thru">Thru-axle</option><option value="qr">Quick release</option><option value="nuts">Axle nuts</option></select></label><p class="hint" id="bikeAxleHint">What holds each wheel: a thick axle screwed through the fork, a thin rod with a lever, or nuts.</p></div>
-          <div class="bike-profile-field" id="bikeRimBrakeField"><label for="bikeRimBrake">Rim brake type<select id="bikeRimBrake"><option value="unknown">Not sure</option><option value="caliper">Road caliper</option><option value="v-brake">V-brake</option><option value="hydraulic">Hydraulic rim brake</option></select></label></div>
-          <div class="bike-profile-field" id="bikeBrakeFluidField"><label for="bikeBrakeFluid">Brake fluid<select id="bikeBrakeFluid" aria-describedby="bikeBrakeFluidHint"><option value="unknown">Not sure</option><option value="mineral">Mineral oil</option><option value="dot">DOT fluid</option></select></label><p class="hint" id="bikeBrakeFluidHint">It is named on the brake lever or caliper, or in the manual. Never mix them.</p></div>
           <label id="bikeChainField" for="bikeChain">Chain / quick-link reference<input id="bikeChain" type="text" maxlength="120" placeholder="Brand, chain family and speed / part number"></label>
           <label id="bikeHangerField" for="bikeHanger">Derailleur hanger reference<input id="bikeHanger" type="text" maxlength="120" placeholder="Frame-specific part or hanger type"></label>
           <label class="bike-profile-wide" for="bikeNotes">Bike notes <span class="hint">optional</span><textarea id="bikeNotes" rows="3" maxlength="1000" placeholder="e.g. valve length, spare battery or unusual tools"></textarea></label>
         </div>
-        </details>
         <p>Check repair parts against the manufacturer's compatibility information. <span data-info="How a bike profile updates the kit">These references do not verify that a part fits. Check your actual tube, pads, chain/link and hanger against the manufacturer’s compatibility information. Saving updates untouched starting-list items; your manual kit choices stay yours.</span></p>
-        <div class="bike-profile-actions"><button class="go small" id="bikeApply" type="button">Use these bike details</button><button class="kitact" id="bikeSave" type="submit">Save bike for next time</button><button class="linky" id="bikeClear" type="button">Use no bike profile</button></div>
+        <button type="button" class="linky bd-back" data-panel="bikeRepairFields">Back to all details</button>
+      </details>
+      <div class="bike-profile-actions"><button class="go small" id="bikeApply" type="button">Use these bike details</button><button class="kitact" id="bikeSave" type="submit">Save bike for next time</button><button class="linky" id="bikeClear" type="button">Use no bike profile</button></div>
       </form>
       <p>Saved on this device and included in Export / Import. Each saved setup keeps its own copy, so editing a bike will not alter an older trip.</p>
       <p>Repair references: <a href="https://www.schwalbe.com/en/technology-faq/tubeless/" target="_blank" rel="noopener">Schwalbe tubeless guidance</a> · <a href="https://productinfo.shimano.com/en/spec/general-chain-quick-link" target="_blank" rel="noopener">Shimano chain/link compatibility</a></p>
@@ -3176,6 +3222,67 @@ function bikeProfileFieldVisibility(){
   $('bikeRimBrakeField').classList.toggle('hidden',$('bikeBrakes').value!=='rim');
   const brakes=$('bikeBrakes').value;
   $('bikeBrakeFluidField').classList.toggle('hidden',!(brakes==='hydraulic-disc' || brakes==='rim' && $('bikeRimBrake').value==='hydraulic'));
+  renderBikeTiles();   // a field shown or hidden counts in its tile
+}
+/* ---- Bike details as tiles (the owner's wish of 14 Nov 2026): under More details, a tile of a word or two per group, all on one
+   screen; a tap opens only that group (a <details> whose summary is hidden: the tile is its button), the focus on its first field;
+   Back to all details or the tile again closes it, the focus back on the tile. One group at a time; a group opened by the page's own
+   code (`.open=true`) brings its tile along through the toggle event. Only the grouping changed: every field, its id, its options and
+   the way it is read and saved are as before (BK-TILES-SAME). ---- */
+const BIKE_TILE_FIELDS={
+  bikeBrakesSection:[['bikeBrakes'],['bikeRimBrake'],['bikeBrakeFluid'],['bikeDrive'],['bikeShifting']],
+  bikeWheelsSection:[['bikeTyres'],['bikeValve'],['bikeFrontTyre'],['bikeRearTyre'],['bikeAxle']],
+  bikeFrameSection:[['fitSizeLetter','fitSizeNumber'],['bikeSuspension']],
+  bikeBoltsSection:[['fitBoltSt'],['fitBoltDt'],['fitBoltUn'],['fitTopTube'],['bikeRackMounts']],
+  fitMeasureBox:[['fitTriTop'],['fitTriSeat'],['fitTriDown'],['fitSeatGap'],['fitBarWidth']],
+  bikeMaxWeightSection:[['fitMaxWeight'],['fitMaxIncludes'],['bikeBaseKg']],
+  bikeRepairFields:[['bikePads'],['bikeChain'],['bikeHanger'],['bikeNotes']],
+};
+// the fields shown only for some bikes: they count only while shown
+const BIKE_TILE_HIDE={fitTopTube:'fitTopTubeField',bikeRimBrake:'bikeRimBrakeField',bikeBrakeFluid:'bikeBrakeFluidField',bikeChain:'bikeChainField',bikeHanger:'bikeHangerField'};
+function bikeTileStatus(done,total){return done ? `${done} of ${total} set` : 'Not set';}
+function bikeSavedStatus(count){return count ? `${count} saved` : 'None saved';}
+function bikeTileCount(panel){
+  const shown=(BIKE_TILE_FIELDS[panel]||[]).filter(ids=>!ids.every(id=>BIKE_TILE_HIDE[id] && $(BIKE_TILE_HIDE[id]).classList.contains('hidden')));
+  const set=shown.filter(ids=>ids.some(id=>{const v=String($(id).value ?? '').trim();return v!=='' && v!=='unknown';}));
+  return [set.length,shown.length];
+}
+function renderBikeTiles(){
+  const tiles=[...document.querySelectorAll('#bikeTiles .bd-tile')];
+  for(const tile of tiles){
+    const panel=tile.getAttribute('aria-controls');
+    tile.setAttribute('aria-expanded',$(panel).open ? 'true' : 'false');
+    tile.querySelector('.bd-state').textContent=panel==='bikeLibraryPanel' ? bikeSavedStatus(BIKE_PROFILES.length) : bikeTileStatus(...bikeTileCount(panel));
+  }
+  $('bikeTiles').classList.toggle('bd-one-open',tiles.some(tile=>tile.getAttribute('aria-expanded')==='true'));
+}
+function openBikeTile(panel,focus=true){
+  document.querySelectorAll('details.bd-group').forEach(group=>{if(group.id!==panel && group.open)group.open=false;});
+  $(panel).open=true;renderBikeTiles();
+  if(focus){
+    const first=[...$(panel).querySelectorAll('input,select,textarea,button')].find(el=>el.getClientRects().length>0 && !el.disabled);
+    first?.focus();
+  }
+}
+function closeBikeTile(panel){
+  $(panel).open=false;renderBikeTiles();
+  document.querySelector(`#bikeTiles .bd-tile[aria-controls="${panel}"]`)?.focus();
+}
+function initialiseBikeTiles(){
+  $('bikeTiles').addEventListener('click',event=>{
+    const tile=event.target.closest?.('.bd-tile');if(!tile)return;
+    const panel=tile.getAttribute('aria-controls');
+    if($(panel).open)closeBikeTile(panel);else openBikeTile(panel);
+  });
+  $('bikeMoreDetails').addEventListener('click',event=>{const back=event.target.closest?.('.bd-back');if(back)closeBikeTile(back.dataset.panel);});
+  document.querySelectorAll('details.bd-group').forEach(group=>group.addEventListener('toggle',()=>{
+    if(group.open)document.querySelectorAll('details.bd-group').forEach(other=>{if(other!==group && other.open)other.open=false;});
+    renderBikeTiles();
+  }));
+  for(const type of ['toggle','input','change'])$('bikeMoreDetails').addEventListener(type,renderBikeTiles);
+  // an entry the browser rejects on Save is shown in its group, so the browser can point at it
+  $('bikeProfileForm').addEventListener('invalid',event=>{const group=event.target.closest?.('details.bd-group');if(group && !group.open)openBikeTile(group.id,false);},true);
+  renderBikeTiles();
 }
 // ---- Bike details: the Frame and Maximum weight sections (spec 7.1, 7.4) ----
 // Every sentence the dialog shows about the frame or the weight limit, in one table the wording check reads (limit: true = states a result against the entered limit).
@@ -3479,6 +3586,7 @@ function renderBikeProfiles(force=false){
   $('bikeFollowUndo').disabled=!ready;
   $('bikeFollowBar').classList.toggle('hidden',!follow && !BIKE_FOLLOW_MESSAGE);
   renderBikeKitSummary();
+  renderBikeTiles();   // the saved bikes and the form's values, as the tiles count them
 }
 // The line after a move to the bike chosen in Tools; "Without a bike" moves the plan to no bike, the standard bike.
 function followLine(){return S.bikeProfile ? bikeWord('followNote',{name:S.bikeProfile.name}) : bikeWord('followNoteNone');}
@@ -4215,8 +4323,10 @@ function openBikeDetails(opener=document.activeElement,section='frame'){
   }
   if(section==='look'){$('bikeLook').scrollIntoView?.({block:'start'});$('bikeLookTitle').focus({preventScroll:true});}
   if(section==='repair'){
+    // the repair details are spread over the tiles now (the owner's wish of 14 Nov 2026): every tile shows, the focus on the first
     $('bikeMoreDetails').open=true;
-    $('bikeRepairFields').open=true;$('bikeRepairFields').scrollIntoView?.({block:'start'});$('bikeTyres').focus({preventScroll:true});
+    document.querySelectorAll('details.bd-group').forEach(group=>{group.open=false;});renderBikeTiles();
+    $('bikeTiles').scrollIntoView?.({block:'start'});document.querySelector('#bikeTiles .bd-tile')?.focus({preventScroll:true});
   }
 }
 // Typed details not saved yet (name, tyres, weight, measurements, repair notes): Save, Use or a Look tap saves the form (review M1).
@@ -4261,6 +4371,7 @@ function initialiseBikeDetails(){
   $('fitSizeChips').addEventListener('click',event=>{const b=event.target.closest?.('[data-size]');if(b)quickPickSize(b.dataset.size);});
   $('bikeMoreDetails').addEventListener('change',updateFitQuick);
   $('bikeApply').onclick=applyBikeDetails;
+  initialiseBikeTiles();
 }
 function tripKitDefaults(nights=S.nights,sleep=S.sleep,bike=S.bikeProfile){
   const overnight=nights>0, camp=overnight && sleep!=='indoor';
