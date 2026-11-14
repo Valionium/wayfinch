@@ -176,6 +176,41 @@ describe('cards', () => {
     expect(document.activeElement).toBe(host.querySelector('[data-card="daylight"] .ah-toggle'));
   });
 
+  test('[DAY-LAST-NO-POS] Plan tomorrow on the last stage brings "Tonight\'s stop is the end of your route" into view and gives it the focus, as no card repeats it (review of #169, m5)', async () => {
+    const last = testTrip({ route: flatRoute(108.5, { stageEnds: [50, 108.5] }), departureDate: FRI, stay: 'camping' });
+    const today = trip(viewOf(inputsOf({ trip: last, now: `${SAT} 15:00` })));
+    const planned = trip(viewOf(inputsOf({ trip: last, now: `${SAT} 15:00`, plan: { date: SAT, backToTodayAt: null } })));
+    const line = "Tonight's stop is the end of your route (km 108.5)";
+    expect(planned.screen.notes).toContain(line);
+    const { actions } = fakeActions();
+    actions.planTomorrow = async () => { await act(async () => { render(<AheadScreen view={planned} actions={actions} />, host); }); };
+    const scrolled: Element[] = [];
+    const had = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
+    Element.prototype.scrollIntoView = function (this: Element) { scrolled.push(this); };
+    try {
+      await show(today, actions);
+      await click(host.querySelector('[data-card="daylight"] .ah-toggle'));
+      await click(buttonNamed(W.daylightPlanTomorrow));
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      const notes = host.querySelector('.ah-notes')!;
+      expect(notes.textContent).toContain(line);
+      expect(scrolled.at(-1)).toBe(notes);
+      expect(document.activeElement).toBe(notes);
+    } finally {
+      if (had) Object.defineProperty(Element.prototype, 'scrollIntoView', had);
+      else delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    }
+  });
+
+  test('[WX-ACTION] folded, the Weather card says what to do about a freezing night: "Night near −1 °C: pack warm layers" under its title (review of #169, I1)', async () => {
+    const v = trip(viewOf(inputsOf({ positions: [pos({ km: 120, at: `${SAT} 14:20` })], now: `${SAT} 14:20`, spells: [{ range: [0, 300], stamps: [`2026-10-18 03:00`], t: -1 }] })));
+    expect(v.screen.cards.weather.status).toBe('action');
+    await show(v, fakeActions().actions);
+    const card = host.querySelector('[data-card="weather"]')!;
+    expect(card.querySelector('.ah-toggle')!.getAttribute('aria-expanded')).toBe('false');
+    expect(card.querySelector('.ah-card-detail')!.textContent).toContain(W.weatherPackWarm('−1'));
+  });
+
   test('[AH-STRIP] a tap on a strip band or icon puts the focus on the title button of its card, never the body of the page (review of #142, I4 and M1)', async () => {
     const v = trip(viewOf(rainyStop()));
     await show(v, fakeActions().actions);
@@ -309,6 +344,8 @@ describe('cards', () => {
       const before = at(40);
       const after = at(141);
       await show(before, actions);
+      // folded at every width since the owner's ruling of 14 Nov 2026 (sweep item 23): the rider opens it first
+      await click(buttonNamed('Set position by hand'));
       expect(kmField()!.value).toBe(String(before.screen.ride.startKm));
       await focusOnly(kmField()!);
       await focusOnly(slider()!);
@@ -395,11 +432,30 @@ describe('cards', () => {
       await click(buttonNamed('Set position by hand'));
       await click(host.querySelector('[data-update-position]'));
       expect(kmField()).not.toBeNull();
-      // On a computer the picker stays open (spec 9.2).
+      // On a computer an opened picker stays open (spec 9.2); since the owner's ruling of 14 Nov 2026 it starts folded there too.
       railSignal.value = true;
       await show(at(40), actions);
+      expect(kmField()).toBeNull();
+      await click(buttonNamed('Set position by hand'));
       await click(host.querySelector('[data-update-position]'));
       expect(kmField()).not.toBeNull();
+    });
+
+    // The owner's ruling of 14 Nov 2026 (sweep item 23): "Set your position by hand" starts folded at every width, as on phones,
+    // with all three controls kept inside (it was open from the start on a computer).
+    test('[WIDE-COMPUTER-POS] [AH-MANUAL] on a computer the picker starts folded; opened, it holds the slider, the kilometre and the towns', async () => {
+      const { actions } = fakeActions();
+      railSignal.value = true;
+      const v = at(40);
+      await show(v, actions);
+      expect(host.querySelector('#ah-picker')).toBeNull();
+      const toggle = buttonNamed('Set position by hand');
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      await click(toggle);
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(slider()).not.toBeNull();
+      expect(kmField()).not.toBeNull();
+      if (v.towns.length > 0) expect(host.querySelector('#ah-picker select')).not.toBeNull();
     });
   });
 
@@ -627,6 +683,16 @@ describe('Emergency', () => {
     await click(buttonNamed('Emergency', host.querySelector('.ah-chips')!));
     return host.querySelector('#chip-emergency')!;
   };
+  test('[AH-EMERGENCY] the Source link is a 44 px link button, named "Source of these emergency numbers" for a screen reader (review of #169, m2 and m3)', async () => {
+    const v = trip(viewOf(rainyStop()));
+    const card = await emergencyIn(v);
+    const source = [...card.querySelectorAll('a')].find((a) => a.textContent === W.emergencySource)!;
+    expect(source.getAttribute('href')).toBe(v.screen.chips.emergency.sources[0]);
+    expect(source.classList.contains('btn')).toBe(true);
+    expect(source.getAttribute('aria-label')).toBe('Source of these emergency numbers');
+    // the name begins with the words it shows (label in name)
+    expect(source.getAttribute('aria-label')!.startsWith(source.textContent!)).toBe(true);
+  });
   test('[AH-EMERGENCY] Close hands the focus back to the chip that opened the panel, Emergency and the others alike (sweep of 14 Nov 2026, finding 16)', async () => {
     const v = trip(viewOf(rainyStop()));
     const { actions } = fakeActions();
@@ -648,6 +714,10 @@ describe('Emergency', () => {
     expect(card.textContent).toContain(W.emergencyFallback);
     expect(card.textContent).toContain(v.screen.chips.emergency.coords!);
     expect(() => buttonNamed('Share my location', card)).not.toThrow();
+    // the source as a link named "Source" (the owner's ruling of 14 Nov 2026, sweep item 22), to the source the table used
+    const source = [...card.querySelectorAll('a')].find((a) => a.textContent === W.emergencySource)!;
+    expect(source.getAttribute('href')).toBe(v.screen.chips.emergency.sources[0]);
+    expect(card.textContent).not.toMatch(/https?:/);
     // Its lines are facts: no "Unknown" beside the route kilometre or the settlement.
     expect(card.querySelectorAll('.badge')).toHaveLength(0);
   });

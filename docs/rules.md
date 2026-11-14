@@ -190,7 +190,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Without positions between, tomorrow's stop at night equals the next morning's day stop (§6.2a) [DAY-ACROSS-NIGHT]
 - A far-away position decides the stage, never an earlier one (§6.2a) [DAY-NO-ROUTE-POS]
 - A position beyond today's stop keeps the stop and a leg without negative distance (§6.2a) [DAY-PAST-STOP]
-- On the last stage with no position, tonight's stop is the route end and nothing is claimed reached (§6.2a) [DAY-LAST-NO-POS]
+- On the last stage with no position, tonight's stop is the route end and nothing is claimed reached (§6.2a); "Tonight's stop is the end of your route" is said once, among the notes at the top, never again on each card, and Plan tomorrow brings those notes into view (the owner's ruling of 14 Nov 2026, sweep item 17; review of #169) [DAY-LAST-NO-POS]
 - After the ride with no position the text says it plans from tonight's stop (§6.2a) [DAY-NO-LATEST]
 - An approximate position starts the ride at the near edge of its radius (§6.2a) [DAY-APPROX-RIDE]
 - Riding on past the stop to a later camp gets its own clock times (§6.2a) [DAY-RIDE-ON-CLOCK]
@@ -270,7 +270,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Unconfirmed water reads unknown and asks to confirm (§3.2) [W-UNCONFIRMED]
 - An approximate position never uses a source inside its radius (§6.1) [W-APPROX]
 - Zero litres with a tap at the position still gives a finite, honest card (review focus) [W-ZERO]
-- Water strings obey the banned words and show an estimate with a range (§6.3) [W-NEVER-CLAIM]
+- Water strings obey the banned words and show an estimate with a range (§6.3): "To the next water, Ditsch (bakery, km 0.4): about 0.1 L needed, carry 0.1 L.", the next water by its name, its type and its km (an unnamed tap: "drinking water tap at km 41"), never 0 L for a small need (the owner's ruling of 14 Nov 2026, sweep item 19) [W-NEVER-CLAIM]
 
 ## Weather
 
@@ -291,7 +291,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Each country is served by its named weather models (§6.6) [WX-MODELS]
 - A thunderstorm within an hour of the day's ride is a warning (§6.6) [WX-WARN-THUNDER]
 - A thunderstorm at a camp stop tonight is a warning for campers (§6.6) [WX-WARN-NIGHT]
-- Strong gusts, heavy hours and freezing nights make the status action (§6.6) [WX-ACTION]
+- Strong gusts, heavy hours and freezing nights make the status action (§6.6); a night at or below 0 °C outdoors says what to do, "Night near −1 °C: pack warm layers", on the folded card and in the night's item, a stormy night too, and no health advice beyond that (the owner's ruling of 14 Nov 2026, sweep item 17; review of #169) [WX-ACTION]
 - Light likely rain stays fine with its window and plan (§6.6) [WX-FINE-LIGHT]
 - Hail is mentioned for the codes that include it (§6.6) [WX-HAIL]
 - The card title picks the most important reason first (§3.2) [WX-TITLE-ORDER]
@@ -301,7 +301,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Headwind and tailwind follow the wind and the route bearing (§6.6) [WX-WIND]
 - The weather basis names the source, fetch time, model run and attribution (§6.6, §8) [WX-BASIS]
 - Beyond the forecast the card says seasonal estimate, or unknown without data (§6.6) [WX-SEASONAL]
-- Weather text never claims minute accuracy, radar, live data or an all clear (§8) [WX-HONEST]
+- Weather text never claims minute accuracy, radar, live data or an all clear (§8); a temperature range reads "−1 to 1 °C", every minus a real minus sign (the owner's ruling of 14 Nov 2026, sweep item 21) [WX-HONEST]
 - The worked wait-or-go example gives the stated saving (§3.2, §11) [WX-WG-EXAMPLE]
 - When rain lasts all day waiting is said not to help (§11) [WX-WG-NOHELP]
 - Arrival after sunset mentions lights (§11) [WX-WG-LIGHTS]
@@ -392,7 +392,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Train help prefers stations and says times are unchecked (§6.9); a halt is called a station, never by the railway word (sweep 2 of 15 Nov 2026, #9) [EM-TRAIN]
 - Toilets help lists the nearest along the route with access and fee (§6.9) [EM-TOILETS]
 - Help chips always ride from now, in every phase (§6.2a) [EM-NOW]
-- Emergency numbers exist for all ten countries with sources (§6.9) [EM-NUMBERS]
+- Emergency numbers exist for all ten countries with sources (§6.9); the basis says when they were checked, and the source the table used is a 44 px link named "Source" ("Source of these emergency numbers" for a screen reader; mountain rescue's "Mountain rescue source"), never a bare address (the owner's ruling of 14 Nov 2026, sweep item 22) [EM-NUMBERS]
 - An unknown country gets the 112 fallback line (§6.9) [EM-FALLBACK]
 - Without a position the numbers still show and no coordinates are invented (review focus) [EM-NO-POSITION]
 - The emergency card shows position, age, route km and what is near (§6.9) [EM-LOCATION]
@@ -890,7 +890,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - GPX anywhere on Trip, export file on You; pickers stay [WIDE-DROP]
 - a stray drop is cancelled at window level: no navigation or download [WIDE-STRAY]
 - 1280 px at 400% (320 CSS px) works, no horizontal scroll [WIDE-ZOOM]
-- in the rail layout, Ahead opens with the picker open and no position request; Update position says "On a computer, this is usually approximate." [WIDE-COMPUTER-POS]
+- in the rail layout, Ahead opens with "Set your position by hand" folded, as at every width, its slider, kilometre and town list inside (the owner's ruling of 14 Nov 2026, sweep item 23), and no position request; Update position says "On a computer, this is usually approximate." [WIDE-COMPUTER-POS]
 - desktop Firefox at 1280 × 720 passes these [WIDE-FIREFOX]
 
 ## Tool: Tyre pressure
@@ -1371,6 +1371,8 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - the rider reads the deck's kit as a list, never "and … and", and the sleeping bag in a dry bag wherever it rides there, in one wording ("sleeping quilt or bag (in a dry bag), sleeping mat and tent"): The rack top takes, Already up there, the rack deck's line under a pannier (`POSITIONS` unchanged) and the checklist's rack top deck row (review of PR 149, I3, m1) [LC-DECK-WORDS]
 - the frozen bag rules differ from those before this decision by `DECK_CLAIMS` alone: with it read back as `['tent','pad']`, the fingerprint is the old one [LC-DECK-ONLY]
 - the Gear advisor's rack deck suggestion offers the sleeping bag with the tent and the mat, in a dry bag ("Put the sleeping quilt or bag (in a dry bag), sleeping mat and tent on your rack, no new bag needed"), its moves take the sleeping bag to the rack top deck, and a rack to fit says the dry bag too (review of PR 149, I3, m4) [GA-DECK-QUILT]
+- the rack top deck has no limit; when its loose kit comes to more than 20 L (the litres the rider reads, to one decimal), one line says "Strap it tight, or use one rack-top bag: loose items shift.", once where the deck's kit is listed: The rack top takes in the bag list and Already up there in the packing check, never on a pannier's deck line or a checklist line; at 20 L or less, with the deck off or on an indoor trip, no line (the owner's ruling of 14 Nov 2026, review of PR 149, owner question 1) [LC-DECK-LOOSE]
+- the Gear advisor keeps a seat pack beside a rack with kit on its top deck ("Seat pack, 15 L, plus a rack, with … on its top deck") and says on that suggestion, once: "A seat pack and a loaded rack top share the space behind the saddle: check that everything fits before you go."; exactly when the suggestion's bike has a seat pack and kit on the rack top and the suggestion brings them together (a seat pack it adds, or the rack top's kit where the plan had none up there), its card and the closest option alike; never on a suggestion without both (the owner's ruling of 14 Nov 2026, review of PR 149, owner question 2) [GA-DECK-SEAT]
 
 ## Bag planner: looks like Wayfinch (the owner's ruling of 14 Nov 2026, "yes, make the Bag planner look like Wayfinch"; sweep of 14 Nov, finding 27)
 

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { T, TM } from '../../core/wording/en-tyre.ts';
 import { W } from '../../core/wording/en.ts';
+import { TS } from '../../core/wording/en-tyre-screen.ts';
 import { TF } from '../../core/wording/en-tyre-labels.ts';
 import { TN } from '../../core/wording/en-tyre-notes.ts';
 import { TQ } from '../../core/wording/en-tyre-fields.ts';
@@ -391,14 +392,14 @@ export function TyreScreen({ services }: { services: TyreServices }) {
   return (
     <div class="tyre">
       <BackBar href="#/tools" label={TL.toolsBackTools} />
-      <h2 class="tyre-title">{W.tyreTitle}</h2>
+      <h2 class="tyre-title">{TS.tyreTitle}</h2>
       <p class="muted">{T.tyreIntro}</p>
 
       <label class="tyre-input" for="tyre-bike">
         <span class="tyre-label">{W.tyreBikeLabel}</span>
         <select id="tyre-bike" value={key} onChange={(e) => { const v = (e.currentTarget as HTMLSelectElement).value; touched.current = true; acted.current = true; setOffer(null); setGone(null); setPending({}); setSession(load(v)); noteBikeChoice(v === DEFAULT_KEY ? null : v, services.now(), services.storage); }}>
           {host.bikes.filter((b) => saved.includes(b.id)).map((b) => <option key={b.id} value={b.id}>{b.name}{b.id === host.planBikeId ? W.tyreBikeInPlan : ''}</option>)}
-          <option value={DEFAULT_KEY}>{saved.length ? T.tyreBikeWithout : W.tyreBikeNone}</option>
+          <option value={DEFAULT_KEY}>{saved.length ? T.tyreBikeWithout : TS.tyreBikeNone}</option>
         </select>
       </label>
       {/* With no saved bike, the "fits better" line under the bike box (wish 17, sketch 17c). */}
@@ -418,15 +419,15 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         <h2 id="tyre-needed-title">{T.tyreNeededTitle}</h2>
         <p>{T.tyreNeededIntro}</p>
         <p class="muted">{TN.tyreLimitHint}</p>
-        <LimitInput key={`max-${key}`} id="tyre-max" label={W.tyreLimitMaxLabel} required needed="max" value={details.tyreMax} min={details.tyreMin} onPending={onPending}
+        <LimitInput key={`max-${key}`} id="tyre-max" label={TS.tyreLimitMaxLabel} required needed="max" value={details.tyreMax} min={details.tyreMin} onPending={onPending}
           onCommit={(l) => change({ tyreMax: l ?? undefined })} />
         <p class="muted">{TC.tyreLimitBothWheels}</p>
         {bike?.unreadFront && src.frontMm === 'assumed' ? <p class="muted">{TC.tyreCouldntRead(bike.unreadFront)}</p> : null}
         {bike?.unreadRear && src.rearMm === 'assumed' ? <p class="muted">{TC.tyreCouldntRead(bike.unreadRear)}</p> : null}
-        <Field id={bikeKey('front')} label={W.tyreFrontWidthLabel} source={src.frontMm} needed="front" valueText={`${v.front.printedMm} mm`} resetLabel={resetFor('frontMm')} onReset={resetter('frontMm')}
-          editor={<NumberInput key={`front-${key}`} id="tyre-front" label={W.tyreFrontWidthLabel} needed value={own('frontMm', v.front.printedMm)} assumed={v.front.printedMm} onCommit={(n) => change({ frontMm: n })} unit="mm" />} />
-        <Field id={bikeKey('rear')} label={W.tyreRearWidthLabel} source={src.rearMm} needed="rear" valueText={`${v.rear.printedMm} mm`} resetLabel={resetFor('rearMm')} onReset={resetter('rearMm')}
-          editor={<NumberInput key={`rear-${key}`} id="tyre-rear" label={W.tyreRearWidthLabel} needed value={own('rearMm', v.rear.printedMm)} assumed={v.rear.printedMm} onCommit={(n) => change({ rearMm: n })} unit="mm" />} />
+        <Field id={bikeKey('front')} label={TS.tyreFrontWidthLabel} source={src.frontMm} needed="front" valueText={`${v.front.printedMm} mm`} resetLabel={resetFor('frontMm')} onReset={resetter('frontMm')}
+          editor={<NumberInput key={`front-${key}`} id="tyre-front" label={TS.tyreFrontWidthLabel} needed value={own('frontMm', v.front.printedMm)} assumed={v.front.printedMm} onCommit={(n) => change({ frontMm: n })} unit="mm" />} />
+        <Field id={bikeKey('rear')} label={TS.tyreRearWidthLabel} source={src.rearMm} needed="rear" valueText={`${v.rear.printedMm} mm`} resetLabel={resetFor('rearMm')} onReset={resetter('rearMm')}
+          editor={<NumberInput key={`rear-${key}`} id="tyre-rear" label={TS.tyreRearWidthLabel} needed value={own('rearMm', v.rear.printedMm)} assumed={v.rear.printedMm} onCommit={(n) => change({ rearMm: n })} unit="mm" />} />
         {resolved.rearFollowsFront && (v.rimType === 'hookless' || v.rimType === 'unset') ? <p class="muted">{TF.tyreRearLabelShort}: {TC.tyreSameAsFront}</p> : null}
         <Choice<RimType> id="tyre-rimtype" label={TQ.tyreRimTypeLabel} source={src.rimType} needed="rim" value={choiceValue('rimType', v.rimType)} onChange={(x) => change({ rimType: x })}
           options={[{ value: 'hooked', label: TQ.tyreRimHooked }, { value: 'hookless', label: TQ.tyreRimHookless }, { value: 'tubular', label: TQ.tyreRimTubular }]} />
@@ -434,7 +435,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
 
       <section class="card tyre-result" aria-live="polite" aria-labelledby="tyre-result-title" ref={resultRef}>
         <h2 id="tyre-result-title">{TF.tyreResultTitle}</h2>
-        {!resolved.input ? <p>{W.tyreNeedMax}</p> : null}
+        {!resolved.input ? <p>{TS.tyreNeedMax}</p> : null}
         {blockedBy !== null ? <p class="notice">{TC.tyrePendingLimit(blockedBy)}</p> : null}
         {blockedBy === null && result?.needsWidth ? <p class="notice">{resolved.sources.rimType === 'assumed' ? TC.tyreNeedTwo : TC.tyreNeedWidthOnly}</p> : null}
         {blockedBy === null && result && result.refused.length ? (
@@ -443,7 +444,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
             <ul>{result.refused.map((t) => <li key={t}>{t}</li>)}</ul>
           </>
         ) : null}
-        {blockedBy === null && result && result.incompatible ? <h3>{result.warningCodes.includes('rimUnset') ? TN.tyreNeedRimTitle : W.tyreIncompatibleTitle}</h3> : null}
+        {blockedBy === null && result && result.incompatible ? <h3>{result.warningCodes.includes('rimUnset') ? TN.tyreNeedRimTitle : TS.tyreIncompatibleTitle}</h3> : null}
         {showFigures && front && rear ? (
           <>
             <div class="tyre-wheels">
@@ -474,7 +475,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         ) : null}
         {blockedBy === null && result && result.decided.length ? (
           <>
-            <h3>{W.tyreHeadingWhy}</h3>
+            <h3>{TS.tyreHeadingWhy}</h3>
             <ul>{result.decided.map((t) => <li key={t}>{t}</li>)}</ul>
           </>
         ) : null}
@@ -482,42 +483,42 @@ export function TyreScreen({ services }: { services: TyreServices }) {
       </section>
 
       <Card title={TC.tyreLimitsMoreTitle}>
-        <LimitInput key={`min-${key}`} id="tyre-min" label={W.tyreLimitMinLabel} required={false} value={details.tyreMin} onPending={onPending}
+        <LimitInput key={`min-${key}`} id="tyre-min" label={TS.tyreLimitMinLabel} required={false} value={details.tyreMin} onPending={onPending}
           onCommit={(l) => change({ tyreMin: l })} />
-        <LimitInput key={`rim-${key}`} id="tyre-rimmax" label={W.tyreLimitRimLabel} required={false} value={details.rimMax} min={details.tyreMin} onPending={onPending}
+        <LimitInput key={`rim-${key}`} id="tyre-rimmax" label={TS.tyreLimitRimLabel} required={false} value={details.rimMax} min={details.tyreMin} onPending={onPending}
           onCommit={(l) => change({ rimMax: l })} />
       </Card>
 
-      <Card title={W.tyreSectionRider}>
-        <Field id={bikeKey('rider')} label={W.tyreRiderLabel} source={src.riderKg} valueText={`${v.riderKg} kg`} resetLabel={resetFor('riderKg')}
+      <Card title={TS.tyreSectionRider}>
+        <Field id={bikeKey('rider')} label={TS.tyreRiderLabel} source={src.riderKg} valueText={`${v.riderKg} kg`} resetLabel={resetFor('riderKg')}
           onReset={resetter('riderKg')}
-          editor={<NumberInput key={`rider-${key}`} id="tyre-rider" label={W.tyreRiderLabel} value={own('riderKg', v.riderKg)} assumed={v.riderKg} onCommit={(n) => change({ riderKg: n })} unit="kg" />} />
-        <Field id={bikeKey('bikekg')} label={W.tyreBikeKgLabel} source={src.bikeKg} plan={planNote} valueText={`${v.bikeKg} kg`} resetLabel={resetFor('bikeKg')}
+          editor={<NumberInput key={`rider-${key}`} id="tyre-rider" label={TS.tyreRiderLabel} value={own('riderKg', v.riderKg)} assumed={v.riderKg} onCommit={(n) => change({ riderKg: n })} unit="kg" />} />
+        <Field id={bikeKey('bikekg')} label={TS.tyreBikeKgLabel} source={src.bikeKg} plan={planNote} valueText={`${v.bikeKg} kg`} resetLabel={resetFor('bikeKg')}
           onReset={resetter('bikeKg')}
-          editor={<NumberInput key={`bikekg-${key}`} id="tyre-bikekg" label={W.tyreBikeKgLabel} value={own('bikeKg', v.bikeKg)} assumed={v.bikeKg} onCommit={(n) => change({ bikeKg: n })} unit="kg" />} />
-        <Field id={bikeKey('load')} label={W.tyreLoadLabel} source={src.carriedKg} plan={planNote} valueText={`${ctx.summary?.carriedKg ?? 0} kg`} resetLabel={resetFor('carriedKg')}
+          editor={<NumberInput key={`bikekg-${key}`} id="tyre-bikekg" label={TS.tyreBikeKgLabel} value={own('bikeKg', v.bikeKg)} assumed={v.bikeKg} onCommit={(n) => change({ bikeKg: n })} unit="kg" />} />
+        <Field id={bikeKey('load')} label={TS.tyreLoadLabel} source={src.carriedKg} plan={planNote} valueText={`${ctx.summary?.carriedKg ?? 0} kg`} resetLabel={resetFor('carriedKg')}
           onReset={resetter('carriedKg')}
           editor={<>
-            <NumberInput key={`load-${key}`} id="tyre-load" label={W.tyreLoadLabel} value={details.carriedKg} onCommit={(n) => change({ carriedKg: n })} unit="kg" />
+            <NumberInput key={`load-${key}`} id="tyre-load" label={TS.tyreLoadLabel} value={details.carriedKg} onCommit={(n) => change({ carriedKg: n })} unit="kg" />
             <p class="muted">{src.carriedKg === 'entered' ? TN.tyreLoadEnteredNote : TN.tyreLoadNone}</p>
           </>} />
       </Card>
 
-      <Card title={W.tyreSectionBars}>
-        <Field id={bikeKey('bars')} label={W.tyreBarsLabel} source={src.bars} valueText={({ drop: TQ.tyreBarsDrop, flat: TQ.tyreBarsFlat, other: TQ.tyreBarsOther })[v.bars]} resetLabel={resetFor('bars')}
+      <Card title={TS.tyreSectionBars}>
+        <Field id={bikeKey('bars')} label={TS.tyreBarsLabel} source={src.bars} valueText={({ drop: TQ.tyreBarsDrop, flat: TQ.tyreBarsFlat, other: TQ.tyreBarsOther })[v.bars]} resetLabel={resetFor('bars')}
           onReset={resetter('bars')}
-          editor={<Choice<Bars> id="tyre-bars" label={W.tyreBarsLabel} value={choiceValue('bars', v.bars)} onChange={(x) => change({ bars: x })}
+          editor={<Choice<Bars> id="tyre-bars" label={TS.tyreBarsLabel} value={choiceValue('bars', v.bars)} onChange={(x) => change({ bars: x })}
             options={[{ value: 'drop', label: TQ.tyreBarsDrop }, { value: 'flat', label: TQ.tyreBarsFlat }, { value: 'other', label: TQ.tyreBarsOther }]} />} />
       </Card>
 
-      <Card title={W.tyreSectionTyres}>
+      <Card title={TS.tyreSectionTyres}>
         <Choice<Casing> id="tyre-casing" label={TQ.tyreCasingLabel} source={src.casing} value={choiceValue('casing', v.casing)} onChange={(x) => change({ casing: x })}
           options={[{ value: 'supple', label: TQ.tyreCasingSupple }, { value: 'standard', label: TQ.tyreCasingStandard }, { value: 'reinforced', label: TQ.tyreCasingReinforced }]} />
-        <Choice<Setup> id="tyre-setup" label={W.tyreSetupLabel} source={src.setup} value={choiceValue('setup', v.setup)} onChange={(x) => change({ setup: x })}
+        <Choice<Setup> id="tyre-setup" label={TS.tyreSetupLabel} source={src.setup} value={choiceValue('setup', v.setup)} onChange={(x) => change({ setup: x })}
           options={[{ value: 'butyl', label: TQ.tyreSetupButyl }, { value: 'latex', label: TQ.tyreSetupLatex }, { value: 'tpu', label: TQ.tyreSetupTpu }, { value: 'tubeless', label: TQ.tyreSetupTubeless }]} />
       </Card>
 
-      <Card title={W.tyreSectionRim}>
+      <Card title={TS.tyreSectionRim}>
         <Field id={bikeKey('wheel')} label={W.tyreWheelLabel} source={src.wheelBsdMm} valueText={WHEELS.find((w) => w.bsdMm === (v.wheelBsdMm))?.label ?? ''} resetLabel={resetFor('wheelBsdMm')} onReset={resetter('wheelBsdMm')}
           editor={
             <label class="tyre-input" for="tyre-wheel">
@@ -530,7 +531,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
           editor={<NumberInput key={`rim-${key}`} id="tyre-rim" label={TF.tyreRimInnerLabel} value={own('rimInnerMm', v.rimInnerMm)} assumed={v.rimInnerMm} onCommit={(n) => change({ rimInnerMm: n })} unit="mm" />} />
       </Card>
 
-      <Card title={W.tyreSectionSurface}>
+      <Card title={TS.tyreSectionSurface}>
         <Choice<Surface> id="tyre-surface" label={TQ.tyreSurfaceLabel} source={src.surface} value={choiceValue('surface', v.surface)} onChange={(x) => change({ surface: x })}
           options={[{ value: 'paved', label: TQ.tyreSurfacePaved }, { value: 'rough', label: TF.tyreSurfaceRough }, { value: 'unpaved', label: TQ.tyreSurfaceUnpaved }]} />
         <label class="tyre-check">
@@ -541,11 +542,11 @@ export function TyreScreen({ services }: { services: TyreServices }) {
 
       <Card title={W.tyreSectionHeat}>
         <p class="muted">{T.tyreHeatIntro}</p>
-        <NumberInput key={`hp-${key}`} id="tyre-heat-pump" label={W.tyreHeatPumpLabel} signed value={details.heat?.pumpC} onCommit={(n) => changeHeat({ pumpC: n })} unit="°C" />
-        <NumberInput key={`hm-${key}`} id="tyre-heat-max" label={W.tyreHeatMaxLabel} signed value={details.heat?.maxC} onCommit={(n) => changeHeat({ maxC: n })} unit="°C" />
+        <NumberInput key={`hp-${key}`} id="tyre-heat-pump" label={TS.tyreHeatPumpLabel} signed value={details.heat?.pumpC} onCommit={(n) => changeHeat({ pumpC: n })} unit="°C" />
+        <NumberInput key={`hm-${key}`} id="tyre-heat-max" label={TS.tyreHeatMaxLabel} signed value={details.heat?.maxC} onCommit={(n) => changeHeat({ maxC: n })} unit="°C" />
         <NumberInput key={`hh-${key}`} id="tyre-heat-pumph" label={TN.tyrePumpHeightLabel} signed value={details.heat?.pumpHeightM} onCommit={(n) => changeHeat({ pumpHeightM: n })} unit="m" />
         <NumberInput key={`hv-${key}`} id="tyre-heat-high" label={W.tyreHighestLabel} signed value={details.heat?.highestM} onCommit={(n) => changeHeat({ highestM: n })} unit="m" />
-        {!v.heat ? <p class="notice">{W.tyreHeatSkipped}</p> : null}
+        {!v.heat ? <p class="notice">{TS.tyreHeatSkipped}</p> : null}
         {v.heat && showFigures && front && rear && !front.heat?.advise && !rear.heat?.advise ? <p class="muted">{TN.tyreHeatFits}</p> : null}
       </Card>
 

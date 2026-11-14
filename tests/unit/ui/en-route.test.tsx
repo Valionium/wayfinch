@@ -195,7 +195,7 @@ describe('no position to choose first (finding K, the coordinator\'s ruling I1 o
     expect(host.querySelector('[data-strip] [data-unconfirmed]')).toBeNull();
   });
 
-  test('[AH-FROM-START] the shell shows and keeps the real day: a day start kept for today stays as it was; on a computer the slider is there from the start', async () => {
+  test('[AH-FROM-START] the shell shows and keeps the real day: a day start kept for today stays as it was; on a computer the slider is there once the picker is opened', async () => {
     const i = rainyStop({ now: `${SAT} 09:00`, positions: [] });
     await readTrip();
     await saveTrip(i.trip);
@@ -217,6 +217,9 @@ describe('no position to choose first (finding K, the coordinator\'s ruling I1 o
     expect((await readInputs(i.now))!.dayStarts).toEqual([{ day: SAT, km: 30 }]);
     railSignal.value = true;
     await show(shell.view.value, shell.actions);
+    // folded at every width since the owner's ruling of 14 Nov 2026 (sweep item 23; it was open from the start on a computer)
+    expect(host.querySelector('input[type=range]')).toBeNull();
+    await click(buttonNamed('Set position by hand'));
     expect(host.querySelector('input[type=range]')).not.toBeNull();
     stop();
   });

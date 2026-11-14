@@ -108,11 +108,17 @@ describe('inside the radius of an approximate fix', () => {
 });
 
 describe('the water estimate in words', () => {
-  test('[AH-WATER-Q] a short leg’s small need reads "under 0.1 L", never "expected 0 L, planned 0 L"', () => {
+  // The owner's ruling of 14 Nov 2026 (sweep item 19): the next water by its name, type and km, "needed" and "carry" (it was
+  // "Estimate to …: expected under 0.1 L, planned under 0.1 L.").
+  test('[AH-WATER-Q] a short leg’s small need reads "about 0.1 L needed, carry 0.1 L", never 0 L, with the next water\'s type and km', () => {
     const spots = [...RAINY_SPOTS, { b: tap(), km: 125.3 }];
     const s = screen(rainyStop({ spots }));
-    expect(s.cards.water.detail).not.toMatch(/expected 0 L, planned 0 L/);
-    expect(s.cards.water.detail).toMatch(/expected under 0\.1 L, planned under 0\.1 L\./);
+    expect(s.cards.water.detail).not.toMatch(/ 0 L needed|carry 0 L/);
+    expect(s.cards.water.detail).toMatch(/To the next water, [^.]*\(drinking water, km 125\.3\): about 0\.1 L needed, carry 0\.1 L\./);
+  });
+  test('[AH-WATER-Q] a named shop: "To the next water, Ditsch (bakery, km 0.4): about … L needed, carry … L."', () => {
+    expect(W.waterToNext(W.waterPlaceAt('Ditsch', 'bakery', '0.4'), '0.1', '0.1')).toBe('To the next water, Ditsch (bakery, km 0.4): about 0.1 L needed, carry 0.1 L.');
+    expect(W.waterToPoint(W.waterRouteEnd, '1.2', '1.5')).toBe('To the route end: about 1.2 L needed, carry 1.5 L.');
   });
   test('[AH-WATER-Q] at the route end the water question asks for no "next stretch"', () => {
     const i = rainyStop({ routeEndDate: SAT, positions: [pos({ km: 165, at: `${SAT} 14:20` })] });

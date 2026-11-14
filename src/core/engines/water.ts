@@ -123,8 +123,20 @@ export const hasFuelShop = (place: Place): boolean => {
   return shop !== undefined && shop !== 'no' && place.tags['automated'] !== 'yes';
 };
 const SHOP_KINDS = new Set<Place['kind']>(['shop', 'cafe', 'fuel_shop']);
-/** The shops of section 6.0. Any other shop tag is nothing Food would count, so Water can't count it either (INV-03). */
-const FOOD_SHOP_TAGS: ReadonlySet<string> = new Set(['supermarket', 'convenience', 'bakery', 'kiosk']);
+// Tag values come from strangers: they are compared through a Map or Set, never used as object keys.
+export const FOOD_SHOP_WORDS = new Map<string, string>([
+  ['supermarket', W.leavebyWordSupermarket], ['convenience', W.leavebyWordConvenience], ['bakery', W.leavebyWordBakery], ['kiosk', W.leavebyWordKiosk],
+]);
+
+/** "supermarket", "bakery", "fuel-station shop": what a place is, in a word. */
+export function placeWord(p: Place): string {
+  if (p.kind === 'fuel_shop') return W.leavebyWordFuel;
+  if (p.kind === 'restaurant') return W.leavebyWordRestaurant;
+  if (p.kind === 'cafe') return p.tags['amenity'] === 'fast_food' ? W.leavebyWordFastFood : W.leavebyWordCafe;
+  if (p.kind === 'ice_cream') return W.leavebyWordIceCream;
+  if (p.kind === 'drink') return W.leavebyWordPub;
+  return FOOD_SHOP_WORDS.get(p.tags['shop'] ?? '') ?? W.leavebyWordShop;
+}
 const filterCarried = (f: WaterFacts): boolean => f.loadSummary !== null && !('empty' in f.loadSummary) && f.loadSummary.kit.waterFilter === true;
 
 /** Whether this place is a reliable source at this arrival, or why not. The class decides, not the kind. */
@@ -138,7 +150,8 @@ export function sourceAt(place: Place, match: RouteMatch, arrival: Date, f: Wate
   }
   if (place.kind === 'fuel_shop' && !hasFuelShop(place)) return uncertain(W.waterNoShop);
   if (place.waterClass === 'A') return place.indoorOrLimited ? byHours(place, arrival, f) : outdoorA(place, match, arrival, f);
-  if (place.kind === 'shop' && !FOOD_SHOP_TAGS.has(place.tags['shop'] ?? '')) return uncertain(W.waterNotASource);
+  // the shops of section 6.0: any other shop tag is nothing Food would count, so Water can't count it either (INV-03)
+  if (place.kind === 'shop' && !FOOD_SHOP_WORDS.has(place.tags['shop'] ?? '')) return uncertain(W.waterNotASource);
   return SHOP_KINDS.has(place.kind) ? byHours(place, arrival, f) : uncertain(W.waterNotASource);
 }
 
@@ -473,8 +486,15 @@ const trim = (x: number): string => String(Math.round(x * 100) / 100);
 const upToTenth = (x: number): number => Math.ceil(x * 10 - 1e-9) / 10;
 const showUp = (x: number): string => trim(upToTenth(x));
 const showNear = (x: number): string => trim(Math.round(x * 10) / 10);
-/** A need in words: a small one that rounds to 0 reads "under 0.1", never 0, which would say none is needed. */
-const showNeed = (x: number): string => (x > 0 && x < 0.05 ? W.waterUnderTenth : showNear(x));
+
+/** An amount said as "about …": a small one reads 0.1, never 0, which would say none is needed. */
+const showAbout = (x: number): string => (x > 0 && x < 0.05 ? '0.1' : showNear(x));
+/** The next water in words: its name, what it is and its km; with no name, what it is at its km. */
+const nextWater = (t: Target & { kind: 'place' }): string => {
+  const word = t.place.kind === 'water' || !mayBeFood(t.place) ? W.waterWordTap : placeWord(t.place);
+  return t.place.name ? W.waterPlaceAt(t.place.name, word, showKm(t.km)) : W.leavebyPlaceAtKm(t.place.kind === 'water' ? W.waterWordTapUnnamed : word, showKm(t.km));
+};
+const mayBeFood = (p: Place): boolean => SHOP_KINDS.has(p.kind) || p.kind === 'restaurant' || p.kind === 'drink' || p.kind === 'ice_cream';
 
 const nameOf = (t: Target): string => {
   if (t.kind === 'end') return W.waterRouteEnd;
@@ -656,7 +676,7 @@ export function waterAnswer(f: WaterFacts): Answer {
   // The lines every card carries.
   const lines: string[] = [];
   if (s1.kind !== 'place' && s1.km - f.ride.startKm >= 0.05) lines.push(W.waterNoSource(showKm(s1.km - f.ride.startKm)));
-  lines.push(W.waterExpectedPlanned(nameOf(s1), showNeed(expectedS1), showNeed(useS1)), calibrationOf(f));
+  lines.push(s1.kind === 'place' ? W.waterToNext(nextWater(s1), showAbout(expectedS1), showAbout(useS1)) : W.waterToPoint(nameOf(s1), showAbout(expectedS1), showAbout(useS1)), calibrationOf(f));
   const rideHours = f.schedule.ridingMinTo(f.ride.stopKm) / 60;
   if (f.profile.ebike || listS2.some((s) => outsideRange({ planT: s.planT, elevM: s.elevM, ridingHours: rideHours }))) lines.push(W.waterOutsideRange);
 

@@ -17,7 +17,7 @@ import { arrivalStatus } from './daylight.ts';
 import { arrivalRidingOn, hoursIndex, insideRadius, passesOf, routeZoneAt, sunReadable, zoneOfPass, type Pass } from './leaveby.ts';
 import { rejoinKm } from './locate.ts';
 import { flatLegRidingMin, ridingMin, usableFlatKph, type Schedule } from './pace.ts';
-import { noteFor, nowSchedule, offersPlanTomorrow, ridingDate } from './tripday.ts';
+import { cardNoteFor, nowSchedule, offersPlanTomorrow, ridingDate } from './tripday.ts';
 import { seasonalWindow } from './water.ts';
 
 export type SleepFacts = Pick<ScreenInputs, 'trip' | 'places' | 'matches' | 'hours' | 'savedKm' | 'now' | 'routeZones' | 'sun'> & { ride: DayRide; schedule: Schedule };
@@ -329,7 +329,7 @@ export function sleepAnswer(f: SleepFacts): Answer {
     return item;
   });
 
-  const note = noteFor(ride);
+  const note = cardNoteFor(ride);
   const detail = [...(note ? [note] : []), ...(offersPlanTomorrow(ride) ? [W.sleepPlanTomorrow] : [])].join(' ');
   const best = bestOpen;
   const stamp = best
