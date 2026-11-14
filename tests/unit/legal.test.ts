@@ -248,3 +248,10 @@ describe('the one top bar on the pages that are not the app', () => {
     }
   });
 });
+
+test('[LEGAL-ICON] every legal page names the app icon, so no page asks for /favicon.ico', () => {
+  for (const page of ['imprint', 'privacy', 'licences']) {
+    expect(docOf(read(`public/legal/${page}/index.html`)).querySelector('link[rel="icon"]')?.getAttribute('href'), page).toBe('/icons/icon-192.png');
+  }
+  expect(read('tools/build-legal.mjs')).toContain('<link rel="icon" href="/icons/icon-192.png"');
+});

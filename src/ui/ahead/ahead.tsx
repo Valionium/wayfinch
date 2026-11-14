@@ -28,7 +28,9 @@ function focusLater(id: string): void {
   setTimeout(() => {
     const el = document.getElementById(id);
     el?.scrollIntoView?.({ block: 'start' });
-    (el?.querySelector('button, a, h2, h3') as HTMLElement | null)?.focus?.();
+    // A card's title is a heading holding its button: the button takes the focus (a heading without a tabindex takes none, which
+    // left the focus on the page's body; review of #142, I4).
+    (el?.querySelector<HTMLElement>('.ah-toggle') ?? el?.querySelector<HTMLElement>('button, a, h2, h3'))?.focus?.();
   }, 0);
 }
 
@@ -82,6 +84,20 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
     setOpen((was) => new Set([...was, name]));
     focusLater(`card-${name}`);
   };
+  // Close hands the focus back to the chip that opened the panel, so a keyboard or screen reader is not left on the page's body.
+  const closeChip = (): void => {
+    const was = chip;
+    setChip(null);
+    if (was) setTimeout(() => document.querySelector<HTMLElement>(`.ah-chip[aria-controls="chip-${was}"]`)?.focus?.(), 0);
+  };
+  // Plan tomorrow redraws the day: the focus goes to the Back to today at the top, and from there back to the Daylight card.
+  const dayActions: AheadActions = {
+    ...actions,
+    planTomorrow: async (date) => { await actions.planTomorrow(date); focusLater('ah-back-today'); },
+    backToToday: async () => { await actions.backToToday(); focusLater('card-daylight'); },
+  };
+  // With tomorrow planned (after the day's ride), the way back stands at the top, not only in the Daylight card's items.
+  const backOffered = s.cards.daylight.items.some((x) => x.label === W.daylightBackToToday);
   const openChip = (c: ChipKey | null): void => {
     // Emergency's "Last position at … (… ago)" is read at the time it is opened.
     if (c !== null) actions.freshen();
@@ -123,15 +139,16 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
         ) : null}
         <PositionControls v={v} actions={actions} pickerOpen={pickerOpen} onPicker={setPicker} pickerUse={pickerUse} onPickerUsed={pickerUsed} onFixKept={fixKept} rail={rail} />
         {s.notes.length > 0 ? <ul class="ah-notes notice">{s.notes.map((n, i) => <li key={i}>{n}</li>)}</ul> : null}
+        {backOffered ? <p id="ah-back-today" data-back-today><button type="button" class="btn" onClick={() => void dayActions.backToToday()}>{W.daylightBackToToday}</button></p> : null}
         {v.badSpeed ? <p class="notice"><a href="#/trip">{W.appAheadSpeedLink}</a></p> : null}
         <RouteStrip strip={s.strip} bike={v.bike} onOpen={openCard} onSetPosition={rail ? (km) => void actions.setManual(km) : undefined} stopsLater={v.beforeReady} unconfirmed={!v.confirmed} />
         {v.beforeReady ? null : need}
       </div>
-      <TopicCards screen={s} open={open} onToggle={toggle} v={v} actions={actions} onShelter={() => openChip('shelter')} later={v.beforeReady ? AFTER_READY : NONE} />
+      <TopicCards screen={s} open={open} onToggle={toggle} v={v} actions={dayActions} onShelter={() => openChip('shelter')} later={v.beforeReady ? AFTER_READY : NONE} />
       <div class="ah-below">
         {/* Before Get ready offline only Emergency: the other chips answer from saved places too (AH-BEFORE-READY). */}
         <ChipRow shown={v.beforeReady ? ['emergency'] : CHIP_ORDER} open={chip} onOpen={openChip} />
-        {chip ? <ChipPanel chip={chip} screen={s} canShare={v.canShare} actions={actions} onClose={() => setChip(null)} position={v.position} /> : null}
+        {chip ? <ChipPanel chip={chip} screen={s} canShare={v.canShare} actions={actions} onClose={closeChip} position={v.position} /> : null}
       </div>
     </div>
   );

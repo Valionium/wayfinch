@@ -25,6 +25,7 @@ import { keepAfterScreen, readInputs } from '../store/inputs.ts';
 import { addPosition, backToToday, confirmWater, setPlanTomorrow } from '../store/positions.ts';
 import { readMapLink, writeMapLink } from '../store/share-choice.ts';
 import { readPrepared } from '../store/prepared.ts';
+import { deviceZone } from '../store/rules.ts';
 import { weatherStore } from '../store/weather.ts';
 import type { AheadActions, AheadTrip, AheadView, PositionState, Town } from './ahead/actions.ts';
 import { bikeSource } from './bike/live.ts';
@@ -180,7 +181,7 @@ export function browserAhead(deps: AheadDeps = browserDeps()): AheadShell {
 
   const emergencyAlone = (at: Date) => emergencyCard({
     position: here, now: at, country: null, settlements: [], shelters: [], rescuePoints: [], thunderNear: false, dataDate: '',
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timeZone: deviceZone(),
   });
   const unreadable = (at: Date): void => {
     view.value = { kind: 'unreadable', canShare: deps.share !== null, emergency: emergencyAlone(at), position };

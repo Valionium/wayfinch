@@ -26,4 +26,11 @@ export const TR = {
   appAbSearchFailed: "Search needs signal, and the search services did not answer. Check your connection and try again.",
   appAbNoResults: 'Nothing found. Try another spelling, add the town to an address, or search a larger town nearby.',
   appTripHeightsPending: 'This route has no heights. Prepare this route looks them up (Open-Meteo, Copernicus data).',
+  appTripStepHeights: 'Heights',
+  appTripStepHours: 'Opening hours',
+  appTripStepWeather: 'Weather',
+  appTripStepBaseline: 'Seasonal estimate',
+  appTripReplaceTitle: 'Replace your route?',
+  appAbChange: 'Change',
+  appTripOsmSearch: 'Place names: ',
 };

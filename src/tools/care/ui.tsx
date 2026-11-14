@@ -1,7 +1,7 @@
 // Bike care (sub-project 12; design 3.1): a fixed, offline reference of what to do to the bike, how often and when, fitted to the chosen
 // bike. Its own chunk at #/tools/care. It reads the bag planner's bikes and the one chosen bike (sub-project 11) and writes nothing; only
 // the bike line, when the rider switches bikes, writes Wayfinch's own choice record.
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { normaliseBike } from '../../core/bike/normalise.ts';
 import type { BikeRecord } from '../../core/bike/normalise.ts';
 import { resolveBikeSpec } from '../../core/bike/spec.ts';
@@ -138,8 +138,8 @@ export function CareScreen({ services }: { services: TyreServices }) {
   const [steps, setSteps] = useState<StepSource | null>(null);
   const opener = useRef<HTMLButtonElement | null>(null);
   const openSteps: OnSteps = (source, from) => { opener.current = from; setSteps(source); };
-  // Closed: focus goes back to the button that opened it.
-  useEffect(() => { if (steps === null && opener.current) { opener.current.focus(); opener.current = null; } }, [steps]);
+  // Closed: focus goes back to the button that opened it, in the same commit that removes the steps: a key pressed at once (Escape, then Tab) starts from the task, never from the page body.
+  useLayoutEffect(() => { if (steps === null && opener.current) { opener.current.focus(); opener.current = null; } }, [steps]);
   const title = useRef<HTMLHeadingElement>(null);
   // Opening the screen puts the focus on its title (no Back button above it any more).
   useEffect(() => { title.current?.focus(); }, []);
