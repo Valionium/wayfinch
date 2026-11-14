@@ -36,7 +36,7 @@ export function GetReady({ services, snap, reload, lead = null, onRun }: {
       {leading ? <p class="trip-added" role="status" data-added>{lead} {button}</p> : null}
       {leading ? <p class="muted" data-prepare-line>{TR.appTripPrepareLine}</p> : null}
       {ask ? <p class="notice">{TR.appTripIphoneAsk}</p> : null}
-      {line ? <p class="tool-line">{line}</p> : <p class="muted">{W.appTripNothingSaved}</p>}
+      {line ? <p class="tool-line">{line}</p> : <p class="muted">{TF.appTripNothingSaved}</p>}
       {snap.storageMb !== null ? <p class="muted">{TF.appTripStorage(String(snap.storageMb))}</p> : null}
       {leading ? null : <>{button}<p class="muted" data-prepare-line>{TR.appTripPrepareLine}</p></>}
       <RunProgress run={run} />
