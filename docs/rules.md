@@ -124,7 +124,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 
 ## Climbs and climbing card
 
-- A climb needs 100 m at 3 percent; close rises merge across a dip under 20 m (§6.7) [CL-CLIMB]
+- A climb needs 100 m at 3 percent; close rises merge across a dip under 20 m; it starts at its foot and ends at its top, so a flat or a valley road rising under 0.5 percent is no part of it, 6 km of flat ends it as a dip does, and a rise averaging under 3 percent keeps its steeper part as the climb, on files with a point every few metres as on sparse ones (§6.7; review of PR 150, C1) [CL-CLIMB]
 - Climbing left is told to the stop and the end with the next climb (§6.7) [CL-LEFT]
 - Missing heights read unknown, never zero metres (§6.7) [CL-UNKNOWN]
 

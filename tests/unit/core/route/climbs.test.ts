@@ -94,3 +94,109 @@ test.prop([fc.array(fc.integer({ min: -60, max: 90 }), { minLength: 2, maxLength
       if (i > 0) expect(c.startKm).toBeGreaterThanOrEqual(climbs[i - 1]!.topKm);
     });
   });
+
+// Real files (a planner's export, a bike computer's recording) have a point every 5 to 50 m, so the 200 m smoothing works on every
+// point and a flat is never exactly flat: its heights wobble by fractions of a metre, or by metres with recorded heights.
+/** A small seeded generator, so a noisy profile is the same on every run. */
+function seeded(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Points every `stepKm`, heights from `ele`, plus up to ±`noiseM` of seeded noise, in whole metres as files store them. */
+function dense(lengthKm: number, stepKm: number, ele: (km: number) => number, noiseM = 0, seed = 1): [number, number][] {
+  const r = seeded(seed);
+  return sampled(lengthKm, stepKm, ele).map(([km, h]) => [km, Math.round((h as number) + (r() * 2 - 1) * noiseM)]);
+}
+
+/** A profile from straight pieces: [length km, grade %], starting at `base` metres. */
+function pieces(base: number, parts: [number, number][]): (km: number) => number {
+  return (km) => {
+    let h = base;
+    let at = 0;
+    for (const [len, grade] of parts) {
+      const d = Math.min(Math.max(km - at, 0), len);
+      h += (d * 1000 * grade) / 100;
+      at += len;
+    }
+    return h;
+  };
+}
+
+describe('[CL-CLIMB] dense points: a climb starts at its foot and ends at its top, never on the flats around it', () => {
+  plain('5 km flat, 2 km at 6%, 3 km flat, a point every 10 m: one climb, km 5 to 7, 120 m, 6%', async () => {
+    for (const step of [0.01, 0.05]) {
+      const c = await climbsOf(dense(10, step, pieces(200, [[5, 0], [2, 6], [3, 0]])));
+      expect(c, `every ${step * 1000} m`).toHaveLength(1);
+      expect(c[0]!.startKm).toBeGreaterThan(4.85);
+      expect(c[0]!.startKm).toBeLessThan(5.15);
+      expect(c[0]!.topKm).toBeGreaterThan(6.85);
+      expect(c[0]!.topKm).toBeLessThan(7.15);
+      expect(c[0]!.gainM).toBeGreaterThan(110);
+      // The 200 m smoothing rounds the corners at the foot and the top, so the average reads a little under 6%.
+      expect(c[0]!.avgGradePct).toBeGreaterThan(5.3);
+      expect(c[0]!.avgGradePct).toBeLessThan(6.5);
+    }
+  });
+
+  plain('30 km of riverside flat, then 6 km at 6%, then 2 km flat, every 20 m, with and without ±2 m of noise: found, about km 30 to 36', async () => {
+    for (const noise of [0, 2]) {
+      for (const seed of [1, 2, 3]) {
+        const c = await climbsOf(dense(38, 0.02, pieces(150, [[30, 0], [6, 6], [2, 0]]), noise, seed));
+        expect(c, `noise ${noise}, seed ${seed}`).toHaveLength(1);
+        expect(c[0]!.startKm).toBeGreaterThan(29.5);
+        expect(c[0]!.startKm).toBeLessThan(30.5);
+        expect(c[0]!.topKm).toBeGreaterThan(35.5);
+        expect(c[0]!.topKm).toBeLessThan(36.5);
+        expect(c[0]!.avgGradePct).toBeGreaterThan(5.4);
+        expect(c[0]!.avgGradePct).toBeLessThan(6.6);
+      }
+    }
+  });
+
+  plain('2 km flat, 5 km at 6%, 2 km flat, every 10 m: km 2 to 7 at 6%, not km 0 to 9 at 3.4%', async () => {
+    const c = await climbsOf(dense(9, 0.01, pieces(300, [[2, 0], [5, 6], [2, 0]])));
+    expect(c).toHaveLength(1);
+    expect(c[0]!.startKm).toBeCloseTo(2, 0);
+    expect(c[0]!.topKm).toBeCloseTo(7, 0);
+    expect(c[0]!.gainM).toBeGreaterThan(290);
+    expect(c[0]!.avgGradePct).toBeGreaterThan(5.6);
+  });
+
+  plain('a valley road rising 0.3% with ±2 m of noise, a pass of 4%, 8% and 6%, a noisy summit plateau: the climb is the pass alone', async () => {
+    const c = await climbsOf(dense(37, 0.025, pieces(400, [[20, 0.3], [3, 4], [3, 8], [4, 6], [1.5, 0], [5.5, -7]]), 2, 7));
+    expect(c).toHaveLength(1);
+    expect(c[0]!.startKm).toBeGreaterThan(19.5);
+    expect(c[0]!.startKm).toBeLessThan(20.5);
+    expect(c[0]!.topKm).toBeGreaterThan(29.5);
+    expect(c[0]!.topKm).toBeLessThan(30.6);
+    expect(c[0]!.gainM).toBeGreaterThan(580);
+    expect(c[0]!.avgGradePct).toBeGreaterThan(5.5);
+  });
+
+  plain('steps up a valley: three times 10 km flat then 4 km at 7%, every 25 m: three climbs, each about 4 km at 7%', async () => {
+    const c = await climbsOf(dense(42, 0.025, pieces(200, [[10, 0], [4, 7], [10, 0], [4, 7], [10, 0], [4, 7]]), 1, 3));
+    expect(c).toHaveLength(3);
+    c.forEach((x, i) => {
+      expect(x.startKm).toBeGreaterThan(10 + i * 14 - 0.5);
+      expect(x.topKm).toBeLessThan(14 + i * 14 + 0.5);
+      expect(x.avgGradePct).toBeGreaterThan(6.3);
+    });
+  });
+
+  plain('10 km of a 1% valley road, then 3 km at 8%: the 8% climb is found, not lost in a 13 km average under 3%', async () => {
+    for (const step of [0.5, 0.02]) {
+      const c = await climbsOf(dense(13, step, pieces(500, [[10, 1], [3, 8]])));
+      expect(c, `every ${step * 1000} m`).toHaveLength(1);
+      expect(c[0]!.startKm).toBeGreaterThan(9.5);
+      expect(c[0]!.topKm).toBeCloseTo(13, 0);
+      expect(c[0]!.avgGradePct).toBeGreaterThan(7);
+    }
+  });
+});
