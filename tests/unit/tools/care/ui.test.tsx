@@ -5,6 +5,7 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { C, CARE_TASKS, CARRY, PART_LABEL, ROAD_CARDS, SECTION_LABEL, SECTIONS, TAG_LABEL } from '../../../../src/core/wording/en-care.ts';
+import { CL } from '../../../../src/core/wording/en-care-link.ts';
 import { ALL_STEPS_KEY } from '../../../../src/tools/care/steps.tsx';
 import { careDetails } from '../../../../src/core/care/fit.ts';
 import { stepsShown } from '../../../../src/core/care/lines.ts';
@@ -491,4 +492,90 @@ test('[BC-TAGS-ONCE] a task listed under Every month says it is monthly, not onl
   await mount(world([]));
   const month = [...host.querySelectorAll('.care-section')].find((s) => s.querySelector('h3')!.textContent === SECTION_LABEL.month)!;
   expect(month.querySelector('.care-task[data-id="chain-lube"] .care-name')!.textContent).toBe(lube.name);
+});
+
+// ---- What fits your bike (the owner's wish of 14 November 2026) ----
+const fitLine = () => host.querySelector<HTMLElement>('.care-fit');
+const fitButton = () => fitLine()?.querySelector<HTMLButtonElement>('button') ?? null;
+/** Hydraulic discs with mineral oil, electronic gears; nothing else told. */
+const HYDRO_E = { brakes: 'hydraulic-disc', brakeFluid: 'mineral', shifting: 'electronic' };
+
+test('[BC-FIT-LINE] a line at the top names what the list fits; Show all shows every card and task, and Fit to my bike brings the fit back; the button keeps the focus; nothing is written', async () => {
+  const mem = world([bike('bike_h', 'Hydro', HYDRO_E)]);
+  await mount(mem);
+  const line = fitLine()!;
+  expect(line).not.toBeNull();
+  // at the top: before the tabs
+  expect(line.compareDocumentPosition(host.querySelector('[role="tablist"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(line.querySelector('.care-fit-text')!.textContent).toBe(C.careFitShowing('hydraulic disc brakes (mineral oil), electronic gears'));
+  // the text is a polite live region, so a change is read out
+  expect(line.querySelector('.care-fit-text')!.getAttribute('aria-live')).toBe('polite');
+  const b = fitButton()!;
+  expect(b.textContent).toBe(C.careFitShowAll);
+  expect(b.getAttribute('type')).toBe('button');
+  const fittedIds = taskIds();
+  expect(fittedIds).toContain('brakes-hydraulic-bleed');
+  expect(fittedIds).toContain('gears-electronic-battery');
+  for (const id of ['brakes-pads-rim', 'brakes-cable-disc-service', 'gears-cables-look']) expect(fittedIds, id).not.toContain(id);
+  b.focus();
+  await click(b);
+  // every task, as with no bike, each conditioned one tagged
+  expect(taskIds().sort()).toEqual(CARE_TASKS.map((t) => t.id).sort());
+  expect(fitLine()!.querySelector('.care-fit-text')!.textContent).toBe(C.careFitAll);
+  expect(fitButton()!.textContent).toBe(C.careFitMine);
+  expect(document.activeElement).toBe(fitButton());
+  await openRoad();
+  expect(roadIds().sort()).toEqual(ROAD_CARDS.map((c) => c.id).sort());
+  await click(tab(C.careTabCare));
+  await click(fitButton()!);
+  expect(taskIds()).toEqual(fittedIds);
+  expect(fitLine()!.querySelector('.care-fit-text')!.textContent).toBe(C.careFitShowing('hydraulic disc brakes (mineral oil), electronic gears'));
+  expect(document.activeElement).toBe(fitButton());
+  expect(mem.writes).toEqual([]);
+});
+
+test('[BC-FIT-LINE] Show all is not remembered: the screen opened again fits the bike; no line with no bike, no bike chosen, or nothing told', async () => {
+  const mem = world([bike('bike_h', 'Hydro', HYDRO_E)]);
+  await mount(mem);
+  const keys = (): string[] => Object.keys(localStorage).sort();
+  const before = keys();
+  await click(fitButton()!);
+  expect(fitButton()!.textContent).toBe(C.careFitMine);
+  render(null, host);
+  await mount(mem);
+  expect(fitButton()!.textContent).toBe(C.careFitShowAll);
+  expect(taskIds()).not.toContain('brakes-pads-rim');
+  // nothing stored for it, in either app's storage
+  expect(keys()).toEqual(before);
+  expect(mem.writes).toEqual([]);
+  for (const m of [world([]), world([bike('bike_h', 'Hydro', HYDRO_E)], { [BIKE_CHOICE_KEY]: choice(null) }), world([bike('bike_u', 'Old one', {})])]) {
+    render(null, host);
+    await mount(m);
+    expect(fitLine()).toBeNull();
+  }
+});
+
+test('[BC-STEP-WORDS] on screen: the bleed names the bike\'s fluid; under Show all a card that does not fit the bike opens as for no bike, one that fits as for the bike', async () => {
+  await mount(world([bike('bike_h', 'Hydro', HYDRO_E)]));
+  const bleed = await stepsOf(tasks().find((d) => d.dataset.id === 'brakes-hydraulic-bleed')!);
+  expect(bleed.steps.join(' ')).toMatch(/mineral oil, never DOT fluid/);
+  // the maker cross-check stays (review of PR 129, m2)
+  expect(bleed.steps.join(' ')).toMatch(/Shimano usually uses mineral oil, SRAM usually DOT fluid/);
+  await click(fitButton()!);
+  // fits the bike: still its own fluid
+  expect((await stepsOf(tasks().find((d) => d.dataset.id === 'brakes-hydraulic-bleed')!)).steps.join(' ')).toMatch(/mineral oil, never DOT fluid/);
+  // a rim card on this disc bike: every line, as with no bike
+  await openRoad();
+  const rim = await stepsOf(road().find((d) => d.dataset.id === 'brake-rub-rim')!);
+  const card = ROAD_CARDS.find((c) => c.id === 'brake-rub-rim')!;
+  expect(rim.steps).toEqual(stepsShown(card.id, card.steps.length, careDetails(null)).map((i) => card.steps[i]!));
+});
+
+// The live-site sweep of 14 November 2026, items 44 and 47: the words say what fits depends on (the bike's details) and where the
+// "Tell us" link goes (the bag planner's Bike details).
+test('[BC-TELL-US] the "Tell us" link says it opens Bike details; the Tools card says the list is fitted to the bike\'s details', async () => {
+  await mount(world([bike('bike_a', 'Gravel', { brakes: 'rim' })]));
+  expect(tellUs()!.textContent).toMatch(/\bin Bike details\b/);
+  expect(tellUs()!.getAttribute('href')).toBe(bikeDetailsHref('bike_a', 'care'));
+  expect(CL.careCardBody).toMatch(/fitted to your bike's details/);
 });

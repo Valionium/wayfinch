@@ -6,11 +6,12 @@ import { normaliseBike } from '../../core/bike/normalise.ts';
 import type { BikeRecord } from '../../core/bike/normalise.ts';
 import { resolveBikeSpec } from '../../core/bike/spec.ts';
 import type { BikeType } from '../../core/bike/spec.ts';
-import { careDetails, fitted, softTag } from '../../core/care/fit.ts';
+import { careDetails, careFluid, fitOf, fitted, softTag } from '../../core/care/fit.ts';
+import { pictureDetails } from '../../core/care/pictures.ts';
 import { byType, riderType } from '../../core/care/type-order.ts';
 import { searchCare } from '../../core/care/search.ts';
 import type { CareDetails, CareKey, CareTask, Conditions, Fitted, Part, RoadCard } from '../../core/care/types.ts';
-import { C, CARE_TASKS, CARRY, PART_LABEL, PARTS, ROAD_CARDS, SECTION_LABEL, SECTIONS, TAG_LABEL } from '../../core/wording/en-care.ts';
+import { C, CARE_TASKS, CARRY, fitWords, PART_LABEL, PARTS, ROAD_CARDS, SECTION_LABEL, SECTIONS, TAG_LABEL } from '../../core/wording/en-care.ts';
 import { bikeDetailsHref } from '../../ui/bike/link.ts';
 import { choiceVersion } from '../../ui/tools/bike-choice.ts';
 import { BikeLine } from '../../ui/tools/bike-line.tsx';
@@ -68,6 +69,20 @@ const TYPE_WORDS: Record<BikeType, string> = {
 
 function Unusual({ type }: { type: Other }) {
   return type ? <span class="visually-hidden"> ({C.careLessUsual(TYPE_WORDS[type])})</span> : null;
+}
+
+/**
+ * What the list fits (the owner's wish of 14 November 2026): a line at the top names the bike's told details, and one button lifts the
+ * fit (Show all: every card and task, as with no bike) and brings it back (Fit to my bike). The text is a polite live region, so the change
+ * is read out; the button stays the same element, so the focus stays on it. Show all is kept for this visit only (see the pull request).
+ */
+function CareFit({ words, all, onToggle }: { words: string[]; all: boolean; onToggle: () => void }) {
+  return (
+    <div class="care-fit">
+      <p class="care-fit-text" aria-live="polite">{all ? C.careFitAll : C.careFitShowing(words.join(', '))}</p>
+      <button type="button" class="btn care-fit-toggle" onClick={onToggle}>{all ? C.careFitMine : C.careFitShowAll}</button>
+    </div>
+  );
 }
 
 function RoadItem({ card, details, onSteps, other = null }: { card: Fitted<RoadCard>; details: CareDetails; onSteps: OnSteps; other?: Other }) {
@@ -131,11 +146,18 @@ export function CareScreen({ services }: { services: TyreServices }) {
   const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ care: null, road: null });
 
   const bike = chosenBike(services);
-  const details = careDetails(bike);
+  // Show all (the owner's wish of 14 November 2026): the list as with no bike; not stored, so the next visit fits the bike again
+  const [showAll, setShowAll] = useState(false);
+  const own = careDetails(bike);
+  const told = bike ? fitWords(own, pictureDetails(bike).rimBrake, careFluid(bike)) : [];
+  const all = showAll && told.length > 0;
+  const details = all ? careDetails(null) : own;
+  // under Show all, a card or task that does not fit the bike opens as for no bike (every line, the content's own words); one that fits, as for the bike
+  const stepBike = (source: StepSource): BikeRecord | null => (all && !fitOf(source.item.applies, own).show ? null : bike);
   const type = riderType(bike ? resolveBikeSpec(bike, null) : null);
   // "Add your bike" in the bike view: only while no bike is saved (with bikes saved and none chosen, the rider chose that).
   const addHref = savedBikeIds(services.storage).length === 0 ? bikeDetailsHref('new', 'care') : null;
-  const unsure = bike !== null && Object.values(details).some((v) => v === null);
+  const unsure = bike !== null && Object.values(own).some((v) => v === null);
   const fit = fitted(CARE_TASKS, details);
   const shown = searchCare(query, part ? fit.filter((t) => t.part === part) : fit, searchText);
   // The Care search also finds Roadside cards (decision 2): only while something is typed, as the bike and the part filter allow.
@@ -172,6 +194,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
       <p class="muted">{C.careIntro}</p>
       {/* With no saved bike, the "fits better" line in the bike line's place (wish 17). */}
       <BikeLine services={services} tick={tick} none={<FitLine before={HN.hintFitCare} after={HN.hintFitCareAfter} back="care" />} />
+      {told.length > 0 ? <CareFit words={told} all={all} onToggle={() => setShowAll(!all)} /> : null}
       <div class="care-tabs" role="tablist" aria-label={C.careTabsLabel}>
         {TABS.map((t, i) => (
           <button key={t.id} type="button" role="tab" id={`care-tab-${t.id}`} class="care-tab" aria-selected={tab === t.id} aria-controls={`care-panel-${t.id}`}
@@ -234,7 +257,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
           </>
         ) : null}
       </div>
-      {steps ? <StepView key={steps.item.id} source={steps} bike={bike} addHref={addHref} onClose={() => setSteps(null)} /> : null}
+      {steps ? <StepView key={steps.item.id} source={steps} bike={stepBike(steps)} addHref={addHref} onClose={() => setSteps(null)} /> : null}
     </div>
   );
 }

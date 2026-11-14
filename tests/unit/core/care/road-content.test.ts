@@ -92,7 +92,7 @@ test('[BC-ROAD] the figure check is pinned to its field: a figure moved to anoth
   const moved = { ...card, rideOn: 'Fine if it holds air.', steps: card.steps.map((s, i) => (i === 0 ? `${s} Stop if the tyre has a cut or bulge.` : s)) };
   expect(cardMissing(moved)).toEqual(['rideOn: Stop if the tyre has a cut or bulge']);
   const rub = ROAD_CARDS.find((c) => c.id === 'brake-rub-rim')!;
-  expect(cardMissing({ ...rub, steps: rub.steps.map((s, i) => (i === 4 ? 'Open the quick release and ride.' : s)) })).toEqual(['step4: Rim bent and still rubbing', "step4: open the brake's quick release only if you must and ride slowly", 'step4: Until you close it again, this brake works much less: ride slowly and use the other brake.']);
+  expect(cardMissing({ ...rub, steps: rub.steps.map((s, i) => (i === 5 ? 'Open the quick release and ride.' : s)) })).toEqual(['step5: Rim bent and still rubbing', "step5: open the brake's quick release only if you must and ride slowly", 'step5: Until you close it again, this brake works much less: ride slowly and use the other brake.']);
 });
 
 test('[BC-ROAD] nothing that could hurt a rider: no flame, solvent, penetrating oil, forcing a wheel straight, or a lever used as a tyre lever', () => {

@@ -171,6 +171,15 @@
    null,
    "Cable disc brakes only: move the pad away"
   ],
+  "brake-rub-rim": [
+   null,
+   null,
+   null,
+   "Cable rim brakes only: centre the brake",
+   "Hydraulic rim brakes only: no centring screw",
+   null,
+   null
+  ],
   "brake-weak-rim": [
    null,
    null,
