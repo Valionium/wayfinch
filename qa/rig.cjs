@@ -583,38 +583,84 @@ test('[LC-FRAME-FITS-ST] a bottle on the seat tube: the frame bag counts what th
   }
 });
 
-test('[LC-FRAME-FITS-OLD] a plan saved before the ruling loads unchanged; where its frame bag now holds less, the kit is placed afresh, the packing check names what does not fit in it now, and nothing is lost',()=>{
+test('[LC-FRAME-FITS-OLD] a plan saved before the ruling loads unchanged; where its frame bag now holds less, the kit is placed afresh and the packing check says so, naming what does not fit in it now, however the rider gets there (steps, a kit tick, the nights, a reload); shown, it stays for the visit and does not come back; nothing is lost',()=>{
   const STUB='renderBikeProfiles=()=>{};renderClimate=()=>{};renderBags=()=>{};renderKit=()=>{};drawRig=()=>{};syncGPXControl=()=>{};renderPressureHelper=()=>{};renderPackingChecklist=()=>{};applyTheme=()=>{};ensureClimate=()=>{};buildThumb=()=>"";';
-  // without bike.js nothing is drawn cut, so nothing is counted cut: the plan as every page before this one made it
+  // without bike.js nothing is drawn cut, so nothing is counted cut: the plan as every page before this one made it, left at the bags step
   const before=appVM({bike:false});before.run(STUB);
-  const saved=before.run(`(()=>{S.bikeProfile=normaliseBikeProfile({id:'qa_xs',name:'XS',fit:{style:'compact',size:{kind:'letter',value:'XS'}}});
-    S.bags=[{uid:1,pos:'frame',L:2.5},{uid:2,pos:'bottle',slot:'dt',L:0.75},{uid:3,pos:'seat',L:14},{uid:4,pos:'bar',L:13}];S.nextUid=5;S.step=4;S.nights=0;
+  const oldPlan=(style,bags)=>before.run(`(()=>{S.bikeProfile=normaliseBikeProfile({id:'qa_xs',name:'XS',fit:{style:'${style}',size:{kind:'letter',value:'XS'}}});
+    S.bags=${JSON.stringify(bags)};S.nextUid=5;S.step=2;S.nights=0;
     S.decks={bar:false,rack:false};S.placements=null;syncFrameBags();currentPlan();return JSON.stringify(captureDraft());})()`);
-  const plan=JSON.parse(saved),frameKey='1-0';
-  const was=Object.keys(plan.placements.items).filter(id=>plan.placements.items[id].some(e=>e[0]===frameKey));
+  const saved=oldPlan('compact',[{uid:1,pos:'frame',L:2.5},{uid:2,pos:'bottle',slot:'dt',L:0.75},{uid:3,pos:'seat',L:14},{uid:4,pos:'bar',L:13}]);
+  let plan=JSON.parse(saved);const frameKey='1-0';
+  const wasOf=p=>Object.keys(p.placements.items).filter(id=>p.placements.items[id].some(e=>e[0]===frameKey));
+  let was=wasOf(plan);
+  const litresOf=id=>plan.placements.items[id].filter(e=>e[0]===frameKey).reduce((n,e)=>n+e[2],0);
   assert.ok(plan.placements.basis.units.some(u=>u[0]===frameKey&&u[3]===2.2)&&was.length>=3,'the saved plan packs its 2.2 L frame bag');
-  const after=appVM();after.run(STUB);
-  const cut=(a,b)=>{const s=after.html.indexOf(a),e=after.html.indexOf(b,s+a.length);assert.ok(s>=0&&e>s,'missing '+a);return after.html.slice(s,e);};
-  after.run(cut('function renderResult(){','/* ==== 84-packing-checklist.js ==== */'));
-  after.run(`restorePlan(${saved},true)`);
-  assert.deepEqual(JSON.parse(after.run('JSON.stringify(S.bags)')),plan.bags,'the bags load as saved');
-  assert.deepEqual(JSON.parse(after.run('JSON.stringify(S.kit)')),plan.kit,'the kit loads as saved');
-  const now=JSON.parse(after.run(`(()=>{const A=currentPlan();return JSON.stringify({reason:A.notes.replan&&A.notes.replan.reason,items:A.items,spill:A.spill.map(k=>k.id),
-    frame:A.slots.find(s=>s.key==='${frameKey}')?.cap??null});})()`));
-  assert.equal(now.reason,'beside','placed afresh because the frame bag now counts only what fits beside the bottle');
-  assert.equal(now.frame,1.19);
-  const gone=was.filter(id=>!(now.items[id]||[]).some(e=>e[0]===frameKey));
-  assert.ok(gone.length>=1,'something no longer fits in the frame bag');
-  for(const id of Object.keys(plan.placements.items))assert.ok(now.items[id]||now.spill.includes(id),`${id} is still in a bag or named as not fitting`);
-  after.run('renderResult()');
-  const text=after.nodes.get('resultBox').innerHTML.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');
-  assert.match(text,/Your frame bag now counts only what fits beside your bottle: 1\.19 L usable, so the kit was placed afresh\./);
-  const line=(/Does not fit in it now: ([^.]+)\./.exec(text)||[])[1]||'';
-  for(const id of gone)assert.ok(line.toLowerCase().includes(after.run(`kitName(kitById(${JSON.stringify(id)}))`).toLowerCase()),`${id} is named: "${line}"`);
-  // the same plan saved afresh and opened again: no note
-  const again=after.run('JSON.stringify(captureDraft())');
-  const third=appVM();third.run(STUB);third.run(`restorePlan(${again},true)`);
-  assert.equal(third.run('currentPlan().notes.replan'),null,'saved with the new litres: no second note');
+  // the page as the rider opens it: the stored draft restored, the plan read as the start-up's summary write does, at the step it was left on
+  const open=draft=>{
+    const vm=appVM();vm.run(STUB);
+    const cut=(a,b)=>{const i=vm.html.indexOf(a),j=vm.html.indexOf(b,i+a.length);assert.ok(i>=0&&j>i,'missing '+a);return vm.html.slice(i,j);};
+    vm.run(cut('function renderResult(){','/* ==== 84-packing-checklist.js ==== */'));
+    // go() is in the page's start-up part, which this harness does not run: what it does to the plan's state, as the page's own go() does
+    vm.run('var go=n=>{S.step_prev=S.step;S.step=n;};');
+    vm.run(`restorePlan(${draft},true);S.step=${JSON.parse(draft).step};DRAFT_READY=true;currentPlan();`);
+    return vm;
+  };
+  const check=vm=>{vm.run('go(4);renderResult();');return vm.nodes.get('resultBox').innerHTML.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');};
+  const noteOf=(vm,text,what)=>{
+    assert.match(text,/Your frame bag now counts only what fits beside your bottle: 1\.19 L usable, so the kit was placed afresh\./,what);
+    const A=JSON.parse(vm.run(`JSON.stringify((()=>{const A=currentPlan();return {items:A.items,spill:A.spill.map(k=>k.id),cap:usableL(S.bags.find(b=>b.pos==='frame'))};})())`));
+    const gone=was.filter(id=>!(A.items[id]||[]).some(e=>e[0]===frameKey));
+    // the room beside what stayed of the frame bag's own things (what the planner moved in instead does not count against them)
+    A.left=A.cap-was.reduce((n,id)=>n+(A.items[id]||[]).filter(e=>e[0]===frameKey).reduce((t,e)=>t+e[2],0),0);
+    assert.ok(gone.length>=1,what+': something left the frame bag');
+    for(const id of Object.keys(plan.placements.items))assert.ok(A.items[id]||A.spill.includes(id),`${what}: ${id} is still in a bag or named as not fitting`);
+    const out=((/Does not fit in it now: ([^.]+)\./.exec(text)||[])[1]||'').toLowerCase(),also=((/Also moved out of it: ([^.]+)\./.exec(text)||[])[1]||'').toLowerCase();
+    for(const id of gone){
+      const name=vm.run(`kitName(kitById(${JSON.stringify(id)}))`).toLowerCase();
+      // named as not fitting only when it really does not fit beside what stayed (review of PR 170, m1)
+      if(litresOf(id)>A.left+1e-9)assert.ok(out.includes(name),`${what}: ${id} (${litresOf(id)} L, ${A.left} L left) is named as not fitting: "${out}"`);
+      else assert.ok(also.includes(name)&&!out.includes(name),`${what}: ${id} (${litresOf(id)} L, ${A.left} L left) still fits, so it is only named as moved: "${also}" / "${out}"`);
+    }
+  };
+  // the plan read at the bags step, then on to the packing check (go() sets S.step_prev: review of PR 170, I1)
+  let vm=open(saved);
+  assert.deepEqual(JSON.parse(vm.run('JSON.stringify(S.bags)')),plan.bags,'the bags load as saved');
+  assert.deepEqual(JSON.parse(vm.run('JSON.stringify(S.kit)')),plan.kit,'the kit loads as saved');
+  const first=JSON.parse(vm.run(`JSON.stringify((()=>{const A=currentPlan();return {reason:A.notes.replan&&A.notes.replan.reason,frame:A.slots.find(s=>s.key==='${frameKey}')?.cap??null};})())`));
+  assert.equal(first.reason,'beside','placed afresh because the frame bag now counts only what fits beside the bottle');
+  assert.equal(first.frame,1.19);
+  vm.run('go(3);currentPlan();');
+  noteOf(vm,check(vm),'through the steps');
+  // shown: it stays on screen for the rest of the visit, the draft saved after it no longer carries it, and opened again it does not come back
+  vm.run('S.kit.warmers=!S.kit.warmers;currentPlan();');
+  noteOf(vm,check(vm),'again in the same visit');
+  const seen=vm.run('JSON.stringify(captureDraft())');
+  assert.equal(JSON.parse(seen).besideNote,undefined,'the draft saved after the note was shown does not carry it');
+  assert.doesNotMatch(check(open(seen)),/Your frame bag now counts only/,'shown once: not again after a reload');
+  // a kit tick, the nights, a packed tick: each before the packing check, and the note still waits
+  for(const [what,code] of [['a kit tick','S.kit.warmers=!S.kit.warmers;'],['the nights','S.nights=3;'],['a packed tick','setPackedItem("tent",true);']]){
+    vm=open(saved);vm.run(code+'currentPlan();go(3);currentPlan();');
+    noteOf(vm,check(vm),what);
+  }
+  // saved with the new litres before the rider reached the packing check, then opened again: the note still waits in the draft
+  vm=open(saved);
+  const kept=vm.run('JSON.stringify(captureDraft())');
+  assert.ok(JSON.parse(kept).besideNote,'the draft carries the note until it is shown');
+  vm=open(kept);
+  assert.equal(vm.run('currentPlan().notes.replan'),null,'opened again: nothing is placed afresh a second time');
+  noteOf(vm,check(vm),'after a reload');
+  // a plan where the planner moved small things in while others left: what would still fit beside what stayed is named as moved, not as not fitting
+  plan=JSON.parse(oldPlan('diamond-sloping',[{uid:1,pos:'frame',L:2.5},{uid:2,pos:'bottle',slot:'dt',L:0.75},{uid:3,pos:'rack',L:15,pair:true},{uid:4,pos:'bar',L:13}]));
+  was=wasOf(plan);
+  vm=open(JSON.stringify(plan));
+  const both=check(vm);
+  assert.match(both,/Your frame bag now counts only what fits beside your bottle: 1.37 L usable/);
+  assert.match(both,/Also moved out of it: /,'a small thing that would still fit is named as moved');
+  noteOf(vm,both.replace('1.37 L usable','1.19 L usable'),'small things moved in');
+  // the bag's own help says why it counts less (review of PR 170, m2)
+  assert.match(vm.run('bagCapacityHelp(S.bags.find(b=>b.pos==="frame"))'),/bottle/);
+  assert.doesNotMatch(vm.run('bagCapacityHelp(S.bags.find(b=>b.pos==="bar"))'),/bottle/);
 });
 
 for(const [name,fn] of tests){fn();passed++;console.log('ok',name);}
