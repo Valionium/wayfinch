@@ -63,6 +63,7 @@ export const rawBike = (): fc.Arbitrary<Record<string, unknown>> => fc.record({
   rackMounts: maybe(fc.oneof(oneOfOr(['unknown', 'yes', 'no']), fc.constantFrom('Yes', true, false, 'maybe'))),
   axle: maybe(fc.oneof(oneOfOr(['unknown', 'thru', 'qr', 'nuts']), fc.constantFrom('QR', true, 12))),
   rimBrake: maybe(fc.oneof(oneOfOr(['unknown', 'caliper', 'v-brake', 'hydraulic']), fc.constantFrom('disc', true))),
+  brakeFluid: maybe(fc.oneof(oneOfOr(['unknown', 'mineral', 'dot']), fc.constantFrom('DOT', true))),
   pressure: maybe(pressure), fit: maybe(fc.oneof(fit, fc.constant(null))), maxWeight: maybe(fc.record({
     v: numberish(0.1, 900), u: fc.constantFrom('kg', 'lb', 'st'), includes: fc.constantFrom('bike', 'no-bike', 'unsure', 'maybe'),
   })), maxWeightAsked: maybe(fc.constantFrom(true, false, 'yes')), look: maybe(fc.oneof(look, fc.constant(null))),

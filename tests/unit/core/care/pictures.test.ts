@@ -7,7 +7,7 @@ import { gzipSync } from 'node:zlib';
 import { expect, test } from 'vitest';
 import { idsOf, kindOrder, pictureDetails, picturesFor, STEP_PICTURES, type PictureDetails } from '../../../../src/core/care/pictures.ts';
 import { normaliseBike } from '../../../../src/core/bike/normalise.ts';
-import { pictureWordsFrom, type PictureWords } from '../../../../src/core/wording/en-care-pictures.ts';
+import { IF_WORDS, pictureWordsFrom, type PictureWords } from '../../../../src/core/wording/en-care-pictures.ts';
 import CARE_WORDS from '../../../../src/core/wording/en-care-pictures.json';
 import { CARE_TASKS, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
 import { bannedHits } from '../../../fixtures/banned.ts';
@@ -82,9 +82,9 @@ test("[BC-PIC-DETAILS] the brake's release follows the kind of rim brake, never 
   expect(ids('spoke-snapped', 1, D({ brakes: 'rim', rimBrake: 'hydraulic', bars: 'flat' }))).toEqual(['hydro-rim-open', 'brake-qr-open', 'vbrake-open']);
   expect(ids('spoke-snapped', 1, D({ brakes: 'rim', rimBrake: 'caliper', bars: 'flat' }))).toEqual(['brake-qr-open', 'vbrake-open', 'hydro-rim-open']);
   // kind not told: bars only break the tie (drop-bar levers cannot pull V-brakes); no bars told, the caliper first
-  expect(ids('brake-rub-rim', 5, D({ brakes: 'rim', bars: 'flat' }))).toEqual(['vbrake-close', 'brake-qr-close', 'hydro-rim-close']);
-  expect(ids('brake-rub-rim', 5, D({ brakes: 'rim', bars: 'drop' }))[0]).toBe('brake-qr-close');
-  expect(ids('brake-rub-rim', 5, D())[0]).toBe('brake-qr-close');
+  expect(ids('brake-rub-rim', 6, D({ brakes: 'rim', bars: 'flat' }))).toEqual(['vbrake-close', 'brake-qr-close', 'hydro-rim-close']);
+  expect(ids('brake-rub-rim', 6, D({ brakes: 'rim', bars: 'drop' }))[0]).toBe('brake-qr-close');
+  expect(ids('brake-rub-rim', 6, D())[0]).toBe('brake-qr-close');
   // a hydraulic rim brake has no centring screw: no picture of one
   expect(ids('brake-rub-rim', 3, D({ brakes: 'rim', rimBrake: 'hydraulic' }))).toEqual(['rim-centre-caliper', 'rim-centre-vbrake']);
   expect(picturesFor('brake-rub-rim', 3, D({ brakes: 'rim', rimBrake: 'v-brake' })).map((p) => p.kind)).toEqual(['v-brake', 'caliper']);
@@ -139,4 +139,23 @@ test("[BC-PIC-DETAILS] a bike's details for pictures: its brakes, its rim brake'
 
 test('[BC-PIC-DETAILS] every kind of every choice has a picture file listed among the step pictures', () => {
   for (const steps of Object.values(STEP_PICTURES)) for (const e of steps) for (const id of idsOf(e)) expect(files, id).toContain(id);
+});
+
+// The live-site sweep of 14 November 2026, item 46: a picture drawn for one kind only (the pad spacer of a hydraulic disc brake, the
+// gears' barrel of cable gears), shown while the bike's detail that decides it is Not sure, says which kind it is for.
+test('[BC-PIC-IF] a one-kind picture shown while its detail is Not sure is marked so, with its words; told, it is not; other pictures never', () => {
+  expect(picturesFor('puncture-tube', 0, D())).toEqual([{ id: 'pad-spacer', kind: 'hydraulic-disc', assumed: true }]);
+  expect(picturesFor('puncture-tube', 0, D({ brakes: 'hydraulic-disc' }))).toEqual([{ id: 'pad-spacer', kind: 'hydraulic-disc' }]);
+  expect(picturesFor('gears-skipping', 1, D())).toEqual([{ id: 'gears-barrel', kind: 'cable', assumed: true }]);
+  expect(picturesFor('gears-skipping', 1, D({ shifting: 'cable' }))).toEqual([{ id: 'gears-barrel', kind: 'cable' }]);
+  // pictures with a choice of kinds (the switch says it) and single pictures are never marked
+  for (const [id, entries] of Object.entries(STEP_PICTURES)) {
+    entries.forEach((e, i) => {
+      if (e === null || typeof e === 'string' || e.by === 'brakes' || e.by === 'shifting') return;
+      for (const p of picturesFor(id, i, D())) expect(p, `${id} ${i}`).not.toHaveProperty('assumed');
+    });
+  }
+  expect(IF_WORDS['hydraulic-disc']).toBe('If you have hydraulic disc brakes:');
+  expect(IF_WORDS.cable).toBe('If you have cable gears:');
+  for (const t of Object.values(IF_WORDS)) expect(bannedHits(t, false), t).toEqual([]);
 });

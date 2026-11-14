@@ -2385,14 +2385,15 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
           <label for="bikeFrontTyre">Front tyre size<input id="bikeFrontTyre" type="text" maxlength="120" placeholder="e.g. 40-622 (700 × 40C)"></label>
           <label for="bikeRearTyre">Rear tyre size<input id="bikeRearTyre" type="text" maxlength="120" placeholder="e.g. 40-622 (700 × 40C)"></label>
           <p class="bike-profile-wide">Copy sizes from the tyre sidewalls. A spare tube needs the right wheel/tyre size and valve; front and rear may differ.</p>
-          <label for="bikeBrakes">Brake type<select id="bikeBrakes"><option value="unknown">Not set</option><option value="hydraulic-disc">Hydraulic disc</option><option value="cable-disc">Cable disc</option><option value="rim">Rim brakes</option><option value="other">Other</option></select></label>
+          <label for="bikeBrakes">Brake type<select id="bikeBrakes"><option value="unknown">Not sure</option><option value="hydraulic-disc">Hydraulic disc</option><option value="cable-disc">Cable disc</option><option value="rim">Rim brakes</option><option value="other">Other</option></select></label>
           <label for="bikePads">Brake pad / block reference<input id="bikePads" type="text" maxlength="120" placeholder="Exact part or model; note front/rear if different"></label>
           <label for="bikeDrive">Drivetrain<select id="bikeDrive"><option value="unknown">Not set</option><option value="derailleur">Chain + derailleur</option><option value="chain-hub">Chain + hub gears / single speed</option><option value="belt">Belt drive</option></select></label>
-          <label for="bikeShifting">Shifting<select id="bikeShifting"><option value="unknown">Not set</option><option value="cable">Cable operated</option><option value="electronic">Electronic</option><option value="none">No external shifting cable</option></select></label>
+          <label for="bikeShifting">Shifting<select id="bikeShifting"><option value="unknown">Not sure</option><option value="cable">Cable operated</option><option value="electronic">Electronic</option><option value="none">No gears</option></select></label>
           <label for="bikeSuspension">Suspension<select id="bikeSuspension"><option value="unknown">Not sure</option><option value="none">None</option><option value="front">Front fork</option><option value="full">Full suspension</option></select></label>
           <div class="bike-profile-field"><label for="bikeRackMounts">Rack mounts<select id="bikeRackMounts" aria-describedby="bikeRackMountsHint"><option value="unknown">Not sure</option><option value="yes">Yes</option><option value="no">No</option></select></label><p class="hint" id="bikeRackMountsHint">Small threaded holes near the rear axle and on the seat stays, for a rack.</p></div>
           <div class="bike-profile-field"><label for="bikeAxle">Wheel axle<select id="bikeAxle" aria-describedby="bikeAxleHint"><option value="unknown">Not sure</option><option value="thru">Thru-axle</option><option value="qr">Quick release</option><option value="nuts">Axle nuts</option></select></label><p class="hint" id="bikeAxleHint">What holds each wheel: a thick axle screwed through the fork, a thin rod with a lever, or nuts.</p></div>
           <div class="bike-profile-field" id="bikeRimBrakeField"><label for="bikeRimBrake">Rim brake type<select id="bikeRimBrake"><option value="unknown">Not sure</option><option value="caliper">Road caliper</option><option value="v-brake">V-brake</option><option value="hydraulic">Hydraulic rim brake</option></select></label></div>
+          <div class="bike-profile-field" id="bikeBrakeFluidField"><label for="bikeBrakeFluid">Brake fluid<select id="bikeBrakeFluid" aria-describedby="bikeBrakeFluidHint"><option value="unknown">Not sure</option><option value="mineral">Mineral oil</option><option value="dot">DOT fluid</option></select></label><p class="hint" id="bikeBrakeFluidHint">It is named on the brake lever or caliper, or in the manual. Never mix them.</p></div>
           <label id="bikeChainField" for="bikeChain">Chain / quick-link reference<input id="bikeChain" type="text" maxlength="120" placeholder="Brand, chain family and speed / part number"></label>
           <label id="bikeHangerField" for="bikeHanger">Derailleur hanger reference<input id="bikeHanger" type="text" maxlength="120" placeholder="Frame-specific part or hanger type"></label>
           <label class="bike-profile-wide" for="bikeNotes">Bike notes <span class="hint">optional</span><textarea id="bikeNotes" rows="3" maxlength="1000" placeholder="e.g. valve length, spare battery or unusual tools"></textarea></label>
@@ -2932,16 +2933,18 @@ let BIKE_PROFILE_WRITES=Promise.resolve();
 const BIKE_PROFILE_LABELS={
   tyres:{unknown:'Not set',tubes:'With inner tubes',tubeless:'Tubeless',other:'Tubular / other'},
   valve:{unknown:'Not set',presta:'Presta',schrader:'Schrader',dunlop:'Dunlop',other:'Other'},
-  brakes:{unknown:'Not set','hydraulic-disc':'Hydraulic disc','cable-disc':'Cable disc',rim:'Rim brakes',other:'Other'},
+  brakes:{unknown:'Not sure','hydraulic-disc':'Hydraulic disc','cable-disc':'Cable disc',rim:'Rim brakes',other:'Other'},
   drive:{unknown:'Not set',derailleur:'Chain + derailleur','chain-hub':'Chain + hub gears / single speed',belt:'Belt drive'},
-  shifting:{unknown:'Not set',cable:'Cable operated',electronic:'Electronic',none:'No external shifting cable'},
+  shifting:{unknown:'Not sure',cable:'Cable operated',electronic:'Electronic',none:'No gears'},
   suspension:{unknown:'Not sure',none:'None',front:'Front fork',full:'Full suspension'},
   rackMounts:{unknown:'Not sure',yes:'Yes',no:'No'},
   // Care pictures redo (owner's answers 1 and 2 of 9 November 2026): the wheels' axle, and with rim brakes their kind
   axle:{unknown:'Not sure',thru:'Thru-axle',qr:'Quick release',nuts:'Axle nuts'},
   rimBrake:{unknown:'Not sure',caliper:'Road caliper','v-brake':'V-brake',hydraulic:'Hydraulic rim brake'},
+  // the owner's wish of 14 November 2026: with hydraulic brakes (a hydraulic disc or a hydraulic rim brake), their fluid
+  brakeFluid:{unknown:'Not sure',mineral:'Mineral oil',dot:'DOT fluid'},
 };
-const BIKE_PROFILE_ANSWERS=['suspension','rackMounts','axle','rimBrake'];
+const BIKE_PROFILE_ANSWERS=['suspension','rackMounts','axle','rimBrake','brakeFluid'];
 const BIKE_PROFILE_TEXT={name:100,frontTyre:120,rearTyre:120,padType:120,chainType:120,hangerType:120,notes:1000};
 function normalisePressureBike(value){
   const p=dataObject(value) ? value : {};
@@ -3144,7 +3147,7 @@ function persistBikeProfileSelection(){
 }
 const BIKE_PROFILE_INPUTS={name:'bikeName',tyres:'bikeTyres',frontTyre:'bikeFrontTyre',rearTyre:'bikeRearTyre',
   valve:'bikeValve',brakes:'bikeBrakes',padType:'bikePads',drive:'bikeDrive',shifting:'bikeShifting',
-  suspension:'bikeSuspension',rackMounts:'bikeRackMounts',axle:'bikeAxle',rimBrake:'bikeRimBrake',chainType:'bikeChain',hangerType:'bikeHanger',notes:'bikeNotes'};
+  suspension:'bikeSuspension',rackMounts:'bikeRackMounts',axle:'bikeAxle',rimBrake:'bikeRimBrake',brakeFluid:'bikeBrakeFluid',chainType:'bikeChain',hangerType:'bikeHanger',notes:'bikeNotes'};
 // Of the tyre fields only the bike's weight is edited here (spec 7.1 item 3); the rest of bikeProfile.pressure is kept as it was saved.
 const BIKE_WEIGHT_INPUT='bikeBaseKg';
 function bikeProfileFieldVisibility(){
@@ -3152,6 +3155,8 @@ function bikeProfileFieldVisibility(){
   $('bikeChainField').classList.toggle('hidden',drive==='belt');
   $('bikeHangerField').classList.toggle('hidden',['belt','chain-hub'].includes(drive));
   $('bikeRimBrakeField').classList.toggle('hidden',$('bikeBrakes').value!=='rim');
+  const brakes=$('bikeBrakes').value;
+  $('bikeBrakeFluidField').classList.toggle('hidden',!(brakes==='hydraulic-disc' || brakes==='rim' && $('bikeRimBrake').value==='hydraulic'));
 }
 // ---- Bike details: the Frame and Maximum weight sections (spec 7.1, 7.4) ----
 // Every sentence the dialog shows about the frame or the weight limit, in one table the wording check reads (limit: true = states a result against the entered limit).
@@ -3561,6 +3566,7 @@ function initialiseBikeProfiles(){
   $('bikeNew').onclick=startNewBike;
   $('bikeDrive').onchange=bikeProfileFieldVisibility;
   $('bikeBrakes').onchange=bikeProfileFieldVisibility;
+  $('bikeRimBrake').onchange=bikeProfileFieldVisibility;
   $('bikeRemove').onclick=()=>{const p=BIKE_PROFILES.find(b=>b.id===$('bikeSavedSelect').value);if(!p)return;$('bikeRemoveQuestion').textContent=`Remove ${p.name} from saved bikes? Plans using it keep their own copy.`;$('bikeRemovePrompt').classList.remove('hidden');};
   $('bikeRemoveCancel').onclick=()=>{$('bikeRemovePrompt').classList.add('hidden');$('bikeRemove').focus({preventScroll:true});};
   $('bikeRemoveConfirm').onclick=removeSavedBike;
