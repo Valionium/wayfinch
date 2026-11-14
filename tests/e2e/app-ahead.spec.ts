@@ -386,6 +386,27 @@ test('[AH-STRIP-LINE] the owner\'s day at 360 and 1280 px: the icons on the line
   expect(last.cx - g.icons[0]!.cx).toBeGreaterThan(0.85 * g.line.w);
 });
 
+test('[AH-STRIP] a tap on a strip icon, and Back to today at the top, leave the focus on the title button of a card, never the body of the page (review of #142, I4 and M1)', async ({ page }) => {
+  test.skip(!['app-phone', 'app-laptop'].includes(test.info().project.name), 'both widths in the phone and laptop projects');
+  const inputs = rainyStop({ plan: { date: SAT, backToTodayAt: null } });
+  await page.clock.install({ time: inputs.now });
+  app = await loadApp(page, { launch: true, testHooks: true });
+  await drawCase(page, inputs);
+  const focused = () => page.evaluate(() => {
+    const el = document.activeElement;
+    return { tag: el?.tagName ?? '', card: el?.closest('[data-card]')?.getAttribute('data-card') ?? '', toggle: el?.classList.contains('ah-toggle') ?? false };
+  });
+  const icon = page.locator('[data-strip] .ah-icon').first();
+  await icon.focus();
+  await page.keyboard.press('Enter');
+  // The focus moves once the card has opened (a tick later): wait for it there, then check it is no longer the icon nor the body.
+  await expect.poll(async () => (await focused()).toggle).toBe(true);
+  expect((await focused()).tag).toBe('BUTTON');
+  await page.locator('[data-back-today] button').click();
+  await expect.poll(async () => (await focused()).card).toBe('daylight');
+  expect(await focused()).toEqual({ tag: 'BUTTON', card: 'daylight', toggle: true });
+});
+
 test('[AH-STRIP-LINE] an icon over a rain band: the band shows above and below it and can still be tapped', async ({ page }) => {
   test.skip(!['app-phone', 'app-laptop'].includes(test.info().project.name), 'both widths in the phone and laptop projects');
   const inputs = rainyStop();
