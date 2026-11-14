@@ -599,3 +599,67 @@ test('[BV-ZOOM] a mouse drag of a zoomed drawing let go outside it ends there: t
   expect(await sheet.locator('.bv-art').getAttribute('viewBox')).toBe(before);
   expect(errors).toEqual([]);
 });
+
+// The owner's wish of 14 November 2026: the brakes with their fluid and the gear shifting told in You's bike details fit Bike care, which
+// says so at the top; Show all lifts the fit and Fit to my bike brings it back, by keyboard too.
+test('[BC-FIT-LINE] brakes, brake fluid and shifting set in You\'s bike details fit Bike care, which names them; Show all, then Fit to my bike', async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/you' });
+  await seed(page, [U], 'bike_u');
+  // nothing told: no line, every task
+  await page.goto(`${app.origin}/#/tools/care`);
+  await expect(page.getByRole('heading', { name: 'Bike care', level: 2 })).toBeVisible();
+  await expect(page.locator('.care-fit')).toHaveCount(0);
+  await expect(task(page, 'brakes-pads-rim')).toBeVisible();
+  // You, Edit: the bag planner's Bike details, More details, Repair kit details
+  await page.goto(`${app.origin}/#/you`);
+  await page.locator('li.you-bike', { hasText: 'Old one' }).getByRole('link', { name: /Edit/ }).click();
+  await page.waitForURL(/\/tools\/bags\//);
+  await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await page.locator('#bikeMoreDetails > summary').click();
+  await page.locator('#bikeRepairFields > summary').click();
+  await expect(page.locator('#bikeBrakeFluidField')).toBeHidden();
+  await page.getByRole('combobox', { name: /^Brake type/ }).selectOption('hydraulic-disc');
+  const fluid = page.getByRole('combobox', { name: /^Brake fluid/ });
+  await expect(fluid).toBeVisible();
+  await expect(fluid).toHaveValue('unknown');
+  await expect(page.locator('#bikeBrakeFluidHint')).toHaveText("It is printed on the brake lever's cap or in the manual. Never mix them.");
+  await fluid.selectOption('mineral');
+  await page.getByRole('combobox', { name: /^Shifting/ }).selectOption('electronic');
+  await page.evaluate(() => { (document.getElementById('bikeLibraryPanel') as HTMLDetailsElement).open = true; });
+  await page.locator('#bikeSave').click();
+  await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles')!) as { id: string; brakeFluid?: string; shifting: string }[]).find((b) => b.id === 'bike_u'))).toMatchObject({ brakes: 'hydraulic-disc', brakeFluid: 'mineral', shifting: 'electronic' });
+  await page.locator('#bikeDetailsClose').click();
+  await page.waitForURL((u) => u.pathname === '/' && u.hash === '#/you');
+  await page.getByRole('link', { name: 'Care for this bike Old one' }).click();
+  await expect(page).toHaveURL(/#\/tools\/care$/);
+  const line = page.locator('.care-fit');
+  await expect(line).toContainText('Showing what fits your bike: hydraulic disc brakes (mineral oil), electronic gears.');
+  await expect(task(page, 'brakes-hydraulic-bleed')).toBeVisible();
+  await expect(task(page, 'gears-electronic-battery')).toBeVisible();
+  await expect(task(page, 'brakes-pads-rim')).toHaveCount(0);
+  await expect(task(page, 'gears-cables-look')).toHaveCount(0);
+  // no sideways scroll at 320 px with the line
+  await page.setViewportSize({ width: 320, height: 640 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  const showAll = line.getByRole('button', { name: 'Show all' });
+  expect((await showAll.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // by keyboard: the button takes Enter, keeps the focus, and the line says what is shown
+  await showAll.focus();
+  await page.keyboard.press('Enter');
+  await expect(line).toContainText('Showing everything, for every bike.');
+  const mine = line.getByRole('button', { name: 'Fit to my bike' });
+  await expect(mine).toBeFocused();
+  await expect(task(page, 'brakes-pads-rim')).toBeVisible();
+  await expect(task(page, 'gears-cables-look')).toBeVisible();
+  await page.keyboard.press('Space');
+  await expect(line).toContainText('Showing what fits your bike:');
+  await expect(line.getByRole('button', { name: 'Show all' })).toBeFocused();
+  await expect(task(page, 'brakes-pads-rim')).toHaveCount(0);
+  // the bleed names the bike's fluid
+  await task(page, 'brakes-hydraulic-bleed').locator('.care-open').click();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByRole('dialog')).toContainText('mineral oil, never DOT fluid');
+  expect(errors).toEqual([]);
+});

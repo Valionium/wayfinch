@@ -10,7 +10,9 @@
 // check; the creak has no claim about common sources), the careful value ships, brake, steerer, stem and bar bolts use the torque rule
 // or the twist test, carbon parts never go without a torque wrench, each quick release is the brake's or the wheel's. Nothing here is
 // final until the owner's read (O4).
-import type { CareKey, CareTask, CareValue, CarryItem, Part, RoadCard, Section } from '../care/types.ts';
+import type { Fluid } from '../care/fit.ts';
+import type { RimKind } from '../care/pictures.ts';
+import type { CareDetails, CareKey, CareTask, CareValue, CarryItem, Part, RoadCard, Section } from '../care/types.ts';
 
 export const C = {
   careTitle: 'Bike care',
@@ -29,6 +31,11 @@ export const C = {
   careSearchHint: 'For example squeak, chain or bleed',
   careFiltersLabel: 'Parts',
   careTellUs: "Tell us your brakes, tyres… to hide what doesn't apply",
+  // What the list fits (the owner's wish of 14 November 2026): the line at the top, and its button that lifts the fit and brings it back
+  careFitShowing: (what: string): string => `Showing what fits your bike: ${what}.`,
+  careFitAll: 'Showing everything, for every bike.',
+  careFitShowAll: 'Show all',
+  careFitMine: 'Fit to my bike',
   careNothing: 'Nothing matches.',
   careClear: 'Clear search and filter',
   careSigns: "Signs it's due",
@@ -89,6 +96,49 @@ export function TAG_LABEL<K extends CareKey>(key: K, values: readonly CareValue[
         : values.map((v) => words[v]).join(' or ');
   return `${C.careTagIf} ${joined}`;
 }
+
+// ---- What the list fits (the owner's wish of 14 November 2026) ----
+const FLUID_WORDS: Record<Fluid, string> = { mineral: 'mineral oil', dot: 'DOT fluid' };
+const RIM_WORDS: Record<RimKind, string> = { caliper: 'road caliper rim brakes', 'v-brake': 'V-brakes', hydraulic: 'hydraulic rim brakes' };
+
+/**
+ * The bike's told details, in words, for the line "Showing what fits your bike: …": the brakes with their kind and, when hydraulic,
+ * their fluid; the gears; then every other detail the list is fitted to, so the line never hides why something is left out. Not sure
+ * details are not named; with none told, the list is not fitted and the line is not shown.
+ */
+export function fitWords(d: CareDetails, rimBrake: RimKind | null, fluid: Fluid | null): string[] {
+  const out: string[] = [];
+  const brakes = d.brakes === null ? null : d.brakes === 'other' ? 'other brakes' : d.brakes === 'rim' && rimBrake ? RIM_WORDS[rimBrake] : VALUE_WORDS.brakes[d.brakes];
+  if (brakes) out.push(fluid ? `${brakes} (${FLUID_WORDS[fluid]})` : brakes);
+  if (d.shifting !== null) out.push(d.shifting === 'cable' ? 'cable gears' : d.shifting === 'electronic' ? 'electronic gears' : 'no gears');
+  if (d.tyres !== null) out.push(d.tyres === 'other' ? 'tubular or other tyres' : VALUE_WORDS.tyres[d.tyres]);
+  if (d.drive === 'belt') out.push(VALUE_WORDS.drive.belt);
+  else if (d.gears !== null && d.gears !== 'other') out.push(d.gears === 'derailleur' ? 'a derailleur' : VALUE_WORDS.gears.hub);
+  if (d.suspension !== null && d.suspension !== 'other') out.push(VALUE_WORDS.suspension[d.suspension]);
+  if (d.ebike !== null && d.ebike !== 'other') out.push(d.ebike === 'yes' ? VALUE_WORDS.ebike.yes : 'no motor');
+  return out;
+}
+
+/**
+ * Steps that say what the bike has (the owner's wish of 14 November 2026): per card or task, per step (0-based), the words for a told
+ * fluid or shifting. Only the content's own facts, never a new repair instruction: the bleed's "never mix" (book p. 213) with the bike's
+ * own fluid, and the gear card's two sentences cut apart (T17: electronic gears have no cable). Not told: the step as the content has it.
+ */
+export type StepVariant = { by: 'fluid'; words: Record<Fluid, string> } | { by: 'shifting'; words: { cable: string; electronic: string } };
+export const STEP_VARIANTS: Readonly<Record<string, Readonly<Record<number, StepVariant>>>> = {
+  'brakes-hydraulic-bleed': {
+    1: { by: 'fluid', words: { mineral: "Your bike's details say mineral oil: use only mineral oil, never DOT fluid.", dot: "Your bike's details say DOT fluid: use only DOT fluid, never mineral oil." } },
+  },
+  'brakes-spongy': {
+    2: { by: 'fluid', words: {
+      mineral: "Bleed the brake, or take it to a shop. Your bike's details say mineral oil: never mix it with DOT fluid.",
+      dot: "Bleed the brake, or take it to a shop. Your bike's details say DOT fluid: never mix it with mineral oil.",
+    } },
+  },
+  'gears-skipping': {
+    1: { by: 'shifting', words: { cable: 'Cable gears: turn the barrel adjuster a click at a time.', electronic: 'Electronic gears have no cable: check the shifting battery instead.' } },
+  },
+};
 
 // ---- Care tasks (group 2: the draft's 49 rows less the one the owner's rules cut, 48) ----
 export const CARE_TASKS: CareTask[] = [

@@ -4,7 +4,9 @@
 // card "Cable brakes:" for the rim brakes a cable pulls (a road caliper or a V-brake, not a hydraulic rim brake). With the detail Not sure
 // every line shows, the most common modern one first; with another answer the line does not show. No words change; the step count is of
 // the steps shown.
+import { STEP_VARIANTS } from '../wording/en-care.ts';
 import { fitOf } from './fit.ts';
+import type { Fluid } from './fit.ts';
 import type { RimKind } from './pictures.ts';
 import type { CareDetails, Conditions } from './types.ts';
 
@@ -50,4 +52,15 @@ export function stepsShown(id: string, count: number, d: CareDetails, rimBrake: 
   });
   const order = UNSURE_ORDER[id];
   return unsure && order ? order.filter((i) => kept.includes(i)) : kept;
+}
+
+/** What a step's words can follow (the owner's wish of 14 November 2026): the bike's brake fluid and its gear shifting, null when not told. */
+export type StepFacts = { fluid: Fluid | null; shifting: CareDetails['shifting'] };
+
+/** A step's words for the bike: the content's own, or where a step says what the bike has (STEP_VARIANTS), the words for its fluid or shifting. */
+export function stepWords(id: string, step: number, text: string, f: StepFacts): string {
+  const v = STEP_VARIANTS[id]?.[step];
+  if (!v) return text;
+  if (v.by === 'fluid') return f.fluid ? v.words[f.fluid] : text;
+  return f.shifting === 'cable' || f.shifting === 'electronic' ? v.words[f.shifting] : text;
 }

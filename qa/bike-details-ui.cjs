@@ -161,6 +161,34 @@ reset();
   check(!hidden(),'[TB-DETAILS-AXLE] and choosing rim brakes shows it again');
   app.run('fillBikeProfileForm(null)');
 }
+// The owner's wish of 14 November 2026: with hydraulic brakes, Brake fluid (mineral oil, DOT fluid, Not sure) with its hint; Brake type
+// and Shifting start at Not sure, Shifting says No gears.
+{
+  const more=html.slice(html.indexOf('id="bikeMoreDetails"'),html.indexOf('</form>',html.indexOf('id="bikeProfileForm"')));
+  const at=id=>more.indexOf('id="'+id+'"');
+  const options=id=>{const m=more.match(new RegExp('<select id="'+id+'"[^>]*>(.*?)</select>'));return m ? [...m[1].matchAll(/<option value="([^"]*)">([^<]*)<\/option>/g)].map(o=>[o[1],o[2]]) : [];};
+  const labels=JSON.parse(app.run('JSON.stringify(BIKE_PROFILE_LABELS)'));
+  check(/<label for="bikeBrakeFluid">Brake fluid<select id="bikeBrakeFluid" aria-describedby="bikeBrakeFluidHint">/.test(more),'[TB-DETAILS-FLUID] Brake fluid is a select with its own label, tied to its hint');
+  check(JSON.stringify(options('bikeBrakeFluid'))===JSON.stringify([['unknown','Not sure'],['mineral','Mineral oil'],['dot','DOT fluid']]) && JSON.stringify(Object.entries(labels.brakeFluid||{}))===JSON.stringify(options('bikeBrakeFluid')),'[TB-DETAILS-FLUID] it offers Not sure first, Mineral oil and DOT fluid');
+  const hint=more.match(/<p class="hint" id="bikeBrakeFluidHint">([^<]*)<\/p>/);
+  check(hint && hint[1]==="It is printed on the brake lever's cap or in the manual. Never mix them.",'[TB-DETAILS-FLUID] the hint says where to find it and never to mix them');
+  check(at('bikeBrakeFluidField')>at('bikeRimBrakeField') && at('bikeBrakeFluidField')<at('bikeChainField'),'[TB-DETAILS-FLUID] it comes after Rim brake type');
+  check(app.run('BIKE_PROFILE_INPUTS.brakeFluid')==='bikeBrakeFluid','[TB-DETAILS-FLUID] it is read and filled with the other details');
+  check(options('bikeBrakes')[0]?.[1]==='Not sure' && options('bikeShifting')[0]?.[1]==='Not sure','[TB-DETAILS-FLUID] Brake type and Shifting start at Not sure');
+  check(JSON.stringify(options('bikeShifting'))===JSON.stringify(Object.entries(labels.shifting)) && labels.shifting.none==='No gears','[TB-DETAILS-FLUID] Shifting offers cable, electronic and No gears');
+  check(JSON.stringify(options('bikeBrakes'))===JSON.stringify(Object.entries(labels.brakes)),'[TB-DETAILS-FLUID] Brake type offers its labels');
+  const shown=()=>!get('bikeBrakeFluidField').classList.contains('hidden');
+  app.run('fillBikeProfileForm(null)');
+  check(get('bikeBrakeFluid').value==='unknown' && !shown(),'[TB-DETAILS-FLUID] a new bike starts at Not sure, the field hidden while the brakes are not told');
+  const set=(brakes,rimBrake)=>{get('bikeBrakes').value=brakes;get('bikeRimBrake').value=rimBrake;app.run('bikeProfileFieldVisibility()');};
+  set('hydraulic-disc','unknown');check(shown(),'[TB-DETAILS-FLUID] shown for hydraulic disc brakes');
+  set('rim','hydraulic');check(shown(),'[TB-DETAILS-FLUID] shown for a hydraulic rim brake');
+  for(const [b,r] of [['rim','caliper'],['rim','v-brake'],['rim','unknown'],['cable-disc','unknown'],['other','unknown'],['unknown','unknown']]){set(b,r);check(!shown(),'[TB-DETAILS-FLUID] hidden for '+b+' '+r);}
+  check(/\$\('bikeRimBrake'\)\.onchange=bikeProfileFieldVisibility;/.test(html),'[TB-DETAILS-FLUID] a change of rim brake type sets which fields show');
+  app.run(`fillBikeProfileForm(normaliseBikeProfile({id:'filled',brakes:'hydraulic-disc',brakeFluid:'dot'}))`);
+  check(get('bikeBrakeFluid').value==='dot' && shown(),'[TB-DETAILS-FLUID] a saved bike fills it and shows it');
+  app.run('fillBikeProfileForm(null)');
+}
 // Saving them: on the saved bike and the plan's bike, after a reload too; back to Not sure stores no field.
 async function detailsSave(){
   const {appVM:tab,sharedStore}=require('./app-vm.cjs');
@@ -193,6 +221,14 @@ async function detailsSave(){
   check(await a.run('saveBikeProfile()')===true,'[TB-DETAILS-AXLE] saved again with disc brakes');
   await a.run('BIKE_PROFILE_WRITES');
   check(library().axle==='thru' && library().brakes==='cable-disc' && library().rimBrake==='caliper','[TB-DETAILS-AXLE] with disc brakes both stay as answered (the field is hidden; Bike care reads it only with rim brakes)');
+  set('bikeBrakes','hydraulic-disc');set('bikeBrakeFluid','mineral');set('bikeShifting','electronic');
+  check(await a.run('saveBikeProfile()')===true,'[TB-DETAILS-FLUID] the bike saves with a brake fluid');
+  await a.run('BIKE_PROFILE_WRITES');
+  check(library().brakeFluid==='mineral' && current().brakeFluid==='mineral' && library().shifting==='electronic','[TB-DETAILS-FLUID] it is on the saved bike and on loadcheck:bikeProfile');
+  set('bikeBrakeFluid','unknown');
+  check(await a.run('saveBikeProfile()')===true,'[TB-DETAILS-FLUID] saved again at Not sure');
+  await a.run('BIKE_PROFILE_WRITES');
+  check(![library(),current()].some(b=>'brakeFluid' in b),'[TB-DETAILS-FLUID] back to Not sure stores no field');
 }
 // Moved here from the retired pressure-tool-markup and pressure-tool suites (sub-project 6, Task 6): what they guarded
 // besides the tyre helper. Unique ids; the bike weight in the form with its label and help; Use these bike details keeps the repair

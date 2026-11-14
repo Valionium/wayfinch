@@ -177,5 +177,25 @@ const check=(value,message)=>{assert.ok(value,message);checks++;};
     await run(`importAll(${JSON.stringify(JSON.stringify(exported))})`);
     check(run('BIKE_PROFILES[0].axle==="qr" && BIKE_PROFILES[0].rimBrake==="v-brake"'),'[TB-DETAILS-AXLE] import keeps both');
   }
+  // The owner's wish of 14 November 2026: with hydraulic brakes, the brake fluid; an answer only, so a bike stored before keeps its bytes
+  {
+    const read=raw=>JSON.parse(run(`JSON.stringify(normaliseBikeProfile(${JSON.stringify(raw)}))`));
+    for(const brakeFluid of ['mineral','dot']){
+      check(read({id:'h',brakes:'hydraulic-disc',brakeFluid}).brakeFluid===brakeFluid,'[TB-DETAILS-FLUID] '+brakeFluid+' reads back with hydraulic brakes');
+      check(read({id:'h',brakes:'cable-disc',brakeFluid}).brakeFluid===brakeFluid,'[TB-DETAILS-FLUID] and is kept as answered with other brakes');
+    }
+    for(const odd of [{brakeFluid:'unknown'},{brakeFluid:'DOT'},{brakeFluid:true},{}])check(!('brakeFluid' in read({id:'o',brakes:'hydraulic-disc',...odd})),'[TB-DETAILS-FLUID] '+JSON.stringify(odd)+' is no field: Not sure');
+    const old={id:'old',name:'Old',brakes:'hydraulic-disc',shifting:'electronic',axle:'thru'};
+    check(JSON.stringify(read(read(old)))===JSON.stringify(read(old)) && !('brakeFluid' in read(old)),'[TB-DETAILS-FLUID] a bike stored before loads unchanged');
+    const plain=read({id:'p',name:'P',brakes:'hydraulic-disc'}),both=read({id:'p',name:'P',brakes:'hydraulic-disc',brakeFluid:'dot'});
+    const rest={...both};delete rest.brakeFluid;
+    check(JSON.stringify(rest)===JSON.stringify(plain),'[TB-DETAILS-FLUID] no other field changes');
+    run(`renderBikeProfiles=()=>{};SETUPS=[];S.bikeProfile=normaliseBikeProfile(${JSON.stringify(both)});BIKE_PROFILES=[S.bikeProfile];`);
+    const exported=JSON.parse(run('exportAll()'));
+    check(exported.bikeProfiles[0].brakeFluid==='dot' && exported.draft.bikeProfile.brakeFluid==='dot','[TB-DETAILS-FLUID] export carries it');
+    run('BIKE_PROFILES=[];SETUPS=[];');
+    await run(`importAll(${JSON.stringify(JSON.stringify(exported))})`);
+    check(run('BIKE_PROFILES[0].brakeFluid==="dot"'),'[TB-DETAILS-FLUID] import keeps it');
+  }
   console.log(JSON.stringify({suite:'bike-profile-storage',checks}));
 })().catch(error=>{console.error(error);process.exitCode=1;});
