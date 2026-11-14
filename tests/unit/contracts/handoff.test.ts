@@ -1112,6 +1112,36 @@ describe('[TRIP-SMALL-OVER] a day ride\'s bags are sized with the trip\'s weathe
   });
 });
 
+// The sweep of 14 Nov 2026, #31: after the hand-off, Trip setups listed "Before Heidelberg → Speyer, 14 Nov · 6 nights · 0 bags", a plan the
+// rider never made (the planner's untouched start).
+describe('[TRIP-BEFORE-UNTOUCHED] a plan with nothing of the rider\'s in it is not kept as a setup before Plan bags for this trip (sweep 14 Nov 2026, #31)', () => {
+  test('the untouched start: no "Before …" setup, the bar promises none; Undo still gives that plan back exactly', async () => {
+    const p = await dayRide('2026-11-15');
+    p.page.run('SETUPS=[];');
+    await p.page.run('receiveHandoff()');
+    expect(String(p.page.nodes.get('handoffText')!.textContent)).not.toMatch(/kept as a setup|already saved as/);
+    const before = p.page.run('JSON.stringify(captureDraft())');
+    expect(await p.page.run('planTripBags()')).toBe(true);
+    expect(p.json<string[]>('SETUPS.map(s=>s.name)').filter((n) => n.startsWith('Before '))).toEqual([]);
+    expect(p.json<number>('SETUPS.length')).toBe(1);
+    expect(String(p.page.nodes.get('handoffText')!.textContent)).not.toMatch(/kept as a setup/);
+    expect(await p.page.run('undoTripBags()')).toBe(true);
+    expect(p.page.run('JSON.stringify(captureDraft())')).toBe(before);
+    expect(p.json<number>('SETUPS.length')).toBe(0);
+  });
+
+  test('anything of the rider\'s in it (a bag, a route, a touched or sized thing, a tick) and it is kept, as before', async () => {
+    for (const work of ['S.bags=[{uid:1,pos:"seat",L:10}];S.nextUid=2;', 'S.kit.cap=false;S.kitTouched.cap=true;', 'S.custom.tool={L:0.3,kg:0.2,rigid:0};', 'S.packed.docs=true;']) {
+      const p = await dayRide('2026-11-15');
+      p.page.run(`SETUPS=[];${work}`);
+      await p.page.run('receiveHandoff()');
+      expect(String(p.page.nodes.get('handoffText')!.textContent), work).toMatch(/Your plan now is kept as a setup/);
+      expect(await p.page.run('planTripBags()'), work).toBe(true);
+      expect(p.json<string[]>('SETUPS.map(s=>s.name)').filter((n) => n.startsWith('Before ')).length, work).toBe(1);
+    }
+  });
+});
+
 // Pockets on a day ride (owner, 9 Nov 2026): riders on an afternoon ride mostly wear bib shorts and a jersey with pockets, so the small
 // things ride there, counted as carried room, not as bags; the frame bag only when really necessary.
 describe('[TRIP-DAY-POCKETS] a day ride counts the jersey and bib shorts pockets as carried room (owner, 9 Nov 2026)', () => {
