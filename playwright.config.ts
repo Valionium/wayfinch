@@ -15,6 +15,11 @@ const FUNCTIONAL = ['chromium-phone', 'chromium-laptop', 'app-phone', 'app-phone
 // are taken inside the page, and on the phone stand-in (processor at a quarter) they made part 1/4 run 34 % longer, past its limit.
 // A trace holds the pages it saw, the bag planner's too: read one without printing that page's lines 20-25 (AGENTS.md).
 const KEEP_FAILED = process.env.CI ? { trace: { mode: 'retain-on-failure', snapshots: false, screenshots: true }, screenshot: 'only-on-failure' } as const : {};
+// In CI the two phone projects run in parts of their own, one test at a time on the machine (the owner's choice of 15 November 2026):
+// on a machine shared with a second worker, a slowed page sometimes stopped answering for the rest of its test (AH-EMERGENCY,
+// AH-CALL-CONFIRM, AH-NO-AUTO-POS, PRIV-NOTHING-SENT; never on a laptop). The other parts set WAYFINCH_PHONE_APART and leave them out.
+const PHONE = ['app-phone', 'app-phone-light'];
+const phoneApart = process.env.WAYFINCH_PHONE_APART === '1';
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -49,5 +54,5 @@ export default defineConfig({
     ...(process.env.WAYFINCH_WEBKIT
       ? [{ name: 'app-webkit-smoke', testMatch: /app-smoke\.spec\.ts/, use: { browserName: 'webkit' as const, viewport: { width: 390, height: 844 } } }]
       : []),
-  ],
+  ].filter((p) => !(phoneApart && PHONE.includes(p.name))),
 });
