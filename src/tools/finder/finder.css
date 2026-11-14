@@ -1,0 +1,21 @@
+/* The Bike finder (design of 14 November 2026): theme tokens only, so both themes follow; the questions use the tyre tool's radios
+   (theme.css); 320 px up with no sideways scroll. */
+.bf { overflow-wrap: anywhere; max-width: 48rem; }
+/* On a wide screen Tools lays its cards out in two columns: the page takes both. */
+.screen[data-screen='tools'] > .bf { grid-column: 1 / -1; }
+.bf-title { margin: 8px 0 4px; }
+.bf-title:focus, .bf-results h3:focus { outline: none; }
+.bf-title:focus-visible, .bf-results h3:focus-visible { outline: 2px solid var(--blaze); outline-offset: 2px; }
+.bf-legend { font-weight: 600; margin-bottom: 4px; }
+.bf-left { border-left: 4px solid var(--amber); padding: 4px 12px; margin: 8px 0; }
+.bf-show { margin: 8px 0; }
+.bf-results { margin-top: 16px; }
+.bf-results h3 { margin: 0; }
+.bf-list { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 12px; }
+.bf-type { border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+.bf-type h4 { margin: 0; }
+.bf-sub { font-weight: 600; margin: 8px 0 2px; }
+.bf-why, .bf-look { margin: 0; padding-left: 1.25rem; }
+.bf-mind { margin: 8px 0 0; }
+.bf-learn, .bf-add a { display: inline-flex; align-items: center; min-height: 44px; color: var(--blaze); font-weight: 600; }
+.bf-learn { margin-top: 4px; }

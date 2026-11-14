@@ -9,6 +9,7 @@ import { TK } from '../../core/wording/en-tyre-card.ts';
 import { savedBikeIds, toolBike } from '../../tools/tyre/choice.ts';
 import { TL } from '../../core/wording/en-tools.ts';
 import { LL } from '../../core/wording/en-learn-link.ts';
+import { FL } from '../../core/wording/en-finder-link.ts';
 import { readStore } from '../../tools/tyre/storage.ts';
 import type { LastResult } from '../../tools/tyre/storage.ts';
 import type { TyreServices } from '../../tools/tyre/services.ts';
@@ -25,29 +26,42 @@ import { lazy } from '../lazy.tsx';
 // Tools rather than a screen of the shell's, so the first screen carries nothing of it (its budget never rises).
 const LearnScreen = lazy(() => import('../../tools/learn/ui.tsx').then((m) => m.LearnScreen));
 export const LEARN_HREF = '#/tools?learn';
-const learnShown = (): boolean => typeof location !== 'undefined' && location.hash === LEARN_HREF;
+// The Bike finder (design of 14 Nov 2026): Tools' own page at #/tools?finder, a chunk of its own loaded from here, as How a bike is built.
+const FinderScreen = lazy(() => import('../../tools/finder/ui.tsx').then((m) => m.FinderScreen));
+export const FINDER_HREF = '#/tools?finder';
 
-/** Tools: its cards, or How a bike is built while the address says so. */
+type Page = { page: 'cards' | 'learn' | 'finder'; kind?: string | undefined };
+/** The page the address names; #/tools?learn=<type> (the Bike finder's links) opens How a bike is built on that type. */
+function pageShown(): Page {
+  const m = typeof location === 'undefined' ? null : /^#\/tools\?(learn|finder)(?:=([a-z]+))?$/.exec(location.hash);
+  return m ? { page: m[1] as Page['page'], kind: m[2] } : { page: 'cards' };
+}
+
+/** Tools: its cards, or How a bike is built or the Bike finder while the address says so. */
 export function ToolsScreen({ services }: { services: TyreServices }) {
-  const [learn, setLearn] = useState(learnShown);
+  const [shown, setShown] = useState(pageShown);
   useEffect(() => {
     // The window as the effect saw it: a cleanup that comes late (a test's page already gone) still finds it.
     const w = window;
-    const on = (): void => setLearn(learnShown());
+    const on = (): void => setShown(pageShown());
     w.addEventListener('hashchange', on);
     return () => w.removeEventListener('hashchange', on);
   }, []);
-  // Back from the page to the cards: the focus goes to the card's Open link rather than the page's start (review of PR 127, M3), and
-  // Tools shows from its top, not scrolled down to that last card (follow-up of 14 Nov).
-  const was = useRef(learn);
+  // Back from a page to the cards: the focus goes to that card's Open link rather than the page's start (review of PR 127, M3), and
+  // Tools shows from its top, not scrolled down to that card (follow-up of 14 Nov). Back from How a bike is built to the finder, the
+  // finder puts the focus on the link the rider followed.
+  const page = shown.page;
+  const was = useRef(page);
   useEffect(() => {
-    if (was.current && !learn) {
-      document.querySelector<HTMLAnchorElement>(`a[href="${LEARN_HREF}"]`)?.focus({ preventScroll: true });
+    if (was.current !== 'cards' && page === 'cards') {
+      document.querySelector<HTMLAnchorElement>(`a[href="${was.current === 'learn' ? LEARN_HREF : FINDER_HREF}"]`)?.focus({ preventScroll: true });
       window.scrollTo(0, 0);
     }
-    was.current = learn;
-  }, [learn]);
-  return learn ? <LearnScreen services={services} /> : <ToolsCards services={services} />;
+    was.current = page;
+  }, [page]);
+  if (page === 'learn') return <LearnScreen key={shown.kind} services={services} kind={shown.kind} />;
+  // Straight from How a bike is built to the finder is the phone's back (the page has no link there): the finder then focuses the link followed.
+  return page === 'finder' ? <FinderScreen back={was.current === 'learn'} /> : <ToolsCards services={services} />;
 }
 
 // The advisor in the bag planner; closing it comes back here (GA-BACK).
@@ -114,6 +128,10 @@ function ToolsCards({ services }: { services: TyreServices }) {
       <Card title={GA.advisorCardTitle}>
         <p class="tool-line">{GA.advisorCardLine}</p>
         <a class="btn btn-primary" href={ADVISOR_HREF} onClick={() => noteSeen('g')}>{W.tyreCardOpen}<span class="visually-hidden"> {GA.advisorCardTitle}</span></a>
+      </Card>
+      <Card title={FL.finderCardTitle}>
+        <p class="muted">{FL.finderCardBody}</p>
+        <a class="btn btn-primary" href={FINDER_HREF}>{W.tyreCardOpen}<span class="visually-hidden"> {FL.finderCardTitle}</span></a>
       </Card>
       <Card title={LL.learnCardTitle}>
         <p class="muted">{LL.learnCardBody}</p>
