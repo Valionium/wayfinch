@@ -1,4 +1,4 @@
-// How a bike is built (design of 14 November 2026): the parts a learner meets on a whole bike, the guide's 36 and 19 more, each with its
+// How a bike is built (design of 14 November 2026): the parts a learner meets on a whole bike, the guide's 37 and 19 more, each with its
 // step of the build, its group in the list, which bikes have it, what it connects to, and where it sits on the drawing. Pure: the drawing
 // is bikeArt's, untouched; the new parts' points and highlights are worked out from its anchors and frame templates, as part-points.ts
 // does for the guide's. The two pieces the shared drawing does not draw (a front derailleur, a brake cable) are drawn by this page only.
@@ -42,7 +42,7 @@ const TAGS: Partial<Record<LearnId, LearnTag>> = {
 export const LEARN_PARTS: readonly { id: LearnId; step: LearnStep }[] = ([
   ['frame', ['frame', 'head-tube', 'top-tube', 'down-tube', 'seat-tube', 'chainstay', 'seatstay', 'dropouts', 'shock']],
   ['fork', ['fork', 'stanchions', 'headset']],
-  ['wheels', ['hub', 'thru-axle', 'wheel-qr', 'spokes', 'rim', 'tyre', 'bead', 'tube', 'valve', 'tubeless-valve']],
+  ['wheels', ['wheel', 'hub', 'thru-axle', 'wheel-qr', 'spokes', 'rim', 'tyre', 'bead', 'tube', 'valve', 'tubeless-valve']],
   ['drive', ['bottom-bracket', 'crank', 'pedal', 'chainring', 'front-derailleur', 'chain', 'quick-link', 'belt', 'cassette', 'derailleur', 'hanger', 'hub-gears']],
   ['brakes', ['brake-lever', 'brake-cable', 'caliper', 'disc', 'rim-brake', 'pads', 'brake-qr', 'pad-adjuster']],
   ['cockpit', ['stem', 'handlebar', 'grips', 'bar-tape', 'shifter', 'gear-cable', 'barrel']],
@@ -62,6 +62,7 @@ export const EDGES: readonly (readonly [LearnId, LearnId])[] = [
   ['seat-tube', 'seatpost'], ['seat-tube', 'seat-clamp'], ['seat-tube', 'front-derailleur'], ['chainstay', 'dropouts'], ['seatstay', 'dropouts'],
   ['shock', 'seatstay'], ['shock', 'down-tube'], ['down-tube', 'battery'],
   ['dropouts', 'fork'], ['dropouts', 'thru-axle'], ['dropouts', 'wheel-qr'], ['dropouts', 'hanger'],
+  ['wheel', 'dropouts'], ['wheel', 'thru-axle'], ['wheel', 'wheel-qr'],
   ['fork', 'headset'], ['fork', 'stem'], ['fork', 'caliper'], ['fork', 'rim-brake'], ['fork', 'stanchions'], ['headset', 'stem'],
   ['stem', 'handlebar'], ['handlebar', 'grips'], ['handlebar', 'bar-tape'], ['handlebar', 'brake-lever'], ['handlebar', 'shifter'], ['handlebar', 'display'],
   ['hub', 'thru-axle'], ['hub', 'wheel-qr'], ['hub', 'spokes'], ['hub', 'disc'], ['hub', 'cassette'], ['hub', 'hub-gears'], ['hub', 'motor'], ['hub', 'belt'],

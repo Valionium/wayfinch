@@ -4,7 +4,9 @@ import { useState } from 'preact/hooks';
 import { Y } from '../../core/wording/en-you.ts';
 import { DEFAULT_SETTINGS } from '../../store/rules.ts';
 import { Card } from '../card.tsx';
-import { Choice, NumberField } from '../trip/settings.tsx';
+import { readTrip } from '../../store/trip.ts';
+import { suggestedNights } from '../trip/model.ts';
+import { Choice, NumberField, stopsLine } from '../trip/settings.tsx';
 import type { YouServices, YouSnapshot } from './services.ts';
 
 type Problems = Partial<Record<string, string>>;
@@ -21,9 +23,18 @@ export function RiderCards({ services, snap, reload }: { services: YouServices; 
     await reload();
     return result.ok;
   };
+  // A flat speed that changes the suggested nights plans the trip's nights again around the rider's own stops: said here, as on Trip
+  // (re-review 2 of PR 163, m-6), so no own stop goes unnamed.
+  const [stopsSaid, setStopsSaid] = useState('');
   const saveSetting = async (field: 'flatKph' | 'units', value: unknown): Promise<boolean> => {
+    const before = field === 'flatKph' && settings.nights === null ? await readTrip().catch(() => null) : null;
     const result = await services.writeSettings({ [field]: value });
     say(field, result.reasons[field] ?? result.note);
+    if (field === 'flatKph') {
+      const next = result.ok && before ? { ...before, flatKph: value as number } : null;
+      const now = next ? suggestedNights(next) : null;
+      setStopsSaid(next && before && now !== suggestedNights(before) ? await stopsLine(next, now!).catch(() => '') : '');
+    }
     await reload();
     return result.ok;
   };
@@ -39,6 +50,7 @@ export function RiderCards({ services, snap, reload }: { services: YouServices; 
             onCommit={(v) => saveSetting('flatKph', v ?? DEFAULT_SETTINGS.flatKph)} problem={problem('flatKph')}
           />
           <p class="muted">{Y.youFlatKphHint}</p>
+          <p class="muted" role="status" data-you-stops>{stopsSaid}</p>
           <Choice
             name="thirst" legend={Y.youThirstLegend} value={profile.thirst} onPick={(v) => saveProfile('thirst', v)}
             options={[['less', Y.youThirstLess], ['average', Y.youThirstAverage], ['more', Y.youThirstMore]]}

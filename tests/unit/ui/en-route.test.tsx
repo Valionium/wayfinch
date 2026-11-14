@@ -77,7 +77,7 @@ describe('the name (finding M)', () => {
       expect(page, d.name).not.toMatch(/\bAhead\b/);
     }
     expect(readFileSync(join(legal, 'privacy/index.html'), 'utf8')).toContain('Trip, En route, Tools, You');
-    for (const s of [W.appTabAhead, W.appTripOpenAhead, W.appAheadNeedTitle, W.appAheadNeedUntil, W.appTripGoLater, W.appTripGetReadyLater, W.appTripNextGetReady, TF.appTripDepartureNone]) {
+    for (const s of [W.appTabAhead, W.appTripOpenAhead, W.appAheadNeedTitle, W.appAheadNeedUntil, W.appTripGoLater, W.appTripGetReadyLater, TF.appTripNextGetReady, TF.appTripDepartureNone]) {
       expect(s).toContain('En route');
       expect(bannedHits(s)).toEqual([]);
     }

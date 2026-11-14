@@ -55,7 +55,8 @@ function onPart(spec: BikeSpec, id: PartPlace): [string, number, boolean?] | 'wh
     case 'hub': case 'wheel-qr': case 'thru-axle': case 'dropouts': return ['bk-hub', 0.5, true];
     case 'spokes': return ['bk-spokes', 0.5];
     case 'rim': case 'valve': case 'tubeless-valve': return ['bk-rim', 0.5];
-    case 'tyre': case 'bead': case 'tube': return 'wheel';
+    // the wheel (the owner's ruling of 14 November 2026): on the tyre's band, as the tyre, the bead and the tube
+    case 'wheel': case 'tyre': case 'bead': case 'tube': return 'wheel';
     case 'brake-lever': return bars === 'drop' ? ['bk-hood', 2.5] : ['bk-grip', 6.5];
     case 'rim-brake': case 'brake-qr': case 'pads': case 'caliper': case 'pad-adjuster': return ['bk-caliper', 2];
     case 'barrel':
@@ -83,7 +84,7 @@ function* bikes(): Generator<{ name: string; spec: BikeSpec }> {
 }
 
 test('[PG-POINTS] every guide part sits on its drawn part, inside the drawing, for every template, size, handlebar, brake and drive', () => {
-  expect(PART_PLACES.length).toBe(36);
+  expect(PART_PLACES.length).toBe(37);
   // part-points names the one template with a curved down tube rather than reading TEMPLATES
   expect(Object.entries(TEMPLATES).filter(([, t]) => t.step !== undefined).map(([k]) => k)).toEqual(['step-through']);
   let checked = 0;

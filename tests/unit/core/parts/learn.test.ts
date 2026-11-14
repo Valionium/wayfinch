@@ -18,9 +18,9 @@ import { setBike, SIZES, STYLES } from '../bike/drawing-set.ts';
 const ALL: LearnId[] = LEARN_PARTS.map((p) => p.id);
 const sentences = (s: string): number => s.split(/(?<=[.!?])\s+/).filter(Boolean).length;
 
-test('[BL-PARTS] the page knows the guide\'s 36 parts and 19 more, each once, each with a step, a group, a short name and one or two sentences', () => {
-  expect(ALL.length).toBe(55);
-  expect(new Set(ALL).size).toBe(55);
+test('[BL-PARTS] the page knows the guide\'s 37 parts (its 36 and the wheel, the owner\'s ruling of 14 November 2026) and 19 more, each once, each with a step, a group, a short name and one or two sentences', () => {
+  expect(ALL.length).toBe(56);
+  expect(new Set(ALL).size).toBe(56);
   expect([...ALL].sort()).toEqual([...PART_PLACES, ...NEW_PARTS].sort());
   // the guide's parts keep the bike view's short names
   for (const g of GUIDE) { expect(ALL).toContain(g.id); expect(nameOf(g.id)).toBe(PART_SHORT[g.id]); expect(tagOf(g.id)).toBe(g.tag); }
@@ -67,6 +67,21 @@ test('[BL-LINKS] "connects to" goes both ways, names only parts the bike has, an
         expect(linksOf(bike, l), `${kind}: ${l} back to ${id}`).toContain(id);
       }
     }
+  }
+});
+
+// The wheel (the owner's ruling of 14 November 2026): put on with the wheels, first of them; it connects to the dropouts it sits in and to
+// what holds it there on this bike (a thru-axle or a quick release; on nuts, the dropouts alone); its line says what it is made of.
+test('[PG-WHEEL] the page has the wheel: first of the wheels step, connecting to the dropouts and what holds it there, on every kind', () => {
+  expect(stepOf('wheel')).toBe('wheels');
+  expect(ALL.filter((id) => stepOf(id) === 'wheels')[0]).toBe('wheel');
+  expect(nameOf('wheel')).toBe('Wheel');
+  for (const part of ['hub', 'spokes', 'rim', 'tyre']) expect(LN_DOES.wheel, part).toContain(part);
+  for (const kind of KINDS) {
+    const bike = kindBike(kind);
+    expect(partsOf(bike), kind).toContain('wheel');
+    const holds = hasPart(bike, 'thru-axle') ? ['thru-axle'] : hasPart(bike, 'wheel-qr') ? ['wheel-qr'] : [];
+    expect([...linksOf(bike, 'wheel')].sort(), kind).toEqual(['dropouts', ...holds].sort());
   }
 });
 
