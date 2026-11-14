@@ -62,6 +62,11 @@ test('[BW-TOPICS] the drawing marks the step\'s parts that the bike shown has, i
 
 test('[BW-TOPICS] the freehub steps mark the rear of the bike: the rear gears or the hub gears, never the hub, whose label is the front one', () => {
   for (const s of WORK_STEPS.freehub) expect(s.parts).not.toContain('hub');
+  // the Wheel (PR 161) is labelled on the front wheel too: no step marks it, so the rear wheel's steps never name the front one, and
+  // the tyre pressure steps mean the rim itself (dented; its highest pressure), so they keep the Rim
+  for (const s of TOPICS.flatMap((t) => WORK_STEPS[t])) expect(s.parts).not.toContain('wheel');
+  expect(WORK_STEPS.pressure[2]!.parts).toContain('rim');
+  expect(WORK_STEPS.pressure[3]!.parts).toContain('rim');
   expect(stepMarked(kindBike('gravel'), 'freehub', 0)).toEqual(['cassette', 'derailleur']);
   expect(stepMarked(kindBike('gravel'), 'freehub', 2)).toEqual(['cassette']);
   expect(stepMarked(kindBike('city'), 'freehub', 1)).toEqual(['hub-gears', 'chain']);
