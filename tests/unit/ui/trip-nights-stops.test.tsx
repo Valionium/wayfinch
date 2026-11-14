@@ -6,7 +6,7 @@ import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { planStages } from '../../../src/core/route/stages.ts';
 import type { Trip, TripStop } from '../../../src/core/types.ts';
-import { BD } from '../../../src/core/wording/en-beds.ts';
+import { TF } from '../../../src/core/wording/en-trip-fields.ts';
 import { DEFAULT_SETTINGS } from '../../../src/store/rules.ts';
 import type { Settings } from '../../../src/store/rules.ts';
 import type { SettingsOutcome, TripServices, TripSnapshot } from '../../../src/ui/trip/services.ts';
@@ -42,7 +42,7 @@ async function setNights(snap: TripSnapshot, value: string, outcome: SettingsOut
 describe('A change of nights says the stops are chosen afresh (review of PR 101, M4)', () => {
   test('[TRIP-DAY-STOPS] with the rider\'s own stop: "New stops for 3 nights. Stops you chose for the old nights are not kept."', async () => {
     const said = await setNights(snapOf([stop(92, 'rider'), stop(177, 'auto')]), '3');
-    expect(said).toBe(BD.appTripStopsNewNights(3, true));
+    expect(said).toBe(TF.appTripStopsNewNights(3, true));
     expect(said).toBe('New stops for 3 nights. Stops you chose for the old nights are not kept.');
     expect(host.querySelector('[data-nights-stops]')!.getAttribute('role')).toBe('status');
   });

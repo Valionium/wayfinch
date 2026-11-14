@@ -12,6 +12,8 @@ export const TF = {
   appTripNightsUseSuggested: 'Use the suggestion',
   appTripDepartureNone: 'No date yet. Without one, En route gives distances only and says why.',
   appTripDateClear: 'Clear the date',
+  // Other nights choose every stop afresh (TRIP-DAY-STOPS), said once beside the nights (review of PR 101, M4).
+  appTripStopsNewNights: (n: number, own: boolean): string => `New stops for ${n} ${n === 1 ? 'night' : 'nights'}.${own ? ' Stops you chose for the old nights are not kept.' : ''}`,
   appTripPace: 'Pace',
   appTripFlatKph: 'Flat speed, unloaded (km/h)',
   appTripStay: 'Stay type',

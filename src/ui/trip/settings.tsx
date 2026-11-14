@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
 import { TF } from '../../core/wording/en-trip-fields.ts';
-import { BD } from '../../core/wording/en-beds.ts';
 import { keepFreshOffered } from '../../data/refresh.ts';
 import type { Settings } from '../../store/rules.ts';
 import { useFollowing } from '../follow.ts';
@@ -98,7 +97,7 @@ export function TripSettings({ services, snap, reload, part, focusDate = 0 }: {
     const ok = await save('nights', v);
     const now = trip ? v ?? suggestedNights(trip) : null;
     const held = trip?.stops?.routeId === trip?.route.id ? trip?.stops : undefined;
-    setStopsSaid(ok && held && held.days.length > 0 && now !== null && now > 0 && now !== was ? BD.appTripStopsNewNights(now, held.days.some((d) => d.by === 'rider')) : '');
+    setStopsSaid(ok && held && held.days.length > 0 && now !== null && now > 0 && now !== was ? TF.appTripStopsNewNights(now, held.days.some((d) => d.by === 'rider')) : '');
     return ok;
   };
 
