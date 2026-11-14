@@ -11,6 +11,7 @@ import { W } from '../../../src/core/wording/en.ts';
 import { TR } from '../../../src/core/wording/en-trip.ts';
 import { TF } from '../../../src/core/wording/en-trip-fields.ts';
 import { HO } from '../../../src/core/wording/en-handoff.ts';
+import { TK } from '../../../src/core/wording/en-track.ts';
 import type { StepName, StepReport } from '../../../src/data/prepare.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
 import { closeDb, openDb } from '../../../src/store/db.ts';
@@ -847,7 +848,7 @@ describe('What the review of group 5 found', () => {
       await click(host.querySelector('button.hit')!);
     }
     await click(button(W.appAbPlan));
-    await until(() => text().includes(W.routeTrackTooLong), 'the reason');
+    await until(() => text().includes(TK.routeTrackTooLong), 'the reason');
     expect(text()).not.toContain(TR.appAbNone);
   });
 });

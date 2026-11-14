@@ -6,7 +6,7 @@
 // afterwards, and only then is its hash final. Stages and the sample grid need the trip's settings, so they are empty.
 import { haversineKm } from '../geo/haversine.ts';
 import type { Route, RoutePoint } from '../types.ts';
-import { W } from '../wording/en.ts';
+import { TK } from '../wording/en-track.ts';
 import { realAscent } from './ascent.ts';
 import { findClimbs } from './climbs.ts';
 import { GpxError } from './gpx.ts';
@@ -26,7 +26,7 @@ export function assembleRoute(raw: RawPoint[], name: string, source: 'gpx' | 'pl
     if (i > 0 && p.break !== true) distance += haversineKm(points[i - 1]!, r);
     points.push({ ...r, km: distance });
   });
-  if (distance > MAX_TRACK_KM) throw new GpxError('too-long', W.routeTrackTooLong);
+  if (distance > MAX_TRACK_KM) throw new GpxError('too-long', TK.routeTrackTooLong);
 
   // Climbing: each section on its own, and a figure only when every height is known.
   let ascentM: number | null = null;
