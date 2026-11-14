@@ -104,6 +104,22 @@ test('[BF-FLOW] questions left: said, the focus on the first; all answered: the 
   expect(await page.evaluate((k) => localStorage.getItem(k), KEY)).toBeNull();
 });
 
+// The flake of 14 Nov 2026 (CI of PRs 160 and 163): Show pressed within a frame of the last answer. The answer's render left an effect
+// waiting for the next frame; Show's render ran it first, it took the focus request while the list was not there yet, and the list's own
+// render then found none. Here both happen with no frame between them, every time.
+test('[BF-FLOW] Show pressed right after the last answer, with no frame between them, still moves the focus to the list', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools?finder' });
+  await answer(page, ['Day rides for fun or fitness', 'Paved roads', 'Little: a phone, a jacket', 'Speed first', 'Yes']);
+  await page.evaluate(async () => {
+    document.querySelector<HTMLInputElement>('input[name="bf-motor"][value="no"]')!.click();
+    // the answer's render commits on a microtask; Show comes before the next frame
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    document.querySelector<HTMLButtonElement>('.bf-show')!.click();
+  });
+  await expect(page.getByRole('heading', { name: 'Bike types for your answers', level: 3 })).toBeFocused();
+  await expect(types(page).first().locator('h4')).toHaveText('Road bike');
+});
+
 test('[BF-LEARN] each type opens its own drawing in How a bike is built (Explore); back comes to the list, the focus on that link', async ({ page }) => {
   app = await loadApp(page, { launch: true, path: '/#/tools?finder' });
   await answer(page, ['Touring with a rack and panniers', 'Paved and gravel', 'Kit for several days', 'A balance', 'No']);
