@@ -21,6 +21,8 @@ export const BD = {
   appTripStopUndo: 'Undo',
   appTripStopChanged: (day: number): string => `Day ${day} ends at the stop you chose.`,
   appTripStopNoChoice: "No other place to sleep is mapped near this day's planned end.",
+  // Other nights choose every stop afresh (TRIP-DAY-STOPS), said once beside the nights (review of PR 101, M4).
+  appTripStopsNewNights: (n: number, own: boolean): string => `New stops for ${n} ${n === 1 ? 'night' : 'nights'}.${own ? ' Stops you chose for the old nights are not kept.' : ''}`,
   appTripBedNear: (name: string, km: string, town: string | null): string => `To sleep near the end: ${name}, km ${km}${town === null ? '' : `, by ${town}`}`,
   appTripBedTown: (name: string, km: string, windowKm: string): string => `No place to sleep mapped within ${windowKm} km of the end; nearest town: ${name}, km ${km}`,
   appTripBedNone: (windowKm: string): string => `No place to sleep mapped within ${windowKm} km of the end`,

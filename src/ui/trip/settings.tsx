@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
 import { TF } from '../../core/wording/en-trip-fields.ts';
+import { BD } from '../../core/wording/en-beds.ts';
 import { keepFreshOffered } from '../../data/refresh.ts';
 import type { Settings } from '../../store/rules.ts';
 import { useFollowing } from '../follow.ts';
@@ -71,6 +72,7 @@ export function TripSettings({ services, snap, reload, part, focusDate = 0 }: {
   const dateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [fresh, setFresh] = useFollowing(settings.keepFresh);
   const dateField = useRef<HTMLInputElement>(null);
+  const [stopsSaid, setStopsSaid] = useState('');
   useEffect(() => { if (focusDate > 0) dateField.current?.focus(); }, [focusDate]);
 
   const save: Save = async (field, value) => {
@@ -89,6 +91,16 @@ export function TripSettings({ services, snap, reload, part, focusDate = 0 }: {
     await reload();
   };
   const problem = (f: string): string | null => problems[f] || null;
+  // Other nights choose every night's stop afresh, the rider's own picks included (TRIP-DAY-STOPS): said once, here, when the trip
+  // had stops (review of PR 101, M4). A day ride has none to say.
+  const saveNights = async (v: number | null): Promise<boolean> => {
+    const was = trip ? settings.nights ?? suggestedNights(trip) : null;
+    const ok = await save('nights', v);
+    const now = trip ? v ?? suggestedNights(trip) : null;
+    const held = trip?.stops?.routeId === trip?.route.id ? trip?.stops : undefined;
+    setStopsSaid(ok && held && held.days.length > 0 && now !== null && now > 0 && now !== was ? BD.appTripStopsNewNights(now, held.days.some((d) => d.by === 'rider')) : '');
+    return ok;
+  };
 
   if (part === 'remove') return <RemoveTrip snap={snap} reload={reload} />;
   if (part === 'when') {
@@ -132,10 +144,11 @@ export function TripSettings({ services, snap, reload, part, focusDate = 0 }: {
         ) : null}
         <NumberField
           id="trip-nights" label={TF.appTripNights} value={settings.nights} step="1" min={0} max={30}
-          placeholder={trip ? String(suggestedNights(trip)) : undefined} onCommit={(v) => save('nights', v)} problem={problem('nights')}
+          placeholder={trip ? String(suggestedNights(trip)) : undefined} onCommit={saveNights} problem={problem('nights')}
         />
         {trip ? <p class="muted">{TF.appTripNightsSuggested(suggestedNights(trip))}</p> : null}
-        {settings.nights !== null ? <button type="button" class="btn" onClick={() => void save('nights', null)}>{TF.appTripNightsUseSuggested}</button> : null}
+        <p class="muted" role="status" data-nights-stops>{stopsSaid}</p>
+        {settings.nights !== null ? <button type="button" class="btn" onClick={() => void saveNights(null)}>{TF.appTripNightsUseSuggested}</button> : null}
 
         {trip ? <p class="muted">{TR.appTripSettingsStageNote}</p> : null}
       </div>
