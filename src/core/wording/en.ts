@@ -631,7 +631,6 @@ export const W = {
   tyreMeasuredFrontLabel: 'Front wheel load (kg)',
   tyreMeasuredRearLabel: 'Rear wheel load (kg)',
   tyreCaliperFrontLabel: 'Front tyre width, calipered (mm)',
-  tyreSramNothingSent: 'Nothing is filled in or sent for you.',
 
   // ---- The store (sub-project 5): why a value or a write was refused ----
   appStoreFlatKphRange: 'Flat speed goes from 15 to 40 km/h.',

@@ -563,7 +563,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
             {sramList(v).map((row) => <li key={row.label}><strong>{row.label}:</strong> {row.value}</li>)}
           </ul>
           <p><a class="btn btn-primary" href={SRAM_URL} target="_blank" rel="noopener noreferrer">{TN.tyreSramLink}</a></p>
-          <p class="muted">{W.tyreSramNothingSent} {TN.tyreSramDiffer}</p>
+          <p class="muted">{TS.tyreSramNothingSent} {TN.tyreSramDiffer}</p>
         </Card>
       ) : null}
     </div>
