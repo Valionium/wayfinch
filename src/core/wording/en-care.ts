@@ -702,7 +702,8 @@ export const CARE_TASKS: CareTask[] = [
     signs: 'spongy lever, lever pulls to the bar',
     steps: [
       'Use the fluid named on the lever or caliper.',
-      'Shimano uses mineral oil, SRAM uses DOT fluid; never mix.',
+      // the owner's ruling of 14 November 2026: Magura too, with the fluid Not sure (its disc and rim brakes use Royal Blood mineral oil)
+      'Shimano uses mineral oil, SRAM uses DOT fluid, Magura uses mineral oil too; never mix.',
       'Fit the bleed block and bleed with the right kit.',
     ],
     tools: 'bleed kit, fluid, gloves', minutes: [45, 45], who: 'shop', why: 'Shop (needs a bleed kit; brakes are critical, a mistake can cause a crash)',
