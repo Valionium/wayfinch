@@ -399,8 +399,9 @@ test('[AH-STRIP] a tap on a strip icon, and Back to today at the top, leave the 
   const icon = page.locator('[data-strip] .ah-icon').first();
   await icon.focus();
   await page.keyboard.press('Enter');
-  await expect.poll(async () => (await focused()).tag).not.toBe('BODY');
-  expect((await focused()).toggle).toBe(true);
+  // The focus moves once the card has opened (a tick later): wait for it there, then check it is no longer the icon nor the body.
+  await expect.poll(async () => (await focused()).toggle).toBe(true);
+  expect((await focused()).tag).toBe('BUTTON');
   await page.locator('[data-back-today] button').click();
   await expect.poll(async () => (await focused()).card).toBe('daylight');
   expect(await focused()).toEqual({ tag: 'BUTTON', card: 'daylight', toggle: true });
