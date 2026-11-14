@@ -39,7 +39,7 @@ export function ThemeButton() {
   const dark = useDark();
   return (
     <button
-      type="button" class="theme-btn" aria-label={dark ? TH.toLight : TH.toDark}
+      type="button" class="theme-btn" aria-label={dark ? TH.toLight : TH.toDark} title={TH.hint(dark, themeChoice.value === 'auto')}
       onClick={() => { void setTheme(dark ? 'light' : 'dark'); }}
     >
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">

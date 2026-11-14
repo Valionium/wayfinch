@@ -68,7 +68,7 @@ test('[BK-RETURN] from You: Edit, a new colour, Update saved bike, then the cros
 
 test('[BK-RETURN] from You: Add a bike, named and saved, then Escape: You at the bikes lists it in its colour', async ({ page }) => {
   await wayfinch(page, '#/you');
-  await tapInto(page, page.getByRole('link', { name: 'Add a bike' }));
+  await tapInto(page, page.getByRole('link', { name: 'Add your bike' }));
   await moreDetails(page);
   await page.locator('#bikeName').fill('Gravel');
   await swatch(page, 'Orange').click();
@@ -81,7 +81,7 @@ test('[BK-RETURN] from You: Add a bike, named and saved, then Escape: You at the
 
 test('[BK-ADD-CHOSEN] from You: Add a bike, a colour tapped: saved, In your plan on You, and Tools shows it as the chosen bike straight away', async ({ page }) => {
   await wayfinch(page, '#/you');
-  await tapInto(page, page.getByRole('link', { name: 'Add a bike' }));
+  await tapInto(page, page.getByRole('link', { name: 'Add your bike' }));
   await swatch(page, 'Orange').click();
   await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles') ?? '[]') as unknown[]).length)).toBe(3);
   const added = await page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles')!) as { id: string }[])[2]!.id);
@@ -154,7 +154,7 @@ test('[BK-RETURN] offline, as the installed app: Edit, a new colour, the cross, 
 // Review of PR 49, M1: Escape or a tap beside the dialog never drops what the rider typed and has not saved.
 test('[BK-RETURN] Add a bike, a name typed and not saved: Escape and a tap beside the dialog keep it open with the name; once saved, Escape goes back', async ({ page }) => {
   await wayfinch(page, '#/you');
-  await tapInto(page, page.getByRole('link', { name: 'Add a bike' }));
+  await tapInto(page, page.getByRole('link', { name: 'Add your bike' }));
   await moreDetails(page);
   await page.locator('#bikeName').fill('Gravel');
   await page.keyboard.press('Escape');
