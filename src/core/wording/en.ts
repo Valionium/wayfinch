@@ -100,7 +100,8 @@ export const W = {
     `Refill at ${s} and fill up completely — it's the last reliable water for ${km} km. Carry ${litres} L extra.`,
   waterBottlesHold: (capacity: string, litres: string, s: string): string => `Your bottles hold ${capacity} L. Carry ${litres} L extra from ${s}.`,
   waterRefill: (s: string, where: string, litres: string): string => `Refill at ${s} (${where}): fill to ${litres} L`,
-  waterAhead: (km: string): string => `+${km} km`,
+  // A place at the rider's own kilometre reads "here", never "+0 km", as the stamps do (sweep of 14 Nov 2026, finding 20).
+  waterAhead: (km: string): string => (km === '0' ? 'here' : `+${km} km`),
   waterBack: (km: string): string => `${km} km back`,
   waterRefreshOrCarry: (edgeKm: string, km: string): string => `No place data after km ${edgeKm} — refresh this stretch, or carry for ${km} km.`,
   waterEnoughToReach: (s2: string, s1: string): string => `Enough to reach ${s2} — refilling at ${s1} is optional.`,
@@ -201,7 +202,7 @@ export const W = {
   weatherGustsUpTo: (kmh: string): string => `gusts up to ${kmh} km/h`,
   weatherRainingAnyway: 'Raining anyway? Shelter',
   weatherStampHere: (time: string): string => `here · ${time}`,
-  weatherStampAhead: (km: string): string => `+${km} km`,
+  weatherStampAhead: (km: string): string => (km === '0' ? 'here' : `+${km} km`),
   weatherBasis: (fetched: string, run: string | null): string => `Open-Meteo forecast fetched ${fetched}${run ? ` · model run ${run}` : ''}`,
   weatherAttribution: 'Weather data by Open-Meteo.com',
   weatherDetailRange: (half: string, parts: string): string => `30-minute detail to ${half}, day parts to ${parts}`,
@@ -403,6 +404,8 @@ export const W = {
 
   // ---- The help chips (section 6.9). ----
   helpNearest: (what: string, name: string, km: string): string => `Nearest ${what}: ${name}, km ${km}`,
+  helpNearestUnnamed: (what: string, km: string): string => `Nearest ${what}: no name mapped, km ${km}`,
+  helpUnnamed: (what: string): string => `Unnamed ${what}`,
   helpNone: (what: string): string => `No ${what} mapped near your route`,
   helpNoneAhead: (what: string): string => `No ${what} mapped ahead.`,
   helpNoneBehind: (what: string): string => `No ${what} mapped behind.`,
@@ -415,6 +418,7 @@ export const W = {
   helpWordHalt: 'halt',
   helpWordToilets: 'toilets',
   helpToiletsAt: (name: string): string => `toilets at ${name}`,
+  helpToiletsAtUnnamed: 'toilets at a place with no name mapped',
   helpRepairsMapped: 'repairs mapped',
   helpRepairsNotMapped: 'repairs not mapped',
   helpNoRepairs: 'mapped as no repairs',
@@ -424,6 +428,7 @@ export const W = {
   helpOpenUntil: (hm: string): string => `open until ${hm}`,
   helpEmergencyDepartment: 'emergency department mapped',
   helpEmergencyUnknown: 'emergency department not known',
+  helpSpecialist: (what: string): string => `specialist clinic: ${what}`,
   helpStationOnly: 'Station only — train times and bike carriage not checked',
   helpSunset: (hm: string): string => `sunset ${hm}`,
   helpBeforeSunrise: (hm: string): string => `before sunrise (${hm})`,
@@ -437,6 +442,7 @@ export const W = {
   helpCantWorkOut: "Help can't be worked out from these settings. Check the flat speed in Trip settings.",
   helpNoPlaceData: 'No place data for this stretch. Refresh it.',
   helpFromNoPosition: (km: string): string => `No position yet: measured from km ${km}.`,
+  helpFromNow: (hm: string): string => `Times here count from setting off now (${hm}), not from your planned start.`,
 
   // ---- The Emergency card and Share my location (section 6.9). Share lines are in the sender's words, with no relative time. ----
   emergencyCall: 'Call 112',

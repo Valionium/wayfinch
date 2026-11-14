@@ -37,7 +37,12 @@ const KIND_WORD = new Map<PlaceKind, string>([
 
 const isKind = (...kinds: PlaceKind[]) => (p: Place): boolean => kinds.includes(p.kind);
 const wordOf = (p: Place): string => (p.kind === 'station' ? (p.tags['railway'] === 'halt' ? W.helpWordHalt : W.helpWordStation) : KIND_WORD.get(p.kind) ?? W.helpWordToilets);
-const nameOf = (p: Place): string => (typeof p.name === 'string' && p.name.trim() !== '' ? p.name : wordOf(p));
+const hasName = (p: Place): p is Place & { name: string } => typeof p.name === 'string' && p.name.trim() !== '';
+/**
+ * A place with no name is called unnamed: its kind is never shown as if it were its name ("Nearest halt: halt"). Public
+ * toilets are the one kind whose plain word is a fair label ("toilets · km 101", EM-TOILETS).
+ */
+const nameOf = (p: Place): string => (hasName(p) ? p.name : p.kind === 'toilets' ? W.helpWordToilets : W.helpUnnamed(wordOf(p)));
 const closedAccess = (value: string | undefined): boolean => value === 'private' || value === 'no';
 
 const repairLine = (p: Place): string => {
@@ -45,7 +50,21 @@ const repairLine = (p: Place): string => {
   return v === 'yes' ? W.helpRepairsMapped : v === 'no' ? W.helpNoRepairs : W.helpRepairsNotMapped;
 };
 const valveLine = (p: Place): string => (p.tags['valves'] ? W.helpValves(p.tags['valves']) : W.helpValvesNotMapped);
-const departmentYes = (p: Place): boolean => p.tags['emergency'] === 'yes';
+/**
+ * A hospital mapped with only specialities other than general care (healthcare:speciality=psychiatry, say) is a specialist
+ * clinic: its emergency=yes may be for that speciality alone, so it is never offered as an emergency department.
+ */
+const GENERAL_CARE = ['general', 'emergency'];
+const specialities = (p: Place): string[] | null => {
+  const list = (p.tags['healthcare:speciality'] ?? '').split(';').map((x) => x.trim().toLowerCase()).filter(Boolean);
+  return list.length > 0 && !list.some((x) => GENERAL_CARE.includes(x)) ? list : null;
+};
+const departmentYes = (p: Place): boolean => p.tags['emergency'] === 'yes' && specialities(p) === null;
+const hospitalLines = (p: Place): string[] => {
+  const special = specialities(p);
+  if (special) return [W.helpSpecialist(special.map((x) => x.replace(/_/g, ' ')).join(', ')), W.helpEmergencyUnknown];
+  return [departmentYes(p) ? W.helpEmergencyDepartment : W.helpEmergencyUnknown];
+};
 
 const toiletsAccess = (p: Place): string | undefined => (p.kind === 'toilets' ? p.tags['access'] : p.tags['toilets:access'] ?? p.tags['access']);
 const accessLine = (p: Place): string => {
@@ -68,7 +87,7 @@ const GROUPS: Record<HelpKind, Group[]> = {
     { what: W.helpWordPharmacy, counts: isKind('pharmacy'), hasHours: true },
     {
       what: W.helpWordHospital, counts: (p) => p.kind === 'hospital' && p.tags['emergency'] !== 'no', preferred: departmentYes,
-      lines: (p) => [departmentYes(p) ? W.helpEmergencyDepartment : W.helpEmergencyUnknown],
+      lines: hospitalLines,
       status: (p) => (departmentYes(p) ? 'fine' : 'unknown'),
     },
   ],
@@ -78,12 +97,22 @@ const GROUPS: Record<HelpKind, Group[]> = {
   toilets: [
     {
       what: W.helpWordToilets, counts: (p) => (p.kind === 'toilets' || p.stop?.toilets === true) && !closedAccess(toiletsAccess(p)), hasHours: true,
-      label: (p) => (p.kind === 'toilets' ? nameOf(p) : W.helpToiletsAt(nameOf(p))), lines: (p) => [accessLine(p), feeLine(p)],
+      label: (p) => (p.kind === 'toilets' ? nameOf(p) : hasName(p) ? W.helpToiletsAt(p.name) : W.helpToiletsAtUnnamed), lines: (p) => [accessLine(p), feeLine(p)],
     },
   ],
 };
 
 const validDate = (d: Date): boolean => Number.isFinite(d.getTime());
+
+/**
+ * The chips ride there now (EM-NOW), while the cards ride from the planned start. When that start is still to come (before
+ * the trip, before the day's ride, after it), the chip says its times count from now, so "closed on arrival" at 00:30 is not
+ * read as the arrival on the day's ride (finding 13 of 14 Nov 2026). Shelter's chip says the same.
+ */
+export function fromNowNote(ride: DayRide, now: Date, timeZone: string): string[] {
+  if (!validDate(now) || !validDate(ride.departure) || ride.departure.getTime() - now.getTime() < 60_000) return [];
+  return [W.helpFromNow(formatHm(now, isKnownZone(timeZone) ? timeZone : 'UTC'))];
+}
 
 const reach = (s: Pass, from: Km): number => Math.abs(s.match.km - from) + rejoinKm(s.match.offRouteM);
 
@@ -183,7 +212,8 @@ export function helpChip(kind: HelpKind, f: HelpFacts): Answer {
     const passes: Pass[] = [];
     for (const m of f.matches) {
       const place = places.get(m.placeId);
-      if (!place || !g.counts(place)) continue;
+      // A place mapped access=private or no is no help to a passing rider (a private funicular halt, finding 14 of 14 Nov 2026).
+      if (!place || !g.counts(place) || closedAccess(place.tags['access'])) continue;
       // Written so that a broken kilometre or distance fails.
       const onRoute = m.km >= 0 && m.km <= lengthKm;
       if (onRoute && m.offRouteM >= 0 && m.offRouteM <= radiusKmFor(place) * 1000) passes.push({ place, match: m });
@@ -211,13 +241,15 @@ export function helpChip(kind: HelpKind, f: HelpFacts): Answer {
   const group = GROUPS[kind][0]!;
   // The title says "nearest", so it names the nearest; what is preferred comes first in the list.
   const first = [...firsts].sort((a, b) => a.reach - b.reach || compareFinal(a.pass.place, b.pass.place))[0];
-  const title = first
-    ? W.helpNearest(wordOf(first.pass.place), nameOf(first.pass.place), showKm(first.pass.match.km))
+  const firstPlace = first?.pass.place;
+  const title = first && firstPlace
+    ? hasName(firstPlace) ? W.helpNearest(wordOf(firstPlace), firstPlace.name, showKm(first.pass.match.km)) : W.helpNearestUnnamed(wordOf(firstPlace), showKm(first.pass.match.km))
     : !saved && rows.length === 0 ? W.helpNoPlaceData : W.helpNone(group.what);
   const detail = [
-    ...(isTrain ? [W.helpStationOnly] : []),
+    ...(isTrain ? [`${W.helpStationOnly}.`] : []),
     ...(start.position ? [] : [W.helpFromNoPosition(showKm(start.aheadKm))]),
     ...(first ? noneLines : []),
+    ...fromNowNote(f.ride, f.now, zone(start.aheadKm).timeZone),
   ].join(' ');
   return makeAnswer({
     topic: 'help', status: first ? first.item.status : 'unknown', title, stamp: first ? first.item.stamp : null,

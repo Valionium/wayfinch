@@ -5,6 +5,7 @@ import type { Answer, AnswerItem, Km, PlaceHours, Position } from '../../../../s
 import { bannedHits } from '../../../fixtures/banned.ts';
 import { at, bikeShop, cafe, flatRoute, hospital, pharmacy, pos, repairStation, station, sun, testTrip, toilet, type PlaceBuilder } from '../../../fixtures/build.ts';
 import { placeAt } from '../../../fixtures/places.ts';
+import { W } from '../../../../src/core/wording/en.ts';
 import { hoursOf, SAT, spots, type Spot } from './water-helpers.ts';
 import { momentOf, openAllYear, type Moment } from './weather-helpers.ts';
 
@@ -403,5 +404,70 @@ describe('bad data reads honest', () => {
     expect(typeof a.title).toBe('string');
     for (const i of a.items) if (['bike_shop', 'pharmacy', 'toilets'].includes(placeKind)) expect(i.status).toBe('unknown');
     expect(bannedHits([a.title, a.detail, ...a.items.map((i) => `${i.label} ${i.detail ?? ''}`)].join(' '))).toEqual([]);
+  });
+});
+
+// The live sweep of 14 Nov 2026 (findings 13 to 15), on a route out of Heidelberg, with the places as the pack holds them.
+describe('sweep of 14 Nov 2026', () => {
+  const unnamed = (b: PlaceBuilder): PlaceBuilder => ({ atKm: (km, o = {}) => ({ ...b.atKm(km, o), name: null }) });
+  test('[EM-NOW] before the planned start the chip says its times count from setting off now (finding 13)', () => {
+    // 00:25 on the first day, start at 08:30: the cards ride from 08:30, the chip from now.
+    const a = chip('bike', { moment: { now: `${SAT} 00:25` }, spots: [{ b: named(bikeShop, 'Fahrrad Service'), km: 2 }] });
+    expect(itemAt(a, 2).detail).toMatch(/about 00:3\d/);
+    expect(a.detail).toContain('Times here count from setting off now (00:25), not from your planned start.');
+  });
+  test('[EM-NOW] while riding the times already count from now, and the chip says nothing more (finding 13)', () => {
+    const a = chip('bike', { moment: riding(100), spots: [{ b: named(bikeShop, 'A'), km: 110 }] });
+    expect(a.detail).not.toContain('setting off now');
+  });
+  test('[EM-TRAIN] a halt mapped access=private is no way out: left out, the public station named (finding 14)', () => {
+    // The pack's unnamed funicular halt (railway=halt, access=private) 752 m off at km 0; Heidelberg Hauptbahnhof at km 1.5.
+    const a = chip('train', {
+      moment: { now: `${SAT} 00:25` },
+      spots: [
+        { b: unnamed(station({ tags: { railway: 'halt', access: 'private' } })), km: 0, off: 752 },
+        { b: station({ name: 'Heidelberg Hauptbahnhof' }), km: 1.5, off: 361 },
+      ],
+    });
+    expect(a.items.map((i) => i.label)).toEqual(['Heidelberg Hauptbahnhof · km 1.5, 361 m off route']);
+    expect(a.title).toBe('Nearest station: Heidelberg Hauptbahnhof, km 1.5');
+  });
+  test('[EM-TRAIN] an unnamed stop is called unnamed, never by its kind as if that were its name (finding 14)', () => {
+    const a = chip('train', { moment: riding(100), spots: [{ b: unnamed(station({ tags: { railway: 'halt' } })), km: 102, off: 752 }] });
+    expect(a.title).toBe('Nearest halt: no name mapped, km 102');
+    expect(itemAt(a, 102).label).toBe('Unnamed halt · km 102, 752 m off route');
+  });
+  test('[EM-PHARMACY] an unnamed hospital is called unnamed (finding 15)', () => {
+    const plain = { atKm: (km: Km, o = {}) => ({ ...hospital().atKm(km, o), name: null, tags: { amenity: 'hospital' } }) };
+    const a = chip('pharmacy', { moment: riding(100), spots: [{ b: plain, km: 100.3, off: 16 }] });
+    expect(itemAt(a, 100.3).label).toBe('Unnamed hospital · km 100.3, 16 m off route');
+  });
+  test('[EM-PHARMACY] a specialist clinic never reads as an emergency department, even mapped emergency=yes (finding 15)', () => {
+    // OSM way 155203932 as the pipeline now keeps it: amenity=hospital, emergency=yes, healthcare=doctor, healthcare:speciality=psychiatry.
+    const clinic = hospital({ name: 'Kinder- & Jugendpsychiatrie Heidelberg', tags: { healthcare: 'doctor', 'healthcare:speciality': 'psychiatry' } });
+    const general = hospital({ name: 'St. Josefskrankenhaus', tags: { healthcare: 'hospital' } });
+    const a = chip('pharmacy', { moment: riding(100), spots: [{ b: clinic, km: 100.6, off: 68 }, { b: general, km: 103 }] });
+    const c = itemAt(a, 100.6);
+    expect(c.detail).not.toContain('emergency department mapped');
+    expect(c.detail).toContain('specialist clinic: psychiatry · emergency department not known');
+    expect(c.status).toBe('unknown');
+    // The general hospital with a department comes first, and keeps its line.
+    expect(a.items.map((i) => i.stamp?.km)).toEqual([103, 100.6]);
+    expect(itemAt(a, 103).detail).toContain('emergency department mapped');
+    expect(itemAt(a, 103).status).toBe('fine');
+  });
+  test('[AH-CARD-ORDER] a place at the own kilometre of the rider reads "here", never "+0 km", in the lines of the chips too (finding 20)', () => {
+    const a = chip('pharmacy', { moment: riding(100), spots: [{ b: pharmacy(null, { name: 'Hof Apotheke' }), km: 100.02, off: 35 }] });
+    expect(itemAt(a, 100.02).detail).toMatch(/^here · about 12:0\d/);
+    expect(W.waterAhead('0')).toBe('here');
+    expect(W.weatherStampAhead('0')).toBe('here');
+    expect(W.weatherStampAhead('0.1')).toBe('+0.1 km');
+  });
+  test('[EM-PHARMACY] several specialities are listed in words; a general one stays a hospital (finding 15)', () => {
+    const many = hospital({ name: 'Klinik', tags: { 'healthcare:speciality': 'anaesthetics;plastic_surgery' } });
+    const general = hospital({ name: 'Allgemein', tags: { 'healthcare:speciality': 'general;surgery' } });
+    const a = chip('pharmacy', { moment: riding(100), spots: [{ b: many, km: 104 }, { b: general, km: 96 }] });
+    expect(itemAt(a, 104).detail).toContain('specialist clinic: anaesthetics, plastic surgery');
+    expect(itemAt(a, 96).detail).toContain('emergency department mapped');
   });
 });
