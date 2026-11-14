@@ -1,7 +1,7 @@
 // Climb check (the owner's idea of 14 November 2026, design 2026-11-14-climb-check-design.md): the route's climbs, the hardest
-// first, each with its riding time at the trip's flat speed and a plain judgement from its steepest 500 m. The climbs are the
-// route's own (CL-CLIMB) and the time is the pace engine's, so Trip, Ahead and Climb check give one figure. A route with a missing
-// height has no climbs here either: unknown, never "none".
+// first, each with its riding time at the trip's flat speed and a plain judgement from its steepest 500 m. The climbs are
+// the route's own (CL-CLIMB, as En route's Climbing card reads them) and the time is the pace engine's, so Trip, En route and
+// Climb check give one figure. A route with a missing height has no climbs here either: unknown, never "none".
 import { ridingMin } from '../engines/pace.ts';
 import type { Climb, Km, Route } from '../types.ts';
 
@@ -19,8 +19,11 @@ export type CheckedClimb = {
   /** Riding minutes at the trip's flat speed with a loaded bike, without breaks; null when the speed gives no time. */
   ridingMin: number | null;
   level: ClimbLevel;
-  /** The trip's day it starts on; null before the days are planned. */
-  day: number | null;
+  /** The trip's days it starts and ends on, as Trip's days; null before the days are planned. */
+  firstDay: number | null;
+  lastDay: number | null;
+  /** Each day that ends partway up it (review of PR 150, I1). */
+  dayEnds: { day: number; km: Km }[];
 };
 
 export type ClimbCheck = { kind: 'no-heights' } | { kind: 'none' } | { kind: 'climbs'; climbs: CheckedClimb[]; more: number };
@@ -45,16 +48,19 @@ export function climbCheck(route: Route, o: { flatKph: number; ebike?: boolean }
   if (!heights) return { kind: 'no-heights' };
   const found = route.climbs.filter(valid).sort((a, b) => hardness(b) - hardness(a) || a.startKm - b.startKm);
   if (found.length === 0) return { kind: 'none' };
-  const dayOf = (km: Km): number | null => {
-    const stages = route.stages;
-    if (stages.length === 0) return null;
-    return (stages.find((s) => km >= s.startKm && km < s.endKm) ?? stages[stages.length - 1]!).day;
-  };
+  const stages = route.stages;
+  // A climb starting where a day ends starts on the next day; one ending where a day ends is that day's.
+  const firstDayOf = (km: Km): number | null =>
+    stages.length === 0 ? null : (stages.find((s) => km >= s.startKm && km < s.endKm) ?? stages[stages.length - 1]!).day;
+  const lastDayOf = (km: Km): number | null =>
+    stages.length === 0 ? null : (stages.find((s) => km > s.startKm && km <= s.endKm) ?? stages[stages.length - 1]!).day;
   const climbs = found.slice(0, CLIMBS_SHOWN).map((c): CheckedClimb => {
     const min = ridingMin(route, c.startKm, c.topKm, o.flatKph);
     return {
       startKm: c.startKm, topKm: c.topKm, lengthKm: c.topKm - c.startKm, gainM: c.gainM, avgGradePct: c.avgGradePct, steepestPct: c.steepest500mPct,
-      ridingMin: Number.isFinite(min) ? min : null, level: climbLevel(c.steepest500mPct, o.ebike === true), day: dayOf(c.startKm),
+      ridingMin: Number.isFinite(min) ? min : null, level: climbLevel(c.steepest500mPct, o.ebike === true),
+      firstDay: firstDayOf(c.startKm), lastDay: lastDayOf(c.topKm),
+      dayEnds: stages.filter((s) => s.endKm > c.startKm && s.endKm < c.topKm).map((s) => ({ day: s.day, km: s.endKm })),
     };
   });
   return { kind: 'climbs', climbs, more: found.length - climbs.length };

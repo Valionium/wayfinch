@@ -65,7 +65,7 @@ test('[CC-TRIP] a route with climbs: Climb check is folded under the days, opens
   await expect(item).toContainText('36.2 km · 1,630 m up · average 4.5% · steepest 500 m 8.7%');
   await expect(item).toContainText(/About \d h( \d+ min)? of riding \(estimate\)/);
   await expect(item).toContainText('Steep in places: a slow climb in low gears with a loaded bike.');
-  await expect(box).toContainText("Estimates from the route's heights and your flat speed of 25 km/h with a loaded bike. Short ramps can be steeper than these figures.");
+  await expect(box).toContainText("Estimates from the route's heights and your flat speed of 25 km/h with a loaded bike. Short ramps can be steeper than these figures, and heights from a phone recording or a map can make a stretch look steeper than it is (bridges, tunnels).");
   await noSideways(page);
   const results = await new AxeBuilder({ page }).include('[data-climb-check]').analyze();
   expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join('; ')}`)).toEqual([]);

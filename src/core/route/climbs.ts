@@ -9,23 +9,61 @@ export const MIN_CLIMB_GRADE_PCT = 3;
 export const CLIMB_DIP_M = 20;
 const STEEP_WINDOW_KM = 0.5;
 
+/** Half the distance the heights are averaged over before the steepest 500 m is read. */
+const STEEP_AVERAGE_HALF_KM = 0.25;
+/** Besides the places where the averaged profile bends, windows are tried this often. */
+const STEEP_STEP_KM = 0.01;
+
+/**
+ * The steepest 500 m of a climb, read on its heights averaged over 500 m of distance (review of PR 150, I2): a recording's height
+ * noise, or a bridge or a tunnel in a map's heights, then barely moves it, and a steady grade still reads as itself. Never under the
+ * climb's own average.
+ */
 function steepest500m(km: Km[], h: number[], s: number, p: number): number {
   const length = km[p]! - km[s]!;
   const average = length > 0 ? ((h[p]! - h[s]!) / (length * 1000)) * 100 : 0;
   if (length < STEEP_WINDOW_KM) return average;
-  // The profile is piecewise linear, so the steepest window starts or ends at a vertex.
-  const at = (x: number): number => {
-    let i = s;
-    while (i < p - 1 && km[i + 1]! < x) i++;
-    const width = km[i + 1]! - km[i]!;
-    return width > 0 ? h[i]! + ((h[i + 1]! - h[i]!) * (x - km[i]!)) / width : h[i]!;
+  const last = km.length - 1;
+  // The area under the profile from the route's start to each point; the profile is straight between points.
+  const area = [0];
+  for (let i = 1; i <= last; i++) area.push(area[i - 1]! + ((h[i - 1]! + h[i]!) / 2) * (km[i]! - km[i - 1]!));
+  const integral = (x: number): number => {
+    if (x <= km[0]!) return 0;
+    if (x >= km[last]!) return area[last]!;
+    let lo = 0;
+    let hi = last;
+    while (lo + 1 < hi) {
+      const mid = (lo + hi) >> 1;
+      if (km[mid]! <= x) lo = mid; else hi = mid;
+    }
+    const width = km[hi]! - km[lo]!;
+    const y = width > 0 ? h[lo]! + ((h[hi]! - h[lo]!) * (x - km[lo]!)) / width : h[lo]!;
+    return area[lo]! + ((h[lo]! + y) / 2) * (x - km[lo]!);
   };
+  // The height averaged over 250 m either side, held to the route's ends.
+  const averaged = (x: number): number => {
+    const a = Math.max(km[0]!, x - STEEP_AVERAGE_HALF_KM);
+    const b = Math.min(km[last]!, x + STEEP_AVERAGE_HALF_KM);
+    return (integral(b) - integral(a)) / (b - a);
+  };
+  const from = km[s]!;
+  const to = km[p]! - STEEP_WINDOW_KM;
   let best = average;
-  for (let j = s; j <= p; j++) {
+  const tryFrom = (x: number): void => {
+    if (x < from || x > to) return;
+    best = Math.max(best, ((averaged(x + STEEP_WINDOW_KM) - averaged(x)) / (STEEP_WINDOW_KM * 1000)) * 100);
+  };
+  // The averaged profile bends where a point is 250 m from a window's end, so the steepest window mostly starts at such a place;
+  // a grid catches the rest.
+  const w = STEEP_AVERAGE_HALF_KM;
+  const L = STEEP_WINDOW_KM;
+  for (let j = 0; j <= last; j++) {
     const x = km[j]!;
-    if (x + STEEP_WINDOW_KM <= km[p]! + 1e-12) best = Math.max(best, ((at(x + STEEP_WINDOW_KM) - h[j]!) / (STEEP_WINDOW_KM * 1000)) * 100);
-    if (x - STEEP_WINDOW_KM >= km[s]! - 1e-12) best = Math.max(best, ((h[j]! - at(x - STEEP_WINDOW_KM)) / (STEEP_WINDOW_KM * 1000)) * 100);
+    if (x < from - L - w || x > km[p]! + w) continue;
+    for (const d of [0, w, -w, -L, w - L, -w - L]) tryFrom(x + d);
   }
+  for (let x = from; x <= to; x += STEEP_STEP_KM) tryFrom(x);
+  tryFrom(to);
   return best;
 }
 

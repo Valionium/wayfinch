@@ -136,6 +136,8 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - each climb's time is the pace engine's riding time at the trip's flat speed with a loaded bike, without breaks, shown to 5 min as an estimate; a speed that gives no time gives none [CC-TIME]
 - by the steepest 500 m: under 8% steady, from 8% steep, from 12% likely a walk in places with a loaded bike [CC-WALK]
 - a bike with a motor (Bike details' e-bike) gets no walk judgement, and the list says why [CC-EBIKE]
+- a climb over a night names its days ("Days 1 to 2") and says where each day ends on it, as Trip's days do (review of PR 150, I1) [CC-DAYS]
+- the steepest 500 m (here and on En route's Climbing card) is read on the heights averaged over 500 m, never under the climb's average, so recording noise or a bridge in the heights barely moves it; the lead says such heights can make a stretch look steeper (review of PR 150, I2) [CC-STEEP]
 - every figure says it is an estimate and that short ramps can be steeper; no gear and no health advice [CC-HONEST]
 - on Trip, Climb check is one button under the days in the route summary, folded until opened; its list is its own chunk, opens offline, and works by keyboard at 320 px in both themes [CC-TRIP]
 

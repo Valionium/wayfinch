@@ -50,7 +50,7 @@ describe('[CC-LIST] the climbs, hardest first, with where, length, gain and grad
     expect(c!.avgGradePct).toBeCloseTo(6, 1);
     expect(c!.steepestPct).toBeCloseTo(6, 1);
     expect(c!.level).toBe('steady');
-    expect(c!.day).toBeNull(); // no days planned yet
+    expect([c!.firstDay, c!.lastDay, c!.dayEnds]).toEqual([null, null, []]); // no days planned yet
     expect(out.kind === 'climbs' && out.more).toBe(0);
   });
 
@@ -60,7 +60,7 @@ describe('[CC-LIST] the climbs, hardest first, with where, length, gain and grad
     const withDays: Route = { ...route, stages: [stage(1, 0, 9), stage(2, 9, route.lengthKm)] };
     const list = climbsOf(climbCheck(withDays, { flatKph: 20 }));
     expect(list.map((c) => Math.round(c.startKm))).toEqual([10, 0]);
-    expect(list.map((c) => c.day)).toEqual([2, 1]);
+    expect(list.map((c) => [c.firstDay, c.lastDay])).toEqual([[2, 2], [1, 1]]);
     expect(list.map((c) => c.level)).toEqual(['steep', 'steady']);
     expect(list[0]!.avgGradePct).toBeCloseTo(10, 1);
   });
@@ -124,5 +124,85 @@ describe('[CC-EBIKE] a bike with a motor gets no walk judgement', () => {
     expect([7, 9, 12, 20].map((p) => climbLevel(p, true))).toEqual(['steady', 'steep', 'steep', 'steep']);
     const route = await routeOf([[0, 100], [3, 100], [4, 250], [8, 250]]);
     expect(climbsOf(climbCheck(route, { flatKph: 20, ebike: true })).map((c) => c.level)).toEqual(['steep']);
+  });
+});
+
+describe("[CC-DAYS] a climb over a night says which days it spans and where the day ends on it, as Trip's days do", () => {
+  test('a climb from km 0 to 36 over days 1 (0 to 22) and 2 (22 to 43): days 1 to 2, day 1 ending at km 22', async () => {
+    const route = await routeOf([[0, 400], [36.2, 2030], [43, 2030], [95, 300]]);
+    const withDays: Route = { ...route, stages: [stage(1, 0, 22), stage(2, 22, 43), stage(3, 43, route.lengthKm)] };
+    const [c] = climbsOf(climbCheck(withDays, { flatKph: 20 }));
+    expect([c!.firstDay, c!.lastDay]).toEqual([1, 2]);
+    expect(c!.dayEnds).toEqual([{ day: 1, km: 22 }]);
+  });
+
+  test("over three days it names every day end on it; a climb ending exactly at a day end is that day's alone", async () => {
+    const route = await routeOf([[0, 400], [36, 2000], [40, 2000]]);
+    const three: Route = { ...route, stages: [stage(1, 0, 10), stage(2, 10, 20), stage(3, 20, route.lengthKm)] };
+    const [c] = climbsOf(climbCheck(three, { flatKph: 20 }));
+    expect([c!.firstDay, c!.lastDay]).toEqual([1, 3]);
+    expect(c!.dayEnds).toEqual([{ day: 1, km: 10 }, { day: 2, km: 20 }]);
+    const top = climbsOf(climbCheck(route, { flatKph: 20 }))[0]!.topKm;
+    const exact: Route = { ...route, stages: [stage(1, 0, top), stage(2, top, route.lengthKm)] };
+    const [d] = climbsOf(climbCheck(exact, { flatKph: 20 }));
+    expect([d!.firstDay, d!.lastDay, d!.dayEnds]).toEqual([1, 1, []]);
+  });
+});
+
+/** A small seeded generator, so noisy heights are the same on every run. */
+function seeded(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Height noise as a recording has it: normal, sigma `sd` metres, its knots `everyKm` apart and straight between them. */
+function recorded(sd: number, everyKm: number, seed: number): (km: number) => number {
+  const r = seeded(seed);
+  const knots: number[] = [];
+  const knot = (i: number): number => {
+    while (knots.length <= i) knots.push(Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r()) * sd);
+    return knots[i]!;
+  };
+  return (km) => {
+    const i = Math.floor(km / everyKm);
+    const f = km / everyKm - i;
+    return knot(i) * (1 - f) + knot(i + 1) * f;
+  };
+}
+
+describe('[CC-STEEP] the steepest 500 m is read on heights averaged over 500 m, so recording noise and a bridge barely move it', () => {
+  test('a steady 10% climb with recorded heights (sigma 5 m over 100 m, a point every 10 m) reads steep, not a walk, in at least 38 of 40', async () => {
+    let steep = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const noise = recorded(5, 0.1, seed);
+      const route = await routeOf(sampled(7, 0.01, (km) => 300 + Math.min(Math.max(km - 1, 0), 5) * 100 + noise(km)).map(([k, h]) => [k, Math.round(h as number)]));
+      const levels = climbsOf(climbCheck(route, { flatKph: 20 })).map((c) => c.level);
+      if (levels.length > 0 && levels.every((l) => l === 'steep')) steep++;
+    }
+    expect(steep).toBeGreaterThanOrEqual(38);
+  });
+
+  test('a clean 6% climb, a point every 10 m, reads 6% at its steepest', async () => {
+    const route = await routeOf(sampled(7, 0.01, (km) => 300 + Math.min(Math.max(km - 1, 0), 5) * 60));
+    const [c] = climbsOf(climbCheck(route, { flatKph: 20 }));
+    expect(c!.steepestPct).toBeGreaterThan(5.8);
+    expect(c!.steepestPct).toBeLessThan(6.2);
+  });
+
+  test('a 6% road with a bridge in the heights (the valley 40 m below for 300 m, a point every 100 m) never reads a walk', async () => {
+    const road = (km: number): number => 300 + Math.min(Math.max(km - 1, 0), 5) * 60;
+    const route = await routeOf(sampled(7, 0.1, (km) => road(km) - (km > 3.45 && km < 3.75 ? 40 : 0)));
+    const list = climbsOf(climbCheck(route, { flatKph: 20 }));
+    expect(list.length).toBeGreaterThan(0);
+    for (const c of list) {
+      expect(c.steepestPct).toBeLessThan(CLIMB_WALK_PCT);
+      expect(c.level).not.toBe('walk');
+    }
   });
 });

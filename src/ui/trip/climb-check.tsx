@@ -19,9 +19,10 @@ export function ClimbList({ route, flatKph, ebike }: { route: Route; flatKph: nu
       <ol class="trip-days" data-climb-list aria-label={CC.appClimbListLabel}>
         {check.climbs.map((c) => (
           <li key={`${c.startKm}-${c.topKm}`} data-climb-level={c.level}>
-            <strong>{CC.appClimbWhere(c.day, showKm(c.startKm), showKm(c.topKm))}</strong>
+            <strong>{CC.appClimbWhere(c.firstDay, c.lastDay, showKm(c.startKm), showKm(c.topKm))}</strong>
             <span>{CC.appClimbFigures(showKm(c.lengthKm), c.gainM, c.avgGradePct.toFixed(1), c.steepestPct.toFixed(1))}</span>
             <span>{c.ridingMin === null ? CC.appClimbNoTime : CC.appClimbTime(shownClimbMin(c.ridingMin))}</span>
+            {c.dayEnds.map((d) => <span key={d.day} data-climb-day-end>{CC.appClimbDayEnd(d.day, showKm(d.km))}</span>)}
             {c.level === 'walk' ? <strong>{LEVEL[c.level]}</strong> : <span class="muted">{LEVEL[c.level]}</span>}
           </li>
         ))}

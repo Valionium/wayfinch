@@ -10,12 +10,14 @@ export const CC = {
   appClimbButton: 'Climb check',
   appClimbAbout: 'The climbs of this route, the hardest first, with time estimates.',
   appClimbLead: (kph: string): string =>
-    `Estimates from the route's heights and your flat speed of ${kph} km/h with a loaded bike. Short ramps can be steeper than these figures.`,
+    `Estimates from the route's heights and your flat speed of ${kph} km/h with a loaded bike. Short ramps can be steeper than these figures, and heights from a phone recording or a map can make a stretch look steeper than it is (bridges, tunnels).`,
   appClimbEbike: 'Your bike has a motor, so Climb check does not judge whether a climb is a walk: that depends on its assist.',
   appClimbNoHeights: "Climb check needs the route's heights. Prepare this route looks them up.",
   appClimbNone: 'No climb on this route gains 100 m at 3% or more.',
   appClimbListLabel: 'Climbs, the hardest first',
-  appClimbWhere: (day: number | null, from: string, to: string): string => `${day === null ? '' : `Day ${day} · `}km ${from} to ${to}`,
+  appClimbWhere: (first: number | null, last: number | null, from: string, to: string): string =>
+    `${first === null ? '' : last === null || last === first ? `Day ${first} · ` : `Days ${first} to ${last} · `}km ${from} to ${to}`,
+  appClimbDayEnd: (day: number, km: string): string => `Day ${day} ends at km ${km}, partway up this climb.`,
   appClimbFigures: (km: string, upM: number, avg: string, steepest: string): string => `${km} km · ${shownUp(upM)} m up · average ${avg}% · steepest 500 m ${steepest}%`,
   appClimbTime: (min: number): string => {
     const h = Math.floor(min / 60);
