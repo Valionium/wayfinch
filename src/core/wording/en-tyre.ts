@@ -33,3 +33,26 @@ export const TM = {
   tyreWindowOne: (value: string): string => `Aim for ${value} bar. Lower is the careful side.`,
   tyreSplit: (front: string, rear: string): string => `Weight split: ${front}% front, ${rear}% rear.`,
 };
+
+/**
+ * The SRAM cross-check's labels and values, moved from en.ts as they were (14 Nov 2026): the brake fluid in the bike's details (the
+ * owner's wish of 14 November 2026) costs the first screen a few bytes, and these pay for them. Shown only in the tyre tool's own chunk,
+ * under the same check as T (tests/unit/core/wording-tyre.test.ts).
+ */
+export const TS = {
+  tyreSramRider: 'Rider weight',
+  tyreSramGear: 'Bike and gear weight',
+  tyreSramWidth: 'Tyre width',
+  tyreSramCasing: 'Casing',
+  tyreSramWheel: 'Wheel size',
+  tyreSramRim: 'Rim type',
+  tyreSramInner: 'Inner rim width',
+  tyreSramRide: 'Ride type',
+  tyreSramWet: 'Wet or dry',
+  tyreSramThin: 'Thin',
+  tyreSramRimUnset: 'Not set here: look at your rim',
+  tyreSramRoad: 'Road',
+  tyreSramGravel: 'Gravel',
+  tyreSramWetWord: 'Wet',
+  tyreSramDryWord: 'Dry',
+};

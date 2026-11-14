@@ -46,6 +46,8 @@ export type BikeRecord = {
   suspension?: 'none' | 'front' | 'full'; rackMounts?: 'yes' | 'no';
   /** Care pictures redo (owner's answers 1 and 2 of 9 November 2026): the wheels' axle, and with rim brakes their kind; answers only. */
   axle?: 'thru' | 'qr' | 'nuts'; rimBrake?: 'caliper' | 'v-brake' | 'hydraulic';
+  /** The owner's wish of 14 November 2026: with hydraulic brakes, their fluid; an answer only. */
+  brakeFluid?: 'mineral' | 'dot';
   pressure: PressureBike; fit: Fit | null; maxWeight: MaxWeight | null; maxWeightAsked: boolean; look: Look | null; geometry: Geometry | null;
 };
 
@@ -61,8 +63,9 @@ const CHOICES = {
   rackMounts: ['unknown', 'yes', 'no'],
   axle: ['unknown', 'thru', 'qr', 'nuts'],
   rimBrake: ['unknown', 'caliper', 'v-brake', 'hydraulic'],
+  brakeFluid: ['unknown', 'mineral', 'dot'],
 } as const;
-type Choices = { [K in Exclude<keyof typeof CHOICES, 'suspension' | 'rackMounts' | 'axle' | 'rimBrake'>]: (typeof CHOICES)[K][number] };
+type Choices = { [K in Exclude<keyof typeof CHOICES, 'suspension' | 'rackMounts' | 'axle' | 'rimBrake' | 'brakeFluid'>]: (typeof CHOICES)[K][number] };
 const FIT_STYLES: readonly FitStyle[] = ['unknown', 'diamond-level', 'diamond-sloping', 'compact', 'trapeze', 'mixte', 'step-through', 'full-suspension'];
 const FIT_SIZES: readonly SizeLetter[] = ['XS', 'S', 'M', 'L', 'XL'];
 const WHEELS: readonly WheelWord[] = ['700c', '650b', '650c', '29', '27.5', '26'];
