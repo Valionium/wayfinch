@@ -4,6 +4,7 @@ import { reportRide } from '../../core/engines/ride-report.ts';
 import type { RideOutcome, RideReport } from '../../core/engines/ride-report.ts';
 import type { Profile } from '../../core/types.ts';
 import { shortMapDate, W } from '../../core/wording/en.ts';
+import { IR } from '../../core/wording/en-import-refuse.ts';
 import { Y } from '../../core/wording/en-you.ts';
 import { WEATHER_MODE } from '../../data/weather-mode.ts';
 import type { WeatherMode } from '../../data/weather-mode.ts';
@@ -117,8 +118,8 @@ export function describeImport(text: string, here: ExportFile | null = null): Im
   } catch {
     return { ok: false, reason: Y.youImportUnreadable };
   }
-  if (!isObject(file) || file.app !== 'copilot' || file.kind !== 'export') return { ok: false, reason: W.appStoreImportNotOurs };
-  if (typeof file.v === 'number' && file.v > 1) return { ok: false, reason: W.appStoreImportNewer };
+  if (!isObject(file) || file.app !== 'copilot' || file.kind !== 'export') return { ok: false, reason: IR.appStoreImportNotOurs };
+  if (typeof file.v === 'number' && file.v > 1) return { ok: false, reason: IR.appStoreImportNewer };
   const lines: string[] = [];
   const warnings: string[] = [];
   const trip = file.trip;
