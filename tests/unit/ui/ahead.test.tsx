@@ -167,8 +167,21 @@ describe('cards', () => {
     expect(document.activeElement).toBe(top.querySelector('button'));
     // At the top: before the strip and the cards, right under the notes.
     expect(top.compareDocumentPosition(host.querySelector('[data-strip]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Back to today (the stand-in draws today again): the focus lands on the Daylight card's title button, never the page's body
+    // (review of #142, I4).
+    actions.backToToday = async () => { calls.push(['backToToday']); await act(async () => { render(<AheadScreen view={riding} actions={actions} />, host); }); };
     await click(top.querySelector('button'));
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     expect(calls.at(-1)).toEqual(['backToToday']);
+    expect(document.activeElement).toBe(host.querySelector('[data-card="daylight"] .ah-toggle'));
+  });
+
+  test('[AH-STRIP] a tap on a strip band or icon puts the focus on the title button of its card, never the body of the page (review of #142, I4 and M1)', async () => {
+    const v = trip(viewOf(rainyStop()));
+    await show(v, fakeActions().actions);
+    await click(host.querySelector('.ah-band'));
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(document.activeElement).toBe(host.querySelector('[data-card="weather"] .ah-toggle'));
   });
 
   test('[AH-WATER-Q] with no water you can carry entered, the Water card links to You, where it is entered (sweep of 14 Nov 2026, finding 18)', async () => {

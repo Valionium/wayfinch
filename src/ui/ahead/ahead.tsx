@@ -28,7 +28,9 @@ function focusLater(id: string): void {
   setTimeout(() => {
     const el = document.getElementById(id);
     el?.scrollIntoView?.({ block: 'start' });
-    (el?.querySelector('button, a, h2, h3') as HTMLElement | null)?.focus?.();
+    // A card's title is a heading holding its button: the button takes the focus (a heading without a tabindex takes none, which
+    // left the focus on the page's body; review of #142, I4).
+    (el?.querySelector<HTMLElement>('.ah-toggle') ?? el?.querySelector<HTMLElement>('button, a, h2, h3'))?.focus?.();
   }, 0);
 }
 
