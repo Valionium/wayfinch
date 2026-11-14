@@ -749,6 +749,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - no car, foot or synthetic route accepted; source checked [AB-NO-CAR]
 - no thinning; passes through the same buildRoute [AB-FULL-GEOMETRY]
 - only the search text is sent; fallback both ways [AB-SEARCH]
+- a French, Italian or Spanish street word (place, chemin, impasse, route, piazza, viale, corso, plaza), as a whole word, makes an address search; a name that only starts with one (Placerville, Piazzola sul Brenta) stays a town search, as Norwegen and Newcastle do (NEXT task 6) [AB-ADDRESS-WORDS]
 - no bike router answers: asks for a GPX [AB-NONE]
 
 ## App: Position
