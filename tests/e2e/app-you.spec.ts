@@ -127,7 +127,8 @@ test('[PRIV-LEGAL-REACH] the imprint, the privacy notice and the licences are tw
       if (from !== 'You') await tab(page, 'You').click(); // tap 1
       await page.locator('[data-legal-links]').getByRole('link', { name, exact: true }).click(); // tap 2
       await expect(page.getByRole('heading', { level: 1 })).toContainText(heading);
-      await expect(page.locator('main')).toContainText("Drafted by an AI from the project's spec. Not legal advice.");
+      await expect(page.locator('main').getByRole('navigation', { name: 'Legal pages' })).toBeVisible();
+      await expect(page.locator('main')).not.toContainText('Drafted by an AI'); // LEGAL-NO-AI-LINE (the owner's ruling of 14 Nov 2026)
     }
   }
   await page.getByRole('link', { name: /Wayfinch/ }).first().click();
@@ -147,7 +148,8 @@ test('[PRIV-LEGAL-OFFLINE] after the first visit, all three legal pages open in 
   for (const path of ['/legal/imprint/', '/legal/privacy/', '/legal/licences/']) {
     await page.goto(`${app.origin}${path}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expect(page.locator('main')).toContainText("Drafted by an AI from the project's spec. Not legal advice.");
+    await expect(page.locator('main').getByRole('navigation', { name: 'Legal pages' })).toBeVisible();
+    await expect(page.locator('main')).not.toContainText('Drafted by an AI'); // LEGAL-NO-AI-LINE (the owner's ruling of 14 Nov 2026)
     await expect(page.locator('link[rel=stylesheet]')).toHaveCount(1);
   }
 });
