@@ -4,6 +4,7 @@ import { effect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { T, TM } from '../../core/wording/en-tyre.ts';
+import { TQ } from '../../core/wording/en-tyre-fields.ts';
 import { W, shortMapDate } from '../../core/wording/en.ts';
 import { TF } from '../../core/wording/en-tyre-labels.ts';
 import { TN } from '../../core/wording/en-tyre-notes.ts';
@@ -52,7 +53,7 @@ const NeededTag = () => <> <span class="tyre-needed-tag">{T.tyreNeededTag}</span
 function SourceLine({ source, plan }: { source: Source; plan?: string }) {
   if (source === 'bike') return <>{W.tyreFromBike}</>;
   if (source === 'plan') return <>{plan ?? ''}</>;
-  if (source === 'you') return <>{W.tyreFromYou}</>;
+  if (source === 'you') return <>{TQ.tyreFromYou}</>;
   return null;
 }
 
@@ -164,7 +165,7 @@ function LimitInput({ id, label, required, value, min, onCommit, onPending, need
         {(['bar', 'psi'] as const).map((u) => (
           <label key={u} class="tyre-option">
             <input type="radio" name={`${id}-unit`} checked={unit === u} onChange={() => { setUnit(u); evaluate(text, u, false); }} />
-            <span>{u === 'bar' ? W.tyreUnitBar : W.tyreUnitPsi}</span>
+            <span>{u === 'bar' ? TQ.tyreUnitBar : TQ.tyreUnitPsi}</span>
           </label>
         ))}
       </div>
@@ -176,7 +177,7 @@ function LimitInput({ id, label, required, value, min, onCommit, onPending, need
               {note.alt.unit === 'psi' ? (
                 <>
                   <button type="button" class="btn btn-primary" onClick={() => { setUnit('psi'); evaluate(text, 'psi', false, true); }}>{W.tyreAskYesPsi(String(note.alt.value))}</button>
-                  <button type="button" class="btn" onClick={() => evaluate(text, 'bar', true)}>{W.tyreAskNoBar}</button>
+                  <button type="button" class="btn" onClick={() => evaluate(text, 'bar', true)}>{TQ.tyreAskNoBar}</button>
                 </>
               ) : (
                 <>
@@ -424,8 +425,8 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         <Field id={bikeKey('rear')} label={W.tyreRearWidthLabel} source={src.rearMm} needed="rear" valueText={`${v.rear.printedMm} mm`} resetLabel={resetFor('rearMm')} onReset={resetter('rearMm')}
           editor={<NumberInput key={`rear-${key}`} id="tyre-rear" label={W.tyreRearWidthLabel} needed value={own('rearMm', v.rear.printedMm)} assumed={v.rear.printedMm} onCommit={(n) => change({ rearMm: n })} unit="mm" />} />
         {resolved.rearFollowsFront && (v.rimType === 'hookless' || v.rimType === 'unset') ? <p class="muted">{TF.tyreRearLabelShort}: {TC.tyreSameAsFront}</p> : null}
-        <Choice<RimType> id="tyre-rimtype" label={W.tyreRimTypeLabel} source={src.rimType} needed="rim" value={choiceValue('rimType', v.rimType)} onChange={(x) => change({ rimType: x })}
-          options={[{ value: 'hooked', label: W.tyreRimHooked }, { value: 'hookless', label: W.tyreRimHookless }, { value: 'tubular', label: W.tyreRimTubular }]} />
+        <Choice<RimType> id="tyre-rimtype" label={TQ.tyreRimTypeLabel} source={src.rimType} needed="rim" value={choiceValue('rimType', v.rimType)} onChange={(x) => change({ rimType: x })}
+          options={[{ value: 'hooked', label: TQ.tyreRimHooked }, { value: 'hookless', label: TQ.tyreRimHookless }, { value: 'tubular', label: TQ.tyreRimTubular }]} />
       </section>
 
       <section class="card tyre-result" aria-live="polite" aria-labelledby="tyre-result-title" ref={resultRef}>
@@ -464,7 +465,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         {resolved.input && resolved.assumed.length ? <p class="tyre-assumed">{W.tyreAssumedList(resolved.assumed.map((f) => ASSUMED_WORDS[f]).join(', '))}</p> : null}
         {blockedBy === null && listed.length ? (
           <>
-            <h3>{W.tyreHeadingWarnings}</h3>
+            <h3>{TQ.tyreHeadingWarnings}</h3>
             <ul class="tyre-warnings">{listed.map((n) => <li key={n.code + n.text}>{n.text}</li>)}</ul>
           </>
         ) : null}
@@ -500,17 +501,17 @@ export function TyreScreen({ services }: { services: TyreServices }) {
       </Card>
 
       <Card title={W.tyreSectionBars}>
-        <Field id={bikeKey('bars')} label={W.tyreBarsLabel} source={src.bars} valueText={({ drop: W.tyreBarsDrop, flat: W.tyreBarsFlat, other: W.tyreBarsOther })[v.bars]} resetLabel={resetFor('bars')}
+        <Field id={bikeKey('bars')} label={W.tyreBarsLabel} source={src.bars} valueText={({ drop: TQ.tyreBarsDrop, flat: TQ.tyreBarsFlat, other: TQ.tyreBarsOther })[v.bars]} resetLabel={resetFor('bars')}
           onReset={resetter('bars')}
           editor={<Choice<Bars> id="tyre-bars" label={W.tyreBarsLabel} value={choiceValue('bars', v.bars)} onChange={(x) => change({ bars: x })}
-            options={[{ value: 'drop', label: W.tyreBarsDrop }, { value: 'flat', label: W.tyreBarsFlat }, { value: 'other', label: W.tyreBarsOther }]} />} />
+            options={[{ value: 'drop', label: TQ.tyreBarsDrop }, { value: 'flat', label: TQ.tyreBarsFlat }, { value: 'other', label: TQ.tyreBarsOther }]} />} />
       </Card>
 
       <Card title={W.tyreSectionTyres}>
-        <Choice<Casing> id="tyre-casing" label={W.tyreCasingLabel} source={src.casing} value={choiceValue('casing', v.casing)} onChange={(x) => change({ casing: x })}
-          options={[{ value: 'supple', label: W.tyreCasingSupple }, { value: 'standard', label: W.tyreCasingStandard }, { value: 'reinforced', label: W.tyreCasingReinforced }]} />
+        <Choice<Casing> id="tyre-casing" label={TQ.tyreCasingLabel} source={src.casing} value={choiceValue('casing', v.casing)} onChange={(x) => change({ casing: x })}
+          options={[{ value: 'supple', label: TQ.tyreCasingSupple }, { value: 'standard', label: TQ.tyreCasingStandard }, { value: 'reinforced', label: TQ.tyreCasingReinforced }]} />
         <Choice<Setup> id="tyre-setup" label={W.tyreSetupLabel} source={src.setup} value={choiceValue('setup', v.setup)} onChange={(x) => change({ setup: x })}
-          options={[{ value: 'butyl', label: W.tyreSetupButyl }, { value: 'latex', label: W.tyreSetupLatex }, { value: 'tpu', label: W.tyreSetupTpu }, { value: 'tubeless', label: W.tyreSetupTubeless }]} />
+          options={[{ value: 'butyl', label: TQ.tyreSetupButyl }, { value: 'latex', label: TQ.tyreSetupLatex }, { value: 'tpu', label: TQ.tyreSetupTpu }, { value: 'tubeless', label: TQ.tyreSetupTubeless }]} />
       </Card>
 
       <Card title={W.tyreSectionRim}>
@@ -527,8 +528,8 @@ export function TyreScreen({ services }: { services: TyreServices }) {
       </Card>
 
       <Card title={W.tyreSectionSurface}>
-        <Choice<Surface> id="tyre-surface" label={W.tyreSurfaceLabel} source={src.surface} value={choiceValue('surface', v.surface)} onChange={(x) => change({ surface: x })}
-          options={[{ value: 'paved', label: W.tyreSurfacePaved }, { value: 'rough', label: TF.tyreSurfaceRough }, { value: 'unpaved', label: W.tyreSurfaceUnpaved }]} />
+        <Choice<Surface> id="tyre-surface" label={TQ.tyreSurfaceLabel} source={src.surface} value={choiceValue('surface', v.surface)} onChange={(x) => change({ surface: x })}
+          options={[{ value: 'paved', label: TQ.tyreSurfacePaved }, { value: 'rough', label: TF.tyreSurfaceRough }, { value: 'unpaved', label: TQ.tyreSurfaceUnpaved }]} />
         <label class="tyre-check">
           <input type="checkbox" checked={details.wet ?? false} onChange={(e) => change({ wet: (e.currentTarget as HTMLInputElement).checked })} />
           <span>{TF.tyreWetLabel}</span>
