@@ -619,19 +619,24 @@ test('[GA-ANSWER] a rack with panniers is one rack: Looking ahead beside "a rack
 });
 
 // The owner's decision of 7 Nov 2026: the sleeping bag may ride on the rack deck, so "Put the tent on your rack" offers it too.
-test('[GA-DECK-QUILT] with a rack fitted, the rack deck suggestion offers the sleeping bag with the tent and the mat: "Put the sleeping quilt or bag, sleeping mat and tent on your rack, no new bag needed", and its moves take the sleeping bag to the rack top deck',async()=>{
+test('[GA-DECK-QUILT] with a rack fitted, the rack deck suggestion offers the sleeping bag with the tent and the mat, in a dry bag: "Put the sleeping quilt or bag (in a dry bag), sleeping mat and tent on your rack, no new bag needed", and its moves take the sleeping bag to the rack top deck; at two nights with no rack, "a rack" and Looking ahead\'s seat pack say the dry bag too',async()=>{
   const p=page({bike:FULL,setup:TENT_IN_PACK+"S.bags=[{uid:1,pos:'rack',pair:true,L:10},{uid:2,pos:'pack',L:20}];S.decks={bar:false,rack:false};"});
   assert.ok(p.json('!!currentPlan().items.quilt'),'the sleeping bag is in a bag today');
   await ask(p,{style:'bags-first',goal:'backpack'});
   const first=p.json('ADVISOR.answer.items[0]');
   assert.deepEqual([first.kind,first.newBags],['deck',0],'the rack deck, no new bag');
-  assert.equal(p.json('advisorWhat(ADVISOR.answer.items[0],ADVISOR.input)'),'Put the sleeping quilt or bag, sleeping mat and tent on your rack, no new bag needed');
+  assert.equal(p.json('advisorWhat(ADVISOR.answer.items[0],ADVISOR.input)'),'Put the sleeping quilt or bag (in a dry bag), sleeping mat and tent on your rack, no new bag needed');
   const moves=p.json('advisorMoves(ADVISOR.answer.items[0],ADVISOR.input)');
   assert.ok(moves.some(m=>/^Sleeping quilt or bag: .+ → rack top deck$/.test(m)),'the sleeping bag: '+JSON.stringify(moves));
   assert.ok(textOf(view(p).answer).includes('Sleeping quilt or bag: '),'on screen');
   // its kilos are the deck's in the advisor's result, as the tent's and the mat's
   const kg=p.json("+['quilt','pad','tent'].reduce((n,id)=>n+itemKg(kitById(id)),0).toFixed(2)");
   assert.equal(p.json('ADVISOR.answer.items[0].result.kgByPos.deck'),kg,'the deck carries the three');
+  // the reviewer's rider of PR 61 at its two nights, no rack, Panniers are fine (review of PR 149, m4): the outcome the ruling gives
+  const q=page({bike:FULL,setup:PACK30});
+  await ask(q,{style:'panniers',goal:'backpack'});
+  assert.equal(q.json('advisorWhat(ADVISOR.answer.items[0],ADVISOR.input)'),'A rack, with the sleeping quilt or bag (in a dry bag), sleeping mat and tent on its top deck','Minimal: a rack');
+  assert.equal(q.json('advisorWhat(ADVISOR.answer.ahead,ADVISOR.input)'),'Seat pack, 15 L, plus a rack, with the sleeping quilt or bag (in a dry bag), sleeping mat and tent on its top deck','Looking ahead: a seat pack and the rack');
 });
 
 test('[GA-DECK] the deck suggestion\'s moves include the tent and the sleeping mat going to the rack top deck (review of PR 61, m1)',async()=>{
@@ -716,7 +721,7 @@ test('[GA-ANSWER] every shape of suggestion reads cleanly, what to get and the d
     const p=noRack;
     p.context.qaS=JSON.stringify(shapes[4][2]);
     assert.equal(p.json("advisorWhat(JSON.parse(qaS),advisorInput('bags-first','backpack'))"),
-      'Frame bag, full triangle, 6 L, plus rack and pannier, 23 L, with the sleeping quilt or bag, sleeping mat and tent on its top deck');
+      'Frame bag, full triangle, 6 L, plus rack and pannier, 23 L, with the sleeping quilt or bag (in a dry bag), sleeping mat and tent on its top deck');
   }
 });
 
