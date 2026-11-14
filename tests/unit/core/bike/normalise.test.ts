@@ -111,6 +111,33 @@ describe("a bike as the bag planner stores it (spec section 7.1's table), read r
     expect(keys.slice(keys.indexOf('rackMounts'), keys.indexOf('rackMounts') + 3)).toEqual(['rackMounts', 'axle', 'rimBrake']);
   });
 
+  // The owner's wish of 14 November 2026: with hydraulic brakes, which brake fluid (mineral oil or DOT fluid), stored only as an answer.
+  test("[TB-DETAILS-FLUID] brakeFluid (mineral, dot) keeps each listed answer whatever the brakes; Not sure, anything else or a missing field is no field; a bike stored before keeps its bytes; it comes last", () => {
+    const base = normaliseBike({ ...clone(full), brakes: 'hydraulic-disc' })!;
+    const rest = (b: Json): Json => { const others = { ...b }; delete others.brakeFluid; return others; };
+    for (const brakeFluid of ['mineral', 'dot'] as const) {
+      const got = normaliseBike({ ...clone(full), brakes: 'hydraulic-disc', brakeFluid })!;
+      expect(got.brakeFluid, brakeFluid).toBe(brakeFluid);
+      expect(rest(got), brakeFluid).toEqual(rest(base));
+      // kept as answered with any brakes; Bike care reads it only with hydraulic brakes (careFluid)
+      expect(normaliseBike({ ...clone(full), brakes: 'cable-disc', brakeFluid })!.brakeFluid).toBe(brakeFluid);
+    }
+    for (const odd of [{ brakeFluid: 'unknown' }, { brakeFluid: 'DOT' }, { brakeFluid: 'dot5.1' }, { brakeFluid: true }, { brakeFluid: null }, {}]) {
+      const got = normaliseBike({ ...clone(full), brakes: 'hydraulic-disc', ...odd })!;
+      expect(got, JSON.stringify(odd)).not.toHaveProperty('brakeFluid');
+      expect(rest(got), JSON.stringify(odd)).toEqual(rest(base));
+    }
+    // old data loads unchanged: a bike stored before gains no field and keeps its bytes, every detail Not sure stays Not sure
+    for (const before of [normaliseBike({ id: 'bike_bare' })!, normaliseBike({ id: 'bike_old', brakes: 'hydraulic-disc', shifting: 'electronic' })!, base]) {
+      expect(Object.keys(before)).not.toContain('brakeFluid');
+      expect(JSON.stringify(normaliseBike(JSON.parse(JSON.stringify(before))))).toBe(JSON.stringify(before));
+    }
+    expect(normaliseBike({ id: 'bike_bare' })!.brakes).toBe('unknown');
+    expect(normaliseBike({ id: 'bike_bare' })!.shifting).toBe('unknown');
+    const keys = Object.keys(normaliseBike({ id: 'bike_x', brakes: 'rim', axle: 'qr', rimBrake: 'hydraulic', brakeFluid: 'mineral' })!);
+    expect(keys.slice(keys.indexOf('rimBrake'), keys.indexOf('rimBrake') + 2)).toEqual(['rimBrake', 'brakeFluid']);
+  });
+
   test('[BK-NORMALISE] a block with nothing set is null; a colour is stored in lower case; numbers round as the page rounds', () => {
     const bike = clone(full) as Json;
     bike.look = { colour: '#2563B8', bars: null, ebike: null };

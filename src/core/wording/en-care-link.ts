@@ -3,7 +3,7 @@
 
 export const CL = {
   careCardTitle: 'Bike care',
-  careCardBody: 'What to do to your bike, how often and when, fitted to your bike.',
+  careCardBody: "What to do to your bike, how often and when, fitted to your bike's details.",
   careCardOpen: 'Open',
   careForBike: 'Care for this bike',
 };
