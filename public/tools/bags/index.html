@@ -2599,6 +2599,11 @@ const deckItemName = k => kitName(k) + (k.id === 'quilt' ? ' (in a dry bag)' : '
 const QUILT_DECK_NOTE = 'On the rack top deck it rides in a dry bag.';
 // The rack deck's line under a pannier, in place of POSITIONS.rack.strapNote (frozen, so it still names the tent and the mat only).
 const RACK_DECK_NOTE = 'sleeping quilt or bag (in a dry bag), sleeping mat and tent live up here, panniers or not';
+// The rack top has no limit (the owner's ruling of 14 Nov 2026): above about 20 L of loose kit up there, one line, said once where the
+// deck's kit is listed (The rack top takes, Already up there), on the litres as the rider reads them (LC-DECK-LOOSE).
+const DECK_LOOSE_L = 20;
+const DECK_LOOSE_NOTE = 'Strap it tight, or use one rack-top bag: loose items shift.';
+const deckLooseHtml = L => +L.toFixed(1) > DECK_LOOSE_L ? `<p>${DECK_LOOSE_NOTE}</p>` : '';
 const isBottle = pos => POSITIONS[pos].kind === 'bottle';
 
 
@@ -6350,6 +6355,8 @@ const ADVISOR_WORDING = {
   deckOwn:{text:'Put the {items} on your rack, no new bag needed'}, deckNew:{text:'A rack, with the {items} on its top deck'},
   deckOwnBare:{text:"Use your rack's top deck, no new bag needed"}, deckNewBare:{text:'A rack with a top deck'},
   deckOwnPlus:{text:"the {items} on your rack's top deck"}, deckOwnPlusBare:{text:"your rack's top deck"},
+  // a seat pack beside a loaded rack top (the owner's ruling of 14 Nov 2026, GA-DECK-SEAT)
+  seatDeck:{text:'A seat pack and a loaded rack top share the space behind the saddle: check that everything fits before you go.'},
   comboTitle:{text:'About the same result, with other bags. Tap one for its details.'},
   howMore:{text:'{first}, and {n} more'}, howNone:{text:'Your things stay where they are.'},
   rackAnd:{text:'Rack and {type}'}, rackDeckWith:{text:'with the {items} on its top deck'},
@@ -6446,6 +6453,14 @@ function advisorDeckText(s, input, inList){
   return items ? advisorWord(own ? 'deckOwn' : 'deckNew', { items }) : advisorWord(own ? 'deckOwnBare' : 'deckNewBare');
 }
 const advisorLower = t => t.replace(/^./, c => c.toLowerCase());
+// A seat pack beside a loaded rack top, which share the space behind the saddle (the owner's ruling of 14 Nov 2026): a suggestion
+// whose bike has both, and which brings them together, a seat pack it adds or the rack top's kit where the plan had none (GA-DECK-SEAT).
+function advisorSeatDeck(s, input){
+  const bags = advisorTrialBags(s, input);
+  if(!bags.some(b => b.pos === 'seat') || !advisorDecked(bags, s.decks, input).length) return false;
+  const base = advisorBase(input);
+  return s.add.some(b => b.pos === 'seat') || !advisorDecked(base.bags, base.decks, input).length;
+}
 // Panniers on a rack to fit bring its top deck: what rides there, said once with that one rack (review of PR 61, I3).
 function advisorRackDeck(s, input){
   if(!s.add.some(b => b.pos === 'rack') || advisorRackFitted(input) || !s.decks.rack) return '';
@@ -6558,6 +6573,7 @@ function advisorCardHtml(s, input, i, shown0 = advisorShown(s, input)){
   const moves = shown0.moves, shown = moves.slice(0, 8);
   if(moves.length > shown.length) shown.push(advisorWord('moreMoves', { n:moves.length - shown.length }));
   return `<article class="adv-card" tabindex="0" aria-labelledby="advS${i}"><h5 id="advS${i}">${htmlEsc(advisorWhat(s, input))}</h5>${tags}`
+    + (advisorSeatDeck(s, input) ? `<p class="adv-note">${htmlEsc(advisorWord('seatDeck'))}</p>` : '')
     // the drawing is named by its bag; the bike image inside, which names only the bike, is hidden
     + `<div class="adv-drawing" role="img" aria-label="${htmlEsc(advisorDrawnName(s, input))}">${art ? art.svg.replace(/^<svg\b/, '<svg aria-hidden="true"') : ''}</div>`
     + `<p class="adv-why"><strong>${advisorWord('whyTitle')}</strong> ${advisorWhy(s, input).map(htmlEsc).join(' ')}</p>`
@@ -6633,6 +6649,7 @@ function advisorAnswerHtml(answer, input){
     if(c){
       const left = [c.result.overL > 0 ? `${+c.result.overL.toFixed(1)} L` : '', c.result.spillIds.map(id => kitById(id) ? kitName(kitById(id)) : id).join('; ')].filter(Boolean);
       lines.push(advisorWord('closest', { what:advisorWhat(c, input) }));
+      if(advisorSeatDeck(c, input)) lines.push(advisorWord('seatDeck'));
       if(left.length) lines.push(advisorWord('stillOver', { what:left.join(': ') }));
     } else lines.push(advisorWord('closestNone'));
     body = lines.map(l => `<p class="adv-plain">${htmlEsc(l)}</p>`).join('') + advisorBiggerHtml(answer, input);   // F: beyond the setup
@@ -11337,7 +11354,7 @@ function renderBags(){
   const claims = deckClaims();
   if(claims.length) $('bagList').insertAdjacentHTML('beforeend',
     `<div class="finding note" style="margin-top:10px"><b>The rack top takes ${htmlEsc(listOf(claims.map(deckItemName)))}</b>
-     <p>${claims.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L strapped outside bags. ${infoHelp('How rack-top kit is counted','<p>Selected items that can be strapped to the rack top are counted as carried kit, but do not use space inside bags. Check that they are secured and protected from weather.</p>')}</p></div>`);
+     <p>${claims.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L strapped outside bags. ${infoHelp('How rack-top kit is counted','<p>Selected items that can be strapped to the rack top are counted as carried kit, but do not use space inside bags. Check that they are secured and protected from weather.</p>')}</p>${deckLooseHtml(claims.reduce((s,k)=>s+itemL(k),0))}</div>`);
 
   // a kept plan's sleeping bag gone up on the deck, said here when the bags step is the first the rider sees (LC-DECK-NOTE)
   const deckNote = deckNoteHtml(2);
@@ -12228,7 +12245,7 @@ function renderResult(){
     const deckNames = so.decks.map(b => POSITIONS[b.pos].strapLabel.toLowerCase());
     if(claimed.length){
       strapBody = `<div class="finding note"><b>Already up there: ${htmlEsc(listOf(claimed.map(deckItemName)))}</b>
-        <p>${claimed.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L carried outside. ${infoHelp('How strapped items are counted','<p>Items carried on the rack top or handlebar straps are excluded from the volume inside the bags. Only suitable items should be carried outside; protect them from rain and road spray and secure them clear of the wheels.</p>')}</p></div>`;
+        <p>${claimed.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L carried outside. ${infoHelp('How strapped items are counted','<p>Items carried on the rack top or handlebar straps are excluded from the volume inside the bags. Only suitable items should be carried outside; protect them from rain and road spray and secure them clear of the wheels.</p>')}</p>${deckLooseHtml(claimed.reduce((s,k)=>s+itemL(k),0))}</div>`;
     }
     if(!so.cand.length && !claimed.length){
       strapBody = `<div class="emptyfind">You have ${deckNames.join(' and ')}, but nothing in your kit is suited to riding outside. Straps want things that shrug off rain and road spray — a mat, shoes, a towel, a tent body.</div>`;
