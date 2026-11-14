@@ -388,6 +388,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 
 - Bike help lists nearest shops and repair points with status (§6.9, §6.0) [EM-BIKE]
 - Health help lists the nearest pharmacy and hospital with unknown as unknown (§6.9) [EM-PHARMACY]
+- Until the speciality is mapped, a hospital named as a psychiatric, psychosomatic or rehabilitation clinic adds "check before going" and is never hidden, moved down or demoted; a speciality tag decides when there is one (the owner's ruling of 14 Nov 2026) [EM-CLINIC-NAME]
 - Train help prefers stations and says times are unchecked (§6.9); a halt is called a station, never by the railway word (sweep 2 of 15 Nov 2026, #9) [EM-TRAIN]
 - Toilets help lists the nearest along the route with access and fee (§6.9) [EM-TOILETS]
 - Help chips always ride from now, in every phase (§6.2a) [EM-NOW]

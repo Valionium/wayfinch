@@ -648,9 +648,6 @@ export const W = {
   appStoreRouteNotReadable: 'This route could not be read.',
   appStoreNotKept: "This browser did not keep that. Check the phone's free storage.",
   appStoreChangedElsewhere: 'This was changed in another window. Showing the newer data.',
-  appStoreImportNotOurs: 'This is not a Wayfinch export file. Nothing was changed.',
-  appStoreImportNewer: 'This file comes from a newer version of Wayfinch. Update the app, then try again. Nothing was changed.',
-  appStoreImportProfile: "The rider details in this file can't be read. Nothing was changed.",
   // Refresh this stretch (sub-project 5, group 4).
   appStretchNotice: "This sends the outline of this stretch to the Overpass service, a public OpenStreetMap service. Nothing else about you or your ride goes with it.",
   appStretchSaved: (from: string, to: string, places: number): string => `Km ${from}–${to} refreshed: ${places} ${places === 1 ? 'place' : 'places'} from OpenStreetMap.`,

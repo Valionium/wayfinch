@@ -6,6 +6,7 @@ import type { Climb, Profile, Route, RoutePoint, Stage, Trip, TripStop, TripStop
 import type { Ride } from '../core/engines/water-learning.ts';
 import { W } from '../core/wording/en.ts';
 import { IM } from '../core/wording/en-import.ts';
+import { IR } from '../core/wording/en-import-refuse.ts';
 import { exportTyres, importTyres } from '../tools/tyre/storage.ts';
 import { clearCopies, flushWrites, markChanged, noteCopy, tracked } from './changed.ts';
 import { closeDb, CURRENT, DB_NAME, inTx } from './db.ts';
@@ -141,11 +142,11 @@ const calibrationReads = (c: unknown): boolean => isObject(c) && goodStamp(c.upd
 const tyresRead = (t: unknown): boolean => isObject(t) && goodStamp(t.updatedAt) && isObject(t.byBike);
 
 function fileProblem(file: unknown): string | null {
-  if (!isObject(file) || file.app !== 'copilot' || file.kind !== 'export') return W.appStoreImportNotOurs;
-  if (typeof file.v === 'number' && file.v > 1) return W.appStoreImportNewer;
-  if (file.v !== 1) return W.appStoreImportNotOurs;
+  if (!isObject(file) || file.app !== 'copilot' || file.kind !== 'export') return IR.appStoreImportNotOurs;
+  if (typeof file.v === 'number' && file.v > 1) return IR.appStoreImportNewer;
+  if (file.v !== 1) return IR.appStoreImportNotOurs;
   if (!tripReads(file.trip)) return IM.appStoreImportTrip;
-  if (!profileReads(file.profile)) return W.appStoreImportProfile;
+  if (!profileReads(file.profile)) return IR.appStoreImportProfile;
   if (!settingsRead(file.settings)) return IM.appStoreImportSettings;
   if (!calibrationReads(file.calibration)) return IM.appStoreImportCalibration;
   if (!tyresRead(file.tyres)) return IM.appStoreImportTyres;
