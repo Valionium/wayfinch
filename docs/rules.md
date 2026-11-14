@@ -1126,6 +1126,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - the bike's type sorts the cards and tasks, never hides one: those usual on the rider's type first, the others after them, slightly greyed and still a button, said in words to screen readers; a detail the rider told decides alone; with no type nothing moves (the owner's answer 5 (a)) [BV-ORDER]
 - every part has a short name for its label and button, and the view's and button's words have no banned word [BV-WORDS]
 - a card's parts start with what a rider touches first for it, from data (FIRST_PARTS), only among the parts its shown steps name, the rest in the text's order; the puncture card starts with the wheel's rim (the guide has no part called the wheel), the tyre and the tube (the owner's ruling of 14 November 2026); a card with no such order keeps the text's [BV-FIRST-PARTS]
+- a tap on the bike view flashes no box over it (the owner's report of 14 November 2026 on the learn page's drawing): no tap highlight on the drawing or anything it holds; the keyboard's focus ring is on the part button, never the drawing [BV-NO-FLASH]
 
 ## Tool: How a bike is built (design of 14 November 2026; the owner's wish and choice "Explore + build-up" of 14 November)
 
@@ -1149,6 +1150,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - the words say what is so on every bike: a quick link joins the chain without tools but usually needs pliers to open and is often for one use; disc brakes work with either axle; the chainring and the belt as a belt bike has them; brakes beside the rim, discs on a lockring, shifters on the bar ends, a mid-drive motor holding the cranks [BL-FACTS]
 - the focus never falls to the page: after a Connects-to button it goes to the part's name, when a zoom button turns itself off to the other way, back from the page to Tools to its card's Open link (Tools showing from its top), and in Build-up from Back, on reaching the first step, to Next [BL-FOCUS]
 - in Build-up, an arrow key that turns the step away from the focused part button hands the focus to Next, never to the page (review of PR 157, I3: the same key handler as How it works) [BL-KEYS-FOCUS]
+- a tap on the drawing flashes no box over it (the owner's report of 14 November 2026): no tap highlight on the drawing or anything it holds, and the drawing never takes the focus; the keyboard's focus ring is on the part button [BL-NO-FLASH]
 
 ## Tool: How a bike is built, How it works (design of 14 November 2026; the owner's idea "How a bike works" and his go of 14 November)
 
