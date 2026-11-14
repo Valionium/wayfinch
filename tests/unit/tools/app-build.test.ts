@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import type { Plugin } from 'vite';
 import { buildDist, runVite } from '../../../tools/build.mjs';
-import { measure } from '../../../tools/size-budget.mjs';
+import { gzipBytes, measure } from '../../../tools/size-budget.mjs';
 
 const REPO = fileURLToPath(new URL('../../../', import.meta.url));
 const sha256 = (b: Buffer | string) => createHash('sha256').update(b).digest('hex');
@@ -490,4 +490,27 @@ test("[TRIP-PREP-FIRST] Before you leave adds nothing to the first screen: at or
   expect(lazy.filter((f) => text(on, f).includes('data-prep-item') && text(on, f).includes('copilot:tripPrep:v1')).length).toBe(1);
   console.log(`TRIP-PREP-FIRST: first screen ${figures.firstJsGzip} bytes gzipped, lazy ${figures.lazyJsGzip}`);
   expect(figures.firstJsGzip).toBeLessThanOrEqual(141_425);
+});
+
+// The Bike finder (design of 14 November 2026): Tools' page at #/tools?finder, a chunk of its own loaded from the Tools chunk, as How a bike
+// is built is. 141,320 bytes is main's first screen at the branch point (2966037) and 246,484 its lazy total; the first screen may not rise,
+// and the finder adds at most 5,000 bytes to the lazy total (the coordinator's share of 14 November 2026).
+test("[BF-LAZY] the Bike finder is a chunk of its own: its table, words and key in neither the first screen nor the Tools chunk; the first screen at or below main's figure", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  const marks = ['copilot:bikeFinder:v1', 'Built for touring with a rack and panniers.', 'data-finder-type'];
+  for (const mark of marks) expect(first.includes(mark), mark).toBe(false);
+  const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
+  const chunk = lazy.filter((f) => marks.every((m) => text(on, f).includes(m)));
+  expect(chunk.length).toBe(1);
+  // the Tools chunk has the card and loads the page by a dynamic import, never with its words
+  const tools = lazy.filter((f) => text(on, f).includes('tools-bike'));
+  expect(tools.length).toBe(1);
+  expect(text(on, tools[0]!)).toContain('Find a bike type');
+  expect(text(on, tools[0]!)).toContain(chunk[0]!.replace(/^assets\//, ''));
+  for (const mark of marks) expect(text(on, tools[0]!).includes(mark), mark).toBe(false);
+  console.log(`BF-LAZY: first screen ${figures.firstJsGzip} bytes gzipped, lazy ${figures.lazyJsGzip}`);
+  expect(figures.firstJsGzip).toBeLessThanOrEqual(141_320);
+  // the finder's own chunk: within its share of the lazy total (the build's own gzip, level 9)
+  expect(gzipBytes(readFileSync(join(on, chunk[0]!)))).toBeLessThanOrEqual(5_000);
 });
