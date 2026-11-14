@@ -590,3 +590,17 @@ test('[HON-BUDGET] measured and printed for 200, 800 and 1,600 km', () => {
     expect(times[10]).toBeGreaterThan(0);
   }
 }, 120_000);
+
+// The owner's rulings of 14 Nov 2026 for En route (sweep of 14 Nov, item 17): with tonight's stop the route end, the line says so once,
+// at the top, never again on each card.
+describe('tonight at the route end is said once', () => {
+  test('[DAY-LAST-NO-POS] "Tonight\'s stop is the end of your route" is among the notes at the top, and on no card', () => {
+    const s = buildScreen(inputsOf({ trip: testTrip({ route: flatRoute(108.5) }), now: `${SAT} 19:00` })).screen;
+    const line = "Tonight's stop is the end of your route (km 108.5)";
+    expect(s.notes.filter((n) => n === line)).toHaveLength(1);
+    for (const name of CARDS) {
+      const card = (s.cards as unknown as Record<string, Answer>)[name]!;
+      expect(`${card.title} ${card.detail} ${card.items.map((i) => `${i.label} ${i.detail ?? ''}`).join(' ')}`, name).not.toContain(line);
+    }
+  });
+});

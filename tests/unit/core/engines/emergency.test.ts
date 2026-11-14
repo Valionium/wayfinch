@@ -79,13 +79,12 @@ describe('the table', () => {
     expect(emergencyTable('CZ')!.mountain!.name).toBe(W.emergencyMountainCzechia);
     expect(emergencyTable('PL')!.mountain!.name).toBe(W.emergencyMountainPoland);
   });
+  // Since the owner's ruling of 14 Nov 2026 (sweep item 22) the sources are links beside the basis, not in its words.
   test('[EM-NUMBERS] the basis gives the year, and the 112 source beside the mountain source', () => {
-    const cz = card({ country: 'CZ' }).basis.join(' ');
-    expect(cz).toContain('checked 2 Nov 2026');
-    expect(cz).toContain(emergencyTable('CZ')!.source);
-    expect(cz).toContain(emergencyTable('CZ')!.mountain!.source);
-    const at_ = card({ country: 'AT' }).basis.join(' ');
-    expect(at_.split(emergencyTable('AT')!.source).length).toBe(2);
+    const cz = card({ country: 'CZ' });
+    expect(cz.basis.join(' ')).toContain('checked 2 Nov 2026');
+    expect(cz.sources).toEqual([emergencyTable('CZ')!.source, emergencyTable('CZ')!.mountain!.source]);
+    expect(card({ country: 'AT' }).sources).toEqual([emergencyTable('AT')!.source]);
     expect(card({ country: null }).basis.join(' ')).toContain('checked 2 Nov 2026');
   });
   test('[EM-NUMBERS] the table\'s country follows the position', () => {
@@ -104,8 +103,12 @@ describe('the table', () => {
     expect(pl.items.map((i) => i.label).slice(0, 3)).toEqual(['112', '+48 601 100 300', '985']);
     expect(JSON.stringify(emergencyTable('PL'))).not.toMatch(/network/i);
   });
-  test('[EM-NUMBERS] the basis names where the numbers come from and when they were checked', () => {
-    expect(card({ country: 'AT' }).basis.join(' ')).toContain('oesterreich.gv.at');
+  // The owner's ruling of 14 Nov 2026 (sweep item 22): the source is a link named "Source", never a bare address (it was the address
+  // printed in the basis line).
+  test('[EM-NUMBERS] the basis says when the numbers were checked; the source the table used is a link, never a bare address', () => {
+    expect(card({ country: 'AT' }).sources[0]).toContain('oesterreich.gv.at');
+    expect(card({ country: 'DE' }).sources).toEqual([emergencyTable('DE')!.source]);
+    expect(card({ country: 'AT' }).basis.join(' ')).not.toMatch(/https?:/);
     expect(card({ country: 'AT' }).basis.join(' ')).toContain('2 Nov');
     expect(card({ country: 'AT' }).freshness.dataDates['emergencyNumbers']).toBe('2026-11-02');
   });

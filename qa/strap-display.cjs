@@ -240,4 +240,43 @@ test('[LC-DECK-NOTE] a kept plan from before, with the sleeping bag in a bag and
   check(run('currentPlan().items.quilt[0][0]')===from,'deck off: the sleeping bag is back where the rider put it');
 });
 
+// ---- The owner's ruling of 14 Nov 2026: the rack top has no limit; above about 20 L of loose kit up there, one line ----
+const LOOSE='Strap it tight, or use one rack-top bag: loose items shift.';
+const timesIn=(html,text)=>html.split(text).length-1;
+const findingOf=(html,head)=>(html.match(new RegExp('<div class="finding note"[^>]*><b>'+head+'[^<]*</b>[\\s\\S]*?</div>'))||[''])[0];
+test('[LC-DECK-LOOSE] the rack top has no limit: above 20 L of loose kit up there, one line says to strap it tight or use one rack-top bag, once where the deck\'s kit is listed (The rack top takes, Already up there); at 20 L or less, none',()=>{
+  // a synthetic sleeping bag (11 L) and the tent at the litres given, on the rack top with a pannier below
+  const at=(tentL,more={})=>{
+    render({bags:[frame,seat,rackBag],kit:{quilt:true,tent:true,pump:true},custom:{quilt:{L:11,kg:1.6,rigid:0},tent:{L:tentL,kg:2.6,rigid:45}},
+      decks:{bar:false,rack:true},...more});
+    run('renderBags();renderResult();');
+    const rows=JSON.parse(run('JSON.stringify(checklistOfBags(currentPlan()).groups)'));
+    return {list:nodes.get('bagList').innerHTML,result:nodes.get('resultBox').innerHTML,rows,
+      shown:run('deckClaims().reduce((s,k)=>s+itemL(k),0).toFixed(1)'),decked:run('JSON.stringify(deckedIds())')};
+  };
+  // exactly 20 L: no line
+  let v=at(9);
+  check(v.shown==='20.0'&&v.decked==='["quilt","tent"]','20 L on the rack top');
+  check(timesIn(v.list,LOOSE)===0&&timesIn(v.result,LOOSE)===0,'at 20 L, no line');
+  // 20.1 L: the line, once in each place, inside the finding that lists the deck's kit
+  v=at(9.1);
+  check(v.shown==='20.1','20.1 L on the rack top');
+  check(timesIn(v.list,LOOSE)===1&&findingOf(v.list,'The rack top takes ').includes(LOOSE),'the bag list: once, in The rack top takes');
+  check(timesIn(v.result,LOOSE)===1&&findingOf(v.result,'Already up there: ').includes(LOOSE),'the packing check: once, in Already up there');
+  check(v.list.includes('<i class="deckline">'+run('RACK_DECK_NOTE')+'</i>'),'the pannier\'s deck line as before');
+  check(v.rows.every(g=>!String(g.subtitle).includes(LOOSE)&&g.items.every(r=>!String(r.note).includes(LOOSE))),'never on a checklist line');
+  // the line follows the litres the rider reads: 20.04 L shows as 20.0 L, so no line
+  v=at(9.04);
+  check(v.shown==='20.0'&&timesIn(v.list,LOOSE)===0&&timesIn(v.result,LOOSE)===0,'20.04 L, shown as 20.0 L: no line');
+  // no limit: with the mat too, 29 L, all three ride up there and the line is still said once
+  v=at(9,{kit:{quilt:true,tent:true,pad:true,pump:true},custom:{quilt:{L:11,kg:1.6,rigid:0},tent:{L:9,kg:2.6,rigid:45},pad:{L:9,kg:0.4,rigid:51}}});
+  check(v.shown==='29.0'&&v.decked==='["quilt","pad","tent"]','29 L, all three on the rack top: the deck has no limit');
+  check(timesIn(v.list,LOOSE)===1&&timesIn(v.result,LOOSE)===1,'29 L: once in each place');
+  // the deck off, or an indoor trip: nothing loose up there, no line
+  v=at(9.1,{decks:{bar:false,rack:false}});
+  check(v.decked==='[]'&&timesIn(v.list,LOOSE)===0&&timesIn(v.result,LOOSE)===0,'deck off: no line');
+  v=at(9.1,{sleep:'indoor'});
+  check(v.decked==='[]'&&timesIn(v.list,LOOSE)===0&&timesIn(v.result,LOOSE)===0,'an indoor trip: no line');
+});
+
 console.log(JSON.stringify({suite:'strap-display',cases,checks,scope:'actual allocation and emitted SVG plus scoped colour/thumbnail rules; no browser rendering'}));

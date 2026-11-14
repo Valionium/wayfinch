@@ -8,7 +8,7 @@ import type { Answer, AnswerItem, Baseline, Cover, DayRide, GridHour, Km, Missin
 import { showKm, W } from '../wording/en.ts';
 import { usablePosition } from './locate.ts';
 import { usableFlatKph, type Schedule } from './pace.ts';
-import { noteFor, zoneLookupOf } from './tripday.ts';
+import { cardNoteFor, zoneLookupOf } from './tripday.ts';
 import { detailFor, hourClass, modelsForRoute } from './weather-classes.ts';
 import { amountLine, chanceLine, dayStopsOf, gridOf, hourAt, hoursTouching, onTheRide, pointNearKm, pointNearPosition, rainWindows, ridePoints, routeForecast, shownKm, weekdayOf, windowWhen, type RidePoint } from './weather-windows.ts';
 
@@ -203,7 +203,8 @@ const shortDay = (t: Date, tz: string): string => {
   const w = wallClock(t, tz);
   return W.timeShortDay(weekdayOf(t, tz), w.day, W.timeMonth(w.month - 1));
 };
-const degrees = (c: number): string => String(Math.round(c) + 0);
+/** Whole degrees, a minus with a real minus sign (the owner's ruling of 14 Nov 2026). */
+const degrees = (c: number): string => String(Math.round(c) + 0).replace('-', '−');
 
 const kmRange = (w: RainWindow, lengthKm: Km): string => {
   const [a, b] = shownKm(w, lengthKm);
@@ -350,7 +351,10 @@ function nightItem(f: WeatherFacts, night: NightLow): AnswerItem {
     parts.push(W.weatherThunderNight(showKm(night.km), stormWhen(f, night.thunderHours.from, night.thunderHours.to, tz), within ? W.rainHours(formatHm(night.thunderHours.from, tz), formatHm(night.thunderHours.to, tz)) : null));
     if (night.hail) parts.push(W.weatherHail);
   }
-  const status: Status = outdoorStay(f) && night.thunderHours ? 'warning' : outdoorStay(f) && night.lowC !== null && night.lowC <= 0 ? 'action' : 'fine';
+  const freezing = outdoorStay(f) && night.lowC !== null && night.lowC <= 0;
+  const status: Status = outdoorStay(f) && night.thunderHours ? 'warning' : freezing ? 'action' : 'fine';
+  // A freezing night says what to do, a stormy one too (review of #169, m1).
+  if (freezing) parts.push(W.weatherPackWarm(degrees(night.lowC!)));
   return { label, stamp: { km: night.km }, status, detail: parts.join(' · ') };
 }
 
@@ -465,8 +469,10 @@ export function weatherAnswer(f: WeatherFacts, windows: RainWindow[], plans: Rai
   const missing = new Set<Missing>(plans.flatMap((p) => p.missing));
   if (needsWeather) missing.add('weather');
 
-  const note = noteFor(f.ride);
-  const detail = [here?.line ?? '', note ?? ''].filter(Boolean).join(' ');
+  const note = cardNoteFor(f.ride);
+  // The folded card says what to do about a freezing night too, not only its item (review of #169, I1).
+  const warm = low?.kind === 'low' ? W.weatherPackWarm(degrees(low.lowC)) : '';
+  const detail = [here?.line ?? '', note ?? '', warm].filter(Boolean).join(' ');
   return makeAnswer({
     topic: 'weather', status, title, stamp, detail, items, basis: basisOf(f, gap !== null || night.seasonal),
     freshness: freshnessOf(f), missing: [...missing],

@@ -6,7 +6,7 @@ import type { Answer, AnswerItem, StopIdea } from '../types.ts';
 import { showKm, W } from '../wording/en.ts';
 import { newestMapDate, shortMapDate, spotName } from './covers.ts';
 import { arrivalRidingOn, hoursIndex, insideRadius, isFoodPlace, open247, passesOf, zoneOfPass } from './leaveby.ts';
-import { noteFor } from './tripday.ts';
+import { cardNoteFor } from './tripday.ts';
 import { routeForecast, gridOf } from './weather-windows.ts';
 import type { FoodFacts, Ideas } from './stop-ideas.ts';
 
@@ -60,7 +60,7 @@ export function foodAnswer(f: FoodFacts, ideas: Ideas): Answer {
   const dataDates: Record<string, string> = {};
   if (newest !== null) dataDates['places'] = newest;
   if (forecast) dataDates['weather'] = forecast.fetchedAt.toISOString();
-  const note = noteFor(f.ride);
+  const note = cardNoteFor(f.ride);
   const items = ideas.status === 'unknown' && !title ? [] : [...ideas.timeline.map(itemOf), ...nextOpenItems(f)];
   return makeAnswer({
     topic: 'food', status: ideas.status, title: title?.reason ?? ideas.line ?? W.stopNoneAtArrival,
