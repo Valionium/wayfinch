@@ -125,7 +125,7 @@ const check=(value,message)=>{assert.ok(value,message);checks++;};
     const before=q.values.get('loadcheck:bikeProfiles'),beforeCurrent=q.values.get('loadcheck:bikeProfile');
     check(!(await run('bikeStoreSet(BIKE_PROFILE_KEY,[])')) && !(await run('persistBikeProfileSelection()')),'BK-STORE-04 a page knowing 2 refuses to rewrite a list marked 3');
     check(q.values.get('loadcheck:bikeProfiles')===before && q.values.get('loadcheck:bikeProfile')===beforeCurrent && q.values.get('loadcheck:bikeProfilesFormat')==='3','BK-STORE-04 nothing was rewritten');
-    check(run('BIKE_PROFILE_MESSAGE')==='This bike list was saved by a newer version of Load Check. Reload to edit it.','BK-STORE-04 the message is shown');
+    check(run('BIKE_PROFILE_MESSAGE')==='This bike list was saved by a newer version of the Bag planner. Reload to edit it.','BK-STORE-04 the message is shown');
     q.values.set('loadcheck:bikeProfilesFormat','2');
     // 05: junk from an import
     run(`S.bikeProfile=normaliseBikeProfile({id:'junk',name:'Junk',fit:7});`);

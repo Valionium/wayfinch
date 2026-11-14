@@ -8,13 +8,14 @@ const J=code=>JSON.parse(app.run(`JSON.stringify(${code})`)??'null');
 const dlg=html.slice(html.indexOf('id="bikeDetailsBox"'),html.indexOf('id="maxWeightBox"'));
 const at=s=>dlg.indexOf(s);
 
-// [BK-UI-07] the dialog opens on the frame pictures and the size row; everything else is under a closed "More details (optional)".
+// [BK-UI-07] the frame pictures and the size row are the Quick start; everything else comes after them. Since the owner's answer of
+// 14 Nov 2026 ("All tiles at top") Bike details opens on its tiles, Quick start the first; a new bike opens at Quick start.
 {
   const quick=at('id="bikeQuick"'),more=at('id="bikeMoreDetails"');
   check(quick>0&&more>quick,'BK-UI-07 the quick block comes first');
   check(at('id="fitStyleChoices"')>quick&&at('id="fitStyleChoices"')<more,'BK-UI-07 frame pictures are in the quick block');
   check(at('id="fitSizeChips"')>quick&&at('id="fitSizeChips"')<more&&at('id="fitQuickResult"')>quick&&at('id="fitQuickResult"')<more,'BK-UI-07 size row and result are in the quick block');
-  check(/<details[^>]*id="bikeMoreDetails"(?![^>]*\sopen)[^>]*>\s*<summary>More details \(optional\)<\/summary>/.test(dlg),'BK-UI-07 More details is closed by default');
+  check(/<details class="bike-tool-optional bd-group" id="bikeQuickGroup"[^>]*><summary>Quick start<\/summary>\s*<section class="bike-quick" id="bikeQuick"/.test(dlg) && at('aria-controls="bikeQuickGroup"')>0 && at('aria-controls="bikeQuickGroup"')<at('class="bd-tile" aria-expanded="false" aria-controls="bikeLookGroup"'),'BK-UI-07 the quick block is the Quick start tile, the first tile');
   for(const id of ['fitBoltSt','fitBoltDt','fitBoltUn','fitTopTube','fitMeasureBox','fitMaxWeight','bikeRepairFields','bikeLibraryPanel','bikeApply','bikeBaseKg'])
     check(at('id="'+id+'"')>more,'BK-UI-07 '+id+' sits under More details');
   check(app.run(`FIT_STYLES.length>=8`)&&app.run(`['XS','S','M','L','XL'].every(l=>fitSizeChipLetters().includes(l))`),'BK-UI-07 sizes XS to XL');
