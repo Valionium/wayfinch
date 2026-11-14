@@ -1707,8 +1707,8 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .photo-modes .look-chip[aria-pressed=true]{outline:2px solid var(--blaze);outline-offset:1px}
 .bike-more>summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600}
 /* Bike details as tiles (the owner's wish of 14 Nov 2026): two columns on a phone, four where the dialog is wide, all on one screen;
-   an open tile spans the row and the others step aside until it closes */
-.bike-more{container-type:inline-size}
+   an open tile spans the row and the others step aside until it closes; the grid's own section is its container (review of PR 164, N1) */
+#bikeProfilePanel,.bike-more{container-type:inline-size}
 .bd-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
 @container (min-width:560px){.bd-tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .bd-tile{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-width:0;min-height:64px;padding:10px 12px;

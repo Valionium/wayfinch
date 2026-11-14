@@ -119,8 +119,12 @@ export function openColours(box: HTMLElement, options: ColoursOptions): Colours 
   root.append(now, grid, done);
   box.appendChild(root);
 
+  // the colour in use, else the first: where the focus goes into the grid
+  const focusChecked = (): void => (keep?.checked ? keep : radios.find((r) => r.checked) ?? radios[0]!).focus();
   const show = (current: string | null, fresh = false): void => {
-    // another bike shown (review of PR 162, m1): the old bike's colour is never offered, so a tap never stores it on this one
+    // another bike shown (review of PR 162, m1): the old bike's colour is never offered, so a tap never stores it on this one; a cell
+    // that had the focus hands it to the colour now checked, never to the page (re-check of PR 162, m4)
+    const had = fresh && keep !== null && keep === document.activeElement;
     if (fresh && keep) {
       keep.closest('label')!.remove();
       keepNote.remove();
@@ -138,6 +142,7 @@ export function openColours(box: HTMLElement, options: ColoursOptions): Colours 
     dot.hidden = hex === null;
     dot.style.background = hex ?? '';
     name.textContent = at >= 0 ? MORE_COLOURS[at]!.name : hex ? options.words.own(nearestSwatchName(hex) ?? '') : '';
+    if (had) focusChecked();
   };
   show(options.current);
 
@@ -176,7 +181,7 @@ export function openColours(box: HTMLElement, options: ColoursOptions): Colours 
   return {
     root,
     show,
-    focus: () => (keep?.checked ? keep : radios.find((r) => r.checked) ?? radios[0]!).focus(),
+    focus: focusChecked,
     close: () => root.remove(),
   };
 }

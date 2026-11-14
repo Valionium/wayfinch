@@ -148,6 +148,22 @@ test('[BK-TILES-A11Y] all ten tiles on the first screen as Bike details opens, 4
   }
 });
 
+// Review of PR 164, N1: "four where the dialog is wide" never applied, since no container was around the grid.
+test('[BK-TILES-GRID] two columns on a phone (320, 360 px), four where the dialog is wide (1280, 1440 px); all ten whole on the first screen', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/' });
+  await page.evaluate(() => localStorage.setItem('loadcheck:walkthrough:v1', 'done'));
+  const size = page.viewportSize()!;
+  const widths = size.width === 360 ? [320, 360] : [size.width, 1440];
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: size.height });
+    await openFromRig(page);
+    const tops = await page.evaluate(() => [...document.querySelectorAll('#bikeTiles .bd-tile')].map((t) => Math.round(t.getBoundingClientRect().top)));
+    expect(tops.filter((top) => top === tops[0]).length, `${width} px: tiles in the first row`).toBe(width < 600 ? 2 : 4);
+    expect(await allInView(page), `${width} px: every tile on the first screen`).toBe(true);
+    expect(await sideways(page), `${width} px: no sideways scroll`).toBe(false);
+  }
+});
+
 test('[BK-TILES-SAME] an old bike loads unchanged into the tiles and saves unchanged', async ({ page }) => {
   app = await loadApp(page, { launch: true, path: '/' });
   await page.evaluate((bike) => {
