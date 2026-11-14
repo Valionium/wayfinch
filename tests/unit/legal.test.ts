@@ -136,7 +136,7 @@ describe('licences', () => {
 
   test('[PRIV-LICENCES-ALL] every dependency is on the Licences page and in THIRD_PARTY, with its version', () => {
     const third = read('THIRD_PARTY');
-    expect(Object.keys(deps()).length).toBeGreaterThanOrEqual(9);
+    expect(Object.keys(deps()).length).toBeGreaterThanOrEqual(8);
     for (const [name, version] of Object.entries(deps())) {
       expect(page().includes(name), `${name} on the page`).toBe(true);
       expect(page().includes(version), `${name} ${version} on the page`).toBe(true);
@@ -163,7 +163,7 @@ describe('licences', () => {
   test('[PRIV-LICENCES-ALL] the fonts, opening_hours, the MIT note, Open-Meteo, Copernicus and OpenStreetMap are credited as the spec says', () => {
     const text = page().replace(/\s+/g, ' ');
     const html = read('public/legal/licences/index.html');
-    for (const part of ['SIL OPEN FONT LICENSE Version 1.1', 'Copyright 2017 The Barlow Project Authors', 'IBM Corp.', 'LGPL-3.0-only', 'Open Database Licence',
+    for (const part of ['SIL OPEN FONT LICENSE Version 1.1', 'Source Sans 3', 'Copyright 2010-2020 Adobe', 'IBM Corp.', 'LGPL-3.0-only', 'Open Database Licence',
       'MIT licence', "covers only the project's own code", 'CC BY 4.0', 'Copernicus', '© OpenStreetMap contributors', 'BSD 2-Clause']) {
       expect(text, part).toContain(part);
     }
@@ -211,12 +211,12 @@ describe('the legal pages on a phone: only markup and style changed', () => {
   // pages' wording must not change by a character in that work. When the owner edits the wording, replace the hash with the new one.
   const TEXT_HASH: Record<string, string> = {
     privacy: '09607ea939ef9aa629b545fcae1b2e696d8471f0f1eac9d4199a9d1f11358840',
-    licences: '90e677bd3eb82d551718df50a184d85aed348b4fc5c763af67683ed6cd1c2e9a',
+    licences: 'e046795857c1368139c9261c051a94bd34b73442c0d1dc401835d345810c8b4f',
     imprint: '600d647d43c99cc6ad200f4e0f65adaadbcd723980b9b947d2a87df61e9cc064',
   };
   for (const [name, hash] of Object.entries(TEXT_HASH)) {
     test(`[LEGAL-PHONE-TEXT] the ${name} page's text is the same, character for character`, () => {
-      // The bar's words are the one top bar's of every tool (owner's list of 7 Nov 2026, items 8 and 9); every other character as it was.
+      // The bar's words are the one top bar's of every tool (owner's list of 7 Nov 2026, items 8 and 9); every other character as it was; the font credit changed from Barlow to Source Sans 3 (owner's choice, 9 Nov 2026).
       const text = textOfFile(`public/legal/${name}/index.html`).replace(/\s+/g, ' ').trim();
       expect(text.startsWith(`${TL.toolsBack} `)).toBe(true);
       // The tab's new name, "En route" for "Ahead" (owner's finding M, 8 Nov 2026), is one of the privacy page's two changes of words; the other is "Prepare this route" for "Get ready offline" (owner's choice, 9 Nov 2026).
