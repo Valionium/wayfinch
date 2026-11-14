@@ -135,11 +135,11 @@ test('[BF-LOOK] each type says what to look for: tyres, mounts, gears, brakes; k
     for (const f of findTypes(a)) {
       const look = lookFor(f.type, a);
       const label = `${JSON.stringify(a)} ${f.type}`;
-      expect(look.slice(0, 4), label).toEqual(['tyres', a.carry === 'days' ? 'mounts-days' : 'mounts', 'gears', 'brakes']);
+      expect(look.slice(0, 4), label).toEqual(['tyres', a.carry === 'days' ? 'mountsDays' : 'mounts', 'gears', 'brakes']);
       expect(look.includes('suspension'), label).toBe(f.type === 'mtb' || f.type === 'full');
       expect(look.includes('motor'), label).toBe(f.type === 'ebike');
       // a motor wanted: every other type says it is also made with one
-      expect(look.includes('motor-too'), label).toBe(a.motor === 'yes' && f.type !== 'ebike');
+      expect(look.includes('motorToo'), label).toBe(a.motor === 'yes' && f.type !== 'ebike');
     }
   }
   for (const t of TYPES) {
@@ -151,7 +151,7 @@ test('[BF-LOOK] each type says what to look for: tyres, mounts, gears, brakes; k
   expect(FN_LOOK.mtb.suspension).toBeTruthy();
   expect(FN_LOOK.full.suspension).toBeTruthy();
   expect(FN_LOOK.ebike.motor).toBeTruthy();
-  for (const k of ['tyres', 'mounts', 'gears', 'brakes', 'suspension', 'motor'] as const) expect(FN_LOOK_LABEL[k]).toBeTruthy();
+  for (const k of ['tyres', 'mounts', 'mountsDays', 'gears', 'brakes', 'suspension', 'motor', 'motorToo'] as const) expect(FN_LOOK_LABEL[k]).toBeTruthy();
   // frame size: the maker's size chart, no fitting advice
   expect(FN.frame).toContain('size chart');
   expect(FN.frame).not.toMatch(/\bcm\b|inseam|height|tall/i);

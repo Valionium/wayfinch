@@ -54,7 +54,7 @@ type Mode = 'explore' | 'build';
 const MODES: readonly Mode[] = ['explore', 'build'];
 
 /** `kind`: the type to open on, from the Bike finder's link (#/tools?learn=<type>); anything else opens as before. */
-export function LearnScreen({ services, kind: asked }: { services: TyreServices; kind?: string }) {
+export function LearnScreen({ services, kind: asked }: { services: TyreServices; kind?: string | undefined }) {
   const [tick, redraw] = useState(0);
   void choiceVersion.value;
   useEffect(() => {

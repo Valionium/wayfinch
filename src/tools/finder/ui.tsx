@@ -3,25 +3,17 @@
 // drawing in How a bike is built. It keeps the answers in its one copilot:* key (answers.ts), and never changes a saved bike.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { complete, findTypes, lookFor, missing, ORDER, QUESTIONS } from '../../core/finder/rank.ts';
-import type { Answers, FinderType, Look, Question } from '../../core/finder/rank.ts';
+import type { Answers, FinderType, Question } from '../../core/finder/rank.ts';
 import { FN, FN_ANSWERS, FN_LOOK, FN_LOOK_LABEL, FN_MIND, FN_MOTOR_TOO, FN_QUESTIONS, FN_TYPES, FN_WHY } from '../../core/wording/en-finder.ts';
 import { bikeDetailsHref } from '../../ui/bike/link.ts';
-import { clearAnswers, FINDER_KEY, readAnswers, writeAnswers } from './answers.ts';
+import { clearAnswers, readAnswers, writeAnswers } from './answers.ts';
 import './finder.css';
 
 /** The type whose drawing the rider opened last: back from How a bike is built, the focus goes to its link. This visit only. */
 let followed: FinderType | null = null;
 
-/** One line of what to look for: its label and words. */
-function lookLine(type: FinderType, k: Look): [string, string] {
-  const w = FN_LOOK[type];
-  switch (k) {
-    case 'mounts-days': return [FN_LOOK_LABEL.mounts, w.mountsDays];
-    case 'motor-too': return [FN_LOOK_LABEL.motor, FN_MOTOR_TOO];
-    default: return [FN_LOOK_LABEL[k], w[k] ?? ''];
-  }
-}
 
+const EVENTS = ['storage', 'pageshow', 'copilot:deleted'];
 const firstRadio = (root: HTMLElement | null, q: Question): HTMLInputElement | null | undefined => root?.querySelector<HTMLInputElement>(`input[name="bf-${q}"]`);
 
 export function FinderScreen() {
@@ -41,16 +33,13 @@ export function FinderScreen() {
     const link = back ? root.current?.querySelector<HTMLAnchorElement>(`a[data-finder-learn="${back}"]`) : null;
     if (link) link.focus(); else title.current?.focus();
   }, []);
-  // Another tab's change, or Delete co-pilot data here or there: read again, so a deleted answer never comes back with the next tap.
+  // Another tab's change, Delete co-pilot data here or there, a return from the back/forward cache: read again, so a deleted answer never
+  // comes back with the next tap. What is stored is what this page last wrote, so reading it again changes nothing else.
   useEffect(() => {
     const again = (): void => { const a = readAnswers(); setAnswers(a); if (!complete(a)) setShown(false); };
-    const onStorage = (e: StorageEvent): void => { if (e.key === null || e.key === FINDER_KEY) again(); };
-    const onShow = (e: PageTransitionEvent): void => { if (e.persisted) again(); };
     const w = window;
-    w.addEventListener('storage', onStorage);
-    w.addEventListener('pageshow', onShow);
-    w.addEventListener('copilot:deleted', again);
-    return () => { w.removeEventListener('storage', onStorage); w.removeEventListener('pageshow', onShow); w.removeEventListener('copilot:deleted', again); };
+    for (const t of EVENTS) w.addEventListener(t, again);
+    return () => { for (const t of EVENTS) w.removeEventListener(t, again); };
   }, []);
   useEffect(() => { if (toList.current) { toList.current = false; heading.current?.focus(); } });
 
@@ -118,7 +107,7 @@ export function FinderScreen() {
                 {f.mind ? <p class="bf-mind"><strong>{FN.mind}</strong> {FN_MIND[f.mind]}</p> : null}
                 <p class="bf-sub">{FN.look}</p>
                 <ul class="bf-look">
-                  {lookFor(f.type, full).map((k) => { const [label, words] = lookLine(f.type, k); return <li key={k}><strong>{label}:</strong> {words}</li>; })}
+                  {lookFor(f.type, full).map((k) => <li key={k}><strong>{FN_LOOK_LABEL[k]}:</strong> {FN_LOOK[f.type][k] ?? FN_MOTOR_TOO}</li>)}
                 </ul>
                 <a class="bf-learn" href={`#/tools?learn=${f.type}`} data-finder-learn={f.type} onClick={() => { followed = f.type; }}>
                   {FN.learn}<span class="visually-hidden"> ({FN_TYPES[f.type]})</span>

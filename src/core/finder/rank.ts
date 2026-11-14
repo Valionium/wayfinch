@@ -79,11 +79,11 @@ export function findTypes(a: Full): Fit[] {
 }
 
 /** What to look for on a type: its tyres, mounts (for kit for several days, those that carry it), gears and brakes, then what it adds. */
-export type Look = 'tyres' | 'mounts' | 'mounts-days' | 'gears' | 'brakes' | 'suspension' | 'motor' | 'motor-too';
+export type Look = 'tyres' | 'mounts' | 'mountsDays' | 'gears' | 'brakes' | 'suspension' | 'motor' | 'motorToo';
 export function lookFor(type: FinderType, a: Full): Look[] {
-  const out: Look[] = ['tyres', a.carry === 'days' ? 'mounts-days' : 'mounts', 'gears', 'brakes'];
+  const out: Look[] = ['tyres', a.carry === 'days' ? 'mountsDays' : 'mounts', 'gears', 'brakes'];
   if (type === 'mtb' || type === 'full') out.push('suspension');
   if (type === 'ebike') out.push('motor');
-  else if (a.motor === 'yes') out.push('motor-too');
+  else if (a.motor === 'yes') out.push('motorToo');
   return out;
 }

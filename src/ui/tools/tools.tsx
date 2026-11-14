@@ -30,13 +30,11 @@ export const LEARN_HREF = '#/tools?learn';
 const FinderScreen = lazy(() => import('../../tools/finder/ui.tsx').then((m) => m.FinderScreen));
 export const FINDER_HREF = '#/tools?finder';
 
-type Page = { page: 'cards' | 'learn' | 'finder'; kind?: string };
+type Page = { page: 'cards' | 'learn' | 'finder'; kind?: string | undefined };
 /** The page the address names; #/tools?learn=<type> (the Bike finder's links) opens How a bike is built on that type. */
 function pageShown(): Page {
-  if (typeof location === 'undefined') return { page: 'cards' };
-  if (location.hash === FINDER_HREF) return { page: 'finder' };
-  const learn = /^#\/tools\?learn(?:=([a-z]+))?$/.exec(location.hash);
-  return learn ? { page: 'learn', ...(learn[1] ? { kind: learn[1] } : {}) } : { page: 'cards' };
+  const m = typeof location === 'undefined' ? null : /^#\/tools\?(learn|finder)(?:=([a-z]+))?$/.exec(location.hash);
+  return m ? { page: m[1] as Page['page'], kind: m[2] } : { page: 'cards' };
 }
 
 /** Tools: its cards, or How a bike is built or the Bike finder while the address says so. */
@@ -61,7 +59,7 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
     }
     was.current = page;
   }, [page]);
-  if (page === 'learn') return <LearnScreen key={shown.kind ?? ''} services={services} {...(shown.kind ? { kind: shown.kind } : {})} />;
+  if (page === 'learn') return <LearnScreen key={shown.kind} services={services} kind={shown.kind} />;
   return page === 'finder' ? <FinderScreen /> : <ToolsCards services={services} />;
 }
 
