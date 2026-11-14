@@ -136,10 +136,12 @@ export function LearnScreen({ services }: { services: TyreServices }) {
         </select>
       </label>
       {addHref ? <p class="muted bl-add"><a href={addHref}>{LN.add}</a> {LN.addAfter}</p> : null}
-      {kind === 'own' && record && bike.shows ? (
+      {kind === 'own' && record && (bike.shows || bike.single) ? (
         <p class="muted bl-shows">
-          {bike.shows.brakes ? `${LN.showsBrakes(bike.shows.brakes)} ` : ''}{bike.shows.drive ? `${LN.showsDrive} ` : ''}
-          <a href={bikeDetailsHref(record.id, 'tools')}>{LN.setThem}</a>
+          {bike.single ? `${LN.single} ` : ''}
+          {bike.shows?.brakes ? `${LN.showsBrakes(bike.shows.brakes)} ` : ''}{bike.shows?.drive ? `${LN.showsDrive} ` : ''}
+          {/* A link to set only what the rider has not answered: brakes set as Other were answered (follow-up of 14 Nov). */}
+          {bike.shows?.brakes === 'unset' || bike.shows?.drive ? <a href={bikeDetailsHref(record.id, 'tools')}>{LN.setThem}</a> : null}
         </p>
       ) : null}
       <div class="bl-modes" role="group" aria-label={LN.modes}>
