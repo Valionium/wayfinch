@@ -1,6 +1,6 @@
 // Your data (spec sections 3.5 and 4.4): export, import and delete. Each says what it does before it does it; a file that cannot be
 // read writes nothing; delete names what goes and asks first.
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { Y } from '../../core/wording/en-you.ts';
 import { Card } from '../card.tsx';
 import { bagDeleteHref } from './services.ts';
@@ -121,7 +121,7 @@ function DeleteAll({ services, reload }: { services: YouServices; reload: () => 
   const opener = useRef<HTMLButtonElement>(null);
   const question = useRef<HTMLParagraphElement>(null);
   const wasAsking = useRef(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (asking) question.current?.focus();
     else if (wasAsking.current) opener.current?.focus();
     wasAsking.current = asking;

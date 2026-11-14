@@ -1,6 +1,6 @@
 // Water learning (spec sections 3.5 and 6.3): the status of the personal factor, and the post-ride report. The report is worked
 // out in `core` (reportRide); this only collects the answers and shows what comes back.
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { REPORT_TEMPS } from '../../core/engines/ride-report.ts';
 import type { ReportTemp, RideOutcome } from '../../core/engines/ride-report.ts';
 import { uncertainty } from '../../core/engines/water-base.ts';
@@ -36,7 +36,7 @@ export function LearnCard({ services, snap, reload }: { services: YouServices; s
   // The form's first field takes the focus as it opens; closed, the button that opened it has it back (sweep 14 Nov, 49).
   const opener = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (open) document.getElementById('ride-hours')?.focus();
     else if (wasOpen.current) opener.current?.focus();
     wasOpen.current = open;
