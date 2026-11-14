@@ -226,6 +226,10 @@ body{
 .draftbar.hidden{display:none}
 .draftbar .linky{margin-left:auto}
 .draftbar.quiet{border-color:var(--line)}
+/* free play (design of 14 Nov 2026): hidden by its attribute, 44 px targets, none of it in the small view */
+#freePlayBar[hidden],#freePlayBar [hidden],body.lc-small #freePlayBar{display:none!important}
+#freePlayBar button{min-height:44px}
+#freePlayBar .free-play-words{flex:1 1 16em;min-width:0}
 #bikeFollowUndo{min-height:44px;margin-left:0}
 .balance-line{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin:0 0 12px;font-size:13px;color:var(--muted);line-height:1.45}
 .balance-line .linky{min-height:44px}
@@ -2003,6 +2007,13 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <button class="kitact" id="advisorReturn" type="button"></button>
     <span id="advisorReturnText"></span>
   </div>
+  <!-- free play without Trip's route (the owner's wish 3, design of 14 Nov 2026): offered while the plan is the trip's -->
+  <div class="draftbar quiet" id="freePlayBar" role="status" hidden>
+    <span class="free-play-words"><b id="freePlayHead" hidden></b> <span id="freePlayText"></span></span>
+    <button class="kitact" id="freePlayBack" type="button" hidden>Back to the trip's plan</button>
+    <button class="linky" id="freePlaySave" type="button" hidden>Save as a new setup</button>
+    <button class="linky" id="freePlayStart" type="button" hidden>Try other bags freely</button>
+  </div>
 
   <!-- the small view's head (the owner's answer 4 of 8 Nov 2026): shown only in the small view of a day ride -->
   <div class="small-head" id="smallHead" hidden><h2 id="smallTitle" tabindex="-1">Bags for this trip</h2><p id="smallTripLine"></p></div>
@@ -3137,6 +3148,7 @@ function maxWeightLabel(m){
   return (m.u==='lb' ? `${m.v} lb (${round1(m.v*LB_TO_KG).toFixed(1)} kg)` : `${m.v} kg`)+', '+incl;
 }
 function persistBikeProfileSelection(){
+  if(FREE_PLAY) return Promise.resolve(true);   // free play's bike is in free play only (FP-NO-WRITE)
   const snapshot=normaliseBikeProfile(S.bikeProfile);
   BIKE_PROFILE_WRITES=BIKE_PROFILE_WRITES.catch(()=>false).then(()=>bikeStoreSet(BIKE_PROFILE_CURRENT_KEY,snapshot));
   return BIKE_PROFILE_WRITES;
@@ -5311,7 +5323,8 @@ function weightCheck(plan = currentPlan(), bike = S.bikeProfile, bagsKg){
 }
 // The pop-up never opens over another dialog, the handoff bar or a carried-over question; it then waits for the next time.
 // The small view shows nothing but the bike with its bags: the question waits for the full planner (SMALL_VIEW is a var, set later).
-function weightPromptBlocked(){ return DIALOGS.length > 0 || WEIGHT_PROMPT_BLOCKS.handoffBar || WEIGHT_PROMPT_BLOCKS.carriedQuestion || SMALL_VIEW === true; }
+// Nor in free play (design of 14 Nov 2026): the question waits for the trip's plan, so free play saves no answer (FREE_PLAY is a var too).
+function weightPromptBlocked(){ return DIALOGS.length > 0 || WEIGHT_PROMPT_BLOCKS.handoffBar || WEIGHT_PROMPT_BLOCKS.carriedQuestion || SMALL_VIEW === true || !!FREE_PLAY; }
 function weightPromptDue(){
   if(!gearBags().length) return false;
   return S.bikeProfile ? !S.bikeProfile.maxWeightAsked : !MAX_WEIGHT_SKIPPED;
@@ -6691,7 +6704,7 @@ function trialWaits(where){
   else { SAVE_MESSAGE = line; if($('saveMsg')) $('saveMsg').textContent = line; draftStatus(line); }
   return true;
 }
-function exportPlanFile(){ return trialWaits('export') ? false : downloadAll(); }
+function exportPlanFile(){ return trialWaits('export') || freePlayWaits('export') ? false : downloadAll(); }
 // Try in Bag planner: the plan as the advisor tried it (the suggestion's bags and decks, a fresh plan), at the packing check.
 function startTrial(s, input = ADVISOR.input){
   if(TRIAL || !s || !input || input.fromQuestionnaire) return false;
@@ -8956,7 +8969,7 @@ function loadSummary(now = new Date()){
 }
 // The stored summary, unless it says the same as this one; true when written.
 function writeLoadSummary(always = false){
-  if(!DRAFT_READY || deletedSinceLoad()) return false;
+  if(!DRAFT_READY || deletedSinceLoad() || FREE_PLAY) return false;   // Tools and Trip read the trip's plan, never free play (FP-NO-WRITE)
   // during a trial, the plan without the trial bag (decision 7; review of PR 68, C1): Wayfinch reads this summary in Tools, the tyre tool and Ahead
   let next; try { next = withoutTrial(() => loadSummary()); } catch(e){ return false; }
   const stored = readLocalJson(SUMMARY_KEY), bare = x => JSON.stringify({ ...x, at:null, planUpdatedAt:null });
@@ -11868,7 +11881,7 @@ function renderResult(){
     else $('bagsOwnStatus').textContent = 'Enter a weight from 0 to 50 kg. The last valid value was kept.';
   };
   if($('dlAll')) $('dlAll').onclick = exportPlanFile;
-  if($('impAll')) $('impAll').onclick = () => $('impFile').click();
+  if($('impAll')) $('impAll').onclick = () => { if(!freePlayWaits('import')) $('impFile').click(); };
   if($('impFile')) $('impFile').onchange = e => {
     const f = e.target.files[0]; if(!f) return;
     if(f.size > MAX_IMPORT_BYTES){
@@ -13223,6 +13236,7 @@ function bikeChoiceNow(){
 }
 // Stamped just after Wayfinch's record when that one is dated later (a clock set wrong), so this change is the newest choice.
 function noteBikeChoicePage(bikeId){
+  if(FREE_PLAY) return Promise.resolve(false);   // a bike tried in free play is no choice for Wayfinch (FP-NO-WRITE)
   let other=null; try { other=bikeChoiceOf(k=>window.localStorage.getItem(k),'copilot:bikeChoice:v1','copilot'); } catch(e){}
   return store.set(BIKE_CHOICE_RECORD_KEY,{app:'load-check',kind:'bike-choice',v:1,bikeId,at:new Date(Math.max(Date.now(),other ? other.at+1 : 0)).toISOString()});
 }
@@ -13246,7 +13260,7 @@ function bikeFollowedAt(){
 function followBikeChoice(){
   // nor while a trial bag is tried (review of PR 68, M4): the record is not marked seen, so the follow waits for the page's next open after
   // Keep or Remove (TB-PAGE-FOLLOWS: only at start-up and on a return from the back/forward cache, never under the rider's fingers)
-  if(!DRAFT_READY || DRAFT_FROZEN || TRIAL || BIKE_PROFILE_BUSY || DELETED_ELSEWHERE || !$('bikeDetailsBox').classList.contains('hidden')) return false;
+  if(!DRAFT_READY || DRAFT_FROZEN || TRIAL || FREE_PLAY || BIKE_PROFILE_BUSY || DELETED_ELSEWHERE || !$('bikeDetailsBox').classList.contains('hidden')) return false;
   const c=bikeChoiceNow();
   if(!c || c.app!=='copilot' || c.at<=bikeFollowedAt()) return false;
   const seen=()=>store.set(BIKE_FOLLOWED_KEY,{app:'load-check',kind:'bike-followed',v:1,at:new Date(c.at).toISOString()});
@@ -13688,6 +13702,7 @@ function savedDraftMessage(){
   return draftSaveNote();
 }
 function draftSaveNote(){
+  if(FREE_PLAY) return FREE_PLAY_WORDS.status;
   if(!DRAFT_READY || DRAFT_SAVE_STATUS.state === 'loading') return 'Loading your saved plan…';
   if(DRAFT_SAVE_STATUS.state === 'pending') return 'Saving your current plan and packed checks…';
   if(DRAFT_SAVE_STATUS.state === 'conflict') return 'This plan was changed in another tab, so this tab is not saving. Load the newer plan to carry on.';
@@ -13698,6 +13713,7 @@ function draftSaveNote(){
 }
 function notifyDraftSaveStatus(){
   draftStatus(draftSaveNote());
+  renderFreePlayBar();
   if(typeof renderPackingSaveStatus === 'function') renderPackingSaveStatus();
   if(typeof renderOfflinePackingStatus === 'function') renderOfflinePackingStatus();
 }
@@ -13762,6 +13778,7 @@ function saveDraftInBrowser(value){
 // Every draft write passes here. During a trial a queued save waits (decision 7); a hidden or closing tab (flushDraft) still saves, the
 // plan without the trial bag (captureDraft), so the rider's other changes are kept and nothing of the trial is.
 function persistDraft(serial, flushing = false){
+  if(FREE_PLAY) return DRAFT_WRITES;   // free play writes nothing of the trip's plan, not even from a hidden or closing tab (FP-NO-WRITE)
   DRAFT_LATEST_SERIAL=serial;
   if(DRAFT_FROZEN || deletedSinceLoad()) return DRAFT_WRITES;
   if(TRIAL && !flushing){ TRIAL.pendingOther = serial !== DRAFT_SIGNATURE; return DRAFT_WRITES; }
@@ -13808,6 +13825,7 @@ function persistDraft(serial, flushing = false){
 }
 function queueDraftSave(){
   if(!DRAFT_READY) return;
+  renderFreePlayBar();   // the free-play line follows the plan with every change (FP-OFFER)
   clearTimeout(DRAFT_TIMER);
   DRAFT_TIMER = setTimeout(() => {
     DRAFT_TIMER = null;
@@ -13867,7 +13885,7 @@ function handleForeignDraft(other){
   showTabNotice('This plan was changed in another tab. Your last change here was not saved.',true);
 }
 function checkOtherTabs(){
-  if(!DRAFT_READY || deletedSinceLoad()) return;
+  if(!DRAFT_READY || deletedSinceLoad() || FREE_PLAY) return;   // another tab's plan is taken at Back, never over free play (FP-BACK)
   if(window.storage){ foreignDraftAccount().then(other => { if(other) handleForeignDraft(other); }); return; }
   const other=foreignDraft(); if(other) handleForeignDraft(other);
 }
@@ -13932,6 +13950,7 @@ function showRecoveredDraft(){
   $('draftBar').classList.remove('hidden');
 }
 $('draftNew').onclick = async () => {
+  if(freePlayWaits('new')) return;
   if($('draftNew').dataset.confirm !== 'yes'){
     $('draftText').textContent = 'Start a new plan? This clears the trip and packing choices; your selected bike and saved setups remain.';
     $('draftNew').textContent = 'Yes, clear this plan';
@@ -14027,6 +14046,7 @@ function readImportFile(f){
   rd.readAsText(f);
 }
 async function importAll(text){
+  if(FREE_PLAY) return FREE_PLAY_WORDS.waits.import;
   if(typeof text !== 'string' || text.length > MAX_IMPORT_BYTES || importByteLength(text) > MAX_IMPORT_BYTES) return IMPORT_SIZE_MESSAGE;
   let d; try { d = JSON.parse(text); } catch(e){ return 'That did not parse as JSON.'; }
   if(!dataObject(d) || d.app !== undefined && d.app !== 'load-check') return 'That is not a Load Check export.';
@@ -14309,7 +14329,7 @@ function renderSetupCompare(){
 }
 function startSetupAction(id,kind){
   const s=SETUPS.find(setup => setup.id === id); if(!s) return false;
-  if(kind !== 'rename' && trialWaits('setup')){ renderResult(); return false; }   // a setup is never updated with a trial bag
+  if(kind !== 'rename' && (trialWaits('setup') || freePlayWaits('update'))){ renderResult(); return false; }   // a setup is never updated with a trial bag, nor from free play
   SETUP_ACTION=kind === 'rename' ? {kind,id,name:s.name} : {kind:'update',id,snapshot:snapshotSetup(s.name,s.note)};
   renderResult();
   const target=kind === 'rename' ? $('renameSetupName') : $('resultBox').querySelector('[data-confirm-update="'+id+'"]');
@@ -14344,7 +14364,7 @@ async function duplicateSetup(id){
 async function confirmSetupUpdate(id){
   const index=SETUPS.findIndex(s => s.id === id);
   if(index < 0 || !SETUP_ACTION || SETUP_ACTION.kind !== 'update' || SETUP_ACTION.id !== id) return false;
-  if(trialWaits('setup')){ renderResult(); return false; }
+  if(trialWaits('setup') || freePlayWaits('update')){ renderResult(); return false; }
   const original=SETUPS[index],reviewed=normaliseSetup(SETUP_ACTION.snapshot); if(!reviewed) return false;
   // Reports are self-contained measurements of the previous prediction. Keep
   // their sent/pending state and detach them from the new packing outcome.
@@ -14610,6 +14630,117 @@ async function resetCalibration(){
   await store.set('loadcheck:packEff', null);
   renderBags(); renderResult(); drawRig();
 }
+
+/* ---- Free play without Trip's route (the owner's wish 3; design of 14 Nov 2026, 2026-11-14-bag-planner-free-play-design.md) ----
+   While the plan open is the trip's (it carries the route hash Wayfinch handed over), one line in the full planner offers "Try other
+   bags freely". Free play is a copy of that plan without Trip's route (the track and its two ends, as Remove this track takes them),
+   in this tab's memory only: nothing of the trip's plan is written (the draft, also from a hidden or closing tab; the load summary
+   Tools and Trip read; the plan's bike and the bike choice Wayfinch follows; no setup is updated), and Export, Import, Start a new
+   plan and an update wait, each saying why. Only the rider's Save as a new setup keeps it, as one new setup with no trip link. Back
+   to the trip's plan puts back the plan of before exactly (the restore Undo uses, with the kept placements and the balancing's
+   memory), at its step; another tab's newer plan is then taken as from any other tab. A reload or a closed tab ends free play: the
+   trip's plan opens, as it was. A saved bike, the theme and a report are no plan and are saved as always. ---- */
+var FREE_PLAY=null;   // {plan (captureDraft as JSON), placements, cache, balance, handling, handoffHidden, note} or null
+var FREE_PLAY_BACK=null;   // the trip's plan's signature just after Back, while the line says so
+var FREE_PLAY_WORDS={
+  offer:'This is your trip\'s plan, with the route from Trip.',
+  start:'Try other bags freely',backButton:'Back to the trip\'s plan',saveButton:'Save as a new setup',
+  head:'Free play — your trip\'s plan is not changed.',
+  on:'Nothing here is kept unless you save it as a new setup.',
+  back:'Back to your trip\'s plan, as it was.',
+  saved:name => `Saved as a new setup: ${name}. Nothing else here is kept.`,
+  status:'Free play: this plan is not saved. Your trip\'s plan is not changed.',
+  waits:{
+    update:'In free play a saved setup is not updated. Save as a new setup instead.',
+    export:'In free play nothing is exported. Tap Back to the trip\'s plan first.',
+    import:'In free play nothing is imported. Tap Back to the trip\'s plan first.',
+    new:'In free play the trip\'s plan is not cleared. Tap Back to the trip\'s plan first.',
+    appUpdate:'The update reloads the page, which ends free play: it waits until you tap Back to the trip\'s plan.',
+  },
+};
+// What is the rider's and no plan's, so Back keeps it as it is now: the theme and the packing factor.
+var FREE_PLAY_OWN=['theme','packEff'];
+function freePlayState(){ const s=JSON.parse(JSON.stringify(S)); FREE_PLAY_OWN.forEach(k => delete s[k]); return s; }
+function freePlayTripRoute(){ return !!S.gpx && typeof S.gpx.copilotRoute === 'string' && /^[0-9a-f]{64}$/.test(S.gpx.copilotRoute); }
+function freePlayOffered(){
+  return !FREE_PLAY && DRAFT_READY && !DRAFT_FROZEN && !TRIAL && SMALL_VIEW !== true && !deletedSinceLoad() && freePlayTripRoute();
+}
+function freePlaySetText(el,text){ if(el && el.textContent !== text) el.textContent=text; }   // a live line says only what changed
+function renderFreePlayBar(){
+  const bar=$('freePlayBar'); if(!bar || !FREE_PLAY_WORDS) return;
+  const on=!!FREE_PLAY,offer=!on && freePlayOffered(),back=!on && !!FREE_PLAY_BACK && FREE_PLAY_BACK === DRAFT_SIGNATURE;
+  bar.hidden=!on && !offer;
+  bar.classList.toggle('quiet',!on);
+  $('freePlayHead').hidden=!on; freePlaySetText($('freePlayHead'),on ? FREE_PLAY_WORDS.head : '');
+  freePlaySetText($('freePlayText'),on ? FREE_PLAY.note || FREE_PLAY_WORDS.on : back ? FREE_PLAY_WORDS.back : FREE_PLAY_WORDS.offer);
+  freePlaySetText($('freePlayStart'),FREE_PLAY_WORDS.start); freePlaySetText($('freePlayBack'),FREE_PLAY_WORDS.backButton);
+  freePlaySetText($('freePlaySave'),FREE_PLAY_WORDS.saveButton);
+  $('freePlayBack').hidden=!on; $('freePlaySave').hidden=!on; $('freePlayStart').hidden=!offer;
+}
+// Export, Import, Start a new plan and a setup's Update during free play: nothing happens, and the line says why. True when they wait.
+function freePlayWaits(where){
+  if(!FREE_PLAY) return false;
+  const line=FREE_PLAY_WORDS.waits[where] || '';
+  if(where === 'export' || where === 'import'){ if($('impMsg')) $('impMsg').textContent=line; }
+  else if(where === 'update'){ SAVE_MESSAGE=line; if($('saveMsg')) $('saveMsg').textContent=line; }
+  else if(where === 'new'){ if($('draftText')) $('draftText').textContent=line; }
+  FREE_PLAY.note=line; renderFreePlayBar();
+  return true;
+}
+async function startFreePlay(){
+  if(!freePlayOffered()) return false;
+  await flushDraft();   // a change still waiting is saved first, so storage and Back hold the same trip's plan
+  if(!freePlayOffered()) return false;   // another tab's plan came in meanwhile
+  currentPlan();   // the kept plan as it stands, so the one put back is the one the rider had
+  const handoff=$('handoffBar');
+  FREE_PLAY={plan:JSON.stringify(captureDraft()),state:freePlayState(),placements:S.placements,cache:PLAN_CACHE,
+    balance:{...BALANCE,run:null,loading:false,undone:new Set(BALANCE.undone)},handling:{...HANDLING,run:null},
+    handoffHidden:handoff ? handoff.classList.contains('hidden') : true,note:''};
+  FREE_PLAY_BACK=null;
+  // the bar of Plan bags for this trip (its Undo) and the draft's own bar wait; the first comes back at Back as it was
+  if(handoff) handoff.classList.add('hidden');
+  if($('draftBar')) $('draftBar').classList.add('hidden');
+  clearGPX();
+  renderBags(); renderKit();
+  notifyDraftSaveStatus();   // the save line says free play is not saved; the bar shows
+  if($('freePlayBack')) $('freePlayBack').focus();
+  return true;
+}
+function endFreePlay(){
+  if(!FREE_PLAY) return false;
+  const fp=FREE_PLAY;
+  restorePlan(JSON.parse(fp.plan),true,false);   // while free play is still on, so the restore itself writes nothing
+  // then the page's own state of before, as it held it: a plan read back is normalised once more (a place gains its empty country),
+  // so the plan restored alone would be saved again; the kept plan as the page held it (a kept plan read again can split a pair's
+  // load another way), and the balancing's memory of it, so nothing the rider undid there is balanced again
+  for(const k of Object.keys(S)) if(!FREE_PLAY_OWN.includes(k) && !Object.hasOwn(fp.state,k)) delete S[k];
+  Object.assign(S,JSON.parse(JSON.stringify(fp.state)));
+  S.placements=fp.placements;
+  if(fp.cache.placements === S.placements && fp.cache.sig === planSignature()) PLAN_CACHE=fp.cache;
+  Object.assign(BALANCE,fp.balance); Object.assign(HANDLING,fp.handling);
+  FREE_PLAY=null;
+  const handoff=$('handoffBar'); if(handoff && !fp.handoffHidden) handoff.classList.remove('hidden');
+  syncGPXControl(); renderBags(); renderKit(); renderBikeProfiles(true);
+  if(S.step === 4) renderResult();
+  drawRig();
+  FREE_PLAY_BACK=DRAFT_SIGNATURE;
+  notifyDraftSaveStatus();
+  checkOtherTabs();   // a newer trip's plan from another tab is taken now, as from any other tab
+  if($('freePlayStart')) $('freePlayStart').focus();
+  return true;
+}
+// Save as a new setup: the rider's tap is the only way free play is kept. One new setup, with no trip link; free play goes on.
+async function saveFreePlay(){
+  if(!FREE_PLAY) return false;
+  const name=`Free play, ${todayDay()}`,saved=await saveSetup(name,'');
+  if(!FREE_PLAY) return saved;
+  FREE_PLAY.note=saved ? FREE_PLAY_WORDS.saved(name)+(SAVE_MESSAGE ? ' '+SAVE_MESSAGE : '') : SAVE_MESSAGE;
+  renderFreePlayBar();
+  return saved;
+}
+$('freePlayStart').onclick=() => { startFreePlay(); };
+$('freePlayBack').onclick=() => { endFreePlay(); };
+$('freePlaySave').onclick=() => { saveFreePlay(); };
 
 /* ================= BAG INSPECTOR ================= */
 // Clicking a bag on the finished plan enlarges it into the top-left corner and
@@ -15143,6 +15274,7 @@ async function applyUpdate(){
   if(UPDATE_STATE.applying || !UPDATE_STATE.registration?.waiting){showUpdateReady();return;}
   // an update reloads the page, which would drop a trial without a word: it waits for Keep or Remove (review of PR 68, M3)
   if(TRIAL){UPDATE_STATE.note=advisorWord('trialUpdate');showUpdateReady();return;}
+  if(FREE_PLAY){UPDATE_STATE.note=FREE_PLAY_WORDS.waits.appUpdate;showUpdateReady();return;}   // nor free play (FP-WAITS)
   UPDATE_STATE.applying=true;UPDATE_STATE.note='';showUpdateReady();
   const finish=note=>{UPDATE_STATE.applying=false;UPDATE_STATE.note=note;showUpdateReady();};
   let saved=false;
