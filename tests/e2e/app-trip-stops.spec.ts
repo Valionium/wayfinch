@@ -52,7 +52,11 @@ test('[TRIP-STOPS-KEEP] a stop the rider picked stays when the nights change: th
 
   // The nights, by keyboard: 2 → 3.
   const nights = page.locator('#trip-nights');
-  if (!(await nights.isVisible())) await page.getByRole('button', { name: 'Change: Route', exact: true }).click();
+  if (!(await nights.isVisible())) {
+    await page.getByRole('button', { name: 'Change: Route', exact: true }).click();
+    // the opened step's heading takes the focus first (review of PR 73, I4); only then does the rider move on to the nights
+    await expect(page.locator('[data-step="route"] h2')).toBeFocused();
+  }
   await nights.focus();
   await nights.fill('3');
   await nights.press('Enter');
