@@ -16,7 +16,7 @@ export const STEP_PARTS: Readonly<Record<string, readonly L[]>> = {
   'puncture-tubeless': [none, none, none, none, none, [['spare tube', 'tube'], ['tubeless valve', 'tubeless-valve']], none],
   'chain-broken': [none, [['quick link', 'quick-link'], ['chain', 'chain']], none, [['rear gears', 'cassette']], none, none],
   'spoke-snapped': [[['spoke', 'spokes'], ['hub', 'hub']], [['Rim brakes', 'rim-brake'], ['rim', 'rim'], ["brake's quick release", 'brake-qr']], [['Disc brakes', 'caliper'], ['rim', 'rim'], ['frame', 'frame'], ['fork', 'fork']], none, [["brake's quick release", 'brake-qr'], ['Rim brakes', 'rim-brake']]],
-  'brake-rub-rim': [[['dropouts', 'dropouts'], ["wheel's quick release", 'wheel-qr']], [['tyre bead', 'bead']], [['pad', 'pads'], ['tyre', 'tyre'], ['spokes', 'spokes']], [['brake', 'rim-brake']], [["brake's quick release", 'brake-qr']], [["brake's quick release", 'brake-qr']]],
+  'brake-rub-rim': [[['dropouts', 'dropouts'], ["wheel's quick release", 'wheel-qr']], [['tyre bead', 'bead']], [['pad', 'pads'], ['tyre', 'tyre'], ['spokes', 'spokes']], [['brake', 'rim-brake']], [['Hydraulic rim brakes', 'rim-brake']], [["brake's quick release", 'brake-qr']], [["brake's quick release", 'brake-qr']]],
   'brake-rub-disc': [[['thru-axle', 'thru-axle'], ["wheel's quick release", 'wheel-qr'], ['dropouts', 'dropouts']], [['pad', 'pads']], [['caliper', 'caliper'], ['lever', 'brake-lever']], [['caliper', 'caliper']], [['pad adjuster', 'pad-adjuster'], ['pad', 'pads'], ['disc', 'disc']]],
   'brake-weak-rim': [[['rim', 'rim'], ['pads', 'pads']], [["brake's quick release", 'brake-qr']], [['barrel adjuster', 'barrel']], [['pads', 'pads'], ['rim', 'rim']], [['pads', 'pads']]],
   'brake-weak-disc': [[['lever', 'brake-lever'], ['pads', 'pads']], [['disc', 'disc'], ['pads', 'pads']], [['pad adjuster', 'pad-adjuster'], ['barrel adjuster', 'barrel']], [['lever', 'brake-lever']], none],
@@ -74,10 +74,25 @@ export const STEP_PARTS: Readonly<Record<string, readonly L[]>> = {
   'ebike-range-drop': [[['tyre', 'tyre']], [['battery', 'battery']], none, [['battery', 'battery']]],
 };
 
-/** A card's parts, for the bike view: each part its shown steps name (`texts`, the card's steps), in the order the text first names them. */
+/**
+ * The parts a rider touches first for a card, which lead its parts in the bike view and on its "What is it, where is it?" line (the
+ * owner's ruling of 14 November 2026: the puncture card starts with the wheel, the tyre and the tube, not the disc caliper its warning
+ * names first). The guide has no part called the wheel: its rim stands for it. Only parts the card's shown steps name; a card not listed
+ * keeps the text's order.
+ */
+export const FIRST_PARTS: Readonly<Record<string, readonly PartId[]>> = {
+  'puncture-tube': ['rim', 'tyre', 'tube'],
+};
+
+/**
+ * A card's parts, for the bike view: each part its shown steps name (`texts`, the card's steps), its first parts (FIRST_PARTS) first,
+ * the rest in the order the text first names them.
+ */
 export function cardParts(id: string, texts: readonly string[], shown: readonly number[]): PartId[] {
   const steps = STEP_PARTS[id] ?? [];
-  return [...new Set(shown.flatMap((i) => linkSegments(texts[i] ?? '', steps[i] ?? []).flatMap((s) => (typeof s === 'string' ? [] : [s.part]))))];
+  const named = [...new Set(shown.flatMap((i) => linkSegments(texts[i] ?? '', steps[i] ?? []).flatMap((s) => (typeof s === 'string' ? [] : [s.part]))))];
+  const first = (FIRST_PARTS[id] ?? []).filter((p) => named.includes(p));
+  return [...first, ...named.filter((p) => !first.includes(p))];
 }
 
 export type Segment = string | { text: string; part: PartId };

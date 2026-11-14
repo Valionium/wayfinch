@@ -2,6 +2,7 @@
 // shows only for rim brakes, one that starts "Disc brakes:" only for disc brakes; brakes Not sure, all of them, the disc line first.
 import { expect, test } from 'vitest';
 import { STEP_WHEN, stepsShown } from '../../../../src/core/care/lines.ts';
+import { picturesFor } from '../../../../src/core/care/pictures.ts';
 import type { RimKind } from '../../../../src/core/care/pictures.ts';
 import type { CareDetails } from '../../../../src/core/care/types.ts';
 import CARE_WORDS from '../../../../src/core/wording/en-care-pictures.json';
@@ -43,6 +44,7 @@ test('[BC-STEP-LINES] every line for one kind of brake carries its condition; a 
       else if (t.startsWith('Hydraulic:')) expect(w, at).toEqual({ brakes: ['hydraulic-disc'] });
       else if (t.startsWith('Cable:') || (t.startsWith('Cable brakes:') && disc)) expect(w, at).toEqual({ brakes: ['cable-disc'] });
       else if (t.startsWith('Cable brakes:')) expect(w, at).toEqual({ rimBrake: ['caliper', 'v-brake'] });
+      else if (t.startsWith('Hydraulic rim brakes:')) expect(w, at).toEqual({ rimBrake: ['hydraulic'] });
       else expect(w, at).toBeNull();
     });
     if (!when) expect(stepsShown(item.id, item.steps.length, d('rim'))).toEqual(item.steps.map((_, i) => i));
@@ -86,9 +88,39 @@ test('[BC-STEP-TITLES] each step for some bikes only has a title saying which, t
     when.forEach((w, i) => {
       if (w === null) expect(t![i], `${item.id} ${i + 1}`).toBeNull();
       else {
-        expect(t![i], `${item.id} ${i + 1}`).toMatch(/^(Rim|Disc|Cable disc|Hydraulic disc|Cable rim) brakes only: [a-z]/);
+        expect(t![i], `${item.id} ${i + 1}`).toMatch(/^(Rim|Disc|Cable disc|Hydraulic disc|Cable rim|Hydraulic rim) brakes only: [a-z]/);
         expect(bannedHits(t![i]!, false), t![i]!).toEqual([]);
       }
     });
   }
+});
+
+// The owner's ruling of 14 November 2026: a hydraulic rim brake gets its own centring step, with its own words and never the road
+// caliper's centring screw; no honest picture of it exists, so it shows its text alone.
+test('[BC-HYDRO-RIM-CENTRE] Brake rubbing: a hydraulic rim brake sees its own centring step and not the cable one, with no picture; a road caliper or V-brake the cable one only; not told, both, the cable one first', () => {
+  const rub = ROAD_CARDS.find((c) => c.id === 'brake-rub-rim')!;
+  const hydro = rub.steps.findIndex((t) => t.startsWith('Hydraulic rim brakes:'));
+  const cable = rub.steps.findIndex((t) => t.startsWith('Cable brakes:') && /centring screw/.test(t));
+  expect(hydro).toBeGreaterThan(-1);
+  expect(cable).toBeGreaterThan(-1);
+  expect(rub.steps[hydro]).not.toMatch(/road caliper|V-brake|spring screw|turn its/i);
+  expect(rub.steps[hydro]).toMatch(/shop/);
+  const shown = (k: RimKind | null) => stepsShown(rub.id, rub.steps.length, d('rim'), k);
+  expect(shown('hydraulic')).toContain(hydro);
+  expect(shown('hydraulic')).not.toContain(cable);
+  for (const k of ['caliper', 'v-brake'] as const) {
+    expect(shown(k), k).toContain(cable);
+    expect(shown(k), k).not.toContain(hydro);
+  }
+  expect(shown(null).indexOf(cable)).toBeLessThan(shown(null).indexOf(hydro));
+  expect(shown(null).length).toBe(rub.steps.length);
+  // its own step has no picture: no road caliper's centring screw, no V-brake's spring screw
+  for (const k of [null, 'hydraulic', 'caliper', 'v-brake'] as const) {
+    expect(picturesFor(rub.id, hydro, { brakes: 'rim', rimBrake: k, axle: null, shifting: null, bars: null }), String(k)).toEqual([]);
+  }
+  // the cable step keeps its two pictures
+  expect(picturesFor(rub.id, cable, { brakes: 'rim', rimBrake: 'caliper', axle: null, shifting: null, bars: null }).map((p) => p.id)).toEqual(['rim-centre-caliper', 'rim-centre-vbrake']);
+  // its title says which brakes it is for
+  expect(stepTitlesFrom(CARE_WORDS)!['brake-rub-rim']![hydro]).toMatch(/^Hydraulic rim brakes only: /);
+  expect(bannedHits(rub.steps[hydro]!, false)).toEqual([]);
 });
