@@ -726,7 +726,8 @@ test("[BV-VIEW] the card's parts as buttons and as labels on the drawing; a tap 
   await click(where()[0]!);
   await sheetOpen();
   const parts = [...sheet()!.querySelectorAll('.bv-parts button')].map((b) => b.textContent);
-  expect(parts).toEqual(['Thru-axle', 'Wheel quick release', 'Dropouts', 'Brake pads', 'Disc caliper', 'Brake lever', 'Pad adjuster', 'Brake disc']);
+  // the wheel, linked in the card's first step since the owner's ruling of 14 November 2026 (PG-WHEEL-LINKS), in the text's order
+  expect(parts).toEqual(['Thru-axle', 'Wheel quick release', 'Wheel', 'Dropouts', 'Brake pads', 'Disc caliper', 'Brake lever', 'Pad adjuster', 'Brake disc']);
   expect(sheet()!.querySelector('.bv-parts')!.getAttribute('aria-label')).toBe('Parts in this card');
   // each label is one of the card's parts, inside the hidden picture, and none can take the focus
   expect(labels().length).toBeGreaterThan(3);
