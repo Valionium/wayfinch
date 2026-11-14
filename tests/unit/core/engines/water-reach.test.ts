@@ -586,15 +586,20 @@ describe('what the card never claims', () => {
   test('[W-NEVER-CLAIM] says "estimate", shows a range and the calibration status', () => {
     const a = waterAnswer(factsOf({ spots: [tapAt(41, 'Kehl'), tapAt(60)], litres: 3 }));
     expect(textOf(a)).toMatch(/[Ee]stimate/);
-    expect(a.detail).toMatch(/expected [\d.]+ L, planned [\d.]+ L/);
+    // the owner's ruling of 14 Nov 2026 (sweep item 19): "about … L needed, carry … L" (it was "expected … L, planned … L")
+    expect(a.detail).toMatch(/To the next water, Kehl \(drinking water, km 41\): about [\d.]+ L needed, carry [\d.]+ L\./);
     expect(a.detail).toContain('not calibrated yet');
     expect(waterAnswer(factsOf({ spots: [tapAt(41), tapAt(60)], litres: 3, profile: { sumW: 1 } })).detail).toContain('partly calibrated');
     expect(waterAnswer(factsOf({ spots: [tapAt(41), tapAt(60)], litres: 3, profile: { sumW: 3 } })).detail).toContain('calibrated from your rides');
   });
+  test('[W-NEVER-CLAIM] an unnamed tap reads "drinking water tap at km 41", a named one keeps its name (review of #169, m6)', () => {
+    expect(waterAnswer(factsOf({ spots: [{ b: tap({ name: null }), km: 41 }, tapAt(60)], litres: 3 })).detail).toMatch(/To the next water, drinking water tap at km 41: about [\d.]+ L needed, carry [\d.]+ L\./);
+    expect(waterAnswer(factsOf({ spots: [tapAt(41, 'Kehl'), tapAt(60)], litres: 3 })).detail).toContain('To the next water, Kehl (drinking water, km 41):');
+  });
   test('[W-NEVER-CLAIM] the range is to S1: expected at k x SR_model, planned at k x U x SR_model', () => {
     const f = factsOf({ spots: [tapAt(41), tapAt(60)], litres: 3 });
     const { s1 } = findS1S2(f);
-    const m = /expected ([\d.]+) L, planned ([\d.]+) L/.exec(waterAnswer(f).detail)!;
+    const m = /about ([\d.]+) L needed, carry ([\d.]+) L/.exec(waterAnswer(f).detail)!;
     near(Number(m[1]), use(f, 'now', s1, 'median'), 0.05);
     near(Number(m[2]), use(f, 'now', s1, 'plan'), 0.05);
   });

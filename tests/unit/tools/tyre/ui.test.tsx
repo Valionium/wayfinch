@@ -3,6 +3,7 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { W } from '../../../../src/core/wording/en.ts';
+import { TS } from '../../../../src/core/wording/en-tyre-screen.ts';
 import { T } from '../../../../src/core/wording/en-tyre.ts';
 import { readHost } from '../../../../src/tools/tyre/host.ts';
 import { TYRE_KEY, exportTyres, importTyres, readStore } from '../../../../src/tools/tyre/storage.ts';
@@ -72,27 +73,27 @@ beforeEach(() => { go('tools/tyre'); });
 describe('the tyre screen', () => {
   test('[TY-UI-REQUIRED] the sidewall maximum is the only required field; without it the screen says so and shows no figure', async () => {
     await mount(services(memory()));
-    expect(host.textContent).toContain(W.tyreNeedMax);
+    expect(host.textContent).toContain(TS.tyreNeedMax);
     expect(figures()).toEqual([]);
-    await type(labelled(W.tyreLimitMaxLabel), '5');
+    await type(labelled(TS.tyreLimitMaxLabel), '5');
     // With only the maximum, the rim type and width are unknown: friendly words, not an error.
     expect(figures()).toEqual([]);
     expect(host.textContent).toContain(TC.tyreNeedTwo);
     expect(host.textContent).not.toContain('do not fit together');
     await hooked();
     expect(figures().length).toBe(2);
-    expect(host.textContent).not.toContain(W.tyreNeedMax);
+    expect(host.textContent).not.toContain(TS.tyreNeedMax);
     // The rest was assumed, and the screen says what.
     expect(host.querySelector('.tyre-assumed')?.textContent).toContain('rider weight 75 kg');
-    await type(labelled(W.tyreLimitMaxLabel), '');
+    await type(labelled(TS.tyreLimitMaxLabel), '');
     expect(figures()).toEqual([]);
-    expect(host.textContent).toContain(W.tyreNeedMax);
+    expect(host.textContent).toContain(TS.tyreNeedMax);
   });
 
   test('[TY-UI-REQUIRED] a limit typed in the wrong unit is asked about, and nothing shows while the question stands', async () => {
     await mount(services(memory()));
     await hooked();
-    await type(labelled(W.tyreLimitMaxLabel), '65');
+    await type(labelled(TS.tyreLimitMaxLabel), '65');
     expect(host.textContent).toContain('Did you mean 65 psi?');
     expect(figures()).toEqual([]);
     await click(button('Yes, 65 psi'));
@@ -112,14 +113,14 @@ describe('the tyre screen', () => {
     await mount(services(mem, 82));
     expect((host.querySelector('#tyre-bike') as HTMLSelectElement).value).toBe(bike.id);
     const from = [...host.querySelectorAll('.tyre-from')].map((e) => e.textContent ?? '');
-    expect(from.some((t) => t.includes(W.tyreBarsLabel) && t.includes('Flat') && t.includes('from your bike') && t.includes(W.tyreChange))).toBe(true);
+    expect(from.some((t) => t.includes(TS.tyreBarsLabel) && t.includes('Flat') && t.includes('from your bike') && t.includes(W.tyreChange))).toBe(true);
     expect(from.some((t) => t.includes(W.tyreWheelLabel) && t.includes('650B') && t.includes('from your bike'))).toBe(true);
-    expect(from.some((t) => t.includes(W.tyreFrontWidthLabel) && t.includes('42 mm') && t.includes('from your bike'))).toBe(true);
-    expect(from.some((t) => t.includes(W.tyreBikeKgLabel) && t.includes('14 kg') && t.includes('from your bag plan, saved 28 Oct'))).toBe(true);
-    expect(from.some((t) => t.includes(W.tyreLoadLabel) && t.includes('10.2 kg') && t.includes('saved 28 Oct'))).toBe(true);
+    expect(from.some((t) => t.includes(TS.tyreFrontWidthLabel) && t.includes('42 mm') && t.includes('from your bike'))).toBe(true);
+    expect(from.some((t) => t.includes(TS.tyreBikeKgLabel) && t.includes('14 kg') && t.includes('from your bag plan, saved 28 Oct'))).toBe(true);
+    expect(from.some((t) => t.includes(TS.tyreLoadLabel) && t.includes('10.2 kg') && t.includes('saved 28 Oct'))).toBe(true);
     const before = JSON.stringify(Object.fromEntries(Object.entries(mem.kv.dump()).filter(([k]) => k.startsWith('loadcheck:'))));
     // Change the handlebar: it is now the tool's own value, and Load Check's records are the same.
-    const change = [...host.querySelectorAll('.tyre-from')].find((e) => e.textContent?.includes(W.tyreBarsLabel))!.querySelector('button')!;
+    const change = [...host.querySelectorAll('.tyre-from')].find((e) => e.textContent?.includes(TS.tyreBarsLabel))!.querySelector('button')!;
     await click(change);
     await click(host.querySelector('input[name="tyre-bars"][value="drop"]')!);
     const stored = readStore(mem.kv);
@@ -130,7 +131,7 @@ describe('the tyre screen', () => {
   test('[TY-UI-FROM-YOU] rider weight from You, read through the function the app connects to its store', async () => {
     await mount(services(memory(LOADCHECK), 82));
     const from = [...host.querySelectorAll('.tyre-from')].map((e) => e.textContent ?? '');
-    expect(from.some((t) => t.includes(W.tyreRiderLabel) && t.includes('82 kg') && t.includes('from You'))).toBe(true);
+    expect(from.some((t) => t.includes(TS.tyreRiderLabel) && t.includes('82 kg') && t.includes('from You'))).toBe(true);
   });
 
   test('[TY-UI-FROM-BIKE] a plan whose bike nobody has is treated as no bike, and another bike does not take the plan\'s load', async () => {
@@ -144,11 +145,11 @@ describe('the tyre screen', () => {
   test('[TY-UI-STORE] details are kept per bike id, or under a default key, and travel in the export', async () => {
     const mem = memory(LOADCHECK);
     await mount(services(mem));
-    await type(labelled(W.tyreLimitMaxLabel), '6');
+    await type(labelled(TS.tyreLimitMaxLabel), '6');
     const sel = host.querySelector('#tyre-bike') as HTMLSelectElement;
     await act(() => { sel.value = 'default'; sel.dispatchEvent(new Event('change', { bubbles: true })); });
     expect(figures()).toEqual([]);
-    await type(labelled(W.tyreLimitMaxLabel), '4.5');
+    await type(labelled(TS.tyreLimitMaxLabel), '4.5');
     const read = readStore(mem.kv);
     expect(read.ok && read.store.entries[bike.id]?.details.tyreMax).toEqual({ value: 6, unit: 'bar' });
     expect(read.ok && read.store.entries.default?.details.tyreMax).toEqual({ value: 4.5, unit: 'bar' });
@@ -167,8 +168,8 @@ describe('the tyre screen', () => {
   test('[TY-UI-STORE] #/tools/tyre opens the tool inside Tools', async () => {
     await act(() => { go('tools/tyre'); render(<App />, host); });
     // The tool's screen is a lazy chunk: it comes in a moment later.
-    for (let n = 0; n < 200 && !host.textContent?.includes(W.tyreTitle); n++) await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
-    expect(host.textContent).toContain(W.tyreTitle);
+    for (let n = 0; n < 200 && !host.textContent?.includes(TS.tyreTitle); n++) await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+    expect(host.textContent).toContain(TS.tyreTitle);
     expect(host.querySelector('.tabs [aria-current="page"]')?.textContent).toBe('Tools');
   });
 
@@ -176,8 +177,8 @@ describe('the tyre screen', () => {
     const mem = memory(LOADCHECK);
     const before = JSON.stringify(Object.entries(mem.kv.dump()).sort());
     await mount(services(mem, 80));
-    await type(labelled(W.tyreLimitMaxLabel), '5');
-    await type(labelled(W.tyreLimitMinLabel), '3');
+    await type(labelled(TS.tyreLimitMaxLabel), '5');
+    await type(labelled(TS.tyreLimitMinLabel), '3');
     await click(host.querySelector('input[name="tyre-setup"][value="tubeless"]')!);
     await click(host.querySelector('input[name="tyre-surface"][value="unpaved"]')!);
     expect(figures().length).toBe(2);
@@ -189,7 +190,7 @@ describe('the tyre screen', () => {
   test('[TY-UI-LAST] the Tools tab shows the last tyre result and the bag plan line', async () => {
     const mem = memory(LOADCHECK);
     await mount(services(mem));
-    await type(labelled(W.tyreLimitMaxLabel), '3.2');
+    await type(labelled(TS.tyreLimitMaxLabel), '3.2');
     render(null, host);
     await act(() => { render(<ToolsScreen services={services(mem)} />, host); });
     const text = host.textContent ?? '';
@@ -209,11 +210,11 @@ describe('the tyre screen', () => {
   test('[TY-UI-WARNINGS] every warning, and what decided the number, are in words; the split is always shown', async () => {
     const mem = memory(LOADCHECK);
     await mount(services(mem, 110));
-    await type(labelled(W.tyreLimitMaxLabel), '2.5');
+    await type(labelled(TS.tyreLimitMaxLabel), '2.5');
     const text = host.textContent ?? '';
     expect(text).toContain(TC.tyreWarnCapBinds);
     expect(text).toContain('held down by your tyre');
-    expect(text).toContain(W.tyreHeadingWhy);
+    expect(text).toContain(TS.tyreHeadingWhy);
     expect(text).toMatch(/Weight split: \d+% front, \d+% rear\./);
     expect(text).toContain(TC.tyreWhyLever);
     // A hookless rim from the bike says what it needs.
@@ -222,15 +223,15 @@ describe('the tyre screen', () => {
     render(null, host);
     await mount(services(memory()));
     await hooked();
-    await type(labelled(W.tyreLimitMaxLabel), '5');
+    await type(labelled(TS.tyreLimitMaxLabel), '5');
     expect(host.textContent).toMatch(/Weight split: 45% front, 55% rear\./);
     expect(host.textContent).toContain(TC.tyreWhyDefaultNoPlan);
   });
 
   test('[TY-UI-WARNINGS] a refused width is said in words and no figure is shown', async () => {
     await mount(services(memory()));
-    await type(labelled(W.tyreLimitMaxLabel), '5');
-    await type(labelled(W.tyreFrontWidthLabel), '100');
+    await type(labelled(TS.tyreLimitMaxLabel), '5');
+    await type(labelled(TS.tyreFrontWidthLabel), '100');
     expect(figures()).toEqual([]);
     expect(host.textContent).toContain('outside the 18 to 83 mm this tool covers');
   });
@@ -240,19 +241,19 @@ describe('the extras', () => {
   test('[TY-HEAT] with the temperatures and the highest point the screen says how high to pump; without them it says the check was skipped', async () => {
     await mount(services(memory()));
     await hooked();
-    await type(labelled(W.tyreLimitMaxLabel), '3');
-    expect(host.textContent).toContain(W.tyreHeatSkipped);
-    await type(labelled(W.tyreHeatPumpLabel), '15');
-    await type(labelled(W.tyreHeatMaxLabel), '35');
+    await type(labelled(TS.tyreLimitMaxLabel), '3');
+    expect(host.textContent).toContain(TS.tyreHeatSkipped);
+    await type(labelled(TS.tyreHeatPumpLabel), '15');
+    await type(labelled(TS.tyreHeatMaxLabel), '35');
     await type(labelled(W.tyreHighestLabel), '2000');
-    expect(host.textContent).not.toContain(W.tyreHeatSkipped);
+    expect(host.textContent).not.toContain(TS.tyreHeatSkipped);
     expect(host.textContent).toMatch(/Pump to at most \d\.\d\d bar/);
   });
 
   test('[TY-MEASURED] weighed wheel loads and calipered widths are taken, and the screen says so', async () => {
     await mount(services(memory()));
     await hooked();
-    await type(labelled(W.tyreLimitMaxLabel), '6');
+    await type(labelled(TS.tyreLimitMaxLabel), '6');
     await type(labelled(W.tyreMeasuredFrontLabel), '40');
     expect(host.textContent).not.toContain(TC.tyreWhyMeasured);
     await type(labelled(W.tyreMeasuredRearLabel), '60');
@@ -264,7 +265,7 @@ describe('the extras', () => {
 
   test('[TY-SRAM] a link and the list of what to type there; nothing prefilled or sent; the calculators differ', async () => {
     await mount(services(memory()));
-    await type(labelled(W.tyreLimitMaxLabel), '6');
+    await type(labelled(TS.tyreLimitMaxLabel), '6');
     const a = host.querySelector('a[href^="https://axs.sram.com/"]') as HTMLAnchorElement;
     expect(a.getAttribute('href')).toBe('https://axs.sram.com/guides/tire/pressure');
     expect(a.getAttribute('rel')).toContain('noopener');
@@ -290,45 +291,45 @@ describe('review findings, on the screen', () => {
     const mem = memory(TWO);
     await mount(services(mem));
     await select('default');
-    await type(labelled(W.tyreLimitMaxLabel), '8');
+    await type(labelled(TS.tyreLimitMaxLabel), '8');
     await click(host.querySelector('input[name="tyre-rimtype"][value="hooked"]')!);
-    await type(labelled(W.tyreRiderLabel), '110');
+    await type(labelled(TS.tyreRiderLabel), '110');
     const before = stored(mem);
     await select('bike_b');
-    expect((labelled(W.tyreLimitMaxLabel)).value).toBe('');
-    expect(host.textContent).toContain(W.tyreNeedMax);
+    expect((labelled(TS.tyreLimitMaxLabel)).value).toBe('');
+    expect(host.textContent).toContain(TS.tyreNeedMax);
     expect(stored(mem)).toBe(before);
     const read = readStore(mem.kv);
     expect(read.ok && read.store.entries.bike_b).toBeUndefined();
     await select('default');
-    expect((labelled(W.tyreLimitMaxLabel)).value).toBe('8');
+    expect((labelled(TS.tyreLimitMaxLabel)).value).toBe('8');
     expect(stored(mem)).toBe(before);
     // Weighed loads and a stored limit of the other bike do not leak either.
     await type(labelled(W.tyreMeasuredFrontLabel), '40');
     await type(labelled(W.tyreMeasuredRearLabel), '60');
     await select('bike_b');
-    await type(labelled(W.tyreLimitMaxLabel), '65');
+    await type(labelled(TS.tyreLimitMaxLabel), '65');
     await click(button('Yes, 65 psi'));
     expect((labelled(W.tyreMeasuredFrontLabel)).value).toBe('');
     const r2 = readStore(mem.kv);
     expect(r2.ok && r2.store.entries.bike_b?.details.measured).toBeUndefined();
     expect(r2.ok && r2.store.entries.default?.details.tyreMax).toEqual({ value: 8, unit: 'bar' });
     await select('default');
-    expect((labelled(W.tyreLimitMaxLabel)).value).toBe('8');
+    expect((labelled(TS.tyreLimitMaxLabel)).value).toBe('8');
   });
 
   test('[TY-UI-REQUIRED] I1: a rim maximum that is asked about or rejected shows no figure until it is answered', async () => {
     await mount(services(memory()));
     await hooked();
-    await type(labelled(W.tyreLimitMaxLabel), '7');
+    await type(labelled(TS.tyreLimitMaxLabel), '7');
     expect(figures().length).toBe(2);
-    await type(labelled(W.tyreLimitRimLabel), '65');
+    await type(labelled(TS.tyreLimitRimLabel), '65');
     expect(host.textContent).toContain('Did you mean 65 psi?');
     expect(figures()).toEqual([]);
-    expect(resultText()).toContain(TC.tyrePendingLimit(W.tyreLimitRimLabel));
+    expect(resultText()).toContain(TC.tyrePendingLimit(TS.tyreLimitRimLabel));
     await click(host.querySelectorAll('button')[[...host.querySelectorAll('button')].findIndex((b) => b.textContent === 'Yes, 65 psi')]!);
     expect(figures().length).toBe(2);
-    await type(labelled(W.tyreLimitRimLabel), '170');
+    await type(labelled(TS.tyreLimitRimLabel), '170');
     await click(host.querySelector('input[name="tyre-rimmax-unit"][value="psi"]') ?? host.querySelectorAll('input[name="tyre-rimmax-unit"]')[1]!);
     expect(figures()).toEqual([]);
   });
@@ -336,11 +337,11 @@ describe('review findings, on the screen', () => {
   test('[TY-UI-LAST] I2: the Tools card is always current, or gone', async () => {
     const mem = memory(LOADCHECK);
     await mount(services(mem));
-    await type(labelled(W.tyreLimitMaxLabel), '8');
+    await type(labelled(TS.tyreLimitMaxLabel), '8');
     render(null, host);
     await mount(services(mem));
-    await type(labelled(W.tyreLimitMaxLabel), '4');
-    await type(labelled(W.tyreLimitMinLabel), '2');
+    await type(labelled(TS.tyreLimitMaxLabel), '4');
+    await type(labelled(TS.tyreLimitMinLabel), '2');
     const read = readStore(mem.kv);
     const shownFront = Number((figures()[0] ?? '').replace(' bar', ''));
     expect(shownFront).toBeGreaterThan(0);
@@ -351,7 +352,7 @@ describe('review findings, on the screen', () => {
     expect(host.textContent).toContain('Trail Bike');
     render(null, host);
     await mount(services(mem));
-    await type(labelled(W.tyreLimitMaxLabel), '');
+    await type(labelled(TS.tyreLimitMaxLabel), '');
     const gone = readStore(mem.kv);
     expect(gone.ok && gone.store.entries[bike.id]?.last).toBeNull();
     render(null, host);
@@ -367,15 +368,15 @@ describe('review findings, on the screen', () => {
   test('[TY-UI-WARNINGS] I4: the screen with no figure prints no pressure number', async () => {
     await mount(services(memory()));
     await hooked();
-    await type(labelled(W.tyreLimitMaxLabel), '1.2');
+    await type(labelled(TS.tyreLimitMaxLabel), '1.2');
     expect(figures()).toEqual([]);
-    expect(host.querySelector('.tyre-result h3')?.textContent).toBe(W.tyreIncompatibleTitle);
+    expect(host.querySelector('.tyre-result h3')?.textContent).toBe(TS.tyreIncompatibleTitle);
     expect(resultText()).not.toMatch(/\d\s*(bar|psi)/);
   });
 
   test('[TY-UI-WARNINGS] I5 and I7: what was assumed is listed, with no luggage and the weight to enter, rim type and width first', async () => {
     await mount(services(memory()));
-    await type(labelled(W.tyreLimitMaxLabel), '5');
+    await type(labelled(TS.tyreLimitMaxLabel), '5');
     const line = host.querySelector('.tyre-assumed')?.textContent ?? '';
     expect(line).toContain('no luggage');
     expect(line).toContain('rider weight 75 kg (enter yours)');
@@ -387,7 +388,7 @@ describe('review findings, on the screen', () => {
   test('[TY-UI-WARNINGS] C2: an unset rim type shows nothing selected, stays within hookless limits, says so beside the figure, and one tap clears it', async () => {
     const mem = memory();
     await mount(services(mem));
-    await type(labelled(W.tyreLimitMaxLabel), '7');
+    await type(labelled(TS.tyreLimitMaxLabel), '7');
     const rimRadios = [...host.querySelectorAll('input[name="tyre-rimtype"]')] as HTMLInputElement[];
     expect(rimRadios.length).toBe(3);
     expect(rimRadios.some((r) => r.checked)).toBe(false);
@@ -395,8 +396,8 @@ describe('review findings, on the screen', () => {
     expect(resultText()).toContain(TC.tyreNeedTwo);
     expect(resultText()).not.toContain('do not fit together');
     expect(readStore(mem.kv).ok && Object.values((readStore(mem.kv) as { store: { entries: Record<string, { last: unknown }> } }).store.entries).every((e) => e.last === null)).toBe(true);
-    await type(labelled(W.tyreFrontWidthLabel), '32');
-    await type(labelled(W.tyreRearWidthLabel), '32');
+    await type(labelled(TS.tyreFrontWidthLabel), '32');
+    await type(labelled(TS.tyreRearWidthLabel), '32');
     const big = figures().map((t) => Number((t ?? '').replace(' bar', '')));
     expect(big.length).toBe(2);
     expect(Math.max(...big)).toBeLessThanOrEqual(4.5); // the 32 mm hookless row
@@ -410,7 +411,7 @@ describe('review findings, on the screen', () => {
   test('[TY-UI-FROM-BIKE] I6: an assumed choice can be confirmed by tapping it, and a bike\'s choice is labelled', async () => {
     const mem = memory();
     await mount(services(mem));
-    await type(labelled(W.tyreLimitMaxLabel), '5');
+    await type(labelled(TS.tyreLimitMaxLabel), '5');
     const casing = host.querySelectorAll('input[name="tyre-casing"]');
     expect([...casing].some((r) => (r as HTMLInputElement).checked)).toBe(false);
     expect(host.querySelector('.tyre-assumed')?.textContent).toContain('standard casing');
@@ -419,12 +420,12 @@ describe('review findings, on the screen', () => {
     render(null, host);
     await mount(services(memory(TWO)));
     const legends = [...host.querySelectorAll('legend')].map((l) => l.textContent ?? '');
-    expect(legends.some((t) => t.includes(W.tyreSetupLabel) && t.includes(W.tyreFromBike))).toBe(true);
+    expect(legends.some((t) => t.includes(TS.tyreSetupLabel) && t.includes(W.tyreFromBike))).toBe(true);
   });
 
   test('[TY-UI-FROM-BIKE] M7: Clear, not "Back to your bike\'s value", when no bike supplies the field', async () => {
     await mount(services(memory()));
-    await type(labelled(W.tyreRiderLabel), '80');
+    await type(labelled(TS.tyreRiderLabel), '80');
     expect(button(TC.tyreClear)).toBeDefined();
     expect(host.textContent).not.toContain(W.tyreBackToBike);
   });
@@ -433,9 +434,9 @@ describe('review findings, on the screen', () => {
     const mem = memory();
     await mount(services(mem));
     await hooked();
-    await type(labelled(W.tyreLimitMaxLabel), '3');
-    await type(labelled(W.tyreHeatPumpLabel), '15');
-    await type(labelled(W.tyreHeatMaxLabel), '35');
+    await type(labelled(TS.tyreLimitMaxLabel), '3');
+    await type(labelled(TS.tyreHeatPumpLabel), '15');
+    await type(labelled(TS.tyreHeatMaxLabel), '35');
     await type(labelled(W.tyreHighestLabel), '2000');
     expect(host.querySelector('.tyre-wheel')?.textContent).toMatch(/Pump to at most/);
     // The heat limit can leave one value: it reads as one value, not "2.50 to 2.50".
@@ -446,13 +447,13 @@ describe('review findings, on the screen', () => {
     await mount(services(memory()));
     await hooked();
     await click(host.querySelectorAll('input[name="tyre-max-unit"]')[1]!);
-    await type(labelled(W.tyreLimitMaxLabel), '5');
+    await type(labelled(TS.tyreLimitMaxLabel), '5');
     expect(host.textContent).toContain('Did you mean 5 bar?');
     expect(figures()).toEqual([]);
     await click(button('Yes, 5 bar'));
     expect(figures().length).toBe(2);
-    await type(labelled(W.tyreLimitMinLabel), '4');
-    await type(labelled(W.tyreLimitRimLabel), '3');
+    await type(labelled(TS.tyreLimitMinLabel), '4');
+    await type(labelled(TS.tyreLimitRimLabel), '3');
     expect(host.textContent).toContain(TC.tyreLimitBelowMin);
     expect(figures()).toEqual([]);
   });
@@ -463,27 +464,27 @@ describe('re-check findings, on the screen', () => {
 
   test('[TY-UI-REQUIRED] R1 and R5: a hooked rim may keep an assumed width; a hookless one asks for it, in one or two things', async () => {
     await mount(services(memory()));
-    await type(labelled(W.tyreLimitMaxLabel), '7');
+    await type(labelled(TS.tyreLimitMaxLabel), '7');
     expect(resultText()).toContain(TC.tyreNeedTwo);
     await click(host.querySelector('input[name="tyre-rimtype"][value="hookless"]')!);
     expect(resultText()).toContain(TC.tyreNeedWidthOnly);
     expect(figures()).toEqual([]);
-    await type(labelled(W.tyreFrontWidthLabel), '28');
+    await type(labelled(TS.tyreFrontWidthLabel), '28');
     expect(figures().length).toBe(2);
     expect(Math.max(...figures().map((f) => Number((f ?? '').replace(' bar', ''))))).toBeLessThanOrEqual(5);
     await click(host.querySelector('input[name="tyre-rimtype"][value="hooked"]')!);
-    await type(labelled(W.tyreFrontWidthLabel), '');
+    await type(labelled(TS.tyreFrontWidthLabel), '');
     expect(figures().length).toBe(2);
   });
 
   test('[TY-UI-WARNINGS] R9 and R7: the hooked button says what to do when unsure; a rear width that follows the front is said so on hookless rims', async () => {
     await mount(services(memory()));
-    await type(labelled(W.tyreLimitMaxLabel), '7');
-    await type(labelled(W.tyreFrontWidthLabel), '30');
+    await type(labelled(TS.tyreLimitMaxLabel), '7');
+    await type(labelled(TS.tyreFrontWidthLabel), '30');
     expect(resultText()).toContain(TC.tyreWarnRimUnset);
     expect(resultText()).toContain(TC.tyreRimUnsure);
     expect(host.textContent).toContain(TC.tyreSameAsFront);
-    await type(labelled(W.tyreRearWidthLabel), '45');
+    await type(labelled(TS.tyreRearWidthLabel), '45');
     expect(host.textContent).not.toContain(TC.tyreSameAsFront);
   });
 
@@ -491,15 +492,15 @@ describe('re-check findings, on the screen', () => {
     const odd = { ...bike, frontTyre: '28 x 1 1/2', pressure: { wheel: '700c', rim: 'hooked' } };
     await mount(services(memory({ ...LOADCHECK, 'loadcheck:bikeProfiles': JSON.stringify([odd]), 'loadcheck:bikeProfile': JSON.stringify(odd) })));
     expect(host.textContent).toContain(TC.tyreCouldntRead('28 x 1 1/2'));
-    expect([...host.querySelectorAll('.tyre-from')].some((e) => (e.textContent ?? '').includes(W.tyreFrontWidthLabel))).toBe(false);
+    expect([...host.querySelectorAll('.tyre-from')].some((e) => (e.textContent ?? '').includes(TS.tyreFrontWidthLabel))).toBe(false);
   });
 
   test('[TY-UI-LAST] R6: with heat advice only the pump-to line is given, no range', async () => {
     await mount(services(memory()));
     await click(host.querySelector('input[name="tyre-rimtype"][value="hooked"]')!);
-    await type(labelled(W.tyreLimitMaxLabel), '3');
-    await type(labelled(W.tyreHeatPumpLabel), '15');
-    await type(labelled(W.tyreHeatMaxLabel), '35');
+    await type(labelled(TS.tyreLimitMaxLabel), '3');
+    await type(labelled(TS.tyreHeatPumpLabel), '15');
+    await type(labelled(TS.tyreHeatMaxLabel), '35');
     await type(labelled(W.tyreHighestLabel), '2000');
     const wheel = host.querySelector('.tyre-wheel')?.textContent ?? '';
     expect(wheel).toMatch(/Pump to at most/);
@@ -524,16 +525,16 @@ describe('re-check findings, on the screen', () => {
       for (const el of needed.querySelectorAll('[data-needed]')) expect(el.querySelector('.tyre-needed-tag')?.textContent, el.getAttribute('data-needed')!).toBe(T.tyreNeededTag);
       expect(needed.querySelector('#tyre-max')).not.toBeNull();
       expect(needed.querySelectorAll('input[name="tyre-rimtype"]').length).toBe(3);
-      expect(needed.textContent).toContain(W.tyreFrontWidthLabel);
-      expect(needed.textContent).toContain(W.tyreRearWidthLabel);
+      expect(needed.textContent).toContain(TS.tyreFrontWidthLabel);
+      expect(needed.textContent).toContain(TS.tyreRearWidthLabel);
       // No other field is marked, and none of the three is asked for anywhere else.
       expect(screen.querySelectorAll('[data-needed]').length).toBe(4);
       expect(screen.querySelectorAll('input[name="tyre-rimtype"]').length).toBe(3);
-      expect([...screen.querySelectorAll('.tyre-label')].filter((l) => l.textContent?.startsWith(W.tyreFrontWidthLabel)).length).toBe(1);
+      expect([...screen.querySelectorAll('.tyre-label')].filter((l) => l.textContent?.startsWith(TS.tyreFrontWidthLabel)).length).toBe(1);
       // Then the answer, then everything optional.
       expect(cards[1]!.classList.contains('tyre-result')).toBe(true);
       const optional = cards.slice(2).map((c) => c.querySelector('h2')?.textContent);
-      expect(optional.slice(0, 7)).toEqual([TC.tyreLimitsMoreTitle, W.tyreSectionRider, W.tyreSectionBars, W.tyreSectionTyres, W.tyreSectionRim, W.tyreSectionSurface, W.tyreSectionHeat]);
+      expect(optional.slice(0, 7)).toEqual([TC.tyreLimitsMoreTitle, TS.tyreSectionRider, TS.tyreSectionBars, TS.tyreSectionTyres, TS.tyreSectionRim, TS.tyreSectionSurface, W.tyreSectionHeat]);
       expect(optional).toContain(W.tyreSectionMeasured);
     }
   });
@@ -543,8 +544,8 @@ describe('re-check findings, on the screen', () => {
     (Element.prototype as unknown as { scrollIntoView: (this: Element) => void }).scrollIntoView = function (this: Element) { calls.push(this); };
     await mount(services(memory()));
     await click(host.querySelector('input[name="tyre-rimtype"][value="hooked"]')!);
-    await type(labelled(W.tyreLimitMaxLabel), '6');
-    await type(labelled(W.tyreLimitMaxLabel), '65');
+    await type(labelled(TS.tyreLimitMaxLabel), '6');
+    await type(labelled(TS.tyreLimitMaxLabel), '65');
     expect(calls.at(-1)?.id).toBe('tyre-max-note');
     delete (Element.prototype as unknown as Record<string, unknown>).scrollIntoView;
   });
@@ -571,14 +572,14 @@ describe('the bike box (device check, 6 November 2026)', () => {
   test('[TY-UI-BIKEBOX] no saved bike: the box says so, and nothing else is offered', async () => {
     await mount(services(memory({ ...base, 'loadcheck:bikeProfiles': '[]', 'loadcheck:bikeProfile': 'null' })));
     expect(sel().value).toBe('default');
-    expect(optionTexts()).toEqual([W.tyreBikeNone]);
+    expect(optionTexts()).toEqual([TS.tyreBikeNone]);
   });
 
   test('[TY-UI-BIKEBOX] one saved bike: it is preselected, "No saved bike" is gone, "Without a bike" stays', async () => {
     await mount(services(memory({ ...base, 'loadcheck:bikeProfiles': JSON.stringify([bikeC]), 'loadcheck:bikeProfile': 'null' })));
     expect(sel().value).toBe('bike_c');
     expect(optionTexts()).toEqual(['my bike', T.tyreBikeWithout]);
-    expect(host.textContent).not.toContain(W.tyreBikeNone);
+    expect(host.textContent).not.toContain(TS.tyreBikeNone);
   });
 
   test("[TY-UI-BIKEBOX] several bikes: the plan's bike, else the most recently saved, else the current one", async () => {
@@ -616,7 +617,7 @@ describe('the bike box (device check, 6 November 2026)', () => {
     await changed(mem, { 'loadcheck:bikeProfiles': '[]' }, 'pageshow');
     expect(sel().value).toBe('default');
     expect(host.textContent).toContain(T.tyreBikeGoneNone);
-    expect(optionTexts()).toEqual([W.tyreBikeNone]);
+    expect(optionTexts()).toEqual([TS.tyreBikeNone]);
   });
 
   test('[TY-UI-BIKEBOX] only the rider changes the bike: a newer save of another bike, typing, or a bike added never switches it', async () => {
@@ -624,12 +625,12 @@ describe('the bike box (device check, 6 November 2026)', () => {
     const mem = memory({ ...base, 'loadcheck:bikeProfiles': two, 'loadcheck:bikeProfile': 'null', 'loadcheck:saved-at:v1': ledger({ [bike.id]: '2026-11-02T10:00:00Z', bike_b: '2026-10-01T10:00:00Z' }) });
     await mount(services(mem));
     expect(sel().value).toBe(bike.id);
-    await type(labelled(W.tyreLimitMaxLabel), '6');
+    await type(labelled(TS.tyreLimitMaxLabel), '6');
     // B is edited in the bag planner and is now the newest: its record, then its stamp, as two events.
     await changed(mem, { 'loadcheck:bikeProfiles': JSON.stringify([bike, { ...bikeB, frontTyre: '32-622' }]) });
     await changed(mem, { 'loadcheck:saved-at:v1': ledger({ [bike.id]: '2026-11-02T10:00:00Z', bike_b: '2026-11-05T10:00:00Z' }) }, 'visibilitychange');
     expect(sel().value).toBe(bike.id);
-    expect(labelled(W.tyreLimitMaxLabel).value).toBe('6');
+    expect(labelled(TS.tyreLimitMaxLabel).value).toBe('6');
     expect(host.textContent).not.toContain(T.tyreBikeGoneNext);
     // A bike added shows in the box and changes nothing else; a choice by hand stays.
     await changed(mem, { 'loadcheck:bikeProfiles': JSON.stringify([bike, bikeB, bikeC]) }, 'pageshow');
@@ -655,7 +656,7 @@ describe('the bike box (device check, 6 November 2026)', () => {
   test('[TY-UI-BIKEBOX] opened with no saved bike and typed in the fields (or picked by hand), a bike saved later does not switch the box', async () => {
     const mem = memory({ ...base, 'loadcheck:bikeProfiles': '[]', 'loadcheck:bikeProfile': 'null' });
     await mount(services(mem));
-    await type(labelled(W.tyreLimitMaxLabel), '6');
+    await type(labelled(TS.tyreLimitMaxLabel), '6');
     await changed(mem, { 'loadcheck:bikeProfiles': JSON.stringify([bikeC]) });
     expect(sel().value).toBe('default');
     expect(optionTexts()).toEqual(['my bike', T.tyreBikeWithout]);
