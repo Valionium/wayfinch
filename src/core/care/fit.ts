@@ -18,6 +18,18 @@ export function careDetails(bike: BikeRecord | null): CareDetails {
   };
 }
 
+/** A hydraulic brake's fluid (the owner's wish of 14 November 2026). */
+export type Fluid = 'mineral' | 'dot';
+
+/**
+ * The bike's brake fluid, read only with hydraulic brakes (a hydraulic disc, or a hydraulic rim brake), as the kind of rim brake is read
+ * only with rim brakes; null when it is not told, or the brakes are not hydraulic (an answer kept from before a change of brakes).
+ */
+export function careFluid(bike: BikeRecord | null): Fluid | null {
+  if (!bike?.brakeFluid) return null;
+  return bike.brakes === 'hydraulic-disc' || (bike.brakes === 'rim' && bike.rimBrake === 'hydraulic') ? bike.brakeFluid : null;
+}
+
 const KEYS: readonly CareKey[] = ['brakes', 'tyres', 'drive', 'gears', 'shifting', 'suspension', 'ebike'];
 
 /**

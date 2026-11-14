@@ -12,7 +12,7 @@ import { stepsShown } from '../../../../src/core/care/lines.ts';
 import { careDetails } from '../../../../src/core/care/fit.ts';
 import { byType, riderType, TYPE_USUAL, usualOn } from '../../../../src/core/care/type-order.ts';
 import type { CareDetails } from '../../../../src/core/care/types.ts';
-import { cardParts } from '../../../../src/core/parts/links.ts';
+import { cardParts, FIRST_PARTS } from '../../../../src/core/parts/links.ts';
 import { GAP, hitsShapes, labelSize, labelWidth, placeLabels, segmentHitsRect } from '../../../../src/core/parts/labels.ts';
 import type { Layout, Shapes } from '../../../../src/core/parts/labels.ts';
 import { cardSpec, inBox, openingFocus, inkMarkup, outline, outlineOn, partSpot, placeView, tangles, typeSpec, viewMarkup, wholeBox, zoomBox } from '../../../../src/core/parts/view.ts';
@@ -315,4 +315,32 @@ test("[BV-WORDS] every part has a short name for its label and button, and a car
   }
   expect(partsLine(['tyre', 'bead', 'tube'])).toBe('Tyre, tyre bead, inner tube');
   for (const t of [C.careWhere, C.careLessUsual('road')]) expect(bannedHits(t, false), t).toEqual([]);
+});
+
+// The owner's ruling of 14 November 2026: a card's parts start with what a rider touches first for it, from data (FIRST_PARTS), never a
+// one-off; the puncture card starts with the wheel (its rim: the guide has no part called the wheel), the tyre and the tube, then the rest
+// in the text's order. A card with no such order keeps the text's.
+test("[BV-FIRST-PARTS] a card's parts start with its first parts from data (the puncture card: wheel rim, tyre, tube), the rest in the text's order; other cards keep the text's order", () => {
+  const tube = items.find((x) => x.id === 'puncture-tube')!;
+  for (const brakes of [null, 'rim', 'hydraulic-disc'] as const) {
+    const parts = partsOf(tube, { ...careDetails(null), brakes });
+    expect(parts.slice(0, 3), String(brakes)).toEqual(['rim', 'tyre', 'tube']);
+    expect(new Set(parts).size, String(brakes)).toBe(parts.length);
+  }
+  expect(partsOf(tube, careDetails(null))).toEqual(['rim', 'tyre', 'tube', 'caliper', 'brake-lever', 'bead', 'spokes', 'valve', 'disc', 'pads']);
+  expect(partsLine(partsOf(tube, careDetails(null)))).toBe('Rim, tyre, inner tube, disc caliper, brake lever, tyre bead, spokes, valve, brake disc, brake pads');
+  // every first-parts entry names a card that exists and only parts that card names, each once
+  for (const [id, first] of Object.entries(FIRST_PARTS)) {
+    const it = items.find((x) => x.id === id);
+    expect(it, id).toBeDefined();
+    const named = cardParts(id, it!.steps, it!.steps.map((_, i) => i));
+    expect(new Set(first).size, id).toBe(first.length);
+    for (const p of first) expect(named, `${id}: ${p}`).toContain(p);
+  }
+  // a first part the shown steps do not name is not added: only the shown steps' parts, reordered
+  expect(cardParts('puncture-tube', tube.steps, [2])).toEqual(['tube']);
+  // a card with no first parts keeps the order its text names them in
+  const chain = items.find((x) => x.id === 'chain-broken')!;
+  expect(FIRST_PARTS['chain-broken']).toBeUndefined();
+  expect(partsOf(chain, careDetails(null))).toEqual(['quick-link', 'chain', 'cassette']);
 });

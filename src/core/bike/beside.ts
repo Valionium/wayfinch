@@ -1,8 +1,8 @@
 // The frame bag beside the plan's bottles (owner, 9 Nov 2026: the full Bag planner's three-quarter frame bag must not be drawn over a
-// bottle). bike.js only: the bag planner draws its rig's bags from the anchors, so its frame shapes are cut clear of the bottles the plan
+// bottle). bike.js, and tripArt: the bag planner draws its rig's bags from the anchors, so its frame shapes are cut clear of the bottles the plan
 // has inside the triangle. Each shape keeps the cut that leaves it the most room: a straight lower edge (beside a seat-tube bottle it
 // slopes down to the down tube), or one that steps round the bottle's top (beside a down-tube bottle). A shape already clear of a bottle
-// is kept as it is. The co-pilot's own drawing keeps its boxes, so its first screen stays as it is.
+// is kept as it is. bikeArt keeps its boxes; Trip's and Tools' drawing of the plan cuts the same shapes through tripArt (paint.ts, BK-FRAME-BESIDE-SMALL).
 import { boxOf, clip } from './art.ts';
 import type { Anchors, Box, P, Spot } from './art.ts';
 
