@@ -16,8 +16,7 @@ const host = document.createElement('div');
 document.body.append(host);
 // Trip's bike is the bag planner's current one.
 const withBike = (): void => { localStorage.setItem('loadcheck:bikeProfile', JSON.stringify({ id: 'bike_1', name: 'Blue', brakes: 'rim', drive: 'derailleur' })); refreshBikeSource(); };
-const PREPARED = { at: new Date('2026-11-14T18:00:00Z'), steps: [] } as unknown as TripSnapshot['prepared'];
-const snap = (trip: Trip, prepared = true) => ({ trip, prepared: prepared ? PREPARED : null });
+const snap = (trip: Trip): Pick<TripSnapshot, 'trip'> => ({ trip });
 
 beforeEach(() => { render(null, host); localStorage.clear(); refreshBikeSource(); });
 afterEach(() => { render(null, host); vi.restoreAllMocks(); });
@@ -41,17 +40,16 @@ test('[TRIP-PREP-ITEMS] [TRIP-PREP-LINKS] a heading, a line that the ticks are t
   expect(care.textContent).toBe(PR.prepInCare);
   expect(care.getAttribute('aria-label')).toBe(PR.prepInCareLabel('Check the rim brake pads and rim wear'));
   expect(item('kit').querySelector('a')!.getAttribute('href')).toBe('#/tools/care?bike=bike_1');
-  expect(item('tell').querySelector('a')!.getAttribute('href')).toBe('#/ahead');
+  expect(item('tell').querySelector('a, button')).toBeNull();
   expect(item('charge').querySelector('a, button')).toBeNull();
   expect(item('night').querySelector('a, button')).toBeNull();
   // the forecast is this step's own button, above the list
   expect(item('forecast').querySelector('a, button')).toBeNull();
 });
 
-test('[TRIP-PREP-LINKS] with no bike, Bike care opens as it is; not yet prepared, telling someone links nowhere', async () => {
-  await act(() => { render(<BeforeYouGo snap={snap(testTrip(), false)} />, host); });
+test('[TRIP-PREP-LINKS] with no bike, Bike care opens as it is', async () => {
+  await act(() => { render(<BeforeYouGo snap={snap(testTrip())} />, host); });
   expect(item('tyres-pressure').querySelector('a')!.getAttribute('href')).toBe('#/tools/care');
-  expect(item('tell').querySelector('a, button')).toBeNull();
 });
 
 test('[TRIP-PREP-TICKS] a tick is kept on this phone for this route and shows again; a refused tick stays on screen and the rider is told', async () => {
@@ -81,6 +79,6 @@ test('[TRIP-PREP-TICKS] a tick is kept on this phone for this route and shows ag
 });
 
 test('[TRIP-PREP-ITEMS] with no trip there is no list', async () => {
-  await act(() => { render(<BeforeYouGo snap={{ trip: null, prepared: null }} />, host); });
+  await act(() => { render(<BeforeYouGo snap={{ trip: null }} />, host); });
   expect(host.querySelector('[data-prep]')).toBeNull();
 });

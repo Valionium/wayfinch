@@ -7,9 +7,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { loadApp, preparedTrip, removeBuilds } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
-import type { StoreInPage } from './fixtures/store-page.ts';
-
-declare const __store: StoreInPage;
+import type { Trip } from '../../src/core/types.ts';
 
 const json = (path: string) => JSON.parse(readFileSync(new URL(`../../contracts/${path}`, import.meta.url), 'utf8'));
 const sample = json('bike-library/sample.json') as Record<string, unknown>[];
@@ -30,21 +28,23 @@ test.afterAll(() => removeBuilds());
 const inDays = (n: number): string => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date(Date.now() + n * 86_400_000));
 
 /** The app with the sample bike and a trip of `nights` nights leaving in three days, on Trip with Prepare this route's step open. */
-async function prepStep(page: Page, opts: { nights?: number; places?: boolean } = {}): Promise<void> {
+async function prepStep(page: Page, opts: { nights?: number } = {}): Promise<Trip> {
   app = await loadApp(page);
   await page.evaluate((e) => { for (const [k, v] of Object.entries(e)) localStorage.setItem(k, v); }, SEED);
-  await preparedTrip(page, 'heidelberg-strasbourg', { nights: opts.nights ?? 2, places: opts.places ?? false, departureDate: inDays(3) });
+  const trip = await preparedTrip(page, 'heidelberg-strasbourg', { nights: opts.nights ?? 2, departureDate: inDays(3) });
   // A new load: a change of the address's hash alone would keep the screen that read the store before the trip was put in.
   await page.goto(`${app.origin}/#/trip`, { waitUntil: 'domcontentloaded' });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-trip-line]')).toContainText(ROUTE_NAME);
   await openPrep(page);
+  return trip;
 }
 
 /** Prepare this route's step: open already while it is the step to do, otherwise from its title or its Update. */
 async function openPrep(page: Page): Promise<void> {
+  // the trip read first: before it, no step but Route can open
+  await expect(page.locator('[data-trip-line]')).toContainText(ROUTE_NAME);
   const step = page.locator('[data-step="getready"]');
-  await expect(step.locator('h2')).toBeVisible();
   if ((await step.getAttribute('data-open')) !== 'true') await step.locator('.trip-step-open, .trip-step-change').click();
   await expect(page.locator('[data-step="getready"] [data-prep]')).toBeVisible();
 }
@@ -65,8 +65,8 @@ test("[TRIP-PREP-ITEMS] [TRIP-PREP-LINKS] a three-day trip on the sample bike: B
   }
   await expect(prep.getByRole('checkbox', { name: /rim brake pads/ })).toHaveCount(0);
   await expect(prep).not.toContainText(/\bready\b|\bsafe\b|\d+ of \d+/i);
-  // Not prepared yet: En route has no Share progress, so telling someone links nowhere
-  await expect(page.locator('[data-prep-item="tell"] a')).toHaveCount(0);
+  // done outside the app: telling someone (En route's Share progress needs a position on the route), charging, the first night
+  for (const id of ['tell', 'charge', 'night']) await expect(page.locator(`[data-prep-item="${id}"] a, [data-prep-item="${id}"] button`)).toHaveCount(0);
   // the forecast is this step's own button, above the list: the item links nowhere else
   await expect(page.locator('[data-prep-item="forecast"]')).toContainText('prepare this route again');
   await expect(page.locator('[data-prep-item="forecast"] a, [data-prep-item="forecast"] button')).toHaveCount(0);
@@ -83,7 +83,7 @@ test('[TRIP-PREP-ITEMS] a day ride has the two every-ride checks and no night', 
 });
 
 test('[TRIP-PREP-TICKS] a tick, by tap or by keyboard, stays after a reload for this route; only its one key is written', async ({ page }) => {
-  await prepStep(page);
+  const trip = await prepStep(page);
   const before = await allLocal(page);
   expect(before[KEY]).toBeUndefined();
   await page.locator('[data-prep-item="kit"] label').click();
@@ -95,21 +95,13 @@ test('[TRIP-PREP-TICKS] a tick, by tap or by keyboard, stays after a reload for 
   await expect(box(page, 'charge')).not.toBeChecked();
   await box(page, 'brakes-lever-test').check();
   const after = await allLocal(page);
-  const route = await page.evaluate(async () => (await __store.readTrip())!.route.id);
-  expect(JSON.parse(after[KEY]!)).toEqual({ route, ticked: ['kit', 'brakes-lever-test'] });
+  expect(JSON.parse(after[KEY]!)).toEqual({ route: trip.route.id, ticked: ['kit', 'brakes-lever-test'] });
   expect(Object.fromEntries(Object.entries(after).filter(([k]) => k !== KEY))).toEqual(before);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await openPrep(page);
   await expect(box(page, 'kit')).toBeChecked();
   await expect(box(page, 'brakes-lever-test')).toBeChecked();
   await expect(box(page, 'charge')).not.toBeChecked();
-});
-
-test('[TRIP-PREP-LINKS] once Prepare this route has run, telling someone links to En route, where Share progress is', async ({ page }) => {
-  await prepStep(page, { places: true });
-  await page.getByRole('link', { name: 'Share progress on En route', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => location.hash)).toBe('#/ahead');
-  await expect(page.getByRole('button', { name: 'Share progress', exact: true }).first()).toBeVisible();
 });
 
 test('[TRIP-PREP-FIT] keyboard and screen reader reach every box and link; 44 px targets; 320 px to wide, both themes, no sideways scroll, no accessibility violations', async ({ page }) => {
@@ -133,6 +125,17 @@ test('[TRIP-PREP-FIT] keyboard and screen reader reach every box and link; 44 px
         expect(b.x + b.width, what).toBeLessThanOrEqual(width);
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${scheme} ${width} px`).toBe(true);
+      // the links take the theme's accent, as every plain link does (SHELL-LINK), never the browser's blue
+      const colours = await page.evaluate(() => {
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--blaze)';
+        document.body.append(probe);
+        const want = getComputedStyle(probe).color;
+        probe.remove();
+        return { want, got: [...document.querySelectorAll('[data-prep] a')].map((a) => getComputedStyle(a).color) };
+      });
+      expect(colours.got.length).toBeGreaterThan(0);
+      expect([...new Set(colours.got)], `${scheme} ${width}`).toEqual([colours.want]);
       const results = await new AxeBuilder({ page }).include('[data-prep]').analyze();
       expect(results.violations.map((v) => `${scheme} ${width} ${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join('; ')}`)).toEqual([]);
     }

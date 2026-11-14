@@ -7,11 +7,11 @@ import type { Conditions } from '../care/types.ts';
 import type { Trip } from '../types.ts';
 import { PR, PREP_CHECKS } from '../wording/en-prep.ts';
 
-/** Where an item is done: Bike care, En route (Share progress), or not elsewhere (outside the app, or the step the list is in). */
-export type PrepLink = 'care' | 'ahead' | null;
+/** Where an item is done: Bike care, or not elsewhere in the app (outside it, or in the step the list is in). */
+export type PrepLink = 'care' | null;
 export type PrepItem = { id: string; text: string; link: PrepLink };
-/** `days`: the route's stages; `bike`: Trip's bike (null: none, every detail Not sure); `prepared`: Prepare this route has ended once. */
-export type PrepFacts = { days: number; bike: Pick<BikeRecord, 'brakes' | 'drive'> | null; prepared: boolean };
+/** `days`: the route's stages; `bike`: Trip's bike (null: none, every detail Not sure). */
+export type PrepFacts = { days: number; bike: Pick<BikeRecord, 'brakes' | 'drive'> | null };
 
 /** Bike care's tasks with their conditions (en-care.ts): those for every trip, then those added for two days or more, in this order. */
 export const EVERY_TRIP: readonly { id: string; applies: Conditions }[] = [
@@ -26,8 +26,8 @@ export const LONGER_TRIP: readonly { id: string; applies: Conditions }[] = [
 ];
 
 /** The facts of a trip and Trip's bike that the list depends on. */
-export function prepFacts(trip: Trip, bike: BikeRecord | null, prepared: boolean): PrepFacts {
-  return { days: trip.route.stages.length, bike: bike && { brakes: bike.brakes, drive: bike.drive }, prepared };
+export function prepFacts(trip: Trip, bike: BikeRecord | null): PrepFacts {
+  return { days: trip.route.stages.length, bike: bike && { brakes: bike.brakes, drive: bike.drive } };
 }
 
 /**
@@ -53,8 +53,8 @@ export function prepItems(f: PrepFacts): PrepItem[] {
     { id: 'charge', text: PR.prepCharge, link: null },
     // in the step the list is in: its own button
     { id: 'forecast', text: PR.prepForecast, link: null },
-    // En route's Share progress needs what Prepare this route saves.
-    { id: 'tell', text: PR.prepTell, link: f.prepared ? 'ahead' : null },
+    // En route's Share progress needs a position on the route, so before leaving this is done outside the app.
+    { id: 'tell', text: PR.prepTell, link: null },
     ...(longer ? [{ id: 'night', text: PR.prepNight, link: null }] : []),
   ];
 }

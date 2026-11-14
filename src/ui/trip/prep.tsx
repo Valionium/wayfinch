@@ -14,7 +14,7 @@ import './prep.css';
 type Ticks = { route: string; ticked: string[]; notKept: boolean };
 
 /** The list for Trip's snapshot and Trip's bike (the bag planner's current one, as Trip draws it); nothing without a trip. */
-export function BeforeYouGo({ snap }: { snap: Pick<TripSnapshot, 'trip' | 'prepared'> }) {
+export function BeforeYouGo({ snap }: { snap: Pick<TripSnapshot, 'trip'> }) {
   const trip: Trip | null = snap.trip;
   const bike = bikeSource.value.bike;
   const route = trip?.route.id ?? '';
@@ -22,7 +22,7 @@ export function BeforeYouGo({ snap }: { snap: Pick<TripSnapshot, 'trip' | 'prepa
   // Another route: its own ticks, read afresh.
   const ticks = state.route === route ? state : { route, ticked: readTicks(route), notKept: false };
   if (!trip) return null;
-  const items = prepItems(prepFacts(trip, bike, snap.prepared !== null));
+  const items = prepItems(prepFacts(trip, bike));
   // Bike care with Trip's bike chosen: tools/bike-link.ts's toolHref, written out so the chunk needs none of that module (a test holds it equal).
   const careHref = bike ? `#/tools/care?bike=${encodeURIComponent(bike.id)}` : '#/tools/care';
 
@@ -30,14 +30,10 @@ export function BeforeYouGo({ snap }: { snap: Pick<TripSnapshot, 'trip' | 'prepa
     const kept = setTick(route, id, on);
     // Refused: the tick shows for now, and the line says it is not kept.
     const shown = kept ?? (on ? [...ticks.ticked.filter((x) => x !== id), id] : ticks.ticked.filter((x) => x !== id));
-    setState({ route, ticked: shown, notKept: kept === null });
+    setState({ route, notKept: kept === null, ticked: shown });
   };
 
-  const linkOf = (it: PrepItem) => {
-    if (it.link === 'care') return <a class="prep-link" href={careHref} aria-label={PR.prepInCareLabel(it.text)}>{PR.prepInCare}</a>;
-    if (it.link === 'ahead') return <a class="prep-link" href="#/ahead">{PR.prepOpenShare}</a>;
-    return null;
-  };
+  const linkOf = (it: PrepItem) => (it.link === 'care' ? <a class="prep-link" href={careHref} aria-label={PR.prepInCareLabel(it.text)}>{PR.prepInCare}</a> : null);
 
   return (
     <section class="prep" aria-labelledby="prep-title" data-prep>

@@ -12,7 +12,7 @@ import { flatRoute, testTrip } from '../../../fixtures/build.ts';
 
 const bike = (extra: Record<string, unknown>): BikeRecord => normaliseBike({ id: 'bike_1', name: 'Test', ...extra })!;
 const DISC_CHAIN = bike({ brakes: 'hydraulic-disc', tyres: 'tubeless', drive: 'derailleur', shifting: 'cable' });
-const facts = (over: Partial<PrepFacts> = {}): PrepFacts => ({ days: 1, bike: DISC_CHAIN, prepared: true, ...over });
+const facts = (over: Partial<PrepFacts> = {}): PrepFacts => ({ days: 1, bike: DISC_CHAIN, ...over });
 const ids = (f: PrepFacts): string[] => prepItems(f).map((i) => i.id);
 const careName = (id: string): string => CARE_TASKS.find((t) => t.id === id)!.name;
 
@@ -59,19 +59,18 @@ test("[TRIP-PREP-ITEMS] the first night is one plain line for two days or more, 
 test("[TRIP-PREP-ITEMS] prepFacts: the days are the route's stages, and the bike's brakes and drive", () => {
   const trip = testTrip();
   expect(trip.route.stages.length).toBe(4);
-  expect(prepFacts(trip, bike({ brakes: 'rim', drive: 'belt' }), false)).toEqual({ days: 4, bike: { brakes: 'rim', drive: 'belt' }, prepared: false });
-  expect(prepFacts(trip, null, true)).toEqual({ days: 4, bike: null, prepared: true });
-  expect(prepFacts({ ...trip, route: flatRoute(60) }, null, true).days).toBe(1);
+  expect(prepFacts(trip, bike({ brakes: 'rim', drive: 'belt' }))).toEqual({ days: 4, bike: { brakes: 'rim', drive: 'belt' } });
+  expect(prepFacts(trip, null)).toEqual({ days: 4, bike: null });
+  expect(prepFacts({ ...trip, route: flatRoute(60) }, null).days).toBe(1);
 });
 
-test('[TRIP-PREP-LINKS] each item says where it is done: Bike care, En route once prepared; charging, the forecast (this step) and the first night have none', () => {
+test('[TRIP-PREP-LINKS] the bike checks and the kit link to Bike care; charging, the forecast (this step), telling someone and the first night link nowhere', () => {
   const links = (f: PrepFacts) => Object.fromEntries(prepItems(f).map((i) => [i.id, i.link]));
   expect(links(facts({ days: 3 }))).toEqual({
     'brakes-lever-test': 'care', 'tyres-pressure': 'care', 'chain-wear-check': 'care', 'brakes-pads-disc': 'care', 'frame-bolts-check': 'care',
-    kit: 'care', charge: null, forecast: null, tell: 'ahead', night: null,
+    kit: 'care', charge: null, forecast: null, tell: null, night: null,
   });
-  // En route has no Share progress before Prepare this route has run: telling someone then links nowhere
-  expect(links(facts({ prepared: false })).tell).toBeNull();
+  // En route's Share progress needs a position on the route: before leaving there is none, so telling someone is done outside the app
 });
 
 test("[TRIP-PREP-ITEMS] the bike checks are Bike care's tasks word for word: the same names and the same conditions as en-care.ts", () => {

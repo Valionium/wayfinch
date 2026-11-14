@@ -11,7 +11,6 @@ export const PR = {
   prepNight: "Check where you sleep the first night: open that night, and booked if it takes bookings.",
   prepInCare: 'In Bike care',
   prepInCareLabel: (what: string): string => `In Bike care: ${what}`,
-  prepOpenShare: 'Share progress on En route',
   prepNotKept: 'That tick could not be kept on this phone. It shows until you leave this screen.',
 };
 
