@@ -1,5 +1,5 @@
 /* How a bike is built (design of 14 November 2026, section 6): theme tokens only, so both themes follow; 320 px up with no sideways
-   scroll; from 760 px of page width the drawing and its words on the left, the parts list on the right. The bike view's palette: blaze for the
+   scroll; from 760 px of page width the drawing and its words on the left, the parts list on the right (Explore). The bike view's palette: blaze for the
    picked part, muted leaders, panel pills. */
 .bl { overflow-wrap: anywhere; max-width: 64rem; container-type: inline-size; }
 /* On a wide screen Tools lays its cards out in two columns: the page takes both. */
@@ -67,3 +67,18 @@
 .bl-hint { margin: 8px 0; }
 .bl-list h3 { margin: 8px 0 4px; }
 .bl-group h4 { font-size: 1rem; margin: 12px 0 6px; }
+
+/* Build-up (design 4): the switch, the step, its parts, Back and Next. One column: the step's words go under the drawing. */
+.bl-modes { display: flex; gap: 8px; margin: 0 0 8px; }
+.bl-mode { min-height: 44px; flex: 1 1 0; max-width: 12rem; }
+.bl-mode[aria-pressed='true'] { border: 2px solid var(--blaze); font-weight: 600; }
+@container (min-width: 760px) {
+  .bl-main.bl-main-build { display: block; max-width: 44rem; }
+}
+.bl-build { margin: 8px 0 0; }
+.bl-step { margin: 0 0 4px; font-size: 1.15rem; }
+.bl-line { font-size: 1.0625rem; margin: 0 0 8px; }
+.bl-built { margin: 0 0 8px; }
+.bl-steps { display: flex; gap: 8px; margin: 12px 0 0; }
+.bl-back, .bl-next { min-height: 44px; min-width: 6rem; }
+.bl-back:disabled { opacity: 0.5; cursor: default; }

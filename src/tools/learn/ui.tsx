@@ -7,9 +7,9 @@ import { bikeArt } from '../../core/bike/art.ts';
 import { normaliseBike } from '../../core/bike/normalise.ts';
 import type { BikeRecord } from '../../core/bike/normalise.ts';
 import { resolveBikeSpec } from '../../core/bike/spec.ts';
-import { GROUPS, groupOf, KINDS, kindBike, linksOf, ownBike, partsOf, stepOf, tagOf } from '../../core/parts/learn.ts';
+import { GROUPS, groupOf, KINDS, kindBike, linksOf, ownBike, partsOf, stepLine, stepOf, stepParts, stepsOf, tagOf } from '../../core/parts/learn.ts';
 import type { LearnBike, LearnId, LearnKind } from '../../core/parts/learn.ts';
-import { GROUP_NAMES, KIND_NAMES, LN, LN_DOES, nameOf, tagWords } from '../../core/wording/en-learn.ts';
+import { GROUP_NAMES, KIND_NAMES, LN, LN_DOES, nameOf, STEP_LINES, STEP_NAMES, tagWords } from '../../core/wording/en-learn.ts';
 import { themeChoice } from '../../ui/theme-apply.ts';
 import { bikeDetailsHref } from '../../ui/bike/link.ts';
 import { choiceVersion } from '../../ui/tools/bike-choice.ts';
@@ -50,6 +50,8 @@ function themeNow(): 'dark' | 'light' {
 const MAIN: readonly LearnId[] = ['frame', 'fork', 'handlebar', 'saddle', 'chainring', 'chain', 'belt', 'cassette', 'hub-gears', 'tyre', 'caliper', 'rim-brake', 'pedal'];
 
 type Shown = 'own' | LearnKind;
+type Mode = 'explore' | 'build';
+const MODES: readonly Mode[] = ['explore', 'build'];
 
 export function LearnScreen({ services }: { services: TyreServices }) {
   const [tick, redraw] = useState(0);
@@ -88,7 +90,27 @@ export function LearnScreen({ services }: { services: TyreServices }) {
     setSaid(LN.said(nameOf(id), LN_DOES[id].split(/(?<=\.)\s/)[0]!));
     if (fromList) figure.current?.scrollIntoView?.({ block: 'nearest' });
   };
-  const labelled = now ? parts.filter((p) => groupOf(stepOf(p)) === groupOf(stepOf(now))) : MAIN.filter((p) => parts.includes(p));
+  // Build-up (design 4): the steps of this bike, the one shown (a bike with fewer steps falls back to its last), its parts.
+  const [mode, setMode] = useState<Mode>('explore');
+  const build = mode === 'build';
+  const steps = stepsOf(bike);
+  const [at, setAt] = useState(0);
+  const i = Math.min(at, steps.length - 1);
+  const step = steps[i]!;
+  const inStep = stepParts(bike, step);
+  const last = i === steps.length - 1;
+  const turn = (to: number): void => {
+    const n = (to + steps.length) % steps.length;
+    setAt(n);
+    setPicked(null);
+    setSaid(`${LN.step(n + 1, steps.length, STEP_NAMES[steps[n]!])}. ${STEP_LINES[stepLine(bike, steps[n]!)]}`);
+  };
+  const onKey = (e: KeyboardEvent): void => {
+    if (!build || (e.target as Element | null)?.closest?.('select, input')) return;
+    if (e.key === 'ArrowRight' && !last) { e.preventDefault(); turn(i + 1); }
+    if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); turn(i - 1); }
+  };
+  const labelled = build ? inStep : now ? parts.filter((p) => groupOf(stepOf(p)) === groupOf(stepOf(now))) : MAIN.filter((p) => parts.includes(p));
   const name = kind === 'own' ? art.label : LN.typical(KIND_NAMES[kind]);
   const addHref = savedBikeIds(services.storage).length === 0 ? bikeDetailsHref('new', 'tools') : null;
   const tag = now ? tagOf(now) : undefined;
@@ -105,9 +127,31 @@ export function LearnScreen({ services }: { services: TyreServices }) {
         </select>
       </label>
       {addHref ? <p class="muted bl-add"><a href={addHref}>{LN.add}</a> {LN.addAfter}</p> : null}
-      <div class="bl-main">
+      <div class="bl-modes" role="group" aria-label={LN.modes}>
+        {MODES.map((m) => (
+          <button key={m} type="button" class="btn bl-mode" aria-pressed={mode === m} onClick={() => { setMode(m); setPicked(null); }}>{m === 'build' ? LN.build : LN.explore}</button>
+        ))}
+      </div>
+      <div class={`bl-main${build ? ' bl-main-build' : ''}`} onKeyDown={(e) => onKey(e as unknown as KeyboardEvent)}>
         <div class="bl-left" ref={figure}>
-          <LearnDrawing key={kind} bike={bike} art={art} picked={now} marked={now ? [now] : []} labelled={labelled} name={name} onPick={(id) => pick(id)} />
+          <LearnDrawing key={kind} bike={bike} art={art} picked={now} marked={build ? [...new Set([...inStep, ...(now ? [now] : [])])] : now ? [now] : []}
+            labelled={labelled} name={build ? `${name}. ${LN.step(i + 1, steps.length, STEP_NAMES[step])}` : name} onPick={(id) => pick(id)} upto={build ? step : 'ebike'} />
+          {build ? (
+            <section class="bl-build" aria-labelledby="bl-step-title">
+              <h3 id="bl-step-title" class="bl-step">{LN.step(i + 1, steps.length, STEP_NAMES[step])}</h3>
+              <p class="bl-line">{STEP_LINES[stepLine(bike, step)]}</p>
+              {last ? <p class="muted bl-built">{LN.built}</p> : null}
+              <ul class="bl-parts" aria-label={LN.stepParts}>
+                {inStep.map((p) => (
+                  <li key={p}><button type="button" class="btn bl-part" data-part={p} aria-pressed={p === now} onClick={() => pick(p)}>{nameOf(p)}</button></li>
+                ))}
+              </ul>
+              <div class="bl-steps">
+                <button type="button" class="btn bl-back" disabled={i === 0} onClick={() => turn(i - 1)}>{LN.back}</button>
+                <button type="button" class="btn btn-primary bl-next" onClick={() => turn(last ? 0 : i + 1)}>{last ? LN.again : LN.next}</button>
+              </div>
+            </section>
+          ) : null}
           <section class="bl-entry" aria-live="off">
             {now ? (
               <>
@@ -121,10 +165,10 @@ export function LearnScreen({ services }: { services: TyreServices }) {
                   ))}
                 </ul>
               </>
-            ) : <p class="bl-hint">{LN.tapHint}</p>}
+            ) : build ? null : <p class="bl-hint">{LN.tapHint}</p>}
           </section>
         </div>
-        <section class="bl-list" aria-labelledby="bl-list-title">
+        {build ? null : <section class="bl-list" aria-labelledby="bl-list-title">
           <h3 id="bl-list-title">{LN.list}</h3>
           {GROUPS.map((g) => {
             const inGroup = parts.filter((p) => groupOf(stepOf(p)) === g);
@@ -139,7 +183,7 @@ export function LearnScreen({ services }: { services: TyreServices }) {
               </section>
             );
           })}
-        </section>
+        </section>}
       </div>
       <p class="visually-hidden" aria-live="polite">{said}</p>
     </div>

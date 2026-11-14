@@ -2,7 +2,7 @@
 // (the guide's parts keep theirs, the bike view's PART_SHORT, here as a copy a test keeps equal: importing it would add a chunk to the
 // first screen's list), what it does in one or two plain sentences, the list's headings, the build's steps and
 // how their parts attach. Under the banned-words test (tests/unit/core/parts/learn.test.ts).
-import type { LearnGroup, LearnId, LearnKind, LearnTag } from '../parts/learn.ts';
+import type { LearnGroup, LearnId, LearnKind, LearnStep, LearnTag, StepLine } from '../parts/learn.ts';
 import { TAG_WORDS } from './en-parts.ts';
 
 const NAMES: Readonly<Record<LearnId, string>> = {
@@ -91,6 +91,31 @@ export const GROUP_NAMES: Readonly<Record<LearnGroup, string>> = {
   frame: 'Frame and fork', wheels: 'Wheels', drive: 'Drivetrain', brakes: 'Brakes', cockpit: 'Cockpit', saddle: 'Saddle', ebike: 'E-bike',
 };
 
+export const STEP_NAMES: Readonly<Record<LearnStep, string>> = {
+  frame: 'Frame', fork: 'Fork and headset', wheels: 'Wheels', drive: 'Drivetrain', brakes: 'Brakes', cockpit: 'Cockpit',
+  saddle: 'Saddle and seatpost', ebike: 'Motor, battery and display',
+};
+
+/** How a step's parts attach, one short line. */
+export const STEP_LINES: Readonly<Record<StepLine, string>> = {
+  frame: 'The frame comes first: every other part is fixed to it.',
+  fork: 'The fork\'s steerer slides up through the head tube, and the headset\'s bearings let it turn.',
+  'fork-suspension': 'The suspension fork\'s steerer slides up through the head tube, and the headset\'s bearings let it turn.',
+  'wheels-thru': 'Each wheel\'s hub sits in the dropouts, and a thru-axle goes through both and screws in.',
+  'wheels-qr': 'Each wheel\'s hub sits in the dropouts, and a quick release through the hub clamps it there.',
+  'drive-derailleur': 'The bottom bracket goes into the frame and the cranks onto it; the chain runs from the chainring to the rear gears and through the derailleur, bolted to the hanger.',
+  'drive-two': 'The bottom bracket goes into the frame and the cranks onto it; the chain runs from the chainrings to the rear gears, and a derailleur at each end moves it.',
+  'drive-hub': 'The bottom bracket goes into the frame and the cranks onto it; the chain runs from the chainring to the one sprocket of the hub gears.',
+  'drive-belt': 'The bottom bracket goes into the frame and the cranks onto it; the belt runs from the front ring to the rear sprocket, through a gap in the frame.',
+  'brakes-disc': 'Each caliper bolts to the frame or the fork beside its disc, which bolts to the hub; a hose or cable runs to the lever, which clamps to the bar that comes next.',
+  'brakes-rim': 'Each rim brake bolts to the fork or the frame above the rim; a cable runs to the lever, which clamps to the bar that comes next.',
+  'cockpit-drop': 'The stem clamps onto the steerer above the headset and holds the bar; the shifters sit in the brake levers, and tape wraps the bar.',
+  'cockpit-flat': 'The stem clamps onto the steerer above the headset and holds the bar; the shifters and grips slide onto the bar.',
+  saddle: 'The seatpost slides into the seat tube and the seat clamp holds it; the saddle clamps onto the top of the post.',
+  'ebike-cranks': 'The motor bolts to the frame round the bottom bracket, the battery clicks into its holder on the down tube, and the display clamps to the bar.',
+  'ebike-hub': 'The motor is inside a wheel\'s hub, the battery clicks into its holder on the down tube, and the display clamps to the bar.',
+};
+
 export const KIND_NAMES: Readonly<Record<LearnKind, string>> = {
   road: 'Road', gravel: 'Gravel', touring: 'Touring', city: 'City', mtb: 'Mountain hardtail', full: 'Mountain full suspension', fat: 'Fat',
   ebike: 'E-bike',
@@ -101,6 +126,15 @@ export const LN = {
   intro: 'Tap any part to see what it is and what it connects to.',
   yourBike: 'Your bike',
   kinds: 'Bike to show',
+  modes: 'Way to learn',
+  explore: 'Explore',
+  build: 'Build-up',
+  step: (n: number, of: number, name: string) => `Step ${n} of ${of}: ${name}`,
+  back: 'Back',
+  next: 'Next',
+  again: 'Start again',
+  built: 'Every part is on: the bike is built.',
+  stepParts: 'Parts in this step',
   add: 'Add your bike',
   addAfter: 'to see your own.',
   list: 'All parts',

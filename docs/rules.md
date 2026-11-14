@@ -1111,6 +1111,10 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - switching the bike shows that bike's parts only; a picked part the new bike lacks is dropped [BL-SWITCH]
 - the zoom buttons zoom towards the picked part and back to the whole bike [BL-ZOOM]
 - at 320 px and wide, in both themes: no sideways scroll, every target at least 44 px, nothing axe objects to; it opens offline [BL-PHONE]
+- the build-up's steps are frame, fork and headset, wheels, drivetrain, brakes (on a bike with brakes), cockpit, saddle and seatpost, then motor, battery and display on an e-bike only; each part the bike has is in exactly one step (a tubeless valve and a cable disc's pad adjuster, other bikes' parts, stay in the list only), and each step says in one short line how its parts attach, as this bike has them (thru-axle or quick release, one or two derailleurs, hub gears or a belt, disc or rim brakes, drop or flat bars, a motor at the cranks or in a hub) [BL-STEPS]
+- the drawing as built is the shared drawing's own markup with every element of a later step left out, a casing with its painted part, a pattern's own shapes kept; the last step is the whole drawing; the page's own front derailleur and brake cable come with their steps [BL-STAGE]
+- Build-up shows "Step n of N: <name>", the step's line and parts (marked in blaze and named on the drawing, each a button to its words), Back (none on the first step) and Next ("Start again" on the last); the arrow keys turn the steps while the focus is in it; a step is said politely; a bike with fewer steps falls back to its last; Explore brings back the whole bike and the list [BL-BUILD]
+- Build-up at 320 px and wide, in both themes: no sideways scroll, every target at least 44 px, nothing axe objects to [BL-BUILD-PHONE]
 
 ## Tool: Gear advisor, the search (sub-project 13, group 1)
 

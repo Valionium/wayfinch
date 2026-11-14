@@ -141,6 +141,63 @@ export function linksOf(bike: LearnBike, id: LearnId): LearnId[] {
   return partsOf(bike).filter((p) => other.has(p));
 }
 
+// ---- the build ----
+
+/** The build's steps for this bike: the brakes only where it has brakes, the e-bike's last step only on an e-bike. */
+export const stepsOf = (bike: LearnBike): LearnStep[] =>
+  STEPS.filter((s) => (s === 'ebike' ? bike.spec.ebike.value : s === 'brakes' ? bike.spec.brakes.value !== 'none' : true));
+
+/** Parts the build passes over: a tubeless tyre's valve and a cable disc's pad adjuster are other bikes' (they stay in the list). */
+const BUILD_SKIP: readonly LearnId[] = ['tubeless-valve', 'pad-adjuster'];
+export const stepParts = (bike: LearnBike, step: LearnStep): LearnId[] =>
+  partsOf(bike).filter((id) => stepOf(id) === step && !BUILD_SKIP.includes(id));
+
+/** Which line says how a step's parts attach: some steps have one for each kind of bike. */
+export type StepLine = 'frame' | 'fork' | 'fork-suspension' | 'wheels-thru' | 'wheels-qr' | 'drive-derailleur' | 'drive-two' | 'drive-hub'
+  | 'drive-belt' | 'brakes-disc' | 'brakes-rim' | 'cockpit-drop' | 'cockpit-flat' | 'saddle' | 'ebike-cranks' | 'ebike-hub';
+export function stepLine(bike: LearnBike, step: LearnStep): StepLine {
+  const s = bike.spec;
+  switch (step) {
+    case 'fork': return s.fork.value === 'suspension' ? 'fork-suspension' : 'fork';
+    case 'wheels': return s.brakes.value === 'disc' ? 'wheels-thru' : 'wheels-qr';
+    case 'drive': return s.drive.value === 'belt' ? 'drive-belt' : s.drive.value === 'hub' ? 'drive-hub' : hasPart(bike, 'front-derailleur') ? 'drive-two' : 'drive-derailleur';
+    case 'brakes': return s.brakes.value === 'rim' ? 'brakes-rim' : 'brakes-disc';
+    case 'cockpit': return s.bars.value === 'drop' ? 'cockpit-drop' : 'cockpit-flat';
+    case 'ebike': return s.motor.value === 'cranks' ? 'ebike-cranks' : 'ebike-hub';
+    default: return step;
+  }
+}
+
+/** The drawing's classes, each with the step that adds it. A casing goes with the painted part it outlines. */
+const CLASS_STEP: Readonly<Record<string, LearnStep>> = {
+  'bk-frame': 'frame', 'bk-stays': 'frame', 'bk-shock': 'frame', 'bk-fork': 'fork', 'bk-seal': 'fork',
+  'bk-tyre': 'wheels', 'bk-rim': 'wheels', 'bk-spokes': 'wheels', 'bk-hub': 'wheels', 'bk-rimband': 'wheels', 'bk-rimedge': 'wheels',
+  'bk-chain': 'drive', 'bk-belt': 'drive', 'bk-cog': 'drive', 'bk-hubgear': 'drive', 'bk-mech': 'drive', 'bk-ring': 'drive', 'bk-crank': 'drive', 'bk-bb': 'drive',
+  'bk-rotor': 'brakes', 'bk-caliper': 'brakes', 'bk-hood': 'brakes',
+  'bk-bar': 'cockpit', 'bk-grip': 'cockpit', 'bk-post': 'saddle', 'bk-saddle': 'saddle', 'bk-battery': 'ebike', 'bk-motor': 'ebike',
+};
+export const classStep = (cls: string): LearnStep | undefined => CLASS_STEP[cls];
+
+/**
+ * The drawing as built up to `upto`: bikeArt's (or paintedArt's) markup with every element of a later step left out. A casing is left
+ * out with the painted part after it; elements of no step (a pattern's own shapes) stay.
+ */
+export function stageMarkup(svg: string, upto: LearnStep): string {
+  const at = STEPS.indexOf(upto);
+  const later = (cls: string): boolean => {
+    const step = cls.split(' ').map((c) => CLASS_STEP[c]).find(Boolean);
+    return step !== undefined && STEPS.indexOf(step) > at;
+  };
+  return svg.replace(/<(?:path|circle|rect)\b[^>]*?\/>/g, (el, offset: number) => {
+    const cls = /\bclass="([^"]*)"/.exec(el)?.[1] ?? '';
+    if (/\bbk-casing\b/.test(cls)) {
+      const next = /^<path class="bk-paint ([^"]*)"/.exec(svg.slice(offset + el.length));
+      return next && later(next[1]!) ? '' : el;
+    }
+    return later(cls) ? '' : el;
+  });
+}
+
 // ---- where the parts are ----
 
 const add = (a: P, b: P): P => [a[0] + b[0], a[1] + b[1]];

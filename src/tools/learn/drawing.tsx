@@ -4,8 +4,8 @@
 // anywhere on it picks the nearest part (pickAt). Pointer only: the parts list is the keyboard and screen-reader way in.
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { Anchors, P } from '../../core/bike/art.ts';
-import { extrasMarkup, learnSpot, partsOf, pickAt } from '../../core/parts/learn.ts';
-import type { LearnBike, LearnId } from '../../core/parts/learn.ts';
+import { extrasMarkup, learnSpot, partsOf, pickAt, stageMarkup, stepOf, STEPS } from '../../core/parts/learn.ts';
+import type { LearnBike, LearnId, LearnStep } from '../../core/parts/learn.ts';
 import { labelSize, labelWidth } from '../../core/parts/labels.ts';
 import { inBox, inkMarkup, MAX_ZOOM, outline, placeView, viewMarkup, wholeBox, zoomBox } from '../../core/parts/view.ts';
 import type { Spot } from '../../core/parts/view.ts';
@@ -56,16 +56,20 @@ export type DrawingProps = {
   /** The drawing's name for screen readers. */
   name: string;
   onPick: (id: LearnId) => void;
+  /** Build-up (design 4): the bike as built up to this step, the later steps' parts left out of the drawing and of a tap. */
+  upto?: LearnStep;
 };
 
 type Zoom = { z: number; centre: P };
 
-export function LearnDrawing({ bike, art, picked, marked, labelled, name, onPick }: DrawingProps) {
-  const { svg, anchors } = art;
+export function LearnDrawing({ bike, art, picked, marked, labelled, name, onPick, upto = 'ebike' }: DrawingProps) {
+  const { anchors } = art;
+  const svg = upto === 'ebike' ? art.svg : stageMarkup(art.svg, upto);
+  const built = (id: LearnId): boolean => STEPS.indexOf(stepOf(id)) <= STEPS.indexOf(upto);
   const k = anchors.scale / 0.11;
-  const extras = extrasMarkup(bike, anchors);
+  const extras = extrasMarkup(bike, anchors, upto);
   const drawn = svg + extras;
-  const spots = partsOf(bike).flatMap((id): [LearnId, Spot][] => { const s = learnSpot(bike, anchors, id); return s ? [[id, s]] : []; });
+  const spots = partsOf(bike).filter(built).flatMap((id): [LearnId, Spot][] => { const s = learnSpot(bike, anchors, id); return s ? [[id, s]] : []; });
   const spotOf = (id: LearnId): Spot | undefined => spots.find(([x]) => x === id)?.[1];
   const whole = wholeBox(anchors);
   const box = useRef<HTMLDivElement>(null);
