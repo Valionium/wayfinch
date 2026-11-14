@@ -299,10 +299,12 @@ describe('Tools loads as its own chunk', () => {
     expect(cards().length).toBeGreaterThanOrEqual(1);
     expect(root.querySelector('main[data-screen="tools"] .bike-large svg')).not.toBeNull();
     expect(root.querySelector('.bike-line')).not.toBeNull();
-    // Then the whole screen: the line and the five cards (bags, tyre pressure, Bike care: sub-project 12; the Gear advisor's: sub-project 13, group 3;
-    // How a bike is built, last: the owner's wish of 14 Nov 2026).
-    await vi.waitFor(() => expect(cards().length).toBe(5));
+    // Then the whole screen: the line and the six cards (bags, tyre pressure, Bike care: sub-project 12; the Gear advisor's: sub-project 13, group 3;
+    // Find a bike type: the Bike finder of 14 Nov 2026; How a bike is built, last: the owner's wish of 14 Nov 2026).
+    await vi.waitFor(() => expect(cards().length).toBe(6));
     expect(cards()[3]!.querySelector('h2')?.textContent).toBe('Gear advisor');
+    expect(cards()[4]!.querySelector('h2')?.textContent).toBe('Find a bike type');
+    expect(cards()[5]!.querySelector('h2')?.textContent).toBe('How a bike is built');
     expect(root.querySelector('.bike-line select')).not.toBeNull();
     expect(root.querySelectorAll('.bike-line').length).toBe(1);
     render(null, root);
