@@ -22,7 +22,7 @@ const text = (el: Element | null | undefined): string => (el?.textContent ?? '')
 const SUBTITLE = 'What to take, where it goes, what to leave at home.';
 
 describe('the name and the steps', () => {
-  test('[LC-LOOK-NAME] the header names the Bag planner as part of Wayfinch, with a short plain English line and one theme button', () => {
+  test('[LC-WF-NAME] the header names the Bag planner as part of Wayfinch, with a short plain English line and one theme button', () => {
     const mast = doc.querySelector('header.mast');
     expect(text(mast?.querySelector('h1'))).toBe('Wayfinch · Bag planner');
     expect(text(mast?.querySelector('p'))).toBe(SUBTITLE);
@@ -35,7 +35,7 @@ describe('the name and the steps', () => {
     expect(doc.querySelector('.wf-bar #themeBtn, .wf-bar .themebtn, .wf-bar .theme-btn')).toBeNull();
   });
 
-  test('[LC-LOOK-STEPS] step one is Ride: the step labels, the walkthrough, the lines that send the rider back to it, and "Back to step one"', () => {
+  test('[LC-WF-STEPS] step one is Ride: the step labels, the walkthrough, the lines that send the rider back to it, and "Back to step one"', () => {
     expect([...doc.querySelectorAll('#crumbs button')].map((b) => [b.getAttribute('data-to'), text(b)])).toEqual([['1', 'Ride'], ['2', 'Bags'], ['3', 'Kit'], ['4', 'Check']]);
     expect(text(doc.querySelector('#walkthroughInvite p'))).toBe('A short guide to Ride, Bags, Kit and Check.');
     expect(PAGE).toContain("{label:'Ride',title:'Tell us about the ride',");
@@ -57,7 +57,7 @@ describe('the name and the steps', () => {
     for (const old of [/add a route in Trip/, /Add a date in Trip/, /ends in Trip/, /Retry in Trip/, /Choose a place in Trip/, /Return to Trip/]) expect(PAGE, String(old)).not.toMatch(old);
   });
 
-  test('[LC-LOOK-FOOT] the footer is English: "Imprint and privacy" opens the same dialog, and no Load Check tagline', () => {
+  test('[LC-WF-FOOT] the footer is English: "Imprint and privacy" opens the same dialog, and no Load Check tagline', () => {
     const button = doc.querySelector('footer.sitefoot #legalBtn');
     expect(text(button)).toBe('Imprint and privacy');
     expect(button?.hasAttribute('lang')).toBe(false);
@@ -81,7 +81,7 @@ describe('the font', () => {
   }, 240_000);
   afterAll(() => { if (on) rmSync(join(on, '..'), { recursive: true, force: true, maxRetries: 3 }); });
 
-  test('[LC-LOOK-FONT] /tools/bags/font.css holds exactly the app\'s own Source Sans 3 rules, the same precached files; the page links it in its head; the off build has none', () => {
+  test('[LC-WF-FONT] /tools/bags/font.css holds exactly the app\'s own Source Sans 3 rules, the same precached files; the page links it in its head; the off build has none', () => {
     const shell = readFileSync(join(on, 'index.html'), 'utf8');
     const appCss = shell.match(/<link rel="stylesheet"[^>]*href="\/(assets\/[^"]+\.css)"/)?.[1];
     expect(appCss).toBeDefined();

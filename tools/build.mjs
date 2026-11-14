@@ -122,11 +122,13 @@ function writeCarePictures(target) {
  * Bag planner look like Wayfinch"). The page is a file of public/ and can't know Vite's hashed names, so the launch build writes the
  * app's own @font-face rules of that family, exactly as the app's built stylesheet has them, into /tools/bags/font.css: the same
  * addresses, so the same files, precached like every file. A stylesheet without them fails the build, rather than a page that quietly
- * draws another font.
+ * draws another font. Only a test's stand-in for Vite builds an app with no page or no stylesheet at all; then there is nothing to write.
  */
 function writePageFont(target) {
-  const css = readFileSync(join(target, 'index.html'), 'utf8').match(/<link rel="stylesheet"[^>]*href="\/(assets\/[^"]+\.css)"/)?.[1];
-  const rules = css ? (readFileSync(join(target, css), 'utf8').match(/@font-face\{[^}]*\}/g) ?? []).filter((r) => /font-family:\s*"?Source Sans 3"?[;}]/.test(r)) : [];
+  const shell = join(target, 'index.html');
+  const css = existsSync(shell) ? readFileSync(shell, 'utf8').match(/<link rel="stylesheet"[^>]*href="\/(assets\/[^"]+\.css)"/)?.[1] : undefined;
+  if (!css) return;
+  const rules = (readFileSync(join(target, css), 'utf8').match(/@font-face\{[^}]*\}/g) ?? []).filter((r) => /font-family:\s*"?Source Sans 3"?[;}]/.test(r));
   if (rules.length === 0) throw new Error("The app's stylesheet has no Source Sans 3: the bag planner's /tools/bags/font.css can't be written.");
   mkdirSync(join(target, 'tools', 'bags'), { recursive: true });
   writeFileSync(join(target, 'tools', 'bags', 'font.css'), `/* Wayfinch's Source Sans 3 for the bag planner: the app's own rules, written by tools/build.mjs (writePageFont). */\n${rules.join('\n')}\n`);

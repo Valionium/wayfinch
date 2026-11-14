@@ -23,6 +23,12 @@ async function openPlanner(page: Page): Promise<void> {
   await page.evaluate(() => { localStorage.setItem('loadcheck:walkthrough:v1', 'done'); localStorage.setItem('copilot:moved-card', 'seen'); });
   await page.goto(`${app.origin}/tools/bags/`, { waitUntil: 'load' });
   await ready(page);
+  await chooseStepOne(page);
+}
+
+/** A page that opens marks no step as the current one until a step is chosen (as on main); choosing step one marks it. */
+async function chooseStepOne(page: Page): Promise<void> {
+  await page.locator('#crumbs button[data-to="1"]').click();
   await expect(page.locator('#crumbs button[aria-current="step"]')).toHaveCount(1);
 }
 
@@ -69,7 +75,7 @@ const headerFacts = (page: Page) => page.evaluate(async () => {
   };
 });
 
-test('[LC-LOOK-NAME] [LC-LOOK-STEPS] [LC-LOOK-FOOT] the header names "Wayfinch · Bag planner", step one is Ride, Check goes "Back to step one", the footer is English', async ({ page }) => {
+test('[LC-WF-NAME] [LC-WF-STEPS] [LC-WF-FOOT] the header names "Wayfinch · Bag planner", step one is Ride, Check goes "Back to step one", the footer is English', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await openPlanner(page);
@@ -94,7 +100,7 @@ test('[LC-LOOK-NAME] [LC-LOOK-STEPS] [LC-LOOK-FOOT] the header names "Wayfinch �
   expect(errors).toEqual([]);
 });
 
-test('[LC-LOOK-TYPE] [LC-LOOK-WIDTHS] header and step labels in Source Sans 3 and Wayfinch\'s colours, 44 px targets, one theme button, no sideways scroll, in both themes at each width', async ({ page }) => {
+test('[LC-WF-TYPE] header and step labels in Source Sans 3 and Wayfinch\'s colours, 44 px targets, one theme button, no sideways scroll, at 320/360 px and wide in both themes', async ({ page }) => {
   await openPlanner(page);
   const height = page.viewportSize()!.height;
   for (const width of WIDTHS()) {
@@ -119,7 +125,7 @@ test('[LC-LOOK-TYPE] [LC-LOOK-WIDTHS] header and step labels in Source Sans 3 an
   }
 });
 
-test("[LC-LOOK-OFFLINE] the header's font is the app's own precached file: offline the page still draws it", async ({ page, context }) => {
+test("[LC-WF-OFFLINE] the header's font is the app's own precached file: offline the page still draws it", async ({ page, context }) => {
   await openPlanner(page);
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.reload({ waitUntil: 'load' });
@@ -127,6 +133,7 @@ test("[LC-LOOK-OFFLINE] the header's font is the app's own precached file: offli
   await context.setOffline(true);
   await page.goto(`${app!.origin}/tools/bags/`, { waitUntil: 'load' });
   await ready(page);
+  await chooseStepOne(page);
   const facts = await headerFacts(page);
   expect(facts.loaded).toEqual([true, true, true]);
   expect(facts.fonts).toEqual(Array(6).fill('Source Sans 3'));
