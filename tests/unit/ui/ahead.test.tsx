@@ -151,6 +151,40 @@ describe('cards', () => {
     expect(calls.at(-1)).toEqual(['backToToday']);
   });
 
+  test('[AH-PLAN-TOMORROW] with tomorrow planned, Back to today stands at the top under the notes; Plan tomorrow moves the focus to it (sweep of 14 Nov 2026, findings 16 and 17)', async () => {
+    const riding = trip(viewOf(rainyStop()));
+    const after = trip(viewOf(rainyStop({ plan: { date: SAT, backToTodayAt: null } })));
+    const { actions, calls } = fakeActions();
+    // The store keeps the choice and the shell draws the planned day: here the stand-in draws it at once.
+    actions.planTomorrow = async (date) => { calls.push(['planTomorrow', date]); await act(async () => { render(<AheadScreen view={after} actions={actions} />, host); }); };
+    await show(riding, actions);
+    expect(host.querySelector('[data-back-today]')).toBeNull();
+    await click(host.querySelector('[data-card="daylight"] .ah-toggle'));
+    await click(buttonNamed(W.daylightPlanTomorrow));
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    const top = host.querySelector('[data-back-today]')!;
+    expect(top).not.toBeNull();
+    expect(document.activeElement).toBe(top.querySelector('button'));
+    // At the top: before the strip and the cards, right under the notes.
+    expect(top.compareDocumentPosition(host.querySelector('[data-strip]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await click(top.querySelector('button'));
+    expect(calls.at(-1)).toEqual(['backToToday']);
+  });
+
+  test('[AH-WATER-Q] with no water you can carry entered, the Water card links to You, where it is entered (sweep of 14 Nov 2026, finding 18)', async () => {
+    const i = rainyStop();
+    const v = trip(viewOf({ ...i, profile: { ...i.profile, capacityL: null }, waterLeft: { litres: 1, at: i.now, confirmed: true } }));
+    expect(v.screen.cards.water.title).toBe(W.waterEnterCapacity);
+    const { actions } = fakeActions();
+    await show(v, actions);
+    const link = host.querySelector<HTMLAnchorElement>('[data-card="water"] a[href="#/you"]');
+    expect(link).not.toBeNull();
+    expect(link!.textContent).toBe(W.appAheadSetCapacity);
+    // With it entered, no link.
+    await show(trip(viewOf(i)), actions);
+    expect(host.querySelector('[data-card="water"] a[href="#/you"]')).toBeNull();
+  });
+
   test('[AH-WATER-Q] unconfirmed water reads unknown and asks: 0 to 3 L, another amount, and "Still about 0.6 L?" in one tap', async () => {
     const i = rainyStop();
     const v = trip(viewOf({ ...i, waterLeft: { litres: 1.2, at: new Date(i.now.getTime() - 60 * 60_000), confirmed: false } }));
@@ -580,6 +614,20 @@ describe('Emergency', () => {
     await click(buttonNamed('Emergency', host.querySelector('.ah-chips')!));
     return host.querySelector('#chip-emergency')!;
   };
+  test('[AH-EMERGENCY] Close hands the focus back to the chip that opened the panel, Emergency and the others alike (sweep of 14 Nov 2026, finding 16)', async () => {
+    const v = trip(viewOf(rainyStop()));
+    const { actions } = fakeActions();
+    await show(v, actions);
+    for (const label of ['Emergency', 'Pharmacy']) {
+      const chip = buttonNamed(label, host.querySelector('.ah-chips')!);
+      await click(chip);
+      const panel = host.querySelector('.ah-chip-panel')!;
+      await click(buttonNamed(W.appAheadClose, panel));
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      expect(host.querySelector('.ah-chip-panel')).toBeNull();
+      expect(document.activeElement, label).toBe(chip);
+    }
+  });
   test('[AH-EMERGENCY] with a position: 112 to call, the fallback line, the coordinates and Share my location', async () => {
     const v = trip(viewOf(rainyStop()));
     const card = await emergencyIn(v);
