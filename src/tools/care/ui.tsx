@@ -11,7 +11,7 @@ import { pictureDetails } from '../../core/care/pictures.ts';
 import { byType, riderType } from '../../core/care/type-order.ts';
 import { searchCare } from '../../core/care/search.ts';
 import type { CareDetails, CareKey, CareTask, Conditions, Fitted, Part, RoadCard } from '../../core/care/types.ts';
-import { C, CARE_TASKS, CARRY, fitWords, PART_LABEL, PARTS, ROAD_CARDS, SECTION_LABEL, SECTIONS, TAG_LABEL } from '../../core/wording/en-care.ts';
+import { C, CARE_TASKS, CARRY, fitWords, PART_LABEL, PARTS, ROAD_CARDS, SECTION_LABEL, SECTIONS, TAG_LABEL, taskName, tellUsLine } from '../../core/wording/en-care.ts';
 import { bikeDetailsHref } from '../../ui/bike/link.ts';
 import { choiceVersion } from '../../ui/tools/bike-choice.ts';
 import { BikeLine } from '../../ui/tools/bike-line.tsx';
@@ -99,7 +99,7 @@ function TaskItem({ task, details, onSteps, other = null }: { task: Fitted<CareT
   return (
     <div class={`care-task${other ? ' care-other-type' : ''}`} data-id={task.id}>
       <button type="button" class="care-open" aria-haspopup="dialog" onClick={(e) => onSteps({ kind: 'task', item: task }, e.currentTarget)}>
-        <span class="care-name">{task.name}</span> <Tags item={task} details={details} /><Unusual type={other} />
+        <span class="care-name">{taskName(task, details)}</span> <Tags item={task} details={details} /><Unusual type={other} />
       </button>
     </div>
   );
@@ -172,7 +172,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
   const type = riderType(bike ? resolveBikeSpec(bike, null) : null);
   // "Add your bike" in the bike view: only while no bike is saved (with bikes saved and none chosen, the rider chose that).
   const addHref = savedBikeIds(services.storage).length === 0 ? bikeDetailsHref('new', 'care') : null;
-  const unsure = bike !== null && Object.values(own).some((v) => v === null);
+  const tell = bike ? tellUsLine(own) : null;
   const fit = fitted(CARE_TASKS, details);
   const shown = searchCare(query, part ? fit.filter((t) => t.part === part) : fit, searchText);
   // The Care search also finds Roadside cards (decision 2): only while something is typed, as the bike and the part filter allow.
@@ -225,7 +225,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
             <button key={p} type="button" class="btn care-filter" aria-pressed={part === p} onClick={() => setPart(part === p ? null : p)}>{PART_LABEL[p]}</button>
           ))}
         </div>
-        {unsure && bike ? <p class="muted care-tell"><a href={bikeDetailsHref(bike.id, 'care')}>{C.careTellUs}</a></p> : null}
+        {tell && bike ? <p class="muted care-tell"><a href={bikeDetailsHref(bike.id, 'care', tell.look ? 'look' : undefined)}>{tell.text}</a></p> : null}
         <p class="visually-hidden" role="status">{cardHits.length > 0 ? C.careFoundBoth(shown.length, cardHits.length) : C.careFound(shown.length)}</p>
         {shown.length === 0 && cardHits.length === 0 ? (
           <p class="care-none">{C.careNothing} <button type="button" class="btn" onClick={clearBoth}>{C.careClear}</button></p>

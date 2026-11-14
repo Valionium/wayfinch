@@ -151,7 +151,8 @@ export function LearnScreen({ services }: { services: TyreServices }) {
       </div>
       <div class={`bl-main${build ? ' bl-main-build' : ''}`} onKeyDown={(e) => onKey(e as unknown as KeyboardEvent)}>
         <div class="bl-left" ref={figure}>
-          <LearnDrawing key={kind} bike={bike} art={art} picked={now} marked={build ? [...new Set([...inStep, ...(now ? [now] : [])])] : now ? [now] : []}
+          {/* A zoom of its own in each mode: one made in Explore never crops a Build-up step (sweep 2 of 15 Nov 2026, #7). */}
+          <LearnDrawing key={`${kind} ${mode}`} bike={bike} art={art} picked={now} marked={build ? [...new Set([...inStep, ...(now ? [now] : [])])] : now ? [now] : []}
             labelled={labelled} name={build ? `${name}. ${LN.step(i + 1, steps.length, STEP_NAMES[step])}` : name} onPick={(id) => pick(id)} upto={build ? step : 'ebike'} />
           {build ? (
             <section class="bl-build" aria-labelledby="bl-step-title">

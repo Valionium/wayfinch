@@ -4,14 +4,18 @@
 // that would split its chunk (BC-CHUNK) and name one chunk more in the first screen (TRIP-PREP-FIRST). Pure: no DOM, no storage, no clock.
 import type { BikeRecord } from '../bike/normalise.ts';
 import type { Conditions } from '../care/types.ts';
+import { dayStopOf } from '../route/day-stops.ts';
 import type { Trip } from '../types.ts';
 import { PR, PREP_CHECKS } from '../wording/en-prep.ts';
 
 /** Where an item is done: Bike care, or not elsewhere in the app (outside it, or in the step the list is in). */
 export type PrepLink = 'care' | null;
 export type PrepItem = { id: string; text: string; link: PrepLink };
-/** `days`: the route's stages; `bike`: Trip's bike (null: none, every detail Not sure). */
-export type PrepFacts = { days: number; bike: Pick<BikeRecord, 'brakes' | 'drive'> | null };
+/**
+ * `days`: the route's stages; `bike`: Trip's bike (null: none, every detail Not sure); `started`: the departure date is today or past, so
+ * the day before it is gone; `night`: the name of the place Trip holds for night 1 (sweep 2 of 15 Nov 2026, #6).
+ */
+export type PrepFacts = { days: number; bike: Pick<BikeRecord, 'brakes' | 'drive'> | null; started?: true; night?: string };
 
 /** Bike care's tasks with their conditions (en-care.ts): those for every trip, then those added for two days or more, in this order. */
 export const EVERY_TRIP: readonly { id: string; applies: Conditions }[] = [
@@ -25,9 +29,14 @@ export const LONGER_TRIP: readonly { id: string; applies: Conditions }[] = [
   { id: 'frame-bolts-check', applies: {} },
 ];
 
-/** The facts of a trip and Trip's bike that the list depends on. */
-export function prepFacts(trip: Trip, bike: BikeRecord | null): PrepFacts {
-  return { days: trip.route.stages.length, bike: bike && { brakes: bike.brakes, drive: bike.drive } };
+/** The facts of a trip and Trip's bike that the list depends on. `today`: the date in the route's start zone, as Trip's line reads it. */
+export function prepFacts(trip: Trip, bike: BikeRecord | null, today?: string): PrepFacts {
+  const stop = trip.route.stages.length > 1 ? dayStopOf(trip, 0) : null;
+  return {
+    days: trip.route.stages.length, bike: bike && { brakes: bike.brakes, drive: bike.drive },
+    ...(today !== undefined && trip.departureDate !== null && trip.departureDate <= today ? { started: true as const } : {}),
+    ...(stop?.placeId && stop.name ? { night: stop.name } : {}),
+  };
 }
 
 /**
@@ -52,9 +61,9 @@ export function prepItems(f: PrepFacts): PrepItem[] {
     { id: 'kit', text: PR.prepKit, link: 'care' },
     { id: 'charge', text: PR.prepCharge, link: null },
     // in the step the list is in: its own button
-    { id: 'forecast', text: PR.prepForecast, link: null },
+    ...(f.started ? [] : [{ id: 'forecast', text: PR.prepForecast, link: null }]),
     // En route's Share progress needs a position on the route, so before leaving this is done outside the app.
     { id: 'tell', text: PR.prepTell, link: null },
-    ...(longer ? [{ id: 'night', text: PR.prepNight, link: null }] : []),
+    ...(longer ? [{ id: 'night', text: f.night ? PR.prepNightAt(f.night) : PR.prepNight, link: null }] : []),
   ];
 }

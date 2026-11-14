@@ -56,6 +56,37 @@ test("[TRIP-PREP-ITEMS] the first night is one plain line for two days or more, 
   expect(ids(facts({ days: 1 }))).not.toContain('night');
 });
 
+// Sweep 2 of 15 Nov 2026, #6: no "the day before you leave" once that day is past; the first night names the stop Trip holds for it.
+test('[TRIP-PREP-ITEMS] a trip that starts today, or has started, has no "the day before you leave" line; tomorrow, later or with no date it has', () => {
+  const trip = testTrip({ departureDate: '2026-10-17' });
+  const forecastOn = (today: string | undefined, t = trip): boolean => ids(prepFacts(t, DISC_CHAIN, today)).includes('forecast');
+  expect(forecastOn('2026-10-17')).toBe(false);
+  expect(forecastOn('2026-10-18')).toBe(false);
+  expect(forecastOn('2026-10-16')).toBe(true);
+  expect(forecastOn('2026-10-01')).toBe(true);
+  expect(forecastOn('2026-10-17', { ...trip, departureDate: null })).toBe(true);
+  // no date known for today: as before
+  expect(forecastOn(undefined)).toBe(true);
+  // everything else stays, in its order
+  expect(ids(prepFacts(trip, DISC_CHAIN, '2026-10-17'))).toEqual(ids(prepFacts(trip, DISC_CHAIN)).filter((i) => i !== 'forecast'));
+});
+
+test("[TRIP-PREP-ITEMS] the first night's line names the place Trip holds for night 1; with no place held (none, or the rider's No stop) it is the plain line", () => {
+  const trip = testTrip();
+  const basis = trip.route.stages.slice(0, -1).map((s) => s.endKm);
+  const day = (placeId: string | null, name: string | null, by: 'auto' | 'rider' = 'auto') => ({ placeId, km: basis[0]!, name, town: null, by });
+  const rest = basis.slice(1).map((km) => ({ placeId: null, km, name: null, town: null, by: 'auto' as const }));
+  const held = (d: ReturnType<typeof day>) => ({ ...trip, stops: { routeId: trip.route.id, basis, days: [d, ...rest] } });
+  const night = (t: typeof trip) => prepItems(prepFacts(t, null)).find((i) => i.id === 'night')!.text;
+  expect(night(held(day('p1', 'Campingpark Eberbach')))).toBe(PR.prepNightAt('Campingpark Eberbach'));
+  expect(PR.prepNightAt('Campingpark Eberbach')).toBe('Check where you sleep the first night (Campingpark Eberbach): open that night, and booked if it takes bookings.');
+  expect(night(held(day('p1', 'Camping am See', 'rider')))).toBe(PR.prepNightAt('Camping am See'));
+  expect(night(held(day(null, null, 'rider')))).toBe(PR.prepNight);
+  expect(night(trip)).toBe(PR.prepNight);
+  // stops held for another route are not this trip's
+  expect(night({ ...held(day('p1', 'Campingpark Eberbach')), stops: { routeId: 'other', basis, days: [day('p1', 'Campingpark Eberbach'), ...rest] } })).toBe(PR.prepNight);
+});
+
 test("[TRIP-PREP-ITEMS] prepFacts: the days are the route's stages, and the bike's brakes and drive", () => {
   const trip = testTrip();
   expect(trip.route.stages.length).toBe(4);

@@ -195,10 +195,13 @@ function meteoHits(answer: unknown): FoundPlace[] {
 
 const PHOTON_KEYS = ['place', 'natural', 'water', 'waterway', 'mountain_pass', 'boundary'];
 
-/** What a hit is, in words: Photon's own value (`camp_site`), shown only when it is not a plain town or an unnamed building. */
+/**
+ * What a hit is, in words: Photon's own value (`camp_site`), shown only when it is not a plain town, an unnamed building or a street,
+ * square or road, whose map class (pedestrian, residential, tertiary) means nothing to a rider (sweep 2 of 15 Nov 2026, #8).
+ */
 const kindOf = (key: unknown, value: unknown): string | undefined => {
   const v = clean(value, 40).replace(/_/g, ' ');
-  return key === 'place' || v === '' || v === 'yes' ? undefined : v;
+  return key === 'place' || key === 'highway' || v === '' || v === 'yes' ? undefined : v;
 };
 
 /** Hits from Photon. `broad`: an address or a named place was asked for, so streets, house numbers, stations and the like stay. */

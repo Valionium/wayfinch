@@ -71,9 +71,11 @@ export type BikeDrawingProps = {
   known?: readonly string[];
   /** A colour tried on the first-run card: drawn, and carried into Bike details, never saved. */
   tryColour?: Swatch | null;
+  /** Trip's saved bike: the caption is its name and Bike details (sweep 2 of 15 Nov 2026, #5). */
+  name?: string | undefined;
 };
 
-export function BikeDrawing({ bike, summary, size = 'large', back, caption = true, known, tryColour }: BikeDrawingProps) {
+export function BikeDrawing({ bike, summary, size = 'large', back, caption = true, known, tryColour, name }: BikeDrawingProps) {
   const theme = useTheme();
   const [prefix] = useState(() => `bk${(drawings += 1)}-`);
   const look = bike?.look?.paint;
@@ -82,12 +84,13 @@ export function BikeDrawing({ bike, summary, size = 'large', back, caption = tru
     if (look || summary) import('../../core/bike/paint.ts').then((m) => setReady((extras = m) ? 1 : 0), () => 0);
   }, [look, summary]);
   // Drawn again only when what it is drawn from changes.
-  const { spec, art, words } = useMemo(() => {
+  const { spec, art, words: drawn } = useMemo(() => {
     const plan = size === 'large' ? bagViewOf(summary, bike, known ?? (bike ? [bike.id] : [])) : null;
     const r = resolveBikeSpec(bike, plan), s = tryColour ? { ...r, colour: { value: tryColour.hex, mark: 'entered' as const } } : r;
     const o = { theme, idPrefix: prefix };
     return { spec: s, art: extras ? extras.tripArt(s, plan, o, look) : bikeArt(s, plan, o), words: captionOf(s, bike, plan) };
   }, [bike, summary, known, size, theme, prefix, ready, tryColour]);
+  const words = name ? { text: name, action: W.bikeDetailsLink } : drawn;
   const href = bikeDetailsHref(bike?.id ?? 'new', back, 'look') + (tryColour ? `&colour=${tryColour.name.toLowerCase()}` : '');
   const box = useRef<HTMLSpanElement>(null);
   const last = useRef({ svg: '' });

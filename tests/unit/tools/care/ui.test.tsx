@@ -71,7 +71,8 @@ async function stepsOf(item: HTMLElement): Promise<{ text: string; steps: string
   expect(host.querySelector('dialog.care-steps')).toBeNull();
   return out;
 }
-const tellUs = () => [...host.querySelectorAll('a')].find((a) => a.textContent === C.careTellUs) ?? null;
+// Since sweep 2 of 15 Nov 2026 (#4) the line names the details that are Not sure, so it is found by its place; its words are checked where it shows.
+const tellUs = () => host.querySelector<HTMLAnchorElement>('.care-tell a');
 
 test('[BC-TABS] two tabs, Care and Roadside repairs, in a named tablist; one selected, arrows, Home and End move; only its panel shows', async () => {
   await mount(world([]));
@@ -182,6 +183,43 @@ test('[BC-TELL-US] shown with a Not sure detail, leading to the bike\'s details 
   await mount(world([bike('bike_a', 'Gravel', { brakes: 'rim' })], { [BIKE_CHOICE_KEY]: choice(null) }));
   expect(tellUs()).toBeNull();
   expect(taskIds()).toEqual(CARE_TASKS.map((t) => t.id));
+});
+
+// Sweep 2 of 15 Nov 2026, #4: the line names only what is Not sure, by Bike details' own field names; the e-bike alone opens Look.
+test('[BC-TELL-US] the line names only the Not sure details; with only the e-bike Not sure it asks for that and opens Bike details at Look', async () => {
+  await mount(world([bike('bike_a', 'Gravel', { brakes: 'rim' })]));
+  expect(tellUs()!.textContent).toBe("Tell us your tyre setup, drivetrain, shifting, suspension and whether it is an e-bike in Bike details to hide what doesn't apply");
+  render(null, host);
+  // everything told but the e-bike (the sweep's bike: Look's e-bike is only guessed)
+  const { look: _look, ...rest } = ANSWERED;
+  void _look;
+  await mount(world([bike('bike_a', 'Gravel', rest)]));
+  expect(tellUs()!.textContent).toBe('Say whether it is an e-bike (Bike details) to hide e-bike tasks');
+  expect(tellUs()!.getAttribute('href')).toBe(bikeDetailsHref('bike_a', 'care', 'look'));
+  render(null, host);
+  // two details: both named, no e-bike words when that is told
+  await mount(world([bike('bike_a', 'Gravel', { ...ANSWERED, tyres: 'unknown', suspension: undefined })]));
+  expect(tellUs()!.textContent).toBe("Tell us your tyre setup and suspension in Bike details to hide what doesn't apply");
+  expect(tellUs()!.getAttribute('href')).toBe(bikeDetailsHref('bike_a', 'care'));
+  render(null, host);
+  await mount(world([bike('bike_a', 'Gravel', { ...rest, brakes: 'unknown' })]));
+  expect(tellUs()!.textContent).toBe("Tell us your brake type and whether it is an e-bike in Bike details to hide what doesn't apply");
+});
+
+test('[BC-FORK-ONLY] with a front fork only, the fork wipe names the fork legs alone, in the list and its steps; a full-suspension or Not sure bike keeps the shock shaft', async () => {
+  const wipe = () => tasks().find((d) => d.dataset.id === 'susp-wipe-stanchions')!;
+  await mount(world([bike('bike_a', 'Trekking', { ...ANSWERED, suspension: 'front' })]));
+  expect(wipe().querySelector('.care-name')!.textContent).toBe('Wipe the fork legs');
+  await click(wipe().querySelector<HTMLElement>('.care-open')!);
+  expect(host.querySelector('dialog.care-steps .care-steps-name')!.textContent).toBe('Wipe the fork legs');
+  render(null, host);
+  await mount(world([bike('bike_a', 'Trail', { ...ANSWERED, suspension: 'full' })]));
+  expect(wipe().querySelector('.care-name')!.textContent).toBe('Wipe the fork legs and shock shaft');
+  render(null, host);
+  await mount(world([bike('bike_a', 'Gravel', { brakes: 'rim' })]));
+  expect(wipe().querySelector('.care-name')!.textContent).toBe('Wipe the fork legs and shock shaft');
+  // the content's own name is unchanged (the draft's words)
+  expect(CARE_TASKS.find((t) => t.id === 'susp-wipe-stanchions')!.name).toBe('Wipe the fork legs and shock shaft');
 });
 
 test('[BC-TELL-US] the list fits the chosen bike, not the first one', async () => {

@@ -67,7 +67,8 @@ export function TripBike({ bike, trip }: { bike: BikeSource; trip: boolean | nul
     </section>
   ) : (
     <div class="trip-bike" ref={box}>
-      <BikeDrawing bike={bike.bike} summary={bike.summary} known={bike.known} back="trip" />
+      {/* A saved bike is named as Tools names it (sweep 2 of 15 Nov 2026, #5); a plan-only bike keeps the drawing's own caption. */}
+      <BikeDrawing bike={bike.bike} summary={bike.summary} known={bike.known} back="trip" name={bike.bikes.find((b) => b.id === bike.bike?.id)?.name} />
       {at.line ? <p class="bike-hint-done" role="status">{said}</p> : null}
     </div>
   );
