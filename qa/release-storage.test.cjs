@@ -31,7 +31,7 @@ const check=(value,message)=>{assert.ok(value,message);checks++;};
   await run(`importAll(JSON.stringify({feedback:[{at:'2026-10-03T12:00:00.000Z',kind:'feedback',step:1,message:'One',packEff:.88},{at:'2026-10-03T12:00:00.000Z',kind:'feedback',step:1,message:'Two',packEff:.88}]}))`);
   check(run('FEEDBACK.filter(f=>f.at===\'2026-10-03T12:00:00.000Z\').length===2'),'same timestamp does not discard distinct reports');
   check((await run('importAll("{broken")')).includes('parse'),'invalid JSON rejected');
-  check((await run('importAll(JSON.stringify({app:"another-app",settings:{theme:"light"}}))')).includes('not a Load Check'),'wrong app rejected');
+  check((await run('importAll(JSON.stringify({app:"another-app",settings:{theme:"light"}}))')).includes('not a Bag planner export'),'wrong app rejected');
   check((await run('importAll("界".repeat(Math.floor(MAX_IMPORT_BYTES/3)+1))')).includes('64 MiB'),'UTF-8 byte bound matches File.size for multibyte text');
   check(q.html.includes('if(f.size > MAX_IMPORT_BYTES)') && q.html.includes("$('impMsg').textContent = IMPORT_SIZE_MESSAGE"),'file picker and parser use identical limits');
   const excess=await run('importAll(JSON.stringify({setups:Array.from({length:22},(_,i)=>qaSetup(i+100))}))');
