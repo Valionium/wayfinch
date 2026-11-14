@@ -12,7 +12,8 @@ const EXTRA: Record<PlaceKind, string[]> = {
   bike_shop: ['service:bicycle:repair', 'service:bicycle:pump'],
   repair_station: ['valves', 'service:bicycle:pump', 'service:bicycle:tools'],
   air: ['valves', 'service:bicycle:pump', 'service:bicycle:tools'],
-  hospital: ['emergency'],
+  // What kind of care it is: a specialist clinic mapped emergency=yes is never offered as an emergency department.
+  hospital: ['emergency', 'healthcare', 'healthcare:speciality'],
   toilets: ['drinking_water'],
   settlement: ['place', 'population'],
   shop: STOP, cafe: STOP, restaurant: STOP, drink: STOP, ice_cream: STOP, fuel_shop: STOP,
