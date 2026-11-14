@@ -86,7 +86,7 @@ test('[FP-START] [FP-NO-WRITE] [FP-BACK] a trip planned from Wayfinch: free play
   await page.locator('#freePlayStart').focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#freePlayHead')).toHaveText('Free play — your trip\'s plan is not changed.');
-  await expect(page.locator('#freePlayText')).toHaveText('Nothing here is kept unless you save it as a new setup.');
+  await expect(page.locator('#freePlayText')).toHaveText('Nothing here is kept unless you save it as a new setup. A reload ends free play.');
   await expect(page.locator('#freePlayBack')).toBeFocused();
   await expect(page.locator('#freePlayStart')).toBeHidden();
   await expect(page.locator('#handoffBar')).toBeHidden();
@@ -156,6 +156,28 @@ test('[FP-OFFER] no line on a plan that never came from Trip, nor in a day ride\
   await expect(page.locator('#smallHead')).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('#freePlayBar')).toBeHidden();
   await page.locator('#smallFull').click();
+  await expect(page.locator('#freePlayStart')).toBeVisible();
+});
+
+test('[FP-OFFER] no free play while Plan bags for this trip waits for the trip\'s weather; the line comes once the plan is made (review of PR 146, C1)', async ({ page }) => {
+  test.skip(lightProject(), 'storage, not the theme');
+  await plannerWithPlan(page);
+  await handOver(page, handoffFixture());
+  // the trip's measured weather answers slowly: Plan bags waits for it (up to 5 s) before it sizes the bags
+  await page.route('https://archive-api.open-meteo.com/**', async (route) => { await new Promise((r) => setTimeout(r, 4500)); await route.abort().catch(() => undefined); });
+  await openFresh(page, `/tools/bags/#copilot-handoff=${ID}`);
+  await ready(page);
+  await expect(page.locator('#handoffPlan')).toBeVisible();
+  await expect(page.locator('#freePlayStart')).toBeHidden();   // the trip waits for the rider's answer
+  await page.locator('#handoffPlan').click();
+  await page.waitForFunction('TRIP_BAGS.hold === true');
+  for (let i = 0; i < 3; i++) {
+    await expect(page.locator('#freePlayStart')).toBeHidden();
+    expect(await page.evaluate('freePlayOffered()')).toBe(false);
+    await page.waitForTimeout(500);
+  }
+  expect(await page.evaluate('TRIP_BAGS.hold')).toBe(true);   // still waiting: the checks above were made during the wait
+  await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('#freePlayStart')).toBeVisible();
 });
 

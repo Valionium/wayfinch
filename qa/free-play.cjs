@@ -36,8 +36,15 @@ async function page({route=true,storage=sharedStore()}={}){
   writes.length=0;
   const json=code=>JSON.parse(p.run(`JSON.stringify(${code})`)??'null');
   const el=id=>p.run(`$('${id}')`);
+  // the bars whose showing the tests read keep their classes, as a browser does (the VM's elements keep none); all start hidden
+  for(const id of ['weatherBar','weatherUndo','draftBar','handoffBar']){
+    const set=new Set(['hidden']);
+    el(id).classList={add:(...c)=>c.forEach(x=>set.add(x)),remove:(...c)=>c.forEach(x=>set.delete(x)),contains:c=>set.has(c),
+      toggle:(c,f)=>{const on=f===undefined ? !set.has(c) : !!f;if(on)set.add(c);else set.delete(c);return on;}};
+  }
   return {...p,writes,json,el};
 }
+const shown=(p,id)=>!p.el(id).classList.contains('hidden');
 // What holds the trip's plan and what Wayfinch reads of it: the draft, the summary, the plan's bike, the bike choice, the setups, the bikes.
 const PLAN_KEYS=['loadcheck:draft','loadcheck:draft:local-meta','loadcheck:summary:v1','loadcheck:bikeProfile','loadcheck:bikeChoice:v1',
   'loadcheck:bikeFollowed:v1','loadcheck:setups','loadcheck:setups-more:v1','loadcheck:setup-marks:v1','loadcheck:bikeProfiles','loadcheck:handoff-done'];
@@ -61,14 +68,21 @@ test('[FP-OFFER] the line offers free play only while the plan open is the trip\
   assert.equal(p.el('freePlayStart').textContent,'Try other bags freely');
   assert.equal(p.el('freePlayBack').hidden,true,'no Back before free play');
   assert.equal(p.el('freePlaySave').hidden,true,'no Save before free play');
-  // not while the small view shows, a trial bag is tried, another tab's plan waits, or the draft is not read yet
-  for(const [on,off] of [['SMALL_VIEW=true','SMALL_VIEW=false'],['TRIAL={before:{bags:[]},uids:[]}','TRIAL=null'],['DRAFT_FROZEN=true','DRAFT_FROZEN=false'],['DRAFT_READY=false','DRAFT_READY=true']]){
+  // not while the small view shows, a trial bag is tried, another tab's plan waits, or the draft is not read yet; nor while a trip from
+  // Wayfinch waits for the rider's answer, its route goes in, or Plan bags for this trip is making the plan (review of PR 146, C1)
+  for(const [on,off] of [['SMALL_VIEW=true','SMALL_VIEW=false'],['TRIAL={before:{bags:[]},uids:[]}','TRIAL=null'],['DRAFT_FROZEN=true','DRAFT_FROZEN=false'],['DRAFT_READY=false','DRAFT_READY=true'],
+    ['TRIP_BAGS.hold=true','TRIP_BAGS.hold=false'],['HANDOFF.busy=true','HANDOFF.busy=false'],['WEIGHT_PROMPT_BLOCKS.handoffBar=true','WEIGHT_PROMPT_BLOCKS.handoffBar=false']]){
     p.run(on);
     assert.equal(p.json('freePlayOffered()'),false,on);
     p.run('renderFreePlayBar()');
     assert.equal(p.el('freePlayBar').hidden,true,on+': no line');
+    assert.equal(await p.run('startFreePlay()'),false,on+': nor by hand');
+    assert.equal(p.json('FREE_PLAY'),null,on);
     p.run(off);
   }
+  // the end of the wait draws the line again: Plan bags' bar changes, and with it the line
+  p.run('TRIP_BAGS.hold=true;renderFreePlayBar();TRIP_BAGS.hold=false;showHandoffBar("Planned.",{undo:true})');
+  assert.equal(p.el('freePlayBar').hidden,false,'shown again once the plan is made');
   // a plan that never came from Trip has no trip's plan to keep: no line
   const q=await page({route:false});
   assert.equal(q.json('freePlayOffered()'),false);
@@ -91,7 +105,8 @@ test('[FP-START] free play starts from a copy of the plan open now without Trip\
   for(const k of ['nights','month','departureDate','sleep','pace'])assert.deepEqual(now.trip[k],before.trip[k],k+' as in the trip\'s plan');
   assert.equal(p.el('freePlayBar').hidden,false);
   assert.equal(p.el('freePlayHead').textContent,'Free play — your trip\'s plan is not changed.');
-  assert.equal(p.el('freePlayText').textContent,'Nothing here is kept unless you save it as a new setup.');
+  assert.equal(p.el('freePlayText').textContent,'Nothing here is kept unless you save it as a new setup. A reload ends free play.');
+  for(const n of [1,2])assert.notEqual(p.el('geoStatus'+n).textContent,'Track place cleared.','no line that reads as if the trip\'s place went (review of PR 146, M3)');
   assert.equal(p.el('freePlayBack').hidden,false);assert.equal(p.el('freePlayBack').textContent,'Back to the trip\'s plan');
   assert.equal(p.el('freePlaySave').hidden,false);assert.equal(p.el('freePlaySave').textContent,'Save as a new setup');
   assert.equal(p.el('freePlayStart').hidden,true);
@@ -168,6 +183,40 @@ test('[FP-BACK] another tab\'s change to the trip\'s plan never lands on free pl
   assert.equal(p.json('DRAFT_FROZEN'),false);
 });
 
+test('[FP-BACK] the trip\'s weather line and its Undo wait during free play and come back exactly at Back, where Undo still works; the restored-plan bar and the place lines come back too (review of PR 146, I1, M1, M3)',async()=>{
+  const p=await page();
+  // the trip's plan has a weather line with its Undo (one kit item the measured weather changed), the restored-plan bar, place lines
+  const id=p.json('Object.keys(S.kit).find(k=>kitById(k))');
+  p.context.qaId=id;
+  p.run(`WEATHER_KIT.undo={ids:[qaId],kit:{...S.kit,[qaId]:!S.kit[qaId]},touched:{...S.kitTouched},placements:S.placements,after:weatherKitKey()};
+    showWeatherBar('Measured weather for June came in: something added.',true);$('draftBar').classList.remove('hidden');
+    $('geoStatus1').textContent='Heidelberg found.';$('geoStatus2').textContent='Strasbourg found.';`);
+  const undo=p.run('JSON.stringify(WEATHER_KIT.undo)'),kit=p.run('JSON.stringify(S.kit)');
+  await p.run('startFreePlay()');
+  assert.equal(shown(p,'weatherBar'),false,'the trip\'s weather line waits');
+  assert.equal(shown(p,'draftBar'),false);
+  assert.equal(p.json('WEATHER_KIT.undo'),null,'its Undo is not free play\'s');
+  assert.equal(p.run('undoWeatherKit()'),false,'so nothing of free play is undone by it');
+  assert.equal(p.run('JSON.stringify(S.kit)'),kit);
+  // the measured weather landing in free play changes nothing of free play's kit and waits for the trip's plan
+  p.run('S.kitTouched={};S.month=11;');
+  const playKit=p.run('JSON.stringify(S.kit)');
+  assert.equal(p.run('climateKitFollows()'),false);
+  assert.equal(p.run('JSON.stringify(S.kit)'),playKit,'free play\'s kit as it was');
+  assert.equal(shown(p,'weatherBar'),false,'and no line of free play\'s');
+  let follows=0;p.context.qaFollows=()=>{follows++;return false;};
+  p.run('climateKitFollows=qaFollows');   // the landing that waited is taken in once the trip's plan is back
+  p.run('endFreePlay()');
+  assert.equal(follows,1,'the weather that landed in free play is taken into the trip\'s plan at Back');
+  assert.equal(p.run('JSON.stringify(WEATHER_KIT.undo)'),undo,'the trip\'s weather Undo as it was');
+  assert.equal(shown(p,'weatherBar'),true);assert.equal(shown(p,'weatherUndo'),true);
+  assert.equal(p.el('weatherText').textContent,'Measured weather for June came in: something added.');
+  assert.equal(shown(p,'draftBar'),true,'the restored-plan bar is back');
+  assert.equal(p.el('geoStatus1').textContent,'Heidelberg found.');assert.equal(p.el('geoStatus2').textContent,'Strasbourg found.');
+  assert.equal(p.run('undoWeatherKit()'),true,'and the trip\'s weather Undo still works');
+  assert.equal(p.json(`S.kit[qaId]`),!JSON.parse(kit)[id]);
+});
+
 test('[FP-SAVE] only the rider\'s tap saves free play, as one new setup with no trip link; the setups of before and the trip\'s plan stay byte for byte',async()=>{
   const p=await page();
   const setups=p.run('JSON.stringify(storedSetupsLocal())'),draftRaw=p.values.get('loadcheck:draft'),summary=p.values.get('loadcheck:summary:v1');
@@ -214,12 +263,37 @@ test('[FP-WAITS] during free play a setup is never updated, and Export, Import, 
   assert.equal(p.json('UPDATE_STATE.applying'),false,'the update waits');
   assert.equal(p.run('UPDATE_STATE.note'),'The update reloads the page, which ends free play: it waits until you tap Back to the trip\'s plan.');
   assert.equal(p.json('weightPromptBlocked()'),true,'the question of the weight limit waits too: free play saves no answer');
+  // a weight limit given in free play is free play's bike's only: no saved bike, no Skip remembered (review of PR 146, I2)
+  const bikes=p.run('JSON.stringify(BIKE_PROFILES)');
+  await p.run(`rememberMaxWeight({maxWeight:{v:130,u:'kg',includes:'bike'},maxWeightAsked:true})`);
+  assert.deepEqual(p.json('S.bikeProfile.maxWeight'),{v:130,u:'kg',includes:'bike'},'free play\'s bike has it');
+  assert.equal(p.run('JSON.stringify(BIKE_PROFILES)'),bikes,'the saved bikes do not');
+  await p.run('S.bikeProfile=null;rememberMaxWeight({maxWeightAsked:true})');
+  assert.equal(p.json('MAX_WEIGHT_SKIPPED'),false,'Skip without a bike is not remembered');
+  // a colour on the plan's bike is free play's; a saved bike is not changed in free play, and its saves wait with a line
+  p.run(`S.bikeProfile=normaliseBikeProfile(JSON.parse(JSON.stringify(BIKE_PROFILES[0])));BIKE_PROFILE_EDITOR_ID=S.bikeProfile.id;writeLook({colour:'#aa3311'})`);
+  assert.equal(p.json('S.bikeProfile.look.colour'),'#aa3311');
+  assert.equal(p.run('JSON.stringify(BIKE_PROFILES)'),bikes,'the saved bike keeps its look');
+  p.run(`BIKE_PROFILE_EDITOR_ID='bike_two';writeLook({colour:'#113355'})`);
+  assert.equal(p.run('JSON.stringify(BIKE_PROFILES)'),bikes,'a saved bike shown alone is not changed either');
+  for(const call of ['saveBikeProfile()','removeSavedBike()','saveShownBike()']){
+    p.run('BIKE_PROFILE_MESSAGE=""');
+    assert.equal(await p.run(call),false,call+' waits');
+    assert.equal(p.run('BIKE_PROFILE_MESSAGE'),'In free play your saved bikes are not changed. Tap Back to the trip\'s plan to save a bike.',call);
+  }
+  assert.equal(await p.run('bikeStoreSet(BIKE_PROFILE_KEY,BIKE_PROFILES)'),false,'and nothing reaches the saved bikes by any other way');
+  assert.equal(p.run('JSON.stringify(BIKE_PROFILES)'),bikes);
+  // a copy of the reports or any export carries the trip's plan as the working plan, never free play's (review of PR 146, M4)
+  p.run('S.bags.push({uid:S.nextUid++,pos:"top",slot:"front",L:1.5})');
+  const ex=JSON.parse(p.run('exportAll()'));delete ex.draft.updatedAt;
+  assert.ok(JSON.stringify(ex.draft)===p.run('FREE_PLAY.plan'),'the export\'s working plan is the trip\'s');
   // a rename is no plan: it still works
   assert.equal(p.run(`startSetupAction('${id}','rename')`),true);
   await wait(50);
   assert.deepEqual(planWrites(p),[],'nothing written');
   assert.ok(stored(p)===was,'every stored value as before');
   p.run('endFreePlay()');
+  assert.equal(p.run('JSON.stringify(BIKE_PROFILES)'),bikes,'after Back the saved bikes are the stored ones');
   assert.equal(p.run('freePlayWaits("export")'),false,'after Back nothing waits');
   assert.equal(p.json('weightPromptBlocked()'),false,'and the question may come again');
 });
