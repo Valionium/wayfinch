@@ -6129,7 +6129,9 @@ function advisorWhy(s, input){
   const left = +r.backL.toFixed(1);   // litres that round to nothing are nothing on the back
   // the back's change is what comes off less what goes in: when other things go in, both are said, never "stay there" (#40)
   const flow = off >= 0.1 ? advisorBackFlow(s, input) : null;
-  if(flow && flow.on >= 0.1) out.push(advisorWord('backSwap', { off:flow.off, on:flow.on, left, was:+base.backL.toFixed(1) }));
+  // the figures as shown add up: each rounded once, what goes in worked out from the shown ones (review of PR 137, m1)
+  const was = +base.backL.toFixed(1), on = flow ? +(left - was + flow.off).toFixed(1) : 0;
+  if(flow && flow.on >= 0.1 && on >= 0.1) out.push(advisorWord('backSwap', { off:flow.off, on, left, was }));
   else if(off >= 0.1) out.push(left === 0 ? advisorWord('backAll', { l:off }) : advisorWord('backSome', { l:off, left }));
   const d = {};
   new Set([...Object.keys(base.kgByPos), ...Object.keys(r.kgByPos)]).forEach(p => {
