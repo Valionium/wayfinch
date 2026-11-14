@@ -12,8 +12,19 @@ export const TF = {
   appTripNightsUseSuggested: 'Use the suggestion',
   appTripDepartureNone: 'No date yet. Without one, En route gives distances only and says why.',
   appTripDateClear: 'Clear the date',
-  // Other nights choose every stop afresh (TRIP-DAY-STOPS), said once beside the nights (review of PR 101, M4).
-  appTripStopsNewNights: (n: number, own: boolean): string => `New stops for ${n} ${n === 1 ? 'night' : 'nights'}.${own ? ' Stops you chose for the old nights are not kept.' : ''}`,
+  // Other nights choose their stops again (TRIP-DAY-STOPS), said once beside the nights (review of PR 101, M4), planned around the
+  // rider's own stops, which are named, with where to change one (the owner's rulings of 14 Nov 2026, TRIP-STOPS-KEEP). `kept`,
+  // `dropped`: the stops' words (appTripStopNight), joined, or '' for none; `uneven`: the days' words (appTripDayUneven), joined. A day
+  // ride (0) names only what goes.
+  appTripStopsNewNights: (n: number, kept: string, dropped: string, uneven: string): string => (n < 1
+    ? `A day ride has no nights, so your stops are not kept: ${dropped}.`
+    : `New stops for ${n} ${n === 1 ? 'night' : 'nights'}${kept ? `, keeping yours: ${kept}` : ''}.${dropped ? ` Not kept: ${dropped}.` : ''}`
+      + `${uneven ? ` Around your stops, ${uneven}.` : ''}${kept || dropped ? ' To change a stop, use Change stop under its day in Your route.' : ''}`),
+  // one own stop: its name ("No stop" for the rider's No stop) and its night, the new one, or the old one (`was`; review of PR 163, m-1)
+  appTripStopNight: (name: string | null, night: number, was?: boolean): string => `${name ?? 'No stop'} (${was ? 'was ' : ''}night ${night})`,
+  appTripDayUneven: (day: number, km: string, long: boolean): string => `day ${day} (${km} km) is much ${long ? 'longer' : 'shorter'} than an even day`,
+  // the line after a route is added, only Add a route's chunk says it (moved word for word from en.ts to keep the first screen at main's figure)
+  appTripNextGetReady: 'Next: Prepare this route, so En route can show water, food, sleep and weather.',
   appTripPace: 'Pace',
   appTripFlatKph: 'Flat speed, unloaded (km/h)',
   appTripStay: 'Stay type',
