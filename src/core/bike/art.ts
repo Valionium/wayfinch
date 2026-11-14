@@ -612,7 +612,7 @@ export function bikeArt(spec: BikeSpec, bags: BagView | null, options: ArtOption
     const svg = `<svg class="bk" viewBox="0 0 ${VIEW_W} ${VIEW_H}" role="img" aria-label="${NAME}">${b.defs.length ? `<defs>${b.defs.join('')}</defs>` : ''}${parts.join('')}${b.art.join('')}</svg>`;
     hit = { key, svg, anchors };
     RECENT.unshift(hit);
-    RECENT.splice(12);
+    RECENT.length = Math.min(RECENT.length, 12);
   }
   const svg = withCasing((colour ? hit.svg.split(`stroke="${PAINT}"`).join(`stroke="${colour}"`) : hit.svg).replace(NAME, label), colour, options.theme ?? 'dark');
   return { svg, anchors: hit.anchors, label };
