@@ -2,7 +2,7 @@
 // (else a typical gravel bike), a switch to a typical bike of another kind, the drawing to tap (drawing.tsx), the picked part's words and
 // what it connects to, and every part as a button by group: the keyboard and screen-reader way in. Its own chunk, loaded from the Tools
 // chunk; it reads the bag planner's bikes and the tools' bike choice, and writes nothing.
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { bikeArt } from '../../core/bike/art.ts';
 import { normaliseBike } from '../../core/bike/normalise.ts';
 import type { BikeRecord } from '../../core/bike/normalise.ts';
@@ -129,9 +129,9 @@ export function LearnScreen({ services }: { services: TyreServices }) {
   }, [works, wk, wkTry]);
   const stepper = build ? { at: i, count: steps.length } : works && wk ? { at: wi, count: wCount } : null;
   // A turn that takes away the focused part button or link (it is not in the new step) hands the focus to Next, never to the page
-  // (review of PR 157, I3; Build-up and How it works alike).
+  // (review of PR 157, I3; Build-up and How it works alike). In the same commit as the new step, so the focus is never seen on the page.
   const refocus = useRef(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!refocus.current) return;
     refocus.current = false;
     if (document.activeElement === null || document.activeElement === document.body) nextBtn.current?.focus();
