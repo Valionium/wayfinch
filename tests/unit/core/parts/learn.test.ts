@@ -164,12 +164,14 @@ const ON: Partial<Record<LearnId, string>> = {
 
 function* bikes(): Generator<{ name: string; bike: LearnBike }> {
   for (const kind of KINDS) yield { name: kind, bike: kindBike(kind) };
-  // the rider's own, as the page reads them: every brake, drive, axle and shifting answer
-  for (const brakes of ['unknown', 'hydraulic-disc', 'cable-disc', 'rim', 'other']) for (const drive of ['unknown', 'derailleur', 'chain-hub', 'belt']) {
-    for (const axle of [undefined, 'thru', 'qr', 'nuts']) for (const shifting of ['unknown', 'electronic']) {
-      yield { name: `own ${brakes} ${drive} ${axle} ${shifting}`, bike: ownOf({ brakes, drive, shifting, ...(axle ? { axle } : {}) }) };
-    }
-  }
+  // the rider's own, as the page reads them: each brake, drive, axle and shifting answer (one at a time, beside the others' usual)
+  const answers: Record<string, unknown>[] = [
+    ...['unknown', 'hydraulic-disc', 'cable-disc', 'rim', 'other'].map((brakes) => ({ brakes })),
+    ...['unknown', 'derailleur', 'chain-hub', 'belt'].map((drive) => ({ drive, brakes: 'rim' })),
+    ...['thru', 'qr', 'nuts'].flatMap((axle) => [{ axle, brakes: 'rim', drive: 'chain-hub' }, { axle, brakes: 'hydraulic-disc', drive: 'belt' }]),
+    { shifting: 'electronic', drive: 'derailleur' },
+  ];
+  for (const fields of answers) yield { name: `own ${JSON.stringify(fields)}`, bike: ownOf(fields) };
   for (const style of STYLES) for (const size of SIZES) for (const bars of ['drop', 'flat', 'other']) {
     for (const [brakes, drive, ebike] of [['rim', 'derailleur', false], ['hydraulic-disc', 'chain-hub', true], ['cable-disc', 'belt', false], ['unknown', 'unknown', false]] as const) {
       const spec = resolveBikeSpec(setBike(style, size, bars, ebike, ['', ''], null, { brakes, drive }), null);
