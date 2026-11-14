@@ -8,6 +8,9 @@ import type { Page } from '@playwright/test';
 import { loadApp, preparedTrip, removeBuilds } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
 import type { Trip } from '../../src/core/types.ts';
+import type { StoreInPage } from './fixtures/store-page.ts';
+
+declare const __store: StoreInPage;
 
 const json = (path: string) => JSON.parse(readFileSync(new URL(`../../contracts/${path}`, import.meta.url), 'utf8'));
 const sample = json('bike-library/sample.json') as Record<string, unknown>[];
@@ -133,6 +136,61 @@ test('[TRIP-PREP-TICKS] [TRIP-REMOVE] a tick, then Remove this trip, then the sa
   await openPrep(page);
   await expect(box(page, 'kit')).not.toBeChecked();
   expect((await allLocal(page))[KEY]).toBeUndefined();
+});
+
+test('[TRIP-PREP-FOLDED] once Prepare this route has run, its folded row offers "Before you leave" beside Update: it shows the list below the row, Update still opens the step, and Back from Bike care finds the list open', async ({ page }) => {
+  app = await loadApp(page);
+  await page.evaluate((e) => { for (const [k, v] of Object.entries(e)) localStorage.setItem(k, v); }, SEED);
+  const trip = await preparedTrip(page, 'heidelberg-strasbourg', { nights: 2, departureDate: inDays(3) });
+  // Prepare this route ended with every step through: the step is done and folds
+  await page.evaluate(async (route) => {
+    const steps = ['heights', 'places', 'hours', 'weather', 'baseline'].map((step) => ({ step, ok: true, note: null }));
+    await __store.savePrepared(route, { at: new Date(), steps, build: null, forecastFetchedAt: null, baselineYears: null });
+  }, trip.route.id);
+  await page.evaluate(([key, route]) => localStorage.setItem(key, JSON.stringify({ route, ticked: ['kit'] })), [KEY, trip.route.id] as const);
+  await page.goto(`${app.origin}/#/trip`, { waitUntil: 'domcontentloaded' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-trip-line]')).toContainText(ROUTE_NAME);
+  const step = page.locator('[data-step="getready"]');
+  await expect(step).toHaveAttribute('data-state', 'done');
+  await expect(step).not.toHaveAttribute('data-open', 'true');
+  const opener = step.getByRole('button', { name: 'Before you leave', exact: true });
+  await expect(opener).toHaveAttribute('aria-expanded', 'false');
+  await expect(step.locator('[data-prep]')).toHaveCount(0);
+  // the list below the row, its ticks as kept; the step stays folded
+  await opener.click();
+  await expect(opener).toHaveAttribute('aria-expanded', 'true');
+  await expect(step.locator('[data-prep]')).toBeVisible();
+  await expect(box(page, 'kit')).toBeChecked();
+  await expect(step).not.toHaveAttribute('data-open', 'true');
+  // From the keyboard: Enter folds it and shows it again
+  await opener.focus();
+  await page.keyboard.press('Enter');
+  await expect(step.locator('[data-prep]')).toHaveCount(0);
+  await page.keyboard.press('Enter');
+  await expect(step.locator('[data-prep]')).toBeVisible();
+  // Bike care and Back: the list is open where it was
+  await page.getByRole('link', { name: 'In Bike care: Test both brakes', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Bike care', level: 2 })).toBeVisible();
+  await page.goBack();
+  await expect(page.locator('[data-step="getready"] [data-prep]')).toBeVisible();
+  // Update does what it did: opens the step (the list is in it), no run starts
+  await page.locator('[data-step="getready"]').getByRole('button', { name: 'Update: Prepare this route', exact: true }).click();
+  await expect(page.locator('[data-step="getready"]')).toHaveAttribute('data-open', 'true');
+  await expect(page.locator('[data-step="getready"] [data-prep]')).toHaveCount(1);
+  await expect(page.locator('[data-step="getready"] [aria-busy="true"]')).toHaveCount(0);
+  // 320 px: the row's buttons are 44 px and inside the screen, nothing scrolls sideways
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.locator('[data-step="getready"]').getByRole('button', { name: 'Before you leave', exact: true }).click();
+  for (const el of await page.locator('[data-step="getready"] .trip-step-head button').all()) {
+    const b = (await el.boundingBox())!;
+    expect(b.height, await el.innerText()).toBeGreaterThanOrEqual(43.5);
+    expect(b.x + b.width, await el.innerText()).toBeLessThanOrEqual(320);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const results = await new AxeBuilder({ page }).include('[data-step="getready"]').analyze();
+  expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join('; ')}`)).toEqual([]);
 });
 
 test('[TRIP-PREP-FIT] keyboard and screen reader reach every box and link; 44 px targets; 320 px to wide, both themes, no sideways scroll, no accessibility violations', async ({ page }) => {

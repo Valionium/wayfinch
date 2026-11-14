@@ -58,3 +58,22 @@ export function BeforeYouGo({ snap }: { snap: Pick<TripSnapshot, 'trip'> }) {
     </section>
   );
 }
+
+/** Whether the list beside the folded step was shown last: kept while the page lives, so Back from Bike care finds it as it was. */
+let besideShown = false;
+
+/**
+ * Once Prepare this route has run, its step folds to one row with Update (which only opens the step). Beside it, "Before you leave"
+ * shows the list below the row and hides it again (the sweep of 15 November 2026, finding 1); the step stays folded.
+ */
+export function PrepBeside({ snap }: { snap: Pick<TripSnapshot, 'trip'> }) {
+  const [shown, setShown] = useState(besideShown);
+  if (!snap.trip) return null;
+  const flip = (): void => { besideShown = !shown; setShown(besideShown); };
+  return (
+    <div class="prep-beside">
+      <button type="button" class="trip-step-change" aria-expanded={shown} aria-controls="prep-beside-list" onClick={flip}>{PR.prepTitle}</button>
+      {shown ? <div id="prep-beside-list" class="prep-beside-list"><BeforeYouGo snap={snap} /></div> : null}
+    </div>
+  );
+}

@@ -9,3 +9,6 @@
 .prep-tick span { overflow-wrap: anywhere; }
 .prep-link { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
 a.prep-link { padding: 0 4px; color: var(--blaze); }
+/* Beside the folded step's Update: the button in the row, the list below it at full width (as Remove this trip's question). */
+.prep-beside { display: contents; }
+.prep-beside-list { flex: 1 1 100%; min-width: 0; }

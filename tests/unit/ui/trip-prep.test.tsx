@@ -82,3 +82,26 @@ test('[TRIP-PREP-ITEMS] with no trip there is no list', async () => {
   await act(() => { render(<BeforeYouGo snap={{ trip: null }} />, host); });
   expect(host.querySelector('[data-prep]')).toBeNull();
 });
+
+test('[TRIP-PREP-FOLDED] beside the folded step: "Before you leave" shows the list below the row and hides it; drawn again, it is as it was left', async () => {
+  const { PrepBeside } = await import('../../../src/ui/trip/prep.tsx');
+  await act(() => { render(<PrepBeside snap={{ trip: null }} />, host); });
+  expect(host.innerHTML).toBe('');
+  await act(() => { render(<PrepBeside snap={snap(testTrip())} />, host); });
+  const opener = host.querySelector<HTMLButtonElement>('button')!;
+  expect(opener.textContent).toBe(PR.prepTitle);
+  expect(opener.getAttribute('aria-expanded')).toBe('false');
+  expect(host.querySelector('[data-prep]')).toBeNull();
+  await act(() => { opener.click(); });
+  expect(opener.getAttribute('aria-expanded')).toBe('true');
+  expect(host.querySelector(`#${opener.getAttribute('aria-controls')!} [data-prep]`)).not.toBeNull();
+  // Bike care and Back: Trip is drawn again, the list still shown
+  await act(() => { render(null, host); });
+  await act(() => { render(<PrepBeside snap={snap(testTrip())} />, host); });
+  expect(host.querySelector('[data-prep]')).not.toBeNull();
+  await act(() => { host.querySelector<HTMLButtonElement>('button')!.click(); });
+  expect(host.querySelector('[data-prep]')).toBeNull();
+  await act(() => { render(null, host); });
+  await act(() => { render(<PrepBeside snap={snap(testTrip())} />, host); });
+  expect(host.querySelector('[data-prep]')).toBeNull();
+});
