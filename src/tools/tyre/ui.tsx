@@ -4,10 +4,10 @@ import { effect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { T, TM } from '../../core/wording/en-tyre.ts';
-import { TQ } from '../../core/wording/en-tyre-fields.ts';
 import { W, shortMapDate } from '../../core/wording/en.ts';
 import { TF } from '../../core/wording/en-tyre-labels.ts';
 import { TN } from '../../core/wording/en-tyre-notes.ts';
+import { TQ } from '../../core/wording/en-tyre-fields.ts';
 import { HN } from '../../core/wording/en-hint.ts';
 import { BackBar } from '../../ui/back-bar/back-bar.tsx';
 import { FitLine } from '../../ui/bike/fit-line.tsx';
@@ -32,9 +32,9 @@ import type { TyreServices } from './services.ts';
 import { TC } from '../../core/wording/en-tyre-calc.ts';
 
 const ASSUMED_WORDS: Record<FieldName, string> = {
-  riderKg: TF.tyreAssumedRider, bikeKg: TF.tyreAssumedBike, bars: TF.tyreAssumedBars, wheelBsdMm: W.tyreAssumedWheel, frontMm: TF.tyreAssumedFront,
-  rearMm: TF.tyreAssumedRear, casing: TF.tyreAssumedCasing, setup: W.tyreAssumedSetup, rimType: TN.tyreAssumedRimType, rimInnerMm: TF.tyreAssumedRim,
-  surface: W.tyreAssumedSurface, carriedKg: W.tyreAssumedNoLuggage,
+  riderKg: TF.tyreAssumedRider, bikeKg: TF.tyreAssumedBike, bars: TF.tyreAssumedBars, wheelBsdMm: TQ.tyreAssumedWheel, frontMm: TF.tyreAssumedFront,
+  rearMm: TF.tyreAssumedRear, casing: TF.tyreAssumedCasing, setup: TQ.tyreAssumedSetup, rimType: TN.tyreAssumedRimType, rimInnerMm: TF.tyreAssumedRim,
+  surface: TQ.tyreAssumedSurface, carriedKg: TQ.tyreAssumedNoLuggage,
 };
 
 const parseNumber = (text: string, signed = false): number | null => {
@@ -161,7 +161,7 @@ function LimitInput({ id, label, required, value, min, onCommit, onPending, need
         <input id={id} type="text" inputMode="decimal" autoComplete="off" value={text} aria-describedby={note ? `${id}-note` : undefined}
           onInput={(e) => { const t = (e.currentTarget as HTMLInputElement).value; setText(t); evaluate(t, unit, false); }} />
       </label>
-      <div class="tyre-options" role="group" aria-label={W.tyreUnitFor(label)}>
+      <div class="tyre-options" role="group" aria-label={TQ.tyreUnitFor(label)}>
         {(['bar', 'psi'] as const).map((u) => (
           <label key={u} class="tyre-option">
             <input type="radio" name={`${id}-unit`} checked={unit === u} onChange={() => { setUnit(u); evaluate(text, u, false); }} />
@@ -176,7 +176,7 @@ function LimitInput({ id, label, required, value, min, onCommit, onPending, need
             <span class="tyre-ask">
               {note.alt.unit === 'psi' ? (
                 <>
-                  <button type="button" class="btn btn-primary" onClick={() => { setUnit('psi'); evaluate(text, 'psi', false, true); }}>{W.tyreAskYesPsi(String(note.alt.value))}</button>
+                  <button type="button" class="btn btn-primary" onClick={() => { setUnit('psi'); evaluate(text, 'psi', false, true); }}>{TQ.tyreAskYesPsi(String(note.alt.value))}</button>
                   <button type="button" class="btn" onClick={() => evaluate(text, 'bar', true)}>{TQ.tyreAskNoBar}</button>
                 </>
               ) : (
@@ -367,7 +367,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
   const v = resolved.values;
   const own = (field: FieldName, value: number): number | undefined => (src[field] === 'assumed' ? undefined : value);
   const planDate = host.summary ? (shortMapDate(host.summary.at) ?? '') : '';
-  const planNote = W.tyreFromPlan(planDate);
+  const planNote = TQ.tyreFromPlan(planDate);
   const bikeKey = (name: string) => `tyre-${name}`;
   const changeHeat = (patch: NonNullable<Details['heat']>): void => {
     const heat = { ...details.heat, ...patch };
@@ -444,8 +444,8 @@ export function TyreScreen({ services }: { services: TyreServices }) {
         {showFigures && front && rear ? (
           <>
             <div class="tyre-wheels">
-              <WheelFigure label={W.tyreFront} w={front} />
-              <WheelFigure label={W.tyreRear} w={rear} />
+              <WheelFigure label={TQ.tyreFront} w={front} />
+              <WheelFigure label={TQ.tyreRear} w={rear} />
             </div>
             <p class="muted">{TN.tyreRoundedNote}</p>
           </>

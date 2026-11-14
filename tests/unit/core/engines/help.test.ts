@@ -449,7 +449,8 @@ describe('sweep of 14 Nov 2026', () => {
     const a = chip('pharmacy', { moment: riding(100), spots: [{ b: clinic, km: 100.6, off: 68 }, { b: general, km: 103 }] });
     const c = itemAt(a, 100.6);
     expect(c.detail).not.toContain('emergency department mapped');
-    expect(c.detail).toContain('specialist clinic: psychiatry · emergency department not known');
+    // Its emergency=yes is said as mapped, with the limit plainly: never "not known", never an emergency department (review of #140, I2).
+    expect(c.detail).toContain('specialist clinic: psychiatry · emergency mapped, maybe not for every case · check before going');
     expect(c.status).toBe('unknown');
     // The general hospital with a department comes first, and keeps its line.
     expect(a.items.map((i) => i.stamp?.km)).toEqual([103, 100.6]);
@@ -463,11 +464,38 @@ describe('sweep of 14 Nov 2026', () => {
     expect(W.weatherStampAhead('0')).toBe('here');
     expect(W.weatherStampAhead('0.1')).toBe('+0.1 km');
   });
-  test('[EM-PHARMACY] several specialities are listed in words; a general one stays a hospital (finding 15)', () => {
-    const many = hospital({ name: 'Klinik', tags: { 'healthcare:speciality': 'anaesthetics;plastic_surgery' } });
-    const general = hospital({ name: 'Allgemein', tags: { 'healthcare:speciality': 'general;surgery' } });
-    const a = chip('pharmacy', { moment: riding(100), spots: [{ b: many, km: 104 }, { b: general, km: 96 }] });
-    expect(itemAt(a, 104).detail).toContain('specialist clinic: anaesthetics, plastic surgery');
-    expect(itemAt(a, 96).detail).toContain('emergency department mapped');
+  test('[EM-PHARMACY] a hospital with an emergency department is never demoted: an accident hospital or a Klinikum mapped with specialities stays one, first (review of #140, I2)', () => {
+    const trauma = hospital({ name: 'Unfallklinik', tags: { healthcare: 'hospital', 'healthcare:speciality': 'trauma;orthopaedics;surgery' } });
+    const klinikum = hospital({ name: 'Klinikum', tags: { 'healthcare:speciality': 'internal;surgery;gynaecology' } });
+    const clinic = hospital({ name: 'Kinder- & Jugendpsychiatrie Heidelberg', tags: { healthcare: 'doctor', 'healthcare:speciality': 'psychiatry' } });
+    const a = chip('pharmacy', { moment: riding(100), spots: [{ b: clinic, km: 100.6, off: 68 }, { b: trauma, km: 104 }, { b: klinikum, km: 96 }] });
+    for (const km of [104, 96]) {
+      expect(itemAt(a, km).detail).toContain('emergency department mapped');
+      expect(itemAt(a, km).detail).not.toContain('specialist');
+      expect(itemAt(a, km).status).toBe('fine');
+    }
+    expect(a.items[0]!.stamp?.km).toBe(104);
+    // A speciality that only contains a non-acute word's letters is no specialist clinic.
+    const ae = hospital({ name: 'Notaufnahme', tags: { 'healthcare:speciality': 'accident_and_emergency' } });
+    expect(itemAt(chip('pharmacy', { moment: riding(100), spots: [{ b: ae, km: 103 }] }), 103).detail).toContain('emergency department mapped');
+  });
+  test('[EM-PHARMACY] only a single non-acute speciality, or a place not mapped as a hospital, is a specialist clinic (review of #140, I2)', () => {
+    // OSM relation 4505865: healthcare=hospital, healthcare:speciality=psychiatry, emergency=yes.
+    const psychiatry = hospital({ name: 'Klinik für Allgemeine Psychiatrie', tags: { healthcare: 'hospital', 'healthcare:speciality': 'psychiatry' } });
+    const practice = { atKm: (km: Km, o = {}) => ({ ...hospital({ name: 'Praxisklinik' }).atKm(km, o), tags: { amenity: 'hospital', healthcare: 'clinic' } }) };
+    const a = chip('pharmacy', { moment: riding(100), spots: [{ b: psychiatry, km: 104 }, { b: practice, km: 96 }] });
+    expect(itemAt(a, 104).detail).toContain('specialist clinic: psychiatry · emergency mapped, maybe not for every case · check before going');
+    expect(itemAt(a, 104).status).toBe('unknown');
+    expect(itemAt(a, 96).detail).toContain('not mapped as a hospital · emergency department not known');
+    expect(itemAt(a, 96).status).toBe('unknown');
+  });
+  test('[EM-PHARMACY] a hospital mapped access=private or no stays listed, its department said, with "check before going"; a private pharmacy or halt does not (review of #140, I3)', () => {
+    const closed = hospital({ name: 'Bundeswehrkrankenhaus', tags: { healthcare: 'hospital', access: 'private' } });
+    const a = chip('pharmacy', { moment: riding(100), spots: [{ b: closed, km: 104 }, { b: pharmacy(null, { name: 'Intern', tags: { access: 'private' } }), km: 102 }] });
+    expect(a.items.map((i) => i.stamp?.km)).toEqual([104]);
+    expect(itemAt(a, 104).detail).toContain('emergency department mapped · access: private · check before going');
+    expect(itemAt(a, 104).status).toBe('unknown');
+    const t = chip('train', { moment: riding(100), spots: [{ b: station({ name: 'Werk', tags: { access: 'no' } }), km: 102 }] });
+    expect(t.items).toEqual([]);
   });
 });

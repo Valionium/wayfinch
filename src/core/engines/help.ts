@@ -51,19 +51,30 @@ const repairLine = (p: Place): string => {
 };
 const valveLine = (p: Place): string => (p.tags['valves'] ? W.helpValves(p.tags['valves']) : W.helpValvesNotMapped);
 /**
- * A hospital mapped with only specialities other than general care (healthcare:speciality=psychiatry, say) is a specialist
- * clinic: its emergency=yes may be for that speciality alone, so it is never offered as an emergency department.
+ * A specialist clinic: mapped as other care than a hospital (healthcare=doctor or clinic; OSM way 155203932, a child psychiatry), or
+ * with non-acute specialities only. Its emergency=yes may be for that care alone, so it is never offered as an emergency department.
+ * A hospital mapped with acute specialities (trauma;surgery, say) stays one: a real emergency department is never demoted (review
+ * of #140, I2).
  */
-const GENERAL_CARE = ['general', 'emergency'];
-const specialities = (p: Place): string[] | null => {
-  const list = (p.tags['healthcare:speciality'] ?? '').split(';').map((x) => x.trim().toLowerCase()).filter(Boolean);
-  return list.length > 0 && !list.some((x) => GENERAL_CARE.includes(x)) ? list : null;
+// psychiatry, child_psychiatry, psychotherapy, psychosomatics, rehabilitation, palliative, dentistry.
+const NON_ACUTE = /^(child_)?psych|^rehab|^palliat|^dent/;
+const specialityList = (p: Place): string[] => (p.tags['healthcare:speciality'] ?? '').toLowerCase().split(';').map((x) => x.trim()).filter(Boolean);
+const specialist = (p: Place): boolean => {
+  const care = p.tags['healthcare']?.trim().toLowerCase();
+  const list = specialityList(p);
+  return (!!care && care !== 'hospital') || (list.length > 0 && list.every((x) => NON_ACUTE.test(x)));
 };
-const departmentYes = (p: Place): boolean => p.tags['emergency'] === 'yes' && specialities(p) === null;
+const mappedYes = (p: Place): boolean => p.tags['emergency'] === 'yes';
+const departmentYes = (p: Place): boolean => mappedYes(p) && !specialist(p);
+/** A hospital mapped access=private or no stays listed, said plainly: in OSM that is often only who runs it (review of #140, I3). */
 const hospitalLines = (p: Place): string[] => {
-  const special = specialities(p);
-  if (special) return [W.helpSpecialist(special.map((x) => x.replace(/_/g, ' ')).join(', ')), W.helpEmergencyUnknown];
-  return [departmentYes(p) ? W.helpEmergencyDepartment : W.helpEmergencyUnknown];
+  const list = specialityList(p);
+  const lines = specialist(p)
+    ? [list.length > 0 ? W.helpSpecialist(list.join(', ').replace(/_/g, ' ')) : W.helpNotHospital, mappedYes(p) ? W.helpEmergencyLimited : W.helpEmergencyUnknown]
+    : [departmentYes(p) ? W.helpEmergencyDepartment : W.helpEmergencyUnknown];
+  const access = p.tags['access'];
+  const closed = closedAccess(access);
+  return [...lines, ...(closed ? [W.helpAccess(access!)] : []), ...(closed || (mappedYes(p) && specialist(p)) ? [W.helpCheckFirst] : [])];
 };
 
 const toiletsAccess = (p: Place): string | undefined => (p.kind === 'toilets' ? p.tags['access'] : p.tags['toilets:access'] ?? p.tags['access']);
@@ -88,7 +99,7 @@ const GROUPS: Record<HelpKind, Group[]> = {
     {
       what: W.helpWordHospital, counts: (p) => p.kind === 'hospital' && p.tags['emergency'] !== 'no', preferred: departmentYes,
       lines: hospitalLines,
-      status: (p) => (departmentYes(p) ? 'fine' : 'unknown'),
+      status: (p) => (departmentYes(p) && !closedAccess(p.tags['access']) ? 'fine' : 'unknown'),
     },
   ],
   train: [
@@ -213,7 +224,7 @@ export function helpChip(kind: HelpKind, f: HelpFacts): Answer {
     for (const m of f.matches) {
       const place = places.get(m.placeId);
       // A place mapped access=private or no is no help to a passing rider (a private funicular halt, finding 14 of 14 Nov 2026).
-      if (!place || !g.counts(place) || closedAccess(place.tags['access'])) continue;
+      if (!place || !g.counts(place) || (closedAccess(place.tags['access']) && place.kind !== 'hospital')) continue;
       // Written so that a broken kilometre or distance fails.
       const onRoute = m.km >= 0 && m.km <= lengthKm;
       if (onRoute && m.offRouteM >= 0 && m.offRouteM <= radiusKmFor(place) * 1000) passes.push({ place, match: m });
@@ -243,7 +254,7 @@ export function helpChip(kind: HelpKind, f: HelpFacts): Answer {
   const first = [...firsts].sort((a, b) => a.reach - b.reach || compareFinal(a.pass.place, b.pass.place))[0];
   const firstPlace = first?.pass.place;
   const title = first && firstPlace
-    ? hasName(firstPlace) ? W.helpNearest(wordOf(firstPlace), firstPlace.name, showKm(first.pass.match.km)) : W.helpNearestUnnamed(wordOf(firstPlace), showKm(first.pass.match.km))
+    ? W.helpNearest(wordOf(firstPlace), hasName(firstPlace) ? firstPlace.name : W.helpNoName, showKm(first.pass.match.km))
     : !saved && rows.length === 0 ? W.helpNoPlaceData : W.helpNone(group.what);
   const detail = [
     ...(isTrain ? [`${W.helpStationOnly}.`] : []),

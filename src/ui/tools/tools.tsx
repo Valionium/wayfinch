@@ -5,6 +5,7 @@ import { CL } from '../../core/wording/en-care-link.ts';
 import { GA } from '../../core/wording/en-advisor.ts';
 import { HN } from '../../core/wording/en-hint.ts';
 import { W } from '../../core/wording/en.ts';
+import { TK } from '../../core/wording/en-tyre-card.ts';
 import { savedBikeIds, toolBike } from '../../tools/tyre/choice.ts';
 import { TL } from '../../core/wording/en-tools.ts';
 import { readStore } from '../../tools/tyre/storage.ts';
@@ -69,10 +70,10 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
         <p class="bike-line" data-hint-line><span>{W.tyreBikeLabel}: {HN.hintToolsTypical} · <a href={bikeDetailsHref('new', 'tools')}>{HN.hintToolsAdd}</a></span></p>
       )} />
       <BagCard services={services} chosen={chosen} note={chosen === null ? TL.toolsNoBike : undefined} />
-      <Card title={W.tyreCardTitle}>
-        <p class="tool-line">{last ? W.tyreCardLast(trimBar(last.frontBar), trimBar(last.rearBar)) : W.tyreCardNone}</p>
-        {last?.bike ? <p class="muted">{W.tyreCardBike(last.bike)}</p> : null}
-        <a class="btn btn-primary" href="#/tools/tyre">{W.tyreCardOpen}<span class="visually-hidden"> {W.tyreCardTitle}</span></a>
+      <Card title={TK.tyreCardTitle}>
+        <p class="tool-line">{last ? TK.tyreCardLast(trimBar(last.frontBar), trimBar(last.rearBar)) : W.tyreCardNone}</p>
+        {last?.bike ? <p class="muted">{TK.tyreCardBike(last.bike)}</p> : null}
+        <a class="btn btn-primary" href="#/tools/tyre">{W.tyreCardOpen}<span class="visually-hidden"> {TK.tyreCardTitle}</span></a>
       </Card>
       <Card title={CL.careCardTitle}>
         <p class="muted">{CL.careCardBody}</p>

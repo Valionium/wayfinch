@@ -404,7 +404,7 @@ export const W = {
 
   // ---- The help chips (section 6.9). ----
   helpNearest: (what: string, name: string, km: string): string => `Nearest ${what}: ${name}, km ${km}`,
-  helpNearestUnnamed: (what: string, km: string): string => `Nearest ${what}: no name mapped, km ${km}`,
+  helpNoName: 'no name mapped',
   helpUnnamed: (what: string): string => `Unnamed ${what}`,
   helpNone: (what: string): string => `No ${what} mapped near your route`,
   helpNoneAhead: (what: string): string => `No ${what} mapped ahead.`,
@@ -429,6 +429,9 @@ export const W = {
   helpEmergencyDepartment: 'emergency department mapped',
   helpEmergencyUnknown: 'emergency department not known',
   helpSpecialist: (what: string): string => `specialist clinic: ${what}`,
+  helpNotHospital: 'not mapped as a hospital',
+  helpEmergencyLimited: 'emergency mapped, maybe not for every case',
+  helpCheckFirst: 'check before going',
   helpStationOnly: 'Station only — train times and bike carriage not checked',
   helpSunset: (hm: string): string => `sunset ${hm}`,
   helpBeforeSunrise: (hm: string): string => `before sunrise (${hm})`,
@@ -600,10 +603,7 @@ export const W = {
   appStorageBlocked: "This browser is not keeping Wayfinch's data. The app works for this visit only. Export what you need before you close it.",
   appNoSignalNoTrip: "No signal, and this trip is not prepared. Distance, climbing and daylight come from the route. Places and weather need a connection: prepare the trip while you are online.",
   // Tyre pressure (spec section 7.2): the calculation's words. Warnings are never silent changes.
-  tyreFront: 'Front',
-  tyreRear: 'Rear',
   tyreDidYouMean: (value: string): string => `Did you mean ${value} psi?`,
-  tyreCardBike: (name: string): string => `For ${name}`,
   // Tyre pressure: the screen and the Tools cards.
   tyreTitle: 'Tyre pressure',
   tyreBikeLabel: 'Bike',
@@ -613,10 +613,6 @@ export const W = {
   tyreFrontBackBar: (value: string): string => `${value} bar`,
   tyrePsiValue: (value: string): string => `${value} psi`,
   tyreAssumedList: (list: string): string => `Not set yet, so assumed: ${list}. Set them for a better figure.`,
-  tyreAssumedNoLuggage: 'no luggage',
-  tyreAssumedWheel: '700C wheels',
-  tyreAssumedSetup: 'inner tubes',
-  tyreAssumedSurface: 'paved road',
   tyreHeadingWhy: 'What decided these numbers',
   tyreIncompatibleTitle: 'No figure: these parts do not fit together',
   tyreSectionRider: 'Rider and load',
@@ -627,8 +623,6 @@ export const W = {
   tyreLimitMaxLabel: 'Tyre maximum (printed on the tyre)',
   tyreLimitMinLabel: 'Tyre minimum (optional)',
   tyreLimitRimLabel: 'Rim maximum (optional)',
-  tyreUnitFor: (label: string): string => `Unit for ${label}`,
-  tyreAskYesPsi: (value: string): string => `Yes, ${value} psi`,
   tyreRiderLabel: 'Rider weight (kg)',
   tyreBikeKgLabel: 'Bike weight (kg)',
   tyreLoadLabel: 'Load carried (kg)',
@@ -638,12 +632,9 @@ export const W = {
   tyreSetupLabel: 'Inner tubes or tubeless',
   tyreWheelLabel: 'Wheel size',
   tyreFromBike: 'from your bike',
-  tyreFromPlan: (date: string): string => `from your bag plan, saved ${date}`,
   tyreChange: 'Change',
   tyreBackToBike: "Back to your bike's value",
-  tyreCardTitle: 'Tyre pressure',
   tyreCardNone: 'Not worked out yet',
-  tyreCardLast: (front: string, rear: string): string => `front ${front} · rear ${rear} bar`,
   tyreCardOpen: 'Open',
   tyreBagCardTitle: 'Bag planner',
   tyreBagCardNone: 'No bag plan yet',
@@ -662,8 +653,6 @@ export const W = {
   tyreMeasuredRearLabel: 'Rear wheel load (kg)',
   tyreCaliperFrontLabel: 'Front tyre width, calipered (mm)',
   tyreSramNothingSent: 'Nothing is filled in or sent for you.',
-  tyreSramWidthBoth: (mm: string): string => `${mm} mm`,
-  tyreSramWidthEach: (front: string, rear: string): string => `${front} mm front, ${rear} mm rear`,
 
   // ---- The store (sub-project 5): why a value or a write was refused ----
   appStoreFlatKphRange: 'Flat speed goes from 15 to 40 km/h.',
@@ -682,10 +671,7 @@ export const W = {
   appStoreChangedElsewhere: 'This was changed in another window. Showing the newer data.',
   appStoreImportNotOurs: 'This is not a Wayfinch export file. Nothing was changed.',
   appStoreImportNewer: 'This file comes from a newer version of Wayfinch. Update the app, then try again. Nothing was changed.',
-  appStoreImportTrip: "The trip in this file can't be read. Nothing was changed.",
   appStoreImportProfile: "The rider details in this file can't be read. Nothing was changed.",
-  appStoreImportSettings: "The settings in this file can't be read. Nothing was changed.",
-  appStoreImportCalibration: "The water learning in this file can't be read. Nothing was changed.",
   // Refresh this stretch (sub-project 5, group 4).
   appStretchNotice: "This sends the outline of this stretch to the Overpass service, a public OpenStreetMap service. Nothing else about you or your ride goes with it.",
   appStretchSaved: (from: string, to: string, places: number): string => `Km ${from}–${to} refreshed: ${places} ${places === 1 ? 'place' : 'places'} from OpenStreetMap.`,
@@ -704,7 +690,6 @@ export const W = {
   appStoreRideLong: 'A ride over 16 hours is not taken in. Check the hours.',
   appStoreRideIntake: 'What you drank goes from 0 to 20 L.',
   appStoreRideWeighing: 'Check the weighing: weight change within 10 kg, toilet stops from 0 to 30.',
-  appStoreImportTyres: "The tyre details in this file can't be read. Nothing was changed.",
 
   // ---- Prepare this route (sub-project 5): each step's note ----
   appPrepHeightsNotice: 'To work out the climbing, sampled points of this route go to the Open-Meteo elevation service, rounded to about 100 m.',
@@ -720,7 +705,6 @@ export const W = {
   appPrepZonesMissing: "The country borders couldn't be read, so this route's time zones and holidays are unknown.",
   appPrepHoursFailed: "Opening hours couldn't be worked out.",
   appPrepWeatherFailed: "The weather service didn't answer, so no forecast was saved.",
-  appPrepWait: (at: string): string => `The weather service asks for a minute's pause. Asking again at about ${at}; you can leave this screen meanwhile.`,
   appPrepNoPlaceData: (kms: string): string => `No place data for km ${kms}: outside the covered countries, or not saved. Refresh this stretch can fetch it.`,
   appPrepNewDataUnfinished: 'Newer map data could not all be fetched, so the earlier map data is kept. Prepare this route picks up where it stopped.',
   appPrepNewDataDropped: 'Newer map data could not be fetched in three tries, so it was given up and the earlier map data is kept.',

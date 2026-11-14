@@ -140,7 +140,6 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   routeStripKm: [['40']],
   routeStripEndText: [['40 km','about 16:35']],
   helpNearest: [['bike shop','Velo','78']],
-  helpNearestUnnamed: [['halt','0']],
   helpUnnamed: [['halt']],
   helpSpecialist: [['psychiatry']],
   helpFromNow: [['00:25']],

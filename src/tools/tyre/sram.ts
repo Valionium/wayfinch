@@ -1,7 +1,6 @@
 // The cross-check with SRAM (spec section 7.2): a link, and the list of exactly what to type there. Nothing is prefilled or sent, and no
 // SRAM formula is here: this only reads the screen's own values back to the rider.
 import { TQ } from '../../core/wording/en-tyre-fields.ts';
-import { W } from '../../core/wording/en.ts';
 import { TS } from '../../core/wording/en-tyre.ts';
 import type { Values } from './model.ts';
 import { WHEELS } from './tables.ts';
@@ -22,7 +21,7 @@ export function sramList(v: Values): { label: string; value: string }[] {
     { label: TS.tyreSramGear, value: kg(gear) },
     {
       label: TS.tyreSramWidth,
-      value: v.front.printedMm === v.rear.printedMm ? W.tyreSramWidthBoth(mm(v.front.printedMm)) : W.tyreSramWidthEach(mm(v.front.printedMm), mm(v.rear.printedMm)),
+      value: v.front.printedMm === v.rear.printedMm ? TQ.tyreSramWidthBoth(mm(v.front.printedMm)) : TQ.tyreSramWidthEach(mm(v.front.printedMm), mm(v.rear.printedMm)),
     },
     { label: TS.tyreSramCasing, value: casing },
     { label: TS.tyreSramWheel, value: WHEELS.find((w) => w.bsdMm === v.wheelBsdMm)?.label ?? '' },
