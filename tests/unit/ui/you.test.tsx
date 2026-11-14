@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import full from '../../../contracts/load-summary/full.json';
 import sample from '../../../contracts/bike-library/sample.json';
 import { W } from '../../../src/core/wording/en.ts';
+import { IR } from '../../../src/core/wording/en-import-refuse.ts';
 import { Y } from '../../../src/core/wording/en-you.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
 import { closeDb, openDb } from '../../../src/store/db.ts';
@@ -451,12 +452,12 @@ describe('Export and import (spec sections 3.5 and 4.4)', () => {
       return text();
     };
     await attempt('this is not json', Y.youImportUnreadable);
-    await attempt(JSON.stringify({ hello: 'world' }), W.appStoreImportNotOurs);
-    await attempt(JSON.stringify({ app: 'copilot', kind: 'export', v: 2 }), W.appStoreImportNewer);
+    await attempt(JSON.stringify({ hello: 'world' }), IR.appStoreImportNotOurs);
+    await attempt(JSON.stringify({ app: 'copilot', kind: 'export', v: 2 }), IR.appStoreImportNewer);
     // Right shape, damaged inside: the preview offers it, the store refuses it whole.
     const good = JSON.parse((await (async () => { saved.length = 0; await click(button(Y.youExport)); await until(() => saved.length === 1, 'the file'); return saved[0]!.text; })())) as { profile: Record<string, unknown> };
     good.profile.weightKg = 'heavy';
-    await attempt(JSON.stringify(good), W.appStoreImportProfile);
+    await attempt(JSON.stringify(good), IR.appStoreImportProfile);
     expect(JSON.stringify([await readProfile(), await readSettings(), await readTrip()])).toBe(before);
   });
 });
