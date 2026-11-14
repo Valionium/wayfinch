@@ -33,4 +33,6 @@ export const TR = {
   appTripReplaceTitle: 'Replace your route?',
   appAbChange: 'Change',
   appTripOsmSearch: 'Place names: ',
+  appTripFileFailed: 'That file could not be read. Nothing was changed.',
+  appTripUnchanged: 'Your current route is unchanged.',
 };

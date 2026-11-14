@@ -123,7 +123,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     const before = (await readTrip())!.route.id;
     await pick('this is not a GPX file');
     await until(() => text().includes(W.routeGpxUnreadable), 'the refusal');
-    expect(text()).toContain(W.appTripUnchanged);
+    expect(text()).toContain(TR.appTripUnchanged);
     await pick('x'.repeat(21 * 1024 * 1024));
     await until(() => text().includes(W.routeGpxTooLarge), 'the size refusal');
     expect(text()).not.toContain(W.routeGpxUnreadable);
@@ -137,7 +137,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     const broken = { name: 'a.gpx', size: 10, text: () => Promise.reject(new Error('boom')) };
     Object.defineProperty(input, 'files', { value: [broken], configurable: true });
     await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })); });
-    await until(() => text().includes(W.appTripFileFailed), 'the refusal');
+    await until(() => text().includes(TR.appTripFileFailed), 'the refusal');
     expect(await readTrip()).toBeNull();
   });
 
@@ -861,7 +861,7 @@ describe('Messages that must not be lost', () => {
     await until(() => host.querySelector('[data-replace]') !== null, 'the question');
     await click(button(W.appTripReplaceYes));
     await until(() => text().includes(W.appTripReplacedNoDate('Fixture: Altdorf over the Gotthard to Bellinzona')), 'the sentence');
-    expect(text()).not.toContain(W.appTripUnchanged);
+    expect(text()).not.toContain(TR.appTripUnchanged);
   });
 });
 
