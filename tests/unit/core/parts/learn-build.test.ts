@@ -5,8 +5,8 @@ import { expect, test } from 'vitest';
 import { bikeArt } from '../../../../src/core/bike/art.ts';
 import { paintedArt } from '../../../../src/core/bike/paint.ts';
 import { resolveBikeSpec } from '../../../../src/core/bike/spec.ts';
-import { classStep, extrasMarkup, KINDS, kindBike, partsOf, stageMarkup, stepLine, stepOf, stepParts, STEPS, stepsOf } from '../../../../src/core/parts/learn.ts';
-import type { LearnBike } from '../../../../src/core/parts/learn.ts';
+import { classStep, extrasMarkup, KINDS, kindBike, ownBike, partsOf, stageMarkup, stepLine, stepOf, stepParts, STEPS, stepsOf } from '../../../../src/core/parts/learn.ts';
+import type { LearnBike, LearnId } from '../../../../src/core/parts/learn.ts';
 import { STEP_LINES, STEP_NAMES, LN } from '../../../../src/core/wording/en-learn.ts';
 import { bannedHits } from '../../../fixtures/banned.ts';
 import { elements, setBike, SIZES, STYLES } from '../bike/drawing-set.ts';
@@ -55,6 +55,50 @@ test('[BL-STEPS] each step says in one short line how its parts attach, as this 
     expect(bannedHits(t), t).toEqual([]);
     expect(t.split(/(?<=\.)\s/).length, t).toBeLessThanOrEqual(1);
   }
+});
+
+/** The words of a step's line that name a part, and the part each names. */
+const NAMED: readonly (readonly [RegExp, LearnId])[] = [
+  [/\bframe\b/, 'frame'], [/head tube/, 'head-tube'], [/headset/, 'headset'], [/suspension fork/, 'stanchions'], [/\bfork\b/, 'fork'],
+  [/dropouts/, 'dropouts'], [/\bhubs?\b(?! gears)/, 'hub'], [/thru-axle/, 'thru-axle'], [/quick release/, 'wheel-qr'], [/\brim\b/, 'rim'],
+  [/bottom bracket/, 'bottom-bracket'], [/\bcranks?\b/, 'crank'], [/chainrings?/, 'chainring'], [/\bchain\b/, 'chain'], [/\bbelt\b/, 'belt'],
+  [/rear gears/, 'cassette'], [/\bderailleur\b/, 'derailleur'], [/each end|front derailleur/, 'front-derailleur'], [/hanger/, 'hanger'],
+  [/hub gears/, 'hub-gears'], [/caliper/, 'caliper'], [/\bdiscs?\b/, 'disc'], [/rim brake/, 'rim-brake'], [/\blevers?\b/, 'brake-lever'],
+  [/\bhose\b|\bcable\b/, 'brake-cable'], [/\bstem\b/, 'stem'], [/\bbar\b/, 'handlebar'], [/\btape\b/, 'bar-tape'], [/\bgrips\b/, 'grips'],
+  [/shifters?/, 'shifter'], [/seatpost|\bpost\b/, 'seatpost'], [/seat tube/, 'seat-tube'], [/seat clamp/, 'seat-clamp'], [/saddle/, 'saddle'],
+  [/motor/, 'motor'], [/battery/, 'battery'], [/display/, 'display'], [/down tube/, 'down-tube'],
+];
+
+function* ownBikes(): Generator<{ name: string; bike: LearnBike }> {
+  for (const style of ['diamond-sloping', 'step-through', 'full-suspension']) for (const tyre of ['28-622', '40-622', '60-622', '100-559']) {
+    for (const brakes of ['unknown', 'hydraulic-disc', 'cable-disc', 'rim', 'other']) for (const drive of ['unknown', 'derailleur', 'chain-hub', 'belt']) {
+      for (const axle of [undefined, 'thru', 'qr', 'nuts']) for (const [bars, ebike, motor, shifting] of [['drop', false, undefined, 'cable'], ['flat', true, 'cranks', 'electronic'], ['other', true, 'rear-hub', 'cable']] as const) {
+        const r = setBike(style, 'M', bars, ebike, [tyre, tyre], null, { brakes, drive, shifting, ...(axle ? { axle } : {}) });
+        if (motor) r.look = { ...r.look!, motor };
+        yield { name: `${style} ${tyre} ${brakes} ${drive} ${axle} ${bars}${ebike ? ` e-bike ${motor}` : ''} ${shifting}`, bike: ownBike(resolveBikeSpec(r, null), r) };
+      }
+    }
+  }
+  for (const kind of KINDS) yield { name: kind, bike: kindBike(kind) };
+}
+
+test('[BL-STEPS] on every bike, by type, drive, brakes, axle, bars and motor, each step\'s line names only parts that bike has, and its brakes are a step', () => {
+  let checked = 0;
+  for (const { name, bike } of ownBikes()) {
+    const parts = partsOf(bike);
+    const steps = stepsOf(bike);
+    expect(steps, name).toContain('brakes');
+    for (const s of steps) {
+      const line = STEP_LINES[stepLine(bike, s)].toLowerCase();
+      for (const [re, id] of NAMED) if (re.test(line)) expect(parts, `${name}, ${s}: "${line}" names ${id}`).toContain(id);
+      checked += 1;
+    }
+  }
+  expect(checked).toBeGreaterThan(10_000);
+  // the wheels as they are held: hub gears' rear wheel on nuts, a quick release in front of a city bike
+  expect(STEP_LINES[stepLine(kindBike('city'), 'wheels')]).toMatch(/nuts/);
+  expect(STEP_LINES[stepLine(kindBike('city'), 'wheels')]).toMatch(/quick release/);
+  expect(STEP_LINES[stepLine(kindBike('gravel'), 'wheels')]).not.toMatch(/nuts/);
 });
 
 const classesOf = (svg: string): string[] => elements(svg).flatMap((e) => (e.attrs.class ?? '').split(' ').filter((c) => c.startsWith('bk-')));

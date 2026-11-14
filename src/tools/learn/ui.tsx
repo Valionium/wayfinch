@@ -103,11 +103,15 @@ export function LearnScreen({ services }: { services: TyreServices }) {
   const step = steps[i]!;
   const inStep = stepParts(bike, step);
   const last = i === steps.length - 1;
+  // Back turns itself off on the first step: the focus then goes to Next, never to the page (review of PR 128, I5).
+  const backBtn = useRef<HTMLButtonElement>(null);
+  const nextBtn = useRef<HTMLButtonElement>(null);
   const turn = (to: number): void => {
     const n = (to + steps.length) % steps.length;
     setAt(n);
     setPicked(null);
     setSaid(`${LN.step(n + 1, steps.length, STEP_NAMES[steps[n]!])}. ${STEP_LINES[stepLine(bike, steps[n]!)]}`);
+    if (n === 0 && document.activeElement === backBtn.current) nextBtn.current?.focus();
   };
   const onKey = (e: KeyboardEvent): void => {
     if (!build || (e.target as Element | null)?.closest?.('select, input')) return;
@@ -158,8 +162,8 @@ export function LearnScreen({ services }: { services: TyreServices }) {
                 ))}
               </ul>
               <div class="bl-steps">
-                <button type="button" class="btn bl-back" disabled={i === 0} onClick={() => turn(i - 1)}>{LN.back}</button>
-                <button type="button" class="btn btn-primary bl-next" onClick={() => turn(last ? 0 : i + 1)}>{last ? LN.again : LN.next}</button>
+                <button type="button" ref={backBtn} class="btn bl-back" disabled={i === 0} onClick={() => turn(i - 1)}>{LN.back}</button>
+                <button type="button" ref={nextBtn} class="btn btn-primary bl-next" onClick={() => turn(last ? 0 : i + 1)}>{last ? LN.again : LN.next}</button>
               </div>
             </section>
           ) : null}

@@ -193,16 +193,24 @@ export const stepParts = (bike: LearnBike, step: LearnStep): LearnId[] =>
   partsOf(bike).filter((id) => stepOf(id) === step && !BUILD_SKIP.includes(id));
 
 /** Which line says how a step's parts attach: some steps have one for each kind of bike. */
-export type StepLine = 'frame' | 'fork' | 'fork-suspension' | 'wheels-thru' | 'wheels-qr' | 'drive-derailleur' | 'drive-two' | 'drive-hub'
-  | 'drive-belt' | 'brakes-disc' | 'brakes-rim' | 'cockpit-drop' | 'cockpit-flat' | 'saddle' | 'ebike-cranks' | 'ebike-hub';
+export type StepLine = 'frame' | 'fork' | 'fork-suspension' | 'wheels-thru' | 'wheels-qr' | 'wheels-nuts' | 'wheels-thru-nuts' | 'wheels-qr-nuts'
+  | 'drive-derailleur' | 'drive-two' | 'drive-hub' | 'drive-belt' | 'drive-chain' | 'brakes-disc' | 'brakes-rim'
+  | 'cockpit-drop' | 'cockpit-flat' | 'cockpit-drop-plain' | 'cockpit-flat-plain' | 'saddle' | 'ebike-cranks' | 'ebike-hub';
 export function stepLine(bike: LearnBike, step: LearnStep): StepLine {
   const s = bike.spec;
   switch (step) {
     case 'fork': return s.fork.value === 'suspension' ? 'fork-suspension' : 'fork';
-    case 'wheels': return s.brakes.value === 'disc' ? 'wheels-thru' : 'wheels-qr';
-    case 'drive': return s.drive.value === 'belt' ? 'drive-belt' : s.drive.value === 'hub' ? 'drive-hub' : hasPart(bike, 'front-derailleur') ? 'drive-two' : 'drive-derailleur';
+    case 'wheels': {
+      // as the wheels are held: hub gears keep the rear wheel on nuts unless the rider said otherwise (review of PR 128, I4)
+      const axle = axleOf(bike);
+      if (axle === 'nuts') return 'wheels-nuts';
+      if (bike.rearNuts) return axle === 'thru' ? 'wheels-thru-nuts' : 'wheels-qr-nuts';
+      return axle === 'thru' ? 'wheels-thru' : 'wheels-qr';
+    }
+    case 'drive': return s.drive.value === 'belt' ? 'drive-belt' : s.drive.value === 'hub' ? 'drive-hub' : s.drive.value === 'chain' ? 'drive-chain'
+      : hasPart(bike, 'front-derailleur') ? 'drive-two' : 'drive-derailleur';
     case 'brakes': return s.brakes.value === 'rim' ? 'brakes-rim' : 'brakes-disc';
-    case 'cockpit': return s.bars.value === 'drop' ? 'cockpit-drop' : 'cockpit-flat';
+    case 'cockpit': return (s.bars.value === 'drop' ? 'cockpit-drop' : 'cockpit-flat') + (hasPart(bike, 'shifter') ? '' : '-plain') as StepLine;
     case 'ebike': return s.motor.value === 'cranks' ? 'ebike-cranks' : 'ebike-hub';
     default: return step;
   }

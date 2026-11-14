@@ -108,3 +108,23 @@ test('[BL-BUILD-PHONE] Build-up at 320 px and in this project\'s size and theme:
   const results = await new AxeBuilder({ page }).include('.bl').analyze();
   expect(results.violations.map((v) => v.id)).toEqual([]);
 });
+
+test('[BL-FOCUS] Back that reaches the first step, by a press or the arrow key, hands the focus to Next, never to the page', async ({ page }) => {
+  await openBuild(page);
+  const back = page.getByRole('button', { name: 'Back' });
+  const next = page.getByRole('button', { name: 'Next' });
+  await next.click();
+  await next.click();
+  await back.focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await expect(step(page)).toHaveText('Step 1 of 7: Frame');
+  await expect(back).toBeDisabled();
+  await expect(next).toBeFocused();
+  await next.click();
+  await back.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(step(page)).toHaveText('Step 1 of 7: Frame');
+  await expect(next).toBeFocused();
+  expect(await page.evaluate(() => document.activeElement !== document.body && document.activeElement !== null)).toBe(true);
+});
