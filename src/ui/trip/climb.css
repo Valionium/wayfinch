@@ -1,5 +1,0 @@
-/* Climb check on Trip (CC-TRIP): one button under the days; the list is its own chunk. */
-.climb-list { list-style: none; margin: 8px 0; padding: 0; }
-.climb-list li { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
-.climb-list li:first-child { border-top: 0; }
-.climb-walk { font-weight: 600; }

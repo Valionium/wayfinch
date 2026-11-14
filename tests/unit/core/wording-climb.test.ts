@@ -37,7 +37,8 @@ test('[CC-HONEST] times and figures say they are estimates; no gear and no healt
 test('[CC-LIST] where, figures and the count of the rest read plainly', () => {
   expect(CC.appClimbWhere(2, '54.3', '61')).toBe('Day 2 · km 54.3 to 61');
   expect(CC.appClimbWhere(null, '54.3', '61')).toBe('km 54.3 to 61');
-  expect(CC.appClimbFigures('6.7', '420', '6.3', '9.8')).toBe('6.7 km · 420 m up · average 6.3% · steepest 500 m 9.8%');
+  expect(CC.appClimbFigures('6.7', 418, '6.3', '9.8')).toBe('6.7 km · 420 m up · average 6.3% · steepest 500 m 9.8%');
+  expect(CC.appClimbFigures('36.2', 1626, '4.5', '8.7')).toBe('36.2 km · 1,630 m up · average 4.5% · steepest 500 m 8.7%');
   expect(CC.appClimbMore(1)).toBe('1 smaller climb is not listed.');
   expect(CC.appClimbMore(3)).toBe('3 smaller climbs are not listed.');
 });
