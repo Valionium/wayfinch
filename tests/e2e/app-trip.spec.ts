@@ -113,7 +113,8 @@ test('[TRIP-ATTRIBUTION] Licences under the route opens the licences page, in fl
   await page.locator('[data-summary]').getByRole('link', { name: 'Licences', exact: true }).click();
   await expect(page).toHaveURL(`${app.origin}/legal/licences/`);
   await expect(page.getByRole('heading', { level: 1 })).toContainText(/Licences and data/);
-  await expect(page.locator('main')).toContainText("Drafted by an AI from the project's spec. Not legal advice.");
+  await expect(page.locator('main').getByRole('navigation', { name: 'Legal pages' })).toBeVisible();
+  await expect(page.locator('main')).not.toContainText('Drafted by an AI'); // LEGAL-NO-AI-LINE (the owner's ruling of 14 Nov 2026)
   await page.goto(`${app.origin}/#/you/legal`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('You');
   await expect(page.locator('[data-legal-links]').getByRole('link', { name: 'Licences and data', exact: true })).toBeInViewport();
