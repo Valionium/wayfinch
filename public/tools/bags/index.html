@@ -5760,7 +5760,7 @@ function keepPlan(change = {}){
   if(!afresh) plan.notes.offer = replanOffer(plan);
   // A kept plan whose bags still hold what the rack deck now carries (the sleeping bag, since the owner's decision of 7 Nov 2026: kept
   // before it, or by an older page): it goes up on the deck, everything else stays where it was, and a note says so (LC-DECK-NOTE).
-  const toDeck = !afresh && before ? deckedIds().filter(id => before.items[id]) : [];
+  const toDeck = !afresh && before ? deckedIds().filter(id => (before.items[id] || []).length) : [];
   if(toDeck.length) plan.notes.replan = { reason:'deckRule', movedPacked:[],
     toDeck:toDeck.map(id => ({ id, from:[...new Set(before.items[id].map(e => e[0]))] })) };
   if(!before && PLAN_PLACED_AGAIN && plan.basis.units.length) plan.notes.replan = { reason:'migrated', movedPacked:[] };
