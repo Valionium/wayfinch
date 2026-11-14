@@ -70,7 +70,7 @@ export function LearnScreen({ services }: { services: TyreServices }) {
   const record = chosenBike(services);
   const [shown, setShown] = useState<Shown>(record ? 'own' : 'gravel');
   const kind: Shown = shown === 'own' && !record ? 'gravel' : shown;
-  const bike: LearnBike = kind === 'own' ? ownBike(resolveBikeSpec(record, null)) : kindBike(kind);
+  const bike: LearnBike = kind === 'own' ? ownBike(resolveBikeSpec(record, null), record) : kindBike(kind);
   const look = kind === 'own' ? record?.look?.paint ?? null : null;
   const [, setReady] = useState(0);
   useEffect(() => {
@@ -85,6 +85,10 @@ export function LearnScreen({ services }: { services: TyreServices }) {
   const now = picked && parts.includes(picked) ? picked : null;
   const [said, setSaid] = useState('');
   const figure = useRef<HTMLDivElement>(null);
+  // A pick from "Connects to" replaces the buttons, the pressed one too: the focus goes to the part's name (review of PR 127, I5).
+  const nameEl = useRef<HTMLHeadingElement>(null);
+  const toName = useRef(false);
+  useEffect(() => { if (toName.current) { toName.current = false; nameEl.current?.focus(); } });
   const pick = (id: LearnId, fromList = false): void => {
     setPicked(id);
     setSaid(LN.said(nameOf(id), LN_DOES[id].split(/(?<=\.)\s/)[0]!));
@@ -110,7 +114,8 @@ export function LearnScreen({ services }: { services: TyreServices }) {
     if (e.key === 'ArrowRight' && !last) { e.preventDefault(); turn(i + 1); }
     if (e.key === 'ArrowLeft' && i > 0) { e.preventDefault(); turn(i - 1); }
   };
-  const labelled = build ? inStep : now ? parts.filter((p) => groupOf(stepOf(p)) === groupOf(stepOf(now))) : MAIN.filter((p) => parts.includes(p));
+  // The picked part is named with what it connects to (fewer labels than its whole group: a phone's drawing stays readable).
+  const labelled = build ? inStep : now ? linksOf(bike, now) : MAIN.filter((p) => parts.includes(p));
   const name = kind === 'own' ? art.label : LN.typical(KIND_NAMES[kind]);
   const addHref = savedBikeIds(services.storage).length === 0 ? bikeDetailsHref('new', 'tools') : null;
   const tag = now ? tagOf(now) : undefined;
@@ -127,6 +132,12 @@ export function LearnScreen({ services }: { services: TyreServices }) {
         </select>
       </label>
       {addHref ? <p class="muted bl-add"><a href={addHref}>{LN.add}</a> {LN.addAfter}</p> : null}
+      {kind === 'own' && record && bike.shows ? (
+        <p class="muted bl-shows">
+          {bike.shows.brakes ? `${LN.showsBrakes(bike.shows.brakes)} ` : ''}{bike.shows.drive ? `${LN.showsDrive} ` : ''}
+          <a href={bikeDetailsHref(record.id, 'tools')}>{LN.setThem}</a>
+        </p>
+      ) : null}
       <div class="bl-modes" role="group" aria-label={LN.modes}>
         {MODES.map((m) => (
           <button key={m} type="button" class="btn bl-mode" aria-pressed={mode === m} onClick={() => { setMode(m); setPicked(null); }}>{m === 'build' ? LN.build : LN.explore}</button>
@@ -155,13 +166,13 @@ export function LearnScreen({ services }: { services: TyreServices }) {
           <section class="bl-entry" aria-live="off">
             {now ? (
               <>
-                <h3 class="bl-name">{nameOf(now)}</h3>
+                <h3 class="bl-name" tabIndex={-1} ref={nameEl}>{nameOf(now)}</h3>
                 {tag ? <p class="muted bl-tag">{LN.onlyOn(tagWords(tag))}</p> : null}
                 <p class="bl-does">{LN_DOES[now]}</p>
                 <h4 class="bl-connects">{LN.connects}</h4>
                 <ul class="bl-links">
                   {linksOf(bike, now).map((l) => (
-                    <li key={l}><button type="button" class="btn bl-link" onClick={() => pick(l)}>{nameOf(l)}</button></li>
+                    <li key={l}><button type="button" class="btn bl-link" onClick={() => { toName.current = true; pick(l); }}>{nameOf(l)}</button></li>
                   ))}
                 </ul>
               </>

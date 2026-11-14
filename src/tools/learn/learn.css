@@ -82,3 +82,9 @@
 .bl-steps { display: flex; gap: 8px; margin: 12px 0 0; }
 .bl-back, .bl-next { min-height: 44px; min-width: 6rem; }
 .bl-back:disabled { opacity: 0.5; cursor: default; }
+/* What the page shows for an answer the rider has not given, and the line that suggests zooming (review of PR 127/128). */
+.bl-shows { margin: 0 0 8px; }
+.bl-shows a { display: inline-flex; align-items: center; min-height: 44px; color: var(--blaze); font-weight: 600; }
+.bl-zoomhint { margin: 4px 0 0; font-size: 0.9375rem; text-align: right; }
+.bl-name:focus { outline: none; }
+.bl-name:focus-visible { outline: 2px solid var(--blaze); outline-offset: 2px; }

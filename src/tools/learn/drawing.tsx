@@ -155,6 +155,18 @@ export function LearnDrawing({ bike, art, picked, marked, labelled, name, onPick
     setZ(zoom.z * (e.deltaY < 0 ? 1.15 : 1 / 1.15), centreNow);
   };
   const zoomTo = (z: number): void => setZ(z, hot && z > zoom.z ? hot.at : centreNow);
+  // A zoom button that turns itself off hands the focus to the other way (review of PR 127, I5): it never falls to the page.
+  const outBtn = useRef<HTMLButtonElement>(null);
+  const inBtn = useRef<HTMLButtonElement>(null);
+  const zoomBy = (k: number): void => {
+    const z = Math.min(MAX_ZOOM, Math.max(1, r2(zoom.z * k)));
+    zoomTo(z);
+    if (z <= 1) inBtn.current?.focus();
+    if (z >= MAX_ZOOM) outBtn.current?.focus();
+  };
+  // Parts whose points sit close together on this view: a line says zooming tells them apart.
+  const close = zoom.z < MAX_ZOOM && layout.labels.some((a, i) => layout.labels.some((b, j) => j > i
+    && Math.hypot(a.to[0] - b.to[0], a.to[1] - b.to[1]) > 0.5 && Math.hypot(a.to[0] - b.to[0], a.to[1] - b.to[1]) < 10));
 
   const inner = viewMarkup(svg).replace(/^<svg[^>]*>|<\/svg>$/g, '') + extras;
   const layer = layerMarkup(svg, marked.flatMap((id) => { const s = spotOf(id); return s ? [s] : []; }), k);
@@ -199,10 +211,11 @@ export function LearnDrawing({ bike, art, picked, marked, labelled, name, onPick
         </svg>
       </div>
       <div class="bl-zoom" role="group" aria-label={LN.zoomGroup}>
-        <button type="button" class="btn bl-zoom-btn" aria-label={LN.zoomOut} disabled={zoom.z <= 1} onClick={() => zoomTo(zoom.z / 1.5)}>−</button>
-        <button type="button" class="btn bl-zoom-btn bl-whole" disabled={zoom.z <= 1} onClick={() => setZoom({ z: 1, centre: centreNow })}>{LN.whole}</button>
-        <button type="button" class="btn bl-zoom-btn" aria-label={LN.zoomIn} disabled={zoom.z >= MAX_ZOOM} onClick={() => zoomTo(zoom.z * 1.5)}>+</button>
+        <button type="button" ref={outBtn} class="btn bl-zoom-btn" aria-label={LN.zoomOut} disabled={zoom.z <= 1} onClick={() => zoomBy(1 / 1.5)}>−</button>
+        <button type="button" class="btn bl-zoom-btn bl-whole" disabled={zoom.z <= 1} onClick={() => { setZoom({ z: 1, centre: centreNow }); inBtn.current?.focus(); }}>{LN.whole}</button>
+        <button type="button" ref={inBtn} class="btn bl-zoom-btn" aria-label={LN.zoomIn} disabled={zoom.z >= MAX_ZOOM} onClick={() => zoomBy(1.5)}>+</button>
       </div>
+      {close ? <p class="muted bl-zoomhint">{LN.zoomHint}</p> : null}
     </div>
   );
 }

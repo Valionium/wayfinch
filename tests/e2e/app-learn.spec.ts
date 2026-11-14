@@ -153,3 +153,46 @@ test('[BL-PHONE] at 320 px and in this project\'s size and theme: no sideways sc
   const results = await new AxeBuilder({ page }).include('.bl').analyze();
   expect(results.violations.map((v) => v.id)).toEqual([]);
 });
+
+test('[BL-FOCUS] the focus never falls to the page: after a Connects-to button, when the zoom turns its own button off, and back from the page to Tools', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools' });
+  await page.getByRole('link', { name: 'Open How a bike is built' }).click();
+  await expect(page.getByRole('heading', { name: 'How a bike is built', level: 2 })).toBeFocused();
+  const onBody = () => page.evaluate(() => document.activeElement === document.body || document.activeElement === null);
+  await part(page, 'saddle').click();
+  await page.locator('.bl-links').getByRole('button', { name: 'Seatpost' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.bl-name')).toHaveText('Seatpost');
+  await expect(page.locator('.bl-name')).toBeFocused();
+  expect(await onBody()).toBe(false);
+  const zoomIn = page.getByRole('button', { name: 'Zoom in' });
+  const zoomOut = page.getByRole('button', { name: 'Zoom out' });
+  await zoomIn.focus();
+  await page.keyboard.press('Enter');
+  await zoomOut.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.bl-canvas')).toHaveAttribute('data-zoom', '1');
+  await expect(zoomIn).toBeFocused();
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Whole bike' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(zoomIn).toBeFocused();
+  for (let n = 0; n < 4; n += 1) await page.keyboard.press('Enter');
+  await expect(page.locator('.bl-canvas')).toHaveAttribute('data-zoom', '4');
+  await expect(zoomOut).toBeFocused();
+  expect(await onBody()).toBe(false);
+  await page.goBack();
+  await expect(page.getByRole('link', { name: 'Open How a bike is built' })).toBeFocused();
+});
+
+test('[BL-OWN] a saved bike with no brakes or gears told is shown with disc brakes and derailleur gears, said plainly, with a way to set them', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools?learn' });
+  await seed(page, [{ id: 'bike_n', name: 'Plain', frontTyre: '40-622', rearTyre: '40-622' }]);
+  await expect(page.getByLabel('Bike to show')).toHaveValue('own');
+  await expect(page.locator('.bl-shows')).toContainText('brakes aren\'t set, so this shows disc brakes');
+  await expect(page.locator('.bl-shows')).toContainText('gears aren\'t set, so this shows derailleur gears');
+  await expect(page.locator('.bl-shows').getByRole('link', { name: 'Set them in Bike details' })).toHaveAttribute('href', /bike-details=bike_n/);
+  await expect(page.getByRole('heading', { name: 'Brakes', level: 4 })).toBeVisible();
+  await expect(part(page, 'brake-lever')).toBeVisible();
+  await expect(part(page, 'derailleur')).toBeVisible();
+});
