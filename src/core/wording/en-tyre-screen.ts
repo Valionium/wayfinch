@@ -25,4 +25,5 @@ export const TS = {
   tyreHeatSkipped: 'Heat and altitude are not checked. Enter the temperatures and the highest point to check.',
   tyreHeatPumpLabel: 'Temperature where you pump (°C)',
   tyreHeatMaxLabel: 'Highest temperature on the trip (°C)',
+  tyreSramNothingSent: 'Nothing is filled in or sent for you.',
 };
