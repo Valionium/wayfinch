@@ -623,7 +623,7 @@ test('[BC-FIT-LINE] brakes, brake fluid and shifting set in You\'s bike details 
   const fluid = page.getByRole('combobox', { name: /^Brake fluid/ });
   await expect(fluid).toBeVisible();
   await expect(fluid).toHaveValue('unknown');
-  await expect(page.locator('#bikeBrakeFluidHint')).toHaveText("It is printed on the brake lever's cap or in the manual. Never mix them.");
+  await expect(page.locator('#bikeBrakeFluidHint')).toHaveText('It is named on the brake lever or caliper, or in the manual. Never mix them.');
   await fluid.selectOption('mineral');
   await page.getByRole('combobox', { name: /^Shifting/ }).selectOption('electronic');
   await page.evaluate(() => { (document.getElementById('bikeLibraryPanel') as HTMLDetailsElement).open = true; });

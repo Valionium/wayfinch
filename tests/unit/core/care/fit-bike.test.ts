@@ -77,9 +77,14 @@ test('[BC-STEP-WORDS] a hydraulic brake step names the bike\'s fluid and says ne
   const all = (b: BikeRecord | null) => bleed.steps.map((_, i) => textOf(bleed.id, i, b)).join(' ');
   expect(all(mineral)).toMatch(/mineral oil/);
   expect(all(mineral)).toMatch(/never .*DOT fluid/i);
-  expect(all(mineral)).not.toMatch(/Shimano|SRAM/);
   expect(all(dot)).toMatch(/DOT fluid/);
   expect(all(dot)).toMatch(/never .*mineral oil/i);
+  // review of PR 129, m2: a told fluid keeps the content's cross-check (which maker usually uses which fluid) and sends the rider to the
+  // lever or caliper, so a fluid set wrong in the details is caught before the bleed
+  for (const b of [mineral, dot]) {
+    expect(textOf(bleed.id, 1, b), String(b.brakeFluid)).toMatch(/Shimano usually uses mineral oil, SRAM usually DOT fluid/);
+    expect(textOf(bleed.id, 1, b), String(b.brakeFluid)).toMatch(/lever or caliper/);
+  }
   // Not sure: the step as the content has it, both fluids and never mix
   expect(bleed.steps.map((_, i) => textOf(bleed.id, i, unsure))).toEqual(bleed.steps);
   expect(bleed.steps.map((_, i) => textOf(bleed.id, i, null))).toEqual(bleed.steps);
@@ -105,7 +110,7 @@ test('[BC-STEP-WORDS] electronic gears get the shifting battery instead of the c
   expect(textOf(card.id, step, bike({ shifting: 'none' }))).toBe(card.steps[step]);
 });
 
-test('[BC-STEP-WORDS] every variant belongs to a step that exists, is made of the content\'s own words (no new repair instruction), and has no banned word', () => {
+test('[BC-STEP-WORDS] every variant belongs to a step that exists and has no banned word; the gears variants are the content\'s own two sentences; each fluid variant names its fluid, says never to mix and, for the bleed, keeps the maker cross-check and the lever or caliper', () => {
   const items = [...CARE_TASKS, ...ROAD_CARDS];
   for (const [id, steps] of Object.entries(STEP_VARIANTS)) {
     const item = items.find((x) => x.id === id);
@@ -122,6 +127,15 @@ test('[BC-STEP-WORDS] every variant belongs to a step that exists, is made of th
   // the gear card's variants are its own two sentences, cut apart
   const gears = ROAD_CARDS.find((c) => c.id === 'gears-skipping')!;
   for (const text of Object.values(STEP_VARIANTS['gears-skipping']![1]!.words)) expect(gears.steps[1]).toContain(text);
+  // the fluid variants: the bike's fluid, never the other, and for the bleed the content's maker cross-check and the lever or caliper
+  for (const [id, steps] of Object.entries(STEP_VARIANTS)) {
+    for (const v of Object.values(steps)) {
+      if (v.by !== 'fluid') continue;
+      expect(v.words.mineral, id).toMatch(/details say mineral oil.*never (mix it with )?DOT fluid/);
+      expect(v.words.dot, id).toMatch(/details say DOT fluid.*never (mix it with )?mineral oil/);
+      if (id === 'brakes-hydraulic-bleed') for (const t of Object.values(v.words)) expect(t).toMatch(/Shimano usually uses mineral oil, SRAM usually DOT fluid.*lever or caliper/);
+    }
+  }
 });
 
 test('[BC-FIT-LINE] the line names what the list is fitted to: the brakes with their kind and fluid, the gears, and every other detail told; nothing told, nothing', () => {
@@ -143,4 +157,24 @@ test('[BC-FIT-LINE] the line names what the list is fitted to: the brakes with t
     .toEqual(['rim brakes', 'cable gears', 'tubeless tyres', 'a belt drive', 'a suspension fork', 'an e-bike']);
   expect(C.careFitShowing(['hydraulic disc brakes (mineral oil)', 'electronic gears'].join(', '))).toBe('Showing what fits your bike: hydraulic disc brakes (mineral oil), electronic gears.');
   for (const t of [C.careFitShowing('x'), C.careFitAll, C.careFitShowAll, C.careFitMine]) expect(bannedHits(t, false), t).toEqual([]);
+});
+
+// Review of PR 129, m1: the line reads true for every gear shifting with every drive. Shifting "No gears" beside a drive with gears is
+// never "no gears, a derailleur": a hub or belt bike without a shifter is a single speed, a derailleur says what Shifting is set to.
+test('[BC-FIT-LINE] the gears read true for every shifting with every drive: no "no gears" beside gears, a hub with no shifter a single speed', () => {
+  const words = (drive: string, shifting: string) => fitWords(careDetails(bike({ drive, shifting })), null, null);
+  const want: Record<string, Record<string, string[]>> = {
+    derailleur: { cable: ['cable gears', 'a derailleur'], electronic: ['electronic gears', 'a derailleur'], none: ['a derailleur (Shifting set to No gears)'], unknown: ['a derailleur'] },
+    'chain-hub': { cable: ['cable gears', 'hub gears'], electronic: ['electronic gears', 'hub gears'], none: ['a single speed'], unknown: ['hub gears or a single speed'] },
+    belt: { cable: ['cable gears', 'a belt drive'], electronic: ['electronic gears', 'a belt drive'], none: ['a single-speed belt drive'], unknown: ['a belt drive'] },
+    unknown: { cable: ['cable gears'], electronic: ['electronic gears'], none: ['no gears'], unknown: [] },
+  };
+  for (const [drive, row] of Object.entries(want)) {
+    for (const [shifting, expected] of Object.entries(row)) {
+      const got = words(drive, shifting);
+      expect(got, `${drive} + ${shifting}`).toEqual(expected);
+      // "no gears" only ever stands alone, never beside a word for gears
+      if (got.includes('no gears')) expect(got.join(' '), `${drive} + ${shifting}`).not.toMatch(/derailleur|hub|belt|single speed/);
+    }
+  }
 });

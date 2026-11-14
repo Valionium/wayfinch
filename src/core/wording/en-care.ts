@@ -110,10 +110,17 @@ export function fitWords(d: CareDetails, rimBrake: RimKind | null, fluid: Fluid 
   const out: string[] = [];
   const brakes = d.brakes === null ? null : d.brakes === 'other' ? 'other brakes' : d.brakes === 'rim' && rimBrake ? RIM_WORDS[rimBrake] : VALUE_WORDS.brakes[d.brakes];
   if (brakes) out.push(fluid ? `${brakes} (${FLUID_WORDS[fluid]})` : brakes);
-  if (d.shifting !== null) out.push(d.shifting === 'cable' ? 'cable gears' : d.shifting === 'electronic' ? 'electronic gears' : 'no gears');
+  // the gears read true together (review of PR 129, m1): with no shifter a hub or belt bike is a single speed, a hub with one has gears;
+  // a derailleur with Shifting set to No gears (an answer from before, "No external shifting cable") says so rather than "no gears"
+  const sh = d.shifting;
+  const shifter = sh === 'cable' || sh === 'electronic';
+  const gears = d.drive === 'belt' ? (sh === 'other' ? 'a single-speed belt drive' : VALUE_WORDS.drive.belt)
+    : d.gears === 'hub' ? (sh === 'other' ? 'a single speed' : shifter ? 'hub gears' : VALUE_WORDS.gears.hub)
+      : d.gears === 'derailleur' ? (sh === 'other' ? 'a derailleur (Shifting set to No gears)' : 'a derailleur') : null;
+  if (shifter) out.push(sh === 'cable' ? 'cable gears' : 'electronic gears');
+  else if (sh === 'other' && gears === null) out.push('no gears');
   if (d.tyres !== null) out.push(d.tyres === 'other' ? 'tubular or other tyres' : VALUE_WORDS.tyres[d.tyres]);
-  if (d.drive === 'belt') out.push(VALUE_WORDS.drive.belt);
-  else if (d.gears !== null && d.gears !== 'other') out.push(d.gears === 'derailleur' ? 'a derailleur' : VALUE_WORDS.gears.hub);
+  if (gears) out.push(gears);
   if (d.suspension !== null && d.suspension !== 'other') out.push(VALUE_WORDS.suspension[d.suspension]);
   if (d.ebike !== null && d.ebike !== 'other') out.push(d.ebike === 'yes' ? VALUE_WORDS.ebike.yes : 'no motor');
   return out;
@@ -127,7 +134,11 @@ export function fitWords(d: CareDetails, rimBrake: RimKind | null, fluid: Fluid 
 export type StepVariant = { by: 'fluid'; words: Record<Fluid, string> } | { by: 'shifting'; words: { cable: string; electronic: string } };
 export const STEP_VARIANTS: Readonly<Record<string, Readonly<Record<number, StepVariant>>>> = {
   'brakes-hydraulic-bleed': {
-    1: { by: 'fluid', words: { mineral: "Your bike's details say mineral oil: use only mineral oil, never DOT fluid.", dot: "Your bike's details say DOT fluid: use only DOT fluid, never mineral oil." } },
+    // the content's maker cross-check stays (review of PR 129, m2), so a fluid set wrong in the details is caught at the lever or caliper
+    1: { by: 'fluid', words: {
+      mineral: "Your bike's details say mineral oil: use only mineral oil, never DOT fluid. Shimano usually uses mineral oil, SRAM usually DOT fluid: if that does not match your brakes, check the lever or caliper.",
+      dot: "Your bike's details say DOT fluid: use only DOT fluid, never mineral oil. Shimano usually uses mineral oil, SRAM usually DOT fluid: if that does not match your brakes, check the lever or caliper.",
+    } },
   },
   'brakes-spongy': {
     2: { by: 'fluid', words: {

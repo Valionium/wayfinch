@@ -533,7 +533,8 @@ test('[BC-STEP-WORDS] on screen: the bleed names the bike\'s fluid; under Show a
   await mount(world([bike('bike_h', 'Hydro', HYDRO_E)]));
   const bleed = await stepsOf(tasks().find((d) => d.dataset.id === 'brakes-hydraulic-bleed')!);
   expect(bleed.steps.join(' ')).toMatch(/mineral oil, never DOT fluid/);
-  expect(bleed.steps.join(' ')).not.toMatch(/Shimano/);
+  // the maker cross-check stays (review of PR 129, m2)
+  expect(bleed.steps.join(' ')).toMatch(/Shimano usually uses mineral oil, SRAM usually DOT fluid/);
   await click(fitButton()!);
   // fits the bike: still its own fluid
   expect((await stepsOf(tasks().find((d) => d.dataset.id === 'brakes-hydraulic-bleed')!)).steps.join(' ')).toMatch(/mineral oil, never DOT fluid/);

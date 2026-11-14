@@ -171,7 +171,8 @@ reset();
   check(/<label for="bikeBrakeFluid">Brake fluid<select id="bikeBrakeFluid" aria-describedby="bikeBrakeFluidHint">/.test(more),'[TB-DETAILS-FLUID] Brake fluid is a select with its own label, tied to its hint');
   check(JSON.stringify(options('bikeBrakeFluid'))===JSON.stringify([['unknown','Not sure'],['mineral','Mineral oil'],['dot','DOT fluid']]) && JSON.stringify(Object.entries(labels.brakeFluid||{}))===JSON.stringify(options('bikeBrakeFluid')),'[TB-DETAILS-FLUID] it offers Not sure first, Mineral oil and DOT fluid');
   const hint=more.match(/<p class="hint" id="bikeBrakeFluidHint">([^<]*)<\/p>/);
-  check(hint && hint[1]==="It is printed on the brake lever's cap or in the manual. Never mix them.",'[TB-DETAILS-FLUID] the hint says where to find it and never to mix them');
+  // review of PR 129, m2: the content's own place ("the fluid named on the lever or caliper"), or the manual
+  check(hint && hint[1]==='It is named on the brake lever or caliper, or in the manual. Never mix them.','[TB-DETAILS-FLUID] the hint says where to find it, as the content does, and never to mix them');
   check(at('bikeBrakeFluidField')>at('bikeRimBrakeField') && at('bikeBrakeFluidField')<at('bikeChainField'),'[TB-DETAILS-FLUID] it comes after Rim brake type');
   check(app.run('BIKE_PROFILE_INPUTS.brakeFluid')==='bikeBrakeFluid','[TB-DETAILS-FLUID] it is read and filled with the other details');
   check(options('bikeBrakes')[0]?.[1]==='Not sure' && options('bikeShifting')[0]?.[1]==='Not sure','[TB-DETAILS-FLUID] Brake type and Shifting start at Not sure');
