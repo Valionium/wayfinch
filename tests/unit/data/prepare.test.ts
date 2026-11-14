@@ -27,6 +27,10 @@ import { loadFixturePack } from '../../fixtures/packs/index.ts';
 import { saveStretch } from '../../../src/store/stretch.ts';
 import { showKm } from '../../../src/core/wording/en.ts';
 import type { Build } from './pack-server.ts';
+import { zonesOrDevice } from '../../../src/store/rules.ts';
+
+/** No zones stored: the screen reads the phone's own zone, as before Prepare this route (sweep of 14 Nov 2026, #1; was []). */
+const NO_ZONES = zonesOrDevice([]);
 
 const openingHours = vi.hoisted(() => ({ tags: [] as string[] }));
 vi.mock('opening_hours', async (original) => {
@@ -200,7 +204,7 @@ describe('the steps', () => {
     expect(await readPrepared()).toBeNull();
     const i = await inputs();
     expect(i.savedKm).toEqual([]);
-    expect(i.routeZones).toEqual([]);
+    expect(i.routeZones).toEqual(NO_ZONES);
   });
 });
 
@@ -710,7 +714,7 @@ describe('zones and holidays', () => {
     const reports = await prepareTrip({ ...deps, fetch: async (u, o) => (String(u) === '/data/boundaries.v1.json' ? new Response('gone', { status: 500 }) : deps.fetch(u, o)) }, () => undefined);
     expect(step(reports, 'places')).toMatchObject({ ok: false, note: W.appPrepZonesMissing });
     const i = await inputs();
-    expect(i.routeZones).toEqual([]);
+    expect(i.routeZones).toEqual(NO_ZONES);
     expect(i.savedKm.length).toBeGreaterThan(0);
     expect(step(reports, 'hours').ok).toBe(true); // hours use the zones stored in the pack (section 5)
   });

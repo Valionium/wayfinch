@@ -26,8 +26,6 @@ export const W = {
 
   // ---- Route files (GPX) ----
   routeGpxTooLarge: 'Choose a GPX file of 20 MB or less.',
-  routeGpxTooManyPoints: 'This GPX has more than 200,000 points. Export a simplified track and try again.',
-  routeGpxTooManySections: 'This GPX has more than 500 separate sections. Export fewer sections and try again.',
   routeGpxUnreadable: 'That did not read as a GPX track or route with valid coordinates.',
   routeTrackTooLong: 'The track distance could not be processed. Try a shorter or simplified GPX.',
 
@@ -91,7 +89,6 @@ export const W = {
   waterSaltyFood: 'On a long hot ride, have some salty food.',
   waterColdReminder: 'In the cold you may feel less thirsty. Keep sipping.',
   waterOutsideRange: 'outside the validated range',
-  waterDayFlag: 'This day adds up to more than 11.4 L. Consider shorter or cooler stretches.',
 
   // ---- Water: the reach rule (section 6.3). `s` names a source or point; litres and kilometres come as shown. ----
   waterNotEnough: (s: string, litres: string): string => `Not enough water to reach ${s} with a reserve — you need about ${litres} L.`,
@@ -596,7 +593,6 @@ export const W = {
   // Tyre pressure (spec section 7.2): the calculation's words. Warnings are never silent changes.
   tyreFront: 'Front',
   tyreRear: 'Rear',
-  tyreDidYouMean: (value: string): string => `Did you mean ${value} psi?`,
   tyreCardBike: (name: string): string => `For ${name}`,
   // Tyre pressure: the screen and the Tools cards.
   tyreTitle: 'Tyre pressure',
@@ -604,9 +600,6 @@ export const W = {
   tyreBikeNone: 'No saved bike',
   tyreBikeInPlan: ' (in your plan)',
   tyreNeedMax: 'Enter the maximum pressure printed on your tyre to see a figure.',
-  tyreFrontBackBar: (value: string): string => `${value} bar`,
-  tyrePsiValue: (value: string): string => `${value} psi`,
-  tyreAssumedList: (list: string): string => `Not set yet, so assumed: ${list}. Set them for a better figure.`,
   tyreAssumedNoLuggage: 'no luggage',
   tyreAssumedWheel: '700C wheels',
   tyreAssumedSetup: 'inner tubes',
@@ -667,8 +660,6 @@ export const W = {
   tyreBagCardLine: (count: number, kg: string): string => `${count} ${count === 1 ? 'bag' : 'bags'} · ${kg} kg`,
   tyreBagCardAge: (date: string): string => `Saved ${date}`,
   // Extras: heat and altitude, weighed loads and calipered widths, the SRAM cross-check.
-  tyreRefuseTemp: (what: string): string => `${what} is not a usable temperature (−40 to 60 °C).`,
-  tyreRefuseHeight: (what: string): string => `${what} is not a usable height (−400 to 9000 m).`,
   tyreSectionHeat: 'Heat and altitude',
   tyreHeatSkipped: 'Heat and altitude are not checked. Enter the temperatures and the highest point to check.',
   tyreHeatPumpLabel: 'Temperature where you pump (°C)',
@@ -718,9 +709,7 @@ export const W = {
   appStoreThirstChoice: 'Thirst is less, average or more.',
   appStoreEbikeChoice: 'E-bike is yes or no.',
   appStoreRideShort: 'A ride under one hour is too short to learn from.',
-  appStoreRideLong: 'A ride over 16 hours is not taken in. Check the hours.',
   appStoreRideIntake: 'What you drank goes from 0 to 20 L.',
-  appStoreRideWeighing: 'Check the weighing: weight change within 10 kg, toilet stops from 0 to 30.',
   appStoreImportTyres: "The tyre details in this file can't be read. Nothing was changed.",
 
   // ---- Prepare this route (sub-project 5): each step's note ----
@@ -759,7 +748,6 @@ export const W = {
   appTripUnnamed: 'Unnamed route',
   appTripFileFailed: "That file could not be read. Nothing was changed.",
   appTripUnchanged: 'Your current route is unchanged.',
-  appTripReplaceTitle: 'Replace your route?',
   appTripReplaceYes: 'Replace route',
   appTripReplaceCancel: 'Cancel',
   appTripReplacedNoDate: (name: string): string => `Replaced with “${name}”, but its departure date was not saved. Set the date in the Route step.`,
@@ -775,7 +763,6 @@ export const W = {
   appTripDayDetail: (hours: string, up: string | null): string => `${hours} h riding${up === null ? '' : `, ${up} m up`}`,
   appTripHeightsCredit: 'Heights looked up from Copernicus data through Open-Meteo.',
   appTripMapDate: (date: string, fromSource: boolean): string => `map data ${fromSource ? 'of' : 'from'} ${date}`,
-  appTripOsmSearch: 'Place names: ',
   appTripLicences: 'Licences',
   appTripDepartureNone: 'No date yet. Without one, En route gives distances only and says why.',
   appTripDateClear: 'Clear the date',
@@ -792,11 +779,7 @@ export const W = {
   appTripRetryButton: 'Try again',
   appTripNothingSaved: 'Nothing is saved on this phone for this route yet.',
   appTripWorking: 'Working. Keep this screen open until it stops.',
-  appTripStepHeights: 'Heights',
   appTripStepPlaces: 'Map data and places',
-  appTripStepHours: 'Opening hours',
-  appTripStepWeather: 'Weather',
-  appTripStepBaseline: 'Seasonal estimate',
   appTripStepSave: 'Saving',
   appTripProgress: (n: number, total: number, name: string): string => `Step ${n} of ${total}: ${name}`,
   appTripProgressPart: (done: number, total: number): string => `${done} of ${total}`,
@@ -843,7 +826,6 @@ export const W = {
   appHandoffNotKept: 'The route could not be passed on to the bag planner. Try again.',
   // Plan from A to B (spec section 7.1). Only the search text goes to the search services; only the two end points go to a bike router.
   appAbPlan: 'Plan the route',
-  appAbChange: (label: string): string => `Change ${label.toLowerCase()}`,
   appAbName: (a: string, b: string): string => `${a} to ${b}`,
 
   // Ahead (sub-project 5, group 6): the position, the picker, the strip, the cards' controls, the chips, the share step.
@@ -911,6 +893,7 @@ export const W = {
   appAheadChipShelter: 'Shelter',
   appAheadChipEmergency: 'Emergency',
   appAheadClose: 'Close',
+  appAheadSetCapacity: 'Set the water you can carry',
   appAheadWaterQuestion: 'How much water do you have?',
   appAheadWaterLitres: (l: string): string => `${l} L`,
   appAheadWaterCustom: 'Another amount (L)',

@@ -2,11 +2,12 @@
 // bike is drawn when the browser reveals the page and glides back from the bag planner (LC-GLIDE); the full Tools screen (a chunk of
 // its own, tools.tsx) shows the same card. Reads only; the bag planner's own storage is never written.
 import type { BikeRecord } from '../../core/bike/normalise.ts';
-import { W, shortMapDate } from '../../core/wording/en.ts';
+import { W } from '../../core/wording/en.ts';
 import type { TyreServices } from '../../tools/tyre/services.ts';
 import { BikeDrawing } from '../bike/drawing.tsx';
 import { bikeSource } from '../bike/live.ts';
 import { Card } from '../card.tsx';
+import { savedDay } from '../saved-day.ts';
 
 /**
  * `chosen` is the bike the rider chose in Tools' bike line, which the full Tools screen works out (its chunk carries the choice): the
@@ -16,7 +17,7 @@ import { Card } from '../card.tsx';
  */
 export function BagCard({ services, chosen, note }: { services: TyreServices; chosen?: BikeRecord | null | undefined; note?: string | undefined }) {
   const sum = services.host().summary;
-  const saved = sum ? shortMapDate(sum.at) : null;
+  const saved = sum ? savedDay(sum.at) : null;
   const bike = bikeSource.value;
   return (
     <Card title={W.tyreBagCardTitle}>

@@ -57,7 +57,8 @@ const TABS: { name: TabName; label: string }[] = [
 ];
 
 // What the tab is for, under its heading, and the colour mode button over its corner: loaded after the first screen (tab-top.tsx).
-const TabTop = lazy(() => import('./tab-top.tsx').then((m) => m.TabTop), () => null);
+// Until it loads, the line keeps its room (an empty line, which only Trip's and En route's CSS shows), so what is below it does not move when its words arrive.
+const TabTop = lazy(() => import('./tab-top.tsx').then((m) => m.TabTop), ({ name }) => <p class="tab-sub" data-tab-sub={name} />);
 
 /** The moved card, loaded only for a rider it is due to: a chunk of its own, so the first screen stays within its budget. */
 function MovedCardSlot() {

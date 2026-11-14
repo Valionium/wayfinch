@@ -5,6 +5,7 @@ import { REPORT_TEMPS } from '../../core/engines/ride-report.ts';
 import type { ReportTemp, RideOutcome } from '../../core/engines/ride-report.ts';
 import { uncertainty } from '../../core/engines/water-base.ts';
 import { W } from '../../core/wording/en.ts';
+import { YR } from '../../core/wording/en-ride-refuse.ts';
 import { Y } from '../../core/wording/en-you.ts';
 import { Card } from '../card.tsx';
 import type { YouServices, YouSnapshot } from './services.ts';
@@ -58,7 +59,7 @@ export function LearnCard({ services, snap, reload }: { services: YouServices; s
       ...(l === null ? {} : { massLossKg: l }), ...(s === null ? {} : { toiletStops: s }), hilly,
     }, profile, snap.settings.flatKph);
     if (!outcome.ok) {
-      setProblem({ short: W.appStoreRideShort, long: W.appStoreRideLong, intake: W.appStoreRideIntake, weighing: W.appStoreRideWeighing }[outcome.reason]);
+      setProblem({ short: W.appStoreRideShort, long: YR.appStoreRideLong, intake: W.appStoreRideIntake, weighing: YR.appStoreRideWeighing }[outcome.reason]);
       return;
     }
     if (refused) {
