@@ -214,7 +214,11 @@ export function daylightAnswer(f: LeaveFacts): Answer {
     return simple(daylightLeftNow(f, ride), 'unknown', ['date'], [{ label: W.leavebyNeedsDate, stamp: null, status: 'unknown' }]);
   }
 
-  // The route end: the arrival there on the riding date it was reached, else the daylight left.
+  const offers: AnswerItem[] = offersPlanTomorrow(ride) ? [{ label: W.daylightPlanTomorrow, stamp: null, status: 'fine' }]
+    : ride.phase === 'after-ride' ? [{ label: W.daylightBackToToday, stamp: null, status: 'fine' }] : [];
+
+  // The route end: the arrival there on the riding date it was reached, else the daylight left. After the day's ride on the last
+  // stage there is no ride tomorrow, and the way back to today stays (follow-up to the review of #169).
   if (ride.phase === 'route-end' || ride.noRide) {
     if (ride.phase === 'route-end' && ride.routeEndReachedOn === ride.date && ride.startKm < ride.stopKm) {
       const arrival = f.schedule.atKm(ride.stopKm);
@@ -224,12 +228,10 @@ export function daylightAnswer(f: LeaveFacts): Answer {
         detail: noHeights(f) ? W.leavebyNoHeights : '', items: sunItems(f, ride), basis: basisOf(f, ride, null), freshness: freshnessOf(f), missing: noHeights(f) ? ['heights'] : [],
       });
     }
-    return simple(daylightLeftNow(f, ride), 'fine', []);
+    return simple(daylightLeftNow(f, ride), 'fine', [], offers);
   }
 
   const r = leaveBy(f, ride);
-  const offers: AnswerItem[] = offersPlanTomorrow(ride) ? [{ label: W.daylightPlanTomorrow, stamp: null, status: 'fine' }]
-    : ride.phase === 'after-ride' ? [{ label: W.daylightBackToToday, stamp: null, status: 'fine' }] : [];
   const notes = [stopStamp(ride), noteFor(ride) ?? '', r.dataNote ?? '', noHeights(f) ? W.leavebyNoHeights : ''];
 
   // While riding: the arrival at the day's stop.

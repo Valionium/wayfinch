@@ -176,6 +176,32 @@ describe('cards', () => {
     expect(document.activeElement).toBe(host.querySelector('[data-card="daylight"] .ah-toggle'));
   });
 
+  test('[AH-PLAN-TOMORROW] on the last stage, with no ride tomorrow, Back to today still stands at the top and in the Daylight card; the focus goes to it and back (follow-up to the review of #169)', async () => {
+    const last = testTrip({ route: flatRoute(108.5, { stageEnds: [50, 108.5] }), departureDate: FRI, stay: 'camping' });
+    const today = trip(viewOf(inputsOf({ trip: last, now: `${SAT} 15:00` })));
+    const planned = trip(viewOf(inputsOf({ trip: last, now: `${SAT} 15:00`, plan: { date: SAT, backToTodayAt: null } })));
+    const { actions, calls } = fakeActions();
+    actions.planTomorrow = async (date) => { calls.push(['planTomorrow', date]); await act(async () => { render(<AheadScreen view={planned} actions={actions} />, host); }); };
+    actions.backToToday = async () => { calls.push(['backToToday']); await act(async () => { render(<AheadScreen view={today} actions={actions} />, host); }); };
+    await show(today, actions);
+    await click(host.querySelector('[data-card="daylight"] .ah-toggle'));
+    await click(buttonNamed(W.daylightPlanTomorrow));
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(calls.at(-1)).toEqual(['planTomorrow', SAT]);
+    const top = host.querySelector('[data-back-today]');
+    expect(top, 'Back to today at the top').not.toBeNull();
+    expect(document.activeElement).toBe(top!.querySelector('button'));
+    // the Daylight card has it too, as on any other planned day
+    const toggle = host.querySelector('[data-card="daylight"] .ah-toggle')!;
+    if (toggle.getAttribute('aria-expanded') === 'false') await click(toggle);
+    expect(() => buttonNamed(W.daylightBackToToday, host.querySelector('[data-card="daylight"]')!)).not.toThrow();
+    await click(top!.querySelector('button'));
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(calls.at(-1)).toEqual(['backToToday']);
+    expect(document.activeElement).toBe(host.querySelector('[data-card="daylight"] .ah-toggle'));
+    expect(() => buttonNamed(W.daylightPlanTomorrow)).not.toThrow();
+  });
+
   test('[AH-STRIP] a tap on a strip band or icon puts the focus on the title button of its card, never the body of the page (review of #142, I4 and M1)', async () => {
     const v = trip(viewOf(rainyStop()));
     await show(v, fakeActions().actions);
