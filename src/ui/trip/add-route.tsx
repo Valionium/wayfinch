@@ -40,8 +40,8 @@ export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken
     try {
       const out = await services.addRoute(found, old?.route ?? null);
       setRound((n) => n + 1);
-      if (out.kind === 'same') setSaid(W.appTripSameRoute);
-      else onAdded(`${out.kind === 'added' ? W.appTripAdded(out.name) : out.dateNotSaved ? W.appTripReplacedNoDate(out.name) : W.appTripReplaced(out.name)} ${W.appTripNextGetReady}`);
+      if (out.kind === 'same') setSaid(TF.appTripSameRoute);
+      else onAdded(`${out.kind === 'added' ? TF.appTripAdded(out.name) : out.dateNotSaved ? TF.appTripReplacedNoDate(out.name) : TF.appTripReplaced(out.name)} ${W.appTripNextGetReady}`);
       await reload();
     } catch (e) {
       refused(reasonOf(e));
@@ -67,7 +67,7 @@ export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken
       const found = await routeFromGpx(await file.text(), file.name, services.parseXml);
       // A file that cannot be used leaves an open question as it was; one that can replaces it.
       setPending(null);
-      if (old && sameLine(old.route, found.route)) setSaid(W.appTripSameRoute);
+      if (old && sameLine(old.route, found.route)) setSaid(TF.appTripSameRoute);
       else if (old) setPending(found);
       else {
         setBusy(false);

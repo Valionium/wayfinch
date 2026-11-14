@@ -108,6 +108,8 @@ export function TripScreen({ services }: { services: TripServices }) {
   const [dropped, setDropped] = useState<File | null>(null);
   // The step the rider opened by a tap, whose heading takes the focus once it shows.
   const focusTo = useRef<StepName | null>(null);
+  // Change date on the trip line (sweep of 14 Nov 2026, #3): each tap counts, so the date field takes the focus even with Route open.
+  const [dateAsk, setDateAsk] = useState(0);
   const list = useRef<HTMLOListElement>(null);
   const zone = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -144,11 +146,13 @@ export function TripScreen({ services }: { services: TripServices }) {
   const trip = snap?.trip ?? null;
   // Get ready offline is done once a run ended with every step through; one with a step missing stays the step to do.
   const readyDone = snap?.prepared ? snap.prepared.steps.every((x) => x.ok) : false;
-  const suggested: StepName = snap?.running && trip ? 'go' : !trip ? 'route' : !readyDone ? 'getready' : 'bags';
+  // Bags is done once the bag planner holds a plan (sweep of 14 Nov 2026, #5): its line is the Tools card's.
+  const plan = bike.summary && !('empty' in bike.summary) ? bike.summary : null;
+  const suggested: StepName = snap?.running && trip ? 'go' : !trip ? 'route' : !readyDone ? 'getready' : plan ? 'go' : 'bags';
   // Only Get ready offline and Bags need a route (design §2.2).
   const openStep: StepName = chosen !== null && (trip !== null || chosen === 'route' || chosen === 'go') ? chosen : suggested;
   const stateOf = (name: StepName, done: boolean): StepState => (done ? 'done' : name === suggested ? 'next' : 'later');
-  const choose = (name: StepName) => () => { focusTo.current = name; setChosen(name); };
+  const choose = (name: StepName) => () => { focusTo.current = name; setDateAsk(0); setChosen(name); };
   const line = snap ? tripLineOf(trip, localIsoDate(snap.now, snap.zone)) : null;
   const goLink = <p><a class="btn btn-primary" href="#/ahead">{W.appTripOpenAhead}</a></p>;
   return (
@@ -156,7 +160,8 @@ export function TripScreen({ services }: { services: TripServices }) {
       {/* Two panes on a wide screen: the bike, the trip line and the steps; then the route's summary (design §2.2). */}
       <div class="trip-main">
         <TripBike bike={bike} trip={snap ? trip !== null : null} />
-        {line ? <p class="trip-line" data-trip-line><strong>{line.name}</strong>{line.when ? <span>{line.when}</span> : null}</p> : null}
+        {line ? <p class="trip-line" data-trip-line><strong>{line.name}</strong>{line.when ? <span>{line.when}</span> : null}
+          {trip ? <button type="button" class="trip-step-change" onClick={() => { setDateAsk((n) => n + 1); setChosen('route'); }}>{W.appTripChangeDate}</button> : null}</p> : null}
         {/* The shell says it already when the browser refuses storage outright; once is enough. */}
         {snap && !snap.available && !degradedSignal.value.includes('storageBlocked') ? <p class="notice" role="status">{W.appStorageBlocked}</p> : null}
         <ol class="trip-steps-list" aria-label={W.appTripStepsLabel} ref={list}>
@@ -166,7 +171,7 @@ export function TripScreen({ services }: { services: TripServices }) {
             beside={snap?.trip ? <TripSettings services={services} snap={snap} reload={reload} part="remove" /> : null}
           >
             <AddRoute services={services} snap={snap} reload={reload} dropped={dropped} onDropTaken={() => setDropped(null)} onAdded={(said) => { setAdded(said); setChosen(null); }} />
-            {snap?.trip ? <TripSettings services={services} snap={snap} reload={reload} part="when" /> : null}
+            {snap?.trip ? <TripSettings services={services} snap={snap} reload={reload} part="when" focusDate={dateAsk} /> : null}
           </Step>
           <Step
             name="getready" n={2} title={W.appTripGetReadyTitle} state={stateOf('getready', readyDone)} open={openStep === 'getready'} canOpen={trip !== null}
@@ -180,7 +185,9 @@ export function TripScreen({ services }: { services: TripServices }) {
               />
             ) : null}
           </Step>
-          <Step name="bags" n={3} title={W.appTripStepBags} state={stateOf('bags', false)} open={openStep === 'bags'} canOpen={trip !== null} onOpen={choose('bags')} line={W.appTripBagsLater}>
+          <Step name="bags" n={3} title={W.appTripStepBags} state={stateOf('bags', plan !== null)} open={openStep === 'bags'} canOpen={trip !== null} onOpen={choose('bags')}
+            line={plan ? W.tyreBagCardLine(plan.bags.count, String(Number(plan.weight.carriedKg.toFixed(1)))) : W.appTripBagsLater}
+          >
             <p>{W.appTripBagsLater}</p>
             {services.handOff ? <PlanBags handOff={services.handOff} /> : null}
             <p><a class="btn" href="/tools/bags/">{W.appTripOpenBagPlanner}</a></p>
