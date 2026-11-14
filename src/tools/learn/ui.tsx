@@ -59,7 +59,8 @@ const MODE_NAMES: Readonly<Record<Mode, string>> = { explore: LN.explore, build:
 type WorksChunk = typeof import('./works.tsx');
 let worksChunk: WorksChunk | undefined;
 
-export function LearnScreen({ services }: { services: TyreServices }) {
+/** `kind`: the type to open on, from the Bike finder's link (#/tools?learn=<type>); anything else opens as before. */
+export function LearnScreen({ services, kind: asked }: { services: TyreServices; kind?: string | undefined }) {
   const [tick, redraw] = useState(0);
   void choiceVersion.value;
   useEffect(() => {
@@ -74,7 +75,7 @@ export function LearnScreen({ services }: { services: TyreServices }) {
   useEffect(() => { title.current?.focus(); }, []);
 
   const record = chosenBike(services);
-  const [shown, setShown] = useState<Shown>(record ? 'own' : 'gravel');
+  const [shown, setShown] = useState<Shown>(() => (KINDS as readonly string[]).includes(asked ?? '') ? asked as LearnKind : record ? 'own' : 'gravel');
   const kind: Shown = shown === 'own' && !record ? 'gravel' : shown;
   const bike: LearnBike = kind === 'own' ? ownBike(resolveBikeSpec(record, null), record) : kindBike(kind);
   const look = kind === 'own' ? record?.look?.paint ?? null : null;
