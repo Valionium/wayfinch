@@ -240,6 +240,9 @@ test('[AH-CALL-CONFIRM] offline at 360 px: Call 112 asks with the number and who
   await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
   await goOffline(page);
   await page.reload({ waitUntil: 'domcontentloaded' });
+  // The screen as the stored trip draws it, not its first frame: a card opened before that is drawn again, and the question with it.
+  await expect(page.locator('[data-ahead="answers"]')).toBeVisible();
+  await expect(page.locator('[data-card]')).toHaveCount(6);
   const asked = sent(page);
   await page.locator('.ah-chips').getByRole('button', { name: 'Emergency', exact: true }).click();
   const card = page.locator('#chip-emergency');

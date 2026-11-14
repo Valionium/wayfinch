@@ -142,7 +142,10 @@ test('[BC-SCREEN] Tab reaches every tab, filter, task and link; each task opens 
   await task(page, ids[1]!).locator('.care-open').focus();
   await page.keyboard.press('Space');
   await expect(page.getByRole('dialog')).toBeVisible();
+  // Tab straight after Escape moves on from the task just closed: the focus was already back on it, not on the page body
   await page.keyboard.press('Escape');
+  await page.keyboard.press('Tab');
+  expect(await page.evaluate(() => (document.activeElement?.closest('.care-task') as HTMLElement | null)?.dataset.id)).toBe(ids[2]);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   // the arrow keys move between the tabs
   await page.getByRole('tab', { name: 'Care' }).focus();
@@ -592,7 +595,15 @@ test("[BV-VIEW] a tap at any corner of a label's pill, or at its ends, picks tha
     // a real tap at a pill's top-left corner opens that part
     const label = sheet.locator('.bv-label').nth(1);
     const part = await label.getAttribute('data-part');
-    const box = (await label.locator('.bv-pill').boundingBox())!;
+    // the sheet's labels settle for a moment after it shows (one moved 7.6 px within 30 ms): click once the box is the same on two reads a frame apart
+    let box = (await label.locator('.bv-pill').boundingBox())!;
+    await expect.poll(async () => {
+      await page.evaluate(() => new Promise((done) => { requestAnimationFrame(done); }));
+      const next = (await label.locator('.bv-pill').boundingBox())!;
+      const same = next.x === box.x && next.y === box.y;
+      box = next;
+      return same;
+    }).toBe(true);
     await page.mouse.click(box.x + 1, box.y + 1);
     await expect(sheet.locator(`.bv-label[data-part="${part}"]`)).toHaveClass(/bv-label-hot/);
     await page.keyboard.press('Escape');

@@ -52,6 +52,9 @@ test('[BK-TAP-INSTANT] the bag planner saving a colour in another tab redraws th
   // The full Tools screen, not its loading stand-in (whose drawing it replaces): only it links to the Gear advisor (review of PR 90, M2).
   await expect(page.locator('a[href*="gear-advisor"]')).toBeVisible();
   await expect(page.locator('.bk-paint').first()).toHaveAttribute('stroke', '#2563b8');
+  // With a plan the drawing loads the look chunk and swaps in the frame bag's cut once (that swap does replace the drawing): wait until the chunk is in and drawn (two frames after it arrived), so the element held below stays.
+  await expect.poll(() => page.evaluate(() => performance.getEntriesByType('resource').some((e) => /\/assets\/paint-[^/]*\.js$/.test(e.name)))).toBe(true);
+  await page.evaluate(() => new Promise((done) => { requestAnimationFrame(() => requestAnimationFrame(done)); }));
   // Listen after the app, so this runs once the app has had the event; one frame later the drawing must already show it.
   await page.evaluate(() => {
     window.addEventListener('storage', () => {
