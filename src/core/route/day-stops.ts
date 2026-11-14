@@ -3,40 +3,42 @@
 // last ends at the saved sleep place that suits its planned end best (day-beds.ts chooses), or the rider's own choice, or at
 // the planned end when nothing is near or the rider chose "No stop". The days are then worked out as the stage model works out
 // its own: riding hours from the effort between the ends, climbing from the climbing between them.
-import { candidatesNear, windowKm } from '../engines/day-beds.ts';
+import { candidatesNear } from '../engines/day-beds.ts';
 import type { Nights } from '../engines/day-beds.ts';
 import type { Km, Place, Route, RouteMatch, Stage, Stay, TripStop, TripStops } from '../types.ts';
-import { effortProfile, LOAD_PENALTY } from './stages.ts';
+import { effortProfile, LOAD_PENALTY, planStages } from './stages.ts';
 
 /** A stop closer than this to the day's start or the next end would leave a day of almost nothing: it is not taken. */
 const MIN_DAY_KM = 1;
 const SAME_KM = 1e-6;
+
+type Point = { kmExact: number; upExact: number | null; effortExact: number };
+
+/** The stage model's line at a kilometre (`kmExact`) or at an effort (`effortExact`), each figure worked out between its samples. */
+function lineAt(samples: Point[], key: 'kmExact' | 'effortExact', v: number): Point {
+  const last = samples[samples.length - 1]!;
+  if (v <= samples[0]![key]) return samples[0]!;
+  if (v >= last[key]) return last;
+  let lo = 0;
+  let hi = samples.length - 1;
+  while (lo + 1 < hi) {
+    const mid = (lo + hi) >> 1;
+    if (samples[mid]![key] < v) lo = mid; else hi = mid;
+  }
+  const a = samples[lo]!;
+  const b = samples[hi]!;
+  const span = b[key] - a[key];
+  const f = span > 0 ? (v - a[key]) / span : 0;
+  const along = (k: 'kmExact' | 'effortExact'): number => (k === key ? v : a[k] + (b[k] - a[k]) * f);
+  return { kmExact: along('kmExact'), upExact: a.upExact !== null && b.upExact !== null ? a.upExact + (b.upExact - a.upExact) * f : null, effortExact: along('effortExact') };
+}
 
 /** The stages ending at `ends` (one per night, in order), worked out as planStages works out its own. */
 export function stagesEndingAt(route: Route, ends: Km[], flatKph: number): Stage[] {
   const loadedKph = flatKph * LOAD_PENALTY;
   const { samples } = effortProfile(route);
   if (samples.length === 0) return [];
-  const at = (km: Km): { kmExact: number; upExact: number | null; effortExact: number } => {
-    const last = samples[samples.length - 1]!;
-    if (km <= samples[0]!.kmExact) return samples[0]!;
-    if (km >= last.kmExact) return last;
-    let lo = 0;
-    let hi = samples.length - 1;
-    while (lo + 1 < hi) {
-      const mid = (lo + hi) >> 1;
-      if (samples[mid]!.kmExact < km) lo = mid; else hi = mid;
-    }
-    const a = samples[lo]!;
-    const b = samples[hi]!;
-    const span = b.kmExact - a.kmExact;
-    const f = span > 0 ? (km - a.kmExact) / span : 0;
-    return {
-      kmExact: km,
-      upExact: a.upExact !== null && b.upExact !== null ? a.upExact + (b.upExact - a.upExact) * f : null,
-      effortExact: a.effortExact + (b.effortExact - a.effortExact) * f,
-    };
-  };
+  const at = (km: Km): Point => lineAt(samples, 'kmExact', km);
   const points = [samples[0]!, ...ends.map(at), samples[samples.length - 1]!];
   return points.slice(1).map((here, i) => {
     const previous = points[i]!;
@@ -48,7 +50,8 @@ export function stagesEndingAt(route: Route, ends: Km[], flatKph: number): Stage
   });
 }
 
-const sameKms = (a: Km[], b: Km[]): boolean => a.length === b.length && a.every((x, i) => Math.abs(x - b[i]!) <= SAME_KM);
+/** The same ends, to a millionth of a kilometre. */
+export const sameKms = (a: Km[], b: Km[]): boolean => a.length === b.length && a.every((x, i) => Math.abs(x - b[i]!) <= SAME_KM);
 
 /** The planned ends (each day but the last) of an equal-effort plan. */
 export const plannedEnds = (plan: Stage[]): Km[] => plan.slice(0, -1).map((s) => s.endKm);
@@ -82,36 +85,78 @@ export function chooseStops(route: Route, plan: Stage[], places: Place[], matche
 }
 
 /**
- * What became of the rider's own stops when the plan changed under them: `days`, one per night of the new plan, the own stop kept for
- * it or null (chosen afresh); `kept` with its new night and its old (`was`), `lost` with its old night, both 1-based.
+ * The day ends for `nights` nights planned around the rider's own stops: `basis`, one per night; `days`, the own stop each night
+ * keeps (null: chosen afresh); `kept` with its new night and its old (`was`), `dropped` with its old night, both 1-based; `uneven`,
+ * each day much longer (`long`) or shorter than an even day, with its km.
  */
-export type Carried = { days: (TripStop | null)[]; kept: { stop: TripStop; night: number; was: number }[]; lost: { stop: TripStop; night: number }[] };
+export type Around = {
+  basis: Km[]; days: (TripStop | null)[]; kept: { stop: TripStop; night: number; was: number }[]; dropped: { stop: TripStop; night: number }[];
+  uneven: { day: number; km: Km; long: boolean }[];
+};
+
+/** A day this much longer than an even day, or this much shorter, is said (the owner's ruling of 14 Nov 2026: said, never moved). */
+const LONG_DAY = 1.5;
+const SHORT_DAY = 0.5;
 
 /**
- * The rider's own stops of another plan of the same route, carried to this one (the owner's ruling of 14 November 2026: other nights
- * keep the rider's picks where they still fit). An own stop, a place or "No stop", fits a night whose planned end is near its kilometre,
- * as near as that night's own choices are (candidatesNear's window), so a kept stop is one the rider could pick for it: the nearest
- * such night, and a night keeps one, the first in the route's order. A kept "No stop" ends at the new planned end (a kept place is
- * judged again for its new night by the caller). Every other own stop is lost, and named by the caller. Automatic stops are never
- * carried. Stops of this very plan (they hold), of another route, or none: nothing to carry.
+ * The nights planned around the rider's own stops (the owner's rulings of 14 November 2026: own stops are kept, "Yes, plan around").
+ * Each own stop, a place at its kilometre or a "No stop" at its planned end, is a fixed end; the stretches between them are split
+ * into days at equal effort, as the stage model splits a route, and each night more than the own stops goes, one by one, to the
+ * stretch whose days are longest (the first of equals). An own stop goes only when it cannot stay: not on the route (within a
+ * kilometre of its start, its end or the stop before), more own stops than nights (the stop between the two shortest days next to
+ * each other goes first), or a day ride. With no own stop it is the stage model's own plan. Days much longer or shorter than an even
+ * day are listed, never moved. Automatic stops anchor nothing; another route's stops, or none, neither.
  */
-export function carryOwn(stops: TripStops | undefined, route: Route, plan: Stage[]): Carried {
-  const nights = plan.slice(0, -1);
-  const out: Carried = { days: nights.map(() => null), kept: [], lost: [] };
-  const held: TripStops | undefined = stops;
-  if (!stops || stops.routeId !== route.id || !Array.isArray(stops.days) || stopsHold(held, route, plan)) return out;
+export function planAround(stops: TripStops | undefined, route: Route, nights: number): Around {
+  const n = Math.max(0, Math.trunc(Number.isFinite(nights) ? nights : 0));
+  const even = plannedEnds([...planStages(route, { flatKph: 20, pace: 'sporting', nights: n })]);
+  const out: Around = { basis: even, days: even.map(() => null), kept: [], dropped: [], uneven: [] };
+  const { samples } = effortProfile(route);
+  if (!stops || stops.routeId !== route.id || !Array.isArray(stops.days) || samples.length === 0) return out;
+  const effort = (km: Km): number => lineAt(samples, 'kmExact', km).effortExact;
+  const end = route.lengthKm;
+  const anchors: { d: TripStop; was: number; km: Km }[] = [];
   stops.days.forEach((d, i) => {
     if (d?.by !== 'rider') return;
-    const off = (s: Stage): number => Math.abs(d.km - s.endKm);
-    let j = -1;
-    nights.forEach((s, k) => { if (off(s) <= windowKm(s.endKm - s.startKm) + 1e-9 && (j < 0 || off(s) < off(nights[j]!))) j = k; });
-    if (j < 0 || out.days[j]) {
-      out.lost.push({ stop: d, night: i + 1 });
-      return;
+    const km = d.placeId === null ? stops.basis?.[i] : d.km;
+    const before = anchors[anchors.length - 1]?.km ?? 0;
+    if (typeof km === 'number' && km > before + MIN_DAY_KM && km < end - MIN_DAY_KM) anchors.push({ d, was: i + 1, km });
+    else out.dropped.push({ stop: d, night: i + 1 });
+  });
+  while (anchors.length > n) {
+    let k = 0;
+    let best = Infinity;
+    anchors.forEach((_, i) => {
+      const span = effort(anchors[i + 1]?.km ?? end) - effort(anchors[i - 1]?.km ?? 0);
+      if (span <= best) { best = span; k = i; }
+    });
+    const [gone] = anchors.splice(k, 1);
+    out.dropped.push({ stop: gone!.d, night: gone!.was });
+  }
+  out.dropped.sort((a, b) => a.night - b.night);
+  if (anchors.length === 0) return out;
+  const cuts = [0, ...anchors.map((a) => a.km), end].map(effort);
+  const parts = cuts.slice(1).map((to, i) => ({ from: cuts[i]!, to, days: 1 }));
+  for (let more = n - anchors.length; more > 0; more -= 1) parts.reduce((a, b) => ((b.to - b.from) / b.days > (a.to - a.from) / a.days ? b : a)).days += 1;
+  out.basis = [];
+  out.days = [];
+  parts.forEach((p, i) => {
+    for (let d = 1; d < p.days; d += 1) {
+      out.basis.push(lineAt(samples, 'effortExact', p.from + ((p.to - p.from) * d) / p.days).kmExact);
+      out.days.push(null);
     }
-    const stop = d.placeId === null ? { ...d, km: nights[j]!.endKm } : d;
-    out.days[j] = stop;
-    out.kept.push({ stop, night: j + 1, was: i + 1 });
+    const a = anchors[i];
+    if (!a) return;
+    const stop = a.d.placeId === null ? { ...a.d, km: a.km } : a.d;
+    out.basis.push(a.km);
+    out.days.push(stop);
+    out.kept.push({ stop, night: out.basis.length, was: a.was });
+  });
+  const ends = [0, ...out.basis, end];
+  const day = (cuts[cuts.length - 1]! - cuts[0]!) / (n + 1);
+  ends.slice(1).forEach((km, i) => {
+    const e = effort(km) - effort(ends[i]!);
+    if (e > LONG_DAY * day || e < SHORT_DAY * day) out.uneven.push({ day: i + 1, km: km - ends[i]!, long: e > LONG_DAY * day });
   });
   return out;
 }

@@ -5,7 +5,8 @@
 // so every card, the forecast grid and the handoff read the same days.
 import { candidatesNear, closedThatNight } from '../core/engines/day-beds.ts';
 import type { BedChoice } from '../core/engines/day-beds.ts';
-import { carryOwn, chooseStops, stopsHold, withStops } from '../core/route/day-stops.ts';
+import { chooseStops, planAround, plannedEnds, sameKms, stagesEndingAt, stopsHold, withStops } from '../core/route/day-stops.ts';
+import type { Around } from '../core/route/day-stops.ts';
 import { sampleGrid } from '../core/route/grid.ts';
 import { planStages } from '../core/route/stages.ts';
 import type { ScreenInputs, Stage, Trip, TripStop, TripStops } from '../core/types.ts';
@@ -17,13 +18,29 @@ import { readTrip, saveTrip } from '../store/trip.ts';
 /** A day's stop changed by the rider (a place, or null: "No stop", the planned end), or the stops as they were (Undo). */
 export type StopChange = { day: number; to: BedChoice | null } | { restore: TripStops | null };
 
-/** The stage model's plan for the trip as it stands: its speed and pace, the nights as set (or suggested). */
-function planOf(inputs: ScreenInputs): Stage[] {
+/** Ends that can be a plan's for `nights` nights on a route `lengthKm` long: as many, in order, inside the route. */
+const usableEnds = (ends: unknown, nights: number, lengthKm: number): ends is number[] =>
+  Array.isArray(ends) && ends.length === nights && ends.every((km, i) => typeof km === 'number' && km > (i === 0 ? 0 : (ends[i - 1] as number)) && km < lengthKm);
+
+/**
+ * The plan the stops are worked out on (the owner's ruling of 14 Nov 2026, "plan around"): while the nights are the same, the plan
+ * the stops hold for, the stage model's own or one planned around the rider's own stops; otherwise the nights as set (or suggested)
+ * planned again around the rider's own stops (`around`: what became of them). The pace and the speed set the suggested nights and the
+ * hours; the ends depend on the nights and the effort alone.
+ */
+function planOf(inputs: ScreenInputs): { plan: Stage[]; around: Around | null } {
   const { trip } = inputs;
+  const { route } = trip;
   const local = readLocalSettings().settings;
   const pace = trip.pace ?? local.pace;
-  const nights = local.nights ?? planStages(trip.route, { flatKph: trip.flatKph, pace, nights: 0 }).suggestedNights;
-  return [...planStages(trip.route, { flatKph: trip.flatKph, pace, nights })];
+  const nights = local.nights ?? planStages(route, { flatKph: trip.flatKph, pace, nights: 0 }).suggestedNights;
+  const even = [...planStages(route, { flatKph: trip.flatKph, pace, nights })];
+  const held = trip.stops?.routeId === route.id ? trip.stops : undefined;
+  // the stage model's own stages when the ends are its own, so a plan that did not change is the very same
+  const ends = (to: number[]): Stage[] => (sameKms(to, plannedEnds(even)) ? even : stagesEndingAt(route, to, trip.flatKph));
+  if (held && usableEnds(held.basis, plannedEnds(even).length, route.lengthKm) && Array.isArray(held.days) && held.days.length === held.basis.length) return { plan: ends(held.basis), around: null };
+  const around = planAround(held, route, plannedEnds(even).length);
+  return { plan: ends(around.basis), around };
 }
 const nightsOf = (inputs: ScreenInputs) => ({ departureDate: inputs.trip.departureDate, hours: inputs.hours });
 
@@ -31,7 +48,7 @@ const nightsOf = (inputs: ScreenInputs) => ({ departureDate: inputs.trip.departu
 export async function stopChoices(now: Date, day: number): Promise<BedChoice[]> {
   const inputs = await readInputs(now);
   if (!inputs) return [];
-  const s = planOf(inputs)[day - 1];
+  const s = planOf(inputs).plan[day - 1];
   return s ? candidatesNear(s, inputs.places, inputs.matches, inputs.trip.stay, nightsOf(inputs)) : [];
 }
 
@@ -93,12 +110,11 @@ async function settling(now: Date, change: StopChange | undefined, o: { announce
   if (!inputs) return null;
   const { trip } = inputs;
   const { route } = trip;
-  const plan = planOf(inputs);
+  const { plan, around } = planOf(inputs);
   const fresh = plan.length > 1 && inputs.matches.length > 0 ? chooseStops(route, plan, inputs.places, inputs.matches, trip.stay, nightsOf(inputs)) : null;
-  // Other nights on the same route keep the rider's own stops that still fit (the owner's ruling of 14 Nov 2026): judged as held ones,
-  // the other nights chosen afresh. The line beside the nights names what was kept and what was not (core carryOwn, the same rule).
-  const own = carryOwn(trip.stops, route, plan).days;
-  const held = stopsHold(trip.stops, route, plan) ? trip.stops : fresh && { ...fresh, days: fresh.days.map((d, i) => own[i] ?? d) };
+  // Other nights are planned around the rider's own stops (the owner's ruling of 14 Nov 2026): they keep their nights, judged as held
+  // ones; the other nights are chosen afresh. The line beside the nights names them (core planAround, the same rule).
+  const held = stopsHold(trip.stops, route, plan) ? trip.stops : fresh && around ? { ...fresh, days: fresh.days.map((d, i) => around.days[i] ?? d) } : null;
   let next: TripStops | null;
   if (change && 'restore' in change) next = change.restore && stopsHold(change.restore, route, plan) ? judged(change.restore, fresh, inputs) : null;
   else next = held && fresh ? judged(held, fresh, inputs) : fresh;

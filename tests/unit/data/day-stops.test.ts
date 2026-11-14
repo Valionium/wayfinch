@@ -84,38 +84,63 @@ describe('day stops on the store', () => {
     expect((await readTrip())!.stops).toBeUndefined();
   });
 
-  test('[TRIP-DAY-STOPS] other nights choose afresh, and the rider\'s choice of the old plan is not carried over', async () => {
+  // The owner's rulings of 14 Nov 2026: own stops are kept, and the other nights are planned around them ("Yes, plan around"). Before
+  // them this test read "other nights choose afresh, and the rider's choice of the old plan is not carried over" (basis [135], Hotel D).
+  test("[TRIP-DAY-STOPS] [TRIP-STOPS-KEEP] fewer nights (2 → 1): the rider's choice of the old plan stays, the night now ends there", async () => {
     await tripWithPlaces([['campsite', 92.4, 'Camping A'], ['lodging', 86, 'Hotel B'], ['lodging', 177, 'Hotel C'], ['lodging', 135, 'Hotel D']]);
     await settleStops(NOW);
     await settleStops(NOW, { day: 1, to: (await stopChoices(NOW, 1))[1]! });
     localStorage.setItem('copilot:settings', JSON.stringify({ nights: 1, pace: 'sporting', updatedAt: '2026-10-16T07:30:00.000Z' }));
     const one = (await settleStops(NOW))!;
-    expect(one.basis).toEqual([135]);
-    expect(one.days).toEqual([expect.objectContaining({ name: 'Hotel D', by: 'auto' })]);
+    expect(one.basis).toEqual([86]);
+    expect(one.days).toEqual([expect.objectContaining({ name: 'Hotel B', by: 'rider' })]);
+    expect((await readTrip())!.route.stages.map((s) => s.endKm)).toEqual([86, 270]);
   });
 
-  // The owner's ruling of 14 Nov 2026: other nights keep the rider's own picks where they still fit; only the other nights are chosen.
-  test("[TRIP-STOPS-KEEP] 2 → 5 nights: the rider's own stop near a new night's end stays theirs, for that night; the others are chosen afresh", async () => {
+  test("[TRIP-STOPS-KEEP] 2 → 5 nights: the rider's own stop stays an end, the other nights are planned around it and chosen afresh", async () => {
+    const r1 = (km: number) => Math.round(km * 10) / 10;
     await tripWithPlaces([['campsite', 92.4, 'Camping A'], ['lodging', 88, 'Hotel B'], ['lodging', 177, 'Hotel C'], ['campsite', 46, 'Camping E'], ['lodging', 135, 'Hotel D'], ['campsite', 224, 'Camping F']]);
     await settleStops(NOW);
     await settleStops(NOW, { day: 1, to: (await stopChoices(NOW, 1)).find((c) => c.name === 'Hotel B')! });
     expect((await readTrip())!.stops!.days[0]).toMatchObject({ name: 'Hotel B', km: 88, by: 'rider' });
     localStorage.setItem('copilot:settings', JSON.stringify({ nights: 5, pace: 'sporting', updatedAt: '2026-10-16T07:30:00.000Z' }));
     const five = (await settleStops(NOW))!;
-    expect(five.basis.map(Math.round)).toEqual([45, 90, 135, 180, 225]);
+    // 88 km before it (2 days), 182 after (4 days)
+    expect(five.basis.map(r1)).toEqual([44, 88, 133.5, 179, 224.5]);
     expect(five.days.map((d) => [d.name, d.by])).toEqual([['Camping E', 'auto'], ['Hotel B', 'rider'], ['Hotel D', 'auto'], ['Hotel C', 'auto'], ['Camping F', 'auto']]);
     const t = (await readTrip())!;
     expect(t.stops).toEqual(five);
     expect(t.route.stages.map((s) => s.endKm)).toEqual([46, 88, 135, 177, 224, 270]);
+    // settled again with the same nights: nothing moves (the plan the stops hold for)
+    await settleStops(NOW);
+    expect((await readTrip())!.stops).toEqual(five);
+    // the choices for a night are those near its planned end around the own stop
+    expect((await stopChoices(NOW, 3)).map((c) => c.name)).toEqual(['Hotel D']);
   });
 
-  test('[TRIP-STOPS-KEEP] 2 → 3 nights: an own stop near no new end gives way to the place chosen for that night', async () => {
+  test('[TRIP-STOPS-KEEP] 2 → 3 nights: the own stop stays; the 184 km after it are split in two, chosen afresh', async () => {
+    const r1 = (km: number) => Math.round(km * 10) / 10;
     await tripWithPlaces([['campsite', 92.4, 'Camping A'], ['lodging', 86, 'Hotel B'], ['lodging', 177, 'Hotel C'], ['campsite', 68, 'Camping G'], ['lodging', 136, 'Hotel D'], ['campsite', 203, 'Camping H']]);
     await settleStops(NOW);
     await settleStops(NOW, { day: 1, to: (await stopChoices(NOW, 1)).find((c) => c.name === 'Hotel B')! });
     localStorage.setItem('copilot:settings', JSON.stringify({ nights: 3, pace: 'sporting', updatedAt: '2026-10-16T07:30:00.000Z' }));
     const three = (await settleStops(NOW))!;
-    expect(three.days.map((d) => [d.name, d.by])).toEqual([['Camping G', 'auto'], ['Hotel D', 'auto'], ['Camping H', 'auto']]);
+    expect(three.basis.map(r1)).toEqual([86, 147.3, 208.7]);
+    expect(three.days.map((d) => [d.name, d.by])).toEqual([['Hotel B', 'rider'], [null, 'auto'], ['Camping H', 'auto']]);
+  });
+
+  test('[TRIP-STOPS-KEEP] a pace that changes the suggested nights plans around the own stop too (review M9)', async () => {
+    await tripWithPlaces([['campsite', 92.4, 'Camping A'], ['lodging', 86, 'Hotel B'], ['lodging', 177, 'Hotel C']]);
+    localStorage.setItem('copilot:settings', JSON.stringify({ nights: null, pace: 'sporting', updatedAt: '2026-10-16T07:00:00.000Z' }));
+    await settleStops(NOW);
+    await settleStops(NOW, { day: 1, to: (await stopChoices(NOW, 1)).find((c) => c.name === 'Hotel B')! });
+    const t = (await readTrip())!;
+    await readTrip();
+    await saveTrip({ ...t, pace: 'steady' });
+    const after = (await settleStops(NOW))!;
+    expect(after.basis.length).toBe(planStages(route, { flatKph: 25, pace: 'steady', nights: 0 }).suggestedNights);
+    expect(after.days.filter((d) => d.by === 'rider').map((d) => d.name)).toEqual(['Hotel B']);
+    expect(after.basis).toContain(86);
   });
 
   test('[TRIP-DAY-STOPS] never mixed between routes: a replaced route has none of the old stops; Remove this trip takes them', async () => {

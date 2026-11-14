@@ -1,11 +1,9 @@
 // Trip settings (spec section 3.3). Every field saves when it is changed; a value outside its range is refused with the range
 // named, and the field goes back to the last good value. Nothing here works out the days: the services re-plan them.
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { carryOwn } from '../../core/route/day-stops.ts';
-import { planStages } from '../../core/route/stages.ts';
-import type { Pace } from '../../core/route/stages.ts';
+import { planAround } from '../../core/route/day-stops.ts';
 import type { Trip } from '../../core/types.ts';
-import { W } from '../../core/wording/en.ts';
+import { showKm, W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
 import { TF } from '../../core/wording/en-trip-fields.ts';
 import { keepFreshOffered } from '../../data/refresh.ts';
@@ -18,16 +16,17 @@ import type { TripServices, TripSnapshot } from './services.ts';
 type Save = (field: keyof Settings, value: unknown) => Promise<boolean>;
 
 /**
- * The line for a trip whose nights become `n`, '' when it held no stops: by the very rule the stops are settled by (carryOwn, the
- * owner's ruling of 14 Nov 2026), every one of the rider's own stops is named, kept for its new night or not kept; a day ride names
- * only what goes, and says nothing with automatic stops alone.
+ * The line for a trip whose nights become `n`, '' when it held no stops: by the very rule the settle plans them by (planAround, the
+ * owner's rulings of 14 Nov 2026), the rider's own stops are named, kept with their new nights or not kept with their old, and a day
+ * much longer or shorter than an even day is said; a day ride names only what goes, and says nothing with automatic stops alone.
  */
-function stopsLine(trip: Trip, n: number, pace: Pace): string {
+function stopsLine(trip: Trip, n: number): string {
   const held = trip.stops?.routeId === trip.route.id ? trip.stops : undefined;
   if (!held || !Array.isArray(held.days) || held.days.length === 0) return '';
-  const c = carryOwn(held, trip.route, [...planStages(trip.route, { flatKph: trip.flatKph, pace: trip.pace ?? pace, nights: n })]);
-  const lost = c.lost.map((l) => TF.appTripStopNight(l.stop.name, l.night, true)).join(', ');
-  return n > 0 || lost ? TF.appTripStopsNewNights(n, c.kept.map((k) => TF.appTripStopNight(k.stop.name, k.night)).join(', '), lost) : '';
+  const a = planAround(held, trip.route, n);
+  const dropped = a.dropped.map((d) => TF.appTripStopNight(d.stop.name, d.night, true)).join(', ');
+  return n > 0 || dropped ? TF.appTripStopsNewNights(n, a.kept.map((k) => TF.appTripStopNight(k.stop.name, k.night)).join(', '), dropped,
+    a.uneven.map((u) => TF.appTripDayUneven(u.day, showKm(u.km), u.long)).join('; ')) : '';
 }
 
 // Remove this trip stands next to Change in the Route step's done row (owner, 9 Nov 2026): `part="remove"` of this chunk, with its
@@ -113,7 +112,7 @@ export function TripSettings({ services, snap, reload, part, focusDate = 0 }: {
     const was = trip ? settings.nights ?? suggestedNights(trip) : null;
     const ok = await save('nights', v);
     const now = trip ? v ?? suggestedNights(trip) : null;
-    setStopsSaid(ok && trip && now !== null && now !== was ? stopsLine(trip, now, settings.pace) : '');
+    setStopsSaid(ok && trip && now !== null && now !== was ? stopsLine(trip, now) : '');
     return ok;
   };
 
