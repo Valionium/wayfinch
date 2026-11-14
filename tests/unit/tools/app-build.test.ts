@@ -234,6 +234,22 @@ test("[BK-PAINT-LAZY] the look extras are their own chunk: no pattern, texture o
   expect(text(on, 'index.html')).not.toContain(chunk[0]!);
 });
 
+test("[BW-LAZY] How it works is a chunk of its own, loaded on its press: not in the first screen's JavaScript, nor in the learn page's chunk", () => {
+  const figures = measure(on);
+  const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
+  for (const mark of ['Freehub and coasting', 'snakebite', 'mineral oil or DOT fluid']) expect(first.includes(mark), mark).toBe(false);
+  const lazy = files(on).filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !figures.firstFiles.includes(f));
+  const chunk = lazy.filter((f) => text(on, f).includes('Freehub and coasting'));
+  expect(chunk.length).toBe(1);
+  expect(text(on, chunk[0]!)).toContain('snakebite');
+  // the learn page's chunk (its title) holds none of the topics' words; it loads them by a dynamic import, never a static one
+  const learn = lazy.filter((f) => text(on, f).includes('Tap any part to see what it is'));
+  expect(learn.length).toBe(1);
+  expect(learn[0]).not.toBe(chunk[0]);
+  expect(text(on, learn[0]!)).not.toContain('snakebite');
+  expect(text(on, learn[0]!)).toMatch(new RegExp(`import\\(["']\\./${chunk[0]!.replace(/^assets\//, '').replace(/[.]/g, '\\.')}["']\\)`));
+});
+
 test("[AH-ASK-NOTE] Ahead's which-pass words are their own chunk, loaded with the tap: not in the first screen's JavaScript", () => {
   const figures = measure(on);
   const first = figures.firstFiles.map((f) => text(on, f)).join('\n');
