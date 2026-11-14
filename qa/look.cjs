@@ -47,10 +47,11 @@ test('[LC-LOOK-TAPS] every colour, bar and e-bike choice is a labelled radio, no
   assert.ok(colours.every(c=>c.label.trim().length>0),'each swatch is named');
   assert.deepEqual(radios(bars).map(c=>c.label),['Drop','Flat','Other','Not set']);
   assert.deepEqual(radios(eb).map(c=>c.label),['Yes','No','Not set']);
-  // the section holds no text input: only radios and the phone's own colour picker
+  // the section holds no text input: only radios, and More colours is our own grid's button (wish 4, 14 Nov 2026), no longer the
+  // phone's own colour picker
   const html=p.html,section=html.slice(html.indexOf('id="bikeLook"'),html.indexOf('id="bikeMoreDetails"'));
   const inputs=[...section.matchAll(/<input\b[^>]*>/g)].map(m=>m[0]);
-  assert.ok(inputs.length===1&&/type="color"/.test(inputs[0]),'More colours is the phone\'s picker, not a text field');
+  assert.ok(inputs.length===0&&/<button type="button" class="look-chip look-picker" id="lookPickerChip" aria-expanded="false"/.test(section),'More colours is our own grid\'s button, not a text field');
   assert.ok(!/<textarea|<select/.test(section),'no form fields');
   const css=html.slice(0,html.indexOf('</style>'));
   assert.ok(/\.look-swatch,\.look-chip\{[^}]*min-height:44px;min-width:44px/.test(css),'each choice is at least 44 px');
@@ -107,7 +108,7 @@ test('[LC-LOOK-NOTSET] each choice goes back to Not set: no colour is the outlin
 test('[LC-LOOK-SAVES] the plan\'s bike updates loadcheck:bikeProfile and its saved copy; a saved bike alone stays out of the plan; lower case; the format guard holds',async()=>{
   const p=page();
   open(p);
-  p.run("document.getElementById('lookPicker').value='#A1B2C3';flushLookPicker();LOOK_PICKER_TIMER=1;flushLookPicker();");
+  p.run("lookPickerInput('#A1B2C3');flushLookPicker();LOOK_PICKER_TIMER=1;flushLookPicker();");
   await p.settle();
   assert.equal(JSON.parse(p.stored('loadcheck:bikeProfile')).look.colour,'#a1b2c3');
   assert.equal(JSON.parse(p.stored('loadcheck:bikeProfiles')).find(b=>b.id===BIKE.id).look.colour,'#a1b2c3');
