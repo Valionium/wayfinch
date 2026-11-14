@@ -118,6 +118,15 @@ jobs:
           node -e "const s = require('./pw.json').stats; if (!(s.expected + s.unexpected + s.flaky > 0)) { console.error('This part ran no test.'); process.exit(1); }"
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: pw.json
+      # A failed part keeps what Playwright saved of its failed tests (the trace and screenshot of playwright.config.ts) for a week:
+      # `gh run download <run id>` fetches it, `npx playwright show-trace <trace.zip>` opens it.
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ strategy.job-index }}
+          path: test-results
+          retention-days: 7
+          if-no-files-found: ignore
   # WebKit's smoke set (plan Decision 1): it runs on every pull request, is not a required check, and `browser` does not wait for it.
   webkit-smoke:
     runs-on: ubuntu-latest
