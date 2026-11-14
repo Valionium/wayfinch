@@ -135,6 +135,10 @@ export const LN = {
   modes: 'Way to learn',
   explore: 'Explore',
   build: 'Build-up',
+  // How it works (design of 14 Nov 2026): the switch's name and what shows if its chunk can't be loaded; its own words are en-works.ts's
+  works: 'How it works',
+  worksFailed: 'How it works couldn\'t be opened.',
+  worksRetry: 'Try again',
   step: (n: number, of: number, name: string) => `Step ${n} of ${of}: ${name}`,
   back: 'Back',
   next: 'Next',

@@ -247,7 +247,9 @@ test("[BW-LAZY] How it works is a chunk of its own, loaded on its press: not in 
   expect(learn.length).toBe(1);
   expect(learn[0]).not.toBe(chunk[0]);
   expect(text(on, learn[0]!)).not.toContain('snakebite');
-  expect(text(on, learn[0]!)).toMatch(new RegExp(`import\\(["']\\./${chunk[0]!.replace(/^assets\//, '').replace(/[.]/g, '\\.')}["']\\)`));
+  expect(text(on, learn[0]!)).toMatch(new RegExp(`import\\(["'\`]\\./${chunk[0]!.replace(/^assets\//, '').replace(/[.]/g, '\\.')}["'\`]\\)`));
+  // and no static import of it
+  expect(text(on, learn[0]!)).not.toMatch(new RegExp(`from\\s*["']\\./${chunk[0]!.replace(/^assets\//, '').replace(/[.]/g, '\\.')}["']`));
 });
 
 test("[AH-ASK-NOTE] Ahead's which-pass words are their own chunk, loaded with the tap: not in the first screen's JavaScript", () => {
