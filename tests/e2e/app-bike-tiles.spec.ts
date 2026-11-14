@@ -33,8 +33,9 @@ async function openDetails(page: Page, hash: string): Promise<void> {
   await page.goto('about:blank');
   await page.goto(`${app!.origin}/tools/bags/${hash}`, { waitUntil: 'load' });
   await expect(page.locator('#bikeDetailsBox')).toBeVisible();
-  await page.locator('#bikeMoreDetails > summary').click();
+  // the tiles show as soon as Bike details opens (the owner, 14 Nov 2026): nothing to open first, nothing around them that can stay closed
   await expect(page.locator('#bikeTiles')).toBeVisible();
+  expect(await page.evaluate(() => document.getElementById('bikeTiles')!.closest('details') === null)).toBe(true);
 }
 
 test('[BK-TILES-OPEN] the tiles open one group at a time, its fields only, the focus inside; Back to all details and the tile itself close it, the focus on the tile', async ({ page }) => {

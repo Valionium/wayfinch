@@ -8,13 +8,14 @@ const J=code=>JSON.parse(app.run(`JSON.stringify(${code})`)??'null');
 const dlg=html.slice(html.indexOf('id="bikeDetailsBox"'),html.indexOf('id="maxWeightBox"'));
 const at=s=>dlg.indexOf(s);
 
-// [BK-UI-07] the dialog opens on the frame pictures and the size row; everything else is under a closed "More details (optional)".
+// [BK-UI-07] the dialog opens on the frame pictures and the size row; everything else comes after them, under "More details (optional)",
+// whose tiles show at once (the owner, 14 Nov 2026: no wrapper to open first).
 {
   const quick=at('id="bikeQuick"'),more=at('id="bikeMoreDetails"');
   check(quick>0&&more>quick,'BK-UI-07 the quick block comes first');
   check(at('id="fitStyleChoices"')>quick&&at('id="fitStyleChoices"')<more,'BK-UI-07 frame pictures are in the quick block');
   check(at('id="fitSizeChips"')>quick&&at('id="fitSizeChips"')<more&&at('id="fitQuickResult"')>quick&&at('id="fitQuickResult"')<more,'BK-UI-07 size row and result are in the quick block');
-  check(/<details[^>]*id="bikeMoreDetails"(?![^>]*\sopen)[^>]*>\s*<summary>More details \(optional\)<\/summary>/.test(dlg),'BK-UI-07 More details is closed by default');
+  check(/<section[^>]*id="bikeMoreDetails"[^>]*>\s*<h3 id="bikeMoreTitle">More details \(optional\)<\/h3>/.test(dlg),'BK-UI-07 More details (optional) follows the quick block, its tiles shown at once');
   for(const id of ['fitBoltSt','fitBoltDt','fitBoltUn','fitTopTube','fitMeasureBox','fitMaxWeight','bikeRepairFields','bikeLibraryPanel','bikeApply','bikeBaseKg'])
     check(at('id="'+id+'"')>more,'BK-UI-07 '+id+' sits under More details');
   check(app.run(`FIT_STYLES.length>=8`)&&app.run(`['XS','S','M','L','XL'].every(l=>fitSizeChipLetters().includes(l))`),'BK-UI-07 sizes XS to XL');

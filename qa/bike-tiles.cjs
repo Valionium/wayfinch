@@ -41,7 +41,10 @@ const panel=id=>{
   check(tiles.every(([,name])=>name.split(' ').length<=3),'[BK-TILES-GRID] each tile is a word or two');
   const grid=more.indexOf('id="bikeTiles"');
   check(grid>0 && TILES.every(([id])=>more.indexOf(`id="${id}"`)>grid),'[BK-TILES-GRID] the grid comes before every group');
-  check(/<details class="bike-more" id="bikeMoreDetails"><summary>More details \(optional\)<\/summary>/.test(dlg),'[BK-TILES-GRID] the grid is in More details, which stays closed by default');
+  // the tiles show as soon as Bike details opens (the owner, 14 Nov 2026): no wrapper to open first, a heading that says they are optional
+  check(/<section class="bike-more" id="bikeMoreDetails" aria-labelledby="bikeMoreTitle">\s*<h3 id="bikeMoreTitle">More details \(optional\)<\/h3>/.test(dlg) && !/<details[^>]*id="bikeMoreDetails"/.test(dlg),'[BK-TILES-GRID] the tiles show at once under the heading More details (optional), with no wrapper to open');
+  check(!more.slice(0,grid).replace(/<!--[\s\S]*?-->/g,'').includes('<details'),'[BK-TILES-GRID] nothing that can stay closed is around the grid');
+  check(more.slice(0,grid).includes('<p>Tap Use these bike details to plan with them. Saving the bike is optional; repair details can stay blank.</p>') && !dlg.includes('Choose Use these bike details to use them'),'[BK-TILES-GRID] the line before the tiles says plainly what to tap');
   for(const [id,name] of TILES){
     const p=panel(id);
     check(new RegExp(`^<details class="bike-tool-optional bd-group" id="${id}" aria-label="${name}"><summary>${name}</summary>`).test(p),`[BK-TILES-GRID] ${name} is a group closed by default, named as its tile`);

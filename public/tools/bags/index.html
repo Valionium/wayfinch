@@ -2369,8 +2369,10 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         <p class="look-status" id="lookStatus" role="status" aria-live="polite"></p>
         <button type="button" class="linky hidden" id="lookUndo"></button>
       </section>
-      <details class="bike-more" id="bikeMoreDetails"><summary>More details (optional)</summary>
-      <p>Choose Use these bike details to use them in this plan. Saving a reusable bike is optional. Repair details can stay blank.</p>
+      <!-- the tiles show as soon as Bike details opens (the owner, 14 Nov 2026): no wrapper to open first -->
+      <section class="bike-more" id="bikeMoreDetails" aria-labelledby="bikeMoreTitle">
+      <h3 id="bikeMoreTitle">More details (optional)</h3>
+      <p>Tap Use these bike details to plan with them. Saving the bike is optional; repair details can stay blank.</p>
       <!-- The owner's wish of 14 Nov 2026: the details as tiles of a word or two, all on one screen; a tap opens only that group's
            fields (each group a closed <details>, its summary hidden: the tile is its button), Back to all details closes it. -->
       <div class="bd-tiles" id="bikeTiles" role="group" aria-label="Bike details">
@@ -2480,7 +2482,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       </form>
       <p>Saved on this device and included in Export / Import. Each saved setup keeps its own copy, so editing a bike will not alter an older trip.</p>
       <p>Repair references: <a href="https://www.schwalbe.com/en/technology-faq/tubeless/" target="_blank" rel="noopener">Schwalbe tubeless guidance</a> · <a href="https://productinfo.shimano.com/en/spec/general-chain-quick-link" target="_blank" rel="noopener">Shimano chain/link compatibility</a></p>
-      </details>
+      </section>
     </section>
     </div>
   </section>
@@ -3185,7 +3187,7 @@ function triangleLitres(t){
   return {full:down(L),three:down(L*0.75),half:down(L*0.5),insideCm:Math.floor(a-1.5+1e-9)};
 }
 // Format guard (spec 7.1): this page never rewrites a bike list that a newer page marked with a higher number.
-const BIKE_FORMAT_KEY='loadcheck:bikeProfilesFormat',BIKE_FORMAT=2,BIKE_NEWER_MESSAGE='This bike list was saved by a newer version of Load Check. Reload to edit it.';
+const BIKE_FORMAT_KEY='loadcheck:bikeProfilesFormat',BIKE_FORMAT=2,BIKE_NEWER_MESSAGE='This bike list was saved by a newer version of the Bag planner. Reload to edit it.';
 async function bikeStoreSet(key,value){
   if(FREE_PLAY && key===BIKE_PROFILE_KEY)return false;   // free play never changes the saved bikes (review of PR 146, I2)
   const stored=Number(await store.get(BIKE_FORMAT_KEY))||1;
@@ -3300,7 +3302,7 @@ function initialiseBikeTiles(){
     if(group.open)document.querySelectorAll('details.bd-group').forEach(other=>{if(other!==group && other.open)other.open=false;});
     renderBikeTiles();
   }));
-  for(const type of ['toggle','input','change'])$('bikeMoreDetails').addEventListener(type,renderBikeTiles);
+  for(const type of ['input','change'])$('bikeMoreDetails').addEventListener(type,renderBikeTiles);
   // an entry the browser rejects on Save is shown in its group, so the browser can point at it
   $('bikeProfileForm').addEventListener('invalid',event=>{const group=event.target.closest?.('details.bd-group');if(group && !group.open)openBikeTile(group.id,false);},true);
   renderBikeTiles();
@@ -4345,7 +4347,6 @@ function openBikeDetails(opener=document.activeElement,section='frame'){
   if(section==='look'){$('bikeLook').scrollIntoView?.({block:'start'});$('bikeLookTitle').focus({preventScroll:true});}
   if(section==='repair'){
     // the repair details are spread over the tiles now (the owner's wish of 14 Nov 2026): every tile shows, the focus on the first
-    $('bikeMoreDetails').open=true;
     document.querySelectorAll('details.bd-group').forEach(group=>{group.open=false;});renderBikeTiles();
     $('bikeTiles').scrollIntoView?.({block:'start'});document.querySelector('#bikeTiles .bd-tile')?.focus({preventScroll:true});
   }
@@ -4359,7 +4360,6 @@ function closeBikeDetailsSoftly(){
   if(LINK_BIKE && BIKE_FORM_DIRTY && !$('bikeDetailsBox').classList.contains('hidden')){
     BIKE_PROFILE_MESSAGE='Not saved yet: Save bike for next time keeps what you typed. × leaves without it.';
     renderBikeProfiles();
-    if($('bikeMoreDetails'))$('bikeMoreDetails').open=true;
     $('bikeSave').focus?.();
     return;
   }
