@@ -30,9 +30,11 @@ const learnShown = (): boolean => typeof location !== 'undefined' && location.ha
 export function ToolsScreen({ services }: { services: TyreServices }) {
   const [learn, setLearn] = useState(learnShown);
   useEffect(() => {
+    // The window as the effect saw it: a cleanup that comes late (a test's page already gone) still finds it.
+    const w = window;
     const on = (): void => setLearn(learnShown());
-    window.addEventListener('hashchange', on);
-    return () => window.removeEventListener('hashchange', on);
+    w.addEventListener('hashchange', on);
+    return () => w.removeEventListener('hashchange', on);
   }, []);
   return learn ? <LearnScreen services={services} /> : <ToolsCards services={services} />;
 }
@@ -56,10 +58,11 @@ function ToolsCards({ services }: { services: TyreServices }) {
     // A page that was not restored from the cache has read everything fresh already (BK-RETURN).
     const onShow = (e: Event): void => { if ((e as PageTransitionEvent).persisted) again(); };
     const onVisible = (): void => { if (document.visibilityState !== 'hidden') again(); };
-    window.addEventListener('storage', onStorage);
-    window.addEventListener('pageshow', onShow);
-    document.addEventListener('visibilitychange', onVisible);
-    return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('pageshow', onShow); document.removeEventListener('visibilitychange', onVisible); };
+    const [w, d] = [window, document];
+    w.addEventListener('storage', onStorage);
+    w.addEventListener('pageshow', onShow);
+    d.addEventListener('visibilitychange', onVisible);
+    return () => { w.removeEventListener('storage', onStorage); w.removeEventListener('pageshow', onShow); d.removeEventListener('visibilitychange', onVisible); };
   }, []);
   const host = services.host();
   const read = readStore(services.storage);
