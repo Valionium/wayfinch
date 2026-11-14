@@ -11,8 +11,10 @@ const BUDGETS = /\[PERF-/;
 const FUNCTIONAL = ['chromium-phone', 'chromium-laptop', 'app-phone', 'app-phone-light', 'app-laptop', 'app-laptop-light', 'app-wide', 'app-wide-firefox'];
 // In CI a failed test of the app's own projects keeps its trace and a screenshot in test-results, which the pull-request workflow
 // uploads: a flake that never shows on a laptop can be read afterwards. Not the budgets (they are timed) and not the handover tests.
+// The trace has every step with its time and log, the console, the requests and the screen as a film, but no page snapshots: those
+// are taken inside the page, and on the phone stand-in (processor at a quarter) they made part 1/4 run 34 % longer, past its limit.
 // A trace holds the pages it saw, the bag planner's too: read one without printing that page's lines 20-25 (AGENTS.md).
-const KEEP_FAILED = process.env.CI ? { trace: 'retain-on-failure', screenshot: 'only-on-failure' } as const : {};
+const KEEP_FAILED = process.env.CI ? { trace: { mode: 'retain-on-failure', snapshots: false, screenshots: true }, screenshot: 'only-on-failure' } as const : {};
 
 export default defineConfig({
   testDir: 'tests/e2e',
