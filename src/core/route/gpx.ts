@@ -2,6 +2,7 @@
 // when they are plausible, a new section at every segment, and Load Check's limits of 20 MB, 200,000 points and 500
 // sections. The XML parser is injected, so this file needs no DOM: the app passes DOMParser, the tests jsdom.
 import { W } from '../wording/en.ts';
+import { RF } from '../wording/en-route-file.ts';
 
 /** One point as the file gives it. `break` marks the first point of a new section: no distance is counted into it. */
 export type RawPoint = { lat: number; lon: number; ele: number | null; break?: true };
@@ -70,7 +71,7 @@ export function parseGpx(
 ): { points: RawPoint[]; segments: number; name: string; hasElev: boolean } {
   if (typeof text !== 'string' || byteLength(text) > GPX_MAX_BYTES) throw new GpxError('too-large', W.routeGpxTooLarge);
   // Counted in the text first, so a file far over the limit is refused before a document of it is built (a phone's memory).
-  if (pointTags(text, 'trkpt') > GPX_MAX_POINTS || pointTags(text, 'rtept') > GPX_MAX_POINTS) throw new GpxError('too-many-points', W.routeGpxTooManyPoints);
+  if (pointTags(text, 'trkpt') > GPX_MAX_POINTS || pointTags(text, 'rtept') > GPX_MAX_POINTS) throw new GpxError('too-many-points', RF.routeGpxTooManyPoints);
   let doc: XmlDocLike;
   try {
     doc = parseXml(text);
@@ -83,7 +84,7 @@ export function parseGpx(
   let nodes = tags(doc, 'trkpt');
   if (nodes.length === 0) nodes = tags(doc, 'rtept');
   if (nodes.length < 2) throw new GpxError('unreadable', W.routeGpxUnreadable);
-  if (nodes.length > GPX_MAX_POINTS) throw new GpxError('too-many-points', W.routeGpxTooManyPoints);
+  if (nodes.length > GPX_MAX_POINTS) throw new GpxError('too-many-points', RF.routeGpxTooManyPoints);
 
   const points: RawPoint[] = [];
   let previousGroup: XmlElementLike | null = null;
@@ -113,6 +114,6 @@ export function parseGpx(
     gap = false;
   }
   if (points.length < 2) throw new GpxError('unreadable', W.routeGpxUnreadable);
-  if (segments > GPX_MAX_SECTIONS) throw new GpxError('too-many-sections', W.routeGpxTooManySections);
+  if (segments > GPX_MAX_SECTIONS) throw new GpxError('too-many-sections', RF.routeGpxTooManySections);
   return { points, segments, name: nameFrom(doc), hasElev: points.some((p) => p.ele !== null) };
 }

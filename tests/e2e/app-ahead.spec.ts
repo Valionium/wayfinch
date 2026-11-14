@@ -240,6 +240,9 @@ test('[AH-CALL-CONFIRM] offline at 360 px: Call 112 asks with the number and who
   await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
   await goOffline(page);
   await page.reload({ waitUntil: 'domcontentloaded' });
+  // The screen as the stored trip draws it, not its first frame: a card opened before that is drawn again, and the question with it.
+  await expect(page.locator('[data-ahead="answers"]')).toBeVisible();
+  await expect(page.locator('[data-card]')).toHaveCount(6);
   const asked = sent(page);
   await page.locator('.ah-chips').getByRole('button', { name: 'Emergency', exact: true }).click();
   const card = page.locator('#chip-emergency');
@@ -384,6 +387,27 @@ test('[AH-STRIP-LINE] the owner\'s day at 360 and 1280 px: the icons on the line
   for (let n = 1; n < g.icons.length; n += 1) expect(g.icons[n]!.x).toBeGreaterThanOrEqual(g.icons[n - 1]!.x + g.icons[n - 1]!.w);
   // spread: the first place near the start, the last at the stop
   expect(last.cx - g.icons[0]!.cx).toBeGreaterThan(0.85 * g.line.w);
+});
+
+test('[AH-STRIP] a tap on a strip icon, and Back to today at the top, leave the focus on the title button of a card, never the body of the page (review of #142, I4 and M1)', async ({ page }) => {
+  test.skip(!['app-phone', 'app-laptop'].includes(test.info().project.name), 'both widths in the phone and laptop projects');
+  const inputs = rainyStop({ plan: { date: SAT, backToTodayAt: null } });
+  await page.clock.install({ time: inputs.now });
+  app = await loadApp(page, { launch: true, testHooks: true });
+  await drawCase(page, inputs);
+  const focused = () => page.evaluate(() => {
+    const el = document.activeElement;
+    return { tag: el?.tagName ?? '', card: el?.closest('[data-card]')?.getAttribute('data-card') ?? '', toggle: el?.classList.contains('ah-toggle') ?? false };
+  });
+  const icon = page.locator('[data-strip] .ah-icon').first();
+  await icon.focus();
+  await page.keyboard.press('Enter');
+  // The focus moves once the card has opened (a tick later): wait for it there, then check it is no longer the icon nor the body.
+  await expect.poll(async () => (await focused()).toggle).toBe(true);
+  expect((await focused()).tag).toBe('BUTTON');
+  await page.locator('[data-back-today] button').click();
+  await expect.poll(async () => (await focused()).card).toBe('daylight');
+  expect(await focused()).toEqual({ tag: 'BUTTON', card: 'daylight', toggle: true });
 });
 
 test('[AH-STRIP-LINE] an icon over a rain band: the band shows above and below it and can still be tapped', async ({ page }) => {
