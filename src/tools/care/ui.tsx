@@ -6,12 +6,12 @@ import { normaliseBike } from '../../core/bike/normalise.ts';
 import type { BikeRecord } from '../../core/bike/normalise.ts';
 import { resolveBikeSpec } from '../../core/bike/spec.ts';
 import type { BikeType } from '../../core/bike/spec.ts';
-import { careDetails, careFluid, fitOf, fitted, softTag } from '../../core/care/fit.ts';
+import { careDetails, careFluid, fitBike, fitted, softTag } from '../../core/care/fit.ts';
 import { pictureDetails } from '../../core/care/pictures.ts';
 import { byType, riderType } from '../../core/care/type-order.ts';
 import { searchCare } from '../../core/care/search.ts';
 import type { CareDetails, CareKey, CareTask, Conditions, Fitted, Part, RoadCard } from '../../core/care/types.ts';
-import { C, CARE_TASKS, CARRY, fitWords, PART_LABEL, PARTS, ROAD_CARDS, SECTION_LABEL, SECTIONS, TAG_LABEL, taskName, tellUsLine } from '../../core/wording/en-care.ts';
+import { C, CARE_TASKS, CARRY, fitWords, KIND_TAG, PART_LABEL, PARTS, ROAD_CARDS, SECTION_LABEL, SECTIONS, TAG_LABEL, taskName, tellUsLine } from '../../core/wording/en-care.ts';
 import { bikeDetailsHref } from '../../ui/bike/link.ts';
 import { choiceVersion } from '../../ui/tools/bike-choice.ts';
 import { BikeLine } from '../../ui/tools/bike-line.tsx';
@@ -47,12 +47,15 @@ const searchText = (t: CareTask): string[] => [t.name, PART_LABEL[t.part], ...t.
 
 const cardText = (c: RoadCard): string[] => [c.problem, PART_LABEL[c.part], ...c.words];
 
-/** The tags of a Not sure detail (and a task's soft tag): "if you have disc brakes". Tasks, cards and carry items alike. */
-function Tags({ item, details }: { item: { tags: CareKey[]; applies: Conditions; soft?: CareTask['soft'] }; details: CareDetails }) {
+/**
+ * The tags of a Not sure detail (and a task's soft tag): "if you have disc brakes"; a task for one kind of rim brake names the kind. Tasks,
+ * cards and carry items alike.
+ */
+function Tags({ item, details }: { item: { tags: CareKey[]; applies: Conditions; soft?: CareTask['soft']; rimBrake?: CareTask['rimBrake'] }; details: CareDetails }) {
   const soft = softTag(item, details);
   // a soft tag that says a detail's own tag stands in for it (sweep of 14 November 2026, item 45): the condition said once
   const own = soft ? item.tags.filter((k) => !item.soft?.replaces?.includes(k)) : item.tags;
-  const all = [...own.map((k: CareKey) => TAG_LABEL(k, item.applies[k] as never)), ...(soft ? [soft] : [])];
+  const all = [...own.map((k: CareKey) => (k === 'brakes' && item.rimBrake ? KIND_TAG(item.rimBrake) : TAG_LABEL(k, item.applies[k] as never))), ...(soft ? [soft] : [])];
   return all.length === 0 ? null : <span class="muted care-tags">{all.join(' · ')}</span>;
 }
 
@@ -165,16 +168,18 @@ export function CareScreen({ services }: { services: TyreServices }) {
   // Show all (the owner's wish of 14 November 2026): the list as with no bike; not stored, so the next visit fits the bike again
   const [showAll, setShowAll] = useState(false);
   const own = careDetails(bike);
-  const told = bike ? fitWords(own, pictureDetails(bike).rimBrake, careFluid(bike)) : [];
+  const ownRim = pictureDetails(bike).rimBrake;
+  const told = bike ? fitWords(own, ownRim, careFluid(bike)) : [];
   const all = showAll && told.length > 0;
   const details = all ? careDetails(null) : own;
+  const rim = all ? null : ownRim;
   // under Show all, a card or task that does not fit the bike opens as for no bike (every line, the content's own words); one that fits, as for the bike
-  const stepBike = (source: StepSource): BikeRecord | null => (all && !fitOf(source.item.applies, own).show ? null : bike);
+  const stepBike = (source: StepSource): BikeRecord | null => (all && !fitBike(source.item, own, ownRim).show ? null : bike);
   const type = riderType(bike ? resolveBikeSpec(bike, null) : null);
   // "Add your bike" in the bike view: only while no bike is saved (with bikes saved and none chosen, the rider chose that).
   const addHref = savedBikeIds(services.storage).length === 0 ? bikeDetailsHref('new', 'care') : null;
   const tell = bike ? tellUsLine(own) : null;
-  const fit = fitted(CARE_TASKS, details);
+  const fit = fitted(CARE_TASKS, details, rim);
   const shown = searchCare(query, part ? fit.filter((t) => t.part === part) : fit, searchText);
   // The Care search also finds Roadside cards (decision 2): only while something is typed, as the bike and the part filter allow.
   const allCards = fitted(ROAD_CARDS, details);
@@ -237,7 +242,7 @@ export function CareScreen({ services }: { services: TyreServices }) {
             <section key={s} class="care-section">
               <h3>{SECTION_LABEL[s]}</h3>
               {byType(inSection, type, details).map(({ item: t, usual }) => (
-                <TaskItem key={t.id} task={t} name={taskName(t, fitOf(t.applies, own).show ? own : details)} details={details} onSteps={openSteps} other={usual ? null : type} />
+                <TaskItem key={t.id} task={t} name={taskName(t, fitBike(t, own, ownRim).show ? own : details)} details={details} onSteps={openSteps} other={usual ? null : type} />
               ))}
             </section>
           );

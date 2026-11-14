@@ -1,4 +1,5 @@
 // Bike care's content and fitting types (sub-project 12; design 3.2 and 3.3). Pure data: no DOM, no storage.
+import type { RimKind } from './pictures.ts';
 
 /** The sections of the Care list, in design 3.1's order. */
 export type Section = 'ride' | 'wet' | 'week' | 'month' | 'half-year' | 'year' | 'notice';
@@ -29,6 +30,11 @@ export type CareTask = {
    * the soft tag already says while it shows, so a task never says its condition twice (live-site sweep of 14 November 2026, item 45).
    */
   soft?: { applies: Conditions; tag: string; replaces?: CareKey[] };
+  /**
+   * A task for some kinds of rim brake only (the owner's ruling of 14 November 2026: the hydraulic rim brake's spongy lever), beside
+   * `applies` rim brakes; the kind is read only with rim brakes, as a step's is (lines.ts). See fitBike.
+   */
+  rimBrake?: readonly RimKind[];
 };
 /** `part` is the part filter the card belongs to (group 3's ruling: the Care search's filters limit the cards too). */
 export type RoadCard = { id: string; problem: string; part: Part; applies: Conditions; checkFirst: string; steps: string[]; rideOn: string; carry: string[]; words: string[]; critical: boolean };

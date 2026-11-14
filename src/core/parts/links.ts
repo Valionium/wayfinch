@@ -12,7 +12,7 @@ const none: L = [];
  * (see linkSegments). The bike view (design of 9 November 2026, 2.1): every part a step names is linked at its first mention.
  */
 export const STEP_PARTS: Readonly<Record<string, readonly L[]>> = {
-  'puncture-tube': [[['disc brakes', 'caliper'], ['brake lever', 'brake-lever']], [['tyre bead', 'bead'], ['rim', 'rim'], ['tube', 'tube'], ['tyre', 'tyre'], ['spoke', 'spokes']], [['tube', 'tube']], [['tyre', 'tyre'], ['tube', 'tube'], ['rim', 'rim']], none, [['tyre', 'tyre'], ['rim', 'rim']], [['tube', 'tube'], ['valve', 'valve'], ['bead', 'bead'], ['rim', 'rim'], ['tyre', 'tyre'], ['Disc brakes', 'caliper'], ['disc', 'disc'], ['pads', 'pads']]],
+  'puncture-tube': [[['wheel', 'wheel'], ['disc brakes', 'caliper'], ['brake lever', 'brake-lever']], [['tyre bead', 'bead'], ['rim', 'rim'], ['tube', 'tube'], ['tyre', 'tyre'], ['spoke', 'spokes']], [['tube', 'tube']], [['tyre', 'tyre'], ['tube', 'tube'], ['rim', 'rim']], none, [['tyre', 'tyre'], ['rim', 'rim']], [['tube', 'tube'], ['valve', 'valve'], ['bead', 'bead'], ['rim', 'rim'], ['tyre', 'tyre'], ['Disc brakes', 'caliper'], ['disc', 'disc'], ['pads', 'pads'], ['wheel', 'wheel']]],
   'puncture-tubeless': [none, none, none, none, none, [['spare tube', 'tube'], ['tubeless valve', 'tubeless-valve']], none],
   'chain-broken': [none, [['quick link', 'quick-link'], ['chain', 'chain']], none, [['rear gears', 'cassette']], none, none],
   'spoke-snapped': [[['spoke', 'spokes'], ['hub', 'hub']], [['Rim brakes', 'rim-brake'], ['rim', 'rim'], ["brake's quick release", 'brake-qr']], [['Disc brakes', 'caliper'], ['rim', 'rim'], ['frame', 'frame'], ['fork', 'fork']], none, [["brake's quick release", 'brake-qr'], ['Rim brakes', 'rim-brake']]],
@@ -65,9 +65,11 @@ export const STEP_PARTS: Readonly<Record<string, readonly L[]>> = {
   'brakes-hydraulic-bleed': [[['lever', 'brake-lever'], ['caliper', 'caliper']], none, none],
   'brakes-squeal': [[['pads', 'pads'], ['disc', 'disc']], [['pads', 'pads']], [['caliper', 'caliper'], ['disc', 'disc']], [['rim', 'rim'], ['pads', 'pads']], none],
   'brakes-spongy': [[['pads', 'pads']], none, none],
+  'brakes-hydro-rim-spongy': [[['pads', 'pads']], [['rim', 'rim'], ['pads', 'pads']], none, none],
   'chain-replace': [[['chain', 'chain'], ['chainring', 'chainring'], ['rear gear', 'cassette']], [['chain', 'chain'], ['chainring', 'chainring'], ['rear gear', 'cassette'], ['rear derailleur', 'derailleur']], [['quick link', 'quick-link']], [['stiff link', 'chain'], ['rear gears', 'cassette']], none],
   'chain-deep-clean': [[['chain', 'chain'], ['quick link', 'quick-link']], [['chain', 'chain'], ['chainrings', 'chainring'], ['brake discs', 'disc'], ['pads', 'pads'], ['rims', 'rim']], none, [['chain', 'chain']], [['chain', 'chain']]],
   'gears-indexing': [[['rear gear', 'cassette'], ['barrel adjuster', 'barrel'], ['chain', 'chain']], [['hanger', 'hanger']], none, [['cassette', 'cassette'], ['jockey wheel', 'derailleur']], [['rear gear', 'cassette'], ['jockey wheel', 'derailleur']], [['derailleur', 'derailleur']]],
+  'gears-electronic-adjust': [none, none, [['hanger', 'hanger']], [['rear derailleur', 'derailleur']], none],
   'wheels-wobble': [[['dropouts', 'dropouts']], [['tyre bead', 'bead'], ['rim', 'rim']], [['spoke', 'spokes']], [['rim', 'rim']], [['spoke', 'spokes'], ['rim', 'rim']]],
   'tyres-replace': [[['tyre', 'tyre'], ['tube', 'tube'], ['valve', 'valve']], [['tyre', 'tyre'], ['rim', 'rim'], ['bead', 'bead']], [['tube', 'tube'], ['valve', 'valve'], ['rim', 'rim']], [['valve', 'valve'], ['tube', 'tube']], [['tyre', 'tyre'], ['tube', 'tube'], ['bead', 'bead']], [['dropouts', 'dropouts'], ["wheel's quick release", 'wheel-qr']]],
   'frame-creak': [[['crank', 'chainring'], ['seatpost', 'seatpost']], [['seatpost', 'seatpost'], ['frame', 'frame']], none],
@@ -77,11 +79,11 @@ export const STEP_PARTS: Readonly<Record<string, readonly L[]>> = {
 /**
  * The parts a rider touches first for a card, which lead its parts in the bike view and on its "What is it, where is it?" line (the
  * owner's ruling of 14 November 2026: the puncture card starts with the wheel, the tyre and the tube, not the disc caliper its warning
- * names first). The guide has no part called the wheel: its rim stands for it. Only parts the card's shown steps name; a card not listed
- * keeps the text's order.
+ * names first); the wheel is the guide's own part (the owner's second ruling that day). Only parts the card's shown steps name; a card not
+ * listed keeps the text's order.
  */
 export const FIRST_PARTS: Readonly<Record<string, readonly PartId[]>> = {
-  'puncture-tube': ['rim', 'tyre', 'tube'],
+  'puncture-tube': ['wheel', 'tyre', 'tube'],
 };
 
 /**

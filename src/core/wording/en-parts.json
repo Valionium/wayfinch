@@ -24,6 +24,10 @@
    "name": "Seatpost and its clamp",
    "text": "The seatpost holds the saddle and slides into the frame's seat tube. The clamp at the top of the seat tube holds the post at its height."
   },
+  "wheel": {
+   "name": "Wheel",
+   "text": "The wheel is the hub in the middle, the spokes and the rim, with the tyre on the rim. Its axle sits in the dropouts of the fork or the frame, held there by a thru-axle, a quick release or nuts."
+  },
   "hub": {
    "name": "Hub",
    "text": "The hub is the middle of the wheel. It turns on bearings round the axle, and the spokes run from it to the rim."
