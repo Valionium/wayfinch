@@ -7257,9 +7257,13 @@ function ensureClimate(place, month){
    a plan without the rain trousers while the packing check said they were over (sweep 14 Nov 2026, #24). Never silently (the
    coordinator's ruling on the review of PR 135, I2): a line names exactly what was added and taken out, with Undo. Not the rider's work,
    so Plan bags for this trip's Undo still holds; a plan Plan bags has just made, with nothing ticked since, is packed afresh, as Plan
-   bags packs it (#25); any other plan keeps its packing, so no ticked thing moves without a word (m1). */
-const WEATHER_KIT={undo:null};
-const weatherKitKey=() => JSON.stringify([S.kit,S.kitTouched,S.bags,S.placements,S.pinned,S.packed]);
+   bags packs it (#25); any other plan keeps its packing, so no ticked thing moves without a word (m1). Weather that lands while Plan
+   bags for this trip is making the plan is part of making it: no line of its own, the plan's own Undo covers it; what lands after the
+   plan is made is said once the plan is there (review of PR 135, N1, m5). A second landing adds to the first line, from the same
+   starting point, while the rider has changed nothing (m6). */
+const WEATHER_KIT={undo:null,pending:false};
+// the rider's work the Undo must not undo: the kit, the bags, hand placements and ticks (the automatic balancing's packing is not)
+const weatherKitKey=() => JSON.stringify([S.kit,S.kitTouched,S.bags,S.pinned,S.packed]);
 function showWeatherBar(text,undo=false){
   const bar=$('weatherBar'); if(!bar) return;
   $('weatherText').textContent=text;
@@ -7267,16 +7271,20 @@ function showWeatherBar(text,undo=false){
   bar.classList.toggle('hidden',!text);
 }
 function climateKitFollows(){
+  if(TRIP_BAGS.hold){ WEATHER_KIT.pending=true; return false; }   // Plan bags for this trip takes it in (planTripBagsHeld), or says it after
+  const prev=WEATHER_KIT.undo && weatherKitKey() === WEATHER_KIT.undo.after ? WEATHER_KIT.undo : null;
   const was={...S.kit},touched={...(S.kitTouched || {})},placements=S.placements,undo=TRIP_BAGS.undo,kept=undo && tripWorkKey(captureDraft()) === undo.after;
   applyTripKitDefaults();
-  const ids=[...new Set([...Object.keys(was),...Object.keys(S.kit)])].filter(id => !!was[id] !== !!S.kit[id] && kitById(id));
-  if(!ids.length) return false;
+  if(![...new Set([...Object.keys(was),...Object.keys(S.kit)])].some(id => !!was[id] !== !!S.kit[id])) return false;
   if(kept && undo.fresh && !Object.values(S.packed || {}).some(Boolean)) keepPlan({load:null});
   if(kept) undo.after=tripWorkKey(captureDraft());
+  // what changed since the first landing the rider has not answered (m6)
+  const from=prev ? prev.kit : was;
+  const ids=[...new Set([...Object.keys(from),...Object.keys(S.kit)])].filter(id => !!from[id] !== !!S.kit[id] && kitById(id));
   const names=on => ids.filter(id => !!S.kit[id] === on).map(id => kitWord(kitById(id)));
   const added=names(true),out=names(false);
-  WEATHER_KIT.undo={ids,kit:was,touched,placements,after:weatherKitKey()};
-  showWeatherBar(`Measured weather for ${MONTHS[S.month]} came in: ${[added.length ? listOf(added)+' added' : '',out.length ? listOf(out)+' taken out' : ''].filter(Boolean).join('; ')}.`,true);
+  WEATHER_KIT.undo=ids.length ? {ids,kit:from,touched:prev ? prev.touched : touched,placements:prev ? prev.placements : placements,after:weatherKitKey()} : null;
+  showWeatherBar(ids.length ? `Measured weather for ${MONTHS[S.month]} came in: ${[added.length ? listOf(added)+' added' : '',out.length ? listOf(out)+' taken out' : ''].filter(Boolean).join('; ')}.` : '',!!ids.length);
   if(S.step === 3) renderKit();
   drawRig(); queueDraftSave();
   return true;
@@ -13037,7 +13045,12 @@ async function planTripBags(){
      and a tab hidden or closed during the wait keeps it as the stored plan. The new plan is saved once it is made. */
   await flushDraft();
   TRIP_BAGS.hold=true;
-  try { return await planTripBagsHeld(t,name,undo,wasBike,before); } finally { TRIP_BAGS.hold=false; queueDraftSave(); }
+  try { return await planTripBagsHeld(t,name,undo,wasBike,before); } finally {
+    TRIP_BAGS.hold=false;
+    // weather that came in after the wait, while the plan was being stored: said now, on the plan as made, with its Undo (review of PR 135, N1)
+    if(WEATHER_KIT.pending){ WEATHER_KIT.pending=false; if(climateKitFollows()){ if(S.step === 4) renderResult(); else renderSmallBags(); } }
+    queueDraftSave();
+  }
 }
 async function planTripBagsHeld(t,name,undo,wasBike,before){
   const base=tripFoundation();

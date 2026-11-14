@@ -1083,6 +1083,7 @@ describe('[TRIP-SMALL-OVER] a day ride\'s bags are sized with the trip\'s weathe
   test('the measured weather that comes in while the bags are planned is in the plan: the rain trousers it calls for have a place, nothing is over', async () => {
     const p = await dayRide('2026-11-15');
     weatherLands(p.page, 17, ticks(30));   // in 30 ms: within the few seconds the planning waits for the weather
+    classes(p.page, 'weatherBar', 'weatherUndo');
     await p.page.run('receiveHandoff()');
     expect(await p.page.run('planTripBags()')).toBe(true);
     expect(p.json<string>('tripClimate().source')).toBe('measured');
@@ -1092,6 +1093,13 @@ describe('[TRIP-SMALL-OVER] a day ride\'s bags are sized with the trip\'s weathe
     expect(String(p.page.nodes.get('smallBagList')!.innerHTML)).toContain('Rain trousers');
     // the trip setup made for the route holds the same kit
     expect(p.json<boolean>('SETUPS[0].kit.rainpants')).toBe(true);
+    // weather that lands during the wait is part of making the plan: no line or Undo of its own, Plan bags' Undo covers it (review of
+    // PR 135, N1: that Undo could never work)
+    expect(shown(p.page, 'weatherBar')).toBe(false);
+    expect(p.json('WEATHER_KIT.undo')).toBeNull();
+    expect(await p.page.run('undoWeatherKit()')).toBe(false);
+    expect(String(p.page.nodes.get('weatherText')!.textContent)).toBe('');
+    expect(await p.page.run('undoTripBags()')).toBe(true);
   });
 
   test('weather that comes in after the plan brings its kit in at once, as the next start would; the small view then names what does not fit, its litres and what to do; Undo still works', async () => {
@@ -1125,8 +1133,31 @@ describe('[TRIP-SMALL-OVER] a day ride\'s bags are sized with the trip\'s weathe
     expect(said).toBe('Measured weather for November came in: rain trousers added.');
     expect(bannedHits(said)).toEqual([]);
     expect(shown(p.page, 'weatherUndo')).toBe(true);
-    // the weather's kit is not the rider's work: Undo still takes the plan back
+    // its Undo works, also after the automatic balancing has packed the plan again: the rain trousers go, as the rider's own choice
+    p.page.run('keepPlan({load:null});currentPlan();');
+    expect(await p.page.run('undoWeatherKit()')).toBe(true);
+    expect(p.json<boolean>(`carrying('rainpants')`)).toBe(false);
+    expect(p.json<boolean>('S.kitTouched.rainpants')).toBe(true);
+    expect(String(p.page.nodes.get('weatherText')!.textContent)).toBe('Back to the kit before the measured weather: rain trousers.');
+    // the weather's kit is not the rider's work: Plan bags' Undo still takes the plan back
     expect(await p.page.run('undoTripBags()')).toBe(true);
+  });
+
+  test('a second landing adds to the first line from the same starting point; one that takes back what the first brought leaves no line (review of PR 135, m6)', async () => {
+    const p = await dayRide('2026-11-15');
+    let land = () => {};
+    weatherLands(p.page, 17, new Promise<void>((r) => { land = r; }));
+    classes(p.page, 'weatherBar', 'weatherUndo');
+    p.page.run('CLIMATE_WAIT_MS=0;');
+    await p.page.run('receiveHandoff()');
+    expect(await p.page.run('planTripBags()')).toBe(true);
+    land(); await ticks();
+    expect(String(p.page.nodes.get('weatherText')!.textContent)).toBe('Measured weather for November came in: rain trousers added.');
+    // another place's figures come in, drier: the rain trousers go again, so nothing changed from where the rider was
+    p.page.run(`Object.values(CLIMATE).forEach(c=>{c.rainDays=0;});climateKitFollows();`);
+    expect(p.json<boolean>(`carrying('rainpants')`)).toBe(false);
+    expect(shown(p.page, 'weatherBar')).toBe(false);
+    expect(p.json('WEATHER_KIT.undo')).toBeNull();
   });
 
   // Review of PR 135, I1: the plan from before must never be lost while the page waits for the weather. Nothing is written until the
