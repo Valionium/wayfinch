@@ -13,10 +13,12 @@ const q=appVM();
 const {run}=q;
 const json=code=>JSON.parse(run(`JSON.stringify(${code})`));
 run('DRAFT_READY=true');
+// the 6-night start these tests were written on: a new plan has no nights entered since the owner's ruling of 14 Nov 2026 (sweep #32)
+run('S.nights=6;S.nightsOpen=null;applyTripKitDefaults()');
 // the page's own starting kit, for the one full-kit mix (review of PRs 116/117, M3)
 const FULLKIT=JSON.stringify(json('S.kit'));
 // a smaller kit than the page's own, so each press runs a few hundred trials less (the QA suites run within LC-QA-ALL's time)
-const KIT0=JSON.stringify(Object.fromEntries(['tent','quilt','pad','stove','pot','lock','tool','pump','bank','puffy','rain','firstaid','wash','camp','tubes','phone'].map(k=>[k,true]))),NIGHTS0=json('S.nights');
+const KIT0=JSON.stringify(Object.fromEntries(['tent','quilt','pad','stove','pot','lock','tool','pump','bank','puffy','rain','firstaid','wash','camp','tubes','phone'].map(k=>[k,true]))),NIGHTS0=6;   // the 6-night trip these tests were written on (a new plan has no nights entered since the owner's ruling of 14 Nov 2026, sweep #32)
 const bike={id:'qa_hf',fit:{style:'diamond-sloping',size:{kind:'letter',value:'M'}},look:{bars:'drop'},frontTyre:'47-584',rearTyre:'47-584'};
 // A plan at the packing step: these bags and decks, the kit as the page starts it, nothing kept yet; with `balanced`, the automatic
 // balancing as the page applies it at the first look (it takes its time, so only where a test needs it).
@@ -63,7 +65,7 @@ test('[HF-STORED] a press is stored as kept placements only: the bags, kit and h
     other.run('DRAFT_READY=true');
     const ojson=code=>JSON.parse(other.run(`JSON.stringify(${code})`));
     other.run(`S.bikeProfile=normaliseBikeProfile(${JSON.stringify(bike)});S.bags=${JSON.stringify(json('S.bags'))};S.nextUid=${json('S.nextUid')};S.decks=${JSON.stringify(json('S.decks'))};
-      S.kit=${JSON.stringify(json('S.kit'))};S.qty=${JSON.stringify(json('S.qty'))};S.foodMode=2;S.step=4;keepPlan({load:${JSON.stringify(placements)}})`);
+      S.kit=${JSON.stringify(json('S.kit'))};S.qty=${JSON.stringify(json('S.qty'))};S.foodMode=2;S.nights=${json('S.nights')};S.step=4;keepPlan({load:${JSON.stringify(placements)}})`);
     assert.deepEqual(ojson('currentPlan().items'),items,`${name}: a reload packs the same`);
     assert.equal(ojson('autoBalancePlan()'),false,`${name}: nothing more to move`);
     assert.equal(ojson('handlingAvailable()&&HANDLING.last'),null,`${name}: a loaded plan is never run through Handling first by itself`);

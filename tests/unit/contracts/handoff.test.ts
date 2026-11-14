@@ -78,6 +78,8 @@ function planner(gpx: string | null, opts: { db?: boolean } = {}) {
   const json = <T>(code: string): T => JSON.parse(page.run(`JSON.stringify(${code})`) as string) as T;
   return { page, log, json };
 }
+/** The bar as the rider reads it: its one line, then what "What changes" holds (the owner's ruling of 14 Nov 2026, sweep #29). */
+const barText = (page: VM) => `${String(page.nodes.get('handoffText')?.textContent ?? '')} ${String(page.nodes.get('handoffDetail')?.textContent ?? '')}`;
 const untouched = `JSON.stringify({bags:S.bags,kit:S.kit.tent,kitTouched:S.kitTouched,custom:S.custom,qty:S.qty,packed:S.packed,pinned:S.pinned,bike:S.bikeProfile,tyre:S.tyrePressure,setups:SETUPS})`;
 
 describe('[C-HANDOFF] the bag planner applies a trip from Wayfinch', () => {
@@ -158,7 +160,7 @@ describe('[C-HANDOFF] what travels, and the bar names it (re-check N1)', () => {
     const { page, json } = planner(gpx);
     page.run("S.pace='steady';S.flatKph=20;S.sleep='indoor';");
     await page.run('receiveHandoff()');
-    const text = String(page.nodes.get('handoffText')!.textContent);
+    const text = barText(page);
     expect(text).toMatch(/2 nights/);
     expect(text).not.toMatch(/the pace|speed|the stay/);
     await page.run('applyHandoff()');
@@ -168,7 +170,7 @@ describe('[C-HANDOFF] what travels, and the bar names it (re-check N1)', () => {
     const { gpx } = await handedOff('loop', { nights: 2, pace: 'hard', flatKph: 28, stay: 'mixed' });
     const { page, json } = planner(gpx);
     await page.run('receiveHandoff()');
-    const text = String(page.nodes.get('handoffText')!.textContent);
+    const text = barText(page);
     expect(text).toMatch(/the pace/);
     expect(text).toMatch(/the flat speed/);
     expect(text).toMatch(/the stay/);
@@ -186,7 +188,7 @@ describe('[C-HANDOFF] where the nights came from (review I4)', () => {
     page.context.qaText = gpx;
     expect(json<{ nightsSuggested?: boolean }>('handoffTrip(qaText)').nightsSuggested).toBe(true);
     await page.run('receiveHandoff()');
-    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/\d+ nights, as Wayfinch suggests for this route/);
+    expect(barText(page)).toMatch(/\d+ nights, as Wayfinch suggests for this route/);
   });
 });
 
@@ -246,7 +248,7 @@ describe('[TRIP-DAY-STOPS] days that end where you can sleep travel to the bag p
     page.context.qaText = gpx;
     expect(json('handoffTrip(qaText)')).toMatchObject({ nights: 3, stops: ends, stopNames: ['Camping "Am See"', null, 'Hotel Krone'] });
     await page.run('receiveHandoff()');
-    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/where each day ends/);
+    expect(barText(page)).toMatch(/where each day ends/);
     expect(await page.run('applyHandoff()')).toBe(true);
     const days = json<{ km: number; name: string | null }[]>('nightStops().slice(1,-1).map(s=>({km:s.kmExact,name:s.name}))');
     days.forEach((d, i) => expect(d.km).toBeCloseTo(ends[i]!, 6));
@@ -508,12 +510,12 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     const { gpx } = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
     const fresh = longPlanner(gpx);
     await fresh.page.run('receiveHandoff()');
-    expect(String(fresh.page.nodes.get('handoffText')!.textContent)).toMatch(/Your plan now is kept as a setup/);
+    expect(barText(fresh.page)).toMatch(/Your plan now is kept as a setup/);
     const same = longPlanner(gpx);
     same.page.run(`SETUPS=[${qaSetup('t_same')}];`);
     await same.page.run('receiveHandoff()');
-    expect(String(same.page.nodes.get('handoffText')!.textContent)).not.toMatch(/kept as a setup/);
-    expect(String(same.page.nodes.get('handoffText')!.textContent)).toMatch(/already saved as Setup t_same/);
+    expect(barText(same.page)).not.toMatch(/kept as a setup/);
+    expect(barText(same.page)).toMatch(/already saved as Setup t_same/);
   });
 
   test('"Open the setup made on …" names the trip\'s nights and date when they differ from the setup\'s (review of PR 80, m4)', async () => {
@@ -532,7 +534,7 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     page.run(`SETUPS=[${qaSetup('t_made', { saved: '2026-11-06', forRoute: { hash: route, name: 'Heidelberg → Strasbourg', departureDate: '2026-06-12' } })}];`);
     await page.run('receiveHandoff()');
     expect(json<string>('HANDOFF.reuse')).toBe('t_made');
-    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/the setup made on 6 Nov/);
+    expect(barText(page)).toMatch(/the setup made on 6 Nov/);
     expect(await page.run('reuseTripSetup()')).toBe(true);
     expect(json('[S.step,SETUPS.length]')).toEqual([2, 1]);
     expect(JSON.parse(page.values.get('loadcheck:handoff-done')!)).toMatchObject({ outcome: 'applied' });
@@ -1256,14 +1258,14 @@ describe('[TRIP-SMALL-OVER] a day ride\'s bags are sized with the trip\'s weathe
 // rider never made (the planner's untouched start).
 describe('[TRIP-BEFORE-UNTOUCHED] a plan with nothing of the rider\'s in it is not kept as a setup before Plan bags for this trip (sweep 14 Nov 2026, #31)', () => {
   // the trip and choices a new plan starts with: the harness's planner sets its own trip, so it is put back here
-  const START = `S.nights=6;S.sleep='camp';S.pace='sporting';S.flatKph=25;S.departureDate=null;S.month=new Date().getMonth();S.mode='comfort';S.foodMode=2;S.pockets=null;`;
+  const START = `S.nights=0;S.nightsOpen=0;S.sleep='camp';S.pace='sporting';S.flatKph=25;S.departureDate=null;S.month=new Date().getMonth();S.mode='comfort';S.foodMode=2;S.pockets=null;`;
   test('the untouched start: no "Before …" setup, the bar promises none; Undo still gives that plan back exactly', async () => {
     const p = await dayRide('2026-11-15');
     p.page.run(`SETUPS=[];${START}`);
-    await p.page.run('receiveHandoff()');
-    expect(String(p.page.nodes.get('handoffText')!.textContent)).not.toMatch(/kept as a setup|already saved as/);
     const before = p.page.run('JSON.stringify(captureDraft())');
-    expect(await p.page.run('planTripBags()')).toBe(true);
+    // nothing would be replaced: planned at once, no ask (the owner's ruling of 14 Nov 2026, sweep #29)
+    expect(await p.page.run('receiveHandoff()')).toBe(true);
+    expect(barText(p.page)).not.toMatch(/already saved as/);
     expect(p.json<string[]>('SETUPS.map(s=>s.name)').filter((n) => n.startsWith('Before '))).toEqual([]);
     expect(p.json<number>('SETUPS.length')).toBe(1);
     expect(String(p.page.nodes.get('handoffText')!.textContent)).not.toMatch(/kept as a setup/);
@@ -1274,14 +1276,72 @@ describe('[TRIP-BEFORE-UNTOUCHED] a plan with nothing of the rider\'s in it is n
 
   test('anything of the rider\'s in it (a bag, a touched or sized thing, a tick; the trip, the mode, the food mode, the pockets) and it is kept, as before (review of PR 141, m1)', async () => {
     for (const work of ['S.bags=[{uid:1,pos:"seat",L:10}];S.nextUid=2;', 'S.kit.cap=false;S.kitTouched.cap=true;', 'S.custom.tool={L:0.3,kg:0.2,rigid:0};', 'S.packed.docs=true;',
-      'S.mode="light";', 'S.foodMode=1;', 'S.nights=2;', 'S.departureDate="2026-12-01";', 'S.pace="hard";', 'S.pockets={jersey:false,bib:true};']) {
+      'S.mode="light";', 'S.foodMode=1;', 'S.nights=2;', 'S.nightsOpen=null;', 'S.departureDate="2026-12-01";', 'S.pace="hard";', 'S.pockets={jersey:false,bib:true};']) {
       const p = await dayRide('2026-11-15');
       p.page.run(`SETUPS=[];${START}${work}`);
       await p.page.run('receiveHandoff()');
-      expect(String(p.page.nodes.get('handoffText')!.textContent), work).toMatch(/Your plan now is kept as a setup/);
+      expect(barText(p.page), work).toMatch(/Your plan now is kept as a setup/);
       expect(await p.page.run('planTripBags()'), work).toBe(true);
       expect(p.json<string[]>('SETUPS.map(s=>s.name)').filter((n) => n.startsWith('Before ')).length, work).toBe(1);
     }
+  });
+});
+
+// The hand-off asked twice (sweep of 14 Nov 2026, #29): the rider taps Plan bags for this trip in Trip, and the planner asked again in six lines.
+describe('[LC-HAND-ATONCE] after Plan bags for this trip in Trip, a plan with nothing of the rider\'s to replace is planned at once, with Undo (the owner\'s ruling of 14 Nov 2026, sweep #29)', () => {
+  const FRESH = `SETUPS=[];S.nights=0;S.nightsOpen=0;S.sleep='camp';S.pace='sporting';S.flatKph=25;S.departureDate=null;S.month=new Date().getMonth();S.mode='comfort';S.foodMode=2;S.pockets=null;`;
+  test('a long trip on a fresh planner: no ask, the trip setup made and Bags opened, the answer written; Undo gives the fresh plan back exactly', async () => {
+    const { gpx } = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
+    const { page, json } = longPlanner(gpx);
+    page.run(`S.bags=[];S.nextUid=1;S.kit={};S.kitTouched={};S.custom={};S.qty={};S.packed={};S.pinned={};S.bikeProfile=null;${FRESH}applyTripKitDefaults();`);
+    expect(json<boolean>('planIsUntouched()')).toBe(true);
+    const before = page.run('JSON.stringify(captureDraft())');
+    expect(await page.run('receiveHandoff()')).toBe(true);
+    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/^Planned for Heidelberg → Strasbourg: a new trip setup/);
+    expect(json('[S.step,S.nights,SETUPS.length,HANDOFF.busy]')).toEqual([2, 2, 1, false]);
+    expect(JSON.parse(page.values.get('loadcheck:handoff-done')!)).toMatchObject({ id: ID, outcome: 'applied' });
+    expect(json<boolean>('$("handoffMore").hidden')).toBe(true);
+    expect(await page.run('undoTripBags()')).toBe(true);
+    expect(page.run('JSON.stringify(captureDraft())')).toBe(before);
+    expect(json<number>('SETUPS.length')).toBe(0);
+  });
+  test('a setup made before for this route is a choice, so the planner asks; so it does with any of the rider\'s work in the plan', async () => {
+    const handed = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
+    const reuse = longPlanner(handed.gpx);
+    reuse.page.run(`S.bags=[];S.nextUid=1;S.kit={};S.kitTouched={};S.custom={};S.qty={};S.packed={};S.pinned={};${FRESH}applyTripKitDefaults();
+      SETUPS=[${qaSetup('t_made', { saved: '2026-11-06', forRoute: { hash: handed.trip.route.hash, name: 'Heidelberg → Strasbourg', departureDate: '2026-06-12' } })}];`);
+    await reuse.page.run('receiveHandoff()');
+    expect(String(reuse.page.nodes.get('handoffText')!.textContent)).toMatch(/Plan bags for this trip\?$/);
+    expect(reuse.json<number>('SETUPS.length')).toBe(1);
+    const worked = longPlanner(handed.gpx);
+    await worked.page.run('receiveHandoff()');
+    expect(String(worked.page.nodes.get('handoffText')!.textContent)).toMatch(/Plan bags for this trip\?$/);
+    expect(worked.json<number>('SETUPS.length')).toBe(0);
+  });
+});
+
+describe('[LC-HAND-ASK] otherwise the planner asks in one line, and "What changes" holds the rest (the owner\'s ruling of 14 Nov 2026, sweep #29)', () => {
+  test('one sentence and its question; what the tap would change, the plan kept and the setup of this route behind What changes; the bar after the tap has none', async () => {
+    const { gpx } = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
+    const { page, json } = longPlanner(gpx);
+    await page.run('receiveHandoff()');
+    const line = String(page.nodes.get('handoffText')!.textContent);
+    expect(line).toMatch(/^A trip from Wayfinch: [^?]+\. Plan bags for this trip\?$/);
+    expect(line).not.toMatch(/A new trip setup|kept as a setup/);
+    const more = String(page.nodes.get('handoffDetail')!.textContent);
+    expect(more).toMatch(/^A new trip setup gets the route, the date and 2 nights, with the bags and kit predicted for it, from the plan here now\./);
+    expect(more).toMatch(/Your plan now is kept as a setup\.$/);
+    expect(json<boolean>('$("handoffMore").hidden')).toBe(false);
+    expect(bannedHits(`${line} ${more}`)).toEqual([]);
+    expect(readFileSync(join(process.cwd(), 'public', 'tools', 'bags', 'index.html'), 'utf8')).toContain('<details class="handoff-more" id="handoffMore" hidden><summary>What changes</summary><p id="handoffDetail"></p></details>');
+    expect(await page.run('planTripBags()')).toBe(true);
+    expect(json<boolean>('$("handoffMore").hidden')).toBe(true);
+    expect(String(page.nodes.get('handoffDetail')!.textContent)).toBe('');
+  });
+  test('a day ride says so in its one line', async () => {
+    const { page } = longPlanner((await handedOff('loop', { nights: 0 })).gpx);
+    await page.run('receiveHandoff()');
+    expect(String(page.nodes.get('handoffText')!.textContent)).toMatch(/^A trip from Wayfinch: [^?]+, a day ride\. Plan bags for this trip\?$/);
   });
 });
 

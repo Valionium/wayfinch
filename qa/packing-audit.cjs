@@ -15,7 +15,7 @@ const source=[
   "function routeProfile(){return null;} function placeLabel(p){return p.name;} function plural(n){return n+' nights';}",
   'globalThis.api={S,KIT,POSITIONS,physical,allocateInto,allocate,getChecklistModel,itemL,itemKg,placedKg,weightIn,loadByZone,deckClaims,activeKit,rebalancePairs,fitsLength,moveTargets,incomingFor,usableL,packingSummary,rainAccess,comfortFill,currentPlan};'
 ].join('\n');
-const context=vm.createContext({});vm.runInContext(source,context);const a=context.api,initial=JSON.parse(JSON.stringify(a.S));
+const context=vm.createContext({});vm.runInContext(source,context);const a=context.api,initial=JSON.parse(JSON.stringify({...a.S,nights:6,nightsOpen:null}));   // the 6-night trip these cases were written on (a new plan has no nights entered since the owner's ruling of 14 Nov 2026, sweep #32)
 function reset(ids=[]){Object.assign(a.S,JSON.parse(JSON.stringify(initial)));a.S.kit={};ids.forEach(id=>a.S.kit[id]=true);a.S.foodMode=1;}
 function bag(uid,pos,L,extra={}){return {uid,pos,L,...extra};}
 function allocation(){return a.allocateInto(a.S.bags.flatMap(a.physical));}

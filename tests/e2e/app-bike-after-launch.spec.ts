@@ -49,8 +49,10 @@ test('[LC-RIG-START] after Start a new plan > Yes, clear this plan, the plan\'s 
   await expect.poll(() => read(page, 'loadcheck:draft').then((d) => d !== null)).toBe(true);
   await page.reload({ waitUntil: 'load' });
   await draftReady(page);
+  // Start a new plan at its fixed place, the end of step one (the owner's ruling of 14 Nov 2026, sweep #37)
+  await page.locator('#crumbs button[data-to="1"]').click();
+  await page.locator('#draftNewRide').click();
   await expect(page.locator('#draftBar')).toBeVisible();
-  await page.locator('#draftNew').click();
   await expect(page.locator('#draftNew')).toHaveText('Yes, clear this plan');
   await Promise.all([page.waitForEvent('load'), page.locator('#draftNew').click()]);
   await draftReady(page);

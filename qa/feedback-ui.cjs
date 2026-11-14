@@ -49,7 +49,7 @@ check(()=>{context.window.scrollY=2100;nights.docTop=2500;run('rememberViewportC
 check(()=>{events.get('click')({type:'click',target:{closest:()=>({closest:()=>true})}});assert.equal(run('VIEWPORT_ANCHOR'),null);});
 check(()=>{run('rememberViewportControl(nightsControl);beginDialog(document.getElementById("mockDialog"),true,()=>{},null)');assert.equal(run('VIEWPORT_ANCHOR'),null);assert.equal(context.document.body.style.overflow,'hidden');assert.ok(context.document.body.classList.contains('modal-open'));run('endDialog(document.getElementById("mockDialog"))');assert.ok(!context.document.body.classList.contains('modal-open'));});
 // Reuse actual trip rendering, but avoid large bike/result markup irrelevant here.
-run('drawRig=()=>{};S.gpx={name:"Loop",km:180,distanceKm:180};S.place={lat:49,lon:8,name:"Track start"};S.place2={lat:49,lon:8,name:"Track end"};S.departureDate="2026-10-05";');
+run('drawRig=()=>{};S.nights=6;S.nightsOpen=null;S.gpx={name:"Loop",km:180,distanceKm:180};S.place={lat:49,lon:8,name:"Track start"};S.place2={lat:49,lon:8,name:"Track end"};S.departureDate="2026-10-05";');
 ['forecastNote','climateNote','nightsSuggestion','nightsSuggestionHint','checkNightsSuggestion'].forEach(id=>context.document.getElementById(id).classList=classes());
 const token=run('GPX_LOAD_ID');
 check(()=>{run('clearGPX()');assert.equal(run('S.gpx'),null);assert.equal(run('S.place'),null);assert.equal(run('S.place2'),null);assert.equal(run('routeProfile()'),null);assert.ok(run('GPX_LOAD_ID')>token);});
