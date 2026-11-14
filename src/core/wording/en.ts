@@ -118,6 +118,8 @@ export const W = {
   waterToPoint: (where: string, need: string, carry: string): string => `To ${where}: about ${need} L needed, carry ${carry} L.`,
   waterPlaceAt: (name: string, word: string, km: string): string => `${name} (${word}, km ${km})`,
   waterWordTap: 'drinking water',
+  // an unnamed tap (review of #169, m6)
+  waterWordTapUnnamed: 'drinking water tap',
   waterNotCalibrated: 'Your personal factor is not calibrated yet.',
   waterPartlyCalibrated: 'Your personal factor is partly calibrated.',
   waterCalibrated: 'Your personal factor is calibrated from your rides.',
@@ -463,6 +465,8 @@ export const W = {
   // the table's source is a link beside it, never a bare address (the owner's ruling of 14 Nov 2026)
   emergencyNumbersBasis: (date: string): string => `Numbers from the app's own table, checked ${date}.`,
   emergencySource: 'Source',
+  // its name for a screen reader begins with the words it shows (review of #169, m3)
+  emergencySourceName: 'Source of these emergency numbers',
   emergencyMountainSource: 'Mountain rescue source',
   emergencyPositionAt: (hm: string, age: string): string => `Last position at ${hm} (${age})`,
   emergencyOldPosition: (hm: string, age: string): string => `From your position at ${hm} (${age})`,
@@ -622,9 +626,6 @@ export const W = {
   tyreBagCardAge: (date: string): string => `Saved ${date}`,
   // Extras: heat and altitude, weighed loads and calipered widths, the SRAM cross-check.
   tyreSectionHeat: 'Heat and altitude',
-  tyreHeatSkipped: 'Heat and altitude are not checked. Enter the temperatures and the highest point to check.',
-  tyreHeatPumpLabel: 'Temperature where you pump (°C)',
-  tyreHeatMaxLabel: 'Highest temperature on the trip (°C)',
   tyreHighestLabel: 'Highest point of the trip (m)',
   tyreSectionMeasured: 'Measured values (optional)',
   tyreMeasuredFrontLabel: 'Front wheel load (kg)',

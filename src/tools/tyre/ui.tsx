@@ -541,11 +541,11 @@ export function TyreScreen({ services }: { services: TyreServices }) {
 
       <Card title={W.tyreSectionHeat}>
         <p class="muted">{T.tyreHeatIntro}</p>
-        <NumberInput key={`hp-${key}`} id="tyre-heat-pump" label={W.tyreHeatPumpLabel} signed value={details.heat?.pumpC} onCommit={(n) => changeHeat({ pumpC: n })} unit="°C" />
-        <NumberInput key={`hm-${key}`} id="tyre-heat-max" label={W.tyreHeatMaxLabel} signed value={details.heat?.maxC} onCommit={(n) => changeHeat({ maxC: n })} unit="°C" />
+        <NumberInput key={`hp-${key}`} id="tyre-heat-pump" label={TS.tyreHeatPumpLabel} signed value={details.heat?.pumpC} onCommit={(n) => changeHeat({ pumpC: n })} unit="°C" />
+        <NumberInput key={`hm-${key}`} id="tyre-heat-max" label={TS.tyreHeatMaxLabel} signed value={details.heat?.maxC} onCommit={(n) => changeHeat({ maxC: n })} unit="°C" />
         <NumberInput key={`hh-${key}`} id="tyre-heat-pumph" label={TN.tyrePumpHeightLabel} signed value={details.heat?.pumpHeightM} onCommit={(n) => changeHeat({ pumpHeightM: n })} unit="m" />
         <NumberInput key={`hv-${key}`} id="tyre-heat-high" label={W.tyreHighestLabel} signed value={details.heat?.highestM} onCommit={(n) => changeHeat({ highestM: n })} unit="m" />
-        {!v.heat ? <p class="notice">{W.tyreHeatSkipped}</p> : null}
+        {!v.heat ? <p class="notice">{TS.tyreHeatSkipped}</p> : null}
         {v.heat && showFigures && front && rear && !front.heat?.advise && !rear.heat?.advise ? <p class="muted">{TN.tyreHeatFits}</p> : null}
       </Card>
 

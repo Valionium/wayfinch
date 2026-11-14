@@ -492,7 +492,7 @@ const showAbout = (x: number): string => (x > 0 && x < 0.05 ? '0.1' : showNear(x
 /** The next water in words: its name, what it is and its km; with no name, what it is at its km. */
 const nextWater = (t: Target & { kind: 'place' }): string => {
   const word = t.place.kind === 'water' || !mayBeFood(t.place) ? W.waterWordTap : placeWord(t.place);
-  return t.place.name ? W.waterPlaceAt(t.place.name, word, showKm(t.km)) : W.leavebyPlaceAtKm(word, showKm(t.km));
+  return t.place.name ? W.waterPlaceAt(t.place.name, word, showKm(t.km)) : W.leavebyPlaceAtKm(t.place.kind === 'water' ? W.waterWordTapUnnamed : word, showKm(t.km));
 };
 const mayBeFood = (p: Place): boolean => SHOP_KINDS.has(p.kind) || p.kind === 'restaurant' || p.kind === 'drink' || p.kind === 'ice_cream';
 

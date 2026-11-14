@@ -176,6 +176,41 @@ describe('cards', () => {
     expect(document.activeElement).toBe(host.querySelector('[data-card="daylight"] .ah-toggle'));
   });
 
+  test('[DAY-LAST-NO-POS] Plan tomorrow on the last stage brings "Tonight\'s stop is the end of your route" into view and gives it the focus, as no card repeats it (review of #169, m5)', async () => {
+    const last = testTrip({ route: flatRoute(108.5, { stageEnds: [50, 108.5] }), departureDate: FRI, stay: 'camping' });
+    const today = trip(viewOf(inputsOf({ trip: last, now: `${SAT} 15:00` })));
+    const planned = trip(viewOf(inputsOf({ trip: last, now: `${SAT} 15:00`, plan: { date: SAT, backToTodayAt: null } })));
+    const line = "Tonight's stop is the end of your route (km 108.5)";
+    expect(planned.screen.notes).toContain(line);
+    const { actions } = fakeActions();
+    actions.planTomorrow = async () => { await act(async () => { render(<AheadScreen view={planned} actions={actions} />, host); }); };
+    const scrolled: Element[] = [];
+    const had = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
+    Element.prototype.scrollIntoView = function (this: Element) { scrolled.push(this); };
+    try {
+      await show(today, actions);
+      await click(host.querySelector('[data-card="daylight"] .ah-toggle'));
+      await click(buttonNamed(W.daylightPlanTomorrow));
+      await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+      const notes = host.querySelector('.ah-notes')!;
+      expect(notes.textContent).toContain(line);
+      expect(scrolled.at(-1)).toBe(notes);
+      expect(document.activeElement).toBe(notes);
+    } finally {
+      if (had) Object.defineProperty(Element.prototype, 'scrollIntoView', had);
+      else delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    }
+  });
+
+  test('[WX-ACTION] folded, the Weather card says what to do about a freezing night: "Night near −1 °C: pack warm layers" under its title (review of #169, I1)', async () => {
+    const v = trip(viewOf(inputsOf({ positions: [pos({ km: 120, at: `${SAT} 14:20` })], now: `${SAT} 14:20`, spells: [{ range: [0, 300], stamps: [`2026-10-18 03:00`], t: -1 }] })));
+    expect(v.screen.cards.weather.status).toBe('action');
+    await show(v, fakeActions().actions);
+    const card = host.querySelector('[data-card="weather"]')!;
+    expect(card.querySelector('.ah-toggle')!.getAttribute('aria-expanded')).toBe('false');
+    expect(card.querySelector('.ah-card-detail')!.textContent).toContain(W.weatherPackWarm('−1'));
+  });
+
   test('[AH-STRIP] a tap on a strip band or icon puts the focus on the title button of its card, never the body of the page (review of #142, I4 and M1)', async () => {
     const v = trip(viewOf(rainyStop()));
     await show(v, fakeActions().actions);
@@ -648,6 +683,16 @@ describe('Emergency', () => {
     await click(buttonNamed('Emergency', host.querySelector('.ah-chips')!));
     return host.querySelector('#chip-emergency')!;
   };
+  test('[AH-EMERGENCY] the Source link is a 44 px link button, named "Source of these emergency numbers" for a screen reader (review of #169, m2 and m3)', async () => {
+    const v = trip(viewOf(rainyStop()));
+    const card = await emergencyIn(v);
+    const source = [...card.querySelectorAll('a')].find((a) => a.textContent === W.emergencySource)!;
+    expect(source.getAttribute('href')).toBe(v.screen.chips.emergency.sources[0]);
+    expect(source.classList.contains('btn')).toBe(true);
+    expect(source.getAttribute('aria-label')).toBe('Source of these emergency numbers');
+    // the name begins with the words it shows (label in name)
+    expect(source.getAttribute('aria-label')!.startsWith(source.textContent!)).toBe(true);
+  });
   test('[AH-EMERGENCY] Close hands the focus back to the chip that opened the panel, Emergency and the others alike (sweep of 14 Nov 2026, finding 16)', async () => {
     const v = trip(viewOf(rainyStop()));
     const { actions } = fakeActions();

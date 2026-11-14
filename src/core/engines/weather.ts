@@ -351,8 +351,10 @@ function nightItem(f: WeatherFacts, night: NightLow): AnswerItem {
     parts.push(W.weatherThunderNight(showKm(night.km), stormWhen(f, night.thunderHours.from, night.thunderHours.to, tz), within ? W.rainHours(formatHm(night.thunderHours.from, tz), formatHm(night.thunderHours.to, tz)) : null));
     if (night.hail) parts.push(W.weatherHail);
   }
-  const status: Status = outdoorStay(f) && night.thunderHours ? 'warning' : outdoorStay(f) && night.lowC !== null && night.lowC <= 0 ? 'action' : 'fine';
-  if (status === 'action') parts.push(W.weatherPackWarm(degrees(night.lowC!)));
+  const freezing = outdoorStay(f) && night.lowC !== null && night.lowC <= 0;
+  const status: Status = outdoorStay(f) && night.thunderHours ? 'warning' : freezing ? 'action' : 'fine';
+  // A freezing night says what to do, a stormy one too (review of #169, m1).
+  if (freezing) parts.push(W.weatherPackWarm(degrees(night.lowC!)));
   return { label, stamp: { km: night.km }, status, detail: parts.join(' · ') };
 }
 
@@ -468,7 +470,9 @@ export function weatherAnswer(f: WeatherFacts, windows: RainWindow[], plans: Rai
   if (needsWeather) missing.add('weather');
 
   const note = cardNoteFor(f.ride);
-  const detail = [here?.line ?? '', note ?? ''].filter(Boolean).join(' ');
+  // The folded card says what to do about a freezing night too, not only its item (review of #169, I1).
+  const warm = low?.kind === 'low' ? W.weatherPackWarm(degrees(low.lowC)) : '';
+  const detail = [here?.line ?? '', note ?? '', warm].filter(Boolean).join(' ');
   return makeAnswer({
     topic: 'weather', status, title, stamp, detail, items, basis: basisOf(f, gap !== null || night.seasonal),
     freshness: freshnessOf(f), missing: [...missing],

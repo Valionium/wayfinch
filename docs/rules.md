@@ -190,7 +190,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Without positions between, tomorrow's stop at night equals the next morning's day stop (§6.2a) [DAY-ACROSS-NIGHT]
 - A far-away position decides the stage, never an earlier one (§6.2a) [DAY-NO-ROUTE-POS]
 - A position beyond today's stop keeps the stop and a leg without negative distance (§6.2a) [DAY-PAST-STOP]
-- On the last stage with no position, tonight's stop is the route end and nothing is claimed reached (§6.2a); "Tonight's stop is the end of your route" is said once, among the notes at the top, never again on each card (the owner's ruling of 14 Nov 2026, sweep item 17) [DAY-LAST-NO-POS]
+- On the last stage with no position, tonight's stop is the route end and nothing is claimed reached (§6.2a); "Tonight's stop is the end of your route" is said once, among the notes at the top, never again on each card, and Plan tomorrow brings those notes into view (the owner's ruling of 14 Nov 2026, sweep item 17; review of #169) [DAY-LAST-NO-POS]
 - After the ride with no position the text says it plans from tonight's stop (§6.2a) [DAY-NO-LATEST]
 - An approximate position starts the ride at the near edge of its radius (§6.2a) [DAY-APPROX-RIDE]
 - Riding on past the stop to a later camp gets its own clock times (§6.2a) [DAY-RIDE-ON-CLOCK]
@@ -270,7 +270,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Unconfirmed water reads unknown and asks to confirm (§3.2) [W-UNCONFIRMED]
 - An approximate position never uses a source inside its radius (§6.1) [W-APPROX]
 - Zero litres with a tap at the position still gives a finite, honest card (review focus) [W-ZERO]
-- Water strings obey the banned words and show an estimate with a range (§6.3): "To the next water, Ditsch (bakery, km 0.4): about 0.1 L needed, carry 0.1 L.", the next water by its name, its type and its km, never 0 L for a small need (the owner's ruling of 14 Nov 2026, sweep item 19) [W-NEVER-CLAIM]
+- Water strings obey the banned words and show an estimate with a range (§6.3): "To the next water, Ditsch (bakery, km 0.4): about 0.1 L needed, carry 0.1 L.", the next water by its name, its type and its km (an unnamed tap: "drinking water tap at km 41"), never 0 L for a small need (the owner's ruling of 14 Nov 2026, sweep item 19) [W-NEVER-CLAIM]
 
 ## Weather
 
@@ -291,7 +291,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Each country is served by its named weather models (§6.6) [WX-MODELS]
 - A thunderstorm within an hour of the day's ride is a warning (§6.6) [WX-WARN-THUNDER]
 - A thunderstorm at a camp stop tonight is a warning for campers (§6.6) [WX-WARN-NIGHT]
-- Strong gusts, heavy hours and freezing nights make the status action (§6.6); a night at or below 0 °C outdoors says what to do, "Night near −1 °C: pack warm layers", and no health advice beyond that (the owner's ruling of 14 Nov 2026, sweep item 17) [WX-ACTION]
+- Strong gusts, heavy hours and freezing nights make the status action (§6.6); a night at or below 0 °C outdoors says what to do, "Night near −1 °C: pack warm layers", on the folded card and in the night's item, a stormy night too, and no health advice beyond that (the owner's ruling of 14 Nov 2026, sweep item 17; review of #169) [WX-ACTION]
 - Light likely rain stays fine with its window and plan (§6.6) [WX-FINE-LIGHT]
 - Hail is mentioned for the codes that include it (§6.6) [WX-HAIL]
 - The card title picks the most important reason first (§3.2) [WX-TITLE-ORDER]
@@ -391,7 +391,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - Train help prefers stations and says times are unchecked (§6.9); a halt is called a station, never by the railway word (sweep 2 of 15 Nov 2026, #9) [EM-TRAIN]
 - Toilets help lists the nearest along the route with access and fee (§6.9) [EM-TOILETS]
 - Help chips always ride from now, in every phase (§6.2a) [EM-NOW]
-- Emergency numbers exist for all ten countries with sources (§6.9); the basis says when they were checked, and the source the table used is a link named "Source" (mountain rescue's "Mountain rescue source"), never a bare address (the owner's ruling of 14 Nov 2026, sweep item 22) [EM-NUMBERS]
+- Emergency numbers exist for all ten countries with sources (§6.9); the basis says when they were checked, and the source the table used is a 44 px link named "Source" ("Source of these emergency numbers" for a screen reader; mountain rescue's "Mountain rescue source"), never a bare address (the owner's ruling of 14 Nov 2026, sweep item 22) [EM-NUMBERS]
 - An unknown country gets the 112 fallback line (§6.9) [EM-FALLBACK]
 - Without a position the numbers still show and no coordinates are invented (review focus) [EM-NO-POSITION]
 - The emergency card shows position, age, route km and what is near (§6.9) [EM-LOCATION]

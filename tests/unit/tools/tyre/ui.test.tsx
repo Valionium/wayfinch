@@ -242,11 +242,11 @@ describe('the extras', () => {
     await mount(services(memory()));
     await hooked();
     await type(labelled(TS.tyreLimitMaxLabel), '3');
-    expect(host.textContent).toContain(W.tyreHeatSkipped);
-    await type(labelled(W.tyreHeatPumpLabel), '15');
-    await type(labelled(W.tyreHeatMaxLabel), '35');
+    expect(host.textContent).toContain(TS.tyreHeatSkipped);
+    await type(labelled(TS.tyreHeatPumpLabel), '15');
+    await type(labelled(TS.tyreHeatMaxLabel), '35');
     await type(labelled(W.tyreHighestLabel), '2000');
-    expect(host.textContent).not.toContain(W.tyreHeatSkipped);
+    expect(host.textContent).not.toContain(TS.tyreHeatSkipped);
     expect(host.textContent).toMatch(/Pump to at most \d\.\d\d bar/);
   });
 
@@ -435,8 +435,8 @@ describe('review findings, on the screen', () => {
     await mount(services(mem));
     await hooked();
     await type(labelled(TS.tyreLimitMaxLabel), '3');
-    await type(labelled(W.tyreHeatPumpLabel), '15');
-    await type(labelled(W.tyreHeatMaxLabel), '35');
+    await type(labelled(TS.tyreHeatPumpLabel), '15');
+    await type(labelled(TS.tyreHeatMaxLabel), '35');
     await type(labelled(W.tyreHighestLabel), '2000');
     expect(host.querySelector('.tyre-wheel')?.textContent).toMatch(/Pump to at most/);
     // The heat limit can leave one value: it reads as one value, not "2.50 to 2.50".
@@ -499,8 +499,8 @@ describe('re-check findings, on the screen', () => {
     await mount(services(memory()));
     await click(host.querySelector('input[name="tyre-rimtype"][value="hooked"]')!);
     await type(labelled(TS.tyreLimitMaxLabel), '3');
-    await type(labelled(W.tyreHeatPumpLabel), '15');
-    await type(labelled(W.tyreHeatMaxLabel), '35');
+    await type(labelled(TS.tyreHeatPumpLabel), '15');
+    await type(labelled(TS.tyreHeatMaxLabel), '35');
     await type(labelled(W.tyreHighestLabel), '2000');
     const wheel = host.querySelector('.tyre-wheel')?.textContent ?? '';
     expect(wheel).toMatch(/Pump to at most/);

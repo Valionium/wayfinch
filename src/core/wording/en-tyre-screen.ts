@@ -22,4 +22,7 @@ export const TS = {
   tyreFrontWidthLabel: 'Front tyre width (mm)',
   tyreRearWidthLabel: 'Rear tyre width (mm)',
   tyreSetupLabel: 'Inner tubes or tubeless',
+  tyreHeatSkipped: 'Heat and altitude are not checked. Enter the temperatures and the highest point to check.',
+  tyreHeatPumpLabel: 'Temperature where you pump (°C)',
+  tyreHeatMaxLabel: 'Highest temperature on the trip (°C)',
 };

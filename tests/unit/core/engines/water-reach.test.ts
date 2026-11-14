@@ -592,6 +592,10 @@ describe('what the card never claims', () => {
     expect(waterAnswer(factsOf({ spots: [tapAt(41), tapAt(60)], litres: 3, profile: { sumW: 1 } })).detail).toContain('partly calibrated');
     expect(waterAnswer(factsOf({ spots: [tapAt(41), tapAt(60)], litres: 3, profile: { sumW: 3 } })).detail).toContain('calibrated from your rides');
   });
+  test('[W-NEVER-CLAIM] an unnamed tap reads "drinking water tap at km 41", a named one keeps its name (review of #169, m6)', () => {
+    expect(waterAnswer(factsOf({ spots: [{ b: tap({ name: null }), km: 41 }, tapAt(60)], litres: 3 })).detail).toMatch(/To the next water, drinking water tap at km 41: about [\d.]+ L needed, carry [\d.]+ L\./);
+    expect(waterAnswer(factsOf({ spots: [tapAt(41, 'Kehl'), tapAt(60)], litres: 3 })).detail).toContain('To the next water, Kehl (drinking water, km 41):');
+  });
   test('[W-NEVER-CLAIM] the range is to S1: expected at k x SR_model, planned at k x U x SR_model', () => {
     const f = factsOf({ spots: [tapAt(41), tapAt(60)], litres: 3 });
     const { s1 } = findS1S2(f);

@@ -553,6 +553,24 @@ describe('cold nights and temperature ranges', () => {
     const mild = answerOf(factsOf([{ km: 150, stamps: [`${SUN} 03:00`], t: 6 }], riding(120, '14:20'))).items.find((i) => i.label.startsWith("Night's low"))!;
     expect(mild.detail ?? '').not.toContain('pack warm layers');
   });
+  test('[WX-ACTION] the folded card says it too: "Action needed" over the card\'s own detail "Night near −1 °C: pack warm layers" (review of #169, I1)', () => {
+    const a = answerOf(factsOf([{ km: 150, stamps: [`${SUN} 03:00`], t: -1 }], riding(120, '14:20')));
+    expect(a.status).toBe('action');
+    expect(a.title).toBe("Night's low about −1 °C at km 150");
+    expect(a.detail).toContain('Night near −1 °C: pack warm layers');
+    expect(answerOf(factsOf([{ km: 150, stamps: [`${SUN} 03:00`], t: 6 }], riding(120, '14:20'))).detail).not.toContain('pack warm layers');
+    // indoors the night asks for nothing
+    expect(answerOf(factsOf([{ km: 150, stamps: [`${SUN} 03:00`], t: -1 }], riding(120, '14:20', { trip: testTrip({ stay: 'accommodation' }) }))).detail).not.toContain('pack warm layers');
+  });
+  test('[WX-ACTION] a freezing night with a thunderstorm still says pack warm layers, beside the storm (review of #169, m1)', () => {
+    const a = answerOf(factsOf([{ km: 150, stamps: [`${SUN} 02:00`, `${SUN} 03:00`, `${SUN} 04:00`], t: -2, pp: 40, code: 95 }], riding(120, '14:20')));
+    expect(a.status).toBe('warning');
+    const night = a.items.find((i) => i.label.startsWith("Night's low"))!;
+    expect(night.label).toBe("Night's low about −2 °C at km 150");
+    expect(night.detail).toMatch(/[Tt]hunderstorm/);
+    expect(night.detail).toContain('Night near −2 °C: pack warm layers');
+    expect(a.detail).toContain('Night near −2 °C: pack warm layers');
+  });
 
   test('[WX-HONEST] a temperature range reads "−1 to 1 °C", with a real minus sign, never "-1–1 °C"', () => {
     expect(W.weatherTemps('−1', '1')).toBe('−1 to 1 °C');

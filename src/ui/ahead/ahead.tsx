@@ -23,14 +23,16 @@ const NeedReady = lazy(() => import('./need-ready.tsx').then((m) => m.NeedReady)
 // What En route will show, with no route: two lines of a chunk of their own (AH-EMPTY); the button under them is here.
 const EmptyLines = lazy(() => import('./empty.tsx').then((m) => m.EmptyLines), () => null);
 
-function focusLater(id: string): void {
+/** Scrolls `view` (else `id`) to the top and focuses `id`'s button; with no `id`, `view` itself takes the focus. */
+function focusLater(id: string, view?: string): void {
   // After the render that opens it, so the element exists.
   setTimeout(() => {
     const el = document.getElementById(id);
-    el?.scrollIntoView?.({ block: 'start' });
+    const shown = (view && document.getElementById(view)) || el;
+    shown?.scrollIntoView?.({ block: 'start' });
     // A card's title is a heading holding its button: the button takes the focus (a heading without a tabindex takes none, which
     // left the focus on the page's body; review of #142, I4).
-    (el?.querySelector<HTMLElement>('.ah-toggle') ?? el?.querySelector<HTMLElement>('button, a, h2, h3'))?.focus?.();
+    (el?.querySelector<HTMLElement>('.ah-toggle') ?? el?.querySelector<HTMLElement>('button, a, h2, h3') ?? shown)?.focus?.({ preventScroll: true });
   }, 0);
 }
 
@@ -90,10 +92,12 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
     setChip(null);
     if (was) setTimeout(() => document.querySelector<HTMLElement>(`.ah-chip[aria-controls="chip-${was}"]`)?.focus?.(), 0);
   };
-  // Plan tomorrow redraws the day: the focus goes to the Back to today at the top, and from there back to the Daylight card.
+  // Plan tomorrow redraws the day: the notes at the top come into view (on the last stage they alone say "Tonight's stop is the end
+  // of your route"; review of #169, m5), and the focus goes to the Back to today under them, or to the notes where there is none. From
+  // Back to today the focus goes back to the Daylight card.
   const dayActions: AheadActions = {
     ...actions,
-    planTomorrow: async (date) => { await actions.planTomorrow(date); focusLater('ah-back-today'); },
+    planTomorrow: async (date) => { await actions.planTomorrow(date); focusLater('ah-back-today', 'ah-notes'); },
     backToToday: async () => { await actions.backToToday(); focusLater('card-daylight'); },
   };
   // With tomorrow planned (after the day's ride), the way back stands at the top, not only in the Daylight card's items.
@@ -138,7 +142,7 @@ function TripAhead({ v, actions }: { v: AheadTrip; actions: AheadActions }) {
           />
         ) : null}
         <PositionControls v={v} actions={actions} pickerOpen={pickerOpen} onPicker={setPicker} pickerUse={pickerUse} onPickerUsed={pickerUsed} onFixKept={fixKept} rail={rail} />
-        {s.notes.length > 0 ? <ul class="ah-notes notice">{s.notes.map((n, i) => <li key={i}>{n}</li>)}</ul> : null}
+        {s.notes.length > 0 ? <ul id="ah-notes" class="ah-notes notice" tabIndex={-1}>{s.notes.map((n, i) => <li key={i}>{n}</li>)}</ul> : null}
         {backOffered ? <p id="ah-back-today" data-back-today><button type="button" class="btn" onClick={() => void dayActions.backToToday()}>{W.daylightBackToToday}</button></p> : null}
         {v.badSpeed ? <p class="notice"><a href="#/trip">{W.appAheadSpeedLink}</a></p> : null}
         <RouteStrip strip={s.strip} bike={v.bike} onOpen={openCard} onSetPosition={rail ? (km) => void actions.setManual(km) : undefined} stopsLater={v.beforeReady} unconfirmed={!v.confirmed} />
