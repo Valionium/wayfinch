@@ -1242,3 +1242,6 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - "Get ready offline" is called "Prepare this route" wherever a rider reads it (Trip's step and button, En route's cards and their button, notes, You, the privacy page); its ids, keys and function names stay; no wording module or the privacy page says "Get ready" (§3.3) [PREP-NAME]
 - under the Prepare this route button one line says what it fetches and why; Trip's heading has "Plan before you ride" and En route's "While you ride: the next water, food, sleep and weather" under it; the Route step says when to upload a GPX and when a town-to-town route is enough; their words are in lazy modules (§3.3) [PREP-LINE]
 - they add nothing to the first screen's JavaScript: at or below main's figure at the branch point, 144,741 bytes gzipped (4f9cddc) (§4.5) [PREP-FIRST]
+- on You, the question that opens (Delete Wayfinch data from this phone) and the Report a ride form take the focus as they open, and the button that opened them has it back when they close: it is never left on the page body [YOU-FOCUS]
+- under Export my data, the import has its own visible heading "Import from a file", above "Choose a saved Wayfinch file" [YOU-IMPORT-HEAD]
+- the colour mode button says where it stands and where Automatic is, in its title; the Android install hint shows on Android only [YOU-WORDS]

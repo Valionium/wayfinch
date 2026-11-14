@@ -1,6 +1,6 @@
 // Your data (spec sections 3.5 and 4.4): export, import and delete. Each says what it does before it does it; a file that cannot be
 // read writes nothing; delete names what goes and asks first.
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { Y } from '../../core/wording/en-you.ts';
 import { Card } from '../card.tsx';
 import { bagDeleteHref } from './services.ts';
@@ -67,6 +67,7 @@ function ExportImport({ services, reload }: { services: YouServices; reload: () 
       </div>
       <p class="muted">{Y.youExportNote}</p>
       {said ? <p role="status" data-exported>{said}</p> : null}
+      <h3 class="you-import-title">{Y.youImport}</h3>
       <div class="field">
         <label for="you-import">{Y.youImportFileLabel}</label>
         <input id="you-import" ref={picker} type="file" accept="application/json,.json" onChange={(e) => void pick(e.currentTarget.files?.[0])} />
@@ -116,6 +117,15 @@ function DeleteAll({ services, reload }: { services: YouServices; reload: () => 
   const [alsoBags, setAlsoBags] = useState(false);
   const [state, setState] = useState<'idle' | 'deleted' | 'failed'>('idle');
   const [busy, setBusy] = useState(false);
+  // The question takes the focus as it opens; closed, the button that opened it has it back (sweep 14 Nov, 49).
+  const opener = useRef<HTMLButtonElement>(null);
+  const question = useRef<HTMLParagraphElement>(null);
+  const wasAsking = useRef(false);
+  useEffect(() => {
+    if (asking) question.current?.focus();
+    else if (wasAsking.current) opener.current?.focus();
+    wasAsking.current = asking;
+  }, [asking]);
   const confirm = async (): Promise<void> => {
     if (busy) return;
     setBusy(true);
@@ -129,9 +139,9 @@ function DeleteAll({ services, reload }: { services: YouServices; reload: () => 
   };
   return (
     <div data-delete>
-      {!asking ? <button type="button" class="btn" onClick={() => { setAsking(true); setState('idle'); }}>{Y.youDelete}</button> : (
+      {!asking ? <button type="button" class="btn" ref={opener} onClick={() => { setAsking(true); setState('idle'); }}>{Y.youDelete}</button> : (
         <div class="notice" role="alertdialog" aria-labelledby="del-ask" data-delete-ask>
-          <p id="del-ask"><strong>{Y.youDeleteAsk}</strong></p>
+          <p id="del-ask" ref={question} tabIndex={-1}><strong>{Y.youDeleteAsk}</strong></p>
           <p>{Y.youDeleteGoes}</p>
           <label class="choice-option">
             <input type="checkbox" name="also-bags" checked={alsoBags} onChange={(e) => setAlsoBags(e.currentTarget.checked)} />
