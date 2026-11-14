@@ -25,7 +25,9 @@ import { TripScreen } from '../../../src/ui/trip/trip.tsx';
 import { browserYouServices } from '../../../src/ui/you/services.ts';
 import type { YouServices } from '../../../src/ui/you/services.ts';
 import { YouScreen } from '../../../src/ui/you/you.tsx';
-import { testTrip } from '../../fixtures/build.ts';
+import { flatRoute, pointAtKm, testTrip } from '../../fixtures/build.ts';
+import { placeAt } from '../../fixtures/places.ts';
+import { planStages } from '../../../src/core/route/stages.ts';
 
 vi.setConfig({ testTimeout: 30_000 });
 const host = document.createElement('div');
@@ -170,6 +172,30 @@ describe('Rider and water you can carry (spec section 3.5)', () => {
     await type(field('you-capacity'), '');
     await vi.waitFor(async () => expect((await readProfile()).capacityL).toBeNull(), { timeout: 20_000 });
     expect(host.querySelector('[role=alert]')).toBeNull();
+  });
+
+  // Re-review 2 of PR 163, m-6 (the coordinator's ruling): a flat speed changed in You, with the nights left to the suggestion, plans the
+  // nights again around the rider's own stops as a change on Trip does; You says which are kept and which not, nothing goes unnamed.
+  test('[TRIP-STOPS-KEEP] a faster flat speed in You (2 → 1 suggested nights) names the own stop kept and the one not kept', async () => {
+    const route = { ...flatRoute(270), id: 'route-flat270', hash: 'f'.repeat(64) };
+    const stages = [...planStages(route, { flatKph: 25, pace: 'sporting', nights: 2 })];
+    const own = (km: number) => ({ placeId: `campsite-${km}`, km, name: `Camping ${km}`, town: null, by: 'rider' as const });
+    await readTrip();
+    await saveTrip({ ...testTrip(), route: { ...route, stages }, flatKph: 25, pace: 'sporting', stops: { routeId: route.id, basis: stages.slice(0, -1).map((x) => x.endKm), days: [own(92), own(177)] } });
+    // the places Prepare this route saved for the trip
+    const db = await openDb();
+    for (const km of [92, 177]) {
+      const at = pointAtKm(km);
+      await db.put('places', placeAt('campsite', at.lat, at.lon, { id: `campsite-${km}`, name: `Camping ${km}` }));
+      await db.add('matches', { placeId: `campsite-${km}`, km, offRouteM: 0 });
+    }
+    await show();
+    await type(field('you-kph'), '40');
+    await until(() => (host.querySelector('[data-you-stops]')?.textContent ?? '') !== '', 'the line');
+    expect(host.querySelector('[data-you-stops]')!.textContent).toBe('New stops for 1 night, keeping yours: Camping 177 (night 1). Not kept: Camping 92 (was night 1). To change a stop, use Change stop under its day in Your route.');
+    expect(host.querySelector('[data-you-stops]')!.getAttribute('role')).toBe('status');
+    // and the trip holds what the line said
+    expect((await readTrip())!.stops!.days.map((d) => [d.name, d.by])).toEqual([['Camping 177', 'rider']]);
   });
 
   test('[YOU-RIDER] a value out of range is refused with the range named, and the last good value stays', async () => {

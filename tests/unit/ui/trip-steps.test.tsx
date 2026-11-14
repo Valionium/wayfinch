@@ -215,7 +215,7 @@ describe('The message after a route is added (owner\'s item 2)', () => {
     const name = (await readTrip())!.route.name;
     const said = host.querySelector<HTMLElement>('[data-added]')!;
     expect(said.textContent).toContain(TF.appTripAdded(name));
-    expect(said.textContent).toContain(W.appTripNextGetReady);
+    expect(said.textContent).toContain(TF.appTripNextGetReady);
     expect(step('getready').contains(said)).toBe(true);
     // The message's button is the step's one Prepare this route button, not a second one.
     expect([...step('getready').querySelectorAll('button')].filter((b) => b.textContent === W.appTripGetReadyButton)).toHaveLength(1);
@@ -232,7 +232,7 @@ describe('The message after a route is added (owner\'s item 2)', () => {
     await click(buttonIn(host.querySelector('[data-replace]')!, W.appTripReplaceYes));
     await until(() => host.querySelector('[data-added]') !== null, 'the message');
     const name = (await readTrip())!.route.name;
-    expect(host.querySelector('[data-added]')!.textContent).toContain(`${TF.appTripReplaced(name)} ${W.appTripNextGetReady}`);
+    expect(host.querySelector('[data-added]')!.textContent).toContain(`${TF.appTripReplaced(name)} ${TF.appTripNextGetReady}`);
     expect(openSteps()).toEqual(['getready']);
   });
 });

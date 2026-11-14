@@ -61,8 +61,10 @@ describe('A settle and another window (review of PR 101, M6)', () => {
     };
     await settleStops(NOW, { day: 2, to: pickDay2 });
     const after = (await readTrip())!;
-    expect(after.stops!.days[0]).toEqual({ placeId: null, km: 90, name: null, town: null, by: 'rider' });
+    // Both picks stay. Since the owner's rulings of 14 Nov 2026 ("plan around") and the coordinator's on their review (I-2), the place
+    // picked for day 2 is a fixed end and the No stop's day ends at the even split before it: 91.5 km (it was the old planned end, 90).
+    expect(after.stops!.days[0]).toEqual({ placeId: null, km: 91.5, name: null, town: null, by: 'rider' });
     expect(after.stops!.days[1]).toMatchObject({ name: 'Hotel E', by: 'rider' });
-    expect(after.route.stages.map((s) => s.endKm)).toEqual([90, 183, 270]);
+    expect(after.route.stages.map((s) => s.endKm)).toEqual([91.5, 183, 270]);
   });
 });
