@@ -11642,7 +11642,7 @@ function firstFixes({weatherReady,miss,over,fix,routeFailed,spill,stranded}){
 }
 function jumpToResult(target){
   // Comfortable or Lightweight sits at the start of Kit since the ruling of 14 Nov 2026: there, the focus on the choice (review of PR 166, I1)
-  if(target === 'comfort'){ go(3); $('modeBar').querySelector('[data-mode="comfort"]').focus(); return; }
+  if(target === 'comfort' || target === 'light'){ go(3); $('modeBar').querySelector(`[data-mode="${target}"]`).focus(); return; }
   // Check's Review ride and Review route open Ride's fields, folded or not, with the focus on the retry they ask for (I2)
   if(target === 'trip' || target === 'route'){
     RIDE_OPEN = true; go(1);
@@ -11732,7 +11732,7 @@ function renderResult(){
       ? 'Some kit needs to be removed, worn or carried in another suitable position. Review the suggestions below; if essentials still do not fit, you may need more carrying space.'
       : tight
       ? (S.mode === 'light'
-        ? `This is the minimum setup: ${bagCount(holding)} carrying everything, with ${Math.abs(d)} L to spare. Tight is the point here — nothing is mounted that does not earn it. If that sounds unpleasant on a long trip, switch to comfortable above.`
+        ? `This is the minimum setup: ${bagCount(holding)} carrying everything, with ${Math.abs(d)} L to spare. Tight is the point here — nothing is mounted that does not earn it. If that sounds unpleasant on a long trip, choose Comfortable at the start of Kit. <button class="linky retry" type="button" data-result-jump="comfort">Go to Comfortable in Kit</button>`
         : `Only ${Math.abs(d)} L spare across ${bagCount(holding)}, and that margin is spread thin rather than sitting in one usable gap. Expect to repack twice on the first morning.`)
       : (() => { const owned = usableUnits().length, empty = mountedEmptySentence(slots);
           return `Your kit goes into ${holding} of your ${owned} bag${owned>1?'s':''} — ${mounted} L mounted, ${Math.abs(d)} L spare.${empty ? ' ' + empty : ''}`; })()}</p>
@@ -11946,7 +11946,7 @@ function renderResult(){
       + swapNote
       + `<div class="finding note"><b>Mount these ${slots.length}</b><p>${slots.map(unitLabel).join(', ')}.</p></div>`
     : (swapNote || `<div class="emptyfind">${S.mode==='comfort'
-      ? 'Comfortable keeps your bike bags mounted for spare room. Choose Lightweight at the start of Kit to check which bags you can leave at home.'
+      ? 'Comfortable keeps your bike bags mounted for spare room. Choose Lightweight at the start of Kit to check which bags you can leave at home. <button class="linky retry" type="button" data-result-jump="light">Go to Lightweight in Kit</button>'
       : 'No bag removals are suggested for this packing arrangement.'}</div>`))
     + (emptyMounted ? `<div class="finding note"><p>${emptyMounted}</p></div>` : '');
 
@@ -12223,7 +12223,8 @@ function renderResult(){
   } else {
     roomBody = (cf.emptyBags
       ? `<div class="finding note"><b>${cf.emptyBags} bag${cf.emptyBags>1?'s are':' is'} mounted and empty</b>
-         <p>Two honest answers here. Leave ${cf.emptyBags>1?'them':'it'} at home and the bike is lighter, handles better and packs faster — switch to <b>Lightweight</b> above and the check will do exactly that. Or keep ${cf.emptyBags>1?'them':'it'} and use the room, which is what the list below is for.</p></div>`
+         <p>Two honest answers here. Leave ${cf.emptyBags>1?'them':'it'} at home and the bike is lighter, handles better and packs faster — choose <b>Lightweight</b> at the start of Kit and the check will do exactly that. Or keep ${cf.emptyBags>1?'them':'it'} and use the room, which is what the list below is for.</p>
+         <button class="linky retry" type="button" data-result-jump="light">Go to Lightweight in Kit</button></div>`
       : '') +
       `<div class="finding note"><b>${cf.freeL} L spare — ${cf.addedL} L of it worth using</b>
         ${infoHelp('How optional additions are checked','<p>Each addition is checked against the individual gap it would go in, for rigid length and volume. These are optional comfort items; they are not needed to resolve the essential checks.</p>')}

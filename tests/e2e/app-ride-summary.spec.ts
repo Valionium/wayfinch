@@ -146,3 +146,30 @@ test('[LC-RIDE-FOLD] Check\'s Review ride opens Ride\'s fields, folded or not, w
   await expect(page.locator('#retryWeather')).toBeVisible();
   await expect(page.locator('#retryWeather')).toBeFocused();
 });
+
+test('[LC-MODE-KIT] nothing on Check points to a switch that is not there: each pointer to Comfortable or Lightweight names Kit and goes there, the focus on the choice (review of PR 166, I3)', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/tools/bags/' });
+  await ready(page);
+  await page.evaluate(() => localStorage.setItem('loadcheck:walkthrough:v1', 'done'));
+  const stale = /switch to (comfortable|lightweight)|(comfortable|lightweight)(<\/b>)? above/i;
+  // Comfortable with bags mounted and empty: "Leave them at home … choose Lightweight at the start of Kit"
+  await page.evaluate(`S.nights = 1; S.sleep = 'indoor'; S.mode = 'comfort'; S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:13 }, { uid:3, pos:'frame', L:6 },
+    { uid:4, pos:'pack', L:30 }, { uid:5, pos:'fork', L:3, pair:true }]; S.nextUid = 6; S.decks = { bar:false, rack:false }; applyTripKitDefaults(); go(2); go(3); go(4);`);
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();   // the weight question, skipped
+  const empty = page.locator('#resultBox .finding.note', { hasText: 'Two honest answers here' });
+  await empty.evaluate((el) => { const d = el.closest('details'); if (d) d.open = true; });
+  await expect(empty).toContainText('choose Lightweight at the start of Kit and the check will do exactly that');
+  expect(await page.locator('#s4').innerHTML()).not.toMatch(stale);
+  await empty.getByRole('button', { name: 'Go to Lightweight in Kit' }).click();
+  await expect(page.locator('#s3')).toBeVisible();
+  await expect(page.locator('#s3 #modeBar button[data-mode="light"]')).toBeFocused();
+  // Lightweight, only just fitting: the verdict names Kit for Comfortable
+  const tight = await page.evaluate(`(() => { S.mode = 'light'; S.bags = [{ uid:1, pos:'seat', L:6 }]; S.nextUid = 2; go(4);
+    for (let L = 6; L <= 30; L += 0.25) { S.bags[0].L = L; S.bags[0].userL = true; renderResult();
+      if (/minimum setup/.test(document.getElementById('verdictBox').textContent)) return L; } return null; })()`);
+  expect(tight, 'a Lightweight plan that only just fits').not.toBeNull();
+  await expect(page.locator('#verdictBox')).toContainText('choose Comfortable at the start of Kit');
+  expect(await page.locator('#s4').innerHTML()).not.toMatch(stale);
+  await page.locator('#verdictBox').getByRole('button', { name: 'Go to Comfortable in Kit' }).click();
+  await expect(page.locator('#s3 #modeBar button[data-mode="comfort"]')).toBeFocused();
+});
