@@ -2,6 +2,7 @@
 // first screen carries none of it. The rider's own list: each item links where the app does it, and a tick stays on this phone for this
 // route (store/prep-ticks.ts). Nothing here calls the trip ready, safe or complete, and nothing counts the ticks (Decision 2).
 import { useState } from 'preact/hooks';
+import { localIsoDate } from '../../core/answers/time.ts';
 import { prepFacts, prepItems } from '../../core/prep/items.ts';
 import type { PrepItem } from '../../core/prep/items.ts';
 import type { Trip } from '../../core/types.ts';
@@ -13,8 +14,11 @@ import './prep.css';
 
 type Ticks = { route: string; ticked: string[]; notKept: boolean };
 
+/** What the list reads of Trip's snapshot: the trip, and the moment and zone that give today (as Trip's line reads it). */
+type Snap = Pick<TripSnapshot, 'trip'> & Partial<Pick<TripSnapshot, 'now' | 'zone'>>;
+
 /** The list for Trip's snapshot and Trip's bike (the bag planner's current one, as Trip draws it); nothing without a trip. */
-export function BeforeYouGo({ snap }: { snap: Pick<TripSnapshot, 'trip'> }) {
+export function BeforeYouGo({ snap }: { snap: Snap }) {
   const trip: Trip | null = snap.trip;
   const bike = bikeSource.value.bike;
   const route = trip?.route.id ?? '';
@@ -22,7 +26,7 @@ export function BeforeYouGo({ snap }: { snap: Pick<TripSnapshot, 'trip'> }) {
   // Another route: its own ticks, read afresh.
   const ticks = state.route === route ? state : { route, ticked: readTicks(route), notKept: false };
   if (!trip) return null;
-  const items = prepItems(prepFacts(trip, bike));
+  const items = prepItems(prepFacts(trip, bike, snap.now && snap.zone ? localIsoDate(snap.now, snap.zone) : undefined));
   // Bike care with Trip's bike chosen: tools/bike-link.ts's toolHref, written out so the chunk needs none of that module (a test holds it equal).
   const careHref = bike ? `#/tools/care?bike=${encodeURIComponent(bike.id)}` : '#/tools/care';
 
@@ -66,7 +70,7 @@ let besideShown = false;
  * Once Prepare this route has run, its step folds to one row with Update (which only opens the step). Beside it, "Before you leave"
  * shows the list below the row and hides it again (the sweep of 15 November 2026, finding 1); the step stays folded.
  */
-export function PrepBeside({ snap }: { snap: Pick<TripSnapshot, 'trip'> }) {
+export function PrepBeside({ snap }: { snap: Snap }) {
   const [shown, setShown] = useState(besideShown);
   if (!snap.trip) return null;
   const flip = (): void => { besideShown = !shown; setShown(besideShown); };

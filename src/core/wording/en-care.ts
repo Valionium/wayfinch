@@ -30,7 +30,11 @@ export const C = {
   careSearchLabel: 'Search',
   careSearchHint: 'For example squeak, chain or bleed',
   careFiltersLabel: 'Parts',
-  careTellUs: "Tell us your brakes, tyres… in Bike details to hide what doesn't apply",
+  // Only what is Not sure, by Bike details' own field names (sweep 2 of 15 Nov 2026, #4): tellUsLine below puts them together
+  careTellUs: (what: string): string => `Tell us your ${what} in Bike details to hide what doesn't apply`,
+  careTellUsEbikeToo: 'whether it is an e-bike',
+  careTellUsEbike: 'Say whether it is an e-bike (Bike details) to hide e-bike tasks',
+  careForkOnly: 'Wipe the fork legs',
   // What the list fits (the owner's wish of 14 November 2026): the line at the top, and its button that lifts the fit and brings it back
   careFitShowing: (what: string): string => `Showing what fits your bike: ${what}.`,
   careFitAll: 'Showing everything, for every bike.',
@@ -127,6 +131,24 @@ export function fitWords(d: CareDetails, rimBrake: RimKind | null, fluid: Fluid 
   if (d.ebike !== null && d.ebike !== 'other') out.push(d.ebike === 'yes' ? VALUE_WORDS.ebike.yes : 'no motor');
   return out;
 }
+
+/** Bike details' field for each detail (the gears come with the drivetrain); the e-bike, in Look, is said apart. */
+const FIELD_WORDS: Partial<Record<CareKey, string>> = { brakes: 'brake type', tyres: 'tyre setup', drive: 'drivetrain', shifting: 'shifting', suspension: 'suspension' };
+
+/**
+ * The "Tell us" line for the Not sure details (sweep 2 of 15 Nov 2026, #4), null when every one is told: their fields by name, and
+ * `look` when the e-bike alone is Not sure, so the link opens Bike details at Look.
+ */
+export function tellUsLine(d: CareDetails): { text: string; look: boolean } | null {
+  const fields = (Object.keys(FIELD_WORDS) as CareKey[]).filter((k) => d[k] === null).map((k) => FIELD_WORDS[k]!);
+  const all = d.ebike === null ? [...fields, C.careTellUsEbikeToo] : fields;
+  if (all.length === 0) return null;
+  if (fields.length === 0) return { text: C.careTellUsEbike, look: true };
+  return { text: C.careTellUs(all.length > 1 ? `${all.slice(0, -1).join(', ')} and ${all[all.length - 1]}` : all[0]!), look: false };
+}
+
+/** A task's name for the bike: the fork wipe names the fork alone on a bike with a front fork only (sweep 2 of 15 Nov 2026, #4). */
+export const taskName = (t: CareTask, d: CareDetails): string => (t.id === 'susp-wipe-stanchions' && d.suspension === 'front' ? C.careForkOnly : t.name);
 
 /**
  * Steps that say what the bike has (the owner's wish of 14 November 2026): per card or task, per step (0-based), the words for a told

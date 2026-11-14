@@ -11,7 +11,7 @@ import { cardParts, linkSegments, STEP_PARTS } from '../../core/parts/links.ts';
 import type { PartId } from '../../core/parts/guide.ts';
 import type { CareTask, RoadCard } from '../../core/care/types.ts';
 import { riderType } from '../../core/care/type-order.ts';
-import { C, CARRY, WHO_LABEL } from '../../core/wording/en-care.ts';
+import { C, CARRY, taskName, WHO_LABEL } from '../../core/wording/en-care.ts';
 import { partsLine } from '../../core/wording/en-part-names.ts';
 import { IF_WORDS, KIND_WORDS, SWITCH_WORDS } from '../../core/wording/en-care-pictures.ts';
 import { loadPictures, Picture, pictureReady, stepTitle } from './picture.tsx';
@@ -192,7 +192,7 @@ export function StepView({ source, bike = null, addHref = null, onClose }: {
   const steps = shownSteps.map((i) => texts[i]!);
   const end = endOf(source);
   const last = end ? steps.length + 1 : steps.length;
-  const name = source.kind === 'road' ? source.item.problem : source.item.name;
+  const name = source.kind === 'road' ? source.item.problem : taskName(source.item, careDetails(bike));
   const titleId = `care-steps-title-${source.item.id}`;
   const details = pictureDetails(bike);
   const pictures = shownSteps.map((i) => picturesFor(source.item.id, i, details));
