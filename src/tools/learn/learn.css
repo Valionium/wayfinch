@@ -92,7 +92,8 @@
 /* How it works (design of 14 November 2026, "How a bike works"): three ways in share the row; the Topic drop-down as Bike to show;
    the line for a part the bike shown lacks; the tyre tool's link, a 44 px target. */
 .bl-modes { flex-wrap: wrap; }
-.bl-mode { min-width: 5.5rem; }
+/* each name on one line: at 320 px the three fit one row; a larger text size wraps the row, never a name */
+.bl-mode { flex: 1 1 auto; white-space: nowrap; padding-inline: 10px; }
 .bw-none { margin: 0 0 8px; }
 .bw-tyre { margin: 0 0 8px; }
 .bw-tyre a { display: inline-flex; align-items: center; min-height: 44px; color: var(--blaze); font-weight: 600; }

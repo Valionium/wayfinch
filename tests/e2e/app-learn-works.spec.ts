@@ -61,6 +61,8 @@ test('[BW-OPEN] How it works is a third switch beside Explore and Build-up: a pr
 
 test('[BW-STEPS] Back and Next turn a topic\'s steps, each marking its parts; the arrow keys too; Back on reaching step 1 hands the focus to Next', async ({ page }) => {
   await openWorks(page);
+  // a new topic keeps the focus on the drop-down (it is never drawn again)
+  await page.getByLabel('Topic').focus();
   await page.getByLabel('Topic').selectOption('brakes');
   await expect(page.getByLabel('Topic')).toBeFocused();
   await expect(step(page)).toHaveText('Step 1 of 5: Brakes');
