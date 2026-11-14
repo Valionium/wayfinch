@@ -16,12 +16,12 @@ const sentencesOf = (s: string): string[] => s.split(/(?<=[.!?])\s+/).filter(Boo
 const wordsOf = (s: string): number => s.split(/\s+/).filter(Boolean).length;
 const text = (topic: (typeof TOPICS)[number]): string => TOPIC_STEPS[topic].join(' ');
 
-test('[BW-TOPICS] six topics from the pedals to the road, each 3 to 5 steps, every step with its words and the parts it moves', () => {
+test('[BW-TOPICS] six topics from the pedals to the road, each 4 or 5 steps, every step with its words and the parts it moves', () => {
   expect(TOPICS).toEqual(['cranks', 'chain', 'gears', 'freehub', 'brakes', 'pressure']);
   expect(TOPICS.map((t) => TOPIC_NAMES[t])).toEqual(['Cranks and bottom bracket', 'Chain and gear ratio', 'Gears and shifting', 'Freehub and coasting', 'Brakes', 'Tyre pressure']);
   for (const t of TOPICS) {
     const steps = WORK_STEPS[t];
-    expect(steps.length, t).toBeGreaterThanOrEqual(3);
+    expect(steps.length, t).toBeGreaterThanOrEqual(4);
     expect(steps.length, t).toBeLessThanOrEqual(5);
     expect(TOPIC_STEPS[t].length, t).toBe(steps.length);
     steps.forEach((s, i) => {
@@ -52,7 +52,21 @@ test('[BW-TOPICS] the drawing marks the step\'s parts that the bike shown has, i
   }
   // the rider's electronic gears have no gear cable to mark
   const r = setBike('diamond-sloping', 'M', 'drop', false, ['28-622', '28-622'], null, { brakes: 'hydraulic-disc', drive: 'derailleur', shifting: 'electronic' });
-  expect(stepMarked(ownBike(resolveBikeSpec(r, null), r), 'gears', 0)).toEqual(['shifter']);
+  const own = ownBike(resolveBikeSpec(r, null), r);
+  expect(stepMarked(own, 'gears', 0)).toEqual(['shifter']);
+  // review of PR 157, M5: a hydraulic bike's brakes step marks no barrel adjuster (the cable's) and no pad adjuster
+  expect(stepMarked(own, 'brakes', 3)).toEqual(['brake-cable', 'caliper']);
+  for (const s of WORK_STEPS.brakes) expect(s.parts).not.toContain('barrel');
+  expect(stepMarked(kindBike('city'), 'brakes', 3)).toEqual(['brake-cable', 'rim-brake']);
+});
+
+test('[BW-TOPICS] the freehub steps mark the rear of the bike: the rear gears or the hub gears, never the hub, whose label is the front one', () => {
+  for (const s of WORK_STEPS.freehub) expect(s.parts).not.toContain('hub');
+  expect(stepMarked(kindBike('gravel'), 'freehub', 0)).toEqual(['cassette', 'derailleur']);
+  expect(stepMarked(kindBike('gravel'), 'freehub', 2)).toEqual(['cassette']);
+  expect(stepMarked(kindBike('city'), 'freehub', 1)).toEqual(['hub-gears', 'chain']);
+  expect(stepMarked(kindBike('city'), 'freehub', 2)).toEqual(['hub-gears']);
+  expect(stepMarked(kindBike('city'), 'freehub', 4)).toEqual(['hub-gears']);
 });
 
 test('[BW-MISSING] a step about a part the bike shown lacks names the first typical bike that has it; with the part there, no line', () => {
@@ -73,6 +87,22 @@ test('[BW-MISSING] a step about a part the bike shown lacks names the first typi
       expect(KINDS.slice(0, KINDS.indexOf(m!.kind)).some((o) => hasPart(kindBike(o), s.key!))).toBe(false);
     });
   }
+  // review of PR 157, C1: a bike with hub gears has rear gears, in its hub: no line ever says it has none; the freehub's first step is
+  // about derailleur gears, so a hub-gear bike is told it has no rear derailleur, which is so
+  for (const s of TOPICS.flatMap((t) => WORK_STEPS[t])) expect(s.key).not.toBe('cassette');
+  expect(missingOf(kindBike('city'), 'freehub', 0)).toEqual({ part: 'derailleur', kind: 'road' });
+  const belt = setBike('diamond-sloping', 'M', 'flat', false, ['40-622', '40-622'], null, { brakes: 'hydraulic-disc', drive: 'belt' });
+  const hubs: LearnBike[] = [kindBike('city'), ownBike(resolveBikeSpec(belt, null), belt)];
+  for (const bike of hubs) {
+    expect(hasPart(bike, 'hub-gears')).toBe(true);
+    for (const t of TOPICS) WORK_STEPS[t].forEach((_, i) => {
+      const m = missingOf(bike, t, i);
+      if (m) expect(LW.none(m.part, m.kind), `${t} ${i}`).not.toMatch(/rear gears|hub gears/i);
+    });
+  }
+  // review of PR 157, M3: what a step says politely carries its line
+  expect(worksSaid('gears', 2, missingOf(kindBike('gravel'), 'gears', 2))).toBe(`Step 3 of 5: Gears and shifting. ${TOPIC_STEPS.gears[2]} No front derailleur on the bike shown: choose Road in Bike to show.`);
+  expect(worksSaid('gears', 2, null)).toBe(`Step 3 of 5: Gears and shifting. ${TOPIC_STEPS.gears[2]}`);
   expect(LW.none('front-derailleur', 'road')).toBe('No front derailleur on the bike shown: choose Road in Bike to show.');
   expect(LW.none('hub-gears', 'city')).toBe('No hub gears on the bike shown: choose City in Bike to show.');
 });
@@ -110,6 +140,11 @@ test('[BW-FACTS] the words say what is so: the ratio sum, easy and hard gears, c
   expect(text('brakes')).toMatch(/mineral oil or DOT fluid/);
   expect(text('brakes')).toMatch(/Never mix/);
   expect(text('brakes')).not.toMatch(/Shimano|SRAM|Magura|Tektro|Hayes/);
+  // review of PR 157: what holds on some bikes only says so (I1: cable gears; M1: a mid-drive's chainring; M2: a freewheel's ratchet)
+  expect(TOPIC_STEPS.gears[0]).toMatch(/cable gears/);
+  expect(TOPIC_STEPS.gears[1]).toMatch(/or on electronic gears a small motor/);
+  expect(TOPIC_STEPS.cranks[2]).toMatch(/^On most bikes/);
+  expect(TOPIC_STEPS.freehub[0]).toMatch(/^With derailleur gears, the rear gears usually/);
   // the left pedal's thread is reversed
   expect(text('cranks')).toMatch(/left pedal's thread runs the other way/);
   // tyre pressure: no figure anywhere (the Tyre pressure tool works it out), and never above the tyre's or rim's highest

@@ -102,6 +102,41 @@ test('[BW-STEPS] Back and Next turn a topic\'s steps, each marking its parts; th
   await expect(step(page)).toHaveText('Step 1 of 5: Chain and gear ratio');
 });
 
+test('[BW-STEPS] an arrow key that turns the step away from the focused part button or link hands the focus to Next, never to the page', async ({ page }) => {
+  await openWorks(page);
+  const onBody = () => page.evaluate(() => document.activeElement === document.body || document.activeElement === null);
+  // step 1's Bottom bracket is not a part of step 2
+  await page.locator('.bw-works .bl-part[data-part="bottom-bracket"]').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(step(page)).toHaveText('Step 2 of 5: Cranks and bottom bracket');
+  expect(await onBody()).toBe(false);
+  await expect(page.getByRole('button', { name: 'Next' })).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(step(page)).toHaveText('Step 1 of 5: Cranks and bottom bracket');
+  // the tyre tool's link is on the last step only
+  await page.getByLabel('Topic').selectOption('pressure');
+  for (let n = 0; n < 4; n += 1) await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByRole('link', { name: 'Open Tyre pressure' }).focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(step(page)).toHaveText('Step 4 of 5: Tyre pressure');
+  expect(await onBody()).toBe(false);
+  await page.keyboard.press('ArrowLeft');
+  await expect(step(page)).toHaveText('Step 3 of 5: Tyre pressure');
+});
+
+test('[BL-KEYS-FOCUS] in Build-up too, an arrow key that turns the step away from the focused part button hands the focus to Next', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools?learn' });
+  await page.getByRole('button', { name: 'Build-up' }).click();
+  await expect(page.locator('.bl-step')).toHaveText('Step 1 of 7: Frame');
+  await page.locator('.bl-build .bl-part[data-part="down-tube"]').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.bl-step')).toHaveText('Step 2 of 7: Fork and headset');
+  expect(await page.evaluate(() => document.activeElement === document.body || document.activeElement === null)).toBe(false);
+  await expect(page.getByRole('button', { name: 'Next' })).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('.bl-step')).toHaveText('Step 1 of 7: Frame');
+});
+
 test('[BW-MISSING] a step about a part the bike shown lacks says so and names a bike that has it; the tyre step links to Tyre pressure', async ({ page }) => {
   await openWorks(page);
   await page.getByLabel('Topic').selectOption('gears');
@@ -110,9 +145,17 @@ test('[BW-MISSING] a step about a part the bike shown lacks says so and names a 
   await next.click();
   await expect(step(page)).toHaveText('Step 3 of 5: Gears and shifting');
   await expect(page.locator('.bw-none')).toHaveText('No front derailleur on the bike shown: choose Road in Bike to show.');
+  // the line is said with the step (review of PR 157, M3), and again when the bike shown changes
+  const said = page.locator('[aria-live="polite"]');
+  await expect(said).toHaveText(/^Step 3 of 5: Gears and shifting. .* No front derailleur on the bike shown: choose Road in Bike to show.$/);
   await page.getByLabel('Bike to show').selectOption('road');
   await expect(step(page)).toHaveText('Step 3 of 5: Gears and shifting');
   await expect(page.locator('.bw-none')).toHaveCount(0);
+  await expect(said).toHaveText(/^Step 3 of 5: Gears and shifting. /);
+  await expect(said).not.toContainText('No front derailleur');
+  await page.getByLabel('Bike to show').selectOption('city');
+  await expect(said).toContainText('No front derailleur');
+  await page.getByLabel('Bike to show').selectOption('road');
   await expect(label(page, 'front-derailleur')).toBeAttached();
   await page.getByLabel('Topic').selectOption('pressure');
   for (let n = 0; n < 4; n += 1) await next.click();
