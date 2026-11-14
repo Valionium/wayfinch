@@ -255,6 +255,32 @@ test('[HF-KEEPS] side to side on the full kit: no pair ends uneven by the pair n
   }
 });
 
+// The lines of re-check of PR 117, N2 and N3, are conditional above and no mix there reaches them: two mixes that do, asserted without
+// "if" (handover task 4, item 4). Each after the automatic balancing, as the page applies it at the first look.
+test('[HF-KEEPS] N2: "Already packed" with an uneven pair says the pair stays uneven; N3: a press that only evens a pair says so',()=>{
+  const fills=()=>json(`(()=>{const g={};currentPlan().slots.forEach(s=>{if(countOf(s)>1)(g[s.uid]=g[s.uid]||[]).push((s.cap-s.left)/s.cap);});return Object.values(g).filter(f=>f.length===2).map(f=>Math.abs(f[0]-f[1]));})()`);
+  // N2: the 16-thing kit, a day ride, comfort, the bikepacking bags
+  plan(SETS.bikepacking,{},"S.nights=0;S.mode='comfort'",true,KIT0);
+  assert.equal(press(),false,'N2: nothing to pack');
+  assert.equal(json('HANDLING.last.kind'),'already');
+  assert.ok(fills().some(g=>g>=PAIR_GAP),'N2: a pair is uneven');
+  const l2=line();
+  assert.match(l2,/Already packed for handling: the heavy things sit as low and central as your bags allow\./);
+  assert.match(l2,/<li>The fork cages stay uneven: \d+ % and \d+ % full\.<\/li>/);
+  assert.doesNotMatch(l2,/undefined/);
+  // N3: the full kit, comfort, a rear pannier pair of 15 L with the rack deck, a fork pair, a frame bag and a bar roll
+  const N3=[{uid:1,pos:'rack',L:15,pair:true},{uid:2,pos:'fork',L:3,pair:true},{uid:3,pos:'frame',L:4.5},{uid:4,pos:'bar',L:9}];
+  plan(N3,{rack:true},"S.mode='comfort'",true,FULLKIT);
+  const before=fills();
+  assert.ok(before.some(g=>g>=PAIR_GAP),'N3: a pair is uneven before the press');
+  assert.equal(press(),true,'N3: the press packs');
+  assert.equal(json('HANDLING.last.route'),'even');
+  assert.ok(fills().every((g,i)=>g<PAIR_GAP || g<=before[i]+1e-9),'N3: the uneven pair is even now, none more uneven');
+  const l3=line();
+  assert.match(l3,/Packed for handling, to even the rear panniers: /);
+  assert.doesNotMatch(l3,/undefined/);
+});
+
 test('[HF-SMALL] not in the small view, nor before the packing step, during a trial or on a draft another tab froze',()=>{
   for(const [why,extra] of [['the small view','SMALL_VIEW=true'],['the kit step','S.step=3'],['a trial','TRIAL={before:{},uids:[]}'],['a frozen draft','DRAFT_FROZEN=true']]){
     plan(SETS.bikepacking,{},'');
