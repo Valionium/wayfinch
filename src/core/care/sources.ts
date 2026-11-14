@@ -98,6 +98,10 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
     urls: ['https://www.parktool.com/en-us/product/chain-wear-indicator-cc-3-2'],
     note: "Source: interval: book p. 206; wear signs: book pp. 41, 158 Book: p. 206: differs: book says weekly; moved from Every month. Round 2: pp. 41, 158: agrees (check stretch with a gauge, smallest ring and sprocket, replace when the gauge sinks in or the chain slips); gap filled: the signs of a worn chain",
   },
+  'gears-electronic-adjust': {
+    urls: ['https://support.sram.com/hc/en-us/articles/13826255048219-How-do-I-MicroAdjust-my-SRAM-Eagle-AXS-Transmission', 'https://www.parktool.com/en-us/blog/repair-help/sram-axs-shifter-pairing', 'https://www.bike-magazin.de/en/workshop/circuit-or-drive/adjusting-sram-axs-how-to-get-your-gears-working-smoothly-again-with-microadjust/'],
+    note: "The owner's ruling of 14 November 2026. Research note docs/research/2026-11-09-modern-bike-mechanisms.md: electronic shifting (SRAM AXS, Shimano Di2) has no gear cable and no barrel adjuster; adjustment is done with the shifter buttons or an app. SRAM: MicroAdjust from the shifter buttons or in the AXS app, in small steps; pairing again after a part is added or replaced (Park Tool). Shimano Di2 was not checked, so no brand's own button steps: the maker's app or manual says how. Battery first: gears-electronic-battery (a flat system stops shifting). The hanger: as gears-indexing (book pp. 214-215; a bent hanger needs a shop). Only derailleur gears: an electronic hub gear has no derailleur or hanger. No time in minutes: no source gives one.",
+  },
   'gears-electronic-battery': {
     urls: ['https://www.competitivecyclist.com/bulletin/electronic-shifting-axs-di2-faq', 'https://ridereview.com/questions/how-to-check-shimano-di2-battery'],
     note: "Source: interval: book p. 206 Book: p. 206: differs: book says make sure the battery is charged weekly; moved from Every month. Round 2: not covered by the new pages",
@@ -181,6 +185,10 @@ export const SOURCES: Record<string, { urls: string[]; note?: string }> = {
   'brakes-spongy': {
     urls: ['https://www.parktool.com/blog/repair-help/shimano-hydraulic-brake-service-and-adjustment'],
     note: "Source: book p. 213 Book: p. 213: agrees (air, leaks at the hose joints, overheated fluid; bleed). Round 2: not covered by the new pages",
+  },
+  'brakes-hydro-rim-spongy': {
+    urls: ['https://www.manualslib.com/manual/748630/Magura-Hs33.html?page=21', 'https://www.tartybikes.co.uk/hydro_rim_brake_spares/magura_royal_blood_mineral_oil/c5p2075.html'],
+    note: "The owner's ruling of 14 November 2026: the spongy brake and the bleed (brakes-spongy, brakes-hydraulic-bleed) for a hydraulic rim brake. Magura HS33 manual, bleeding and filling: only Magura Royal Blood mineral oil, never DOT brake fluid; the oil does not age, so bleed only when the lever is slow or spongy or after a hose change; with Magura's service or bleed kit. Tartybikes: Royal Blood is for Magura's disc brakes and the HS33 and HS11 rim brakes. Pads and leaks: as brakes-spongy (book p. 213). No time in minutes: no source gives one. Other makes of hydraulic rim brake are not named: the fluid comes from the brake's manual.",
   },
   'chain-replace': {
     urls: ['https://www.parktool.com/en-us/product/chain-wear-indicator-cc-3-2'],

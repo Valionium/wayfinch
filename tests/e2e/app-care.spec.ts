@@ -105,7 +105,7 @@ test('[BC-SCREEN] every task, at the project size and at 200% text: no sideways 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   // every task shows, the conditioned ones tagged, and the quiet line leads to the bike's details
-  await expect(page.locator('.care-task')).toHaveCount(48);
+  await expect(page.locator('.care-task')).toHaveCount(50);
   await expect(page.getByRole('link', { name: "Tell us your brake type, tyre setup, drivetrain, shifting, suspension and whether it is an e-bike in Bike details to hide what doesn't apply" })).toHaveAttribute('href', '/tools/bags/#bike-details=bike_u&back=care');
   // the tablist and the filters have names
   await expect(page.getByRole('tablist', { name: 'Bike care' })).toBeVisible();
@@ -116,7 +116,7 @@ test('[BC-SCREEN] every task, at the project size and at 200% text: no sideways 
 test('[BC-SCREEN] Tab reaches every tab, filter, task and link; each task opens with Enter and Space', async ({ page }) => {
   app = await loadApp(page, { launch: true, path: '/#/tools/care' });
   await seed(page, [U], null);
-  await expect(page.locator('.care-task')).toHaveCount(48);
+  await expect(page.locator('.care-task')).toHaveCount(50);
   await page.getByRole('link', { name: 'Tools', exact: true }).first().focus();
   const reached: string[] = [];
   for (let i = 0; i < 90; i += 1) {

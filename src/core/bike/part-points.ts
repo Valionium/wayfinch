@@ -4,10 +4,10 @@
 import type { Anchors, P } from './art.ts';
 import type { BikeSpec } from './spec.ts';
 
-/** The 36 parts of the guide (design 4.3), in its six groups' order. */
+/** The guide's parts (design 4.3, and the wheel: the owner's ruling of 14 November 2026), in its six groups' order. */
 export const PART_PLACES = [
   'frame', 'fork', 'headset', 'stem', 'handlebar', 'seatpost',
-  'hub', 'wheel-qr', 'thru-axle', 'spokes', 'rim', 'dropouts',
+  'wheel', 'hub', 'wheel-qr', 'thru-axle', 'spokes', 'rim', 'dropouts',
   'tyre', 'bead', 'tube', 'valve', 'tubeless-valve',
   'brake-lever', 'rim-brake', 'pads', 'brake-qr', 'barrel', 'caliper', 'disc', 'pad-adjuster',
   'chain', 'quick-link', 'chainring', 'cassette', 'derailleur', 'hanger', 'gear-cable', 'hub-gears',
@@ -105,6 +105,8 @@ export function partPoint(spec: BikeSpec, anchors: Anchors, id: PartPlace): P | 
         return lerp(at(fc, 2, a + 0.35), at(fc, rimR, a), 0.6);
       }
       case 'rim': return at(fc, rimR, -Math.PI / 3);
+      // the whole wheel: on its tyre, low on the front, where no other wheel part has its point
+      case 'wheel': return at(fc, (outer + rimR) / 2, Math.PI / 6);
       case 'dropouts': return rear;
       case 'tyre': return at(fc, outer - (outer - rimR) / 2, -Math.PI / 4);
       case 'bead': case 'tube': return at(fc, rimR + (outer - rimR) * (id === 'bead' ? 0.25 : 0.5), id === 'bead' ? (-5 * Math.PI) / 6 : -Math.PI / 6);
