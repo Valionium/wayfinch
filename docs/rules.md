@@ -124,7 +124,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 
 ## Climbs and climbing card
 
-- A climb needs 100 m at 3 percent; close rises merge across a dip under 20 m (§6.7) [CL-CLIMB]
+- A climb needs 100 m at 3 percent; close rises merge across a dip under 20 m; it starts at its foot and ends at its top, so a flat or a valley road rising under 0.5 percent is no part of it, 6 km of flat ends it as a dip does, and a rise averaging under 3 percent keeps its steeper part as the climb, on files with a point every few metres as on sparse ones (§6.7; review of PR 150, C1) [CL-CLIMB]
 - Climbing left is told to the stop and the end with the next climb (§6.7) [CL-LEFT]
 - Missing heights read unknown, never zero metres (§6.7) [CL-UNKNOWN]
 
@@ -749,6 +749,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - no car, foot or synthetic route accepted; source checked [AB-NO-CAR]
 - no thinning; passes through the same buildRoute [AB-FULL-GEOMETRY]
 - only the search text is sent; fallback both ways [AB-SEARCH]
+- Plan from A to B's form: the search hint once under Start and End, named by both fields (aria-describedby); the privacy note behind "What is sent?", word for word; after a pick or Change the focus goes to the next empty field, else to Plan the route; the pick prompt's status is in the page before any search and filled when the hits come; a hit's name keeps its parts apart (unseen commas); a busy Search is aria-disabled, stays focusable, and a press meanwhile sends nothing (sweep of 14 Nov 2026, #8, #9; NEXT task 6) [AB-FORM]
 - a French, Italian or Spanish street word (place, chemin, impasse, route, piazza, viale, corso, plaza), as a whole word, makes an address search; a name that only starts with one (Placerville, Piazzola sul Brenta) stays a town search, as Norwegen and Newcastle do (NEXT task 6) [AB-ADDRESS-WORDS]
 - no bike router answers: asks for a GPX [AB-NONE]
 
