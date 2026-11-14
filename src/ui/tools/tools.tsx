@@ -37,10 +37,14 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
     w.addEventListener('hashchange', on);
     return () => w.removeEventListener('hashchange', on);
   }, []);
-  // Back from the page to the cards: the focus goes to the card's Open link rather than the page's start (review of PR 127, M3).
+  // Back from the page to the cards: the focus goes to the card's Open link rather than the page's start (review of PR 127, M3), and
+  // Tools shows from its top, not scrolled down to that last card (follow-up of 14 Nov).
   const was = useRef(learn);
   useEffect(() => {
-    if (was.current && !learn) document.querySelector<HTMLAnchorElement>(`a[href="${LEARN_HREF}"]`)?.focus();
+    if (was.current && !learn) {
+      document.querySelector<HTMLAnchorElement>(`a[href="${LEARN_HREF}"]`)?.focus({ preventScroll: true });
+      window.scrollTo(0, 0);
+    }
     was.current = learn;
   }, [learn]);
   return learn ? <LearnScreen services={services} /> : <ToolsCards services={services} />;

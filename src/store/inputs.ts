@@ -12,7 +12,7 @@ import type { Tx } from './db.ts';
 import { readLoadSummary } from './loadcheck-read.ts';
 import { keptPositions, readPlanTomorrow, sweepPositions, withoutStampedAhead, ZONES_KEY } from './positions.ts';
 import { PROFILE_META, usableProfile } from './profile.ts';
-import { goodDate, goodDayStart, usableHolidays, usableSavedKm, usableTrip, usableWater, usableZones } from './rules.ts';
+import { goodDate, goodDayStart, usableHolidays, usableSavedKm, usableTrip, usableWater, usableZones, zonesOrDevice } from './rules.ts';
 import { readLocalSettings } from './settings-local.ts';
 
 // What preparation writes (Tasks 7 to 9), in `meta`, under the prefix that replacing the route removes.
@@ -24,7 +24,7 @@ export const ROUTE_END_META = `${ROUTE_META_PREFIX}routeEnd`;
 const validDate = (d: Date): boolean => Number.isFinite(d.getTime());
 
 const todayAndYesterday = (now: Date, zones: ZoneSpan[]): { today: string; yesterday: string } => {
-  const today = ridingDate(now, zoneLookupOf(zones)(0).timeZone);
+  const today = ridingDate(now, zoneLookupOf(zonesOrDevice(zones))(0).timeZone);
   return { today, yesterday: addDaysIso(today, -1) };
 };
 
@@ -74,7 +74,7 @@ export async function readInputs(now: Date): Promise<ScreenInputs | null> {
     positions, dayStarts, routeEndDate: goodDate(read.routeEndDate) ? read.routeEndDate : null, planTomorrow: readPlanTomorrow(),
     profile: usableProfile(read.profile), loadSummary: readLoadSummary(), waterLeft: waterOver ? null : water,
     settings: { campWaterL: trip.campWaterL, keepFresh: local.keepFresh },
-    now, sun: sunFromSuncalc, routeZones, holidays: usableHolidays(read.holidays), demo: null,
+    now, sun: sunFromSuncalc, routeZones: zonesOrDevice(routeZones), holidays: usableHolidays(read.holidays), demo: null,
   };
 }
 

@@ -4,7 +4,7 @@ import { effect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { T, TM } from '../../core/wording/en-tyre.ts';
-import { W, shortMapDate } from '../../core/wording/en.ts';
+import { W } from '../../core/wording/en.ts';
 import { TF } from '../../core/wording/en-tyre-labels.ts';
 import { TN } from '../../core/wording/en-tyre-notes.ts';
 import { TQ } from '../../core/wording/en-tyre-fields.ts';
@@ -14,6 +14,7 @@ import { BackBar } from '../../ui/back-bar/back-bar.tsx';
 import { FitLine } from '../../ui/bike/fit-line.tsx';
 import { noteSeen } from '../../ui/bike/hint-seen.ts';
 import { Card, Notice } from '../../ui/card.tsx';
+import { savedDay } from '../../ui/saved-day.ts';
 import { choiceMadeIn, choiceVersion, noteBikeChoice } from '../../ui/tools/bike-choice.ts';
 import { checkLimit, tyreEstimate } from './core.ts';
 import type { Bars, Casing, Limit, RimType, Setup, Surface, Unit, Wheel } from './core.ts';
@@ -367,7 +368,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
   const src = resolved.sources;
   const v = resolved.values;
   const own = (field: FieldName, value: number): number | undefined => (src[field] === 'assumed' ? undefined : value);
-  const planDate = host.summary ? (shortMapDate(host.summary.at) ?? '') : '';
+  const planDate = host.summary ? (savedDay(host.summary.at) ?? '') : '';
   const planNote = TQ.tyreFromPlan(planDate);
   const bikeKey = (name: string) => `tyre-${name}`;
   const changeHeat = (patch: NonNullable<Details['heat']>): void => {
