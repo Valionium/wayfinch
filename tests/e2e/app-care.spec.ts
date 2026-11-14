@@ -106,7 +106,7 @@ test('[BC-SCREEN] every task, at the project size and at 200% text: no sideways 
   await expect(page.getByRole('dialog')).toHaveCount(0);
   // every task shows, the conditioned ones tagged, and the quiet line leads to the bike's details
   await expect(page.locator('.care-task')).toHaveCount(48);
-  await expect(page.getByRole('link', { name: "Tell us your brakes, tyres… in Bike details to hide what doesn't apply" })).toHaveAttribute('href', '/tools/bags/#bike-details=bike_u&back=care');
+  await expect(page.getByRole('link', { name: "Tell us your brake type, tyre setup, drivetrain, shifting, suspension and whether it is an e-bike in Bike details to hide what doesn't apply" })).toHaveAttribute('href', '/tools/bags/#bike-details=bike_u&back=care');
   // the tablist and the filters have names
   await expect(page.getByRole('tablist', { name: 'Bike care' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Parts' })).toBeVisible();
@@ -129,7 +129,7 @@ test('[BC-SCREEN] Tab reaches every tab, filter, task and link; each task opens 
     });
     if (here) reached.push(here);
   }
-  for (const want of ['tab:Care', 'tab:Roadside repairs', 'input:care-search', "a:Tell us your brakes, tyres… in Bike details to hide what doesn't apply"]) expect(reached, want).toContain(want);
+  for (const want of ['tab:Care', 'tab:Roadside repairs', 'input:care-search', "a:Tell us your brake type, tyre setup, drivetrain, shifting, suspension and whether it is an e-bike in Bike details to hide what doesn't apply"]) expect(reached, want).toContain(want);
   for (const part of ['Chain', 'Brakes', 'Tyres', 'Gears', 'Wheels', 'Suspension', 'E-bike', 'Frame & bolts']) expect(reached, part).toContain(`button:${part}`);
   const ids = await page.locator('.care-task').evaluateAll((ds) => ds.map((d) => (d as HTMLElement).dataset.id!));
   for (const id of ids) expect(reached, id).toContain(`task:${id}`);

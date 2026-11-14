@@ -92,12 +92,21 @@ export function TripSettings({ services, snap, reload, part, focusDate = 0 }: {
   const problem = (f: string): string | null => problems[f] || null;
   // Other nights choose every night's stop afresh, the rider's own picks included (TRIP-DAY-STOPS): said once, here, when the trip
   // had stops (review of PR 101, M4). A day ride has none to say.
+  const sayStops = (ok: boolean, was: number | null, now: number | null): void => {
+    const held = trip?.stops?.routeId === trip?.route.id ? trip?.stops : undefined;
+    setStopsSaid(ok && held && held.days.length > 0 && now !== null && now > 0 && now !== was ? TF.appTripStopsNewNights(now, held.days.some((d) => d.by === 'rider')) : '');
+  };
   const saveNights = async (v: number | null): Promise<boolean> => {
     const was = trip ? settings.nights ?? suggestedNights(trip) : null;
     const ok = await save('nights', v);
-    const now = trip ? v ?? suggestedNights(trip) : null;
-    const held = trip?.stops?.routeId === trip?.route.id ? trip?.stops : undefined;
-    setStopsSaid(ok && held && held.days.length > 0 && now !== null && now > 0 && now !== was ? TF.appTripStopsNewNights(now, held.days.some((d) => d.by === 'rider')) : '');
+    sayStops(ok, was, trip ? v ?? suggestedNights(trip) : null);
+    return ok;
+  };
+  // With the nights left to the suggestion, a pace or flat speed that changes it chooses the stops afresh too: said the same way,
+  // beside those fields (review of the Trip PRs, M9). Which stops are chosen is unchanged.
+  const savePlan = async (field: 'pace' | 'flatKph', v: unknown): Promise<boolean> => {
+    const ok = await save(field, v);
+    sayStops(ok, trip ? settings.nights ?? suggestedNights(trip) : null, ok && trip && settings.nights === null ? suggestedNights({ ...trip, [field]: v }) : null);
     return ok;
   };
 
@@ -166,12 +175,13 @@ export function TripSettings({ services, snap, reload, part, focusDate = 0 }: {
       </div>
 
       <Choice
-        name="pace" legend={TF.appTripPace} value={settings.pace} onPick={(v) => save('pace', v)}
+        name="pace" legend={TF.appTripPace} value={settings.pace} onPick={(v) => savePlan('pace', v)}
         options={[['steady', W.appTripPaceSteady], ['sporting', W.appTripPaceSporting], ['hard', W.appTripPaceHard]]}
       />
       {problem('pace') ? <p class="field-problem" role="alert">{problem('pace')}</p> : null}
 
-      <NumberField id="trip-kph" label={TF.appTripFlatKph} value={settings.flatKph} step="0.5" min={15} max={40} onCommit={(v) => save('flatKph', v ?? Number.NaN)} problem={problem('flatKph')} />
+      <NumberField id="trip-kph" label={TF.appTripFlatKph} value={settings.flatKph} step="0.5" min={15} max={40} onCommit={(v) => savePlan('flatKph', v ?? Number.NaN)} problem={problem('flatKph')} />
+      <p class="muted" role="status" data-plan-stops>{stopsSaid}</p>
 
       <Choice
         name="stay" legend={TF.appTripStay} value={settings.stay} onPick={(v) => save('stay', v)}

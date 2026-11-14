@@ -133,6 +133,20 @@ test('[BL-ZOOM] the zoom buttons zoom in on the picked part and back to the whol
   await expect(page.locator('.bl-canvas')).toHaveAttribute('data-zoom', '1');
 });
 
+// Sweep 2 of 15 Nov 2026, #7: a zoom made in Explore does not carry into Build-up, where it cut the crank off the drivetrain step.
+test('[BL-ZOOM] a zoom in Explore is not carried into Build-up, nor back: each mode opens on the whole bike', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools?learn' });
+  await part(page, 'derailleur').click();
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await expect(page.locator('.bl-canvas')).toHaveAttribute('data-zoom', '2.25');
+  await page.getByRole('button', { name: 'Build-up', exact: true }).click();
+  await expect(page.locator('.bl-canvas')).toHaveAttribute('data-zoom', '1');
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await page.getByRole('button', { name: 'Explore', exact: true }).click();
+  await expect(page.locator('.bl-canvas')).toHaveAttribute('data-zoom', '1');
+});
+
 test('[BL-PHONE] at 320 px and in this project\'s size and theme: no sideways scroll, 44 px targets, nothing axe objects to; it opens offline', async ({ page }) => {
   app = await loadApp(page, { launch: true, path: '/#/tools' });
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
