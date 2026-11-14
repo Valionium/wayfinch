@@ -40,7 +40,7 @@ function listFiles(dir) {
 
 function headersFile(launch) {
   const noCache = ['/offline-worker.js', '/', '/build.json'];
-  if (launch) noCache.push('/tools/bags/', '/manifest.webmanifest', '/tools/bags/bike.js', '/tools/bags/bike-photo.js', '/tools/bags/advisor.js', '/tools/bags/weightmap.js', '/tools/bags/colours.js');
+  if (launch) noCache.push('/tools/bags/', '/manifest.webmanifest', '/tools/bags/bike.js', '/tools/bags/bike-photo.js', '/tools/bags/advisor.js', '/tools/bags/weightmap.js', '/tools/bags/colours.js', '/tools/bags/font.css');
   const immutable = ['/assets/*', '/vendor/leaflet-1.9.4/*'];
   return [
     ...noCache.map((path) => `${path}\n  Cache-Control: no-cache\n`),
@@ -118,6 +118,30 @@ function writeCarePictures(target) {
 }
 
 /**
+ * The bag planner's header and step labels are drawn in the app's own Source Sans 3 (the owner's ruling of 14 Nov 2026, "yes, make the
+ * Bag planner look like Wayfinch"). The page is a file of public/ and can't know Vite's hashed names, so the launch build writes the
+ * app's own @font-face rules of that family, exactly as the app's built stylesheet has them, into /tools/bags/font.css: the same
+ * addresses, so the same files, precached like every file. A stylesheet without them fails the build, rather than a page that quietly
+ * draws another font. A shell that loads the app from /assets/ without a stylesheet link found there fails too (review of PR 159,
+ * m3); only a test's stand-in for Vite, a shell that loads nothing from /assets/, has nothing to write.
+ */
+export function writePageFont(target) {
+  const path = join(target, 'index.html');
+  const shell = existsSync(path) ? readFileSync(path, 'utf8') : '';
+  const css = [...shell.matchAll(/<link\b[^>]*>/g)].map((m) => m[0])
+    .filter((tag) => /\srel="stylesheet"/.test(tag))
+    .map((tag) => tag.match(/\shref="\/(assets\/[^"]+\.css)"/)?.[1]).find(Boolean);
+  if (!css) {
+    if (shell.includes('"/assets/')) throw new Error("The app's page has no stylesheet link: the bag planner's /tools/bags/font.css can't be written.");
+    return;
+  }
+  const rules = (readFileSync(join(target, css), 'utf8').match(/@font-face\{[^}]*\}/g) ?? []).filter((r) => /font-family:\s*"?Source Sans 3"?[;}]/.test(r));
+  if (rules.length === 0) throw new Error("The app's stylesheet has no Source Sans 3: the bag planner's /tools/bags/font.css can't be written.");
+  mkdirSync(join(target, 'tools', 'bags'), { recursive: true });
+  writeFileSync(join(target, 'tools', 'bags', 'font.css'), `/* Wayfinch's Source Sans 3 for the bag planner: the app's own rules, written by tools/build.mjs (writePageFont). */\n${rules.join('\n')}\n`);
+}
+
+/**
  * Builds the site into `out`.
  * `extraFiles` ({ 'assets/x.js': bytes }) are written and precached like any other file; only tests use it so far.
  * `pagePath` is the page served at / with the switch off (the frozen copy); a test may build a site around another page. `vite` lets a test watch for the one step only the launch runs.
@@ -150,6 +174,8 @@ export async function buildDist({ out = join(ROOT, 'dist'), launch, emergency = 
     // The one top bar of the bag planner and the legal pages (src/ui/back-bar/): /back-bar.js and /back-bar.css, precached with the rest.
     writeBackBar(target);
     writeCarePictures(target);
+    // The app's own Source Sans 3 for the bag planner's header and step labels: /tools/bags/font.css, precached like every other file.
+    writePageFont(target);
     mkdirSync(join(target, 'tools', 'bags'), { recursive: true });
     writeFileSync(join(target, 'tools', 'bags', 'bike.js'), await compileBikeScript());
     // The photo colour picker, loaded only when a rider taps From a photo; precached like every other file.
