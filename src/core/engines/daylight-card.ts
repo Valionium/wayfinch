@@ -12,7 +12,7 @@ import { arrivalStatus, daylightLeft } from './daylight.ts';
 import { bindingPlace, closingDay, closingWord, leaveBy, routeZoneAt, stopStamp, sunReadable, type LeaveBy, type LeaveFacts } from './leaveby.ts';
 import { adjusted, latestPosition, usablePosition } from './locate.ts';
 import { usableFlatKph } from './pace.ts';
-import { noteFor, offersPlanTomorrow, ridingDate, zoneLookupOf } from './tripday.ts';
+import { cardNoteFor, offersPlanTomorrow, ridingDate, zoneLookupOf } from './tripday.ts';
 import { weekdayOf } from './weather-windows.ts';
 
 const MIN = 60_000;
@@ -204,7 +204,7 @@ const atLeastAction = (status: Status): Status => (status === 'fine' ? 'action' 
 export function daylightAnswer(f: LeaveFacts): Answer {
   const ride = f.ride;
   const simple = (title: string, status: Status, missing: Missing[], items: AnswerItem[] = []): Answer => makeAnswer({
-    topic: 'daylight', status, title, stamp: null, detail: noteFor(ride) ?? '', items, basis: [W.daylightBasis], freshness: freshnessOf(f), missing,
+    topic: 'daylight', status, title, stamp: null, detail: cardNoteFor(ride) ?? '', items, basis: [W.daylightBasis], freshness: freshnessOf(f), missing,
   });
   if (!usableFlatKph(f.trip.flatKph) || !validDate(f.now) || !validDate(ride.departure)) return simple(W.daylightCantWorkOut, 'unknown', []);
   const stopSun = sunAt(f, ride.stopKm, ride.date);
@@ -230,7 +230,7 @@ export function daylightAnswer(f: LeaveFacts): Answer {
   const r = leaveBy(f, ride);
   const offers: AnswerItem[] = offersPlanTomorrow(ride) ? [{ label: W.daylightPlanTomorrow, stamp: null, status: 'fine' }]
     : ride.phase === 'after-ride' ? [{ label: W.daylightBackToToday, stamp: null, status: 'fine' }] : [];
-  const notes = [stopStamp(ride), noteFor(ride) ?? '', r.dataNote ?? '', noHeights(f) ? W.leavebyNoHeights : ''];
+  const notes = [stopStamp(ride), cardNoteFor(ride) ?? '', r.dataNote ?? '', noHeights(f) ? W.leavebyNoHeights : ''];
 
   // While riding: the arrival at the day's stop.
   if (ride.phase === 'riding') {

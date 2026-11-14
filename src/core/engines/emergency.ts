@@ -18,6 +18,8 @@ export type EmergencyFacts = {
 export type EmergencyCard = Answer & {
   largeText: true; numbers: string[]; coords: string | null; share: string | null;
   rescue: RescueLine | null; notes: string[]; updatePosition: boolean; routeKm: number | null;
+  /** The sources the table used, the numbers' first and mountain rescue's second: links named "Source", never printed (owner, 14 Nov 2026). */
+  sources: string[];
 };
 
 const MIN = 60_000;
@@ -197,11 +199,12 @@ export function emergencyCard(f: EmergencyFacts): EmergencyCard {
     ...shelters,
   ];
   const checked = table?.checked ?? EMERGENCY_CHECKED;
+  const sources = [...new Set([table?.source ?? EUROPE_112_SOURCE, ...(table?.mountain ? [table.mountain.source] : [])])];
   const placesShown = settlement !== null || rescue !== null || shelters.length > 0;
   const answer = makeAnswer({
     topic: 'help', status: 'action', title: W.emergencyCall, stamp: null, detail: W.emergencyFallback, items,
     basis: [
-      W.emergencyNumbersBasis(`${shortMapDate(checked) ?? checked} ${checked.slice(0, 4)}`, [...new Set([table?.source ?? EUROPE_112_SOURCE, ...(table?.mountain ? [table.mountain.source] : [])])].join(' ; ')),
+      W.emergencyNumbersBasis(`${shortMapDate(checked) ?? checked} ${checked.slice(0, 4)}`),
       ...(placesShown ? [W.waterBasisOsm] : []),
     ],
     freshness: { dataDates: { emergencyNumbers: checked, ...(mapDate ? { places: dataDate } : {}) }, stale: false },
@@ -210,7 +213,7 @@ export function emergencyCard(f: EmergencyFacts): EmergencyCard {
   const share = position && coords
     ? safely(() => (r ? shareText(position, r, rescue) : `${coords}\n${geoLink(position)}`), null)
     : null;
-  return { ...answer, largeText: true, numbers, coords, share, rescue, notes, updatePosition: r?.old ?? false, routeKm: r?.km ?? null };
+  return { ...answer, largeText: true, numbers, coords, share, rescue, notes, updatePosition: r?.old ?? false, routeKm: r?.km ?? null, sources };
 }
 
 /** The Share my location message, or null when the card has no position to share. */

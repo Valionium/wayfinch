@@ -412,5 +412,8 @@ export function noteFor(ride: DayRide): string | null {
   }
 }
 
+/** The start note as a card says it: tonight at the route end is said once, at the top, not on each card (the owner's ruling of 14 Nov 2026). */
+export const cardNoteFor = (ride: DayRide): string | null => (ride.note?.kind === 'tonight-route-end' ? null : noteFor(ride));
+
 /** Plan tomorrow is offered before and while riding. */
 export const offersPlanTomorrow = (ride: DayRide): boolean => ride.phase === 'before-ride' || ride.phase === 'riding';

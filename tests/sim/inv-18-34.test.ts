@@ -15,6 +15,8 @@ const morning = { positions: [pos({ km: 0.1, at: `${SAT} 07:50` })], now: `${SAT
 const riding = { positions: [pos({ km: 0.1, at: `${SAT} 08:30` }), pos({ km: 40, at: `${SAT} 12:00` })], now: `${SAT} 12:10` };
 const RAIN = { range: [60, 70] as [number, number], stamps: stamps(SAT, 10, 16), pp: 80, mm: 1 };
 const moment = inputsOf({ ...riding, spots: [{ b: cafe(OPEN_LONG), km: 50 }, { b: pharmacy(OPEN_LONG), km: 45 }, { b: tap(), km: 55 }, { b: campsite(), km: 70 }], spells: [RAIN] });
+// Below zero with a real minus sign, a range written "−3 to 1 °C" (the owner's ruling of 14 Nov 2026).
+const coldRide = inputsOf({ ...riding, spells: [{ range: [0, 60], stamps: stamps(SAT, 0, 23), t: -3 }, { range: [61, 300], stamps: stamps(SAT, 0, 23), t: 1 }, { range: [0, 300], stamps: [...stamps(FRI, 0, 23), ...stamps('2026-10-18', 0, 23)], t: -2 }], spots: [{ b: cafe(OPEN_LONG), km: 50 }] });
 
 describe('statuses and distances', () => {
   test('[INV-18] only Water, Weather and Daylight are ever warning', () => {
@@ -72,6 +74,12 @@ describe('statuses and distances', () => {
     failsOnScreen('INV-21', moment, (s) => { const x = s.cards.weather.items.find((y) => y.stamp === null && /°C/.test(y.detail ?? ''))!; x.detail = '13 °C'; }, /Weather shows 13 °C/);
     failsOnScreen('INV-21', moment, (s) => { s.cards.weather.items.find((y) => y.label.startsWith("Night's low"))!.label = "Night's low about 13 °C at km 78"; }, /Weather shows 13 °C/);
     failsOnScreen('INV-21', moment, (s) => { s.cards.water.detail += ' 40 °C.'; }, /Water card shows a temperature/);
+  });
+  test('[INV-21] a temperature below zero reads with its real minus, and both ends of a range are the raw forecast', () => {
+    const s = holds('INV-21', coldRide);
+    expect(s.cards.weather.items.map((x) => x.detail)).toContain('−3 to 1 °C');
+    failsOnScreen('INV-21', coldRide, (x) => { x.cards.weather.items.find((y) => y.label.startsWith("Night's low"))!.label = "Night's low about −40 °C at km 78"; }, /Weather shows -40 °C/);
+    failsOnScreen('INV-21', coldRide, (x) => { x.cards.weather.items.find((y) => y.stamp === null && /°C/.test(y.detail ?? ''))!.detail = '−30 to 1 °C'; }, /Weather shows -30 °C/);
   });
 
   test('[INV-22] a basis with ages and attribution, and no half-hour rain time beyond 48 hours', () => {
@@ -171,6 +179,7 @@ describe('all the words', () => {
     // A temperature may read below zero, and a name may say anything.
     const cold = inputsOf({ ...morning, spells: [{ range: [0, 300], stamps: stamps(SAT, 1, 23), t: -7 }], spots: [{ b: cafe(OPEN_LONG, { name: 'NaN' }), km: 20 }] });
     holds('INV-30', cold);
+    holds('INV-30', coldRide);
   });
   test('[INV-31] no banned word, with place names masked', () => {
     holds('INV-31', moment);

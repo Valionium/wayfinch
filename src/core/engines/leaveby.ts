@@ -12,7 +12,7 @@ import { fineLimit } from './daylight.ts';
 import { rejoinKm } from './locate.ts';
 import { flatLegClockMin, usableFlatKph, type Schedule } from './pace.ts';
 import { ridingDate, scheduleFor, zoneLookupOf } from './tripday.ts';
-import { findS1S2, hasFuelShop, type WaterFacts } from './water.ts';
+import { findS1S2, FOOD_SHOP_WORDS, hasFuelShop, placeWord, type WaterFacts } from './water.ts';
 
 export type LeaveFacts = WaterFacts & Pick<ScreenInputs, 'holidays'>;
 
@@ -43,10 +43,6 @@ const LATEST_START = '04:00';
 const validDate = (d: Date | null): d is Date => d !== null && Number.isFinite(d.getTime());
 type Span = [number, number];
 
-// Tag values come from strangers: they are compared through a Map or Set, never used as object keys.
-const FOOD_SHOP_WORDS = new Map<string, string>([
-  ['supermarket', W.leavebyWordSupermarket], ['convenience', W.leavebyWordConvenience], ['bakery', W.leavebyWordBakery], ['kiosk', W.leavebyWordKiosk],
-]);
 
 /** A food shop of section 6.12: supermarket, convenience store, bakery, kiosk or fuel-station shop. */
 export const isFoodShop = (p: Place): boolean =>
@@ -55,15 +51,8 @@ export const isFoodShop = (p: Place): boolean =>
 /** A food place or restaurant (section 6.0's food and restaurant rows). Drink places are not. */
 export const isFoodPlace = (p: Place): boolean => isFoodShop(p) || p.kind === 'cafe' || p.kind === 'restaurant' || p.kind === 'ice_cream';
 
-/** "supermarket", "bakery", "fuel-station shop": what a place is, in a word. */
-export function placeWord(p: Place): string {
-  if (p.kind === 'fuel_shop') return W.leavebyWordFuel;
-  if (p.kind === 'restaurant') return W.leavebyWordRestaurant;
-  if (p.kind === 'cafe') return p.tags['amenity'] === 'fast_food' ? W.leavebyWordFastFood : W.leavebyWordCafe;
-  if (p.kind === 'ice_cream') return W.leavebyWordIceCream;
-  if (p.kind === 'drink') return W.leavebyWordPub;
-  return FOOD_SHOP_WORDS.get(p.tags['shop'] ?? '') ?? W.leavebyWordShop;
-}
+// what a place is, in a word: in water.ts, which the Water line names its next water with too (the owner's ruling of 14 Nov 2026)
+export { placeWord };
 const namedAt = (p: Place, km: Km): string => W.leavebyPlaceAtKm(placeWord(p), showKm(km));
 
 /** A place has one route match per pass: this tells two passes of one place apart. */

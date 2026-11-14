@@ -908,8 +908,12 @@ const INV20: Check = {
   },
 };
 
-const degreesIn = (text: string): number[] => [...text.matchAll(/(-?\d+)(?:–(-?\d+))? °C/g)].flatMap((m) => [Number(m[1]), ...(m[2] === undefined ? [] : [Number(m[2])])]);
+// A temperature below zero reads with a real minus sign, a range "−3 to 1 °C" (the owner's ruling of 14 Nov 2026).
+const DEGREES = /([-−]?\d+)(?:(?:–| to )([-−]?\d+))? °C/g;
+const degree = (x: string): number => Number(x.replace('−', '-'));
+const degreesIn = (text: string): number[] => [...text.matchAll(DEGREES)].flatMap((m) => [degree(m[1]!), ...(m[2] === undefined ? [] : [degree(m[2])])]);
 const shown = (t: number): number => Math.round(t) + 0;
+const minus = (t: number): string => String(t).replace('-', '−');
 
 const INV21: Check = {
   id: 'INV-21',
@@ -929,7 +933,7 @@ const INV21: Check = {
       return h && Number.isFinite(h.t) ? [h.t] : [];
     });
     const row = s.cards.weather.items.find((x) => x.stamp === null && /°C/.test(x.detail ?? ''));
-    if (row && temps.length > 0) must(row.detail === W.weatherTemps(String(shown(Math.min(...temps))), String(shown(Math.max(...temps)))), `the ride's temperatures read "${row.detail}", the raw forecast ${Math.min(...temps)} to ${Math.max(...temps)}`);
+    if (row && temps.length > 0) must(row.detail === W.weatherTemps(minus(shown(Math.min(...temps))), minus(shown(Math.max(...temps)))), `the ride's temperatures read "${row.detail}", the raw forecast ${Math.min(...temps)} to ${Math.max(...temps)}`);
   },
 };
 function hasRawMismatch(a: Answer, forecast: NonNullable<ScreenParts['forecast']>): boolean {
@@ -1171,7 +1175,7 @@ const INV29: Check = {
 
 const BROKEN = /NaN|undefined|\bnull\b|Infinity|\[object/;
 const NEGATIVE = /(?:^|[\s(+·,])[-−]\d/;
-const FIGURES_BELOW_ZERO_MAY = /-?\d+(?:–-?\d+)? °C|-?\d{1,3}\.\d{5}, -?\d{1,3}\.\d{5}|geo:\S+/g; // only temperatures and coordinates
+const FIGURES_BELOW_ZERO_MAY = /[-−]?\d+(?:(?:–| to )[-−]?\d+)? °C|-?\d{1,3}\.\d{5}, -?\d{1,3}\.\d{5}|geo:\S+/g; // only temperatures and coordinates
 
 /** Names and tag values come from strangers: they may say anything, and are masked before the text is judged. */
 function maskerOf(i: ScreenInputs): (t: string) => string {
