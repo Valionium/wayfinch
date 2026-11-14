@@ -273,7 +273,7 @@ describe('the extras', () => {
     expect(items.length).toBe(9);
     expect(items[0]).toContain('Rider weight');
     expect(host.textContent).toContain('Calculators differ by 10–30%');
-    expect(host.textContent).toContain(W.tyreSramNothingSent);
+    expect(host.textContent).toContain(TS.tyreSramNothingSent);
   });
 });
 
