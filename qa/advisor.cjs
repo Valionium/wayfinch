@@ -725,6 +725,70 @@ test('[GA-ANSWER] every shape of suggestion reads cleanly, what to get and the d
   }
 });
 
+// The owner's ruling of 14 Nov 2026: a seat pack beside a loaded rack top stays a suggestion, with one line on the space they share.
+const SEAT_DECK='A seat pack and a loaded rack top share the space behind the saddle: check that everything fits before you go.';
+const timesIn=(html,text)=>String(html).split(text).length-1;
+test('[GA-DECK-SEAT] "Seat pack, 15 L, plus a rack, with … on its top deck" stays, with one line on the space a seat pack and a loaded rack top share: exactly on a suggestion that brings the two together, never on one without both',async()=>{
+  // the reviewer's rider of PR 61 at two nights, no rack, Panniers are fine: Minimal a rack alone, Looking ahead a seat pack and the rack
+  const q=page({bike:FULL,setup:PACK30});
+  await ask(q,{style:'panniers',goal:'backpack'});
+  const a=q.json('ADVISOR.answer'),n=a.items.length;
+  assert.equal(q.json('advisorWhat(ADVISOR.answer.items[0],ADVISOR.input)'),'A rack, with the sleeping quilt or bag (in a dry bag), sleeping mat and tent on its top deck','Minimal: a rack alone');
+  assert.equal(q.json('advisorWhat(ADVISOR.answer.ahead,ADVISOR.input)'),'Seat pack, 15 L, plus a rack, with the sleeping quilt or bag (in a dry bag), sleeping mat and tent on its top deck','Looking ahead: the suggestion stays');
+  const html=view(q).answer;
+  const card=i=>{const at=html.indexOf(`<h5 id="advS${i}">`);return at<0 ? '' : html.slice(html.lastIndexOf('<article',at),html.indexOf('</article>',at));};
+  assert.equal(timesIn(card(0),SEAT_DECK),0,'a rack alone: no line');
+  assert.equal(timesIn(card(n),SEAT_DECK),1,'a seat pack and the rack: the line, once, on its card');
+  // every card on screen: the line exactly where its bike has a seat pack and kit on the rack top that the suggestion brings together
+  const refs=[...a.items.map((_,i)=>[`ADVISOR.answer.items[${i}]`,i]),...(a.ahead ? [['ADVISOR.answer.ahead',n],...(a.aheadAlts||[]).map((_,k)=>[`ADVISOR.answer.aheadAlts[${k}]`,n+1+k])] : [])];
+  let lines=0;
+  for(const [ref,i] of refs){
+    const s=q.json(ref),bags=q.json(`advisorTrialBags(${ref},ADVISOR.input)`);
+    const decked=q.json(`advisorDecked(advisorTrialBags(${ref},ADVISOR.input),${ref}.decks,ADVISOR.input)`),before=q.json(`advisorDecked(advisorBase(ADVISOR.input).bags,advisorBase(ADVISOR.input).decks,ADVISOR.input)`);
+    // brought together: a seat pack the suggestion adds, or the rack top's kit where the plan had none up there
+    const mix=bags.some(b=>b.pos==='seat')&&decked.length>0&&(s.add.some(b=>b.pos==='seat')||before.length===0);
+    assert.equal(timesIn(card(i),SEAT_DECK),mix ? 1 : 0,q.json(`advisorWhat(${ref},ADVISOR.input)`));
+    lines+=mix ? 1 : 0;
+  }
+  assert.equal(timesIn(html,SEAT_DECK),lines,'nowhere else on screen');
+  // every shape: the line only where a seat pack and a loaded rack top come together in the suggestion
+  const res={overL:0,spillIds:[],backL:0,backKg:0,outOfReach:0,kgByPos:{},items:{}};
+  const sg=(kind,add,remove,o={})=>({kind,add,remove,decks:{bar:false,rack:false},newBags:add.length,litres:0,deck:false,tags:[],rangeL:add[0] ? [add[0].L,add[0].L] : [0,0],result:res,score:0,...o});
+  const deckOn={decks:{bar:false,rack:true}};
+  const noRack=page({bike:FULL,setup:PACK30});
+  const fitted=page({bike:FULL,setup:TENT_IN_PACK+"S.bags=[{uid:1,pos:'rack',pair:true,L:10},{uid:2,pos:'pack',L:20}];S.decks={bar:false,rack:false};"});
+  const withSeat=page({bike:FULL,setup:TENT_IN_PACK+"S.bags=[{uid:1,pos:'rack',pair:true,L:10},{uid:2,pos:'seat',L:10},{uid:3,pos:'pack',L:20}];S.decks={bar:false,rack:false};"});
+  const loaded=page({bike:FULL,setup:TENT_IN_PACK+"S.bags=[{uid:1,pos:'rack',pair:true,L:10},{uid:2,pos:'seat',L:10},{uid:3,pos:'pack',L:20}];S.decks={bar:false,rack:true};"});
+  const indoor=page({bike:FULL,setup:"S.nights=2;S.sleep='indoor';applyTripKitDefaults();S.mode='comfort';S.nextUid=5;S.bags=[{uid:1,pos:'rack',pair:true,L:10},{uid:3,pos:'pack',L:20}];S.decks={bar:false,rack:true};"});
+  assert.ok(loaded.json('deckedIds().length>0')&&loaded.json("S.bags.some(b=>b.pos==='seat')"),'this rider has a seat pack and a loaded rack top already');
+  assert.ok(indoor.json('deckedIds().length===0'),'an indoor trip: nothing on the rack top');
+  const shapes=[
+    [noRack,'a seat pack alone',sg('add',[{uid:9,pos:'seat',L:12}],null),false],
+    [noRack,'a rack alone',sg('deck',[],null,{...deckOn,deck:true}),false],
+    [noRack,'a seat pack and a rack to fit',sg('ahead',[{uid:9,pos:'seat',L:15}],null,{...deckOn,deck:true}),true],
+    [noRack,'a seat pack and panniers on a rack to fit',sg('ahead',[{uid:9,pos:'seat',L:12},{uid:10,pos:'rack',pair:true,L:15}],null,deckOn),true],
+    [noRack,'panniers on a rack to fit',sg('add',[{uid:9,pos:'rack',pair:true,L:15}],null,deckOn),false],
+    [noRack,'a seat pack and a handlebar roll',sg('add-two',[{uid:9,pos:'seat',L:12},{uid:10,pos:'bar',L:10}],null),false],
+    [fitted,'a seat pack beside the deck of a rack fitted',sg('ahead',[{uid:9,pos:'seat',L:8}],null,{...deckOn,deck:true}),true],
+    [withSeat,'the deck of a rack fitted, beside the rider\'s seat pack',sg('deck',[],null,{...deckOn,deck:true}),true],
+    [withSeat,'fork cages',sg('add',[{uid:9,pos:'fork',pair:true,L:3}],null),false],
+    [loaded,'fork cages beside a seat pack and a rack top loaded already',sg('add',[{uid:9,pos:'fork',pair:true,L:3}],null,deckOn),false],
+    [loaded,'a bigger seat pack beside a loaded rack top',sg('swap',[{uid:9,pos:'seat',L:16}],2,{...deckOn,rangeL:[16,18]}),true],
+    [indoor,'a seat pack beside an empty rack top',sg('add',[{uid:9,pos:'seat',L:12}],null,deckOn),false],
+  ];
+  const input="advisorInput('bags-first','backpack')";
+  for(const [p,name,s,want] of shapes){
+    p.context.qaS=JSON.stringify(s);
+    assert.equal(p.json(`advisorSeatDeck(JSON.parse(qaS),${input})`),want,name);
+    assert.equal(timesIn(p.run(`advisorCardHtml(JSON.parse(qaS),${input},0)`),SEAT_DECK),want ? 1 : 0,name+': on its card');
+  }
+  // the closest option when nothing helps says it too, with that mix only
+  const say=(p,closest)=>textOf(p.run(`advisorAnswerHtml(${JSON.stringify({kind:'nothing-helps',tried:40,frameReason:null,partial:false,closest})},${input})`));
+  const over={overL:2.4,spillIds:['stove'],backL:0,backKg:0,outOfReach:0,kgByPos:{},items:{}};
+  assert.equal(timesIn(say(noRack,sg('ahead',[{uid:9,pos:'seat',L:15}],null,{...deckOn,deck:true,result:over})),SEAT_DECK),1,'closest: a seat pack and a rack to fit');
+  assert.equal(timesIn(say(noRack,sg('add',[{uid:9,pos:'seat',L:16}],null,{result:over})),SEAT_DECK),0,'closest: a seat pack alone');
+});
+
 // ---- Task 7: trial bags (decision 7) ----
 
 // Every loadcheck:* value in storage.
