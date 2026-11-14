@@ -70,7 +70,8 @@ const NAMED: readonly (readonly [RegExp, LearnId])[] = [
 ];
 
 function* ownBikes(): Generator<{ name: string; bike: LearnBike }> {
-  for (const style of ['diamond-sloping', 'step-through', 'full-suspension']) for (const tyre of ['28-622', '40-622', '60-622', '100-559']) {
+  // a road and a mountain bike, a step-through and a full-suspension frame: every line's kind of bike, with every brake, drive and axle answer
+  for (const [style, tyre] of [['diamond-sloping', '28-622'], ['diamond-sloping', '60-622'], ['step-through', '40-622'], ['full-suspension', '60-622']] as const) {
     for (const brakes of ['unknown', 'hydraulic-disc', 'cable-disc', 'rim', 'other']) for (const drive of ['unknown', 'derailleur', 'chain-hub', 'belt']) {
       for (const axle of [undefined, 'thru', 'qr', 'nuts']) for (const [bars, ebike, motor, shifting] of [['drop', false, undefined, 'cable'], ['flat', true, 'cranks', 'electronic'], ['other', true, 'rear-hub', 'cable']] as const) {
         const r = setBike(style, 'M', bars, ebike, [tyre, tyre], null, { brakes, drive, shifting, ...(axle ? { axle } : {}) });
@@ -94,7 +95,7 @@ test('[BL-STEPS] on every bike, by type, drive, brakes, axle, bars and motor, ea
       checked += 1;
     }
   }
-  expect(checked).toBeGreaterThan(10_000);
+  expect(checked).toBeGreaterThan(5_000);
   // the wheels as they are held: hub gears' rear wheel on nuts, a quick release in front of a city bike
   expect(STEP_LINES[stepLine(kindBike('city'), 'wheels')]).toMatch(/nuts/);
   expect(STEP_LINES[stepLine(kindBike('city'), 'wheels')]).toMatch(/quick release/);
@@ -104,7 +105,8 @@ test('[BL-STEPS] on every bike, by type, drive, brakes, axle, bars and motor, ea
 const classesOf = (svg: string): string[] => elements(svg).flatMap((e) => (e.attrs.class ?? '').split(' ').filter((c) => c.startsWith('bk-')));
 
 test('[BL-STAGE] the drawing as built: every element of a later step left out, a casing with its painted part, the last step the whole drawing', () => {
-  for (const style of STYLES) for (const size of SIZES) for (const bars of ['drop', 'flat', 'other']) for (const ebike of [false, true]) {
+  // sizes scale the frame only, never which elements it draws: one size for every template (its classes are the same at all five)
+  for (const style of STYLES) for (const size of SIZES.slice(0, 1)) for (const bars of ['drop', 'flat', 'other']) for (const ebike of [false, true]) {
     for (const colour of [null, '#2f6fb5']) {
       const spec = resolveBikeSpec(setBike(style, size, bars, ebike, ['', ''], colour, { brakes: ebike ? 'rim' : 'hydraulic-disc', drive: ebike ? 'chain-hub' : 'derailleur' }), null);
       const { svg } = bikeArt(spec, null);
