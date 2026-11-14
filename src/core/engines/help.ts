@@ -257,7 +257,7 @@ export function helpChip(kind: HelpKind, f: HelpFacts): Answer {
     ? W.helpNearest(wordOf(firstPlace), hasName(firstPlace) ? firstPlace.name : W.helpNoName, showKm(first.pass.match.km))
     : !saved && rows.length === 0 ? W.helpNoPlaceData : W.helpNone(group.what);
   const detail = [
-    ...(isTrain ? [`${W.helpStationOnly}.`] : []),
+    ...(isTrain ? [W.helpStationOnly] : []),
     ...(start.position ? [] : [W.helpFromNoPosition(showKm(start.aheadKm))]),
     ...(first ? noneLines : []),
     ...fromNowNote(f.ride, f.now, zone(start.aheadKm).timeZone),
