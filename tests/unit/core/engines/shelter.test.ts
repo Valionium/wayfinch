@@ -83,6 +83,17 @@ describe('what it lists', () => {
     expect(Math.abs(ahead.stamp!.at!.getTime() - (at(when).getTime() + clockMs(10)))).toBeLessThanOrEqual(1000);
     expect(a.items.find((i) => i.stamp!.km === 70)!.detail).toMatch(/^6 km back/);
   });
+  test('[STOP-CHIP] a cover at the own kilometre of the rider reads "here" and still gives its arrival (finding 20)', () => {
+    const a = chip({ moment: riding(100, '12:00'), spots: [{ b: shelter(), km: 100.02 }] });
+    expect(a.items[0]!.detail).toMatch(/^here · about 12:0\d/);
+    expect(a.items[0]!.stamp!.at).toBeDefined();
+  });
+  test('[STOP-CHIP] before the trip the chip says its times count from setting off now, as the help chips do (sweep of 14 Nov 2026, finding 13)', () => {
+    const when = '2026-10-16 12:00';
+    const f = stopFactsOf({ moment: { trip: LONG(), positions: [pos({ km: 76, at: when })], now: when }, spots: [{ b: shelter(), km: 86 }] });
+    expect(shelterChip(f, false).detail).toBe('Times here count from setting off now (12:00), not from your planned start.');
+    expect(chip({ moment: riding(100, '12:00'), spots: [{ b: shelter(), km: 101 }] }).detail).toBe('');
+  });
   test('[STOP-CHIP] before the trip the chip adds the position\'s own rejoin leg (INV-19)', () => {
     const when = '2026-10-16 12:00';
     const f = stopFactsOf({ moment: { trip: LONG(), positions: [pos({ km: 76, at: when, off: 1000 })], now: when }, spots: [{ b: shelter(), km: 86 }] });

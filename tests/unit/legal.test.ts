@@ -10,6 +10,7 @@ import { buildDist } from '../../tools/build.mjs';
 import { imprintBlock, sha256, textOf } from '../../tools/build-legal.mjs';
 import { LEGAL_PAGES } from '../../src/ui/legal/links.tsx';
 import { TL } from '../../src/core/wording/en-tools.ts';
+import { Y } from '../../src/core/wording/en-you.ts';
 
 /** jsdom ships no types here (tests/jsdom.d.ts), so the window it returns is typed as a browser window. */
 const docOf = (html: string): Document => (new JSDOM(html) as unknown as { window: { document: Document } }).window.document;
@@ -219,8 +220,8 @@ describe('the legal pages on a phone: only markup and style changed', () => {
       // The bar's words are the one top bar's of every tool (owner's list of 7 Nov 2026, items 8 and 9); every other character as it was; the font credit changed from Barlow to Source Sans 3 (owner's choice, 9 Nov 2026).
       const text = textOfFile(`public/legal/${name}/index.html`).replace(/\s+/g, ' ').trim();
       expect(text.startsWith(`${TL.toolsBack} `)).toBe(true);
-      // The tab's new name, "En route" for "Ahead" (owner's finding M, 8 Nov 2026), is one of the privacy page's two changes of words; the other is "Prepare this route" for "Get ready offline" (owner's choice, 9 Nov 2026).
-      const got = sha256(text.replace(TL.toolsBack, '← Wayfinch').replace('(Trip, En route, Tools, You)', '(Trip, Ahead, Tools, You)').replaceAll('Prepare this route', 'Get ready offline'));
+      // The tab's new name, "En route" for "Ahead" (owner's finding M, 8 Nov 2026), is one of the privacy page's three changes of words (the third: the delete button's new name, sweep 14 Nov, 51); the other is "Prepare this route" for "Get ready offline" (owner's choice, 9 Nov 2026).
+      const got = sha256(text.replace(TL.toolsBack, '← Wayfinch').replace('(Trip, En route, Tools, You)', '(Trip, Ahead, Tools, You)').replaceAll('Prepare this route', 'Get ready offline').replace('Delete Wayfinch data from this phone', 'Delete co-pilot data'));
       expect(got === hash ? 'same' : `different: ${got}`).toBe('same');
     });
   }
@@ -247,4 +248,15 @@ describe('the one top bar on the pages that are not the app', () => {
       expect(bars[0]!.querySelector('a')!.textContent, page).toBe(TL.toolsBack);
     }
   });
+});
+
+test('[YOU-WORDS] the privacy page names the delete button as You shows it', () => {
+  expect(docOf(read('public/legal/privacy/index.html')).body.textContent).toContain(`under You, ${Y.youDelete}`);
+});
+
+test('[LEGAL-ICON] every legal page names the app icon, so no page asks for /favicon.ico', () => {
+  for (const page of ['imprint', 'privacy', 'licences']) {
+    expect(docOf(read(`public/legal/${page}/index.html`)).querySelector('link[rel="icon"]')?.getAttribute('href'), page).toBe('/icons/icon-192.png');
+  }
+  expect(read('tools/build-legal.mjs')).toContain('<link rel="icon" href="/icons/icon-192.png"');
 });

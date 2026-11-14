@@ -6,7 +6,7 @@
 export const TR = {
   appTripKeepFreshWhy: 'Updates only the weather, when the app opens with signal and a newer forecast exists. Places update only when you ask.',
   appAbNote: 'Type a town, an address (street and number), or a named place such as a station, campsite or hotel. The words you type go only to two place-search services: Open-Meteo for towns and Photon (OpenStreetMap) for addresses and named places. Nothing you type is stored. Planning sends the start and end points to a bike router.',
-  appAbHint: 'Search needs signal. It asks once when you press Search.',
+  appAbHint: 'Type a town, an address or a named place such as a station, campsite or hotel. Search needs signal and asks once when you press it.',
   appAbList: 'Places found',
   appTripPrepareLine: 'Fetches places, opening hours, heights and weather for this route and keeps them on your phone, so En route works without signal.',
   appTripSettingsStageNote: 'Changing nights, pace or speed changes the days of your route.',
@@ -26,4 +26,13 @@ export const TR = {
   appAbSearchFailed: "Search needs signal, and the search services did not answer. Check your connection and try again.",
   appAbNoResults: 'Nothing found. Try another spelling, add the town to an address, or search a larger town nearby.',
   appTripHeightsPending: 'This route has no heights. Prepare this route looks them up (Open-Meteo, Copernicus data).',
+  appTripStepHeights: 'Heights',
+  appTripStepHours: 'Opening hours',
+  appTripStepWeather: 'Weather',
+  appTripStepBaseline: 'Seasonal estimate',
+  appTripReplaceTitle: 'Replace your route?',
+  appAbChange: 'Change',
+  appTripOsmSearch: 'Place names: ',
+  appTripFileFailed: 'That file could not be read. Nothing was changed.',
+  appTripUnchanged: 'Your current route is unchanged.',
 };

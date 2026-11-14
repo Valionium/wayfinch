@@ -10,6 +10,7 @@ import type { RawPoint } from '../core/route/gpx.ts';
 import { buildRoute } from '../core/route/profile.ts';
 import type { Route } from '../core/types.ts';
 import { W } from '../core/wording/en.ts';
+import { PS } from '../core/wording/en-prepare-steps.ts';
 import type { PreparedStore } from '../store/prepared.ts';
 import type { Retry } from './openmeteo.ts';
 import type { PrepareDeps } from './prepare.ts';
@@ -32,7 +33,7 @@ const heightKey = (p: LatLng): string => `${p.lat.toFixed(3)},${p.lon.toFixed(3)
  */
 export const toldRetry = (deps: PrepareDeps, zone: string, after: string): Retry => ({
   sleep: deps.sleep ?? waitMs, now: deps.now,
-  onWait: (until) => deps.onNotice?.(until === null ? after : W.appPrepWait(formatHm(until, zone))),
+  onWait: (until) => deps.onNotice?.(until === null ? after : PS.appPrepWait(formatHm(until, zone))),
 });
 const deviceZone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 

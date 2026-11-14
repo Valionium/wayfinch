@@ -285,7 +285,7 @@ test('[YOU-DELETE-UI] after Delete now and a reload, no empty database comes bac
   await page.getByLabel('Your weight (kg)').fill('82');
   await page.getByLabel('Your weight (kg)').blur();
   await saved();
-  await page.getByRole('button', { name: 'Delete co-pilot data' }).click();
+  await page.getByRole('button', { name: 'Delete Wayfinch data from this phone' }).click();
   await page.getByRole('button', { name: 'Delete now' }).click();
   await expect(page.getByText('Deleted from this phone.')).toBeVisible();
   await page.reload({ waitUntil: 'domcontentloaded' });
