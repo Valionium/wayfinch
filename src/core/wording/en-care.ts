@@ -145,7 +145,8 @@ export const STEP_VARIANTS: Readonly<Record<string, Readonly<Record<number, Step
   'brakes-hydro-rim-spongy': {
     2: { by: 'fluid', words: {
       mineral: "Your bike's details say mineral oil: use only mineral oil, never DOT fluid. Magura rim brakes use mineral oil: if that does not match your brakes, check the brake's manual.",
-      dot: "Your bike's details say DOT fluid: use only DOT fluid, never mineral oil. Magura rim brakes use mineral oil: if that does not match your brakes, check the brake's manual.",
+      // review of PR 161, m2: a told DOT is likelier a slip than a DOT rim brake, so the Magura check comes first
+      dot: "Your bike's details say DOT fluid, but Magura rim brakes use mineral oil: check the brake's manual before any fluid goes in. If it is DOT fluid, never mix it with mineral oil.",
     } },
   },
   'brakes-spongy': {
@@ -719,7 +720,7 @@ export const CARE_TASKS: CareTask[] = [
     signs: 'lever feels soft or slow and goes to the bar',
     steps: [
       'Check pads are not worn out.',
-      'Check for fluid leaks.',
+      'Check for fluid leaks; oil on the rim or pads: clean the rim and replace the pads.',
       "Use the fluid the brake's manual names: Magura rim brakes use mineral oil. Never mix mineral oil and DOT fluid.",
       'Bleed the brake, or take it to a shop.',
     ],
@@ -776,9 +777,9 @@ export const CARE_TASKS: CareTask[] = [
     signs: 'slow shift, noise, skips between gears, or a shifter does nothing',
     steps: [
       'Check the shifting battery first, and charge it if it is low.',
-      "A wireless shifter that does nothing may need pairing again: see the maker's manual or app.",
-      "Fine-tune the rear derailleur with the maker's app or the shifter buttons, a small step at a time, while you test every gear.",
+      "A wireless shifter that does nothing: check its own battery (usually a coin battery you replace, not charge; see the maker's manual), then pair it again if it still does nothing.",
       'Check the hanger is straight; a bent hanger needs a shop.',
+      "Fine-tune the rear derailleur with the maker's app, or the shifter buttons in its adjust mode (see its manual), a small step at a time, while you test every gear.",
       'If it still shifts badly, take it to a shop.',
     ],
     tools: "charger, the maker's app", minutes: null, who: 'you', why: 'Yourself or shop',

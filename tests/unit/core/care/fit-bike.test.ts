@@ -219,13 +219,23 @@ test("[BC-HYDRO-RIM-SPONGY] a hydraulic rim brake's spongy lever: pads, leaks, t
   expect(t.steps).toContain('Bleed the brake, or take it to a shop.');
   expect(t.steps.join(' ')).toMatch(/Magura rim brakes use mineral oil/);
   expect(t.steps.join(' ')).toMatch(/[Nn]ever mix/);
+  // review of PR 161, m3: what a leak does on a rim brake: oil on the rim or pads, so clean the rim and replace the pads
+  expect(t.steps[1]).toMatch(/leaks; oil on the rim or pads: clean the rim and replace the pads/);
   expect(t.words).toEqual(expect.arrayContaining(['bleed', 'spongy', 'magura']));
   const step = t.steps.findIndex((s) => /Magura/.test(s));
   for (const fluid of ['mineral', 'dot'] as const) {
     const b = bike({ brakes: 'rim', rimBrake: 'hydraulic', brakeFluid: fluid });
     const text = textOf(HYDRO_RIM, step, b);
-    expect(text, fluid).toMatch(fluid === 'mineral' ? /details say mineral oil: use only mineral oil, never DOT fluid/ : /details say DOT fluid: use only DOT fluid, never mineral oil/);
-    expect(text, fluid).toMatch(/Magura rim brakes use mineral oil: if that does not match your brakes, check the brake's manual/);
+    if (fluid === 'mineral') {
+      expect(text).toMatch(/details say mineral oil: use only mineral oil, never DOT fluid/);
+      expect(text).toMatch(/Magura rim brakes use mineral oil: if that does not match your brakes, check the brake's manual/);
+    } else {
+      // review of PR 161, m2: a told DOT is likelier a slip than a DOT rim brake: the Magura check and the manual come first, and the
+      // step never says to use only DOT fluid
+      expect(text).toMatch(/details say DOT fluid, but Magura rim brakes use mineral oil: check the brake's manual before any fluid goes in/);
+      expect(text).not.toMatch(/use only/);
+      expect(text).toMatch(/never mix it with mineral oil/);
+    }
     for (const [i, s] of t.steps.entries()) if (i !== step) expect(textOf(HYDRO_RIM, i, b)).toBe(s);
   }
   // not told, or a fluid kept from other brakes: the content's own words
@@ -241,8 +251,14 @@ test("[BC-E-GEARS-ADJUST] electronic gears' adjusting: the battery first, pairin
   expect(t.section).toBe('notice');
   expect(t.applies).toEqual({ gears: ['derailleur'], shifting: ['electronic'] });
   expect(t.steps[0]).toMatch(/battery/);
-  expect(t.steps.join(' ')).toMatch(/pairing again/);
-  expect(t.steps.join(' ')).toMatch(/maker's app or the shifter buttons/);
+  // review of PR 161, I1: a dead wireless shifter's own coin battery (replaced, not charged) comes before pairing it again
+  const shifter = t.steps.find((x) => /wireless shifter/.test(x))!;
+  expect(shifter).toMatch(/coin battery you replace, not charge/);
+  expect(shifter.search(/battery/)).toBeLessThan(shifter.search(/pair/));
+  // I2: the hanger is checked before fine-tuning through every gear (a bent hanger can put the derailleur into the spokes)
+  expect(t.steps.findIndex((x) => /hanger/.test(x))).toBeLessThan(t.steps.findIndex((x) => /Fine-tune/.test(x)));
+  // m1: the shifter buttons fine-tune only in the maker's adjust mode
+  expect(t.steps.find((x) => /Fine-tune/.test(x))).toMatch(/maker's app, or the shifter buttons in its adjust mode \(see its manual\)/);
   expect(t.steps.join(' ')).toMatch(/shop/);
   // no brand's own button steps: the maker's app or manual says how
   expect(t.steps.join(' ')).not.toMatch(/Di2|AXS|Shimano|SRAM|junction|hold the/i);
