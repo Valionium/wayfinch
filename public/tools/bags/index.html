@@ -2515,8 +2515,14 @@ const POSITIONS = {
 const POS_ORDER = ['top','frame','fork','bar','seat','rack','pack','bottle','bottleU'];
 // things happy to ride outside in the weather
 const STRAPPABLE = ['pad','tent','shoes','towel'];
-// what always ends up strapped across a rack top when you are camping
-const DECK_CLAIMS = ['tent','pad'];
+// what always ends up strapped across a rack top when you are camping; the sleeping bag too (the owner's decision of 7 Nov 2026)
+const DECK_CLAIMS = ['tent','pad','quilt'];
+// Up on the rack top the sleeping bag rides in a dry bag: said, in these words, wherever the rider reads that it rides there (review
+// of PR 149, I3): the deck's lists, the checklist, the deck note, the Gear advisor's lines.
+const deckItemName = k => kitName(k) + (k.id === 'quilt' ? ' (in a dry bag)' : '');
+const QUILT_DECK_NOTE = 'On the rack top deck it rides in a dry bag.';
+// The rack deck's line under a pannier, in place of POSITIONS.rack.strapNote (frozen, so it still names the tent and the mat only).
+const RACK_DECK_NOTE = 'sleeping quilt or bag (in a dry bag), sleeping mat and tent live up here, panniers or not';
 const isBottle = pos => POSITIONS[pos].kind === 'bottle';
 
 
@@ -5021,7 +5027,7 @@ function toggleDeck(which){
   S.decks[which] = !S.decks[which];
   renderBags(); drawRig();
 }
-// a rack top always ends up carrying the tent and the mat
+// a rack top always ends up carrying the tent, the mat and the sleeping bag (DECK_CLAIMS): all of them, the deck has no limit
 
 function deckClaims(){
   if(!hasDeck('rack') || !camping()) return [];
@@ -5817,6 +5823,11 @@ function keepPlan(change = {}){
   const plan = planView(placementsSelection(change.replan ? null : before));
   if(afresh && before) plan.notes.replan = { reason:change.why || replanReason(before.basis, basis), movedPacked:movedPacked(before, plan) };
   if(!afresh) plan.notes.offer = replanOffer(plan);
+  // A kept plan stored with the rack deck on whose bags still hold what the deck now carries (the sleeping bag, since the owner's
+  // decision of 7 Nov 2026: kept before it, or by an older page): it goes up on the deck, everything else stays where it was, and a
+  // note waits until the rider has seen it (LC-DECK-NOTE). The rider turning the deck on is no such move.
+  const toDeck = before && before.basis && before.basis.rackDeck && basis.rackDeck ? deckedIds().filter(id => (before.items[id] || []).length) : [];
+  if(toDeck.length) noteDeckMove(before, toDeck);
   if(!before && PLAN_PLACED_AGAIN && plan.basis.units.length) plan.notes.replan = { reason:'migrated', movedPacked:[] };
   PLAN_PLACED_AGAIN = false;
   S.placements = plan.basis.units.length
@@ -5825,6 +5836,57 @@ function keepPlan(change = {}){
 }
 function replanReason(was, now){
   return was.mode !== now.mode ? 'mode' : was.rackDeck !== now.rackDeck ? 'rackDeck' : 'bags';
+}
+/* ---- The deck note (LC-DECK-NOTE; review of PR 149, I1, I2, m2, m3): what a kept plan's bags held that now rides on the rack deck.
+   It waits in the planner's own storage, through ticks, reloads and balancing, until the bags step or the packing check has shown it;
+   then that stored plan's mark is kept, so the same plan opened again (a saved setup is not rewritten) has no second note. ---- */
+const DECK_NOTE_KEY = 'loadcheck:deck-note:v1';
+let DECK_NOTE_SHOWN = null;   // the note seen in this visit: it stays on screen while what it says is true
+let DECK_NOTE_MEM = null;     // when storage can't be written, the note waits in this tab
+// Free play's own (FP-NO-WRITE): read and changed there, never written, gone at Back; the trip's plan's note waits as it was.
+let DECK_NOTE_PLAY = null;
+function readDeckNote(){
+  const v = (FREE_PLAY && DECK_NOTE_PLAY) || readLocalJson(DECK_NOTE_KEY) || DECK_NOTE_MEM;
+  const item = m => dataObject(m) && DECK_CLAIMS.includes(m.id) && (m.from === null || typeof m.from === 'string') ? { id:m.id, from:m.from === null ? null : m.from.slice(0, 80), hand:m.hand === true, packed:m.packed === true } : null;
+  const ok = dataObject(v) && v.app === 'load-check' && v.kind === 'deck-note' && v.v === 1;
+  const pending = ok && dataObject(v.pending) && typeof v.pending.sig === 'string' && Array.isArray(v.pending.items) ? { sig:v.pending.sig.slice(0, 40), items:v.pending.items.slice(0, 8).map(item).filter(Boolean) } : null;
+  return { pending:pending && pending.items.length ? pending : null, seen:ok && Array.isArray(v.seen) ? v.seen.filter(x => typeof x === 'string').slice(-40) : [] };
+}
+function writeDeckNote(n){
+  const v = { app:'load-check', kind:'deck-note', v:1, pending:n.pending, seen:n.seen.slice(-40) };
+  if(FREE_PLAY){ DECK_NOTE_PLAY = v; return; }
+  DECK_NOTE_MEM = v;
+  try{ if(deletedSinceLoad()) return; const before = readLocalRaw(DECK_NOTE_KEY); window.localStorage.setItem(DECK_NOTE_KEY, JSON.stringify(v)); stampKey(DECK_NOTE_KEY, v, before); }catch(e){}
+}
+// The stored plan the move came from, as a short mark (FNV-1a over its units and everything it held).
+function deckNoteSig(before){
+  const text = JSON.stringify([before.basis, before.inUse, before.items]);
+  let h = 0x811c9dc5;
+  for(let i = 0; i < text.length; i++){ h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(16).padStart(8, '0') + text.length.toString(16);
+}
+function noteDeckMove(before, ids){
+  const n = readDeckNote(), sig = deckNoteSig(before);
+  if(n.seen.includes(sig) || (n.pending && n.pending.sig === sig)) return;
+  const units = usableUnits(), bagOf = key => { const u = units.find(x => x.key === key); return u ? unitLabel(u).toLowerCase() : null; };
+  n.pending = { sig, items:ids.map(id => { const pin = S.pinned && S.pinned[id];
+    return { id, from:bagOf(pin || before.items[id][0][0]), hand:!!pin, packed:!!(S.packed && S.packed[id]) }; }) };
+  writeDeckNote(n);
+}
+// Drawn at the bags step (2) and the packing check (4); shown there while that step is the rider's, it is seen.
+function deckNoteHtml(step){
+  const n = readDeckNote(), note = n.pending || DECK_NOTE_SHOWN;
+  if(!note) return '';
+  const up = deckedIds(), items = note.items.filter(m => up.includes(m.id));
+  if(!items.length) return '';
+  if(n.pending && S.step === step){ DECK_NOTE_SHOWN = n.pending; n.seen = [...n.seen.filter(x => x !== n.pending.sig), n.pending.sig]; n.pending = null; writeDeckNote(n); }
+  const lines = items.map(m => {
+    const k = kitById(m.id), name = htmlEsc((k ? kitName(k) : m.id).toLowerCase()), bag = m.from ? 'the ' + htmlEsc(m.from) : 'a bag';
+    return (m.hand ? `<p>You had put your ${name} in ${bag}; it now rides on the rack top deck, in a dry bag. To keep it in ${bag}, turn the rack top deck off.</p>`
+      : `<p>Your ${name} now rides on the rack top deck, in a dry bag, as the planner now packs it on a camping trip with the rack deck on. It was in ${bag}; everything else stays where it was. To carry it inside again, turn the rack top deck off.</p>`)
+      + (m.packed ? `<p>Packed already, now planned for the rack top deck: ${name}.</p>` : '');
+  });
+  return `<div class="finding note" data-deck-note="1">${lines.join('')}</div>`;
 }
 // Ticks stay through a full re-plan; these are the ticked items whose bag changed (design 7.7).
 function movedPacked(before, plan){
@@ -6114,7 +6176,7 @@ function advisorOldBag(s, input){
 // new bag ("Put the tent on your rack, no new bag needed"); else a rack to fit. `inList`: the words inside a longer line.
 // What the planner's own deck placement puts on the rack deck with these bags and decks.
 function advisorDecked(bags, decks, input){ return withInputs(advisorChanges(bags, decks, input.context), () => deckedIds()); }
-const advisorDeckItems = (s, input) => advisorList(advisorDecked(advisorTrialBags(s, input), s.decks, input).map(id => (kitById(id) ? kitName(kitById(id)) : id).toLowerCase()));
+const advisorDeckItems = (s, input) => advisorList(advisorDecked(advisorTrialBags(s, input), s.decks, input).map(id => (kitById(id) ? deckItemName(kitById(id)) : id).toLowerCase()));
 function advisorDeckText(s, input, inList){
   const items = advisorDeckItems(s, input), own = advisorRackFitted(input);
   if(inList) return own ? (items ? advisorWord('deckOwnPlus', { items }) : advisorWord('deckOwnPlusBare')) : (items ? advisorWord('deckNew', { items }) : advisorWord('deckNewBare')).replace(/^./, c => c.toLowerCase());
@@ -6931,6 +6993,7 @@ function checklistOfBags(A){
     if(kitById(row.id) && inside.some(p=>p.pos==='seat') && isHeavy(kitById(row.id)))
       row.note=[row.note,row.id==='bank'?BANK_SEAT_NOTE:HEAVY_SEAT_NOTE].filter(Boolean).join(' ');
     if(row.id==='tent')row.note=[row.note,TENT_POLES_NOTE].filter(Boolean).join(' ');
+    if(row.id==='quilt'&&inside.some(p=>p.kind==='strap'))row.note=[row.note,QUILT_DECK_NOTE].filter(Boolean).join(' ');
   });
   // Only two bags need a loading order (19 item 16); it is advice and moves nothing.
   (A.slots||[]).forEach(slot=>{
@@ -9042,7 +9105,7 @@ function fillColour(pct){
   }
   return 'rgb(224,68,40)';
 }
-// A deck is loaded only with kit strapped there (Contract 1). The plan straps the tent and mat to the rack top (deckClaims) and
+// A deck is loaded only with kit strapped there (Contract 1). The plan straps the tent, mat and sleeping bag to the rack top (deckClaims) and
 // nothing to the bar's bungees, which the rig draws as an empty deck.
 function deckLoaded(which){ return which === 'rack' && deckClaims().length > 0; }
 // The plan's bags in Contract 1's shape (spec 7.1): what bike.js reads of a plan. Usable bags only, as the plan counts them;
@@ -10939,7 +11002,7 @@ function renderBags(){
             frameShapeGlyph(b)}<span>${framePreset(b).label}${
             minShapeIdx()>0?`<i>capped by ${inTriangleCount()} cage${inTriangleCount()>1?'s':''}</i>`:'<i>tap to change</i>'}</span></button>`:''}
         </div>`:''}
-        ${hasDeck(b.pos)&&p.strappable?`<i class="deckline">${p.strapNote}</i>`:''}
+        ${hasDeck(b.pos)&&p.strappable?`<i class="deckline">${b.pos==='rack' ? RACK_DECK_NOTE : p.strapNote}</i>`:''}
       </div>
       <div class="bagmeasure">
         <label class="measurelabel" for="bagVolume${b.uid}">${bot?'Bottle capacity':'Labelled volume'}${n>1?' per bag':''}</label>
@@ -11004,8 +11067,12 @@ function renderBags(){
   }
   const claims = deckClaims();
   if(claims.length) $('bagList').insertAdjacentHTML('beforeend',
-    `<div class="finding note" style="margin-top:10px"><b>The rack top takes ${htmlEsc(claims.map(k=>kitName(k).toLowerCase()).join(' and '))}</b>
+    `<div class="finding note" style="margin-top:10px"><b>The rack top takes ${htmlEsc(listOf(claims.map(deckItemName)))}</b>
      <p>${claims.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L strapped outside bags. ${infoHelp('How rack-top kit is counted','<p>Selected items that can be strapped to the rack top are counted as carried kit, but do not use space inside bags. Check that they are secured and protected from weather.</p>')}</p></div>`);
+
+  // a kept plan's sleeping bag gone up on the deck, said here when the bags step is the first the rider sees (LC-DECK-NOTE)
+  const deckNote = deckNoteHtml(2);
+  if(deckNote) $('bagList').insertAdjacentHTML('beforeend', deckNote);
 
   $('bagList').querySelectorAll('.bagrow').forEach(r => {
     const b = S.bags.find(x => x.uid === +r.dataset.uid);
@@ -11727,7 +11794,7 @@ function renderResult(){
     const s = A.slots.find(x => x.key === key);
     return s ? `<p>Packed already, now planned for the ${htmlEsc(unitLabel(s).toLowerCase())}: ${htmlEsc(names.join(', '))}.</p>` : '';
   }).join('');
-  const replanHtml = (replanNote ? `<div class="finding note"><p>${replanWhy[replanNote.reason]}</p>${packedLines}</div>` : '')
+  const replanHtml = deckNoteHtml(4) + (replanNote ? `<div class="finding note"><p>${replanWhy[replanNote.reason]}</p>${packedLines}</div>` : '')
     + (replanGain ? `<div class="finding note"><p>${htmlEsc(replanGain.gain)} Re-plan keeps your hand placements and ticks.</p>
         <button class="linky" data-replan="1">Re-plan</button></div>` : '');
   // Hand placements that can't be kept are never silent (design 7.4).
@@ -11890,7 +11957,7 @@ function renderResult(){
   if(so){
     const deckNames = so.decks.map(b => POSITIONS[b.pos].strapLabel.toLowerCase());
     if(claimed.length){
-      strapBody = `<div class="finding note"><b>Already up there: ${htmlEsc(claimed.map(k=>kitName(k).toLowerCase()).join(' and '))}</b>
+      strapBody = `<div class="finding note"><b>Already up there: ${htmlEsc(listOf(claimed.map(deckItemName)))}</b>
         <p>${claimed.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L carried outside. ${infoHelp('How strapped items are counted','<p>Items carried on the rack top or handlebar straps are excluded from the volume inside the bags. Only suitable items should be carried outside; protect them from rain and road spray and secure them clear of the wheels.</p>')}</p></div>`;
     }
     if(!so.cand.length && !claimed.length){
@@ -13803,6 +13870,9 @@ function restorePlan(p, draft, restoreSettings=true){
   const savedPlacements=dataObject(p) ? p.placements : undefined;
   p=normalisePlan(p);
   if(!p) return false;
+  // another plan (a saved setup) replaces this one: a deck note still waiting about this one goes, and so does the one on screen
+  DECK_NOTE_SHOWN = null;
+  if(!draft){ const n = readDeckNote(); if(n.pending){ n.pending = null; writeDeckNote(n); } }
   endTrial();
   cancelGPXLoad();
   if(typeof invalidateTripPreview === 'function') invalidateTripPreview();
@@ -14902,6 +14972,7 @@ async function startFreePlay(){
       pending:WEATHER_KIT.pending,landed:false},
     places:[text('geoStatus1'),text('geoStatus2')],bikes:JSON.stringify(BIKE_PROFILES),note:''};
   FREE_PLAY_BACK=null;
+  DECK_NOTE_PLAY=null;   // free play's deck notes are its own, in this tab only
   FREE_PLAY_BARS.forEach(id => { if($(id)) $(id).classList.add('hidden'); });
   WEATHER_KIT.undo=null; WEATHER_KIT.pending=false;
   clearGPX();
@@ -14926,6 +14997,7 @@ function endFreePlay(){
   WEATHER_KIT.undo=fp.weather.undo; WEATHER_KIT.pending=fp.weather.pending;
   BIKE_PROFILES=freePlayStoredBikes(fp.bikes);   // the saved bikes as stored: free play changed none of them
   FREE_PLAY=null;
+  DECK_NOTE_PLAY=null;
   fp.bars.forEach(([id,on]) => { if($(id)) $(id).classList.toggle('hidden',!on); });
   if($('weatherText')) $('weatherText').textContent=fp.weather.text;
   if($('weatherUndo')) $('weatherUndo').classList.toggle('hidden',!fp.weather.undoShown);

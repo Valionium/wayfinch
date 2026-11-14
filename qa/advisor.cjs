@@ -600,8 +600,10 @@ test('[GA-STYLE] a giant backpack holding the tent and the sleeping bag, no rack
 // ---- The review of PR 61 ----
 
 test('[GA-ANSWER] a rack with panniers is one rack: Looking ahead beside "a rack" names the rack once, in what to get and in the drawing\'s name, and says what rides on its top deck (review of PR 61, I3)',async()=>{
-  // the reviewer's rider: a 30 L backpack holding the tent, two nights camping, no rack, Panniers are fine
-  const p=page({bike:FULL,setup:"S.nights=2;S.sleep='camp';applyTripKitDefaults();S.mode='comfort';S.bags=[{uid:1,pos:'pack',L:30}];S.nextUid=2;S.decks={bar:false,rack:false};"});
+  // the reviewer's rider: a 30 L backpack holding the tent, no rack, Panniers are fine; four nights camping, not the review's two: since
+  // the sleeping bag rides on the rack deck too (the owner's decision of 7 Nov 2026), at two nights a seat pack and the deck take it all
+  // and no pannier is suggested; four nights' food brings the rack with a pannier back into Looking ahead
+  const p=page({bike:FULL,setup:"S.nights=4;S.sleep='camp';applyTripKitDefaults();S.mode='comfort';S.bags=[{uid:1,pos:'pack',L:30}];S.nextUid=2;S.decks={bar:false,rack:false};"});
   await ask(p,{style:'panniers',goal:'backpack'});
   const a=p.json('ADVISOR.answer');
   const shown=[...a.items.map((_,i)=>`ADVISOR.answer.items[${i}]`),...(a.ahead ? ['ADVISOR.answer.ahead'] : [])];
@@ -614,6 +616,27 @@ test('[GA-ANSWER] a rack with panniers is one rack: Looking ahead beside "a rack
     if(s.add.some(b=>b.pos==='rack')){panniers++;assert.ok(/on its top deck/.test(what),'the deck that comes with the rack is said: '+what);}
   }
   assert.ok(panniers>0,'a rack with panniers is among them');
+});
+
+// The owner's decision of 7 Nov 2026: the sleeping bag may ride on the rack deck, so "Put the tent on your rack" offers it too.
+test('[GA-DECK-QUILT] with a rack fitted, the rack deck suggestion offers the sleeping bag with the tent and the mat, in a dry bag: "Put the sleeping quilt or bag (in a dry bag), sleeping mat and tent on your rack, no new bag needed", and its moves take the sleeping bag to the rack top deck; at two nights with no rack, "a rack" and Looking ahead\'s seat pack say the dry bag too',async()=>{
+  const p=page({bike:FULL,setup:TENT_IN_PACK+"S.bags=[{uid:1,pos:'rack',pair:true,L:10},{uid:2,pos:'pack',L:20}];S.decks={bar:false,rack:false};"});
+  assert.ok(p.json('!!currentPlan().items.quilt'),'the sleeping bag is in a bag today');
+  await ask(p,{style:'bags-first',goal:'backpack'});
+  const first=p.json('ADVISOR.answer.items[0]');
+  assert.deepEqual([first.kind,first.newBags],['deck',0],'the rack deck, no new bag');
+  assert.equal(p.json('advisorWhat(ADVISOR.answer.items[0],ADVISOR.input)'),'Put the sleeping quilt or bag (in a dry bag), sleeping mat and tent on your rack, no new bag needed');
+  const moves=p.json('advisorMoves(ADVISOR.answer.items[0],ADVISOR.input)');
+  assert.ok(moves.some(m=>/^Sleeping quilt or bag: .+ → rack top deck$/.test(m)),'the sleeping bag: '+JSON.stringify(moves));
+  assert.ok(textOf(view(p).answer).includes('Sleeping quilt or bag: '),'on screen');
+  // its kilos are the deck's in the advisor's result, as the tent's and the mat's
+  const kg=p.json("+['quilt','pad','tent'].reduce((n,id)=>n+itemKg(kitById(id)),0).toFixed(2)");
+  assert.equal(p.json('ADVISOR.answer.items[0].result.kgByPos.deck'),kg,'the deck carries the three');
+  // the reviewer's rider of PR 61 at its two nights, no rack, Panniers are fine (review of PR 149, m4): the outcome the ruling gives
+  const q=page({bike:FULL,setup:PACK30});
+  await ask(q,{style:'panniers',goal:'backpack'});
+  assert.equal(q.json('advisorWhat(ADVISOR.answer.items[0],ADVISOR.input)'),'A rack, with the sleeping quilt or bag (in a dry bag), sleeping mat and tent on its top deck','Minimal: a rack');
+  assert.equal(q.json('advisorWhat(ADVISOR.answer.ahead,ADVISOR.input)'),'Seat pack, 15 L, plus a rack, with the sleeping quilt or bag (in a dry bag), sleeping mat and tent on its top deck','Looking ahead: a seat pack and the rack');
 });
 
 test('[GA-DECK] the deck suggestion\'s moves include the tent and the sleeping mat going to the rack top deck (review of PR 61, m1)',async()=>{
@@ -693,12 +716,12 @@ test('[GA-ANSWER] every shape of suggestion reads cleanly, what to get and the d
       assert.ok((text.match(/\brack\b/gi)||[]).length<=1,`${name} ${kind}: one rack: ${text}`);
     }
   }
-  // the reviewer's case, word for word
+  // the reviewer's case, word for word; the sleeping bag rides on the deck too (the owner's decision of 7 Nov 2026)
   {
     const p=noRack;
     p.context.qaS=JSON.stringify(shapes[4][2]);
     assert.equal(p.json("advisorWhat(JSON.parse(qaS),advisorInput('bags-first','backpack'))"),
-      'Frame bag, full triangle, 6 L, plus rack and pannier, 23 L, with the sleeping mat and tent on its top deck');
+      'Frame bag, full triangle, 6 L, plus rack and pannier, 23 L, with the sleeping quilt or bag (in a dry bag), sleeping mat and tent on its top deck');
   }
 });
 

@@ -169,7 +169,9 @@ test('[BAL-LINE] a change made by hand (a move, a forgotten placement) is not ba
 test('[BAL-KEEPS] Undo never moves a thing ticked as packed: while a thing the balance moved is ticked, the line keeps the balance without Undo and says why; unticked, Undo is back',()=>{
   for(const name of ['bikepacking','full bags and a backpack','touring']){
     const bags=SETS[name];
-    plan(bags,{rack:bags.some(b=>b.pos==='rack')},fresh());
+    // touring with its rack deck off: with it on, the sleeping bag rides on the deck (the owner's decision of 7 Nov 2026) and the plan
+    // is balanced already, so there would be no move to tick (LC-DECK-QUILT below)
+    plan(bags,{rack:bags.some(b=>b.pos==='rack')&&name!=='touring'},fresh());
     const own=json('currentPlan().items');
     assert.equal(json('autoBalancePlan()'),true,name);
     const m=json('BALANCE.last.moves[0]'),balanced=json('currentPlan().items');
@@ -189,6 +191,19 @@ test('[BAL-KEEPS] Undo never moves a thing ticked as packed: while a thing the b
     assert.equal(json('undoBalance()'),true);
     assert.deepEqual(json('currentPlan().items'),own,`${name}: the packing before the balance`);
   }
+});
+
+// The owner's decision of 7 Nov 2026: the sleeping bag may ride on the rack deck. The touring set's bar roll held it; now the deck does.
+test('[LC-DECK-QUILT] touring with its rack deck on: the sleeping bag rides on the deck, out of the handlebar roll, and the plan needs no balance; with the deck off it is in a bag and the balance moves it',()=>{
+  plan(SETS.touring,{rack:true},fresh());
+  assert.equal(json('S.nights>0&&S.sleep==="camp"'),true,'a camping trip');
+  assert.deepEqual(json('deckedIds()'),['quilt','pad','tent'],'the sleeping bag, the mat and the tent on the deck');
+  assert.equal(json('currentPlan().items.quilt||null'),null,'the sleeping bag in no bag');
+  assert.equal(json('advisorResult(currentPlan()).kgByPos.deck'),json("+['quilt','pad','tent'].reduce((n,id)=>n+itemKg(kitById(id)),0).toFixed(2)"),'its kilos on the deck');
+  assert.equal(json('autoBalancePlan()'),false,'balanced already');
+  plan(SETS.touring,{},fresh());
+  assert.ok(json('currentPlan().items.quilt'),'deck off: the sleeping bag is in a bag');
+  assert.equal(json('autoBalancePlan()'),true,'and the balance has its moves');
 });
 
 // Review of PR 79, m1: after an earlier balance, the packing before this one still carries the earlier moves; the line says what it is.
