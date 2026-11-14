@@ -101,7 +101,11 @@ describe('The departure date one tap from the trip line (sweep #3)', () => {
 });
 
 describe('Bags shows a bag plan (sweep #5)', () => {
+  /** The trip's nights, as Trip settings hold them: 2. */
+  const twoNights = () => localStorage.setItem('copilot:settings', JSON.stringify({ nights: 2, pace: 'sporting', updatedAt: '2026-10-10T08:00:00.000Z' }));
+
   test('[TRIP-BAGS-DONE] with a bag plan saved, Bags is done: its tick, "1 bag · 1.5 kg" and Change; once prepared, Go is the step to do', async () => {
+    twoNights();
     localStorage.setItem('loadcheck:summary:v1', plan());
     refreshBikeSource();
     await withRoute();
@@ -123,6 +127,15 @@ describe('Bags shows a bag plan (sweep #5)', () => {
 
   test('[TRIP-BAGS-DONE] an empty plan, or none, leaves Bags as a step still to do', async () => {
     localStorage.setItem('loadcheck:summary:v1', JSON.stringify({ app: 'load-check', kind: 'load-summary', v: 1, at: '2026-10-10T08:00:00Z', empty: true }));
+    refreshBikeSource();
+    await withRoute();
+    expect(step('bags').dataset.state).not.toBe('done');
+    expect(step('bags').textContent).toContain(W.appTripBagsLater);
+  });
+
+  test('[TRIP-BAGS-DONE] a plan made for other nights is not this trip\'s: Bags stays a step to do (review of the Trip PRs, M3)', async () => {
+    twoNights();
+    localStorage.setItem('loadcheck:summary:v1', plan({ nights: 5 }));
     refreshBikeSource();
     await withRoute();
     expect(step('bags').dataset.state).not.toBe('done');
