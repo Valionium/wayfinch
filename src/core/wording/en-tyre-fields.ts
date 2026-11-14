@@ -1,4 +1,4 @@
-// The tyre tool's choice words and its SRAM cross-check list, which only its own chunk shows, in their own module so that the
+// The tyre tool's choice words, which only its own chunk shows, in their own module so that the
 // first screen does not carry them. Moved from en.ts as they were (14 Nov 2026): they pay for the clearer En route chips (sweep of
 // 14 Nov 2026, findings 13 to 15). They follow the same rules as en.ts: the banned-words test reads this object too
 // (tests/unit/core/wording-tyre-fields.test.ts).
@@ -27,19 +27,4 @@ export const TQ = {
   tyreSurfacePaved: 'Paved',
   tyreSurfaceUnpaved: 'Unpaved',
   tyreFromYou: 'from You',
-  tyreSramRider: 'Rider weight',
-  tyreSramGear: 'Bike and gear weight',
-  tyreSramWidth: 'Tyre width',
-  tyreSramCasing: 'Casing',
-  tyreSramWheel: 'Wheel size',
-  tyreSramRim: 'Rim type',
-  tyreSramInner: 'Inner rim width',
-  tyreSramRide: 'Ride type',
-  tyreSramWet: 'Wet or dry',
-  tyreSramThin: 'Thin',
-  tyreSramRimUnset: 'Not set here: look at your rim',
-  tyreSramRoad: 'Road',
-  tyreSramGravel: 'Gravel',
-  tyreSramWetWord: 'Wet',
-  tyreSramDryWord: 'Dry',
 };

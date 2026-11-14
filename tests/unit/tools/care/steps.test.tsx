@@ -6,7 +6,7 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterAll, afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { idsOf, STEP_PICTURES } from '../../../../src/core/care/pictures.ts';
-import { KIND_WORDS, stepTitlesFrom, SWITCH_WORDS, type PictureWords } from '../../../../src/core/wording/en-care-pictures.ts';
+import { IF_WORDS, KIND_WORDS, stepTitlesFrom, SWITCH_WORDS, type PictureWords } from '../../../../src/core/wording/en-care-pictures.ts';
 import CARE_WORDS from '../../../../src/core/wording/en-care-pictures.json';
 import { C, CARE_TASKS, CARRY, ROAD_CARDS } from '../../../../src/core/wording/en-care.ts';
 import { PART_SHORT } from '../../../../src/core/wording/en-part-names.ts';
@@ -751,4 +751,37 @@ test('[BV-ZOOM] a card whose parts sit close together opens zoomed in on them; W
   const box = sheet()!.querySelector('.bv-art')!.getAttribute('viewBox');
   await click(sheetButton('Zoom in')!);
   expect(sheet()!.querySelector('.bv-art')!.getAttribute('viewBox')).not.toBe(box);
+});
+
+// The live-site sweep of 14 November 2026, item 46: "Take the wheel off" with no bike shows the pad spacer of a hydraulic disc brake;
+// it now says it is for those brakes, above the picture; a bike with hydraulic disc brakes sees no such line.
+test('[BC-PIC-IF] the puncture card\'s first step says its pad spacer picture is for hydraulic disc brakes while the brakes are not told', async () => {
+  await mount();
+  await openCard('puncture-tube');
+  await click(button(C.careStepsNext)!);
+  await shown(1);
+  const line = dialog()!.querySelector('.care-pic-if');
+  expect(line?.textContent).toBe(IF_WORDS['hydraulic-disc']);
+  // before the picture, inside the step
+  expect(line!.compareDocumentPosition(dialog()!.querySelector('.care-steps-body [role="img"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  act(() => { render(null, host); });
+  await mount(memory({
+    'loadcheck:bikeProfiles': JSON.stringify([{ id: 'bike_h', name: 'Hydro', brakes: 'hydraulic-disc', tyres: 'tubes' }]),
+    'loadcheck:bikeProfile': JSON.stringify({ id: 'bike_h', name: 'Hydro' }),
+  }).kv);
+  await openCard('puncture-tube');
+  await click(button(C.careStepsNext)!);
+  await shown(1);
+  expect(dialog()!.querySelector('.care-pic-if')).toBeNull();
+});
+
+// Review of PR 131, m1: opened, Lube the chain says its rain-or-mud condition once (the step view's "And always after rain or mud."),
+// not also in its name.
+test('[BC-TAGS-ONCE] opened, Lube the chain says "rain or mud" once', async () => {
+  await mount();
+  localStorage.setItem(ALL_STEPS_KEY, '1');
+  await click(host.querySelector<HTMLElement>('.care-task[data-id="chain-lube"] .care-open')!);
+  const text = dialog()!.textContent!;
+  expect(text.match(/rain or mud/g)?.length).toBe(1);
+  expect(text).toContain(C.careAlsoWet);
 });
