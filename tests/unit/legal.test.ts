@@ -19,6 +19,8 @@ const read = (path: string): string => readFileSync(join(ROOT, path), 'utf8');
 const textOfFile = (path: string): string => docOf(read(path)).body.textContent ?? '';
 const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true, recursive: true })
   .filter((e) => e.isFile()).map((e) => join(e.parentPath, e.name));
+/** The imprint's "Art des Angebots" since the owner's ruling of 14 Nov 2026 (sweep 59), the sentence after its bold label. */
+const IMPRINT_OFFER = 'Wayfinch ist eine kostenlose, privat betriebene Web-App für Bikepacking. Dazu gehört der Bag planner (früher Load Check), ein Werkzeug zur Planung von Fahrradgepäck. Es werden keine Waren oder Dienstleistungen verkauft.';
 const deps = (): Record<string, string> => (JSON.parse(read('package.json')) as { dependencies: Record<string, string> }).dependencies;
 
 let site = '';
@@ -86,10 +88,28 @@ describe('the pages are on the site and reachable', () => {
     expect(listed.some((p) => p.startsWith('/legal/') && p.endsWith('.html'))).toBe(false);
   });
 
-  test('every legal text begins with the line that says an AI drafted it', () => {
+  // The line that said an AI drafted the texts came off the pages (the owner's ruling of 14 Nov 2026, sweep 59). It was this test's
+  // opposite until then; the note for maintainers is kept in docs/rules.md and tools/build-legal.mjs, never on a page.
+  test('[LEGAL-NO-AI-LINE] no legal page shows the line that says an AI drafted it, nor its box', () => {
     for (const page of LEGAL_PAGES) {
-      const body = docOf(readFileSync(join(site, page.href.slice(1), 'index.html'), 'utf8')).querySelector('main')!.textContent!.trim();
-      expect(body.startsWith("Drafted by an AI from the project's spec. Not legal advice."), page.href).toBe(true);
+      for (const html of [readFileSync(join(site, page.href.slice(1), 'index.html'), 'utf8'), read(`public${page.href}index.html`)]) {
+        const doc = docOf(html);
+        expect(doc.body.textContent, page.href).not.toMatch(/Drafted by an AI|Not legal advice/i);
+        expect(doc.querySelector('.lg-draft'), page.href).toBeNull();
+        expect(doc.querySelector('main')!.firstElementChild!.matches('h1, nav.lg-nav'), page.href).toBe(true);
+      }
+    }
+    expect(read('tools/build-legal.mjs')).not.toContain('class="lg-draft"');
+    expect(read('public/legal/legal.css')).not.toContain('.lg-draft');
+  });
+
+  // The imprint's "Art des Angebots" names Wayfinch (the owner's ruling of 14 Nov 2026, sweep 59). It is changed in the bag planner's
+  // block, so the built imprint and the bag planner's own Impressum say the same (PRIV-IMPRINT-SAME). Only yes or no is shown.
+  test('[LEGAL-IMPRINT-WAYFINCH] the imprint\'s Art des Angebots names Wayfinch and its Bag planner (formerly Load Check), in the bag planner\'s block and the built imprint', () => {
+    const built = docOf(readFileSync(join(site, 'legal', 'imprint', 'index.html'), 'utf8')).querySelector('[data-imprint]')!;
+    for (const [where, text] of [['the bag planner block', imprintBlock().text], ['the built imprint', textOf(built.innerHTML)]] as const) {
+      expect(text.includes(`Art des Angebots. ${IMPRINT_OFFER}`) ? 'named' : 'not named', where).toBe('named');
+      expect(text.includes('Load Check ist ein') ? 'old sentence' : 'gone', where).toBe('gone');
     }
   });
 });
@@ -223,13 +243,17 @@ describe('the legal pages on a phone: only markup and style changed', () => {
     licences: 'e046795857c1368139c9261c051a94bd34b73442c0d1dc401835d345810c8b4f',
     imprint: '600d647d43c99cc6ad200f4e0f65adaadbcd723980b9b947d2a87df61e9cc064',
   };
+  const AI_LINE = "Drafted by an AI from the project's spec. Not legal advice.";
   for (const [name, hash] of Object.entries(TEXT_HASH)) {
     test(`[LEGAL-PHONE-TEXT] the ${name} page's text is the same, character for character`, () => {
       // The bar's words are the one top bar's of every tool (owner's list of 7 Nov 2026, items 8 and 9); every other character as it was; the font credit changed from Barlow to Source Sans 3 (owner's choice, 9 Nov 2026).
       const text = textOfFile(`public/legal/${name}/index.html`).replace(/\s+/g, ' ').trim();
       expect(text.startsWith(`${TL.toolsBack} `)).toBe(true);
+      // The line that said an AI drafted the text came off all three pages (the owner's ruling of 14 Nov 2026, sweep 59; LEGAL-NO-AI-LINE):
+      // it stood right after the bar's words, and is put back there below, so the hash is still the one of 6 Nov.
+      expect(text.includes(AI_LINE)).toBe(false);
       // The tab's new name, "En route" for "Ahead" (owner's finding M, 8 Nov 2026), is one of the privacy page's three changes of words (the third: the delete button's new name, sweep 14 Nov, 51); the other is "Prepare this route" for "Get ready offline" (owner's choice, 9 Nov 2026).
-      const got = sha256(text.replace(TL.toolsBack, '← Wayfinch').replace('(Trip, En route, Tools, You)', '(Trip, Ahead, Tools, You)').replaceAll('Prepare this route', 'Get ready offline').replace('Delete Wayfinch data from this phone', 'Delete co-pilot data').replace(PRIVACY_ADDED, ''));
+      const got = sha256(text.replace(TL.toolsBack, `← Wayfinch ${AI_LINE}`).replace('(Trip, En route, Tools, You)', '(Trip, Ahead, Tools, You)').replaceAll('Prepare this route', 'Get ready offline').replace('Delete Wayfinch data from this phone', 'Delete co-pilot data').replace(PRIVACY_ADDED, ''));
       expect(got === hash ? 'same' : `different: ${got}`).toBe('same');
     });
   }
