@@ -1,44 +1,60 @@
 // Trip prep: which "Before you leave" items show for a trip and a bike, and where in the app each is done (design of 15 November 2026).
-// The bike checks are Bike care's own tasks, by their names, fitted as Bike care fits them (a Not sure detail shows the task, ruling R3 on
-// PR 58). Pure: no DOM, no storage, no clock.
+// The bike checks are Bike care's own tasks, by their names and conditions, fitted as Bike care fits them (a Not sure detail shows the
+// task, ruling R3 on PR 58); tests hold the names, the conditions and the fit equal to Bike care's. They are not imported from Bike care:
+// that would split its chunk (BC-CHUNK) and name one chunk more in the first screen (TRIP-PREP-FIRST). Pure: no DOM, no storage, no clock.
 import type { BikeRecord } from '../bike/normalise.ts';
-import { careDetails, fitOf } from '../care/fit.ts';
-import type { CareDetails } from '../care/types.ts';
-import { dayStopOf } from '../route/day-stops.ts';
+import type { Conditions } from '../care/types.ts';
 import type { Trip } from '../types.ts';
-import { CARE_TASKS } from '../wording/en-care.ts';
-import { PR } from '../wording/en-prep.ts';
+import { PR, PREP_CHECKS } from '../wording/en-prep.ts';
 
-/** Where an item is done: Bike care, Trip's Prepare this route step, En route (Share progress), or outside the app. */
-export type PrepLink = 'care' | 'prepare' | 'ahead' | null;
+/** Where an item is done: Bike care, En route (Share progress), or not elsewhere (outside the app, or the step the list is in). */
+export type PrepLink = 'care' | 'ahead' | null;
 export type PrepItem = { id: string; text: string; link: PrepLink };
-/** `days`: the route's stages; `prepared`: Prepare this route has ended once for this route; `firstStop`: the place day 1 ends at. */
-export type PrepFacts = { days: number; details: CareDetails; prepared: boolean; firstStop: string | null };
+/** `days`: the route's stages; `bike`: Trip's bike (null: none, every detail Not sure); `prepared`: Prepare this route has ended once. */
+export type PrepFacts = { days: number; bike: Pick<BikeRecord, 'brakes' | 'drive'> | null; prepared: boolean };
 
-/** Bike care's tasks for every trip, and those added for a trip of two days or more, in this order. */
-const EVERY_TRIP: readonly string[] = ['brakes-lever-test', 'tyres-pressure'];
-const LONGER_TRIP: readonly string[] = ['chain-wear-check', 'brakes-pads-disc', 'brakes-pads-rim', 'frame-bolts-check'];
+/** Bike care's tasks with their conditions (en-care.ts): those for every trip, then those added for two days or more, in this order. */
+export const EVERY_TRIP: readonly { id: string; applies: Conditions }[] = [
+  { id: 'brakes-lever-test', applies: {} },
+  { id: 'tyres-pressure', applies: {} },
+];
+export const LONGER_TRIP: readonly { id: string; applies: Conditions }[] = [
+  { id: 'chain-wear-check', applies: { drive: ['chain'] } },
+  { id: 'brakes-pads-disc', applies: { brakes: ['cable-disc', 'hydraulic-disc'] } },
+  { id: 'brakes-pads-rim', applies: { brakes: ['rim'] } },
+  { id: 'frame-bolts-check', applies: {} },
+];
 
 /** The facts of a trip and Trip's bike that the list depends on. */
 export function prepFacts(trip: Trip, bike: BikeRecord | null, prepared: boolean): PrepFacts {
-  const stop = trip.route.stages.length >= 2 ? dayStopOf(trip, 0) : null;
-  return { days: trip.route.stages.length, details: careDetails(bike), prepared, firstStop: stop && stop.placeId !== null && stop.name ? stop.name : null };
+  return { days: trip.route.stages.length, bike: bike && { brakes: bike.brakes, drive: bike.drive }, prepared };
+}
+
+/**
+ * Bike care's fit (care/fit.ts, careDetails and fitOf) on the two details these checks depend on: a Not sure detail passes, a value in
+ * the list passes, any other value (Other included) hides the check.
+ */
+function fits(applies: Conditions, bike: PrepFacts['bike']): boolean {
+  const brakes = !bike || bike.brakes === 'unknown' ? null : bike.brakes;
+  const drive = !bike || bike.drive === 'unknown' ? null : bike.drive === 'belt' ? 'belt' : 'chain';
+  return (brakes === null || !applies.brakes || (applies.brakes as readonly string[]).includes(brakes))
+    && (drive === null || !applies.drive || applies.drive.includes(drive));
 }
 
 /** The list, in its order: the bike checks, then the kit, charging, the forecast, telling someone and, for two days or more, the first night. */
 export function prepItems(f: PrepFacts): PrepItem[] {
   const longer = f.days >= 2;
-  const checks = (longer ? [...EVERY_TRIP, ...LONGER_TRIP] : EVERY_TRIP).flatMap((id): PrepItem[] => {
-    const task = CARE_TASKS.find((t) => t.id === id);
-    return task && fitOf(task.applies, f.details).show ? [{ id: task.id, text: task.name, link: 'care' }] : [];
-  });
+  const checks = (longer ? [...EVERY_TRIP, ...LONGER_TRIP] : EVERY_TRIP)
+    .filter((t) => fits(t.applies, f.bike))
+    .map((t): PrepItem => ({ id: t.id, text: PREP_CHECKS[t.id]!, link: 'care' }));
   return [
     ...checks,
     { id: 'kit', text: PR.prepKit, link: 'care' },
     { id: 'charge', text: PR.prepCharge, link: null },
-    { id: 'forecast', text: PR.prepForecast, link: 'prepare' },
+    // in the step the list is in: its own button
+    { id: 'forecast', text: PR.prepForecast, link: null },
     // En route's Share progress needs what Prepare this route saves.
     { id: 'tell', text: PR.prepTell, link: f.prepared ? 'ahead' : null },
-    ...(longer ? [{ id: 'night', text: PR.prepNight(f.firstStop), link: null }] : []),
+    ...(longer ? [{ id: 'night', text: PR.prepNight, link: null }] : []),
   ];
 }

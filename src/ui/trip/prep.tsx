@@ -1,26 +1,30 @@
-// Trip prep: "Before you leave" in Trip's Go step (design of 15 November 2026). A chunk of its own, opened with the step. The rider's own
-// list: each item links where the app does it, and a tick stays on this phone for this route (store/prep-ticks.ts). Nothing here calls
-// the trip ready, safe or complete, and nothing counts the ticks (Decision 2).
+// Trip prep: "Before you leave" at the end of Trip's Prepare this route step (design of 15 November 2026), in that step's chunk, so the
+// first screen carries none of it. The rider's own list: each item links where the app does it, and a tick stays on this phone for this
+// route (store/prep-ticks.ts). Nothing here calls the trip ready, safe or complete, and nothing counts the ticks (Decision 2).
 import { useState } from 'preact/hooks';
-import type { BikeRecord } from '../../core/bike/normalise.ts';
 import { prepFacts, prepItems } from '../../core/prep/items.ts';
 import type { PrepItem } from '../../core/prep/items.ts';
 import type { Trip } from '../../core/types.ts';
 import { PR } from '../../core/wording/en-prep.ts';
 import { readTicks, setTick } from '../../store/prep-ticks.ts';
-import { toolHref } from '../tools/bike-link.ts';
+import { bikeSource } from '../bike/live.ts';
+import type { TripSnapshot } from './services.ts';
 import './prep.css';
 
 type Ticks = { route: string; ticked: string[]; notKept: boolean };
 
-/** `prepared`: Prepare this route has ended once for this route; `openPrepare` opens that step. */
-export function BeforeYouGo({ trip, bike, prepared, openPrepare }: { trip: Trip; bike: BikeRecord | null; prepared: boolean; openPrepare: () => void }) {
-  const route = trip.route.id;
+/** The list for Trip's snapshot and Trip's bike (the bag planner's current one, as Trip draws it); nothing without a trip. */
+export function BeforeYouGo({ snap }: { snap: Pick<TripSnapshot, 'trip' | 'prepared'> }) {
+  const trip: Trip | null = snap.trip;
+  const bike = bikeSource.value.bike;
+  const route = trip?.route.id ?? '';
   const [state, setState] = useState<Ticks>(() => ({ route, ticked: readTicks(route), notKept: false }));
   // Another route: its own ticks, read afresh.
   const ticks = state.route === route ? state : { route, ticked: readTicks(route), notKept: false };
-  const items = prepItems(prepFacts(trip, bike, prepared));
-  const careHref = bike ? toolHref('tools/care', bike.id) : '#/tools/care';
+  if (!trip) return null;
+  const items = prepItems(prepFacts(trip, bike, snap.prepared !== null));
+  // Bike care with Trip's bike chosen: tools/bike-link.ts's toolHref, written out so the chunk needs none of that module (a test holds it equal).
+  const careHref = bike ? `#/tools/care?bike=${encodeURIComponent(bike.id)}` : '#/tools/care';
 
   const flip = (id: string, on: boolean): void => {
     const kept = setTick(route, id, on);
@@ -31,7 +35,6 @@ export function BeforeYouGo({ trip, bike, prepared, openPrepare }: { trip: Trip;
 
   const linkOf = (it: PrepItem) => {
     if (it.link === 'care') return <a class="prep-link" href={careHref} aria-label={PR.prepInCareLabel(it.text)}>{PR.prepInCare}</a>;
-    if (it.link === 'prepare') return <button type="button" class="btn prep-link" onClick={openPrepare}>{PR.prepOpenPrepare}</button>;
     if (it.link === 'ahead') return <a class="prep-link" href="#/ahead">{PR.prepOpenShare}</a>;
     return null;
   };

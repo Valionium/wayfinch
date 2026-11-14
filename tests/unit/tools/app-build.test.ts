@@ -480,8 +480,8 @@ test("[PREP-FIRST] Prepare this route adds nothing to the first screen: at or be
   expect(figures.firstJsGzip).toBeLessThanOrEqual(144_741);
 });
 
-// Trip prep, "Before you leave" on Trip's Go step (design of 15 November 2026): the list, its words and its ticks' key are a chunk of their
-// own, loaded with the Go step. 141,425 bytes is main's first screen at the branch point (16e828a); the first screen may not rise above it.
+// Trip prep, "Before you leave" in Trip's Prepare this route step (design of 15 November 2026): the list, its words and its ticks' key come
+// with that step's lazy chunk. 141,425 bytes is main's first screen at the branch point (16e828a); the first screen may not rise above it.
 test("[TRIP-PREP-FIRST] Before you leave adds nothing to the first screen: at or below main's figure; its list, words and key are a lazy chunk", () => {
   const figures = measure(on);
   const first = figures.firstFiles.map((f) => text(on, f)).join('\n');

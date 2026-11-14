@@ -1,13 +1,13 @@
 import { expect, test } from 'vitest';
 import { W } from '../../../src/core/wording/en.ts';
-import { PR } from '../../../src/core/wording/en-prep.ts';
+import { PR, PREP_CHECKS } from '../../../src/core/wording/en-prep.ts';
 import { TR } from '../../../src/core/wording/en-trip.ts';
 import { TF } from '../../../src/core/wording/en-trip-fields.ts';
 import { bannedHits } from '../../fixtures/banned.ts';
 
 const texts = (): [string, string][] => [
-  ...Object.entries(PR).map(([k, v]): [string, string] => [k, typeof v === 'function' ? (v as (s: string) => string)('Camping Rheinaue') : v]),
-  ['prepNight(null)', PR.prepNight(null)],
+  ...Object.entries(PR).map(([k, v]): [string, string] => [k, typeof v === 'function' ? (v as (s: string) => string)('Test both brakes') : v]),
+  ...Object.entries(PREP_CHECKS).map(([k, v]): [string, string] => [`prepCheck ${k}`, v]),
 ];
 
 test('[HON-BANNED] no string of Before you leave uses a banned word; every key is its own, in none of en.ts, en-trip.ts or en-trip-fields.ts', () => {
@@ -16,7 +16,7 @@ test('[HON-BANNED] no string of Before you leave uses a banned word; every key i
     expect(key).toMatch(/^prep/);
     expect(text.trim()).not.toBe('');
     expect(bannedHits(text, false), `${key}: ${text}`).toEqual([]);
-    const own = key.replace(/\(null\)$/, '');
+    const own = key.replace(/ .*$/, '');
     expect(own in W || own in TR || own in TF, own).toBe(false);
   }
 });

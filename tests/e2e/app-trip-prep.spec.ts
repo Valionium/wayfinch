@@ -1,4 +1,5 @@
-// Trip prep in a real browser (design of 15 November 2026): "Before you leave" in Trip's Go step, on the real store and the real build.
+// Trip prep in a real browser (design of 15 November 2026): "Before you leave" at the end of Trip's Prepare this route step, on the real
+// store and the real build.
 // The list fits the bike and the trip, each item links where the app does it, and the ticks stay on this phone for this route.
 import { readFileSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
@@ -28,8 +29,8 @@ test.afterAll(() => removeBuilds());
 
 const inDays = (n: number): string => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date(Date.now() + n * 86_400_000));
 
-/** The app with the sample bike and a trip of `nights` nights leaving in three days, on Trip with the Go step open. */
-async function goStep(page: Page, opts: { nights?: number; places?: boolean } = {}): Promise<void> {
+/** The app with the sample bike and a trip of `nights` nights leaving in three days, on Trip with Prepare this route's step open. */
+async function prepStep(page: Page, opts: { nights?: number; places?: boolean } = {}): Promise<void> {
   app = await loadApp(page);
   await page.evaluate((e) => { for (const [k, v] of Object.entries(e)) localStorage.setItem(k, v); }, SEED);
   await preparedTrip(page, 'heidelberg-strasbourg', { nights: opts.nights ?? 2, places: opts.places ?? false, departureDate: inDays(3) });
@@ -37,8 +38,15 @@ async function goStep(page: Page, opts: { nights?: number; places?: boolean } = 
   await page.goto(`${app.origin}/#/trip`, { waitUntil: 'domcontentloaded' });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-trip-line]')).toContainText(ROUTE_NAME);
-  await page.locator('[data-step="go"]').getByRole('button', { name: 'Go', exact: true }).click();
-  await expect(page.locator('[data-prep]')).toBeVisible();
+  await openPrep(page);
+}
+
+/** Prepare this route's step: open already while it is the step to do, otherwise from its title or its Update. */
+async function openPrep(page: Page): Promise<void> {
+  const step = page.locator('[data-step="getready"]');
+  await expect(step.locator('h2')).toBeVisible();
+  if ((await step.getAttribute('data-open')) !== 'true') await step.locator('.trip-step-open, .trip-step-change').click();
+  await expect(page.locator('[data-step="getready"] [data-prep]')).toBeVisible();
 }
 
 const items = (page: Page) => page.locator('[data-prep-item]');
@@ -47,7 +55,7 @@ const box = (page: Page, id: string) => page.locator(`[data-prep-item="${id}"] i
 const allLocal = (page: Page): Promise<Record<string, string>> => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).sort().map((k) => [k, localStorage.getItem(k)!])));
 
 test("[TRIP-PREP-ITEMS] [TRIP-PREP-LINKS] a three-day trip on the sample bike: Bike care's checks for it by name, the rest of the list, and each link goes where it is done", async ({ page }) => {
-  await goStep(page);
+  await prepStep(page);
   const prep = page.locator('[data-prep]');
   await expect(prep.getByRole('heading', { name: 'Before you leave', level: 3 })).toBeVisible();
   expect(await ids(page)).toEqual(['brakes-lever-test', 'tyres-pressure', 'chain-wear-check', 'brakes-pads-disc', 'frame-bolts-check', 'kit', 'charge', 'forecast', 'tell', 'night']);
@@ -59,12 +67,10 @@ test("[TRIP-PREP-ITEMS] [TRIP-PREP-LINKS] a three-day trip on the sample bike: B
   await expect(prep).not.toContainText(/\bready\b|\bsafe\b|\d+ of \d+/i);
   // Not prepared yet: En route has no Share progress, so telling someone links nowhere
   await expect(page.locator('[data-prep-item="tell"] a')).toHaveCount(0);
-  // the forecast: Open Prepare this route opens step 2, its heading takes the focus
-  await prep.getByRole('button', { name: 'Open Prepare this route', exact: true }).click();
-  await expect(page.locator('[data-step="getready"][data-open]')).toBeVisible();
-  await expect(page.locator('[data-step="getready"] h2')).toBeFocused();
+  // the forecast is this step's own button, above the list: the item links nowhere else
+  await expect(page.locator('[data-prep-item="forecast"]')).toContainText('prepare this route again');
+  await expect(page.locator('[data-prep-item="forecast"] a, [data-prep-item="forecast"] button')).toHaveCount(0);
   // a bike check: Bike care opens with this trip's bike chosen
-  await page.locator('[data-step="go"]').getByRole('button', { name: 'Go', exact: true }).click();
   await page.getByRole('link', { name: 'In Bike care: Test both brakes', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Bike care', level: 2 })).toBeVisible();
   await expect.poll(() => page.evaluate(() => location.hash)).toBe('#/tools/care');
@@ -72,12 +78,12 @@ test("[TRIP-PREP-ITEMS] [TRIP-PREP-LINKS] a three-day trip on the sample bike: B
 });
 
 test('[TRIP-PREP-ITEMS] a day ride has the two every-ride checks and no night', async ({ page }) => {
-  await goStep(page, { nights: 0 });
+  await prepStep(page, { nights: 0 });
   expect(await ids(page)).toEqual(['brakes-lever-test', 'tyres-pressure', 'kit', 'charge', 'forecast', 'tell']);
 });
 
 test('[TRIP-PREP-TICKS] a tick, by tap or by keyboard, stays after a reload for this route; only its one key is written', async ({ page }) => {
-  await goStep(page);
+  await prepStep(page);
   const before = await allLocal(page);
   expect(before[KEY]).toBeUndefined();
   await page.locator('[data-prep-item="kit"] label').click();
@@ -93,21 +99,21 @@ test('[TRIP-PREP-TICKS] a tick, by tap or by keyboard, stays after a reload for 
   expect(JSON.parse(after[KEY]!)).toEqual({ route, ticked: ['kit', 'brakes-lever-test'] });
   expect(Object.fromEntries(Object.entries(after).filter(([k]) => k !== KEY))).toEqual(before);
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.locator('[data-step="go"]').getByRole('button', { name: 'Go', exact: true }).click();
+  await openPrep(page);
   await expect(box(page, 'kit')).toBeChecked();
   await expect(box(page, 'brakes-lever-test')).toBeChecked();
   await expect(box(page, 'charge')).not.toBeChecked();
 });
 
 test('[TRIP-PREP-LINKS] once Prepare this route has run, telling someone links to En route, where Share progress is', async ({ page }) => {
-  await goStep(page, { places: true });
+  await prepStep(page, { places: true });
   await page.getByRole('link', { name: 'Share progress on En route', exact: true }).click();
   await expect.poll(() => page.evaluate(() => location.hash)).toBe('#/ahead');
   await expect(page.getByRole('button', { name: 'Share progress', exact: true }).first()).toBeVisible();
 });
 
 test('[TRIP-PREP-FIT] keyboard and screen reader reach every box and link; 44 px targets; 320 px to wide, both themes, no sideways scroll, no accessibility violations', async ({ page }) => {
-  await goStep(page);
+  await prepStep(page);
   // Tab goes box, then its link, then the next box
   await box(page, 'brakes-lever-test').focus();
   await page.keyboard.press('Tab');

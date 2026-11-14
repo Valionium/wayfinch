@@ -3,16 +3,16 @@
 import { expect, test } from 'vitest';
 import { normaliseBike } from '../../../../src/core/bike/normalise.ts';
 import type { BikeRecord } from '../../../../src/core/bike/normalise.ts';
-import { careDetails } from '../../../../src/core/care/fit.ts';
-import { prepFacts, prepItems } from '../../../../src/core/prep/items.ts';
+import { careDetails, fitOf } from '../../../../src/core/care/fit.ts';
+import { EVERY_TRIP, LONGER_TRIP, prepFacts, prepItems } from '../../../../src/core/prep/items.ts';
 import type { PrepFacts } from '../../../../src/core/prep/items.ts';
 import { CARE_TASKS } from '../../../../src/core/wording/en-care.ts';
-import { PR } from '../../../../src/core/wording/en-prep.ts';
+import { PR, PREP_CHECKS } from '../../../../src/core/wording/en-prep.ts';
 import { flatRoute, testTrip } from '../../../fixtures/build.ts';
 
 const bike = (extra: Record<string, unknown>): BikeRecord => normaliseBike({ id: 'bike_1', name: 'Test', ...extra })!;
-const DISC_CHAIN = careDetails(bike({ brakes: 'hydraulic-disc', tyres: 'tubeless', drive: 'derailleur', shifting: 'cable' }));
-const facts = (over: Partial<PrepFacts> = {}): PrepFacts => ({ days: 1, details: DISC_CHAIN, prepared: true, firstStop: null, ...over });
+const DISC_CHAIN = bike({ brakes: 'hydraulic-disc', tyres: 'tubeless', drive: 'derailleur', shifting: 'cable' });
+const facts = (over: Partial<PrepFacts> = {}): PrepFacts => ({ days: 1, bike: DISC_CHAIN, prepared: true, ...over });
 const ids = (f: PrepFacts): string[] => prepItems(f).map((i) => i.id);
 const careName = (id: string): string => CARE_TASKS.find((t) => t.id === id)!.name;
 
@@ -40,49 +40,62 @@ test("[TRIP-PREP-ITEMS] two days or more add the chain, the pads that fit the br
 });
 
 test('[TRIP-PREP-ITEMS] fitted as Bike care fits: a belt drive has no chain check, rim brakes only the rim pads, a Not sure detail shows both', () => {
-  const belt = careDetails(bike({ brakes: 'rim', drive: 'belt' }));
-  expect(ids(facts({ days: 3, details: belt })).filter((i) => !['kit', 'charge', 'forecast', 'tell', 'night'].includes(i)))
+  const belt = bike({ brakes: 'rim', drive: 'belt' });
+  expect(ids(facts({ days: 3, bike: belt })).filter((i) => !['kit', 'charge', 'forecast', 'tell', 'night'].includes(i)))
     .toEqual(['brakes-lever-test', 'tyres-pressure', 'brakes-pads-rim', 'frame-bolts-check']);
   // No bike at all: every detail is Not sure, so each task shows, as in Bike care (ruling R3: a needed task missed is worse than one extra)
-  expect(ids(facts({ days: 3, details: careDetails(null) })).slice(0, 6))
+  expect(ids(facts({ days: 3, bike: null })).slice(0, 6))
     .toEqual(['brakes-lever-test', 'tyres-pressure', 'chain-wear-check', 'brakes-pads-disc', 'brakes-pads-rim', 'frame-bolts-check']);
   // a brake answered "Other" is not a disc or a rim brake: neither pads task
-  expect(ids(facts({ days: 3, details: careDetails(bike({ brakes: 'other', drive: 'chain-hub' })) }))).not.toContain('brakes-pads-disc');
-  expect(ids(facts({ days: 3, details: careDetails(bike({ brakes: 'other', drive: 'chain-hub' })) }))).toContain('chain-wear-check');
+  expect(ids(facts({ days: 3, bike: bike({ brakes: 'other', drive: 'chain-hub' }) }))).not.toContain('brakes-pads-disc');
+  expect(ids(facts({ days: 3, bike: bike({ brakes: 'other', drive: 'chain-hub' }) }))).toContain('chain-wear-check');
 });
 
-test("[TRIP-PREP-ITEMS] the first night names the stop Trip chose for day 1, and says it plainly without one", () => {
-  expect(prepItems(facts({ days: 2, firstStop: 'Camping Rheinaue' })).find((i) => i.id === 'night')!.text).toBe(PR.prepNight('Camping Rheinaue'));
-  expect(PR.prepNight('Camping Rheinaue')).toContain('Camping Rheinaue');
-  expect(prepItems(facts({ days: 2 })).find((i) => i.id === 'night')!.text).toBe(PR.prepNight(null));
-  // a day ride has no night, whatever the stops say
-  expect(ids(facts({ days: 1, firstStop: 'Camping Rheinaue' }))).not.toContain('night');
+test("[TRIP-PREP-ITEMS] the first night is one plain line for two days or more, never on a day ride", () => {
+  expect(prepItems(facts({ days: 2 })).find((i) => i.id === 'night')!.text).toBe(PR.prepNight);
+  expect(ids(facts({ days: 1 }))).not.toContain('night');
 });
 
-test("[TRIP-PREP-ITEMS] prepFacts: the days are the route's stages, the bike's details as Bike care reads them, and the stop day 1 ends at", () => {
+test("[TRIP-PREP-ITEMS] prepFacts: the days are the route's stages, and the bike's brakes and drive", () => {
   const trip = testTrip();
   expect(trip.route.stages.length).toBe(4);
-  const f = prepFacts(trip, bike({ brakes: 'rim', drive: 'belt' }), false);
-  expect(f).toEqual({ days: 4, details: careDetails(bike({ brakes: 'rim', drive: 'belt' })), prepared: false, firstStop: null });
-  expect(prepFacts(trip, null, true).details).toEqual(careDetails(null));
+  expect(prepFacts(trip, bike({ brakes: 'rim', drive: 'belt' }), false)).toEqual({ days: 4, bike: { brakes: 'rim', drive: 'belt' }, prepared: false });
+  expect(prepFacts(trip, null, true)).toEqual({ days: 4, bike: null, prepared: true });
   expect(prepFacts({ ...trip, route: flatRoute(60) }, null, true).days).toBe(1);
-  // a stop Trip chose for day 1 (at the stage's end) is named; one for another route, or with no place, is not
-  const stops = { routeId: trip.route.id, basis: [78, 150, 222], days: [
-    { placeId: 'p1', km: 78, name: 'Camping Rheinaue', town: null, by: 'auto' as const },
-    { placeId: 'p2', km: 150, name: 'Hotel Krone', town: null, by: 'auto' as const },
-    { placeId: null, km: 222, name: null, town: null, by: 'auto' as const },
-  ] };
-  expect(prepFacts({ ...trip, stops }, null, true).firstStop).toBe('Camping Rheinaue');
-  expect(prepFacts({ ...trip, stops: { ...stops, routeId: 'another-route' } }, null, true).firstStop).toBeNull();
-  expect(prepFacts({ ...trip, stops: { ...stops, days: [{ ...stops.days[0]!, placeId: null, name: null }, ...stops.days.slice(1)] } }, null, true).firstStop).toBeNull();
 });
 
-test('[TRIP-PREP-LINKS] each item says where it is done: Bike care, Prepare this route, En route once prepared; charging and the first night have none', () => {
+test('[TRIP-PREP-LINKS] each item says where it is done: Bike care, En route once prepared; charging, the forecast (this step) and the first night have none', () => {
   const links = (f: PrepFacts) => Object.fromEntries(prepItems(f).map((i) => [i.id, i.link]));
   expect(links(facts({ days: 3 }))).toEqual({
     'brakes-lever-test': 'care', 'tyres-pressure': 'care', 'chain-wear-check': 'care', 'brakes-pads-disc': 'care', 'frame-bolts-check': 'care',
-    kit: 'care', charge: null, forecast: 'prepare', tell: 'ahead', night: null,
+    kit: 'care', charge: null, forecast: null, tell: 'ahead', night: null,
   });
   // En route has no Share progress before Prepare this route has run: telling someone then links nowhere
   expect(links(facts({ prepared: false })).tell).toBeNull();
+});
+
+test("[TRIP-PREP-ITEMS] the bike checks are Bike care's tasks word for word: the same names and the same conditions as en-care.ts", () => {
+  const checks = [...EVERY_TRIP, ...LONGER_TRIP];
+  expect(Object.keys(PREP_CHECKS).sort()).toEqual(checks.map((c) => c.id).sort());
+  for (const c of checks) {
+    const task = CARE_TASKS.find((t) => t.id === c.id);
+    expect(task, c.id).toBeDefined();
+    expect(PREP_CHECKS[c.id], c.id).toBe(task!.name);
+    expect(c.applies, c.id).toEqual(task!.applies);
+  }
+});
+
+test("[TRIP-PREP-ITEMS] the checks fit every bike exactly as Bike care fits them (careDetails, fitOf): each answer of brakes and drive, and no bike", () => {
+  const checks = [...EVERY_TRIP, ...LONGER_TRIP];
+  // the checks depend on no other detail than these two
+  for (const c of checks) expect(Object.keys(c.applies).every((k) => k === 'brakes' || k === 'drive'), c.id).toBe(true);
+  const bikes: (BikeRecord | null)[] = [null];
+  for (const brakes of ['unknown', 'hydraulic-disc', 'cable-disc', 'rim', 'other']) {
+    for (const drive of ['unknown', 'derailleur', 'chain-hub', 'belt']) bikes.push(bike({ brakes, drive }));
+  }
+  for (const b of bikes) {
+    const care = careDetails(b);
+    const expected = checks.filter((c) => fitOf(CARE_TASKS.find((t) => t.id === c.id)!.applies, care).show).map((c) => c.id);
+    expect(ids(facts({ days: 3, bike: b })).filter((i) => i in PREP_CHECKS), JSON.stringify(b && [b.brakes, b.drive])).toEqual(expected);
+  }
 });

@@ -27,8 +27,6 @@ const TripSettings = lazy(() => import('./settings.tsx').then((m) => m.TripSetti
 const GetReady = lazy(() => import('./getready.tsx').then((m) => m.GetReady));
 // The route's summary, with its profile and the stops on it, is its own chunk as well.
 const RouteSummary = lazy(() => import('./summary.tsx').then((m) => m.RouteSummary));
-// Before you leave (Trip prep, design of 15 Nov 2026) is one more: it opens with the Go step.
-const BeforeYouGo = lazy(() => import('./prep.tsx').then((m) => m.BeforeYouGo));
 
 /** Contract 2: hands the route and the trip's settings to the bag planner, which asks before it changes anything. */
 function PlanBags({ handOff }: { handOff: NonNullable<TripServices['handOff']> }) {
@@ -192,7 +190,6 @@ export function TripScreen({ services }: { services: TripServices }) {
             name="go" n={4} title={W.appTripStepGo} state={stateOf('go', false)} open={openStep === 'go'} canOpen onOpen={choose('go')} line={W.appTripGoLater}
             below={readyDone && openStep !== 'go' ? goLink : null}
           >
-            {trip ? <BeforeYouGo trip={trip} bike={bike.bike} prepared={!!snap?.prepared} openPrepare={choose('getready')} /> : null}
             <p>{W.appTripFlightMode}</p>
             {goLink}
           </Step>

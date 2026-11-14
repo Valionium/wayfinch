@@ -4,6 +4,7 @@ import { W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
 import { TF } from '../../core/wording/en-trip-fields.ts';
 import { askForHomeScreen } from '../install.ts';
+import { BeforeYouGo } from './prep.tsx';
 import { labelOf, NotSaved, RunProgress, usePrepareRun } from './run.tsx';
 import { savedLine } from './saved-line.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
@@ -43,6 +44,7 @@ export function GetReady({ services, snap, reload, lead = null, onRun }: {
       {progress ? null : <NotSaved failed={failed} />}
       {!progress && saved.length > 0 ? <p class="muted">{W.appTripStepsOk}: {saved.map((s) => labelOf(s.step)).join(', ')}.</p> : null}
       <p class="tool-line">{W.appTripFlightMode}</p>
+      <BeforeYouGo snap={snap} />
     </div>
   );
 }
