@@ -568,6 +568,40 @@ test("[BV-VIEW] a tap at the top, middle or bottom of any label's pill picks tha
   expect(errors).toEqual([]);
 });
 
+// NEXT task 4, item 3 (the owner's try-out): a tap at a pill's corner opens that pill's part too. The pill is round-ended, so its corners
+// lay outside the drawn shape, where a neighbour's 44 px tap area or the drawing took the tap: the whole pill's box is its own now.
+test("[BV-VIEW] a tap at any corner of a label's pill, or at its ends, picks that label's own part, on the busiest cards, and opens it", async ({ page }) => {
+  const errors = errorsOf(page);
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [U], null);
+  for (const [id, name] of [['puncture-tube', 'Puncture (inner tube)'], ['brake-rub-disc', 'Disc brake rubbing'], ['chain-broken', 'Broken chain']] as const) {
+    await openSteps(page, id, name);
+    await page.locator('.care-where').click();
+    const sheet = page.locator('dialog.part-sheet');
+    await expect(sheet.locator('.bv-label').first()).toBeVisible();
+    const hits = await page.evaluate(() => [...document.querySelectorAll<SVGGElement>('dialog.part-sheet .bv-label')].flatMap((g) => {
+      const r = g.querySelector('.bv-pill')!.getBoundingClientRect();
+      const points: [number, number][] = [[r.left + 1, r.top + 1], [r.right - 1, r.top + 1], [r.left + 1, r.bottom - 1], [r.right - 1, r.bottom - 1],
+        [r.left + 1, r.top + r.height / 2], [r.right - 1, r.top + r.height / 2]];
+      return points.map(([x, y]) => {
+        const el = document.elementFromPoint(x, y);
+        return `${g.dataset.part} at ${Math.round(x - r.left)},${Math.round(y - r.top)} -> ${el?.closest('[data-part]')?.getAttribute('data-part') ?? 'none'}`;
+      });
+    }));
+    expect(hits.filter((h) => { const [a, b] = h.split(' -> '); return a!.split(' at ')[0] !== b; }), id).toEqual([]);
+    // a real tap at a pill's top-left corner opens that part
+    const label = sheet.locator('.bv-label').nth(1);
+    const part = await label.getAttribute('data-part');
+    const box = (await label.locator('.bv-pill').boundingBox())!;
+    await page.mouse.click(box.x + 1, box.y + 1);
+    await expect(sheet.locator(`.bv-label[data-part="${part}"]`)).toHaveClass(/bv-label-hot/);
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('dialog.care-steps')).toHaveCount(0);
+  }
+  expect(errors).toEqual([]);
+});
+
 // Review of PR 107, I2: a mouse drag that ends outside the drawing ends the drag: the labels come back and a hover does not pan.
 test('[BV-ZOOM] a mouse drag of a zoomed drawing let go outside it ends there: the labels come back, and a hover after it moves nothing', async ({ page }) => {
   const errors = errorsOf(page);
