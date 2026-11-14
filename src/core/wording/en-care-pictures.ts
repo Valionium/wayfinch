@@ -12,6 +12,8 @@ export const KIND_WORDS: Readonly<Record<string, string>> = {
   'hydraulic-disc': 'Hydraulic disc brakes', thru: 'Thru-axle', qr: 'Quick release', nuts: 'Axle nuts', drop: 'Drop bars', flat: 'Flat bars', cable: 'Cable gears',
   'in-tube': 'In the down tube', 'on-tube': 'On the down tube',
 };
+/** Above a picture drawn for one kind only, while the bike's detail is Not sure (live-site sweep of 14 November 2026, item 46). */
+export const IF_WORDS: Readonly<Record<string, string>> = { 'hydraulic-disc': 'If you have hydraulic disc brakes:', cable: 'If you have cable gears:' };
 /** The switch's own words. */
 export const SWITCH_WORDS = { other: 'Other kinds', show: (kind: string): string => `Show ${kind}` } as const;
 

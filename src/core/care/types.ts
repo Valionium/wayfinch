@@ -25,9 +25,10 @@ export type CareTask = {
   note: string | null; words: string[]; applies: Conditions; critical: boolean;
   /**
    * Conditions that never hide the task: while the bike does not meet them (a detail Not sure, or another answer), the task shows with
-   * `tag` (coordinator's ruling R3 on PR 58: a needed task missed is worse than one extra).
+   * `tag` (coordinator's ruling R3 on PR 58: a needed task missed is worse than one extra). `replaces`: the Not sure details whose own tag
+   * the soft tag already says while it shows, so a task never says its condition twice (live-site sweep of 14 November 2026, item 45).
    */
-  soft?: { applies: Conditions; tag: string };
+  soft?: { applies: Conditions; tag: string; replaces?: CareKey[] };
 };
 /** `part` is the part filter the card belongs to (group 3's ruling: the Care search's filters limit the cards too). */
 export type RoadCard = { id: string; problem: string; part: Part; applies: Conditions; checkFirst: string; steps: string[]; rideOn: string; carry: string[]; words: string[]; critical: boolean };

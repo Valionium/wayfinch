@@ -50,7 +50,9 @@ const cardText = (c: RoadCard): string[] => [c.problem, PART_LABEL[c.part], ...c
 /** The tags of a Not sure detail (and a task's soft tag): "if you have disc brakes". Tasks, cards and carry items alike. */
 function Tags({ item, details }: { item: { tags: CareKey[]; applies: Conditions; soft?: CareTask['soft'] }; details: CareDetails }) {
   const soft = softTag(item, details);
-  const all = [...item.tags.map((k: CareKey) => TAG_LABEL(k, item.applies[k] as never)), ...(soft ? [soft] : [])];
+  // a soft tag that says a detail's own tag stands in for it (sweep of 14 November 2026, item 45): the condition said once
+  const own = soft ? item.tags.filter((k) => !item.soft?.replaces?.includes(k)) : item.tags;
+  const all = [...own.map((k: CareKey) => TAG_LABEL(k, item.applies[k] as never)), ...(soft ? [soft] : [])];
   return all.length === 0 ? null : <span class="muted care-tags">{all.join(' · ')}</span>;
 }
 
