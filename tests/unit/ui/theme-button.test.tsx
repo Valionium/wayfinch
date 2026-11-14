@@ -25,6 +25,13 @@ const button = () => host.querySelector<HTMLButtonElement>('button.theme-btn');
 const settle = async () => { for (let i = 0; i < 40; i += 1) await act(() => new Promise((r) => setTimeout(r, 5))); };
 
 describe('the colour mode button', { timeout: 30_000 }, () => {
+  test('[YOU-WORDS] its title says where it stands and that Automatic is in You, Settings', async () => {
+    go('trip');
+    render(<App />, host);
+    await settle();
+    expect(button()!.getAttribute('title')).toBe('Theme: dark (automatic). Automatic is in You, Settings.');
+  });
+
   test('[THEME-BUTTON] it is on Ahead, Trip and Tools, not on You, and says which mode it switches to', async () => {
     for (const screen of ['ahead', 'trip', 'tools'] as const) {
       go(screen);

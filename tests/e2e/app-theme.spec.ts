@@ -121,7 +121,7 @@ test('[THEME-SYNC] export and import carry the one theme: a choice made in the b
   await page.reload({ waitUntil: 'load' });
   await expect(page.locator('[data-you-loaded]')).toBeVisible();
   expect(await shown(page)).toBeNull();
-  await page.getByLabel('Choose an export file').setInputFiles({ name: 'w.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(body)) });
+  await page.getByLabel('Choose a saved Wayfinch file').setInputFiles({ name: 'w.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(body)) });
   await page.getByRole('button', { name: /Import this file|Replace anyway/ }).click();
   await page.getByRole('button', { name: /Import this file|Replace anyway/ }).click({ timeout: 2000 }).catch(() => undefined);
   await expect.poll(() => shown(page)).toBe(other(start));

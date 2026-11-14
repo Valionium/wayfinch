@@ -15,6 +15,13 @@
 .care-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .care-filter[aria-pressed='true'] { background: var(--blaze); border-color: var(--blaze); color: var(--ground); font-weight: 600; }
 .care-tell { margin: 0 0 12px; }
+/* What the list fits (owner's wish of 14 November 2026): the line and its one button, wrapping under it on a narrow phone. */
+.care-fit {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 12px 0 0; padding: 8px 12px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+}
+.care-fit-text { flex: 1 1 14rem; min-width: 0; margin: 0; }
+.care-fit-toggle { min-height: 44px; }
 .care-tell a { color: inherit; }
 .care-section h3 { margin: 20px 0 8px; }
 .care-task, .care-road { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); margin: 0 0 8px; }
@@ -59,6 +66,9 @@ dialog.care-steps::backdrop { background: var(--ground); }
 .care-step-h:focus-visible { outline: 2px solid var(--blaze); outline-offset: 2px; }
 .care-step-t, .care-step-words p { font-size: 1.0625rem; }
 .care-step-list h3 { font-size: 1rem; margin: 20px 0 4px; }
+/* a one-kind picture while the bike's detail is Not sure says which kind it is for (sweep of 14 November 2026, item 46) */
+.care-pic-if { margin: 12px 0 0; font-weight: 600; }
+.care-pic-if + .care-pic { margin-top: 4px; }
 .care-pic { margin: 12px 0 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 .care-pics-two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .care-pics-two .care-pic { margin-top: 12px; }

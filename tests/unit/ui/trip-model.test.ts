@@ -25,7 +25,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     expect(withDays.stages).toEqual([...expected]);
     const s = summaryOf(tripOf(withDays), { day1LeaveBy: null });
     expect(s.distance).toBe(`${Math.round(route.lengthKm * 10) / 10} km`);
-    expect(s.climbing).toMatch(/^[\d,]+ m climbing$/);
+    expect(s.climbing).toMatch(/^[\d,]+ m up$/);
     expect(s.profile).not.toBeNull();
     expect(s.stages).toHaveLength(expected.length);
     expect(s.stages[0]!.text).toBe(`Day 1 · ${Math.round((expected[0]!.endKm - expected[0]!.startKm) * 10) / 10} km`);

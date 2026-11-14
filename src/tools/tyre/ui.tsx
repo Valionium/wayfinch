@@ -4,14 +4,16 @@ import { effect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { T, TM } from '../../core/wording/en-tyre.ts';
-import { W, shortMapDate } from '../../core/wording/en.ts';
+import { W } from '../../core/wording/en.ts';
 import { TF } from '../../core/wording/en-tyre-labels.ts';
 import { TN } from '../../core/wording/en-tyre-notes.ts';
 import { HN } from '../../core/wording/en-hint.ts';
+import { TZ } from '../../core/wording/en-tyre-figures.ts';
 import { BackBar } from '../../ui/back-bar/back-bar.tsx';
 import { FitLine } from '../../ui/bike/fit-line.tsx';
 import { noteSeen } from '../../ui/bike/hint-seen.ts';
 import { Card, Notice } from '../../ui/card.tsx';
+import { savedDay } from '../../ui/saved-day.ts';
 import { choiceMadeIn, choiceVersion, noteBikeChoice } from '../../ui/tools/bike-choice.ts';
 import { checkLimit, tyreEstimate } from './core.ts';
 import type { Bars, Casing, Limit, RimType, Setup, Surface, Unit, Wheel } from './core.ts';
@@ -219,8 +221,8 @@ function WheelFigure({ label, w }: { label: string; w: Wheel }) {
   return (
     <div class="tyre-wheel">
       <h3>{label}</h3>
-      <p class="tyre-big">{W.tyreFrontBackBar(bar2(w.bar))}</p>
-      <p class="tyre-psi">{W.tyrePsiValue(String(w.psi))}</p>
+      <p class="tyre-big">{TZ.tyreFrontBackBar(bar2(w.bar))}</p>
+      <p class="tyre-psi">{TZ.tyrePsiValue(String(w.psi))}</p>
       {w.heat?.advise ? <p class="tyre-heat"><strong>{TC.tyreHeatPumpLine(bar2(w.heat.pumpToBar), String(w.heat.pumpToPsi))}</strong></p> : null}
       {w.heat?.advise ? null : <p class="muted">{lo === hi ? TM.tyreWindowOne(hi) : TM.tyreWindow(lo, hi)}</p>}
     </div>
@@ -365,7 +367,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
   const src = resolved.sources;
   const v = resolved.values;
   const own = (field: FieldName, value: number): number | undefined => (src[field] === 'assumed' ? undefined : value);
-  const planDate = host.summary ? (shortMapDate(host.summary.at) ?? '') : '';
+  const planDate = host.summary ? (savedDay(host.summary.at) ?? '') : '';
   const planNote = W.tyreFromPlan(planDate);
   const bikeKey = (name: string) => `tyre-${name}`;
   const changeHeat = (patch: NonNullable<Details['heat']>): void => {
@@ -461,7 +463,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
             <br /><span class="muted">{TN.tyreSplitSensitivity}</span>
           </p>
         ) : null}
-        {resolved.input && resolved.assumed.length ? <p class="tyre-assumed">{W.tyreAssumedList(resolved.assumed.map((f) => ASSUMED_WORDS[f]).join(', '))}</p> : null}
+        {resolved.input && resolved.assumed.length ? <p class="tyre-assumed">{TZ.tyreAssumedList(resolved.assumed.map((f) => ASSUMED_WORDS[f]).join(', '))}</p> : null}
         {blockedBy === null && listed.length ? (
           <>
             <h3>{W.tyreHeadingWarnings}</h3>

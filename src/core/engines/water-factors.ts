@@ -2,6 +2,7 @@
 // after a ride can raise what the rider carries, but never what the app prompts them to drink.
 import type { Profile } from '../types.ts';
 import { W } from '../wording/en.ts';
+import { WL } from '../wording/en-water-day.ts';
 import { heatRule, uncertainty } from './water-base.ts';
 import type { Ride } from './water-base.ts';
 
@@ -122,7 +123,7 @@ export function drinkingAdvice(o: { kDrink: number; srModel: number; rideMin: nu
   if (promptLPerH !== null) lines.push(W.waterGentleSchedule(promptLPerH));
   if (heat) lines.push(W.waterSaltyFood);
   if (o.minPlanT < COLD_BELOW_C) lines.push(W.waterColdReminder);
-  if (dayFlag) lines.push(W.waterDayFlag);
+  if (dayFlag) lines.push(WL.waterDayFlag);
   return { promptLPerH, dayFlag, lines };
 }
 
