@@ -23,6 +23,9 @@
 .bl-figure { margin: 4px 0 0; }
 .bl-canvas { position: relative; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: pointer; }
 .bl-canvas.bl-zoomed { touch-action: none; }
+/* No tap highlight (the owner's report of 14 Nov 2026): the hand cursor is inherited by all the drawing holds, and a phone highlighted the
+   outermost element showing it, the whole drawing, as one box. The part tapped is marked in blaze; the part buttons keep the focus ring. */
+.bl-canvas, .bl-canvas * { -webkit-tap-highlight-color: transparent; }
 .bl-svg { display: block; width: 100%; height: auto; }
 .bl-art { overflow: hidden; }
 .bl-extra { fill: none; stroke: var(--line); stroke-linecap: round; stroke-linejoin: round; }
@@ -88,3 +91,12 @@
 .bl-zoomhint { margin: 4px 0 0; font-size: 0.9375rem; text-align: right; }
 .bl-name:focus { outline: none; }
 .bl-name:focus-visible { outline: 2px solid var(--blaze); outline-offset: 2px; }
+
+/* How it works (design of 14 November 2026, "How a bike works"): three ways in share the row; the Topic drop-down as Bike to show;
+   the line for a part the bike shown lacks; the tyre tool's link, a 44 px target. */
+.bl-modes { flex-wrap: wrap; }
+/* each name on one line: at 320 px the three fit one row; a larger text size wraps the row, never a name */
+.bl-mode { flex: 1 1 auto; white-space: nowrap; padding-inline: 10px; }
+.bw-none { margin: 0 0 8px; }
+.bw-tyre { margin: 0 0 8px; }
+.bw-tyre a { display: inline-flex; align-items: center; min-height: 44px; color: var(--blaze); font-weight: 600; }

@@ -710,3 +710,28 @@ test('[BC-FIT-LINE] brakes, brake fluid and shifting set in You\'s bike details 
   await expect(page.getByRole('dialog')).toContainText('mineral oil, never DOT fluid');
   expect(errors).toEqual([]);
 });
+
+// The owner's report of 14 Nov 2026 on How a bike is built (the same kind of drawing): a tap flashed the whole picture as one box. The bike
+// view's drawing and all it holds have no tap highlight either; its part buttons keep the keyboard's focus ring.
+test('[BV-NO-FLASH] a tap on the bike view flashes no box: no tap highlight on the drawing or anything in it; the focus ring is on the part button', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools/care' });
+  await seed(page, [U], null);
+  await openSteps(page, 'puncture-tube', 'Puncture (inner tube)');
+  await page.locator('.care-where').click();
+  const sheet = page.locator('dialog.part-sheet');
+  await expect(sheet.locator('.bv-label').first()).toBeVisible();
+  const parts = ['.bv-canvas', '.bv-svg', '.bv-art', '.bv-bike', '.bv-label', '.bv-tap', '.bv-label text'];
+  const flash = await page.evaluate((list) => list.map((s) => {
+    const el = document.querySelector(`dialog.part-sheet ${s}`);
+    return `${s} ${el ? getComputedStyle(el).getPropertyValue('-webkit-tap-highlight-color') : 'missing'}`;
+  }), parts);
+  expect(flash).toEqual(parts.map((s) => `${s} rgba(0, 0, 0, 0)`));
+  await page.keyboard.press('Shift');
+  await sheet.locator('.bv-part').first().focus();
+  const ring = await page.evaluate(() => {
+    const b = document.activeElement as HTMLElement;
+    const c = document.querySelector<HTMLElement>('dialog.part-sheet .bv-canvas')!;
+    return { part: b.classList.contains('bv-part'), visible: b.matches(':focus-visible'), button: getComputedStyle(b).outlineStyle, canvas: getComputedStyle(c).outlineStyle, stop: c.tabIndex };
+  });
+  expect(ring).toEqual({ part: true, visible: true, button: 'solid', canvas: 'none', stop: -1 });
+});
