@@ -104,6 +104,12 @@ progress { width: 100%; accent-color: var(--blaze); }
 .hit { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-width: 0; text-align: left; overflow-wrap: anywhere; }
 .hit-name { font-weight: 600; }
 .hit-line { color: var(--muted); font-size: 0.9375rem; }
+/* Plan from A to B (sweep of 14 Nov 2026, #8): the pick prompt is always in the page, empty until the hits come; what is sent is one tap away;
+   a busy Search stays focusable (aria-disabled) and looks it. */
+.ab-picking:empty { margin: 0; }
+.ab-sent { margin: 0 0 12px; }
+.ab-sent summary { min-height: 44px; padding: 11px 0; box-sizing: border-box; cursor: pointer; color: var(--blaze); font-weight: 600; }
+[data-plan-ab] .btn[aria-disabled='true'] { opacity: 0.6; cursor: progress; }
 /* Days that end where you can sleep (TRIP-DAY-STOPS): Change stop, its choices and Undo, each a full-size target. */
 .trip-stop-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .trip-stop-choices { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
