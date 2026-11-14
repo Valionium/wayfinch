@@ -1,12 +1,13 @@
 // More colours (wish 4, design of 14 Nov 2026): the DOM part of our own colour picker, served as /tools/bags/colours.js and loaded on
 // the first tap of Look's More colours, in place of the browser's colour input (Android's dialog broke its words over two lines).
 // A grid of 65 named colours: one radio group, one Tab stop, native radios named by their colour; the arrows move in two directions
-// (moveInGrid). It stores nothing: the page is told of each pick and keeps the colour as before, "#rrggbb" in lower case.
+// (moveInGrid). It stores nothing: the page is told of each pick and keeps the colour as before, "#rrggbb" in lower case. A colour from
+// before that is not in the grid gets a cell of its own, first: Keep my colour (the owner's ruling of 14 Nov 2026).
 import { contrastRatio, nearestSwatchName } from '../../core/bike/colour.ts';
 import { findMoreColour, MORE_COLOURS, MORE_COLUMNS, moveInGrid } from '../../core/bike/more-colours.ts';
 
-/** The words the grid shows; the page passes its own, from its bike wording table. */
-export type ColoursWords = { title: string; done: string; own: (name: string) => string };
+/** The words the grid shows; the page passes its own, from its bike wording table. With no `keep` (an older page), no Keep my colour cell. */
+export type ColoursWords = { title: string; done: string; own: (name: string) => string; keep?: string };
 export type ColoursOptions = {
   words: ColoursWords;
   /** The bike's colour now, or null. */
@@ -30,7 +31,10 @@ const CSS = `.wf-colours{margin-top:8px}
 .wf-colour input{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
 .wf-colour.on{outline:3px solid var(--blaze);outline-offset:2px}
 .wf-colour.on::after{content:'';position:absolute;left:50%;top:50%;width:9px;height:17px;margin:-12px 0 0 -5px;border:solid var(--tick);border-width:0 3px 3px 0;transform:rotate(45deg);box-sizing:border-box}
-.wf-colour:has(input:focus-visible){outline:3px solid var(--ink);outline-offset:2px}
+.wf-colour:has(input:focus-visible),.wf-colour-keep:has(input:focus-visible) .wf-colour{outline:3px solid var(--ink);outline-offset:2px}
+.wf-colour-keep{grid-column:1/-1;position:relative;display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;font-weight:600}
+.wf-colour-keep input{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+.wf-colour-keep .wf-colour{flex:none;width:52px}
 .wf-colours-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .wf-colours-done{min-height:44px;min-width:44px;margin-top:6px;padding:0 16px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;font:inherit;font-size:14px;cursor:pointer}
 .wf-colours-done:focus-visible{outline:2px solid var(--ink);outline-offset:2px}`;
@@ -79,6 +83,27 @@ export function openColours(box: HTMLElement, options: ColoursOptions): Colours 
     radios.push(radio);
     labels.push(label);
   }
+  // Keep my colour: made the first time a colour outside the grid is shown, then kept while the grid is open, so a rider who tries a
+  // grid colour can choose theirs again. It holds the last such colour shown (a photo's, picked while the grid is open, replaces it).
+  let keep: HTMLInputElement | null = null;
+  let keepCell: HTMLElement | null = null;
+  const keepFor = (hex: string): void => {
+    if (!keep) {
+      const label = el('label', 'wf-colour-keep');
+      keepCell = el('span', 'wf-colour');
+      keepCell.setAttribute('aria-hidden', 'true');
+      keep = el('input', '');
+      keep.type = 'radio';
+      keep.name = 'wfMoreColour';
+      const text = el('span', '');
+      text.textContent = options.words.keep ?? '';
+      label.append(keep, keepCell, text);
+      grid.prepend(label);
+    }
+    keep.value = hex;
+    keepCell!.style.setProperty('--c', hex);
+    keepCell!.style.setProperty('--tick', tickFor(hex));
+  };
   const done = el('button', 'wf-colours-done');
   done.type = 'button';
   done.textContent = options.words.done;
@@ -89,6 +114,11 @@ export function openColours(box: HTMLElement, options: ColoursOptions): Colours 
     const at = findMoreColour(current);
     radios.forEach((r, i) => { r.checked = i === at; labels[i]!.classList.toggle('on', i === at); });
     const hex = typeof current === 'string' && /^#[0-9a-fA-F]{6}$/.test(current) ? current.toLowerCase() : null;
+    if (hex && at < 0 && options.words.keep) keepFor(hex);
+    if (keep) {
+      keep.checked = at < 0 && hex === keep.value;
+      keepCell!.classList.toggle('on', keep.checked);
+    }
     dot.hidden = hex === null;
     dot.style.background = hex ?? '';
     name.textContent = at >= 0 ? MORE_COLOURS[at]!.name : hex ? options.words.own(nearestSwatchName(hex) ?? '') : '';
@@ -109,12 +139,17 @@ export function openColours(box: HTMLElement, options: ColoursOptions): Colours 
       return;
     }
     if (e.altKey || e.ctrlKey || e.metaKey) return;
-    const from = radios.indexOf(e.target as HTMLInputElement);
-    if (from < 0) return;
-    const to = moveInGrid(from, e.key);
+    // -1 is Keep my colour, before the first colour: Right or Down from it go to the first; Left from the first and Up from the first
+    // row come back to it; its other moves stay on it
+    const onKeep = keep !== null && e.target === keep;
+    const from = onKeep ? -1 : radios.indexOf(e.target as HTMLInputElement);
+    if (from < 0 && !onKeep) return;
+    let to = moveInGrid(from, e.key);
     if (to === null) return;
+    if (onKeep) to = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 0 : -1;
+    else if (keep && ((e.key === 'ArrowLeft' && from === 0) || (e.key === 'ArrowUp' && from < MORE_COLUMNS))) to = -1;
     e.preventDefault();
-    const radio = radios[to]!;
+    const radio = to < 0 ? keep! : radios[to]!;
     radio.focus();
     if (to === from && radio.checked) return;
     show(radio.value);
@@ -125,7 +160,7 @@ export function openColours(box: HTMLElement, options: ColoursOptions): Colours 
   return {
     root,
     show,
-    focus: () => (radios.find((r) => r.checked) ?? radios[0]!).focus(),
+    focus: () => (keep?.checked ? keep : radios.find((r) => r.checked) ?? radios[0]!).focus(),
     close: () => root.remove(),
   };
 }

@@ -3205,6 +3205,7 @@ const BIKE_WORDING={
   lookMore:{text:'More colours'},
   coloursDone:{text:'Done'},
   coloursOwn:{text:'Your own colour, close to {name}'},
+  coloursKeep:{text:'Keep my colour'},
   coloursFailed:{text:'More colours could not be opened. Reload the page and try again.'},
   lookPhoto:{text:'From a photo'},
   lookUndo:{text:'Undo'},
@@ -4079,7 +4080,7 @@ async function toggleLookColours(){
   if(LOOK_COLOURS || $('bikeDetailsBox').classList.contains('hidden'))return;
   if(LOOK_PHOTO){closeLookPhoto();renderLook();}
   LOOK_COLOURS=module.openColours($('lookColoursBox'),{
-    words:{title:bikeWord('lookMore'),done:bikeWord('coloursDone'),own:name=>bikeWord('coloursOwn',{name})},
+    words:{title:bikeWord('lookMore'),done:bikeWord('coloursDone'),own:name=>bikeWord('coloursOwn',{name}),keep:bikeWord('coloursKeep')},
     current:(currentLook()||{colour:null}).colour,
     onPick:(hex,settle)=>{if(!settle){lookPickerInput(hex);return;}clearTimeout(LOOK_PICKER_TIMER);LOOK_PICKER_TIMER=null;setLook({colour:String(hex).toLowerCase()});},
     onClose:()=>closeLookColours(true)});
