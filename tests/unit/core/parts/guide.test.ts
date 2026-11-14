@@ -217,3 +217,51 @@ test('[PG-LINKS] a part name is linked at its first mention only, and words that
   expect(linkSegments('pad adjuster, then the pad', [['pad adjuster', 'pad-adjuster'], ['pad', 'pads']]))
     .toEqual([{ text: 'pad adjuster', part: 'pad-adjuster' }, ', then the ', { text: 'pad', part: 'pads' }]);
 });
+
+// The owner's ruling of 14 November 2026: every card and Care task links the wheel the way the puncture card does (PR 161), at its first
+// mention that names the part, once a card; the puncture card keeps its two. Not the part, so never its link: "Wheel it to dry" (a verb),
+// a jockey wheel (the derailleur's), the wheel's quick release (a link of its own) and "not the wheel's" (that quick release, said short).
+const NOT_THE_WHEEL = /Wheel it\b|jockey wheels?\b|wheel's quick release|wheel quick releases?\b|not the wheel's/g;
+/** Where a step names the wheel itself: the start of each "wheel" or "wheels" that is a word of its own and none of the above. */
+const wheelMentions = (text: string): number[] => {
+  const not = [...text.matchAll(NOT_THE_WHEEL)].map((m) => [m.index, m.index + m[0].length] as const);
+  return [...text.matchAll(/\bwheels?\b/gi)].map((m) => m.index).filter((at) => !not.some(([a, b]) => at >= a && at < b));
+};
+const linkedAt = (text: string, step: Parameters<typeof linkSegments>[1]): { at: number; text: string; part: string }[] => {
+  let at = 0;
+  const out: { at: number; text: string; part: string }[] = [];
+  for (const seg of linkSegments(text, step)) {
+    if (typeof seg !== 'string') out.push({ at, text: seg.text, part: seg.part });
+    at += typeof seg === 'string' ? seg.length : seg.text.length;
+  }
+  return out;
+};
+test("[PG-WHEEL-LINKS] every card and Care task links the wheel at its first mention that names it, once a card (the puncture card keeps its two); every other link stays as it was", () => {
+  let cards = 0;
+  for (const it of [...ROAD_CARDS, ...CARE_TASKS]) {
+    const steps = STEP_PARTS[it.id]!;
+    const wheel = it.steps.flatMap((text, i) => linkedAt(text, steps[i]!).filter((l) => l.part === 'wheel').map((l) => ({ step: i, ...l })));
+    const named = it.steps.flatMap((text, i) => wheelMentions(text).map((at) => ({ step: i, at })));
+    if (it.id === 'puncture-tube') {
+      expect(wheel.map((l) => [l.step, l.text]), it.id).toEqual([[0, 'wheel'], [6, 'wheel']]);
+      continue;
+    }
+    if (named.length === 0) { expect(wheel, it.id).toEqual([]); continue; }
+    cards += 1;
+    expect(wheel.length, `${it.id}: one link`).toBe(1);
+    expect({ step: wheel[0]!.step, at: wheel[0]!.at }, `${it.id}: the first mention`).toEqual(named[0]);
+    expect(wheel[0]!.text, it.id).toMatch(/^wheels?$/);
+  }
+  expect(cards).toBe(21);
+  // no other link moves: each step's other links are the same with the wheel's entry and without it
+  let others = 0;
+  for (const it of [...ROAD_CARDS, ...CARE_TASKS]) {
+    STEP_PARTS[it.id]!.forEach((step, i) => {
+      const without = linkedAt(it.steps[i]!, step.filter(([, p]) => p !== 'wheel'));
+      expect(linkedAt(it.steps[i]!, step).filter((l) => l.part !== 'wheel'), `${it.id} ${i + 1}`).toEqual(without);
+      others += without.length;
+    });
+  }
+  // main's count before the ruling (93d2649): 289 links that are not the wheel
+  expect(others).toBe(289);
+});
