@@ -1,0 +1,90 @@
+/* How a bike is built (design of 14 November 2026, section 6): theme tokens only, so both themes follow; 320 px up with no sideways
+   scroll; from 760 px of page width the drawing and its words on the left, the parts list on the right (Explore). The bike view's palette: blaze for the
+   picked part, muted leaders, panel pills. */
+.bl { overflow-wrap: anywhere; max-width: 64rem; container-type: inline-size; }
+/* On a wide screen Tools lays its cards out in two columns: the page takes both. */
+.screen[data-screen='tools'] > .bl { grid-column: 1 / -1; }
+.bl-title { margin: 8px 0 4px; }
+.bl-title:focus { outline: none; }
+.bl-title:focus-visible { outline: 2px solid var(--blaze); outline-offset: 2px; }
+.bl-kind { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+.bl-kind select {
+  flex: 1 1 12rem; min-width: 0; max-width: 100%; min-height: 44px; padding: 6px 10px; border: 1px solid var(--muted); border-radius: 8px;
+  background: var(--ground); color: var(--ink); font: inherit;
+}
+.bl-add { margin: 0 0 8px; }
+.bl-add a { display: inline-flex; align-items: center; min-height: 44px; color: var(--blaze); font-weight: 600; }
+.bl-main { display: block; }
+.bl-left { min-width: 0; }
+@container (min-width: 760px) {
+  .bl-main { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; align-items: start; }
+}
+
+.bl-figure { margin: 4px 0 0; }
+.bl-canvas { position: relative; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: pointer; }
+.bl-canvas.bl-zoomed { touch-action: none; }
+.bl-svg { display: block; width: 100%; height: auto; }
+.bl-art { overflow: hidden; }
+.bl-extra { fill: none; stroke: var(--line); stroke-linecap: round; stroke-linejoin: round; }
+.bl-hot, .bl-halo { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.bl-hot { stroke: var(--blaze); }
+.bl-hot-fill { fill: var(--blaze); }
+.bl-halo { stroke: var(--blaze); opacity: 0.22; }
+.bl-halo-fill { fill: var(--blaze); }
+.bl-ring.bl-hot { fill: var(--panel); stroke-width: 1.2; }
+.bl-ring.bl-halo { fill: var(--blaze); stroke: none; }
+.bl-dash { stroke-dasharray: 2.2 1.6; }
+.bl-leader { stroke: var(--muted); stroke-width: 0.9; }
+.bl-dot { fill: var(--ink); }
+.bl-arrow line { stroke: var(--blaze); stroke-width: 2.25; stroke-linecap: round; }
+.bl-arrow polygon { fill: var(--blaze); }
+.bl-label { cursor: pointer; }
+.bl-tap { fill: transparent; cursor: pointer; }
+.bl-pill { fill: var(--panel); stroke: var(--line); stroke-width: 0.75; }
+.bl-label-hot .bl-pill { stroke: var(--blaze); stroke-width: 1.5; }
+.bl-label text { fill: var(--ink); font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
+.bl-label-hot text { fill: var(--blaze); }
+@media (prefers-reduced-motion: no-preference) {
+  .bl-hot, .bl-pill, .bl-label text { transition: stroke 150ms ease, fill 150ms ease; }
+}
+@media (forced-colors: active) {
+  .bl-hot, .bl-leader, .bl-arrow line { stroke: Highlight; }
+  .bl-hot-fill, .bl-dot, .bl-arrow polygon, .bl-label text { fill: CanvasText; }
+}
+.bl-zoom { display: flex; justify-content: flex-end; gap: 8px; padding: 4px 0 0; }
+.bl-zoom-btn { min-width: 44px; min-height: 44px; font-size: 1.1rem; }
+.bl-whole { font-size: 0.9375rem; }
+.bl-zoom-btn:disabled { opacity: 0.5; cursor: default; }
+
+.bl-entry { margin: 8px 0 16px; min-height: 5rem; }
+.bl-name { margin: 0 0 4px; font-size: 1.15rem; }
+.bl-tag { margin: 0 0 6px; }
+.bl-does { font-size: 1.0625rem; margin: 0 0 8px; }
+.bl-connects { font-size: 1rem; margin: 8px 0 6px; }
+.bl-links, .bl-parts { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.bl-link, .bl-part { min-height: 44px; border-radius: 22px; padding: 6px 14px; }
+.bl-part[aria-pressed='true'] { border: 2px solid var(--blaze); font-weight: 600; }
+.bl-hint { margin: 8px 0; }
+.bl-list h3 { margin: 8px 0 4px; }
+.bl-group h4 { font-size: 1rem; margin: 12px 0 6px; }
+
+/* Build-up (design 4): the switch, the step, its parts, Back and Next. One column: the step's words go under the drawing. */
+.bl-modes { display: flex; gap: 8px; margin: 0 0 8px; }
+.bl-mode { min-height: 44px; flex: 1 1 0; max-width: 12rem; }
+.bl-mode[aria-pressed='true'] { border: 2px solid var(--blaze); font-weight: 600; }
+@container (min-width: 760px) {
+  .bl-main.bl-main-build { display: block; max-width: 44rem; }
+}
+.bl-build { margin: 8px 0 0; }
+.bl-step { margin: 0 0 4px; font-size: 1.15rem; }
+.bl-line { font-size: 1.0625rem; margin: 0 0 8px; }
+.bl-built { margin: 0 0 8px; }
+.bl-steps { display: flex; gap: 8px; margin: 12px 0 0; }
+.bl-back, .bl-next { min-height: 44px; min-width: 6rem; }
+.bl-back:disabled { opacity: 0.5; cursor: default; }
+/* What the page shows for an answer the rider has not given, and the line that suggests zooming (review of PR 127/128). */
+.bl-shows { margin: 0 0 8px; }
+.bl-shows a { display: inline-flex; align-items: center; min-height: 44px; color: var(--blaze); font-weight: 600; }
+.bl-zoomhint { margin: 4px 0 0; font-size: 0.9375rem; text-align: right; }
+.bl-name:focus { outline: none; }
+.bl-name:focus-visible { outline: 2px solid var(--blaze); outline-offset: 2px; }
