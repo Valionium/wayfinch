@@ -27,7 +27,16 @@ async function tapInto(page: Page, link: ReturnType<Page['locator']>): Promise<v
   await link.click();
   await page.waitForURL(/\/tools\/bags\//);
   await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await openTile(page, 'bikeLookGroup');   // the Look tile (the owner, 14 Nov 2026: Bike details opens on its tiles)
   await expect(page.locator('#lookSwatches')).toBeVisible();
+}
+/** Since the tiles (the owner's answer of 14 Nov 2026, "All tiles at top"): a group opens from its tile; one already open goes back to the
+ *  tiles first, by its own Back to all details. */
+async function openTile(page: Page, id: string): Promise<void> {
+  const other = page.locator(`details.bd-group[open]:not(#${id}) .bd-back`);
+  if (await other.count()) await other.first().click();
+  const tile = page.locator(`#bikeTiles .bd-tile[aria-controls="${id}"]`);
+  if ((await tile.getAttribute('aria-expanded')) !== 'true') await tile.click();
 }
 /** More details, where the name and Save bike for next time / Update saved bike are. */
 async function moreDetails(page: Page): Promise<void> {
@@ -71,6 +80,7 @@ test('[BK-RETURN] from You: Add a bike, named and saved, then Escape: You at the
   await tapInto(page, page.getByRole('link', { name: 'Add your bike' }));
   await moreDetails(page);
   await page.locator('#bikeName').fill('Gravel');
+  await openTile(page, 'bikeLookGroup');
   await swatch(page, 'Orange').click();
   await page.locator('#bikeSave').click();
   await expect.poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('loadcheck:bikeProfiles')!) as { name: string }[]).map((b) => b.name))).toContain('Gravel');
@@ -157,6 +167,9 @@ test('[BK-RETURN] Add a bike, a name typed and not saved: Escape and a tap besid
   await tapInto(page, page.getByRole('link', { name: 'Add your bike' }));
   await moreDetails(page);
   await page.locator('#bikeName').fill('Gravel');
+  // Escape in the open Saved bikes tile goes back to the tiles first (the owner, 14 Nov 2026); the next one is the dialog's own
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#bikeLibraryPanel')).toBeHidden();
   await page.keyboard.press('Escape');
   await expect(page.locator('#bikeDetailsBox')).toBeVisible();
   await expect(page.locator('#bikeProfileStatus')).toContainText('Not saved yet');

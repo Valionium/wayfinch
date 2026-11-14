@@ -261,6 +261,7 @@ test('[BK-FORK-ZOOM] Look inside the bag planner: the same close-up', async ({ p
   await page.locator('#s1 button[data-to="2"]').click();
   await page.locator('#bikeDetailsOpen').click();
   await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await page.locator('#bikeTiles .bd-tile[aria-controls="bikeLookGroup"]').click();   // the Look tile (the owner, 14 Nov 2026)
   await page.locator('#bikeLookTitle').scrollIntoViewIfNeeded();
   await chooseForkColours(page);
 });
@@ -340,6 +341,7 @@ test('[BK-LOOK-BARE] Look inside the bag planner draws the plan\'s bike alone; t
   await plannedWithBags(page);
   await page.locator('#bikeDetailsOpen').click();
   await expect(page.locator('#bikeDetailsBox')).toBeVisible();
+  await page.locator('#bikeTiles .bd-tile[aria-controls="bikeLookGroup"]').click();   // the Look tile (the owner, 14 Nov 2026)
   await bikeAlone(page);
   await page.locator('#bikeDetailsClose').click();
   await expect(page.locator('#bikeDetailsBox')).toBeHidden();

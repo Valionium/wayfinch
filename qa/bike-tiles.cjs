@@ -1,6 +1,6 @@
 'use strict';
-// Bike details as tiles (the owner's wish of 14 Nov 2026): under More details, a grid of eight tiles of a word or two, each opening only
-// its own group of fields; brake type and brake fluid are details of the bike (Brakes and gears), not of the repair kit. Only the
+// Bike details as tiles (the owner's wishes of 14 Nov 2026, "All tiles at top"): Bike details opens on one grid of ten tiles of a word or
+// two, Quick start and Look among them, each opening only its own group; brake type and brake fluid are details of the bike (Brakes and gears), not of the repair kit. Only the
 // grouping and the opening change: every field keeps its id, its options, its label and the way it is read and saved.
 // The browser side (opening, focus, widths, themes, an old bike) is tests/e2e/app-bike-tiles.spec.ts. Nothing of the page is printed.
 const assert=require('node:assert/strict');
@@ -11,10 +11,12 @@ const html=app.html;
 const dlg=html.slice(html.indexOf('id="bikeDetailsBox"'),html.indexOf('id="maxWeightBox"'));
 const more=dlg.slice(dlg.indexOf('id="bikeMoreDetails"'));
 
-const TILES=[['bikeBrakesSection','Brakes and gears'],['bikeWheelsSection','Wheels and tyres'],['bikeFrameSection','Frame and fork'],
+const TILES=[['bikeQuickGroup','Quick start'],['bikeLookGroup','Look'],['bikeBrakesSection','Brakes and gears'],['bikeWheelsSection','Wheels and tyres'],['bikeFrameSection','Frame and fork'],
   ['bikeBoltsSection','Bolts and mounts'],['fitMeasureBox','Measurements'],['bikeMaxWeightSection','Weights'],['bikeRepairFields','Repair kit'],
   ['bikeLibraryPanel','Saved bikes']];
 const GROUPS={
+  bikeQuickGroup:[],   // its frame pictures and sizes are drawn by the page
+  bikeLookGroup:[],
   bikeBrakesSection:['bikeBrakes','bikeRimBrake','bikeBrakeFluid','bikeDrive','bikeShifting'],
   bikeWheelsSection:['bikeTyres','bikeValve','bikeFrontTyre','bikeRearTyre','bikeAxle'],
   bikeFrameSection:['fitSizeLetter','fitSizeNumber','fitSizeUnit','bikeSuspension'],
@@ -26,25 +28,33 @@ const GROUPS={
 };
 const controls=text=>[...text.matchAll(/<select\b[^>]*>[\s\S]*?<\/select>|<input\b[^>]*>|<textarea\b[^>]*>[\s\S]*?<\/textarea>/g)].map(m=>m[0]);
 const idOf=tag=>tag.match(/\sid="([^"]+)"/)[1];
-/** A group's own markup: from its <details> to the next group, the end of the form or the end of More details. */
+/** A group's own markup: from its <details> to the next group, More details, the start or the end of the form. */
 const panel=id=>{
-  const start=more.indexOf(`<details class="bike-tool-optional bd-group" id="${id}"`);
+  const start=dlg.indexOf(`<details class="bike-tool-optional bd-group" id="${id}"`);
   if(start<0)return '';
-  const ends=[more.indexOf('<details class="bike-tool-optional bd-group"',start+1),more.indexOf('</form>',start),more.indexOf('<form id="bikeProfileForm">',start)].filter(i=>i>start);
-  return more.slice(start,Math.min(...ends));
+  const ends=[dlg.indexOf('<details class="bike-tool-optional bd-group"',start+1),dlg.indexOf('id="bikeMoreDetails"',start),dlg.indexOf('</form>',start),dlg.indexOf('<form id="bikeProfileForm">',start)].filter(i=>i>start);
+  return dlg.slice(start,Math.min(...ends));
 };
 
-// [BK-TILES-GRID] eight tiles, each a button of a word or two that opens its own group; all of them before the groups, in More details
+// [BK-TILES-GRID] ten tiles, each a button of a word or two that opens its own group; the grid first in Bike details, before every group
 {
-  const tiles=[...more.matchAll(/<button type="button" class="bd-tile" aria-expanded="false" aria-controls="([^"]+)"><span class="bd-name">([^<]+)<\/span><span class="bd-state"[^>]*><\/span><\/button>/g)].map(m=>[m[1],m[2]]);
-  check(JSON.stringify(tiles)===JSON.stringify(TILES),'[BK-TILES-GRID] the eight tiles, in order, each naming its group: '+JSON.stringify(tiles));
+  // named by its group alone, its status as its description (review of PR 164, C1)
+  const tiles=[...dlg.matchAll(/<button type="button" class="bd-tile" aria-expanded="false" aria-controls="([^"]+)" aria-labelledby="bdName-\1" aria-describedby="bdState-\1"><span class="bd-name" id="bdName-\1">([^<]+)<\/span><span class="bd-state" id="bdState-\1"><\/span><\/button>/g)].map(m=>[m[1],m[2]]);
+  check(JSON.stringify(tiles)===JSON.stringify(TILES),'[BK-TILES-GRID] the ten tiles, in order, each naming its group: '+JSON.stringify(tiles));
   check(tiles.every(([,name])=>name.split(' ').length<=3),'[BK-TILES-GRID] each tile is a word or two');
-  const grid=more.indexOf('id="bikeTiles"');
-  check(grid>0 && TILES.every(([id])=>more.indexOf(`id="${id}"`)>grid),'[BK-TILES-GRID] the grid comes before every group');
-  // the tiles show as soon as Bike details opens (the owner, 14 Nov 2026): no wrapper to open first, a heading that says they are optional
-  check(/<section class="bike-more" id="bikeMoreDetails" aria-labelledby="bikeMoreTitle">\s*<h3 id="bikeMoreTitle">More details \(optional\)<\/h3>/.test(dlg) && !/<details[^>]*id="bikeMoreDetails"/.test(dlg),'[BK-TILES-GRID] the tiles show at once under the heading More details (optional), with no wrapper to open');
-  check(!more.slice(0,grid).replace(/<!--[\s\S]*?-->/g,'').includes('<details'),'[BK-TILES-GRID] nothing that can stay closed is around the grid');
-  check(more.slice(0,grid).includes('<p>Tap Use these bike details to plan with them. Saving the bike is optional; repair details can stay blank.</p>') && !dlg.includes('Choose Use these bike details to use them'),'[BK-TILES-GRID] the line before the tiles says plainly what to tap');
+  const grid=dlg.indexOf('id="bikeTiles"');
+  check(grid>0 && TILES.every(([id])=>dlg.indexOf(`id="${id}"`)>grid),'[BK-TILES-GRID] the grid comes before every group');
+  // all tiles at top (the owner, 14 Nov 2026): the grid is the first thing in the panel, nothing that can stay closed around it
+  check(/<section class="bike-profile-panel" id="bikeProfilePanel">\s*(<!--[\s\S]*?-->\s*)?<div class="bd-tiles" id="bikeTiles"/.test(dlg),'[BK-TILES-GRID] the grid is the first thing in Bike details');
+  check(!dlg.slice(0,grid).replace(/<!--[\s\S]*?-->/g,'').includes('<details') && !/<details[^>]*id="bikeMoreDetails"/.test(dlg),'[BK-TILES-GRID] nothing that can stay closed is around the grid');
+  check(/<details class="bike-tool-optional bd-group" id="bikeQuickGroup"[^>]*><summary>Quick start<\/summary>\s*<section class="bike-quick" id="bikeQuick"/.test(dlg) && /<details class="bike-tool-optional bd-group" id="bikeLookGroup"[^>]*><summary>Look<\/summary>\s*<section class="bike-look" id="bikeLook"/.test(dlg),'[BK-TILES-GRID] Quick start and Look are tiles of their own');
+  check(more.includes('<p>Tap Use these bike details to plan with them. Saving the bike is optional; repair details can stay blank.</p>') && !dlg.includes('Choose Use these bike details to use them'),'[BK-TILES-GRID] the line before the details says plainly what to tap');
+  // the status line and the bike-swap note are never inside a closed group: by the buttons, always shown
+  const status=dlg.indexOf('id="bikeProfileStatus"');
+  check(status>dlg.lastIndexOf('<details class="bike-tool-optional bd-group"') && status<dlg.indexOf('id="bikeApply"') && dlg.indexOf('id="bikeSwapNote"')>status && dlg.indexOf('id="bikeSwapUndo"')<dlg.indexOf('id="bikeApply"'),'[BK-TILES-GRID] the status line and the swap note sit by the buttons, outside every group');
+  // the dialog's own line under its title names what is there now, no heading it no longer has (review of PR 164, M2)
+  const sub=dlg.match(/<p id="bikeDetailsSummary">([^<]*)<\/p>/)?.[1];
+  check(sub==='Frame, look and more details, all optional' && !/today's details/i.test(dlg),'[BK-TILES-GRID] the line under Bike details: '+sub);
   for(const [id,name] of TILES){
     const p=panel(id);
     check(new RegExp(`^<details class="bike-tool-optional bd-group" id="${id}" aria-label="${name}"><summary>${name}</summary>`).test(p),`[BK-TILES-GRID] ${name} is a group closed by default, named as its tile`);
@@ -60,6 +70,7 @@ const panel=id=>{
   const repair=panel('bikeRepairFields');
   check(!repair.includes('id="bikeBrakes"') && !repair.includes('id="bikeBrakeFluid"') && panel('bikeBrakesSection').indexOf('id="bikeBrakeFluidField"')>panel('bikeBrakesSection').indexOf('id="bikeRimBrakeField"'),'[BK-TILES-GROUPS] Brake type and Brake fluid are under Brakes and gears, fluid after Rim brake type');
   check(Object.values(GROUPS).flat().length===34 && new Set(Object.values(GROUPS).flat()).size===34,'[BK-TILES-GROUPS] every one of the 34 fields is in one group');
+  check(panel('bikeQuickGroup').includes('id="fitStyleChoices"') && panel('bikeQuickGroup').includes('id="fitSizeChips"') && panel('bikeLookGroup').includes('id="lookSwatches"'),'[BK-TILES-GROUPS] Quick start holds the frame pictures and sizes, Look the colours');
   // the hints and the repair note go with their fields
   check(panel('bikeBoltsSection').includes('id="bikeRackMountsHint"') && panel('bikeWheelsSection').includes('id="bikeAxleHint"') && panel('bikeBrakesSection').includes('id="bikeBrakeFluidHint"'),'[BK-TILES-GROUPS] each hint sits with its field');
   check(panel('bikeRepairFields').includes('data-info="How a bike profile updates the kit"'),'[BK-TILES-GROUPS] the repair parts note is in Repair kit');
@@ -77,5 +88,16 @@ const panel=id=>{
 {
   check(app.run('bikeTileStatus(0,5)')==='Not set' && app.run('bikeTileStatus(2,5)')==='2 of 5 set' && app.run('bikeTileStatus(5,5)')==='5 of 5 set','[BK-TILES-STATUS] Not set, or n of m set');
   check(app.run('bikeSavedStatus(0)')==='None saved' && app.run('bikeSavedStatus(1)')==='1 saved' && app.run('bikeSavedStatus(3)')==='3 saved','[BK-TILES-STATUS] Saved bikes: None saved, or n saved');
+  // only what is saved counts (review of PR 164, M3): what the maximum weight includes is kept only with a maximum weight, and its
+  // Not sure is a Not sure like every other
+  const set=(id,v)=>{app.context.document.getElementById(id).value=v;};
+  const weights=()=>JSON.parse(app.run("JSON.stringify(bikeTileCount('bikeMaxWeightSection'))"));
+  set('fitMaxWeight','');set('fitMaxIncludes','bike');set('bikeBaseKg','');
+  check(JSON.stringify(weights())==='[0,3]','[BK-TILES-STATUS] what it includes, without a maximum weight, counts nothing: '+JSON.stringify(weights()));
+  set('fitMaxWeight','120');
+  check(JSON.stringify(weights())==='[2,3]','[BK-TILES-STATUS] with a maximum weight it counts');
+  set('fitMaxIncludes','unsure');
+  check(JSON.stringify(weights())==='[1,3]','[BK-TILES-STATUS] Not sure counts as not set');
+  set('fitMaxWeight','');set('fitMaxIncludes','');
 }
 console.log(JSON.stringify({suite:'bike-tiles',checks}));

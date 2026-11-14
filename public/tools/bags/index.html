@@ -2319,19 +2319,35 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
 </div>
 <div id="bikeDetailsBox" class="bike-dialog-box bike-details-box hidden" role="dialog" aria-modal="true" aria-labelledby="bikeDetailsTitle">
   <section class="bike-dialog-card">
-    <header class="bike-dialog-head"><div><h2 id="bikeDetailsTitle" tabindex="-1">Bike details</h2><p id="bikeDetailsSummary">Frame, maximum weight and today's details</p><a class="linky hidden" id="bikeDetailsBack" href="/#/you"></a></div><button type="button" id="bikeDetailsClose" aria-label="Close bike details">×</button></header>
+    <header class="bike-dialog-head"><div><h2 id="bikeDetailsTitle" tabindex="-1">Bike details</h2><p id="bikeDetailsSummary">Frame, look and more details, all optional</p><a class="linky hidden" id="bikeDetailsBack" href="/#/you"></a></div><button type="button" id="bikeDetailsClose" aria-label="Close bike details">×</button></header>
     <div class="bike-dialog-body" id="bikeDetailsBody">
     <section class="bike-profile-panel" id="bikeProfilePanel">
+      <!-- The owner's wishes of 14 Nov 2026 ("All tiles at top"): Bike details opens on one grid of tiles of a word or two, all on one
+           screen at 320 px; a tap opens only that group (a closed <details>, its summary hidden: the tile is its button), Back to all
+           details or Escape closes it. -->
+      <div class="bd-tiles" id="bikeTiles" role="group" aria-label="Bike details">
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeQuickGroup" aria-labelledby="bdName-bikeQuickGroup" aria-describedby="bdState-bikeQuickGroup"><span class="bd-name" id="bdName-bikeQuickGroup">Quick start</span><span class="bd-state" id="bdState-bikeQuickGroup"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeLookGroup" aria-labelledby="bdName-bikeLookGroup" aria-describedby="bdState-bikeLookGroup"><span class="bd-name" id="bdName-bikeLookGroup">Look</span><span class="bd-state" id="bdState-bikeLookGroup"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeBrakesSection" aria-labelledby="bdName-bikeBrakesSection" aria-describedby="bdState-bikeBrakesSection"><span class="bd-name" id="bdName-bikeBrakesSection">Brakes and gears</span><span class="bd-state" id="bdState-bikeBrakesSection"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeWheelsSection" aria-labelledby="bdName-bikeWheelsSection" aria-describedby="bdState-bikeWheelsSection"><span class="bd-name" id="bdName-bikeWheelsSection">Wheels and tyres</span><span class="bd-state" id="bdState-bikeWheelsSection"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeFrameSection" aria-labelledby="bdName-bikeFrameSection" aria-describedby="bdState-bikeFrameSection"><span class="bd-name" id="bdName-bikeFrameSection">Frame and fork</span><span class="bd-state" id="bdState-bikeFrameSection"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeBoltsSection" aria-labelledby="bdName-bikeBoltsSection" aria-describedby="bdState-bikeBoltsSection"><span class="bd-name" id="bdName-bikeBoltsSection">Bolts and mounts</span><span class="bd-state" id="bdState-bikeBoltsSection"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="fitMeasureBox" aria-labelledby="bdName-fitMeasureBox" aria-describedby="bdState-fitMeasureBox"><span class="bd-name" id="bdName-fitMeasureBox">Measurements</span><span class="bd-state" id="bdState-fitMeasureBox"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeMaxWeightSection" aria-labelledby="bdName-bikeMaxWeightSection" aria-describedby="bdState-bikeMaxWeightSection"><span class="bd-name" id="bdName-bikeMaxWeightSection">Weights</span><span class="bd-state" id="bdState-bikeMaxWeightSection"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeRepairFields" aria-labelledby="bdName-bikeRepairFields" aria-describedby="bdState-bikeRepairFields"><span class="bd-name" id="bdName-bikeRepairFields">Repair kit</span><span class="bd-state" id="bdState-bikeRepairFields"></span></button>
+        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeLibraryPanel" aria-labelledby="bdName-bikeLibraryPanel" aria-describedby="bdState-bikeLibraryPanel"><span class="bd-name" id="bdName-bikeLibraryPanel">Saved bikes</span><span class="bd-state" id="bdState-bikeLibraryPanel"></span></button>
+      </div>
+      <details class="bike-tool-optional bd-group" id="bikeQuickGroup" aria-label="Quick start"><summary>Quick start</summary>
       <section class="bike-quick" id="bikeQuick" aria-labelledby="bikeQuickTitle">
         <h3 id="bikeQuickTitle">Your frame</h3>
         <p class="hint">Two taps: the picture that looks most like your frame, then its size. Skip anything you do not know.</p>
         <fieldset class="fit-styles"><legend>Frame style</legend><div id="fitStyleChoices"></div></fieldset>
         <fieldset class="fit-sizes"><legend>Frame size</legend><div id="fitSizeChips"></div></fieldset>
         <div class="fit-quick-result" id="fitQuickResult" role="status" aria-live="polite"></div>
-        <div class="bike-profile-status" id="bikeProfileStatus" role="status" aria-live="polite"></div>
-        <p class="bike-swap hidden" id="bikeSwapNote" role="status"></p>
-        <div class="bike-profile-actions"><button class="linky hidden" id="bikeSwapUndo" type="button"></button></div>
       </section>
+        <button type="button" class="linky bd-back" data-panel="bikeQuickGroup">Back to all details</button>
+      </details>
+      <details class="bike-tool-optional bd-group" id="bikeLookGroup" aria-label="Look"><summary>Look</summary>
       <section class="bike-look" id="bikeLook" aria-labelledby="bikeLookTitle">
         <h3 id="bikeLookTitle" tabindex="-1">Look</h3>
         <p class="hint" id="lookHint"></p>
@@ -2369,22 +2385,10 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         <p class="look-status" id="lookStatus" role="status" aria-live="polite"></p>
         <button type="button" class="linky hidden" id="lookUndo"></button>
       </section>
-      <!-- the tiles show as soon as Bike details opens (the owner, 14 Nov 2026): no wrapper to open first -->
-      <section class="bike-more" id="bikeMoreDetails" aria-labelledby="bikeMoreTitle">
-      <h3 id="bikeMoreTitle">More details (optional)</h3>
+        <button type="button" class="linky bd-back" data-panel="bikeLookGroup">Back to all details</button>
+      </details>
+      <section class="bike-more" id="bikeMoreDetails" aria-label="More details">
       <p>Tap Use these bike details to plan with them. Saving the bike is optional; repair details can stay blank.</p>
-      <!-- The owner's wish of 14 Nov 2026: the details as tiles of a word or two, all on one screen; a tap opens only that group's
-           fields (each group a closed <details>, its summary hidden: the tile is its button), Back to all details closes it. -->
-      <div class="bd-tiles" id="bikeTiles" role="group" aria-label="Bike details">
-        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeBrakesSection"><span class="bd-name">Brakes and gears</span><span class="bd-state"></span></button>
-        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeWheelsSection"><span class="bd-name">Wheels and tyres</span><span class="bd-state"></span></button>
-        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeFrameSection"><span class="bd-name">Frame and fork</span><span class="bd-state"></span></button>
-        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeBoltsSection"><span class="bd-name">Bolts and mounts</span><span class="bd-state"></span></button>
-        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="fitMeasureBox"><span class="bd-name">Measurements</span><span class="bd-state"></span></button>
-        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeMaxWeightSection"><span class="bd-name">Weights</span><span class="bd-state"></span></button>
-        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeRepairFields"><span class="bd-name">Repair kit</span><span class="bd-state"></span></button>
-        <button type="button" class="bd-tile" aria-expanded="false" aria-controls="bikeLibraryPanel"><span class="bd-name">Saved bikes</span><span class="bd-state"></span></button>
-      </div>
       <details class="bike-tool-optional bd-group" id="bikeLibraryPanel" aria-label="Saved bikes"><summary>Saved bikes</summary>
         <label for="bikeName">Bike name<input id="bikeName" type="text" maxlength="100" placeholder="A name for reuse"></label>
         <label for="bikeSavedSelect">Saved bikes</label><select id="bikeSavedSelect"><option value="">Choose a saved bike…</option></select>
@@ -2478,6 +2482,9 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
         <p>Check repair parts against the manufacturer's compatibility information. <span data-info="How a bike profile updates the kit">These references do not verify that a part fits. Check your actual tube, pads, chain/link and hanger against the manufacturer’s compatibility information. Saving updates untouched starting-list items; your manual kit choices stay yours.</span></p>
         <button type="button" class="linky bd-back" data-panel="bikeRepairFields">Back to all details</button>
       </details>
+      <div class="bike-profile-status" id="bikeProfileStatus" role="status" aria-live="polite"></div>
+      <p class="bike-swap hidden" id="bikeSwapNote" role="status"></p>
+      <div class="bike-profile-actions"><button class="linky hidden" id="bikeSwapUndo" type="button"></button></div>
       <div class="bike-profile-actions"><button class="go small" id="bikeApply" type="button">Use these bike details</button><button class="kitact" id="bikeSave" type="submit">Save bike for next time</button><button class="linky" id="bikeClear" type="button">Use no bike profile</button></div>
       </form>
       <p>Saved on this device and included in Export / Import. Each saved setup keeps its own copy, so editing a bike will not alter an older trip.</p>
@@ -3266,9 +3273,33 @@ const BIKE_TILE_HIDE={fitTopTube:'fitTopTubeField',bikeRimBrake:'bikeRimBrakeFie
 function bikeTileStatus(done,total){return done ? `${done} of ${total} set` : 'Not set';}
 function bikeSavedStatus(count){return count ? `${count} saved` : 'None saved';}
 function bikeTileCount(panel){
+  // Quick start: the frame's style and its size; Look: its colour, handlebar and e-bike, as the drawing shows them
+  if(panel==='bikeQuickGroup')return [(fitFormStyle()!=='unknown' ? 1 : 0)+(fitText('fitSizeLetter')!=='' || fitText('fitSizeNumber')!=='' ? 1 : 0),2];
+  if(panel==='bikeLookGroup'){const look=currentLook() || {};return [['colour','bars','ebike'].filter(k=>look[k]!==null && look[k]!==undefined).length,3];}
   const shown=(BIKE_TILE_FIELDS[panel]||[]).filter(ids=>!ids.every(id=>BIKE_TILE_HIDE[id] && $(BIKE_TILE_HIDE[id]).classList.contains('hidden')));
-  const set=shown.filter(ids=>ids.some(id=>{const v=String($(id).value ?? '').trim();return v!=='' && v!=='unknown';}));
+  // only what is saved counts: what the maximum weight includes is kept only with a maximum weight, and its Not sure is a Not sure
+  const answered=id=>{const v=String($(id).value ?? '').trim();
+    return id==='fitMaxIncludes' ? v!=='' && v!=='unsure' && String($('fitMaxWeight').value ?? '').trim()!=='' : v!=='' && v!=='unknown';};
+  const set=shown.filter(ids=>ids.some(answered));
   return [set.length,shown.length];
+}
+// The field a refused entry is in (review of PR 164, I2): its tile opens and the field takes the focus, so the message's "above" is there.
+function bikeIssueField(issue){
+  const W=BIKE_WORDING;
+  if(issue===W.weightIncludes.text)return 'fitMaxIncludes';
+  if(issue===W.weightNumber.text || issue===W.weightRange.text || /^Did you mean/.test(issue))return 'fitMaxWeight';
+  if(issue===W.seatGap.text)return 'fitSeatGap';
+  if(issue===W.barWidth.text)return 'fitBarWidth';
+  if([W.triangleAll.text,W.triangleRange.text,W.triangle.text].includes(issue))
+    return ['fitTriTop','fitTriSeat','fitTriDown'].find(id=>{const t=fitText(id),v=t==='' ? null : readDecimal(t);return v===null || v<15 || v>90;}) || 'fitTriTop';
+  if(/bike-weight/.test(issue))return BIKE_WEIGHT_INPUT;
+  return fitText('fitSizeNumber')!=='' ? 'fitSizeNumber' : null;   // the frame number's own messages come first
+}
+function showBikeIssue(issue){
+  const id=bikeIssueField(issue);if(!id)return;
+  const group=$(id).closest?.('details.bd-group');
+  if(group)openBikeTile(group.id,false);
+  $(id).focus();
 }
 function renderBikeTiles(){
   const tiles=[...document.querySelectorAll('#bikeTiles .bd-tile')];
@@ -3297,12 +3328,23 @@ function initialiseBikeTiles(){
     const panel=tile.getAttribute('aria-controls');
     if($(panel).open)closeBikeTile(panel);else openBikeTile(panel);
   });
-  $('bikeMoreDetails').addEventListener('click',event=>{const back=event.target.closest?.('.bd-back');if(back)closeBikeTile(back.dataset.panel);});
+  const panel=$('bikeProfilePanel');   // the grid, Quick start, Look and the details
+  panel.addEventListener('click',event=>{const back=event.target.closest?.('.bd-back');if(back)closeBikeTile(back.dataset.panel);});
   document.querySelectorAll('details.bd-group').forEach(group=>group.addEventListener('toggle',()=>{
     if(group.open)document.querySelectorAll('details.bd-group').forEach(other=>{if(other!==group && other.open)other.open=false;});
+    // Look lays out its drawing by measuring it, which a closed group cannot: it draws again once open
+    if(group.open && group.id==='bikeLookGroup')renderLook();
     renderBikeTiles();
   }));
-  for(const type of ['input','change'])$('bikeMoreDetails').addEventListener(type,renderBikeTiles);
+  for(const type of ['input','change','click'])panel.addEventListener(type,()=>{if(!$('bikeDetailsBox').classList.contains('hidden'))renderBikeTiles();});
+  // Escape inside an open tile closes that tile, the focus back on it, before the dialog's own Escape (review of PR 164, M4)
+  panel.addEventListener('keydown',event=>{
+    if(event.key!=='Escape' || event.defaultPrevented)return;
+    const group=event.target.closest?.('details.bd-group[open]'),tile=event.target.closest?.('.bd-tile[aria-expanded="true"]');
+    const panel=group ? group.id : tile ? tile.getAttribute('aria-controls') : null;
+    if(!panel)return;
+    event.preventDefault();event.stopPropagation();closeBikeTile(panel);
+  });
   // an entry the browser rejects on Save is shown in its group, so the browser can point at it
   $('bikeProfileForm').addEventListener('invalid',event=>{const group=event.target.closest?.('details.bd-group');if(group && !group.open)openBikeTile(group.id,false);},true);
   renderBikeTiles();
@@ -3657,7 +3699,7 @@ function bikeEditorIssue(){
 async function applyBikeDetails(){
   if(BIKE_PROFILE_BUSY || !DRAFT_READY)return false;
   const issue=bikeEditorIssue();
-  if(issue){BIKE_PROFILE_MESSAGE=issue;renderBikeProfiles();return false;}
+  if(issue){BIKE_PROFILE_MESSAGE=issue;renderBikeProfiles();showBikeIssue(issue);return false;}
   BIKE_PROFILE_BUSY=true;BIKE_FORM_DIRTY=false;useBikeProfile(readBikeProfileEditor());
   let saved=false;try{saved=await persistBikeProfileSelection();}catch(e){}
   BIKE_PROFILE_BUSY=false;
@@ -3666,8 +3708,9 @@ async function applyBikeDetails(){
 }
 async function saveBikeProfile(event){
   event?.preventDefault();if(BIKE_PROFILE_BUSY || !DRAFT_READY || freePlayWaits('bikes'))return false;
-  if(!$('bikeName').value.trim()){BIKE_PROFILE_MESSAGE='Give this bike a name before saving.';renderBikeProfiles();$('bikeName').focus({preventScroll:true});return false;}
-  const issue=bikeEditorIssue();if(issue){BIKE_PROFILE_MESSAGE=issue;renderBikeProfiles();return false;}
+  // the name is under Saved bikes, so that tile opens on it (review of PR 164, M1)
+  if(!$('bikeName').value.trim()){BIKE_PROFILE_MESSAGE='Give this bike a name before saving.';renderBikeProfiles();openBikeTile('bikeLibraryPanel',false);$('bikeName').focus();return false;}
+  const issue=bikeEditorIssue();if(issue){BIKE_PROFILE_MESSAGE=issue;renderBikeProfiles();showBikeIssue(issue);return false;}
   const p=readBikeProfileEditor();if(!p)return false;
   const index=BIKE_PROFILES.findIndex(b=>b.id===p.id);
   if(index<0 && BIKE_PROFILES.length>=MAX_BIKE_PROFILES){BIKE_PROFILE_MESSAGE='You have 20 saved bikes. Update or remove one before adding another.';renderBikeProfiles();return false;}
@@ -4319,7 +4362,9 @@ function openBikeDetailsFromLink(hash=location.hash){
   const [href,key]=BIKE_BACKS[link.back];
   if(!inThisPage(href))setWayfinchBack(href);   // the Gear advisor is in this page: Back to Wayfinch keeps going to Wayfinch
   $('bikeDetailsBack').href=href;$('bikeDetailsBack').textContent=bikeWord(key);$('bikeDetailsBack').classList.remove('hidden');
-  openBikeDetails($('rigBikeDetails'),link.section==='look' ? 'look' : 'frame');
+  // Look by its link; a new bike at Quick start, its frame and size (the owner's ruling of 9 Nov 2026); a bike of the rider's, every tile
+  const start=link.section==='look' ? 'look' : link.id==='new' ? 'quick' : 'tiles';
+  openBikeDetails($('rigBikeDetails'),start);
   LINK_BIKE=true;LINK_ADDS=false;
   if(plan)fillBikeProfileForm(plan);
   else if(saved){fillBikeProfileForm(saved);$('bikeSavedSelect').value=saved.id;}
@@ -4329,7 +4374,7 @@ function openBikeDetailsFromLink(hash=location.hash){
   else fillBikeProfileForm(S.bikeProfile);
   renderBikeProfiles();
   rememberLookOpening();renderLook();
-  if(link.section==='look'){$('bikeLook').scrollIntoView?.({block:'start'});$('bikeLookTitle').focus({preventScroll:true});}
+  startBikeDetails(start);   // again, on the bike the form now holds
   return true;
 }
 function openBikeDetails(opener=document.activeElement,section='frame'){
@@ -4344,12 +4389,22 @@ function openBikeDetails(opener=document.activeElement,section='frame'){
     $('bikeDetailsTitle').focus({preventScroll:true});
     rememberLookOpening();renderLook();
   }
-  if(section==='look'){$('bikeLook').scrollIntoView?.({block:'start'});$('bikeLookTitle').focus({preventScroll:true});}
-  if(section==='repair'){
-    // the repair details are spread over the tiles now (the owner's wish of 14 Nov 2026): every tile shows, the focus on the first
-    document.querySelectorAll('details.bd-group').forEach(group=>{group.open=false;});renderBikeTiles();
-    $('bikeTiles').scrollIntoView?.({block:'start'});document.querySelector('#bikeTiles .bd-tile')?.focus({preventScroll:true});
+  startBikeDetails(section);
+}
+/* Where Bike details starts (the owner's answer of 14 Nov 2026, "All tiles at top"): the tile a way in is about, the focus on its first
+   field (Look on its heading, as before); with nothing in particular meant (the rig, Kit's Review bike details, an existing bike from
+   Wayfinch), every tile, the focus on the first. */
+const BIKE_START_GROUPS={look:'bikeLookGroup',quick:'bikeQuickGroup',weights:'bikeMaxWeightSection'};
+function startBikeDetails(section){
+  const group=BIKE_START_GROUPS[section];
+  if(group){
+    openBikeTile(group,section!=='look');
+    if(section==='look')$('bikeLookTitle').focus({preventScroll:true});
+    $('bikeTiles').scrollIntoView?.({block:'nearest'});
+    return;
   }
+  document.querySelectorAll('details.bd-group').forEach(other=>{other.open=false;});renderBikeTiles();
+  $('bikeTiles').scrollIntoView?.({block:'nearest'});document.querySelector('#bikeTiles .bd-tile')?.focus({preventScroll:true});
 }
 // Typed details not saved yet (name, tyres, weight, measurements, repair notes): Save, Use or a Look tap saves the form (review M1).
 let BIKE_FORM_DIRTY=false;
@@ -6591,7 +6646,7 @@ function renderFitLines(){
     if(show && !line.dataset.filled){
       line.innerHTML = `${htmlEsc(before())} <button class="linky" type="button" id="${add}" aria-haspopup="dialog" aria-controls="bikeDetailsBox">${htmlEsc(bikeWord('fitAdd'))}</button> ${htmlEsc(after())}`;
       line.dataset.filled = '1';
-      const button = $(add); if(button) button.onclick = () => openBikeDetails(button);
+      const button = $(add); if(button) button.onclick = () => openBikeDetails(button,'quick');   // Add your bike: its frame and size
     }
     line.hidden = !show;
     // a bike saved in Bike details opened from here hides the line: closing it puts the focus on what stays
@@ -12217,7 +12272,7 @@ function renderResult(){
     if($('impMsg')) $('impMsg').textContent = msg;
   };
   if($('maxWeightChange')) $('maxWeightChange').onclick = () => openMaxWeight($('maxWeightChange'));
-  if($('bikeDetailsFromWeight')) $('bikeDetailsFromWeight').onclick = () => openBikeDetails($('bikeDetailsFromWeight'));
+  if($('bikeDetailsFromWeight')) $('bikeDetailsFromWeight').onclick = () => openBikeDetails($('bikeDetailsFromWeight'),'weights');
   if($('bagsOwnKg')) $('bagsOwnKg').onchange = e => {
     const ok = commitBagsOwnKg(e.target.value);
     if(ok) renderResult();

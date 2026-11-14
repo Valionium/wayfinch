@@ -67,8 +67,10 @@ test('[HINT-SMALL] Make it yours opens Bike details at Your frame (frame style a
   app = await loadApp(page);
   await page.getByRole('region', { name: 'Design your bike' }).getByRole('link', { name: 'Make it yours' }).click();
   await expect(page).toHaveURL(`${app.origin}/tools/bags/`);
-  // The owner's ruling of 9 Nov 2026: "Open it at size and frame type". Bike details opens at its top, Your frame, not at Look.
-  await expect(page.locator('#bikeDetailsTitle')).toBeFocused();
+  // The owner's ruling of 9 Nov 2026: "Open it at size and frame type". Bike details opens at its top, Your frame, not at Look; since
+  // the tiles (the owner, 14 Nov 2026) that is the Quick start tile, the focus on its first frame picture.
+  await expect(page.locator('#bikeTiles .bd-tile[aria-controls="bikeQuickGroup"]')).toHaveAttribute('aria-expanded', 'true');
+  expect(await page.evaluate(() => document.getElementById('bikeQuickGroup')!.contains(document.activeElement))).toBe(true);
   for (const part of [page.locator('#bikeQuickTitle'), page.getByRole('group', { name: 'Frame style' }), page.getByRole('group', { name: 'Frame size' })]) await expect(part).toBeInViewport();
   await expect(page.locator('#bikeLookTitle')).not.toBeFocused();
   await page.goto(`${app.origin}/#/trip`, { waitUntil: 'domcontentloaded' });
@@ -148,7 +150,10 @@ test('[FIT-LINE] the Bag planner and the Gear advisor with no bike: a line under
   expect(await noSideways(page)).toBe(true);
   await add.click();
   await expect(page.locator('#bikeDetailsBox')).toBeVisible();
-  await expect(page.locator('#bikeDetailsTitle')).toBeFocused();
+  // Add your bike opens the Quick start tile, the focus in it (the owner, 14 Nov 2026); Escape goes back to the tiles, the next one closes
+  expect(await page.evaluate(() => document.getElementById('bikeQuickGroup')!.contains(document.activeElement))).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#bikeTiles .bd-tile[aria-controls="bikeQuickGroup"]')).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.locator('#bikeDetailsBox')).toBeHidden();
   await expect(add).toBeFocused();
@@ -230,7 +235,9 @@ test('[HINT-COLOUR] five dots of 44 px in a row the card keeps, nothing moves wh
   await card.getByRole('link', { name: 'Make it yours' }).click();
   await page.waitForURL(/\/tools\/bags\//);
   await expect(page.locator('#bikeDetailsBox')).toBeVisible();
-  // Teal is picked in Look, on the drawing there, and nothing is saved until the rider saves
+  // Teal is picked in Look, on the drawing there, and nothing is saved until the rider saves (Look is a tile of its own since 14 Nov 2026)
+  await page.locator('#bikeQuickGroup .bd-back').click();
+  await page.locator('#bikeTiles .bd-tile[aria-controls="bikeLookGroup"]').click();
   await expect(page.locator('#lookSwatches input:checked')).toHaveCount(1);
   expect(await page.locator('#lookSwatches label:has(input:checked)').innerText()).toMatch(/Teal/);
   expect(await page.evaluate(() => localStorage.getItem('loadcheck:bikeProfiles'))).toBeNull();
