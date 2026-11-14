@@ -1,7 +1,8 @@
 import { defineConfig } from '@playwright/test';
+import type { Project } from '@playwright/test';
 
 // Chromium for the handover tests (sub-project 4), and the app's own projects below (sub-project 5).
-// No retries: a flaky handover is a finding, not noise. List reporter only, and no page dumps (the page isn't printed).
+// No retries: a flaky handover is a finding, not noise. List reporter only, and no page dumps in the log (the page isn't printed).
 const APP_SPECS = /app-.*\.spec\.ts/;
 // The wide-screen tests (Task 22, and the bag planner's of sub-project 6) set their own window sizes; they run in the two projects
 // below, in Chromium and in Firefox.
@@ -9,6 +10,18 @@ const WIDE = /app-wide(-planner)?\.spec\.ts/;
 // Budgets (§4.5) are timed on the phone stand-in alone, after every other project: three other browsers on the same machine are not a phone.
 const BUDGETS = /\[PERF-/;
 const FUNCTIONAL = ['chromium-phone', 'chromium-laptop', 'app-phone', 'app-phone-light', 'app-laptop', 'app-laptop-light', 'app-wide', 'app-wide-firefox'];
+// In CI a failed test of the app's own projects keeps its trace and a screenshot in test-results, which the pull-request workflow
+// uploads: a flake that never shows on a laptop can be read afterwards. Not the budgets (they are timed) and not the handover tests.
+// The trace has every step with its time and log, the console, the requests and the screen as a film, but no page snapshots: those
+// are taken inside the page, and on the phone stand-in (processor at a quarter) they made part 1/4 run 34 % longer, past its limit.
+// A trace holds the pages it saw, the bag planner's too: read one without printing that page's lines 20-25 (AGENTS.md).
+const KEEP_FAILED = process.env.CI ? { trace: { mode: 'retain-on-failure', snapshots: false, screenshots: true }, screenshot: 'only-on-failure' } as const : {};
+// In CI the two phone projects run in parts of their own, one test at a time on the machine (the owner's choice of 15 November 2026):
+// on a machine shared with a second worker, a slowed page sometimes stopped answering for the rest of its test (AH-EMERGENCY,
+// AH-CALL-CONFIRM, AH-NO-AUTO-POS, PRIV-NOTHING-SENT; never on a laptop). The other parts set WAYFINCH_PHONE_APART and leave them out.
+const PHONE = ['app-phone', 'app-phone-light'];
+const phoneApart = process.env.WAYFINCH_PHONE_APART === '1';
+const apart = (projects: Project[]): Project[] => projects.filter((p) => !(phoneApart && PHONE.includes(p.name ?? '')));
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -25,17 +38,17 @@ export default defineConfig({
     trace: 'off',
     video: 'off',
   },
-  projects: [
+  projects: apart([
     { name: 'chromium-phone', testIgnore: APP_SPECS, use: { viewport: { width: 360, height: 640 } } },
     { name: 'chromium-laptop', testIgnore: APP_SPECS, use: { viewport: { width: 1280, height: 720 } } },
     // The app: the phone stand-in (360 x 640, the processor slowed to a quarter, §4.5), a laptop, each in both themes.
-    { name: 'app-phone', testMatch: APP_SPECS, testIgnore: WIDE, grepInvert: BUDGETS, metadata: { cpuThrottle: 4 }, use: { viewport: { width: 360, height: 640 }, colorScheme: 'dark' } },
-    { name: 'app-phone-light', testMatch: APP_SPECS, testIgnore: WIDE, grepInvert: BUDGETS, metadata: { cpuThrottle: 4 }, use: { viewport: { width: 360, height: 640 }, colorScheme: 'light' } },
-    { name: 'app-laptop', testMatch: APP_SPECS, testIgnore: WIDE, grepInvert: BUDGETS, use: { viewport: { width: 1280, height: 720 }, colorScheme: 'dark' } },
-    { name: 'app-laptop-light', testMatch: APP_SPECS, testIgnore: WIDE, grepInvert: BUDGETS, use: { viewport: { width: 1280, height: 720 }, colorScheme: 'light' } },
+    { name: 'app-phone', testMatch: APP_SPECS, testIgnore: WIDE, grepInvert: BUDGETS, metadata: { cpuThrottle: 4 }, use: { ...KEEP_FAILED, viewport: { width: 360, height: 640 }, colorScheme: 'dark' } },
+    { name: 'app-phone-light', testMatch: APP_SPECS, testIgnore: WIDE, grepInvert: BUDGETS, metadata: { cpuThrottle: 4 }, use: { ...KEEP_FAILED, viewport: { width: 360, height: 640 }, colorScheme: 'light' } },
+    { name: 'app-laptop', testMatch: APP_SPECS, testIgnore: WIDE, grepInvert: BUDGETS, use: { ...KEEP_FAILED, viewport: { width: 1280, height: 720 }, colorScheme: 'dark' } },
+    { name: 'app-laptop-light', testMatch: APP_SPECS, testIgnore: WIDE, grepInvert: BUDGETS, use: { ...KEEP_FAILED, viewport: { width: 1280, height: 720 }, colorScheme: 'light' } },
     // Desktop at 1280 x 720 (the short window of spec section 3.8), in Chromium and in Firefox. Both block a pull request.
-    { name: 'app-wide', testMatch: WIDE, use: { viewport: { width: 1280, height: 720 }, colorScheme: 'dark' } },
-    { name: 'app-wide-firefox', testMatch: WIDE, use: { browserName: 'firefox' as const, viewport: { width: 1280, height: 720 }, colorScheme: 'dark' } },
+    { name: 'app-wide', testMatch: WIDE, use: { ...KEEP_FAILED, viewport: { width: 1280, height: 720 }, colorScheme: 'dark' } },
+    { name: 'app-wide-firefox', testMatch: WIDE, use: { ...KEEP_FAILED, browserName: 'firefox' as const, viewport: { width: 1280, height: 720 }, colorScheme: 'dark' } },
     // In CI the budgets have a job of their own (WAYFINCH_SHARDED): a dependency on every other project would also put every test
     // into one shard.
     { name: 'app-budgets', testMatch: APP_SPECS, testIgnore: WIDE, grep: BUDGETS, dependencies: process.env.WAYFINCH_SHARDED ? [] : FUNCTIONAL, metadata: { cpuThrottle: 4 }, use: { viewport: { width: 360, height: 640 }, colorScheme: 'dark' } },
@@ -43,5 +56,5 @@ export default defineConfig({
     ...(process.env.WAYFINCH_WEBKIT
       ? [{ name: 'app-webkit-smoke', testMatch: /app-smoke\.spec\.ts/, use: { browserName: 'webkit' as const, viewport: { width: 390, height: 844 } } }]
       : []),
-  ],
+  ]),
 });
