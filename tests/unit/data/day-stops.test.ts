@@ -7,6 +7,7 @@ import { freshStore } from '../store/helpers.ts';
 import { planStages } from '../../../src/core/route/stages.ts';
 import type { Trip } from '../../../src/core/types.ts';
 import { settleStops, stopChoices } from '../../../src/data/day-stops.ts';
+import { stagesEndingAt } from '../../../src/core/route/day-stops.ts';
 import { BD } from '../../../src/core/wording/en-beds.ts';
 import { dayEndWords } from '../../../src/ui/trip/summary.tsx';
 import { prepareTrip } from '../../../src/data/prepare.ts';
@@ -166,6 +167,22 @@ describe('day stops on the store', () => {
     expect(picked.days.map((d) => [d.name, d.by, r1(d.km)])).toEqual([['Hotel B', 'rider', 86], [null, 'rider', 178]]);
   });
 
+  // Re-review 2 of the rework, m-7 (the coordinator's ruling): a trip saved before the update keeps its days as they are until the
+  // rider changes the nights, the pace or the speed; a settle with nothing changed never splits them again.
+  test('[TRIP-STOPS-KEEP] a trip saved with a pick before the update: a settle keeps its days and its planned ends exactly', async () => {
+    const t = await tripWithPlaces([['campsite', 92.4, 'Camping A'], ['lodging', 86, 'Hotel B'], ['lodging', 177, 'Hotel C']]);
+    // what main stored: the planned ends at the even split, the rider's Hotel B for night 1, the days ending at the stops
+    const saved = { routeId: route.id, basis: [90, 180], days: [
+      { placeId: 'lodging-86', km: 86, name: 'Hotel B', town: null, by: 'rider' as const },
+      { placeId: 'lodging-177', km: 177, name: 'Hotel C', town: null, by: 'auto' as const },
+    ] };
+    await readTrip();
+    await saveTrip({ ...t, stops: saved, route: { ...t.route, stages: stagesEndingAt(t.route, [86, 177], 25) } });
+    const after = (await settleStops(NOW))!;
+    expect(after).toEqual(saved);
+    expect((await readTrip())!.route.stages.map((x) => x.endKm)).toEqual([86, 177, 270]);
+  });
+
   test('[TRIP-STOPS-KEEP] a pace that changes the suggested nights plans around the own stop too (review M9)', async () => {
     await tripWithPlaces([['campsite', 92.4, 'Camping A'], ['lodging', 86, 'Hotel B'], ['lodging', 177, 'Hotel C']]);
     localStorage.setItem('copilot:settings', JSON.stringify({ nights: null, pace: 'sporting', updatedAt: '2026-10-16T07:00:00.000Z' }));
@@ -279,6 +296,19 @@ describe('review of PR 101: stops judged again, gone places, export', () => {
     expect((await readTrip())!.route.stages[0]!.endKm).toBe(93);
     // said until the rider picks again, not lost on the next settle
     expect((await settleStops(NOW))!.days[0]!.was).toBe('Other');
+  });
+
+  // Re-review 2, m-5 (the coordinator's ruling): only places the rider picked are fixed ends, never a place standing in for one.
+  test("[TRIP-STOPS-KEEP] a place standing in for a gone pick is no fixed end: other nights share out around the rider's picks alone", async () => {
+    const r1 = (km: number) => Math.round(km * 10) / 10;
+    await tripWithPlaces([['lodging', 96, 'Other'], ['lodging', 177, 'Hotel C']]);
+    await settleStops(NOW);
+    await settleStops(NOW, { day: 1, to: (await stopChoices(NOW, 1)).find((c) => c.name === 'Other')! });
+    await dropPlace('lodging-96');
+    await addPlace('lodging', 93, 'Newer');
+    expect((await settleStops(NOW))!.days[0]).toMatchObject({ name: 'Newer', by: 'auto', was: 'Other' });
+    localStorage.setItem('copilot:settings', JSON.stringify({ nights: 3, pace: 'sporting', updatedAt: '2026-10-16T07:30:00.000Z' }));
+    expect((await settleStops(NOW))!.basis.map(r1)).toEqual([67.5, 135, 202.5]);
   });
 
   test('[TRIP-DAY-STOPS] export and import carry the stops, the rider\'s own pick included; another route\'s are left out (I3)', async () => {

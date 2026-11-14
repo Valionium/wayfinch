@@ -185,3 +185,39 @@ describe('planning the nights around the rider\'s own stops', () => {
     expect(ends({ ...one, routeId: 'other' }, 3)).toEqual([67.5, 135, 202.5]);
   });
 });
+
+// Re-review 2 of the rework, I-3 (the coordinator's ruling): while the number of nights stays the same, each pick stays on its night;
+// only a change of nights shares the nights out again.
+describe('a pick keeps its night while the nights stay the same', () => {
+  const own = (km: number, name: string | null): TripStop => ({ placeId: name ? `p-${km}` : null, km, name, town: null, by: 'rider' });
+  const auto = (km: number, name: string): TripStop => ({ placeId: `p-${km}`, km, name, town: null, by: 'auto' });
+  const r1 = (km: number) => Math.round(km * 10) / 10;
+
+  test('[TRIP-STOPS-KEEP] alpine-pass, 3 nights: a place picked for night 1 at 23.7 km (offered within its 3 km window) stays night 1', async () => {
+    const f = await loadFixtureRoute('alpine-pass');
+    const alpine = await buildRoute(f.points, f.name, 'gpx');
+    const before = planAround({ routeId: alpine.id, basis: [], days: [] }, alpine, 3).basis;
+    const held: TripStops = { routeId: alpine.id, basis: before, days: [own(before[0]!, 'Here'), auto(before[1]!, 'B'), auto(before[2]!, 'C')] };
+    const moved: TripStops = { ...held, days: [own(23.7, 'There'), held.days[1]!, held.days[2]!] };
+    const kept = planAround(moved, alpine, 3, true);
+    expect(kept.kept.map((k) => [k.stop.name, k.night])).toEqual([['There', 1]]);
+    expect(r1(kept.basis[0]!)).toBe(23.7);
+    expect(kept.basis.length).toBe(3);
+    // shared out afresh, as for a change of nights, the near tie hands the night over: what the rule keeps from happening
+    expect(planAround(moved, alpine, 3).kept.map((k) => k.night)).not.toEqual([1]);
+  });
+
+  test('[TRIP-STOPS-KEEP] the same nights: each picked place, and each No stop, stays on its night for any pick within its window', () => {
+    const three = plannedEnds([...planStages(route, { flatKph: 25, pace: 'sporting', nights: 3 })]);
+    for (let night = 0; night < 3; night += 1) {
+      for (const off of [-6.75, -3, 0, 3, 6.75]) {
+        const days = three.map((km, i) => (i === night ? own(km + off, 'Pick') : i === (night + 1) % 3 ? own(km, null) : auto(km, 'A')));
+        const a = planAround({ routeId: route.id, basis: three, days }, route, 3, true);
+        expect(a.kept.find((k) => k.stop.name === 'Pick')?.night, `night ${night + 1}, ${off} km`).toBe(night + 1);
+        const none = a.kept.find((k) => k.stop.placeId === null);
+        if (none) expect(none.night).toBe(((night + 1) % 3) + 1);
+        expect(a.dropped).toEqual([]);
+      }
+    }
+  });
+});

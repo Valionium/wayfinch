@@ -25,7 +25,7 @@ const settleNow: Settle = () => import('../../data/day-stops.ts').then((m) => m.
  * longer or shorter than an even day is said with its length once the nights have their places (`settle`; review of the rework, m-3);
  * a day ride names only what goes, and says nothing with automatic stops alone.
  */
-async function stopsLine(trip: Trip, n: number, settle: Settle): Promise<string> {
+export async function stopsLine(trip: Trip, n: number, settle: Settle = settleNow): Promise<string> {
   const held = trip.stops?.routeId === trip.route.id ? trip.stops : undefined;
   if (!held || !Array.isArray(held.days) || held.days.length === 0) return '';
   const a = planAround(held, trip.route, n);

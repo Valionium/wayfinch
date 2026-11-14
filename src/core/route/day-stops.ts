@@ -104,7 +104,7 @@ const SHORT_DAY = 0.5;
  * night, which ends at the even split like any other, while that night exists and no picked place ends it; otherwise it goes. With
  * no place picked it is the stage model's own plan. Automatic stops anchor nothing; another route's stops, or none, neither.
  */
-export function planAround(stops: TripStops | undefined, route: Route, nights: number): Around {
+export function planAround(stops: TripStops | undefined, route: Route, nights: number, keep = false): Around {
   const n = Math.max(0, Math.trunc(Number.isFinite(nights) ? nights : 0));
   const out: Around = { basis: plannedEnds([...planStages(route, { flatKph: 20, pace: 'sporting', nights: n })]), days: [], kept: [], dropped: [] };
   const { samples } = effortProfile(route);
@@ -116,15 +116,15 @@ export function planAround(stops: TripStops | undefined, route: Route, nights: n
   const end = route.lengthKm;
   const anchors: { d: TripStop; was: number; km: Km }[] = [];
   const none: { d: TripStop; was: number }[] = [];
-  // A place that stands in for the rider's pick gone from the saved places (`was`) holds its end too, so the day does not move under it.
   stops.days.forEach((d, i) => {
-    const mine = d?.by === 'rider';
-    if (!mine && !(d?.was && d.placeId !== null)) return;
+    if (d?.by !== 'rider') return;
     if (d.placeId === null) { none.push({ d, was: i + 1 }); return; }
     const before = anchors[anchors.length - 1]?.km ?? 0;
     if (typeof d.km === 'number' && d.km > before + MIN_DAY_KM && d.km < end - MIN_DAY_KM) anchors.push({ d, was: i + 1, km: d.km });
-    else if (mine) out.dropped.push({ stop: d, night: i + 1 });
+    else out.dropped.push({ stop: d, night: i + 1 });
   });
+  // The same nights (`keep`): each picked place stays on its night, so each stretch keeps the days it has (re-review 2, I-3).
+  const same = keep && stops.days.length === n;
   while (anchors.length > n) {
     let k = 0;
     let best = Infinity;
@@ -133,12 +133,13 @@ export function planAround(stops: TripStops | undefined, route: Route, nights: n
       if (span <= best) { best = span; k = i; }
     });
     const [gone] = anchors.splice(k, 1);
-    if (gone!.d.by === 'rider') out.dropped.push({ stop: gone!.d, night: gone!.was });
+    out.dropped.push({ stop: gone!.d, night: gone!.was });
   }
   if (anchors.length > 0) {
     const cuts = [0, ...anchors.map((a) => a.km), end].map(effort);
-    const parts = cuts.slice(1).map((to, i) => ({ from: cuts[i]!, to, days: 1 }));
-    for (let more = n - anchors.length; more > 0; more -= 1) parts.reduce((a, b) => ((b.to - b.from) / b.days > (a.to - a.from) / a.days ? b : a)).days += 1;
+    const nightOf = (i: number): number => (i < 0 ? 0 : i >= anchors.length ? n + 1 : anchors[i]!.was);
+    const parts = cuts.slice(1).map((to, i) => ({ from: cuts[i]!, to, days: same ? nightOf(i) - nightOf(i - 1) : 1 }));
+    for (let more = same ? 0 : n - anchors.length; more > 0; more -= 1) parts.reduce((a, b) => ((b.to - b.from) / b.days > (a.to - a.from) / a.days ? b : a)).days += 1;
     out.basis = parts.flatMap((p, i) => [
       ...Array.from({ length: p.days - 1 }, (_, d) => lineAt(samples, 'effortExact', p.from + ((p.to - p.from) * (d + 1)) / p.days).kmExact),
       ...(anchors[i] ? [anchors[i].km] : []),
