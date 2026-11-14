@@ -768,3 +768,14 @@ test('[BC-PIC-IF] the puncture card\'s first step says its pad spacer picture is
   await shown(1);
   expect(dialog()!.querySelector('.care-pic-if')).toBeNull();
 });
+
+// Review of PR 131, m1: opened, Lube the chain says its rain-or-mud condition once (the step view's "And always after rain or mud."),
+// not also in its name.
+test('[BC-TAGS-ONCE] opened, Lube the chain says "rain or mud" once', async () => {
+  await mount();
+  localStorage.setItem(ALL_STEPS_KEY, '1');
+  await click(host.querySelector<HTMLElement>('.care-task[data-id="chain-lube"] .care-open')!);
+  const text = dialog()!.textContent!;
+  expect(text.match(/rain or mud/g)?.length).toBe(1);
+  expect(text).toContain(C.careAlsoWet);
+});

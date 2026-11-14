@@ -334,8 +334,9 @@ export const CARE_TASKS: CareTask[] = [
     words: ['cable', 'stiff shift', 'sticky', 'rust', 'frayed'], applies: { shifting: ['cable'] }, critical: false,
   },
   {
-    // listed under Every month, so its name says monthly too (live-site sweep of 14 November 2026, item 45; the note's own "at least monthly")
-    id: 'chain-lube', name: 'Lube the chain, after every wash and after rain or mud; at least monthly', part: 'chain', section: 'month', alsoWet: true,
+    // listed under Every month, so its name says monthly too (live-site sweep of 14 November 2026, item 45; the note's own "at least monthly");
+    // rain or mud is said by alsoWet's own line, so not in the name as well (review of PR 131, m1)
+    id: 'chain-lube', name: 'Lube the chain, after every wash; at least monthly', part: 'chain', section: 'month', alsoWet: true,
     signs: 'squeaks, looks dry or rusty',
     steps: [
       'Clean or wipe the chain first; oil goes on after every wash.',
