@@ -1271,3 +1271,7 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - "Get ready offline" is called "Prepare this route" wherever a rider reads it (Trip's step and button, En route's cards and their button, notes, You, the privacy page); its ids, keys and function names stay; no wording module or the privacy page says "Get ready" (§3.3) [PREP-NAME]
 - under the Prepare this route button one line says what it fetches and why; Trip's heading has "Plan before you ride" and En route's "While you ride: the next water, food, sleep and weather" under it; the Route step says when to upload a GPX and when a town-to-town route is enough; their words are in lazy modules (§3.3) [PREP-LINE]
 - they add nothing to the first screen's JavaScript: at or below main's figure at the branch point, 144,741 bytes gzipped (4f9cddc) (§4.5) [PREP-FIRST]
+- the first Tab stop on every screen is "Skip to the tabs": Enter puts the focus on the current tab (the tabs sit on the left at a wide width but last in the page) and leaves the address alone [SHELL-SKIP]
+- a plain link takes the accent colour of the theme, never the browser's blue or purple [SHELL-LINK]
+- the line under Trip's and En route's heading keeps its room before its words load: nothing below it moves when they arrive, at 320 to 1280 px [SHELL-SUB-STILL]
+- every legal page names the icon, so the browser does not ask for /favicon.ico [LEGAL-ICON]
