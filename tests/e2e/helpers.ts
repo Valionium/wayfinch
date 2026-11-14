@@ -124,12 +124,15 @@ export async function servePack(page: Page, id: string, hold: (url: string) => '
   return { requests, manifest };
 }
 
-/** A trip on a fixture route, saved through the store. With `places`, also Prepare this route's places and hours, on the fixture pack. */
-export async function preparedTrip(page: Page, id: string, opts: { departureDate?: string | null; places?: boolean; weather?: boolean; atMs?: number } = {}): Promise<Trip> {
+/**
+ * A trip on a fixture route, saved through the store. With `places`, also Prepare this route's places and hours, on the fixture pack.
+ * `nights` splits it into that many nights plus one days (none by default).
+ */
+export async function preparedTrip(page: Page, id: string, opts: { departureDate?: string | null; places?: boolean; weather?: boolean; atMs?: number; nights?: number } = {}): Promise<Trip> {
   await withStore(page);
   const fixture = await loadFixtureRoute(id as FixtureRouteId);
   const built = await buildRoute(fixture.points, fixture.name, 'gpx');
-  const stages = [...planStages(built, { flatKph: 25, pace: 'sporting', nights: 0 })];
+  const stages = [...planStages(built, { flatKph: 25, pace: 'sporting', nights: opts.nights ?? 0 })];
   const withStages = { ...built, stages };
   const trip: Trip = {
     route: { ...withStages, sampleGrid: sampleGrid(withStages, withStages.climbs, stages) },
