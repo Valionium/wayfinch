@@ -17,9 +17,12 @@ export type ColoursOptions = {
   /** Escape or Done: the page closes the grid and takes the focus back to its chip. */
   onClose: () => void;
 };
-export type Colours = { root: HTMLElement; show: (current: string | null) => void; focus: () => void; close: () => void };
+/** `show`: the colour now; `fresh` when the page shows another bike, so Keep my colour starts again from that bike's colour. */
+export type Colours = { root: HTMLElement; show: (current: string | null, fresh?: boolean) => void; focus: () => void; close: () => void };
 
 const STYLE_ID = 'wf-colours-style';
+/** Each grid's Keep my colour description gets an id of its own. */
+let keepNotes = 0;
 // The page's own tokens (--line, --blaze, --ink, --muted) follow its theme. The cells keep the theme's line, so White and Black show on
 // both panels; the colour in use has the accent's outline and a tick, so it never depends on seeing the colour itself.
 const CSS = `.wf-colours{margin-top:8px}
@@ -87,6 +90,9 @@ export function openColours(box: HTMLElement, options: ColoursOptions): Colours 
   // grid colour can choose theirs again. It holds the last such colour shown (a photo's, picked while the grid is open, replaces it).
   let keep: HTMLInputElement | null = null;
   let keepCell: HTMLElement | null = null;
+  // its description, the colour it keeps (review of PR 162, m2): outside the label, so the name stays "Keep my colour"
+  const keepNote = el('span', 'wf-colours-sr');
+  keepNote.id = `wf-colours-keep-${(keepNotes += 1)}`;
   const keepFor = (hex: string): void => {
     if (!keep) {
       const label = el('label', 'wf-colour-keep');
@@ -99,7 +105,10 @@ export function openColours(box: HTMLElement, options: ColoursOptions): Colours 
       text.textContent = options.words.keep ?? '';
       label.append(keep, keepCell, text);
       grid.prepend(label);
+      keep.setAttribute('aria-describedby', keepNote.id);
+      root.appendChild(keepNote);
     }
+    keepNote.textContent = options.words.own(nearestSwatchName(hex) ?? '');
     keep.value = hex;
     keepCell!.style.setProperty('--c', hex);
     keepCell!.style.setProperty('--tick', tickFor(hex));
@@ -110,7 +119,14 @@ export function openColours(box: HTMLElement, options: ColoursOptions): Colours 
   root.append(now, grid, done);
   box.appendChild(root);
 
-  const show = (current: string | null): void => {
+  const show = (current: string | null, fresh = false): void => {
+    // another bike shown (review of PR 162, m1): the old bike's colour is never offered, so a tap never stores it on this one
+    if (fresh && keep) {
+      keep.closest('label')!.remove();
+      keepNote.remove();
+      keep = null;
+      keepCell = null;
+    }
     const at = findMoreColour(current);
     radios.forEach((r, i) => { r.checked = i === at; labels[i]!.classList.toggle('on', i === at); });
     const hex = typeof current === 'string' && /^#[0-9a-fA-F]{6}$/.test(current) ? current.toLowerCase() : null;

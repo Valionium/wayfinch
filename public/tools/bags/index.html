@@ -3688,6 +3688,9 @@ function followShownBike(){
   if(!LOOK_OPENING || LOOK_OPENING.forId===BIKE_PROFILE_EDITOR_ID)return;
   if(LOOK_CREATING && LOOK_OPENING.forId===''){LOOK_OPENING.forId=BIKE_PROFILE_EDITOR_ID;LOOK_CREATING=false;return;}
   const message=LOOK_MESSAGE;rememberLookOpening();LOOK_MESSAGE=message;
+  // More colours open: the old bike's arrow move is dropped and Keep my colour starts from this bike's colour (review of PR 162, m1)
+  clearTimeout(LOOK_PICKER_TIMER);LOOK_PICKER_TIMER=null;
+  if(LOOK_COLOURS)LOOK_COLOURS.show(currentLook().colour,true);
 }
 function lookSwatches(){const B=bikeModule();return B ? B.SWATCHES : [];}
 

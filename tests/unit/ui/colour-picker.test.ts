@@ -207,3 +207,38 @@ test('[LC-COLOURS-KEEP] a page that passes no word for it (an older page) gets t
   expect(shown).toHaveLength(65);
   expect(shown.some((r) => r.checked)).toBe(false);
 });
+
+// Review of PR 162, m1 and m2: the page showing another bike starts the cell again from that bike's colour, so a tap never stores the old
+// bike's colour on the new one; and the cell is described by the colour it keeps, as every other cell is named by its colour.
+test('[LC-COLOURS-KEEP] another bike shown (show with fresh): the old colour\'s cell goes; a grid colour has none, an own colour its own; nothing is picked', () => {
+  const k = openKeep('#a1b2c3');
+  k.picker.show('#2563b8', true);
+  expect(k.visible().map(k.nameOf)).not.toContain('Keep my colour');
+  expect(k.visible()).toHaveLength(65);
+  expect(k.box.querySelectorAll('.wf-colour-keep')).toHaveLength(0);
+  expect(k.byName('Blue').checked).toBe(true);
+  // the next bike's own colour gets a cell of its own, holding that colour only
+  k.picker.show('#123456', true);
+  expect(k.byName('Keep my colour').value).toBe('#123456');
+  expect(k.byName('Keep my colour').checked).toBe(true);
+  // a later grid colour on the same bike keeps it, as before
+  k.picker.show('#6b1d2a');
+  expect(k.byName('Keep my colour').value).toBe('#123456');
+  expect(k.onPick).not.toHaveBeenCalled();
+});
+
+test('[LC-COLOURS-KEEP] the cell is described by the colour it keeps ("Your own colour, close to Silver"), and its description follows its colour', () => {
+  const k = openKeep('#a1b2c3');
+  const keep = k.byName('Keep my colour');
+  const described = () => (keep.getAttribute('aria-describedby') ?? '').split(' ').map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+  expect(described()).toBe('Your own colour, close to Silver');
+  // outside the label, so the name stays "Keep my colour"
+  expect(k.nameOf(keep)).toBe('Keep my colour');
+  // after a grid pick it still describes its own colour, not the one now checked
+  k.byName('Burgundy').closest('label')!.click();
+  k.picker.show('#6b1d2a');
+  expect(described()).toBe('Your own colour, close to Silver');
+  k.picker.show('#123456', true);
+  expect(k.byName('Keep my colour').getAttribute('aria-describedby')).toBeTruthy();
+  expect((document.getElementById(k.byName('Keep my colour').getAttribute('aria-describedby')!)?.textContent ?? '')).toMatch(/^Your own colour, close to /);
+});

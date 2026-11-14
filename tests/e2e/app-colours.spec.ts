@@ -226,3 +226,25 @@ test('[LC-COLOURS-KEEP] a colour from before: Keep my colour first, checked and 
   await expect(chip(page)).toBeFocused();
   expect(errors).toEqual([]);
 });
+
+// Review of PR 162, m1: another bike shown while the grid is open (another tab, a restored plan) starts Keep my colour again from that
+// bike's colour, and a pending arrow move of the old bike is dropped: the old bike's colour is never stored on the new bike. The editor is
+// moved here as renderBikeProfiles moves it when another tab changes the bikes.
+test("[LC-COLOURS-KEEP] another bike shown while the grid is open: its own colour, never the old bike's; the old bike's pending arrow move stores nothing", async ({ page }) => {
+  const own = { ...BLUE, id: 'bike_own', name: 'Own colour', look: { colour: '#a1b2c3', bars: 'drop', ebike: false } };
+  const blue = { ...BLUE, id: 'bike_b', name: 'Blue one' };
+  await look(page, { 'loadcheck:bikeProfile': JSON.stringify(own), 'loadcheck:bikeProfiles': JSON.stringify([own, blue]) });
+  await chip(page).click();
+  const keep = grid(page).getByRole('radio', { name: 'Keep my colour' });
+  await expect(keep).toBeChecked();
+  await expect(keep).toHaveAccessibleDescription('Your own colour, close to Silver');
+  // an arrow paints White on the first bike, to be stored once the rider pauses; the shown bike changes before that
+  await keep.focus();
+  await page.keyboard.press('ArrowRight');
+  await page.evaluate("BIKE_PROFILE_EDITOR_ID='bike_b';renderLook()");
+  await expect(grid(page).getByRole('radio', { name: 'Blue', exact: true })).toBeChecked();
+  await expect(keep).toHaveCount(0);
+  await page.waitForTimeout(700);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('loadcheck:bikeProfiles')!).map((b: { id: string; look: { colour: string } }) => [b.id, b.look.colour]));
+  expect(saved).toEqual([['bike_own', '#a1b2c3'], ['bike_b', '#2563b8']]);
+});
