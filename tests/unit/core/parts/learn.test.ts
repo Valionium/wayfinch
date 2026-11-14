@@ -119,6 +119,23 @@ test('[BL-OWN] the rider\'s bike always has brakes and gears: brakes not set or 
   expect(LN.showsDrive).toMatch(/gears aren't set.*derailleur/);
 });
 
+test('[BL-OWN] a single speed (no gears, drive not told) is drawn and described as one; brakes set as Other are named as the rider set them, with nothing to set', () => {
+  const single = ownOf({ drive: 'unknown', shifting: 'none' });
+  expect(single.spec.drive.value).toBe('chain');
+  expect(single.single).toBe(true);
+  expect(single.shows?.drive).toBeUndefined();
+  const has = (ids: LearnId[]) => ids.map((id) => hasPart(single, id));
+  expect(has(['chain', 'chainring', 'crank', 'quick-link'])).toEqual([true, true, true, true]);
+  expect(has(['cassette', 'derailleur', 'hanger', 'hub-gears', 'shifter', 'gear-cable', 'front-derailleur'])).toEqual([false, false, false, false, false, false, false]);
+  // gears told elsewhere keep their own drive; only a drive not told with no gears is a single speed
+  expect(ownOf({ drive: 'chain-hub', shifting: 'none' }).single).toBeUndefined();
+  expect(ownOf({ drive: 'unknown', shifting: 'cable' }).shows?.drive).toBe('unset');
+  expect(LN.single).toMatch(/single speed/);
+  expect(LN.showsBrakes('other')).toMatch(/set as Other/);
+  expect(LN.showsBrakes('other')).not.toMatch(/aren't set/);
+  for (const t of [LN.single, LN.showsBrakes('other')]) expect(bannedHits(t), t).toEqual([]);
+});
+
 test('[BL-OWN] the rider\'s answers decide the axle, the pad adjuster and the gear cable; a belt bike has hub gears; hub gears keep the rear wheel on nuts', () => {
   const has = (b: LearnBike, ...ids: LearnId[]) => ids.map((id) => hasPart(b, id));
   expect(has(ownOf({ brakes: 'hydraulic-disc' }), 'thru-axle', 'wheel-qr')).toEqual([true, false]);
