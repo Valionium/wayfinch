@@ -365,12 +365,16 @@ const rimBike = (bars: string | null, rimBrake?: string) => memory({
   'loadcheck:bikeProfiles': JSON.stringify([{ id: 'bike_a', name: 'Mine', brakes: 'rim', ...(rimBrake ? { rimBrake } : {}), ...(bars ? { look: { colour: null, bars, ebike: false } } : {}) }]),
   'loadcheck:bikeProfile': JSON.stringify({ id: 'bike_a', name: 'Mine' }),
 }).kv;
-/** Brake rubbing, step 5 ("Open the brake's quick release"), for the bike in `kv`. */
+/**
+ * Brake rubbing's step "Open the brake's quick release", for the bike in `kv`: step 5 when the kind of rim brake is told, step 6 when not
+ * (both centring lines show then, the hydraulic rim brake's own since the owner's ruling of 14 November 2026, BC-HYDRO-RIM-CENTRE).
+ */
 async function brakeStep5(kv: KeyValueStore): Promise<void> {
   act(() => { render(null, host); });
   await mount(kv);
   await openCard('brake-rub-rim');
   for (let i = 0; i < 5; i += 1) await click(button(C.careStepsNext)!);
+  if (!dialog()!.querySelector('.care-step-t')!.textContent!.startsWith('Rim bent')) await click(button(C.careStepsNext)!);
 }
 const imgNames = () => [...dialog()!.querySelectorAll('.care-step [role="img"]')].map((i) => i.getAttribute('aria-label'));
 
@@ -543,7 +547,8 @@ const where = () => [...dialog()!.querySelectorAll<HTMLButtonElement>('.care-whe
 test("[PG-SHEET-OPEN] a part's name in a step is a button that reads as the text; a tap opens the bike view over the step with that part's entry, focus on the view's title; Close returns focus to the name, the step view stays", async () => {
   const push = vi.spyOn(history, 'pushState');
   await brakeStep5(rimBike('drop'));
-  const step = card('brake-rub-rim').steps[4]!;
+  // with the kind of rim brake not told both centring lines show, so the quick release is the sixth step (BC-HYDRO-RIM-CENTRE)
+  const step = card('brake-rub-rim').steps[5]!;
   expect(dialog()!.querySelector('.care-step-t')!.textContent).toBe(step);
   const link = partLink("brake's quick release")!;
   expect(link.tagName).toBe('BUTTON');
@@ -565,7 +570,7 @@ test("[PG-SHEET-OPEN] a part's name in a step is a button that reads as the text
   expect(sheet()).toBeNull();
   expect(vi.mocked(history.back).mock.calls.length).toBe(back + 1);
   expect(dialog()!.open).toBe(true);
-  expect(counter()).toBe(C.careStepsCount(5, 6));
+  expect(counter()).toBe(C.careStepsCount(6, 7));
   expect(document.activeElement).toBe(partLink("brake's quick release"));
 });
 
@@ -575,7 +580,7 @@ test('[PG-SHEET-KEYS] in the view, Escape closes it alone and the arrows leave t
   await sheetOpen();
   const s = sheet()!;
   await act(() => { s.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })); });
-  expect(counter()).toBe(C.careStepsCount(5, 6));
+  expect(counter()).toBe(C.careStepsCount(6, 7));
   await act(() => { s.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); });
   expect(sheet()).toBeNull();
   expect(dialog()!.open).toBe(true);
@@ -670,7 +675,8 @@ test('[BV-BUTTON] "What is it, where is it?" sits under the text on every screen
     expect(b.previousElementSibling, `screen ${i}`).not.toBeNull();
     if (i < screens - 1) await click(button(C.careStepsNext)!);
   }
-  expect(where()[0]!.querySelector('.care-where-parts')!.textContent).toBe('Disc caliper, brake lever, tyre, rim, tyre bead, spokes, inner tube, valve, brake disc, brake pads');
+  // the owner's ruling of 14 November 2026: the wheel (its rim), the tyre and the tube first, the rest in the text's order (BV-FIRST-PARTS)
+  expect(where()[0]!.querySelector('.care-where-parts')!.textContent).toBe('Rim, tyre, inner tube, disc caliper, brake lever, tyre bead, spokes, valve, brake disc, brake pads');
   const b = where()[0]!;
   expect(b.getAttribute('aria-haspopup')).toBe('dialog');
   await click(b);
