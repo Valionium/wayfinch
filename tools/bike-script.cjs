@@ -35,6 +35,10 @@ const advisorOptions={...options,stdin:{...options.stdin,
 const weightMapOptions={...options,stdin:{...options.stdin,
   contents:"import { render } from './src/ui/weight-map/view.ts';\n"+'window.WayfinchWeightMap = Object.freeze({ render });\n',
   sourcefile:'weightmap-entry.ts'}};
+// Our own colour picker (wish 4, design of 14 Nov 2026): /tools/bags/colours.js, loaded on the first tap of More colours; window.WayfinchColours.
+const coloursOptions={...options,stdin:{...options.stdin,
+  contents:"import { openColours } from './src/ui/colour-picker/picker.ts';\n"+'window.WayfinchColours = Object.freeze({ openColours });\n',
+  sourcefile:'colours-entry.ts'}};
 let cached=null,cachedAdvisor=null,cachedMap=null;
 /** weightmap.js's text, built once per process, for the QA suites' page VM. */
 function weightMapScriptSync(){
@@ -51,4 +55,4 @@ function advisorScriptSync(){
   if(cachedAdvisor===null)cachedAdvisor=Buffer.from(require('esbuild').buildSync(advisorOptions).outputFiles[0].contents).toString('utf8');
   return cachedAdvisor;
 }
-module.exports={bikeScriptOptions:options,photoScriptOptions:photoOptions,advisorScriptOptions:advisorOptions,weightMapOptions,bikeScriptSync,advisorScriptSync,weightMapScriptSync};
+module.exports={bikeScriptOptions:options,photoScriptOptions:photoOptions,coloursOptions,advisorScriptOptions:advisorOptions,weightMapOptions,bikeScriptSync,advisorScriptSync,weightMapScriptSync};

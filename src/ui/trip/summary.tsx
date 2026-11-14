@@ -253,7 +253,7 @@ export function RouteSummary({ snap, stops, beds, settle = settleStops, choices 
         </ol>
         <p class="visually-hidden" role="status" aria-live="polite" data-stop-said>{said}</p>
         <ClimbCheck trip={trip} />
-        {missingHeights ? <p class="muted">{TR.appTripHeightsPending}</p> : snap.heightsLookedUp ? <p class="muted">{W.appTripHeightsCredit}</p> : null}
+        {missingHeights ? <p class="muted">{TR.appTripHeightsPending}</p> : snap.heightsLookedUp ? <p class="muted">{TF.appTripHeightsCredit}</p> : null}
         {trip.route.source === 'planned' || snap.prepared?.build ? <OsmCredit lead={TF.appTripOsmLead} date={packDate(snap.prepared?.build)} /> : null}
         <p class="muted"><a href="/legal/licences/">{W.appTripLicences}</a></p>
       </div>

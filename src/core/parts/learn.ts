@@ -87,6 +87,8 @@ export const EDGES: readonly (readonly [LearnId, LearnId])[] = [
  */
 export type LearnBike = {
   spec: BikeSpec; frontMech: boolean; axle?: 'thru' | 'qr' | 'nuts'; rearNuts?: boolean; hydraulic?: boolean; electronic?: boolean;
+  /** A single speed: the rider said No gears and no drive, so the drawing's plain chain is the bike's own (follow-up of 14 Nov). */
+  single?: true;
   shows?: { brakes?: 'unset' | 'other'; drive?: 'unset' };
 };
 /** How the wheels are held: the rider's answer, else a thru-axle with disc brakes and a quick release with rim brakes (design choice 5). */
@@ -123,7 +125,9 @@ export function ownBike(spec: BikeSpec, record: BikeRecord | null = null): Learn
     shows.brakes = record?.brakes === 'other' ? 'other' : 'unset';
     out = { ...out, brakes: { value: 'disc', mark: 'guessed' } };
   }
-  if (out.drive.value === 'chain') {
+  // No gears and no drive told: a single speed, drawn as the drawing's plain chain; gears not told otherwise show derailleur gears
+  const single = out.drive.value === 'chain' && record?.shifting === 'none';
+  if (out.drive.value === 'chain' && !single) {
     shows.drive = 'unset';
     out = { ...out, drive: { value: 'derailleur', mark: 'guessed' } };
   }
@@ -136,6 +140,7 @@ export function ownBike(spec: BikeSpec, record: BikeRecord | null = null): Learn
     rearNuts: (drive === 'hub' || drive === 'belt') && axle !== 'thru' && axle !== 'qr',
     ...(record?.brakes === 'hydraulic-disc' ? { hydraulic: true } : {}),
     ...(record?.shifting === 'electronic' ? { electronic: true } : {}),
+    ...(single ? { single: true as const } : {}),
     ...(shows.brakes || shows.drive ? { shows } : {}),
   };
 }

@@ -115,7 +115,7 @@ test('[HINT-LOCAL] Delete co-pilot data on You, then Tools, Tyre pressure, Bike 
   await page.evaluate(() => { location.hash = '#/tools'; });
   await expect(page.locator('[data-hint-line]')).toBeVisible();
   await page.evaluate(() => { location.hash = '#/you'; });
-  await page.getByRole('button', { name: 'Delete co-pilot data' }).click();
+  await page.getByRole('button', { name: 'Delete Wayfinch data from this phone' }).click();
   await page.getByRole('button', { name: 'Delete now' }).click();
   await expect(page.locator('[data-delete] [role=status]')).toBeVisible();
   const copilot = () => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('copilot:')));

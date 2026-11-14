@@ -196,3 +196,26 @@ test('[BL-OWN] a saved bike with no brakes or gears told is shown with disc brak
   await expect(part(page, 'brake-lever')).toBeVisible();
   await expect(part(page, 'derailleur')).toBeVisible();
 });
+
+test('[BL-OWN] a single speed is drawn and named as one; brakes set as Other are named so, with nothing to set', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools?learn' });
+  await seed(page, [{ id: 'bike_s', name: 'Fixie', frontTyre: '28-622', rearTyre: '28-622', brakes: 'other', shifting: 'none' }]);
+  await expect(page.getByLabel('Bike to show')).toHaveValue('own');
+  await expect(page.locator('.bl-shows')).toContainText('single speed');
+  await expect(page.locator('.bl-shows')).toContainText('set as Other');
+  await expect(page.locator('.bl-shows')).not.toContainText('aren\'t set');
+  await expect(page.locator('.bl-shows').getByRole('link')).toHaveCount(0);
+  await expect(part(page, 'chain')).toBeVisible();
+  for (const id of ['derailleur', 'cassette', 'shifter', 'gear-cable']) await expect(part(page, id)).toHaveCount(0);
+  await expect(page.locator('.bl-bike .bk-mech')).toHaveCount(0);
+});
+
+test('[BL-FOCUS] the Tools tab from the page shows Tools from its top, the focus on the page\'s card, not the page\'s start', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/#/tools' });
+  await page.getByRole('link', { name: 'Open How a bike is built' }).click();
+  await expect(page.getByRole('heading', { name: 'How a bike is built', level: 2 })).toBeFocused();
+  await part(page, 'saddle').scrollIntoViewIfNeeded();
+  await page.locator('nav.tabs a', { hasText: 'Tools' }).click();
+  await expect(page.getByRole('link', { name: 'Open How a bike is built' })).toBeFocused();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+});

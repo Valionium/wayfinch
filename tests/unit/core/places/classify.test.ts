@@ -126,3 +126,8 @@ plain('coordinates are rounded to five decimals and disused objects are dropped'
   expect([p.lat, p.lon]).toEqual([49.40123, 8.69457]);
   expect(classifyObject(obj({ shop: 'bakery', disused: 'yes' }), ctx(), opts())).toBeNull();
 });
+
+plain('[PIPE-KIND-04] a hospital keeps what kind of care it is, so a specialist clinic never reads as an emergency department (sweep of 14 Nov 2026, finding 15)', () => {
+  const tags = { amenity: 'hospital', emergency: 'yes', healthcare: 'doctor', 'healthcare:speciality': 'psychiatry', building: 'yes', operator: 'X' };
+  expect(classifyObject(obj(tags), ctx(), opts())!.tags).toEqual({ amenity: 'hospital', emergency: 'yes', healthcare: 'doctor', 'healthcare:speciality': 'psychiatry' });
+});
