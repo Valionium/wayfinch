@@ -23,7 +23,8 @@ const ROAD_IDS = ROAD_CARDS.map((c) => c.id);
 const filled = (s: unknown): boolean => typeof s === 'string' && s.trim().length > 0 && s.trim() === s;
 
 test('[BC-CONTENT] every task has every field of design 3.2 filled; 3 to 6 steps; minutes low <= high; ids unique; parts and sections valid', () => {
-  expect(CARE_TASKS.length).toBe(48);
+  // the draft's 48, and the hydraulic rim brake's spongy lever and the electronic gears' adjusting (the owner's ruling of 14 November 2026)
+  expect(CARE_TASKS.length).toBe(50);
   const ids = CARE_TASKS.map((t) => t.id);
   expect(new Set(ids).size).toBe(ids.length);
   for (const t of CARE_TASKS) {
@@ -144,7 +145,7 @@ test('[BC-CONTENT] hub gear oil shows on every chain-hub or belt bike; with shif
 });
 
 // ---- Group 2, Task 5: the full list ----
-/** The draft's 49 Care rows in the app's order, less the one row the owner's rules cut. */
+/** The draft's 49 Care rows in the app's order, less the one row the owner's rules cut, and the owner's two tasks of 14 November 2026. */
 const FULL_IDS = [
   'brakes-lever-test', 'ebike-charge-indoors',
   'frame-wash', 'chain-dry-lube', 'belt-rinse', 'brakes-rotor-wipe', 'brakes-rim-wipe', 'ebike-dry-contacts',
@@ -154,11 +155,11 @@ const FULL_IDS = [
   'brakes-rotor-thickness',
   'tyres-sealant-topup', 'susp-lowers-service', 'gears-hub-oil', 'gears-cables-replace', 'susp-fork-service', 'susp-shock-service', 'ebike-service',
   'brakes-cable-disc-service', 'belt-tension', 'frame-torque-check', 'wheels-true-tension',
-  'brakes-hydraulic-bleed', 'brakes-squeal', 'brakes-spongy', 'chain-replace', 'chain-deep-clean', 'gears-indexing', 'wheels-wobble', 'tyres-replace', 'frame-creak',
+  'brakes-hydraulic-bleed', 'brakes-squeal', 'brakes-spongy', 'brakes-hydro-rim-spongy', 'chain-replace', 'chain-deep-clean', 'gears-indexing', 'gears-electronic-adjust', 'wheels-wobble', 'tyres-replace', 'frame-creak',
   'ebike-range-drop',
 ];
 
-test("[BC-CONTENT] the full list holds the draft's Care tasks in its order, 48 of the 49: chain-wipe is cut (owner, 7 Nov: no source for a wipe after every ride)", () => {
+test("[BC-CONTENT] the full list holds the draft's Care tasks in its order, 48 of the 49 (chain-wipe is cut, owner, 7 Nov: no source for a wipe after every ride), and the owner's two tasks of 14 November 2026", () => {
   expect(CARE_TASKS.map((t) => t.id)).toEqual(FULL_IDS);
   expect(CARE_TASKS.map((t) => t.id)).not.toContain('chain-wipe');
   // the list is sorted by section, as the screen shows it

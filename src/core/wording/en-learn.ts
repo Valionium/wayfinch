@@ -7,7 +7,7 @@ import { TAG_WORDS } from './en-parts.ts';
 
 const NAMES: Readonly<Record<LearnId, string>> = {
   frame: 'Frame', fork: 'Fork', headset: 'Headset', stem: 'Stem', handlebar: 'Handlebar', seatpost: 'Seatpost',
-  hub: 'Hub', 'wheel-qr': 'Wheel quick release', 'thru-axle': 'Thru-axle', spokes: 'Spokes', rim: 'Rim', dropouts: 'Dropouts',
+  wheel: 'Wheel', hub: 'Hub', 'wheel-qr': 'Wheel quick release', 'thru-axle': 'Thru-axle', spokes: 'Spokes', rim: 'Rim', dropouts: 'Dropouts',
   tyre: 'Tyre', bead: 'Tyre bead', tube: 'Inner tube', valve: 'Valve', 'tubeless-valve': 'Tubeless valve',
   'brake-lever': 'Brake lever', 'rim-brake': 'Rim brake', pads: 'Brake pads', 'brake-qr': 'Brake quick release', barrel: 'Barrel adjuster',
   caliper: 'Disc caliper', disc: 'Brake disc', 'pad-adjuster': 'Pad adjuster',
@@ -37,6 +37,7 @@ export const LN_DOES: Readonly<Record<LearnId, string>> = {
   fork: 'The fork holds the front wheel and turns with the handlebar. Its steerer tube runs up through the frame\'s head tube to the stem.',
   stanchions: 'The smooth upper legs of a suspension fork. They slide into the lower legs as the fork soaks up bumps.',
   headset: 'The two bearings at the top and bottom of the head tube. They let the fork and the handlebar turn smoothly.',
+  wheel: 'The hub, the spokes and the rim, with the tyre on the rim. It sits in the dropouts, held by a thru-axle, a quick release or nuts.',
   hub: 'The middle of the wheel. It turns on bearings round the axle, and the spokes run from it to the rim.',
   'thru-axle': 'A thick axle that goes through the dropouts and the hub and screws into the far side. It holds the wheel firmly in place.',
   'wheel-qr': 'A thin rod through the hub with a lever. Closing the lever clamps the wheel in the dropouts, with no tools.',

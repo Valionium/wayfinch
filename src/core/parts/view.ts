@@ -122,6 +122,7 @@ export function partSpot(id: PartId, spec: BikeSpec, anchors: Anchors): Spot | n
       const steerTop = add(headTop, mul(unit(sub(headBottom, headTop)), -32 * anchors.scale));
       return { ...s, piece: { d: `M${pt(headTop)} L${pt(steerTop)} L${pt(clamp)}`, w: 2.1 * k, dashed: false } };
     }
+    case 'wheel': return ink(['bk-tyre', 'bk-rim', 'bk-spokes', 'bk-hub'], true);
     case 'hub': return ink(['bk-hub'], true);
     case 'spokes': return ink(['bk-spokes'], true);
     case 'rim': return ink(['bk-rim'], true);
