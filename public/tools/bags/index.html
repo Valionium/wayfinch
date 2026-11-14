@@ -1944,15 +1944,16 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
    every width; the layout stays the page's. ---- */
 :root{--wf-font:'Source Sans 3',system-ui,sans-serif}
 .mast h1{font-family:var(--wf-font);font-weight:700;font-size:28px;line-height:1.2;letter-spacing:0;text-transform:none;color:var(--ink)}
-.mast h1 .mast-app{font-weight:600;color:var(--muted)}
+.mast h1 .mast-app{font-weight:600;font-size:.7em;color:var(--muted)}
 .mast p{font-family:var(--wf-font);font-weight:400;font-size:16px;line-height:1.4;letter-spacing:0;text-transform:none;color:var(--muted);margin-top:4px}
 .crumbs button{font-family:var(--wf-font);font-weight:600;font-size:17px;line-height:1.2;letter-spacing:0;text-transform:none;color:var(--muted);padding:8px 10px;min-width:44px}
 .crumbs button:hover{color:var(--ink)}
 .crumbs button[aria-current=step]{color:var(--ink);border-bottom-color:var(--blaze)}
 .themebtn{border-radius:8px;background:var(--panel);color:var(--ink)}
 .themebtn:hover{border-color:var(--blaze);color:var(--ink)}
+.themebtn svg{width:24px;height:24px}
 @media screen and (max-width:640px){
-  .mast h1{font-size:26px}
+  .mast h1{font-size:25px}
   .crumbs button{font-size:16px;padding:10px 4px}
 }
 </style>
@@ -11432,7 +11433,7 @@ function resultConfidence(c){
   const details=`<dl class="confidencegrid">
       <div><dt>Distance and climbing</dt><dd>${htmlEsc(route)}${routeDetail ? `<span>${htmlEsc(routeDetail)}</span>` : ''}</dd></div>
       <div><dt>Seasonal weather</dt><dd>${htmlEsc(weather)}<span>Historical records guide packing; they are not a forecast for your departure.</span></dd></div>
-      <div><dt>Departure forecast</dt><dd>${htmlEsc(forecastStatusText(forecast))}${forecastNote ? `<span>${htmlEsc(forecastNote)}</span>` : ''}<span>Forecasts supplement the seasonal packing check. Selected locations only; daily details and refresh are in Trip.</span><button class="linky" data-result-jump="trip">Review forecast</button></dd></div>
+      <div><dt>Departure forecast</dt><dd>${htmlEsc(forecastStatusText(forecast))}${forecastNote ? `<span>${htmlEsc(forecastNote)}</span>` : ''}<span>Forecasts supplement the seasonal packing check. Selected locations only; daily details and refresh are in Ride.</span><button class="linky" data-result-jump="trip">Review forecast</button></dd></div>
       <div><dt>Packing</dt><dd>Typical item sizes plus any corrections you entered. Bags are counted at ${Math.round(packEff()*100)}% of their labelled volume.<span>Check the suggested fit against your actual gear.</span></dd></div>
     </dl><p>Climate figures are modelled approximations, not forecasts. Packed volumes are typical values and vary by brand and compression. Check the suggested arrangement with your actual bags and gear.</p>`;
   const routeCaution=profile && !['GPX','OSM cycle','Valhalla','BRouter'].includes(profile.via)?routeDetail:'';
@@ -11441,7 +11442,7 @@ function resultConfidence(c){
 }
 function firstFixes({weatherReady,miss,over,fix,routeFailed,spill,stranded}){
   const items=[];
-  if(!weatherReady) items.push({text:S.place ? 'Finish or retry the weather check; weather-based suggestions are provisional.' : 'Choose a place so cold and rain can be checked.',jump:'trip',label:'Review trip'});
+  if(!weatherReady) items.push({text:S.place ? 'Finish or retry the weather check; weather-based suggestions are provisional.' : 'Choose a place so cold and rain can be checked.',jump:'trip',label:'Review ride'});
   if(miss.length) items.push({text:`${miss.length} essential check${miss.length===1?'':'s'}: ${miss.slice(0,3).map(m=>m.t).join(', ')}${miss.length>3?'…':''}.`,jump:'missing',label:'Review missing kit'});
   if(over) items.push({text:!gearBags().length ? 'Add the bags you own before deciding whether your kit fits.'
     : fix && fix.cleared ? `The suggested ${fix.drop.length} optional item${fix.drop.length===1?'':'s'} would clear the overflow. Review the list before removing them.`
@@ -11667,7 +11668,7 @@ function renderResult(){
        <button class="linky send" id="sendRep"${unsentCount()?'':' disabled'}>Send my reports</button>
        <button class="linky" id="dlAll">Export</button>
        <button class="linky" id="impAll">Import</button>
-       <input type="file" id="impFile" aria-label="Import a Load Check JSON export" accept="application/json,.json" class="hidden">
+       <input type="file" id="impFile" aria-label="Import a Bag planner JSON export" accept="application/json,.json" class="hidden">
        <span id="impMsg"></span>
      </div>
      ${IMPORTED_DRAFT ? `<div class="undobar"><span>Imported file contains a working plan. Using it replaces your current bike, trip, bags, kit and checklist.</span><button class="linky" id="useImportedDraft">Use imported plan</button><button class="linky" id="dismissImportedDraft">Keep current plan</button></div>` : ''}
@@ -12282,14 +12283,14 @@ function packingChecklistExtras(model,print=false){
 }
 function renderPrintableChecklist(model=getChecklistModel()){
   const root=$('printChecklist');if(!root)return false;
-  root.innerHTML=`<h1>Load Check · Packing checklist</h1><p class="print-trip">${htmlEsc(model.tripLabel)}</p><p class="print-details">${htmlEsc([...model.tripDetails,model.modeLabel].join(' · '))}</p>
+  root.innerHTML=`<h1>Bag planner · Packing checklist</h1><p class="print-trip">${htmlEsc(model.tripLabel)}</p><p class="print-details">${htmlEsc([...model.tripDetails,model.modeLabel].join(' · '))}</p>
     ${bikeChecklistSummaryHtml(model.bikeProfile,true)}
     <p class="print-progress">${model.totals.packed} of ${model.totals.items} selected items packed · ${model.totals.remaining} remaining · ${packingChecklistNumber(model.totals.L)} L selected kit volume · ${packingChecklistNumber(model.totals.kg,3)} kg of kit. Water is listed separately. One box covers the complete named quantity.</p>
     ${model.warnings.map(message=>`<p class="print-warning">${htmlEsc(message)}</p>`).join('')}
     ${model.groups.map(group=>`<section class="print-group"><h2>${htmlEsc(group.title)}</h2>${group.subtitle?`<p class="print-group-subtitle">${htmlEsc(group.subtitle)}</p>`:''}<ul>${group.items.map(row=>
       `<li class="print-item"><span class="print-tick" aria-hidden="true">${row.packed?'✓':''}</span><span class="print-item-text"><span class="print-item-name">${htmlEsc(row.name)}</span><span class="print-item-meta">${htmlEsc(packingChecklistRowMeta(row))}</span>${row.note?`<span class="print-item-note">${htmlEsc(row.note)}</span>`:''}${row.bikeReference?`<span class="print-item-note">Bike reference: ${htmlEsc(row.bikeReference)}</span>`:''}</span></li>`).join('')}</ul></section>`).join('')}
     ${model.items.length?'':'<p>No kit items are selected in this plan.</p>'}${packingChecklistExtras(model,true)}
-    <p class="print-footer">Printed from your current Load Check plan. A tick means the full quantity has been packed; it does not confirm bag fit, weather suitability or refill availability.</p>`;
+    <p class="print-footer">Printed from your current plan in the Bag planner. A tick means the full quantity has been packed; it does not confirm bag fit, weather suitability or refill availability.</p>`;
   return true;
 }
 function renderPackingSaveStatus(){
@@ -13400,7 +13401,7 @@ const DELETED_SETUPS = [];
 // Keep file and parser limits identical; a full supported library fits in an export.
 const MAX_SAVED_SETUPS = 60;   // 20 general and 40 trip setups (MAX_GENERAL_SETUPS, MAX_TRIP_SETUPS)
 const MAX_IMPORT_BYTES = 64 * 1024 * 1024;
-const IMPORT_SIZE_MESSAGE = 'That file is too large. Import a Load Check export up to 64 MiB.';
+const IMPORT_SIZE_MESSAGE = 'That file is too large. Import a Bag planner export up to 64 MiB.';
 function importByteLength(text){ return new Blob([text]).size; }
 function savedSetupResult(saved, message=''){
   SAVE_MESSAGE = message + (saved ? '' : (message ? ' ' : '') + 'Changes are kept for this session only. Export to keep them after reload.');
@@ -14324,7 +14325,7 @@ async function importAll(text){
   if(FREE_PLAY) return FREE_PLAY_WORDS.waits.import;
   if(typeof text !== 'string' || text.length > MAX_IMPORT_BYTES || importByteLength(text) > MAX_IMPORT_BYTES) return IMPORT_SIZE_MESSAGE;
   let d; try { d = JSON.parse(text); } catch(e){ return 'That did not parse as JSON.'; }
-  if(!dataObject(d) || d.app !== undefined && d.app !== 'load-check') return 'That is not a Load Check export.';
+  if(!dataObject(d) || d.app !== undefined && d.app !== 'load-check') return 'That is not a Bag planner export.';
   const rawSetups=Array.isArray(d.setups) ? d.setups : [], rawFeedback=Array.isArray(d.feedback) ? d.feedback : [],
     rawBikeProfiles=Array.isArray(d.bikeProfiles) ? d.bikeProfiles : [];
   const setups=rawSetups.slice(0,MAX_SAVED_SETUPS).map(s => normaliseSetup(s)).filter(Boolean);
@@ -16149,7 +16150,7 @@ const DROP_ZONES={
   gpx:{accepts:f => /\.gpx$/i.test(f.name) || /gpx|xml/i.test(f.type),read:readGPXFile,
     refuse:() => {$('gpxMsg').textContent='That is not a GPX file. Drop a .gpx file here, or choose one.';}},
   json:{accepts:f => /\.json$/i.test(f.name) || /json/i.test(f.type),read:f => readImportFile(f),
-    refuse:() => {if($('impMsg'))$('impMsg').textContent='That is not a Load Check JSON export. Drop the .json file here, or choose one.';}}
+    refuse:() => {if($('impMsg'))$('impMsg').textContent='That is not a Bag planner JSON export. Drop the .json file here, or choose one.';}}
 };
 function dropZoneOf(target){
   const el=target && target.closest ? target.closest('.gpxbar,.datarow') : null;

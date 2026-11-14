@@ -71,6 +71,9 @@ const headerFacts = (page: Page) => page.evaluate(async () => {
     targets: [...steps, theme].every((b) => { const r = b.getBoundingClientRect(); return r.height >= 44 && r.width >= 44; }),
     within: [h1, line, theme, ...steps].every(within),
     sideways: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    // the app's theme icon is 24 px; the title stays on one line from 320 px up (review of PR 159, m4 and m5)
+    icon: Math.round(theme.querySelector('svg')!.getBoundingClientRect().width),
+    titleLines: Math.round(h1.getBoundingClientRect().height / parseFloat(getComputedStyle(h1).lineHeight)),
     themeButtons: [...document.querySelectorAll('button')].filter((b) => /\b(light|dark)\b/i.test(`${b.getAttribute('aria-label') ?? ''} ${b.textContent ?? ''}`) && b.getClientRects().length > 0).length,
   };
 });
@@ -120,6 +123,8 @@ test('[LC-WF-TYPE] header and step labels in Source Sans 3 and Wayfinch\'s colou
       expect(facts.within, where).toBe(true);
       expect(facts.sideways, where).toBe(false);
       expect(facts.themeButtons, where).toBe(1);
+      expect(facts.icon, where).toBe(24);
+      expect(facts.titleLines, where).toBe(1);
     }
     expect(new Set(seen), `${width} px: both themes`).toEqual(new Set(['dark', 'light']));
   }

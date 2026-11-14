@@ -3,13 +3,13 @@
 // Trip), Check's last button says "Back to step one", the footer is English, and the header and step labels use Wayfinch's own
 // Source Sans 3, the very files the app loads, precached. The browser side (both themes, 320/360 px and wide, offline) is in
 // tests/e2e/app-planner-look.spec.ts. The page is never printed here: failures show short texts and counts only.
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { buildDist } from '../../../tools/build.mjs';
+import { buildDist, writePageFont } from '../../../tools/build.mjs';
 import { bannedHits } from '../../fixtures/banned.ts';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -53,8 +53,16 @@ describe('the name and the steps', () => {
       'Weather unchecked. Choose a place in Ride.',
       'Return to Ride and retry the weather check.',
       'Return to Ride to retry or upload a GPX track.',
+      'daily details and refresh are in Ride.',
     ]) expect(PAGE, line).toContain(line);
-    for (const old of [/add a route in Trip/, /Add a date in Trip/, /ends in Trip/, /Retry in Trip/, /Choose a place in Trip/, /Return to Trip/]) expect(PAGE, String(old)).not.toMatch(old);
+    for (const old of [/add a route in Trip/, /Add a date in Trip/, /ends in Trip/, /Retry in Trip/, /Choose a place in Trip/, /Return to Trip/, /are in Trip/]) expect(PAGE, String(old)).not.toMatch(old);
+    // nothing on the page sends the rider "in Trip" any more: the Trip that stays is Wayfinch's ("Back to Trip", "the route from Trip")
+    expect(PAGE.match(/\bin Trip\b/g) ?? []).toEqual([]);
+    // the buttons on Check that go to step one name it as the step labels do (review of PR 159, m1)
+    const jumps = [...PAGE.matchAll(/jump:'trip',label:'([^']*)'/g)].map((m) => m[1]);
+    expect(jumps.length).toBeGreaterThan(0);
+    expect(jumps.filter((label) => /\btrip\b/i.test(label!))).toEqual([]);
+    expect(jumps).toContain('Review ride');
   });
 
   test('[LC-WF-FOOT] the footer is English: "Imprint and privacy" opens the same dialog, and no Load Check tagline', () => {
@@ -63,6 +71,20 @@ describe('the name and the steps', () => {
     expect(button?.hasAttribute('lang')).toBe(false);
     expect(PAGE).toContain("$('legalBtn').onclick = openLegal;");
     expect(text(doc.querySelector('footer.sitefoot>span'))).toBe('Bag planner · a free tool, and its figures are estimates');
+  });
+
+  test('[LC-WF-NAME] the printed checklist and the import messages name the Bag planner (review of PR 159, m2); stored and sent values keep theirs', () => {
+    for (const line of [
+      '<h1>Bag planner · Packing checklist</h1>',
+      'Printed from your current plan in the Bag planner.',
+      'aria-label="Import a Bag planner JSON export"',
+      "'That file is too large. Import a Bag planner export up to 64 MiB.'",
+      "return 'That is not a Bag planner export.';",
+      "'That is not a Bag planner JSON export. Drop the .json file here, or choose one.'",
+    ]) expect(PAGE, line).toContain(line);
+    for (const old of [/Load Check · Packing checklist/, /current Load Check plan/, /Import a Load Check/, /not a Load Check/]) expect(PAGE, String(old)).not.toMatch(old);
+    // the export's own name and the keys stay as they are: old exports import, old data loads
+    expect(PAGE).toContain("d.app !== 'load-check'");
   });
 });
 
@@ -101,5 +123,40 @@ describe('the font', () => {
     // the off build: no font file of the page, nothing else changed by it
     const offBuild = JSON.parse(readFileSync(join(off, 'build.json'), 'utf8')) as { files: Record<string, string> };
     expect(Object.keys(offBuild.files).some((f) => f.startsWith('/tools/'))).toBe(false);
+  });
+});
+
+// Review of PR 159, m3: a real shell (one that loads the app from /assets/) whose stylesheet link is missing or written another way never
+// lets the build go on quietly; the link is found whatever the order of its attributes. Only a stand-in shell with nothing from /assets/
+// (the build tests' own) has nothing to write.
+describe('the font file, in the build', () => {
+  const RULE = '@font-face{font-family:"Source Sans 3";font-weight:600;font-style:normal;font-display:swap;src:url(/assets/source-sans-3-latin-600-normal-AbCd1234.woff2)format("woff2")}';
+  const site = (shell: string, css?: string): string => {
+    const dir = mkdtempSync(join(tmpdir(), 'wf-page-font-'));
+    mkdirSync(join(dir, 'assets'));
+    writeFileSync(join(dir, 'index.html'), shell);
+    if (css !== undefined) writeFileSync(join(dir, 'assets', 'style-x.css'), css);
+    return dir;
+  };
+  const SCRIPT = '<script type="module" src="/assets/index-x.js"></script>';
+
+  test('[LC-WF-FONT] a shell that loads the app without a stylesheet link fails the build loudly', () => {
+    const dir = site(`<!doctype html>${SCRIPT}<div id="app"></div>`);
+    expect(() => writePageFont(dir)).toThrow(/no stylesheet link/);
+    expect(existsSync(join(dir, 'tools', 'bags', 'font.css'))).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('[LC-WF-FONT] the stylesheet link is found with href before rel; a stylesheet without Source Sans 3 fails the build', () => {
+    const good = site(`<!doctype html>${SCRIPT}<link crossorigin href="/assets/style-x.css" rel="stylesheet">`, `body{margin:0}${RULE}`);
+    writePageFont(good);
+    expect(readFileSync(join(good, 'tools', 'bags', 'font.css'), 'utf8').match(/@font-face\{[^}]*\}/g)).toEqual([RULE]);
+    const bare = site(`<!doctype html>${SCRIPT}<link rel="stylesheet" href="/assets/style-x.css">`, 'body{margin:0}');
+    expect(() => writePageFont(bare)).toThrow(/no Source Sans 3/);
+    // a test's stand-in shell, with nothing from /assets/: nothing to write, no error
+    const stand = site('<!doctype html><div id="app"></div>');
+    expect(() => writePageFont(stand)).not.toThrow();
+    expect(existsSync(join(stand, 'tools', 'bags', 'font.css'))).toBe(false);
+    for (const dir of [good, bare, stand]) rmSync(dir, { recursive: true, force: true });
   });
 });
