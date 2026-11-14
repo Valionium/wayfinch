@@ -1053,6 +1053,65 @@ describe('[TRIP-DAY-BAGS] a day ride from Wayfinch gets a plan to ride with (own
   });
 });
 
+/** The weather archive's answer for every year asked: 30 days, `wet` of them with rain (1 mm or more), 2 to 9 °C. It lands once `hold` settles. */
+function weatherLands(page: VM, wet: number, hold: Promise<unknown> = Promise.resolve()) {
+  const daily = { temperature_2m_min: Array.from({ length: 30 }, () => 2), temperature_2m_max: Array.from({ length: 30 }, () => 9),
+    precipitation_sum: Array.from({ length: 30 }, (_, i) => (i < wet ? 3 : 0)) };
+  page.context.fetch = async (url: string) => {
+    if (!String(url).includes('archive-api')) throw new Error('offline');
+    await hold;
+    return { ok: true, json: async () => ({ daily }) };
+  };
+}
+const ticks = (ms = 20) => new Promise((r) => setTimeout(r, ms));
+
+// The sweep of 14 Nov 2026, #24: the small view listed the top tube bag and nothing more, while the full planner's Check for the same plan
+// said "0.8 litres over · Rain trousers". The bags were sized before the measured weather of the trip came in (17 rain days in November
+// near Heidelberg, where the planner's own model says fewer), and the rain trousers that weather calls for were ticked only later.
+describe('[TRIP-SMALL-OVER] a day ride\'s bags are sized with the trip\'s weather, and the small view names whatever does not fit (sweep 14 Nov 2026, #24)', () => {
+  test('the measured weather that comes in while the bags are planned is in the plan: the rain trousers it calls for have a place, nothing is over', async () => {
+    const p = await dayRide('2026-11-15');
+    weatherLands(p.page, 17, ticks(30));   // in 30 ms: within the few seconds the planning waits for the weather
+    await p.page.run('receiveHandoff()');
+    expect(await p.page.run('planTripBags()')).toBe(true);
+    expect(p.json<string>('tripClimate().source')).toBe('measured');
+    expect(p.json<boolean>(`carrying('rainpants')`)).toBe(true);
+    expect(p.json('currentPlan().spill.map(k=>k.id)')).toEqual([]);
+    expect(p.json<boolean>('$("smallOver").hidden')).toBe(true);
+    expect(String(p.page.nodes.get('smallBagList')!.innerHTML)).toContain('Rain trousers');
+    // the trip setup made for the route holds the same kit
+    expect(p.json<boolean>('SETUPS[0].kit.rainpants')).toBe(true);
+  });
+
+  test('weather that comes in after the plan brings its kit in at once, as the next start would; the small view then names what does not fit, its litres and what to do; Undo still works', async () => {
+    const p = await dayRide('2026-11-15');
+    let land = () => {};
+    weatherLands(p.page, 17, new Promise<void>((r) => { land = r; }));
+    p.page.run('CLIMATE_WAIT_MS=0;');   // a slow network: the planning does not wait for it
+    await p.page.run('receiveHandoff()');
+    expect(await p.page.run('planTripBags()')).toBe(true);
+    expect(p.json<boolean>(`carrying('rainpants')`)).toBe(false);   // the planner's own model: rain is not likely
+    land(); await ticks();
+    expect(p.json<string>('tripClimate().source')).toBe('measured');
+    expect(p.json<boolean>(`carrying('rainpants')`)).toBe(true);   // as the full planner's Check and the next start have it
+    p.page.run('renderSmallBags()');   // the page's packing check redraws it (renderResult; a stub in this harness)
+    // 1.2 L of top tube bag and the rain trousers' 0.8 L: something is over now
+    const over = p.json<string[]>(`[...new Set(currentPlan().spill.map(k=>k.id))].map(id=>id==='tubes'?'Spare tube':kitById(id).name)`);
+    expect(over.length).toBeGreaterThan(0);
+    // packed afresh for the new kit, as Plan bags packs it: Re-plan would leave no less over (sweep #25)
+    expect(p.json<number>('currentPlan().summary.overL')).toBe(p.json<number>('freshPlan({bags:S.bags,placements:null}).summary.overL'));
+    expect(p.json<boolean>('$("smallOver").hidden')).toBe(false);
+    const line = String(p.page.nodes.get('smallOver')!.textContent);
+    expect(line).toMatch(/^Does not fit in these bags: /);
+    for (const name of over) expect(line).toMatch(new RegExp(`${name} \\(\\d+(\\.\\d+)? L\\)`));
+    expect(line).toMatch(/Open the full Bag planner/);
+    expect(line).toMatch(/leave/);
+    expect(bannedHits(line)).toEqual([]);
+    // the weather's kit is not the rider's work: Undo still takes the plan back
+    expect(await p.page.run('undoTripBags()')).toBe(true);
+  });
+});
+
 // Pockets on a day ride (owner, 9 Nov 2026): riders on an afternoon ride mostly wear bib shorts and a jersey with pockets, so the small
 // things ride there, counted as carried room, not as bags; the frame bag only when really necessary.
 describe('[TRIP-DAY-POCKETS] a day ride counts the jersey and bib shorts pockets as carried room (owner, 9 Nov 2026)', () => {

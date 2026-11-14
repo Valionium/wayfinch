@@ -2231,7 +2231,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <!-- the small view's list (owner, 9 Nov 2026): what goes in each bag, water in one line, at most one line on what does not fit -->
     <div class="small-bags" id="smallBags" hidden>
       <div id="smallBalance"></div>
-      <p class="small-over" id="smallOver" hidden></p>
+      <p class="small-over" id="smallOver" role="status" hidden></p>
       <div id="smallBagList"></div>
       <p class="small-water" id="smallWater"></p>
       <p class="small-water" id="smallWear" hidden></p>
@@ -7057,6 +7057,16 @@ const CLIMATE_KEY = 'loadcheck:climate';
 
 let CLIMATE = {};          // "lat,lon,month" -> normals, kept between visits
 let CLIMATE_PENDING = {};  // in-flight, so a re-render does not refetch
+// The same fetches as promises, so Plan bags for this trip can wait for the trip's weather before it sizes the bags (sweep 14 Nov 2026, #24)
+const CLIMATE_LANDING = {};
+// How long Plan bags for this trip waits for the weather at most; what lands later still brings its kit in (climateLanded).
+let CLIMATE_WAIT_MS = 5000;
+function tripClimateSettled(ms = CLIMATE_WAIT_MS){
+  const all = Object.values(CLIMATE_LANDING);
+  if(!all.length || !(ms > 0)) return Promise.resolve();
+  let timer = null;
+  return Promise.race([Promise.all(all).catch(() => {}),new Promise(r => { timer = setTimeout(r, ms); })]).finally(() => clearTimeout(timer));
+}
 
 // A failed lookup lives for this visit only (Retry weather is there for it); kept between visits it would never be tried again.
 function savedClimate(all){
@@ -7219,17 +7229,32 @@ function ensureClimate(place, month){
   const k = climateKey(place.lat, place.lon, month);
   if(CLIMATE[k] || CLIMATE_PENDING[k]) return;
   CLIMATE_PENDING[k] = true;
-  fetchNormals(place.lat, place.lon, month).then(async n => {
+  CLIMATE_LANDING[k] = fetchNormals(place.lat, place.lon, month).then(async n => {
     delete CLIMATE_PENDING[k];
     CLIMATE[k] = n || { source: 'failed' };
     await store.set(CLIMATE_KEY, savedClimate(CLIMATE));
+    if(n) climateKitFollows();
     renderClimate(); renderResult();
   }).catch(async () => {
     delete CLIMATE_PENDING[k];
     CLIMATE[k] = { source: 'failed' };
     await store.set(CLIMATE_KEY, savedClimate(CLIMATE));
     renderClimate(); renderResult();
-  });
+  }).finally(() => { delete CLIMATE_LANDING[k]; });
+}
+/* Measured figures that land bring the kit they call for (rain trousers, warm layers) at once, as the next start would: only kit the
+   rider never touched (applyTripKitDefaults). Before, it came only at the next start or at Kit, so the small view of a day ride listed
+   a plan without the rain trousers while the packing check said they were over (sweep 14 Nov 2026, #24). Not the rider's work, so
+   Plan bags for this trip's Undo still holds; while the rider has not worked on that plan since, it is packed afresh, as Plan bags packs
+   it (#25: the kept packing left more over than Re-plan's). */
+function climateKitFollows(){
+  const was=JSON.stringify(S.kit),undo=TRIP_BAGS.undo,kept=undo && tripWorkKey(captureDraft()) === undo.after;
+  applyTripKitDefaults();
+  if(JSON.stringify(S.kit) === was) return false;
+  if(kept){ keepPlan({load:null}); undo.after=tripWorkKey(captureDraft()); }
+  if(S.step === 3) renderKit();
+  drawRig(); queueDraftSave();
+  return true;
 }
 function failedClimatePlaces(){
   const places = [S.place, S.place2, routeHigh()].filter(Boolean);
@@ -12712,9 +12737,12 @@ function renderSmallBags(A){
   $('smallLeft').hidden=!left.length; $('smallLeft').textContent=left.length ? `Left at home: ${listOf(left)}.` : '';
   const out=m.groups.filter(g => g.id === 'overflow' || g.id === 'unassigned').flatMap(g => g.items);
   const long=out.some(row => row.tooLong);
+  // each with the litres that have no place, the packing check's own figure (sweep 14 Nov 2026, #24: say plainly what does not fit)
+  const overL=row => { const o=row.placements.find(p => p.kind === 'overflow'); return +(o ? o.L : row.L).toFixed(2); };
+  const one=out.length === 1;
   $('smallOver').hidden=!out.length;
-  $('smallOver').textContent=out.length ? `${out.map(name).join(', ')} ${out.length === 1 ? 'does' : 'do'} not fit in these bags${
-    long ? ' (too long for them)' : ''}. Open the full Bag planner to add a bag or leave something at home.` : '';
+  $('smallOver').textContent=out.length ? `Does not fit in these bags: ${out.map(row => `${name(row)} (${overL(row)} L)`).join(', ')}${
+    long ? ', too long for them' : ''}. Wear ${one ? 'it' : 'them'} or leave ${one ? 'it' : 'them'} at home. Open the full Bag planner to add a bag or a bigger one.` : '';
 }
 // The pockets' line and switches (owner, 9 Nov 2026): "In your jersey pockets: …", and Jersey pockets and Bib shorts pockets to turn off.
 function pocketsHtml(){
@@ -12963,6 +12991,10 @@ async function planTripBags(){
     showHandoffBar('The route from Wayfinch could not be read. Your plan is unchanged.',{apply:true,plan:true,reuse:!!HANDOFF.reuse});
     return false;
   }
+  // the bags are sized for the kit the trip's own weather calls for: its measured figures, fetched as the route went in, are waited for a
+  // few seconds at most (sweep 14 Nov 2026, #24: the rain trousers of a wet November came in after the bags, and did not fit)
+  await tripClimateSettled();
+  applyTripKitDefaults();
   if(!HANDOFF.long) oneSpareTube();   // a day ride's one spare tube (owner, 9 Nov 2026), before its bags are sized
   if(!HANDOFF.long && afternoonRide() && !S.pockets) S.pockets={jersey:true,bib:true};   // the jersey and bib shorts pockets (owner, 9 Nov 2026)
   const proposal=gearBags().length ? null : proposedTripBags();   // nothing mounted to start from: the smallest setup that holds the kit
