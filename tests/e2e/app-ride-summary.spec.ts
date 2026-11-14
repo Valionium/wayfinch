@@ -111,3 +111,38 @@ test('[LC-MODE-KIT] Comfortable or Lightweight is chosen at the start of Kit; Ch
   await expect(page.locator('#s4 #modeBar')).toHaveCount(0);
   expect(await page.evaluate('S.mode')).toBe('light');
 });
+
+test('[LC-MODE-KIT] Check says where Comfortable is now: at the start of Kit, one tap away, never a switch that is not on the screen (review of PR 166, I1)', async ({ page }) => {
+  app = await loadApp(page, { launch: true, path: '/tools/bags/' });
+  await ready(page);
+  await page.evaluate(() => localStorage.setItem('loadcheck:walkthrough:v1', 'done'));
+  await page.evaluate('S.nights = 4; S.sleep = "camp"; S.nightsOpen = null; applyTripKitDefaults(); go(3);');
+  await page.locator('#s3 #modeBar button[data-mode="light"]').click();
+  await page.locator('#crumbs button[data-to="4"]').click();
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();   // the weight question, skipped
+  const leave = page.locator('#resultBox details.sec', { hasText: 'Leave it behind' });
+  await leave.evaluate((d) => { (d as HTMLDetailsElement).open = true; });
+  const note = leave.locator('.finding.cut', { hasText: 'Lightweight has left' });
+  await expect(note).toBeVisible();
+  await expect(note).toContainText('Choose Comfortable at the start of Kit to bring them back.');
+  expect(await page.locator('#s4').textContent()).not.toMatch(/Switch to (Comfortable|Lightweight)/);
+  const go = note.getByRole('button', { name: 'Go to Comfortable in Kit' });
+  expect((await go.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await go.click();
+  await expect(page.locator('#s3')).toBeVisible();
+  await expect(page.locator('#s3 #modeBar button[data-mode="comfort"]')).toBeFocused();
+});
+
+test('[LC-RIDE-FOLD] Check\'s Review ride opens Ride\'s fields, folded or not, with the focus on Retry weather when the weather failed (review of PR 166, I2)', async ({ page }) => {
+  await tripPlanned(page);   // the e2e helpers block the climate requests: the trip's measured weather fails
+  await page.locator('#crumbs button[data-to="4"]').click();
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();   // the weight question, skipped
+  const review = page.locator('#verdictBox [data-result-jump="trip"]');
+  await expect(review).toHaveText('Review ride');
+  await review.click();
+  await expect(page.locator('#s1')).toBeVisible();
+  await expect(page.locator('#rideFields')).toBeVisible();
+  await expect(page.locator('#rideChange')).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#retryWeather')).toBeVisible();
+  await expect(page.locator('#retryWeather')).toBeFocused();
+});

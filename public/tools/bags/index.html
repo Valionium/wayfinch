@@ -11635,13 +11635,22 @@ function firstFixes({weatherReady,miss,over,fix,routeFailed,spill,stranded}){
     jump:gearBags().length ? 'cuts' : 'bags',label:gearBags().length ? 'Review overflow' : 'Add your bags'});
   if(spill.some(k=>k.tooLong)) items.push({text:'Some items are too long for the available bags. Check another position or carry suitable items outside.',jump:'length',label:'Review long items'});
   if(stranded.some(x=>x.item && x.item.rainkit)) items.push({text:'Rain gear is buried in a bag that needs unpacking. Move it somewhere reachable.',jump:'reach',label:'Review access'});
-  if(routeFailed) items.push({text:'Retry the route calculation or load a GPX before relying on distance and climbing.',jump:'trip',label:'Review route'});
+  if(routeFailed) items.push({text:'Retry the route calculation or load a GPX before relying on distance and climbing.',jump:'route',label:'Review route'});
   return `<section class="firstfixes" aria-labelledby="firstFixesTitle"><h3 id="firstFixesTitle">${items.length ? 'Fix these first' : 'Ready to pack'}</h3>${items.length
     ? `<ol>${items.slice(0,4).map(item=>`<li><span>${htmlEsc(item.text)}</span><button class="linky retry" data-result-jump="${item.jump}">${item.label}</button></li>`).join('')}</ol>`
     : '<p>No issues were flagged in the current check. Use the bag-by-bag list to mark what you have packed.</p><button class="linky retry" data-result-jump="allocation">Open packing list</button>'}</section>`;
 }
 function jumpToResult(target){
-  const step={trip:1,bags:2,kit:3}[target];
+  // Comfortable or Lightweight sits at the start of Kit since the ruling of 14 Nov 2026: there, the focus on the choice (review of PR 166, I1)
+  if(target === 'comfort'){ go(3); $('modeBar').querySelector('[data-mode="comfort"]').focus(); return; }
+  // Check's Review ride and Review route open Ride's fields, folded or not, with the focus on the retry they ask for (I2)
+  if(target === 'trip' || target === 'route'){
+    RIDE_OPEN = true; go(1);
+    const retry = $(target === 'trip' ? 'retryWeather' : 'retryRoute');
+    if(retry && retry.isConnected){ retry.focus({preventScroll:true}); retry.scrollIntoView?.({block:'center'}); }
+    return;
+  }
+  const step={bags:2,kit:3}[target];
   if(step){ go(step); return; }
   const title={missing:'Missing',cuts:'Leave it behind',allocation:'Where it goes',reach:'Can you reach it',length:'Long and rigid'}[target];
   const detail=[...$('resultBox').querySelectorAll('.sec')].find(el=>el.querySelector('summary b')?.textContent === title);
@@ -11745,7 +11754,8 @@ function renderResult(){
   const strippedNote = stripped.length
     ? `<div class="finding cut"><b>Lightweight has left ${stripped.length} thing${stripped.length>1?'s':''} at home</b>
        <p>${htmlEsc(listOf(stripped.map(k => kitName(k))))} — <b>${stripped.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L</b>
-       and ${stripped.reduce((s,k)=>s+itemKg(k),0).toFixed(1)} kg. Switch to <b>Comfortable</b> to bring them back.
+       and ${stripped.reduce((s,k)=>s+itemKg(k),0).toFixed(1)} kg. Choose <b>Comfortable</b> at the start of Kit to bring them back.
+       <button class="linky retry" type="button" data-result-jump="comfort">Go to Comfortable in Kit</button>
        ${infoHelp('How Lightweight changes the load','<p>Lightweight excludes eligible comfort items from the carried kit while leaving their checkboxes selected. Comfortable includes them again. Safety items are not removed by this mode.</p>')}</p></div>`
     : '';
   let fixBody = '';
@@ -11936,7 +11946,7 @@ function renderResult(){
       + swapNote
       + `<div class="finding note"><b>Mount these ${slots.length}</b><p>${slots.map(unitLabel).join(', ')}.</p></div>`
     : (swapNote || `<div class="emptyfind">${S.mode==='comfort'
-      ? 'Comfortable keeps your bike bags mounted for spare room. Switch to Lightweight to check which bags you can leave at home.'
+      ? 'Comfortable keeps your bike bags mounted for spare room. Choose Lightweight at the start of Kit to check which bags you can leave at home.'
       : 'No bag removals are suggested for this packing arrangement.'}</div>`))
     + (emptyMounted ? `<div class="finding note"><p>${emptyMounted}</p></div>` : '');
 
@@ -12439,6 +12449,7 @@ function renderResult(){
   });
   if($('applyCal')) $('applyCal').onclick = applyCalibration;
   if($('resetCal')) $('resetCal').onclick = resetCalibration;
+  $('resultBox').querySelectorAll('[data-result-jump]').forEach(b => b.onclick = () => jumpToResult(b.dataset.resultJump));
   $('resultBox').querySelectorAll('.kitact[data-ids]').forEach(btn => btn.onclick = () => {
     const open = [...$('resultBox').querySelectorAll('.sec')].map(s => s.hasAttribute('open'));
     const scroll = window.scrollY;
