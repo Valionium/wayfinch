@@ -110,7 +110,7 @@ export const STEP_LINES: Readonly<Record<StepLine, string>> = {
   'drive-two': 'The cranks turn on the bottom bracket at the frame\'s lowest point; the chain runs from the chainrings to the rear gears, and a derailleur at each end moves it.',
   'drive-hub': 'The cranks turn on the bottom bracket at the frame\'s lowest point; the chain runs from the chainring to the one sprocket of the hub gears.',
   'drive-belt': 'The cranks turn on the bottom bracket at the frame\'s lowest point; the belt runs from the front ring to the sprocket of the hub gears, through a gap in the frame.',
-  'drive-chain': 'The cranks turn on the bottom bracket at the frame\'s lowest point; the chain runs from the chainring to the rear wheel.',
+  'drive-chain': 'The cranks turn on the bottom bracket at the frame\'s lowest point; the chain runs from the chainring to the one sprocket on the rear wheel: a single speed.',
   'brakes-disc': 'Each caliper bolts to the frame or the fork beside its disc, which is fixed to the hub; a hose or cable runs to the lever, which clamps to the bar that comes next.',
   'brakes-rim': 'Each rim brake is fixed to the fork or the frame by the rim; a cable or hose runs to the lever, which clamps to the bar that comes next.',
   'cockpit-drop': 'The stem clamps onto the steerer above the headset and holds the bar; the shifters sit in the brake levers, and tape wraps the bar.',
@@ -146,9 +146,10 @@ export const LN = {
   // A bike always has brakes and gears (review of PR 127/128, I2 and I3): what the page shows for an answer not given, said plainly.
   showsBrakes: (why: 'unset' | 'other') => (why === 'unset'
     ? 'Your bike\'s brakes aren\'t set, so this shows disc brakes.'
-    : 'Your bike has another kind of brake (a coaster or drum brake, say); this shows disc brakes.'),
+    : 'Your bike\'s brakes are set as Other (a coaster or drum brake, say); this shows disc brakes.'),
   showsDrive: 'Your bike\'s gears aren\'t set, so this shows derailleur gears.',
   setThem: 'Set them in Bike details',
+  single: 'Your bike has one gear, a single speed: nothing to shift.',
   list: 'All parts',
   connects: 'Connects to',
   onlyOn: (tag: string) => `Only on bikes with ${tag}.`,
