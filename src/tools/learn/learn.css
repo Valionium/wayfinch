@@ -23,6 +23,9 @@
 .bl-figure { margin: 4px 0 0; }
 .bl-canvas { position: relative; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: pointer; }
 .bl-canvas.bl-zoomed { touch-action: none; }
+/* No tap highlight (the owner's report of 14 Nov 2026): the hand cursor is inherited by all the drawing holds, and a phone highlighted the
+   outermost element showing it, the whole drawing, as one box. The part tapped is marked in blaze; the part buttons keep the focus ring. */
+.bl-canvas, .bl-canvas * { -webkit-tap-highlight-color: transparent; }
 .bl-svg { display: block; width: 100%; height: auto; }
 .bl-art { overflow: hidden; }
 .bl-extra { fill: none; stroke: var(--line); stroke-linecap: round; stroke-linejoin: round; }
