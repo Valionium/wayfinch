@@ -9,6 +9,7 @@ import { closeDb, openDb, ROUTE_META_PREFIX, ROUTE_STORES, STORES } from '../../
 import { readInputs } from '../../../src/store/inputs.ts';
 import { addPosition, confirmWater, readPlanTomorrow, setPlanTomorrow } from '../../../src/store/positions.ts';
 import { saveForecast, saveHours, savePrepared, saveZones } from '../../../src/store/prepared.ts';
+import { PREP_TICKS_KEY, readTicks, setTick } from '../../../src/store/prep-ticks.ts';
 import { NotPutBackError, removeTrip, TRIP_KEYS } from '../../../src/store/remove-trip.ts';
 import { readSettings, writeSettings } from '../../../src/store/settings.ts';
 import { DEFAULT_SETTINGS } from '../../../src/store/rules.ts';
@@ -127,8 +128,9 @@ async function freshPhone(db: Dump, local: string): Promise<void> {
   for (const [k, v] of JSON.parse(local) as [string, string][]) localStorage.setItem(k, v);
 }
 
-test('[TRIP-REMOVE] the trip keys are the ones the app writes: the plan for tomorrow, the looked-up heights mark and the handoff envelope', () => {
-  expect([...TRIP_KEYS].sort()).toEqual([HANDOFF_KEY, HEIGHTS_FLAG, PLAN_TOMORROW_KEY].sort());
+// Before you leave's ticks are the trip's too (Trip prep; the coordinator's ruling on PR 155: Remove this trip clears them).
+test('[TRIP-REMOVE] the trip keys are the ones the app writes: the plan for tomorrow, the looked-up heights mark, the handoff envelope and the prep ticks', () => {
+  expect([...TRIP_KEYS].sort()).toEqual([HANDOFF_KEY, HEIGHTS_FLAG, PLAN_TOMORROW_KEY, PREP_TICKS_KEY].sort());
   // Every store is either the trip's or the rider's: a store added later must be put on one side.
   expect([...STORES].sort()).toEqual([...ROUTE_STORES, 'trip', 'calibration', 'meta', HANDOFF_STORE].sort());
 });
@@ -418,4 +420,29 @@ test('[TRIP-REMOVE-FAIL] the database refuses and the nights can not be put back
   }
   // The trip itself is whole.
   expect((await readTrip())?.route.id).toBe(trip().route.id);
+});
+
+test("[TRIP-PREP-TICKS] [TRIP-REMOVE] Remove this trip clears Before you leave's ticks, so the same route added again starts unticked; refused, they are put back", async () => {
+  await tripPhone();
+  const id = trip().route.id;
+  expect(setTick(id, 'kit', true)).toEqual(['kit']);
+  // the database refuses half-way: the ticks are put back with the other keys
+  const proto = Object.getPrototypeOf((await openDb()).transaction(HANDOFF_STORE).store) as { clear: () => unknown };
+  const real = proto.clear;
+  proto.clear = function (this: unknown) {
+    if ((this as { name?: string }).name === HANDOFF_STORE) throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+    return real.call(this);
+  };
+  try {
+    await expect(removeTrip(trip().route)).rejects.toMatchObject({ name: 'QuotaExceededError' });
+  } finally {
+    proto.clear = real;
+  }
+  expect(readTicks(id)).toEqual(['kit']);
+  // removed: the key is gone, and the very same route saved again has no ticks
+  await removeTrip(trip().route);
+  expect(localStorage.getItem(PREP_TICKS_KEY)).toBeNull();
+  await saveTrip(trip());
+  expect((await readTrip())?.route.id).toBe(id);
+  expect(readTicks(id)).toEqual([]);
 });

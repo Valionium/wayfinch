@@ -11,11 +11,31 @@ import { showKm, W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
 import { BD } from '../../core/wording/en-beds.ts';
 import { TF } from '../../core/wording/en-trip-fields.ts';
+import { CC } from '../../core/wording/en-climb.ts';
 import { Glyph, ICON_WORD, slotsOf } from '../ahead/strip.tsx';
+import { bikeSource } from '../bike/live.ts';
 import { Card } from '../card.tsx';
+import { lazy } from '../lazy.tsx';
 import { OsmCredit } from './credit.tsx';
 import { PROFILE_BOX, packDate, profileY, summaryOf } from './model.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
+
+// Climb check's list is a chunk of its own, loaded when the rider opens it (CC-TRIP).
+const ClimbList = lazy(() => import('./climb-check.tsx').then((m) => m.ClimbList));
+
+/** Climb check (CC-TRIP): one button under the days, folded until the rider opens it. An e-bike gets no walk judgement (CC-EBIKE). */
+function ClimbCheck({ trip }: { trip: Trip }) {
+  const [open, setOpen] = useState(false);
+  const ebike = bikeSource.value.bike?.look?.ebike === true;
+  return (
+    <div data-climb-check>
+      <button type="button" class="btn" aria-expanded={open ? 'true' : 'false'} aria-controls={open ? 'trip-climb-check' : undefined} onClick={() => setOpen(!open)}>{CC.appClimbButton}</button>
+      {open
+        ? <div id="trip-climb-check"><ClimbList route={trip.route} flatKph={trip.flatKph} ebike={ebike} /></div>
+        : <p class="muted">{CC.appClimbAbout}</p>}
+    </div>
+  );
+}
 
 /**
  * Room above the line for the icons: the profile grows from 72 to 118 px (design §6). Each icon stands on the line, its bottom at
@@ -232,7 +252,8 @@ export function RouteSummary({ snap, stops, beds, settle = settleStops, choices 
           })}
         </ol>
         <p class="visually-hidden" role="status" aria-live="polite" data-stop-said>{said}</p>
-        {missingHeights ? <p class="muted">{TR.appTripHeightsPending}</p> : snap.heightsLookedUp ? <p class="muted">{W.appTripHeightsCredit}</p> : null}
+        <ClimbCheck trip={trip} />
+        {missingHeights ? <p class="muted">{TR.appTripHeightsPending}</p> : snap.heightsLookedUp ? <p class="muted">{TF.appTripHeightsCredit}</p> : null}
         {trip.route.source === 'planned' || snap.prepared?.build ? <OsmCredit lead={TF.appTripOsmLead} date={packDate(snap.prepared?.build)} /> : null}
         <p class="muted"><a href="/legal/licences/">{W.appTripLicences}</a></p>
       </div>

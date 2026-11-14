@@ -1,0 +1,11 @@
+/* Trip prep's list in the Go step (design of 15 November 2026). The tick boxes are Trip's .choice-option (trip.css): 44 px tall. */
+.prep { margin: 0 0 12px; }
+.prep h3 { font-size: 1rem; margin: 0 0 4px; }
+.prep-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.prep-list li { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; border-top: 1px solid var(--line); }
+.prep-list li:first-child { border-top: 0; }
+.prep-tick { flex: 1 1 14rem; min-width: 0; align-items: flex-start; padding: 10px 0; }
+.prep-tick input { flex: none; margin: 0; }
+.prep-tick span { overflow-wrap: anywhere; }
+.prep-link { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
+a.prep-link { padding: 0 4px; color: var(--blaze); }

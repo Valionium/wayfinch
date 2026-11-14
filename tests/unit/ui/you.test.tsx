@@ -320,11 +320,20 @@ describe('Settings (spec sections 3.5 and 6.6)', () => {
   });
 
   test("[YOU-INSTALL-ANDROID] You's settings say how to install on Android: with Chrome, since other browsers' installed apps may be blocked by Play Protect (owner, 7 Nov 2026)", async () => {
+    const ua = Object.getOwnPropertyDescriptor(navigator, 'userAgent');
+    Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) Chrome/130.0 Mobile Safari/537.36' });
     await show(services());
     const settings = host.querySelector('[data-you-settings]')!;
     expect(settings.textContent).toContain(Y.youInstallAndroid);
     // Chrome names it either way, by version and site (re-check of PR 65, R4)
     expect(Y.youInstallAndroid).toBe('On Android, install with Chrome (⋮ → Install app, or Add to home screen); other browsers may be blocked by Play Protect.');
+    if (ua) Object.defineProperty(navigator, 'userAgent', ua); else delete (navigator as unknown as Record<string, unknown>).userAgent;
+  });
+
+  test('[YOU-INSTALL-ANDROID] the Android hint shows on Android only: a desktop browser or an iPhone is not told about Chrome on Android (sweep 14 Nov, 54)', async () => {
+    await show(services());
+    expect(host.querySelector('[data-you-install]')).toBeNull();
+    expect(host.querySelector('[data-you-settings]')!.textContent).not.toContain('On Android');
   });
 
   test('[YOU-RIDER] the theme is kept and put on the page at once', async () => {

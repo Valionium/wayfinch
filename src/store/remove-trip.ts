@@ -15,11 +15,12 @@ import { readLocalSettings, SETTINGS_KEY, writeLocalSettings } from './settings-
 import { clearRouteData, PLAN_TOMORROW_KEY, ROUTE_TX, sameLine, stampKey } from './trip.ts';
 
 /**
- * This browser's keys of the trip: the plan for tomorrow, the mark that the route's heights were looked up (ui/trip/services.ts) and
- * Plan bags for this trip's envelope (ui/trip/handoff.ts, whose GPX is in the `handoffs` store). Spelled out here, since the store
- * imports nothing of the screens; a test holds them to the screens' names.
+ * This browser's keys of the trip: the plan for tomorrow, the mark that the route's heights were looked up (ui/trip/services.ts),
+ * Plan bags for this trip's envelope (ui/trip/handoff.ts, whose GPX is in the `handoffs` store) and Before you leave's ticks
+ * (store/prep-ticks.ts; the coordinator's ruling on PR 155). Spelled out here, since the store imports nothing of the screens and this
+ * chunk none of the Prepare step's; a test holds them to their modules' names.
  */
-export const TRIP_KEYS: readonly string[] = [PLAN_TOMORROW_KEY, 'copilot:heights-lookup', 'copilot:handoff:v1'];
+export const TRIP_KEYS: readonly string[] = [PLAN_TOMORROW_KEY, 'copilot:heights-lookup', 'copilot:handoff:v1', 'copilot:tripPrep:v1'];
 
 const HANDOFFS = 'handoffs';
 
