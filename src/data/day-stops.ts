@@ -8,7 +8,7 @@ import type { BedChoice } from '../core/engines/day-beds.ts';
 import { chooseStops, stopsHold, withStops } from '../core/route/day-stops.ts';
 import { sampleGrid } from '../core/route/grid.ts';
 import { planStages } from '../core/route/stages.ts';
-import type { ScreenInputs, Stage, TripStop, TripStops } from '../core/types.ts';
+import type { ScreenInputs, Stage, Trip, TripStop, TripStops } from '../core/types.ts';
 import { announceHere } from '../store/changed.ts';
 import { readInputs } from '../store/inputs.ts';
 import { readLocalSettings } from '../store/settings-local.ts';
@@ -67,8 +67,23 @@ function judged(held: TripStops, fresh: TripStops | null, inputs: ScreenInputs):
  */
 let turn: Promise<unknown> = Promise.resolve();
 
+/** What a settle works the stops out from, besides the places and the nights: the route's days, the stops held, the stay, the date, the pace and the speed. */
+/**
+ * The trip changed under a settle: the store's refusal (NewerDataError) or this file's own check. Told by the error's name, not its
+ * class, so this chunk adds no import from the first screen's (review of the Trip PRs, I2).
+ */
+const STALE = 'NewerDataError';
+const isStale = (e: unknown): boolean => e instanceof Error && e.name === STALE;
+const stale = (): Error => Object.assign(new Error('The trip changed while its stops were settled.'), { name: STALE });
+
+const basisOf = (t: Trip): string => JSON.stringify([t.route.id, t.route.stages, t.stops ?? null, t.stay, t.departureDate, t.pace ?? null, t.flatKph]);
+
 export function settleStops(now: Date, change?: StopChange, o: { announce?: boolean } = {}): Promise<TripStops | null> {
-  const mine = turn.then(() => settling(now, change, o));
+  // The trip changed while this settle worked (review of PR 101, M6): once more, on the trip as it is now, so both changes stay.
+  const mine = turn.then(() => settling(now, change, o).catch((e: unknown) => {
+    if (isStale(e)) return settling(now, change, o);
+    throw e;
+  }));
   turn = mine.catch(() => undefined);
   return mine;
 }
@@ -100,6 +115,9 @@ async function settling(now: Date, change: StopChange | undefined, o: { announce
   if (same) return next;
   const stored = await readTrip();
   if (!stored || stored.route.id !== route.id) return null;
+  // What the stops were worked out from must still be what is stored (M6): another window, or this one, may have changed it since
+  // the inputs were read. From here on the store's own guard refuses a write over a trip another window changed after this read.
+  if (basisOf(stored) !== basisOf(trip)) throw stale();
   const { stops: _old, ...rest } = stored;
   void _old;
   await saveTrip({ ...rest, route: { ...stored.route, stages, sampleGrid: grid }, ...(next ? { stops: next } : {}) });
