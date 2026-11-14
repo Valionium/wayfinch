@@ -132,3 +132,9 @@ export async function settleDayStops(now: Date, store: Pick<PreparedStore, 'read
   if (!settled || settled.route.id !== trip.route.id) throw new RouteGoneError();
   return settled;
 }
+
+/**
+ * After a change of nights, pace or flat speed: the days planned again by the stops' own settle, in the caller's turn (review of
+ * PR 101, M5), so they are written once, already ending at the stops. Beside Prepare's settle, so the first screen names no other chunk.
+ */
+export const replan = async (now: () => Date): Promise<unknown> => (await import('./day-stops.ts')).settleInTurn(now(), undefined, { announce: false });
