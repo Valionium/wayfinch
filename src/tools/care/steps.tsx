@@ -3,8 +3,8 @@
 // one history entry, so the phone's back gesture closes it in one go. While a roadside card is open the screen is kept awake (answer 5).
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { BikeRecord } from '../../core/bike/normalise.ts';
-import { careDetails } from '../../core/care/fit.ts';
-import { stepsShown } from '../../core/care/lines.ts';
+import { careDetails, careFluid } from '../../core/care/fit.ts';
+import { stepsShown, stepWords } from '../../core/care/lines.ts';
 import { pictureDetails, picturesFor, type Shown } from '../../core/care/pictures.ts';
 import { resolveBikeSpec } from '../../core/bike/spec.ts';
 import { cardParts, linkSegments, STEP_PARTS } from '../../core/parts/links.ts';
@@ -185,14 +185,17 @@ export function StepView({ source, bike = null, addHref = null, onClose }: {
   const closePart = (): void => { setPart(null); partFrom.current?.focus(); };
   // the steps that show for this bike, as indexes into the card's steps: pictures and part names keep their own step's index
   const shownSteps = stepsShown(source.item.id, source.item.steps.length, careDetails(bike), pictureDetails(bike).rimBrake);
-  const steps = shownSteps.map((i) => source.item.steps[i]!);
+  // each step's words for the bike: its fluid and its gear shifting where a step says what the bike has (owner's wish of 14 November 2026)
+  const facts = { fluid: careFluid(bike), shifting: careDetails(bike).shifting };
+  const texts = source.item.steps.map((t, i) => stepWords(source.item.id, i, t, facts));
+  const steps = shownSteps.map((i) => texts[i]!);
   const end = endOf(source);
   const last = end ? steps.length + 1 : steps.length;
   const name = source.kind === 'road' ? source.item.problem : source.item.name;
   const titleId = `care-steps-title-${source.item.id}`;
   const details = pictureDetails(bike);
   const pictures = shownSteps.map((i) => picturesFor(source.item.id, i, details));
-  const parts = cardParts(source.item.id, source.item.steps, shownSteps);
+  const parts = cardParts(source.item.id, texts, shownSteps);
   // the rider's bike, for its type and where its motor is, and nothing else (the owner's answer 1)
   const own = bike ? resolveBikeSpec(bike, null) : null;
   const tools = source.kind === 'road'

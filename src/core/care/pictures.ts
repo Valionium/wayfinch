@@ -48,7 +48,8 @@ export const STEP_PICTURES: Readonly<Record<string, readonly StepPicture[]>> = {
   'puncture-tubeless': [null, null, 'tubeless-plug', null, null, null, null],
   'tyre-torn': [null, 'tyre-boot', null, null],
   'spoke-snapped': ['spoke-wrap', RIM_OPEN, null, null, RIM_CLOSE],
-  'brake-rub-rim': [WHEEL_SEAT, null, null, RIM_CENTRE, RIM_OPEN, RIM_CLOSE],
+  // the hydraulic rim brake's own centring step (owner's ruling of 14 November 2026) has no picture: no honest drawing of it exists
+  'brake-rub-rim': [WHEEL_SEAT, null, null, RIM_CENTRE, null, RIM_OPEN, RIM_CLOSE],
   'brake-rub-disc': [WHEEL_SEAT, 'pad-gap', 'disc-bolts', null, null],
   'brake-weak-rim': [null, RIM_CLOSE, BRAKE_BARREL, null, null],
   'brake-weak-disc': [null, null, 'disc-pad-adjust', null, null],
