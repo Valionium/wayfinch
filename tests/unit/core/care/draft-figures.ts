@@ -144,11 +144,18 @@ export const DRAFT_FIGURES: Record<string, Figure[]> = {
   'brakes-spongy': [
     f('note', "do not ride until fixed"), f('who', "brakes are critical, a mistake can cause a crash)"), step(0, "check pads are not"), step(1, "check for fluid leaks"), step(2, "bleed the brake, or"),
   ],
+  // not draft rows: the owner's ruling of 14 November 2026 (a hydraulic rim brake's spongy lever; electronic gears' adjusting), pinned the same way
+  'brakes-hydro-rim-spongy': [
+    f('note', "do not ride until fixed"), f('who', "brakes are critical, a mistake can cause a crash)"), step(0, "check pads are not"), step(1, "check for fluid leaks"), step(2, "magura rim brakes use mineral oil"), step(2, "never mix"), step(3, "bleed the brake, or take it to a shop"),
+  ],
   'chain-replace': [
     step(0, "note the chain length"), step(1, "remove the old chain"), step(2, "join it with a"), step(3, "flex the joined link"), step(4, "replace with the same"), f('time', 'about 20 min'),
   ],
   'gears-indexing': [
     step(0, "shift to the smallest"), step(1, "check the hanger is"), step(2, "check for dirt or"), step(3, "check the cassette lockring"), step(4, "on the biggest rear"), step(5, "worn derailleur pivots or"), f('time', 'about 15 min'),
+  ],
+  'gears-electronic-adjust': [
+    step(0, "check the shifting battery first"), step(1, "pairing again"), step(2, "the maker's app or the shifter buttons"), step(2, "a small step at a time"), step(3, "check the hanger is straight"), step(4, "take it to a shop"),
   ],
   'wheels-wobble': [
     step(3, "do not ride if the rim rubs hard"), step(4, "do not remove the wobble, the rim is probably bent"), f('note', "wheels are critical"), f('note', "a failure can cause a crash"), f('who', "shop (wheels are critical"), step(0, "check the wheel is"), step(1, "check the tyre bead"), step(2, "look for a loose"), step(3, "do not ride if"), step(4, "if spoke tweaks do"),

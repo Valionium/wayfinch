@@ -579,3 +579,28 @@ test('[BC-TELL-US] the "Tell us" link says it opens Bike details; the Tools card
   expect(tellUs()!.getAttribute('href')).toBe(bikeDetailsHref('bike_a', 'care'));
   expect(CL.careCardBody).toMatch(/fitted to your bike's details/);
 });
+
+// The owner's ruling of 14 November 2026: the hydraulic rim brake's spongy lever and electronic gears' adjusting show only for bikes they
+// fit, and under Show all. The kind of rim brake not told: the task shows, its tag naming the kind.
+const tagOf = (id: string): string | null => host.querySelector(`.care-task[data-id="${id}"] .care-tags`)?.textContent ?? null;
+test('[BC-FIT-RIM-KIND] a hydraulic rim brake sees its spongy-lever task, a V-brake not; the kind Not sure tags it "if you have hydraulic rim brakes"; Show all shows it', async () => {
+  await mount(world([bike('bike_m', 'Magura', { brakes: 'rim', rimBrake: 'hydraulic', brakeFluid: 'mineral', drive: 'derailleur', shifting: 'electronic' })]));
+  expect(taskIds()).toContain('brakes-hydro-rim-spongy');
+  expect(taskIds()).toContain('gears-electronic-adjust');
+  expect(tagOf('brakes-hydro-rim-spongy')).toBeNull();
+  render(null, host);
+  await mount(world([bike('bike_v', 'V-brake', { brakes: 'rim', rimBrake: 'v-brake', drive: 'derailleur', shifting: 'cable' })]));
+  expect(taskIds()).not.toContain('brakes-hydro-rim-spongy');
+  expect(taskIds()).not.toContain('gears-electronic-adjust');
+  await click(fitButton()!);
+  expect(taskIds()).toContain('brakes-hydro-rim-spongy');
+  expect(taskIds()).toContain('gears-electronic-adjust');
+  expect(tagOf('brakes-hydro-rim-spongy')).toBe('if you have hydraulic rim brakes');
+  // opened under Show all on a bike it does not fit: as for no bike, the content's own words
+  await click(host.querySelector<HTMLElement>('.care-task[data-id="brakes-hydro-rim-spongy"] .care-open')!);
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  render(null, host);
+  await mount(world([bike('bike_r', 'Rim', { brakes: 'rim' })]));
+  expect(taskIds()).toContain('brakes-hydro-rim-spongy');
+  expect(tagOf('brakes-hydro-rim-spongy')).toBe('if you have hydraulic rim brakes');
+});

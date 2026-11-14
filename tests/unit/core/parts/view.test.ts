@@ -1,5 +1,5 @@
 // The bike view (design of 9 November 2026; the owner's answers of 9 November): which bike it draws (a typical bike of the rider's type,
-// never their colours or details), how each of the 36 parts stands out on it, the view it opens on, and labels that never overlap.
+// never their colours or details), how each of the 37 parts stands out on it, the view it opens on, and labels that never overlap.
 import { createHash } from 'node:crypto';
 import fc from 'fast-check';
 import { expect, test } from 'vitest';
@@ -67,7 +67,7 @@ test("[BV-CARD] the drawing borrows what the card talks about: its conditions fi
 
 const at = (b: ViewBox, p: P, m = 0) => inBox(b, p, m);
 
-test('[BV-SPOT] each of the 36 parts stands out on every type\'s bike that has it, inside the drawing: drawn again from the drawing\'s own elements, as a short piece, or as a ring', () => {
+test('[BV-SPOT] each of the 37 parts stands out on every type\'s bike that has it, inside the drawing: drawn again from the drawing\'s own elements, as a short piece, or as a ring', () => {
   for (const t of TYPES) {
     for (const id of PART_PLACES) {
       const spec = cardSpec(t, {}, [], id);
@@ -237,6 +237,26 @@ function checkLayout(l: Layout, n: number, width: number, top: number, areaH: nu
   expect(l.top + areaH, why).toBeLessThanOrEqual(l.height);
 }
 
+// The wheel (the owner's ruling of 14 November 2026): the whole front wheel stands out, its tyre, rim, spokes and hub; the label's point
+// is on the wheel's tyre, apart from the other wheel parts' points.
+test('[PG-WHEEL] the wheel stands out as the whole front wheel (tyre, rim, spokes, hub), its point on the tyre, apart from the other wheel parts', () => {
+  for (const t of TYPES) {
+    const spec = cardSpec(t, {}, ['wheel']);
+    const { svg, anchors } = bikeArt(spec, null);
+    const s = partSpot('wheel', spec, anchors)!;
+    expect([...s.ink].sort(), t).toEqual(['bk-hub', 'bk-rim', 'bk-spokes', 'bk-tyre']);
+    expect(s.clip!.c, t).toEqual([anchors.wheels.front.cx, anchors.wheels.front.cy]);
+    expect(inkMarkup(svg, s.ink, 'bv-ink'), t).toMatch(/class="bv-ink/);
+    const d = Math.hypot(s.at[0] - anchors.wheels.front.cx, s.at[1] - anchors.wheels.front.cy);
+    expect(d, t).toBeGreaterThan((spec.rimMm.value / 2) * anchors.scale);
+    expect(d, t).toBeLessThan(anchors.wheels.front.r);
+    for (const other of ['hub', 'spokes', 'rim', 'tyre', 'bead', 'tube', 'valve'] as const) {
+      const o = partSpot(other, spec, anchors)!.at;
+      expect(Math.hypot(o[0] - s.at[0], o[1] - s.at[1]), `${t} ${other}`).toBeGreaterThan(5);
+    }
+  }
+});
+
 test('[BV-LABELS] on every card, type and width (320 and 360 px phones, the 528 px panel), opened on its focus or on the whole bike, every part in view is labelled off the bike, with no overlap and no leader through another label', () => {
   let layouts = 0;
   const tangled: number[] = [];
@@ -318,17 +338,17 @@ test("[BV-WORDS] every part has a short name for its label and button, and a car
 });
 
 // The owner's ruling of 14 November 2026: a card's parts start with what a rider touches first for it, from data (FIRST_PARTS), never a
-// one-off; the puncture card starts with the wheel (its rim: the guide has no part called the wheel), the tyre and the tube, then the rest
-// in the text's order. A card with no such order keeps the text's.
-test("[BV-FIRST-PARTS] a card's parts start with its first parts from data (the puncture card: wheel rim, tyre, tube), the rest in the text's order; other cards keep the text's order", () => {
+// one-off; the puncture card starts with the wheel, the tyre and the tube, then the rest in the text's order. A card with no such order
+// keeps the text's. The second ruling of 14 November 2026: the guide's own wheel part leads it, not the rim that stood for the wheel.
+test("[BV-FIRST-PARTS] a card's parts start with its first parts from data (the puncture card: wheel, tyre, tube), the rest in the text's order; other cards keep the text's order", () => {
   const tube = items.find((x) => x.id === 'puncture-tube')!;
   for (const brakes of [null, 'rim', 'hydraulic-disc'] as const) {
     const parts = partsOf(tube, { ...careDetails(null), brakes });
-    expect(parts.slice(0, 3), String(brakes)).toEqual(['rim', 'tyre', 'tube']);
+    expect(parts.slice(0, 3), String(brakes)).toEqual(['wheel', 'tyre', 'tube']);
     expect(new Set(parts).size, String(brakes)).toBe(parts.length);
   }
-  expect(partsOf(tube, careDetails(null))).toEqual(['rim', 'tyre', 'tube', 'caliper', 'brake-lever', 'bead', 'spokes', 'valve', 'disc', 'pads']);
-  expect(partsLine(partsOf(tube, careDetails(null)))).toBe('Rim, tyre, inner tube, disc caliper, brake lever, tyre bead, spokes, valve, brake disc, brake pads');
+  expect(partsOf(tube, careDetails(null))).toEqual(['wheel', 'tyre', 'tube', 'caliper', 'brake-lever', 'bead', 'rim', 'spokes', 'valve', 'disc', 'pads']);
+  expect(partsLine(partsOf(tube, careDetails(null)))).toBe('Wheel, tyre, inner tube, disc caliper, brake lever, tyre bead, rim, spokes, valve, brake disc, brake pads');
   // every first-parts entry names a card that exists and only parts that card names, each once
   for (const [id, first] of Object.entries(FIRST_PARTS)) {
     const it = items.find((x) => x.id === id);

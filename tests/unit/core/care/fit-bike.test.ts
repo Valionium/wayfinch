@@ -4,7 +4,7 @@
 import { expect, test } from 'vitest';
 import { normaliseBike } from '../../../../src/core/bike/normalise.ts';
 import type { BikeRecord } from '../../../../src/core/bike/normalise.ts';
-import { careDetails, careFluid, fitted } from '../../../../src/core/care/fit.ts';
+import { careDetails, careFluid, fitBike, fitted } from '../../../../src/core/care/fit.ts';
 import { stepWords } from '../../../../src/core/care/lines.ts';
 import { pictureDetails } from '../../../../src/core/care/pictures.ts';
 import { C, CARE_TASKS, fitWords, ROAD_CARDS, STEP_VARIANTS } from '../../../../src/core/wording/en-care.ts';
@@ -177,4 +177,81 @@ test('[BC-FIT-LINE] the gears read true for every shifting with every drive: no 
       if (got.includes('no gears')) expect(got.join(' '), `${drive} + ${shifting}`).not.toMatch(/derailleur|hub|belt|single speed/);
     }
   }
+});
+
+// ---- The owner's ruling of 14 November 2026: a hydraulic rim brake's spongy lever, and electronic gears' adjusting ----
+const fitIds = (b: BikeRecord | null): string[] => fitted(CARE_TASKS, careDetails(b), pictureDetails(b).rimBrake).map((t) => t.id);
+const HYDRO_RIM = 'brakes-hydro-rim-spongy';
+const E_ADJUST = 'gears-electronic-adjust';
+
+test('[BC-FIT-RIM-KIND] a task for one kind of rim brake shows for that kind and for the kind Not sure (tagged by its kind), never for another kind or other brakes; Show all shows it', () => {
+  const task = CARE_TASKS.find((t) => t.id === HYDRO_RIM)!;
+  expect(task.applies).toEqual({ brakes: ['rim'] });
+  expect(task.rimBrake).toEqual(['hydraulic']);
+  expect(fitIds(bike({ brakes: 'rim', rimBrake: 'hydraulic' }))).toContain(HYDRO_RIM);
+  for (const rimBrake of ['caliper', 'v-brake']) expect(fitIds(bike({ brakes: 'rim', rimBrake })), rimBrake).not.toContain(HYDRO_RIM);
+  for (const brakes of ['hydraulic-disc', 'cable-disc', 'other']) expect(fitIds(bike({ brakes, rimBrake: 'hydraulic' })), brakes).not.toContain(HYDRO_RIM);
+  // the kind told: no tag; the kind Not sure, or the brakes Not sure: its brakes tag, which the screen words by the kind
+  const tags = (b: BikeRecord | null) => fitted(CARE_TASKS, careDetails(b), pictureDetails(b).rimBrake).find((t) => t.id === HYDRO_RIM)?.tags;
+  expect(tags(bike({ brakes: 'rim', rimBrake: 'hydraulic' }))).toEqual([]);
+  expect(tags(bike({ brakes: 'rim' }))).toEqual(['brakes']);
+  expect(tags(bike({}))).toEqual(['brakes']);
+  expect(tags(null)).toEqual(['brakes']);
+  // Show all is the list for no bike: it shows, tagged
+  expect(fitted(CARE_TASKS, careDetails(null), null).map((t) => t.id)).toContain(HYDRO_RIM);
+  // the fit for opening it under Show all follows the kind too: on a V-brake bike it does not fit, so it opens as for no bike
+  expect(fitBike(task, careDetails(bike({ brakes: 'rim', rimBrake: 'v-brake' })), 'v-brake').show).toBe(false);
+  expect(fitBike(task, careDetails(bike({ brakes: 'rim', rimBrake: 'hydraulic' })), 'hydraulic').show).toBe(true);
+  // every other card and task fits as before, whatever the kind of rim brake
+  for (const rimBrake of ['caliper', 'v-brake', 'hydraulic', undefined]) {
+    const b = bike({ brakes: 'rim', ...(rimBrake ? { rimBrake } : {}) });
+    expect(fitIds(b).filter((id) => id !== HYDRO_RIM), String(rimBrake)).toEqual(fitted(CARE_TASKS, careDetails(b)).map((t) => t.id).filter((id) => id !== HYDRO_RIM));
+  }
+});
+
+test("[BC-HYDRO-RIM-SPONGY] a hydraulic rim brake's spongy lever: pads, leaks, the fluid (Magura rim brakes use mineral oil, never mix), bleed or a shop, never ride until fixed; a told fluid names the bike's own with the Magura cross-check", () => {
+  const t = CARE_TASKS.find((x) => x.id === HYDRO_RIM)!;
+  expect(t.part).toBe('brakes');
+  expect(t.section).toBe('notice');
+  expect(t.critical).toBe(true);
+  expect(t.who).toBe('shop');
+  expect(t.note).toBe('Do not ride until fixed.');
+  expect(t.steps).toContain('Bleed the brake, or take it to a shop.');
+  expect(t.steps.join(' ')).toMatch(/Magura rim brakes use mineral oil/);
+  expect(t.steps.join(' ')).toMatch(/[Nn]ever mix/);
+  expect(t.words).toEqual(expect.arrayContaining(['bleed', 'spongy', 'magura']));
+  const step = t.steps.findIndex((s) => /Magura/.test(s));
+  for (const fluid of ['mineral', 'dot'] as const) {
+    const b = bike({ brakes: 'rim', rimBrake: 'hydraulic', brakeFluid: fluid });
+    const text = textOf(HYDRO_RIM, step, b);
+    expect(text, fluid).toMatch(fluid === 'mineral' ? /details say mineral oil: use only mineral oil, never DOT fluid/ : /details say DOT fluid: use only DOT fluid, never mineral oil/);
+    expect(text, fluid).toMatch(/Magura rim brakes use mineral oil: if that does not match your brakes, check the brake's manual/);
+    for (const [i, s] of t.steps.entries()) if (i !== step) expect(textOf(HYDRO_RIM, i, b)).toBe(s);
+  }
+  // not told, or a fluid kept from other brakes: the content's own words
+  for (const b of [bike({ brakes: 'rim', rimBrake: 'hydraulic' }), bike({ brakes: 'rim', rimBrake: 'v-brake', brakeFluid: 'dot' }), null]) {
+    expect(t.steps.map((s, i) => textOf(HYDRO_RIM, i, b))).toEqual(t.steps);
+  }
+  for (const s of [t.name, t.signs, ...t.steps, t.tools, t.note!, t.why!]) expect(bannedHits(s, false), s).toEqual([]);
+});
+
+test("[BC-E-GEARS-ADJUST] electronic gears' adjusting: the battery first, pairing again, fine-tuning with the maker's app or the shifter buttons, the hanger, a shop; only for derailleur bikes with electronic gears", () => {
+  const t = CARE_TASKS.find((x) => x.id === E_ADJUST)!;
+  expect(t.part).toBe('gears');
+  expect(t.section).toBe('notice');
+  expect(t.applies).toEqual({ gears: ['derailleur'], shifting: ['electronic'] });
+  expect(t.steps[0]).toMatch(/battery/);
+  expect(t.steps.join(' ')).toMatch(/pairing again/);
+  expect(t.steps.join(' ')).toMatch(/maker's app or the shifter buttons/);
+  expect(t.steps.join(' ')).toMatch(/shop/);
+  // no brand's own button steps: the maker's app or manual says how
+  expect(t.steps.join(' ')).not.toMatch(/Di2|AXS|Shimano|SRAM|junction|hold the/i);
+  expect(t.words).toEqual(expect.arrayContaining(['di2', 'axs', 'adjust gears']));
+  expect(fitIds(bike({ drive: 'derailleur', shifting: 'electronic' }))).toContain(E_ADJUST);
+  expect(fitIds(bike({ shifting: 'electronic' }))).toContain(E_ADJUST);
+  for (const [drive, shifting] of [['derailleur', 'cable'], ['derailleur', 'none'], ['chain-hub', 'electronic'], ['belt', 'electronic']]) {
+    expect(fitIds(bike({ drive, shifting })), `${drive} ${shifting}`).not.toContain(E_ADJUST);
+  }
+  expect(fitIds(null)).toContain(E_ADJUST);
+  for (const s of [t.name, t.signs, ...t.steps, t.tools]) expect(bannedHits(s, false), s).toEqual([]);
 });
