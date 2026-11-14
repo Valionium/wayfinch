@@ -4,7 +4,7 @@ import type { Route, StoredForecast, ZoneSpan } from '../core/types.ts';
 import { markChanged, tracked } from './changed.ts';
 import { CURRENT, inTx, ROUTE_META_PREFIX } from './db.ts';
 import { ZONES_META } from './inputs.ts';
-import { usableTrip, usableZones } from './rules.ts';
+import { usableTrip, usableZones, zonesOrDevice } from './rules.ts';
 import { readLocalSettings } from './settings-local.ts';
 
 /** When a forecast request last set out, whatever became of it: the service counts a refused request too. */
@@ -38,7 +38,7 @@ export async function readWeatherState(): Promise<WeatherState | null> {
   if (!trip) return null;
   return {
     route: trip.route, departureDate: trip.departureDate, prepared: read.prepared === trip.route.id, forecast: goodForecast(read.forecast) ? read.forecast : null,
-    lastAttemptAt: goodDate(read.attempt) ? read.attempt : null, routeZones: usableZones(read.zones),
+    lastAttemptAt: goodDate(read.attempt) ? read.attempt : null, routeZones: zonesOrDevice(usableZones(read.zones)),
   };
 }
 

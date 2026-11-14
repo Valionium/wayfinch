@@ -32,7 +32,7 @@ export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken
   const old = snap?.trip ?? null;
   useEffect(() => { if (pending) asking.current?.focus(); }, [pending]);
 
-  const refused = (message: string): void => setError(old ? `${message} ${W.appTripUnchanged}` : message);
+  const refused = (message: string): void => setError(old ? `${message} ${TR.appTripUnchanged}` : message);
 
   const commit = async (found: Found): Promise<void> => {
     setBusy(true);
@@ -74,7 +74,7 @@ export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken
         await commit(found);
       }
     } catch (e) {
-      refused(e instanceof GpxError ? e.message : W.appTripFileFailed);
+      refused(e instanceof GpxError ? e.message : TR.appTripFileFailed);
     } finally {
       setBusy(false);
     }
