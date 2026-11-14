@@ -181,7 +181,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
     expect(text()).toContain(W.appTripClimbingUnknown);
     expect(text()).toContain(TR.appTripHeightsPending);
-    expect(text()).not.toContain(W.appTripHeightsCredit);
+    expect(text()).not.toContain(TF.appTripHeightsCredit);
     // What Prepare this route's heights step does: the same line with heights in it.
     const trip = (await readTrip())!;
     const withHeights = { ...trip, route: { ...trip.route, ascentM: 120, points: trip.route.points.map((p) => ({ ...p, ele: 150 })) } };
@@ -189,7 +189,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     await readTrip();
     await saveTrip(withHeights);
     await show(services());
-    expect(text()).toContain(W.appTripHeightsCredit);
+    expect(text()).toContain(TF.appTripHeightsCredit);
     expect(text()).not.toContain(TR.appTripHeightsPending);
   });
 
@@ -403,7 +403,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     await show(svc);
     await pick(await fixtureGpx('loop'));
     await until(() => host.querySelector('[data-getready]') !== null, 'Prepare this route');
-    expect(text()).toContain(W.appTripNothingSaved);
+    expect(text()).toContain(TF.appTripNothingSaved);
     expect(text()).toContain(W.appTripFlightMode);
     await click(button(W.appTripGetReadyButton));
     await until(() => text().includes('1,214 places'), 'the result');
@@ -682,7 +682,7 @@ describe('What the review of group 5 found', () => {
     await settle(30);
     expect(text()).not.toContain(W.appTripStepsOk);
     expect(text()).not.toContain(W.appTripMissingHeading);
-    expect(text()).toContain(W.appTripNothingSaved);
+    expect(text()).toContain(TF.appTripNothingSaved);
     expect(button(W.appTripGetReadyButton)).toBeDefined();
   });
 

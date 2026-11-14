@@ -21,6 +21,8 @@ export const TF = {
   appTripOsmLead: 'Places and routes: ',
   appTripStopsLabel: 'Stops along the route',
   appTripStorage: (mb: string): string => `Wayfinch uses ${mb} MB on this phone (all trips).`,
+  appTripNothingSaved: 'Nothing is saved on this phone for this route yet.',
+  appTripHeightsCredit: 'Heights looked up from Copernicus data through Open-Meteo.',
   appTripAddTitle: 'Add a route',
   appTripReplaceHeading: 'Use another route',
   appTripReplacedNoDate: (name: string): string => `Replaced with “${name}”, but its departure date was not saved. Set the date in the Route step.`,
