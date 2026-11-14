@@ -748,7 +748,6 @@ export const W = {
   appTripUnnamed: 'Unnamed route',
   appTripFileFailed: "That file could not be read. Nothing was changed.",
   appTripUnchanged: 'Your current route is unchanged.',
-  appTripReplaceTitle: 'Replace your route?',
   appTripReplaceYes: 'Replace route',
   appTripReplaceCancel: 'Cancel',
   appTripReplacedNoDate: (name: string): string => `Replaced with “${name}”, but its departure date was not saved. Set the date in the Route step.`,
@@ -764,7 +763,6 @@ export const W = {
   appTripDayDetail: (hours: string, up: string | null): string => `${hours} h riding${up === null ? '' : `, ${up} m up`}`,
   appTripHeightsCredit: 'Heights looked up from Copernicus data through Open-Meteo.',
   appTripMapDate: (date: string, fromSource: boolean): string => `map data ${fromSource ? 'of' : 'from'} ${date}`,
-  appTripOsmSearch: 'Place names: ',
   appTripLicences: 'Licences',
   appTripDepartureNone: 'No date yet. Without one, En route gives distances only and says why.',
   appTripDateClear: 'Clear the date',
@@ -781,11 +779,7 @@ export const W = {
   appTripRetryButton: 'Try again',
   appTripNothingSaved: 'Nothing is saved on this phone for this route yet.',
   appTripWorking: 'Working. Keep this screen open until it stops.',
-  appTripStepHeights: 'Heights',
   appTripStepPlaces: 'Map data and places',
-  appTripStepHours: 'Opening hours',
-  appTripStepWeather: 'Weather',
-  appTripStepBaseline: 'Seasonal estimate',
   appTripStepSave: 'Saving',
   appTripProgress: (n: number, total: number, name: string): string => `Step ${n} of ${total}: ${name}`,
   appTripProgressPart: (done: number, total: number): string => `${done} of ${total}`,
@@ -832,7 +826,6 @@ export const W = {
   appHandoffNotKept: 'The route could not be passed on to the bag planner. Try again.',
   // Plan from A to B (spec section 7.1). Only the search text goes to the search services; only the two end points go to a bike router.
   appAbPlan: 'Plan the route',
-  appAbChange: (label: string): string => `Change ${label.toLowerCase()}`,
   appAbName: (a: string, b: string): string => `${a} to ${b}`,
 
   // Ahead (sub-project 5, group 6): the position, the picker, the strip, the cards' controls, the chips, the share step.

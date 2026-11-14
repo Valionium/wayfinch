@@ -77,6 +77,10 @@ body {
 }
 h1, h2 { font-family: var(--font-display); font-weight: 700; margin: 0; }
 button, a { font: inherit; }
+/* Plain links take the accent, not the browser's blue and purple (sweep 14 Nov, 11). */
+:where(a:not([class])) { color: var(--blaze); }
+.skip-link { position: absolute; left: 8px; top: -100px; z-index: 10; padding: 10px 14px; background: var(--panel); color: var(--ink); border: 2px solid var(--blaze); border-radius: 8px; }
+.skip-link:focus { top: 8px; }
 :focus-visible { outline: 3px solid var(--blaze); outline-offset: 2px; }
 
 .shell { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
@@ -87,6 +91,12 @@ button, a { font: inherit; }
 .theme-btn { position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); cursor: pointer; }
 .screen h1 { font-size: 1.75rem; margin-bottom: 12px; padding-right: 52px; }
 .tab-sub { margin: -6px 0 12px; }
+/* The room of the line before its words load: one line, and two for Ahead's longer line where it wraps (measured at 16 px text). */
+.tab-sub:empty { display: none; }
+.tab-sub[data-tab-sub='trip']:empty, .tab-sub[data-tab-sub='ahead']:empty { display: block; }
+.tab-sub[data-tab-sub='trip'], .tab-sub[data-tab-sub='ahead'] { min-height: 1.4em; }
+/* Where Ahead's longer line wraps depends on the font drawn, so below 600 px both it and its held room are two lines tall, whatever the wrap. */
+@media (max-width: 599px) { .tab-sub[data-tab-sub='ahead'] { min-height: 2.8em; } }
 
 .tabs {
   display: flex;
