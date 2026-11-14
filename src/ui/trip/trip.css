@@ -39,6 +39,9 @@ progress { width: 100%; accent-color: var(--blaze); }
 /* The guided Trip (design of 8 Nov 2026): the trip line, then the four steps on one line of dots. */
 .trip-line { display: flex; flex-direction: column; gap: 2px; margin: 0 0 12px; }
 .trip-line strong { font-family: var(--font-display); font-size: 1.375rem; line-height: 1.15; overflow-wrap: anywhere; }
+.trip-line .trip-step-change { align-self: flex-start; margin-left: -4px; }
+/* A change of nights says once that the stops are chosen afresh (review of PR 101, M4); empty, the line takes no room. */
+[data-nights-stops]:empty { margin: 0; }
 .trip-steps-list { list-style: none; margin: 0 0 12px; padding: 0; }
 .trip-step { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 0 10px; position: relative; }
 .trip-step::before { content: ''; position: absolute; left: 13px; top: 30px; bottom: 0; width: 2px; background: var(--line); }
@@ -104,6 +107,12 @@ progress { width: 100%; accent-color: var(--blaze); }
 .hit { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-width: 0; text-align: left; overflow-wrap: anywhere; }
 .hit-name { font-weight: 600; }
 .hit-line { color: var(--muted); font-size: 0.9375rem; }
+/* Plan from A to B (sweep of 14 Nov 2026, #8): the pick prompt is always in the page, empty until the hits come; what is sent is one tap away;
+   a busy Search stays focusable (aria-disabled) and looks it. */
+.ab-picking:empty { margin: 0; }
+.ab-sent { margin: 0 0 12px; }
+.ab-sent summary { min-height: 44px; padding: 11px 0; box-sizing: border-box; cursor: pointer; color: var(--blaze); font-weight: 600; }
+[data-plan-ab] .btn[aria-disabled='true'] { opacity: 0.6; cursor: progress; }
 /* Days that end where you can sleep (TRIP-DAY-STOPS): Change stop, its choices and Undo, each a full-size target. */
 .trip-stop-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .trip-stop-choices { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }

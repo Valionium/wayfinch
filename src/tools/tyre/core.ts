@@ -1,10 +1,10 @@
 // The tyre pressure estimate (spec section 7.2). Pure: no clock, no storage, no DOM. Its basis is Frank Berto's published 15% tyre-drop
 // data, fitted as a power law. It never exceeds a limit, and it never takes a formula from SRAM, SILCA or Rene Herse.
-import { W } from '../../core/wording/en.ts';
 import { TZ } from '../../core/wording/en-tyre-figures.ts';
 import { TF } from '../../core/wording/en-tyre-labels.ts';
 import { TN } from '../../core/wording/en-tyre-notes.ts';
 import { TW } from '../../core/wording/en-tyre-warn.ts';
+import { TQ } from '../../core/wording/en-tyre-fields.ts';
 import {
   BAR_PER_PSI, DEFAULT_SPLIT, DESIGN_WIDTHS, ETRTO_MIN, FIT_MAX_MM, FIT_MIN_MM, HOOKLESS_CAPS, HOOKLESS_MAX_BAR, LEVER,
   LIMIT_BAR, LIMIT_PSI, P15_COEFFICIENT, P15_EXPONENT, PSI_PER_BAR, RIM_MAX_MM, RIM_MIN_MM, WHEELS, WIDTH_MAX_MM, WIDTH_MIN_MM,
@@ -299,7 +299,7 @@ function validate(i: TyreInput): string[] {
   if (i.measured && !(finitePositive(i.measured.frontKg, 1, 300) && finitePositive(i.measured.rearKg, 1, 300))) out.push(TC.tyreRefuseNumber(TF.tyreWhatWheelLoads));
   if (!finitePositive(i.rimInnerMm, RIM_MIN_MM, RIM_MAX_MM)) out.push(TC.tyreRefuseRim(Number.isFinite(i.rimInnerMm) ? fmt(i.rimInnerMm) : '?'));
   if (!WHEELS.some((w) => w.bsdMm === i.wheelBsdMm)) out.push(TN.tyreRefuseWheel);
-  for (const [label, t] of [[W.tyreFront, i.front], [W.tyreRear, i.rear]] as const) {
+  for (const [label, t] of [[TQ.tyreFront, i.front], [TQ.tyreRear, i.rear]] as const) {
     if (!Number.isFinite(t.printedMm) || t.printedMm < WIDTH_MIN_MM || t.printedMm > WIDTH_MAX_MM) out.push(TC.tyreRefuseWidth(label, Number.isFinite(t.printedMm) ? fmt(t.printedMm) : '?'));
     else if (t.caliperMm !== null && !finitePositive(t.caliperMm, 10, 110)) out.push(TC.tyreRefuseCaliper(label));
   }
@@ -335,7 +335,7 @@ export function tyreEstimate(input: TyreInput): TyreResult {
   const wEffs: number[] = [];
   for (const t of [input.front, input.rear]) {
     const w = t.caliperMm ?? effectiveWidth(t.printedMm, input.rimInnerMm);
-    if (w === null || !Number.isFinite(w) || w < 10) return refusedResult([TC.tyreRefuseWidth(t === input.front ? W.tyreFront : W.tyreRear, fmt(t.printedMm))]);
+    if (w === null || !Number.isFinite(w) || w < 10) return refusedResult([TC.tyreRefuseWidth(t === input.front ? TQ.tyreFront : TQ.tyreRear, fmt(t.printedMm))]);
     wEffs.push(w);
   }
 
@@ -359,7 +359,7 @@ export function tyreEstimate(input: TyreInput): TyreResult {
   const decided: string[] = [];
   let incompatible = false;
 
-  const wheels = ([['front', W.tyreFront, input.front, frontKg, wEffs[0]!], ['rear', W.tyreRear, input.rear, rearKg, wEffs[1]!]] as const).map(
+  const wheels = ([['front', TQ.tyreFront, input.front, frontKg, wEffs[0]!], ['rear', TQ.tyreRear, input.rear, rearKg, wEffs[1]!]] as const).map(
     ([, label, tyre, loadKg, wEff]) => {
       const raw = p15(loadKg, wEff) * wheelFactor(wEff, input.wheelBsdMm) * casingFactor(input.casing) * surfaceFactor(input.surface, wEff, withTube) * (input.wet ? 0.97 : 1);
 

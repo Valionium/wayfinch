@@ -5,6 +5,7 @@ import { CL } from '../../core/wording/en-care-link.ts';
 import { GA } from '../../core/wording/en-advisor.ts';
 import { HN } from '../../core/wording/en-hint.ts';
 import { W } from '../../core/wording/en.ts';
+import { TK } from '../../core/wording/en-tyre-card.ts';
 import { savedBikeIds, toolBike } from '../../tools/tyre/choice.ts';
 import { TL } from '../../core/wording/en-tools.ts';
 import { LL } from '../../core/wording/en-learn-link.ts';
@@ -36,10 +37,14 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
     w.addEventListener('hashchange', on);
     return () => w.removeEventListener('hashchange', on);
   }, []);
-  // Back from the page to the cards: the focus goes to the card's Open link rather than the page's start (review of PR 127, M3).
+  // Back from the page to the cards: the focus goes to the card's Open link rather than the page's start (review of PR 127, M3), and
+  // Tools shows from its top, not scrolled down to that last card (follow-up of 14 Nov).
   const was = useRef(learn);
   useEffect(() => {
-    if (was.current && !learn) document.querySelector<HTMLAnchorElement>(`a[href="${LEARN_HREF}"]`)?.focus();
+    if (was.current && !learn) {
+      document.querySelector<HTMLAnchorElement>(`a[href="${LEARN_HREF}"]`)?.focus({ preventScroll: true });
+      window.scrollTo(0, 0);
+    }
     was.current = learn;
   }, [learn]);
   return learn ? <LearnScreen services={services} /> : <ToolsCards services={services} />;
@@ -97,10 +102,10 @@ function ToolsCards({ services }: { services: TyreServices }) {
         <p class="bike-line" data-hint-line><span>{W.tyreBikeLabel}: {HN.hintToolsTypical} · <a href={bikeDetailsHref('new', 'tools')}>{HN.hintToolsAdd}</a></span></p>
       )} />
       <BagCard services={services} chosen={chosen} note={chosen === null ? TL.toolsNoBike : undefined} />
-      <Card title={W.tyreCardTitle}>
-        <p class="tool-line">{last ? W.tyreCardLast(trimBar(last.frontBar), trimBar(last.rearBar)) : W.tyreCardNone}</p>
-        {last?.bike ? <p class="muted">{W.tyreCardBike(last.bike)}</p> : null}
-        <a class="btn btn-primary" href="#/tools/tyre">{W.tyreCardOpen}<span class="visually-hidden"> {W.tyreCardTitle}</span></a>
+      <Card title={TK.tyreCardTitle}>
+        <p class="tool-line">{last ? TK.tyreCardLast(trimBar(last.frontBar), trimBar(last.rearBar)) : W.tyreCardNone}</p>
+        {last?.bike ? <p class="muted">{TK.tyreCardBike(last.bike)}</p> : null}
+        <a class="btn btn-primary" href="#/tools/tyre">{W.tyreCardOpen}<span class="visually-hidden"> {TK.tyreCardTitle}</span></a>
       </Card>
       <Card title={CL.careCardTitle}>
         <p class="muted">{CL.careCardBody}</p>
