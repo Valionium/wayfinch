@@ -6,7 +6,7 @@ export const RT = {
   appTripRemove: 'Remove this trip',
   appTripRemoveAsk: 'Remove this trip?',
   appTripRemoveGoes: (name: string): string =>
-    `Goes: the route “${name}”, its date, nights and days, and all Prepare this route saved for it (places, opening hours, weather, map data). Also your position, water and day plan in En route.`,
+    `Goes: the route “${name}”, its date, nights and days, and all Prepare this route saved for it (places, opening hours, weather, map data). Also your position, water and day plan in En route, and your Before you leave ticks.`,
   appTripRemoveStays: 'Stays: your bikes, setups and Bag planner plans, your details and rides in You, and your other settings.',
   appTripRemoveAfter: 'Trip and En route then start over, as on the first day. This cannot be undone.',
   appTripRemoveYes: 'Remove trip',
