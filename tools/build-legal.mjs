@@ -71,6 +71,9 @@ export function textOf(markup) {
   return (body.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
+// For maintainers, never on a page: the legal texts (this imprint's frame, the privacy notice, the licences) were drafted by an AI from the
+// project's spec and are not legal advice. The line that said so on each page came off at the owner's ruling of 14 Nov 2026 (sweep 59;
+// LEGAL-NO-AI-LINE in docs/rules.md).
 const page = (block) => `<!doctype html>
 <html lang="de">
 <head>
@@ -90,7 +93,6 @@ const page = (block) => `<!doctype html>
 <body>
 <header class="lg-top wf-bar"><a class="lg-back" href="/#/you">&larr; Back to Wayfinch</a></header>
 <main class="lg-main">
-<p class="lg-draft">Drafted by an AI from the project's spec. Not legal advice.</p>
 <h1>Impressum · Imprint</h1>
 <p lang="en">Imprint. German law asks for this text in German. It is the same text as in the bag planner, taken from it when this site is built.</p>
 <nav class="lg-nav" aria-label="Legal pages"><a href="/legal/privacy/">Privacy notice</a> <a href="/legal/licences/">Licences and data</a></nav>

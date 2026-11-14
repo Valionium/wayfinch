@@ -20,7 +20,6 @@ h2 { font-size: 1.35rem; margin: 28px 0 8px; }
 h3 { font-size: 1.1rem; margin: 20px 0 4px; }
 a { color: var(--blaze); text-underline-offset: 2px; }
 :focus-visible { outline: 3px solid var(--blaze); outline-offset: 2px; }
-.lg-draft { border-left: 4px solid var(--blaze); padding: 8px 12px; background: var(--panel); font-weight: 600; }
 .lg-nav { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 8px 0; }
 /* A table scrolls sideways inside its own box at a readable size; words are never broken into pieces to squeeze it in. */
 .lg-table-wrap { overflow-x: auto; margin: 8px 0; background-color: var(--ground); }
