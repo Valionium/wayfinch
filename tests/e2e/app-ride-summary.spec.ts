@@ -131,6 +131,7 @@ test('[LC-MODE-KIT] Check says where Comfortable is now: at the start of Kit, on
   await go.click();
   await expect(page.locator('#s3')).toBeVisible();
   await expect(page.locator('#s3 #modeBar button[data-mode="comfort"]')).toBeFocused();
+  await expect(page.locator('#s3 #modeBar button[data-mode="comfort"]')).toBeInViewport();   // in sight, on a phone too (review of PR 166, I4)
 });
 
 test('[LC-RIDE-FOLD] Check\'s Review ride opens Ride\'s fields, folded or not, with the focus on Retry weather when the weather failed (review of PR 166, I2)', async ({ page }) => {
@@ -156,6 +157,7 @@ test('[LC-MODE-KIT] nothing on Check points to a switch that is not there: each 
   await page.evaluate(`S.nights = 1; S.sleep = 'indoor'; S.mode = 'comfort'; S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'bar', L:13 }, { uid:3, pos:'frame', L:6 },
     { uid:4, pos:'pack', L:30 }, { uid:5, pos:'fork', L:3, pair:true }]; S.nextUid = 6; S.decks = { bar:false, rack:false }; applyTripKitDefaults(); go(2); go(3); go(4);`);
   if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();   // the weight question, skipped
+  await page.setViewportSize({ width: 320, height: 640 });   // the narrowest phone; the verdict's jump below at 360 px (review of PR 166, I4)
   const empty = page.locator('#resultBox .finding.note', { hasText: 'Two honest answers here' });
   await empty.evaluate((el) => { const d = el.closest('details'); if (d) d.open = true; });
   await expect(empty).toContainText('choose Lightweight at the start of Kit and the check will do exactly that');
@@ -163,13 +165,16 @@ test('[LC-MODE-KIT] nothing on Check points to a switch that is not there: each 
   await empty.getByRole('button', { name: 'Go to Lightweight in Kit' }).click();
   await expect(page.locator('#s3')).toBeVisible();
   await expect(page.locator('#s3 #modeBar button[data-mode="light"]')).toBeFocused();
+  await expect(page.locator('#s3 #modeBar button[data-mode="light"]')).toBeInViewport();   // in sight, on a phone too (review of PR 166, I4)
   // Lightweight, only just fitting: the verdict names Kit for Comfortable
   const tight = await page.evaluate(`(() => { S.mode = 'light'; S.bags = [{ uid:1, pos:'seat', L:6 }]; S.nextUid = 2; go(4);
-    for (let L = 6; L <= 30; L += 0.25) { S.bags[0].L = L; S.bags[0].userL = true; renderResult();
+    for (let L = 6; L <= 30; L += 0.5) { S.bags[0].L = L; S.bags[0].userL = true; renderResult();
       if (/minimum setup/.test(document.getElementById('verdictBox').textContent)) return L; } return null; })()`);
   expect(tight, 'a Lightweight plan that only just fits').not.toBeNull();
   await expect(page.locator('#verdictBox')).toContainText('choose Comfortable at the start of Kit');
   expect(await page.locator('#s4').innerHTML()).not.toMatch(stale);
+  await page.setViewportSize({ width: 360, height: 640 });
   await page.locator('#verdictBox').getByRole('button', { name: 'Go to Comfortable in Kit' }).click();
   await expect(page.locator('#s3 #modeBar button[data-mode="comfort"]')).toBeFocused();
+  await expect(page.locator('#s3 #modeBar button[data-mode="comfort"]')).toBeInViewport();   // in sight, on a phone too (review of PR 166, I4)
 });

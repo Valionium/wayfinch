@@ -11659,7 +11659,8 @@ function firstFixes({weatherReady,miss,over,fix,routeFailed,spill,stranded}){
 }
 function jumpToResult(target){
   // Comfortable or Lightweight sits at the start of Kit since the ruling of 14 Nov 2026: there, the focus on the choice (review of PR 166, I1)
-  if(target === 'comfort' || target === 'light'){ go(3); $('modeBar').querySelector(`[data-mode="${target}"]`).focus(); return; }
+  // in sight on a phone too: go()'s smooth scroll to the top would win over the focus's own (review of PR 166, I4)
+  if(target === 'comfort' || target === 'light'){ go(3); const b = $('modeBar').querySelector(`[data-mode="${target}"]`); b.focus({preventScroll:true}); b.scrollIntoView?.({block:'center'}); return; }
   // Check's Review ride and Review route open Ride's fields, folded or not, with the focus on the retry they ask for (I2)
   if(target === 'trip' || target === 'route'){
     RIDE_OPEN = true; go(1);
