@@ -5905,6 +5905,8 @@ const ADVISOR_WORDING = {
   usingPlan:{text:'Using your packing: {n} items, {m} bags'},
   toQuestionnaire:{text:'Answer a few questions instead'}, toPlan:{text:'Use my packing instead'},
   start:{text:'Starting from a 15 L backpack, holding what it can.'},
+  // with no bag plan, why a backpack and what gives a better answer (sweep 14 Nov 2026, #43)
+  startNoPlan:{text:'Starting from a 15 L backpack, holding what it can, since there is no bag plan yet. Plan your bags first for an answer on your own packing.'},
   riding:{text:'Riding'}, ridingRoad:{text:'Road'}, ridingGravel:{text:'Gravel'}, ridingMtb:{text:'Mountain bike trails'},
   ridingTouring:{text:'Touring'}, ridingEveryday:{text:'Everyday'},
   nights:{text:'Nights away'}, sleep:{text:'Nights spent'}, sleepCamp:{text:'Camping'}, sleepIndoor:{text:'Hotels'},
@@ -5918,6 +5920,8 @@ const ADVISOR_WORDING = {
   drawnWith:{text:'Your bike with {what}'}, drawnSwap:{text:'Your bike with {new} instead of your {old}'},
   whyTitle:{text:'Why it helps:'}, movesTitle:{text:'Where your things move'},
   backAll:{text:'Takes the {l} L off your back.'}, backSome:{text:'Takes {l} L off your back; {left} L stay there.'},
+  // the room the new bags free in the backpack takes what was left over (sweep 14 Nov 2026, #40): both said, so the figures add up
+  backSwap:{text:'Takes {off} L off your back and puts {on} L of other things in its place: {left} L on your back instead of {was} L.'},
   movesKg:{text:'Moves {kg} kg from {from} to {to}.'}, fitsOver:{text:'Fits everything that was left over.'},
   lower:{text:'Puts the weight lower and nearer the middle of the bike.'},
   alreadyGood:{text:'Your bags already suit this; nothing to add.'},
@@ -6102,13 +6106,31 @@ function advisorMoves(s, input){
   diff.placedFromOverflow.forEach(id => lines.push(advisorWord('moveLine', { item:name(id), from:advisorWord('leftOver'), to:where((b.items[id] || []).map(e => e[0]).join(','), bags) })));
   return lines;
 }
+/* What comes off the back and what goes onto it, item by item, in litres: the compared plan's body slots against the trial's, read
+   on planWith's copies. Kept per suggestion, as the cards and the combinations both read it. */
+const ADVISOR_FLOWS = new WeakMap();
+function advisorBackFlow(s, input){
+  if(ADVISOR_FLOWS.has(s)) return ADVISOR_FLOWS.get(s);
+  const base = advisorBase(input), a = advisorPlan(base.bags, base.decks, input), b = advisorPlan(advisorTrialBags(s, input), s.decks, input);
+  const back = P => { const m = {}; P.slots.forEach(sl => { if(POSITIONS[sl.pos].onBody) (sl.items || []).forEach(k => { m[k.id] = (m[k.id] || 0) + k.vol; }); }); return m; };
+  const A = back(a), B = back(b);
+  let off = 0, on = 0;
+  new Set([...Object.keys(A), ...Object.keys(B)]).forEach(id => { const d = (B[id] || 0) - (A[id] || 0); if(d > 0) on += d; else off -= d; });
+  const flow = { off:+off.toFixed(1), on:+on.toFixed(1) };
+  ADVISOR_FLOWS.set(s, flow);
+  return flow;
+}
 // Why it helps the goal, in one or two lines (design §2).
 function advisorWhy(s, input){
   const base = advisorBase(input).result, r = s.result, out = [];
-  if(base.overL > 0 || base.spillIds.length) out.push(advisorWord('fitsOver'));
+  // only when the suggestion itself leaves nothing over (sweep 14 Nov 2026, #40)
+  if((base.overL > 0 || base.spillIds.length) && !(r.overL > 0) && !r.spillIds.length) out.push(advisorWord('fitsOver'));
   const off = +(base.backL - r.backL).toFixed(1);
   const left = +r.backL.toFixed(1);   // litres that round to nothing are nothing on the back
-  if(off >= 0.1) out.push(left === 0 ? advisorWord('backAll', { l:off }) : advisorWord('backSome', { l:off, left }));
+  // the back's change is what comes off less what goes in: when other things go in, both are said, never "stay there" (#40)
+  const flow = off >= 0.1 ? advisorBackFlow(s, input) : null;
+  if(flow && flow.on >= 0.1) out.push(advisorWord('backSwap', { off:flow.off, on:flow.on, left, was:+base.backL.toFixed(1) }));
+  else if(off >= 0.1) out.push(left === 0 ? advisorWord('backAll', { l:off }) : advisorWord('backSome', { l:off, left }));
   const d = {};
   new Set([...Object.keys(base.kgByPos), ...Object.keys(r.kgByPos)]).forEach(p => {
     const g = ADVISOR_GROUPS[p]; if(g) d[g] = (d[g] || 0) + (r.kgByPos[p] || 0) - (base.kgByPos[p] || 0);
@@ -6197,7 +6219,7 @@ function advisorOverKey(s, input){
 function advisorAnswerHtml(answer, input){
   const notes = [];
   if(ADVISOR.again && ADVISOR.answer === answer) notes.push(advisorWord(TRIAL ? 'changedTrial' : 'again'));
-  if(input.fromQuestionnaire) notes.push(advisorWord('start'));
+  if(input.fromQuestionnaire) notes.push(advisorWord(advisorHasPlan() ? 'start' : 'startNoPlan'));
   if(input.style === 'bags' && input.bags.some(b => b.pos === 'rack')) notes.push(advisorWord('rackOut'));
   if(advisorNoMounts() && advisorRackFitted(input)) notes.push(advisorWord('rackKept'));
   if(answer.frameReason) notes.push(advisorWord('frameNone', { reason:answer.frameReason }));
@@ -6248,7 +6270,7 @@ function advisorStepsHtml(){
     carried = `<p class="adv-using">${advisorWord('usingPlan', c)}</p><button type="button" class="linky adv-switch" id="advSource" data-source="questionnaire">${advisorWord('toQuestionnaire')}</button>`;
   } else {
     const radios = (name, list, value) => list.map(([v, k]) => advisorChoice(name, v, advisorWord(k), value === v)).join('');
-    carried = `<p class="adv-start">${advisorWord('start')}</p>`
+    carried = `<p class="adv-start">${advisorWord(advisorHasPlan() ? 'start' : 'startNoPlan')}</p>`
       + (advisorHasPlan() ? `<button type="button" class="linky adv-switch" id="advSource" data-source="plan">${advisorWord('toPlan')}</button>` : '')
       + advisorGroup('advRidingT', advisorWord('riding'), radios('advRiding', [['road', 'ridingRoad'], ['gravel', 'ridingGravel'], ['mtb', 'ridingMtb'], ['touring', 'ridingTouring'], ['everyday', 'ridingEveryday']], q.riding))
       + `<label class="adv-nights" for="advNights">${advisorWord('nights')}<input id="advNights" type="number" inputmode="numeric" min="0" max="30" step="1" value="${q.nights}"></label>`
@@ -6279,7 +6301,8 @@ function advisorStatus(answer){
 function renderAdvisorAnswer(){
   const box = $('advisorAnswer'); if(!box) return;
   box.innerHTML = ADVISOR.error ? `<p class="adv-note">${htmlEsc(ADVISOR.error)}</p>`
-    : !advisorComplete() ? `<p class="adv-hint">${advisorWord('needAll')}</p>`
+    // shown once and read once: a screen reader hears it from the status line (sweep 14 Nov 2026, #41)
+    : !advisorComplete() ? `<p class="adv-hint" aria-hidden="true">${advisorWord('needAll')}</p>`
     : ADVISOR.answer ? advisorAnswerHtml(ADVISOR.answer, ADVISOR.input) : '';
   const status = $('advisorStatus');
   if(status) status.textContent = ADVISOR.error || (!advisorComplete() ? advisorWord('needAll') : ADVISOR.answer ? advisorStatus(ADVISOR.answer) : '');
