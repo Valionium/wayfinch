@@ -79,7 +79,7 @@ export function BikeDrawing({ bike, summary, size = 'large', back, caption = tru
   const look = bike?.look?.paint;
   const [ready, setReady] = useState(0);
   useEffect(() => {
-    if ((look || summary) && !extras) import('../../core/bike/paint.ts').then((m) => { extras = m; setReady(1); }, () => 0);
+    if (look || summary) import('../../core/bike/paint.ts').then((m) => setReady((extras = m) ? 1 : 0), () => 0);
   }, [look, summary]);
   // Drawn again only when what it is drawn from changes.
   const { spec, art, words } = useMemo(() => {
