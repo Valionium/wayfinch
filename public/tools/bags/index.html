@@ -2133,7 +2133,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <div class="eyebrow">Step two</div>
     <h2 class="lede" id="stepTitle2" tabindex="-1">Your bag cupboard</h2>
     <p class="sub">List the bags you own and their labelled sizes. You can add a second bag where the bike has another mounting spot. The check will suggest which bags to mount and which can stay at home.</p>
-    <div class="bike-profile-card"><b id="bikeStepSummary">Bike repair details · optional</b><p>Use a bike profile for repair suggestions that match your tyres, brakes and drivetrain.</p><button class="kitact" type="button" id="bikeDetailsOpen" aria-haspopup="dialog" aria-controls="bikeDetailsBox">Bike details</button></div>
+    <div class="bike-profile-card"><b id="bikeStepSummary">Bike repair details · optional</b><p>Use a bike profile for repair suggestions that match your tyres, brakes and drivetrain.</p><button class="kitact" type="button" id="bikeDetailsOpen" aria-haspopup="dialog" aria-controls="bikeDetailsBox">Repair details</button></div>
     <div class="recallwrap hidden" id="recallWrap">
       <div class="pickhead">Start from one you have saved</div>
       <div id="recallList"></div>
@@ -2922,6 +2922,8 @@ const S = {
   pendingSaveName:'', pendingSaveNote:'',
 };
 KIT.forEach(k => S.kit[k.id] = !!k.on);
+// The trip and choices a new plan starts with (planIsUntouched); its month is the one the rider is in (start-up sets it).
+const PLAN_START = { nights:S.nights, sleep:S.sleep, pace:S.pace, flatKph:S.flatKph, mode:S.mode, foodMode:S.foodMode };
 const BIKE_PROFILE_KEY='loadcheck:bikeProfiles',BIKE_PROFILE_CURRENT_KEY='loadcheck:bikeProfile',MAX_BIKE_PROFILES=20;
 let BIKE_PROFILES=[],BIKE_PROFILE_EDITOR_ID='',BIKE_PROFILE_FORM_READY=false,BIKE_PROFILE_BUSY=false,BIKE_PROFILE_MESSAGE='';
 let BIKE_PROFILE_WRITES=Promise.resolve();
@@ -12985,12 +12987,14 @@ function planSameKey(p){
 function todayDay(){ const n=new Date(); return `${n.getDate()} ${MONTHS[n.getMonth()].slice(0,3)}`; }
 // The plan here, as a trip setup with no thumbnail (the drawing is made from the plan when shown), unless a saved setup holds it.
 function setupHoldingPlan(){ const sig=planSameKey(captureDraft()); return SETUPS.find(s => planSameKey(s) === sig) || null; }
-/* A plan with nothing of the rider's in it: no bag, no route or place, no deck, no kit touched, sized, counted, added, placed by hand,
-   ticked or carried. It is not kept as a setup before a trip is planned (sweep 14 Nov 2026, #31: "Before … · 0 bags", a plan the rider
+/* A plan with nothing of the rider's in it: the trip, mode and food mode a new plan starts with, no pockets, no bag, no route or place,
+   no deck, no kit touched, sized, counted, added, placed by hand, ticked or carried. It is not kept as a setup before a trip is planned (sweep 14 Nov 2026, #31: "Before … · 0 bags", a plan the rider
    never made); Undo still brings it back, from the draft taken before the tap. */
 function planIsUntouched(){
   const none=o => !o || !Object.keys(o).length;
-  return !S.bags.length && !S.gpx && !S.place && !S.place2 && !(S.decks && (S.decks.bar || S.decks.rack)) && none(S.kitTouched) && none(S.custom)
+  // the trip, the mode and the food mode as a new plan starts them, and no pockets (review of PR 141, m1)
+  const started=Object.keys(PLAN_START).every(k => S[k] === PLAN_START[k]) && !S.departureDate && S.month === new Date().getMonth() && !S.pockets;
+  return started && !S.bags.length && !S.gpx && !S.place && !S.place2 && !(S.decks && (S.decks.bar || S.decks.rack)) && none(S.kitTouched) && none(S.custom)
     && none(S.qty) && none(S.pinned) && none(S.packed) && none(S.carried) && !KIT.some(k => k.added);
 }
 function keepPlanBefore(){

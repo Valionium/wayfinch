@@ -1115,9 +1115,11 @@ describe('[TRIP-SMALL-OVER] a day ride\'s bags are sized with the trip\'s weathe
 // The sweep of 14 Nov 2026, #31: after the hand-off, Trip setups listed "Before Heidelberg → Speyer, 14 Nov · 6 nights · 0 bags", a plan the
 // rider never made (the planner's untouched start).
 describe('[TRIP-BEFORE-UNTOUCHED] a plan with nothing of the rider\'s in it is not kept as a setup before Plan bags for this trip (sweep 14 Nov 2026, #31)', () => {
+  // the trip and choices a new plan starts with: the harness's planner sets its own trip, so it is put back here
+  const START = `S.nights=6;S.sleep='camp';S.pace='sporting';S.flatKph=25;S.departureDate=null;S.month=new Date().getMonth();S.mode='comfort';S.foodMode=2;S.pockets=null;`;
   test('the untouched start: no "Before …" setup, the bar promises none; Undo still gives that plan back exactly', async () => {
     const p = await dayRide('2026-11-15');
-    p.page.run('SETUPS=[];');
+    p.page.run(`SETUPS=[];${START}`);
     await p.page.run('receiveHandoff()');
     expect(String(p.page.nodes.get('handoffText')!.textContent)).not.toMatch(/kept as a setup|already saved as/);
     const before = p.page.run('JSON.stringify(captureDraft())');
@@ -1130,10 +1132,11 @@ describe('[TRIP-BEFORE-UNTOUCHED] a plan with nothing of the rider\'s in it is n
     expect(p.json<number>('SETUPS.length')).toBe(0);
   });
 
-  test('anything of the rider\'s in it (a bag, a route, a touched or sized thing, a tick) and it is kept, as before', async () => {
-    for (const work of ['S.bags=[{uid:1,pos:"seat",L:10}];S.nextUid=2;', 'S.kit.cap=false;S.kitTouched.cap=true;', 'S.custom.tool={L:0.3,kg:0.2,rigid:0};', 'S.packed.docs=true;']) {
+  test('anything of the rider\'s in it (a bag, a touched or sized thing, a tick; the trip, the mode, the food mode, the pockets) and it is kept, as before (review of PR 141, m1)', async () => {
+    for (const work of ['S.bags=[{uid:1,pos:"seat",L:10}];S.nextUid=2;', 'S.kit.cap=false;S.kitTouched.cap=true;', 'S.custom.tool={L:0.3,kg:0.2,rigid:0};', 'S.packed.docs=true;',
+      'S.mode="light";', 'S.foodMode=1;', 'S.nights=2;', 'S.departureDate="2026-12-01";', 'S.pace="hard";', 'S.pockets={jersey:false,bib:true};']) {
       const p = await dayRide('2026-11-15');
-      p.page.run(`SETUPS=[];${work}`);
+      p.page.run(`SETUPS=[];${START}${work}`);
       await p.page.run('receiveHandoff()');
       expect(String(p.page.nodes.get('handoffText')!.textContent), work).toMatch(/Your plan now is kept as a setup/);
       expect(await p.page.run('planTripBags()'), work).toBe(true);
