@@ -207,6 +207,14 @@ describe('nothing from outside', () => {
   });
 });
 
+// What stays on the device, two more kinds (review of PR 158, M3): the Bike finder's answers (copilot:bikeFinder:v1) and the ticks of Before
+// you leave (copilot:tripPrep:v1). The page's only other change of words since the hash below.
+const PRIVACY_ADDED = ' your answers in Find a bike type, your ticks in Before you leave,';
+test('[BF-STORE] the privacy page names the Bike finder\'s answers and Before you leave\'s ticks among what stays on the device', () => {
+  const text = textOfFile('public/legal/privacy/index.html').replace(/\s+/g, ' ');
+  expect(text).toContain(`tyre details,${PRIVACY_ADDED} the place data`);
+});
+
 describe('the legal pages on a phone: only markup and style changed', () => {
   // Taken from the files as they were on 6 November 2026, before the phone fixes (body text, whitespace single-spaced). The three
   // pages' wording must not change by a character in that work. When the owner edits the wording, replace the hash with the new one.
@@ -221,7 +229,7 @@ describe('the legal pages on a phone: only markup and style changed', () => {
       const text = textOfFile(`public/legal/${name}/index.html`).replace(/\s+/g, ' ').trim();
       expect(text.startsWith(`${TL.toolsBack} `)).toBe(true);
       // The tab's new name, "En route" for "Ahead" (owner's finding M, 8 Nov 2026), is one of the privacy page's three changes of words (the third: the delete button's new name, sweep 14 Nov, 51); the other is "Prepare this route" for "Get ready offline" (owner's choice, 9 Nov 2026).
-      const got = sha256(text.replace(TL.toolsBack, '← Wayfinch').replace('(Trip, En route, Tools, You)', '(Trip, Ahead, Tools, You)').replaceAll('Prepare this route', 'Get ready offline').replace('Delete Wayfinch data from this phone', 'Delete co-pilot data'));
+      const got = sha256(text.replace(TL.toolsBack, '← Wayfinch').replace('(Trip, En route, Tools, You)', '(Trip, Ahead, Tools, You)').replaceAll('Prepare this route', 'Get ready offline').replace('Delete Wayfinch data from this phone', 'Delete co-pilot data').replace(PRIVACY_ADDED, ''));
       expect(got === hash ? 'same' : `different: ${got}`).toBe('same');
     });
   }
