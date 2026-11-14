@@ -12,9 +12,10 @@ test.afterEach(async () => { await app?.close(); app = undefined; });
 test.afterAll(() => removeBuilds());
 
 const PAGES = [
-  { path: '/#/tools/tyre', back: '#/tools', ready: '.tyre' },
-  { path: '/legal/privacy/', back: '/#/you', ready: '.lg-main' },
-  { path: '/tools/bags/', back: '/#/tools', ready: '#rigBox' },
+  // Tyre pressure, a screen of Tools, says so (the owner's ruling of 14 Nov 2026, sweep #42)
+  { path: '/#/tools/tyre', back: '#/tools', ready: '.tyre', text: '← Tools' },
+  { path: '/legal/privacy/', back: '/#/you', ready: '.lg-main', text: '← Back to Wayfinch' },
+  { path: '/tools/bags/', back: '/#/tools', ready: '#rigBox', text: '← Back to Wayfinch' },
 ] as const;
 
 /** The bar's place on screen: how much of it is in the window (0 to 1). */
@@ -49,7 +50,7 @@ for (const where of PAGES) {
       const bar = page.locator('.wf-bar');
       await expect(bar).toHaveCount(1);
       const link = bar.locator('a').first();
-      await expect(link).toHaveText('← Back to Wayfinch');
+      await expect(link).toHaveText(where.text);
       expect(await link.getAttribute('href')).toBe(where.back);
       await expect(link).toBeInViewport({ ratio: 1 });
       const box = (await link.boundingBox())!;
@@ -63,7 +64,7 @@ for (const where of PAGES) {
       expect(await page.evaluate(() => scrollY)).toBeGreaterThan(300);
       await expect.poll(() => shown(bar), `${where.path} away`).toBe(0);
       // still in the page for a screen reader: not hidden, the link a link
-      await expect(page.getByRole('link', { name: 'Back to Wayfinch' })).toHaveCount(1);
+      await expect(bar.getByRole('link', { name: where.text.slice(2) })).toHaveCount(1);
       // a little scroll up: back at once, whole
       await wheel(page, -120);
       await expect.poll(() => shown(bar), `${where.path} back`).toBe(1);
