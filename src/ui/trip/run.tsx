@@ -10,8 +10,8 @@ import { runningSignal } from './run-state.ts';
 
 export const STEP_ORDER: StepName[] = ['heights', 'places', 'hours', 'weather', 'baseline', 'save'];
 const LABEL: Record<StepName, string> = {
-  heights: W.appTripStepHeights, places: W.appTripStepPlaces, hours: W.appTripStepHours,
-  weather: W.appTripStepWeather, baseline: W.appTripStepBaseline, save: W.appTripStepSave,
+  heights: TR.appTripStepHeights, places: W.appTripStepPlaces, hours: TR.appTripStepHours,
+  weather: TR.appTripStepWeather, baseline: TR.appTripStepBaseline, save: W.appTripStepSave,
 };
 export const labelOf = (step: string): string => (LABEL as Record<string, string>)[step] ?? step;
 
