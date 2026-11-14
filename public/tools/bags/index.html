@@ -5843,8 +5843,10 @@ function replanReason(was, now){
 const DECK_NOTE_KEY = 'loadcheck:deck-note:v1';
 let DECK_NOTE_SHOWN = null;   // the note seen in this visit: it stays on screen while what it says is true
 let DECK_NOTE_MEM = null;     // when storage can't be written, the note waits in this tab
+// Free play's own (FP-NO-WRITE): read and changed there, never written, gone at Back; the trip's plan's note waits as it was.
+let DECK_NOTE_PLAY = null;
 function readDeckNote(){
-  const v = readLocalJson(DECK_NOTE_KEY) || DECK_NOTE_MEM;
+  const v = (FREE_PLAY && DECK_NOTE_PLAY) || readLocalJson(DECK_NOTE_KEY) || DECK_NOTE_MEM;
   const item = m => dataObject(m) && DECK_CLAIMS.includes(m.id) && (m.from === null || typeof m.from === 'string') ? { id:m.id, from:m.from === null ? null : m.from.slice(0, 80), hand:m.hand === true, packed:m.packed === true } : null;
   const ok = dataObject(v) && v.app === 'load-check' && v.kind === 'deck-note' && v.v === 1;
   const pending = ok && dataObject(v.pending) && typeof v.pending.sig === 'string' && Array.isArray(v.pending.items) ? { sig:v.pending.sig.slice(0, 40), items:v.pending.items.slice(0, 8).map(item).filter(Boolean) } : null;
@@ -5852,6 +5854,7 @@ function readDeckNote(){
 }
 function writeDeckNote(n){
   const v = { app:'load-check', kind:'deck-note', v:1, pending:n.pending, seen:n.seen.slice(-40) };
+  if(FREE_PLAY){ DECK_NOTE_PLAY = v; return; }
   DECK_NOTE_MEM = v;
   try{ if(deletedSinceLoad()) return; const before = readLocalRaw(DECK_NOTE_KEY); window.localStorage.setItem(DECK_NOTE_KEY, JSON.stringify(v)); stampKey(DECK_NOTE_KEY, v, before); }catch(e){}
 }
@@ -14969,6 +14972,7 @@ async function startFreePlay(){
       pending:WEATHER_KIT.pending,landed:false},
     places:[text('geoStatus1'),text('geoStatus2')],bikes:JSON.stringify(BIKE_PROFILES),note:''};
   FREE_PLAY_BACK=null;
+  DECK_NOTE_PLAY=null;   // free play's deck notes are its own, in this tab only
   FREE_PLAY_BARS.forEach(id => { if($(id)) $(id).classList.add('hidden'); });
   WEATHER_KIT.undo=null; WEATHER_KIT.pending=false;
   clearGPX();
@@ -14993,6 +14997,7 @@ function endFreePlay(){
   WEATHER_KIT.undo=fp.weather.undo; WEATHER_KIT.pending=fp.weather.pending;
   BIKE_PROFILES=freePlayStoredBikes(fp.bikes);   // the saved bikes as stored: free play changed none of them
   FREE_PLAY=null;
+  DECK_NOTE_PLAY=null;
   fp.bars.forEach(([id,on]) => { if($(id)) $(id).classList.toggle('hidden',!on); });
   if($('weatherText')) $('weatherText').textContent=fp.weather.text;
   if($('weatherUndo')) $('weatherUndo').classList.toggle('hidden',!fp.weather.undoShown);
