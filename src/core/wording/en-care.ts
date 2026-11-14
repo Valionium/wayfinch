@@ -334,7 +334,8 @@ export const CARE_TASKS: CareTask[] = [
     words: ['cable', 'stiff shift', 'sticky', 'rust', 'frayed'], applies: { shifting: ['cable'] }, critical: false,
   },
   {
-    id: 'chain-lube', name: 'Lube the chain, after every wash and always after rain or mud', part: 'chain', section: 'month', alsoWet: true,
+    // listed under Every month, so its name says monthly too (live-site sweep of 14 November 2026, item 45; the note's own "at least monthly")
+    id: 'chain-lube', name: 'Lube the chain, after every wash and after rain or mud; at least monthly', part: 'chain', section: 'month', alsoWet: true,
     signs: 'squeaks, looks dry or rusty',
     steps: [
       'Clean or wipe the chain first; oil goes on after every wash.',
@@ -492,7 +493,8 @@ export const CARE_TASKS: CareTask[] = [
     // On every chain-hub or belt bike; a single speed is stored the same way, so without a known shifter it is tagged (coordinator's
     // ruling R3 on PR 58: a hub-gear rider never loses it, a single-speed rider sees one tagged task).
     words: ['internal hub', 'alfine', 'nexus', 'rohloff', 'oil change', 'hub gears', 'slipping'], applies: { gears: ['hub'] }, critical: false,
-    soft: { applies: { shifting: ['cable', 'electronic'] }, tag: 'If your hub has gears' },
+    // "If your hub has gears" says the gears' own Not sure tag too ("if you have hub gears or a single speed"): one, never both (sweep, 14 Nov)
+    soft: { applies: { shifting: ['cable', 'electronic'] }, tag: 'If your hub has gears', replaces: ['gears'] },
   },
   {
     id: 'gears-cables-replace', name: 'Replace the gear cables and casing', part: 'gears', section: 'half-year', alsoWet: false,

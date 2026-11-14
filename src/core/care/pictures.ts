@@ -22,8 +22,12 @@ export type StepPicture = string | Kinds | null;
 export type PictureDetails = {
   brakes: CareDetails['brakes']; rimBrake: RimKind | null; axle: AxleKind | null; shifting: CareDetails['shifting']; bars: Bars | null;
 };
-/** One picture to show, with its kind ('caliper', 'thru', …) where it is one of several; the first of a step's list is shown. */
-export type Shown = { id: string; kind: string | null };
+/**
+ * One picture to show, with its kind ('caliper', 'thru', …) where it is one of several; the first of a step's list is shown. `assumed`:
+ * a picture drawn for one kind only (a hydraulic disc's pad spacer, cable gears' barrel), shown while the bike's detail that decides it
+ * is Not sure, so the step says which kind it is for (live-site sweep of 14 November 2026, item 46).
+ */
+export type Shown = { id: string; kind: string | null; assumed?: true };
 
 /** The brake's quick release, by the kind of rim brake (redo, answer 2): only on rim-brake steps, never on a disc brake's. */
 const RIM_OPEN: Kinds = { by: 'rim-brake', pictures: { caliper: 'brake-qr-open', 'v-brake': 'vbrake-open', hydraulic: 'hydro-rim-open' } };
@@ -87,9 +91,10 @@ export function picturesFor(id: string, step: number, d: PictureDetails): Shown[
   if (entry === null) return [];
   if (typeof entry === 'string') return [{ id: entry, kind: null }];
   const pics = entry.pictures as Partial<Record<string, string>>;
-  return kindOrder(entry.by, d).flatMap((kind) => {
+  const assumed = (entry.by === 'brakes' && d.brakes === null) || (entry.by === 'shifting' && d.shifting === null);
+  return kindOrder(entry.by, d).flatMap((kind): Shown[] => {
     const id = pics[kind];
-    return id ? [{ id, kind }] : [];
+    return id ? [assumed ? { id, kind, assumed: true } : { id, kind }] : [];
   });
 }
 

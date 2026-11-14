@@ -4,7 +4,7 @@
 import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { C, CARE_TASKS, CARRY, PART_LABEL, ROAD_CARDS, SECTION_LABEL, SECTIONS } from '../../../../src/core/wording/en-care.ts';
+import { C, CARE_TASKS, CARRY, PART_LABEL, ROAD_CARDS, SECTION_LABEL, SECTIONS, TAG_LABEL } from '../../../../src/core/wording/en-care.ts';
 import { ALL_STEPS_KEY } from '../../../../src/tools/care/steps.tsx';
 import { careDetails } from '../../../../src/core/care/fit.ts';
 import { stepsShown } from '../../../../src/core/care/lines.ts';
@@ -465,4 +465,30 @@ test("[BV-ORDER] on a road bike (30 mm tyres, nothing else told) the cards and t
   expect(host.querySelectorAll('.care-other-type').length).toBe(0);
   await openRoad();
   expect(host.querySelectorAll('.care-other-type').length).toBe(0);
+});
+
+// The live-site sweep of 14 November 2026, item 45: no task says its condition twice, and no name contradicts its section.
+test('[BC-TAGS-ONCE] with nothing told, hub gear oil says its condition once ("If your hub has gears"), not "if you have hub gears or a single speed" beside it; the soft tag still stands alone when only the shifter is Not sure', async () => {
+  const oil = () => tasks().find((d) => d.dataset.id === 'gears-hub-oil')!.querySelector('.care-open .muted')!.textContent;
+  await mount(world([]));
+  expect(oil()).toBe('If your hub has gears');
+  render(null, host);
+  await mount(world([bike('bike_a', 'Unsure', {})]));
+  expect(oil()).toBe('If your hub has gears');
+  render(null, host);
+  // the shifter told (cables), the gears not: the gears tag alone
+  await mount(world([bike('bike_a', 'Cables', { shifting: 'cable' })]));
+  expect(oil()).toBe(TAG_LABEL('gears', ['hub']));
+  render(null, host);
+  await mount(world([bike('bike_a', 'Hub', { drive: 'chain-hub' })]));
+  expect(oil()).toBe('If your hub has gears');
+});
+
+test('[BC-TAGS-ONCE] a task listed under Every month says it is monthly, not only after washes or rain: Lube the chain', async () => {
+  const lube = CARE_TASKS.find((t) => t.id === 'chain-lube')!;
+  expect(lube.section).toBe('month');
+  expect(lube.name).toMatch(/monthly/);
+  await mount(world([]));
+  const month = [...host.querySelectorAll('.care-section')].find((s) => s.querySelector('h3')!.textContent === SECTION_LABEL.month)!;
+  expect(month.querySelector('.care-task[data-id="chain-lube"] .care-name')!.textContent).toBe(lube.name);
 });

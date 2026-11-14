@@ -13,7 +13,7 @@ import type { CareTask, RoadCard } from '../../core/care/types.ts';
 import { riderType } from '../../core/care/type-order.ts';
 import { C, CARRY, WHO_LABEL } from '../../core/wording/en-care.ts';
 import { partsLine } from '../../core/wording/en-part-names.ts';
-import { KIND_WORDS, SWITCH_WORDS } from '../../core/wording/en-care-pictures.ts';
+import { IF_WORDS, KIND_WORDS, SWITCH_WORDS } from '../../core/wording/en-care-pictures.ts';
 import { loadPictures, Picture, pictureReady, stepTitle } from './picture.tsx';
 
 /** The All steps choice, remembered on the phone: '1' or '0'. A copilot:* key, so Delete co-pilot data removes it. */
@@ -97,6 +97,7 @@ function Pictures({ shown, view }: { shown: Shown[]; view: string }) {
   const others = ready.filter((p) => p !== now && p.kind);
   return (
     <div class="care-pics">
+      {now.assumed && now.kind && IF_WORDS[now.kind] ? <p class="care-pic-if">{IF_WORDS[now.kind]}</p> : null}
       <Picture key={now.id} id={now.id} view={view} />
       {others.length > 0 ? (
         <div class="care-kinds" role="group" aria-label={SWITCH_WORDS.other} ref={row}>
