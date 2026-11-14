@@ -105,6 +105,10 @@ test('[LC-WT-NOPOP] the first visit to Check opens no maximum-weight box; the in
   await page.locator('#crumbs button[data-to="4"]').click();
   await expect(page.locator('#stepTitle4')).toBeFocused();
   await expect(page.locator('#maxWeightBox')).toBeHidden();
+  // the inline line, in its own section of the packing check: "Your bike's maximum weight · not entered"
+  const section = page.locator('#resultBox details.sec', { hasText: "Your bike's maximum weight" });
+  await expect(section.locator('summary')).toContainText('not entered');
+  await section.locator('summary').click();
   const add = page.locator('#maxWeightChange');
   await expect(add).toBeVisible();
   await add.click();

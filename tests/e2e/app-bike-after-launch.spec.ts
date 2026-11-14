@@ -73,7 +73,9 @@ test('[LC-TABS-BIKE] "Yes, clear this plan" in one tab never drops the selected 
   await other.goto(`${app!.origin}/tools/bags/`, { waitUntil: 'load' });
   await draftReady(other);
   expect(await other.evaluate('S.bikeProfile.id')).toBe('bike_b');
-  await page.locator('#draftNew').click();
+  // Start a new plan at its fixed place, the end of step one (the owner's ruling of 14 Nov 2026, sweep #37)
+  await page.locator('#crumbs button[data-to="1"]').click();
+  await page.locator('#draftNewRide').click();
   await Promise.all([page.waitForEvent('load'), page.locator('#draftNew').click()]);
   await draftReady(page);
   // the other tab hears the plan go and shows an empty plan, on the same bike

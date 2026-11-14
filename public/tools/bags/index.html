@@ -13081,7 +13081,7 @@ async function receiveHandoff(){
   HANDOFF.reuse=handoffPlannable(t) ? tripSetupFor(t.route)?.id || null : null;
   const heights=parsed.hasElev ? '' : ' This route has no heights, so its days are split by distance.';
   if(handoffPlannable(t)){
-    // The rider tapped Plan bags for this trip in Trip: with nothing of theirs here to replace and no setup of this route to choose
+    // The rider tapped Plan bags for this trip in Wayfinch's Trip: with nothing of theirs here to replace and no setup of this route to choose
     // instead, it is planned at once, with Undo (the owner's ruling of 14 Nov 2026, sweep #29: the hand-off asked twice).
     if(!HANDOFF.reuse && planIsUntouched()){ await planTripBags(); return true; }
     const base=tripFoundation(),reuse=HANDOFF.reuse && SETUPS.find(x => x.id === HANDOFF.reuse),held=setupHoldingPlan(),passed=passedFoundation();
