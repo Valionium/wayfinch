@@ -6,7 +6,7 @@ import { markChanged, tracked } from './changed.ts';
 import { CURRENT, inTx, ROUTE_META_PREFIX } from './db.ts';
 import type { Tx } from './db.ts';
 import { HOLIDAYS_META, SAVED_KM_META, ZONES_META } from './inputs.ts';
-import { usableHolidays, usableSavedKm, usableTrip, usableZones } from './rules.ts';
+import { usableHolidays, usableSavedKm, usableTrip, usableZones, zonesOrDevice } from './rules.ts';
 import { readLocalSettings } from './settings-local.ts';
 
 /** The refreshed stretches with their dates. It goes with the route. */
@@ -25,7 +25,7 @@ export async function readStretchState(): Promise<StretchState | null> {
     zones: (await tx.objectStore('meta').get(ZONES_META)) as unknown,
   }));
   const trip = usableTrip(read.trip, local);
-  return trip ? { route: trip.route, departureDate: trip.departureDate, routeZones: usableZones(read.zones) } : null;
+  return trip ? { route: trip.route, departureDate: trip.departureDate, routeZones: zonesOrDevice(usableZones(read.zones)) } : null;
 }
 
 /** The stored places among these ids. */
