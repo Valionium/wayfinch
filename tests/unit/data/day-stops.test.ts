@@ -7,6 +7,8 @@ import { freshStore } from '../store/helpers.ts';
 import { planStages } from '../../../src/core/route/stages.ts';
 import type { Trip } from '../../../src/core/types.ts';
 import { settleStops, stopChoices } from '../../../src/data/day-stops.ts';
+import { BD } from '../../../src/core/wording/en-beds.ts';
+import { dayEndWords } from '../../../src/ui/trip/summary.tsx';
 import { prepareTrip } from '../../../src/data/prepare.ts';
 import { openDb } from '../../../src/store/db.ts';
 import { readTrip, replaceRoute, saveTrip } from '../../../src/store/trip.ts';
@@ -127,6 +129,41 @@ describe('day stops on the store', () => {
     const three = (await settleStops(NOW))!;
     expect(three.basis.map(r1)).toEqual([86, 147.3, 208.7]);
     expect(three.days.map((d) => [d.name, d.by])).toEqual([['Hotel B', 'rider'], [null, 'auto'], ['Camping H', 'auto']]);
+  });
+
+  // The coordinator's ruling on the rework's review (I-2): a rider's "No stop" means no place for that night, never a fixed end, so the
+  // words under the day ("the day ends where the effort splits evenly") stay true, and even days come back.
+  test('[TRIP-STOPS-KEEP] Hotel B at 86 km, 3 nights, then No stop for night 1: the days split evenly again; back to 2 nights, about 90 and 180', async () => {
+    const r1 = (km: number) => Math.round(km * 10) / 10;
+    await tripWithPlaces([['campsite', 92.4, 'Camping A'], ['lodging', 86, 'Hotel B'], ['lodging', 177, 'Hotel C']]);
+    await settleStops(NOW);
+    await settleStops(NOW, { day: 1, to: (await stopChoices(NOW, 1)).find((c) => c.name === 'Hotel B')! });
+    localStorage.setItem('copilot:settings', JSON.stringify({ nights: 3, pace: 'sporting', updatedAt: '2026-10-16T07:30:00.000Z' }));
+    expect((await settleStops(NOW))!.basis.map(r1)).toEqual([86, 147.3, 208.7]);
+    const none = (await settleStops(NOW, { day: 1, to: null }))!;
+    expect(none.basis.map(r1)).toEqual([67.5, 135, 202.5]);
+    expect(none.days[0]).toMatchObject({ placeId: null, by: 'rider' });
+    expect(r1(none.days[0]!.km)).toBe(67.5);
+    let t = (await readTrip())!;
+    expect(r1(t.route.stages[0]!.endKm)).toBe(67.5);
+    expect(dayEndWords(t, 0, 'Day 1')!.below).toBe(BD.appTripStopSplit);
+    localStorage.setItem('copilot:settings', JSON.stringify({ nights: 2, pace: 'sporting', updatedAt: '2026-10-16T08:00:00.000Z' }));
+    const two = (await settleStops(NOW))!;
+    expect(two.basis.map(r1)).toEqual([90, 180]);
+    expect(two.days.map((d) => [d.name, d.by])).toEqual([[null, 'rider'], ['Hotel C', 'auto']]);
+    t = (await readTrip())!;
+    expect(t.route.stages.map((s) => r1(s.endKm))).toEqual([90, 177, 270]);
+  });
+
+  test("[TRIP-STOPS-KEEP] a place picked for a night is planned around at once; the night with the rider's No stop keeps it, at its new even end", async () => {
+    const r1 = (km: number) => Math.round(km * 10) / 10;
+    await tripWithPlaces([['campsite', 92.4, 'Camping A'], ['lodging', 86, 'Hotel B'], ['lodging', 177, 'Hotel C']]);
+    await settleStops(NOW);
+    await settleStops(NOW, { day: 2, to: null });
+    const picked = (await settleStops(NOW, { day: 1, to: (await stopChoices(NOW, 1)).find((c) => c.name === 'Hotel B')! }))!;
+    // 86 km, then 184 km in two days
+    expect(picked.basis.map(r1)).toEqual([86, 178]);
+    expect(picked.days.map((d) => [d.name, d.by, r1(d.km)])).toEqual([['Hotel B', 'rider', 86], [null, 'rider', 178]]);
   });
 
   test('[TRIP-STOPS-KEEP] a pace that changes the suggested nights plans around the own stop too (review M9)', async () => {

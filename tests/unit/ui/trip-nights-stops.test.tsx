@@ -12,6 +12,7 @@ import { DEFAULT_SETTINGS } from '../../../src/store/rules.ts';
 import type { Settings } from '../../../src/store/rules.ts';
 import type { SettingsOutcome, TripServices, TripSnapshot } from '../../../src/ui/trip/services.ts';
 import { TripSettings } from '../../../src/ui/trip/settings.tsx';
+import type { Settle } from '../../../src/ui/trip/settings.tsx';
 import { flatRoute } from '../../fixtures/build.ts';
 
 const host = document.createElement('div');
@@ -31,9 +32,10 @@ function snapOf(stops: TripStop[] | null, nights: number | null = 2): TripSnapsh
   return { now: new Date('2026-10-16T08:00:00Z'), available: true, trip, settings: { ...DEFAULT_SETTINGS, nights } as Settings, prepared: null, places: 4, forecastTo: null, forecastFetchedAt: null, zone: 'Europe/Berlin', storageMb: null, day1LeaveBy: null, heightsLookedUp: false, running: false, nothingSaved: false } as TripSnapshot;
 }
 
-async function setNights(snap: TripSnapshot, value: string, outcome: SettingsOutcome = { ok: true, reasons: {}, note: null }): Promise<string> {
+/** `settle`: the stops as the settle leaves them once the nights have their places (none here unless a test gives them). */
+async function setNights(snap: TripSnapshot, value: string, outcome: SettingsOutcome = { ok: true, reasons: {}, note: null }, settle: Settle = async () => null): Promise<string> {
   const services = { writeSettings: async () => outcome } as unknown as TripServices;
-  await act(async () => { render(<TripSettings services={services} snap={snap} reload={async () => undefined} part="when" />, host); });
+  await act(async () => { render(<TripSettings services={services} snap={snap} reload={async () => undefined} part="when" settle={settle} />, host); });
   const input = host.querySelector<HTMLInputElement>('#trip-nights')!;
   await act(async () => { input.value = value; input.dispatchEvent(new Event('change', { bubbles: true })); });
   await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
@@ -47,27 +49,43 @@ describe('A change of nights says the stops are chosen afresh (review of PR 101,
   test('[TRIP-STOPS-KEEP] 2 → 3 nights: the own stop is kept, named with its night, and the line says where to change a stop', async () => {
     const said = await setNights(snapOf([stop(92, 'rider'), stop(177, 'auto')]), '3');
     expect(said).toBe(TF.appTripStopsNewNights(3, TF.appTripStopNight('Camping 92', 2), '', ''));
-    expect(said).toBe('New stops for 3 nights, planned around yours: Camping 92 (night 2). To change a stop, use Change stop under its day in Your route.');
+    expect(said).toBe('New stops for 3 nights, keeping yours: Camping 92 (night 2). To change a stop, use Change stop under its day in Your route.');
     expect(said).toContain(BD.appTripStopChange);
     expect(said).toContain(TF.appTripSummaryTitle);
     expect(host.querySelector('[data-nights-stops]')!.getAttribute('role')).toBe('status');
   });
 
-  test("[TRIP-STOPS-KEEP] nights up and down: own places and the rider's No stop are kept, each with its new night", async () => {
-    expect(await setNights(snapOf([stop(92, 'rider'), stop(177, 'auto')]), '5')).toBe('New stops for 5 nights, planned around yours: Camping 92 (night 2). To change a stop, use Change stop under its day in Your route.');
+  // The coordinator's ruling on the rework's review (I-2): the rider's No stop is no fixed end; it stays on its night while that night
+  // exists and no picked place ends it, and goes, named, otherwise.
+  test("[TRIP-STOPS-KEEP] nights up and down: own places are kept with their new nights; the rider's No stop stays on its night or is named", async () => {
+    const change = 'To change a stop, use Change stop under its day in Your route.';
+    expect(await setNights(snapOf([stop(92, 'rider'), stop(177, 'auto')]), '5')).toBe(`New stops for 5 nights, keeping yours: Camping 92 (night 2). ${change}`);
     const noStop: TripStop = { placeId: null, km: plan[1]!.endKm, name: null, town: null, by: 'rider' };
-    expect(await setNights(snapOf([stop(92, 'rider'), noStop]), '5')).toBe('New stops for 5 nights, planned around yours: Camping 92 (night 2), No stop (night 4). To change a stop, use Change stop under its day in Your route.');
-    expect(await setNights(snapOf([stop(92, 'rider'), noStop]), '3')).toBe('New stops for 3 nights, planned around yours: Camping 92 (night 2), No stop (night 3). To change a stop, use Change stop under its day in Your route.');
+    expect(await setNights(snapOf([stop(92, 'auto'), noStop]), '3')).toBe(`New stops for 3 nights, keeping yours: No stop (night 2). ${change}`);
+    expect(await setNights(snapOf([stop(92, 'auto'), noStop]), '1')).toBe(`New stops for 1 night. Not kept: No stop (was night 2). ${change}`);
+    // night 2 now ends at the place picked for night 1
+    expect(await setNights(snapOf([stop(92, 'rider'), noStop]), '5')).toBe(`New stops for 5 nights, keeping yours: Camping 92 (night 2). Not kept: No stop (was night 2). ${change}`);
   });
 
   test('[TRIP-STOPS-KEEP] fewer nights than own stops: the one between the two shortest days is named as not kept, with its old night', async () => {
     expect(await setNights(snapOf([stop(92, 'rider'), stop(177, 'rider')]), '1'))
-      .toBe('New stops for 1 night, planned around yours: Camping 177 (night 1). Not kept: Camping 92 (was night 1). To change a stop, use Change stop under its day in Your route.');
+      .toBe('New stops for 1 night, keeping yours: Camping 177 (night 1). Not kept: Camping 92 (was night 1). To change a stop, use Change stop under its day in Your route.');
   });
 
   test('[TRIP-STOPS-KEEP] a day much shorter or longer than an even day around an own stop is said in plain words; the stop is not moved', async () => {
-    expect(await setNights(snapOf([stop(20, 'rider'), stop(177, 'auto')]), '1'))
-      .toBe('New stops for 1 night, planned around yours: Camping 20 (night 1). Around your stops, day 1 (20 km) is much shorter than an even day; day 2 (250 km) is much longer than an even day. To change a stop, use Change stop under its day in Your route.');
+    const settled = async () => ({ routeId: route.id, basis: [20], days: [stop(20, 'rider')] });
+    expect(await setNights(snapOf([stop(20, 'rider'), stop(177, 'auto')]), '1', undefined, settled))
+      .toBe('New stops for 1 night, keeping yours: Camping 20 (night 1). Around your stops, day 1 (20 km) is much shorter than an even day; day 2 (250 km) is much longer than an even day. To change a stop, use Change stop under its day in Your route.');
+  });
+
+  // Review of the rework, m-3: the figure is the day as it ends once the other nights have their places, not the planned day.
+  test('[TRIP-STOPS-KEEP] the length said is the day as it ends with the places chosen for the other nights', async () => {
+    const one = [...planStages(route, { flatKph: 25, pace: 'sporting', nights: 1 })];
+    const snap = snapOf(null, 1);
+    snap.trip = { ...snap.trip!, route: { ...route, stages: one }, stops: { routeId: route.id, basis: [one[0]!.endKm], days: [stop(10, 'rider')] } };
+    // planned 10 / 140 / 270: day 2 is 130 km, not much longer; the place for night 2 is at 150 km, so day 2 is 140 km
+    const settled = async () => ({ routeId: route.id, basis: [10, 140], days: [stop(10, 'rider'), stop(150, 'auto')] });
+    expect(await setNights(snap, '2', undefined, settled)).toBe('New stops for 2 nights, keeping yours: Camping 10 (night 1). Around your stops, day 1 (10 km) is much shorter than an even day; day 2 (140 km) is much longer than an even day. To change a stop, use Change stop under its day in Your route.');
   });
 
   test('[TRIP-STOPS-KEEP] a day ride has no nights: the own stops are named as not kept, never dropped without a word', async () => {

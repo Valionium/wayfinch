@@ -1,7 +1,7 @@
 // Days that end where the rider can sleep (owner's ruling of 9 Nov 2026: "the stop is saved, and it carries over to the Bag
 // planner and En route": Yes). The stage model's plan stays the basis; the stops move each day's end.
 import { describe, expect, test } from 'vitest';
-import { chooseStops, dayStopOf, endsOf, planAround, plannedEnds, stagesEndingAt, stopsHold, withStops } from '../../../../src/core/route/day-stops.ts';
+import { chooseStops, dayStopOf, endsOf, planAround, plannedEnds, stagesEndingAt, stopsHold, unevenDays, withStops } from '../../../../src/core/route/day-stops.ts';
 import { planStages } from '../../../../src/core/route/stages.ts';
 import type { Place, RouteMatch, TripStop, TripStops } from '../../../../src/core/types.ts';
 import { flatRoute, pointAtKm } from '../../../fixtures/build.ts';
@@ -111,7 +111,7 @@ describe('planning the nights around the rider\'s own stops', () => {
     for (const n of [0, 1, 3, 5]) expect(ends(undefined, n)).toEqual(plannedEnds([...planStages(route, { flatKph: 25, pace: 'sporting', nights: n })]));
     const a = planAround(held([auto(92, 'A'), auto(176, 'B')], [90, 180]), route, 3);
     expect(a.basis.map(r3)).toEqual([67.5, 135, 202.5]);
-    expect(a).toMatchObject({ days: [null, null, null], kept: [], dropped: [], uneven: [] });
+    expect(a).toMatchObject({ days: [null, null, null], kept: [], dropped: [] });
   });
 
   test('[TRIP-STOPS-KEEP] one own stop: it stays an end; nights up (2 → 3, 2 → 5) and down (2 → 1) go to the stretch with the longest days', () => {
@@ -125,7 +125,7 @@ describe('planning the nights around the rider\'s own stops', () => {
     expect(three.days).toEqual([null, own(92, 'Camping A'), null]);
     expect(three.kept).toEqual([{ stop: own(92, 'Camping A'), night: 2, was: 1 }]);
     expect(three.dropped).toEqual([]);
-    expect(three.uneven).toEqual([]);
+    expect(unevenDays(route, three.basis)).toEqual([]);
   });
 
   test('[TRIP-STOPS-KEEP] two own stops: both stay; the night added goes to the first of the two longest stretches', () => {
@@ -135,11 +135,14 @@ describe('planning the nights around the rider\'s own stops', () => {
     expect(ends(two, 2)).toEqual([92, 178.5]);
   });
 
-  test('[TRIP-STOPS-KEEP] three own stops near the start and the end: all stay, and the very short and very long days are said, not moved', () => {
+  test('[TRIP-STOPS-KEEP] three own stops near the start and the end: all stay; the very short and very long days are found on the days as they end, not moved', () => {
     const near = planAround(held([own(1.5, 'Start Camp'), own(135, 'Mid Hotel'), own(268.8, 'End Camp')]), route, 3);
     expect(near.basis.map(r3)).toEqual([1.5, 135, 268.8]);
     expect(near.dropped).toEqual([]);
-    expect(near.uneven.map((u) => [u.day, r3(u.km), u.long])).toEqual([[1, 1.5, false], [2, 133.5, true], [3, 133.8, true], [4, 1.2, false]]);
+    expect(unevenDays(route, near.basis).map((u) => [u.day, r3(u.km), u.long])).toEqual([[1, 1.5, false], [2, 133.5, true], [3, 133.8, true], [4, 1.2, false]]);
+    // the days as they end once the other nights have their places (review of the rework, m-3): an end moved by an automatic stop moves the figure
+    expect(unevenDays(route, [10, 150]).map((u) => [u.day, r3(u.km), u.long])).toEqual([[1, 10, false], [2, 140, true]]);
+    expect(unevenDays(route, [90, 180])).toEqual([]);
   });
 
   test('[TRIP-STOPS-KEEP] more own stops than nights: the stop between the two shortest days next to each other goes, named with its old night; a day ride keeps none', () => {
@@ -157,11 +160,18 @@ describe('planning the nights around the rider\'s own stops', () => {
     expect(ride.dropped.map((d) => d.night)).toEqual([1, 2, 3]);
   });
 
-  test('[TRIP-STOPS-KEEP] the rider\'s No stop stays an end at its planned end; a stop not on the route (at its start, its end, or out of order) goes, named', () => {
+  // The coordinator's ruling on the rework's review (I-2): a rider's "No stop" is no fixed end, only "no place picked for that night".
+  test("[TRIP-STOPS-KEEP] the rider's No stop is no fixed end: the night keeps it while it exists, at the even split; otherwise it goes, named; a stop not on the route goes, named", () => {
     const none = held([auto(92, 'A'), own(180, null)], [90, 180]);
     const a = planAround(none, route, 3);
-    expect(a.basis.map(r3)).toEqual([60, 120, 180]);
-    expect(a.kept).toEqual([{ stop: own(180, null), night: 3, was: 2 }]);
+    expect(a.basis.map(r3)).toEqual([67.5, 135, 202.5]);
+    expect(a.days.map((d) => d && [d.placeId, r3(d.km), d.by])).toEqual([null, [null, 135, 'rider'], null]);
+    expect(a.kept.map((k) => [k.stop.name, k.night, k.was])).toEqual([[null, 2, 2]]);
+    expect(planAround(none, route, 1)).toMatchObject({ kept: [], dropped: [{ stop: own(180, null), night: 2 }] });
+    // its night now ends at a place the rider picked: the No stop cannot be that night's too
+    const both = planAround(held([own(92, 'Camping A'), own(180, null)]), route, 3);
+    expect(both.kept.map((k) => [k.stop.name, k.night])).toEqual([['Camping A', 2]]);
+    expect(both.dropped).toEqual([{ stop: own(180, null), night: 2 }]);
     const off = planAround(held([own(0.5, 'At start'), own(150, 'Fine'), own(120, 'Behind'), own(269.5, 'At end')]), route, 3);
     expect(off.kept.map((k) => k.stop.name)).toEqual(['Fine']);
     expect(off.dropped.map((d) => [d.stop.name, d.night])).toEqual([['At start', 1], ['Behind', 3], ['At end', 4]]);

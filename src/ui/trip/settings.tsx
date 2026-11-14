@@ -1,8 +1,8 @@
 // Trip settings (spec section 3.3). Every field saves when it is changed; a value outside its range is refused with the range
 // named, and the field goes back to the last good value. Nothing here works out the days: the services re-plan them.
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { planAround } from '../../core/route/day-stops.ts';
-import type { Trip } from '../../core/types.ts';
+import { endsOf, planAround, unevenDays } from '../../core/route/day-stops.ts';
+import type { Trip, TripStops } from '../../core/types.ts';
 import { showKm, W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
 import { TF } from '../../core/wording/en-trip-fields.ts';
@@ -15,18 +15,26 @@ import type { TripServices, TripSnapshot } from './services.ts';
 
 type Save = (field: keyof Settings, value: unknown) => Promise<boolean>;
 
+/** Settles the day stops now and gives the stops as they are then (Trip's summary's own settle, from its chunk). */
+export type Settle = () => Promise<TripStops | null>;
+const settleNow: Settle = () => import('../../data/day-stops.ts').then((m) => m.settleStops(new Date()));
+
 /**
  * The line for a trip whose nights become `n`, '' when it held no stops: by the very rule the settle plans them by (planAround, the
- * owner's rulings of 14 Nov 2026), the rider's own stops are named, kept with their new nights or not kept with their old, and a day
- * much longer or shorter than an even day is said; a day ride names only what goes, and says nothing with automatic stops alone.
+ * owner's rulings of 14 Nov 2026), the rider's own stops are named, kept with their new nights or not kept with their old; a day much
+ * longer or shorter than an even day is said with its length once the nights have their places (`settle`; review of the rework, m-3);
+ * a day ride names only what goes, and says nothing with automatic stops alone.
  */
-function stopsLine(trip: Trip, n: number): string {
+async function stopsLine(trip: Trip, n: number, settle: Settle): Promise<string> {
   const held = trip.stops?.routeId === trip.route.id ? trip.stops : undefined;
   if (!held || !Array.isArray(held.days) || held.days.length === 0) return '';
   const a = planAround(held, trip.route, n);
   const dropped = a.dropped.map((d) => TF.appTripStopNight(d.stop.name, d.night, true)).join(', ');
-  return n > 0 || dropped ? TF.appTripStopsNewNights(n, a.kept.map((k) => TF.appTripStopNight(k.stop.name, k.night)).join(', '), dropped,
-    a.uneven.map((u) => TF.appTripDayUneven(u.day, showKm(u.km), u.long)).join('; ')) : '';
+  if (n < 1) return dropped ? TF.appTripStopsNewNights(0, '', dropped, '') : '';
+  // only a place the rider picked can leave a day uneven: the days as they now end, with the other nights' places
+  const settled = a.kept.some((k) => k.stop.placeId !== null) ? await settle().catch(() => null) : null;
+  const uneven = settled ? unevenDays(trip.route, endsOf(settled, trip.route.lengthKm)).map((u) => TF.appTripDayUneven(u.day, showKm(u.km), u.long)).join('; ') : '';
+  return TF.appTripStopsNewNights(n, a.kept.map((k) => TF.appTripStopNight(k.stop.name, k.night)).join(', '), dropped, uneven);
 }
 
 // Remove this trip stands next to Change in the Route step's done row (owner, 9 Nov 2026): `part="remove"` of this chunk, with its
@@ -75,10 +83,11 @@ export function Choice({ name, legend, value, options, onPick }: { name: string;
  * `when`: the departure date and the nights, which stay in the Route step; `details`: the trip details folded under it (guided Trip
  * design §2.2): start time, pace, flat speed, stay type, camp water and keep fresh.
  */
-export function TripSettings({ services, snap, reload, part, focusDate = 0 }: {
+export function TripSettings({ services, snap, reload, part, focusDate = 0, settle = settleNow }: {
   services: TripServices; snap: TripSnapshot; reload: () => Promise<void>; part: 'when' | 'details' | 'remove';
   /** Counts the trip line's Change date taps: each one puts the focus on the date (sweep of 14 Nov 2026, #3). */
   focusDate?: number;
+  settle?: Settle;
 }) {
   const { settings, trip } = snap;
   const [problems, setProblems] = useState<Partial<Record<string, string>>>({});
@@ -112,7 +121,7 @@ export function TripSettings({ services, snap, reload, part, focusDate = 0 }: {
     const was = trip ? settings.nights ?? suggestedNights(trip) : null;
     const ok = await save('nights', v);
     const now = trip ? v ?? suggestedNights(trip) : null;
-    setStopsSaid(ok && trip && now !== null && now !== was ? stopsLine(trip, now) : '');
+    setStopsSaid(ok && trip && now !== null && now !== was ? await stopsLine(trip, now, settle) : '');
     return ok;
   };
 

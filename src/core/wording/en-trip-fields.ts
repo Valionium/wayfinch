@@ -18,7 +18,7 @@ export const TF = {
   // ride (0) names only what goes.
   appTripStopsNewNights: (n: number, kept: string, dropped: string, uneven: string): string => (n < 1
     ? `A day ride has no nights, so your stops are not kept: ${dropped}.`
-    : `New stops for ${n} ${n === 1 ? 'night' : 'nights'}${kept ? `, planned around yours: ${kept}` : ''}.${dropped ? ` Not kept: ${dropped}.` : ''}`
+    : `New stops for ${n} ${n === 1 ? 'night' : 'nights'}${kept ? `, keeping yours: ${kept}` : ''}.${dropped ? ` Not kept: ${dropped}.` : ''}`
       + `${uneven ? ` Around your stops, ${uneven}.` : ''}${kept || dropped ? ' To change a stop, use Change stop under its day in Your route.' : ''}`),
   // one own stop: its name ("No stop" for the rider's No stop) and its night, the new one, or the old one (`was`; review of PR 163, m-1)
   appTripStopNight: (name: string | null, night: number, was?: boolean): string => `${name ?? 'No stop'} (${was ? 'was ' : ''}night ${night})`,

@@ -58,7 +58,7 @@ test('[TRIP-STOPS-KEEP] a stop the rider picked stays when the nights change: th
   await nights.press('Enter');
   const line = page.locator('[data-nights-stops]');
   await expect(line).toHaveAttribute('role', 'status');
-  await expect(line).toContainText(new RegExp(`^New stops for 3 nights, planned around yours: ${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(night \\d\\)`));
+  await expect(line).toContainText(new RegExp(`^New stops for 3 nights, keeping yours: ${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(night \\d\\)`));
   await expect(line).toContainText('To change a stop, use Change stop under its day in Your route.');
   await expect(nights).toBeFocused();
 
