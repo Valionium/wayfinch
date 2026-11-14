@@ -6,7 +6,7 @@
 export const HN = {
   hintEveryTool: 'Your bike is in every tool now: bags, tyre pressure and bike care fit it.',
   hintToolsTypical: 'a typical gravel bike',
-  hintToolsAdd: 'Add yours',
+  hintToolsAdd: 'Add your bike',
   hintAdd: 'Add your bike',
   hintFitTyre: 'No saved bike, so nothing is filled in.',
   hintFitTyreAfter: 'and its tyre sizes fill in here.',
