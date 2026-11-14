@@ -212,7 +212,8 @@ test('[BC-ROAD] the Roadside tab fits the chosen bike; every card open, at the p
   // a critical card's steps end with the shop line, a puncture's do not
   await page.evaluate(() => { localStorage.setItem('copilot:careAllSteps:v1', '1'); });
   await card(page, 'brake-rub-rim').locator('.care-open').click();
-  await expect(page.getByRole('dialog').locator('.care-step-all')).toHaveCount(6);
+  // the kind of rim brake not told: both centring lines (BC-HYDRO-RIM-CENTRE), 7 steps
+  await expect(page.getByRole('dialog').locator('.care-step-all')).toHaveCount(7);
   await expect(page.getByRole('dialog').getByText('If unsure, a shop.')).toBeVisible();
   await page.keyboard.press('Escape');
   await card(page, 'puncture-tube').locator('.care-open').click();
@@ -361,8 +362,9 @@ test("[PG-SHEET-OPEN] a part's name opens the bike view: a bottom sheet on a pho
   app = await loadApp(page, { launch: true, path: '/#/tools/care' });
   await seed(page, [A], 'bike_a');
   await openSteps(page, 'brake-rub-rim', 'Brake rubbing');
-  for (let i = 0; i < 5; i += 1) await page.getByRole('button', { name: 'Next' }).click();
-  await expect(page.locator('.care-steps-count')).toHaveText('Step 5 of 6');
+  // the kind of rim brake not told: both centring lines show (BC-HYDRO-RIM-CENTRE), so the brake's quick release is step 6 of 7
+  for (let i = 0; i < 6; i += 1) await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.locator('.care-steps-count')).toHaveText('Step 6 of 7');
   const link = page.locator('.care-step .care-part', { hasText: "brake's quick release" });
   await link.click();
   const sheet = page.getByRole('dialog', { name: 'Where to find: Brake rubbing' });
@@ -397,7 +399,7 @@ test("[PG-SHEET-OPEN] a part's name opens the bike view: a bottom sheet on a pho
   await expect(sheet.getByRole('heading', { level: 3 })).toHaveText("The wheel's quick release");
   await page.goBack();
   await expect(page.locator('dialog.part-sheet')).toHaveCount(0);
-  await expect(page.locator('.care-steps-count')).toHaveText('Step 5 of 6');
+  await expect(page.locator('.care-steps-count')).toHaveText('Step 6 of 7');
   await expect(page).toHaveURL(/#\/tools\/care$/);
   expect(errors).toEqual([]);
 });

@@ -52,9 +52,10 @@ export const ROAD_FIGURES: Record<string, RoadFigure[]> = {
     step(2, 'not touching the tyre or spokes'),
     step(3, 'centre the brake'), step(3, 'turn its small centring screw a little'), step(3, 'the spring screw on the side of one arm'),
     step(3, 'ride on gently and have it seen to at a shop'),
-    step(4, 'Rim bent and still rubbing'), step(4, "open the brake's quick release only if you must and ride slowly"),
-    step(4, 'Until you close it again, this brake works much less: ride slowly and use the other brake.'),
-    step(5, "Close the brake's quick release once the wheel is fixed."),
+    step(4, 'Hydraulic rim brakes: there is no centring screw.'), step(4, 'ride on gently and have it seen to at a shop'),
+    step(5, 'Rim bent and still rubbing'), step(5, "open the brake's quick release only if you must and ride slowly"),
+    step(5, 'Until you close it again, this brake works much less: ride slowly and use the other brake.'),
+    step(6, "Close the brake's quick release once the wheel is fixed."),
     f('rideOn', 'Fine if light rub'), f('rideOn', 'Walk if the wheel is bent or the brake will not stop you'),
   ],
   'brake-rub-disc': [
@@ -118,7 +119,7 @@ export const ROAD_FIGURES: Record<string, RoadFigure[]> = {
 
 /** The draft's full step counts per card (so a step cannot be merged or cut unseen). */
 export const ROAD_STEP_COUNTS: Record<string, number> = {
-  'puncture-tube': 7, 'puncture-tubeless': 7, 'chain-broken': 6, 'spoke-snapped': 5, 'brake-rub-rim': 6, 'brake-rub-disc': 5,
+  'puncture-tube': 7, 'puncture-tubeless': 7, 'chain-broken': 6, 'spoke-snapped': 5, 'brake-rub-rim': 7, 'brake-rub-disc': 5,
   'brake-weak-rim': 5, 'brake-weak-disc': 5, 'gears-skipping': 4, 'bolt-loose': 4, 'tyre-torn': 4, 'ebike-no-power': 5,
 };
 
