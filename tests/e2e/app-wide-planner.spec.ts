@@ -21,9 +21,10 @@ async function planner(page: Page, width = 1280, height = 720): Promise<void> {
   await expect(page.locator('#rigBike svg.bk')).toBeVisible();
 }
 
-/** The finished plan with three bags, the weight question skipped. */
+/** The finished plan with three bags, the weight question skipped; on the 6-night trip these tests were written on (a new plan has no
+ *  nights entered since the owner's ruling of 14 Nov 2026, sweep #32). */
 async function finished(page: Page): Promise<void> {
-  await page.evaluate("S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'frame', L:6 }, { uid:3, pos:'bar', L:12 }]; S.nextUid = 4; go(2); go(3); go(4)");
+  await page.evaluate("S.nights = 6; S.nightsOpen = null; applyTripKitDefaults(); S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'frame', L:6 }, { uid:3, pos:'bar', L:12 }]; S.nextUid = 4; go(2); go(3); go(4)");
   if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
   await expect(page.locator('#rigSvg [data-inspect]').first()).toBeVisible();
 }
