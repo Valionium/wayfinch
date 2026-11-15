@@ -262,7 +262,7 @@ export function RouteSummary({ snap, stops, beds, settle = settleStops, choices 
         <ClimbCheck trip={trip} pending={missingHeights} />
         {!missingHeights && snap.heightsLookedUp ? <p class="muted">{TF.appTripHeightsCredit}</p> : null}
         {trip.route.source === 'planned' || snap.prepared?.build ? <OsmCredit lead={TF.appTripOsmLead} date={packDate(snap.prepared?.build)} /> : null}
-        <p class="muted"><a href="/legal/licences/">{W.appTripLicences}</a></p>
+        <p class="muted"><a href="/legal/licences/">{TF.appTripLicences}</a></p>
       </div>
     </Card>
   );

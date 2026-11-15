@@ -697,9 +697,6 @@ export const W = {
   bikeHintLaterName: 'Later: show this smaller',
 
   // ---- Trip (sub-project 5, group 5): add a route, the summary, settings, Prepare this route, A to B. No word here calls a trip ready, safe or complete. ----
-  appTripUnnamed: 'Unnamed route',
-  appTripReplaceYes: 'Replace route',
-  appTripReplaceCancel: 'Cancel',
   appTripDistance: (km: string): string => `${km} km`,
   appTripClimbing: (m: string): string => `${m} m up`,
   appTripClimbingUnknown: 'Climbing unknown',
@@ -708,7 +705,6 @@ export const W = {
   appTripDayLeaveBy: (about: string): string => `leave by ${about}`,
   appTripDayDetail: (hours: string, up: string | null): string => `${hours} h riding${up === null ? '' : `, ${up} m up`}`,
   appTripMapDate: (date: string, fromSource: boolean): string => `map data ${fromSource ? 'of' : 'from'} ${date}`,
-  appTripLicences: 'Licences',
   appTripPaceSteady: 'Steady',
   appTripPaceSporting: 'Sporting',
   appTripPaceHard: 'Hard',
@@ -724,7 +720,6 @@ export const W = {
   appTripStepSave: 'Saving',
   appTripProgress: (n: number, total: number, name: string): string => `Step ${n} of ${total}: ${name}`,
   appTripProgressPart: (done: number, total: number): string => `${done} of ${total}`,
-  appTripStepsOk: 'Steps that went through',
   appTripReplanFailed: 'The setting was kept, but the days could not be updated. Change it again to try once more.',
   appTripPlaces: (n: string): string => `${n} ${n === '1' ? 'place' : 'places'}`,
   appTripNoPlaces: 'no places saved',

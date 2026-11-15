@@ -47,6 +47,13 @@ export const TF = {
   appTripPickGpx: 'Choose a GPX file',
   appTripReading: 'Reading the file…',
   appTripReplaceBody: (oldName: string, newName: string, km: string): string => `“${newName}” (${km} km) would replace “${oldName}”. The places, forecast, positions, departure date and nights saved for the old route are removed. The departure date goes back to today and the nights to the stage model's suggestion; pace, speed, start time, stay and camp water stay.`,
+  // Moved word for word from en.ts, as only Trip's chunks say them, to keep the first screen at main's figure with the date and
+  // the nights in Trip details' folded line (the owner's ruling A of 15 Nov 2026)
+  appTripUnnamed: 'Unnamed route',
+  appTripReplaceYes: 'Replace route',
+  appTripReplaceCancel: 'Cancel',
+  appTripLicences: 'Licences',
+  appTripStepsOk: 'Steps that went through',
   appTripOsmLink: '© OpenStreetMap contributors',
   appTripGeoNamesLink: 'GeoNames',
   appTripGeoNamesLicence: ', CC BY 4.0',

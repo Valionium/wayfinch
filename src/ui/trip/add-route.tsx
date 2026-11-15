@@ -118,8 +118,8 @@ export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken
               <h3 id="trip-replace-title" tabIndex={-1} ref={asking}>{TR.appTripReplaceTitle}</h3>
               <p>{TF.appTripReplaceBody(old.route.name, pending.route.name, showKm(pending.route.lengthKm))}</p>
               <div class="row">
-                <button type="button" class="btn btn-primary" onClick={() => void commit(pending)}>{W.appTripReplaceYes}</button>
-                <button type="button" class="btn" onClick={() => setPending(null)}>{W.appTripReplaceCancel}</button>
+                <button type="button" class="btn btn-primary" onClick={() => void commit(pending)}>{TF.appTripReplaceYes}</button>
+                <button type="button" class="btn" onClick={() => setPending(null)}>{TF.appTripReplaceCancel}</button>
               </div>
             </div>
           ) : null}

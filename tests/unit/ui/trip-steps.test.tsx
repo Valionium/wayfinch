@@ -287,7 +287,7 @@ describe('The message after a route is added (owner\'s item 2)', () => {
     await click(buttonIn(step('route'), W.appTripStepChange));
     await pick(await fixtureGpx('loop'));
     await until(() => host.querySelector('[data-replace]') !== null, 'the question');
-    await click(buttonIn(host.querySelector('[data-replace]')!, W.appTripReplaceYes));
+    await click(buttonIn(host.querySelector('[data-replace]')!, TF.appTripReplaceYes));
     await until(() => host.querySelector('[data-added]') !== null, 'the message');
     const name = (await readTrip())!.route.name;
     expect(host.querySelector('[data-added]')!.textContent).toContain(`${TF.appTripReplaced(name)} ${TF.appTripNextGetReady}`);
@@ -547,7 +547,7 @@ describe('What the review of PR 73 found', () => {
     const file = new File([await fixtureGpx('loop')], 'loop.gpx');
     await act(async () => { zone.dispatchEvent(new CustomEvent('filedrop', { detail: file })); });
     await until(() => host.querySelector('[data-replace]') !== null, 'the question');
-    await click(buttonIn(host.querySelector('[data-replace]')!, W.appTripReplaceCancel));
+    await click(buttonIn(host.querySelector('[data-replace]')!, TF.appTripReplaceCancel));
     await click(buttonIn(step('bags'), W.appTripStepBags));
     await click(buttonIn(step('route'), W.appTripStepChange));
     await until(() => step('route').querySelector('[data-add-route]') !== null, 'Add a route');

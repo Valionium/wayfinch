@@ -50,7 +50,7 @@ function Body({ services, snap, reload, lead = null, onRun }: Props) {
       {leading ? null : <>{button}<p class="muted" data-prepare-line>{TR.appTripPrepareLine}</p></>}
       <RunProgress run={run} />
       {progress ? null : <NotSaved failed={failed} />}
-      {!progress && saved.length > 0 ? <p class="muted">{W.appTripStepsOk}: {saved.map((s) => labelOf(s.step)).join(', ')}.</p> : null}
+      {!progress && saved.length > 0 ? <p class="muted">{TF.appTripStepsOk}: {saved.map((s) => labelOf(s.step)).join(', ')}.</p> : null}
       <p class="tool-line">{W.appTripFlightMode}</p>
       <BeforeYouGo snap={snap} />
     </div>

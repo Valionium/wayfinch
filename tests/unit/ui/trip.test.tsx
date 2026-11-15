@@ -155,7 +155,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     await until(() => host.querySelector('[data-replace]') !== null, 'the question');
     expect(host.querySelector('[data-replace]')!.textContent).toContain(first.route.name);
     expect((await readTrip())!.route.id).toBe(first.route.id);
-    await click(button(W.appTripReplaceCancel));
+    await click(button(TF.appTripReplaceCancel));
     expect(host.querySelector('[data-replace]')).toBeNull();
     const kept = (await readTrip())!;
     expect(kept.route.id).toBe(first.route.id);
@@ -163,7 +163,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
 
     await pick(await fixtureGpx('alpine-pass'));
     await until(() => host.querySelector('[data-replace]') !== null, 'the question again');
-    await click(button(W.appTripReplaceYes));
+    await click(button(TF.appTripReplaceYes));
     await until(() => text().includes('Altdorf'), 'the new route');
     const replaced = (await readTrip())!;
     expect(replaced.route.id).not.toBe(first.route.id);
@@ -439,7 +439,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     expect(button(W.appTripUpdateButton)).toBeDefined();
     expect(text()).toContain(W.appTripFlightMode);
     // The steps that went through name the data saved, the same right after the run as after a reload: "Saving" is not one.
-    const ok = [...host.querySelectorAll('p.muted')].find((p) => p.textContent?.startsWith(W.appTripStepsOk))!.textContent!;
+    const ok = [...host.querySelectorAll('p.muted')].find((p) => p.textContent?.startsWith(TF.appTripStepsOk))!.textContent!;
     expect(ok).not.toContain(W.appTripStepSave);
   });
 
@@ -552,7 +552,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     const credit = [...host.querySelectorAll('[data-summary] a')].find((a) => a.textContent === '© OpenStreetMap contributors')!;
     expect(credit.getAttribute('href')).toBe('https://www.openstreetmap.org/copyright');
     expect(host.querySelector('[data-summary]')!.textContent).toContain('map data of 25 Oct');
-    const licences = [...host.querySelectorAll('a')].find((a) => a.textContent === W.appTripLicences)!;
+    const licences = [...host.querySelectorAll('a')].find((a) => a.textContent === TF.appTripLicences)!;
     // The licences page itself, a page of the site the worker precaches (owner's device check, 5 Nov: #/you/legal showed only "You").
     expect(licences.getAttribute('href')).toBe('/legal/licences/');
     render(null, host);
@@ -642,7 +642,7 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     await click(button(W.appAbPlan));
     await until(() => host.querySelector('[data-replace]') !== null, 'the question');
     expect((await readTrip())!.route.id).toBe(before);
-    await click(button(W.appTripReplaceCancel));
+    await click(button(TF.appTripReplaceCancel));
     expect((await readTrip())!.route.id).toBe(before);
   });
 
@@ -684,7 +684,7 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     const [a, b] = [before.route.points[0]!, before.route.points.at(-1)!];
     expect(net.urls.at(-1)!.startsWith(`https://routing.openstreetmap.de/routed-bike/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?`)).toBe(true);
     expect(kept((await readTrip())!)).toEqual(kept(before));
-    await click(button(W.appTripReplaceCancel));
+    await click(button(TF.appTripReplaceCancel));
     expect(kept((await readTrip())!)).toEqual(kept(before));
     // Changing one end opens its search, as after a pick.
     await click(button(`${TR.appAbChange} ${TR.appAbTo.toLowerCase()}`));
@@ -778,10 +778,10 @@ describe('What the review of group 5 found', () => {
     await until(() => text().includes(W.appTripMissingHeading), 'the first run');
     await pick(await fixtureGpx('alpine-pass'));
     await until(() => host.querySelector('[data-replace]') !== null, 'the question');
-    await click(button(W.appTripReplaceYes));
+    await click(button(TF.appTripReplaceYes));
     await until(() => text().includes('Altdorf'), 'the new route');
     await settle(30);
-    expect(text()).not.toContain(W.appTripStepsOk);
+    expect(text()).not.toContain(TF.appTripStepsOk);
     expect(text()).not.toContain(W.appTripMissingHeading);
     expect(text()).toContain(TF.appTripNothingSaved);
     expect(button(W.appTripGetReadyButton)).toBeDefined();
@@ -961,7 +961,7 @@ describe('Messages that must not be lost', () => {
     await show(svc);
     await pick(await fixtureGpx('alpine-pass'));
     await until(() => host.querySelector('[data-replace]') !== null, 'the question');
-    await click(button(W.appTripReplaceYes));
+    await click(button(TF.appTripReplaceYes));
     await until(() => text().includes(TF.appTripReplacedNoDate('Fixture: Altdorf over the Gotthard to Bellinzona')), 'the sentence');
     expect(text()).not.toContain(TR.appTripUnchanged);
   });

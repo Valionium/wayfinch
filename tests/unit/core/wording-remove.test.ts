@@ -38,7 +38,7 @@ test('[TRIP-REMOVE-ASK] the confirm step names what goes and what stays, in plai
 // Trip's chunk words moved out of en.ts to make room on the first screen keep en.ts's checks.
 test('[HON-BANNED] none of Trip\'s moved chunk words uses a banned word or calls the trip ready; none is also in en.ts', () => {
   const fields = Object.entries(TF).map(([k, v]): [string, string] => [k, typeof v === 'function' ? (v as (...a: unknown[]) => string)(3, 4, '5') : v]);
-  expect(fields.length).toBe(35); // 31, the words of an own stop kept or not and of an uneven day on other nights (the owner's ruling of 14 Nov 2026), the line after a route is added (moved from en.ts), and the kept route's line (the owner's ruling B of 15 Nov 2026)
+  expect(fields.length).toBe(40); // 31, the words of an own stop kept or not and of an uneven day on other nights (the owner's ruling of 14 Nov 2026), the line after a route is added (moved from en.ts), the kept route's line (the owner's ruling B of 15 Nov 2026) and five words moved from en.ts with it
   for (const [key, text] of fields) {
     expect(key).toMatch(/^appTrip[A-Z]/);
     expect(bannedHits(text, false), `${key}: ${text}`).toEqual([]);

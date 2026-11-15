@@ -4,7 +4,7 @@ import { parseGpx } from '../../core/route/gpx.ts';
 import type { RawPoint, XmlDocLike } from '../../core/route/gpx.ts';
 import { buildRoute } from '../../core/route/profile.ts';
 import type { Route } from '../../core/types.ts';
-import { W } from '../../core/wording/en.ts';
+import { TF } from '../../core/wording/en-trip-fields.ts';
 
 const stem = (fileName: string): string => fileName.replace(/^.*[\\/]/, '').replace(/\.[^.]*$/, '').trim().slice(0, 60);
 
@@ -15,7 +15,7 @@ const stem = (fileName: string): string => fileName.replace(/^.*[\\/]/, '').repl
 export async function routeFromGpx(text: string, fileName: string, parseXml: (s: string) => XmlDocLike): Promise<{ route: Route; hadHeights: boolean }> {
   const parsed = parseGpx(text, parseXml);
   const raw: RawPoint[] = parsed.points;
-  const route = await buildRoute(raw, parsed.name || stem(fileName) || W.appTripUnnamed, 'gpx');
+  const route = await buildRoute(raw, parsed.name || stem(fileName) || TF.appTripUnnamed, 'gpx');
   return { route, hadHeights: route.points.every((p) => p.ele !== null) };
 }
 
