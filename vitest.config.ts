@@ -7,6 +7,6 @@ export default defineConfig({
   define: { __WF_TEST_HOOKS__: 'false' },
   test: {
     include: ['tests/unit/**/*.test.{ts,tsx}', 'tests/sim/**/*.test.ts'],
-    setupFiles: ['tests/setup-fast-check.ts'],
+    setupFiles: ['tests/setup-fast-check.ts', 'tests/setup-turn.ts'],
   },
 });
