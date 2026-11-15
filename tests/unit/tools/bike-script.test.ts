@@ -23,7 +23,8 @@ test('[BK-ART-ANCHORS] with the switch on the bag planner gets /tools/bags/bike.
   const context = { window: {} as Record<string, unknown>, text: JSON.stringify(sample[0]) };
   runInNewContext(source, context);
   expect(Object.keys(context.window.WayfinchBike as object).sort()).toEqual(['SWATCHES', 'bikeArt', 'nearestSwatchName', 'normaliseBike', 'oklabMedian', 'resolveBikeSpec',
-    'PATTERN_LIST', 'FADES', 'DEFAULT_COLOURS', 'PAINT_WORDS', 'forkColours', 'pairFor', 'colourName', 'bagShape', 'PAIR_OFFSET', 'shapedArt'].sort());
+    'PATTERN_LIST', 'FADES', 'DEFAULT_COLOURS', 'PAINT_WORDS', 'forkColours', 'pairFor', 'colourName', 'bagShape', 'PAIR_OFFSET', 'shapedArt',
+    'frameKept'].sort());   // frameKept: the frame bag's share beside the plan's bottles (the owner's ruling of 14 Nov 2026, BK-FRAME-COUNT)
   const theirs = runInNewContext('const B = window.WayfinchBike; B.bikeArt(B.resolveBikeSpec(B.normaliseBike(JSON.parse(text)), null), null).svg', context) as string;
   const mine = bikeArt(resolveBikeSpec(normaliseBike(sample[0]), null), null);
   expect(mine.label).toContain('blue frame');

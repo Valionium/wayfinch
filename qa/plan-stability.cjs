@@ -252,10 +252,11 @@ test('[LC-KEEP-11] triggers: each one places afresh and says why; a hand placeme
   // resizing the seat pack
   start();p=change('S.bags.find(b=>b.uid===3).L=15;');
   assert.equal(notes().replan.reason,'bags');assert.deepEqual(keysOf(p,'lock'),['3-0']);
-  // a cage in the triangle: the frame bag goes from 6.0 to 4.5 L
+  // a cage in the triangle: the frame bag goes from 6.0 to 4.5 L, and counts only what fits beside the bottle, as the rig draws it
+  // (the owner's ruling of 14 Nov 2026, LC-FRAME-FITS): 3.12 L usable, no longer 3.96
   start();assert.equal(json("S.bags.flatMap(physical).find(u=>u.key==='1-0')&&usableL(S.bags[0])"),5.28);
   p=change("S.bags.push({uid:9,pos:'bottle',slot:'dt',L:.75});syncFrameBags();");
-  assert.equal(json('usableL(S.bags[0])'),3.96);assert.equal(notes().replan.reason,'bags');assert.deepEqual(keysOf(p,'lock'),['3-0']);
+  assert.equal(json('usableL(S.bags[0])'),3.12);assert.equal(notes().replan.reason,'bags');assert.deepEqual(keysOf(p,'lock'),['3-0']);
   // the rack deck on
   start();p=change('S.decks.rack=true;');
   assert.equal(notes().replan.reason,'rackDeck');assert.deepEqual(keysOf(p,'lock'),['3-0']);

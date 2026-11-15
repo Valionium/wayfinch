@@ -18,7 +18,7 @@ test.skip(({ colorScheme }) => colorScheme === 'light', 'storage, not the theme'
 const ready = (page: Page) => page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY === true');
 const saved = (page: Page) => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter((k) => k.startsWith('loadcheck:')).sort().map((k) => [k, localStorage.getItem(k)])));
 
-test('[LC-MOVE-PLANS] hand placements, ticks, setups, three bikes and an old pressure saved by the old page open at /tools/bags/ byte for byte, with no re-plan', async ({ page }) => {
+test('[LC-MOVE-PLANS] hand placements, ticks, setups, three bikes and an old pressure saved by the old page open at /tools/bags/ byte for byte; its frame bag beside the bottle now counts what fits, placed again once with the note, nothing lost', async ({ page }) => {
   await page.context().route(/^https:\/\//, (route) => route.abort());
   server = await startCfLike({ dir: legacySite(tempDir()) });
   await page.goto(`${server.origin}/`, { waitUntil: 'domcontentloaded' });
@@ -70,9 +70,23 @@ test('[LC-MOVE-PLANS] hand placements, ticks, setups, three bikes and an old pre
   await page.waitForTimeout(600);
   const after = await saved(page);
   for (const [key, value] of Object.entries(before)) expect(after[key], key).toBe(value);
-  // nothing was placed again: the plan is the one stored, with no re-plan note
-  expect(await page.evaluate('JSON.stringify(S.placements)')).toBe(JSON.stringify(draft.placements));
-  expect(await page.evaluate('currentPlan().notes.replan')).toBeNull();
+  // The owner's ruling of 14 Nov 2026 (LC-FRAME-FITS, LC-FRAME-FITS-OLD): the frame bag beside the seat-tube bottle now counts only what
+  // the rig draws there, so the kit is placed again, once, and the packing check says why. The stored plan itself is untouched (above),
+  // and nothing is lost: everything the old page placed is in a bag or named as not fitting, and the hand placement is kept or named.
+  const stored = draft.placements as { basis: { units: [string, string, string, number, number][] }; items: Record<string, unknown> };
+  const now = await page.evaluate(`(() => { const A = currentPlan(); return { reason: A.notes.replan && A.notes.replan.reason, units: A.basis.units,
+    items: Object.keys(A.items), spill: A.spill.map((k) => k.id), kept: A.hand.kept, notKept: A.hand.notKept.map((n) => n.id) }; })()`) as
+    { reason: string | null; units: [string, string, string, number, number][]; items: string[]; spill: string[]; kept: string[]; notKept: string[] };
+  expect(now.reason).toBe('beside');
+  // the same bags; only the frame bag holds less
+  expect(now.units.map((u) => u[0])).toEqual(stored.basis.units.map((u) => u[0]));
+  for (const [i, u] of now.units.entries()) {
+    if (u[1] === 'frame') expect(u[3], 'the frame bag counts less').toBeLessThan(stored.basis.units[i]![3]);
+    else expect(u, u[0]).toEqual(stored.basis.units[i]);
+  }
+  for (const id of Object.keys(stored.items)) expect(now.items.includes(id) || now.spill.includes(id), id).toBe(true);
+  const [pinnedId] = Object.keys(draft.pinned);
+  expect(now.kept.includes(pinnedId!) || now.notKept.includes(pinnedId!), 'the hand placement is kept or named').toBe(true);
   expect(await page.evaluate('JSON.stringify(S.pinned)')).toBe(JSON.stringify(draft.pinned));
   // the bike, its tyre fields and the setups came through as they were
   expect(await page.evaluate('JSON.stringify(S.bikeProfile.pressure)')).toBe(JSON.stringify(JSON.parse(before['loadcheck:bikeProfile']!).pressure));

@@ -164,27 +164,36 @@ test('[LC-RIG-TAPS] with no bike.js the rig still shows a bike, the bags and eve
   assert.ok(bare.run('currentPlan().slots.length')>0);
 });
 
-test('[LC-RIG-SAME-PLAN] a bike without frame details plans byte-identically to the frozen root copy (its deck rule read as today\'s), and drawing the rig changes nothing',()=>{
+test('[LC-RIG-SAME-PLAN] a bike without frame details plans byte-identically to the frozen root copy (its deck rule, and its frame bag beside a bottle, read as today\'s), and drawing the rig changes nothing',()=>{
   // The root copy keeps the deck rule of before the owner's decision of 7 Nov 2026 (the sleeping bag rides on the rack deck too). It is
   // compared here with that one line read as today's, the only difference the plans may have; the file itself is never changed.
+  // Nor does it count a frame bag beside a bottle in the triangle only for what fits there (the owner's ruling of 14 Nov 2026,
+  // LC-FRAME-FITS): its one usable-litres line is read with the share this page counts for the same plan (QA_FRAME_SHARE), nothing else.
   const oldDeck="const DECK_CLAIMS = ['tent','pad'];",newDeck="const DECK_CLAIMS = ['tent','pad','quilt'];";
+  const oldUse='function usableL(b){ return +(ratedL(b) * packEff()).toFixed(2); }';
+  const newUse="var QA_FRAME_SHARE=1;function usableL(b){ return +(ratedL(b) * (b.pos === 'frame' && !b.userL ? QA_FRAME_SHARE : 1) * packEff()).toFixed(2); }";
   const old=appVM({page:path.join(__dirname,'..','releases','load-check-root.html'),bike:false,
-    edit:html=>{assert.equal(html.split(oldDeck).length,2,'the root copy has its deck rule once');return html.replace(oldDeck,newDeck);}});
+    edit:html=>{assert.equal(html.split(oldDeck).length,2,'the root copy has its deck rule once');
+      assert.equal(html.split(oldUse).length,2,'the root copy counts usable litres in one line');return html.replace(oldDeck,newDeck).replace(oldUse,newUse);}});
   assert.equal(q.run('JSON.stringify(DECK_CLAIMS)'),old.run('JSON.stringify(DECK_CLAIMS)'),'the page has today\'s deck rule');
   const snapshot=(vm,code)=>vm.run(`(()=>{${code};const A=currentPlan();
     return JSON.stringify({slots:A.slots,inUse:A.inUse,items:A.items,overflow:A.overflow,summary:packingSummary(A),
       specs:S.bags.map(b=>bagSpec(b)),cap:capL(),rated:ratedTotal(),water:waterL(),kit:kitL()});})()`);
   const bikes=[null,{id:'qa_plain'},{id:'qa_named',name:'Tourer',frontTyre:'40-622',rearTyre:'40-622',brakes:'rim',look:{colour:'#2563b8',bars:'flat',ebike:true}}];
-  let n=0;
+  let n=0,cut=0;
   for(const bike of bikes)for(const bags of Object.values(SETS))for(const step of [2,3,4])for(const nights of [0,3]){
     const set=`S.bikeProfile=${bike?`normaliseBikeProfile(${JSON.stringify(bike)})`:'null'};S.bags=${JSON.stringify(bags)};S.step=${step};S.nights=${nights};
       S.decks={bar:true,rack:true};Object.keys(S.kit).forEach(k=>S.kit[k]=false);KIT.forEach(k=>S.kit[k.id]=!!k.on)`;
     const before=snapshot(q,set);
+    const share=q.run('(()=>{const b=S.bags.find(x=>x.pos==="frame");return b?besideShare(b):1;})()');
+    if(share<1)cut++;
+    old.run(`QA_FRAME_SHARE=${share};`);
     assert.equal(before,snapshot(old,set),`same plan as the root copy: ${JSON.stringify(bike)} step ${step}`);
     assert.equal(snapshot(q,'drawRig()'),before,'drawing the rig changes nothing');
     n++;
   }
   assert.ok(n>=72);
+  assert.ok(cut>=12,`the bikepacking set's frame bag beside its down-tube bottle is counted cut (${cut} plans)`);
   // the frozen rules are untouched (the selection fixtures and LC-FREEZE-01 run in their own suite)
   assert.equal(q.run('FRAME_PRESETS.map(p=>p.L+p.label).join()'),old.run('FRAME_PRESETS.map(p=>p.L+p.label).join()'));
 });
@@ -493,6 +502,171 @@ test('[FIT-LINE] the Bag planner with no bike saved and none in the plan: one qu
   fresh.run(`BIKE_PROFILES=[];renderBikeProfiles();`);
   assert.equal(line().hidden,false,'the last saved bike removed: the line again');
   assert.deepEqual(written.filter(k=>/^copilot:/.test(k)),[],'no co-pilot key written');
+});
+
+// The owner's ruling of 14 Nov 2026 ("Yes, count what fits"): a frame bag beside a bottle in the triangle counts only the part of it the rig
+// draws there. Measured on the page's own drawing: the frame shape the rig draws for the plan, over the same shape drawn without the bottles.
+run(`var qaFrameFits=(fit,bags,step)=>{
+  S.bikeProfile=fit?normaliseBikeProfile({id:'qa_fit',name:'Fit',fit}):null;S.bags=bags.map(b=>({...b}));S.nextUid=1+Math.max(0,...S.bags.map(b=>b.uid));
+  S.decks={bar:false,rack:false};S.placements=null;S.pinned={};S.step=step;syncFrameBags();
+  const fb=S.bags.find(b=>b.pos==='frame'),i=frameShapeIdx(fb),B=bikeModule(),f=bikeFit(S.bikeProfile);
+  const area=s=>{const p=s.split(' ').map(q=>q.split(',').map(Number));let t=0;p.forEach((a,k)=>{const b=p[(k+1)%p.length];t+=a[0]*b[1]-b[0]*a[1];});return Math.abs(t)/2;};
+  const unit=()=>{const u=planBasis().units.find(x=>x[1]==='frame');return u?u[3]:null;};
+  const at=s=>{const was=S.step;S.step=s;const L=unit();S.step=was;return L;};
+  if(step===1)return {plan:unit(),shown:bagCapacityText(fb)};
+  const drawn=rigAnchors().frame.shapes[i];
+  const spec={...B.resolveBikeSpec(B.normaliseBike(S.bikeProfile),planBagView()),bottles:[],
+    mounts:{st:!!f.cages.st,dt:!!f.cages.dt,un:!!f.cages.un,top:!!(f.topMounts.front||f.topMounts.rear),frame:!f.frameBag.none}};
+  const whole=B.bikeArt(spec,null,{theme:'dark',idPrefix:'qa'}).anchors.frame.shapes[i];
+  const A=currentPlan(),slot=A.slots.find(s=>s.pos==='frame');
+  const kept=[BESIDE_NOTE,BESIDE_SHOWN];BESIDE_NOTE=null;BESIDE_SHOWN={out:[],in:[],packed:[]};const note=besideNoteHtml(A);[BESIDE_NOTE,BESIDE_SHOWN]=kept;
+  return {usable:bagSpec(fb).usable,rated:ratedL(fb),share:area(drawn)/area(whole),plan:unit(),slot:slot?slot.cap:null,step1:at(1),
+    shown:bagCapacityText(fb),help:besideHelp(fb),note,eff:packEff(),cap:capL()};
+};`);
+const frameFits=(fit,bags,step=3)=>json(`qaFrameFits(${JSON.stringify(fit)},${JSON.stringify(bags)},${step})`);
+const fitOf=(style,size,bolts={})=>({style,size:size?{kind:'letter',value:size}:null,bolts:{st:'unknown',dt:'unknown',un:'unknown',...bolts}});
+const near=(a,b)=>Math.abs(a-b)<=0.0051;
+const asDrawn=(r,what)=>{
+  const want=+(r.rated*r.share*r.eff).toFixed(2);
+  assert.ok(near(r.plan,want),`${what}: the plan counts ${r.plan} L usable, the rig draws ${(r.share*100).toFixed(1)}% of ${r.rated} L: ${want} L`);
+  if(r.slot!==null)assert.ok(near(r.slot,want),`${what}: the packed frame bag holds ${r.slot} L, not ${want} L`);
+  assert.equal(r.step1,r.plan,`${what}: the same litres before anything is drawn (the plan never depends on the step)`);
+};
+
+test('[LC-FRAME-FITS] an XS frame with a bottle on the down tube: the frame bag counts only the part drawn beside the bottle, about 54% of the three-quarter bag, and says so; every style, size and bottle in the triangle counts what the rig draws, at every step',()=>{
+  const xs=frameFits(fitOf('compact','XS'),[{uid:1,pos:'frame',L:6},{uid:2,pos:'bottle',slot:'dt',L:0.75}]);
+  assert.ok(xs.usable&&xs.rated===2.5,'the XS frame\'s three-quarter bag, 2.5 L: '+JSON.stringify(xs));
+  assert.ok(xs.share>0.5&&xs.share<0.6,'the rig draws about 54% of it beside the bottle: '+xs.share);
+  asDrawn(xs,'compact XS beside a down-tube bottle');
+  assert.equal(xs.plan,1.19);
+  assert.equal(xs.shown,'1.19 L usable beside your bottle.');
+  let n=0,cut=0;
+  const fits=[null,...['unknown','diamond-level','diamond-sloping','compact','full-suspension','trapeze','mixte'].flatMap(style=>['XS','S','M','L','XL'].map(size=>fitOf(style,size,{st:'yes',dt:'yes'})))];
+  for(const fit of fits)for(const slots of [['dt'],['st'],['st','dt']])for(const step of [2,3]){
+    const bags=[{uid:1,pos:'frame',L:6},...slots.map((slot,k)=>({uid:2+k,pos:'bottle',slot,L:slot==='st'?0.5:0.75}))];
+    const r=frameFits(fit,bags,step);
+    if(!r.usable)continue;
+    const what=`${fit?fit.style+' '+fit.size.value:'no bike'} beside ${slots.join('+')}, step ${step}`;
+    asDrawn(r,what);
+    if(r.plan<+(r.rated*r.eff).toFixed(2)){cut++;assert.match(r.shown,slots.length>1?/ L usable beside your bottles\.$/:/ L usable beside your bottle\.$/,what);}
+    else assert.doesNotMatch(r.shown,/beside/,what);
+    // a bag's litres by one rule wherever they are shown (LC-LITRES-ONE): two decimals at most, no trailing zeros, in its line, its help and its note
+    assert.doesNotMatch(`${r.shown} ${r.help} ${r.note}`,/\d\.\d0 L|\.00 L/,`[LC-LITRES-ONE] ${what}: ${r.shown} ${r.help} ${r.note}`);
+    n++;
+  }
+  assert.ok(n>=150&&cut>=100,`${n} plans, ${cut} of them cut`);
+});
+
+test('[LC-FRAME-FITS-NONE] no bottle in the triangle (none, or only under the down tube), or a figure the rider typed: the frame bag counts its litres as before, and its line says nothing of a bottle',()=>{
+  let n=0;
+  for(const fit of [null,fitOf('compact','XS',{un:'yes'}),fitOf('diamond-level','M',{un:'yes'}),fitOf('trapeze','L',{un:'yes'}),fitOf('full-suspension','S',{un:'yes'})])
+    for(const bags of [[{uid:1,pos:'frame',L:6}],[{uid:1,pos:'frame',L:6},{uid:2,pos:'bottleU',slot:'un',L:0.5}]])for(const step of [2,3]){
+      const r=frameFits(fit,bags,step);
+      if(!r.usable)continue;
+      assert.ok(Math.abs(r.share-1)<1e-9,'nothing is drawn cut');
+      assert.equal(r.plan,+(r.rated*r.eff).toFixed(2));
+      assert.doesNotMatch(r.shown,/beside/);
+      n++;
+    }
+  // the rider's own bag, typed: counted as typed beside the bottle (the note asks them to check it fits, as before)
+  const own=frameFits(fitOf('compact','XS'),[{uid:1,pos:'frame',L:3,userL:true},{uid:2,pos:'bottle',slot:'dt',L:0.75}]);
+  assert.equal(own.plan,+(3*own.eff).toFixed(2));
+  assert.doesNotMatch(own.shown,/beside/);
+  assert.ok(n>=15);
+});
+
+test('[LC-FRAME-FITS-ST] a bottle on the seat tube: the frame bag counts what the rig draws beside it',()=>{
+  for(const [fit,L] of [[fitOf('diamond-level','M'),0.5],[fitOf('compact','XS',{st:'yes'}),0.5],[null,0.75],[fitOf('mixte','S',{st:'yes'}),0.5]]){
+    const r=frameFits(fit,[{uid:1,pos:'frame',L:6},{uid:2,pos:'bottle',slot:'st',L}]);
+    const what=`${fit?fit.style+' '+fit.size.value:'no bike'} beside a seat-tube bottle`;
+    assert.ok(r.usable,what);
+    assert.ok(r.share<0.95,`${what}: drawn cut (${r.share})`);
+    asDrawn(r,what);
+    assert.match(r.shown,/ L usable beside your bottle\.$/,what);
+  }
+});
+
+test('[LC-FRAME-FITS-OLD] a plan saved before the ruling loads unchanged; where its frame bag now holds less, the kit is placed afresh and the packing check says so, naming what does not fit in it now, however the rider gets there (steps, a kit tick, the nights, a reload); shown, it stays for the visit and does not come back; nothing is lost',()=>{
+  const STUB='renderBikeProfiles=()=>{};renderClimate=()=>{};renderBags=()=>{};renderKit=()=>{};drawRig=()=>{};syncGPXControl=()=>{};renderPressureHelper=()=>{};renderPackingChecklist=()=>{};applyTheme=()=>{};ensureClimate=()=>{};buildThumb=()=>"";';
+  // without bike.js nothing is drawn cut, so nothing is counted cut: the plan as every page before this one made it, left at the bags step
+  const before=appVM({bike:false});before.run(STUB);
+  const oldPlan=(style,bags,kit)=>before.run(`(()=>{S.bikeProfile=normaliseBikeProfile({id:'qa_xs',name:'XS',fit:{style:'${style}',size:{kind:'letter',value:'XS'}}});
+    S.bags=${JSON.stringify(bags)};S.nextUid=5;S.step=2;S.nights=0;${kit?`S.kit=${JSON.stringify(Object.fromEntries(kit.map(k=>[k,true])))};S.kitTouched={...S.kit};`:''}
+    S.decks={bar:false,rack:false};S.placements=null;syncFrameBags();currentPlan();return JSON.stringify(captureDraft());})()`);
+  const saved=oldPlan('compact',[{uid:1,pos:'frame',L:2.5},{uid:2,pos:'bottle',slot:'dt',L:0.75},{uid:3,pos:'seat',L:14},{uid:4,pos:'bar',L:13}]);
+  let plan=JSON.parse(saved);const frameKey='1-0';
+  const wasOf=p=>Object.keys(p.placements.items).filter(id=>p.placements.items[id].some(e=>e[0]===frameKey));
+  let was=wasOf(plan);
+  const litresOf=id=>plan.placements.items[id].filter(e=>e[0]===frameKey).reduce((n,e)=>n+e[2],0);
+  assert.ok(plan.placements.basis.units.some(u=>u[0]===frameKey&&u[3]===2.2)&&was.length>=3,'the saved plan packs its 2.2 L frame bag');
+  // the page as the rider opens it: the stored draft restored, the plan read as the start-up's summary write does, at the step it was left on
+  const open=draft=>{
+    const vm=appVM();vm.run(STUB);
+    const cut=(a,b)=>{const i=vm.html.indexOf(a),j=vm.html.indexOf(b,i+a.length);assert.ok(i>=0&&j>i,'missing '+a);return vm.html.slice(i,j);};
+    vm.run(cut('function renderResult(){','/* ==== 84-packing-checklist.js ==== */'));
+    // go() is in the page's start-up part, which this harness does not run: what it does to the plan's state, as the page's own go() does
+    vm.run('var go=n=>{S.step_prev=S.step;S.step=n;};');
+    vm.run(`restorePlan(${draft},true);S.step=${JSON.parse(draft).step};DRAFT_READY=true;currentPlan();`);
+    return vm;
+  };
+  const check=vm=>{vm.run('go(4);renderResult();');return vm.nodes.get('resultBox').innerHTML.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');};
+  const noteOf=(vm,text,what)=>{
+    assert.match(text,/Your frame bag now counts only what fits beside your bottle: 1\.19 L usable, so the kit was placed afresh\./,what);
+    const A=JSON.parse(vm.run(`JSON.stringify((()=>{const A=currentPlan();return {items:A.items,spill:A.spill.map(k=>k.id),cap:usableL(S.bags.find(b=>b.pos==='frame'))};})())`));
+    const gone=was.filter(id=>!(A.items[id]||[]).some(e=>e[0]===frameKey));
+    // the room beside what stayed of the frame bag's own things (what the planner moved in instead does not count against them)
+    A.left=A.cap-was.reduce((n,id)=>n+(A.items[id]||[]).filter(e=>e[0]===frameKey).reduce((t,e)=>t+e[2],0),0);
+    assert.ok(gone.length>=1,what+': something left the frame bag');
+    for(const id of Object.keys(plan.placements.items))assert.ok(A.items[id]||A.spill.includes(id),`${what}: ${id} is still in a bag or named as not fitting`);
+    const out=((/Does not fit in it now: ([^.]+)\./.exec(text)||[])[1]||'').toLowerCase(),also=((/Also moved out of it: ([^.]+)\./.exec(text)||[])[1]||'').toLowerCase();
+    for(const id of gone){
+      const name=vm.run(`kitName(kitById(${JSON.stringify(id)}))`).toLowerCase();
+      // named as not fitting only when it really does not fit beside what stayed (review of PR 170, m1)
+      if(litresOf(id)>A.left+1e-9)assert.ok(out.includes(name),`${what}: ${id} (${litresOf(id)} L, ${A.left} L left) is named as not fitting: "${out}"`);
+      else assert.ok(also.includes(name)&&!out.includes(name),`${what}: ${id} (${litresOf(id)} L, ${A.left} L left) still fits, so it is only named as moved: "${also}" / "${out}"`);
+    }
+  };
+  // the plan read at the bags step, then on to the packing check (go() sets S.step_prev: review of PR 170, I1)
+  let vm=open(saved);
+  assert.deepEqual(JSON.parse(vm.run('JSON.stringify(S.bags)')),plan.bags,'the bags load as saved');
+  assert.deepEqual(JSON.parse(vm.run('JSON.stringify(S.kit)')),plan.kit,'the kit loads as saved');
+  const first=JSON.parse(vm.run(`JSON.stringify((()=>{const A=currentPlan();return {reason:A.notes.replan&&A.notes.replan.reason,frame:A.slots.find(s=>s.key==='${frameKey}')?.cap??null};})())`));
+  assert.equal(first.reason,'beside','placed afresh because the frame bag now counts only what fits beside the bottle');
+  assert.equal(first.frame,1.19);
+  vm.run('go(3);currentPlan();');
+  noteOf(vm,check(vm),'through the steps');
+  // shown: it stays on screen for the rest of the visit, the draft saved after it no longer carries it, and opened again it does not come back
+  vm.run('S.kit.warmers=!S.kit.warmers;currentPlan();');
+  noteOf(vm,check(vm),'again in the same visit');
+  const seen=vm.run('JSON.stringify(captureDraft())');
+  assert.equal(JSON.parse(seen).besideNote,undefined,'the draft saved after the note was shown does not carry it');
+  assert.doesNotMatch(check(open(seen)),/Your frame bag now counts only/,'shown once: not again after a reload');
+  // a kit tick, the nights, a packed tick: each before the packing check, and the note still waits
+  for(const [what,code] of [['a kit tick','S.kit.warmers=!S.kit.warmers;'],['the nights','S.nights=3;'],['a packed tick','setPackedItem("tent",true);']]){
+    vm=open(saved);vm.run(code+'currentPlan();go(3);currentPlan();');
+    noteOf(vm,check(vm),what);
+  }
+  // saved with the new litres before the rider reached the packing check, then opened again: the note still waits in the draft
+  vm=open(saved);
+  const kept=vm.run('JSON.stringify(captureDraft())');
+  assert.ok(JSON.parse(kept).besideNote,'the draft carries the note until it is shown');
+  vm=open(kept);
+  assert.equal(vm.run('currentPlan().notes.replan'),null,'opened again: nothing is placed afresh a second time');
+  noteOf(vm,check(vm),'after a reload');
+  // a plan where the planner moved small things in while others left: what would still fit beside what stayed is named as moved, not as not fitting
+  // the camping kit this case was written with: since the owner's rulings of 14 Nov 2026 (PR 173, #32) a fresh planner's nights are a day
+  // ride's until entered, whose kit is too small to move anything out of the frame bag that would still fit
+  const CAMP=['quilt','pad','tent','rain','puffy','base1','bibs','socks','camp','cap','underwear','shades','stove','pot','spork','food','snacks','tool','tubes','pump','levers','link','chaintl','hanger','patch','boot','lock','bank','phone','cables','headlamp','firstaid','wash','towel','teeth','wipes','docs','cash'];
+  plan=JSON.parse(oldPlan('diamond-sloping',[{uid:1,pos:'frame',L:2.5},{uid:2,pos:'bottle',slot:'dt',L:0.75},{uid:3,pos:'rack',L:15,pair:true},{uid:4,pos:'bar',L:13}],CAMP));
+  was=wasOf(plan);
+  vm=open(JSON.stringify(plan));
+  const both=check(vm);
+  assert.match(both,/Your frame bag now counts only what fits beside your bottle: 1.37 L usable/);
+  assert.match(both,/Also moved out of it: /,'a small thing that would still fit is named as moved');
+  noteOf(vm,both.replace('1.37 L usable','1.19 L usable'),'small things moved in');
+  // the bag's own help says why it counts less (review of PR 170, m2)
+  assert.match(vm.run('bagCapacityHelp(S.bags.find(b=>b.pos==="frame"))'),/bottle/);
+  assert.doesNotMatch(vm.run('bagCapacityHelp(S.bags.find(b=>b.pos==="bar"))'),/bottle/);
 });
 
 for(const [name,fn] of tests){fn();passed++;console.log('ok',name);}

@@ -5,8 +5,8 @@ const path=require('node:path');
 const ROOT=path.join(__dirname,'..');
 const options={
   stdin:{
-    contents:"import { bagShape, bikeArt, shapedArt, DEFAULT_COLOURS, FADES, colourName, forkColours, nearestSwatchName, normaliseBike, oklabMedian, PAINT_WORDS, PAIR_OFFSET, pairFor, PATTERN_LIST, resolveBikeSpec, SWATCHES } from './src/core/bike/planner.ts';\n"
-      +'window.WayfinchBike = Object.freeze({ bikeArt, resolveBikeSpec, SWATCHES, nearestSwatchName, normaliseBike, oklabMedian, PATTERN_LIST, FADES, DEFAULT_COLOURS, PAINT_WORDS, forkColours, pairFor, colourName, bagShape, PAIR_OFFSET, shapedArt });\n',
+    contents:"import { bagShape, bikeArt, frameKept, shapedArt, DEFAULT_COLOURS, FADES, colourName, forkColours, nearestSwatchName, normaliseBike, oklabMedian, PAINT_WORDS, PAIR_OFFSET, pairFor, PATTERN_LIST, resolveBikeSpec, SWATCHES } from './src/core/bike/planner.ts';\n"
+      +'window.WayfinchBike = Object.freeze({ bikeArt, resolveBikeSpec, SWATCHES, nearestSwatchName, normaliseBike, oklabMedian, PATTERN_LIST, FADES, DEFAULT_COLOURS, PAINT_WORDS, forkColours, pairFor, colourName, bagShape, PAIR_OFFSET, shapedArt, frameKept });\n',
     resolveDir:ROOT,
     sourcefile:'bike-entry.ts',
     loader:'ts',
