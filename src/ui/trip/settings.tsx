@@ -112,10 +112,19 @@ function Part({ services, snap, reload, part, focusDate = 0, settle = settleNow 
   const [fresh, setFresh] = useFollowing(settings.keepFresh);
   const dateField = useRef<HTMLInputElement>(null);
   const [stopsSaid, setStopsSaid] = useState('');
+  // A change the last save could not plan the days for (its note says so): then nothing is said about new stops (review of PR 175, m-2).
+  const noted = useRef(false);
+  // Once the days follow the nights again, the line beside the nights that said they would goes.
+  const dayCount = trip?.route.stages.length;
+  useEffect(() => setProblems((p) => (p.nights === W.appTripReplanFailed ? { ...p, nights: '' } : p)), [dayCount]);
   useEffect(() => { if (focusDate > answered) { answered = focusDate; dateField.current?.focus(); } }, [focusDate]);
+  // The stops' code a change of nights plans its days with comes as Trip details opens, so the taps after a change do not wait for it
+  // on a slow link (review of PR 175, m-1).
+  useEffect(() => { if (part === 'when') void Promise.allSettled([import('../../data/heights.ts'), import('../../data/day-stops.ts')]); }, []);
 
   const save: Save = async (field, value) => {
     const result = await services.writeSettings({ [field]: value });
+    noted.current = !!result.note;
     // A refusal stays beside its field only until the next change that is accepted.
     // An accepted change clears the old refusals, but a note about it (its days could not be updated) is always shown.
     setProblems((p) => (result.ok ? (result.note ? { [field]: result.note } : {}) : { ...p, [field]: result.reasons[field] ?? result.note ?? '' }));
@@ -136,7 +145,7 @@ function Part({ services, snap, reload, part, focusDate = 0, settle = settleNow 
     const was = trip ? settings.nights ?? suggestedNights(trip) : null;
     const ok = await save('nights', v);
     const now = trip ? v ?? suggestedNights(trip) : null;
-    setStopsSaid(ok && trip && now !== null && now !== was ? await stopsLine(trip, now, settle) : '');
+    setStopsSaid(ok && !noted.current && trip && now !== null && now !== was ? await stopsLine(trip, now, settle) : '');
     return ok;
   };
   // With the nights left to the suggestion, a pace or flat speed that changes it plans the nights again around the own stops too: said
@@ -145,7 +154,7 @@ function Part({ services, snap, reload, part, focusDate = 0, settle = settleNow 
   const savePlan = async (field: 'pace' | 'flatKph', v: unknown): Promise<boolean> => {
     const was = trip ? settings.nights ?? suggestedNights(trip) : null;
     const ok = await save(field, v);
-    const next = ok && trip && settings.nights === null ? ({ ...trip, [field]: v } as Trip) : null;
+    const next = ok && !noted.current && trip && settings.nights === null ? ({ ...trip, [field]: v } as Trip) : null;
     const now = next ? suggestedNights(next) : null;
     setStopsSaid(next && now !== null && now !== was ? await stopsLine(next, now, settle) : '');
     return ok;

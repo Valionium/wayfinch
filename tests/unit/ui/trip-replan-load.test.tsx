@@ -161,6 +161,8 @@ describe('The stops\' code for a change of nights (review of PR 175, m-1 and m-2
     await until(() => host.querySelector('[data-summary] .trip-days')?.children.length === n + 1, 'the days for the nights set');
     expect(await days()).toBe(n + 1);
     expect(readLocalSettings().settings.nights).toBe(n);
+    // and the line that said they would goes
+    await until(() => line() === '', 'the line gone');
   }, 20_000);
 
   test('[TRIP-REPLAN-LOAD] the days a change of nights could not plan are planned on the next open of Trip, once the code loads (m-2)', async () => {

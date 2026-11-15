@@ -720,7 +720,7 @@ export const W = {
   appTripStepSave: 'Saving',
   appTripProgress: (n: number, total: number, name: string): string => `Step ${n} of ${total}: ${name}`,
   appTripProgressPart: (done: number, total: number): string => `${done} of ${total}`,
-  appTripReplanFailed: 'The setting was kept, but the days could not be updated. Change it again to try once more.',
+  appTripReplanFailed: 'The setting is kept. The days update when Wayfinch can load again.',
   appTripPlaces: (n: string): string => `${n} ${n === '1' ? 'place' : 'places'}`,
   appTripNoPlaces: 'no places saved',
   appTripWeatherTo: (day: string): string => `weather to ${day}`,
