@@ -380,6 +380,32 @@ describe('[TRIP-BAGS-LONG] a trip of one night or more: straight into the full B
     expect(await page.run('undoTripBags()')).toBe(false);
   });
 
+  test('Undo gives the plan back as it was also when its places came from the place search, an older page or a track: no place gains a country or loses a field, and the draft it saves is that plan (review of PR 146, the note for the owner)', async () => {
+    const { gpx } = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
+    const track = '<?xml version="1.0"?><gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg><trkpt lat="49" lon="8"><ele>100</ele></trkpt><trkpt lat="49.01" lon="8"><ele>110</ele></trkpt></trkseg></trk></gpx>';
+    for (const places of [
+      // the start as the place search lists it (its id and source), with no country code, in Germany; the end as an older page kept it, without a country
+      `setPlace(1,normaliseGeoHits([{id:2907911,name:'Heidelberg',admin1:'Baden-Württemberg',country:'Germany',latitude:49.40768,longitude:8.69079,elevation:114,feature_code:'PPLA2'}])[0]);
+       setPlace(2,{lat:48.58,lon:7.75,elev:140,name:'Strasbourg',where:'Grand Est'});`,
+      // a track's two ends as the map's lookup names them, one with no country code
+      `reverseName=async(lat)=>lat<49.005?{name:'Wiesloch',where:'Baden-Württemberg, Germany',country:''}:{name:'Walldorf',where:'Baden-Württemberg, Germany',country:'DE'};
+       await loadGPX(qaTrack,'ride.gpx');`,
+    ]) {
+      const { page } = longPlanner(gpx);
+      page.context.qaTrack = track;
+      await page.run(`(async()=>{renderResult=()=>{};ensureClimate=()=>{};ensureRoute=()=>{};${places}})()`);
+      expect(page.run('JSON.stringify([S.place&&S.place.name,S.place2&&S.place2.name])')).not.toBe('[null,null]');
+      await page.run('receiveHandoff()');
+      const before = page.run('JSON.stringify(captureDraft())') as string;
+      await page.run('planTripBags()');
+      expect(await page.run('undoTripBags()')).toBe(true);
+      expect(page.run('JSON.stringify(captureDraft())')).toBe(before);
+      await page.run('flushDraft()');
+      const saved = JSON.parse(page.values.get('loadcheck:draft')!) as { trip: unknown };
+      expect(JSON.stringify(saved.trip)).toBe(JSON.stringify((JSON.parse(before) as { trip: unknown }).trip));
+    }
+  });
+
   test('Undo never deletes a setup the rider changed and never drops later work (review of PR 80, I2)', async () => {
     const { gpx } = await handedOff('heidelberg-strasbourg', { nights: 2 }, '2026-06-12');
     const { page, json } = longPlanner(gpx);
