@@ -28,13 +28,13 @@ async function seeded(page: Page, entries: Record<string, string>, path = '/#/to
   await page.reload({ waitUntil: 'domcontentloaded' });
 }
 
-test('[BK-WHERE] the Tools card shows the bike with its bags above "3 bags · 10.2 kg"; a tap goes straight to its Look', async ({ page }) => {
+test('[BK-WHERE] the Tools card shows the bike with its bags above "3 bags, 2 bottles · 10.2 kg"; a tap goes straight to its Look', async ({ page }) => {
   app = await loadApp(page, { launch: true });
   await seeded(page, SEED);
   const card = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Bag planner' }) });
   await expect(card.locator('svg.bk')).toBeVisible();
   expect(await card.locator('.bk-bag').count()).toBeGreaterThan(0);
-  await expect(card.getByText('3 bags · 10.2 kg')).toBeVisible();
+  await expect(card.getByText('3 bags, 2 bottles · 10.2 kg')).toBeVisible();
   const link = card.getByRole('link', { name: /^Your bike: touring bike/ });
   await expect(link).toHaveAttribute('href', `/tools/bags/#bike-details=${bike.id as string}&back=tools&section=look`);
   await link.click();

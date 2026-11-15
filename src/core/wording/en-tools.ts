@@ -6,4 +6,6 @@ export const TL = {
   toolsNoBike: 'No bike chosen. The Bag planner uses a standard bike.',
   // The one top bar of every tool and the legal pages (owner's list, items 8 and 9): the same words everywhere, static pages included.
   toolsBack: '← Back to Wayfinch',
+  // a screen of Tools (Tyre pressure) says where it goes back to (the owner's ruling of 14 Nov 2026, sweep #42)
+  toolsBackTools: '← Tools',
 };

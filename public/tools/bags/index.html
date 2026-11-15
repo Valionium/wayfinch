@@ -226,6 +226,17 @@ body{
 .draftbar.hidden{display:none}
 .draftbar .linky{margin-left:auto}
 .draftbar.quiet{border-color:var(--line)}
+/* the owner's rulings of 14 Nov 2026: the restored plan said once, as one quiet line (sweep #37); the hand-off's "What changes" (#29);
+   Start a new plan at its fixed place, the end of step one */
+#draftBar.restored{border:0;background:none;padding:0;margin:0 0 8px;font-size:12px;color:var(--muted)}
+.handoff-more{flex:1 1 100%;font-size:13px}
+.handoff-more[hidden]{display:none}
+.handoff-more summary{min-height:44px;display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.handoff-more summary::before{content:'▸';text-decoration:none}
+.handoff-more[open] summary::before{content:'▾'}
+.handoff-more p{margin:0 0 4px}
+.newplan-row{margin:12px 0 0}
+.newplan-row .linky{min-height:44px}
 /* free play (design of 14 Nov 2026): hidden by its attribute, 44 px targets, none of it in the small view */
 #freePlayBar[hidden],#freePlayBar [hidden],body.lc-small #freePlayBar{display:none!important}
 #freePlayBar button{min-height:44px}
@@ -2016,6 +2027,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
   </div>
   <div class="draftbar hidden" id="handoffBar" role="status">
     <span id="handoffText"></span>
+    <details class="handoff-more" id="handoffMore" hidden><summary>What changes</summary><p id="handoffDetail"></p></details>
     <button class="kitact hidden" id="handoffPlan" type="button">Plan bags for this trip</button>
     <button class="linky hidden" id="handoffReuse" type="button">Open that setup</button>
     <button class="kitact" id="handoffApply" type="button">Apply</button>
@@ -2156,8 +2168,8 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <div class="field">
         <label for="nights">Nights out <span class="hint">0 for a day ride</span></label>
         <div class="nightchoice">
-          <input type="number" id="nights" value="6" min="0" max="30" aria-describedby="nightsSuggestionHint">
-          <div class="night-suggestion" id="nightsSuggestion"><span>Suggested nights</span><b>—</b></div>
+          <input type="number" id="nights" min="0" max="30" aria-describedby="nightsSuggestionHint">
+          <div class="night-suggestion" id="nightsSuggestion"><span>Suggested:</span><b>—</b></div>
         </div>
         <p class="datehint" id="nightsSuggestionHint">Choose both ends or upload a GPX for a suggestion. Your chosen number stays unchanged.</p>
       </div>
@@ -2170,7 +2182,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     </div>
     <div id="forecastNote" class="forecast-note" aria-live="polite"></div>
 
-    <div class="field" id="sleepWrap">
+    <div class="field hidden" id="sleepWrap">
       <span class="fieldlabel" id="sleepLabel">Staying overnight</span>
       <div class="chips" id="sleepChips" role="group" aria-labelledby="sleepLabel">
         <button class="chip" data-v="camp" aria-pressed="true">Camping</button>
@@ -2185,6 +2197,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <button class="go" data-to="2">Next — your bags</button>
       <button class="go ghost" id="justPlan">Just plan it for me</button>
     </div>
+    <p class="newplan-row"><button class="linky" id="draftNewRide" type="button">Start a new plan</button></p>
   </section>
 
   <!-- STEP 2 -->
@@ -2274,7 +2287,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <span class="nlab">Nights out</span>
       <div class="nstep">
         <button id="nDown" aria-label="One night fewer">−</button>
-        <b id="nOut">6</b>
+        <b id="nOut">0</b>
         <button id="nUp" aria-label="One night more">+</button>
       </div>
       <button id="nRevert" class="nrevert hidden"></button>
@@ -3027,15 +3040,18 @@ const CATALOGUE = [
 
 /* ================= STATE ================= */
 const S = {
-  region:'rhein', place:null, place2:null, flatKph:25, pace:'sporting', nightsAuto:false, gpx:null, theme:'dark', month:5, departureDate:null, nights:6, sleep:'camp',
+  region:'rhein', place:null, place2:null, flatKph:25, pace:'sporting', nightsAuto:false, gpx:null, theme:'dark', month:5, departureDate:null, nights:0, nightsOpen:0, sleep:'camp',
   bags:[],
   kit:{}, kitTouched:{}, bikeProfile:null, custom:{}, qty:{}, foodMode:2, adv:false, onlyOn:false, step:1, nextUid:1, region2:'', mode:'comfort', editMode:'add',
   decks:{ bar:false, rack:false }, frameNote:null, pollOn:true, pollStep:null, justSaved:null, recallOpen:null, fbOpen:null, fbSent:null, packed:{}, pinned:{}, placements:null, carried:{}, packOpen:null, devMode:false, packEff:null,
   pendingSaveName:'', pendingSaveNote:'',
 };
 KIT.forEach(k => S.kit[k.id] = !!k.on);
-// The trip and choices a new plan starts with (planIsUntouched); its month is the one the rider is in (start-up sets it).
-const PLAN_START = { nights:S.nights, sleep:S.sleep, pace:S.pace, flatKph:S.flatKph, mode:S.mode, foodMode:S.foodMode };
+// The trip and choices a new plan starts with (planIsUntouched); its month is the one the rider is in (start-up sets it). Its nights are
+// not entered (the owner's ruling of 14 Nov 2026, sweep #32): Nights out is empty, and the plan takes the suggested nights once both ends
+// are known, else a day ride. S.nightsOpen is the number the planner put there; any other number in S.nights is the rider's.
+const nightsOpenNow = () => S.nightsOpen === S.nights;
+const PLAN_START ={ nights:S.nights, sleep:S.sleep, pace:S.pace, flatKph:S.flatKph, mode:S.mode, foodMode:S.foodMode };
 const BIKE_PROFILE_KEY='loadcheck:bikeProfiles',BIKE_PROFILE_CURRENT_KEY='loadcheck:bikeProfile',MAX_BIKE_PROFILES=20;
 let BIKE_PROFILES=[],BIKE_PROFILE_EDITOR_ID='',BIKE_PROFILE_FORM_READY=false,BIKE_PROFILE_BUSY=false,BIKE_PROFILE_MESSAGE='';
 let BIKE_PROFILE_WRITES=Promise.resolve();
@@ -5207,6 +5223,10 @@ function packEff(){ return S.packEff || PACK_EFF; }
 function usableL(b){ return +(ratedL(b) * packEff()).toFixed(2); }
 
 function ratedTotal(){ return +gearBags().reduce((s,b)=>s+ratedL(b)*countOf(b),0).toFixed(1); }
+// One rule for a bag's litres wherever they are shown, rated, usable or in Where it goes: two decimals at most, no trailing zeros, as the
+// plan's own figures (the owner's ruling of 14 Nov 2026, sweep #26). ratedTotal keeps its one decimal for the plans it compares.
+const bagL = v => String(+(+v).toFixed(2));
+const ratedShown = () => bagL(gearBags().reduce((s,b)=>s+ratedL(b)*countOf(b),0));
 
 function totalL(b){ return +(usableL(b) * countOf(b)).toFixed(2); }
 
@@ -5593,6 +5613,8 @@ function weightPromptDue(){
   if(!gearBags().length) return false;
   return S.bikeProfile ? !S.bikeProfile.maxWeightAsked : !MAX_WEIGHT_SKIPPED;
 }
+// Not called by the page since the owner's ruling of 14 Nov 2026 (sweep #34: the box covered the result on the first visit to Check):
+// the box opens only from the weight check's own line ("Add your bike's maximum weight"). Kept with its guards (LC-WT-10).
 function maybeAskMaxWeight(){
   if(S.step !== 4 || !weightPromptDue() || weightPromptBlocked()) return false;
   openMaxWeight(document.activeElement);
@@ -6984,6 +7006,8 @@ function openAdvisorFromLink(hash = location.hash){
   if(link.back){
     const [href] = BIKE_BACKS[link.back];
     ADVISOR.back = href; setWayfinchBack(href);   // the one top bar goes there too
+    // and says so when that is Tools (the owner's ruling of 14 Nov 2026, sweep #42); closing the advisor leaves for Tools
+    if(link.back === 'tools') $('backToWayfinch').textContent = '← Tools';
   }
   openAdvisor($('backToWayfinch'));
   return true;
@@ -7394,6 +7418,31 @@ function applySectionState(state, secs, userChoice=SECTION_CHOICE){
 function bagCount(n){ return n + (n === 1 ? ' bag' : ' bags'); }
 // Nights as typed: whole numbers from 0 to 30; anything else is brought into that range.
 function nightsFromText(text){ return Math.min(30, Math.max(0, parseInt(text, 10) || 0)); }
+// Nights not entered (sweep #32): the suggestion once both ends are known (kept while the route is measured), else a day ride.
+function nightsFollowed(){
+  if(routePending()) return S.nights;
+  const P = planRoute();
+  return P && P.distanceKm > 0 ? Math.min(30, P.suggestedNights) : 0;
+}
+// True when the nights not entered moved to the suggestion (or back to a day ride); the untouched kit follows, as for a typed number.
+function followNights(){
+  if(!nightsOpenNow()) return false;
+  const was = S.nights, n = nightsFollowed();
+  if(n === was) return false;
+  S.nights = S.nightsOpen = n;
+  if(S.baseNights === was) S.baseNights = n;   // the packing check's "Nights changed" is the rider's change only
+  applyTripKitDefaults();
+  $('sleepWrap').classList.toggle('hidden', n === 0);
+  queueDraftSave();
+  return true;
+}
+// The Nights out field as the rider leaves it: empty is nights not entered again; a number is the rider's.
+function nightsTyped(text){
+  S.nightsAuto = false;
+  if(String(text).trim() === ''){ S.nightsOpen = S.nights; followNights(); return; }
+  S.nights = nightsFromText(text); S.nightsOpen = null;
+}
+const nightsField = () => { $('nights').value = nightsOpenNow() ? '' : S.nights; };
 // Litres for a sentence: one decimal, but two when one would show a small overflow as 0.0.
 function litresText(v){ return Math.abs(v) >= 0.1 ? v.toFixed(1) : v.toFixed(2); }
 function fixSuggestion(){
@@ -8940,7 +8989,7 @@ function applyTrip(preview){
     syncDepartureDate(); $('month').value=p.month; done.push(MONTHS[p.month]);
   }
   if(p.nights != null){
-    S.nights = p.nights; S.nightsAuto = false; $('nights').value = p.nights;
+    S.nights = p.nights; S.nightsAuto = false; S.nightsOpen = null; $('nights').value = p.nights;
     done.push(plural(p.nights));
   }
   if(p.sleep){
@@ -9751,7 +9800,7 @@ function noteSentence(g){
 }
 function balanceNote(out, start, gain, heldGain = 0){
   const MIN = window.WayfinchAdvisor.MIN_GAIN_SCORE;
-  if(gain < MIN) return { text:'Your load is as balanced as your bags allow.', map:false, groups:[] };
+  if(gain < MIN) return { text:'Your load is as balanced as your bags allow.', map:false, groups:[], best:true };
   // the balancing itself can take MIN_GAIN_SCORE or more with the rider's things where they are: nothing of theirs to blame (review of
   // PR 89, C1); it is about to (its line says it checks), or the rider put the plan back with Undo or made a step by hand, so no line
   if(heldGain >= MIN) return null;
@@ -9987,6 +10036,32 @@ function startHandling(o = {}){
   setTimeout(() => handlingSlice(run), 0);
   return true;
 }
+/* Whether a press would move nothing ("Already packed for handling"), worked out by the press's own search on the plan as it is, in
+   slices between frames, once per plan and ticks (review of PR 173, I1: "as balanced as your bags allow" alone is no proof, since a press
+   takes smaller gains and evens pairs). Nothing is applied or stored. now: at once (the QA suites). */
+const HANDLING_PROBE = { key:null, nothing:false, done:true };   // done: the search for key has come back
+function handlingNothing(now = false){
+  const key = JSON.stringify([idealKey(), Object.keys(S.packed || {}).filter(id => S.packed[id]).sort()]), p = HANDLING_PROBE;
+  if(p.key === key) return p.nothing;
+  p.key = key; p.nothing = false; p.done = false;
+  currentPlan();
+  const start = idealTrial(S.bags, {}, S.placements), fixed = handlingFixed(start), W = window.WayfinchAdvisor;
+  const trial = rememberedTrial(), fresh = pins => trial(pins, start), extra = splitThings(), pairs = shownPairs();
+  const go = n => W.handlingFirst(start, trial, fresh, { fixed, extra, maxTrials:BALANCE_TRIALS, budget:n, pairs });
+  const done = out => { p.nothing = !out.apply && !out.held; p.done = true; return p.nothing; };
+  if(now) return done(go(Infinity));
+  let n = 0;
+  const slice = () => {
+    if(p.key !== key) return;   // the plan changed: its own probe decides
+    if(PLAN_TRIAL || TRIAL || S.step !== 4 || DRAFT_FROZEN || HANDLING.run){ p.key = null; p.done = true; return; }
+    n += HANDLING_SLICE;
+    const out = go(n);
+    if(!out.done){ setTimeout(slice, 0); return; }
+    if(done(out) && S.step === 4) drawWeightMap();
+  };
+  setTimeout(slice, 0);
+  return false;
+}
 function handlingSlice(run){
   if(HANDLING.run !== run) return;
   if(PLAN_TRIAL || TRIAL || S.step !== 4 || DRAFT_FROZEN || run.key !== idealKey()){ HANDLING.run = null; return; }
@@ -10119,12 +10194,17 @@ function fillHandling(){
   const show = handlingAvailable();
   const last = handlingOnShow() ? HANDLING.last : null;
   const back = !HANDLING.run && !!last && last.kind === 'packed' && !handlingPacked(last);
-  const gone = !show || (!HANDLING.run && !!last && !back);
+  // the load already as balanced as the bags allow, its line says so, and a press would move nothing: no button (the owner's ruling of
+  // 14 Nov 2026, sweep #33; review of PR 173, I1); the line is the one the ideal was drawn from, and the press's own search decides
+  const ready = show && !HANDLING.run && !handlingPressed() && !!window.WayfinchAdvisor.balance && !(BALANCE.run && BALANCE.run.key === idealKey());
+  const found = ready && IDEAL_CACHE.key === idealKey() ? IDEAL_CACHE.value : null;
+  const best = !!(found && found.note && found.note.best) && handlingNothing();
+  const gone = !show || best || (!HANDLING.run && !!last && !back);
   // the button going while it has the focus: the focus goes to its line, never to the page (review of PR 121, R1)
-  const line = gone && document.activeElement === b ? document.querySelector('#resultBox .hf-line') : null;
+  const line = gone && document.activeElement === b ? document.querySelector('#resultBox .hf-line') || (best ? $('weightLine') : null) : null;
   b.hidden = gone;
   if(line){ line.setAttribute('tabindex', '-1'); line.focus({ preventScroll:true }); }
-  hint.hidden = !show || HANDLING.run || !!last;
+  hint.hidden = !show || best || HANDLING.run || !!last;
   // described by the hint only while the hint is there (R2)
   if(hint.hidden) b.removeAttribute('aria-describedby'); else b.setAttribute('aria-describedby', 'handlingHint');
   const busy = !!(HANDLING.run || BALANCE.run || BALANCE.loading);
@@ -10449,7 +10529,7 @@ function drawRig(){
     foot.innerHTML = '';
     leg.innerHTML = `<span class="lg ghost-key"></span> Choose your bags and bottles in step two.`;
   } else if(stage === 2){
-    foot.innerHTML = `<span>Usable <b>${capL()} L</b> <em class="of">of ${ratedTotal()} L rated</em></span>` +
+    foot.innerHTML = `<span>Usable <b>${capL()} L</b> <em class="of">of ${ratedShown()} L rated</em></span>` +
       `<span>${gearBags().length} bag${gearBags().length===1?'':'s'}${waterL()?' · '+waterL()+' L water':''}</span>` +
       `<span>&nbsp;</span>`;
     leg.innerHTML = S.editMode === 'remove'
@@ -10735,24 +10815,31 @@ function mountRouteVisuals(profile){
 
 function renderNightsSuggestion(){
   const pending=routePending(),profile=pending ? null : planRoute(),P=profile?.distanceKm>0 ? profile : null;
-  let value='—',hint='Choose both ends or upload a GPX for a suggestion. Your chosen number stays unchanged.';
-  if(pending){value='Calculating…';hint='The route is being measured. Your chosen number stays unchanged.';}
+  // nights not entered (the owner's ruling of 14 Nov 2026, sweep #32): one line says what the plan uses until the rider enters a number
+  const open=nightsOpenNow(),stays=open ? '' : ' Your chosen number stays unchanged.';
+  // a day ride whatever the reason (a 0-night suggestion, the route still measured), and the planner's limit named as such (review of PR 173, m1, m2)
+  const capped=!!P && P.suggestedNights>30 && S.nights===30;
+  const planned=S.nights === 0 || !P ? 'Planned as a day ride until you enter nights.' : capped ? `Planned with ${plural(S.nights)}, this planner’s limit, until you enter nights.` : `Planned with the suggested ${plural(S.nights)} until you enter nights.`;
+  let value='—',hint='Choose both ends or upload a GPX for a suggestion.'+stays;
+  if(pending){value='Calculating…';hint='The route is being measured.'+stays;}
   else if(P){
     value=plural(P.suggestedNights);
-    hint=`Based on ${P.flat} kph unloaded and ${P.pace.hours} riding hours a day${P.ascent == null ? '; climbing is unavailable, so this is a distance-only minimum' : ', including estimated climbing effort'}. `+
-      (P.suggestedNights>30 ? 'The suggestion exceeds this planner’s 30-night limit. ' : '')+'Your chosen number stays unchanged.';
-  }else if(S.place && S.place2){hint='A suggestion is unavailable. Retry the route or upload a GPX. Your chosen number stays unchanged.';}
+    hint=`Based on ${P.flat} kph unloaded and ${P.pace.hours} riding hours a day${P.ascent == null ? '; climbing is unavailable, so this is a distance-only minimum' : ', including estimated climbing effort'}.`+
+      (P.suggestedNights>30 ? ' The suggestion exceeds this planner’s 30-night limit.' : '')+stays;
+  }else if(S.place && S.place2){hint='A suggestion is unavailable. Retry the route or upload a GPX.'+stays;}
   const trip=$('nightsSuggestion'),check=$('checkNightsSuggestion'),help=$('nightsSuggestionHint');
-  [trip,help,check].forEach(el=>el?.classList.toggle('hidden',!pending && !P));
-  if(trip)trip.innerHTML=`<span>Suggested nights</span><b>${htmlEsc(value)}</b>`;
-  if(help)help.innerHTML=P ? `Your chosen number stays unchanged. ${infoHelp('How suggested nights are calculated', `<p>${htmlEsc(hint)}</p>`)}` : htmlEsc(hint);
-  if(check)check.innerHTML=P ? `Suggested: ${htmlEsc(value)}${P.ascent == null ? ' · distance only' : ''}${P.suggestedNights>30 ? ' · above the 30-night limit' : ''} · your choice stays ${infoHelp('How suggested nights are calculated',`<p>${htmlEsc(hint)}</p>`)}` :
-    pending ? 'Suggested nights: calculating… · your choice stays' : 'Suggested nights: — · add a route in Ride';
+  trip?.classList.toggle('hidden',!pending && !P);
+  [help,check].forEach(el=>el?.classList.toggle('hidden',!pending && !P && !open));
+  if(trip)trip.innerHTML=`<span>Suggested:</span><b>${htmlEsc(value)}</b>`;
+  if(help)help.innerHTML=P ? `${open ? planned : 'Your chosen number stays unchanged.'} ${infoHelp('How suggested nights are calculated', `<p>${htmlEsc(hint)}</p>`)}` : htmlEsc(open && (!pending || S.nights === 0) ? planned : hint);
+  if(check)check.innerHTML=P ? `Suggested: ${htmlEsc(value)}${P.ascent == null ? ' · distance only' : ''}${P.suggestedNights>30 ? ' · above the 30-night limit' : ''} · ${open ? (S.nights === 0 ? 'planned as a day ride until you enter nights' : capped ? `planned with ${plural(S.nights)} until you enter nights` : 'planned with them until you enter nights') : 'your choice stays'} ${infoHelp('How suggested nights are calculated',`<p>${htmlEsc(hint)}</p>`)}` :
+    pending ? `Suggested nights: calculating…${open ? (S.nights === 0 ? ' · planned as a day ride until you enter nights' : '') : ' · your choice stays'}` : open ? 'Planned as a day ride until you enter nights' : 'Suggested nights: — · add a route in Ride';
 }
 
 // Estimated daily effort, split across the number of days the rider chose.
 function renderRoutePlan(){
   const box = $('routePlan'); if(!box) return;
+  followNights();   // nights not entered follow the route as it is now known (sweep #32)
   renderNightsSuggestion();
   const routeFocus=captureFocus(box);
   if(!S.place || !S.place2){ clearRouteVisuals(); box.innerHTML = ''; return; }
@@ -10920,7 +11007,7 @@ function softRefresh(){
   drawRig();
   const btl = bottles();
   $('bagTotal').innerHTML = S.bags.length
-    ? `<b>${capL()} L</b> usable <em class="of">of ${ratedTotal()} L rated</em>${btl.length?` · <b>${waterL()} L</b> water`:''}`
+    ? `<b>${capL()} L</b> usable <em class="of">of ${ratedShown()} L rated</em>${btl.length?` · <b>${waterL()} L</b> water`:''}`
     : `<b>Nothing yet</b>`;
 }
 
@@ -11176,8 +11263,8 @@ function readBagMeasure(text, min, max, optional=false){
 function bagCapacityText(b){
   if(isBottle(b.pos)) return `${b.L} L of water.`;
   const n = countOf(b);
-  return `${usableL(b).toFixed(2)} L usable${
-    n > 1 ? ` each · ${totalL(b).toFixed(2)} L for the pair` : ''}.`;
+  return `${bagL(usableL(b))} L usable${
+    n > 1 ? ` each · ${bagL(totalL(b))} L for the pair` : ''}.`;
 }
 function bagCapacityHelp(b){
   return infoHelp('How usable bag space is counted',isBottle(b.pos)
@@ -11196,7 +11283,7 @@ function renderBags(){
   syncFrameBags();
   const gear = gearBags(), btl = bottles();
   $('bagTotal').innerHTML = S.bags.length
-    ? `<b>${capL()} L</b> usable <em class="of">of ${ratedTotal()} L rated</em>${btl.length?` · <b>${waterL()} L</b> water`:''}`
+    ? `<b>${capL()} L</b> usable <em class="of">of ${ratedShown()} L rated</em>${btl.length?` · <b>${waterL()} L</b> water`:''}`
     : `<b>Nothing yet</b>`;
 
   const row = b => {
@@ -11244,7 +11331,7 @@ function renderBags(){
         <small class="baginputstatus" role="status" aria-live="polite"></small>
       </div>
       <button class="drop" aria-label="Remove ${htmlEsc(bagLabel(b))}">×</button>
-    </div>${n>1?`<div class="pairnote">Pair: <b>${totalL(b).toFixed(1)} L</b> usable. ${infoHelp('How matched pairs are checked',`<p>Two bags of ${b.L} L are checked separately. Each item must fit inside one of them. The packing check may recommend taking only one bag if it is enough.</p>`)}</div>`:''}`;
+    </div>${n>1?`<div class="pairnote">Pair: <b>${bagL(totalL(b))} L</b> usable. ${infoHelp('How matched pairs are checked',`<p>Two bags of ${b.L} L are checked separately. Each item must fit inside one of them. The packing check may recommend taking only one bag if it is enough.</p>`)}</div>`:''}`;
   };
 
   $('quickPick').innerHTML = QUICKPICK.map(pos => {
@@ -11756,8 +11843,8 @@ function renderResult(){
           return `Your kit goes into ${holding} of your ${owned} bag${owned>1?'s':''} — ${mounted} L mounted, ${Math.abs(d)} L spare.${empty ? ' ' + empty : ''}`; })()}</p>
     <div class="meters">
       <div class="meter"><b>${kit} L</b><span>Kit volume ${infoHelp('How kit volume is counted','<p>The total uses your selected kit, quantities, packed sizes and food carried between resupply stops. Lightweight mode leaves eligible comfort items at home. Typical packed volumes vary by brand and compression.</p>'+pocketsLeftOut())}</span></div>
-      <div class="meter"><b>${mounted} L</b><span>Usable bag space ${infoHelp('Why usable space is lower than the labels',`<p>Bags are counted at ${Math.round(packEff()*100)} per cent of their labelled size to allow for seams, closures and awkward shapes. You own ${ratedTotal()} L of labelled bag capacity; this result counts only the mounted bags.</p><p>“It fits” means the selected kit fits within this estimated usable volume and the entered length limits. Check your actual bags and gear: their shape, opening and compression affect the fit.</p>`)}</span></div>
-      <div class="meter"><b>${(kitKg()+waterL()).toFixed(1)} kg</b><span>Kit + water ${infoHelp('What the packing weight includes',`<p>This adds selected kit and carried food to water in your bottle cages${waterL()?' (counted full)':''}. It excludes the bike, rider and empty luggage.</p>${pocketsLeftOut()}`)}</span></div>
+      <div class="meter"><b>${mounted} L</b><span>Usable bag space ${infoHelp('Why usable space is lower than the labels',`<p>Bags are counted at ${Math.round(packEff()*100)} per cent of their labelled size to allow for seams, closures and awkward shapes. You own ${ratedShown()} L of labelled bag capacity; this result counts only the mounted bags.</p><p>“It fits” means the selected kit fits within this estimated usable volume and the entered length limits. Check your actual bags and gear: their shape, opening and compression affect the fit.</p>`)}</span></div>
+      <div class="meter"><b>${+carriedKg(A).toFixed(1)} kg</b><span>Kit + water ${infoHelp('What the packing weight includes',`<p>This adds selected kit and carried food to water in your bottle cages${waterL()?' (counted full)':''}. It excludes the bike, rider and empty luggage.</p>${pocketsLeftOut()}`)}</span></div>
     </div></div>${firstFixes({weatherReady,miss,over,fix,routeFailed,spill,stranded})}${resultConfidence(c)}${weatherNote}${routeNote}`;
   $('verdictBox').querySelectorAll('[data-result-jump]').forEach(button=>button.onclick=()=>jumpToResult(button.dataset.resultJump));
 
@@ -12270,7 +12357,7 @@ function renderResult(){
                   : (fixBody ? '' : '<div class="emptyfind">Nothing obviously redundant.</div>')),
       over && fix && fix.cleared ? 'frees ' + fix.freed + ' L' : null) +
     sec(false, 'Bags you can leave at home', leaveU.length ? leaveU.length + ' of ' + usableUnits().length : 'none suggested', leaveU.length?'amber':'green', bagsBody,
-      leaveU.length ? 'saves ' + leaveU.reduce((s,x)=>s+(+x.u.L||0),0).toFixed(1) + ' L of bag' : null) +
+      leaveU.length ? 'saves ' + bagL(leaveU.reduce((s,x)=>s+(+x.u.L||0),0)) + ' L of bag' : null) +
     sec(false, 'Can you reach it', rainUnplaced.length ? 'rain kit has no bag' : rainBuried.length ? 'rain kit out of reach' : (otherBuried.length||otherNoBag.length ? 'some out of reach' : 'good'), rainUnplaced.length||rainBuried.length?'red':(otherBuried.length||otherNoBag.length?'amber':'green'), reach) +
     sec(false, 'Where it goes',
         slots.length + (slots.length === 1 ? ' bag' : ' bags') + (spill.length?' + overflow':'') + (A.hand.kept.length ? ' · ' + A.hand.kept.length + ' moved' : ''),
@@ -13032,9 +13119,11 @@ function writeHandoffDone(outcome){
   const before=readLocalRaw(HANDOFF_DONE_KEY),value={app:'load-check',kind:'handoff-done',v:1,id:HANDOFF.id,outcome,at:new Date().toISOString()};
   try { window.localStorage.setItem(HANDOFF_DONE_KEY,JSON.stringify(value)); stampSaved(HANDOFF_DONE_KEY,value,before); } catch(e){}
 }
-function showHandoffBar(text,{apply=false,undo=false,plan=false,reuse=false}={}){
+function showHandoffBar(text,{apply=false,undo=false,plan=false,reuse=false,more=''}={}){
   const bar=$('handoffBar'); if(!bar) return;
   $('handoffText').textContent=text;
+  // the ask is one line; what Plan bags for this trip would change is behind "What changes" (the owner's ruling of 14 Nov 2026, sweep #29)
+  if($('handoffMore')){ $('handoffDetail').textContent=more; $('handoffMore').hidden=!more; if(!more) $('handoffMore').open=false; }
   $('handoffApply').classList.toggle('hidden',!apply); $('handoffCancel').classList.toggle('hidden',!apply);
   // a long trip's first answer is Plan bags for this trip; Apply then only puts the route in, as before
   if($('handoffPlan')){ $('handoffPlan').classList.toggle('hidden',!plan); $('handoffPlan').disabled=HANDOFF.busy; }
@@ -13047,6 +13136,8 @@ function showHandoffBar(text,{apply=false,undo=false,plan=false,reuse=false}={})
   WEIGHT_PROMPT_BLOCKS.handoffBar=apply;
   renderFreePlayBar();   // free play is offered only once the trip is in and planned (review of PR 146, C1)
 }
+// After a tap that hides the bar's buttons (Undo), the focus goes to its line, never to the page (review of PR 173, I3).
+function handoffLineFocus(){ const t=$('handoffText'); if(!t) return; t.setAttribute('tabindex','-1'); t.focus({preventScroll:true}); }
 // True when a handoff waits for the rider's answer.
 async function receiveHandoff(){
   const id=handoffFragmentId();
@@ -13064,10 +13155,14 @@ async function receiveHandoff(){
   HANDOFF.reuse=handoffPlannable(t) ? tripSetupFor(t.route)?.id || null : null;
   const heights=parsed.hasElev ? '' : ' This route has no heights, so its days are split by distance.';
   if(handoffPlannable(t)){
+    // The rider tapped Plan bags for this trip in Wayfinch's Trip: with nothing of theirs here to replace and no setup of this route to choose
+    // instead, it is planned at once, with Undo (the owner's ruling of 14 Nov 2026, sweep #29: the hand-off asked twice).
+    if(!HANDOFF.reuse && planIsUntouched()){ await planTripBags(); return true; }
     const base=tripFoundation(),reuse=HANDOFF.reuse && SETUPS.find(x => x.id === HANDOFF.reuse),held=setupHoldingPlan(),passed=passedFoundation();
     const from=base ? 'from your general setup '+base.name : gearBags().length ? 'from the plan here now' : 'starting from the fewest bags that hold the kit';
-    showHandoffBar(`A trip from Wayfinch: ${name}${HANDOFF.long ? '' : ', a day ride'}. Plan bags for this trip? A new trip setup gets ${handoffChanges(t)}, with the bags and kit predicted for it, ${from}${HANDOFF.long ? '' : ', and shows your bike with its bags'}.${passed ? ` Your general setup ${passed.name} has no bags, so it is not used.` : ''}${held ? ` Your plan now is already saved as ${held.name}.` : planIsUntouched() ? '' : ' Your plan now is kept as a setup.'}${
-      reuse ? ` Or open the setup made on ${setupDay(reuse)} for this route.` : ''}${heights}`,{apply:true,plan:true,reuse:!!reuse});
+    showHandoffBar(`A trip from Wayfinch: ${name}${HANDOFF.long ? '' : ', a day ride'}. Plan bags for this trip?`,{apply:true,plan:true,reuse:!!reuse,
+      more:`A new trip setup gets ${handoffChanges(t)}, with the bags and kit predicted for it, ${from}${HANDOFF.long ? '' : ', and shows your bike with its bags'}.${passed ? ` Your general setup ${passed.name} has no bags, so it is not used.` : ''}${held ? ` Your plan now is already saved as ${held.name}.` : planIsUntouched() ? '' : ' Your plan now is kept as a setup.'}${
+      reuse ? ` Or open the setup made on ${setupDay(reuse)} for this route.` : ''}${heights}`.trim()});
   } else showHandoffBar(`A trip from Wayfinch: ${name}. Apply it to this plan? It sets ${handoffChanges(t)}; your bags, kit and bike stay as they are.${heights}`,{apply:true});
   return true;
 }
@@ -13092,7 +13187,7 @@ async function putHandoffTripIn(){
   const t=HANDOFF.trip || {};
   if(t.departureDate){ S.departureDate=t.departureDate; S.month=+t.departureDate.slice(5,7)-1; }
   else if(t.month !== undefined){ S.month=t.month; if(S.departureDate && +S.departureDate.slice(5,7)-1 !== S.month) S.departureDate=null; }
-  if(t.nights !== undefined){ S.nights=t.nights; S.nightsAuto=false; }
+  if(t.nights !== undefined){ S.nights=t.nights; S.nightsAuto=false; S.nightsOpen=null; }
   if(t.sleep) S.sleep=t.sleep;
   if(t.pace) S.pace=t.pace;
   if(t.flatKph !== undefined) S.flatKph=t.flatKph;
@@ -13102,7 +13197,7 @@ async function putHandoffTripIn(){
   if(t.route) S.gpx.copilotRoute=t.route;
   if(t.stops) S.gpx.copilotStops=t.stops.map((km,i) => ({km,name:t.stopNames[i]}));
   applyTripKitDefaults();   // only kit defaults the rider never touched follow the new trip
-  $('month').value=S.month; $('nights').value=S.nights; syncDepartureDate();
+  $('month').value=S.month; nightsField(); syncDepartureDate();
   $('sleepWrap').classList.toggle('hidden',S.nights === 0);
   $('sleepChips').querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed',c.dataset.v === S.sleep));
   syncGPXControl(); renderClimate(); renderBags(); renderKit(); if(S.step === 4) renderResult(); drawRig();
@@ -13265,7 +13360,7 @@ function setPocket(id,on){
   renderPockets(); drawRig();
   return true;
 }
-function openFullPlanner(){ if(!SMALL_VIEW) return false; setSmallView(false); if(S.step === 4) maybeAskMaxWeight(); return true; }
+function openFullPlanner(){ if(!SMALL_VIEW) return false; setSmallView(false); return true; }
 $('smallFull').onclick=openFullPlanner;
 function setupDay(s){ const d=s && s.saved; return d && /^\d{4}-\d{2}-\d{2}/.test(d) ? `${+d.slice(8,10)} ${MONTHS[+d.slice(5,7)-1].slice(0,3)}` : 'an earlier day'; }
 function tripSetupFor(hash){ return hash ? SETUPS.find(s => setupKind(s) === 'trip' && s.forRoute && s.forRoute.hash === hash) || null : null; }
@@ -13414,7 +13509,7 @@ function setupHoldingPlan(){ const sig=planSameKey(captureDraft()); return SETUP
 function planIsUntouched(){
   const none=o => !o || !Object.keys(o).length;
   // the trip, the mode and the food mode as a new plan starts them, and no pockets (review of PR 141, m1)
-  const started=Object.keys(PLAN_START).every(k => S[k] === PLAN_START[k]) && !S.departureDate && S.month === new Date().getMonth() && !S.pockets;
+  const started=Object.keys(PLAN_START).every(k => S[k] === PLAN_START[k]) && nightsOpenNow() && !S.departureDate && S.month === new Date().getMonth() && !S.pockets;
   return started && !S.bags.length && !S.gpx && !S.place && !S.place2 && !(S.decks && (S.decks.bar || S.decks.rack)) && none(S.kitTouched) && none(S.custom)
     && none(S.qty) && none(S.pinned) && none(S.packed) && none(S.carried) && !KIT.some(k => k.added);
 }
@@ -13524,6 +13619,7 @@ async function undoTripBags(){
   TRIP_BAGS.undo=null;
   if(tripWorkKey(captureDraft()) !== u.after){
     showHandoffBar('Nothing is undone: your plan has changed since it was planned for this trip, so your changes and the setups stay.');
+    handoffLineFocus();
     return false;
   }
   const was=S.bikeProfile ? S.bikeProfile.id : null;
@@ -13539,11 +13635,12 @@ async function undoTripBags(){
   showHandoffBar(`Undone: your plan is as it was${gone.length ? `, and ${gone.length === 1 ? 'the setup' : 'the setups'} made for this trip ${gone.length === 1 ? 'is' : 'are'} gone` : ''}.${
     changed.length ? ` Kept, because you changed ${changed.length === 1 ? 'it' : 'them'} since: ${changed.map(s => s.name).join(', ')}.` : ''}${
     stored ? '' : ` The change did not reach storage (it may be full), so ${gone.length === 1 ? 'that setup' : 'those setups'} may come back after a reload.`}`);
+  handoffLineFocus();
   return true;
 }
 
 // What Apply sets: the trip's fields, and the route with what loadGPX made of it. Copies, so later changes don't reach them.
-const HANDOFF_TRIP_FIELDS=['departureDate','month','nights','sleep','pace','flatKph'];
+const HANDOFF_TRIP_FIELDS=['departureDate','month','nights','nightsOpen','sleep','pace','flatKph'];
 function handoffFields(){
   currentPlan();   // settled, so the placements are the plan's
   return JSON.parse(JSON.stringify({trip:Object.fromEntries(HANDOFF_TRIP_FIELDS.map(k => [k,S[k] === undefined ? null : S[k]])),
@@ -13557,7 +13654,9 @@ function undoHandoff(){
   const {before,after}=HANDOFF.undo,same=(a,b) => JSON.stringify(a) === JSON.stringify(b);
   currentPlan();
   const notPlacedSince=same(S.placements,after.placements);
-  for(const k of HANDOFF_TRIP_FIELDS) if(same(S[k] === undefined ? null : S[k],after.trip[k])) S[k]=before.trip[k];
+  // the nights not entered come back only with the nights Apply set: a number the rider entered since stays entered (review of PR 173, m3)
+  const nightsBack=same(S.nights,after.trip.nights);
+  for(const k of HANDOFF_TRIP_FIELDS) if((k !== 'nightsOpen' || nightsBack) && same(S[k] === undefined ? null : S[k],after.trip[k])) S[k]=before.trip[k];
   if(same({gpx:S.gpx,place:S.place,place2:S.place2},after.route)){
     cancelGPXLoad();
     S.gpx=before.route.gpx; S.place=before.route.place; S.place2=before.route.place2;
@@ -13567,13 +13666,14 @@ function undoHandoff(){
   applyTripKitDefaults();   // untouched kit defaults follow the trip back
   // where nothing was placed again since Apply, the plan's placements go back too; else the rider's stay
   if(notPlacedSince) keepPlan({load:before.placements});
-  $('month').value=S.month; $('nights').value=S.nights; syncDepartureDate();
+  $('month').value=S.month; nightsField(); syncDepartureDate();
   $('sleepWrap').classList.toggle('hidden',S.nights === 0);
   $('sleepChips').querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed',c.dataset.v === S.sleep));
   if(S.place) ensureClimate(S.place,S.month); if(S.place2) ensureClimate(S.place2,S.month);
   syncGPXControl(); renderClimate(); renderBags(); renderKit(); if(S.step === 4) renderResult(); drawRig();
   HANDOFF.undo=null; queueDraftSave();
   showHandoffBar('Undone: the route and trip settings from Wayfinch are taken back. What you changed since stays.');
+  handoffLineFocus();
   return true;
 }
 function cancelHandoff(){
@@ -13629,7 +13729,7 @@ function capturePlan(){
     tyrePressure:normaliseTyrePressure(S.tyrePressure),
     trip: { place:S.place, place2:S.place2, month:S.month, nights:S.nights, sleep:S.sleep,
             flatKph:S.flatKph, pace:S.pace, departureDate:S.departureDate || null,
-            region:S.place && S.place.preset ? S.place.preset : '' },
+            region:S.place && S.place.preset ? S.place.preset : '', ...(nightsOpenNow() ? { nightsOpen:true } : {}) },
     bags:JSON.parse(JSON.stringify(S.bags)), decks:{ ...S.decks }, kit:{ ...S.kit }, kitTouched:{ ...S.kitTouched },
     custom:JSON.parse(JSON.stringify(S.custom)), qty:{ ...S.qty }, foodMode:S.foodMode,
     gpx:S.gpx ? JSON.parse(JSON.stringify(S.gpx)) : null,
@@ -13992,7 +14092,8 @@ function normalisePlan(p){
   return {trip:{place,place2,region:place && place.preset || '',month:dataInteger(t.month,0,11,5),nights,
       sleep:['camp','mixed','indoor'].includes(t.sleep) ? t.sleep : 'camp',
       flatKph:dataNumber(t.flatKph,15,40,25),pace:typeof t.pace === 'string' && Object.hasOwn(PACE,t.pace) ? t.pace : 'sporting',
-      departureDate:typeof normaliseDepartureDate === 'function' ? normaliseDepartureDate(t.departureDate) : null},
+      departureDate:typeof normaliseDepartureDate === 'function' ? normaliseDepartureDate(t.departureDate) : null,
+      ...(t.nightsOpen === true ? {nightsOpen:true} : {})},
     bikeProfile:normaliseBikeProfile(p.bikeProfile),tyrePressure:normaliseTyrePressure(p.tyrePressure),
     bags,decks:{bar:decks.bar === true,rack:decks.rack === true},kit,kitTouched,custom,qty,addedKit,gpx,
     routeSnapshot:gpx?null:normaliseRouteSnapshot(p.routeSnapshot,place,place2),
@@ -14134,6 +14235,7 @@ function restorePlan(p, draft, restoreSettings=true){
     sleep:['camp','mixed','indoor'].includes(t.sleep) ? t.sleep : 'camp',
     departureDate:t.departureDate || null,
     nightsAuto:false,
+    nightsOpen:t.nightsOpen === true && Number.isInteger(+t.nights) ? Math.max(0, Math.min(30, +t.nights)) : null,   // a plan saved before: its nights as entered
     baseNights:Number.isInteger(+p.baseNights) ? +p.baseNights : +t.nights,
     flatKph:+t.flatKph || 25, pace:t.pace || 'sporting',
     bags:JSON.parse(JSON.stringify(p.bags)), decks:{ bar:false, rack:false, ...(p.decks || {}) },
@@ -14169,7 +14271,7 @@ function restorePlan(p, draft, restoreSettings=true){
   [1,2,3,4].forEach(i => $('s'+i).classList.toggle('hidden', i !== S.step));
   $('crumbs').querySelectorAll('button').forEach(b =>
     b.setAttribute('aria-current', +b.dataset.to === S.step ? 'step' : 'false'));
-  $('month').value = S.month; $('nights').value = S.nights;
+  $('month').value = S.month; nightsField();
   if(typeof syncDepartureDate === 'function') syncDepartureDate();
   $('sleepWrap').classList.toggle('hidden', S.nights === 0);
   $('sleepChips').querySelectorAll('.chip').forEach(c =>
@@ -14435,19 +14537,30 @@ window.addEventListener('storage', followOtherTabs);
 document.addEventListener('visibilitychange', () => { if(document.hidden) flushDraft(); else { checkOtherTabs(); followThemeChoice(); } });
 window.addEventListener('pageshow', event => { checkOtherTabs(); followThemeChoice(); if(event.persisted){ followBikeChoice(); advisorFollow(); } });
 window.addEventListener('pagehide', flushDraft);
+/* The restored plan is said once in a tab's session, as one quiet line (the owner's ruling of 14 Nov 2026, sweep #37: it filled the first
+   screen at 320 px on every visit). Start a new plan has its fixed place at the end of step one; its question comes up here. */
+const RESTORED_NOTED_KEY = 'loadcheck:restoredNoted:v1';
 function showRecoveredDraft(){
+  try { if(window.sessionStorage.getItem(RESTORED_NOTED_KEY)) return; window.sessionStorage.setItem(RESTORED_NOTED_KEY, '1'); } catch(e){}
   $('draftText').textContent = 'Your working plan was restored from this browser.';
-  $('draftBar').classList.remove('hidden');
+  $('draftNew').classList.add('hidden'); $('draftKeep').classList.add('hidden');
+  $('draftBar').classList.add('restored'); $('draftBar').classList.remove('hidden');
 }
+function askNewPlan(){
+  $('draftText').textContent = 'Start a new plan? This clears the trip and packing choices; your selected bike and saved setups remain.';
+  $('draftNew').textContent = 'Yes, clear this plan';
+  $('draftNew').dataset.confirm = 'yes';
+  $('draftNew').classList.remove('hidden'); $('draftKeep').classList.remove('hidden');
+  $('draftBar').classList.remove('restored', 'hidden');
+}
+$('draftNewRide').onclick = () => {
+  if(freePlayWaits('new')) return;
+  askNewPlan();
+  $('draftText').setAttribute('tabindex', '-1'); $('draftText').focus();   // the question, read and in view
+};
 $('draftNew').onclick = async () => {
   if(freePlayWaits('new')) return;
-  if($('draftNew').dataset.confirm !== 'yes'){
-    $('draftText').textContent = 'Start a new plan? This clears the trip and packing choices; your selected bike and saved setups remain.';
-    $('draftNew').textContent = 'Yes, clear this plan';
-    $('draftNew').dataset.confirm = 'yes';
-    $('draftKeep').classList.remove('hidden');
-    return;
-  }
+  if($('draftNew').dataset.confirm !== 'yes'){ askNewPlan(); return; }
   DRAFT_READY = false;
   clearTimeout(DRAFT_TIMER);
   await DRAFT_WRITES.catch(() => {});
@@ -14467,7 +14580,10 @@ $('draftNew').onclick = async () => {
   }
   window.location.reload();
 };
-$('draftKeep').onclick = () => $('draftBar').classList.add('hidden');
+$('draftKeep').onclick = () => {
+  $('draftBar').classList.add('hidden');
+  if(S.step === 1) $('draftNewRide').focus();   // back to the button that asked, never to the page
+};
 
 // Everything collected so far, as one file to keep or send on.
 function exportAll(){
@@ -16125,7 +16241,7 @@ function go(n){
   if(n === 2){renderBags();renderBikeProfiles();}
   if(n === 3){ renderKit(); renderModeBar(); }
   if(n === 1) renderRideSummary();
-  if(n === 4){ renderResult(); maybeAskMaxWeight(); }
+  if(n === 4) renderResult();   // the bike's maximum weight is asked from its own line only, never by itself (owner, 14 Nov 2026, sweep #34)
   drawRig();
   window.scrollTo({ top:0, behavior:'smooth' });
   $('stepTitle'+n).focus({preventScroll:true});
@@ -16152,10 +16268,9 @@ $('departureDate').onchange = e => {
   S.departureDate=normaliseDepartureDate(e.target.value);
   syncDepartureDate(); renderClimate(); renderResult(); drawRig();
 };
-$('nights').onchange = e => { e.target.value = String(S.nights); };   // a clamped or truncated entry shows the number in use
+$('nights').onchange = () => nightsField();   // a clamped or truncated entry shows the number in use; nights not entered stay empty
 $('nights').oninput = e => {
-  S.nightsAuto = false;                 // a hand-set number is not overwritten
-  S.nights = nightsFromText(e.target.value);
+  nightsTyped(e.target.value);          // a hand-set number is not overwritten
   applyTripKitDefaults();
   $('sleepWrap').classList.toggle('hidden', S.nights === 0);
   renderClimate(); drawRig();
@@ -16235,7 +16350,7 @@ $('kitFind').onkeydown = e => {
   if(e.key === 'Escape'){ $('kitFind').value = ''; $('kitFindOut').classList.add('hidden'); }
 };
 const setNights = n => {
-  S.nightsAuto = false;
+  S.nightsAuto = false; S.nightsOpen = null;
   S.nights = Math.min(30, Math.max(0, n));
   applyTripKitDefaults();
   $('nights').value = S.nights;

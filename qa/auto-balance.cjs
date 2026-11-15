@@ -12,8 +12,10 @@ const q=appVM();
 const {run}=q;
 const json=code=>JSON.parse(run(`JSON.stringify(${code})`));
 run('DRAFT_READY=true');
+// the 6-night start these tests were written on: a new plan has no nights entered since the owner's ruling of 14 Nov 2026 (sweep #32)
+run('S.nights=6;S.nightsOpen=null;applyTripKitDefaults()');
 // the kit as the page starts it (a test below takes a thing out; the tests added after it start from this kit again)
-const KIT0=JSON.stringify(json('S.kit')),NIGHTS0=json('S.nights');
+const KIT0=JSON.stringify(json('S.kit')),NIGHTS0=6;   // the 6-night trip these tests were written on (a new plan has no nights entered since the owner's ruling of 14 Nov 2026, sweep #32)
 const fresh=(more='')=>`S.kit=${KIT0};S.nights=${NIGHTS0};${more}`;
 const bike={id:'qa_bal',fit:{style:'diamond-sloping',size:{kind:'letter',value:'M'}},look:{bars:'drop'},frontTyre:'47-584',rearTyre:'47-584'};
 // A plan at the packing step: these bags and decks, the kit as the page starts it, nothing kept yet.
@@ -108,7 +110,7 @@ test("[BAL-STORED] the balance is stored as kept placements: the plan read again
   const other=appVM({storage:q.store});
   other.run('DRAFT_READY=true');
   const ojson=code=>JSON.parse(other.run(`JSON.stringify(${code})`));
-  other.run(`S.bikeProfile=normaliseBikeProfile(${JSON.stringify(bike)});S.bags=${JSON.stringify(SETS.bikepacking)};S.nextUid=6;S.kit=${JSON.stringify(json('S.kit'))};S.qty=${JSON.stringify(json('S.qty'))};S.step=4;keepPlan({load:${JSON.stringify(placements)}})`);
+  other.run(`S.bikeProfile=normaliseBikeProfile(${JSON.stringify(bike)});S.bags=${JSON.stringify(SETS.bikepacking)};S.nextUid=6;S.kit=${JSON.stringify(json('S.kit'))};S.qty=${JSON.stringify(json('S.qty'))};S.nights=${json('S.nights')};S.step=4;keepPlan({load:${JSON.stringify(placements)}})`);
   assert.deepEqual(ojson('currentPlan().items'),items,'a reload packs the same');
   assert.equal(ojson('autoBalancePlan()'),false,'a balanced plan loaded: nothing more to move');
   assert.equal(ojson('balanceLine()'),'','and no line');

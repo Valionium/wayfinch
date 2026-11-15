@@ -111,7 +111,7 @@ describe('Bags shows a bag plan (sweep #5)', () => {
     await withRoute();
     expect(step('bags').dataset.state).toBe('done');
     expect(step('bags').querySelector('.trip-dot')!.textContent).toBe('✓');
-    expect(step('bags').textContent).toContain(W.tyreBagCardLine(1, '1.5'));
+    expect(step('bags').textContent).toContain(W.tyreBagCardLine(1, 1.5));
     expect(step('bags').textContent).not.toContain(W.appTripBagsLater);
     await click(buttonIn(step('bags'), W.appTripStepChange));
     expect(openSteps()).toEqual(['bags']);

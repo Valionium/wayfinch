@@ -7,4 +7,7 @@ export const TK = {
   tyreCardTitle: 'Tyre pressure',
   tyreCardLast: (front: string, rear: string): string => `front ${front} · rear ${rear} bar`,
   tyreCardBike: (name: string): string => `For ${name}`,
+  // the Bag planner card's line with the bottles in the plan's cages beside its bags (the owner's ruling of 14 Nov 2026, sweep #26)
+  tyreBagCardBottles: (count: number, bottles: number, kg: number): string =>
+    `${count} ${count === 1 ? 'bag' : 'bags'}, ${bottles} ${bottles === 1 ? 'bottle' : 'bottles'} · ${+kg.toFixed(1)} kg`,
 };

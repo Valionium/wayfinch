@@ -77,7 +77,7 @@ async function tripPlanned(page: Page): Promise<void> {
   await page.goto('about:blank');
   await page.goto(`${app.origin}/tools/bags/#copilot-handoff=${ID}`, { waitUntil: 'load' });
   await ready(page);
-  await page.locator('#handoffPlan').click();
+  // a fresh planner has nothing of the rider's to replace: Plan bags for this trip is done at once (the owner's ruling of 14 Nov 2026, sweep #29)
   await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
   await settled(page);
 }
