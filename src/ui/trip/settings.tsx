@@ -23,12 +23,13 @@ const settleNow: Settle = () => import('../../data/day-stops.ts').then((m) => m.
  * The line for a trip whose nights become `n`, '' when it held no stops: by the very rule the settle plans them by (planAround, the
  * owner's rulings of 14 Nov 2026), the rider's own stops are named, kept with their new nights or not kept with their old; a day much
  * longer or shorter than an even day is said with its length once the nights have their places (`settle`; review of the rework, m-3);
- * a day ride names only what goes, and says nothing with automatic stops alone.
+ * a day ride names only what goes, and says nothing with automatic stops alone. Stops that already have `n` nights (stored before
+ * another window changed the nights) keep each pick on its night, as the settle keeps them (re-review 3 of PR 163, m-8).
  */
 export async function stopsLine(trip: Trip, n: number, settle: Settle = settleNow): Promise<string> {
   const held = trip.stops?.routeId === trip.route.id ? trip.stops : undefined;
   if (!held || !Array.isArray(held.days) || held.days.length === 0) return '';
-  const a = planAround(held, trip.route, n);
+  const a = planAround(held, trip.route, n, held.days.length === n);
   const dropped = a.dropped.map((d) => TF.appTripStopNight(d.stop.name, d.night, true)).join(', ');
   if (n < 1) return dropped ? TF.appTripStopsNewNights(0, '', dropped, '') : '';
   // only a place the rider picked can leave a day uneven: the days as they now end, with the other nights' places

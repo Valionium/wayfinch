@@ -27,7 +27,6 @@ export const W = {
   // ---- Route files (GPX) ----
   routeGpxTooLarge: 'Choose a GPX file of 20 MB or less.',
   routeGpxUnreadable: 'That did not read as a GPX track or route with valid coordinates.',
-  routeTrackTooLong: 'The track distance could not be processed. Try a shorter or simplified GPX.',
 
   // ---- The start of the day's ride (section 6.2a). ----
   routeDayOneAtStart: 'Day 1 starts at the route start (km 0)',
@@ -622,7 +621,7 @@ export const W = {
   tyreCardOpen: 'Open',
   tyreBagCardTitle: 'Bag planner',
   tyreBagCardNone: 'No bag plan yet',
-  tyreBagCardLine: (count: number, kg: string): string => `${count} ${count === 1 ? 'bag' : 'bags'} · ${kg} kg`,
+  tyreBagCardLine: (count: number, kg: number): string => `${count} ${count === 1 ? 'bag' : 'bags'} · ${+kg.toFixed(1)} kg`,
   tyreBagCardAge: (date: string): string => `Saved ${date}`,
   // Extras: heat and altitude, weighed loads and calipered widths, the SRAM cross-check.
   tyreSectionHeat: 'Heat and altitude',

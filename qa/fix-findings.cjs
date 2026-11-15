@@ -257,7 +257,8 @@ const J=(app,code)=>JSON.parse(app.run(`JSON.stringify(${code})`)??'null');
 {const app=fresh();
  const n=v=>app.run(`nightsFromText(${JSON.stringify(v)})`);
  check(n('45')===30&&n('2.5')===2&&n('-3')===0&&n('')===0&&n('abc')===0&&n('7')===7&&n('30')===30,'platform-4 the number used for typed text');
- check(app.html.includes("$('nights').onchange = e => { e.target.value = String(S.nights);"),'platform-4 the field is rewritten when the entry is committed');
+ // the field shows the number in use; nights not entered stay empty (the owner's ruling of 14 Nov 2026, sweep #32)
+ check(app.html.includes("$('nights').onchange = () => nightsField();") && app.html.includes("const nightsField = () => { $('nights').value = nightsOpenNow() ? '' : S.nights; };"),'platform-4 the field is rewritten when the entry is committed');
 }
 // [LC-FIX-platform-5] Moving between steps clears a "Sent" notice and keeps an unsent feedback draft.
 {const app=fresh();

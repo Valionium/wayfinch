@@ -544,6 +544,24 @@ describe('a clinic known only by its name', () => {
     }
     expect(lines(chip('pharmacy', { moment: riding(100), spots: [{ b: bare('Rehaklinik'), km: 104 }] }), 104)).toContain('emergency department not known');
   });
+  test('[EM-CLINIC-NAME] a town named like Reha (Rehau, Rehagen, Trehafod) adds nothing; Reha as a word or Reha-Klinik, Rehaklinik, Rehabilitationsklinik do', () => {
+    for (const name of ['Klinikum Rehau', 'Krankenhaus Rehau', 'Kreiskrankenhaus Rehagen', 'Hôpital de Rehaupal', 'Trehafod Hospital']) {
+      for (const b of [hospital({ name }), bare(name)]) {
+        const a = chip('pharmacy', { moment: riding(100), spots: [{ b, km: 104 }] });
+        expect(itemAt(a, 104).detail, name).not.toContain(W.helpCheckFirst);
+      }
+    }
+    const named = [
+      'Reha-Klinik Rehau', 'Rehaklinik', 'Rehabilitationsklinik Rehau', 'Rehazentrum Bad Rehau', 'RehaCentrum Hamburg', 'Neuroreha Rehau', 'Reha Rehau',
+      'Klinik für Kinder- und Jugendpsychiatrie', 'Gerontopsychiatrisches Zentrum', 'Klinik für Psychosomatik Rehau',
+    ];
+    for (const name of named) {
+      for (const b of [hospital({ name }), bare(name)]) {
+        const a = chip('pharmacy', { moment: riding(100), spots: [{ b, km: 104 }] });
+        expect(checks(a, 104), name).toBe(1);
+      }
+    }
+  });
   test('[EM-CLINIC-NAME] a general hospital whose name merely contains "Klinik" (or clinique, clinica) does not', () => {
     for (const name of ['Klinikum Stuttgart', 'Kreisklinik Ebersberg', 'Universitätsklinikum Heidelberg', 'Klinik am Eichert', 'Clinique Saint-Jean', 'Clinica San Carlo', 'Kreiskrankenhaus']) {
       const a = chip('pharmacy', { moment: riding(100), spots: [{ b: hospital({ name }), km: 104 }] });
