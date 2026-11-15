@@ -38,7 +38,9 @@ export const TF = {
   appTripHeightsCredit: 'Heights looked up from Copernicus data through Open-Meteo.',
   appTripAddTitle: 'Add a route',
   appTripReplaceHeading: 'Use another route',
-  appTripReplacedNoDate: (name: string): string => `Replaced with “${name}”, but its departure date was not saved. Set the date in the Route step.`,
+  // at the top of the Route step opened with a trip (the owner's ruling B of 15 Nov 2026, TRIP-ROUTE-KEPT)
+  appTripRouteKept: (name: string): string => `Your route: ${name} (kept)`,
+  appTripReplacedNoDate: (name: string): string => `Replaced with “${name}”, but its departure date was not saved. Set the date in Trip details.`,
   appTripSameRoute: 'That is the route you already have. Nothing was changed.',
   appTripAdded: (name: string): string => `Added “${name}”.`,
   appTripReplaced: (name: string): string => `Replaced with “${name}”.`,

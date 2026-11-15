@@ -85,8 +85,11 @@ function PlaceChoice({ id, label, services, chosen, onChoose }: {
   );
 }
 
-export function PlanAB({ services, onRoute }: { services: TripServices; onRoute: (found: { route: Route; hadHeights: boolean }) => Promise<void> }) {
-  const [picked, setPicked] = useState<Record<Slot, FoundPlace | null>>({ from: null, to: null });
+/** `ends`: Start and End already chosen, the current route's towns (TRIP-ROUTE-KEPT). */
+export function PlanAB({ services, onRoute, ends }: {
+  services: TripServices; onRoute: (found: { route: Route; hadHeights: boolean }) => Promise<void>; ends?: Record<Slot, FoundPlace> | null;
+}) {
+  const [picked, setPicked] = useState<Record<Slot, FoundPlace | null>>(ends ?? { from: null, to: null });
   const [busy, setBusy] = useState(false);
   const [none, setNone] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);

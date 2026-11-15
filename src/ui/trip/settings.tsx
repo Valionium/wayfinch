@@ -81,8 +81,9 @@ export function Choice({ name, legend, value, options, onPick }: { name: string;
 }
 
 /**
- * `when`: the departure date and the nights, which stay in the Route step; `details`: the trip details folded under it (guided Trip
- * design §2.2): start time, pace, flat speed, stay type, camp water and keep fresh.
+ * The two parts of Trip details, folded under the Route step (guided Trip design §2.2; the owner's ruling A of 15 Nov 2026,
+ * TRIP-DETAILS-ALL): `when`, the departure date and the nights, first and only with a trip; `details`, start time, pace, flat speed,
+ * stay type, camp water and keep fresh. Each part says its own nights line (TRIP-STOPS-KEEP), as before.
  */
 export function TripSettings({ services, snap, reload, part, focusDate = 0, settle = settleNow }: {
   services: TripServices; snap: TripSnapshot; reload: () => Promise<void>; part: 'when' | 'details' | 'remove';
