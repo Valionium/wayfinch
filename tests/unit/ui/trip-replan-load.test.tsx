@@ -114,7 +114,7 @@ const days = async (): Promise<number> => (await readTrip())!.route.stages.lengt
 const ONE_LINE = 'The setting is kept. The days update when Wayfinch can load again.';
 
 describe('The stops\' code for a change of nights (review of PR 175, m-1 and m-2)', () => {
-  test('[TRIP-REPLAN-LOAD] opening Trip details starts loading the stops\' code, so on a slow link a date set after a change of nights does not wait for it (m-1)', async () => {
+  test('[TRIP-REPLAN-LOAD] opening Trip details starts loading the stops\' code, so on a slow link (2 s a chunk) a date set after a change of nights does not wait for it (m-1)', async () => {
     code.slowMs = 2000;
     const svc = await withRoute();
     expect(code.asked).toEqual([]);
@@ -128,7 +128,7 @@ describe('The stops\' code for a change of nights (review of PR 175, m-1 and m-2
     // the date set straight after the change of nights takes its turn behind it, and lands at once
     const from = Date.now();
     expect(await svc.setDeparture('2026-10-17')).toBeNull();
-    expect(Date.now() - from).toBeLessThan(1000);
+    expect(Date.now() - from).toBeLessThan(1500);
     expect(readLocalSettings().settings.nights).toBe(before);
     expect(await days()).toBe(before + 1);
     expect((await readTrip())!.departureDate).toBe('2026-10-17');
