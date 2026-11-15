@@ -1721,8 +1721,8 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .ride-summary:not([hidden]){display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin:14px 0 18px;padding:10px 12px;border:1px solid var(--line);background:var(--panel)}
 .ride-summary p{flex:1 1 220px;min-width:0;margin:0;overflow-wrap:anywhere}
 /* Bike details as tiles (the owner's wish of 14 Nov 2026): two columns on a phone, four where the dialog is wide, all on one screen;
-   an open tile spans the row and the others step aside until it closes */
-.bike-more{container-type:inline-size}
+   an open tile spans the row and the others step aside until it closes; the grid's own section is its container (review of PR 164, N1) */
+#bikeProfilePanel,.bike-more{container-type:inline-size}
 .bd-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
 @container (min-width:560px){.bd-tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .bd-tile{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-width:0;min-height:64px;padding:10px 12px;
@@ -5220,7 +5220,26 @@ function ratedL(b){
 // The packing factor is a guess until riders report back; once they have,
 // S.packEff holds the measured value and this uses that instead.
 function packEff(){ return S.packEff || PACK_EFF; }
-function usableL(b){ return +(ratedL(b) * packEff()).toFixed(2); }
+function usableL(b){ return +(ratedL(b) * besideShare(b) * packEff()).toFixed(2); }
+// The frame bag counts only what fits beside the plan's bottles in the triangle (the owner's ruling of 14 Nov 2026, "Yes, count what fits"):
+// the rig draws it cut there (bike.js, BK-FRAME-BESIDE), so its usable litres take the share of its shape that drawing keeps (frameKept),
+// at every step, as the rig draws it once the bags are known (LC-FRAME-FITS). A figure the rider typed is their own bag's, counted as typed;
+// without bike.js nothing is drawn cut, so nothing is counted cut. Kept per bike and bags: the plan asks for every unit it weighs.
+let BESIDE_MEMO = { bike:undefined, key:null, kept:null };
+function besideShare(b){
+  if(b.pos !== 'frame' || b.userL) return 1;
+  const B = bikeModule(); if(!B || !B.frameKept) return 1;
+  const key = JSON.stringify([S.bags.map(x => [x.pos, x.slot, x.L, x.pair]), S.decks]);
+  if(BESIDE_MEMO.bike !== S.bikeProfile || BESIDE_MEMO.key !== key){
+    const view = planBagView(true), fit = bikeFit(S.bikeProfile);
+    const spec = { ...B.resolveBikeSpec(B.normaliseBike(S.bikeProfile), view),
+      mounts:{ st:!!fit.cages.st, dt:!!fit.cages.dt, un:!!fit.cages.un, top:!!(fit.topMounts.front || fit.topMounts.rear), frame:!fit.frameBag.none } };
+    BESIDE_MEMO = { bike:S.bikeProfile, key, kept:view.bottles.some(x => x.slot !== 'un') ? B.frameKept(spec) : null };
+  }
+  return BESIDE_MEMO.kept ? BESIDE_MEMO.kept[frameShapeIdx(b)] ?? 1 : 1;
+}
+// wherever a frame bag's litres are shown less for the cut, it says so (LC-FRAME-FITS)
+function besideWords(b){ return usableL(b) < +(ratedL(b) * packEff()).toFixed(2) ? ` beside your bottle${inTriangleCount() > 1 ? 's' : ''}` : ''; }
 
 function ratedTotal(){ return +gearBags().reduce((s,b)=>s+ratedL(b)*countOf(b),0).toFixed(1); }
 // One rule for a bag's litres wherever they are shown, rated, usable or in Where it goes: two decimals at most, no trailing zeros, as the
@@ -6055,6 +6074,15 @@ function keepPlan(change = {}){
   const afresh = !!change.replan || !before || !sameBasis(before.basis, basis);
   const plan = planView(placementsSelection(change.replan ? null : before));
   if(afresh && before) plan.notes.replan = { reason:change.why || replanReason(before.basis, basis), movedPacked:movedPacked(before, plan) };
+  // what the frame bag held that it no longer does, with its litres there: the note waits until the packing check shows it (LC-FRAME-FITS-OLD)
+  if(plan.notes.replan && plan.notes.replan.reason === 'beside'){
+    const frames = new Set(basis.units.filter(u => u[1] === 'frame').map(u => u[0]));
+    const inFrame = (items, id) => (items[id] || []).filter(e => frames.has(e[0]));
+    const was = Object.keys(before.items || {}).filter(id => inFrame(before.items, id).length);
+    BESIDE_NOTE = { out:was.filter(id => !inFrame(plan.items, id).length).map(id => [id, +inFrame(before.items, id).reduce((n, e) => n + e[2], 0).toFixed(2)]),
+      in:was.filter(id => inFrame(plan.items, id).length), packed:plan.notes.replan.movedPacked.slice() };
+    BESIDE_SHOWN = null;
+  }
   if(!afresh) plan.notes.offer = replanOffer(plan);
   // A kept plan stored with the rack deck on whose bags still hold what the deck now carries (the sleeping bag, since the owner's
   // decision of 7 Nov 2026: kept before it, or by an older page): it goes up on the deck, everything else stays where it was, and a
@@ -6068,7 +6096,47 @@ function keepPlan(change = {}){
   PLAN_CACHE = { sig:planSignature(), plan, placements:S.placements };
 }
 function replanReason(was, now){
-  return was.mode !== now.mode ? 'mode' : was.rackDeck !== now.rackDeck ? 'rackDeck' : 'bags';
+  return was.mode !== now.mode ? 'mode' : was.rackDeck !== now.rackDeck ? 'rackDeck' : besideOnly(was, now) ? 'beside' : 'bags';
+}
+// The same bags, but for a frame bag that now counts only what fits beside a bottle, the cut the plan it was kept from did not count (a plan
+// saved before the owner's ruling of 14 Nov 2026, or by an older page): the rider changed nothing, so the note says what did (LC-FRAME-FITS-OLD).
+function besideOnly(was, now){
+  return Array.isArray(was.units) && was.units.length === now.units.length && was.units.every((u, i) => {
+    const v = now.units[i];
+    if(!Array.isArray(u) || [0, 1, 2, 4].some(k => u[k] !== v[k])) return false;
+    if(u[3] === v[3]) return true;
+    const b = v[1] === 'frame' && usableUnits().find(x => x.key === v[0]);
+    return !!b && v[3] < u[3] && Math.abs(u[3] - +(ratedL(b) * packEff()).toFixed(2)) < 0.005;
+  });
+}
+/* The frame bag's note (LC-FRAME-FITS-OLD; review of PR 170, I1): the kit placed afresh for the cut, and what it moved out of the frame bag.
+   It waits, in this tab and in the draft (besideNote), through the steps, ticks, changes and reloads, until the packing check has shown it;
+   shown, it stays on screen for the rest of the visit while the frame bag counts less, and the draft no longer carries it. Another plan
+   opened (a saved setup, a handed-over trip) takes it away. A thing is named as not fitting only when it would not fit beside what stayed
+   (review of PR 170, m1); the others are named as moved. */
+let BESIDE_NOTE = null, BESIDE_SHOWN = null;
+function readBesideNote(v){
+  if(!dataObject(v) || !Array.isArray(v.out) || !Array.isArray(v.packed)) return null;
+  const out = v.out.slice(0, 60).filter(x => Array.isArray(x) && typeof x[0] === 'string' && kitById(x[0]) && dataNumber(x[1], 0, 80) !== null).map(x => [x[0], +x[1]]);
+  const ids = list => (Array.isArray(list) ? list : []).slice(0, 60).filter(id => typeof id === 'string' && kitById(id));
+  return out.length ? { out, in:ids(v.in), packed:ids(v.packed) } : null;
+}
+function besideNoteHtml(A){
+  const note = BESIDE_NOTE || BESIDE_SHOWN, fb = S.bags.find(b => b.pos === 'frame');
+  if(!note || !fb || !besideWords(fb)) return '';
+  if(BESIDE_NOTE && S.step === 4){ BESIDE_SHOWN = BESIDE_NOTE; BESIDE_NOTE = null; if(!FREE_PLAY) queueDraftSave(); }
+  const keys = new Set(physical(fb).map(u => u.key)), there = id => (A.items[id] || []).filter(e => keys.has(e[0]));
+  const name = id => kitName(kitById(id)).replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase());
+  // the room beside what stayed of the frame bag's own things: what the planner moved in instead does not count against them
+  const left = usableL(fb) - [...note.in, ...note.out.map(x => x[0])].reduce((n, id) => n + there(id).reduce((t, e) => t + e[2], 0), 0);
+  const moved = note.out.filter(([id]) => !there(id).length);
+  const out = moved.filter(([, L]) => L > left + 1e-9).map(([id]) => name(id)), also = moved.filter(([, L]) => L <= left + 1e-9).map(([id]) => name(id));
+  const packed = note.packed.filter(id => S.packed && S.packed[id] && A.items[id]).map(id => {
+    const s = A.slots.find(x => x.key === A.items[id][0][0]);
+    return s ? `<p>Packed already, now planned for the ${htmlEsc(unitLabel(s).toLowerCase())}: ${htmlEsc(name(id))}.</p>` : '';
+  }).join('');
+  return `<div class="finding note" data-beside-note="1"><p>Your frame bag now counts only what fits${besideWords(fb)}: ${bagL(usableL(fb))} L usable, so the kit was placed afresh.</p>${
+    out.length ? `<p>Does not fit in it now: ${htmlEsc(listOf(out))}.</p>` : ''}${also.length ? `<p>Also moved out of it: ${htmlEsc(listOf(also))}.</p>` : ''}${packed}</div>`;
 }
 /* ---- The deck note (LC-DECK-NOTE; review of PR 149, I1, I2, m2, m3): what a kept plan's bags held that now rides on the rack deck.
    It waits in the planner's own storage, through ticks, reloads and balancing, until the bags step or the packing check has shown it;
@@ -9381,10 +9449,10 @@ function fillColour(pct){
 // nothing to the bar's bungees, which the rig draws as an empty deck.
 function deckLoaded(which){ return which === 'rack' && deckClaims().length > 0; }
 // The plan's bags in Contract 1's shape (spec 7.1): what bike.js reads of a plan. Usable bags only, as the plan counts them;
-// fills from the packed slots once the kit is known. It only reads the plan.
-function planBagView(){
-  if(S.step === 1) return null;
-  const stage = S.step, A = stage >= 3 ? currentPlan() : null, items = [], bottles = [];
+// fills from the packed slots once the kit is known. It only reads the plan. `shape`: the bags alone, empty, at any step (besideShare).
+function planBagView(shape = false){
+  if(S.step === 1 && !shape) return null;
+  const stage = S.step, A = stage >= 3 && !shape ? currentPlan() : null, items = [], bottles = [];
   const fillOf = u => {
     const s = A && A.slots.find(x => x.key === u.key);
     return s && s.cap > 0 ? +Math.min(1, (s.cap - s.left) / s.cap).toFixed(3) : 0;
@@ -11263,13 +11331,19 @@ function readBagMeasure(text, min, max, optional=false){
 function bagCapacityText(b){
   if(isBottle(b.pos)) return `${b.L} L of water.`;
   const n = countOf(b);
-  return `${bagL(usableL(b))} L usable${
+  return `${bagL(usableL(b))} L usable${besideWords(b)}${
     n > 1 ? ` each · ${bagL(totalL(b))} L for the pair` : ''}.`;
 }
 function bagCapacityHelp(b){
   return infoHelp('How usable bag space is counted',isBottle(b.pos)
     ? '<p>Bottle capacity is counted in full as water, separately from usable bag space.</p>'
-    : `<p>The check uses ${Math.round(packEff()*100)}% of each bag’s labelled volume to allow for seams, closures and awkward shapes. Each item must fit inside one bag, even when a pair is selected. Check the actual opening, shape and compression with your kit.</p>`);
+    : `<p>The check uses ${Math.round(packEff()*100)}% of each bag’s labelled volume to allow for seams, closures and awkward shapes. Each item must fit inside one bag, even when a pair is selected. Check the actual opening, shape and compression with your kit.</p>${besideHelp(b)}`);
+}
+// A frame bag counted less beside a bottle says so in its help, too (LC-FRAME-FITS; review of PR 170, m2).
+function besideHelp(b){
+  if(!besideWords(b)) return '';
+  const many = inTriangleCount() > 1;
+  return `<p>Beside your bottle${many ? 's' : ''}, only the part of this bag that fits next to ${many ? 'them' : 'it'} counts: about ${Math.round(besideShare(b) * 100)}% of the bag, as the drawing shows it. So ${bagL(usableL(b))} L of its ${bagL(ratedL(b))} L is usable.</p>`;
 }
 function resetBagMeasurements(b){
   delete b.userL; delete b.longestCm;
@@ -11843,7 +11917,7 @@ function renderResult(){
           return `Your kit goes into ${holding} of your ${owned} bag${owned>1?'s':''} — ${mounted} L mounted, ${Math.abs(d)} L spare.${empty ? ' ' + empty : ''}`; })()}</p>
     <div class="meters">
       <div class="meter"><b>${kit} L</b><span>Kit volume ${infoHelp('How kit volume is counted','<p>The total uses your selected kit, quantities, packed sizes and food carried between resupply stops. Lightweight mode leaves eligible comfort items at home. Typical packed volumes vary by brand and compression.</p>'+pocketsLeftOut())}</span></div>
-      <div class="meter"><b>${mounted} L</b><span>Usable bag space ${infoHelp('Why usable space is lower than the labels',`<p>Bags are counted at ${Math.round(packEff()*100)} per cent of their labelled size to allow for seams, closures and awkward shapes. You own ${ratedShown()} L of labelled bag capacity; this result counts only the mounted bags.</p><p>“It fits” means the selected kit fits within this estimated usable volume and the entered length limits. Check your actual bags and gear: their shape, opening and compression affect the fit.</p>`)}</span></div>
+      <div class="meter"><b>${mounted} L</b><span>Usable bag space ${infoHelp('Why usable space is lower than the labels',`<p>Bags are counted at ${Math.round(packEff()*100)} per cent of their labelled size to allow for seams, closures and awkward shapes. You own ${ratedShown()} L of labelled bag capacity; this result counts only the mounted bags.${S.bags.some(b => b.pos === 'frame' && besideWords(b)) ? ' A frame bag beside a bottle counts only the part of it that fits next to the bottle, as drawn.' : ''}</p><p>“It fits” means the selected kit fits within this estimated usable volume and the entered length limits. Check your actual bags and gear: their shape, opening and compression affect the fit.</p>`)}</span></div>
       <div class="meter"><b>${+carriedKg(A).toFixed(1)} kg</b><span>Kit + water ${infoHelp('What the packing weight includes',`<p>This adds selected kit and carried food to water in your bottle cages${waterL()?' (counted full)':''}. It excludes the bike, rider and empty luggage.</p>${pocketsLeftOut()}`)}</span></div>
     </div></div>${firstFixes({weatherReady,miss,over,fix,routeFailed,spill,stranded})}${resultConfidence(c)}${weatherNote}${routeNote}`;
   $('verdictBox').querySelectorAll('[data-result-jump]').forEach(button=>button.onclick=()=>jumpToResult(button.dataset.resultJump));
@@ -12115,7 +12189,8 @@ function renderResult(){
     const s = A.slots.find(x => x.key === key);
     return s ? `<p>Packed already, now planned for the ${htmlEsc(unitLabel(s).toLowerCase())}: ${htmlEsc(names.join(', '))}.</p>` : '';
   }).join('');
-  const replanHtml = deckNoteHtml(4) + (replanNote ? `<div class="finding note"><p>${replanWhy[replanNote.reason]}</p>${packedLines}</div>` : '')
+  // the frame bag's note waits until it is shown here (LC-FRAME-FITS-OLD), so the plan's own one-time note leaves that reason to it
+  const replanHtml = deckNoteHtml(4) + besideNoteHtml(A) + (replanNote && replanNote.reason !== 'beside' ? `<div class="finding note"><p>${replanWhy[replanNote.reason]}</p>${packedLines}</div>` : '')
     + (replanGain ? `<div class="finding note"><p>${htmlEsc(replanGain.gain)} Re-plan keeps your hand placements and ticks.</p>
         <button class="linky" data-replan="1">Re-plan</button></div>` : '');
   // Hand placements that can't be kept are never silent (design 7.4).
@@ -12172,7 +12247,7 @@ function renderResult(){
           : '<li><span class="dim">Nothing else would fit in the space that is left.</span></li>'}</ul></div>`;
     }
     return `<div class="alloc">
-      <div class="alloc-h"><b>${unitLabel(s)}</b><em class="${full?'full':''}">${used} / ${+s.cap.toFixed(2)} L · ${kg.toFixed(1)} kg</em></div>
+      <div class="alloc-h"><b>${unitLabel(s)}</b><em class="${full?'full':''}">${used} / ${+s.cap.toFixed(2)} L${besideWords(s)} · ${kg.toFixed(1)} kg</em></div>
       <div class="alloc-why">${POSITIONS[s.pos].accessible?'<span class="reachdot">Reachable</span> · ':''}${POSITIONS[s.pos].takes}</div>
       ${s.pos === 'bar' && s.items.length ? `<div class="alloc-why">${BAR_LOAD_ADVICE}</div>` : ''}
       <ul>${!s.items.length ? '<li><span class="dim">Empty</span></li>' : s.pos !== 'seat' ? s.items.map(k => line(k, s.key)).join('')
@@ -13746,8 +13821,10 @@ function capturePlan(){
 }
 // During a trial (decision 7) the draft is the plan without the trial bag, wherever it is read: a save, an export, another tab's check.
 function captureDraft(){
-  return withoutTrial(() => ({ ...capturePlan(), settings:draftSettings(),
-    pendingSaveName:S.pendingSaveName, pendingSaveNote:S.pendingSaveNote }));
+  return withoutTrial(() => { const d = { ...capturePlan(), settings:draftSettings(),
+    pendingSaveName:S.pendingSaveName, pendingSaveNote:S.pendingSaveNote };
+    // the frame bag's note, until the packing check has shown it (LC-FRAME-FITS-OLD); older pages ignore it
+    return BESIDE_NOTE ? { ...d, besideNote:{ out:BESIDE_NOTE.out.map(x => x.slice()), in:BESIDE_NOTE.in.slice(), packed:BESIDE_NOTE.packed.slice() } } : d; });
 }
 // The theme belongs to a plan only once the rider has chosen one; following the system is not a choice, so it neither counts as a change nor locks the app to that theme.
 let THEME_CHOSEN = false;
@@ -14204,7 +14281,7 @@ function normaliseReport(f){
 function validPlan(p){ return !!normalisePlan(p); }
 function validSetup(p){ return !!normaliseSetup(p); }
 function restorePlan(p, draft, restoreSettings=true){
-  const savedPlacements=dataObject(p) ? p.placements : undefined;
+  const savedPlacements=dataObject(p) ? p.placements : undefined, savedBeside=draft && dataObject(p) ? p.besideNote : undefined;
   p=normalisePlan(p);
   if(!p) return false;
   // another plan (a saved setup) replaces this one: a deck note still waiting about this one goes, and so does the one on screen
@@ -14254,6 +14331,8 @@ function restorePlan(p, draft, restoreSettings=true){
   if(p.pockets) S.pockets={...p.pockets}; else delete S.pockets;
   POCKET_NOTE='';
   // A stored null is a plan without bags; anything else unusable is an older or foreign save (design 8.4).
+  // the frame bag's note goes with the plan it is about: back from this plan's own draft, gone with another plan (LC-FRAME-FITS-OLD)
+  BESIDE_NOTE = readBesideNote(savedBeside); BESIDE_SHOWN = null;
   keepPlan({ load:p.placements, placedAgain:savedPlacements !== null && !p.placements });
   resetBalance();
   // Saved trips keep the component snapshot they used, even when a reusable
@@ -16043,7 +16122,7 @@ function openBagPop(key, fromButton=null){
 
   const head = `
     <b>${htmlEsc(geo.label)}</b>
-    <span>${used} / ${+s.cap.toFixed(2)} L · ${kg.toFixed(1)} kg</span>
+    <span>${used} / ${+s.cap.toFixed(2)} L${besideWords(s)} · ${kg.toFixed(1)} kg</span>
     <div class="popbar"><i style="width:${Math.min(100,pctFull)}%;background:${fillColour(pct)}"></i></div>
     <em>${pctFull}% full · ${P.accessible ? 'opens at the roadside' : 'stop and unpack'}${
       bagMaxLength(s) ? ' · inside length ' + bagMaxLength(s) + ' cm (' + (s.longestCm ? 'your measurement' : 'estimated') + ')' : ''}</em>`;

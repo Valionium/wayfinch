@@ -13,6 +13,7 @@ const source=[
   section('const BOTTLE_SPOTS =','function bottleArt('),
   "const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];",
   "function routeProfile(){return null;} function placeLabel(p){return p.name;} function plural(n){return n+' nights';}",
+  "function bikeModule(){return null;}   // the drawing (bike.js) is not in these sections: nothing is drawn cut, so nothing is counted cut (LC-FRAME-FITS)",
   'globalThis.api={S,KIT,POSITIONS,physical,allocateInto,allocate,getChecklistModel,itemL,itemKg,placedKg,weightIn,loadByZone,deckClaims,activeKit,rebalancePairs,fitsLength,moveTargets,incomingFor,usableL,packingSummary,rainAccess,comfortFill,currentPlan};'
 ].join('\n');
 const context=vm.createContext({});vm.runInContext(source,context);const a=context.api,initial=JSON.parse(JSON.stringify({...a.S,nights:6,nightsOpen:null}));   // the 6-night trip these cases were written on (a new plan has no nights entered since the owner's ruling of 14 Nov 2026, sweep #32)
