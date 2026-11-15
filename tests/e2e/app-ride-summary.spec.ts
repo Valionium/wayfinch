@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { loadApp, removeBuilds } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
 
@@ -17,6 +17,39 @@ test.afterAll(() => removeBuilds());
 const ID = 'abcdef0123456789abcdef0123456789';
 const ready = (page: Page) => page.waitForFunction('typeof DRAFT_READY !== "undefined" && DRAFT_READY === true');
 const settled = (page: Page) => page.waitForFunction('!DRAFT_TIMER && !DRAFT_PENDING_SERIAL && DRAFT_SAVE_STATUS.state === "saved" && JSON.stringify(captureDraft()) === DRAFT_SIGNATURE', null, { timeout: 20_000 });
+/**
+ * The page has stopped scrolling: scrollY the same for half a second. A jump's smooth scroll can still move the page after the focus
+ * has scrolled to the choice, so "in sight" is judged only once the page is still (re-check 3 of PR 166, m10).
+ */
+const scrollStill = (page: Page) => page.evaluate(() => new Promise<void>((resolve) => {
+  let last = scrollY;
+  let since = performance.now();
+  const id = setInterval(() => {
+    if (scrollY !== last) { last = scrollY; since = performance.now(); } else if (performance.now() - since >= 500) { clearInterval(id); resolve(); }
+  }, 50);
+}));
+/**
+ * Check's jump to Kit's choice, tapped again with the page scrolled to each of `from`, judged once the page is still: the choice focused
+ * and in sight. From a place where the choice is already in sight after the step change, the focus scrolls nothing, so only go()'s
+ * smooth scroll to the top moves the page: on a phone that took the choice out of sight (review of PR 166, I4; re-check 3, m10).
+ * `back` brings Check back with the pointer shown.
+ */
+async function jumpsLand(page: Page, back: () => Promise<void>, pointer: Locator, choice: Locator, from: number[]): Promise<void> {
+  for (const y of from) {
+    await back();
+    await page.evaluate((y) => scrollTo({ top: y, behavior: 'instant' }), y);
+    await pointer.dispatchEvent('click');
+    await scrollStill(page);
+    await expect(choice, `from scrollY ${y}`).toBeFocused();
+    await expect(choice, `from scrollY ${y}`).toBeInViewport();
+  }
+}
+const toCheck = async (page: Page, open?: Locator): Promise<void> => {
+  await page.evaluate('go(4)');
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();   // the weight question, skipped
+  if (open) await open.evaluate((el) => { const d = el.closest('details'); if (d) d.open = true; });
+  await scrollStill(page);   // go()'s own smooth scroll to the top done, so the tap starts from a page at rest
+};
 
 /** The co-pilot's handoff as it writes it (src/store/db.ts and src/ui/trip/handoff.ts): the GPX in its database, the envelope. */
 async function handOver(page: Page, gpx: string): Promise<void> {
@@ -131,7 +164,9 @@ test('[LC-MODE-KIT] Check says where Comfortable is now: at the start of Kit, on
   await go.click();
   await expect(page.locator('#s3')).toBeVisible();
   await expect(page.locator('#s3 #modeBar button[data-mode="comfort"]')).toBeFocused();
+  await scrollStill(page);
   await expect(page.locator('#s3 #modeBar button[data-mode="comfort"]')).toBeInViewport();   // in sight, on a phone too (review of PR 166, I4)
+  await jumpsLand(page, () => toCheck(page, note), go, page.locator('#s3 #modeBar button[data-mode="comfort"]'), [0, 500, 600, 700, 800, 900, 1500]);
 });
 
 test('[LC-RIDE-FOLD] Check\'s Review ride opens Ride\'s fields, folded or not, with the focus on Retry weather when the weather failed (review of PR 166, I2)', async ({ page }) => {
@@ -165,7 +200,9 @@ test('[LC-MODE-KIT] nothing on Check points to a switch that is not there: each 
   await empty.getByRole('button', { name: 'Go to Lightweight in Kit' }).click();
   await expect(page.locator('#s3')).toBeVisible();
   await expect(page.locator('#s3 #modeBar button[data-mode="light"]')).toBeFocused();
+  await scrollStill(page);
   await expect(page.locator('#s3 #modeBar button[data-mode="light"]')).toBeInViewport();   // in sight, on a phone too (review of PR 166, I4)
+  await jumpsLand(page, () => toCheck(page, empty), empty.getByRole('button', { name: 'Go to Lightweight in Kit' }), page.locator('#s3 #modeBar button[data-mode="light"]'), [0, 500, 600, 700, 800, 900, 1500]);
   // Lightweight, only just fitting: the verdict names Kit for Comfortable
   const tight = await page.evaluate(`(() => { S.mode = 'light'; S.bags = [{ uid:1, pos:'seat', L:6 }]; S.nextUid = 2; go(4);
     for (let L = 6; L <= 30; L += 0.5) { S.bags[0].L = L; S.bags[0].userL = true; renderResult();
@@ -176,5 +213,7 @@ test('[LC-MODE-KIT] nothing on Check points to a switch that is not there: each 
   await page.setViewportSize({ width: 360, height: 640 });
   await page.locator('#verdictBox').getByRole('button', { name: 'Go to Comfortable in Kit' }).click();
   await expect(page.locator('#s3 #modeBar button[data-mode="comfort"]')).toBeFocused();
+  await scrollStill(page);
   await expect(page.locator('#s3 #modeBar button[data-mode="comfort"]')).toBeInViewport();   // in sight, on a phone too (review of PR 166, I4)
+  await jumpsLand(page, () => toCheck(page), page.locator('#verdictBox').getByRole('button', { name: 'Go to Comfortable in Kit' }), page.locator('#s3 #modeBar button[data-mode="comfort"]'), [0, 500, 600, 700, 800, 900, 1500]);
 });
