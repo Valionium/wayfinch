@@ -1706,6 +1706,9 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,[tabindex]:focus-vis
 .photo-modes{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 .photo-modes .look-chip[aria-pressed=true]{outline:2px solid var(--blaze);outline-offset:1px}
 .bike-more>summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600}
+/* Ride folded to one line for a trip from Wayfinch (the owner's ruling of 14 Nov 2026): the line, then Change */
+.ride-summary:not([hidden]){display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin:14px 0 18px;padding:10px 12px;border:1px solid var(--line);background:var(--panel)}
+.ride-summary p{flex:1 1 220px;min-width:0;margin:0;overflow-wrap:anywhere}
 /* Bike details as tiles (the owner's wish of 14 Nov 2026): two columns on a phone, four where the dialog is wide, all on one screen;
    an open tile spans the row and the others step aside until it closes */
 .bike-more{container-type:inline-size}
@@ -2097,6 +2100,12 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <div class="eyebrow">Step one</div>
     <h2 class="lede" id="stepTitle1" tabindex="-1">Where and when</h2>
     <p class="sub">Choose where and when you will ride. <span data-info="How seasonal weather guides the kit">The weather decides half your packing list. The check packs for the cold tenth of nights rather than the average ones.</span></p>
+    <!-- a trip from Wayfinch is entered once (the owner's ruling of 14 Nov 2026, sweep finding 28): its plan folds this step to one line -->
+    <div class="ride-summary" id="rideSummary" hidden>
+      <p id="rideSummaryText"></p>
+      <button type="button" class="kitact" id="rideChange" aria-expanded="false" aria-controls="rideFields">Change</button>
+    </div>
+    <div id="rideFields">
 
     <div class="tellbox">
         <label for="tellInput">Describe the trip in one line <span class="hint">the quick way — or fill the fields in below</span></label>
@@ -2170,6 +2179,7 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       </div>
     </div>
 
+    </div>
     <div class="fbslot" data-fb="1"></div>
     <div class="nav">
       <button class="go" data-to="2">Next — your bags</button>
@@ -2215,6 +2225,15 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
     <div class="eyebrow">Step three</div>
     <h2 class="lede" id="stepTitle3" tabindex="-1">Untick what you don't have</h2>
     <p class="sub" id="kitStartingList">Start with a typical list for this trip. Tick what you plan to take and untick what you will leave at home. Search to find an item or add your own.</p>
+    <!-- chosen before the kit (the owner's ruling of 14 Nov 2026, sweep finding 28), no longer on Check -->
+    <div class="modebar" id="modeBar">
+      <button data-mode="comfort">
+        <b>Comfortable</b><i>Keeps your selected kit and uses the bags you own</i>
+      </button>
+      <button data-mode="light">
+        <b>Lightweight</b><i>Leaves comfort items at home and uses fewer bags</i>
+      </button>
+    </div>
     <div class="bike-profile-card" id="bikeKitSummary"></div>
     <div class="advbar">
       <div class="kit-size-controls"><button class="advtog" id="advBtn" aria-pressed="false">Set my own sizes</button><span data-info="How kit sizes are counted">Listed items start with typical packed volumes and weights. Choose <b>Set my own sizes</b> to select a size option or enter your gear's measurements. Packed volume is the space it occupies in a bag; rigid length matters for things that do not bend. New items ask for their size and category before being added.</span></div>
@@ -2262,14 +2281,6 @@ button.info-button:focus-visible{outline:2px solid var(--blaze);outline-offset:-
       <span class="check-night-suggestion" id="checkNightsSuggestion">Suggested nights: — · add a route in Ride</span>
     </div>
     <div id="nightsNote"></div>
-    <div class="modebar" id="modeBar">
-      <button data-mode="comfort">
-        <b>Comfortable</b><i>Keeps your selected kit and uses the bags you own</i>
-      </button>
-      <button data-mode="light">
-        <b>Lightweight</b><i>Leaves comfort items at home and uses fewer bags</i>
-      </button>
-    </div>
     <div class="result-save">
       <button class="go small" id="quickSave">Keep as a setup</button>
       <span id="quickSaveMsg">Your working plan is saved automatically in this browser.</span>
@@ -11641,13 +11652,23 @@ function firstFixes({weatherReady,miss,over,fix,routeFailed,spill,stranded}){
     jump:gearBags().length ? 'cuts' : 'bags',label:gearBags().length ? 'Review overflow' : 'Add your bags'});
   if(spill.some(k=>k.tooLong)) items.push({text:'Some items are too long for the available bags. Check another position or carry suitable items outside.',jump:'length',label:'Review long items'});
   if(stranded.some(x=>x.item && x.item.rainkit)) items.push({text:'Rain gear is buried in a bag that needs unpacking. Move it somewhere reachable.',jump:'reach',label:'Review access'});
-  if(routeFailed) items.push({text:'Retry the route calculation or load a GPX before relying on distance and climbing.',jump:'trip',label:'Review route'});
+  if(routeFailed) items.push({text:'Retry the route calculation or load a GPX before relying on distance and climbing.',jump:'route',label:'Review route'});
   return `<section class="firstfixes" aria-labelledby="firstFixesTitle"><h3 id="firstFixesTitle">${items.length ? 'Fix these first' : 'Ready to pack'}</h3>${items.length
     ? `<ol>${items.slice(0,4).map(item=>`<li><span>${htmlEsc(item.text)}</span><button class="linky retry" data-result-jump="${item.jump}">${item.label}</button></li>`).join('')}</ol>`
     : '<p>No issues were flagged in the current check. Use the bag-by-bag list to mark what you have packed.</p><button class="linky retry" data-result-jump="allocation">Open packing list</button>'}</section>`;
 }
 function jumpToResult(target){
-  const step={trip:1,bags:2,kit:3}[target];
+  // Comfortable or Lightweight sits at the start of Kit since the ruling of 14 Nov 2026: there, the focus on the choice (review of PR 166, I1)
+  // in sight on a phone too: go()'s smooth scroll to the top would win over the focus's own (review of PR 166, I4)
+  if(target === 'comfort' || target === 'light'){ go(3); const b = $('modeBar').querySelector(`[data-mode="${target}"]`); b.focus({preventScroll:true}); b.scrollIntoView?.({block:'center'}); return; }
+  // Check's Review ride and Review route open Ride's fields, folded or not, with the focus on the retry they ask for (I2)
+  if(target === 'trip' || target === 'route'){
+    RIDE_OPEN = true; go(1);
+    const retry = $(target === 'trip' ? 'retryWeather' : 'retryRoute');
+    if(retry && retry.isConnected){ retry.focus({preventScroll:true}); retry.scrollIntoView?.({block:'center'}); }
+    return;
+  }
+  const step={bags:2,kit:3}[target];
   if(step){ go(step); return; }
   const title={missing:'Missing',cuts:'Leave it behind',allocation:'Where it goes',reach:'Can you reach it',length:'Long and rigid'}[target];
   const detail=[...$('resultBox').querySelectorAll('.sec')].find(el=>el.querySelector('summary b')?.textContent === title);
@@ -11729,7 +11750,7 @@ function renderResult(){
       ? 'Some kit needs to be removed, worn or carried in another suitable position. Review the suggestions below; if essentials still do not fit, you may need more carrying space.'
       : tight
       ? (S.mode === 'light'
-        ? `This is the minimum setup: ${bagCount(holding)} carrying everything, with ${Math.abs(d)} L to spare. Tight is the point here — nothing is mounted that does not earn it. If that sounds unpleasant on a long trip, switch to comfortable above.`
+        ? `This is the minimum setup: ${bagCount(holding)} carrying everything, with ${Math.abs(d)} L to spare. Tight is the point here — nothing is mounted that does not earn it. If that sounds unpleasant on a long trip, choose Comfortable at the start of Kit. <button class="linky retry" type="button" data-result-jump="comfort">Go to Comfortable in Kit</button>`
         : `Only ${Math.abs(d)} L spare across ${bagCount(holding)}, and that margin is spread thin rather than sitting in one usable gap. Expect to repack twice on the first morning.`)
       : (() => { const owned = usableUnits().length, empty = mountedEmptySentence(slots);
           return `Your kit goes into ${holding} of your ${owned} bag${owned>1?'s':''} — ${mounted} L mounted, ${Math.abs(d)} L spare.${empty ? ' ' + empty : ''}`; })()}</p>
@@ -11751,7 +11772,8 @@ function renderResult(){
   const strippedNote = stripped.length
     ? `<div class="finding cut"><b>Lightweight has left ${stripped.length} thing${stripped.length>1?'s':''} at home</b>
        <p>${htmlEsc(listOf(stripped.map(k => kitName(k))))} — <b>${stripped.reduce((s,k)=>s+itemL(k),0).toFixed(1)} L</b>
-       and ${stripped.reduce((s,k)=>s+itemKg(k),0).toFixed(1)} kg. Switch to <b>Comfortable</b> to bring them back.
+       and ${stripped.reduce((s,k)=>s+itemKg(k),0).toFixed(1)} kg. Choose <b>Comfortable</b> at the start of Kit to bring them back.
+       <button class="linky retry" type="button" data-result-jump="comfort">Go to Comfortable in Kit</button>
        ${infoHelp('How Lightweight changes the load','<p>Lightweight excludes eligible comfort items from the carried kit while leaving their checkboxes selected. Comfortable includes them again. Safety items are not removed by this mode.</p>')}</p></div>`
     : '';
   let fixBody = '';
@@ -11942,7 +11964,7 @@ function renderResult(){
       + swapNote
       + `<div class="finding note"><b>Mount these ${slots.length}</b><p>${slots.map(unitLabel).join(', ')}.</p></div>`
     : (swapNote || `<div class="emptyfind">${S.mode==='comfort'
-      ? 'Comfortable keeps your bike bags mounted for spare room. Switch to Lightweight to check which bags you can leave at home.'
+      ? 'Comfortable keeps your bike bags mounted for spare room. Choose Lightweight at the start of Kit to check which bags you can leave at home. <button class="linky retry" type="button" data-result-jump="light">Go to Lightweight in Kit</button>'
       : 'No bag removals are suggested for this packing arrangement.'}</div>`))
     + (emptyMounted ? `<div class="finding note"><p>${emptyMounted}</p></div>` : '');
 
@@ -12219,7 +12241,8 @@ function renderResult(){
   } else {
     roomBody = (cf.emptyBags
       ? `<div class="finding note"><b>${cf.emptyBags} bag${cf.emptyBags>1?'s are':' is'} mounted and empty</b>
-         <p>Two honest answers here. Leave ${cf.emptyBags>1?'them':'it'} at home and the bike is lighter, handles better and packs faster — switch to <b>Lightweight</b> above and the check will do exactly that. Or keep ${cf.emptyBags>1?'them':'it'} and use the room, which is what the list below is for.</p></div>`
+         <p>Two honest answers here. Leave ${cf.emptyBags>1?'them':'it'} at home and the bike is lighter, handles better and packs faster — choose <b>Lightweight</b> at the start of Kit and the check will do exactly that. Or keep ${cf.emptyBags>1?'them':'it'} and use the room, which is what the list below is for.</p>
+         <button class="linky retry" type="button" data-result-jump="light">Go to Lightweight in Kit</button></div>`
       : '') +
       `<div class="finding note"><b>${cf.freeL} L spare — ${cf.addedL} L of it worth using</b>
         ${infoHelp('How optional additions are checked','<p>Each addition is checked against the individual gap it would go in, for rigid length and volume. These are optional comfort items; they are not needed to resolve the essential checks.</p>')}
@@ -12445,6 +12468,7 @@ function renderResult(){
   });
   if($('applyCal')) $('applyCal').onclick = applyCalibration;
   if($('resetCal')) $('resetCal').onclick = resetCalibration;
+  $('resultBox').querySelectorAll('[data-result-jump]').forEach(b => b.onclick = () => jumpToResult(b.dataset.resultJump));
   $('resultBox').querySelectorAll('.kitact[data-ids]').forEach(btn => btn.onclick = () => {
     const open = [...$('resultBox').querySelectorAll('.sec')].map(s => s.hasAttribute('open'));
     const scroll = window.scrollY;
@@ -15140,6 +15164,27 @@ function freePlayStoredBikes(before){
   return JSON.parse(before);
 }
 function freePlayTripRoute(){ return !!S.gpx && typeof S.gpx.copilotRoute === 'string' && /^[0-9a-f]{64}$/.test(S.gpx.copilotRoute); }
+/* ---- Ride, folded for a trip from Wayfinch (the owner's ruling of 14 Nov 2026, sweep finding 28): with the trip's route in the plan, step
+   one shows the trip on one line, where, when, nights and the GPX by its name, and Change opens today's fields. A plan without a trip
+   from Wayfinch shows the step as before. Nothing of it is stored: Change holds for this tab only. ---- */
+var RIDE_OPEN=false;   // a var: renderFreePlayBar can run before this line has (FREE_PLAY_WORDS is one for the same reason)
+function rideSummaryText(){
+  const where=S.place && S.place2 ? `${placeLabel(S.place)} → ${placeLabel(S.place2)}` : S.place ? placeLabel(S.place) : 'Your route';
+  const when=S.departureDate ? `${+S.departureDate.slice(8,10)} ${MONTHS[+S.departureDate.slice(5,7)-1].slice(0,3)}` : MONTHS[S.month];
+  const gpx=S.gpx && (S.gpx.name || S.gpx.file);
+  return [where,when,S.nights === 0 ? 'day ride' : plural(S.nights),gpx ? `GPX: ${gpx}` : ''].filter(Boolean).join(' · ');
+}
+function renderRideSummary(){
+  const box=$('rideSummary'); if(!box) return;
+  const trip=freePlayTripRoute() && !FREE_PLAY;
+  box.hidden=!trip;
+  $('rideFields').hidden=trip && !RIDE_OPEN;
+  $('rideChange').setAttribute('aria-expanded',String(trip && RIDE_OPEN));
+  $('rideChange').textContent=trip && RIDE_OPEN ? 'Done' : 'Change';
+  if(trip) freePlaySetText($('rideSummaryText'),rideSummaryText());
+}
+// Comfortable or Lightweight, at the start of Kit since the same ruling: pressed as the plan says, wherever the plan changed
+function renderModeBar(){ $('modeBar').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === S.mode)); }
 function freePlayOffered(){
   // nor while a trip from Wayfinch waits for the rider's answer, its route goes in, or Plan bags for this trip makes the plan (review of PR 146, C1)
   return !FREE_PLAY && DRAFT_READY && !DRAFT_FROZEN && !TRIAL && SMALL_VIEW !== true && !deletedSinceLoad() && freePlayTripRoute() &&
@@ -15147,6 +15192,7 @@ function freePlayOffered(){
 }
 function freePlaySetText(el,text){ if(el && el.textContent !== text) el.textContent=text; }   // a live line says only what changed
 function renderFreePlayBar(){
+  renderRideSummary(); renderModeBar();   // they follow the plan with every change, as this line does
   const bar=$('freePlayBar'); if(!bar || !FREE_PLAY_WORDS) return;
   const on=!!FREE_PLAY,offer=!on && freePlayOffered(),back=!on && !!FREE_PLAY_BACK && FREE_PLAY_BACK === DRAFT_SIGNATURE;
   bar.hidden=!on && !offer;
@@ -16077,7 +16123,8 @@ function go(n){
   renderFeedback();
   if(n === 4 && S.step_prev !== 4) S.baseNights = S.nights;
   if(n === 2){renderBags();renderBikeProfiles();}
-  if(n === 3) renderKit();
+  if(n === 3){ renderKit(); renderModeBar(); }
+  if(n === 1) renderRideSummary();
   if(n === 4){ renderResult(); maybeAskMaxWeight(); }
   drawRig();
   window.scrollTo({ top:0, behavior:'smooth' });
@@ -16199,8 +16246,9 @@ $('nDown').onclick   = () => setNights(S.nights - 1);
 $('nUp').onclick     = () => setNights(S.nights + 1);
 $('nRevert').onclick = () => setNights(S.baseNights);
 $('modeBar').querySelectorAll('button').forEach(b => b.onclick = () => {
-  S.mode = b.dataset.mode; renderResult(); drawRig();
+  S.mode = b.dataset.mode; renderModeBar(); renderResult(); drawRig();
 });
+$('rideChange').onclick = () => { RIDE_OPEN = !RIDE_OPEN; renderRideSummary(); };
 $('quickSave').onclick = () => saveSetup(S.pendingSaveName.trim(), S.pendingSaveNote.trim());
 // hover on the finished plan tells you how full a bag is before you open it
 // and so does keyboard focus on a bag (spec 7.1 item 13), placed above the focused bag. It only reads the plan.
