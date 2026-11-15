@@ -667,6 +667,20 @@ test('[LC-FRAME-FITS-OLD] a plan saved before the ruling loads unchanged; where 
   // the bag's own help says why it counts less (review of PR 170, m2)
   assert.match(vm.run('bagCapacityHelp(S.bags.find(b=>b.pos==="frame"))'),/bottle/);
   assert.doesNotMatch(vm.run('bagCapacityHelp(S.bags.find(b=>b.pos==="bar"))'),/bottle/);
+  // only food left the frame bag (LC-FIT-04's and LC-FIT-08b's plans, saved by an older page at the bags step): nothing is named as moved,
+  // and the headline still waits through a reload until the packing check shows it (review of PR 170, m4)
+  const FIT=require('./fixtures/selection/fit.json');
+  for(const [id,L] of [['LC-FIT-04','4\\.77'],['LC-FIT-08b','1\\.22']]){
+    const fx=FIT.find(x=>x.id===id).input.plan;
+    vm=open(before.run(`(()=>{restorePlan(${JSON.stringify({...fx,step:2})},true);S.step=2;S.placements=null;currentPlan();return JSON.stringify(captureDraft());})()`));
+    const waiting=vm.run('JSON.stringify(captureDraft())');
+    assert.deepEqual(JSON.parse(waiting).besideNote.out,[],`${id}: only food left the frame bag`);
+    vm=open(waiting);
+    const text=check(vm);
+    assert.match(text,new RegExp(`Your frame bag now counts only what fits beside your bottle: ${L} L usable, so the kit was placed afresh\\.`),`${id}: the headline after a reload`);
+    assert.doesNotMatch(text,/Does not fit in it now|Also moved out of it/,`${id}: nothing is named as moved`);
+    assert.doesNotMatch(check(open(vm.run('JSON.stringify(captureDraft())'))),/Your frame bag now counts only/,`${id}: shown once, not again after the next reload`);
+  }
 });
 
 for(const [name,fn] of tests){fn();passed++;console.log('ok',name);}

@@ -6119,7 +6119,8 @@ function readBesideNote(v){
   if(!dataObject(v) || !Array.isArray(v.out) || !Array.isArray(v.packed)) return null;
   const out = v.out.slice(0, 60).filter(x => Array.isArray(x) && typeof x[0] === 'string' && kitById(x[0]) && dataNumber(x[1], 0, 80) !== null).map(x => [x[0], +x[1]]);
   const ids = list => (Array.isArray(list) ? list : []).slice(0, 60).filter(id => typeof id === 'string' && kitById(id));
-  return out.length ? { out, in:ids(v.in), packed:ids(v.packed) } : null;
+  // only food left the frame bag: nothing is named, but the headline still waits (review of PR 170, m4)
+  return { out, in:ids(v.in), packed:ids(v.packed) };
 }
 function besideNoteHtml(A){
   const note = BESIDE_NOTE || BESIDE_SHOWN, fb = S.bags.find(b => b.pos === 'frame');
@@ -13700,7 +13701,15 @@ async function undoTripBags(){
   const was=S.bikeProfile ? S.bikeProfile.id : null;
   if(SMALL_VIEW) setSmallView(false);
   WEATHER_KIT.undo=null; showWeatherBar('');
+  const held=JSON.parse(u.draft);
   restorePlan(JSON.parse(u.draft),true,false); planBikeChosen(was);
+  // a plan read back is normalised once more (a place gains its country and loses the search's fields, a track's fields come in the
+  // stored order), so the plan restored alone is not the plan as it was: where the places and the track read back are the ones it
+  // held, those come back as held (review of PR 146, the note for the owner)
+  const same=(a,b) => JSON.stringify(a) === JSON.stringify(b),trip=dataObject(held.trip) ? held.trip : {};
+  if(dataObject(trip.place) && same(normalisePlace(trip.place),S.place)) S.place=trip.place;
+  if(dataObject(trip.place2) && same(normalisePlace(trip.place2),S.place2)) S.place2=trip.place2;
+  if(dataObject(held.gpx) && same(normaliseGPX(held.gpx),S.gpx)) S.gpx=held.gpx;
   // the setups it made go, unless the rider changed one since; any other change to the list since stays
   const changed=SETUPS.filter(s => u.made.includes(s.id) && JSON.stringify(s) !== u.bodies[s.id]);
   const gone=SETUPS.filter(s => u.made.includes(s.id) && !changed.includes(s));
