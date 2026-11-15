@@ -85,8 +85,15 @@ function PlaceChoice({ id, label, services, chosen, onChoose }: {
   );
 }
 
-export function PlanAB({ services, onRoute }: { services: TripServices; onRoute: (found: { route: Route; hadHeights: boolean }) => Promise<void> }) {
-  const [picked, setPicked] = useState<Record<Slot, FoundPlace | null>>({ from: null, to: null });
+/**
+ * `ends`: Start and End already chosen, the current route's towns (TRIP-ROUTE-KEPT); `under`: the form sits under "Use another route",
+ * so its heading is one level down (review of PR 177, m-2).
+ */
+export function PlanAB({ services, onRoute, ends, under }: {
+  services: TripServices; onRoute: (found: { route: Route; hadHeights: boolean }) => Promise<void>; ends?: Record<Slot, FoundPlace> | null; under?: boolean;
+}) {
+  const Heading = under ? 'h4' : 'h3';
+  const [picked, setPicked] = useState<Record<Slot, FoundPlace | null>>(ends ?? { from: null, to: null });
   const [busy, setBusy] = useState(false);
   const [none, setNone] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -126,7 +133,7 @@ export function PlanAB({ services, onRoute }: { services: TripServices; onRoute:
 
   return (
     <div data-plan-ab>
-      <h3>{TR.appAbTitle}</h3>
+      <Heading>{TR.appAbTitle}</Heading>
       <details class="ab-sent"><summary>{AB.appAbWhatIsSent}</summary><p class="muted">{TR.appAbNote}</p></details>
       <PlaceChoice id="ab-from" label={TR.appAbFrom} services={services} chosen={picked.from} onChoose={choose('from')} />
       <PlaceChoice id="ab-to" label={TR.appAbTo} services={services} chosen={picked.to} onChoose={choose('to')} />

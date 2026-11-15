@@ -79,17 +79,31 @@ const plan = (over: Record<string, unknown> = {}) => JSON.stringify({
 });
 
 describe('The departure date one tap from the trip line (sweep #3)', () => {
-  test('[TRIP-LINE-DATE] with a route the trip line offers Change date: it opens the Route step and puts the focus on the departure date', async () => {
+  // The owner's ruling A of 15 Nov 2026: the date is in Trip details now (TRIP-DETAILS-ALL), so Change date opens Trip details; this
+  // test opened the Route step before.
+  test('[TRIP-LINE-DATE] with a route the trip line offers Change date: it opens Trip details and puts the focus on the departure date', async () => {
     await withRoute();
     const line = host.querySelector<HTMLElement>('[data-trip-line]')!;
-    expect(openSteps()).not.toContain('route');
+    const details = host.querySelector<HTMLElement>('[data-trip-details]')!;
+    const toggle = buttonIn(details, W.appTripDetails);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
     await click(buttonIn(line, W.appTripChangeDate));
-    expect(openSteps()).toEqual(['route']);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
     await until(() => document.activeElement?.id === 'trip-date', 'the focus on the date');
+    expect(details.contains(document.activeElement)).toBe(true);
     // Open already, the same tap moves the focus back to the date.
     (document.activeElement as HTMLElement).blur();
     await click(buttonIn(line, W.appTripChangeDate));
     await until(() => document.activeElement?.id === 'trip-date', 'the focus on the date again');
+    // Trip details opened by its own button again leaves the focus on that button: only Change date moves it to the date.
+    await click(toggle);
+    expect(details.querySelector('#trip-date')).toBeNull();
+    toggle.focus();
+    await click(toggle);
+    await until(() => details.querySelector('#trip-date') !== null, 'the details again');
+    await settle(50);
+    expect(document.activeElement).toBe(toggle);
+    expect(openSteps()).not.toContain('route');
   });
 
   test('[TRIP-LINE-DATE] with no trip the line says "No trip yet" and offers no date', async () => {

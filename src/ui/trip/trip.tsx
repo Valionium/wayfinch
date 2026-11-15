@@ -4,7 +4,7 @@
 import type { ComponentChildren } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { localIsoDate } from '../../core/answers/time.ts';
-import { W } from '../../core/wording/en.ts';
+import { shortIsoDay, W } from '../../core/wording/en.ts';
 import { onChanged } from '../../store/changed.ts';
 import { bikeSource } from '../bike/live.ts';
 import { degradedSignal, noteTripFacts } from '../degraded.ts';
@@ -20,8 +20,8 @@ import './trip.css';
 // Add a route (the file picker, the replace question, Plan from A to B) is a chunk of its own, with the GPX reading: it shows only in
 // the open Route step (TRIP-GUIDED-FIRST).
 const AddRoute = lazy(() => import('./add-route.tsx').then((m) => m.AddRoute));
-// The departure date, the nights and the trip details are a chunk too: they show only in the open Route step or Trip details, so
-// the guided Trip adds nothing to the first screen (TRIP-GUIDED-FIRST).
+// The departure date, the nights and the trip details are a chunk too: they show only once Trip details is open (TRIP-DETAILS-ALL),
+// so the guided Trip adds nothing to the first screen (TRIP-GUIDED-FIRST).
 const TripSettings = lazy(() => import('./settings.tsx').then((m) => m.TripSettings));
 // Get ready offline's step body is one more: it opens with its step (its run is shared with Ahead's card, run.tsx).
 const GetReady = lazy(() => import('./getready.tsx').then((m) => m.GetReady));
@@ -80,23 +80,11 @@ function Step({ name, n, title, state, open, line, change, canOpen, onOpen, chil
   );
 }
 
+// Change date's taps, numbered for the page's whole visit, so the date field answers each once (review of PR 177, m-3).
+let asks = 0;
+
 const PACE_WORD = { steady: W.appTripPaceSteady, sporting: W.appTripPaceSporting, hard: W.appTripPaceHard } as const;
 const STAY_WORD = { camping: W.appTripStayCamping, mixed: W.appTripStayMixed, accommodation: W.appTripStayAccommodation } as const;
-
-/** The trip details, folded to one line under the Route step until Trip details opens them (design §2.2, owner's answer 6). */
-function TripDetails({ services, snap, reload }: { services: TripServices; snap: TripSnapshot; reload: () => Promise<void> }) {
-  const [open, setOpen] = useState(false);
-  const s = snap.settings;
-  return (
-    <div class="trip-details" data-trip-details>
-      <p class="trip-details-line">
-        <span class="muted">{W.appTripDetailsLine(PACE_WORD[s.pace], String(s.flatKph), STAY_WORD[s.stay], s.startTime)}</span>
-        <button type="button" class="trip-step-change" aria-expanded={open} onClick={() => setOpen(!open)}>{W.appTripDetails}</button>
-      </p>
-      {open ? <TripSettings services={services} snap={snap} reload={reload} part="details" /> : null}
-    </div>
-  );
-}
 
 export function TripScreen({ services }: { services: TripServices }) {
   const [snap, setSnap] = useState<TripSnapshot | null>(null);
@@ -108,8 +96,10 @@ export function TripScreen({ services }: { services: TripServices }) {
   const [dropped, setDropped] = useState<File | null>(null);
   // The step the rider opened by a tap, whose heading takes the focus once it shows.
   const focusTo = useRef<StepName | null>(null);
-  // Change date on the trip line (sweep of 14 Nov 2026, #3): each tap counts, so the date field takes the focus even with Route open.
-  const [dateAsk, setDateAsk] = useState(0);
+  // Trip details: 0 folded, -1 opened by its own button, or the number of the Change date tap on the trip line that opened it (sweep of
+  // 14 Nov 2026, #3): each tap counts, so the date field takes the focus even with Trip details open, and answers each tap once, so a
+  // new route or Trip details' own button does not move the focus to it (review of PR 177, m-3).
+  const [details, setDetails] = useState(0);
   const list = useRef<HTMLOListElement>(null);
   const zone = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -148,12 +138,13 @@ export function TripScreen({ services }: { services: TripServices }) {
   const readyDone = snap?.prepared ? snap.prepared.steps.every((x) => x.ok) : false;
   // Bags is done once the bag planner holds a plan for this trip's nights (sweep of 14 Nov 2026, #5; review M3): its line is the
   // Tools card's. A plan made for other nights is not this trip's.
-  const plan = trip && snap && bike.summary && !('empty' in bike.summary) && bike.summary.nights === (snap.settings.nights ?? suggestedNights(trip)) ? bike.summary : null;
+  const nights = trip && snap ? snap.settings.nights ?? suggestedNights(trip) : null;
+  const plan = nights !== null && bike.summary && !('empty' in bike.summary) && bike.summary.nights === nights ? bike.summary : null;
   const suggested: StepName = snap?.running && trip ? 'go' : !trip ? 'route' : !readyDone ? 'getready' : plan ? 'go' : 'bags';
   // Only Get ready offline and Bags need a route (design §2.2).
   const openStep: StepName = chosen !== null && (trip !== null || chosen === 'route' || chosen === 'go') ? chosen : suggested;
   const stateOf = (name: StepName, done: boolean): StepState => (done ? 'done' : name === suggested ? 'next' : 'later');
-  const choose = (name: StepName) => () => { focusTo.current = name; setDateAsk(0); setChosen(name); };
+  const choose = (name: StepName) => () => { focusTo.current = name; setChosen(name); };
   const line = snap ? tripLineOf(trip, localIsoDate(snap.now, snap.zone)) : null;
   const goLink = <p><a class="btn btn-primary" href="#/ahead">{W.appTripOpenAhead}</a></p>;
   return (
@@ -162,17 +153,31 @@ export function TripScreen({ services }: { services: TripServices }) {
       <div class="trip-main">
         <TripBike bike={bike} trip={snap ? trip !== null : null} />
         {line ? <p class="trip-line" data-trip-line><strong>{line.name}</strong>{line.when ? <span>{line.when}</span> : null}
-          {trip ? <button type="button" class="trip-step-change" onClick={() => { setDateAsk((n) => n + 1); setChosen('route'); }}>{W.appTripChangeDate}</button> : null}</p> : null}
+          {trip ? <button type="button" class="trip-step-change" onClick={() => setDetails(++asks)}>{W.appTripChangeDate}</button> : null}</p> : null}
         {/* The shell says it already when the browser refuses storage outright; once is enough. */}
         {snap && !snap.available && !degradedSignal.value.includes('storageBlocked') ? <p class="notice" role="status">{W.appStorageBlocked}</p> : null}
         <ol class="trip-steps-list" aria-label={W.appTripStepsLabel} ref={list}>
           <Step
             name="route" n={1} title={W.appTripStepRoute} state={stateOf('route', trip !== null)} open={openStep === 'route'} canOpen onOpen={choose('route')}
-            line={trip ? routeDoneLine(trip) : null} below={snap ? <TripDetails services={services} snap={snap} reload={reload} /> : null}
+            line={trip ? routeDoneLine(trip) : null}
+            below={snap ? (
+              // The trip details, folded to one line under the Route step until Trip details opens them (design §2.2, owner's answer
+              // 6); with a trip, its departure date and nights first (the owner's ruling A of 15 Nov 2026, TRIP-DETAILS-ALL).
+              <div class="trip-details" data-trip-details>
+                <p class="trip-details-line">
+                  <span class="muted">{W.appTripDetailsLine(
+                    PACE_WORD[snap.settings.pace], String(snap.settings.flatKph), STAY_WORD[snap.settings.stay], snap.settings.startTime,
+                    trip ? shortIsoDay(trip.departureDate ?? '') ?? W.appTripLineNoDate : undefined, nights,
+                  )}</span>
+                  <button type="button" class="trip-step-change" aria-expanded={!!details} onClick={() => setDetails(details ? 0 : -1)}>{W.appTripDetails}</button>
+                </p>
+                {details && trip ? <TripSettings services={services} snap={snap} reload={reload} part="when" focusDate={details} /> : null}
+                {details ? <TripSettings services={services} snap={snap} reload={reload} part="details" /> : null}
+              </div>
+            ) : null}
             beside={snap?.trip ? <TripSettings services={services} snap={snap} reload={reload} part="remove" /> : null}
           >
             <AddRoute services={services} snap={snap} reload={reload} dropped={dropped} onDropTaken={() => setDropped(null)} onAdded={(said) => { setAdded(said); setChosen(null); }} />
-            {snap?.trip ? <TripSettings services={services} snap={snap} reload={reload} part="when" focusDate={dateAsk} /> : null}
           </Step>
           <Step
             name="getready" n={2} title={W.appTripGetReadyTitle} state={stateOf('getready', readyDone)} open={openStep === 'getready'} canOpen={trip !== null}

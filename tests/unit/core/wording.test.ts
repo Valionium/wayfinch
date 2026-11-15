@@ -29,7 +29,7 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   appTripLineEnded: [['Sun 15 Nov']],
   appTripRouteDone: [['165', '1,240', 2], ['82.4', null, 1]],
   appTripStepNo: [[1]],
-  appTripDetailsLine: [['Sporting', '25', 'Camping', '08:30']],
+  appTripDetailsLine: [['Sporting', '25', 'Camping', '08:30'], ['Sporting', '25', 'Camping', '08:30', 'Sat 21 Nov', 2], ['Steady', '22', 'Camping', '08:00', 'No date yet', 1], ['Steady', '22', 'Camping', '08:00', 'Sat 21 Nov', 0]],
   appTripDayLeaveBy: [['about 13:45']],
   appTripDayDetail: [['5.9', '1,130'], ['5.9', null]],
   appTripProfileLabel: [[112, 641]],

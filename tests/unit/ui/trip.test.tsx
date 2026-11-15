@@ -21,6 +21,8 @@ import { preparedStore } from '../../../src/store/prepared.ts';
 import { readTrip } from '../../../src/store/trip.ts';
 import { planned } from '../../../src/ui/trip/model.ts';
 import { routeFromGpx } from '../../../src/ui/trip/read-gpx.ts';
+import { routeEnds } from '../../../src/ui/trip/add-route.tsx';
+import { flatRoute } from '../../fixtures/build.ts';
 import { askForHomeScreen, installOffer } from '../../../src/ui/install.ts';
 import { refreshBikeSource } from '../../../src/ui/bike/live.ts';
 import { TripScreen } from '../../../src/ui/trip/trip.tsx';
@@ -153,7 +155,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     await until(() => host.querySelector('[data-replace]') !== null, 'the question');
     expect(host.querySelector('[data-replace]')!.textContent).toContain(first.route.name);
     expect((await readTrip())!.route.id).toBe(first.route.id);
-    await click(button(W.appTripReplaceCancel));
+    await click(button(TF.appTripReplaceCancel));
     expect(host.querySelector('[data-replace]')).toBeNull();
     const kept = (await readTrip())!;
     expect(kept.route.id).toBe(first.route.id);
@@ -161,7 +163,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
 
     await pick(await fixtureGpx('alpine-pass'));
     await until(() => host.querySelector('[data-replace]') !== null, 'the question again');
-    await click(button(W.appTripReplaceYes));
+    await click(button(TF.appTripReplaceYes));
     await until(() => text().includes('Altdorf'), 'the new route');
     const replaced = (await readTrip())!;
     expect(replaced.route.id).not.toBe(first.route.id);
@@ -305,9 +307,10 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     let nights!: HTMLInputElement;
     try {
       loaded();
-      // The nights are in the Route step, opened by its Change (TRIP-STEPS): the field appears with that tap.
-      for (let i = 0; i < 5000 && !host.querySelector('[data-step="route"] .trip-step-head button'); i++) await new Promise<void>((r) => setTimeout(r, 0));
-      host.querySelector<HTMLButtonElement>('[data-step="route"] .trip-step-head button')!.click();
+      // The nights are in Trip details since the owner's ruling A of 15 Nov 2026 (TRIP-DETAILS-ALL; before, in the Route step, opened
+      // by its Change): the field appears with the tap on Trip details.
+      for (let i = 0; i < 5000 && !host.querySelector('[data-trip-details] button'); i++) await new Promise<void>((r) => setTimeout(r, 0));
+      host.querySelector<HTMLButtonElement>('[data-trip-details] button')!.click();
       for (let i = 0; i < 5000 && !host.querySelector('#trip-nights'); i++) await new Promise<void>((r) => setTimeout(r, 0));
       nights = host.querySelector<HTMLInputElement>('#trip-nights')!;
       nights.focus();
@@ -355,7 +358,8 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
 
   test('[TRIP-SETTINGS] pace, speed and nights change the days on screen and in the store together', async () => {
     await withRoute();
-    await openStep('route');
+    // The nights are in Trip details since the owner's ruling A of 15 Nov 2026 (TRIP-DETAILS-ALL; before, in the Route step).
+    await openDetails();
     const days = () => host.querySelectorAll('[data-summary] ol li').length;
     const before = days();
     const nights = host.querySelector<HTMLInputElement>('#trip-nights')!;
@@ -371,7 +375,8 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
 
   test('[TRIP-SETTINGS] the departure date starts as today, the day the route was added, as a value to change; it saves once typing has settled, and an empty date says what is lost', async () => {
     await withRoute();
-    await openStep('route');
+    // The date is in Trip details since the owner's ruling A of 15 Nov 2026 (TRIP-DETAILS-ALL; before, in the Route step).
+    await openDetails();
     const date = () => host.querySelector<HTMLInputElement>('#trip-date')!;
     expect(date().value).toBe('2026-10-10');
     // The date starts as today, so there is no "Set to today"; "Clear the date" is a tap, not only the browser's own field.
@@ -389,7 +394,8 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
 
   test('[TRIP-SETTINGS] "Clear the date" takes the date away in one tap, also over a date still settling, and says what is lost', async () => {
     await withRoute();
-    await openStep('route');
+    // The date is in Trip details since the owner's ruling A of 15 Nov 2026 (TRIP-DETAILS-ALL; before, in the Route step).
+    await openDetails();
     const date = () => host.querySelector<HTMLInputElement>('#trip-date')!;
     await act(async () => { date().value = '2026-10-17'; date().dispatchEvent(new Event('change', { bubbles: true })); });
     await click(button(TF.appTripDateClear));
@@ -433,7 +439,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     expect(button(W.appTripUpdateButton)).toBeDefined();
     expect(text()).toContain(W.appTripFlightMode);
     // The steps that went through name the data saved, the same right after the run as after a reload: "Saving" is not one.
-    const ok = [...host.querySelectorAll('p.muted')].find((p) => p.textContent?.startsWith(W.appTripStepsOk))!.textContent!;
+    const ok = [...host.querySelectorAll('p.muted')].find((p) => p.textContent?.startsWith(TF.appTripStepsOk))!.textContent!;
     expect(ok).not.toContain(W.appTripStepSave);
   });
 
@@ -546,7 +552,7 @@ describe('Settings and Get ready (spec sections 3.3 and 9.4)', () => {
     const credit = [...host.querySelectorAll('[data-summary] a')].find((a) => a.textContent === '© OpenStreetMap contributors')!;
     expect(credit.getAttribute('href')).toBe('https://www.openstreetmap.org/copyright');
     expect(host.querySelector('[data-summary]')!.textContent).toContain('map data of 25 Oct');
-    const licences = [...host.querySelectorAll('a')].find((a) => a.textContent === W.appTripLicences)!;
+    const licences = [...host.querySelectorAll('a')].find((a) => a.textContent === TF.appTripLicences)!;
     // The licences page itself, a page of the site the worker precaches (owner's device check, 5 Nov: #/you/legal showed only "You").
     expect(licences.getAttribute('href')).toBe('/legal/licences/');
     render(null, host);
@@ -636,8 +642,92 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     await click(button(W.appAbPlan));
     await until(() => host.querySelector('[data-replace]') !== null, 'the question');
     expect((await readTrip())!.route.id).toBe(before);
-    await click(button(W.appTripReplaceCancel));
+    await click(button(TF.appTripReplaceCancel));
     expect((await readTrip())!.route.id).toBe(before);
+  });
+
+  test('[TRIP-ROUTE-KEPT] a route planned from A to B: Change shows "Your route: Heidelberg → Strasbourg (kept)", then Use another route with Start and End already its towns; nothing changes until a new route is added', async () => {
+    const net = network(true);
+    await show(services({ fetch: net.fetch }));
+    await until(() => host.querySelector('#ab-from') !== null, 'Plan from A to B');
+    await choose('ab-from', 'Heidelberg');
+    await choose('ab-to', 'Strasbourg');
+    await click(button(W.appAbPlan));
+    await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
+    const before = (await readTrip())!;
+    const kept = (t: typeof before) => [t.route.id, t.route.name, t.departureDate];
+    await openStep('route');
+    await until(() => host.querySelector('[data-route-kept]') !== null && host.querySelector('[data-plan-ab]') !== null, 'the kept route and the form');
+    const step = host.querySelector<HTMLElement>('[data-step="route"]')!;
+    const line = step.querySelector<HTMLElement>('[data-route-kept]')!;
+    expect(line.textContent).toBe('Your route: Heidelberg → Strasbourg (kept)');
+    expect(line.textContent).toBe(TF.appTripRouteKept('Heidelberg → Strasbourg'));
+    // At the top, then "Use another route", then the form below it.
+    const heading = [...step.querySelectorAll('h3')].find((h) => h.textContent === TF.appTripReplaceHeading)!;
+    expect(heading).toBeDefined();
+    expect(line.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heading.compareDocumentPosition(step.querySelector('[data-add-route]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The section is named by that heading alone, and Plan from A to B sits one level under it (review of PR 177, m-2).
+    const section = step.querySelector('[data-add-route]')!.closest('section')!;
+    expect(section.hasAttribute('aria-label')).toBe(false);
+    expect(section.getAttribute('aria-labelledby')).toBe(heading.id);
+    expect(step.querySelector('[data-plan-ab] h4')!.textContent).toBe(TR.appAbTitle);
+    expect(step.querySelector('[data-plan-ab] h3')).toBeNull();
+    // Start and End are already the route's towns, chosen: their names alone, nothing guessed after them, each with its Change.
+    const ab = host.querySelector<HTMLElement>('[data-plan-ab]')!;
+    expect(ab.querySelector('#ab-from')).toBeNull();
+    expect(ab.querySelector('#ab-to')).toBeNull();
+    expect([...ab.querySelectorAll('.tool-line')].map((x) => x.textContent)).toEqual(['Heidelberg', 'Strasbourg']);
+    expect(button(`${TR.appAbChange} ${TR.appAbFrom.toLowerCase()}`)).toBeDefined();
+    expect(button(`${TR.appAbChange} ${TR.appAbTo.toLowerCase()}`)).toBeDefined();
+    // Opening it sent nothing and wrote nothing.
+    const sent = net.urls.length;
+    await settle(50);
+    expect(net.urls).toHaveLength(sent);
+    expect(kept((await readTrip())!)).toEqual(kept(before));
+    // Plan the route is there at once, from the route's own two ends, and asks before it replaces anything.
+    await click(button(W.appAbPlan));
+    await until(() => host.querySelector('[data-replace]') !== null, 'the question');
+    const [a, b] = [before.route.points[0]!, before.route.points.at(-1)!];
+    expect(net.urls.at(-1)!.startsWith(`https://routing.openstreetmap.de/routed-bike/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?`)).toBe(true);
+    expect(kept((await readTrip())!)).toEqual(kept(before));
+    await click(button(TF.appTripReplaceCancel));
+    expect(kept((await readTrip())!)).toEqual(kept(before));
+    // Changing one end opens its search, as after a pick.
+    await click(button(`${TR.appAbChange} ${TR.appAbTo.toLowerCase()}`));
+    await until(() => ab.querySelector<HTMLInputElement>('#ab-to') !== null, 'the End search');
+    expect(ab.querySelector<HTMLInputElement>('#ab-to')!.value).toBe('');
+    expect(kept((await readTrip())!)).toEqual(kept(before));
+  });
+
+  test('[TRIP-ROUTE-KEPT] a GPX route is kept by its own name and the town boxes stay empty; without a trip the Route step is as before', async () => {
+    await show();
+    expect(host.querySelector('[data-route-kept]')).toBeNull();
+    expect([...host.querySelectorAll('h3')].some((h) => h.textContent === TF.appTripReplaceHeading)).toBe(false);
+    expect(host.querySelector('[data-add-route]')!.closest('section')!.getAttribute('aria-label')).toBe(TF.appTripAddTitle);
+    await until(() => host.querySelector('[data-plan-ab]') !== null, 'Plan from A to B');
+    expect(host.querySelector('[data-plan-ab] h3')!.textContent).toBe(TR.appAbTitle);
+    // A GPX name with " to " in it is still the file's own name.
+    await pick(await fixtureGpx('alpine-pass'));
+    await until(() => host.querySelector('[data-summary]') !== null, 'the summary');
+    const trip = (await readTrip())!;
+    expect(trip.route.name).toContain(' to ');
+    await openStep('route');
+    await until(() => host.querySelector('[data-route-kept]') !== null && host.querySelector('#ab-from') !== null, 'the kept route and the form');
+    expect(host.querySelector('[data-route-kept]')!.textContent).toBe(TF.appTripRouteKept(trip.route.name));
+    expect(host.querySelector<HTMLInputElement>('#ab-from')!.value).toBe('');
+    expect(host.querySelector<HTMLInputElement>('#ab-to')!.value).toBe('');
+  });
+
+  test('[TRIP-ROUTE-KEPT] the towns come from a planned route only, and only when its name parts at " to " into exactly two', () => {
+    const route = { ...flatRoute(40), source: 'planned' as const, name: W.appAbName('Heidelberg', 'Strasbourg') };
+    const [a, b] = [route.points[0]!, route.points.at(-1)!];
+    expect(routeEnds(route)).toEqual({
+      from: { name: 'Heidelberg', where: '', lat: a.lat, lon: a.lon, source: 'osm' },
+      to: { name: 'Strasbourg', where: '', lat: b.lat, lon: b.lon, source: 'osm' },
+    });
+    expect(routeEnds({ ...route, source: 'gpx' })).toBeNull();
+    for (const name of ['Bay to Breakers to Fort Mason', ' to Strasbourg', 'Heidelberg to ', 'Heidelberg–Strasbourg']) expect(routeEnds({ ...route, name }), name).toBeNull();
   });
 
   test('[AB-NONE] when no bike router answers, Trip says so and asks for a GPX; nothing is stored and the file picker stays', async () => {
@@ -697,10 +787,10 @@ describe('What the review of group 5 found', () => {
     await until(() => text().includes(W.appTripMissingHeading), 'the first run');
     await pick(await fixtureGpx('alpine-pass'));
     await until(() => host.querySelector('[data-replace]') !== null, 'the question');
-    await click(button(W.appTripReplaceYes));
+    await click(button(TF.appTripReplaceYes));
     await until(() => text().includes('Altdorf'), 'the new route');
     await settle(30);
-    expect(text()).not.toContain(W.appTripStepsOk);
+    expect(text()).not.toContain(TF.appTripStepsOk);
     expect(text()).not.toContain(W.appTripMissingHeading);
     expect(text()).toContain(TF.appTripNothingSaved);
     expect(button(W.appTripGetReadyButton)).toBeDefined();
@@ -880,7 +970,7 @@ describe('Messages that must not be lost', () => {
     await show(svc);
     await pick(await fixtureGpx('alpine-pass'));
     await until(() => host.querySelector('[data-replace]') !== null, 'the question');
-    await click(button(W.appTripReplaceYes));
+    await click(button(TF.appTripReplaceYes));
     await until(() => text().includes(TF.appTripReplacedNoDate('Fixture: Altdorf over the Gotthard to Bellinzona')), 'the sentence');
     expect(text()).not.toContain(TR.appTripUnchanged);
   });

@@ -53,9 +53,12 @@ test('[TRIP-STOPS-KEEP] a stop the rider picked stays when the nights change: th
   // The nights, by keyboard: 2 → 3.
   const nights = page.locator('#trip-nights');
   if (!(await nights.isVisible())) {
-    await page.getByRole('button', { name: 'Change: Route', exact: true }).click();
-    // the opened step's heading takes the focus first (review of PR 73, I4); only then does the rider move on to the nights
-    await expect(page.locator('[data-step="route"] h2')).toBeFocused();
+    // The nights are in Trip details since the owner's ruling A of 15 Nov 2026 (TRIP-DETAILS-ALL); before, the Route step's Change
+    // opened them. The button keeps the focus; only then does the rider move on to the nights.
+    const details = page.locator('[data-trip-details]').getByRole('button', { name: 'Trip details', exact: true });
+    await details.click();
+    await expect(details).toHaveAttribute('aria-expanded', 'true');
+    await expect(details).toBeFocused();
   }
   await nights.focus();
   await nights.fill('3');

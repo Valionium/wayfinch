@@ -18,10 +18,10 @@ import type { StepName, StepReport } from '../../../src/data/prepare.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
 import { closeDb, openDb } from '../../../src/store/db.ts';
 import { savePrepared } from '../../../src/store/prepared.ts';
-import { readTrip } from '../../../src/store/trip.ts';
+import { readTrip, saveTrip } from '../../../src/store/trip.ts';
 import { refreshBikeSource } from '../../../src/ui/bike/live.ts';
 import { installOffer } from '../../../src/ui/install.ts';
-import { routeDoneLine } from '../../../src/ui/trip/model.ts';
+import { routeDoneLine, suggestedNights } from '../../../src/ui/trip/model.ts';
 import { browserTripServices } from '../../../src/ui/trip/services.ts';
 import type { TripServices } from '../../../src/ui/trip/services.ts';
 import { TripScreen } from '../../../src/ui/trip/trip.tsx';
@@ -135,12 +135,14 @@ describe('Trip as four steps (guided Trip design §2.2)', () => {
     const full = [...step('bags').querySelectorAll('a')].find((a) => a.textContent === W.appTripOpenBagPlanner)!;
     expect(full.getAttribute('href')).toBe('/tools/bags/');
     expect(step('getready').querySelector('[data-getready]')).toBeNull();
-    // Change on Route opens it again, with the departure date and the nights.
+    // Change on Route opens it again, with the route that is kept and the form for another (TRIP-ROUTE-KEPT); the departure date and
+    // the nights are in Trip details since the owner's ruling A of 15 Nov 2026 (TRIP-DETAILS-ALL; before, they were here).
     await click(buttonIn(step('route'), W.appTripStepChange));
     expect(openSteps()).toEqual(['route']);
-    await until(() => step('route').querySelector('#trip-date') !== null, 'the date in the Route step');
-    expect(step('route').querySelector('#trip-nights')).not.toBeNull();
     await until(() => step('route').querySelector('[data-add-route] input[type=file]') !== null, 'the file picker in the Route step');
+    expect(step('route').querySelector('[data-route-kept]')!.textContent).toBe(TF.appTripRouteKept(trip.route.name));
+    expect(host.querySelector('#trip-date')).toBeNull();
+    expect(host.querySelector('#trip-nights')).toBeNull();
     // Go is one tap away too, with the flight-mode line and Open Ahead.
     await click(buttonIn(step('go'), W.appTripStepGo));
     expect(openSteps()).toEqual(['go']);
@@ -187,7 +189,8 @@ describe('The trip line and the trip details (guided Trip design §2.1, §2.2)',
     expect(host.querySelector('.trip-main')!.firstElementChild!.classList.contains('trip-bike')).toBe(true);
   });
 
-  test('[TRIP-DETAILS] the trip details are one folded line under the Route step until Trip details opens them; date and nights are not among them', async () => {
+  // The owner's ruling A of 15 Nov 2026 puts the date and the nights among them (TRIP-DETAILS-ALL); this test said they were not.
+  test('[TRIP-DETAILS] the trip details are one folded line under the Route step until Trip details opens them', async () => {
     await withRoute();
     const details = host.querySelector<HTMLElement>('[data-trip-details]')!;
     expect(step('route').contains(details)).toBe(true);
@@ -199,12 +202,103 @@ describe('The trip line and the trip details (guided Trip design §2.1, §2.2)',
     await until(() => host.querySelector('#trip-start') !== null, 'the details');
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     for (const id of ['#trip-start', '#trip-kph', '#trip-camp', 'input[name=pace]', 'input[name=stay]']) expect(details.querySelector(id), id).not.toBeNull();
-    expect(details.querySelector('#trip-date')).toBeNull();
-    expect(details.querySelector('#trip-nights')).toBeNull();
     // A change saves as before, and the folded line follows it.
     await click(details.querySelector<HTMLInputElement>('input[name=pace][value=steady]')!);
     await until(() => details.textContent!.includes(W.appTripDetailsLine(W.appTripPaceSteady, '25', W.appTripStayCamping, '08:30')), 'the line to follow');
     expect((await readTrip())!.pace).toBe('steady');
+  });
+});
+
+describe("Trip details holds the trip's details (the owner's ruling A of 15 Nov 2026)", () => {
+  const detailsLine = () => host.querySelector<HTMLElement>('[data-trip-details] .trip-details-line .muted')!.textContent;
+  const nightsWord = (n: number) => `${n} ${n === 1 ? 'night' : 'nights'}`;
+
+  test('[TRIP-DETAILS-ALL] the folded line names the date, the nights, pace, speed, stay and start; open, the date and the nights come first, with their own lines', async () => {
+    await withRoute();
+    const n = suggestedNights((await readTrip())!);
+    expect(n).toBeGreaterThan(0);
+    // Added today, Saturday 10 October: the date starts as today.
+    expect(detailsLine()).toBe(`Sat 10 Oct · ${nightsWord(n)} · Sporting · 25 km/h · Camping · start 08:30`);
+    const details = host.querySelector<HTMLElement>('[data-trip-details]')!;
+    await click(buttonIn(details, W.appTripDetails));
+    await until(() => details.querySelector('#trip-date') !== null && details.querySelector('#trip-start') !== null, 'the details with the date');
+    // In this order, which is the order the keyboard reaches them in.
+    expect([...details.querySelectorAll('input[id]')].map((i) => i.id)).toEqual(['trip-date', 'trip-nights', 'trip-start', 'trip-kph', 'trip-camp']);
+    expect(details.textContent).toContain(TF.appTripNightsSuggested(n));
+    expect(details.querySelector('[data-nights-stops]')!.getAttribute('role')).toBe('status');
+    // The nights' own line sits beside the nights, before the next field.
+    const nights = details.querySelector('#trip-nights')!;
+    const said = details.querySelector('[data-nights-stops]')!;
+    const start = details.querySelector('#trip-start')!;
+    expect(nights.compareDocumentPosition(said) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(said.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The Route step's own body holds neither.
+    expect([...step('route').querySelectorAll('#trip-date, #trip-nights')].filter((el) => !details.contains(el))).toEqual([]);
+  });
+
+  test('[TRIP-DETAILS-ALL] the folded line follows the date and the nights, and says "No date yet" without a date; each saves as before', async () => {
+    await withRoute();
+    const details = host.querySelector<HTMLElement>('[data-trip-details]')!;
+    await click(buttonIn(details, W.appTripDetails));
+    await until(() => details.querySelector('#trip-nights') !== null, 'the nights');
+    const nights = details.querySelector<HTMLInputElement>('#trip-nights')!;
+    await act(async () => { nights.value = '3'; nights.dispatchEvent(new Event('input', { bubbles: true })); nights.dispatchEvent(new Event('change', { bubbles: true })); });
+    await until(() => detailsLine()!.startsWith('Sat 10 Oct · 3 nights · '), 'the nights in the line');
+    expect((await readTrip())!.route.stages).toHaveLength(4);
+    const date = details.querySelector<HTMLInputElement>('#trip-date')!;
+    await act(async () => { date.value = '2026-10-17'; date.dispatchEvent(new Event('change', { bubbles: true })); });
+    await settle(900);
+    await until(() => detailsLine() === 'Sat 17 Oct · 3 nights · Sporting · 25 km/h · Camping · start 08:30', 'the date in the line');
+    expect((await readTrip())!.departureDate).toBe('2026-10-17');
+    await click(buttonIn(details, TF.appTripDateClear));
+    await until(() => detailsLine() === `${W.appTripLineNoDate} · 3 nights · Sporting · 25 km/h · Camping · start 08:30`, 'no date in the line');
+    expect((await readTrip())!.departureDate).toBeNull();
+  });
+
+  // Review of PR 177, I-1 and m-6: on main a replace folded the Route step and took the nights' line with it; Trip details stays open
+  // through a replace, so it must not keep what it said about the old route. And a day ride says so (the coordinator's ruling on m-4).
+  test('[TRIP-DETAILS-ALL] [TRIP-STOPS-KEEP] a route replaced with Trip details open leaves no line about the old route beside the nights or the fields; a day ride reads "day ride"', async () => {
+    await withRoute();
+    const trip = (await readTrip())!;
+    const ends = trip.route.stages.slice(0, -1).map((x) => x.endKm);
+    expect(ends.length).toBeGreaterThan(0);
+    await saveTrip({ ...trip, stops: { routeId: trip.route.id, basis: ends, days: ends.map((km, i) => ({ placeId: `p-${i}`, km, name: `Camping ${i + 1}`, town: null, by: 'auto' as const })) } });
+    await show();
+    const details = host.querySelector<HTMLElement>('[data-trip-details]')!;
+    await click(buttonIn(details, W.appTripDetails));
+    await until(() => details.querySelector('#trip-nights') !== null && details.querySelector('#trip-kph') !== null, 'the details');
+    const n = ends.length + 1;
+    const nights = details.querySelector<HTMLInputElement>('#trip-nights')!;
+    await act(async () => { nights.value = String(n); nights.dispatchEvent(new Event('input', { bubbles: true })); nights.dispatchEvent(new Event('change', { bubbles: true })); });
+    const said = () => details.querySelector('[data-nights-stops]')?.textContent ?? '';
+    await until(() => said().startsWith(`New stops for ${n} nights`), 'the nights line');
+    const kph = details.querySelector<HTMLInputElement>('#trip-kph')!;
+    await act(async () => { kph.value = '60'; kph.dispatchEvent(new Event('input', { bubbles: true })); kph.dispatchEvent(new Event('change', { bubbles: true })); });
+    await until(() => details.textContent!.includes(W.appStoreFlatKphRange), 'the speed refused');
+    // Another route, Trip details still open.
+    await click(buttonIn(step('route'), W.appTripStepChange));
+    await pick(await fixtureGpx('loop'));
+    await until(() => host.querySelector('[data-replace]') !== null, 'the question');
+    await click(buttonIn(host.querySelector('[data-replace]')!, TF.appTripReplaceYes));
+    await until(() => host.querySelector('[data-trip-line]')!.textContent!.includes('Heilbronn loop'), 'the new route');
+    await until(() => details.querySelector('#trip-nights') !== null, 'the nights of the new route');
+    await settle(100);
+    expect(buttonIn(details, W.appTripDetails).getAttribute('aria-expanded')).toBe('true');
+    expect(said()).toBe('');
+    expect(details.textContent).not.toContain(W.appStoreFlatKphRange);
+    expect(document.activeElement?.id).not.toBe('trip-date');
+    expect(suggestedNights((await readTrip())!)).toBe(0);
+    expect(detailsLine()).toBe('Sat 10 Oct · day ride · Sporting · 25 km/h · Camping · start 08:30');
+  });
+
+  test('[TRIP-DETAILS-ALL] without a trip Trip details is as before: its line names pace, speed, stay and start, and it holds no date or nights', async () => {
+    await show();
+    expect(detailsLine()).toBe('Sporting · 25 km/h · Camping · start 08:30');
+    const details = host.querySelector<HTMLElement>('[data-trip-details]')!;
+    await click(buttonIn(details, W.appTripDetails));
+    await until(() => details.querySelector('#trip-start') !== null, 'the details');
+    expect(details.querySelector('#trip-date')).toBeNull();
+    expect(details.querySelector('#trip-nights')).toBeNull();
   });
 });
 
@@ -229,7 +323,7 @@ describe('The message after a route is added (owner\'s item 2)', () => {
     await click(buttonIn(step('route'), W.appTripStepChange));
     await pick(await fixtureGpx('loop'));
     await until(() => host.querySelector('[data-replace]') !== null, 'the question');
-    await click(buttonIn(host.querySelector('[data-replace]')!, W.appTripReplaceYes));
+    await click(buttonIn(host.querySelector('[data-replace]')!, TF.appTripReplaceYes));
     await until(() => host.querySelector('[data-added]') !== null, 'the message');
     const name = (await readTrip())!.route.name;
     expect(host.querySelector('[data-added]')!.textContent).toContain(`${TF.appTripReplaced(name)} ${TF.appTripNextGetReady}`);
@@ -489,7 +583,7 @@ describe('What the review of PR 73 found', () => {
     const file = new File([await fixtureGpx('loop')], 'loop.gpx');
     await act(async () => { zone.dispatchEvent(new CustomEvent('filedrop', { detail: file })); });
     await until(() => host.querySelector('[data-replace]') !== null, 'the question');
-    await click(buttonIn(host.querySelector('[data-replace]')!, W.appTripReplaceCancel));
+    await click(buttonIn(host.querySelector('[data-replace]')!, TF.appTripReplaceCancel));
     await click(buttonIn(step('bags'), W.appTripStepBags));
     await click(buttonIn(step('route'), W.appTripStepChange));
     await until(() => step('route').querySelector('[data-add-route]') !== null, 'Add a route');

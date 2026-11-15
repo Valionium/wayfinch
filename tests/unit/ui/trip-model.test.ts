@@ -3,6 +3,7 @@ import { planStages } from '../../../src/core/route/stages.ts';
 import { GpxError } from '../../../src/core/route/gpx.ts';
 import { buildRoute } from '../../../src/core/route/profile.ts';
 import { W } from '../../../src/core/wording/en.ts';
+import { TF } from '../../../src/core/wording/en-trip-fields.ts';
 import { planned, profileOf, profileY, routeDoneLine, summaryOf, tripLineOf, tripRuns } from '../../../src/ui/trip/model.ts';
 import { routeFromGpx } from '../../../src/ui/trip/read-gpx.ts';
 import type { Trip } from '../../../src/core/types.ts';
@@ -37,7 +38,7 @@ describe('Add a route and the summary (spec section 3.3)', () => {
     const points = (await loadFixtureRoute('loop')).points;
     expect((await routeFromGpx(gpxText(points, ''), 'Sunday loop.gpx', parseXml)).route.name).toBe('Sunday loop');
     expect((await routeFromGpx(gpxText(points, 'Named'), 'x.gpx', parseXml)).route.name).toBe('Named');
-    expect((await routeFromGpx(gpxText(points, ''), '', parseXml)).route.name).toBe(W.appTripUnnamed);
+    expect((await routeFromGpx(gpxText(points, ''), '', parseXml)).route.name).toBe(TF.appTripUnnamed);
   });
 
   test('[TRIP-GPX-BAD] each GPX refusal keeps its own plain message, and nothing else is thrown', async () => {

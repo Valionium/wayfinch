@@ -697,9 +697,6 @@ export const W = {
   bikeHintLaterName: 'Later: show this smaller',
 
   // ---- Trip (sub-project 5, group 5): add a route, the summary, settings, Prepare this route, A to B. No word here calls a trip ready, safe or complete. ----
-  appTripUnnamed: 'Unnamed route',
-  appTripReplaceYes: 'Replace route',
-  appTripReplaceCancel: 'Cancel',
   appTripDistance: (km: string): string => `${km} km`,
   appTripClimbing: (m: string): string => `${m} m up`,
   appTripClimbingUnknown: 'Climbing unknown',
@@ -708,7 +705,6 @@ export const W = {
   appTripDayLeaveBy: (about: string): string => `leave by ${about}`,
   appTripDayDetail: (hours: string, up: string | null): string => `${hours} h riding${up === null ? '' : `, ${up} m up`}`,
   appTripMapDate: (date: string, fromSource: boolean): string => `map data ${fromSource ? 'of' : 'from'} ${date}`,
-  appTripLicences: 'Licences',
   appTripPaceSteady: 'Steady',
   appTripPaceSporting: 'Sporting',
   appTripPaceHard: 'Hard',
@@ -724,7 +720,6 @@ export const W = {
   appTripStepSave: 'Saving',
   appTripProgress: (n: number, total: number, name: string): string => `Step ${n} of ${total}: ${name}`,
   appTripProgressPart: (done: number, total: number): string => `${done} of ${total}`,
-  appTripStepsOk: 'Steps that went through',
   appTripReplanFailed: 'The setting was kept, but the days could not be updated. Change it again to try once more.',
   appTripPlaces: (n: string): string => `${n} ${n === '1' ? 'place' : 'places'}`,
   appTripNoPlaces: 'no places saved',
@@ -756,7 +751,9 @@ export const W = {
   appTripOpenAhead: 'Open En route',
   appTripOpenBagPlanner: 'Open the full Bag planner',
   appTripDetails: 'Trip details',
-  appTripDetailsLine: (pace: string, kph: string, stay: string, start: string): string => `${pace} · ${kph} km/h · ${stay} · start ${start}`,
+  // With a trip, the line starts with its date (or 'No date yet') and nights, 'day ride' for none (the owner's ruling A of 15 Nov 2026,
+  // TRIP-DETAILS-ALL; the coordinator's ruling on review m-4 of PR 177).
+  appTripDetailsLine: (pace: string, kph: string, stay: string, start: string, day?: string, nights?: number | null): string => `${day ? `${day} · ${nights ? `${nights} ${nights === 1 ? 'night' : 'nights'}` : 'day ride'} · ` : ''}${pace} · ${kph} km/h · ${stay} · start ${start}`,
   // Contract 2: the trip to the bag planner (spec section 7.1). The route and the settings you set go; the bag planner asks first.
   appHandoffButton: 'Plan bags for this trip',
   appHandoffNote: 'Opens the bag planner with this route and your trip settings. It asks before it changes anything, and your bags stay as they are.',
