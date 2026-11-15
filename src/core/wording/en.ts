@@ -622,7 +622,7 @@ export const W = {
   tyreCardOpen: 'Open',
   tyreBagCardTitle: 'Bag planner',
   tyreBagCardNone: 'No bag plan yet',
-  tyreBagCardLine: (count: number, kg: string): string => `${count} ${count === 1 ? 'bag' : 'bags'} · ${kg} kg`,
+  tyreBagCardLine: (count: number, kg: number): string => `${count} ${count === 1 ? 'bag' : 'bags'} · ${+kg.toFixed(1)} kg`,
   tyreBagCardAge: (date: string): string => `Saved ${date}`,
   // Extras: heat and altitude, weighed loads and calipered widths, the SRAM cross-check.
   tyreSectionHeat: 'Heat and altitude',

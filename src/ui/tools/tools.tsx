@@ -13,6 +13,7 @@ import { FL } from '../../core/wording/en-finder-link.ts';
 import { readStore } from '../../tools/tyre/storage.ts';
 import type { LastResult } from '../../tools/tyre/storage.ts';
 import type { TyreServices } from '../../tools/tyre/services.ts';
+import type { LoadSummary } from '../../core/types.ts';
 import { noteSeen } from '../bike/hint-seen.ts';
 import { bikeDetailsHref } from '../bike/link.ts';
 import { bikeSource, refreshBikeSource } from '../bike/live.ts';
@@ -68,6 +69,11 @@ export function ToolsScreen({ services }: { services: TyreServices }) {
 const ADVISOR_HREF = '/tools/bags/#gear-advisor&back=tools';
 const trimBar = (n: number): string => String(Number(n.toFixed(2)));
 
+/** The bag card's line once this screen is here: with the bottles in the plan's cages, as the load summary has them; none, the card's own. */
+function bagLine(services: TyreServices, full: LoadSummary | null): string | undefined {
+  const sum = services.host().summary, bottles = full && !('empty' in full) ? full.water.bottles.length : 0;
+  return sum && bottles ? TK.tyreBagCardBottles(sum.bagCount, bottles, sum.carriedKg) : undefined;
+}
 function ToolsCards({ services }: { services: TyreServices }) {
   // The bag planner's bikes and plan may change in another tab, or while the phone was elsewhere: read them again when told and when the
   // page shows again (as the tyre tool does), so a removed bike is never offered and the cards follow the plan.
@@ -115,7 +121,8 @@ function ToolsCards({ services }: { services: TyreServices }) {
       <BikeLine services={services} tick={tick} none={source.bike ? null : (
         <p class="bike-line" data-hint-line><span>{W.tyreBikeLabel}: {HN.hintToolsTypical} · <a href={bikeDetailsHref('new', 'tools')}>{HN.hintToolsAdd}</a></span></p>
       )} />
-      <BagCard services={services} chosen={chosen} note={chosen === null ? TL.toolsNoBike : undefined} />
+      {/* the bottles in the plan's cages count beside its bags (the owner's ruling of 14 Nov 2026, sweep #26) */}
+      <BagCard services={services} chosen={chosen} note={chosen === null ? TL.toolsNoBike : undefined} line={bagLine(services, source.summary)} />
       <Card title={TK.tyreCardTitle}>
         <p class="tool-line">{last ? TK.tyreCardLast(trimBar(last.frontBar), trimBar(last.rearBar)) : W.tyreCardNone}</p>
         {last?.bike ? <p class="muted">{TK.tyreCardBike(last.bike)}</p> : null}

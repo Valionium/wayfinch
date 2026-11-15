@@ -392,7 +392,7 @@ test('[GA-TOOLS-CARD] [GA-BACK] [GA-PAGE] Tools\' Gear advisor card opens the ad
   // the way back is the one top bar of every tool (the owner's C): it goes to Tools
   const bar = page.locator('#backToWayfinch');
   await expect(bar).toBeVisible();
-  await expect(bar).toHaveText('← Back to Wayfinch');
+  await expect(bar).toHaveText('← Tools');   // opened from Tools, it says so (the owner's ruling of 14 Nov 2026, sweep #42)
   await expect(bar).toHaveAttribute('href', '/#/tools');
   await bar.click();
   await page.waitForURL((u) => u.pathname === '/' && u.hash === '#/tools');
@@ -640,7 +640,7 @@ test('[GA-RELOAD] [GA-BIKE] from Tools: a reload on the Gear advisor stays on it
   await expect(glideFrame(page), 'the chosen bike').toHaveAttribute('stroke', GREEN.look.colour);
   await expect(page.locator('#advisorBikeSelect')).toHaveValue(GREEN.id);
   // the way back as it was: the one top bar to Tools, no Back to the Bag planner
-  await expect(page.locator('#backToWayfinch')).toHaveText('← Back to Wayfinch');
+  await expect(page.locator('#backToWayfinch')).toHaveText('← Tools');
   await expect(page.locator('#backToWayfinch')).toHaveAttribute('href', '/#/tools');
   await expect(page.locator('#advisorToPlan')).toBeHidden();
   // its answers, still valid for the plan, and the same suggestions

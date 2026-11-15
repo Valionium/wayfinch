@@ -187,7 +187,7 @@ export function TripScreen({ services }: { services: TripServices }) {
             ) : null}
           </Step>
           <Step name="bags" n={3} title={W.appTripStepBags} state={stateOf('bags', plan !== null)} open={openStep === 'bags'} canOpen={trip !== null} onOpen={choose('bags')}
-            line={plan ? W.tyreBagCardLine(plan.bags.count, String(Number(plan.weight.carriedKg.toFixed(1)))) : W.appTripBagsLater}
+            line={plan ? W.tyreBagCardLine(plan.bags.count, plan.weight.carriedKg) : W.appTripBagsLater}
           >
             <p>{W.appTripBagsLater}</p>
             {services.handOff ? <PlanBags handOff={services.handOff} /> : null}

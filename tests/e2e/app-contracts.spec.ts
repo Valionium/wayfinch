@@ -357,7 +357,7 @@ test('[TRIP-DAY-BAGS] the owner\'s day ride in a real browser: no bike, no bags 
   app = await loadApp(page, { launch: true, path: '/tools/bags/' });
   await ready(page);
   await page.evaluate(`(async () => {
-    S.bags = []; S.nights = 0; S.month = 10; S.bikeProfile = null; applyTripKitDefaults();
+    S.bags = []; S.nights = 0; S.month = new Date().getMonth(); S.bikeProfile = null; applyTripKitDefaults();   // a fresh plan with nothing of the rider's in it, in any month
     SETUPS.unshift({ ...snapshotSetup('November · 0 nights', ''), thumb: '', kind: 'general' }); await store.set(SETUP_KEY, SETUPS);
     await flushDraft();
   })()`);
@@ -365,9 +365,9 @@ test('[TRIP-DAY-BAGS] the owner\'s day ride in a real browser: no bike, no bags 
   await handOver(page, ownersDayRide());
   await openFresh(page, `/tools/bags/#copilot-handoff=${ID}`);
   await ready(page);
-  await expect(page.locator('#handoffText')).toContainText('November · 0 nights has no bags, so it is not used');
-  await page.locator('#handoffPlan').click();
+  // nothing of the rider's to replace: planned at once, with Undo (the owner's ruling of 14 Nov 2026, sweep #29)
   await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('#handoffText')).toContainText('November · 0 nights has no bags, so it is not used');
   // a short ride (owner, 10 Nov 2026: no first aid kit, the sunscreen put on and the long gloves worn): the 1.2 L top tube bag alone
   await expect(page.locator('#handoffText')).toContainText('a bottle cage and a top tube bag');
   // an afternoon ride: one bottle, the top tube bag, no seat pack; the jacket a cold November day calls for is worn
@@ -436,11 +436,10 @@ test('[TRIP-DAY-BAGS] in the full planner the day ride\'s tube reads as one tube
   page.on('pageerror', (e) => errors.push(String(e)));
   app = await loadApp(page, { launch: true, path: '/tools/bags/' });
   await ready(page);
-  await page.evaluate(`(async () => { S.bags = []; S.nights = 0; S.month = 10; S.bikeProfile = null; S.custom = {}; applyTripKitDefaults(); await flushDraft(); })()`);
+  await page.evaluate(`(async () => { S.bags = []; S.nights = 0; S.month = new Date().getMonth(); S.bikeProfile = null; S.custom = {}; applyTripKitDefaults(); await flushDraft(); })()`);
   await handOver(page, ownersDayRide());
   await openFresh(page, `/tools/bags/#copilot-handoff=${ID}`);
-  await ready(page);
-  await page.locator('#handoffPlan').click();
+  await ready(page);   // nothing of the rider's to replace: planned at once (sweep #29)
   await expect(page.locator('#handoffUndo')).toBeVisible({ timeout: 20_000 });
   await page.locator('#smallFull').click();
   await page.evaluate('S.adv = true; go(3); renderKit();');
