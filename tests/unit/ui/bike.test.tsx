@@ -195,7 +195,7 @@ describe("back from the bag planner (owner's try-out, 5 Nov 2026)", () => {
 });
 
 describe('where the bike appears (spec section 3.7)', () => {
-  test('[BK-WHERE] the Tools card draws the bike with its bags, under "3 bags · 10.2 kg", and a tap goes to its Look', () => {
+  test('[BK-WHERE] the Tools card draws the bike with its bags, under "3 bags, 2 bottles · 10.2 kg", and a tap goes to its Look', () => {
     localStorage.setItem('loadcheck:bikeProfile', JSON.stringify(sample[0]));
     localStorage.setItem('loadcheck:bikeProfiles', JSON.stringify(sample));
     localStorage.setItem('loadcheck:summary:v1', JSON.stringify(summary));
@@ -204,7 +204,7 @@ describe('where the bike appears (spec section 3.7)', () => {
     const card = host.querySelector('.card')!;
     expect(card.querySelector('h2')!.textContent).toBe('Bag planner');
     expect(card.querySelectorAll('.bk-bag').length).toBeGreaterThan(0);
-    expect(card.textContent).toContain('3 bags · 10.2 kg');
+    expect(card.textContent).toContain('3 bags, 2 bottles · 10.2 kg');   // the bottles in its cages counted too (sweep #26)
     expect(card.querySelector('a.bike-tap')!.getAttribute('href')).toBe('/tools/bags/#bike-details=bike_m2k9x1_4f7a2c9d&back=tools&section=look');
     expect(card.querySelector('a.bike-tap')!.getAttribute('aria-label')).toBe('Your bike: touring bike, 700 × 40 mm front and 42 mm rear tyres, drop bars, blue frame, rear rack. Make it yours');
   });

@@ -96,7 +96,7 @@ const TEMPLATE_ARGS: Record<string, unknown[][]> = {
   tyreAskYesPsi: [['65']],
   tyreFromPlan: [['28 Oct']],
   tyreCardLast: [['2.1','2.4']],
-  tyreBagCardLine: [[3,'10.2'],[1,'2']],
+  tyreBagCardLine: [[3,10.2],[1,2]],
   tyreBagCardAge: [['28 Oct']],
   tyreRefuseTemp: [['The highest temperature on the trip']],
   tyreRefuseHeight: [['The highest point of the trip']],

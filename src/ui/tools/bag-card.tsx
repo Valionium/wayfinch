@@ -13,9 +13,10 @@ import { savedDay } from '../saved-day.ts';
  * `chosen` is the bike the rider chose in Tools' bike line, which the full Tools screen works out (its chunk carries the choice): the
  * card draws it at once, though the plan moves to it only when the bag planner next opens, with its Undo line (owner, 7 Nov 2026).
  * Its bags are the plan's, on the plan's bike: a summary naming another bike draws none. Without it, the plan's bike; null is "Without a
- * bike", the grey standard bike, with `note` saying so (owner, 7 Nov 2026).
+ * bike", the grey standard bike, with `note` saying so (owner, 7 Nov 2026). `line`, from the full Tools screen, also counts the bottles in the
+ * plan's cages (the owner's ruling of 14 Nov 2026, sweep #26); while that screen loads, the line counts the bags only.
  */
-export function BagCard({ services, chosen, note }: { services: TyreServices; chosen?: BikeRecord | null | undefined; note?: string | undefined }) {
+export function BagCard({ services, chosen, note, line }: { services: TyreServices; chosen?: BikeRecord | null | undefined; note?: string | undefined; line?: string | undefined }) {
   const sum = services.host().summary;
   const saved = sum ? savedDay(sum.at) : null;
   const bike = bikeSource.value;
@@ -23,7 +24,7 @@ export function BagCard({ services, chosen, note }: { services: TyreServices; ch
     <Card title={W.tyreBagCardTitle}>
       <BikeDrawing bike={chosen === undefined ? bike.bike : chosen} summary={bike.summary} known={bike.known} back="tools" caption={false} />
       {note ? <p class="muted tools-no-bike">{note}</p> : null}
-      <p class="tool-line">{sum ? W.tyreBagCardLine(sum.bagCount, String(Number(sum.carriedKg.toFixed(1)))) : W.tyreBagCardNone}</p>
+      <p class="tool-line">{sum ? line ?? W.tyreBagCardLine(sum.bagCount, sum.carriedKg) : W.tyreBagCardNone}</p>
       {saved ? <p class="muted">{W.tyreBagCardAge(saved)}</p> : null}
       <a class="btn btn-primary" href="/tools/bags/">{W.tyreCardOpen}<span class="visually-hidden"> {W.tyreBagCardTitle}</span></a>
     </Card>

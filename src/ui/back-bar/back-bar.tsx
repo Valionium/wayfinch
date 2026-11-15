@@ -6,13 +6,13 @@ import { watchBar } from './back-bar.ts';
 // The style comes with this chunk, never in the first screen's stylesheet (the app's CSS is one file: review of PR 70, M2).
 import css from './back-bar.css?inline';
 
-export function BackBar({ href }: { href: string }) {
+export function BackBar({ href, label = TL.toolsBack }: { href: string; label?: string }) {
   const bar = useRef<HTMLDivElement>(null);
   useEffect(() => (bar.current ? watchBar(bar.current) : undefined), []);
   return (
     <div class="wf-bar wf-bar-app" ref={bar}>
       <style>{css}</style>
-      <a href={href}>{TL.toolsBack}</a>
+      <a href={href}>{label}</a>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { bannedHits } from '../../fixtures/banned.ts';
 
 // The words moved out of en.ts for the En route chips (14 Nov 2026); a template is read with sample values.
 const SAMPLES: Record<string, unknown[]> = {
-  tyreUnitFor: ['Tyre maximum'], tyreAskYesPsi: ['65'], tyreFromPlan: ['14 Nov'], tyreSramWidthBoth: ['42'], tyreSramWidthEach: ['42', '45'], tyreCardLast: ['4.1', '4.4'], tyreCardBike: ['Gravel'],
+  tyreUnitFor: ['Tyre maximum'], tyreAskYesPsi: ['65'], tyreFromPlan: ['14 Nov'], tyreSramWidthBoth: ['42'], tyreSramWidthEach: ['42', '45'], tyreCardLast: ['4.1', '4.4'], tyreCardBike: ['Gravel'], tyreBagCardBottles: [3, 2, 10.2],
   appPrepWait: ['14:05'],
 };
 
@@ -16,7 +16,7 @@ test('[HON-BANNED] no word of the tyre tool, its Tools card or Prepare this rout
   const all = { ...TQ, ...PS, ...TK };
   expect(Object.keys(TQ)).toHaveLength(34);
   expect(Object.keys(PS)).toHaveLength(1);
-  expect(Object.keys(TK)).toHaveLength(3);
+  expect(Object.keys(TK)).toHaveLength(4);
   for (const [key, value] of Object.entries(all)) {
     expect(key in W, key).toBe(false);
     const text = typeof value === 'function' ? (value as (...a: unknown[]) => string)(...SAMPLES[key]!) : value;

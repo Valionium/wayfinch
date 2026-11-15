@@ -62,7 +62,7 @@ const reset=()=>app.run(`S.step=4;S.bags=[{uid:1,pos:'frame',L:6}];S.bikeProfile
 (async()=>{
   reset();
   app.run(`S.bikeProfile=normaliseBikeProfile({id:'bike_a',name:'A'});BIKE_PROFILES=[S.bikeProfile];`);
-  check(app.run('weightPromptDue()') && app.run('maybeAskMaxWeight()') && !get('maxWeightBox').classList.contains('hidden'),'LC-WT-10 the first Step 4 asks');
+  check(app.run('weightPromptDue()') && app.run('maybeAskMaxWeight()') && !get('maxWeightBox').classList.contains('hidden'),'LC-WT-10 when it is offered, it asks (never by itself at Check since the ruling of 14 Nov 2026: LC-WT-NOPOP)');
   field('mwValue','120,5');field('mwUnit','kg');field('mwIncludes','bike');
   check(await app.run('saveMaxWeight()'),'LC-WT-17 "120,5" saves');
   check(app.run('S.bikeProfile.maxWeight.v')===120.5 && app.run('S.bikeProfile.maxWeightAsked') && app.run('BIKE_PROFILES[0].maxWeight.v')===120.5 && app.run('BIKE_PROFILES[0].maxWeightAsked'),'LC-WT-17 means 120.5, set on the plan\'s bike and the saved bike');
