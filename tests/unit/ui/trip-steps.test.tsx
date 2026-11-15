@@ -21,7 +21,9 @@ import { savePrepared } from '../../../src/store/prepared.ts';
 import { readTrip, saveTrip } from '../../../src/store/trip.ts';
 import { refreshBikeSource } from '../../../src/ui/bike/live.ts';
 import { installOffer } from '../../../src/ui/install.ts';
-import { routeDoneLine, suggestedNights } from '../../../src/ui/trip/model.ts';
+import { buildRoute } from '../../../src/core/route/profile.ts';
+import { lineKey, planned, routeDoneLine, suggestedNights } from '../../../src/ui/trip/model.ts';
+import { routeFromGpx } from '../../../src/ui/trip/read-gpx.ts';
 import { browserTripServices } from '../../../src/ui/trip/services.ts';
 import type { TripServices } from '../../../src/ui/trip/services.ts';
 import { TripScreen } from '../../../src/ui/trip/trip.tsx';
@@ -289,6 +291,77 @@ describe("Trip details holds the trip's details (the owner's ruling A of 15 Nov 
     expect(document.activeElement?.id).not.toBe('trip-date');
     expect(suggestedNights((await readTrip())!)).toBe(0);
     expect(detailsLine()).toBe('Sat 10 Oct · day ride · Sporting · 25 km/h · Camping · start 08:30');
+  });
+
+  // Review of PR 177, re-check probes R1 and R2 (note n-1): checked by hand there, pinned here. A trip with stops, Trip details open,
+  // and a change of nights that says its line.
+  async function nightsSaid(open: 'date' | 'details'): Promise<{ details: HTMLElement; n: number; said: () => string; nights: () => HTMLInputElement }> {
+    await withRoute();
+    const trip = (await readTrip())!;
+    const ends = trip.route.stages.slice(0, -1).map((x) => x.endKm);
+    expect(ends.length).toBeGreaterThan(0);
+    await saveTrip({ ...trip, stops: { routeId: trip.route.id, basis: ends, days: ends.map((km, i) => ({ placeId: `p-${i}`, km, name: `Camping ${i + 1}`, town: null, by: 'auto' as const })) } });
+    await show();
+    const details = host.querySelector<HTMLElement>('[data-trip-details]')!;
+    if (open === 'date') {
+      await click(buttonIn(host.querySelector('[data-trip-line]')!, W.appTripChangeDate));
+      await until(() => document.activeElement?.id === 'trip-date', 'the focus on the date');
+    } else {
+      await click(buttonIn(details, W.appTripDetails));
+    }
+    await until(() => details.querySelector('#trip-nights') !== null, 'the nights');
+    const n = ends.length + 1;
+    const nights = () => details.querySelector<HTMLInputElement>('#trip-nights')!;
+    nights().focus();
+    await act(async () => { nights().value = String(n); nights().dispatchEvent(new Event('input', { bubbles: true })); nights().dispatchEvent(new Event('change', { bubbles: true })); });
+    const said = () => details.querySelector('[data-nights-stops]')?.textContent ?? '';
+    await until(() => said().startsWith(`New stops for ${n} nights`), 'the nights line');
+    return { details, n, said, nights };
+  }
+  /** What this window hears when another one has written the trip. */
+  const tripChangedElsewhere = async () => {
+    await act(async () => { window.dispatchEvent(new StorageEvent('storage', { key: 'copilot:changed', newValue: JSON.stringify({ at: Date.now() + 1, section: 'trip' }) })); });
+  };
+
+  test('[TRIP-DETAILS-ALL] [TRIP-STOPS-KEEP] a route replaced in another window, with Trip details opened by Change date, clears the line beside the nights and leaves the focus off the date', async () => {
+    const { details, said } = await nightsSaid('date');
+    expect(document.activeElement?.id).toBe('trip-nights');
+    // Another window replaces the route with the loop, through the store, and tells this one.
+    const other = services();
+    const old = (await readTrip())!.route;
+    expect((await other.addRoute(await routeFromGpx(await fixtureGpx('loop'), 'loop.gpx', other.parseXml), old)).kind).toBe('replaced');
+    await tripChangedElsewhere();
+    await until(() => host.querySelector('[data-trip-line]')!.textContent!.includes('Heilbronn loop'), 'the new route');
+    await until(() => details.querySelector('#trip-nights') !== null, 'the nights of the new route');
+    await settle(100);
+    expect(buttonIn(details, W.appTripDetails).getAttribute('aria-expanded')).toBe('true');
+    expect(said()).toBe('');
+    expect(document.activeElement?.id).not.toBe('trip-date');
+    // Change date still answers its next tap.
+    await click(buttonIn(host.querySelector('[data-trip-line]')!, W.appTripChangeDate));
+    await until(() => document.activeElement?.id === 'trip-date', 'the focus on the date again');
+  });
+
+  test("[TRIP-DETAILS-ALL] [TRIP-STOPS-KEEP] Prepare this route's heights step (a new route id, the same points) keeps the line beside the nights and the nights", async () => {
+    const { details, n, said, nights } = await nightsSaid('details');
+    const before = said();
+    const climbing = () => host.querySelector('[data-summary]')!.textContent!.match(/[\d,]+ m up/)?.[0];
+    const climbed = climbing();
+    expect(climbed).toBeTruthy();
+    // The heights step's write: the same points with the looked-up heights, so a new id, the days planned for the nights set.
+    const trip = (await readTrip())!;
+    const looked = await buildRoute(trip.route.points.map((p) => ({ lat: p.lat, lon: p.lon, ele: (p.ele ?? 100) * 1.5 })), trip.route.name, trip.route.source);
+    expect(looked.id).not.toBe(trip.route.id);
+    expect(lineKey(looked)).toBe(lineKey(trip.route));
+    await saveTrip({ ...trip, route: planned(looked, { flatKph: trip.flatKph, pace: trip.pace ?? 'sporting', nights: n }) });
+    await tripChangedElsewhere();
+    await until(() => climbing() !== climbed, 'the new heights');
+    await settle(100);
+    expect((await readTrip())!.route.id).toBe(looked.id);
+    expect(buttonIn(details, W.appTripDetails).getAttribute('aria-expanded')).toBe('true');
+    expect(said()).toBe(before);
+    expect(nights().value).toBe(String(n));
+    expect(detailsLine()).toBe(`Sat 10 Oct · ${nightsWord(n)} · Sporting · 25 km/h · Camping · start 08:30`);
   });
 
   test('[TRIP-DETAILS-ALL] without a trip Trip details is as before: its line names pace, speed, stay and start, and it holds no date or nights', async () => {
