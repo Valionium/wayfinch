@@ -11,7 +11,7 @@ import type { XmlDocLike } from '../../../src/core/route/gpx.ts';
 import { planStages } from '../../../src/core/route/stages.ts';
 import type { Pace } from '../../../src/core/route/stages.ts';
 import type { Trip, TripStops } from '../../../src/core/types.ts';
-import { withStops } from '../../../src/core/route/day-stops.ts';
+import { planAround, stagesEndingAt, withStops } from '../../../src/core/route/day-stops.ts';
 import { DEFAULT_SETTINGS } from '../../../src/store/rules.ts';
 import type { Settings } from '../../../src/store/rules.ts';
 import { handoffGpx, tripAttributes } from '../../../src/ui/trip/handoff.ts';
@@ -285,6 +285,35 @@ describe('[TRIP-DAY-STOPS] days that end where you can sleep travel to the bag p
     const stale: TripStops = { routeId: trip.route.id, basis: plan.slice(0, -1).map((x) => x.endKm), days: plan.slice(0, -1).map((x) => ({ placeId: 'p', km: x.endKm + 2, name: 'X', town: null, by: 'auto' as const })) };
     expect(handoffGpx(trip.route, tripAttributes({ ...trip, route: { ...trip.route, stages: plan }, stops: stale }, settings, { start: null, end: null }))).not.toMatch(/ stops=/);
   });
+
+  test("[TRIP-DAY-STOPS] days still planned around a pick that has gone, none ending at a place: the ends travel without names and the bag planner ends its days where Trip does; a trip on the stage model's own days hands over byte for byte as before (review of PRs 160-163, m-2)", async () => {
+    const base = await handedOff('multi-day-800', { nights: 3, pace: 'sporting' as Pace });
+    const r = base.trip.route;
+    const plan = [...planStages(r, { flatKph: 25, pace: 'sporting', nights: 3 })];
+    const even = plan.slice(0, -1).map((x) => x.endKm);
+    const none = (km: number) => ({ placeId: null, km, name: null, town: null, by: 'auto' as const });
+    // the rider picked a place 60 km before night 1's even end, and Trip planned the other nights around it
+    const around = planAround({ routeId: r.id, basis: even, days: [{ placeId: 'p1', km: even[0]! - 60, name: 'Hotel Post', town: null, by: 'rider' }, none(even[1]!), none(even[2]!)] }, r, 3);
+    // then the place went (deleted, or no longer on the route) and no saved place is near any day's end: the days keep their ends
+    const route = { ...r, stages: stagesEndingAt(r, around.basis, 25) };
+    const ends = route.stages.slice(0, -1).map((s) => s.endKm);
+    ends.forEach((km, i) => expect(Math.abs(km - even[i]!)).toBeGreaterThan(5));
+    const trip = { ...base.trip, route, stops: { routeId: r.id, basis: around.basis, days: around.basis.map(none) } };
+    const gpx = handoffGpx(route, tripAttributes(trip, base.settings, { start: 'A', end: 'B' }));
+    const { page, json } = planner(gpx);
+    page.context.qaText = gpx;
+    expect(json('handoffTrip(qaText)')).toMatchObject({ nights: 3, stopNames: [null, null, null] });
+    json<number[]>('handoffTrip(qaText).stops').forEach((km, i) => expect(km).toBeCloseTo(ends[i]!, 6));
+    await page.run('receiveHandoff()');
+    expect(await page.run('applyHandoff()')).toBe(true);
+    json<number[]>('nightStops().slice(1,-1).map(s=>s.kmExact)').forEach((km, i) => expect(km).toBeCloseTo(ends[i]!, 6));
+    // on the stage model's own days, with no day at a place (or no stops at all), nothing more is sent than before
+    const names = { start: 'A', end: 'B' };
+    const own = { ...base.trip, route: { ...r, stages: plan }, stops: { routeId: r.id, basis: even, days: even.map(none) } };
+    const was = handoffGpx(own.route, tripAttributes({ ...own, stops: undefined }, base.settings, names));
+    expect(was).not.toMatch(/ stops=/);
+    expect(handoffGpx(own.route, tripAttributes(own, base.settings, names))).toBe(was);
+  }, 120_000);
 });
 
 // The guided Trip, part 2 (design §3.3, the owner's answers 1 and 3 of 8 Nov 2026): a trip of one night or more goes straight into
