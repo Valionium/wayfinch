@@ -31,7 +31,8 @@ export function RiderCards({ services, snap, reload }: { services: YouServices; 
     const result = await services.writeSettings({ [field]: value });
     say(field, result.reasons[field] ?? result.note);
     if (field === 'flatKph') {
-      const next = result.ok && before ? { ...before, flatKph: value as number } : null;
+      // a change whose days were not planned (its note says so) names no new stops (review of PR 181, m-3)
+      const next = result.ok && !result.note && before ? { ...before, flatKph: value as number } : null;
       const now = next ? suggestedNights(next) : null;
       setStopsSaid(next && before && now !== suggestedNights(before) ? await stopsLine(next, now!).catch(() => '') : '');
     }

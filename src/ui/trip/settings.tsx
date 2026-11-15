@@ -6,6 +6,7 @@ import type { Trip, TripStops } from '../../core/types.ts';
 import { showKm, W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
 import { TF } from '../../core/wording/en-trip-fields.ts';
+import { heightsCode } from '../../data/prepare.ts';
 import { keepFreshOffered } from '../../data/refresh.ts';
 import type { Settings } from '../../store/rules.ts';
 import { useFollowing } from '../follow.ts';
@@ -17,7 +18,8 @@ type Save = (field: keyof Settings, value: unknown) => Promise<boolean>;
 
 /** Settles the day stops now and gives the stops as they are then (Trip's summary's own settle, from its chunk). */
 export type Settle = () => Promise<TripStops | null>;
-const settleNow: Settle = () => import('../../data/day-stops.ts').then((m) => m.settleStops(new Date()));
+const stopsCode = () => import('../../data/day-stops.ts');
+const settleNow: Settle = () => stopsCode().then((m) => m.settleStops(new Date()));
 
 /**
  * The line for a trip whose nights become `n`, '' when it held no stops: by the very rule the settle plans them by (planAround, the
@@ -114,20 +116,25 @@ function Part({ services, snap, reload, part, focusDate = 0, settle = settleNow 
   const [stopsSaid, setStopsSaid] = useState('');
   // A change the last save could not plan the days for (its note says so): then nothing is said about new stops (review of PR 175, m-2).
   const noted = useRef(false);
-  // Once the days follow the nights again, the line beside the nights that said they would goes.
-  const dayCount = trip?.route.stages.length;
-  useEffect(() => setProblems((p) => (p.nights === W.appTripReplanFailed ? { ...p, nights: '' } : p)), [dayCount]);
+  // Once the days have followed, the line that said they would goes (review of PR 181, m-1).
+  const days = JSON.stringify(trip?.route.stages);
+  useEffect(() => setProblems((p) => (Object.values(p).includes(W.appTripDaysLater) ? {} : p)), [days]);
   useEffect(() => { if (focusDate > answered) { answered = focusDate; dateField.current?.focus(); } }, [focusDate]);
   // The stops' code a change of nights plans its days with comes as Trip details opens, so the taps after a change do not wait for it
   // on a slow link (review of PR 175, m-1).
-  useEffect(() => { if (part === 'when') void Promise.allSettled([import('../../data/heights.ts'), import('../../data/day-stops.ts')]); }, []);
+  useEffect(() => { if (part === 'when') void Promise.allSettled([heightsCode(), stopsCode()]); }, []);
 
   const save: Save = async (field, value) => {
     const result = await services.writeSettings({ [field]: value });
     noted.current = !!result.note;
+    // Days whose code could not load are said to update by themselves only where Your route plans them again: a prepared trip's on
+    // each open and back online, and nights set apart from the days; elsewhere main's sentence asks for the change again (review of
+    // PR 181, I-1).
+    const note = result.note === W.appTripReplanFailed && trip && (snap.prepared || snap.places > 0
+      || (field === 'nights' && value !== null && trip.route.stages.length !== (value as number) + 1)) ? W.appTripDaysLater : result.note;
     // A refusal stays beside its field only until the next change that is accepted.
     // An accepted change clears the old refusals, but a note about it (its days could not be updated) is always shown.
-    setProblems((p) => (result.ok ? (result.note ? { [field]: result.note } : {}) : { ...p, [field]: result.reasons[field] ?? result.note ?? '' }));
+    setProblems((p) => (result.ok ? (note ? { [field]: note } : {}) : { ...p, [field]: result.reasons[field] ?? note ?? '' }));
     // The caller puts a refused value back at once, as the refusal shows: not only once the trip has been read again (on a busy
     // phone that took long enough for the refused value to linger beside its message).
     void reload();

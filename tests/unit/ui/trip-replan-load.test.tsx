@@ -119,7 +119,7 @@ async function typeNights(details: HTMLElement, n: number): Promise<void> {
 }
 
 const days = async (): Promise<number> => (await readTrip())!.route.stages.length;
-const ONE_LINE = 'The setting is kept. The days update when Wayfinch can load again.';
+const ONE_LINE = 'The days update when Wayfinch can load again.';
 
 describe('The stops\' code for a change of nights (review of PR 175, m-1 and m-2)', () => {
   test('[TRIP-REPLAN-LOAD] opening Trip details starts loading the stops\' code, so on a slow link (2 s a chunk) a date set after a change of nights does not wait for it (m-1)', async () => {
