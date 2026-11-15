@@ -70,8 +70,10 @@ const departmentYes = (p: Place): boolean => mappedYes(p) && !specialist(p);
 /**
  * With no speciality mapped (the packs before the healthcare tags, and wherever OSM lacks them), a name that says psychiatry,
  * psychosomatics or rehabilitation only adds "check before going": never hidden, moved down or demoted (the owner's ruling of 14 Nov 2026).
+ * Reha counts as a word (Reha-Klinik, Kinderreha) or as the start of Rehabilitation, Rehaklinik, Rehazentrum, RehaCentrum, so a town
+ * such as Rehau, Rehagen or Trehafod adds nothing. The others are in no place name and stay anywhere in a word: Jugendpsychiatrie.
  */
-const namedClinic = (p: Place): boolean => specialityList(p).length === 0 && /ps[yi]chiatr|psychosomat|reha|r[ée]adapt|riabilit/i.test(p.name ?? '');
+const namedClinic = (p: Place): boolean => specialityList(p).length === 0 && /ps[yi]chiatr|psychosomat|reha(\b|b|kl|z|c)|r[ée]adapt|riabilit/i.test(p.name ?? '');
 /** A hospital mapped access=private or no stays listed, said plainly: in OSM that is often only who runs it (review of #140, I3). */
 const hospitalLines = (p: Place): string[] => {
   const list = specialityList(p);
