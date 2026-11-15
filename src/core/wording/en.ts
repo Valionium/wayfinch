@@ -751,8 +751,9 @@ export const W = {
   appTripOpenAhead: 'Open En route',
   appTripOpenBagPlanner: 'Open the full Bag planner',
   appTripDetails: 'Trip details',
-  // With a trip, the line starts with its date (or 'No date yet') and nights (the owner's ruling A of 15 Nov 2026, TRIP-DETAILS-ALL).
-  appTripDetailsLine: (pace: string, kph: string, stay: string, start: string, day?: string, nights?: number | null): string => `${day ? `${day} · ${nights} ${nights === 1 ? 'night' : 'nights'} · ` : ''}${pace} · ${kph} km/h · ${stay} · start ${start}`,
+  // With a trip, the line starts with its date (or 'No date yet') and nights, 'day ride' for none (the owner's ruling A of 15 Nov 2026,
+  // TRIP-DETAILS-ALL; the coordinator's ruling on review m-4 of PR 177).
+  appTripDetailsLine: (pace: string, kph: string, stay: string, start: string, day?: string, nights?: number | null): string => `${day ? `${day} · ${nights ? `${nights} ${nights === 1 ? 'night' : 'nights'}` : 'day ride'} · ` : ''}${pace} · ${kph} km/h · ${stay} · start ${start}`,
   // Contract 2: the trip to the bag planner (spec section 7.1). The route and the settings you set go; the bag planner asks first.
   appHandoffButton: 'Plan bags for this trip',
   appHandoffNote: 'Opens the bag planner with this route and your trip settings. It asks before it changes anything, and your bags stay as they are.',

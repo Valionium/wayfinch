@@ -10,7 +10,7 @@ import { keepFreshOffered } from '../../data/refresh.ts';
 import type { Settings } from '../../store/rules.ts';
 import { useFollowing } from '../follow.ts';
 import { RemoveTrip } from './remove.tsx';
-import { suggestedNights } from './model.ts';
+import { lineKey, suggestedNights } from './model.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
 
 type Save = (field: keyof Settings, value: unknown) => Promise<boolean>;
@@ -80,17 +80,30 @@ export function Choice({ name, legend, value, options, onPick }: { name: string;
   );
 }
 
+type Props = {
+  services: TripServices; snap: TripSnapshot; reload: () => Promise<void>; part: 'when' | 'details' | 'remove';
+  /** The trip line's last Change date tap, numbered: each new one puts the focus on the date (sweep of 14 Nov 2026, #3). */
+  focusDate?: number;
+  settle?: Settle;
+};
+
+// The last Change date tap the date field answered: a part that mounts again (a new route, Trip details opened by its own button, a
+// trip added in another window) does not take the focus for a tap already answered (review of PR 177, m-3).
+let answered = 0;
+
 /**
  * The two parts of Trip details, folded under the Route step (guided Trip design §2.2; the owner's ruling A of 15 Nov 2026,
  * TRIP-DETAILS-ALL): `when`, the departure date and the nights, first and only with a trip; `details`, start time, pace, flat speed,
- * stay type, camp water and keep fresh. Each part says its own nights line (TRIP-STOPS-KEEP), as before.
+ * stay type, camp water and keep fresh. Each part says its own nights line (TRIP-STOPS-KEEP), as before. A new route (replaced here
+ * or in another window) starts both afresh, as the Route step's fold did before: nothing said about the old route stays (review of
+ * PR 177, I-1); the route's line is the key, as Prepare this route's, so the heights step's new id keeps what was said.
  */
-export function TripSettings({ services, snap, reload, part, focusDate = 0, settle = settleNow }: {
-  services: TripServices; snap: TripSnapshot; reload: () => Promise<void>; part: 'when' | 'details' | 'remove';
-  /** Counts the trip line's Change date taps: each one puts the focus on the date (sweep of 14 Nov 2026, #3). */
-  focusDate?: number;
-  settle?: Settle;
-}) {
+export function TripSettings(props: Props) {
+  const { snap, reload } = props;
+  return props.part === 'remove' ? <RemoveTrip snap={snap} reload={reload} /> : <Part key={snap.trip ? lineKey(snap.trip.route) : ''} {...props} />;
+}
+
+function Part({ services, snap, reload, part, focusDate = 0, settle = settleNow }: Props) {
   const { settings, trip } = snap;
   const [problems, setProblems] = useState<Partial<Record<string, string>>>({});
   const [startDraft, setStartDraft] = useFollowing(settings.startTime);
@@ -99,7 +112,7 @@ export function TripSettings({ services, snap, reload, part, focusDate = 0, sett
   const [fresh, setFresh] = useFollowing(settings.keepFresh);
   const dateField = useRef<HTMLInputElement>(null);
   const [stopsSaid, setStopsSaid] = useState('');
-  useEffect(() => { if (focusDate > 0) dateField.current?.focus(); }, [focusDate]);
+  useEffect(() => { if (focusDate > answered) { answered = focusDate; dateField.current?.focus(); } }, [focusDate]);
 
   const save: Save = async (field, value) => {
     const result = await services.writeSettings({ [field]: value });
@@ -138,7 +151,6 @@ export function TripSettings({ services, snap, reload, part, focusDate = 0, sett
     return ok;
   };
 
-  if (part === 'remove') return <RemoveTrip snap={snap} reload={reload} />;
   if (part === 'when') {
     return (
       <div data-settings="when">

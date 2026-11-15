@@ -59,6 +59,8 @@ progress { width: 100%; accent-color: var(--blaze); }
 .trip-step-open { color: inherit; text-align: left; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
 .trip-step-change { color: var(--blaze); font-weight: 600; font-family: var(--font-body); font-size: 0.9375rem; white-space: nowrap; }
 .trip-step-line { margin: 0; overflow-wrap: anywhere; }
+/* The route kept above Use another route: a long name with no spaces wraps (review of PR 177, m-1). */
+[data-route-kept] { overflow-wrap: anywhere; }
 .trip-details { border-top: 1px solid var(--line); margin: 8px 0 0; padding: 4px 0 0; }
 .trip-details-line { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0 8px; margin: 0; font-size: 0.9375rem; }
 .trip-added { font-weight: 600; }

@@ -9,6 +9,7 @@ import { TF } from '../../core/wording/en-trip-fields.ts';
 import type { FoundPlace } from '../../data/routing.ts';
 import { sameLine } from '../../store/trip.ts';
 import { lazy } from '../lazy.tsx';
+import { lineKey } from './model.ts';
 import { routeFromGpx } from './read-gpx.ts';
 import { reasonOf } from './services.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
@@ -99,8 +100,8 @@ export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken
   return (
     <>
       {old ? <p data-route-kept>{TF.appTripRouteKept(ends ? `${ends.from.name} → ${ends.to.name}` : old.route.name)}</p> : null}
-      <section aria-label={old ? TF.appTripReplaceHeading : TF.appTripAddTitle}>
-        {old ? <h3>{TF.appTripReplaceHeading}</h3> : null}
+      <section aria-label={old ? undefined : TF.appTripAddTitle} aria-labelledby={old ? 'trip-another' : undefined}>
+        {old ? <h3 id="trip-another">{TF.appTripReplaceHeading}</h3> : null}
         <p class="muted" data-choose-hint>{TR.appTripChooseHint}</p>
         <div data-add-route>
           <label class="btn btn-primary file-pick">
@@ -123,7 +124,7 @@ export function AddRoute({ services, snap, reload, onAdded, dropped, onDropTaken
               </div>
             </div>
           ) : null}
-          <PlanAB key={`${round} ${old?.route.name}`} services={services} ends={ends} onRoute={async (found) => { if (old) setPending(found); else await commit(found); }} />
+          <PlanAB key={`${round} ${old && lineKey(old.route)}`} services={services} ends={ends} under={!!old} onRoute={async (found) => { if (old) setPending(found); else await commit(found); }} />
         </div>
       </section>
     </>

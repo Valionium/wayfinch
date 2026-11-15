@@ -649,6 +649,7 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
   test('[TRIP-ROUTE-KEPT] a route planned from A to B: Change shows "Your route: Heidelberg → Strasbourg (kept)", then Use another route with Start and End already its towns; nothing changes until a new route is added', async () => {
     const net = network(true);
     await show(services({ fetch: net.fetch }));
+    await until(() => host.querySelector('#ab-from') !== null, 'Plan from A to B');
     await choose('ab-from', 'Heidelberg');
     await choose('ab-to', 'Strasbourg');
     await click(button(W.appAbPlan));
@@ -666,6 +667,12 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     expect(heading).toBeDefined();
     expect(line.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(heading.compareDocumentPosition(step.querySelector('[data-add-route]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The section is named by that heading alone, and Plan from A to B sits one level under it (review of PR 177, m-2).
+    const section = step.querySelector('[data-add-route]')!.closest('section')!;
+    expect(section.hasAttribute('aria-label')).toBe(false);
+    expect(section.getAttribute('aria-labelledby')).toBe(heading.id);
+    expect(step.querySelector('[data-plan-ab] h4')!.textContent).toBe(TR.appAbTitle);
+    expect(step.querySelector('[data-plan-ab] h3')).toBeNull();
     // Start and End are already the route's towns, chosen: their names alone, nothing guessed after them, each with its Change.
     const ab = host.querySelector<HTMLElement>('[data-plan-ab]')!;
     expect(ab.querySelector('#ab-from')).toBeNull();
@@ -698,6 +705,8 @@ describe('Plan from A to B on Trip (spec section 7.1)', () => {
     expect(host.querySelector('[data-route-kept]')).toBeNull();
     expect([...host.querySelectorAll('h3')].some((h) => h.textContent === TF.appTripReplaceHeading)).toBe(false);
     expect(host.querySelector('[data-add-route]')!.closest('section')!.getAttribute('aria-label')).toBe(TF.appTripAddTitle);
+    await until(() => host.querySelector('[data-plan-ab]') !== null, 'Plan from A to B');
+    expect(host.querySelector('[data-plan-ab] h3')!.textContent).toBe(TR.appAbTitle);
     // A GPX name with " to " in it is still the file's own name.
     await pick(await fixtureGpx('alpine-pass'));
     await until(() => host.querySelector('[data-summary]') !== null, 'the summary');

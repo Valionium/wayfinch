@@ -18,7 +18,7 @@ import type { StepName, StepReport } from '../../../src/data/prepare.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
 import { closeDb, openDb } from '../../../src/store/db.ts';
 import { savePrepared } from '../../../src/store/prepared.ts';
-import { readTrip } from '../../../src/store/trip.ts';
+import { readTrip, saveTrip } from '../../../src/store/trip.ts';
 import { refreshBikeSource } from '../../../src/ui/bike/live.ts';
 import { installOffer } from '../../../src/ui/install.ts';
 import { routeDoneLine, suggestedNights } from '../../../src/ui/trip/model.ts';
@@ -253,6 +253,42 @@ describe("Trip details holds the trip's details (the owner's ruling A of 15 Nov 
     await click(buttonIn(details, TF.appTripDateClear));
     await until(() => detailsLine() === `${W.appTripLineNoDate} · 3 nights · Sporting · 25 km/h · Camping · start 08:30`, 'no date in the line');
     expect((await readTrip())!.departureDate).toBeNull();
+  });
+
+  // Review of PR 177, I-1 and m-6: on main a replace folded the Route step and took the nights' line with it; Trip details stays open
+  // through a replace, so it must not keep what it said about the old route. And a day ride says so (the coordinator's ruling on m-4).
+  test('[TRIP-DETAILS-ALL] [TRIP-STOPS-KEEP] a route replaced with Trip details open leaves no line about the old route beside the nights or the fields; a day ride reads "day ride"', async () => {
+    await withRoute();
+    const trip = (await readTrip())!;
+    const ends = trip.route.stages.slice(0, -1).map((x) => x.endKm);
+    expect(ends.length).toBeGreaterThan(0);
+    await saveTrip({ ...trip, stops: { routeId: trip.route.id, basis: ends, days: ends.map((km, i) => ({ placeId: `p-${i}`, km, name: `Camping ${i + 1}`, town: null, by: 'auto' as const })) } });
+    await show();
+    const details = host.querySelector<HTMLElement>('[data-trip-details]')!;
+    await click(buttonIn(details, W.appTripDetails));
+    await until(() => details.querySelector('#trip-nights') !== null && details.querySelector('#trip-kph') !== null, 'the details');
+    const n = ends.length + 1;
+    const nights = details.querySelector<HTMLInputElement>('#trip-nights')!;
+    await act(async () => { nights.value = String(n); nights.dispatchEvent(new Event('input', { bubbles: true })); nights.dispatchEvent(new Event('change', { bubbles: true })); });
+    const said = () => details.querySelector('[data-nights-stops]')?.textContent ?? '';
+    await until(() => said().startsWith(`New stops for ${n} nights`), 'the nights line');
+    const kph = details.querySelector<HTMLInputElement>('#trip-kph')!;
+    await act(async () => { kph.value = '60'; kph.dispatchEvent(new Event('input', { bubbles: true })); kph.dispatchEvent(new Event('change', { bubbles: true })); });
+    await until(() => details.textContent!.includes(W.appStoreFlatKphRange), 'the speed refused');
+    // Another route, Trip details still open.
+    await click(buttonIn(step('route'), W.appTripStepChange));
+    await pick(await fixtureGpx('loop'));
+    await until(() => host.querySelector('[data-replace]') !== null, 'the question');
+    await click(buttonIn(host.querySelector('[data-replace]')!, TF.appTripReplaceYes));
+    await until(() => host.querySelector('[data-trip-line]')!.textContent!.includes('Heilbronn loop'), 'the new route');
+    await until(() => details.querySelector('#trip-nights') !== null, 'the nights of the new route');
+    await settle(100);
+    expect(buttonIn(details, W.appTripDetails).getAttribute('aria-expanded')).toBe('true');
+    expect(said()).toBe('');
+    expect(details.textContent).not.toContain(W.appStoreFlatKphRange);
+    expect(document.activeElement?.id).not.toBe('trip-date');
+    expect(suggestedNights((await readTrip())!)).toBe(0);
+    expect(detailsLine()).toBe('Sat 10 Oct · day ride · Sporting · 25 km/h · Camping · start 08:30');
   });
 
   test('[TRIP-DETAILS-ALL] without a trip Trip details is as before: its line names pace, speed, stay and start, and it holds no date or nights', async () => {
