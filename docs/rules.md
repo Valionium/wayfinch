@@ -1394,6 +1394,11 @@ One line per rule, in short words, ending in its ID. `npm run rules` reads this 
 - an entry Use these bike details or Save refuses opens the tile that holds it and takes the focus (the bike weight, the maximum weight or what it includes, the frame number, the triangle's first missing or wrong side, saddle to tyre, the bar roll's width), so the message's "highlighted above" is there; a missing name opens Saved bikes on the name [BK-TILES-REFUSED]
 - each way in opens the tile it is about: the drawing's link Look, the focus on its heading; a new bike (Add a bike, Make it yours, Add your bike) Quick start, the focus on its first frame picture; the weight check's Bike details Weights; a bike of the rider's (You, Edit; Bike care; Trip), the rig, step 2's Bike details and Kit's Review bike details every tile, the focus on the first [BK-TILES-START]
 
+## Bag planner: the trip entered once (the owner's ruling of 14 Nov 2026; sweep of 14 Nov, finding 28)
+
+- with a trip from Wayfinch in the plan (its route handed over), step one, Ride, shows the trip on one line, where, when and how many nights, with the GPX by its name, and Change, which opens today's fields with every value as it was; the fold and Change store nothing; a plan without a trip from Wayfinch shows the step as before [LC-RIDE-FOLD]
+- Comfortable or Lightweight is chosen at the start of Kit, before the kit list, no longer on Check; the Check follows the choice [LC-MODE-KIT]
+
 ## Bag planner: the owner's small rulings of 14 Nov 2026 (sweep of 14 Nov, #26, #29, #32, #33, #34, #37, #42)
 
 - after Plan bags for this trip in Trip, a plan with nothing of the rider's in it to replace (as for "Before …": the trip, mode and food mode a new plan starts with, nights not entered, no pockets, bag, route, place or deck, no kit touched, sized, counted, added, placed by hand, ticked or carried) and no trip setup made before for this route is planned at once: no ask, the bar says what was planned and offers Undo, which gives that plan back exactly [LC-HAND-ATONCE]

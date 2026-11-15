@@ -140,7 +140,7 @@ test('rendered verdict and saved setup preserve a 0.01 L overflow',()=>{
 test('comfortable mode avoids claiming all mounted bags are necessary',()=>{
   renderVM.run(`S.mode='comfort';S.kit={tool:true};S.qty={};S.custom={tool:{L:.1,kg:.1,rigid:0}};S.bags=[{uid:1,pos:'top',L:1},{uid:2,pos:'seat',L:14}];renderResult();`);
   const result=renderVM.nodes.get('resultBox').innerHTML;
-  assert(!result.includes('all needed'));assert(!result.includes('Every bag you own is earning its place'));assert(result.includes('none suggested'));assert(result.includes('Switch to Lightweight'));
+  assert(!result.includes('all needed'));assert(!result.includes('Every bag you own is earning its place'));assert(result.includes('none suggested'));assert(result.includes('Choose Lightweight at the start of Kit'));
 });
 test('a lightly used bag is not suggested for removal when its contents would spill',()=>{
   reset(['tool']);a.S.mode='light';a.S.custom.tool={L:.1,kg:.1,rigid:0};a.S.bags=[bag(1,'top',1)];
