@@ -67,6 +67,13 @@ describe('A change of nights says the stops are chosen afresh (review of PR 101,
     expect(await setNights(snapOf([stop(92, 'rider'), noStop]), '5')).toBe(`New stops for 5 nights, keeping yours: Camping 92 (night 2). Not kept: No stop (was night 2). ${change}`);
   });
 
+  // Re-review 3 of PR 163, m-8: another window set 3 nights before this one settled, so the stops stored still have 2; set back to 2,
+  // the settle keeps them as stored (each pick on its night), and the line names that night, not one of a fresh share-out.
+  test('[TRIP-STOPS-KEEP] nights set back to the number the stored stops have: each own stop is named on the night it is stored on', async () => {
+    expect(await setNights(snapOf([stop(60, 'auto'), stop(120, 'rider')], 3), '2'))
+      .toBe('New stops for 2 nights, keeping yours: Camping 120 (night 2). To change a stop, use Change stop under its day in Your route.');
+  });
+
   test('[TRIP-STOPS-KEEP] fewer nights than own stops: the one between the two shortest days is named as not kept, with its old night', async () => {
     expect(await setNights(snapOf([stop(92, 'rider'), stop(177, 'rider')]), '1'))
       .toBe('New stops for 1 night, keeping yours: Camping 177 (night 1). Not kept: Camping 92 (was night 1). To change a stop, use Change stop under its day in Your route.');
