@@ -55,12 +55,16 @@ export function tripAttributes(trip: Trip, settings: Settings, names: { start: s
   const nights = settings.nights ?? planStages(trip.route, { flatKph: settings.flatKph, pace: settings.pace, nights: 0 }).suggestedNights;
   out.push(['nights', String(nights)]);
   if (settings.nights === null) out.push(['nightsFrom', 'suggested']);
-  // Where each day ends, when the days end at places to sleep (owner, 9 Nov 2026): the bag planner ends its days there too.
+  // Where each day ends, when the days end at places to sleep (owner, 9 Nov 2026): the bag planner ends its days there too. Also when
+  // they are not the stage model's own (days still planned around a pick that has gone, none at a place), unnamed, so the bag planner
+  // splits the days as Trip does (review of PRs 160-163, m-2).
   const nightsHere = trip.route.stages.length - 1;
-  const held = nightsHere === nights && nightsHere > 0 ? trip.route.stages.slice(0, -1).map((_, i) => dayStopOf(trip, i)) : [];
-  if (held.length > 0 && held.every((d) => d !== null) && held.some((d) => d!.placeId !== null)) {
-    out.push(['stops', trip.route.stages.slice(0, -1).map((st) => String(st.endKm)).join(',')]);
-    out.push(['stopNames', JSON.stringify(held.map((d) => (d!.placeId !== null ? d!.name : null)))]);
+  const ends = trip.route.stages.slice(0, -1).map((st) => st.endKm);
+  const held = nightsHere === nights && nightsHere > 0 ? ends.map((_, i) => dayStopOf(trip, i)) : [];
+  if (held.length > 0 && (held.every((d) => d !== null) && held.some((d) => d!.placeId !== null)
+    || planStages(trip.route, { flatKph: settings.flatKph, pace: settings.pace, nights }).slice(0, -1).some((st, i) => Math.abs(st.endKm - ends[i]!) > 1e-6))) {
+    out.push(['stops', ends.map(String).join(',')]);
+    out.push(['stopNames', JSON.stringify(held.map((d) => (d?.placeId != null ? d.name : null)))]);
   }
   if (trip.departureDate) {
     out.push(['departureDate', trip.departureDate]);
