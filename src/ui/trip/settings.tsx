@@ -6,7 +6,6 @@ import type { Trip, TripStops } from '../../core/types.ts';
 import { showKm, W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
 import { TF } from '../../core/wording/en-trip-fields.ts';
-import { heightsCode } from '../../data/prepare.ts';
 import { keepFreshOffered } from '../../data/refresh.ts';
 import type { Settings } from '../../store/rules.ts';
 import { useFollowing } from '../follow.ts';
@@ -122,7 +121,7 @@ function Part({ services, snap, reload, part, focusDate = 0, settle = settleNow 
   useEffect(() => { if (focusDate > answered) { answered = focusDate; dateField.current?.focus(); } }, [focusDate]);
   // The stops' code a change of nights plans its days with comes as Trip details opens, so the taps after a change do not wait for it
   // on a slow link (review of PR 175, m-1).
-  useEffect(() => { if (part === 'when') void Promise.allSettled([heightsCode(), stopsCode()]); }, []);
+  useEffect(() => { if (part === 'when') void Promise.allSettled([services.heights?.(), stopsCode()]); }, []);
 
   const save: Save = async (field, value) => {
     const result = await services.writeSettings({ [field]: value });

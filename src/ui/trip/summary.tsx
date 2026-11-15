@@ -155,8 +155,9 @@ const focusChange = (day: number): void => {
  * Settling the stops and the places to pick, from their own chunk (TRIP-DAY-STOPS). The route summary is itself a chunk, so the
  * first screen carries none of it.
  */
-const settleStops = (change?: StopChange): Promise<TripStops | null> => import('../../data/day-stops.ts').then((m) => m.settleStops(new Date(), change));
-const stopChoices = (day: number): Promise<BedChoice[]> => import('../../data/day-stops.ts').then((m) => m.stopChoices(new Date(), day));
+const stopsCode = () => import('../../data/day-stops.ts');
+const settleStops = (change?: StopChange): Promise<TripStops | null> => stopsCode().then((m) => m.settleStops(new Date(), change));
+const stopChoices = (day: number): Promise<BedChoice[]> => stopsCode().then((m) => m.stopChoices(new Date(), day));
 
 export function RouteSummary({ snap, stops, beds, settle = settleStops, choices = stopChoices }: {
   snap: TripSnapshot; stops: TripServices['stops']; beds?: TripServices['dayBeds'];
@@ -172,7 +173,7 @@ export function RouteSummary({ snap, stops, beds, settle = settleStops, choices 
   // phone is back online.
   const behind = trip !== null && snap.settings.nights !== null && trip.route.stages.length !== snap.settings.nights + 1;
   useEffect(() => {
-    if (!(key || behind) || !settle) return undefined;
+    if (!(key || behind)) return undefined;
     const again = (): void => { settle().catch(() => undefined); };
     again();
     addEventListener('online', again);

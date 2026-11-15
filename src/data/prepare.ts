@@ -36,6 +36,7 @@ import { WEATHER_MODE } from './weather-mode.ts';
 /** Prepare's own chunk (heights.ts), one loader for every part that needs it: Prepare, a change of nights, pace or flat speed
  * (services.ts), and Trip details, which asks for it as it opens (review of PR 175, m-1). */
 export const heightsCode = () => import('./heights.ts');
+const holidaysCode = () => import('../core/hours/holidays.ts');
 
 export type StepName = 'heights' | 'places' | 'hours' | 'weather' | 'baseline' | 'save';
 export type StepReport = { step: StepName; ok: boolean; note: string | null };
@@ -307,7 +308,7 @@ async function hoursStep(store: PreparedStore, trip: Trip, zones: ZoneSpan[], no
     const today = localIsoDate(now, startZoneOf(zones));
     const { from, toExclusive } = windowDates(trip, today);
     const worked = await workOutHours(store, trip.route.id, places, matched, from, toExclusive, onProgress);
-    const { holidaysFor } = await import('../core/hours/holidays.ts');
+    const { holidaysFor } = await holidaysCode();
     await store.saveHolidays(trip.route.id, holidaysFor(zonesNamed(zones, places), from, addDaysIso(toExclusive, -1)));
     return worked === 0 ? { step: 'hours', ok: false, note: W.appPrepNoHours } : { step: 'hours', ok: true, note: null };
   } catch (e) {
@@ -511,7 +512,7 @@ export async function catchUpHours(now: Date, o: { requestIdle?: IdleRequest; st
   const matched = new Set(await readMatchedIds());
   const store = o.store ?? preparedStore;
   await workOutHours(store, trip.route.id, places, matched, from, toExclusive);
-  const { holidaysFor } = await import('../core/hours/holidays.ts');
+  const { holidaysFor } = await holidaysCode();
   const named = zonesNamed(zones, places);
   const held = await readHeldHolidays();
   const fresh = holidaysFor(named, from, addDaysIso(toExclusive, -1));

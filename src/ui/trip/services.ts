@@ -32,6 +32,9 @@ import { inTurn } from '../../store/turn.ts';
 import type { PreparedStore } from '../../store/prepared.ts';
 import { planned, tripRuns } from './model.ts';
 
+/** The stops on the profile and the beds near each day's end: one chunk, one loader. */
+const stopsRead = () => import('./stops.ts');
+
 export type TripSnapshot = {
   now: Date;
   /** False when the browser would not open the database: nothing can be read or kept. */
@@ -88,6 +91,8 @@ export type TripServices = {
   dayBeds?: () => Promise<DayBed[]>;
   /** Contract 2: the trip to the bag planner, which then opens. Absent where there is no bag planner to open. */
   handOff?: () => Promise<HandoffOutcome>;
+  /** Starts loading Prepare's chunk, which a change of nights, pace or flat speed plans its days through (review of PR 175, m-1). */
+  heights?: () => Promise<unknown>;
 };
 
 export const HEIGHTS_FLAG = 'copilot:heights-lookup';
@@ -320,8 +325,9 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
       return handOffTrip(trip, settings, deps);
     }),
 
-    stops: () => import('./stops.ts').then((m) => m.readStops(now())),
-    dayBeds: () => import('./stops.ts').then((m) => m.readDayBeds(now())),
+    heights: heightsCode,
+    stops: () => stopsRead().then((m) => m.readStops(now())),
+    dayBeds: () => stopsRead().then((m) => m.readDayBeds(now())),
 
     prepare(onProgress, onNotice) {
       return prepareTrip({
