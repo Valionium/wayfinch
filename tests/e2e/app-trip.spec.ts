@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { fixtureGpx } from '../fixtures/gpx.ts';
+import { fixtureGpx, gpxText } from '../fixtures/gpx.ts';
+import { loadFixtureRoute } from '../fixtures/packs/index.ts';
 import { goOffline, loadApp, preparedTrip, removeBuilds } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
 import type { StoreInPage } from './fixtures/store-page.ts';
@@ -208,4 +209,54 @@ test('[TRIP-STOPS-ROOM] the stops on the height profile never cover the text bel
       for (const t of found.after) expect(t.top, `${id}, ${width} px, list ${open}: "${t.text}" under the icons`).toBeGreaterThanOrEqual(found.lowest - 0.5);
     }
   }
+});
+
+// Review of PR 177, m-1: a GPX route name with no spaces (a bike computer's file name, say) pushed Trip sideways at 320 px through the
+// route's name in Your route. Every place Trip shows the name wraps it within the screen, and the whole name stays in the page.
+test('[TRIP-ROUTE-NAME] a long route name with no spaces wraps wherever Trip shows it: no sideways scroll at 320 and 360 px, folded, while it asks to remove or replace, with Trip details or the Route step open', async ({ page }) => {
+  const problems = watch(page);
+  app = await loadApp(page);
+  const NAME = 'Heidelberg_Koeln_Rheinradweg_Etappe1-3_komplett_Nov2026_v3';
+  const OTHER = 'Heilbronn_Rundtour_Neckar_Kocher_Jagst_komplett_Nov2026_v12';
+  const named = async (id: 'heidelberg-strasbourg' | 'loop', name: string) => ({
+    name: `${id}.gpx`, mimeType: 'application/gpx+xml', buffer: Buffer.from(gpxText((await loadFixtureRoute(id)).points, name)),
+  });
+  const fits = async (what: string): Promise<void> => {
+    for (const width of [320, 360]) {
+      await page.setViewportSize({ width, height: 800 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), `${what} at ${width} px`).toBe(true);
+    }
+  };
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.locator('input[type=file]').setInputFiles(await named('heidelberg-strasbourg', NAME));
+  const summary = page.locator('[data-summary]');
+  await expect(summary.locator('strong').first()).toHaveText(NAME);
+  await fits('just added');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(summary.locator('strong').first()).toHaveText(NAME);
+  await expect(page.locator('[data-trip-line] strong')).toHaveText(NAME);
+  await fits('folded');
+  // Remove this trip's question names the route.
+  await page.getByRole('button', { name: 'Remove this trip', exact: true }).click();
+  const removing = page.getByRole('alertdialog', { name: 'Remove this trip?' });
+  await expect(removing).toContainText(NAME);
+  await fits('asking to remove');
+  await removing.getByRole('button', { name: 'Keep it', exact: true }).click();
+  await expect(removing).toHaveCount(0);
+  // Trip details open.
+  await page.locator('[data-trip-details]').getByRole('button', { name: 'Trip details', exact: true }).click();
+  await expect(page.locator('#trip-nights')).toBeVisible();
+  await fits('Trip details open');
+  // The Route step open: the route that is kept, then the question before another replaces it.
+  await page.locator('[data-step="route"]').getByRole('button', { name: 'Change: Route' }).click();
+  await expect(page.locator('[data-route-kept]')).toContainText(NAME);
+  await fits('the Route step open');
+  await page.locator('input[type=file]').setInputFiles(await named('loop', OTHER));
+  const ask = page.locator('[data-replace]');
+  await expect(ask).toContainText(OTHER);
+  await expect(ask).toContainText(NAME);
+  await fits('asking to replace');
+  await ask.getByRole('button', { name: 'Cancel' }).click();
+  await expect(summary.locator('strong').first()).toHaveText(NAME);
+  expect(problems).toEqual([]);
 });
