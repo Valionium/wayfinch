@@ -9,8 +9,11 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { W } from '../../../src/core/wording/en.ts';
+import { TF } from '../../../src/core/wording/en-trip-fields.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
-import { closeDb } from '../../../src/store/db.ts';
+import { planStages } from '../../../src/core/route/stages.ts';
+import { closeDb, openDb } from '../../../src/store/db.ts';
+import { savePrepared } from '../../../src/store/prepared.ts';
 import { readLocalSettings } from '../../../src/store/settings-local.ts';
 import { readTrip, saveTrip } from '../../../src/store/trip.ts';
 import { refreshBikeSource } from '../../../src/ui/bike/live.ts';
@@ -18,7 +21,12 @@ import { installOffer } from '../../../src/ui/install.ts';
 import { browserTripServices } from '../../../src/ui/trip/services.ts';
 import type { TripServices } from '../../../src/ui/trip/services.ts';
 import { TripScreen } from '../../../src/ui/trip/trip.tsx';
+import { loadRiderKg } from '../../../src/ui/rider-kg.ts';
+import { browserYouServices } from '../../../src/ui/you/services.ts';
+import { YouScreen } from '../../../src/ui/you/you.tsx';
+import { flatRoute, pointAtKm, testTrip } from '../../fixtures/build.ts';
 import { fixtureGpx } from '../../fixtures/gpx.ts';
+import { placeAt } from '../../fixtures/places.ts';
 
 /**
  * How the stops' two chunks load: when each was first asked for, and a link that is slow (`slowMs` from that first ask) or gone
@@ -180,5 +188,91 @@ describe('The stops\' code for a change of nights (review of PR 175, m-1 and m-2
     await until(() => host.querySelector('[data-summary] .trip-days')?.children.length === before + 1, 'the days for the nights set');
     expect(await days()).toBe(before + 1);
     expect(readLocalSettings().settings.nights).toBe(before);
+  }, 20_000);
+});
+
+// Review of PR 181, I-1 (the coordinator's ruling): the days are said to update by themselves only where Trip really plans them again,
+// that is a trip Prepare this route has run for (Your route's settle on each open and back online) or nights the rider set apart from
+// the days; every other change whose code cannot load keeps main's sentence, which asks for the change again. m-1: once the days have
+// followed, the line beside pace or flat speed goes too. m-3: You names no new stops after a change whose days were not planned.
+describe('Review of PR 181: the sentence only where the days are planned again', () => {
+  const MAIN_LINE = 'The setting was kept, but the days could not be updated. Change it again to try once more.';
+  const problemOf = (details: HTMLElement, id: string) => details.querySelector(`#${id}-problem`)?.textContent ?? '';
+  async function typeKph(details: HTMLElement, kph: number): Promise<void> {
+    const f = details.querySelector<HTMLInputElement>('#trip-kph')!;
+    await act(async () => { f.value = String(kph); f.dispatchEvent(new Event('input', { bubbles: true })); f.dispatchEvent(new Event('change', { bubbles: true })); });
+  }
+  const online = async () => { await act(async () => { window.dispatchEvent(new Event('online')); }); await settle(200); };
+
+  test("[TRIP-REPLAN-LOAD] on a trip not yet prepared, Use the suggestion whose code cannot load keeps main's sentence, and nothing plans the days behind the rider's back (P1)", async () => {
+    await withRoute();
+    const before = await days();
+    const details = await openDetails();
+    await typeNights(details, before);
+    await until(() => host.querySelector('[data-summary] .trip-days')?.children.length === before + 1, 'the days for the nights set');
+    code.fail = true;
+    await click(buttonIn(details, TF.appTripNightsUseSuggested));
+    await until(() => problemOf(details, 'trip-nights') !== '', 'the line beside the nights');
+    expect(problemOf(details, 'trip-nights')).toBe(MAIN_LINE);
+    expect(readLocalSettings().settings.nights).toBeNull();
+    code.fail = false;
+    await online();
+    expect(await days()).toBe(before + 1);
+  }, 20_000);
+
+  test("[TRIP-REPLAN-LOAD] on a trip not yet prepared, a flat speed whose code cannot load keeps main's sentence beside it (P2)", async () => {
+    await withRoute();
+    const before = await days();
+    const details = await openDetails();
+    await typeNights(details, before - 1);
+    await until(() => readLocalSettings().settings.nights === before - 1, 'the nights set');
+    code.fail = true;
+    await typeKph(details, 18);
+    await until(() => problemOf(details, 'trip-kph') !== '', 'the line beside the flat speed');
+    expect(problemOf(details, 'trip-kph')).toBe(MAIN_LINE);
+  }, 20_000);
+
+  test('[TRIP-REPLAN-LOAD] on a trip Prepare this route has run for, a flat speed whose code cannot load says the days update when Wayfinch can load again; back online they do, and the line goes (m-1)', async () => {
+    await withRoute();
+    const trip = (await readTrip())!;
+    await savePrepared(trip.route.id, { at: NOW, steps: [], build: { id: 'b', builtAt: '2026-10-28', countries: {} }, forecastFetchedAt: null, baselineYears: null });
+    await show();
+    const was = JSON.stringify((await readTrip())!.route.stages);
+    code.fail = true;
+    const details = await openDetails();
+    await typeKph(details, 18);
+    await until(() => problemOf(details, 'trip-kph') !== '', 'the line beside the flat speed');
+    expect(problemOf(details, 'trip-kph')).toBe(ONE_LINE);
+    expect(JSON.stringify((await readTrip())!.route.stages)).toBe(was);
+    code.fail = false;
+    await online();
+    await until(() => problemOf(details, 'trip-kph') === '', 'the line gone once the days follow');
+    expect(JSON.stringify((await readTrip())!.route.stages)).not.toBe(was);
+    expect((await readTrip())!.flatKph).toBe(18);
+  }, 20_000);
+
+  test('[TRIP-STOPS-KEEP] [TRIP-REPLAN-LOAD] a flat speed in You whose code cannot load names no new stops beside its sentence (m-3)', async () => {
+    await loadRiderKg();
+    const route = { ...flatRoute(270), id: 'route-flat270', hash: 'f'.repeat(64) };
+    const stages = [...planStages(route, { flatKph: 25, pace: 'sporting', nights: 2 })];
+    const own = (km: number) => ({ placeId: `campsite-${km}`, km, name: `Camping ${km}`, town: null, by: 'rider' as const });
+    await readTrip();
+    await saveTrip({ ...testTrip(), route: { ...route, stages }, flatKph: 25, pace: 'sporting', stops: { routeId: route.id, basis: stages.slice(0, -1).map((x) => x.endKm), days: [own(92), own(177)] } });
+    const db = await openDb();
+    for (const km of [92, 177]) {
+      const at = pointAtKm(km);
+      await db.put('places', placeAt('campsite', at.lat, at.lon, { id: `campsite-${km}`, name: `Camping ${km}` }));
+      await db.add('matches', { placeId: `campsite-${km}`, km, offRouteM: 0 });
+    }
+    code.fail = true;
+    act(() => render(null, host));
+    await act(async () => { render(<YouScreen services={{ ...browserYouServices(() => NOW, () => undefined), save: () => undefined }} />, host); });
+    await until(() => host.querySelector('[data-you-loaded]') !== null, 'You to load');
+    const kph = host.querySelector<HTMLInputElement>('#you-kph')!;
+    await act(async () => { kph.value = '40'; kph.dispatchEvent(new Event('input', { bubbles: true })); kph.dispatchEvent(new Event('change', { bubbles: true })); });
+    await until(() => (host.textContent ?? '').includes(MAIN_LINE), 'the sentence');
+    await settle(300);
+    expect(host.querySelector('[data-you-stops]')!.textContent).toBe('');
+    expect((await readTrip())!.stops!.days).toHaveLength(2);
   }, 20_000);
 });
