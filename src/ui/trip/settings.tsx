@@ -11,13 +11,15 @@ import type { Settings } from '../../store/rules.ts';
 import { useFollowing } from '../follow.ts';
 import { RemoveTrip } from './remove.tsx';
 import { lineKey, suggestedNights } from './model.ts';
+// The day stops' loader is the route summary's own: one copy in the lazy part. The summary's chunk comes with this one (on Trip it is
+// loaded already; You's screens, which import from this file, load it with it).
+import { stopsCode } from './summary.tsx';
 import type { TripServices, TripSnapshot } from './services.ts';
 
 type Save = (field: keyof Settings, value: unknown) => Promise<boolean>;
 
 /** Settles the day stops now and gives the stops as they are then (Trip's summary's own settle, from its chunk). */
 export type Settle = () => Promise<TripStops | null>;
-const stopsCode = () => import('../../data/day-stops.ts');
 const settleNow: Settle = () => stopsCode().then((m) => m.settleStops(new Date()));
 
 /**
