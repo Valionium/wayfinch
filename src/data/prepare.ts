@@ -123,7 +123,8 @@ async function heightsStep(deps: PrepareDeps, store: PreparedStore, online: bool
 
 // ---- places ------------------------------------------------------------------------------------------------------------
 
-async function zonesOfRoute(deps: PrepareDeps, route: Route): Promise<ZoneSpan[] | null> {
+/** The route's zones from the bundled file; null when it can't be read. Also Trip's route summary's (TRIP-LOCAL-ZONE). */
+export async function zonesOfRoute(deps: Pick<PrepareDeps, 'fetch'>, route: Route): Promise<ZoneSpan[] | null> {
   try {
     return routeZones(route, await loadBoundaries(deps.fetch));
   } catch {

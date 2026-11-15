@@ -7,6 +7,10 @@ import type { BedChoice, DayBed } from '../../core/engines/day-beds.ts';
 import { dayStopOf } from '../../core/route/day-stops.ts';
 import type { Route, Trip, TripStops } from '../../core/types.ts';
 import type { StopChange } from '../../data/day-stops.ts';
+import { zonesOfRoute } from '../../data/prepare.ts';
+import { announceHere } from '../../store/changed.ts';
+import { saveZones } from '../../store/prepared.ts';
+import { readWeatherState } from '../../store/weather.ts';
 import { showKm, W } from '../../core/wording/en.ts';
 import { TR } from '../../core/wording/en-trip.ts';
 import { BD } from '../../core/wording/en-beds.ts';
@@ -18,6 +22,7 @@ import { Card } from '../card.tsx';
 import { lazy } from '../lazy.tsx';
 import { OsmCredit } from './credit.tsx';
 import { PROFILE_BOX, packDate, profileY, summaryOf } from './model.ts';
+import { runningSignal } from './run-state.ts';
 import type { TripServices, TripSnapshot } from './services.ts';
 
 // Climb check's list is a chunk of its own, loaded when the rider opens it (CC-TRIP).
@@ -159,11 +164,29 @@ const stopsCode = () => import('../../data/day-stops.ts');
 const settleStops = (change?: StopChange): Promise<TripStops | null> => stopsCode().then((m) => m.settleStops(new Date(), change));
 const stopChoices = (day: number): Promise<BedChoice[]> => stopsCode().then((m) => m.stopChoices(new Date(), day));
 
+/**
+ * The route's own zones as soon as it is there (the owner's ruling of 15 Nov 2026, TRIP-LOCAL-ZONE): with none stored (the phone's
+ * zone stands in, country ''), Prepare this route's own lookup over the precached boundary file, stored as Prepare stores them, for
+ * the stored route only (saveZones' route check), never the trip itself. A file that can't be read leaves the phone's zone, unsaid.
+ * While Prepare runs, its end reads all, so nothing is announced mid-run.
+ */
+async function findZones(): Promise<void> {
+  const stored = await readWeatherState();
+  if (!stored || stored.routeZones[0]!.country) return;
+  const zones = await zonesOfRoute({ fetch }, stored.route);
+  if (zones) {
+    await saveZones(stored.route.id, zones);
+    if (!runningSignal.peek()) announceHere('trip');
+  }
+}
+
 export function RouteSummary({ snap, stops, beds, settle = settleStops, choices = stopChoices }: {
   snap: TripSnapshot; stops: TripServices['stops']; beds?: TripServices['dayBeds'];
   settle?: (change?: StopChange) => Promise<TripStops | null>; choices?: (day: number) => Promise<BedChoice[]>;
 }) {
   const { trip } = snap;
+  // A route added, or one Trip opens with: its zones, if none are stored yet.
+  useEffect(() => { if (trip) findZones().catch(() => undefined); }, [trip?.route.id]);
   // The stops come once Get ready offline has saved places: read again when the route, its days, its date, what was saved or the
   // forecast (Update weather moves the cover icons: review of PR 73, M2) change.
   const ready = trip !== null && (snap.prepared !== null || snap.places > 0);
