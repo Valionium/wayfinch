@@ -176,7 +176,33 @@ describe('cards', () => {
     expect(document.activeElement).toBe(host.querySelector('[data-card="daylight"] .ah-toggle'));
   });
 
-  test('[DAY-LAST-NO-POS] Plan tomorrow on the last stage brings "Tonight\'s stop is the end of your route" into view and gives it the focus, as no card repeats it (review of #169, m5)', async () => {
+  test('[AH-PLAN-TOMORROW] on the last stage, with no ride tomorrow, Back to today still stands at the top and in the Daylight card; the focus goes to it and back (follow-up to the review of #169)', async () => {
+    const last = testTrip({ route: flatRoute(108.5, { stageEnds: [50, 108.5] }), departureDate: FRI, stay: 'camping' });
+    const today = trip(viewOf(inputsOf({ trip: last, now: `${SAT} 15:00` })));
+    const planned = trip(viewOf(inputsOf({ trip: last, now: `${SAT} 15:00`, plan: { date: SAT, backToTodayAt: null } })));
+    const { actions, calls } = fakeActions();
+    actions.planTomorrow = async (date) => { calls.push(['planTomorrow', date]); await act(async () => { render(<AheadScreen view={planned} actions={actions} />, host); }); };
+    actions.backToToday = async () => { calls.push(['backToToday']); await act(async () => { render(<AheadScreen view={today} actions={actions} />, host); }); };
+    await show(today, actions);
+    await click(host.querySelector('[data-card="daylight"] .ah-toggle'));
+    await click(buttonNamed(W.daylightPlanTomorrow));
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(calls.at(-1)).toEqual(['planTomorrow', SAT]);
+    const top = host.querySelector('[data-back-today]');
+    expect(top, 'Back to today at the top').not.toBeNull();
+    expect(document.activeElement).toBe(top!.querySelector('button'));
+    // the Daylight card has it too, as on any other planned day
+    const toggle = host.querySelector('[data-card="daylight"] .ah-toggle')!;
+    if (toggle.getAttribute('aria-expanded') === 'false') await click(toggle);
+    expect(() => buttonNamed(W.daylightBackToToday, host.querySelector('[data-card="daylight"]')!)).not.toThrow();
+    await click(top!.querySelector('button'));
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(calls.at(-1)).toEqual(['backToToday']);
+    expect(document.activeElement).toBe(host.querySelector('[data-card="daylight"] .ah-toggle'));
+    expect(() => buttonNamed(W.daylightPlanTomorrow)).not.toThrow();
+  });
+
+  test('[DAY-LAST-NO-POS] Plan tomorrow on the last stage brings "Tonight\'s stop is the end of your route" into view, as no card repeats it, with the focus on Back to today right under it (review of #169, m5; #174)', async () => {
     const last = testTrip({ route: flatRoute(108.5, { stageEnds: [50, 108.5] }), departureDate: FRI, stay: 'camping' });
     const today = trip(viewOf(inputsOf({ trip: last, now: `${SAT} 15:00` })));
     const planned = trip(viewOf(inputsOf({ trip: last, now: `${SAT} 15:00`, plan: { date: SAT, backToTodayAt: null } })));
@@ -195,7 +221,10 @@ describe('cards', () => {
       const notes = host.querySelector('.ah-notes')!;
       expect(notes.textContent).toContain(line);
       expect(scrolled.at(-1)).toBe(notes);
-      expect(document.activeElement).toBe(notes);
+      // the last stage now has Back to today too (#174): it takes the focus, as on any other planned day (PR 142), just under the notes
+      const back = host.querySelector('[data-back-today] button')!;
+      expect(document.activeElement).toBe(back);
+      expect(notes.compareDocumentPosition(back) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     } finally {
       if (had) Object.defineProperty(Element.prototype, 'scrollIntoView', had);
       else delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;

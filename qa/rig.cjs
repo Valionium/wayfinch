@@ -519,8 +519,9 @@ run(`var qaFrameFits=(fit,bags,step)=>{
     mounts:{st:!!f.cages.st,dt:!!f.cages.dt,un:!!f.cages.un,top:!!(f.topMounts.front||f.topMounts.rear),frame:!f.frameBag.none}};
   const whole=B.bikeArt(spec,null,{theme:'dark',idPrefix:'qa'}).anchors.frame.shapes[i];
   const A=currentPlan(),slot=A.slots.find(s=>s.pos==='frame');
+  const kept=[BESIDE_NOTE,BESIDE_SHOWN];BESIDE_NOTE=null;BESIDE_SHOWN={out:[],in:[],packed:[]};const note=besideNoteHtml(A);[BESIDE_NOTE,BESIDE_SHOWN]=kept;
   return {usable:bagSpec(fb).usable,rated:ratedL(fb),share:area(drawn)/area(whole),plan:unit(),slot:slot?slot.cap:null,step1:at(1),
-    shown:bagCapacityText(fb),eff:packEff(),cap:capL()};
+    shown:bagCapacityText(fb),help:besideHelp(fb),note,eff:packEff(),cap:capL()};
 };`);
 const frameFits=(fit,bags,step=3)=>json(`qaFrameFits(${JSON.stringify(fit)},${JSON.stringify(bags)},${step})`);
 const fitOf=(style,size,bolts={})=>({style,size:size?{kind:'letter',value:size}:null,bolts:{st:'unknown',dt:'unknown',un:'unknown',...bolts}});
@@ -549,6 +550,8 @@ test('[LC-FRAME-FITS] an XS frame with a bottle on the down tube: the frame bag 
     asDrawn(r,what);
     if(r.plan<+(r.rated*r.eff).toFixed(2)){cut++;assert.match(r.shown,slots.length>1?/ L usable beside your bottles\.$/:/ L usable beside your bottle\.$/,what);}
     else assert.doesNotMatch(r.shown,/beside/,what);
+    // a bag's litres by one rule wherever they are shown (LC-LITRES-ONE): two decimals at most, no trailing zeros, in its line, its help and its note
+    assert.doesNotMatch(`${r.shown} ${r.help} ${r.note}`,/\d\.\d0 L|\.00 L/,`[LC-LITRES-ONE] ${what}: ${r.shown} ${r.help} ${r.note}`);
     n++;
   }
   assert.ok(n>=150&&cut>=100,`${n} plans, ${cut} of them cut`);
@@ -587,8 +590,8 @@ test('[LC-FRAME-FITS-OLD] a plan saved before the ruling loads unchanged; where 
   const STUB='renderBikeProfiles=()=>{};renderClimate=()=>{};renderBags=()=>{};renderKit=()=>{};drawRig=()=>{};syncGPXControl=()=>{};renderPressureHelper=()=>{};renderPackingChecklist=()=>{};applyTheme=()=>{};ensureClimate=()=>{};buildThumb=()=>"";';
   // without bike.js nothing is drawn cut, so nothing is counted cut: the plan as every page before this one made it, left at the bags step
   const before=appVM({bike:false});before.run(STUB);
-  const oldPlan=(style,bags)=>before.run(`(()=>{S.bikeProfile=normaliseBikeProfile({id:'qa_xs',name:'XS',fit:{style:'${style}',size:{kind:'letter',value:'XS'}}});
-    S.bags=${JSON.stringify(bags)};S.nextUid=5;S.step=2;S.nights=0;
+  const oldPlan=(style,bags,kit)=>before.run(`(()=>{S.bikeProfile=normaliseBikeProfile({id:'qa_xs',name:'XS',fit:{style:'${style}',size:{kind:'letter',value:'XS'}}});
+    S.bags=${JSON.stringify(bags)};S.nextUid=5;S.step=2;S.nights=0;${kit?`S.kit=${JSON.stringify(Object.fromEntries(kit.map(k=>[k,true])))};S.kitTouched={...S.kit};`:''}
     S.decks={bar:false,rack:false};S.placements=null;syncFrameBags();currentPlan();return JSON.stringify(captureDraft());})()`);
   const saved=oldPlan('compact',[{uid:1,pos:'frame',L:2.5},{uid:2,pos:'bottle',slot:'dt',L:0.75},{uid:3,pos:'seat',L:14},{uid:4,pos:'bar',L:13}]);
   let plan=JSON.parse(saved);const frameKey='1-0';
@@ -651,7 +654,10 @@ test('[LC-FRAME-FITS-OLD] a plan saved before the ruling loads unchanged; where 
   assert.equal(vm.run('currentPlan().notes.replan'),null,'opened again: nothing is placed afresh a second time');
   noteOf(vm,check(vm),'after a reload');
   // a plan where the planner moved small things in while others left: what would still fit beside what stayed is named as moved, not as not fitting
-  plan=JSON.parse(oldPlan('diamond-sloping',[{uid:1,pos:'frame',L:2.5},{uid:2,pos:'bottle',slot:'dt',L:0.75},{uid:3,pos:'rack',L:15,pair:true},{uid:4,pos:'bar',L:13}]));
+  // the camping kit this case was written with: since the owner's rulings of 14 Nov 2026 (PR 173, #32) a fresh planner's nights are a day
+  // ride's until entered, whose kit is too small to move anything out of the frame bag that would still fit
+  const CAMP=['quilt','pad','tent','rain','puffy','base1','bibs','socks','camp','cap','underwear','shades','stove','pot','spork','food','snacks','tool','tubes','pump','levers','link','chaintl','hanger','patch','boot','lock','bank','phone','cables','headlamp','firstaid','wash','towel','teeth','wipes','docs','cash'];
+  plan=JSON.parse(oldPlan('diamond-sloping',[{uid:1,pos:'frame',L:2.5},{uid:2,pos:'bottle',slot:'dt',L:0.75},{uid:3,pos:'rack',L:15,pair:true},{uid:4,pos:'bar',L:13}],CAMP));
   was=wasOf(plan);
   vm=open(JSON.stringify(plan));
   const both=check(vm);

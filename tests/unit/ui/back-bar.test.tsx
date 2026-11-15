@@ -5,6 +5,7 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, expect, test } from 'vitest';
 import { TL } from '../../../src/core/wording/en-tools.ts';
+import { bannedHits } from '../../fixtures/banned.ts';
 import { readHost } from '../../../src/tools/tyre/host.ts';
 import type { KeyValueStore } from '../../../src/tools/tyre/storage.ts';
 import { TyreScreen } from '../../../src/tools/tyre/ui.tsx';
@@ -93,7 +94,17 @@ test('[WF-BAR] keyboard and screen readers: the bar is never taken out of the pa
   expect(w.away()).toBe(false);
 });
 
-test('[WF-BAR] the tyre tool has the one top bar, "← Back to Wayfinch" to Tools, in place of its "Tools" box', async () => {
+test('[GA-BACK-TOOLS] Tyre pressure, a screen of Tools, says "← Tools" in its one top bar (the owner\'s ruling of 14 Nov 2026, sweep #42)', async () => {
+  const data = new Map<string, string>();
+  const kv: KeyValueStore = { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => { data.set(k, v); } };
+  await act(() => { render(<TyreScreen services={{ host: () => readHost(kv, () => null), storage: kv, now: () => new Date('2026-11-14T10:00:00Z') }} />, host); });
+  const link = host.querySelector('.wf-bar.wf-bar-app a')!;
+  expect(link.textContent).toBe('← Tools');
+  expect(link.getAttribute('href')).toBe('#/tools');
+  expect(bannedHits(link.textContent!)).toEqual([]);
+});
+
+test('[WF-BAR] the tyre tool has the one top bar, "← Tools" to Tools since the ruling of 14 Nov 2026 (sweep #42), in place of its "Tools" box', async () => {
   const data = new Map<string, string>();
   const kv: KeyValueStore = { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => { data.set(k, v); } };
   await act(() => { render(<TyreScreen services={{ host: () => readHost(kv, () => null), storage: kv, now: () => new Date('2026-11-08T10:00:00Z') }} />, host); });
@@ -101,8 +112,9 @@ test('[WF-BAR] the tyre tool has the one top bar, "← Back to Wayfinch" to Tool
   expect(bar).not.toBeNull();
   expect(host.querySelector('.tyre')!.firstElementChild).toBe(bar);
   const link = bar!.querySelector('a')!;
-  expect(link.textContent).toBe(TL.toolsBack);
-  expect(TL.toolsBack).toBe('← Back to Wayfinch');
+  expect(link.textContent).toBe(TL.toolsBackTools);
+  expect(TL.toolsBack).toBe('← Back to Wayfinch');   // the bar's words elsewhere
+  expect(TL.toolsBackTools).toBe('← Tools');
   expect(link.getAttribute('href')).toBe('#/tools');
   expect([...host.querySelectorAll('a.btn')].some((a) => a.textContent === 'Tools')).toBe(false);
 });

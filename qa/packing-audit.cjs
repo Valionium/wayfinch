@@ -16,7 +16,7 @@ const source=[
   "function bikeModule(){return null;}   // the drawing (bike.js) is not in these sections: nothing is drawn cut, so nothing is counted cut (LC-FRAME-FITS)",
   'globalThis.api={S,KIT,POSITIONS,physical,allocateInto,allocate,getChecklistModel,itemL,itemKg,placedKg,weightIn,loadByZone,deckClaims,activeKit,rebalancePairs,fitsLength,moveTargets,incomingFor,usableL,packingSummary,rainAccess,comfortFill,currentPlan};'
 ].join('\n');
-const context=vm.createContext({});vm.runInContext(source,context);const a=context.api,initial=JSON.parse(JSON.stringify(a.S));
+const context=vm.createContext({});vm.runInContext(source,context);const a=context.api,initial=JSON.parse(JSON.stringify({...a.S,nights:6,nightsOpen:null}));   // the 6-night trip these cases were written on (a new plan has no nights entered since the owner's ruling of 14 Nov 2026, sweep #32)
 function reset(ids=[]){Object.assign(a.S,JSON.parse(JSON.stringify(initial)));a.S.kit={};ids.forEach(id=>a.S.kit[id]=true);a.S.foodMode=1;}
 function bag(uid,pos,L,extra={}){return {uid,pos,L,...extra};}
 function allocation(){return a.allocateInto(a.S.bags.flatMap(a.physical));}
@@ -141,7 +141,7 @@ test('rendered verdict and saved setup preserve a 0.01 L overflow',()=>{
 test('comfortable mode avoids claiming all mounted bags are necessary',()=>{
   renderVM.run(`S.mode='comfort';S.kit={tool:true};S.qty={};S.custom={tool:{L:.1,kg:.1,rigid:0}};S.bags=[{uid:1,pos:'top',L:1},{uid:2,pos:'seat',L:14}];renderResult();`);
   const result=renderVM.nodes.get('resultBox').innerHTML;
-  assert(!result.includes('all needed'));assert(!result.includes('Every bag you own is earning its place'));assert(result.includes('none suggested'));assert(result.includes('Switch to Lightweight'));
+  assert(!result.includes('all needed'));assert(!result.includes('Every bag you own is earning its place'));assert(result.includes('none suggested'));assert(result.includes('Choose Lightweight at the start of Kit'));
 });
 test('a lightly used bag is not suggested for removal when its contents would spill',()=>{
   reset(['tool']);a.S.mode='light';a.S.custom.tool={L:.1,kg:.1,rigid:0};a.S.bags=[bag(1,'top',1)];

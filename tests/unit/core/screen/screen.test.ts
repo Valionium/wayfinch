@@ -591,6 +591,19 @@ test('[HON-BUDGET] measured and printed for 200, 800 and 1,600 km', () => {
   }
 }, 120_000);
 
+// The last stage (follow-up to the review of #169): Plan tomorrow leaves no ride tomorrow, and the way back to today stays.
+describe('Plan tomorrow on the last stage', () => {
+  test('[AH-PLAN-TOMORROW] with no ride tomorrow, the Daylight card still offers Back to today; today\'s screen offers Plan tomorrow', () => {
+    const last = testTrip({ route: flatRoute(108.5, { stageEnds: [50, 108.5] }), departureDate: FRI, stay: 'camping' });
+    const labels = (plan: NonNullable<Parameters<typeof inputsOf>[0]>['plan']): string[] => buildScreen(inputsOf({ trip: last, now: `${SAT} 15:00`, plan })).screen.cards.daylight.items.map((x) => x.label);
+    expect(labels(null)).toContain('Plan tomorrow');
+    const planned = buildScreen(inputsOf({ trip: last, now: `${SAT} 15:00`, plan: { date: SAT, backToTodayAt: null } })).screen;
+    expect(planned.ride.stopKm).toBe(108.5);
+    expect(planned.ride.startKm).toBe(108.5);
+    expect(planned.cards.daylight.items.map((x) => x.label)).toEqual(['Back to today']);
+  });
+});
+
 // The owner's rulings of 14 Nov 2026 for En route (sweep of 14 Nov, item 17): with tonight's stop the route end, the line says so once,
 // at the top, never again on each card.
 describe('tonight at the route end is said once', () => {

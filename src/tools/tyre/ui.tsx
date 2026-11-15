@@ -12,6 +12,7 @@ import { TQ } from '../../core/wording/en-tyre-fields.ts';
 import { HN } from '../../core/wording/en-hint.ts';
 import { TZ } from '../../core/wording/en-tyre-figures.ts';
 import { BackBar } from '../../ui/back-bar/back-bar.tsx';
+import { TL } from '../../core/wording/en-tools.ts';
 import { FitLine } from '../../ui/bike/fit-line.tsx';
 import { noteSeen } from '../../ui/bike/hint-seen.ts';
 import { Card, Notice } from '../../ui/card.tsx';
@@ -390,7 +391,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
 
   return (
     <div class="tyre">
-      <BackBar href="#/tools" />
+      <BackBar href="#/tools" label={TL.toolsBackTools} />
       <h2 class="tyre-title">{TS.tyreTitle}</h2>
       <p class="muted">{T.tyreIntro}</p>
 
@@ -563,7 +564,7 @@ export function TyreScreen({ services }: { services: TyreServices }) {
             {sramList(v).map((row) => <li key={row.label}><strong>{row.label}:</strong> {row.value}</li>)}
           </ul>
           <p><a class="btn btn-primary" href={SRAM_URL} target="_blank" rel="noopener noreferrer">{TN.tyreSramLink}</a></p>
-          <p class="muted">{W.tyreSramNothingSent} {TN.tyreSramDiffer}</p>
+          <p class="muted">{TS.tyreSramNothingSent} {TN.tyreSramDiffer}</p>
         </Card>
       ) : null}
     </div>

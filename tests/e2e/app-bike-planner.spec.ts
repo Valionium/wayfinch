@@ -336,8 +336,10 @@ test('[BK-SHAPES-PAGE] a tap on the middle of each drawn bag shape reaches that 
 
 // The owner's decision of 9 Nov 2026 (weight map design, "slim the weight map down"): at the packing check one line under the drawing,
 // the map only behind "Show the map" when the line says the plan differs from the best arrangement found in the rider's own bags.
+/** The 6-night trip these tests were written on: a new plan has no nights entered since the owner's ruling of 14 Nov 2026 (sweep #32). */
+const SIX_NIGHTS = 'S.nights = 6; S.nightsOpen = null; applyTripKitDefaults(); ';
 async function packingCheck(page: Page, bags: string): Promise<void> {
-  await page.evaluate(`${bags} go(2); go(3); go(4)`);
+  await page.evaluate(`${SIX_NIGHTS}${bags} go(2); go(3); go(4)`);
   if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click(); // the weight question, skipped
   const line = page.locator('#weightLine');
   await expect(line).toBeVisible();
@@ -596,7 +598,7 @@ test('[BAL-STORED] a plan reopened at the packing check in the planner\'s own pa
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await planner(page);
-  await page.evaluate(`(async () => { ${BAL_BAGS} go(2); go(3); S.step = 4; currentPlan(); await flushDraft(); })()`);
+  await page.evaluate(`(async () => { ${SIX_NIGHTS}${BAL_BAGS} go(2); go(3); S.step = 4; currentPlan(); await flushDraft(); })()`);
   const stored = await page.evaluate("localStorage.getItem('loadcheck:draft')");
   await page.reload({ waitUntil: 'load' });
   if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click(); // the weight question, skipped
@@ -841,9 +843,26 @@ test('[HF-LINE] the owner\'s sequence: a press turns the button into the way bac
   expect(errors).toEqual([]);
 });
 
+// The owner's ruling of 14 Nov 2026 (sweep #33; review of PR 173, I1): on this load, as balanced as its bags allow, a press only said
+// "Already packed for handling"; once the press's own search has come back with nothing to move, the button is not offered.
+test('[HF-LINE] [LC-HF-HIDE] a load a press cannot change: the line says it is as balanced as the bags allow, and once the press\'s own search is back there is no Handling first and no hint', async ({ page }) => {
+  await planner(page);
+  await page.evaluate(SIX_NIGHTS + "S.bags = [{ uid:1, pos:'rack', L:20, pair:true }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'bottle', slot:'dt', L:0.75 }, { uid:4, pos:'pack', L:12 }]; S.nextUid = 5; S.decks = { bar:false, rack:true }; S.mode = 'light'; go(2); go(3); go(4)");
+  if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
+  await expect(page.locator('#weightLine')).toHaveText('Your load is as balanced as your bags allow.', { timeout: 60_000 });
+  await page.waitForFunction('HANDLING_PROBE.key !== null && HANDLING_PROBE.nothing === true', null, { timeout: 60_000 });
+  await settled(page);
+  await expect(page.locator('#rigHandling')).toBeHidden();
+  await expect(page.locator('#handlingHint')).toBeHidden();
+  await expect(page.locator('#rigWeightMap')).toBeHidden();   // nothing to show on the map either: the plan is the best found
+});
+
+// The same load while the press's own search has not come back (the button is offered until then): the press says "Already packed for
+// handling", the button goes and the focus goes to its line (review of PR 121, R1), the map button stays; a plan changed gives it back.
 test('[HF-LINE] "Already packed for handling": the line and the map button, no button to press again', async ({ page }) => {
   await planner(page);
-  await page.evaluate("S.bags = [{ uid:1, pos:'rack', L:20, pair:true }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'bottle', slot:'dt', L:0.75 }, { uid:4, pos:'pack', L:12 }]; S.nextUid = 5; S.decks = { bar:false, rack:true }; S.mode = 'light'; go(2); go(3); go(4)");
+  await page.evaluate('handlingNothing = () => false');   // its own search not back yet
+  await page.evaluate(SIX_NIGHTS + "S.bags = [{ uid:1, pos:'rack', L:20, pair:true }, { uid:2, pos:'bar', L:9 }, { uid:3, pos:'bottle', slot:'dt', L:0.75 }, { uid:4, pos:'pack', L:12 }]; S.nextUid = 5; S.decks = { bar:false, rack:true }; S.mode = 'light'; go(2); go(3); go(4)");
   if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
   const button = page.locator('#rigHandling');
   await expect(button).toHaveAttribute('aria-disabled', 'false', { timeout: 60_000 });
