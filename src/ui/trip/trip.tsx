@@ -83,7 +83,6 @@ function Step({ name, n, title, state, open, line, change, canOpen, onOpen, chil
 const PACE_WORD = { steady: W.appTripPaceSteady, sporting: W.appTripPaceSporting, hard: W.appTripPaceHard } as const;
 const STAY_WORD = { camping: W.appTripStayCamping, mixed: W.appTripStayMixed, accommodation: W.appTripStayAccommodation } as const;
 
-
 export function TripScreen({ services }: { services: TripServices }) {
   const [snap, setSnap] = useState<TripSnapshot | null>(null);
   // The step the rider opened; null: the one the trip suggests.
