@@ -27,6 +27,9 @@ async function finished(page: Page): Promise<void> {
   await page.evaluate("S.nights = 6; S.nightsOpen = null; applyTripKitDefaults(); S.bags = [{ uid:1, pos:'seat', L:14 }, { uid:2, pos:'frame', L:6 }, { uid:3, pos:'bar', L:12 }]; S.nextUid = 4; go(2); go(3); go(4)");
   if (await page.locator('#maxWeightBox').isVisible()) await page.locator('#mwClose').click();
   await expect(page.locator('#rigSvg [data-inspect]').first()).toBeVisible();
+  // the packing check settled first: the balancing, the weight map's line and Handling first's own search have come back, so no late
+  // drawing closes what the test opens (they land in their own time, more slowly in Firefox)
+  await page.waitForFunction('!BALANCE.run && !BALANCE.loading && IDEAL_CACHE.value !== null && IDEAL_CACHE.key === idealKey() && HANDLING_PROBE.done', null, { timeout: 60_000 });
 }
 
 /** The height a route map gets at this window size. */

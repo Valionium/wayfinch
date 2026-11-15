@@ -10028,21 +10028,21 @@ function startHandling(o = {}){
 /* Whether a press would move nothing ("Already packed for handling"), worked out by the press's own search on the plan as it is, in
    slices between frames, once per plan and ticks (review of PR 173, I1: "as balanced as your bags allow" alone is no proof, since a press
    takes smaller gains and evens pairs). Nothing is applied or stored. now: at once (the QA suites). */
-const HANDLING_PROBE = { key:null, nothing:false };
+const HANDLING_PROBE = { key:null, nothing:false, done:true };   // done: the search for key has come back
 function handlingNothing(now = false){
   const key = JSON.stringify([idealKey(), Object.keys(S.packed || {}).filter(id => S.packed[id]).sort()]), p = HANDLING_PROBE;
   if(p.key === key) return p.nothing;
-  p.key = key; p.nothing = false;
+  p.key = key; p.nothing = false; p.done = false;
   currentPlan();
   const start = idealTrial(S.bags, {}, S.placements), fixed = handlingFixed(start), W = window.WayfinchAdvisor;
   const trial = rememberedTrial(), fresh = pins => trial(pins, start), extra = splitThings(), pairs = shownPairs();
   const go = n => W.handlingFirst(start, trial, fresh, { fixed, extra, maxTrials:BALANCE_TRIALS, budget:n, pairs });
-  const done = out => { p.nothing = !out.apply && !out.held; return p.nothing; };
+  const done = out => { p.nothing = !out.apply && !out.held; p.done = true; return p.nothing; };
   if(now) return done(go(Infinity));
   let n = 0;
   const slice = () => {
     if(p.key !== key) return;   // the plan changed: its own probe decides
-    if(PLAN_TRIAL || TRIAL || S.step !== 4 || DRAFT_FROZEN || HANDLING.run){ p.key = null; return; }
+    if(PLAN_TRIAL || TRIAL || S.step !== 4 || DRAFT_FROZEN || HANDLING.run){ p.key = null; p.done = true; return; }
     n += HANDLING_SLICE;
     const out = go(n);
     if(!out.done){ setTimeout(slice, 0); return; }
