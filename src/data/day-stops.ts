@@ -1,6 +1,7 @@
 // Days that end where you can sleep, on the store (owner's ruling of 9 Nov 2026, "the stop is saved, and it carries over to the
-// Bag planner and En route"). A chunk of its own: Prepare this route settles the stops once places are saved, and Trip's summary
-// settles them again whenever its route or plan changes, and when the rider picks another place or "No stop" (with Undo).
+// Bag planner and En route"). A chunk of its own: Prepare this route settles the stops once places are saved, a change of nights,
+// pace or speed plans its days here (M5), and Trip's summary settles them again whenever its route or plan changes, and when the
+// rider picks another place or "No stop" (with Undo).
 // The stops are kept with the trip, for its route and its plan alone (core/route/day-stops.ts), and the route's stages end there,
 // so every card, the forecast grid and the handoff read the same days.
 import { candidatesNear, closedThatNight } from '../core/engines/day-beds.ts';
@@ -14,6 +15,7 @@ import { announceHere } from '../store/changed.ts';
 import { readInputs } from '../store/inputs.ts';
 import { readLocalSettings } from '../store/settings-local.ts';
 import { readTrip, saveTrip } from '../store/trip.ts';
+import { inTurn } from '../store/turn.ts';
 
 /** A day's stop changed by the rider (a place, or null: "No stop", the planned end), or the stops as they were (Undo). */
 export type StopChange = { day: number; to: BedChoice | null } | { restore: TripStops | null };
@@ -77,17 +79,6 @@ function judged(held: TripStops, fresh: TripStops | null, inputs: ScreenInputs):
   return { ...held, days };
 }
 
-/**
- * Settles the stops of the stored trip, with the rider's change if any, and writes the trip when its days change. Resolves to the
- * stops now in force, or null when there are none (no places saved, a day ride, or the route gone meanwhile).
- */
-/**
- * Every stop write of this window, one after another (review of PR 101, I5): Trip's automatic settles, the rider's picks and Undo,
- * and Prepare's. Each reads the trip only once the one before has written, so a pick is never overwritten by a settle that read
- * the trip before it.
- */
-let turn: Promise<unknown> = Promise.resolve();
-
 /** What a settle works the stops out from, besides the places and the nights: the route's days, the stops held, the stay, the date, the pace and the speed. */
 /**
  * The trip changed under a settle: the store's refusal (NewerDataError) or this file's own check. Told by the error's name, not its
@@ -99,15 +90,24 @@ const stale = (): Error => Object.assign(new Error('The trip changed while its s
 
 const basisOf = (t: Trip): string => JSON.stringify([t.route.id, t.route.stages, t.stops ?? null, t.stay, t.departureDate, t.pace ?? null, t.flatKph]);
 
-export function settleStops(now: Date, change?: StopChange, o: { announce?: boolean } = {}): Promise<TripStops | null> {
-  // The trip changed while this settle worked (review of PR 101, M6): once more, on the trip as it is now, so both changes stay.
-  const mine = turn.then(() => settling(now, change, o).catch((e: unknown) => {
+/**
+ * Settles the stops of the stored trip, with the rider's change if any, and writes the trip when its days change. Resolves to the
+ * stops now in force, or null when there are none (no places saved, a day ride, or the route gone meanwhile). In the window's one
+ * queue (store/turn.ts; review of PR 101, I5 and M5): Trip's settles, the rider's picks and Undo, Prepare's, and every other Trip
+ * write each wait for the one before, so a pick is never overwritten by a write that read the trip before it.
+ */
+export const settleStops = (now: Date, change?: StopChange, o: { announce?: boolean } = {}): Promise<TripStops | null> => inTurn(() => settleInTurn(now, change, o));
+
+/**
+ * The settle for a caller that holds the turn already: a change of nights, pace or speed plans its days here (M5), so they are
+ * written once, already ending at the stops. The trip changed while it worked (review of PR 101, M6): once more, on the trip as it
+ * is now, so both changes stay.
+ */
+export const settleInTurn = (now: Date, change?: StopChange, o: { announce?: boolean } = {}): Promise<TripStops | null> =>
+  settling(now, change, o).catch((e: unknown) => {
     if (isStale(e)) return settling(now, change, o);
     throw e;
-  }));
-  turn = mine.catch(() => undefined);
-  return mine;
-}
+  });
 
 async function settling(now: Date, change: StopChange | undefined, o: { announce?: boolean }): Promise<TripStops | null> {
   const inputs = await readInputs(now);

@@ -4,7 +4,7 @@
 import { describe, expect, test } from 'vitest';
 import { bikeArt } from '../../../../src/core/bike/art.ts';
 import type { Anchors, P, Spot } from '../../../../src/core/bike/art.ts';
-import { bikeArt as plannerArt, resolveBikeSpec as plannerSpec, shapedArt } from '../../../../src/core/bike/planner.ts';
+import { bikeArt as plannerArt, frameKept, resolveBikeSpec as plannerSpec, shapedArt } from '../../../../src/core/bike/planner.ts';
 import { resolveBikeSpec } from '../../../../src/core/bike/spec.ts';
 import type { BagView } from '../../../../src/core/bike/spec.ts';
 import { drawingSet, setBike } from './drawing-set.ts';
@@ -142,4 +142,31 @@ describe('the frame bag beside the plan\'s bottles (owner, 9 Nov 2026)', () => {
     const outline = (shell[1]!.match(/-?\d*\.?\d+/g) ?? []).map(Number).reduce<P[]>((o, v, i, all) => (i % 2 ? o : [...o, [v, all[i + 1]!] as P]), []);
     expect(drawnBottle(a.bottles.st!, 0.5).filter((p) => inPoly(outline, p)).length).toBe(0);
   });
+});
+
+describe('the frame bag counts what fits beside the plan\'s bottles (owner\'s ruling of 14 Nov 2026)', () => {
+  test('[BK-FRAME-COUNT] every bike of the drawing set: frameKept gives each frame shape the share the rig keeps of it beside the plan\'s bottles in the triangle, the drawn cut\'s area over the whole shape\'s; 1 where it is not cut, and for every shape without a bottle in the triangle', () => {
+    const sets: { slot: Slot; L: number }[][] = [[], [{ slot: 'un', L: 0.5 }], [{ slot: 'dt', L: 0.75 }], [{ slot: 'st', L: 0.5 }], [{ slot: 'st', L: 0.5 }, { slot: 'dt', L: 1 }]];
+    let cut = 0;
+    for (const { name, bike } of bikes()) for (const bottles of sets) {
+      const spec = plannerSpec(bike, view(1, bottles));
+      const kept = frameKept(spec);
+      const whole = bikeArt(spec, null).anchors.frame;
+      const drawn = plannerArt(spec, null).anchors.frame;
+      const label = `${name} beside ${bottles.map((b) => b.slot).join('+') || 'nothing'}`;
+      expect(kept, label).toHaveLength(4);
+      if (!whole || !drawn) { expect(kept, label).toEqual([1, 1, 1, 1]); continue; }
+      kept.forEach((k, i) => {
+        expect(k, `${label}, shape ${i}`).toBeCloseTo(areaOf(poly(drawn.shapes[i]!)) / areaOf(poly(whole.shapes[i]!)), 6);
+        expect(k, `${label}, shape ${i}`).toBeGreaterThan(0);
+        expect(k, `${label}, shape ${i}`).toBeLessThanOrEqual(1);
+        if (k < 1) cut += 1;
+      });
+      expect(kept[0], `${label}: the full shape is never beside a bottle`).toBe(1);
+      if (!bottles.some((b) => b.slot !== 'un')) expect(kept, label).toEqual([1, 1, 1, 1]);
+    }
+    expect(cut).toBeGreaterThan(100);
+    // the owner's case: the XS frame beside its down-tube bottle keeps about 54% of the three-quarter bag
+    expect(frameKept(plannerSpec(setBike('compact', 'XS', 'drop', false), view(1, [{ slot: 'dt', L: 0.75 }])))[1]).toBeCloseTo(0.54, 2);
+  }, 120_000);
 });

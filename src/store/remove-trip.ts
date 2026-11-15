@@ -13,6 +13,7 @@ import { flushWrites, holdsCopy, markChanged, noteCopy, RefusedError, tracked } 
 import { CURRENT, inExistingTx } from './db.ts';
 import { readLocalSettings, SETTINGS_KEY, writeLocalSettings } from './settings-local.ts';
 import { clearRouteData, PLAN_TOMORROW_KEY, ROUTE_TX, sameLine, stampKey } from './trip.ts';
+import { inTurn } from './turn.ts';
 
 /**
  * This browser's keys of the trip: the plan for tomorrow, the mark that the route's heights were looked up (ui/trip/services.ts),
@@ -58,9 +59,12 @@ function putBack(kept: [string, string][]): boolean {
  * so none lands after it; anything still on its way for the old route (Get ready offline, a weather refresh, a position) is refused
  * by the store, which writes only over the route it was meant for. The other windows are told, and read again.
  */
-export async function removeTrip(expected: Route | null): Promise<void> {
-  await flushWrites();
-  return tracked(removing(expected));
+export function removeTrip(expected: Route | null): Promise<void> {
+  // In the window's turn (review of PR 175, m-3): a settle or a pick under way writes first, so its write can't bring the trip back.
+  return inTurn(async () => {
+    await flushWrites();
+    return tracked(removing(expected));
+  });
 }
 
 async function removing(expected: Route | null): Promise<void> {

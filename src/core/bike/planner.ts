@@ -1,5 +1,6 @@
 // The bag planner's bike module, /tools/bags/bike.js (spec section 7.4): bikeArt as both pages draw it, with the anchors carrying the
 // bag planner's own tap targets and tags (targets.ts), which the co-pilot never needs, and the look extras (paint.ts) with their words.
+import { bikeArt as drawnArt } from './art.ts';
 import type { Anchors, ArtOptions, P } from './art.ts';
 import { bagLayer } from './bag-art.ts';
 import { besideBottles } from './beside.ts';
@@ -35,6 +36,22 @@ export function resolveBikeSpec(bike: BikeRecord | null, plan: PlanView | null):
 export function bikeArt(spec: PlannerSpec, bags: BagView | null, options: ArtOptions = {}, paint: Paint | null = null): { svg: string; anchors: PlannerAnchors; label: string } {
   const art = paintedArt(spec, bags, options, paint);
   return { ...art, anchors: withTargets(besideBottles(art.anchors, spec.bottles ?? bags?.bottles ?? [])) };
+}
+
+const areaOf = (s: string): number => {
+  const p = s.split(' ').map((q) => q.split(',').map(Number) as P);
+  return Math.abs(p.reduce((t, a, i) => { const b = p[(i + 1) % p.length]!; return t + a[0] * b[1] - b[0] * a[1]; }, 0)) / 2;
+};
+/**
+ * Of each frame bag shape (full, three-quarter, half, wedge), the share the drawing keeps beside the plan's bottles in the triangle: the
+ * cut shape's area over the whole shape's, 1 where nothing is cut (owner's ruling of 14 Nov 2026, "count what fits": the bag planner
+ * counts a frame bag's usable litres by it, so the plan holds what the rig draws). Only the anchors are read, as bikeArt draws them.
+ */
+export function frameKept(spec: PlannerSpec): number[] {
+  const whole = drawnArt(spec, null).anchors;
+  const cut = besideBottles(whole, spec.bottles ?? []);
+  if (!whole.frame || !cut.frame) return [1, 1, 1, 1];
+  return whole.frame.shapes.map((s, i) => { const c = cut.frame!.shapes[i]!; return c === s ? 1 : areaOf(c) / areaOf(s); });
 }
 
 /**

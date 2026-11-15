@@ -28,6 +28,7 @@ import type { Settings } from '../../store/rules.ts';
 import { readSettings, writeSettings } from '../../store/settings.ts';
 import { readTrip, replaceRoute, RouteGoneError, sameLine, saveTrip } from '../../store/trip.ts';
 import { preparedStore } from '../../store/prepared.ts';
+import { inTurn } from '../../store/turn.ts';
 import type { PreparedStore } from '../../store/prepared.ts';
 import { planned, tripRuns } from './model.ts';
 
@@ -169,13 +170,6 @@ function standaloneNow(): boolean | null {
 }
 
 export function browserTripServices(now: () => Date = () => new Date()): TripServices {
-  // One write at a time: the store refuses a write over a version this window has not read, so taps that follow each other fast must not overlap.
-  let queue: Promise<unknown> = Promise.resolve();
-  const inTurn = <T>(work: () => Promise<T>): Promise<T> => {
-    const run = queue.then(work, work);
-    queue = run.catch(() => undefined);
-    return run;
-  };
   const nav = typeof navigator === 'undefined' ? undefined : navigator;
   const nothing = (at: Date, settings: Settings, available: boolean): TripSnapshot => ({
     now: at, available, trip: null, settings, prepared: null, places: 0, forecastTo: null, forecastFetchedAt: null, zone: 'UTC', storageMb: null, day1LeaveBy: null, heightsLookedUp: false, running: false, nothingSaved: true,
@@ -211,16 +205,6 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
     } catch {
       return { ...nothing(at, settings, true), trip };
     }
-  };
-
-  /** After pace, speed or nights change, the days (and the forecast grid made with them) are made again, so Trip and Ahead agree. */
-  const replan = async (): Promise<void> => {
-    const settings = await readSettings();
-    const trip = await readTrip();
-    if (!trip) return;
-    const route = planned(trip.route, { flatKph: trip.flatKph, pace: trip.pace ?? settings.pace, nights: settings.nights });
-    if (JSON.stringify(route.stages) === JSON.stringify(trip.route.stages) && JSON.stringify(route.sampleGrid) === JSON.stringify(trip.route.sampleGrid)) return;
-    await saveTrip({ ...trip, route });
   };
 
   const addRoute = async ({ route, hadHeights }: { route: Route; hadHeights: boolean }, expected: Route | null): Promise<AddOutcome> => {
@@ -262,7 +246,11 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
       let note = result.newerReason;
       if (result.newer.length === 0 && replans) {
         try {
-          await replan();
+          // After pace, speed or nights change, the days (and the forecast grid made with them) are made again, so Trip and Ahead
+          // agree: by the day stops' own settle, in this turn, so they are written once, already planned around the rider's stops and
+          // ending at the places (review of PR 101, M5). With no places saved that is the stage model's own plan. From Prepare's own
+          // chunk (heights.ts), loaded only for a trip.
+          if (await readTrip()) await (await import('../../data/heights.ts')).replan(now);
         } catch {
           // The setting is kept; only the days are behind. Said on its own, not as a refusal of the setting.
           note = W.appTripReplanFailed;
