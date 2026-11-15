@@ -155,8 +155,9 @@ const focusChange = (day: number): void => {
  * Settling the stops and the places to pick, from their own chunk (TRIP-DAY-STOPS). The route summary is itself a chunk, so the
  * first screen carries none of it.
  */
-const settleStops = (change?: StopChange): Promise<TripStops | null> => import('../../data/day-stops.ts').then((m) => m.settleStops(new Date(), change));
-const stopChoices = (day: number): Promise<BedChoice[]> => import('../../data/day-stops.ts').then((m) => m.stopChoices(new Date(), day));
+const stopsCode = () => import('../../data/day-stops.ts');
+const settleStops = (change?: StopChange): Promise<TripStops | null> => stopsCode().then((m) => m.settleStops(new Date(), change));
+const stopChoices = (day: number): Promise<BedChoice[]> => stopsCode().then((m) => m.stopChoices(new Date(), day));
 
 export function RouteSummary({ snap, stops, beds, settle = settleStops, choices = stopChoices }: {
   snap: TripSnapshot; stops: TripServices['stops']; beds?: TripServices['dayBeds'];
@@ -167,10 +168,17 @@ export function RouteSummary({ snap, stops, beds, settle = settleStops, choices 
   // forecast (Update weather moves the cover icons: review of PR 73, M2) change.
   const ready = trip !== null && (snap.prepared !== null || snap.places > 0);
   const key = ready ? [trip.route.id, trip.route.stages.map((s) => s.endKm).join(','), trip.departureDate, trip.startTime, trip.stay, snap.places, snap.prepared?.at?.getTime?.(), snap.forecastFetchedAt?.getTime()].join('|') : '';
-  // The days end where you can sleep once places are saved: settled again whenever the route, its plan or what was saved change.
+  // The days end where you can sleep once places are saved: settled again whenever the route, its plan or what was saved change. Nights
+  // set apart from the days (a change whose code could not load: review of PR 175, m-2) are planned the same way, now and when the
+  // phone is back online.
+  const behind = trip !== null && snap.settings.nights !== null && trip.route.stages.length !== snap.settings.nights + 1;
   useEffect(() => {
-    if (key && settle) settle().catch(() => undefined);
-  }, [key, settle]);
+    if (!(key || behind)) return undefined;
+    const again = (): void => { settle().catch(() => undefined); };
+    again();
+    addEventListener('online', again);
+    return () => removeEventListener('online', again);
+  }, [key, behind, settle]);
   const [open, setOpen] = useState<{ day: number; list: BedChoice[] | null } | null>(null);
   const [undo, setUndo] = useState<{ day: number; before: TripStops | null; after: TripStops | null } | null>(null);
   const [said, setSaid] = useState('');

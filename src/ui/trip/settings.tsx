@@ -17,7 +17,8 @@ type Save = (field: keyof Settings, value: unknown) => Promise<boolean>;
 
 /** Settles the day stops now and gives the stops as they are then (Trip's summary's own settle, from its chunk). */
 export type Settle = () => Promise<TripStops | null>;
-const settleNow: Settle = () => import('../../data/day-stops.ts').then((m) => m.settleStops(new Date()));
+const stopsCode = () => import('../../data/day-stops.ts');
+const settleNow: Settle = () => stopsCode().then((m) => m.settleStops(new Date()));
 
 /**
  * The line for a trip whose nights become `n`, '' when it held no stops: by the very rule the settle plans them by (planAround, the
@@ -112,13 +113,27 @@ function Part({ services, snap, reload, part, focusDate = 0, settle = settleNow 
   const [fresh, setFresh] = useFollowing(settings.keepFresh);
   const dateField = useRef<HTMLInputElement>(null);
   const [stopsSaid, setStopsSaid] = useState('');
+  // A change the last save could not plan the days for (its note says so): then nothing is said about new stops (review of PR 175, m-2).
+  const noted = useRef(false);
+  // Once the days have followed, the line that said they would goes (review of PR 181, m-1).
+  const days = JSON.stringify(trip?.route.stages);
+  useEffect(() => setProblems((p) => (Object.values(p).includes(W.appTripDaysLater) ? {} : p)), [days]);
   useEffect(() => { if (focusDate > answered) { answered = focusDate; dateField.current?.focus(); } }, [focusDate]);
+  // The stops' code a change of nights plans its days with comes as Trip details opens, so the taps after a change do not wait for it
+  // on a slow link (review of PR 175, m-1).
+  useEffect(() => { if (part === 'when') void Promise.allSettled([services.heights?.(), stopsCode()]); }, []);
 
   const save: Save = async (field, value) => {
     const result = await services.writeSettings({ [field]: value });
+    noted.current = !!result.note;
+    // Days whose code could not load are said to update by themselves only where Your route plans them again: a prepared trip's on
+    // each open and back online, and nights set apart from the days; elsewhere main's sentence asks for the change again (review of
+    // PR 181, I-1).
+    const note = result.note === W.appTripReplanFailed && trip && (snap.prepared || snap.places > 0
+      || (field === 'nights' && value !== null && trip.route.stages.length !== (value as number) + 1)) ? W.appTripDaysLater : result.note;
     // A refusal stays beside its field only until the next change that is accepted.
     // An accepted change clears the old refusals, but a note about it (its days could not be updated) is always shown.
-    setProblems((p) => (result.ok ? (result.note ? { [field]: result.note } : {}) : { ...p, [field]: result.reasons[field] ?? result.note ?? '' }));
+    setProblems((p) => (result.ok ? (note ? { [field]: note } : {}) : { ...p, [field]: result.reasons[field] ?? note ?? '' }));
     // The caller puts a refused value back at once, as the refusal shows: not only once the trip has been read again (on a busy
     // phone that took long enough for the refused value to linger beside its message).
     void reload();
@@ -136,7 +151,7 @@ function Part({ services, snap, reload, part, focusDate = 0, settle = settleNow 
     const was = trip ? settings.nights ?? suggestedNights(trip) : null;
     const ok = await save('nights', v);
     const now = trip ? v ?? suggestedNights(trip) : null;
-    setStopsSaid(ok && trip && now !== null && now !== was ? await stopsLine(trip, now, settle) : '');
+    setStopsSaid(ok && !noted.current && trip && now !== null && now !== was ? await stopsLine(trip, now, settle) : '');
     return ok;
   };
   // With the nights left to the suggestion, a pace or flat speed that changes it plans the nights again around the own stops too: said
@@ -145,7 +160,7 @@ function Part({ services, snap, reload, part, focusDate = 0, settle = settleNow 
   const savePlan = async (field: 'pace' | 'flatKph', v: unknown): Promise<boolean> => {
     const was = trip ? settings.nights ?? suggestedNights(trip) : null;
     const ok = await save(field, v);
-    const next = ok && trip && settings.nights === null ? ({ ...trip, [field]: v } as Trip) : null;
+    const next = ok && !noted.current && trip && settings.nights === null ? ({ ...trip, [field]: v } as Trip) : null;
     const now = next ? suggestedNights(next) : null;
     setStopsSaid(next && now !== null && now !== was ? await stopsLine(next, now, settle) : '');
     return ok;

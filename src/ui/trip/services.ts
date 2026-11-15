@@ -9,7 +9,7 @@ import type { XmlDocLike } from '../../core/route/gpx.ts';
 import { buildScreen } from '../../core/screen/screen.ts';
 import type { Route, Trip } from '../../core/types.ts';
 import { shortIsoDay, W } from '../../core/wording/en.ts';
-import { prepareTrip } from '../../data/prepare.ts';
+import { heightsCode, prepareTrip } from '../../data/prepare.ts';
 import type { StepName, StepReport } from '../../data/prepare.ts';
 import { fetchBaseline, fetchElevation, fetchForecast, fetchModelRuns } from '../../data/openmeteo.ts';
 import { WEATHER_MODE } from '../../data/weather-mode.ts';
@@ -31,6 +31,9 @@ import { preparedStore } from '../../store/prepared.ts';
 import { inTurn } from '../../store/turn.ts';
 import type { PreparedStore } from '../../store/prepared.ts';
 import { planned, tripRuns } from './model.ts';
+
+/** The stops on the profile and the beds near each day's end: one chunk, one loader. */
+const stopsRead = () => import('./stops.ts');
 
 export type TripSnapshot = {
   now: Date;
@@ -88,6 +91,8 @@ export type TripServices = {
   dayBeds?: () => Promise<DayBed[]>;
   /** Contract 2: the trip to the bag planner, which then opens. Absent where there is no bag planner to open. */
   handOff?: () => Promise<HandoffOutcome>;
+  /** Starts loading Prepare's chunk, which a change of nights, pace or flat speed plans its days through (review of PR 175, m-1). */
+  heights?: () => Promise<unknown>;
 };
 
 export const HEIGHTS_FLAG = 'copilot:heights-lookup';
@@ -250,7 +255,7 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
           // agree: by the day stops' own settle, in this turn, so they are written once, already planned around the rider's stops and
           // ending at the places (review of PR 101, M5). With no places saved that is the stage model's own plan. From Prepare's own
           // chunk (heights.ts), loaded only for a trip.
-          if (await readTrip()) await (await import('../../data/heights.ts')).replan(now);
+          if (await readTrip()) await (await heightsCode()).replan(now);
         } catch {
           // The setting is kept; only the days are behind. Said on its own, not as a refusal of the setting.
           note = W.appTripReplanFailed;
@@ -320,8 +325,9 @@ export function browserTripServices(now: () => Date = () => new Date()): TripSer
       return handOffTrip(trip, settings, deps);
     }),
 
-    stops: () => import('./stops.ts').then((m) => m.readStops(now())),
-    dayBeds: () => import('./stops.ts').then((m) => m.readDayBeds(now())),
+    heights: heightsCode,
+    stops: () => stopsRead().then((m) => m.readStops(now())),
+    dayBeds: () => stopsRead().then((m) => m.readDayBeds(now())),
 
     prepare(onProgress, onNotice) {
       return prepareTrip({

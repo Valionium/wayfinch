@@ -33,6 +33,11 @@ import type { FetchLike, GridPoint, Retry } from './openmeteo.ts';
 import { withoutUnknownHolidays } from './overpass.ts';
 import { WEATHER_MODE } from './weather-mode.ts';
 
+/** Prepare's own chunk (heights.ts), one loader for every part that needs it: Prepare, a change of nights, pace or flat speed
+ * (services.ts), and Trip details, which asks for it as it opens (review of PR 175, m-1). */
+export const heightsCode = () => import('./heights.ts');
+const holidaysCode = () => import('../core/hours/holidays.ts');
+
 export type StepName = 'heights' | 'places' | 'hours' | 'weather' | 'baseline' | 'save';
 export type StepReport = { step: StepName; ok: boolean; note: string | null };
 
@@ -94,7 +99,7 @@ async function heightsStep(deps: PrepareDeps, store: PreparedStore, online: bool
       let looked: Route | null = null;
       try {
         // Only a route without heights needs this: a chunk of its own, so the first screen does not carry it.
-        looked = await (await import('./heights.ts')).routeWithHeights(route, deps, store);
+        looked = await (await heightsCode()).routeWithHeights(route, deps, store);
       } catch {
         looked = null;
       }
@@ -303,7 +308,7 @@ async function hoursStep(store: PreparedStore, trip: Trip, zones: ZoneSpan[], no
     const today = localIsoDate(now, startZoneOf(zones));
     const { from, toExclusive } = windowDates(trip, today);
     const worked = await workOutHours(store, trip.route.id, places, matched, from, toExclusive, onProgress);
-    const { holidaysFor } = await import('../core/hours/holidays.ts');
+    const { holidaysFor } = await holidaysCode();
     await store.saveHolidays(trip.route.id, holidaysFor(zonesNamed(zones, places), from, addDaysIso(toExclusive, -1)));
     return worked === 0 ? { step: 'hours', ok: false, note: W.appPrepNoHours } : { step: 'hours', ok: true, note: null };
   } catch (e) {
@@ -337,14 +342,14 @@ async function weatherStep(deps: PrepareDeps, store: PreparedStore, online: bool
     if (!(await store.reserveWeather(route.id, now, WEATHER_GAP_MS))) {
       if (await readForecastDate()) return { step: 'weather', ok: true, note: W.appPrepWeatherRecent };
       // Asked minutes ago (a reload during its wait, say) and nothing saved: nothing is asked now, and it says when it can be.
-      return { step: 'weather', ok: false, note: await (await import('./heights.ts')).spacedNote(startZoneOf(zones), WEATHER_GAP_MS) };
+      return { step: 'weather', ok: false, note: await (await heightsCode()).spacedNote(startZoneOf(zones), WEATHER_GAP_MS) };
     }
     const runs = await runsFor(deps, route, zones);
     const today = localIsoDate(now, startZoneOf(zones));
     const forecast = await deps.fetchForecast(grid, {
       days: forecastDaysFor(route, trip.departureDate, today), with15: deps.with15 ?? WEATHER_MODE === 'auto', fetch: deps.fetch, now: () => now, runs,
       // Inside the turn reserved above: a minute's limit is waited out and the same request sent once more (9 Nov 2026).
-      retry: (await import('./heights.ts')).toldRetry(deps, startZoneOf(zones), ''),
+      retry: (await heightsCode()).toldRetry(deps, startZoneOf(zones), ''),
     });
     await store.saveForecast(route.id, runs.length > 0 && forecast.runs.length === 0 ? { ...forecast, runs } : forecast, now);
     return { step: 'weather', ok: true, note: null };
@@ -440,7 +445,7 @@ export async function prepareTrip(deps: PrepareDeps, onProgress: (step: StepName
     reports.push(await hoursStep(store, trip, zones, deps.now(), (done, total) => onProgress('hours', done, total)));
     // With places and their hours saved, each day ends at a place to sleep near its planned end (owner, 9 Nov 2026), judged for its
     // night with those hours (review of PR 101, I1), before the forecast and the archive are asked for its grid (heights.ts).
-    trip = await (await import('./heights.ts')).settleDayStops(deps.now(), store, trip);
+    trip = await (await heightsCode()).settleDayStops(deps.now(), store, trip);
     begin('weather');
     reports.push(await weatherStep(deps, store, online, trip, zones, deps.now()));
     begin('baseline');
@@ -507,7 +512,7 @@ export async function catchUpHours(now: Date, o: { requestIdle?: IdleRequest; st
   const matched = new Set(await readMatchedIds());
   const store = o.store ?? preparedStore;
   await workOutHours(store, trip.route.id, places, matched, from, toExclusive);
-  const { holidaysFor } = await import('../core/hours/holidays.ts');
+  const { holidaysFor } = await holidaysCode();
   const named = zonesNamed(zones, places);
   const held = await readHeldHolidays();
   const fresh = holidaysFor(named, from, addDaysIso(toExclusive, -1));

@@ -6,6 +6,9 @@ import { addDaysIso } from '../core/answers/time.ts';
 import { pointAtRouteKm } from '../core/geo/project.ts';
 import type { Baseline, GridHour, Km, ModelRun, Route, StoredForecast } from '../core/types.ts';
 
+/** Prepare this route's own requests (openmeteo-prep.ts), one loader for its three uses. */
+const prepCode = () => import('./openmeteo-prep.ts');
+
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
 /** One point to ask about: rounded coordinates, and the route's height there. */
@@ -209,7 +212,7 @@ export async function fetchForecast(grid: GridPoint[], o: { days: number; with15
   const fetchedAt = (o.now ?? (() => new Date()))();
   const url = forecastUrl(grid, o.days, o.with15);
   // Waiting and asking again is Prepare this route's alone: its code is in that chunk (openmeteo-prep.ts).
-  const body = o.retry ? await (await import('./openmeteo-prep.ts')).askPolitely(o.fetch, url, FORECAST_TIMEOUT_MS, o.retry) : await getJson(o.fetch, url, FORECAST_TIMEOUT_MS);
+  const body = o.retry ? await (await prepCode()).askPolitely(o.fetch, url, FORECAST_TIMEOUT_MS, o.retry) : await getJson(o.fetch, url, FORECAST_TIMEOUT_MS);
   const locations = Array.isArray(body) ? body : [body]; // one location comes back as a bare object
   if (isRecord(body) && body['error'] === true) throw new WeatherServiceError('error answer');
   if (locations.length !== grid.length) throw incomplete('wrong number of points');
@@ -247,8 +250,8 @@ export async function fetchModelRuns(f: FetchLike): Promise<ModelRun[]> {
 
 /** Heights at the points, as openmeteo-prep.ts's fetchElevation. */
 export const fetchElevation = (points: { lat: number; lon: number }[], f: FetchLike, retry?: Retry): Promise<(number | null)[]> =>
-  import('./openmeteo-prep.ts').then((m) => m.fetchElevation(points, f, retry));
+  prepCode().then((m) => m.fetchElevation(points, f, retry));
 
 /** The five-year baseline, as openmeteo-prep.ts's fetchBaseline. */
 export const fetchBaseline = (points: GridPoint[], months: number[], f: FetchLike, now: Date = new Date()): Promise<Baseline> =>
-  import('./openmeteo-prep.ts').then((m) => m.fetchBaseline(points, months, f, now));
+  prepCode().then((m) => m.fetchBaseline(points, months, f, now));

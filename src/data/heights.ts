@@ -23,7 +23,7 @@ const HEIGHT_STEP_KM = 0.2;
  * too. 400 keep 200 m up to 80 km and about 680 m on 270 km (measured on Heidelberg to Cologne: 370 m of climbing on its hilly
  * 60 km where 200 m gave 450 m), and leave the forecast and the archive room in the same minute.
  */
-export const MAX_HEIGHT_POINTS = 400;
+const MAX_HEIGHT_POINTS = 400;
 const waitMs = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 /** A height asked for, by the coordinates the request sends. */
 const heightKey = (p: LatLng): string => `${p.lat.toFixed(3)},${p.lon.toFixed(3)}`;
@@ -36,6 +36,8 @@ export const toldRetry = (deps: PrepareDeps, zone: string, after: string): Retry
   onWait: (until) => deps.onNotice?.(until === null ? after : PS.appPrepWait(formatHm(until, zone))),
 });
 const deviceZone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+/** The stops' own chunk, one loader for Prepare's settle and a change of nights, pace or flat speed. */
+const stopsCode = () => import('./day-stops.ts');
 
 /** The route's points as raw points, section breaks kept: a break shows as no distance between two different places. */
 function rawOf(route: Route, ele: (i: number) => number | null): RawPoint[] {
@@ -124,7 +126,7 @@ export async function spacedNote(zone: string, gapMs: number): Promise<string> {
  */
 export async function settleDayStops(now: Date, store: Pick<PreparedStore, 'readTrip'>, trip: Trip): Promise<Trip> {
   try {
-    await (await import('./day-stops.ts')).settleStops(now, undefined, { announce: false });
+    await (await stopsCode()).settleStops(now, undefined, { announce: false });
   } catch {
     return trip;
   }
@@ -137,4 +139,4 @@ export async function settleDayStops(now: Date, store: Pick<PreparedStore, 'read
  * After a change of nights, pace or flat speed: the days planned again by the stops' own settle, in the caller's turn (review of
  * PR 101, M5), so they are written once, already ending at the stops. Beside Prepare's settle, so the first screen names no other chunk.
  */
-export const replan = async (now: () => Date): Promise<unknown> => (await import('./day-stops.ts')).settleInTurn(now(), undefined, { announce: false });
+export const replan = async (now: () => Date): Promise<unknown> => (await stopsCode()).settleInTurn(now(), undefined, { announce: false });

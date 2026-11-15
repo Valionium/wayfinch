@@ -721,6 +721,9 @@ export const W = {
   appTripProgress: (n: number, total: number, name: string): string => `Step ${n} of ${total}: ${name}`,
   appTripProgressPart: (done: number, total: number): string => `${done} of ${total}`,
   appTripReplanFailed: 'The setting was kept, but the days could not be updated. Change it again to try once more.',
+  // Only Trip details says it, where Trip plans the days again by itself (review of PR 181, I-1); here, not in en-trip-fields.ts, as the
+  // lazy parts have no bytes left (the first screen had them back from Prepare's one loader of heights.ts).
+  appTripDaysLater: 'The days update when Wayfinch can load again.',
   appTripPlaces: (n: string): string => `${n} ${n === '1' ? 'place' : 'places'}`,
   appTripNoPlaces: 'no places saved',
   appTripWeatherTo: (day: string): string => `weather to ${day}`,
