@@ -227,6 +227,32 @@ test('[LC-COLOURS-KEEP] another bike shown (show with fresh): the old colour\'s 
   expect(k.onPick).not.toHaveBeenCalled();
 });
 
+// Re-check of PR 162, m4: the focus never falls to the page when the cell that had it goes (another tab changed the bike).
+test('[LC-COLOURS-KEEP] another bike shown while Keep has the focus: the focus moves to the colour now checked (the new cell, or the first), never to the page', () => {
+  const k = openKeep('#a1b2c3');
+  k.picker.focus();
+  expect(k.nameOf(document.activeElement)).toBe('Keep my colour');
+  k.picker.show('#2563b8', true);
+  expect(document.activeElement).toBe(k.byName('Blue'));
+  // an own colour on the next bike: its own cell, checked, takes the focus
+  k.picker.show('#a1b2c3', true);
+  k.picker.focus();
+  k.picker.show('#123456', true);
+  expect(document.activeElement).toBe(k.byName('Keep my colour'));
+  expect(k.byName('Keep my colour').value).toBe('#123456');
+  // no colour at all on the next bike: the first colour
+  k.picker.show(null, true);
+  expect(document.activeElement).toBe(k.byName('White'));
+  // the focus elsewhere is left where it is
+  const outside = document.createElement('button');
+  document.body.appendChild(outside);
+  k.picker.show('#654321', true);
+  outside.focus();
+  k.picker.show('#2563b8', true);
+  expect(document.activeElement).toBe(outside);
+  expect(k.onPick).not.toHaveBeenCalled();
+});
+
 test('[LC-COLOURS-KEEP] the cell is described by the colour it keeps ("Your own colour, close to Silver"), and its description follows its colour', () => {
   const k = openKeep('#a1b2c3');
   const keep = k.byName('Keep my colour');
