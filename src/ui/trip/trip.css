@@ -61,6 +61,9 @@ progress { width: 100%; accent-color: var(--blaze); }
 .trip-step-line { margin: 0; overflow-wrap: anywhere; }
 /* The route kept above Use another route: a long name with no spaces wraps (review of PR 177, m-1). */
 [data-route-kept] { overflow-wrap: anywhere; }
+/* So does the route's name wherever else Trip shows it (Your route, the message once it is added, the questions before it is replaced
+   or removed): Trip never scrolls sideways for it (TRIP-ROUTE-NAME). */
+[data-summary] .tool-line strong, .trip-added, [data-replace] p, #trip-remove-goes { overflow-wrap: anywhere; }
 .trip-details { border-top: 1px solid var(--line); margin: 8px 0 0; padding: 4px 0 0; }
 .trip-details-line { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0 8px; margin: 0; font-size: 0.9375rem; }
 .trip-added { font-weight: 600; }
