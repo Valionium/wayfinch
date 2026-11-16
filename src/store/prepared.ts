@@ -3,7 +3,7 @@
 // carry the route's prefix, so replacing the route removes them.
 import type { Baseline, Place, PlaceHours, RescuePoint, Roof, RouteMatch, StoredForecast, ZoneSpan } from '../core/types.ts';
 import { markChanged, tracked } from './changed.ts';
-import { CURRENT, inTx, ROUTE_META_PREFIX } from './db.ts';
+import { CURRENT, inExistingTx, inTx, ROUTE_META_PREFIX } from './db.ts';
 import type { Tx } from './db.ts';
 import { HOLIDAYS_META, SAVED_KM_META, ZONES_META } from './inputs.ts';
 import { usableHolidays, usableZones } from './rules.ts';
@@ -32,7 +32,7 @@ export type PreparedRecord = {
 };
 
 async function guarded<T>(routeId: string, stores: string[], work: (tx: Tx) => Promise<T>): Promise<T> {
-  return tracked(inTx([...stores, 'trip'], 'readwrite', async (tx) => {
+  return tracked(inExistingTx([...stores, 'trip'], async (tx) => {
     const trip = (await tx.objectStore('trip').get(CURRENT)) as { route?: { id?: unknown } } | undefined;
     if (trip?.route?.id !== routeId) throw new RouteGoneError();
     return work(tx);

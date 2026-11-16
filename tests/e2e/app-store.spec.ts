@@ -126,3 +126,34 @@ test('[ST-DELETE] with a second window open, delete is not held up, and the bag 
   expect(await other.evaluate(async () => __store.readTrip())).toBeNull();
   await other.close();
 });
+
+test('[ST-DELETE] Prepare this route cannot recreate the database after another window deletes it during the zone lookup', async ({ page }) => {
+  const other = await twoWindows(page);
+  await preparedTrip(page, 'heidelberg-strasbourg');
+  let start: () => void = () => undefined;
+  let resume: () => void = () => undefined;
+  const started = new Promise<void>((resolve) => { start = resolve; });
+  const held = new Promise<void>((resolve) => { resume = resolve; });
+  await other.exposeFunction('holdZoneLookup', () => {
+    start();
+    return held;
+  });
+  const prepare = other.evaluate(async () => {
+    const fetchReal = window.fetch;
+    window.fetch = async (input, init) => {
+      if (input === '/data/boundaries.v1.json') {
+        await (window as Window & { holdZoneLookup: () => Promise<void> }).holdZoneLookup();
+      }
+      return fetchReal(input, init);
+    };
+    try { return await __store.prepare(); }
+    finally { window.fetch = fetchReal; }
+  });
+
+  await started;
+  await page.evaluate(() => __store.deleteCopilotData());
+  resume();
+  expect((await prepare).at(-1)).toMatchObject({ step: 'places', ok: false });
+  expect(await other.evaluate(async () => (await indexedDB.databases()).map((db) => db.name))).not.toContain('copilot');
+  await other.close();
+});
