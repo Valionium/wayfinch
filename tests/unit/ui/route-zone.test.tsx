@@ -18,9 +18,9 @@ import type { BoundaryFile } from '../../../src/core/route/zones.ts';
 import { shortIsoDay, W } from '../../../src/core/wording/en.ts';
 import { BOUNDARY_PATH } from '../../../src/data/boundaries.ts';
 import { clearCopies } from '../../../src/store/changed.ts';
-import { closeDb } from '../../../src/store/db.ts';
+import { closeDb, DB_NAME } from '../../../src/store/db.ts';
 import { readInputs } from '../../../src/store/inputs.ts';
-import { readStoredZones } from '../../../src/store/prepared.ts';
+import { preparedStore, readStoredZones } from '../../../src/store/prepared.ts';
 import { readTrip } from '../../../src/store/trip.ts';
 import { refreshBikeSource } from '../../../src/ui/bike/live.ts';
 import { installOffer } from '../../../src/ui/install.ts';
@@ -170,6 +170,30 @@ describe('The route\'s own zone before Prepare this route (the owner\'s ruling o
     await settle(50);
     expect(await readStoredZones()).toEqual([]);
     expect(await readTrip()).toEqual(stored);
+  });
+
+  test('[TRIP-LOCAL-ZONE] deleting co-pilot data in another window during the lookup leaves the database deleted', async () => {
+    let release: (response: Response) => void = () => undefined;
+    const held = new Promise<Response>((resolve) => { release = resolve; });
+    answer = () => held;
+    let finished: () => void = () => undefined;
+    const writeFinished = new Promise<void>((resolve) => { finished = resolve; });
+    const saveZones = preparedStore.saveZones;
+    const write = vi.spyOn(preparedStore, 'saveZones').mockImplementation((...args) => saveZones(...args).finally(finished));
+    try {
+      await show(await oldTrip());
+      await until(() => asked.length > 0, 'the lookup to start');
+      vi.resetModules();
+      const { deleteCopilotData } = await import('../../../src/store/export.ts');
+      vi.resetModules();
+      await deleteCopilotData();
+
+      release(new Response(boundaryText));
+      await writeFinished;
+      expect((await indexedDB.databases()).map((db) => db.name)).not.toContain(DB_NAME);
+    } finally {
+      write.mockRestore();
+    }
   });
 
   test('[TRIP-LOCAL-ZONE] a date another window set while the zones were looked up stays: the lookup writes the zones only, never the trip', async () => {
