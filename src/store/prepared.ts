@@ -77,8 +77,10 @@ export function saveMatched(routeId: string, m: Matched): Promise<Matched['saved
   });
 }
 
-export const saveZones = (routeId: string, zones: ZoneSpan[]): Promise<void> =>
-  guarded(routeId, ['meta'], async (tx) => { await tx.objectStore('meta').put(zones, ZONES_META); });
+export async function saveZones(routeId: string, zones: ZoneSpan[]): Promise<void> {
+  await guarded(routeId, ['meta'], async (tx) => { await tx.objectStore('meta').put(zones, ZONES_META); });
+  markChanged('day');
+}
 
 export const saveHolidays = (routeId: string, holidays: Record<string, string[]>): Promise<void> =>
   guarded(routeId, ['meta'], async (tx) => { await tx.objectStore('meta').put(holidays, HOLIDAYS_META); });

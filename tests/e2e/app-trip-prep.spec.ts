@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { CHANGED_KEY } from '../../src/store/changed.ts';
 import { loadApp, preparedTrip, removeBuilds } from './helpers.ts';
 import type { LoadedApp } from './helpers.ts';
 import type { Trip } from '../../src/core/types.ts';
@@ -100,6 +101,11 @@ test('[TRIP-PREP-ITEMS] a day ride has the two every-ride checks and no night', 
 
 test('[TRIP-PREP-TICKS] a tick, by tap or by keyboard, stays after a reload for this route; only its one key is written', async ({ page }) => {
   const trip = await prepStep(page);
+  // Trip announces its initial zone save independently of the checklist. Let it finish before taking the storage snapshot.
+  await page.waitForFunction((key) => {
+    const change = JSON.parse(localStorage.getItem(key) ?? 'null') as { section: string } | null;
+    return change?.section === 'day';
+  }, CHANGED_KEY);
   const before = await allLocal(page);
   expect(before[KEY]).toBeUndefined();
   await page.locator('[data-prep-item="kit"] label').click();

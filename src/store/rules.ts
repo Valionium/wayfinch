@@ -150,8 +150,8 @@ export const usableZones = (raw: unknown): ZoneSpan[] => (Array.isArray(raw) && 
 export const deviceZone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 /**
- * The zones times and dates are told in: the stored ones, or until Prepare this route has found them the phone's own, as the
- * departure date was set (sweep of 14 Nov 2026, #1), never UTC. Nothing is dropped by date on it: keptPositions reads the stored ones.
+ * Times and dates use the stored route zones. Until the lookup saves them, they use the phone's zone, as the departure date does
+ * (TRIP-LOCAL-ZONE). Kept positions are only dropped by date once the route's zones are stored.
  */
 export const zonesOrDevice = (spans: ZoneSpan[]): ZoneSpan[] => (spans.length > 0 ? spans
   : [{ fromKm: 0, toKm: Infinity, timeZone: deviceZone(), holidayZone: null, country: '' }]);
