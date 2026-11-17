@@ -5,6 +5,7 @@ import { atPosition, loadApp, preparedTrip, removeBuilds, withStore } from './he
 import type { LoadedApp } from './helpers.ts';
 import type { StoreInPage } from './fixtures/store-page.ts';
 import type { Page } from '@playwright/test';
+import { BOUNDARY_PATH } from '../../src/data/boundaries.ts';
 
 declare const __store: StoreInPage;
 declare const window: Window & { copy?: unknown; heard?: string[] };
@@ -156,4 +157,37 @@ test('[ST-DELETE] Prepare this route cannot recreate the database after another 
   expect((await prepare).at(-1)).toMatchObject({ step: 'places', ok: false });
   expect(await other.evaluate(async () => (await indexedDB.databases()).map((db) => db.name))).not.toContain('copilot');
   await other.close();
+});
+
+test.describe('En route follows a zone lookup in another tab', () => {
+  test.use({ timezoneId: 'America/New_York', serviceWorkers: 'block' });
+
+  test('[TRIP-LOCAL-ZONE] an open En route tab switches to the route\'s zone as soon as Trip stores it', async ({ page, context }) => {
+    // 23:30 on 14 July in New York, already 05:30 on the trip's first day in Heidelberg.
+    const now = new Date('2026-07-15T03:30:00Z');
+    await page.clock.setFixedTime(now);
+    app = await loadApp(page, { launch: true, path: '/#/ahead' });
+    await preparedTrip(page, 'heidelberg-strasbourg', { departureDate: '2026-07-15' });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const strip = page.locator('[data-strip] .ah-strip-label');
+    await expect(strip).toHaveText('Day 1');
+
+    const trip = await context.newPage();
+    await trip.clock.setFixedTime(now);
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const boundaries = `**${BOUNDARY_PATH}`;
+    await trip.route(boundaries, async (route) => { await held; await route.continue(); });
+    try {
+      await Promise.all([trip.waitForRequest(boundaries), trip.goto(`${app.origin}/#/trip`, { waitUntil: 'domcontentloaded' })]);
+      await expect(strip).toHaveText('Day 1');
+
+      release();
+      await expect(trip.locator('[data-trip-line]')).toContainText('Starts today');
+      await expect(strip).toHaveText('Today');
+    } finally {
+      release();
+      await trip.close();
+    }
+  });
 });
